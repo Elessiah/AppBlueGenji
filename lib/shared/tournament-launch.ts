@@ -1,6 +1,6 @@
 /**
- * Abréger les étapes pré-`RUNNING` d'un tournoi pour le lancer sur-le-champ —
- * logique pure, partagée.
+ * « Avancer le tournoi » : faire franchir à un tournoi l'étape suivante de son
+ * avant-course, sur-le-champ — logique pure, partagée.
  *
  * Un tournoi traverse quatre étapes avant de commencer — masqué, annoncé,
  * inscriptions, clôture (`tournament-progress.ts`) — et rien ne permettait de
@@ -25,8 +25,13 @@
  *   passage, il ne devient jamais « en cours et invisible » ;
  * - un tournoi déjà dans l'entre-deux (inscriptions closes, début à venir) ne
  *   voit pas ses inscriptions rouvertes rétroactivement ;
- * - n'importe laquelle des quatre étapes peut donc être le point de départ, et
- *   toutes celles qui restaient sont franchies d'un coup.
+ * - n'importe laquelle des quatre étapes peut donc être le point de départ.
+ *
+ * Le geste avance **d'une étape** (`advanceTarget`) et non jusqu'au coup
+ * d'envoi : masqué ou annoncé → inscriptions, inscriptions → clôture, clôture →
+ * en cours. Il se répète, ce qui laisse au staff le temps d'ouvrir les
+ * inscriptions d'un tournoi encore masqué, puis de relire le seeding une fois
+ * les inscriptions closes, avant de lancer.
  *
  * L'état n'est jamais écrit à la main : ce sont les dates qui font foi partout
  * ailleurs (`tournament-state.ts`), et un état posé de force serait défait à la
@@ -35,16 +40,12 @@
  * `syncTournamentState` lance le tournoi comme il l'aurait fait à l'heure dite.
  *
  * Module pur : l'interface s'en sert pour n'afficher le bouton que lorsqu'il
- * mène quelque part et pour nommer ce qui va être sauté, le serveur pour
- * rejouer la règle sous verrou.
+ * mène quelque part et pour nommer l'étape qui vient, le serveur pour rejouer
+ * la règle sous verrou.
  */
 import { MIN_ENTRANTS_FOR_MATCHES } from "./constants";
 import { computeTournamentState, type TournamentStateInput } from "./tournament-state";
-import {
-  computeTournamentProgress,
-  TOURNAMENT_STAGE_ORDER,
-  type TournamentStageKey,
-} from "./tournament-progress";
+import { computeTournamentProgress, type TournamentStageKey } from "./tournament-progress";
 import type { TournamentState } from "./types";
 
 /**
@@ -144,41 +145,7 @@ export function launchBlockReason(
   return null;
 }
 
-/**
- * Étapes d'avant-course que le lancement va franchir d'un coup, de celle où le
- * tournoi se trouve jusqu'à la dernière avant « En cours ».
- *
- * L'étape courante en fait partie : elle est **abrégée**, pas sautée — mais du
- * point de vue de qui confirme, la distinction ne change rien, ce sont les
- * étapes qui n'auront pas lieu comme prévu.
- *
- * **Vide exactement quand `launchBlockReason` refuse**, et c'est ce refus qui
- * le décide, pas un second calcul qui lui ressemblerait. Les deux modules ne
- * traitent pas les dates abîmées de la même façon : `computeTournamentProgress`
- * remplace un jalon illisible par celui de son voisin (`orderedMilestones`)
- * pour que la frise reste dessinable, là où abréger s'y refuse. Sans cette
- * ligne, un tournoi aux dates corrompues rendrait une liste d'étapes bien
- * remplie sur une action que le serveur va refuser en 400 — et l'équivalence
- * annoncée ici serait plus forte que celle tenue.
- *
- * L'étape, elle, est bien celle de `computeTournamentProgress` et non l'état du
- * moteur : c'est la seule des deux à distinguer « masqué » d'« annoncé » et
- * l'avant de l'après-inscriptions — les quatre nuances dont il est justement
- * question ici.
- */
-export function abridgedStagesForLaunch(
-  tournament: LaunchableTournament,
-  now: number = Date.now(),
-): TournamentStageKey[] {
-  if (launchBlockReason(tournament, now) !== null) return [];
-
-  const runningIndex = TOURNAMENT_STAGE_ORDER.indexOf("RUNNING");
-  const { currentIndex } = computeTournamentProgress(tournament, { now });
-  if (currentIndex >= runningIndex) return [];
-  return TOURNAMENT_STAGE_ORDER.slice(currentIndex, runningIndex);
-}
-
-/** Raccourci de lecture : le tournoi peut-il être abrégé maintenant ? */
+/** Raccourci de lecture : le tournoi peut-il être avancé maintenant ? */
 export function canLaunchNow(tournament: LaunchableTournament, now: number = Date.now()): boolean {
   return launchBlockReason(tournament, now) === null;
 }
@@ -201,13 +168,85 @@ export function shortenScheduleForLaunch(
   tournament: LaunchableTournament,
   now: number = Date.now(),
 ): ShortenedSchedule {
-  const target = now - LAUNCH_BACKDATE_MS;
+  return shortenScheduleForAdvance(tournament, "RUNNING", now);
+}
 
-  const startAt = Math.min(timeOf(tournament.startAt), target);
-  const registrationCloseAt = Math.min(timeOf(tournament.registrationCloseAt), startAt);
-  const registrationOpenAt = Math.min(timeOf(tournament.registrationOpenAt), registrationCloseAt);
-  const startVisibilityAt = Math.min(timeOf(tournament.startVisibilityAt), registrationOpenAt);
+/**
+ * Étape où « Avancer le tournoi » mène, depuis l'étape courante.
+ *
+ * Le bouton n'abrège plus tout d'un coup : il fait franchir **une** étape, pour
+ * que le staff puisse ouvrir les inscriptions d'un tournoi encore masqué sans
+ * le lancer, puis clore les inscriptions (et relire le seeding) avant le coup
+ * d'envoi. Masqué et annoncé mènent tous deux aux **inscriptions** — un tournoi
+ * « annoncé » sans inscriptions n'est pas une étape où l'on s'arrête exprès.
+ */
+export type AdvanceTarget = Extract<TournamentStageKey, "REGISTRATION" | "LOCKED" | "RUNNING">;
 
+const ADVANCE_TARGETS: Partial<Record<TournamentStageKey, AdvanceTarget>> = {
+  HIDDEN: "REGISTRATION",
+  ANNOUNCED: "REGISTRATION",
+  REGISTRATION: "LOCKED",
+  LOCKED: "RUNNING",
+};
+
+/**
+ * Jalon qui fait entrer dans chaque étape cible, en index dans
+ * `[visibilité, ouverture, clôture, début]`.
+ */
+const TARGET_MILESTONE: Record<AdvanceTarget, number> = {
+  REGISTRATION: 1,
+  LOCKED: 2,
+  RUNNING: 3,
+};
+
+/**
+ * Étape suivante du tournoi, ou `null` quand il n'y a plus rien à avancer.
+ * `null` exactement quand `launchBlockReason` refuse : c'est ce refus qui le
+ * décide, pour les mêmes raisons que `abridgedStagesForLaunch`.
+ */
+export function advanceTarget(
+  tournament: LaunchableTournament,
+  now: number = Date.now(),
+): AdvanceTarget | null {
+  if (launchBlockReason(tournament, now) !== null) return null;
+  const { current } = computeTournamentProgress(tournament, { now });
+  return ADVANCE_TARGETS[current] ?? null;
+}
+
+/**
+ * Les jalons ramenés au plus tôt pour qu'à l'instant `now` le tournoi soit
+ * **dans l'étape cible** — ni avant, ni après.
+ *
+ * Même principe que `shortenScheduleForLaunch`, dont c'est la généralisation
+ * (cible `RUNNING`) : on ne fait jamais avancer une date, on ne fait que
+ * reculer celle qui ouvre l'étape visée, puis celles qui la précèdent, chacune
+ * bornée par la suivante. Les jalons postérieurs restent à venir : ouvrir les
+ * inscriptions ne touche ni leur clôture ni le coup d'envoi.
+ *
+ * Ne contrôle rien : appeler `advanceTarget` d'abord.
+ */
+export function shortenScheduleForAdvance(
+  tournament: LaunchableTournament,
+  target: AdvanceTarget,
+  now: number = Date.now(),
+): ShortenedSchedule {
+  const backdated = now - LAUNCH_BACKDATE_MS;
+  const pivot = TARGET_MILESTONE[target];
+  const times = [
+    tournament.startVisibilityAt,
+    tournament.registrationOpenAt,
+    tournament.registrationCloseAt,
+    tournament.startAt,
+  ].map(timeOf);
+
+  for (let index = times.length - 1; index >= 0; index -= 1) {
+    let value = times[index];
+    if (index <= pivot) value = Math.min(value, backdated);
+    if (index < times.length - 1) value = Math.min(value, times[index + 1]);
+    times[index] = value;
+  }
+
+  const [startVisibilityAt, registrationOpenAt, registrationCloseAt, startAt] = times;
   return {
     startVisibilityAt: new Date(startVisibilityAt).toISOString(),
     registrationOpenAt: new Date(registrationOpenAt).toISOString(),
@@ -231,4 +270,25 @@ export function shortenScheduleForLaunch(
  */
 export function willCloseWithoutMatches(entrantCount: number): boolean {
   return entrantCount < MIN_ENTRANTS_FOR_MATCHES;
+}
+
+/**
+ * Message rendu à l'organisateur une fois le tournoi avancé.
+ *
+ * Il se décide sur l'état **réellement atteint**, pas seulement sur l'étape
+ * visée : le moteur clôt sur-le-champ un plateau de moins de deux engagés, et
+ * annoncer « tournoi lancé » devant une fiche déjà terminée serait un démenti
+ * immédiat.
+ */
+export function advanceSuccessMessage(
+  target: AdvanceTarget,
+  state: TournamentState,
+  entrantCount: number,
+): string {
+  if (state === "FINISHED") {
+    return "Tournoi clos : il n'y avait pas assez d'engagés pour jouer un match.";
+  }
+  if (state === "RUNNING") return `Tournoi lancé avec ${entrantCount} engagés.`;
+  if (target === "REGISTRATION") return "Inscriptions ouvertes.";
+  return `Inscriptions closes avec ${entrantCount} engagés.`;
 }

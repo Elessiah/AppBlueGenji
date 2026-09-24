@@ -6,7 +6,8 @@ import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tourn
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { participantWording } from "@/lib/shared/participants";
-import { canLaunchNow } from "@/lib/shared/tournament-launch";
+import { advanceTarget } from "@/lib/shared/tournament-launch";
+import { TOURNAMENT_STAGE_META } from "@/lib/shared/tournament-progress";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
 import { registerBlockedNotice } from "../_lib/register-entry";
@@ -41,7 +42,7 @@ interface TournamentHeaderProps {
   onReportIssue: () => void;
   onGuestRegister: () => void;
   /** Abréger le calendrier et démarrer sur-le-champ (staff `tournaments`). */
-  onLaunchNow: () => void;
+  onAdvance: () => void;
   onLiveSaved: () => void;
   /** Ouvre le réglage de l'image (illustration ou logo) (staff `tournaments`). */
   onEditImage: () => void;
@@ -77,7 +78,7 @@ export function TournamentHeader({
   onRegister,
   onReportIssue,
   onGuestRegister,
-  onLaunchNow,
+  onAdvance,
   onLiveSaved,
   onEditImage,
 }: TournamentHeaderProps) {
@@ -88,6 +89,7 @@ export function TournamentHeader({
   // Le seul refus d'inscription qui ne se lise pas tout seul sur la page :
   // avoir une équipe sans en avoir la charge (`_lib/register-entry.ts`).
   const registerNotice = frozen ? null : registerBlockedNotice(detail);
+  const nextStage = advanceTarget(card);
   const showEdit = canShowEditButton(card, detail.isAdmin);
   // L'image se règle dans tous les états, contrairement au formulaire : elle
   // est décorative et n'engage aucune règle du moteur.
@@ -191,21 +193,22 @@ export function TournamentHeader({
               {wording.guestCta}
             </CyberButton>
           )}
-          {/* Lancement anticipé. Le bouton n'apparaît que là où il mène quelque
-              part — même principe que « Modifier » : pas de bouton grisé sur un
-              tournoi déjà en cours. La règle vient du module pur partagé, que le
-              serveur rejoue sous verrou (`lib/shared/tournament-launch.ts`). */}
-          {detail.isAdmin && !frozen && canLaunchNow(card) && (
+          {/* Avancée anticipée : fait franchir l'étape suivante (inscriptions,
+              clôture, coup d'envoi). Le bouton n'apparaît que là où il mène
+              quelque part — même principe que « Modifier » : pas de bouton grisé
+              sur un tournoi déjà en cours. La règle vient du module pur partagé,
+              que le serveur rejoue sous verrou (`lib/shared/tournament-launch.ts`). */}
+          {detail.isAdmin && !frozen && nextStage !== null && (
             <CyberButton
               variant="ghost"
-              onClick={onLaunchNow}
-              title="Abréger les étapes d'avant-course et démarrer le tournoi immédiatement."
+              onClick={onAdvance}
+              title={`Passer à l'étape suivante : ${TOURNAMENT_STAGE_META[nextStage].label}.`}
               style={{ fontSize: 13, padding: "8px 18px" }}
             >
               {/* Le chevron est décoratif : le lecteur d'écran doit entendre
                   l'action, pas « triangle pointant vers la droite ». Même
                   traitement que la flèche du bouton « Retour ». */}
-              <span aria-hidden="true">▶</span> Lancer maintenant
+              <span aria-hidden="true">▶</span> Avancer le tournoi
             </CyberButton>
           )}
           {/* Signalement : ouvert aux seuls engagés, à toute heure du tournoi —

@@ -59,6 +59,7 @@ import {
 } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { NumberInput } from "@/components/ui/number-input";
 
 /** Contrôles que peut désigner un refus de l'envoi. */
 const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
@@ -371,15 +372,14 @@ export function TournamentForm({
             </div>
             <div className="field">
               <label htmlFor="max-teams">{wording.maxLabel}</label>
-              <input
+              <NumberInput
                 id="max-teams"
-                type="number"
                 min={2}
                 max={256}
                 disabled={locked("maxTeams")}
                 value={maxTeams}
-                onChange={(e) => {
-                  setMaxTeams(Number(e.target.value));
+                onValueChange={(next) => {
+                  setMaxTeams(next);
                   fieldErrors.clear("maxTeams");
                 }}
                 {...fieldAttrs("maxTeams")}
@@ -431,16 +431,14 @@ export function TournamentForm({
                 <label htmlFor="match-format-value">
                   {matchFormatType === "BO" ? "Manches jouées (impair)" : "Manches à gagner"}
                 </label>
-                <input
+                <NumberInput
                   id="match-format-value"
-                  type="number"
                   min={MATCH_FORMAT_BOUNDS[matchFormatType].min}
                   max={MATCH_FORMAT_BOUNDS[matchFormatType].max}
                   step={matchFormatType === "BO" ? 2 : 1}
                   disabled={locked("matchFormat")}
                   value={matchFormatValue}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
+                  onValueChange={(value) => {
                     setLastMatchFormatValue(value);
                     patchMatchFormat({ value });
                     fieldErrors.clear("matchFormatValue");
@@ -477,15 +475,13 @@ export function TournamentForm({
               naturalMaxMaps(matchFormat!) > matchWinsRequired(matchFormat!) && (
               <div className="field">
                 <label htmlFor="match-format-max-maps">Maps décisives au maximum</label>
-                <input
+                <NumberInput
                   id="match-format-max-maps"
-                  type="number"
                   min={matchWinsRequired(matchFormat!)}
                   max={naturalMaxMaps(matchFormat!)}
                   disabled={locked("matchFormat")}
                   value={matchMaxMaps(matchFormat!)}
-                  onChange={(e) => {
-                    const value = Number(e.target.value);
+                  onValueChange={(value) => {
                     // Le plafond naturel n'est pas un réglage : le stocker
                     // ferait porter à la ligne une contrainte qui n'en est pas
                     // une, et l'étiquette du tournoi afficherait « FT3 · 5 maps »
@@ -602,14 +598,13 @@ export function TournamentForm({
             {!isSolo && (
               <div className="field">
                 <label htmlFor="registration-min-players">Joueurs minimum dans l&apos;équipe</label>
-                <input
+                <NumberInput
                   id="registration-min-players"
-                  type="number"
                   min={MIN_PLAYERS_BOUNDS.min}
                   max={MIN_PLAYERS_BOUNDS.max}
                   disabled={locked("registrationMinPlayers")}
                   value={values.registrationMinPlayers}
-                  onChange={(e) => set("registrationMinPlayers", Number(e.target.value))}
+                  onValueChange={(next) => set("registrationMinPlayers", next)}
                   aria-describedby="registration-min-players-hint"
                   {...lockedAttr("registrationMinPlayers")}
                 />

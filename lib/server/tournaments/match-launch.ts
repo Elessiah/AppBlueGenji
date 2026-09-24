@@ -149,20 +149,54 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
   }
 }
 
+/** Colonnes propres à la ligne du match, relues sous verrou par `lockLaunchMatch`. */
+const LAUNCH_MATCH_OWN_COLUMNS = `
+  m.id, m.tournament_id, m.status, m.is_bye, m.team1_id, m.team2_id,
+  m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
+  m.team2_ready_at, m.caster_user_id, m.caster_ready_at, m.host_team_id`;
+
 /**
- * Relit le match **sous verrou** de sa seule ligne (`FOR UPDATE OF m`) : les
- * tables jointes ne sont que lues, et verrouiller la ligne du tournoi ferait
- * attendre tout le moteur derrière un clic sur « Prêt ».
+ * Relit le match **sous verrou** de sa seule ligne : les tables jointes ne sont
+ * que lues, et verrouiller la ligne du tournoi ferait attendre tout le moteur
+ * derrière un clic sur « Prêt ».
+ *
+ * Deux requêtes et non une jointure en `FOR UPDATE OF m` : la production tourne
+ * sous **MariaDB**, qui ne connaît pas la clause `OF` (erreur de syntaxe, qui
+ * faisait échouer tout lancement anticipé de tournoi), et un `FOR UPDATE` nu
+ * sur la jointure verrouillerait aussi le tournoi et les deux équipes. La ligne
+ * du match est donc lue seule sous verrou — lecture *courante*, jamais
+ * périmée —, puis l'état du tournoi et le statut fantôme des engagées par une
+ * lecture ordinaire : le premier est verrouillé par le moteur quand il compte
+ * (la transaction qui le modifie le voit), le second ne change pas.
  */
 async function lockLaunchMatch(
   connection: PoolConnection,
   matchId: number,
 ): Promise<LaunchMatchRow | null> {
   const [rows] = await connection.execute<LaunchMatchRow[]>(
-    `SELECT ${LAUNCH_MATCH_COLUMNS} ${LAUNCH_MATCH_FROM} WHERE m.id = ? LIMIT 1 FOR UPDATE OF m`,
+    `SELECT ${LAUNCH_MATCH_OWN_COLUMNS} FROM bg_matches m WHERE m.id = ? LIMIT 1 FOR UPDATE`,
     [matchId],
   );
-  return rows[0] ?? null;
+  const row = rows[0];
+  if (!row) return null;
+
+  const [context] = await connection.execute<
+    (RowDataPacket & {
+      tournament_state: string | null;
+      team1_is_ghost: number | null;
+      team2_is_ghost: number | null;
+    })[]
+  >(
+    `SELECT
+       (SELECT state FROM bg_tournaments WHERE id = ?) AS tournament_state,
+       (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team1_is_ghost,
+       (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost`,
+    [row.tournament_id, nullableId(row.team1_id), nullableId(row.team2_id)],
+  );
+  row.tournament_state = context[0]?.tournament_state ?? "";
+  row.team1_is_ghost = context[0]?.team1_is_ghost ?? null;
+  row.team2_is_ghost = context[0]?.team2_is_ghost ?? null;
+  return row;
 }
 
 async function inTransaction<T>(run: (connection: PoolConnection) => Promise<T>): Promise<T> {

@@ -1,28 +1,32 @@
 /**
- * Lancement anticipé d'un tournoi : abréger ses étapes d'avant-course
- * (masqué, annoncé, inscriptions, clôture), puis le démarrer.
+ * « Avancer le tournoi » : faire franchir au tournoi **l'étape suivante** de son
+ * avant-course — masqué ou annoncé → inscriptions, inscriptions → clôture,
+ * clôture → en cours.
  *
- * Le module n'invente aucun coup d'envoi. Il ramène les quatre jalons au plus
- * tôt (`lib/shared/tournament-launch.ts`, pur et partagé avec l'interface) puis
- * laisse `syncTournamentState` faire ce qu'il aurait fait à l'heure annoncée :
- * clôture d'un plateau désert, initialisation du format, génération de la
- * première manche, réconciliation. **Aucun format n'a donc à connaître le
- * lancement anticipé**, et un format ajouté demain en héritera sans une ligne
+ * Le module n'invente aucune transition. Il ramène au plus tôt le jalon qui
+ * ouvre l'étape visée, et ceux qui le précèdent (`lib/shared/tournament-launch.ts`,
+ * pur et partagé avec l'interface), puis laisse `syncTournamentState` faire ce
+ * qu'il aurait fait à l'heure annoncée : ouverture des inscriptions, clôture,
+ * ou coup d'envoi — clôture d'un plateau désert, initialisation du format,
+ * génération de la première manche. **Aucun format n'a donc à connaître
+ * l'avancée anticipée**, et un format ajouté demain en héritera sans une ligne
  * ici — c'est tout l'intérêt de passer par les dates plutôt que d'écrire
- * `state = 'RUNNING'` à la main, ce qu'une simple synchronisation viendrait de
- * toute façon défaire.
+ * `state` à la main, ce qu'une simple synchronisation viendrait de toute façon
+ * défaire.
  *
  * Tout tient dans une transaction, y compris la synchronisation : si
  * l'initialisation du format échoue, les dates abrégées sont annulées avec elle
- * et le tournoi reste aux inscriptions. Le contraire laisserait un tournoi
- * marqué « en cours » sans plateau ni classement.
+ * et le tournoi reste où il était. Le contraire laisserait un tournoi marqué
+ * « en cours » sans plateau ni classement.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { toIso } from "@/lib/server/serialization";
 import {
+  advanceTarget,
   launchBlockReason,
-  shortenScheduleForLaunch,
+  shortenScheduleForAdvance,
+  type AdvanceTarget,
   type LaunchableTournament,
 } from "@/lib/shared/tournament-launch";
 import type { TournamentState } from "@/lib/shared/types";
@@ -31,18 +35,20 @@ import { publishUpdatedEvent } from "./notifications";
 import { syncTournamentState } from "./state";
 import { validateDateOrder } from "./validation";
 
-/** Ce que le lancement a produit, pour le message rendu à l'organisateur. */
-export type LaunchedTournament = {
+/** Ce que l'avancée a produit, pour le message rendu à l'organisateur. */
+export type AdvancedTournament = {
   id: number;
   name: string;
+  /** Étape visée — celle dont le jalon d'entrée a été ramené à l'instant. */
+  target: AdvanceTarget;
   /**
-   * État **après** synchronisation. `RUNNING` dans le cas nominal, `FINISHED`
-   * si le plateau comptait moins de deux engagées : le tournoi est alors clos
+   * État **après** synchronisation. Pour un coup d'envoi : `RUNNING` dans le
+   * cas nominal, `FINISHED` si le plateau comptait moins de deux engagées : le tournoi est alors clos
    * sur-le-champ (`docs/features/UNDERFILLED_TOURNAMENTS.md`), et l'interface
    * doit le dire au lieu d'annoncer un tournoi en cours.
    */
   state: TournamentState;
-  /** Effectif au moment du lancement — celui qui joue, et pas un de plus. */
+  /** Effectif au moment de l'avancée — au coup d'envoi, celui qui joue. */
   entrantCount: number;
 };
 
@@ -93,7 +99,7 @@ async function countEntrants(
 }
 
 /**
- * Abrège les étapes d'avant-course du tournoi et le démarre immédiatement.
+ * Fait franchir au tournoi l'étape suivante de son avant-course.
  *
  * @throws `TOURNAMENT_NOT_FOUND` — identifiant inconnu.
  * @throws le code de `LaunchBlockReason` — la fenêtre de lancement est fermée.
@@ -101,7 +107,7 @@ async function countEntrants(
  *   construction, mais rien n'écrit de dates incohérentes dans `bg_tournaments`
  *   sans passer par ce contrôle, et ce n'est pas ici que l'exception commencera.
  */
-export async function launchTournamentNow(tournamentId: number): Promise<LaunchedTournament> {
+export async function advanceTournamentNow(tournamentId: number): Promise<AdvancedTournament> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -121,12 +127,17 @@ export async function launchTournamentNow(tournamentId: number): Promise<Launche
 
     // La règle est rejouée ici, sous verrou : l'interface a pu armer son bouton
     // sur un tournoi qui, depuis, a démarré tout seul.
-    const blocked = launchBlockReason(current);
+    const now = Date.now();
+    const blocked = launchBlockReason(current, now);
     if (blocked) throw new Error(blocked);
+    const target = advanceTarget(current, now);
+    // Filet : `advanceTarget` ne rend `null` que quand `launchBlockReason`
+    // refuse, contrôlé juste au-dessus.
+    if (!target) throw new Error("TOURNAMENT_ALREADY_STARTED");
 
     const entrantCount = await countEntrants(connection, tournamentId);
 
-    const shortened = shortenScheduleForLaunch(current);
+    const shortened = shortenScheduleForAdvance(current, target, now);
     const dateError = validateDateOrder(shortened);
     if (dateError) throw new Error(dateError);
 
@@ -144,10 +155,11 @@ export async function launchTournamentNow(tournamentId: number): Promise<Launche
       ],
     );
 
-    // Le coup d'envoi lui-même. La synchronisation relit la ligne dans cette
+    // La transition elle-même. La synchronisation relit la ligne dans cette
     // même transaction, y voit les jalons abrégés, et déroule son chemin
-    // ordinaire — journal Discord (`tournament_started`) compris : le lancement
-    // anticipé n'a pas d'entrée à lui, c'est le même fait accompli.
+    // ordinaire — journal Discord (`tournament_started`) compris au coup
+    // d'envoi : l'avancée anticipée n'a pas d'entrée à lui, c'est le même fait
+    // accompli.
     const { row: synced } = await syncTournamentState(connection, tournamentId);
 
     await connection.commit();
@@ -161,10 +173,11 @@ export async function launchTournamentNow(tournamentId: number): Promise<Launche
     return {
       id: Number(row.id),
       name: row.name,
+      target,
       // `synced` ne peut être `null` que si le tournoi a disparu entre-temps,
       // ce que le verrou de ligne interdit. On se rabat malgré tout sur
-      // l'état calculé plutôt que de risquer un accès sur `null`.
-      state: synced?.state ?? "RUNNING",
+      // l'état lu sous verrou plutôt que de risquer un accès sur `null`.
+      state: synced?.state ?? current.state,
       entrantCount,
     };
   } catch (error) {
