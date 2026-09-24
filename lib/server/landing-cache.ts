@@ -11,7 +11,7 @@
  * sans importer le service, qui importe lui-même `tournaments-service` — le
  * cycle serait immédiat.
  */
-import { cached, invalidateCachedPrefix } from "@/lib/server/cache";
+import { cached, invalidateCached, invalidateCachedPrefix } from "@/lib/server/cache";
 
 const PREFIX = "landing:";
 
@@ -21,6 +21,13 @@ const PREFIX = "landing:";
  * l'ensemble (`tournaments/notifications.ts`).
  */
 export const LANDING_TTL_MS = 60_000;
+
+/**
+ * Clé du direct de la vitrine, partagée par son lecteur (`getLandingLive`) et
+ * son invalidateur ({@link invalidateLandingLive}) : écrite deux fois, elle
+ * pourrait diverger, et l'invalidation se ferait alors dans le vide.
+ */
+export const LANDING_LIVE_KEY = "live";
 
 /** Le direct fait exception : il porte le score en cours, on le garde court. */
 export const LANDING_LIVE_TTL_MS = 5_000;
@@ -40,4 +47,16 @@ export function cachedLanding<T>(key: string, ttlMs: number, loader: () => Promi
  */
 export function invalidateLandingAggregates(): void {
   invalidateCachedPrefix(PREFIX);
+}
+
+/**
+ * Oublie le seul direct de la vitrine (`getLandingLive`).
+ *
+ * Pour les écritures qui ne touchent qu'**un match** — sa chaîne, son antenne,
+ * son horaire : elles déplacent le bouton « Regarder le live », rien d'autre de
+ * l'accueil. Vider tout le préfixe pour elles relancerait compteurs, classement
+ * et ticker à chaque réglage de diffusion d'une soirée de tournoi.
+ */
+export function invalidateLandingLive(): void {
+  invalidateCached(`${PREFIX}${LANDING_LIVE_KEY}`);
 }

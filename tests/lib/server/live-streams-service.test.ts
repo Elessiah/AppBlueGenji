@@ -9,7 +9,7 @@ import {
   setMatchOnAir,
   setTournamentLiveUrl,
 } from "@/lib/server/tournaments/live-streams";
-import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent, publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 async function mockDb(execute: SqlMock) {
@@ -112,7 +112,9 @@ describe("setMatchLiveConfig", () => {
     // direct ne doit pas couper l'antenne déjà ouverte.
     expect(sql).not.toMatch(/live_started_at/);
     expect(params).toEqual(["MANUAL", "https://kick.com/bg", 42]);
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
+    // Un réglage d'antenne ne touche que le plateau et le direct de l'accueil.
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("referme l'antenne en passant en AUTO — elle n'y a plus de sens", async () => {
@@ -161,7 +163,7 @@ describe("setMatchLiveConfig", () => {
       "MATCH_START_AT_REQUIRED",
     );
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("laisse démarquer un match sans date — l'impasse doit rester réversible", async () => {
@@ -250,7 +252,9 @@ describe("setMatchOnAir", () => {
     expect(sql).toMatch(/UPDATE bg_matches SET live_started_at = \?/);
     expect(params[0]).toBeInstanceOf(Date);
     expect(params[1]).toBe(42);
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
+    // Un réglage d'antenne ne touche que le plateau et le direct de l'accueil.
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("referme l'antenne en reposant NULL", async () => {

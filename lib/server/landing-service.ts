@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/server/database";
 import { tournamentAudience } from "@/lib/server/tournament-broadcast";
 import {
   cachedLanding,
+  LANDING_LIVE_KEY,
   LANDING_LIVE_TTL_MS,
   LANDING_TTL_MS,
 } from "@/lib/server/landing-cache";
@@ -169,7 +170,7 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
  * perdent rien : `listTournamentBuckets` la leur resert depuis le cache.
  */
 export async function getLandingLive(): Promise<LandingLive | null> {
-  return cachedLanding("live", LANDING_LIVE_TTL_MS, () => loadLandingLive());
+  return cachedLanding(LANDING_LIVE_KEY, LANDING_LIVE_TTL_MS, () => loadLandingLive());
 }
 
 async function loadLandingLive(): Promise<LandingLive | null> {

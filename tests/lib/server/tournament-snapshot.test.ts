@@ -117,6 +117,7 @@ beforeEach(() => {
     row: runningRow(),
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
   jest.mocked(getTournamentListRow).mockResolvedValue(listRow());
   jest.mocked(getRegistrationRows).mockResolvedValue([]);
@@ -245,6 +246,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
       row: runningRow(),
       stateChanged: true,
       contentChanged: false,
+      launchesChanged: false,
     });
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
@@ -263,11 +265,28 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
       row: runningRow({ bracket_size: 8 }),
       stateChanged: false,
       contentChanged: true,
+      launchesChanged: false,
     });
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
     expect(invalidateTournamentLists).toHaveBeenCalled();
+  });
+
+  it("ne touche pas aux listes pour un simple lancement de match", async () => {
+    // Un lancement ne change que ce plateau, qui est justement en train d'être
+    // reconstruit : aucune carte de la liste ne le montre.
+    jest.mocked(hasPendingStateTransition).mockResolvedValue(true);
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: runningRow(),
+      stateChanged: false,
+      contentChanged: false,
+      launchesChanged: true,
+    });
+
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+    expect(invalidateTournamentLists).not.toHaveBeenCalled();
   });
 
   it("ne touche pas aux listes quand rien n'a basculé", async () => {
@@ -291,6 +310,7 @@ describe("getTournamentSnapshot — provenance de l'ordre de seeding", () => {
       row: runningRow({ format: "SWISS" }),
       stateChanged: false,
       contentChanged: false,
+      launchesChanged: false,
     });
     jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ format: "SWISS" }));
 
@@ -308,6 +328,7 @@ describe("getTournamentSnapshot — provenance de l'ordre de seeding", () => {
       row: runningRow({ format: "SWISS", manual_seeding: 1 }),
       stateChanged: false,
       contentChanged: false,
+      launchesChanged: false,
     });
     jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ format: "SWISS" }));
 
@@ -329,6 +350,7 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
       row,
       stateChanged: false,
       contentChanged: false,
+      launchesChanged: false,
     });
     jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ format, state }));
   }

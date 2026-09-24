@@ -33,8 +33,10 @@ disparaître sans écriture — et le rejouer le fait revenir.
   arrière passé entre la lecture et l'écriture ne laisse pas un lien se poser
   sur un match rouvert.
 - `400 INVALID_REPLAY_URL`, `404 MATCH_NOT_FOUND`.
-- `publishUpdatedEvent` : le lien voyage ensuite dans l'instantané du flux SSE
-  (`BracketMatch.replayUrl`), comme le reste du plateau.
+- `publishMatchUpdatedEvent` : le lien voyage ensuite dans l'instantané du flux
+  SSE (`BracketMatch.replayUrl`), comme le reste du plateau — sans vider la
+  liste publique, la vitrine ni le classement, qu'une rediff ne change pas
+  (`REALTIME_REFRESH.md`).
 
 ## Interface
 

@@ -20,7 +20,7 @@ import {
   type MatchLiveTrigger,
 } from "@/lib/shared/live-streams";
 import type { MatchStatus } from "@/lib/shared/types";
-import { publishUpdatedEvent } from "./notifications";
+import { publishMatchUpdatedEvent, publishUpdatedEvent } from "./notifications";
 
 /** Cible du bouton d'accueil : un tournoi en cours réellement à l'antenne. */
 export type BroadcastingTournament = {
@@ -143,7 +143,7 @@ export async function setMatchLiveConfig(
        WHERE id = ?`,
       [matchId],
     );
-    publishUpdatedEvent(Number(row.tournament_id));
+    publishMatchUpdatedEvent(Number(row.tournament_id), { onAir: true });
     return;
   }
 
@@ -169,7 +169,7 @@ export async function setMatchLiveConfig(
     );
   }
 
-  publishUpdatedEvent(Number(row.tournament_id));
+  publishMatchUpdatedEvent(Number(row.tournament_id), { onAir: true });
 }
 
 /**
@@ -193,7 +193,7 @@ export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<vo
     matchId,
   ]);
 
-  publishUpdatedEvent(Number(row.tournament_id));
+  publishMatchUpdatedEvent(Number(row.tournament_id), { onAir: true });
 }
 
 /**

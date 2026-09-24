@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
-import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listViewerMatchLaunches } from "@/lib/server/tournaments/match-launch-info";
 import { fakeConnection } from "../../helpers/sql-double";
 
@@ -314,7 +314,7 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
     state.candidates = [candidate({ lobby_opened_at: null })];
     await listViewerMatchLaunches(viewer);
     expect(state.writes.some((w) => w.includes("SET lobby_opened_at = NOW()"))).toBe(true);
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it("lance d'office un match dont le délai est échu", async () => {
@@ -326,6 +326,6 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
   it("n'écrit rien quand rien n'est dû", async () => {
     await listViewerMatchLaunches(viewer);
     expect(state.writes).toEqual([]);
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 });

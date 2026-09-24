@@ -27,7 +27,7 @@ import {
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
 import type { MatchStatus, TeamRole } from "@/lib/shared/types";
-import { publishUpdatedEvent } from "./notifications";
+import { publishMatchUpdatedEvent } from "./notifications";
 
 export type LaunchMatchRow = RowDataPacket & {
   id: number;
@@ -331,7 +331,7 @@ export async function setMatchReady(
     const launchedNow = ready ? await launchIfAllReady(connection, matchId) : false;
     return { tournamentId: Number(row.tournament_id), launched: launchedNow };
   });
-  publishUpdatedEvent(tournamentId);
+  publishMatchUpdatedEvent(tournamentId);
   return { launched };
 }
 
@@ -359,7 +359,7 @@ export async function forceLaunchMatch(matchId: number): Promise<void> {
     );
     return Number(row.tournament_id);
   });
-  publishUpdatedEvent(tournamentId);
+  publishMatchUpdatedEvent(tournamentId);
 }
 
 type CasterIdentityRow = RowDataPacket & {
@@ -436,7 +436,7 @@ export async function claimMatchCast(
     );
     return Number(row.tournament_id);
   });
-  publishUpdatedEvent(tournamentId);
+  publishMatchUpdatedEvent(tournamentId);
 }
 
 /**
@@ -463,7 +463,7 @@ export async function releaseMatchCast(
     if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
     return Number(row.tournament_id);
   });
-  publishUpdatedEvent(tournamentId);
+  publishMatchUpdatedEvent(tournamentId);
 }
 
 /**
@@ -489,7 +489,7 @@ export async function setMatchHost(matchId: number, teamId: number | null): Prom
     ]);
     return Number(row.tournament_id);
   });
-  publishUpdatedEvent(tournamentId);
+  publishMatchUpdatedEvent(tournamentId);
 }
 
 /**

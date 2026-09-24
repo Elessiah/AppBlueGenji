@@ -61,6 +61,7 @@ function mockTournamentState(row: RowOverrides<TournamentRow>): void {
     row: tournamentRow(row),
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
 }
 

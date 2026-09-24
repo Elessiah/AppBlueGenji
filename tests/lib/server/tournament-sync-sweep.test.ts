@@ -31,14 +31,18 @@ async function runSweep(options: {
   failOn?: number[];
   changed?: number[];
   contentChanged?: number[];
+  launchesChanged?: number[];
 }): Promise<{
   connection: Connection;
   synced: number[];
   /** Publications observées, avec le nombre de commits déjà faits à cet instant. */
   published: { tournamentId: number; commits: number }[];
+  /** Publications « match seul » (lancements), mêmes conventions. */
+  matchPublished: { tournamentId: number; commits: number }[];
 }> {
   const synced: number[] = [];
   const published: { tournamentId: number; commits: number }[] = [];
+  const matchPublished: { tournamentId: number; commits: number }[] = [];
   let connection!: Connection;
 
   await jest.isolateModulesAsync(async () => {
@@ -49,6 +53,9 @@ async function runSweep(options: {
     jest.doMock("@/lib/server/tournaments/notifications", () => ({
       publishUpdatedEvent: jest.fn((tournamentId: number) => {
         published.push({ tournamentId, commits: connection.commit.mock.calls.length });
+      }),
+      publishMatchUpdatedEvent: jest.fn((tournamentId: number) => {
+        matchPublished.push({ tournamentId, commits: connection.commit.mock.calls.length });
       }),
       publishScoreReportedEvent: jest.fn(),
       publishScoreResolvedEvent: jest.fn(),
@@ -64,6 +71,7 @@ async function runSweep(options: {
           row: null,
           stateChanged: options.changed?.includes(tournamentId) ?? false,
           contentChanged: options.contentChanged?.includes(tournamentId) ?? false,
+          launchesChanged: options.launchesChanged?.includes(tournamentId) ?? false,
         };
       }),
     }));
@@ -92,7 +100,7 @@ async function runSweep(options: {
     clearCache();
   });
 
-  return { connection, synced, published };
+  return { connection, synced, published, matchPublished };
 }
 
 beforeEach(() => {
@@ -152,9 +160,46 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
   });
 
   it("ne publie rien quand l'entretien n'a rien fait", async () => {
-    const { published } = await runSweep({ candidates: [4, 5] });
+    const { published, matchPublished } = await runSweep({ candidates: [4, 5] });
 
     expect(published).toEqual([]);
+    expect(matchPublished).toEqual([]);
+  });
+
+  // Un délai de lancement ouvert ou un match lancé d'office tombe à l'heure de
+  // chaque manche. Publié comme une mise à jour du tournoi, il vidait la liste
+  // publique, la vitrine et le classement du site à chaque fois — alors qu'il
+  // ne change que le plateau de ce tournoi.
+  it("publie un lancement comme un changement de match, après le commit", async () => {
+    const { published, matchPublished } = await runSweep({
+      candidates: [4],
+      launchesChanged: [4],
+    });
+
+    expect(published).toEqual([]);
+    expect(matchPublished).toEqual([{ tournamentId: 4, commits: 1 }]);
+  });
+
+  it("ne double pas la publication quand le tournoi a aussi changé d'état", async () => {
+    const { published, matchPublished } = await runSweep({
+      candidates: [4],
+      changed: [4],
+      launchesChanged: [4],
+    });
+
+    // La mise à jour complète vide déjà l'instantané et réveille la salle.
+    expect(published).toEqual([{ tournamentId: 4, commits: 1 }]);
+    expect(matchPublished).toEqual([]);
+  });
+
+  it("ne publie pas le lancement d'un tournoi dont la transaction a échoué", async () => {
+    const { matchPublished } = await runSweep({
+      candidates: [1, 2],
+      launchesChanged: [1, 2],
+      failOn: [2],
+    });
+
+    expect(matchPublished).toEqual([{ tournamentId: 1, commits: 1 }]);
   });
 
   it("ne publie pas un tournoi dont la transaction a échoué", async () => {
@@ -194,6 +239,7 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
           row: null,
           stateChanged: false,
           contentChanged: false,
+          launchesChanged: false,
         })),
       }));
       jest.doMock("@/lib/server/database", () => {

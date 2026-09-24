@@ -13,7 +13,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { canHaveReplay, normalizeReplayUrl } from "@/lib/shared/match-replay";
 import type { MatchStatus } from "@/lib/shared/types";
-import { publishUpdatedEvent } from "./notifications";
+import { publishMatchUpdatedEvent } from "./notifications";
 
 type MatchReplayRow = RowDataPacket & {
   id: number;
@@ -78,6 +78,6 @@ export async function setMatchReplayUrl(
     throw new Error("MATCH_NOT_REPLAYABLE");
   }
 
-  publishUpdatedEvent(Number(row.tournament_id));
+  publishMatchUpdatedEvent(Number(row.tournament_id));
   return replayUrl;
 }

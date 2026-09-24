@@ -41,7 +41,7 @@ import {
   toLaunchInput,
   type LaunchMatchRow,
 } from "./match-launch";
-import { publishUpdatedEvent } from "./notifications";
+import { publishMatchUpdatedEvent } from "./notifications";
 
 /**
  * Horizon d'anticipation : un match dont l'heure tombe dans l'heure est déjà
@@ -226,7 +226,7 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
     try {
       const changed = await maintainMatchLaunches(connection, tournamentId);
       await connection.commit();
-      if (changed > 0) publishUpdatedEvent(tournamentId);
+      if (changed > 0) publishMatchUpdatedEvent(tournamentId);
     } catch (error) {
       await connection.rollback().catch(() => undefined);
       console.error("[match-launch] entretien impossible", error);

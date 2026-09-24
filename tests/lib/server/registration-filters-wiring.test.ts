@@ -104,6 +104,7 @@ function mockConnection(roster: Member[], overrides: RowOverrides<TournamentRow>
     row: tournament,
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
   jest.mocked(loadTournamentRow).mockResolvedValue(tournament);
 

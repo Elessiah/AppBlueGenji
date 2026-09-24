@@ -214,8 +214,8 @@ juste après l'écriture qui l'a rendue fausse.
 | `tournament-snapshot:<id>` | 3 s | toute publication d'événement du tournoi |
 | `tournaments-list:public` | 15 s | `updated` (plateau, inscrites, état), la création d'un tournoi, et une clôture détectée autour d'un score |
 | `landing:stats`, `landing:ticker`, `landing:leaderboard:<n>` | 60 s | — |
-| `landing:live` | 5 s | — |
-| `tournament-preview:<id>` | 3 s | toute publication d'événement du tournoi |
+| `landing:live` | 5 s | `updated`, et un changement de match qui touche l'antenne (chaîne, mode, ouverture, horaire) |
+| `tournament-preview:<id>` | 3 s | `updated` (inscrites, seeding) |
 | `showcase:sponsors`, `:about-stats`, `:about-pillars`, `:site-copy` | 60 s | toute écriture du staff |
 | `mini-bracket:<id>` | 15 s | — |
 
@@ -232,6 +232,31 @@ autour de leur transaction (`invalidateListsIfStateChanged`) plutôt que de fair
 remonter un « ça a fini » à travers les cinq orchestrations qui peuvent clore.
 La bascule d'état déclenchée par une simple lecture (`snapshot.ts`) rafraîchit
 les listes de la même façon.
+
+**Un changement de match ne vide rien d'autre que son plateau.** Lancement
+(« Prêt », lancement forcé ou d'office, ouverture du délai), hôte, caster,
+diffusion d'un match, horaire, rediff : ces écritures ne touchent ni
+`bg_tournaments`, ni les inscrites, ni un résultat. Elles passent donc par
+`publishMatchUpdatedEvent` (événement `match_updated`, distinct de `updated`
+pour qu'aucun abonné ne confonde les deux mesures), qui n'oublie que
+l'instantané du tournoi — plus le
+direct de l'accueil (`landing:live`) quand l'antenne bouge (`{ onAir: true }`).
+
+Elles passaient par `publishUpdatedEvent`, apparues avec le lancement des
+matchs, la diffusion et le calendrier. Or ce sont les écritures **les plus
+fréquentes** d'une soirée de tournoi — trois « Prêt » par manche, sans compter
+l'ouverture du délai à l'heure de chaque match —, et chacune vidait la liste
+publique, toute la vitrine et le **classement du site**, un rejeu de tous les
+matchs : les caches les plus rentables restaient froids au moment précis où le
+site est le plus lu, ce que la règle ci-dessus existe pour éviter.
+`syncTournamentState` rend pour la même raison un `launchesChanged` distinct de
+`contentChanged` : la passe d'entretien publie un lancement avec
+`publishMatchUpdatedEvent`, et la lecture de l'instantané ne vide plus les
+listes pour lui.
+
+**Règle pour une écriture nouvelle** : `publishUpdatedEvent` si elle change une
+colonne de `bg_tournaments`, les inscrites ou le tirage ; `publishScore…Event`
+si elle change un résultat ; `publishMatchUpdatedEvent` sinon.
 
 ### L'entretien passif réconcilie ce qu'il tranche
 

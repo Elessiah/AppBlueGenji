@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 
 import { setMatchStartAt } from "@/lib/server/tournaments/match-schedule";
-import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 async function mockDb(execute: SqlMock) {
@@ -43,7 +43,7 @@ describe("setMatchStartAt", () => {
     expect(params[0]).toBeInstanceOf(Date);
     expect((params[0] as Date).toISOString()).toBe("2026-08-29T18:30:00.000Z");
     expect(params[1]).toBe(42);
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
   });
 
   it("accepte la valeur brute d'un champ datetime-local", async () => {
@@ -62,7 +62,7 @@ describe("setMatchStartAt", () => {
     expect(await setMatchStartAt(42, null)).toBeNull();
     const [, params] = execute.mock.calls[1] as [string, unknown[]];
     expect(params[0]).toBeNull();
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
   });
 
   it("traite une chaîne vide comme un effacement — le formulaire renvoie « »", async () => {
@@ -101,7 +101,7 @@ describe("setMatchStartAt", () => {
 
     await expect(setMatchStartAt(42, "demain soir")).rejects.toThrow("INVALID_MATCH_START_AT");
     expect(execute).not.toHaveBeenCalled();
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("refuse une date hors bornes", async () => {
@@ -120,7 +120,7 @@ describe("setMatchStartAt", () => {
 
     await expect(setMatchStartAt(999, "2026-08-29T18:30:00Z")).rejects.toThrow("MATCH_NOT_FOUND");
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("programme un match déjà joué — la date est descriptive, pas prescriptive", async () => {

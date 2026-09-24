@@ -106,6 +106,7 @@ function mockConnection(
     row,
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
 
   return { execute, connection, sqls };

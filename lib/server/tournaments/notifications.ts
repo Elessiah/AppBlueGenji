@@ -9,7 +9,7 @@
  * afficher un score périmé.
  */
 import { publishTournamentEvent } from "@/lib/server/live";
-import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server/landing-cache";
 import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
@@ -38,6 +38,35 @@ export function publishUpdatedEvent(tournamentId: number): void {
   invalidateTeamRanking();
   publishTournamentEvent({
     type: "updated",
+    tournamentId,
+    emittedAt: new Date().toISOString(),
+  });
+}
+
+/**
+ * Un match a changé **sans que son résultat bouge** : lancement (« Prêt »,
+ * lancement forcé ou d'office), hôte, caster, diffusion, horaire, rediff.
+ *
+ * On n'oublie que l'instantané du tournoi. Ces écritures passaient par
+ * {@link publishUpdatedEvent}, qui vide aussi la liste publique, la vitrine,
+ * l'aperçu et le **classement du site** — un rejeu de tous les matchs — alors
+ * qu'aucune ne touche une colonne de `bg_tournaments`, les inscrites ou un
+ * résultat. Or ce sont les plus fréquentes d'une soirée de tournoi : trois
+ * « Prêt » par manche, plus l'antenne et l'horaire. Elles gardaient donc froids
+ * les caches les plus rentables du site au moment précis où il est le plus lu.
+ *
+ * `onAir` : l'écriture déplace l'état d'antenne d'un match (chaîne, mode,
+ * ouverture, horaire d'un mode `START_TIME`) — le direct de l'accueil, seul
+ * agrégat de la vitrine qui la lise, est alors oublié lui aussi.
+ */
+export function publishMatchUpdatedEvent(
+  tournamentId: number,
+  options: { onAir?: boolean } = {},
+): void {
+  invalidateTournamentSnapshot(tournamentId);
+  if (options.onAir) invalidateLandingLive();
+  publishTournamentEvent({
+    type: "match_updated",
     tournamentId,
     emittedAt: new Date().toISOString(),
   });

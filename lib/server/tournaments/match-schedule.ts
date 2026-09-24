@@ -20,7 +20,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { normalizeMatchStartAt } from "@/lib/shared/match-schedule";
 import { toIso } from "@/lib/server/serialization";
-import { publishUpdatedEvent } from "./notifications";
+import { publishMatchUpdatedEvent } from "./notifications";
 
 type MatchScheduleRow = RowDataPacket & {
   id: number;
@@ -80,6 +80,6 @@ export async function setMatchStartAt(
     }
   }
 
-  publishUpdatedEvent(Number(rows[0].tournament_id));
+  publishMatchUpdatedEvent(Number(rows[0].tournament_id), { onAir: true });
   return startAt;
 }

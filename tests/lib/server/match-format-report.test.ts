@@ -97,6 +97,7 @@ function mockTournament(matchFormat: FakeFormat, format: TournamentRow["format"]
     }),
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
 }
 

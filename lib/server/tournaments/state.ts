@@ -31,12 +31,33 @@ export function computeTournamentState(
   });
 }
 
+/**
+ * Ce que l'entretien a changé, pour que l'appelant publie **à la bonne
+ * mesure** après son commit.
+ *
+ * - `stateChanged` / `contentChanged` (plateau créé, manche tranchée par le
+ *   délai) touchent la liste publique, la vitrine ou le classement :
+ *   `publishUpdatedEvent`.
+ * - `launchesChanged` (délai de lancement ouvert, match lancé d'office) ne
+ *   touche que le plateau de ce tournoi : `publishMatchUpdatedEvent`. Ces
+ *   écritures tombent à l'heure de chaque manche ; les compter dans
+ *   `contentChanged` vidait à chaque fois les caches globaux du site.
+ */
+export type TournamentSyncResult = {
+  row: TournamentRow | null;
+  stateChanged: boolean;
+  contentChanged: boolean;
+  launchesChanged: boolean;
+};
+
 export async function syncTournamentState(
   connection: PoolConnection,
   tournamentId: number,
-): Promise<{ row: TournamentRow | null; stateChanged: boolean; contentChanged: boolean }> {
+): Promise<TournamentSyncResult> {
   const tournament = await loadTournamentRow(connection, tournamentId);
-  if (!tournament) return { row: null, stateChanged: false, contentChanged: false };
+  if (!tournament) {
+    return { row: null, stateChanged: false, contentChanged: false, launchesChanged: false };
+  }
 
   // Retenu pour la comparaison finale : l'entretien qui suit peut clore le
   // tournoi de son côté, et ses appelants s'appuient sur `stateChanged` pour
@@ -64,6 +85,7 @@ export async function syncTournamentState(
         row: await loadTournamentRow(connection, tournamentId),
         stateChanged: true,
         contentChanged: false,
+        launchesChanged: false,
       };
     }
   }
@@ -208,11 +230,12 @@ export async function syncTournamentState(
     return {
       row: refreshed,
       stateChanged: stateChanged || (refreshed !== null && refreshed.state !== stateAtEntry),
-      contentChanged: bracketCreated || resolvedByTimeout > 0 || launchesChanged > 0,
+      contentChanged: bracketCreated || resolvedByTimeout > 0,
+      launchesChanged: launchesChanged > 0,
     };
   }
 
-  return { row: tournament, stateChanged, contentChanged: false };
+  return { row: tournament, stateChanged, contentChanged: false, launchesChanged: false };
 }
 
 /**

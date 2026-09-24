@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/notifications");
 
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
-import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 const VIDEO = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
@@ -51,7 +51,7 @@ describe("setMatchReplayUrl", () => {
     const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
     expect(sql).toMatch(/SET replay_url = \? WHERE id = \? AND status = 'COMPLETED'/);
     expect(params).toEqual(["https://youtu.be/dQw4w9WgXcQ", 42]);
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it.each<[string | null]>([[null], [""], ["   "]])(
@@ -64,7 +64,7 @@ describe("setMatchReplayUrl", () => {
       const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
       expect(sql).toMatch(/SET replay_url = NULL WHERE id = \?$/);
       expect(params).toEqual([42]);
-      expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+      expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
     },
   );
 
@@ -76,7 +76,7 @@ describe("setMatchReplayUrl", () => {
       "INVALID_REPLAY_URL",
     );
     expect(execute).not.toHaveBeenCalled();
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("répond MATCH_NOT_FOUND sur un match inconnu", async () => {
@@ -98,7 +98,7 @@ describe("setMatchReplayUrl", () => {
 
     await expect(setMatchReplayUrl(42, VIDEO)).rejects.toThrow("MATCH_NOT_REPLAYABLE");
     expect(execute).toHaveBeenCalledTimes(1);
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("refuse si le match a été rouvert entre la lecture et l'écriture", async () => {
@@ -106,6 +106,6 @@ describe("setMatchReplayUrl", () => {
     await mockDb(execute);
 
     await expect(setMatchReplayUrl(42, VIDEO)).rejects.toThrow("MATCH_NOT_REPLAYABLE");
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 });
