@@ -126,8 +126,9 @@ function applyUpdate(state: World, sql: string, params: unknown[]) {
   }
 }
 
-function connectionFor(state: World): PoolConnection {
-  const execute = async (rawSql: string, params: unknown[] = []) => {
+/** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
+function executeFor(state: World) {
+  return async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     if (sql.startsWith("UPDATE")) {
       state.writes.push(sql);
@@ -170,8 +171,11 @@ function connectionFor(state: World): PoolConnection {
     }
     throw new Error(`requête inattendue : ${sql}`);
   };
+}
+
+function connectionFor(state: World): PoolConnection {
   return fakeConnection({
-    execute,
+    execute: executeFor(state),
     beginTransaction: async () => undefined,
     commit: async () => undefined,
     rollback: async () => undefined,
@@ -478,7 +482,7 @@ describe("maintainMatchLaunches", () => {
     // La lecture ordinaire voit l'empreinte vide ; le temps que l'entretien
     // écrive, un capitaine a validé son « Prêt » (empreinte posée).
     state.match = matchState({ launch_pairing: null, lobby_opened_at: null });
-    const base = connectionFor(state);
+    const base = executeFor(state);
     const connection = fakeConnection({
       execute: async (sql: string, params: unknown[] = []) => {
         if (sql.includes("FOR UPDATE OF m") && state.match) {
@@ -489,7 +493,7 @@ describe("maintainMatchLaunches", () => {
             team1_ready_at: STAMP,
           };
         }
-        return base.execute(sql, params);
+        return base(sql, params);
       },
     });
     await maintainMatchLaunches(connection, 7);
@@ -499,12 +503,12 @@ describe("maintainMatchLaunches", () => {
 
   it("parcourt les candidats dans un ordre fixe, pour verrouiller sans interblocage", async () => {
     const queries: string[] = [];
-    const base = connectionFor(state);
+    const base = executeFor(state);
     await maintainMatchLaunches(
       fakeConnection({
         execute: async (sql: string, params: unknown[] = []) => {
           queries.push(sql.replace(/\s+/g, " "));
-          return base.execute(sql, params);
+          return base(sql, params);
         },
       }),
       7,
