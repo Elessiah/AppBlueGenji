@@ -100,20 +100,13 @@ export const KNOWN_ISSUES: readonly KnownIssue[] = [
       "porte tous les textes du site au-dessus de 4,5:1.",
   },
   {
-    title: "Fiche d'un tournoi",
-    criterion: "RGAA 7.1 · WCAG 4.1.2",
+    title: "Erreurs de quelques formulaires",
+    criterion: "RGAA 11.10 · WCAG 3.3.1",
     detail:
-      "Une vérification automatique signale des rôles ARIA à contrôler sur le plateau d'un tournoi " +
-      "(listes et onglets) : certaines rencontres peuvent être mal annoncées par un lecteur d'écran.",
-    workaround: null,
-  },
-  {
-    title: "Titre des fiches d'équipe et de joueur",
-    criterion: "RGAA 8.6 · WCAG 2.4.2",
-    detail:
-      "Les fiches d'équipe et de joueur portent le titre de l'annuaire (« Équipes », « Joueurs ») : " +
-      "deux onglets ouverts sur deux fiches ne se distinguent pas.",
-    workaround: "Le nom de l'équipe ou du joueur est le premier titre de la page.",
+      "L'invitation d'un joueur dans une équipe, la certification du tag Discord et les phases " +
+      "d'un tournoi multi-phases annoncent leurs erreurs par une notification, sans encore signaler " +
+      "le champ en cause.",
+    workaround: "La notification, lue par les lecteurs d'écran, nomme la saisie à corriger.",
   },
   {
     title: "Parcours au lecteur d'écran",

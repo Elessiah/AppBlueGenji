@@ -100,6 +100,6 @@ RGAA 4.1.
 
 **Règle pour la suite** : une PR qui règle un point de `KNOWN_ISSUES` le retire
 et avance `ACCESSIBILITY_STATEMENT_DATE` ; une limite laissée pour plus tard qui
-gêne réellement un visiteur s'y ajoute. Deux entrées (fiche tournoi, titres des
-fiches) correspondent aux tâches 9 et 16, prises par une autre session : la PR
-qui les règle les retire d'ici.
+gêne réellement un visiteur s'y ajoute. Les formulaires que cette PR ne câble
+pas encore (tâche 10, remise dans `ACCESSIBILITE.md` pour sa part restante) y
+figurent : la PR qui les règle retire l'entrée.
