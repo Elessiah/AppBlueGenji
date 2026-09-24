@@ -91,9 +91,15 @@ function connectionFor(world: World): PoolConnection {
       return [world.viewerMemberships, []];
     }
     if (sql.startsWith("SELECT id FROM bg_teams WHERE solo_user_id")) return [world.viewerSolo, []];
-    if (sql.includes("FOR UPDATE OF m")) {
+    if (sql.includes("FOR UPDATE")) {
       // Relecture sous verrou d'un candidat par l'entretien.
       return [world.candidates.filter((c) => c.id === Number(params[0])), []];
+    }
+    if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
+      // Contexte du candidat relu hors verrou (tournoi, statut fantôme).
+      const [tournamentId, team1Id] = params.map(Number);
+      const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
+      return [c ? [{ tournament_state: c.tournament_state, team1_is_ghost: c.team1_is_ghost, team2_is_ghost: c.team2_is_ghost }] : [], []];
     }
     if (sql.includes("WHERE m.tournament_id = ?")) {
       // Entretien : candidats au lancement du tournoi.

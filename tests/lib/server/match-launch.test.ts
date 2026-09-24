@@ -155,6 +155,20 @@ function executeFor(state: World) {
         .map((m) => ({ team_id: m.teamId, roles_json: JSON.stringify(m.roles) }));
       return [rows.slice(0, 1), []];
     }
+    if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
+      // Contexte du match relu hors verrou (tournoi, statut fantôme).
+      const match = state.match;
+      return [
+        match
+          ? [{
+              tournament_state: match.tournament_state,
+              team1_is_ghost: match.team1_is_ghost,
+              team2_is_ghost: match.team2_is_ghost,
+            }]
+          : [],
+        [],
+      ];
+    }
     if (sql.includes("FROM bg_matches m") && sql.includes("WHERE m.tournament_id = ?")) {
       const match = state.match;
       const stale = match && match.launch_pairing !== `${match.team1_id}:${match.team2_id}`;
@@ -485,7 +499,7 @@ describe("maintainMatchLaunches", () => {
     const base = executeFor(state);
     const connection = fakeConnection({
       execute: async (sql: string, params: unknown[] = []) => {
-        if (sql.includes("FOR UPDATE OF m") && state.match) {
+        if (sql.includes("FOR UPDATE") && state.match) {
           state.match = {
             ...state.match,
             launch_pairing: `${TEAM1}:${TEAM2}`,
@@ -499,6 +513,34 @@ describe("maintainMatchLaunches", () => {
     await maintainMatchLaunches(connection, 7);
     expect(state.match?.team1_ready_at).toBe(STAMP);
     expect(state.writes.some((w) => w.includes("SET launch_pairing = ?"))).toBe(false);
+  });
+
+  it("verrouille la seule ligne du match, en SQL que MariaDB comprend", async () => {
+    const queries: string[] = [];
+    const base = executeFor(state);
+    await maintainMatchLaunches(
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          queries.push(sql.replace(/\s+/g, " ").trim());
+          return base(sql, params);
+        },
+      }),
+      7,
+    );
+    const locks = queries.filter((q) => /FOR UPDATE/.test(q));
+    expect(locks.length).toBeGreaterThan(0);
+    for (const lock of locks) {
+      // Pas de clause `OF` (erreur de syntaxe sous MariaDB, la production) ni
+      // de jointure : un `FOR UPDATE` nu sur une jointure verrouillerait aussi
+      // le tournoi et les équipes.
+      expect(lock).not.toMatch(/FOR UPDATE OF/);
+      expect(lock).not.toMatch(/JOIN/);
+      expect(lock).toMatch(/FROM bg_matches m WHERE m\.id = \?/);
+    }
+    // Le contexte (état du tournoi, fantômes) est relu sans verrou.
+    const context = queries.find((q) => q.includes("AS tournament_state") && !q.includes("FROM bg_matches"));
+    expect(context).toBeDefined();
+    expect(context).not.toMatch(/FOR UPDATE|LOCK IN SHARE MODE/);
   });
 
   it("parcourt les candidats dans un ordre fixe, pour verrouiller sans interblocage", async () => {

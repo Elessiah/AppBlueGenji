@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/state");
 jest.mock("@/lib/server/tournaments/bot-logs");
 
-import { launchTournamentNow } from "@/lib/server/tournaments/launch";
+import { advanceTournamentNow } from "@/lib/server/tournaments/advance";
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
@@ -21,17 +21,20 @@ type ExecuteMock = SqlMock;
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
-/** Ligne d'un tournoi aux inscriptions, coup d'envoi dans deux jours. */
+/**
+ * Ligne d'un tournoi aux inscriptions **closes**, coup d'envoi dans un jour :
+ * l'étape suivante est le lancement.
+ */
 function registrationRow(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
   const now = Date.now();
   return tournamentRow({
     id: 7,
     name: "BlueGenji Open",
-    state: "REGISTRATION",
+    state: "UPCOMING",
     start_visibility_at: new Date(now - 3 * DAY),
-    registration_open_at: new Date(now - DAY),
-    registration_close_at: new Date(now + DAY),
-    start_at: new Date(now + 2 * DAY),
+    registration_open_at: new Date(now - 2 * DAY),
+    registration_close_at: new Date(now - HOUR),
+    start_at: new Date(now + DAY),
     ...overrides,
   });
 }
@@ -70,7 +73,7 @@ function writtenMilestones(execute: ExecuteMock): Date[] {
   return (call as [string, unknown[]])[1].slice(0, 4) as Date[];
 }
 
-describe("launchTournamentNow", () => {
+describe("advanceTournamentNow", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // La synchronisation rend la ligne telle qu'elle est après lancement.
@@ -87,11 +90,12 @@ describe("launchTournamentNow", () => {
   it("abrège les jalons puis délègue le coup d'envoi à la synchronisation", async () => {
     const { execute, connection } = mockTournament(registrationRow(), 12);
 
-    const launched = await launchTournamentNow(7);
+    const launched = await advanceTournamentNow(7);
 
     expect(launched).toEqual({
       id: 7,
       name: "BlueGenji Open",
+      target: "RUNNING",
       state: "RUNNING",
       entrantCount: 12,
     });
@@ -108,7 +112,7 @@ describe("launchTournamentNow", () => {
   it("écrit des jalons qui font « en cours » dès l'instant du lancement", async () => {
     const { execute } = mockTournament(registrationRow());
 
-    await launchTournamentNow(7);
+    await advanceTournamentNow(7);
 
     const [startVisibilityAt, registrationOpenAt, registrationCloseAt, startAt] =
       writtenMilestones(execute);
@@ -116,7 +120,7 @@ describe("launchTournamentNow", () => {
     expect(
       computeTournamentState(
         {
-          state: "REGISTRATION",
+          state: "UPCOMING",
           registrationOpenAt,
           registrationCloseAt,
           startAt,
@@ -127,10 +131,74 @@ describe("launchTournamentNow", () => {
     expect(startVisibilityAt.getTime()).toBeLessThanOrEqual(registrationOpenAt.getTime());
   });
 
+  it("depuis les inscriptions, les clôt sans lancer le tournoi", async () => {
+    const now = Date.now();
+    const start = new Date(now + 2 * DAY);
+    const { execute } = mockTournament(
+      registrationRow({
+        state: "REGISTRATION",
+        registration_open_at: new Date(now - DAY),
+        registration_close_at: new Date(now + DAY),
+        start_at: start,
+      }),
+    );
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: registrationRow({ state: "UPCOMING" }),
+      stateChanged: true,
+      contentChanged: false,
+    });
+
+    await expect(advanceTournamentNow(7)).resolves.toMatchObject({
+      target: "LOCKED",
+      state: "UPCOMING",
+    });
+
+    const [, registrationOpenAt, registrationCloseAt, startAt] = writtenMilestones(execute);
+    expect(registrationCloseAt.getTime()).toBeLessThan(Date.now());
+    // Le coup d'envoi n'a pas bougé : clore n'est pas lancer.
+    expect(startAt.getTime()).toBe(start.getTime());
+    expect(
+      computeTournamentState(
+        { state: "REGISTRATION", registrationOpenAt, registrationCloseAt, startAt },
+        Date.now(),
+      ),
+    ).toBe("UPCOMING");
+  });
+
+  it("depuis l'étape « masqué », ouvre les inscriptions en publiant le tournoi", async () => {
+    const now = Date.now();
+    const { execute } = mockTournament(
+      registrationRow({
+        state: "UPCOMING",
+        start_visibility_at: new Date(now + DAY),
+        registration_open_at: new Date(now + 2 * DAY),
+        registration_close_at: new Date(now + 3 * DAY),
+        start_at: new Date(now + 4 * DAY),
+      }),
+    );
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: registrationRow({ state: "REGISTRATION" }),
+      stateChanged: true,
+      contentChanged: false,
+    });
+
+    await expect(advanceTournamentNow(7)).resolves.toMatchObject({
+      target: "REGISTRATION",
+      state: "REGISTRATION",
+    });
+
+    const [startVisibilityAt, registrationOpenAt, registrationCloseAt, startAt] =
+      writtenMilestones(execute);
+    expect(startVisibilityAt.getTime()).toBeLessThanOrEqual(registrationOpenAt.getTime());
+    expect(registrationOpenAt.getTime()).toBeLessThan(Date.now());
+    expect(registrationCloseAt.getTime()).toBeGreaterThan(Date.now());
+    expect(startAt.getTime()).toBeGreaterThan(registrationCloseAt.getTime());
+  });
+
   it("verrouille la ligne pour sérialiser deux lancements concurrents", async () => {
     const { execute } = mockTournament(registrationRow());
 
-    await launchTournamentNow(7);
+    await advanceTournamentNow(7);
 
     const select = execute.mock.calls
       .map((c) => String((c as [string])[0]))
@@ -141,7 +209,7 @@ describe("launchTournamentNow", () => {
   it("purge le journal Discord seulement après le commit", async () => {
     const { connection } = mockTournament(registrationRow());
 
-    await launchTournamentNow(7);
+    await advanceTournamentNow(7);
 
     // La synchronisation a pu réserver une ligne (départ, ou clôture faute
     // d'adversaires) : elle ne part qu'une fois la transaction acquise.
@@ -157,7 +225,7 @@ describe("launchTournamentNow", () => {
       contentChanged: false,
     });
 
-    await expect(launchTournamentNow(7)).resolves.toMatchObject({
+    await expect(advanceTournamentNow(7)).resolves.toMatchObject({
       state: "FINISHED",
       entrantCount: 1,
     });
@@ -172,7 +240,7 @@ describe("launchTournamentNow", () => {
       }),
     );
 
-    await expect(launchTournamentNow(7)).rejects.toThrow("TOURNAMENT_ALREADY_STARTED");
+    await expect(advanceTournamentNow(7)).rejects.toThrow("TOURNAMENT_ALREADY_STARTED");
 
     expect(execute.mock.calls.some((c) => /UPDATE bg_tournaments/.test(String((c as [string])[0])))).toBe(
       false,
@@ -185,7 +253,7 @@ describe("launchTournamentNow", () => {
   it("refuse un tournoi terminé", async () => {
     mockTournament(registrationRow({ state: "FINISHED" }));
 
-    await expect(launchTournamentNow(7)).rejects.toThrow("TOURNAMENT_ALREADY_FINISHED");
+    await expect(advanceTournamentNow(7)).rejects.toThrow("TOURNAMENT_ALREADY_FINISHED");
   });
 
   it("refuse un identifiant inconnu", async () => {
@@ -202,7 +270,7 @@ describe("launchTournamentNow", () => {
       getConnection: jest.fn(async () => connection),
     }));
 
-    await expect(launchTournamentNow(7)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
+    await expect(advanceTournamentNow(7)).rejects.toThrow("TOURNAMENT_NOT_FOUND");
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 
@@ -210,7 +278,7 @@ describe("launchTournamentNow", () => {
     const { connection } = mockTournament(registrationRow());
     jest.mocked(syncTournamentState).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
 
-    await expect(launchTournamentNow(7)).rejects.toThrow("ER_LOCK_DEADLOCK");
+    await expect(advanceTournamentNow(7)).rejects.toThrow("ER_LOCK_DEADLOCK");
 
     // Sans ce rollback, le tournoi resterait marqué « en cours » sans plateau
     // ni classement — le pire des deux mondes.

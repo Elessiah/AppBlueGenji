@@ -363,7 +363,7 @@ describe("acceptation — l'équipe doit encore exister", () => {
 
     const sqls = connection.execute.mock.calls.map(([sql]) => String(sql).replace(/\s+/g, " "));
     const user = sqls.findIndex((q) => /FROM bg_users WHERE id = \? FOR UPDATE/.test(q));
-    const team = sqls.findIndex((q) => /FROM bg_teams WHERE id = \? FOR SHARE/.test(q));
+    const team = sqls.findIndex((q) => /FROM bg_teams WHERE id = \? LOCK IN SHARE MODE/.test(q));
     const claim = sqls.findIndex((q) => /SET status = 'ACCEPTED'/.test(q));
     expect(user).toBe(0);
     expect(team).toBeGreaterThan(user);
