@@ -1231,13 +1231,8 @@ export async function updateOwnProfile(
 type SqlRunner = Pick<PoolConnection, "execute">;
 
 /**
- * Ce que ce compte laisse derrière lui, en **une** requête.
- *
- * Trois `EXISTS` indexés plutôt que trois allers-retours : la suppression est
- * un geste unique, ses trois questions se posent au même instant et sur le même
- * instantané. Les poser séparément laisserait un `await` entre elles — un
- * tournoi créé entre la deuxième et la troisième et la ligne partirait quand
- * même, sur une base qui la refuse.
+ * Les trois questions qui décident du sort d'un compte, en fragments SQL
+ * portant sur une colonne `u.id`.
  *
  * « A joué » se lit comme les statistiques le lisent : un match **compté**
  * (`playedMatchSql` — ni exemption, ni match fantôme, ni double forfait) d'une
@@ -1298,6 +1293,15 @@ function accountTraceSql(): { played: string; organized: string; owned: string }
   };
 }
 
+/**
+ * Ce que ce compte laisse derrière lui, en **une** requête.
+ *
+ * Trois `EXISTS` indexés plutôt que trois allers-retours : la suppression est
+ * un geste unique, ses trois questions se posent au même instant et sur le même
+ * instantané. Les poser séparément laisserait un `await` entre elles — un
+ * tournoi créé entre la deuxième et la troisième et la ligne partirait quand
+ * même, sur une base qui la refuse.
+ */
 async function loadAccountTrace(
   runner: SqlRunner,
   userId: number,
