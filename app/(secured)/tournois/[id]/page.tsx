@@ -22,6 +22,7 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
+import { isPreLaunchState } from "@/lib/shared/seeding";
 import {
   planRoundRollback,
   rollbackStageLabelWithArticle,
@@ -541,9 +542,8 @@ export default function TournamentDetailPage() {
 
   // Aperçu du plateau avant lancement, réservé au staff et au cast : le serveur
   // le laisse à `null` pour les autres, à qui le tirage ne doit rien révéler
-  // d'avance, et pour un tournoi déjà lancé. Deux endroits l'affichent — pendant
-  // les inscriptions et sur un tournoi encore sans match — d'où ce fragment
-  // unique plutôt que deux copies à faire évoluer de front.
+  // d'avance, et pour un tournoi déjà lancé. Il s'affiche sur tout l'avant-course
+  // (`isPreLaunchState`), inscriptions closes comprises.
   const previewBlock = detail.preview ? (
     <div style={{ marginTop: 18 }}>
       <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
@@ -615,13 +615,21 @@ export default function TournamentDetailPage() {
             <h2>{BOARD_TITLES[detail.card.format]}</h2>
           </div>
 
-          {detail.card.state === "REGISTRATION" ? (
+          {/* Tout l'avant-course, et pas seulement les inscriptions : un tournoi
+              aux inscriptions closes (`UPCOMING`) n'a pas davantage de plateau,
+              et c'est précisément le moment où le staff relit le tirage. Les
+              formats à classement chargent leurs métadonnées dès la création
+              (vides), si bien qu'une condition sur `REGISTRATION` seul faisait
+              tomber la clôture dans leur vue — sans match ni aperçu. */}
+          {isPreLaunchState(detail.card.state) ? (
             <>
               <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
                 {formatForBracket === "SURVIVAL"
                   ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
                   : detail.card.format === "BG_SURVIE"
-                    ? "Le classement de départ est celui du seeding ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
+                    ? detail.seedingSource === "MANUAL"
+                      ? "Le classement de départ est l'ordre fixé par le staff ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
+                      : "Le classement de départ est celui du site, dans l'ordre des inscriptions ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
                   : detail.card.format === "SWISS"
                     ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
                     : "Le bracket sera généré automatiquement au démarrage du tournoi."}
@@ -763,7 +771,6 @@ export default function TournamentDetailPage() {
               <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
                 {noMatchesLabel}
               </p>
-              {previewBlock}
             </>
           ) : (
             <>

@@ -7,6 +7,7 @@ import { Pill } from "@/components/cyber";
 import {
   isSeedOrderEffective,
   moveInOrder,
+  registrationsFollowRanking,
   seedingLockReason,
   SEEDING_SOURCE_LABELS,
   type SeedingLockReason,
@@ -196,6 +197,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
 
   const source = detail.seedingSource;
   const showsRealDraw = isSeedOrderEffective(source);
+  // Avant le coup d'envoi, le serveur range déjà la liste selon le classement
+  // du site : elle n'est plus l'ordre d'arrivée, mais le tirage prévu.
+  const followsRanking = registrationsFollowRanking(source, detail.card.state);
 
   // Une seule cellule d'actions, trois gabarits de grille : la poignée n'existe
   // qu'avec le réordonnancement, la cellule d'actions dès que l'une des deux
@@ -230,7 +234,15 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
                serveur renverrait sur une écriture tardive. */
             <p className={styles.hint}>{entrantRemovalBlockMessage(removalNotice)}</p>
           )}
-          {!showsRealDraw && rows.length > 0 && (
+          {followsRanking && rows.length > 0 && (
+            <p className={styles.hint}>
+              Rangées selon le classement du site : chaque nouvelle inscription prend sa
+              place de cote. L&apos;ordre peut encore bouger d&apos;ici le lancement si des
+              cotes changent ; réordonnez la liste pour le figer — votre ordre fera alors
+              autorité.
+            </p>
+          )}
+          {!showsRealDraw && !followsRanking && rows.length > 0 && (
             <p className={styles.warning}>
               Ce format seede depuis le classement du site : les rangs ci-dessous ne sont
               que l&apos;ordre d&apos;arrivée des inscriptions et ne seront pas ceux du

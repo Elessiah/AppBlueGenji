@@ -4,6 +4,7 @@ import {
   loadEntrantsBySiteRanking,
   loadRankingState,
   loadTeamRanking,
+  rankEntrantsBySiteRanking,
 } from "@/lib/server/ranking-service";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
@@ -746,5 +747,47 @@ describe("getTeamRankingPosition — part de parcours", () => {
     await mockDb(fakeDb([matchRow(1, 10, 20, 10)], [teamRow(10), teamRow(20)]));
 
     expect((await getTeamRankingPosition(10)).placementPoints).toBe(0);
+  });
+});
+
+describe("rankEntrantsBySiteRanking", () => {
+  it("range des lignes déjà chargées sans relire les inscriptions", async () => {
+    const execute = fakeDb([matchRow(1, 1, 2, 1), matchRow(2, 1, 3, 1), matchRow(3, 2, 3, 2)], [], []);
+    const rows = [
+      { teamId: 3, teamName: "Charlie", extra: "c" },
+      { teamId: 1, teamName: "Alpha", extra: "a" },
+      { teamId: 2, teamName: "Bravo", extra: "b" },
+    ];
+
+    const ordered = await rankEntrantsBySiteRanking({ execute }, rows);
+
+    expect(ordered.map((row) => row.teamId)).toEqual([1, 2, 3]);
+    // Les lignes sont rendues telles quelles : seules leurs places changent.
+    expect(ordered[0]).toBe(rows[1]);
+    expect(rows.map((row) => row.teamId)).toEqual([3, 1, 2]);
+    // Seules les lectures du rejeu (matchs, classements finaux) ont lieu : la
+    // liste des inscrites d'un tournoi n'est pas relue.
+    const sqls = execute.mock.calls.map(([sql]) => String(sql));
+    expect(sqls.every((sql) => sql.includes("AS played_at") || sql.includes("AS awarded_at"))).toBe(
+      true,
+    );
+  });
+
+  it("donne le même ordre que le chargeur qui lit les inscriptions", async () => {
+    const matches = [matchRow(1, 1, 2, 1), matchRow(2, 3, 1, 3)];
+    const entrants = [
+      { team_id: 1, team_name: "Alpha" },
+      { team_id: 2, team_name: "Bravo" },
+      { team_id: 3, team_name: "Charlie" },
+      { team_id: 4, team_name: "Delta" },
+    ];
+
+    const loaded = await loadEntrantsBySiteRanking({ execute: fakeDb(matches, [], entrants) }, 7);
+    const ranked = await rankEntrantsBySiteRanking(
+      { execute: fakeDb(matches, [], []) },
+      entrants.map((row) => ({ teamId: row.team_id, teamName: row.team_name })),
+    );
+
+    expect(ranked.map((row) => row.teamId)).toEqual(loaded.map((row) => row.teamId));
   });
 });

@@ -360,7 +360,7 @@ export type TeamHistoryRow = {
  * `bg_tournaments.manual_seeding` :
  *
  * - `MANUAL` — ordre fixé à la main par le staff, il fait autorité partout ;
- * - `RANKING` — classement du site (survie, ronde suisse, multi-phases) ;
+ * - `RANKING` — classement du site (survie, ronde suisse, BG Survie, multi-phases) ;
  * - `REGISTRATION` — ordre d'arrivée des inscriptions (formats à plateau).
  *
  * La règle qui le calcule vit dans `lib/shared/seeding.ts` ; le type est ici
@@ -549,8 +549,11 @@ export type TournamentSnapshot = {
   soloUserIds: Record<number, number>;
   /**
    * D'où vient l'ordre de seeding effectif. Sert à l'interface pour dire si la
-   * liste des inscrites, triée par `seed`, est bien celle que jouera le moteur —
-   * en `RANKING` elle ne l'est pas, le classement du site prend la main.
+   * liste des inscrites est bien celle que jouera le moteur. En `RANKING`, avant
+   * le coup d'envoi, l'instantané range `registrations` par le classement du
+   * site, rangs renumérotés (`registrationsFollowRanking`) : la liste est alors
+   * le tirage prévu. Une fois lancé, elle retombe sur la colonne `seed` (ordre
+   * d'arrivée), qui n'est pas le tirage.
    */
   seedingSource: SeedingSource;
   /**

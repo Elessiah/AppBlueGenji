@@ -32,7 +32,8 @@ import { cached, invalidateCached } from "@/lib/server/cache";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { toIso } from "@/lib/server/serialization";
 import { isSoloTournament } from "@/lib/shared/participants";
-import { seedingSource } from "@/lib/shared/seeding";
+import { registrationsFollowRanking, seedingSource } from "@/lib/shared/seeding";
+import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { mapCard, mapMatch, type TournamentRow } from "./_internal";
 import {
   getMatchRows,
@@ -256,17 +257,35 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
           ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
           : null;
 
+    const source = seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1);
+    const registrationRows: TournamentSnapshot["registrations"] = registrations.map((row) => ({
+      teamId: Number(row.team_id),
+      teamName: row.team_name,
+      logoUrl: localUploadUrl(row.logo_url),
+      seed: row.seed === null ? null : Number(row.seed),
+      registeredAt: toIso(row.registered_at)!,
+      finalRank: row.final_rank === null ? null : Number(row.final_rank),
+    }));
+
+    // Avant le coup d'envoi d'un tournoi seedé par le classement du site, la
+    // liste des inscrites **est** ce classement : chaque nouvelle engagée y
+    // prend sa place de cote, et non la dernière. Même tri que l'aperçu du
+    // plateau et que le moteur au lancement (`rankEntrantsBySiteRanking`, que
+    // `loadEntrantsBySiteRanking` appelle), sur les lignes déjà lues — lecture
+    // mutualisée (`transactional: false`), l'instantané n'écrivant rien. Le
+    // rang affiché est renuméroté de 1 à N, comme celui de l'aperçu. Une cote
+    // qui bouge ailleurs (score d'un autre tournoi) est rattrapée par le
+    // battement d'entretien de la salle, qui relit l'instantané.
+    const orderedRegistrations = registrationsFollowRanking(source, card.state)
+      ? (
+          await rankEntrantsBySiteRanking(connection, registrationRows, { transactional: false })
+        ).map((row, index) => ({ ...row, seed: index + 1 }))
+      : registrationRows;
+
     const payload: Omit<TournamentSnapshot, "version"> = {
       card,
       matches: matches.map(mapMatch),
-      registrations: registrations.map((row) => ({
-        teamId: Number(row.team_id),
-        teamName: row.team_name,
-        logoUrl: localUploadUrl(row.logo_url),
-        seed: row.seed === null ? null : Number(row.seed),
-        registeredAt: toIso(row.registered_at)!,
-        finalRank: row.final_rank === null ? null : Number(row.final_rank),
-      })),
+      registrations: orderedRegistrations,
       survival,
       swiss,
       endurance,
@@ -274,7 +293,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       currentPhaseId: phasesDetail?.currentPhaseId ?? null,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
       soloUserIds,
-      seedingSource: seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1),
+      seedingSource: source,
     };
 
     const payloadJson = JSON.stringify(payload);

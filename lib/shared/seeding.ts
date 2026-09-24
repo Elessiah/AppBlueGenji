@@ -46,12 +46,44 @@ export function seedingSource(format: TournamentFormat, manualSeeding: boolean):
 /**
  * L'ordre affiché (celui de la colonne `seed`) est-il bien celui qui sera joué ?
  *
- * Non en `RANKING` : la liste montre alors l'ordre d'arrivée des inscriptions
- * alors que le moteur seedera depuis le classement du site. Le dire évite le
- * malentendu — le staff croit lire le tirage, il ne lit que des inscriptions.
+ * Non en `RANKING` : la colonne `seed` y garde l'ordre d'arrivée des
+ * inscriptions alors que le moteur seede depuis le classement du site. Le dire
+ * évite le malentendu — le staff croit lire le tirage, il ne lit que des
+ * inscriptions.
+ *
+ * Ne suffit pas, seul, à décider d'un avertissement : avant le coup d'envoi,
+ * l'instantané range lui-même la liste par le classement
+ * (`registrationsFollowRanking`), qui **est** alors le tirage prévu. Seule une
+ * liste en `RANKING` qui ne suit pas le classement (tournoi lancé) mérite
+ * l'avertissement.
  */
 export function isSeedOrderEffective(source: SeedingSource): boolean {
   return source !== "RANKING";
+}
+
+/**
+ * Le tournoi est-il encore avant son coup d'envoi ? Masqué, annoncé, aux
+ * inscriptions ou inscriptions closes : aucun plateau n'existe encore, le
+ * tirage est celui que produirait un lancement immédiat.
+ */
+export function isPreLaunchState(state: TournamentState): boolean {
+  return state === "UPCOMING" || state === "REGISTRATION";
+}
+
+/**
+ * La liste des inscrites est-elle rangée selon le classement du site ?
+ *
+ * Oui en `RANKING` tant que le tournoi n'est pas lancé : chaque engagée prend
+ * alors, dès son inscription, la place que lui donne sa cote — celle que le
+ * moteur lui donnera au coup d'envoi si rien ne bouge d'ici là. Une fois lancé,
+ * le classement continue d'évoluer (les matchs du tournoi le font bouger) alors
+ * que le tirage, lui, est fait : la liste retombe sur la colonne `seed`.
+ */
+export function registrationsFollowRanking(
+  source: SeedingSource,
+  state: TournamentState,
+): boolean {
+  return source === "RANKING" && isPreLaunchState(state);
 }
 
 export type SeedingEntry = {

@@ -2,14 +2,16 @@ import { describe, expect, it } from "@jest/globals";
 import {
   applySeedOrder,
   canReorderSeeding,
+  isPreLaunchState,
   isSeedOrderEffective,
   isValidSeedOrder,
   moveInOrder,
+  registrationsFollowRanking,
   seedingLockReason,
   SEEDING_SOURCE_LABELS,
   seedingSource,
 } from "@/lib/shared/seeding";
-import type { TournamentFormat } from "@/lib/shared/types";
+import type { TournamentFormat, TournamentState } from "@/lib/shared/types";
 import type { MatchScoreState } from "@/lib/shared/match-lock";
 
 function match(overrides: Partial<MatchScoreState> = {}): MatchScoreState {
@@ -166,5 +168,33 @@ describe("isSeedOrderEffective", () => {
 
   it("ne l'est pas en RANKING : le classement du site prendra la main au lancement", () => {
     expect(isSeedOrderEffective("RANKING")).toBe(false);
+  });
+});
+
+describe("isPreLaunchState", () => {
+  it.each<[TournamentState, boolean]>([
+    ["UPCOMING", true],
+    ["REGISTRATION", true],
+    ["RUNNING", false],
+    ["FINISHED", false],
+  ])("%s → %s", (state, expected) => {
+    expect(isPreLaunchState(state)).toBe(expected);
+  });
+});
+
+describe("registrationsFollowRanking", () => {
+  it("suit le classement du site tant que le tournoi n'est pas lancé, clôture comprise", () => {
+    expect(registrationsFollowRanking("RANKING", "REGISTRATION")).toBe(true);
+    expect(registrationsFollowRanking("RANKING", "UPCOMING")).toBe(true);
+  });
+
+  it("ne le suit plus une fois le tirage fait", () => {
+    expect(registrationsFollowRanking("RANKING", "RUNNING")).toBe(false);
+    expect(registrationsFollowRanking("RANKING", "FINISHED")).toBe(false);
+  });
+
+  it("ne le suit jamais quand l'ordre vient du staff ou des inscriptions", () => {
+    expect(registrationsFollowRanking("MANUAL", "REGISTRATION")).toBe(false);
+    expect(registrationsFollowRanking("REGISTRATION", "REGISTRATION")).toBe(false);
   });
 });

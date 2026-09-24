@@ -18,6 +18,11 @@ jest.mock("@/lib/server/database");
 // Les formats à classement chargent leurs métadonnées : hors sujet ici, et elles
 // exigeraient une vraie base.
 jest.mock("@/lib/server/tournaments/swiss");
+jest.mock("@/lib/server/tournaments/survival");
+jest.mock("@/lib/server/tournaments/bg-survie");
+// Le classement du site rejoue tout `bg_matches` : bouchonné, seul compte ici
+// l'ordre qu'il rend.
+jest.mock("@/lib/server/ranking-service");
 
 import {
   getTournamentSnapshot,
@@ -34,11 +39,18 @@ import { hasPendingStateTransition, syncTournamentState } from "@/lib/server/tou
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { getDatabase } from "@/lib/server/database";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
+import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
+import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie";
+import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { clearCache } from "@/lib/server/cache";
 import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
 import { fakePool } from "../../helpers/sql-double";
 import type { RowOverrides } from "../../helpers/row-overrides";
-import { tournamentListRow, tournamentRow } from "../../helpers/tournament-rows";
+import {
+  registrationRow,
+  tournamentListRow,
+  tournamentRow,
+} from "../../helpers/tournament-rows";
 
 const TOURNAMENT_ID = 5;
 
@@ -110,6 +122,8 @@ beforeEach(() => {
   jest.mocked(getRegistrationRows).mockResolvedValue([]);
   jest.mocked(getMatchRows).mockResolvedValue([]);
   jest.mocked(loadSwissMeta).mockResolvedValue(null);
+  jest.mocked(loadSurvivalMeta).mockResolvedValue(null);
+  jest.mocked(loadEnduranceMeta).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -299,5 +313,103 @@ describe("getTournamentSnapshot — provenance de l'ordre de seeding", () => {
 
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
     expect(snapshot?.seedingSource).toBe("MANUAL");
+  });
+});
+
+describe("getTournamentSnapshot — inscrites rangées par le classement du site", () => {
+  /** Tournoi aux inscriptions (ou clos, selon `state`), dans le format donné. */
+  function preLaunch(
+    format: TournamentRow["format"],
+    state: TournamentRow["state"] = "REGISTRATION",
+    manualSeeding = 0,
+  ) {
+    const row = runningRow({ format, state, manual_seeding: manualSeeding, bracket_size: null });
+    jest.mocked(loadTournamentRow).mockResolvedValue(row);
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row,
+      stateChanged: false,
+      contentChanged: false,
+    });
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ format, state }));
+  }
+
+  // Ordre d'arrivée : Alpha, Beta, Gamma (seeds 1, 2, 3).
+  const arrivals = [
+    registrationRow({ team_id: 1, team_name: "Alpha", seed: 1 }),
+    registrationRow({ team_id: 2, team_name: "Beta", seed: 2 }),
+    registrationRow({ team_id: 3, team_name: "Gamma", seed: 3 }),
+  ];
+
+  beforeEach(() => {
+    jest.mocked(getRegistrationRows).mockResolvedValue(arrivals);
+    // Classement du site : Gamma, Alpha, Beta.
+    const rank: Record<string, number> = { Gamma: 0, Alpha: 1, Beta: 2 };
+    jest.mocked(rankEntrantsBySiteRanking).mockImplementation(async (_connection, entrants) =>
+      [...entrants].sort((a, b) => rank[a.teamName] - rank[b.teamName]),
+    );
+  });
+
+  const order = (snapshot: Awaited<ReturnType<typeof getTournamentSnapshot>>) =>
+    snapshot?.registrations.map((reg) => [reg.teamName, reg.seed]);
+
+  it.each<[TournamentRow["format"], TournamentRow["state"]]>([
+    ["BG_SURVIE", "REGISTRATION"],
+    ["BG_SURVIE", "UPCOMING"],
+    ["SWISS", "REGISTRATION"],
+    ["SURVIVAL", "UPCOMING"],
+  ])("range une %s en %s dans l'ordre du classement, rangs renumérotés", async (format, state) => {
+    preLaunch(format, state);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(order(snapshot)).toEqual([
+      ["Gamma", 1],
+      ["Alpha", 2],
+      ["Beta", 3],
+    ]);
+    // Lecture mutualisée : l'instantané n'écrit rien, il n'a pas à rejouer
+    // tout `bg_matches` à chaque construction.
+    // Double partiel de connexion : Jest 30 confronte les arguments à la
+    // signature simulée, d'où le `as never` (cf. CLAUDE.md, « Tests »).
+    // Les lignes déjà lues sont triées telles quelles : pas de seconde lecture
+    // des inscriptions.
+    expect(rankEntrantsBySiteRanking).toHaveBeenCalledWith(
+      connection as never,
+      expect.arrayContaining([expect.objectContaining({ teamName: "Alpha" })]),
+      { transactional: false },
+    );
+  });
+
+  it("garde l'ordre d'arrivée d'un format à plateau", async () => {
+    preLaunch("SINGLE");
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(order(snapshot)).toEqual([
+      ["Alpha", 1],
+      ["Beta", 2],
+      ["Gamma", 3],
+    ]);
+    expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
+  });
+
+  it("garde l'ordre saisi par le staff", async () => {
+    preLaunch("BG_SURVIE", "REGISTRATION", 1);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(snapshot?.seedingSource).toBe("MANUAL");
+    expect(order(snapshot)?.map(([name]) => name)).toEqual(["Alpha", "Beta", "Gamma"]);
+    expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
+  });
+
+  it("ne suit plus le classement une fois le tournoi lancé", async () => {
+    // Les matchs du tournoi font bouger les cotes : le tirage, lui, est fait.
+    preLaunch("BG_SURVIE", "RUNNING");
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(order(snapshot)?.map(([name]) => name)).toEqual(["Alpha", "Beta", "Gamma"]);
+    expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
   });
 });

@@ -362,9 +362,13 @@ type EntrantRow = RowDataPacket & { team_id: number; team_name: string };
 /**
  * Inscrites d'un tournoi, **dans l'ordre du classement du site**.
  *
- * Seule porte du seeding par classement : Survie, Ronde suisse, Multi-phases et
- * l'aperçu du plateau l'appellent tous, si bien qu'un aperçu ne peut pas
- * diverger du tirage réel, ni deux formats se seeder différemment.
+ * Porte du seeding par classement : Survie, Ronde suisse, BG Survie,
+ * Multi-phases et l'aperçu du plateau l'appellent tous. Son tri est
+ * `rankEntrantsBySiteRanking`, que l'instantané d'un tournoi applique aussi,
+ * directement, aux inscrites qu'il a déjà lues (liste rangée par le classement
+ * avant le coup d'envoi) : c'est ce tri unique qui garantit qu'un aperçu, la
+ * liste des inscrites et le tirage réel ne divergent pas, ni deux formats ne se
+ * seedent différemment.
  *
  * Les quatre requêtes qu'elle remplace triaient sur une expression SQL
  * (`points DESC, wins DESC, team_id ASC`) : une cote rejouée ne s'écrit pas en
@@ -388,11 +392,6 @@ export async function loadEntrantsBySiteRanking(
   tournamentId: number,
   options: { transactional?: boolean } = {},
 ): Promise<RankedEntrant[]> {
-  const states = await loadRankingState({
-    connection,
-    shared: options.transactional === false,
-  });
-
   const [rows] = await connection.execute<EntrantRow[]>(
     `SELECT r.team_id, t.name AS team_name
      FROM bg_tournament_registrations r
@@ -401,26 +400,48 @@ export async function loadEntrantsBySiteRanking(
     [tournamentId],
   );
 
-  return rows
-    .map((row) => {
-      const teamId = Number(row.team_id);
-      const state = states.get(teamId) ?? baseRankedTeamState();
-      return {
-        teamId,
-        teamName: row.team_name,
-        points: state.points,
-        wins: state.wins,
-        losses: state.losses,
-        draws: state.draws,
-      };
-    })
+  const ranked = await rankEntrantsBySiteRanking(
+    connection,
+    rows.map((row) => ({ teamId: Number(row.team_id), teamName: row.team_name })),
+    options,
+  );
+  return ranked.map(({ teamId, teamName }) => ({ teamId, teamName }));
+}
+
+/**
+ * Range des engagés **déjà chargés** dans l'ordre du classement du site.
+ *
+ * C'est le tri de `loadEntrantsBySiteRanking`, sans sa lecture des
+ * inscriptions : l'instantané d'un tournoi les a déjà en main, et les relire ne
+ * servirait qu'à les obtenir deux fois. Même règle de tri
+ * (`compareRankedTeams`), même lecture du classement (`transactional`), donc le
+ * même ordre que le tirage. Les lignes sont rendues telles quelles, seul leur
+ * ordre change.
+ */
+export async function rankEntrantsBySiteRanking<T extends RankedEntrant>(
+  connection: Queryable,
+  entrants: readonly T[],
+  options: { transactional?: boolean } = {},
+): Promise<T[]> {
+  const states = await loadRankingState({
+    connection,
+    shared: options.transactional === false,
+  });
+
+  return entrants
+    .map((entrant) => ({ entrant, state: states.get(entrant.teamId) ?? baseRankedTeamState() }))
     .sort((a, b) =>
       compareRankedTeams(
-        { points: a.points, wins: a.wins, losses: a.losses, draws: a.draws, name: a.teamName },
-        { points: b.points, wins: b.wins, losses: b.losses, draws: b.draws, name: b.teamName },
+        { ...rankingKey(a.state), name: a.entrant.teamName },
+        { ...rankingKey(b.state), name: b.entrant.teamName },
       ),
     )
-    .map(({ teamId, teamName }) => ({ teamId, teamName }));
+    .map(({ entrant }) => entrant);
+}
+
+/** Ce que `compareRankedTeams` lit d'un état rejoué, nom mis à part. */
+function rankingKey(state: RankedTeamState) {
+  return { points: state.points, wins: state.wins, losses: state.losses, draws: state.draws };
 }
 
 /**
