@@ -27,7 +27,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs et de l'arbitrage, tant que le tournoi n'est pas terminé",
     base: "Consentement",
     duree: "Durée du compte",
   },

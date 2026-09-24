@@ -7,6 +7,8 @@ import "dotenv/config";
 // reprendre d'une main après l'avoir donnée de l'autre.
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "./database";
+import { NamedLockUnavailableError } from "./named-lock";
+import { SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "./seed-lock";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { loadTournamentRow, loadRegisteredTeamIds, getMatchRows } from "./tournaments/repository";
 import { createSingleEliminationBracket } from "./tournaments/bracket-single";
@@ -1643,78 +1645,94 @@ async function main(): Promise<void> {
   try {
     const db = await getDatabase();
 
-    await clearDatabase(db);
-    console.log();
-
-    const userIds = await createUsers(db);
-    console.log();
-
-    const specialUserIds = await createSpecialUsers(db);
-    console.log();
-
-    const namedTeamIds = await createTeams(db, userIds);
-    console.log();
-
-    // Hors du pool de tournois : elles servent à exercer l'administration des
-    // équipes fantômes (badge, attribution, inscription manuelle par le staff).
-    await createGhostTeams(db);
-    console.log();
-
-    // Pool d'équipes étendu pour alimenter les gros brackets (jusqu'à 128) avec
-    // de la marge, afin que teamOffset puisse décaler les tranches.
-    const TEAM_POOL_TARGET = 160;
-    const bulkTeamIds = await createBulkTeams(
+    // Deux seeds concurrents sur la même base s'effacent l'un l'autre en cours
+    // de route : le second attend la fin du premier (voir `seed-lock.ts`).
+    await withSeedLock(
       db,
-      Math.max(0, TEAM_POOL_TARGET - namedTeamIds.length)
+      () => seed(db),
+      () => console.log("⏳ Un autre seed tourne sur cette base, attente de sa fin…"),
     );
-    const teamIds = [...namedTeamIds, ...bulkTeamIds];
-    console.log();
-
-    // Engagés des tournois individuels : une entrée solo par joueur nommé.
-    const soloEntryIds = await createSoloEntries(db, userIds);
-    console.log();
-
-    await createSponsors(db);
-    console.log();
-
-    await createBureau(db);
-    console.log();
-
-    await createRecruitmentAds(db);
-    console.log();
-
-    const organizerId = specialUserIds.get("Admin") ?? userIds[0];
-
-    console.log("🎮 Création des tournois...");
-    for (let i = 0; i < TOURNAMENTS.length; i++) {
-      await createTournament(db, organizerId, teamIds, soloEntryIds, TOURNAMENTS[i], i);
-    }
-
-    const byState = (state: TournamentDef["state"]) =>
-      TOURNAMENTS.filter((t) => t.state === state).length;
-    const byFormat = (format: SeedFormat) =>
-      TOURNAMENTS.filter((t) => (t.format ?? "DOUBLE") === format).length;
-
-    console.log("\n✅ Seed terminé avec succès !");
-    console.log(`\n  Récap :`);
-    console.log(`  · ${userIds.length} joueurs + ${specialUserIds.size} comptes de test (Test_*)`);
-    console.log(`  · ${teamIds.length} équipes (Test - *), dont solo / staff / roster complet`);
-    console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau`);
-    console.log(`  · ${FICTIONAL_RECRUITMENT_ADS.length} annonces de recrutement (longues descriptions, mises en avant concurrentes, brouillon)`);
-    console.log(`  · ${TOURNAMENTS.length} tournois :`);
-    console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);
-    console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase · ${byFormat("BG_SURVIE")} BG Survie`);
-    console.log(`    - effectifs : 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 21, 64, 128`);
-    console.log(`    - individuel : ${TOURNAMENTS.filter((t) => t.participantType === "SOLO").length} tournois solo (${soloEntryIds.length} entrées disponibles)`);
-    console.log(`    - survie : barrage impair (3/5/7/9/11/15/21), cadences 1/2/3, forfaits`);
-    console.log(`    - matchs : reports en attente, conflits de score, délais expirés`);
-    console.log(`\n  Admin de test : DEV_AUTH_USER_ID=${organizerId}\n`);
-
     process.exit(0);
   } catch (error) {
-    console.error("❌ Seed échoué:", error);
+    if (error instanceof NamedLockUnavailableError) {
+      console.error(
+        `❌ Seed abandonné : un autre seed occupe la base depuis plus de ${SEED_LOCK_TIMEOUT_SECONDS} s.`,
+      );
+    } else {
+      console.error("❌ Seed échoué:", error);
+    }
     process.exit(1);
   }
+}
+
+/** Efface le jeu de test précédent puis régénère toute la matrice. */
+async function seed(db: Pool): Promise<void> {
+  await clearDatabase(db);
+  console.log();
+
+  const userIds = await createUsers(db);
+  console.log();
+
+  const specialUserIds = await createSpecialUsers(db);
+  console.log();
+
+  const namedTeamIds = await createTeams(db, userIds);
+  console.log();
+
+  // Hors du pool de tournois : elles servent à exercer l'administration des
+  // équipes fantômes (badge, attribution, inscription manuelle par le staff).
+  await createGhostTeams(db);
+  console.log();
+
+  // Pool d'équipes étendu pour alimenter les gros brackets (jusqu'à 128) avec
+  // de la marge, afin que teamOffset puisse décaler les tranches.
+  const TEAM_POOL_TARGET = 160;
+  const bulkTeamIds = await createBulkTeams(
+    db,
+    Math.max(0, TEAM_POOL_TARGET - namedTeamIds.length)
+  );
+  const teamIds = [...namedTeamIds, ...bulkTeamIds];
+  console.log();
+
+  // Engagés des tournois individuels : une entrée solo par joueur nommé.
+  const soloEntryIds = await createSoloEntries(db, userIds);
+  console.log();
+
+  await createSponsors(db);
+  console.log();
+
+  await createBureau(db);
+  console.log();
+
+  await createRecruitmentAds(db);
+  console.log();
+
+  const organizerId = specialUserIds.get("Admin") ?? userIds[0];
+
+  console.log("🎮 Création des tournois...");
+  for (let i = 0; i < TOURNAMENTS.length; i++) {
+    await createTournament(db, organizerId, teamIds, soloEntryIds, TOURNAMENTS[i], i);
+  }
+
+  const byState = (state: TournamentDef["state"]) =>
+    TOURNAMENTS.filter((t) => t.state === state).length;
+  const byFormat = (format: SeedFormat) =>
+    TOURNAMENTS.filter((t) => (t.format ?? "DOUBLE") === format).length;
+
+  console.log("\n✅ Seed terminé avec succès !");
+  console.log(`\n  Récap :`);
+  console.log(`  · ${userIds.length} joueurs + ${specialUserIds.size} comptes de test (Test_*)`);
+  console.log(`  · ${teamIds.length} équipes (Test - *), dont solo / staff / roster complet`);
+  console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau`);
+  console.log(`  · ${FICTIONAL_RECRUITMENT_ADS.length} annonces de recrutement (longues descriptions, mises en avant concurrentes, brouillon)`);
+  console.log(`  · ${TOURNAMENTS.length} tournois :`);
+  console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);
+  console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase · ${byFormat("BG_SURVIE")} BG Survie`);
+  console.log(`    - effectifs : 0, 1, 2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 15, 16, 17, 21, 64, 128`);
+  console.log(`    - individuel : ${TOURNAMENTS.filter((t) => t.participantType === "SOLO").length} tournois solo (${soloEntryIds.length} entrées disponibles)`);
+  console.log(`    - survie : barrage impair (3/5/7/9/11/15/21), cadences 1/2/3, forfaits`);
+  console.log(`    - matchs : reports en attente, conflits de score, délais expirés`);
+  console.log(`\n  Admin de test : DEV_AUTH_USER_ID=${organizerId}\n`);
 }
 
 main();

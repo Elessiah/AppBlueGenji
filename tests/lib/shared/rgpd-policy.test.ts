@@ -55,6 +55,12 @@ describe("DONNEES_PROFIL", () => {
     expect(overwatch?.finalite).toMatch(/chaque connexion/i);
   });
 
+  it("dit qui lit encore un BattleTag masqué, et jusqu'à quand", () => {
+    const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
+    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des joueurs de tes matchs et de l'arbitrage/);
+    expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);
+  });
+
   it("dit les deux régimes du tag Discord : certifié exposé, non certifié privé", () => {
     // La finalité a changé avec la certification, et une déclaration restée sur
     // l'ancienne serait fausse : le tag certifié est une coordonnée de contact

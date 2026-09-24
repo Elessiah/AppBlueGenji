@@ -249,6 +249,26 @@ modifier le profil d'autrui.
 Le masquage est appliqué **côté serveur, à la source** : le champ masqué vaut
 `null` dans la réponse, il n'est pas seulement caché à l'affichage.
 
+**Le BattleTag masqué a un public restreint, pas nul.** Masqué, il quitte la
+fiche publique et l'annuaire, mais reste lisible là où il sert à jouer — ce que
+la modale ouverte à la bascule (`BattletagVisibilityNotice.tsx`) annonce au
+joueur. `canViewBattletag` (`lib/shared/battletag-visibility.ts`) le repose sur
+la fiche (`getFullProfile`), dans cet ordre :
+
+| Lecteur                                                           | Voit un BattleTag masqué |
+| ----------------------------------------------------------------- | :----------------------: |
+| Le propriétaire du compte                                         | ✅                        |
+| Un joueur engagé dans un **même match** d'un tournoi vivant       | ✅ (coéquipiers compris)  |
+| Permission `tournaments`, titulaire engagé dans un tournoi vivant | ✅                        |
+| Administrateur hors de ce cas, `casting`, joueur, visiteur        | ❌                        |
+
+« Vivant » = tout état sauf `FINISHED`, la borne de
+`tournamentGrantsContactAccess` : le besoin naît du tournoi et s'éteint avec
+lui. L'administrateur n'a **pas** de passe-droit, à l'inverse du tag Discord
+(§2.4) : le BattleTag a un réglage que le joueur garde en main. L'annuaire
+(`listPlayers`) reste masqué — c'est la liste publique, et la question du match
+y serait posée pour chaque ligne.
+
 « À la source » veut dire **partout où le champ est lu**, et pas seulement dans
 les deux lectures de profil. L'avatar en donne la mesure : `getFullProfile` et
 `listPlayers` le masquaient bien, mais trois autres lectures allaient chercher

@@ -1,0 +1,9 @@
+/* Aide sous un champ de la fiche : même gabarit que `.hint` de `/profil`
+   (12 px, `--text-1`), pour que les deux écrans parlent du même ton. */
+.hint {
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-1);
+  margin: 7px 0 0;
+  max-width: 68ch;
+}

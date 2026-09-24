@@ -49,6 +49,19 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
     expect(backup!.details.join(" ")).toMatch(/journal/);
   });
 
+  it("déclare le public d'un BattleTag masqué : joueurs d'un match et arbitrage, le temps du tournoi", () => {
+    // `getFullProfile` rouvre le tag masqué à ces deux publics : sans cette
+    // entrée, le site traiterait une donnée d'une façon qu'il n'a pas annoncée.
+    const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-09-battletag-masque-matchs");
+    expect(entry).toBeDefined();
+    const text = [entry!.summary, ...entry!.details].join(" ");
+    expect(text).toMatch(/joueurs de tes matchs|joueurs d'un match/);
+    expect(text).toMatch(/arbitr/);
+    expect(text).toMatch(/n'est pas terminé/);
+    // L'écart avec le tag Discord est dit : pas de passe-droit administrateur.
+    expect(text).toMatch(/administrateur ne voit pas un BattleTag masqué/);
+  });
+
   it("a des identifiants uniques, bien formés et qui tiennent dans la colonne", () => {
     const ids = PRIVACY_CHANGES.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);

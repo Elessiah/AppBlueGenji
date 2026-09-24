@@ -238,6 +238,7 @@ rattachement aboutit quand même.
 | Écrans | `app/connexion/_components/OAuthButtons.tsx`, `app/(secured)/profil/ConnectedAppsSection.tsx` |
 | Liste des rattachements, côté page | `app/(secured)/profil/useAccountConnections.ts` |
 | Ce que masquer le BattleTag ne fait pas | `app/(secured)/profil/BattletagVisibilityNotice.tsx` |
+| Qui lit un BattleTag masqué (pur) | `lib/shared/battletag-visibility.ts` |
 | Refus en français | `app/connexion/_lib/login-errors.ts`, `app/(secured)/profil/connection-errors.ts` |
 
 ## Configuration
