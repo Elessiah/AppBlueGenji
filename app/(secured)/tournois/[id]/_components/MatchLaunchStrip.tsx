@@ -56,6 +56,8 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
   const showRelease = open && match.casterUserId !== null && (isCaster || canSchedule);
   const showForce = canSchedule && (phase === "LOBBY" || phase === "SCHEDULED");
   const showHost = phase !== "NONE";
+  const showOpen = isParty && (phase === "LOBBY" || phase === "LAUNCHED");
+  const showHostSwap = canSchedule && showHost;
   const hostName =
     match.hostTeamId === null
       ? null
@@ -141,79 +143,83 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
         </span>
       )}
 
-      <span className={styles.actions}>
-        {isParty && (phase === "LOBBY" || phase === "LAUNCHED") && (
-          <button
-            type="button"
-            className={`btn ${styles.primary}`}
-            onClick={() =>
-              window.dispatchEvent(
-                new CustomEvent(MATCH_LAUNCH_OPEN_EVENT, { detail: { matchId: match.id } }),
-              )
-            }
-            aria-label={`Ouvrir le lancement de ${matchLabel}`}
-          >
-            {phase === "LOBBY" ? "Lancement" : "Infos"}
-          </button>
-        )}
-        {showClaim && (
-          <button
-            type="button"
-            className={`btn ghost ${styles.small}`}
-            disabled={busy}
-            aria-disabled={castBlock !== null}
-            title={castBlock === "CASTER_IDENTITY_REQUIRED" ? CAST_IDENTITY_NOTICE : undefined}
-            onClick={claim}
-            aria-label={`Caster ${matchLabel}`}
-          >
-            🎙 Caster
-          </button>
-        )}
-        {showRelease && (
-          <button
-            type="button"
-            className={`btn ghost ${styles.small}`}
-            disabled={busy}
-            onClick={() =>
-              void run(
-                () => send(`/api/matches/${match.id}/caster`, "DELETE"),
-                isCaster ? "Tu ne castes plus ce match." : "Caster retiré.",
-              )
-            }
-            aria-label={
-              isCaster ? `Ne plus caster ${matchLabel}` : `Retirer le caster de ${matchLabel}`
-            }
-          >
-            {isCaster ? "Ne plus caster" : "Retirer caster"}
-          </button>
-        )}
-        {canSchedule && showHost && (
-          <button
-            type="button"
-            className={`btn ghost ${styles.small}`}
-            disabled={busy}
-            onClick={swapHost}
-            aria-label={`Changer l'équipe hôte de ${matchLabel}`}
-            title="Changer l'équipe hôte"
-          >
-            ⇄ Hôte
-          </button>
-        )}
-        {showForce && (
-          <button
-            type="button"
-            className={`btn ${styles.small} ${styles.force}`}
-            disabled={busy}
-            onClick={() => {
-              if (!window.confirm(`Lancer ${matchLabel} sans attendre les « Prêt » manquants ?`)) return;
-              void run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), "Match lancé.");
-            }}
-            aria-label={`Forcer le lancement de ${matchLabel}`}
-          >
-            ▶ Forcer
-          </button>
-        )}
-      </span>
+      {/* Pas de conteneur vide : il porterait seul le `margin-left: auto` et
+          une ligne de hauteur nulle sur les cartes sans aucun bouton. */}
+      {(showOpen || showClaim || showRelease || showHostSwap || showForce) && (
+        <span className={styles.actions}>
+          {showOpen && (
+            <button
+              type="button"
+              className={`btn ${styles.primary}`}
+              onClick={() =>
+                window.dispatchEvent(
+                  new CustomEvent(MATCH_LAUNCH_OPEN_EVENT, { detail: { matchId: match.id } }),
+                )
+              }
+              aria-label={`Ouvrir le lancement de ${matchLabel}`}
+            >
+              {phase === "LOBBY" ? "Lancement" : "Infos"}
+            </button>
+          )}
+          {showClaim && (
+            <button
+              type="button"
+              className={`btn ghost ${styles.small}`}
+              disabled={busy}
+              aria-disabled={castBlock !== null}
+              title={castBlock === "CASTER_IDENTITY_REQUIRED" ? CAST_IDENTITY_NOTICE : undefined}
+              onClick={claim}
+              aria-label={`Caster ${matchLabel}`}
+            >
+              🎙 Caster
+            </button>
+          )}
+          {showRelease && (
+            <button
+              type="button"
+              className={`btn ghost ${styles.small}`}
+              disabled={busy}
+              onClick={() =>
+                void run(
+                  () => send(`/api/matches/${match.id}/caster`, "DELETE"),
+                  isCaster ? "Tu ne castes plus ce match." : "Caster retiré.",
+                )
+              }
+              aria-label={
+                isCaster ? `Ne plus caster ${matchLabel}` : `Retirer le caster de ${matchLabel}`
+              }
+            >
+              {isCaster ? "Ne plus caster" : "Retirer caster"}
+            </button>
+          )}
+          {showHostSwap && (
+            <button
+              type="button"
+              className={`btn ghost ${styles.small}`}
+              disabled={busy}
+              onClick={swapHost}
+              aria-label={`Changer l'équipe hôte de ${matchLabel}`}
+              title="Changer l'équipe hôte"
+            >
+              ⇄ Hôte
+            </button>
+          )}
+          {showForce && (
+            <button
+              type="button"
+              className={`btn ${styles.small} ${styles.force}`}
+              disabled={busy}
+              onClick={() => {
+                if (!window.confirm(`Lancer ${matchLabel} sans attendre les « Prêt » manquants ?`)) return;
+                void run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), "Match lancé.");
+              }}
+              aria-label={`Forcer le lancement de ${matchLabel}`}
+            >
+              ▶ Forcer
+            </button>
+          )}
+        </span>
+      )}
     </div>
   );
 }

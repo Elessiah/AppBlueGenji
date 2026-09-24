@@ -459,9 +459,11 @@ function IdentityLine({
 }
 
 function ContactRow({ contact, onCopy }: { contact: LaunchContact; onCopy: CopyFn }) {
-  const roles = contact.roles
-    .map((role) => ROLE_LABELS[role])
-    .filter((label): label is string => Boolean(label));
+  // Dans l'ordre de la priorité de choix (capitaine, manager, propriétaire),
+  // pas dans l'ordre de saisie : la pastille la plus parlante vient en tête.
+  const roles = (Object.keys(ROLE_LABELS) as TeamRole[])
+    .filter((role) => contact.roles.includes(role))
+    .map((role) => ROLE_LABELS[role] as string);
   return (
     <li className={styles.contact}>
       <div className={styles.contactHead}>
