@@ -86,24 +86,12 @@ export function recruitmentPriorityRank(priority: RecruitmentPriority): number {
 }
 
 /**
- * Fenêtre d'anti-répétition de la modale d'arrivée : une fois affichée à un
- * visiteur, elle ne réapparaît pas avant 7 jours — sauf si une prioritaire
- * qu'il n'a jamais vue s'y ajoute. La banderole, elle, se tait le temps de la
- * visite.
+ * Fenêtre d'anti-répétition de la modale d'arrivée : une prioritaire montrée à
+ * un visiteur ne lui est pas remontrée avant 7 jours — la durée du cookie
+ * ({@link RECRUITMENT_MODAL_COOKIE_MAX_AGE}) *est* cette fenêtre. La banderole,
+ * elle, se tait le temps de la visite.
  */
 export const RECRUITMENT_MODAL_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
-
-/**
- * Décide si la modale prioritaire doit s'afficher, à partir de l'horodatage du
- * dernier affichage (`seenAt`, ms epoch ; `null` si jamais vue) et de l'instant
- * courant `now`. Vraie si jamais vue, si l'horodatage est invalide ou situé dans
- * le futur (horloge décalée), ou si au moins `RECRUITMENT_MODAL_INTERVAL_MS` se
- * sont écoulés depuis le dernier affichage.
- */
-export function shouldShowRecruitmentModal(seenAt: number | null, now: number): boolean {
-  if (seenAt === null || !Number.isFinite(seenAt) || seenAt > now) return true;
-  return now - seenAt >= RECRUITMENT_MODAL_INTERVAL_MS;
-}
 
 /**
  * Cookies de la mise en avant, et pourquoi ce n'est plus `localStorage`.
@@ -119,10 +107,11 @@ export function shouldShowRecruitmentModal(seenAt: number | null, now: number): 
  * navigateur qu'une requete transporte. Le `localStorage` ne pouvait pas le
  * faire : il ne quitte jamais l'onglet.
  *
- * La valeur est la **liste des identifiants** des annonces montrées (`12.15`),
- * et il n'y a pas d'horodatage a cote : la peremption du cookie *est* la
- * fenetre. Une annonce ajoutée à la mise en avant, absente de la liste, la
- * fait donc reparaître.
+ * La valeur est la **liste des identifiants** des annonces montrées (`12.15`) —
+ * pour la modale, les seules pages réellement affichées —, et il n'y a pas
+ * d'horodatage a cote : la peremption du cookie *est* la fenetre. Une annonce
+ * absente de la liste (ajoutée depuis, ou jamais feuilletée) fait donc
+ * reparaître la modale, ouverte sur elle.
  */
 export const RECRUITMENT_MODAL_COOKIE = "bg_recr_modal";
 
@@ -168,6 +157,19 @@ export function serializeRecruitmentSeen(ids: readonly number[]): string {
 export function recruitmentDismissed(cookieValue: string | undefined, adIds: readonly number[]): boolean {
   const seen = parseRecruitmentSeen(cookieValue);
   return adIds.every((id) => seen.has(id));
+}
+
+/**
+ * Parmi les annonces mises en avant, celles que le cookie dit déjà vues, dans
+ * l'ordre reçu. La modale d'arrivée les garde pour vues en réécrivant son
+ * cookie, qui ne porte ainsi que des annonces encore en ligne.
+ */
+export function recruitmentSeenAmong(
+  cookieValue: string | undefined,
+  adIds: readonly number[],
+): number[] {
+  const seen = parseRecruitmentSeen(cookieValue);
+  return adIds.filter((id) => seen.has(id));
 }
 
 /**
@@ -556,15 +558,18 @@ export function sortRecruitmentAds<T extends Prioritized>(ads: readonly T[]): T[
 
 /**
  * Sépare la liste principale (« Recrutement en cours » : prioritaires puis
- * importantes) des « Autres recrutements » (facultatives). Chaque moitié est
- * triée par statut, l'ordre reçu étant gardé à l'intérieur d'un statut.
+ * importantes) des « Autres recrutements » (facultatives), en gardant l'ordre
+ * reçu. Simple partage, sans tri : la liste qu'on lui passe est déjà rangée
+ * ({@link sortRecruitmentAds} au chargement, {@link placeRecruitmentAd} à
+ * chaque écriture), et la trier de nouveau à chaque rendu ne ferait que redire
+ * cet invariant.
  */
 export function splitRecruitmentAds<T extends Prioritized>(
   ads: readonly T[],
 ): { featured: T[]; others: T[] } {
   const featured: T[] = [];
   const others: T[] = [];
-  for (const ad of sortRecruitmentAds(ads)) {
+  for (const ad of ads) {
     (RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].featured ? featured : others).push(ad);
   }
   return { featured, others };

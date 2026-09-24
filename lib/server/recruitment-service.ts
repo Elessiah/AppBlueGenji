@@ -296,18 +296,20 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
  * Lève `RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre fait passer une annonce
  * devant une autre d'un statut plus important : l'ordre se règle **dans** un
  * statut. Les statuts sont relus en base — ceux du client ont pu vieillir
- * depuis l'ouverture de la page.
+ * depuis l'ouverture de la page — **sous verrou, dans la transaction de
+ * l'écriture** : lus avant, un statut changé entre-temps laisserait passer un
+ * ordre mêlé.
  */
 export async function reorderRecruitmentAds(ids: number[]): Promise<void> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { id: number; priority: RecruitmentPriority })[]>(
-    `SELECT id, priority FROM bg_recruitment_ads`,
-  );
-  const priorityById = new Map((rows ?? []).map((row) => [Number(row.id), row.priority] as const));
-  if (recruitmentOrderMixesPriorities(ids, priorityById)) {
-    throw new Error("RECRUITMENT_ORDER_MIXES_PRIORITIES");
-  }
-  await applyDisplayOrder("bg_recruitment_ads", ids);
+  await applyDisplayOrder("bg_recruitment_ads", ids, async (connection) => {
+    const [rows] = await connection.execute<
+      (RowDataPacket & { id: number; priority: RecruitmentPriority })[]
+    >(`SELECT id, priority FROM bg_recruitment_ads FOR UPDATE`);
+    const priorityById = new Map((rows ?? []).map((row) => [Number(row.id), row.priority] as const));
+    if (recruitmentOrderMixesPriorities(ids, priorityById)) {
+      throw new Error("RECRUITMENT_ORDER_MIXES_PRIORITIES");
+    }
+  });
   // L'ordre décide aussi de celui de la modale et de la banderole : la vitrine doit suivre.
   invalidateShowcase();
 }

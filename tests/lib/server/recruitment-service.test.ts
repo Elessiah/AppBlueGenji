@@ -9,7 +9,7 @@ import {
 } from "@/lib/server/recruitment-service";
 import { selectRecruitmentSpotlight } from "@/lib/shared/recruitment";
 import { clearCache } from "@/lib/server/cache";
-import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, type SqlMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/reorder", () => ({ applyDisplayOrder: jest.fn() }));
@@ -306,35 +306,52 @@ describe("recruitment-service", () => {
   });
 
   describe("reorderRecruitmentAds", () => {
-    it("réécrit l'ordre quand il reste groupé par statut", async () => {
+    /**
+     * `applyDisplayOrder` simulé : il joue le contrôle sur la connexion de sa
+     * transaction, comme le vrai, et ne « réécrit » que s'il passe.
+     */
+    async function runReorder(rows: object[], ids: number[]) {
       const { applyDisplayOrder } = await import("@/lib/server/reorder");
-      await mockDb(
-        jest.fn<SqlQuery>().mockResolvedValue([
-          [
-            { id: 1, priority: "PRIORITY" },
-            { id: 2, priority: "PRIORITY" },
-            { id: 3, priority: "OPTIONAL" },
-          ],
-        ]),
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([rows]);
+      const written: number[][] = [];
+      jest.mocked(applyDisplayOrder).mockImplementation(async (_table, order, beforeWrite) => {
+        await beforeWrite?.(fakeConnection({ execute }));
+        written.push(order);
+      });
+      await reorderRecruitmentAds(ids);
+      return { execute, written, applyDisplayOrder };
+    }
+
+    it("réécrit l'ordre quand il reste groupé par statut", async () => {
+      const { written, applyDisplayOrder } = await runReorder(
+        [
+          { id: 1, priority: "PRIORITY" },
+          { id: 2, priority: "PRIORITY" },
+          { id: 3, priority: "OPTIONAL" },
+        ],
+        [2, 1, 3],
       );
-      await reorderRecruitmentAds([2, 1, 3]);
-      expect(applyDisplayOrder).toHaveBeenCalledWith("bg_recruitment_ads", [2, 1, 3]);
+      expect(jest.mocked(applyDisplayOrder).mock.calls[0][0]).toBe("bg_recruitment_ads");
+      expect(written).toEqual([[2, 1, 3]]);
+    });
+
+    it("relit les statuts sous verrou, dans la transaction de l'écriture", async () => {
+      // Lus avant, un statut changé entre la lecture et l'écriture laisserait
+      // passer un ordre mêlé.
+      const { execute } = await runReorder([{ id: 1, priority: "PRIORITY" }], [1]);
+      expect(String(execute.mock.calls[0][0])).toContain("FOR UPDATE");
     });
 
     it("refuse un ordre qui mêle les statuts, sans rien écrire", async () => {
-      const { applyDisplayOrder } = await import("@/lib/server/reorder");
-      await mockDb(
-        jest.fn<SqlQuery>().mockResolvedValue([
+      await expect(
+        runReorder(
           [
             { id: 1, priority: "PRIORITY" },
             { id: 3, priority: "OPTIONAL" },
           ],
-        ]),
-      );
-      await expect(reorderRecruitmentAds([3, 1])).rejects.toThrow(
-        "RECRUITMENT_ORDER_MIXES_PRIORITIES",
-      );
-      expect(applyDisplayOrder).not.toHaveBeenCalled();
+          [3, 1],
+        ),
+      ).rejects.toThrow("RECRUITMENT_ORDER_MIXES_PRIORITIES");
     });
   });
 

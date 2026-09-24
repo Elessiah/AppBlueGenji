@@ -98,10 +98,22 @@ describe("sortRecruitmentAds", () => {
 
 describe("splitRecruitmentAds", () => {
   it("sépare la liste principale des « Autres recrutements »", () => {
-    const list = [ad(1, "OPTIONAL"), ad(2, "IMPORTANT"), ad(3, "PRIORITY"), ad(4, "OPTIONAL")];
+    const list = sortRecruitmentAds([
+      ad(1, "OPTIONAL"),
+      ad(2, "IMPORTANT"),
+      ad(3, "PRIORITY"),
+      ad(4, "OPTIONAL"),
+    ]);
     const { featured, others } = splitRecruitmentAds(list);
     expect(ids(featured)).toEqual([3, 2]);
     expect(ids(others)).toEqual([1, 4]);
+  });
+
+  it("partage sans re-trier : l'ordre reçu est gardé tel quel", () => {
+    // La liste de la page est tenue triée à l'écriture ; la re-trier à chaque
+    // rendu ne ferait que redire cet invariant.
+    const { featured } = splitRecruitmentAds([ad(2, "IMPORTANT"), ad(3, "PRIORITY")]);
+    expect(ids(featured)).toEqual([2, 3]);
   });
 
   it("laisse la liste principale vide s'il n'y a que des facultatives", () => {

@@ -1,3 +1,4 @@
+import type { PoolConnection } from "mysql2/promise";
 import { getDatabase } from "./database";
 
 /**
@@ -6,12 +7,23 @@ import { getDatabase } from "./database";
  * transaction) afin qu'un échec en cours de route ne laisse pas un ordre
  * incohérent. Le nom de table n'est jamais dérivé d'une entrée utilisateur —
  * chaque appelant le code en dur —, l'interpolation est donc sûre.
+ *
+ * `beforeWrite` est joué **dans** la transaction, avant la première écriture :
+ * un appelant qui doit contrôler l'ordre contre l'état de la table (le statut
+ * des annonces de recrutement) y pose ses verrous et y lève son refus, ce qui
+ * annule tout. Contrôler avant d'appeler laisserait un `await` entre la lecture
+ * et l'écriture.
  */
-export async function applyDisplayOrder(table: string, ids: number[]): Promise<void> {
+export async function applyDisplayOrder(
+  table: string,
+  ids: number[],
+  beforeWrite?: (connection: PoolConnection) => Promise<void>,
+): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+    if (beforeWrite) await beforeWrite(connection);
     for (let i = 0; i < ids.length; i += 1) {
       await connection.execute(
         `UPDATE ${table} SET display_order = ? WHERE id = ?`,

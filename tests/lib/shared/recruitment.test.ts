@@ -12,8 +12,8 @@ import {
   parseRecruitmentSeen,
   recruitmentDismissed,
   recruitmentModalStart,
+  recruitmentSeenAmong,
   serializeRecruitmentSeen,
-  shouldShowRecruitmentModal,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
 
@@ -193,44 +193,6 @@ describe("validateRecruitmentAdInput", () => {
   });
 });
 
-describe("shouldShowRecruitmentModal", () => {
-  const now = 1_700_000_000_000;
-
-  it("shows the modal when never seen (null timestamp)", () => {
-    expect(shouldShowRecruitmentModal(null, now)).toBe(true);
-  });
-
-  it("hides the modal when seen just now", () => {
-    expect(shouldShowRecruitmentModal(now, now)).toBe(false);
-  });
-
-  it("hides the modal within the 7-day window", () => {
-    const sixDaysAgo = now - 6 * 24 * 60 * 60 * 1000;
-    expect(shouldShowRecruitmentModal(sixDaysAgo, now)).toBe(false);
-  });
-
-  it("shows the modal exactly one week after the last view", () => {
-    expect(shouldShowRecruitmentModal(now - RECRUITMENT_MODAL_INTERVAL_MS, now)).toBe(true);
-  });
-
-  it("shows the modal once the window has fully elapsed", () => {
-    const eightDaysAgo = now - 8 * 24 * 60 * 60 * 1000;
-    expect(shouldShowRecruitmentModal(eightDaysAgo, now)).toBe(true);
-  });
-
-  it("shows the modal when the stored timestamp is invalid (NaN)", () => {
-    expect(shouldShowRecruitmentModal(Number.NaN, now)).toBe(true);
-  });
-
-  it("shows the modal when the stored timestamp is in the future (skewed clock)", () => {
-    expect(shouldShowRecruitmentModal(now + 60_000, now)).toBe(true);
-  });
-
-  it("spans exactly seven days", () => {
-    expect(RECRUITMENT_MODAL_INTERVAL_MS).toBe(7 * 24 * 60 * 60 * 1000);
-  });
-});
-
 /**
  * Le cookie qui a remplacé `localStorage`.
  *
@@ -337,6 +299,29 @@ describe("recruitmentModalStart", () => {
 
   it("se tait sans prioritaire", () => {
     expect(recruitmentModalStart(undefined, [])).toBeNull();
+  });
+});
+
+describe("recruitmentSeenAmong", () => {
+  it("garde, dans l'ordre de la modale, les annonces déjà vues", () => {
+    expect(recruitmentSeenAmong("7.5", [5, 6, 7])).toEqual([5, 7]);
+  });
+
+  it("oublie les annonces qui ne sont plus mises en avant", () => {
+    // Le cookie réécrit par la modale ne porte ainsi que des annonces en ligne.
+    expect(recruitmentSeenAmong("5.99", [5, 6])).toEqual([5]);
+  });
+
+  it("ne rend rien sans cookie ni sur une valeur illisible", () => {
+    expect(recruitmentSeenAmong(undefined, [5])).toEqual([]);
+    expect(recruitmentSeenAmong("abc", [5])).toEqual([]);
+  });
+});
+
+describe("RECRUITMENT_MODAL_COOKIE_MAX_AGE", () => {
+  it("vaut sept jours", () => {
+    expect(RECRUITMENT_MODAL_INTERVAL_MS).toBe(7 * 24 * 60 * 60 * 1000);
+    expect(RECRUITMENT_MODAL_COOKIE_MAX_AGE).toBe(7 * 24 * 60 * 60);
   });
 });
 

@@ -1249,13 +1249,19 @@ async function runMigrations(db: Pool): Promise<void> {
   // même instruction, après avoir été lue (MySQL affecte de gauche à droite).
   // Si le `DROP` qui suit échouait, le report rejoué au démarrage suivant ne
   // trouverait donc plus rien à faire, et ne pourrait pas écraser un statut
-  // choisi depuis par le staff. Une base neuve n'a jamais eu la colonne :
-  // l'`UPDATE` y bute sur une colonne inconnue, c'est la réussite attendue —
-  // à condition que l'inconnue soit bien `highlight` : si c'est `priority`
-  // (ajout refusé plus haut), la source est tout ce qui reste.
+  // choisi depuis par le staff.
   //
-  // Le `DROP` ne suit que si le report n'a pas échoué pour une autre raison :
-  // il emporterait la seule trace de ce qui était mis en avant.
+  // Une base neuve n'a jamais eu `highlight`, et une base migrée ne l'a plus :
+  // l'`UPDATE` y bute sur une colonne inconnue, c'est la réussite attendue. Mais
+  // le même code d'erreur nommerait aussi `priority`, si son ajout avait été
+  // refusé plus haut — et la source serait alors tout ce qui reste. Plutôt que
+  // de lire le texte de l'erreur (sa forme dépend de la langue des messages du
+  // serveur) ou `information_schema` (réservé à ce qu'aucun essai ne peut
+  // trancher), une lecture de `priority` départage : lisible, c'est bien
+  // `highlight` qui manque.
+  //
+  // Le `DROP` ne suit que si le report a réussi ou que la source est partie :
+  // il emporterait sinon la seule trace de ce qui était mis en avant.
   let highlightCarriedOver = true;
   try {
     await db.execute(
@@ -1265,8 +1271,13 @@ async function runMigrations(db: Pool): Promise<void> {
        WHERE highlight <> 'NONE'`,
     );
   } catch (error) {
+    // `priority` illisible elle aussi : la source reste, on n'y touche pas.
     const sourceGone =
-      isUnknownColumnError(error) && String((error as Error).message).includes("'highlight'");
+      isUnknownColumnError(error) &&
+      (await db.execute(`SELECT priority FROM bg_recruitment_ads LIMIT 0`).then(
+        () => true,
+        () => false,
+      ));
     if (!sourceGone) {
       highlightCarriedOver = false;
       reportSchemaFailure(error, "UPDATE bg_recruitment_ads SET priority (report depuis highlight)");

@@ -21,6 +21,7 @@ import {
   RECRUITMENT_MODAL_COOKIE,
   recruitmentDismissed,
   recruitmentModalStart,
+  recruitmentSeenAmong,
 } from "@/lib/shared/recruitment";
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
@@ -132,10 +133,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieStore = await cookies();
   const spotlight = await getRecruitmentSpotlight();
   const onRecruitmentPage = requestHeaders.get(PATHNAME_HEADER) === RECRUITMENT_PAGE;
-  const modalStart = recruitmentModalStart(
-    cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value,
-    spotlight.modal.map((ad) => ad.id),
-  );
+  const modalCookie = cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value;
+  const modalIds = spotlight.modal.map((ad) => ad.id);
+  const modalStart = recruitmentModalStart(modalCookie, modalIds);
+  const modalSeen = recruitmentSeenAmong(modalCookie, modalIds);
   const bannerDismissed = recruitmentDismissed(
     cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value,
     spotlight.banner.map((ad) => ad.id),
@@ -176,6 +177,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <RecruitmentHighlight
             modalAds={spotlight.modal}
             modalStart={privacyChanges.length > 0 ? null : modalStart}
+            modalSeen={modalSeen}
             bannerAds={spotlight.banner}
             bannerDismissed={bannerDismissed}
             onAdPage={onRecruitmentPage}

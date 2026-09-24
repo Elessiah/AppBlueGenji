@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FocusEvent } from "react";
+import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
@@ -39,6 +39,20 @@ function writeSeenCookie(name: string, value: string, maxAge?: number): void {
   }
 }
 
+/**
+ * Le focus vient-il du clavier ? Un clic de souris donne aussi le focus à un
+ * bouton : compté comme un focus, il figerait la banderole jusqu'au clic
+ * suivant ailleurs. Un navigateur qui ne connaît pas `:focus-visible` lève une
+ * erreur : on s'arrête alors, dans le doute.
+ */
+function isKeyboardFocus(target: EventTarget): boolean {
+  try {
+    return target instanceof Element && target.matches(":focus-visible");
+  } catch {
+    return true;
+  }
+}
+
 function adMeta(ad: RecruitmentAd): string {
   return [ad.teamName, RECRUITMENT_DOMAIN_LABELS[ad.domain], ad.roles].filter(Boolean).join(" · ");
 }
@@ -66,12 +80,13 @@ function adHref(ad: RecruitmentAd): string {
  *
  * La banderole se referme pour la visite (cookie de session), la modale pour
  * sept jours ({@link RECRUITMENT_MODAL_COOKIE_MAX_AGE}). La valeur est la liste
- * des identifiants montrés : une annonce qui s'ajoute à la mise en avant la
- * fait reparaître aussitôt.
+ * des identifiants montrés — pour la modale, des pages réellement affichées :
+ * une annonce qui s'ajoute, ou qu'on n'a jamais feuilletée, la fait reparaître.
  */
 export function RecruitmentHighlight({
   modalAds,
   modalStart,
+  modalSeen = [],
   bannerAds,
   bannerDismissed,
   onAdPage,
@@ -80,6 +95,8 @@ export function RecruitmentHighlight({
   modalAds: readonly RecruitmentAd[];
   /** Page d'ouverture de la modale, `null` si elle se tait (déjà vue, ou choix de confidentialité dû). */
   modalStart: number | null;
+  /** Prioritaires que ce visiteur a déjà vues (cookie) : elles le restent. */
+  modalSeen?: readonly number[];
   /** Prioritaires puis importantes publiées : ce qui défile dans la banderole. */
   bannerAds: readonly RecruitmentAd[];
   /** Le cookie dit que ce visiteur a déjà fermé la banderole telle qu'elle est. */
@@ -96,6 +113,7 @@ export function RecruitmentHighlight({
       {showModal && (
         <RecruitmentArrivalModal
           ads={modalAds}
+          seenIds={modalSeen}
           startIndex={Math.min(Math.max(modalStart, 0), modalAds.length - 1)}
         />
       )}
@@ -108,8 +126,9 @@ export function RecruitmentHighlight({
  * {@link RECRUITMENT_BANNER_ROTATION_MS} ms.
  *
  * Le défilement s'arrête de lui-même dans trois cas, et aucun n'est une option
- * à cocher : au **survol** ou au **focus** (on ne retire pas une annonce de
- * sous le pointeur ni sous le clavier), et dès que le **régime de charge** coupe
+ * à cocher : au **survol à la souris** ou au **focus clavier** (on ne retire pas
+ * une annonce de sous le pointeur ni sous le clavier), et dès que le **régime de
+ * charge** coupe
  * les animations décoratives — page sans focus, machine à la peine, joueur en
  * match, mouvement réduit demandé (`useClientPower`) : une banderole qui tourne
  * derrière un jeu est une image prise au jeu. Un bouton pause le fige pour de
@@ -159,6 +178,16 @@ function RecruitmentBanner({
     setIndex((i) => (i + direction + count) % count);
   }
 
+  // Au doigt, un tap émet l'entrée du pointeur mais jamais sa sortie : compté
+  // comme un survol, il figerait la banderole pour toute la visite.
+  function onPointerEnter(event: PointerEvent<HTMLDivElement>) {
+    if (event.pointerType === "mouse") setHovered(true);
+  }
+
+  function onFocus(event: FocusEvent<HTMLDivElement>) {
+    if (isKeyboardFocus(event.target)) setFocused(true);
+  }
+
   function onBlur(event: FocusEvent<HTMLDivElement>) {
     // Le focus qui passe d'un bouton à l'autre de la banderole ne relance rien.
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
@@ -169,9 +198,9 @@ function RecruitmentBanner({
       className={styles.banner}
       role="region"
       aria-label="Annonces de recrutement"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      onFocus={() => setFocused(true)}
+      onPointerEnter={onPointerEnter}
+      onPointerLeave={() => setHovered(false)}
+      onFocus={onFocus}
       onBlur={onBlur}
     >
       <span className={styles.bannerDot} aria-hidden="true" />
@@ -261,16 +290,32 @@ function RecruitmentBanner({
  */
 function RecruitmentArrivalModal({
   ads,
+  seenIds,
   startIndex,
 }: {
   ads: readonly RecruitmentAd[];
+  seenIds: readonly number[];
   startIndex: number;
 }) {
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(startIndex);
+  // Pages **réellement affichées**, plus celles que le cookie tenait déjà. Tout
+  // compter comme vu dès l'ouverture taisait pour sept jours les prioritaires
+  // qu'un visiteur n'avait jamais feuilletées : fermée sur la page 1, la modale
+  // ne lui aurait jamais montré les suivantes. Elle revient donc, à la visite
+  // suivante, sur la première qu'il n'a pas vue.
+  const [viewed, setViewed] = useState<ReadonlySet<number>>(
+    () => new Set([...seenIds, ads[startIndex % ads.length].id]),
+  );
 
-  // Valeur du cookie : toutes les prioritaires montrées, pas seulement la page lue.
-  const seenValue = serializeRecruitmentSeen(ads.map((ad) => ad.id));
+  // Valeur du cookie : les prioritaires vues, dans l'ordre de la modale.
+  const seenValue = serializeRecruitmentSeen(ads.filter((a) => viewed.has(a.id)).map((a) => a.id));
+
+  function go(direction: -1 | 1) {
+    const next = (index + direction + ads.length) % ads.length;
+    setIndex(next);
+    setViewed((prev) => (prev.has(ads[next].id) ? prev : new Set([...prev, ads[next].id])));
+  }
 
   function dismiss() {
     writeSeenCookie(RECRUITMENT_MODAL_COOKIE, seenValue, RECRUITMENT_MODAL_COOKIE_MAX_AGE);
@@ -280,8 +325,8 @@ function RecruitmentArrivalModal({
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open, onClose: dismiss });
 
-  // La modale « compte » comme vue dès qu'elle est affichée, même si le
-  // visiteur quitte la page sans la fermer. La marque n'est posée qu'ici, à
+  // Une page « compte » comme vue dès qu'elle est affichée, même si le visiteur
+  // quitte le site sans fermer la modale. La marque n'est posée qu'ici, à
   // l'affichage réel : traverser la page de recrutement, où elle est tue, ne
   // doit pas brûler la fenêtre de sept jours sans que rien n'ait été montré.
   useEffect(() => {
@@ -324,7 +369,7 @@ function RecruitmentArrivalModal({
             <button
               type="button"
               className={styles.pagerButton}
-              onClick={() => setIndex((i) => (i - 1 + count) % count)}
+              onClick={() => go(-1)}
             >
               ← Précédente
             </button>
@@ -339,7 +384,7 @@ function RecruitmentArrivalModal({
             <button
               type="button"
               className={styles.pagerButton}
-              onClick={() => setIndex((i) => (i + 1) % count)}
+              onClick={() => go(1)}
             >
               Suivante →
             </button>

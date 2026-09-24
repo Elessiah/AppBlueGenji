@@ -324,10 +324,17 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // pourrait pas écraser un statut choisi depuis.
     expect(section.indexOf("SET priority =")).toBeLessThan(section.indexOf("highlight = 'NONE'"));
     expect(section).toContain("WHERE highlight <> 'NONE'");
-    // Le retrait attend un report réussi (ou une source déjà partie) : sinon il
+    // Le retrait attend un report réussi, ou une source déjà partie : sinon il
     // emporterait la seule trace de ce qui était mis en avant.
     expect(section).toContain("if (highlightCarriedOver) {");
-    expect(section).toContain(".includes(\"'highlight'\")");
+    // « Source partie » se départage par une lecture de `priority`, jamais par
+    // le texte de l'erreur, dont la forme dépend de la langue du serveur.
+    const migration = sql.slice(
+      sql.indexOf("SET priority = CASE highlight"),
+      sql.indexOf("const DROP_RECRUITMENT_HIGHLIGHT"),
+    );
+    expect(migration).toContain("SELECT priority FROM bg_recruitment_ads LIMIT 0");
+    expect(migration).not.toContain(".message");
   });
 
   it("déclare le statut dans la table neuve et l'ajoute aux bases qui tournent", () => {
