@@ -126,11 +126,14 @@
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--blue-300);
-  transition: color 0.16s ease;
+  transition: color 0.16s ease, background-color 0.16s ease;
 }
 
+/* La cible a maintenant une surface : le survol la montre, comme celui des
+   boutons voisins. */
 .bannerLink:hover {
   color: var(--ink);
+  background: rgba(90, 200, 255, 0.08);
 }
 
 /* Parcours à la main : précédente, position, suivante, pause. */
