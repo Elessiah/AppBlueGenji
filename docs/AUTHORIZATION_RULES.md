@@ -315,6 +315,7 @@ la règle :
 | ------------------------------------ | ---------------------------------------------- |
 | Le propriétaire du compte            | Toujours, certifié ou non                      |
 | N'importe qui, tag **non certifié**  | **Jamais**, administrateur compris              |
+| Partie d'un même match lancé         | Du lancement à la fin du match (joueurs des deux engagées, caster inscrit) |
 | Administrateur                       | Toujours (tag certifié)                         |
 | Permission `tournaments`             | Si le joueur est engagé dans un tournoi vivant  |
 | `casting`, joueur, visiteur          | Jamais — le tag n'est **pas** public            |
@@ -343,7 +344,9 @@ l'avatar : un écran ajouté demain n'a rien à afficher plutôt qu'à se souven
 d'une règle. Trois lectures y passent — `getFullProfile`, le panneau de contacts
 d'un tournoi (`GET /api/admin/tournaments/[id]/contacts`, qui n'a plus que la
 certification à appliquer, en SQL, puisque tout joueur listé est engagé dans *ce*
-tournoi) et le profil du titulaire. Rien de tout cela n'entre dans
+tournoi), la modale de lancement d'un match (`GET /api/me/match-launches`, qui
+seule établit `sharesMatchLobby` — lecteur partie du match, match en lancement ou
+lancé) et le profil du titulaire. Rien de tout cela n'entre dans
 `TournamentSnapshot`, qui est diffusé tel quel à tous les abonnés du flux.
 
 ---
@@ -501,6 +504,9 @@ toujours `UPCOMING`.
   égalité — le statut repassait en `AWAITING_CONFIRMATION`, deux reports
   concordants réécrivaient le score, et le verrou de manche n'y opposait rien
   puisqu'il ne vit que du côté de l'arbitrage ;
+- ✅ le match est **lancé** (`MATCH_NOT_LAUNCHED` → 409) : les parties se sont
+  déclarées prêtes, l'arbitrage l'a forcé, ou le délai l'a fait partir
+  (`lib/shared/match-launch.ts`, §4.9) ;
 - ✅ le score constitue un **résultat final** au format de la manche
   (`checkMatchScores`).
 
@@ -530,6 +536,9 @@ Réservé à `ADMIN` et `ARBITRE` :
   (`PATCH /api/admin/matches/[id]/scores`) et **valider un résultat**
   (`POST /api/admin/matches/[id]/resolve`), forfait d'une manche compris ;
 - programmer l'heure d'un match (`PUT /api/admin/matches/[id]/schedule`) ;
+- désigner l'équipe hôte d'un match (`PUT /api/admin/matches/[id]/host`), le
+  **lancer** sans attendre les « Prêt » (`POST /api/admin/matches/[id]/launch`)
+  et retirer le caster inscrit (`DELETE /api/matches/[id]/caster`) — §4.9 ;
 - poser et retirer une pénalité d'endurance (`POST` / `DELETE .../penalties`) ;
 - forcer le forfait de n'importe quel engagé (`POST .../forfeit` avec `teamId`) ;
 - reculer d'un stade (`POST /api/admin/tournaments/[id]/rollback`) ;
@@ -547,6 +556,13 @@ déclencheur `AUTO` / `MANUAL` / `START_TIME`, ouverture de l'antenne).
 La **chaîne officielle du tournoi** est un autre droit : elle passe par
 `PUT /api/admin/tournaments/[id]/live`, protégé par `tournaments`. Un `CASTER`
 ouvre l'antenne d'un match, il ne décide pas de la chaîne du tournoi.
+
+`live` ouvre aussi l'**inscription comme caster** d'un match
+(`POST /api/matches/[matchId]/caster`), à une condition de plus que la
+permission : un tag Discord **certifié** et un compte Battle.net **rattaché**
+(`castBlockReason`, refus `CASTER_IDENTITY_REQUIRED` → 409). Un joueur du match
+ne peut pas le caster (`CASTER_IS_PLAYER`), un match n'a qu'un caster
+(`MATCH_ALREADY_CASTED`), et l'on se retire soi-même (`DELETE`).
 
 `live` n'ouvre **rien d'autre** : ni score, ni horaire, ni seeding, ni édition.
 
@@ -601,6 +617,27 @@ Aucune équipe ni aucun joueur n'est supprimé : ni la fantôme retirée du plat
 ni l'entrée solo d'un joueur. Voir `docs/features/ENTRANT_REMOVAL.md`.
 
 ---
+
+### 4.9 Lancer un match — les trois « Prêt »
+
+Un match jouable entre en **lancement** à son heure de début (dès qu'il est
+jouable s'il n'en a pas) et ne se joue qu'une fois **lancé**
+(`lib/shared/match-launch.ts`, `docs/features/MATCH_LAUNCH.md`).
+`POST /api/matches/[matchId]/ready` (`{ ready: boolean }`) accepte :
+
+- ✅ le **caster inscrit** sur ce match ;
+- ✅ pour une équipe, un membre **en cours** portant `CAPITAINE`, `MANAGER` ou
+  `OWNER` (`canDeclareTeamReady`) — un autre joueur du roster voit la modale sans
+  le bouton (`NOT_TEAM_READY_ROLE` → 403) ;
+- ✅ en individuel, le joueur de l'entrée solo ;
+- ❌ toute autre personne (`NOT_MATCH_PARTY` → 403) ;
+- ❌ hors lancement (`MATCH_NOT_IN_LOBBY`) ou après lancement
+  (`MATCH_ALREADY_LAUNCHED`), tous deux en 409 — un « Prêt » ne se retire plus
+  une fois le match parti.
+
+Une fantôme est prête d'office. Le match part quand toutes les parties attendues
+sont prêtes (le caster seulement s'il y en a un), quand l'arbitrage le force, ou
+d'office passé quinze minutes.
 
 ## 5. Équipes fantômes et entrées solo
 

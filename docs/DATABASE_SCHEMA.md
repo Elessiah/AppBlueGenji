@@ -79,6 +79,17 @@ Ce qu'elle contient aujourd'hui :
 | — (image de tournoi) | `bg_tournaments` | `image_focus_x` |
 | — (image de tournoi) | `bg_tournaments` | `image_focus_y` |
 | — (fiche d'équipe) | `bg_team_invitations` | `roles_json` — rôles proposés avec une invitation, posés à l'arrivée du joueur (`NULL` sur une demande, et sur les invitations d'avant la colonne : DPS) |
+| — (lancement des matchs) | `bg_matches` | `host_team_id` (+ clé étrangère `SET NULL`) — équipe hôte désignée par l'arbitrage, `NULL` = équipe 1 |
+| — (lancement des matchs) | `bg_matches` | `caster_user_id` (+ index et clé étrangère `SET NULL`) — caster inscrit |
+| — (lancement des matchs) | `bg_matches` | `lobby_opened_at`, `team1_ready_at`, `team2_ready_at`, `caster_ready_at` |
+
+`bg_matches.launched_at` n'est **pas** dans la liste, et c'est volontaire : son
+ajout s'accompagne d'un **remplissage** (les matchs déjà jouables au déploiement
+sont posés lancés, sans quoi une rencontre en cours se verrait refuser son score).
+Rejoué à chaque démarrage, ce remplissage lancerait d'office tout match devenu
+jouable depuis ; il ne suit donc que l'ajout **effectif** de la colonne, dans un
+bloc à part qui passe par le même `reportSchemaFailure`. Voir
+`docs/features/MATCH_LAUNCH.md`.
 
 Le coût est nul : chaque entrée retombe en silence quand la colonne est là, et le
 bloc ne fait rien sur une base neuve. **La liste est faite pour rétrécir** — une
