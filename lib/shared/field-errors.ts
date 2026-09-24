@@ -142,6 +142,40 @@ export function firstMisplacedDate<F extends string>(
   return null;
 }
 
+/**
+ * Attribut posé sur un champ **le temps** que le rattachement d'un refus y
+ * ramène le focus (`focusFlaggedField`).
+ *
+ * Un contrôle qui réagit à son focus — la liste de pseudos s'ouvre dès qu'on
+ * entre dans le champ — le lit pour ne pas confondre ce retour avec un geste
+ * du joueur : sinon, le lecteur d'écran entendrait s'ouvrir des suggestions
+ * par-dessus la phrase du refus, qui est pourtant ce qu'il est venu chercher.
+ */
+export const FIELD_ERROR_FOCUS_ATTRIBUTE = "data-field-error-focus";
+
+/** Ce focus vient-il du rattachement d'un refus, et non du joueur ? */
+export function isFieldErrorFocus(element: Element | null | undefined): boolean {
+  return element?.hasAttribute(FIELD_ERROR_FOCUS_ATTRIBUTE) ?? false;
+}
+
+/**
+ * Ramène le focus sur un champ signalé, marqué pendant l'appel.
+ *
+ * `focus()` déclenche ses évènements **pendant** l'appel (React les écoute par
+ * `focusin`, synchrone lui aussi) : la marque est donc lisible par le
+ * gestionnaire, et retirée juste après — le prochain focus, celui du joueur,
+ * n'en porte aucune.
+ */
+export function focusFlaggedField(element: HTMLElement | null | undefined): void {
+  if (!element) return;
+  element.setAttribute(FIELD_ERROR_FOCUS_ATTRIBUTE, "");
+  try {
+    element.focus();
+  } finally {
+    element.removeAttribute(FIELD_ERROR_FOCUS_ATTRIBUTE);
+  }
+}
+
 // ── Tables des formulaires ────────────────────────────────────────────────
 
 /** Identité d'une équipe : création, équipe fantôme, fiche en mode gestion. */
@@ -180,6 +214,40 @@ export type LoginField = "handle" | "code";
 export const LOGIN_FIELD_ERRORS: FieldErrorMap<LoginField> = {
   INVALID_DISCORD_HANDLE: "handle",
   DISCORD_USER_NOT_FOUND: "handle",
+  INVALID_CODE: "code",
+  CODE_INVALID_OR_EXPIRED: "code",
+};
+
+/**
+ * Désignation d'un joueur par son pseudo : invitation dans une équipe et
+ * attribution d'une fantôme (`PlayerPseudoCombobox`). Les deux routes rendent
+ * les mêmes refus sur le pseudo — personne ne le porte, compte supprimé, joueur
+ * déjà dans une équipe ou déjà invité : dans chaque cas, c'est un autre pseudo
+ * qu'il faut saisir.
+ */
+export type PlayerPseudoField = "pseudo";
+
+export const PLAYER_PSEUDO_FIELD_ERRORS: FieldErrorMap<PlayerPseudoField> = {
+  MISSING_PSEUDO: "pseudo",
+  INVALID_PSEUDO: "pseudo",
+  USER_NOT_FOUND: "pseudo",
+  USER_ALREADY_IN_TEAM: "pseudo",
+  ALREADY_INVITED: "pseudo",
+  PLAYER_ACCOUNT_DELETED: "pseudo",
+};
+
+/**
+ * Certification du tag Discord (`DiscordVerificationDialog`). Hors table : les
+ * refus du bot (injoignable, délai dépassé — celui-ci peut tenir au tag comme à
+ * la charge du bot, la phrase dit les deux) et les plafonds de débit, qu'aucune
+ * saisie ne lève.
+ */
+export type DiscordVerificationField = "handle" | "code";
+
+export const DISCORD_VERIFICATION_FIELD_ERRORS: FieldErrorMap<DiscordVerificationField> = {
+  INVALID_DISCORD_HANDLE: "handle",
+  DISCORD_USER_NOT_FOUND: "handle",
+  DISCORD_ID_MISMATCH: "handle",
   INVALID_CODE: "code",
   CODE_INVALID_OR_EXPIRED: "code",
 };

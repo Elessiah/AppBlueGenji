@@ -1,12 +1,12 @@
 "use client";
 
-import { CSSProperties, useState } from "react";
+import { CSSProperties, useEffect, useRef, useState } from "react";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import {
   MAX_PHASES,
   resolvePhasePlan,
   describePhasePlan,
-  validatePhases,
+  findPhaseIssue,
 } from "@/lib/shared/tournament-phases";
 import { CyberButton } from "@/components/cyber";
 import { PhaseCard } from "./PhaseCard";
@@ -14,7 +14,8 @@ import {
   movePhase,
   removePhase,
   addPhase,
-  phaseErrorMessage,
+  phaseFieldId,
+  phaseIssueMessage,
 } from "./phase-form";
 
 const HINT: CSSProperties = {
@@ -29,6 +30,13 @@ interface PhaseBuilderProps {
   maxTeams: number;
   /** Plan verrouillé : consultable, mais plus modifiable (édition restreinte). */
   disabled?: boolean;
+  /**
+   * Demande de focus sur le réglage fautif, incrémentée par le formulaire quand
+   * il refuse l'envoi d'un plan invalide : la phase en cause est dépliée (son
+   * champ n'existe pas repliée), puis le champ reçoit le focus — la consigne et
+   * l'endroit arrivent ensemble, comme pour les autres champs du formulaire.
+   */
+  focusRequest?: number;
   onChange: (phases: PhaseConfig[]) => void;
 }
 
@@ -36,9 +44,11 @@ export function PhaseBuilder({
   phases,
   maxTeams,
   disabled = false,
+  focusRequest = 0,
   onChange,
 }: PhaseBuilderProps) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+  const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 
   const handleToggleExpand = (index: number) => {
     setExpandedIndex(expandedIndex === index ? null : index);
@@ -68,7 +78,28 @@ export function PhaseBuilder({
 
   const plan = resolvePhasePlan(maxTeams, phases);
   const descriptions = describePhasePlan(plan);
-  const error = validatePhases(phases);
+  const issue = findPhaseIssue(phases);
+  const issueMessage = issue ? phaseIssueMessage(issue) : null;
+
+  // Lu par une référence : l'effet ne doit répondre qu'à une **nouvelle**
+  // demande, pas à chaque frappe qui change le défaut du plan.
+  const issueRef = useRef(issue);
+  issueRef.current = issue;
+
+  useEffect(() => {
+    if (focusRequest === 0) return;
+    const current = issueRef.current;
+    if (!current || current.phaseIndex === null || current.field === null) return;
+    setExpandedIndex(current.phaseIndex);
+    setPendingFocusId(phaseFieldId(current.phaseIndex + 1, current.field));
+  }, [focusRequest]);
+
+  // Second temps : le champ n'existe qu'une fois la phase dépliée et rendue.
+  useEffect(() => {
+    if (!pendingFocusId) return;
+    document.getElementById(pendingFocusId)?.focus();
+    setPendingFocusId(null);
+  }, [pendingFocusId]);
 
   return (
     <div>
@@ -90,6 +121,11 @@ export function PhaseBuilder({
             totalPhases={phases.length}
             maxTeams={maxTeams}
             disabled={disabled}
+            issue={
+              issue && issueMessage && issue.phaseIndex === index && issue.field
+                ? { field: issue.field, message: issueMessage }
+                : null
+            }
             onToggleExpand={() => handleToggleExpand(index)}
             onMoveUp={() => handleMoveUp(index)}
             onMoveDown={() => handleMoveDown(index)}
@@ -173,7 +209,7 @@ export function PhaseBuilder({
       </div>
 
       {/* Validation error */}
-      {error && (
+      {issueMessage && (
         <div
           style={{
             padding: "12px 16px",
@@ -191,7 +227,7 @@ export function PhaseBuilder({
               lineHeight: 1.4,
             }}
           >
-            {phaseErrorMessage(error)}
+            {issueMessage}
           </p>
         </div>
       )}

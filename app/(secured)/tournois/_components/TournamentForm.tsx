@@ -3,7 +3,7 @@
 import { FormEvent, useState } from "react";
 import Link from "next/link";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
-import { validatePhases } from "@/lib/shared/tournament-phases";
+import { findPhaseIssue } from "@/lib/shared/tournament-phases";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
 import {
   DEFAULT_MATCH_FORMAT,
@@ -30,7 +30,7 @@ import {
 import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { useToast } from "@/components/ui/toast";
 import { CyberCard, CyberButton } from "@/components/cyber";
-import { phaseErrorMessage } from "../creer/phase-form";
+import { phaseIssueMessage } from "../creer/phase-form";
 import { FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
@@ -143,6 +143,8 @@ export function TournamentForm({
     initialValues.matchFormat?.value ?? DEFAULT_MATCH_FORMAT.value,
   );
   const [loading, setLoading] = useState(false);
+  // Incrémenté à chaque refus d'un plan de phases invalide (`PhaseBuilder`).
+  const [phaseFocusRequest, setPhaseFocusRequest] = useState(0);
   const [image, setImage] = useState<ImagePickerValue>(() => initialImagePickerValue(null));
 
   const { format, maxTeams, phases } = values;
@@ -229,9 +231,12 @@ export function TournamentForm({
 
       // Validate phases for MULTI format
       if (format === "MULTI") {
-        const error = validatePhases(phases);
-        if (error) {
-          showError(phaseErrorMessage(error));
+        const issue = findPhaseIssue(phases);
+        if (issue) {
+          showError(phaseIssueMessage(issue));
+          // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
+          // la phase et y porte le focus.
+          setPhaseFocusRequest((n) => n + 1);
           setLoading(false);
           return;
         }
@@ -503,6 +508,7 @@ export function TournamentForm({
               locked={locked}
               lockedAttr={lockedAttr}
               onSwissTotalRoundsChange={setSwissTotalRounds}
+              phaseFocusRequest={phaseFocusRequest}
             />
           </div>
         </section>

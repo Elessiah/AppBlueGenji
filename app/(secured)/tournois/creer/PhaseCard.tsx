@@ -1,11 +1,14 @@
 "use client";
 
 import { CSSProperties } from "react";
-import type { PhaseConfig } from "@/lib/shared/tournament-phases";
+import type { PhaseConfig, PhaseIssueField } from "@/lib/shared/tournament-phases";
 import type { PhaseFormat } from "@/lib/shared/types";
 import { MIN_PHASES } from "@/lib/shared/tournament-phases";
 import { Pill } from "@/components/cyber";
+import { fieldAria } from "@/lib/shared/field-errors";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import {
+  phaseFieldId,
   phaseFormatLabel,
   phaseSummary,
 } from "./phase-form";
@@ -70,6 +73,11 @@ interface PhaseCardProps {
   maxTeams: number;
   /** Plan verrouillé : consultable, mais plus modifiable (édition restreinte). */
   disabled?: boolean;
+  /**
+   * Défaut du plan qui vise **cette** phase : le réglage en cause et la phrase
+   * du refus, posés sur le champ (`aria-invalid`, `aria-describedby`).
+   */
+  issue?: { field: PhaseIssueField; message: string } | null;
   onToggleExpand: () => void;
   onMoveUp: () => void;
   onMoveDown: () => void;
@@ -84,6 +92,7 @@ export function PhaseCard({
   totalPhases,
   maxTeams,
   disabled = false,
+  issue = null,
   onToggleExpand,
   onMoveUp,
   onMoveDown,
@@ -95,6 +104,15 @@ export function PhaseCard({
   const canRemove = !disabled && totalPhases > MIN_PHASES;
   const bodyId = `phase-body-${phase.position}`;
   const toggleId = `phase-toggle-${phase.position}`;
+  const fieldId = (field: PhaseIssueField) => phaseFieldId(phase.position, field);
+  const helpId = (field: PhaseIssueField) => `${fieldId(field)}-help`;
+  // Attributs d'un réglage, et la phrase du refus qui le vise : le lecteur
+  // d'écran l'entend en arrivant sur le champ, l'aide existante ensuite.
+  const invalidAttrs = (field: PhaseIssueField, ...helpIds: string[]) =>
+    fieldAria(fieldId(field), issue?.field === field, ...helpIds);
+  const errorText = (field: PhaseIssueField) => (
+    <FieldErrorText fieldId={fieldId(field)} message={issue?.field === field ? issue.message : null} />
+  );
 
   return (
     <div
@@ -351,9 +369,10 @@ export function PhaseCard({
 
             {/* Format select */}
             <div className="field">
-              <label htmlFor={`phase-format-${phase.position}`}>Format</label>
+              <label htmlFor={fieldId("format")}>Format</label>
               <select
-                id={`phase-format-${phase.position}`}
+                id={fieldId("format")}
+                {...invalidAttrs("format")}
                 disabled={disabled}
                 value={phase.format}
                 onChange={(e) =>
@@ -368,6 +387,7 @@ export function PhaseCard({
                 <option value="SWISS">Ronde suisse</option>
                 <option value="SURVIVAL">Survie</option>
               </select>
+              {errorText("format")}
             </div>
 
             {/* Qualifier mode and value (hidden on last phase) */}
@@ -394,13 +414,14 @@ export function PhaseCard({
                 </div>
 
                 <div className="field">
-                  <label htmlFor={`phase-qualifier-${phase.position}`}>
+                  <label htmlFor={fieldId("qualifierValue")}>
                     {phase.qualifierMode === "COUNT"
                       ? "Nombre d'équipes qualifiées"
                       : "Pourcentage qualifié"}
                   </label>
                   <input
-                    id={`phase-qualifier-${phase.position}`}
+                    id={fieldId("qualifierValue")}
+                    {...invalidAttrs("qualifierValue")}
                     type="number"
                     min={phase.qualifierMode === "COUNT" ? 1 : 1}
                     max={phase.qualifierMode === "COUNT" ? maxTeams : 99}
@@ -413,6 +434,7 @@ export function PhaseCard({
                       })
                     }
                   />
+                  {errorText("qualifierValue")}
                 </div>
               </>
             )}
@@ -420,16 +442,19 @@ export function PhaseCard({
             {/* Swiss rounds */}
             {phase.format === "SWISS" && (
               <div className="field">
-                <label htmlFor={`phase-swiss-${phase.position}`}>
+                <label htmlFor={fieldId("swissTotalRounds")}>
                   Nombre de manches
                 </label>
                 <input
-                  id={`phase-swiss-${phase.position}`}
+                  id={fieldId("swissTotalRounds")}
+                  {...invalidAttrs("swissTotalRounds", helpId("swissTotalRounds"))}
                   type="number"
                   min={1}
                   max={20}
                   disabled={disabled}
-                  value={phase.swissTotalRounds || ""}
+                  // `??` et non `||` : un 0 saisi doit rester visible — c'est la
+                  // valeur que le refus désigne, un champ vidé l'aurait tue.
+                  value={phase.swissTotalRounds ?? ""}
                   onChange={(e) =>
                     onUpdate({
                       ...phase,
@@ -438,7 +463,10 @@ export function PhaseCard({
                   }
                   placeholder="Automatique"
                 />
-                <p style={HINT}>Laissez vide pour automatique.</p>
+                {errorText("swissTotalRounds")}
+                <p id={helpId("swissTotalRounds")} style={HINT}>
+                  Laissez vide pour automatique.
+                </p>
               </div>
             )}
 
@@ -446,16 +474,19 @@ export function PhaseCard({
             {phase.format === "SURVIVAL" && (
               <>
                 <div className="field">
-                  <label htmlFor={`phase-survival-before-${phase.position}`}>
+                  <label htmlFor={fieldId("survivalRoundsBeforeFirstCut")}>
                     Rounds avant la première coupe
                   </label>
                   <input
-                    id={`phase-survival-before-${phase.position}`}
+                    id={fieldId("survivalRoundsBeforeFirstCut")}
+                    {...invalidAttrs("survivalRoundsBeforeFirstCut", helpId("survivalRoundsBeforeFirstCut"))}
                     type="number"
                     min={1}
                     max={50}
                     disabled={disabled}
-                    value={phase.survivalRoundsBeforeFirstCut || 3}
+                    // `??` et non `||` : un 0 saisi s'affichait « 3 », si bien que
+                    // le champ désigné par le refus montrait une valeur valide.
+                    value={phase.survivalRoundsBeforeFirstCut ?? 3}
                     onChange={(e) =>
                       onUpdate({
                         ...phase,
@@ -463,22 +494,24 @@ export function PhaseCard({
                       })
                     }
                   />
-                  <p style={HINT}>
+                  {errorText("survivalRoundsBeforeFirstCut")}
+                  <p id={helpId("survivalRoundsBeforeFirstCut")} style={HINT}>
                     Laisse le classement se former avant la première élimination.
                   </p>
                 </div>
 
                 <div className="field">
-                  <label htmlFor={`phase-survival-per-${phase.position}`}>
+                  <label htmlFor={fieldId("survivalRoundsPerCut")}>
                     Rounds entre les coupes suivantes
                   </label>
                   <input
-                    id={`phase-survival-per-${phase.position}`}
+                    id={fieldId("survivalRoundsPerCut")}
+                    {...invalidAttrs("survivalRoundsPerCut", helpId("survivalRoundsPerCut"))}
                     type="number"
                     min={1}
                     max={50}
                     disabled={disabled}
-                    value={phase.survivalRoundsPerCut || 3}
+                    value={phase.survivalRoundsPerCut ?? 3}
                     onChange={(e) =>
                       onUpdate({
                         ...phase,
@@ -486,7 +519,10 @@ export function PhaseCard({
                       })
                     }
                   />
-                  <p style={HINT}>Cadence appliquée après la première coupe.</p>
+                  {errorText("survivalRoundsPerCut")}
+                  <p id={helpId("survivalRoundsPerCut")} style={HINT}>
+                    Cadence appliquée après la première coupe.
+                  </p>
                 </div>
               </>
             )}

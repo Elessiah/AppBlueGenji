@@ -8,6 +8,9 @@ import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { VerifiedBadge } from "@/components/discord-tag";
 import { useToast } from "@/components/ui/toast";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+import { DISCORD_VERIFICATION_FIELD_ERRORS } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { oauthStartPath } from "@/lib/shared/oauth-providers";
 import {
@@ -15,6 +18,8 @@ import {
   DISCORD_VERIFICATION_PURPOSE,
 } from "@/lib/shared/discord-identity";
 import { discordVerificationErrorMessage } from "./discord-errors";
+
+const FIELD_IDS = { handle: "discord-verify-handle", code: "discord-verify-code" } as const;
 
 /**
  * Certification du tag Discord, en une ou deux étapes.
@@ -64,9 +69,24 @@ export function DiscordVerificationDialog({
   const [discordId, setDiscordId] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
+  const fieldErrors = useFieldErrors(DISCORD_VERIFICATION_FIELD_ERRORS, FIELD_IDS);
+
+  /**
+   * Refus d'une des deux étapes : dit en notification, et rattaché au champ
+   * qu'il désigne (tag introuvable, code faux). Traduit ici et non au `throw` :
+   * une coupure réseau lève un `TypeError` dont le message anglais partait
+   * sinon tel quel dans la notification — et il ne désigne aucun champ.
+   */
+  const refuse = (e: unknown) => {
+    const code = (e as Error).message;
+    const message = discordVerificationErrorMessage(code);
+    showError(message);
+    fieldErrors.report(code, message);
+  };
 
   const requestVerification = async (event: FormEvent) => {
     event.preventDefault();
+    fieldErrors.clear();
     setLoading(true);
     try {
       const response = await fetch("/api/profile/discord", {
@@ -96,9 +116,7 @@ export function DiscordVerificationDialog({
         ).toLocaleTimeString()}).`,
       );
     } catch (e) {
-      // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
-      // dont le message anglais partait sinon tel quel dans la notification.
-      showError(discordVerificationErrorMessage((e as Error).message));
+      refuse(e);
     } finally {
       setLoading(false);
     }
@@ -106,6 +124,7 @@ export function DiscordVerificationDialog({
 
   const confirmVerification = async (event: FormEvent) => {
     event.preventDefault();
+    fieldErrors.clear();
     setLoading(true);
     try {
       const response = await fetch("/api/profile/discord", {
@@ -118,9 +137,7 @@ export function DiscordVerificationDialog({
       showSuccess("Tag Discord certifié.");
       onVerified(payload.tag ?? handle);
     } catch (e) {
-      // Traduit ici et non au `throw` : une coupure réseau lève un `TypeError`
-      // dont le message anglais partait sinon tel quel dans la notification.
-      showError(discordVerificationErrorMessage((e as Error).message));
+      refuse(e);
     } finally {
       setLoading(false);
     }
@@ -245,13 +262,21 @@ export function DiscordVerificationDialog({
             <div className="field">
               <label htmlFor="discord-verify-handle">Tag Discord</label>
               <input
-                id="discord-verify-handle"
+                id={FIELD_IDS.handle}
                 value={handle}
-                onChange={(e) => setHandle(e.target.value)}
+                onChange={(e) => {
+                  setHandle(e.target.value);
+                  fieldErrors.clear("handle");
+                }}
                 placeholder="ton_pseudo"
                 required
+                {...fieldErrors.aria("handle", "discord-verify-handle-help")}
               />
-              <p style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0", lineHeight: 1.6 }}>
+              <FieldErrorText fieldId={FIELD_IDS.handle} message={fieldErrors.message("handle")} />
+              <p
+                id="discord-verify-handle-help"
+                style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0", lineHeight: 1.6 }}
+              >
                 Le bot doit partager un serveur avec toi pour retrouver ton compte :{" "}
                 <Link
                   href={DISCORD_INVITE_URL}
@@ -278,15 +303,21 @@ export function DiscordVerificationDialog({
             <div className="field">
               <label htmlFor="discord-verify-code">Code reçu en message privé</label>
               <input
-                id="discord-verify-code"
+                id={FIELD_IDS.code}
                 value={code}
-                onChange={(e) => setCode(e.target.value)}
+                onChange={(e) => {
+                  setCode(e.target.value);
+                  fieldErrors.clear("code");
+                }}
                 inputMode="numeric"
+                autoComplete="one-time-code"
                 pattern="\d{6}"
                 placeholder="123456"
                 required
+                {...fieldErrors.aria("code", "discord-verify-code-help")}
               />
-              <p style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0" }}>
+              <FieldErrorText fieldId={FIELD_IDS.code} message={fieldErrors.message("code")} />
+              <p id="discord-verify-code-help" style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0" }}>
                 Cinq essais, puis le code est brûlé — demande-en un nouveau si tu te trompes.
               </p>
             </div>

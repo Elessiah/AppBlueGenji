@@ -103,15 +103,6 @@ export const KNOWN_ISSUES: readonly KnownIssue[] = [
       "(vitrine, connexion, annuaires, fiches, profil, formulaires, fiches de tournoi).",
   },
   {
-    title: "Erreurs de quelques formulaires",
-    criterion: "RGAA 11.10 · WCAG 3.3.1",
-    detail:
-      "L'invitation d'un joueur dans une équipe, la certification du tag Discord et les phases " +
-      "d'un tournoi multi-phases annoncent leurs erreurs par une notification, sans encore signaler " +
-      "le champ en cause.",
-    workaround: "La notification, lue par les lecteurs d'écran, nomme la saisie à corriger.",
-  },
-  {
     title: "Parcours au lecteur d'écran",
     criterion: "Ensemble du référentiel",
     detail:
