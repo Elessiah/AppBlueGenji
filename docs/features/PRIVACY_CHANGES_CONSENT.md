@@ -96,8 +96,13 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   autre ; on n'écrit pas à un inconnu au sujet du compte de quelqu'un.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
   changements qu'il n'a ni acceptés ni déjà reçus, et renvoie au site pour
-  décider. Borné à 1 800 caractères (plafond du bot) : au-delà, les derniers
-  changements sont comptés plutôt que coupés.
+  décider. Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
+  ne **réserve** que les changements qu'un message peut nommer tous
+  (`privacyChangesForOneMessage`), et le reste part au balayage suivant. Le
+  repli qui *compte* les derniers (« … et 1 autre ») ne suffit pas à l'envoi :
+  réservés avant l'envoi, ils étaient tenus pour annoncés sans que leur titre
+  ait été écrit — et c'était toujours le plus récent qui tombait. Le registre
+  entier ne tient plus dans un message depuis sa huitième entrée.
 - **Réservation avant l'envoi** (`bg_privacy_change_notifications`, clé primaire
   `(user_id, change_id)`) : c'est elle qui interdit le doublon. Bot injoignable
   → réservation rendue, le lot repartira ; membre introuvable ou messages privés

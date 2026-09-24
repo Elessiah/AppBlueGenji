@@ -23,8 +23,9 @@ Or le tag Discord du site avait deux défauts, et le second est le pire :
 ## La règle
 
 > Un tag **certifié** est visible des administrateurs en permanence, et de
-> l'arbitrage tant que son titulaire est engagé dans un tournoi vivant. Un tag
-> **non certifié** n'est visible de personne — administrateurs compris.
+> l'arbitrage tant que son titulaire est engagé dans un tournoi vivant — des
+> autres joueurs seulement si son titulaire l'a choisi. Un tag **non certifié**
+> n'est visible de personne — administrateurs compris.
 
 La deuxième moitié est la charnière, et elle n'est pas une précaution de style :
 les comptes existants ont saisi ce tag sous le régime « visible de moi seul ».
@@ -41,10 +42,37 @@ Le public se lit dans `canViewDiscordTag`, et l'ordre des cas *est* la règle :
 | N'importe qui, tag **non certifié**  | **Jamais**                                   |
 | Administrateur                       | Toujours (tag certifié)                       |
 | Permission `tournaments` (arbitre)   | Si le joueur est engagé dans un tournoi vivant |
-| Caster (`casting`), joueur, visiteur | Jamais — le tag n'est **pas** public          |
+| Joueur connecté quelconque           | Si le propriétaire a coché « Tag Discord »    |
+| Caster (`casting`), joueur (case décochée), visiteur sans compte | Jamais |
 
 La clause « non certifié » passe **avant** les rôles. Ce n'est pas un détail
 d'écriture : placée après, elle serait oubliée le jour où un rôle s'ajoute.
+
+### Visible des autres joueurs : un choix, pas un effet de la certification
+
+La certification ouvre le tag à l'**organisation** — administrateurs, arbitres
+pendant un tournoi, parties d'un match lancé. Elle ne l'ouvre pas aux autres
+joueurs, et `/profil` le disait mal : sous les réglages « Visible par les autres
+joueurs », une phrase renvoyait le tag à « ses propres réglages, ci-dessus »,
+comme si la certification décidait aussi pour eux. Un joueur qui voulait être
+trouvé par ses coéquipiers n'avait aucun geste pour cela.
+
+Ce geste est la case **« Tag Discord »** (`bg_users.visible_discord`,
+`VisibilitySettings.discord`), rangée avec ses voisines et **décochée par
+défaut** : un tag existant garde le public sous lequel il a été saisi. Deux
+bornes, tenues par `canViewDiscordTag` et non par l'écran :
+
+- **certifié seulement** — la clause « non certifié » la précède. Publier un tag
+  que personne n'a prouvé ferait écrire à un inconnu au nom d'un autre ; l'écran
+  le dit quand la case est cochée sur un tag non certifié
+  (`DISCORD_PLAYER_VISIBILITY_PENDING`) ;
+- **jamais sans session** — le réglage parle aux joueurs du site, pas au
+  visiteur anonyme (`canViewDiscordTag` refuse tout lecteur absent).
+
+Un tag rendu visible épargne à `getFullProfile` la question du tournoi : la
+réponse est acquise. L'annuaire ne lit toujours pas le tag. L'anonymisation
+remet la case à 0 avec le reste. Déclaré dans `PRIVACY_CHANGES`
+(`2026-09-tag-discord-visible-joueurs`).
 
 ### Le tag et la certification sont deux faits, pas un
 
