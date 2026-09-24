@@ -44,8 +44,10 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
     expect(profileErrorMessage(ACCOUNT_DELETED_ERROR)).toBe(ACCOUNT_DELETED_WRITE_MESSAGE);
     expect(avatarUploadErrorMessage(ACCOUNT_DELETED_ERROR)).toBe(ACCOUNT_DELETED_WRITE_MESSAGE);
     expect(avatarDeleteErrorMessage(ACCOUNT_DELETED_ERROR)).toBe(ACCOUNT_DELETED_WRITE_MESSAGE);
-    // Les deux écritures du profil traduisent dans leur `catch` par ce registre.
-    expect(PROFIL.match(/showError\(profileErrorMessage\(/g) ?? []).toHaveLength(2);
+    // Les deux écritures du profil traduisent dans leur `catch` par ce registre
+    // — la sauvegarde en passant par une variable, pour rattacher aussi le
+    // refus à son champ (`useFieldErrors`).
+    expect(PROFIL.match(/profileErrorMessage\((?:\(e as Error\)\.message|code)\)/g) ?? []).toHaveLength(2);
     expect(PROFIL).toContain("showError(avatarUploadErrorMessage((e as Error).message))");
     expect(PROFIL).toContain("showError(avatarDeleteErrorMessage((e as Error).message))");
   });
