@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
   DISCORD_CERTIFICATION_UNDO,
+  DISCORD_PLAYER_VISIBILITY_NO_TAG,
   DISCORD_PLAYER_VISIBILITY_NOTICE,
   DISCORD_PLAYER_VISIBILITY_PENDING,
   DISCORD_TAG_AUDIENCE,
@@ -50,6 +51,11 @@ describe("DISCORD_PLAYER_VISIBILITY_NOTICE", () => {
   it("dit qu'un tag non certifié reste masqué, case cochée ou non", () => {
     expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toMatch(/non certifié reste masqué/i);
     expect(DISCORD_PLAYER_VISIBILITY_PENDING).toMatch(/pas certifié/i);
+  });
+
+  it("sans tag, nomme d'abord l'enregistrement — pas une certification sans objet", () => {
+    expect(DISCORD_PLAYER_VISIBILITY_NO_TAG).toMatch(/pas encore de tag/i);
+    expect(DISCORD_PLAYER_VISIBILITY_NO_TAG).toMatch(/enregistre-le puis certifie-le/i);
   });
 });
 

@@ -53,6 +53,13 @@ export const DISCORD_PLAYER_VISIBILITY_PENDING =
   "Ton tag n'est pas certifié : il restera masqué aux autres joueurs tant que tu ne l'auras pas certifié.";
 
 /**
+ * Même situation sans **aucun** tag enregistré : « certifie ton tag » renverrait
+ * à un tag qui n'existe pas, le geste est d'abord d'en enregistrer un.
+ */
+export const DISCORD_PLAYER_VISIBILITY_NO_TAG =
+  "Tu n'as pas encore de tag Discord : enregistre-le puis certifie-le pour que les autres joueurs le voient.";
+
+/**
  * Ce qu'un tag **non** certifié vaut : rien, pour personne.
  *
  * La nuance compte au moment de choisir : sans certification, le tag est une

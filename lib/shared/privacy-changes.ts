@@ -302,6 +302,18 @@ export function buildPrivacyChangesMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
 ): string {
+  return layoutPrivacyChangesMessage(changes, siteUrl).text;
+}
+
+/**
+ * Le message **et** le nombre de changements qu'il nomme, sortis de la même
+ * mise en page : `privacyChangesForOneMessage` décide sur ce nombre, jamais en
+ * cherchant un titre dans le texte, qui dépendrait du format de ligne.
+ */
+function layoutPrivacyChangesMessage(
+  changes: readonly PrivacyChange[],
+  siteUrl: string | null,
+): { text: string; named: number } {
   const header =
     changes.length > 1
       ? `🔐 **BlueGenji — ${changes.length} changements de nos règles de confidentialité**`
@@ -323,11 +335,11 @@ export function buildPrivacyChangesMessage(
   for (const [index, change] of changes.entries()) {
     const line = `• **${change.title}** (${formatPrivacyChangeDate(change.publishedAt)}) — ${change.summary}`;
     if (assemble([...lines, line], changes.length - index - 1).length > PRIVACY_DM_MAX_LENGTH) {
-      return assemble(lines, changes.length - index);
+      return { text: assemble(lines, changes.length - index), named: lines.length };
     }
     lines.push(line);
   }
-  return assemble(lines, 0);
+  return { text: assemble(lines, 0), named: lines.length };
 }
 
 /**
@@ -348,10 +360,12 @@ export function privacyChangesForOneMessage(
   changes: readonly PrivacyChange[],
   siteUrl: string | null,
 ): PrivacyChange[] {
+  // Le lot se cherche en retirant par la fin : l'en-tête et le pied dépendent
+  // du nombre de changements, un lot plus court n'est pas seulement un préfixe
+  // du message plus long.
   for (let count = changes.length; count > 1; count -= 1) {
     const batch = changes.slice(0, count);
-    const message = buildPrivacyChangesMessage(batch, siteUrl);
-    if (batch.every((change) => message.includes(`**${change.title}**`))) return batch;
+    if (layoutPrivacyChangesMessage(batch, siteUrl).named === count) return batch;
   }
   return changes.slice(0, 1);
 }

@@ -34,6 +34,7 @@ import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/up
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_NO_TAG,
   DISCORD_PLAYER_VISIBILITY_NOTICE,
   DISCORD_PLAYER_VISIBILITY_PENDING,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
@@ -894,7 +895,7 @@ export default function ProfilePage() {
                   `false` par défaut et l'avertissement accuserait à tort un
                   joueur certifié. */}
               {visibility.discord && discordState.linked !== null && !discordState.verified
-                ? ` ${DISCORD_PLAYER_VISIBILITY_PENDING}`
+                ? ` ${discordState.tag ? DISCORD_PLAYER_VISIBILITY_PENDING : DISCORD_PLAYER_VISIBILITY_NO_TAG}`
                 : null}
             </p>
           </div>

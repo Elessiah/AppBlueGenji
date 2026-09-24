@@ -442,16 +442,33 @@ describe("getFullProfile — ce qui sort du tag", () => {
 });
 
 describe("updateOwnProfile — la case « Tag Discord »", () => {
+  const ASSIGNMENT = "visible_discord = COALESCE(?, visible_discord)";
+
+  /**
+   * Le paramètre lié à l'affectation, retrouvé en comptant les `?` qui la
+   * précèdent dans la requête : un indice écrit à la main se décalerait sans
+   * bruit au premier champ ajouté devant ou derrière.
+   */
+  function visibleDiscordParam(update: Query): unknown {
+    const at = update.sql.indexOf(ASSIGNMENT);
+    expect(at).toBeGreaterThanOrEqual(0);
+    return update.params[(update.sql.slice(0, at).match(/\?/g) ?? []).length];
+  }
+
   it("écrit le réglage par COALESCE, comme ses voisins", async () => {
     const { queries } = fakeDb();
 
     await updateOwnProfile(7, { visibility: { discord: true } });
 
-    const update = find(queries, "UPDATE bg_users")!;
-    expect(update.sql).toContain("visible_discord = COALESCE(?, visible_discord)");
-    // Juste après la majorité, juste avant l'ouverture au recrutement.
-    const at = update.params.length - 3;
-    expect(update.params[at]).toBe(true);
+    expect(visibleDiscordParam(find(queries, "UPDATE bg_users")!)).toBe(true);
+  });
+
+  it("écrit aussi le décochage — `false` n'est pas une absence", async () => {
+    const { queries } = fakeDb();
+
+    await updateOwnProfile(7, { visibility: { discord: false } });
+
+    expect(visibleDiscordParam(find(queries, "UPDATE bg_users")!)).toBe(false);
   });
 
   it("ne touche pas au réglage quand le patch n'en parle pas", async () => {
@@ -459,8 +476,7 @@ describe("updateOwnProfile — la case « Tag Discord »", () => {
 
     await updateOwnProfile(7, { visibility: { avatar: true } });
 
-    const update = find(queries, "UPDATE bg_users")!;
-    expect(update.params[update.params.length - 3]).toBeNull();
+    expect(visibleDiscordParam(find(queries, "UPDATE bg_users")!)).toBeNull();
   });
 });
 

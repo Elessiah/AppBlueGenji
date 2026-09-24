@@ -155,6 +155,8 @@ async function runSweep(now: Date): Promise<number> {
   // Un message par **ensemble** de changements : deux comptes qui ont les mêmes
   // à recevoir partagent un seul appel au bot.
   const groups = new Map<string, { changes: PrivacyChange[]; recipients: DiscordRecipient[]; userIds: number[] }>();
+  const siteUrl = siteBaseUrl();
+  const batchByDue = new Map<string, PrivacyChange[]>();
   for (const row of candidates) {
     const recipient = toRecipient(row);
     if (!recipient) continue;
@@ -164,7 +166,15 @@ async function runSweep(now: Date): Promise<number> {
     // Seulement ce qu'un message peut **nommer** : un changement réservé mais
     // seulement compté (« … et 1 autre ») serait tenu pour annoncé sans que son
     // titre ait été écrit. Le reste demeure dû et part au balayage suivant.
-    const reserved = await reserve(userId, privacyChangesForOneMessage(due, siteBaseUrl()));
+    // Calculé une fois par ensemble de changements dus : la plupart des comptes
+    // du lot ont le même.
+    const dueKey = due.map((change) => change.id).join("|");
+    let batch = batchByDue.get(dueKey);
+    if (!batch) {
+      batch = privacyChangesForOneMessage(due, siteUrl);
+      batchByDue.set(dueKey, batch);
+    }
+    const reserved = await reserve(userId, batch);
     if (reserved.length === 0) continue;
     const key = reserved.map((change) => change.id).join("|");
     const group = groups.get(key) ?? { changes: reserved, recipients: [], userIds: [] };
@@ -176,7 +186,7 @@ async function runSweep(now: Date): Promise<number> {
   let sent = 0;
   for (const group of groups.values()) {
     const report = await pushDiscordDirectMessages(
-      buildPrivacyChangesMessage(group.changes, siteBaseUrl()),
+      buildPrivacyChangesMessage(group.changes, siteUrl),
       group.recipients,
       "privacy-changes",
     );
