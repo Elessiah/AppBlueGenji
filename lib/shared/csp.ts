@@ -83,6 +83,12 @@
  * faisant refuser, avant d'y penser). Rien d'autre ne les emprunte, donc rien d'autre
  * ne peut se faire passer pour Google Identity Services par cette ouverture.
  *
+ * L'invite n'est plus chargée que par `/connexion`, et pourtant ces ouvertures
+ * restent posées sur **toutes** les pages : une navigation client ne relit pas
+ * d'en-tête, le document garde la politique de la page par laquelle on est
+ * arrivé. Les réserver à `/connexion` casserait l'invite pour qui y vient par
+ * un lien depuis l'accueil — c'est-à-dire presque tout le monde.
+ *
  * **Si une page casse après un ajout**, le réflexe est de lire le collecteur
  * (`/api/csp-report`) avant de toucher à la politique : en application, un
  * refus est visible tout de suite, et c'est le seul avantage que ce mode a sur
