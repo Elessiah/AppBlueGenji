@@ -81,6 +81,7 @@ describe("advanceTournamentNow", () => {
       row: registrationRow({ state: "RUNNING" }),
       stateChanged: true,
       contentChanged: false,
+      launchesChanged: false,
     });
   });
   afterEach(() => {
@@ -146,6 +147,7 @@ describe("advanceTournamentNow", () => {
       row: registrationRow({ state: "UPCOMING" }),
       stateChanged: true,
       contentChanged: false,
+      launchesChanged: false,
     });
 
     await expect(advanceTournamentNow(7)).resolves.toMatchObject({
@@ -180,6 +182,7 @@ describe("advanceTournamentNow", () => {
       row: registrationRow({ state: "REGISTRATION" }),
       stateChanged: true,
       contentChanged: false,
+      launchesChanged: false,
     });
 
     await expect(advanceTournamentNow(7)).resolves.toMatchObject({
@@ -223,6 +226,7 @@ describe("advanceTournamentNow", () => {
       row: registrationRow({ state: "FINISHED" }),
       stateChanged: true,
       contentChanged: false,
+      launchesChanged: false,
     });
 
     await expect(advanceTournamentNow(7)).resolves.toMatchObject({

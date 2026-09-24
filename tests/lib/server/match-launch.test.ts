@@ -5,7 +5,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 
 import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
-import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import {
   claimMatchCast,
   forceLaunchMatch,
@@ -212,7 +212,7 @@ describe("setMatchReady", () => {
     expect(state.match?.team1_ready_at).toBe(STAMP);
     expect(state.match?.lobby_opened_at).toBe(STAMP);
     expect(state.match?.launched_at).toBeNull();
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it("lance le match au dernier « Prêt » attendu", async () => {
@@ -258,7 +258,7 @@ describe("setMatchReady", () => {
 
   it("refuse qui n'est ni joueur ni caster du match", async () => {
     await expect(setMatchReady(42, 777, true)).rejects.toThrow("NOT_MATCH_PARTY");
-    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
   it("refuse un match introuvable", async () => {
@@ -348,7 +348,7 @@ describe("forceLaunchMatch", () => {
   it("lance un match en lancement sans attendre", async () => {
     await forceLaunchMatch(42);
     expect(state.match?.launched_at).toBe(STAMP);
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it("lance aussi avant l'heure de début", async () => {
@@ -382,7 +382,7 @@ describe("claimMatchCast", () => {
     state.users[CASTER] = verified;
     await claimMatchCast(42, CASTER, true);
     expect(state.match?.caster_user_id).toBe(CASTER);
-    expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
   });
 
   it("refuse sans la permission `live`", async () => {

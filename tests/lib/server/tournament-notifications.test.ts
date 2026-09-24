@@ -9,6 +9,7 @@ const invalidateSnapshot = jest.fn();
 const invalidateLists = jest.fn();
 const invalidatePreview = jest.fn();
 const invalidateLanding = jest.fn();
+const invalidateLandingLive = jest.fn();
 const invalidateRanking = jest.fn();
 const publishEvent = jest.fn();
 
@@ -26,6 +27,7 @@ jest.mock("@/lib/server/tournaments/preview-cache", () => ({
 
 jest.mock("@/lib/server/landing-cache", () => ({
   invalidateLandingAggregates: () => invalidateLanding(),
+  invalidateLandingLive: () => invalidateLandingLive(),
 }));
 
 jest.mock("@/lib/server/ranking-cache", () => ({
@@ -37,6 +39,7 @@ jest.mock("@/lib/server/live", () => ({
 }));
 
 import {
+  publishMatchUpdatedEvent,
   publishScoreReportedEvent,
   publishScoreResolvedEvent,
   publishUpdatedEvent,
@@ -47,6 +50,7 @@ beforeEach(() => {
   invalidateLists.mockReset();
   invalidatePreview.mockReset();
   invalidateLanding.mockReset();
+  invalidateLandingLive.mockReset();
   invalidateRanking.mockReset();
   publishEvent.mockReset();
 });
@@ -101,6 +105,30 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidateRanking).toHaveBeenCalledTimes(1);
   });
 
+  // Lancement, hôte, caster, horaire, antenne, rediff : les écritures les plus
+  // fréquentes d'une soirée de tournoi. Elles passaient par `publishUpdatedEvent`
+  // et vidaient à chaque « Prêt » la liste publique, la vitrine et le classement
+  // du site — qu'aucune d'elles ne peut changer.
+  it("n'oublie que l'instantané à un changement de match", () => {
+    publishMatchUpdatedEvent(7);
+    expect(invalidateSnapshot).toHaveBeenCalledWith(7);
+    expect(invalidateLists).not.toHaveBeenCalled();
+    expect(invalidatePreview).not.toHaveBeenCalled();
+    expect(invalidateLanding).not.toHaveBeenCalled();
+    expect(invalidateLandingLive).not.toHaveBeenCalled();
+    expect(invalidateRanking).not.toHaveBeenCalled();
+  });
+
+  it("oublie aussi le direct de l'accueil quand l'antenne d'un match bouge", () => {
+    publishMatchUpdatedEvent(7, { onAir: true });
+    expect(invalidateSnapshot).toHaveBeenCalledWith(7);
+    expect(invalidateLandingLive).toHaveBeenCalledTimes(1);
+    // Le reste de la vitrine (compteurs, classement, ticker) ne lit pas l'antenne.
+    expect(invalidateLanding).not.toHaveBeenCalled();
+    expect(invalidateLists).not.toHaveBeenCalled();
+    expect(invalidateRanking).not.toHaveBeenCalled();
+  });
+
   it("invalide avant de réveiller les abonnés", () => {
     // L'ordre compte : un abonné réveillé le premier relirait l'instantané
     // encore en cache, donc la version d'avant l'écriture.
@@ -119,6 +147,22 @@ describe("notifications — événements publiés", () => {
     expect(publishEvent).toHaveBeenCalledWith(
       expect.objectContaining({ type: "updated", tournamentId: 7 }),
     );
+  });
+
+  it("réveille la salle du tournoi à un changement de match", () => {
+    publishMatchUpdatedEvent(7);
+    expect(publishEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "updated", tournamentId: 7 }),
+    );
+  });
+
+  it("invalide avant de réveiller les abonnés, pour un changement de match aussi", () => {
+    const order: string[] = [];
+    invalidateSnapshot.mockImplementation(() => order.push("cache"));
+    publishEvent.mockImplementation(() => order.push("publish"));
+
+    publishMatchUpdatedEvent(7, { onAir: true });
+    expect(order).toEqual(["cache", "publish"]);
   });
 
   it("porte le match concerné pour les événements de score", () => {

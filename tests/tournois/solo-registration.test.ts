@@ -95,6 +95,7 @@ describe("registerCurrentUserTeam", () => {
       row: await jest.mocked(loadTournamentRow)(connection, tournamentId),
       stateChanged: false,
       contentChanged: false,
+      launchesChanged: false,
     }));
   });
 
@@ -237,6 +238,7 @@ describe("qualité pour engager son équipe", () => {
       row: await jest.mocked(loadTournamentRow)(connection, tournamentId),
       stateChanged: false,
       contentChanged: false,
+      launchesChanged: false,
     }));
   });
 

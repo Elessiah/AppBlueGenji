@@ -210,6 +210,7 @@ describe("tournaments-service: match state machine", () => {
         row: tournamentRow({ id: 1, state, participant_type: "TEAM" }),
         stateChanged: false,
         contentChanged: false,
+        launchesChanged: false,
       });
       jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(teamId);
     }

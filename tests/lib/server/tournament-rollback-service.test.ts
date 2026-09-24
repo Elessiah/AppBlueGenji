@@ -149,6 +149,7 @@ function setup(options: {
     row: options.missing ? null : tournamentRow({ id: 7, state: options.state ?? "RUNNING" }),
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
   jest.mocked(loadPhases).mockResolvedValue((options.phases ?? []).map((phase) => phaseRow(phase)));
 

@@ -17,6 +17,7 @@ import {
   resolveExpiredScoreReports,
 } from "@/lib/server/tournaments/finalization";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
+import { maintainMatchLaunches } from "@/lib/server/tournaments/match-launch";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import type { RowOverrides } from "../helpers/row-overrides";
 import { tournamentRow } from "../helpers/tournament-rows";
@@ -49,6 +50,7 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
     jest.mocked(resolveExpiredScoreReports).mockResolvedValue(0);
     jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
     jest.mocked(finalizeTournamentIfDone).mockResolvedValue(undefined);
+    jest.mocked(maintainMatchLaunches).mockResolvedValue(0);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -102,6 +104,29 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
     expect(result.stateChanged).toBe(false);
   });
 
+  // Un lancement ne change que le plateau de ce tournoi. Compté dans
+  // `contentChanged`, il faisait publier une mise à jour complète — liste
+  // publique, vitrine et classement du site vidés à l'heure de chaque manche.
+  it("signale un lancement à part, sans le compter comme un changement de contenu", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ bracket_size: 8 }));
+    jest.mocked(maintainMatchLaunches).mockResolvedValue(2);
+
+    const result = await syncTournamentState(connection, 5);
+
+    expect(result.launchesChanged).toBe(true);
+    expect(result.contentChanged).toBe(false);
+  });
+
+  it("garde `contentChanged` pour une manche tranchée par le délai", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ bracket_size: 8 }));
+    jest.mocked(resolveExpiredScoreReports).mockResolvedValue(1);
+
+    const result = await syncTournamentState(connection, 5);
+
+    expect(result.contentChanged).toBe(true);
+    expect(result.launchesChanged).toBe(false);
+  });
+
   it("ne touche à rien tant que le tournoi n'a pas démarré", async () => {
     const future = new Date(Date.now() + 86_400_000);
     jest.mocked(loadTournamentRow).mockResolvedValue(
@@ -139,7 +164,12 @@ describe("syncTournamentState — entretien d'un tournoi en cours", () => {
 
     const result = await syncTournamentState(connection, 5);
 
-    expect(result).toEqual({ row: null, stateChanged: false, contentChanged: false });
+    expect(result).toEqual({
+      row: null,
+      stateChanged: false,
+      contentChanged: false,
+      launchesChanged: false,
+    });
     expect(createBracketIfMissing).not.toHaveBeenCalled();
   });
 });
@@ -151,6 +181,7 @@ describe("syncTournamentState — ce que `stateChanged` doit rapporter", () => {
     jest.mocked(resolveExpiredScoreReports).mockResolvedValue(0);
     jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
     jest.mocked(finalizeTournamentIfDone).mockResolvedValue(undefined);
+    jest.mocked(maintainMatchLaunches).mockResolvedValue(0);
   });
   afterEach(() => {
     jest.restoreAllMocks();

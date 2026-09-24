@@ -97,6 +97,7 @@ beforeEach(() => {
     row: TOURNAMENT,
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
 });
 
@@ -206,6 +207,7 @@ describe("registerTeamsByIds", () => {
       row: { ...TOURNAMENT, state: "RUNNING" },
       stateChanged: true,
       contentChanged: false,
+      launchesChanged: false,
     });
     const { connection, inserted } = fakeConnection({ teams: [ghost(900), ghost(901)] });
 
@@ -220,6 +222,7 @@ describe("registerTeamsByIds", () => {
       row: null,
       stateChanged: false,
       contentChanged: false,
+      launchesChanged: false,
     });
     const { connection } = fakeConnection({ teams: [ghost(900)] });
 
@@ -323,6 +326,7 @@ describe("registerTeamsByIds", () => {
       row: { ...TOURNAMENT, max_teams: GHOST_BATCH_MAX },
       stateChanged: false,
       contentChanged: false,
+      launchesChanged: false,
     });
 
     await registerTeamsByIds(connection, 12, teamIds);

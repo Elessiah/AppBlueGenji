@@ -101,6 +101,7 @@ function mockRunningTournament(): void {
     row: tournamentRow({ id: 1, state: "RUNNING", format: "BG_SURVIE", participant_type: "TEAM" }),
     stateChanged: false,
     contentChanged: false,
+    launchesChanged: false,
   });
 }
 
