@@ -30,18 +30,23 @@ export function MatchReplayStrip({ match }: { match: BracketMatch }) {
   // il s'agit : chaque contrôle porte le nom de la rencontre.
   const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
 
+  // À côté du bandeau, le bouton se réduit à son pictogramme : la carte fait
+  // 210 px, et un libellé complet repliait « Rediff disponible » sur deux
+  // lignes. Le nom accessible, lui, reste complet.
+  const compact = replayUrl !== null;
   const editButton = showEdit && (
     <button
       type="button"
       className={`btn ghost ${styles.edit}`}
       onClick={() => openReplay(match)}
+      title={compact ? "Modifier la rediff" : undefined}
       aria-label={
         match.replayUrl === null
           ? `Ajouter la rediff de ${matchLabel}`
           : `Modifier la rediff de ${matchLabel}`
       }
     >
-      {match.replayUrl === null ? "＋ Rediff" : "✎ Rediff"}
+      {compact ? "✎" : match.replayUrl === null ? "＋ Rediff" : "✎ Rediff"}
     </button>
   );
 

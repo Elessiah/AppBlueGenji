@@ -74,7 +74,9 @@ describe("MatchReplayStrip — permission live", () => {
   it("offre la modification à côté du bandeau", () => {
     const html = render({ ...played, replayUrl: VIDEO }, true);
     expect(html).toContain("Rediff disponible");
-    expect(html).toContain("✎ Rediff");
+    // Pictogramme seul à côté du bandeau, nom accessible complet.
+    expect(html).toContain(">✎</button>");
+    expect(html).toContain('aria-label="Modifier la rediff de Dragons contre Lions"');
   });
 
   it("garde le bouton sur un match rouvert qui porte encore un lien, pour le retirer", () => {
