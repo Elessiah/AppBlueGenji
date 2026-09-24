@@ -21,9 +21,11 @@ describe("playerRosterStatus", () => {
     expect(playerRosterStatus({ team: null, openToRecruitment: false })).toBe("UNAFFILIATED");
   });
 
-  it("tient un champ absent pour ouvert — c'est le défaut de la colonne", () => {
-    expect(playerRosterStatus({})).toBe("FREE_AGENT");
-    expect(playerRosterStatus({ team: undefined })).toBe("FREE_AGENT");
+  it("tient un champ absent pour fermé — c'est le défaut de la colonne", () => {
+    // Un compte neuf n'est pas free agent : il faut avoir coché la case.
+    expect(playerRosterStatus({})).toBe("UNAFFILIATED");
+    expect(playerRosterStatus({ team: undefined })).toBe("UNAFFILIATED");
+    expect(playerRosterStatus({ team: null })).toBe("UNAFFILIATED");
   });
 });
 
@@ -41,7 +43,7 @@ describe("isFreeAgent", () => {
       { team: null, openToRecruitment: false },
       { team: null },
     ];
-    expect(players.filter(isFreeAgent)).toHaveLength(2);
+    expect(players.filter(isFreeAgent)).toEqual([{ team: null, openToRecruitment: true }]);
   });
 });
 

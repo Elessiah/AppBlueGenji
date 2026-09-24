@@ -226,6 +226,51 @@ describe("Schéma — la règle des deux endroits", () => {
     expect(update).not.toContain("status <> 'PENDING'");
   });
 
+  describe("défaut de `open_to_recruitment` — un compte neuf n'est pas free agent", () => {
+    const block = () => {
+      const start = migrations.indexOf("const OPEN_TO_RECRUITMENT_DEFAULT");
+      expect(start).toBeGreaterThan(-1);
+      return migrations.slice(start, migrations.indexOf("reportSchemaFailure(error, OPEN_TO_RECRUITMENT_DEFAULT)"));
+    };
+
+    it("crée la colonne fermée sur une base neuve", () => {
+      expect(table("bg_users")).toContain("open_to_recruitment TINYINT(1) NOT NULL DEFAULT 0");
+      expect(table("bg_users")).not.toContain("open_to_recruitment TINYINT(1) NOT NULL DEFAULT 1");
+    });
+
+    it("bascule le défaut d'une base qui tourne", () => {
+      expect(block()).toContain(
+        '"ALTER TABLE bg_users ALTER COLUMN open_to_recruitment SET DEFAULT 0"',
+      );
+      expect(block()).toContain("await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);");
+    });
+
+    it("ne remplit qu'une fois, tant que le défaut n'a pas basculé", () => {
+      // Rejoué à chaque démarrage, le remplissage refermerait la case de qui l'a
+      // cochée depuis : il est gardé par le défaut encore à 1.
+      const code = block();
+      expect(code).toContain("COLUMN_DEFAULT");
+      expect(code).toMatch(/if \(currentDefault !== null && currentDefault !== "0"\)/);
+      const guard = code.indexOf("if (currentDefault");
+      expect(code.indexOf("UPDATE bg_users u")).toBeGreaterThan(guard);
+    });
+
+    it("remplit **avant** de basculer le défaut, pour qu'un échec se retente", () => {
+      const code = block();
+      expect(code.indexOf("UPDATE bg_users u")).toBeLessThan(
+        code.indexOf("await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);"),
+      );
+    });
+
+    it("ne ferme que les joueurs sans appartenance en cours", () => {
+      const code = block();
+      const update = code.slice(code.indexOf("UPDATE bg_users u"), code.indexOf("await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);"));
+      expect(update).toContain("SET u.open_to_recruitment = 0");
+      expect(update).toContain("WHERE u.open_to_recruitment = 1");
+      expect(update).toMatch(/NOT EXISTS \(\s*SELECT 1 FROM bg_team_members tm\s*WHERE tm\.user_id = u\.id AND tm\.left_at IS NULL/);
+    });
+  });
+
   it("ne laisse aucun échec de migration passer en silence", () => {
     // Un droit `ALTER` manquant ou un verrou de métadonnées laisserait le schéma
     // en arrière du code : la base démarre, et la panne se lit plus tard sur une
@@ -236,10 +281,11 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    // Six : la boucle des changements récents, les trois retraits de colonne,
-    // le report `user_id` → `authenticated` des visites qui précède le sien, et
-    // `launched_at`, dont le remplissage ne suit que l'ajout effectif.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(6);
+    // Sept : la boucle des changements récents, les trois retraits de colonne,
+    // le report `user_id` → `authenticated` des visites qui précède le sien,
+    // `launched_at`, dont le remplissage ne suit que l'ajout effectif, et le
+    // défaut de `open_to_recruitment`, dont le remplissage ne suit que la bascule.
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(7);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
@@ -357,7 +403,7 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     // pour décider d'un `ADD COLUMN` — en nommant l'exception plutôt qu'en
     // levant le compte, sans quoi il ne verrait plus rien revenir.
     const reads = [...sql.matchAll(/FROM information_schema/gi)];
-    expect(reads).toHaveLength(5);
+    expect(reads).toHaveLength(6);
 
     const net = sql.slice(sql.indexOf("async function warnIfSchemaIsBehind"));
     expect([...net.matchAll(/FROM information_schema/gi)]).toHaveLength(4);
@@ -365,11 +411,15 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     expect(net).toContain("information_schema.COLUMNS");
     expect(net).toContain("console.error");
 
-    // La cinquième, et le fait qu'elle soit **seule** hors du filet.
+    // Les deux exceptions, et le fait qu'elles soient **seules** hors du filet.
+    // La seconde est de même nature : le passage « sans équipe » des joueurs
+    // doit se jouer une fois et une seule, et le défaut de la colonne est la
+    // seule trace durable de ce passage.
     const migrations = sql.slice(0, sql.indexOf("async function warnIfSchemaIsBehind"));
     const outside = [...migrations.matchAll(/FROM\s+information_schema\.(\w+)/gi)].map((m) => m[1]);
-    expect(outside).toEqual(["REFERENTIAL_CONSTRAINTS"]);
+    expect(outside).toEqual(["REFERENTIAL_CONSTRAINTS", "COLUMNS"]);
     expect(migrations).toContain("CONSTRAINT_NAME = 'fk_bg_team_inv_creator'");
+    expect(migrations).toContain("COLUMN_NAME = 'open_to_recruitment'");
   });
 
   it("voit les trois classes de retard, et pas seulement la colonne absente", () => {
