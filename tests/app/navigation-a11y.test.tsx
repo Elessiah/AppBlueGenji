@@ -8,6 +8,7 @@ import { ArenaNav } from "@/components/arena-nav";
 import {
   PublicNavMenu,
   PublicNavPanel,
+  focusLeavesMenu,
   handleMenuEscape,
 } from "@/components/cyber/landing/PublicNavMenu";
 import { readSource } from "../helpers/read-source";
@@ -107,6 +108,35 @@ describe("handleMenuEscape", () => {
 
   it("tolère des références pas encore montées", () => {
     expect(handleMenuEscape("Escape", inside, null, null, () => undefined)).toBe(true);
+  });
+});
+
+describe("focusLeavesMenu", () => {
+  const inside = { id: "lien" } as unknown as EventTarget;
+  const outside = { id: "contenu" } as unknown as EventTarget;
+  const root = { contains: (node: Node | null) => node === (inside as unknown as Node) };
+
+  it("ferme quand la tabulation part vers un élément hors du menu", () => {
+    expect(focusLeavesMenu(outside, root)).toBe(true);
+  });
+
+  it("reste ouvert quand le focus passe d'un lien du panneau à l'autre", () => {
+    expect(focusLeavesMenu(inside, root)).toBe(false);
+  });
+
+  it("ne tranche pas sans cible connue : barre du navigateur, clic sur une zone inerte", () => {
+    // `relatedTarget` vaut `null` aussi pour un clic dans le panneau hors d'un
+    // lien : le fermer alors serait faux, et le clic dehors a son écouteur.
+    expect(focusLeavesMenu(null, root)).toBe(false);
+  });
+
+  it("tolère une racine pas encore montée", () => {
+    expect(focusLeavesMenu(outside, null)).toBe(false);
+  });
+
+  it("est branché sur la racine du menu, qui reçoit la sortie de focus de tous ses liens", () => {
+    const source = readSource("components/cyber/landing/PublicNavMenu.tsx");
+    expect(source).toMatch(/onBlur=\{\(event\) => \{\s*if \(open && focusLeavesMenu\(event\.relatedTarget, event\.currentTarget\)\)/);
   });
 });
 
