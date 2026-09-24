@@ -69,7 +69,12 @@ describe("ToastItem — comportement (source)", () => {
   });
 
   it("ne suspend au focus que s'il vient du clavier", () => {
-    expect(source).toMatch(/if \(!event\.target\.matches\(":focus-visible"\)\) return;/);
+    expect(source).toMatch(/if \(!isKeyboardFocus\(event\.target\)\) return;/);
+  });
+
+  it("ne plante pas sur un navigateur qui ignore :focus-visible", () => {
+    // `matches` lève sur une pseudo-classe inconnue : la lecture est gardée.
+    expect(source).toMatch(/try \{\s*return element\.matches\(":focus-visible"\);\s*\} catch \{\s*return false;\s*\}/);
   });
 
   it("nomme ses boutons pause, reprise et fermeture", () => {

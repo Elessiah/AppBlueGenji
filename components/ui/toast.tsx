@@ -87,6 +87,20 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 }
 
 /**
+ * Le focus vient-il du clavier ? `:focus-visible` le dit, mais un navigateur
+ * qui ne connaît pas la pseudo-classe (Safari avant 15.4) fait **lever**
+ * `matches` là où une feuille de style ignorerait simplement la règle. On
+ * répond alors non : le décompte se suspend encore au survol et au bouton.
+ */
+function isKeyboardFocus(element: Element): boolean {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Une notification. Le décompte se suspend au survol et au focus clavier, et
  * le bouton pause pose un choix explicite qui prime sur les deux
  * (`isCountdownHeld`) : « Pause » le tient arrêté jusqu'au clic suivant,
@@ -154,7 +168,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
       onFocus={(event) => {
         const from = event.relatedTarget;
         if (from instanceof HTMLElement && !event.currentTarget.contains(from)) returnFocus.current = from;
-        if (!event.target.matches(":focus-visible")) return;
+        if (!isKeyboardFocus(event.target)) return;
         releaseResume();
         setFocused(true);
       }}
