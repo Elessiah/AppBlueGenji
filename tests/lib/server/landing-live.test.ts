@@ -10,6 +10,7 @@ import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
 import type { TournamentBuckets, TournamentCard, TournamentFormat } from "@/lib/shared/types";
 import { tournamentCard } from "../../helpers/tournament-card";
+import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
 function card(id: number, name: string, format: TournamentFormat = "SINGLE"): TournamentCard {
   return tournamentCard({
@@ -70,9 +71,9 @@ function matchRow(overrides: Record<string, unknown> = {}) {
 
 async function mockDb(rows: unknown[]) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({
-    execute: jest.fn().mockResolvedValue([rows] as never),
-  } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
+    execute: jest.fn<SqlQuery>().mockResolvedValue([rows]),
+  }));
 }
 
 /**
@@ -84,7 +85,7 @@ async function mockDb(rows: unknown[]) {
  * direct à tous les visiteurs. Les tests injectent donc là où la production lit.
  */
 async function liveFrom(list: TournamentBuckets) {
-  (listTournamentBuckets as jest.Mock).mockResolvedValue(list as never);
+  jest.mocked(listTournamentBuckets).mockResolvedValue(list);
   return getLandingLive();
 }
 
@@ -101,14 +102,14 @@ afterEach(() => {
 
 describe("getLandingLive", () => {
   it("renvoie null sans tournoi en cours", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([]);
 
     expect(await liveFrom(buckets([]))).toBeNull();
   });
 
   it("n'expose aucune cible tant que personne n'est à l'antenne", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([matchRow()]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -120,10 +121,10 @@ describe("getLandingLive", () => {
   });
 
   it("expose la chaîne officielle quand un match est à l'antenne", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue({
+    jest.mocked(findBroadcastingTournament).mockResolvedValue({
       tournamentId: 1,
       url: "https://twitch.tv/bg",
-    } as never);
+    });
     await mockDb([matchRow({ live_trigger: "AUTO", live_url: "https://twitch.tv/bg" })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -138,10 +139,10 @@ describe("getLandingLive", () => {
   it("retient le tournoi qui diffuse, pas le plus récent", async () => {
     // Sans cette préférence, la carte live et le bouton désigneraient deux
     // tournois différents quand plusieurs tournent en parallèle.
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue({
+    jest.mocked(findBroadcastingTournament).mockResolvedValue({
       tournamentId: 2,
       url: "https://kick.com/bg",
-    } as never);
+    });
     await mockDb([matchRow({ live_trigger: "AUTO" })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A"), card(2, "Coupe B")]));
@@ -151,10 +152,10 @@ describe("getLandingLive", () => {
   });
 
   it("retombe sur le premier tournoi en cours si le diffuseur n'est pas listé", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue({
+    jest.mocked(findBroadcastingTournament).mockResolvedValue({
       tournamentId: 99,
       url: "https://twitch.tv/bg",
-    } as never);
+    });
     await mockDb([matchRow()]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -165,7 +166,7 @@ describe("getLandingLive", () => {
   });
 
   it("met en avant le match réellement à l'antenne, pas le premier jouable", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([
       matchRow({ id: 100 }),
       matchRow({ id: 101, live_trigger: "AUTO", live_url: "https://twitch.tv/bg" }),
@@ -179,7 +180,7 @@ describe("getLandingLive", () => {
   });
 
   it("retombe sur le premier match jouable quand aucun n'est à l'antenne", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([matchRow({ id: 100, status: "COMPLETED" }), matchRow({ id: 101 })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -189,7 +190,7 @@ describe("getLandingLive", () => {
   });
 
   it("expose l'état programmé d'un match casté hors antenne", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([matchRow({ live_trigger: "MANUAL" })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -198,7 +199,7 @@ describe("getLandingLive", () => {
   });
 
   it("met en avant un match dont l'heure de début est passée", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([
       matchRow({
         live_trigger: "START_TIME",
@@ -213,7 +214,7 @@ describe("getLandingLive", () => {
   });
 
   it("laisse programmé un match dont l'heure n'est pas atteinte", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([
       matchRow({ live_trigger: "START_TIME", start_at: new Date(Date.now() + 3_600_000) }),
     ]);
@@ -224,7 +225,7 @@ describe("getLandingLive", () => {
   });
 
   it("écarte un lien de match hors liste blanche", async () => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([matchRow({ live_trigger: "AUTO", live_url: "https://exemple.com/live" })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -233,7 +234,7 @@ describe("getLandingLive", () => {
   });
 
   it("survit à une panne du résolveur de diffusion", async () => {
-    (findBroadcastingTournament as jest.Mock).mockRejectedValue(new Error("boom") as never);
+    jest.mocked(findBroadcastingTournament).mockRejectedValue(new Error("boom"));
     await mockDb([matchRow()]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
@@ -255,7 +256,7 @@ describe("getLandingLive", () => {
  */
 describe("getLandingLive — fiche des engagés du match", () => {
   beforeEach(() => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
   });
 
   it("mène à la fiche d'équipe dans un tournoi par équipes", async () => {
@@ -333,7 +334,7 @@ describe("getLandingLive — fiche des engagés du match", () => {
  */
 describe("getLandingLive — seeds du match mis en avant", () => {
   beforeEach(() => {
-    (findBroadcastingTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
   });
 
   it("expose les seeds d'une élimination simple, qui seede par ordre d'inscription", async () => {

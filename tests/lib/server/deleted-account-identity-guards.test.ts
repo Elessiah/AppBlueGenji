@@ -26,6 +26,7 @@ import { linkOAuthIdentity, type OAuthIdentity } from "@/lib/server/account-iden
 import { startDiscordVerification } from "@/lib/server/discord-verification";
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser } from "@/lib/server/bot-integration";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * Les écritures qui reposent une **porte d'entrée**, et la course qu'elles
@@ -59,7 +60,7 @@ function fakeDb(row: Record<string, unknown> | null) {
     if (q.startsWith("SELECT id FROM bg_users")) return [[]];
     return [row ? [row] : []];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { queries };
 }
 

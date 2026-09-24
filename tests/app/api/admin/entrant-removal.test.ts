@@ -8,23 +8,22 @@ import { DELETE } from "@/app/api/admin/tournaments/[id]/registrations/[teamId]/
 import { getCurrentUser } from "@/lib/server/auth";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { removeTournamentEntrant } from "@/lib/server/tournaments/registration-removal";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const admin = { id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] } as unknown as SessionUser;
-const arbitre = {
+const admin = authUser({ id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] });
+const arbitre = authUser({
   id: 2,
   pseudo: "Sifflet",
   isAdmin: false,
   roles: ["ARBITRE"],
-} as unknown as SessionUser;
-const caster = {
+});
+const caster = authUser({
   id: 3,
   pseudo: "Micro",
   isAdmin: false,
   roles: ["CASTER"],
-} as unknown as SessionUser;
-const player = { id: 4, pseudo: "Joueur", isAdmin: false, roles: [] } as unknown as SessionUser;
+});
+const player = authUser({ id: 4, pseudo: "Joueur", isAdmin: false, roles: [] });
 
 const removed = {
   tournamentId: 7,
@@ -48,8 +47,8 @@ function remove(id: string, teamId: string) {
 describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (removeTournamentEntrant as jest.Mock).mockResolvedValue(removed as never);
-    (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(removeTournamentEntrant).mockResolvedValue(removed);
+    jest.mocked(sendBotLog).mockResolvedValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -62,7 +61,7 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     // d'un tournoi exige `isAdmin`.
     ["un arbitre", arbitre],
   ])("retire l'engagé pour %s", async (_label, user) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const res = await remove("7", "102");
 
@@ -72,13 +71,13 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
   });
 
   it("journalise le retrait : anonyme sur Discord, auteur nommé dans pm2", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     const info = jest.spyOn(console, "info").mockImplementation(() => {});
 
     await remove("7", "102");
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    const line = (sendBotLog as jest.Mock).mock.calls[0][0] as string;
+    const line = jest.mocked(sendBotLog).mock.calls[0][0] as string;
     // Le canal est la **seule** trace qui subsiste d'une inscription effacée :
     // elle porte le tournoi, l'engagé et l'effectif restant — l'auteur y est
     // « le staff », jamais son pseudo.
@@ -98,8 +97,8 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
 
   it("répond malgré un bot injoignable", async () => {
     // Le bot est optionnel, et la ligne est déjà effacée : rien à annuler.
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
 
     const res = await remove("7", "102");
 
@@ -107,7 +106,7 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await remove("7", "102");
 
@@ -121,7 +120,7 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     ["un joueur", player],
   ])("rejette %s avec 403", async (_label, user) => {
     // Un `CASTER` lit l'aperçu du plateau ; il ne touche pas aux inscriptions.
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const res = await remove("7", "102");
 
@@ -136,7 +135,7 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     ["un engagé non entier", "7", "abc", "INVALID_TEAM"],
     ["un engagé nul", "7", "0", "INVALID_TEAM"],
   ])("refuse %s en 400", async (_label, id, teamId, code) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     const res = await remove(id, teamId);
 
@@ -148,8 +147,8 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
   it.each(["TOURNAMENT_NOT_FOUND", "TEAM_NOT_IN_TOURNAMENT"])(
     "rend 404 sur %s",
     async (code) => {
-      (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-      (removeTournamentEntrant as jest.Mock).mockRejectedValue(new Error(code) as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(admin);
+      jest.mocked(removeTournamentEntrant).mockRejectedValue(new Error(code));
 
       const res = await remove("7", "102");
 
@@ -163,8 +162,8 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
     "rend 409 sur %s",
     async (code) => {
       // La demande est bien formée : c'est l'état du tournoi qui la contredit.
-      (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-      (removeTournamentEntrant as jest.Mock).mockRejectedValue(new Error(code) as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(admin);
+      jest.mocked(removeTournamentEntrant).mockRejectedValue(new Error(code));
 
       const res = await remove("7", "102");
 
@@ -176,9 +175,9 @@ describe("DELETE /api/admin/tournaments/[id]/registrations/[teamId]", () => {
   it("masque une panne du moteur derrière un code du site", async () => {
     // Le texte d'une erreur mysql2 est anglais et parle du moteur : il reste au
     // journal du serveur, pas dans un toast français.
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (removeTournamentEntrant as jest.Mock).mockRejectedValue(
-      new Error("Deadlock found when trying to get lock") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(removeTournamentEntrant).mockRejectedValue(
+      new Error("Deadlock found when trying to get lock"),
     );
     const logged = jest.spyOn(console, "error").mockImplementation(() => {});
 

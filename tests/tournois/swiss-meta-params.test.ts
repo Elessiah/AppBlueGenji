@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
+import type { SqlQuery } from "../helpers/sql-double";
 
 /**
  * Régression : la requête du classement suisse porte deux placeholders
@@ -29,9 +30,9 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
 
   it("passe bien (tournamentId, phaseId) au classement", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[tournamentRow]] as never) // loadTournament
-      .mockResolvedValueOnce([[]] as never); // classement
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[tournamentRow]]) // loadTournament
+      .mockResolvedValueOnce([[]]); // classement
     const conn = { execute } as never;
 
     await loadSwissMeta(conn, 42);
@@ -44,10 +45,10 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
 
   it("cible la phase demandée dans un tournoi multi-phases", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[tournamentRow]] as never) // phase
-      .mockResolvedValueOnce([[tournamentRow]] as never) // réglages du tournoi
-      .mockResolvedValueOnce([[]] as never); // classement
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[tournamentRow]]) // phase
+      .mockResolvedValueOnce([[tournamentRow]]) // réglages du tournoi
+      .mockResolvedValueOnce([[]]); // classement
     const conn = { execute } as never;
 
     await loadSwissMeta(conn, 42, 7);
@@ -57,7 +58,9 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
   });
 
   it("renvoie null hors mode suisse", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ ...tournamentRow, format: "SINGLE" }]] as never);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ ...tournamentRow, format: "SINGLE" }]]);
     const conn = { execute } as never;
 
     await expect(loadSwissMeta(conn, 42)).resolves.toBeNull();

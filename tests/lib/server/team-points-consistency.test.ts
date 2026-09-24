@@ -5,6 +5,7 @@ import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-se
 import { getLandingLeaderboard } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
 import { RANKING_BASE_POINTS } from "@/lib/shared/ranking";
+import { fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
@@ -125,7 +126,7 @@ async function mockDb() {
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 
@@ -214,7 +215,7 @@ describe("points d'équipe — annuaire, fiche, classement et leaderboard", () =
 
   it("laisse à la cote de départ une équipe qui n'a encore rien joué", async () => {
     const { getDatabase } = await import("@/lib/server/database");
-    (getDatabase as jest.Mock).mockResolvedValue({
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({
       execute: jest.fn(async (sql: unknown) => {
         const text = String(sql);
         if (text.includes("AS members_count")) return [[teamRow()]];
@@ -223,7 +224,7 @@ describe("points d'équipe — annuaire, fiche, classement et leaderboard", () =
         }
         return [[]];
       }),
-    } as never);
+    }));
 
     const [card] = await listTeams();
 

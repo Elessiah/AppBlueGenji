@@ -8,8 +8,9 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { exportOwnData } from "@/lib/server/users-service";
 import { emptyDeepStats } from "@/lib/shared/stats";
 import type { PersonalDataExport } from "@/lib/shared/types";
+import { authUser } from "../../../helpers/auth-user";
 
-const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
+const user = authUser({ id: 42 });
 
 function sampleExport(): PersonalDataExport {
   return {
@@ -53,15 +54,15 @@ describe("GET /api/profile/export", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await GET();
     expect(res.status).toBe(401);
     expect(exportOwnData).not.toHaveBeenCalled();
   });
 
   it("exports only the authenticated user's own data", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-    (exportOwnData as jest.Mock).mockResolvedValue(sampleExport() as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(exportOwnData).mockResolvedValue(sampleExport());
 
     const res = await GET();
     expect(res.status).toBe(200);
@@ -78,8 +79,8 @@ describe("GET /api/profile/export", () => {
   });
 
   it("serves the payload as a downloadable JSON attachment", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-    (exportOwnData as jest.Mock).mockResolvedValue(sampleExport() as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(exportOwnData).mockResolvedValue(sampleExport());
 
     const res = await GET();
     expect(res.headers.get("content-type")).toContain("application/json");
@@ -90,8 +91,8 @@ describe("GET /api/profile/export", () => {
   });
 
   it("returns 404 when the profile no longer exists", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-    (exportOwnData as jest.Mock).mockRejectedValue(new Error("PROFILE_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(exportOwnData).mockRejectedValue(new Error("PROFILE_NOT_FOUND"));
 
     const res = await GET();
     expect(res.status).toBe(404);

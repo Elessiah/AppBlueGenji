@@ -13,6 +13,7 @@ import {
   verifyDiscordChallenge,
 } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * Le code de connexion Discord, et les deux bornes qui en font un secret.
@@ -124,7 +125,7 @@ function fakeDb(challenge: Challenge | null, recentCodes = 0, lockAcquired = tru
   };
   const getConnection = jest.fn(async () => connection);
 
-  (getDatabase as jest.Mock).mockResolvedValue({ execute, getConnection } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection }));
   return { execute, connection, trace, lifecycle, state };
 }
 

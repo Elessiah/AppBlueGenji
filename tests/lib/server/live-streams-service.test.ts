@@ -10,10 +10,11 @@ import {
   setTournamentLiveUrl,
 } from "@/lib/server/tournaments/live-streams";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 /** Ligne de match telle que la lit `loadMatchLiveRow`. */
@@ -39,9 +40,9 @@ afterEach(() => {
 describe("setTournamentLiveUrl", () => {
   it("normalise et enregistre la chaîne officielle", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     const result = await setTournamentLiveUrl(7, "twitch.tv/bluegenji");
@@ -55,9 +56,9 @@ describe("setTournamentLiveUrl", () => {
 
   it("traite une chaîne vide comme un effacement", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     expect(await setTournamentLiveUrl(7, "   ")).toBeNull();
@@ -66,16 +67,16 @@ describe("setTournamentLiveUrl", () => {
 
   it("accepte null comme effacement", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     expect(await setTournamentLiveUrl(7, null)).toBeNull();
   });
 
   it("refuse une URL hors liste blanche sans rien écrire", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ id: 7, state: "RUNNING" }]]);
     await mockDb(execute);
 
     await expect(setTournamentLiveUrl(7, "https://exemple.com/live")).rejects.toThrow(
@@ -86,7 +87,7 @@ describe("setTournamentLiveUrl", () => {
   });
 
   it("refuse un tournoi inconnu", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(setTournamentLiveUrl(999, "https://twitch.tv/x")).rejects.toThrow(
@@ -98,9 +99,9 @@ describe("setTournamentLiveUrl", () => {
 describe("setMatchLiveConfig", () => {
   it("marque un match casté en MANUAL avec sa chaîne", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow()]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow()]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "kick.com/bg" });
@@ -116,9 +117,9 @@ describe("setMatchLiveConfig", () => {
 
   it("referme l'antenne en passant en AUTO — elle n'y a plus de sens", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchLiveConfig(42, { trigger: "AUTO", liveUrl: null });
@@ -130,7 +131,7 @@ describe("setMatchLiveConfig", () => {
 
   it("referme l'antenne en passant en START_TIME — c'est l'horloge qui décide", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           matchRow({
@@ -139,8 +140,8 @@ describe("setMatchLiveConfig", () => {
             live_started_at: new Date(),
           }),
         ],
-      ] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      ])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null });
@@ -153,7 +154,7 @@ describe("setMatchLiveConfig", () => {
   it("refuse START_TIME sur un match sans date de début", async () => {
     // Accepter ce couple poserait une diffusion qui ne s'ouvrirait jamais, et
     // l'échec ne se verrait qu'à l'heure du match.
-    const execute = jest.fn().mockResolvedValueOnce([[matchRow({ start_at: null })]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow({ start_at: null })]]);
     await mockDb(execute);
 
     await expect(setMatchLiveConfig(42, { trigger: "START_TIME", liveUrl: null })).rejects.toThrow(
@@ -165,9 +166,9 @@ describe("setMatchLiveConfig", () => {
 
   it("laisse démarquer un match sans date — l'impasse doit rester réversible", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow({ start_at: null, live_trigger: "START_TIME" })]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ start_at: null, live_trigger: "START_TIME" })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchLiveConfig(42, { trigger: null, liveUrl: null });
@@ -177,9 +178,9 @@ describe("setMatchLiveConfig", () => {
 
   it("efface lien et antenne en démarquant le match", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchLiveConfig(42, { trigger: null, liveUrl: "https://twitch.tv/x" });
@@ -192,9 +193,9 @@ describe("setMatchLiveConfig", () => {
 
   it("accepte un match casté sans lien — badge seul", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow()]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow()]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchLiveConfig(42, { trigger: "MANUAL", liveUrl: "" });
@@ -203,7 +204,7 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("refuse une URL hors liste blanche sans rien écrire", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[matchRow()]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow()]]);
     await mockDb(execute);
 
     await expect(
@@ -213,7 +214,7 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("refuse un mode inconnu", async () => {
-    const execute = jest.fn();
+    const execute = jest.fn<SqlQuery>();
     await mockDb(execute);
 
     await expect(
@@ -226,7 +227,7 @@ describe("setMatchLiveConfig", () => {
   });
 
   it("refuse un match inconnu", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(setMatchLiveConfig(999, { trigger: "AUTO", liveUrl: null })).rejects.toThrow(
@@ -238,9 +239,9 @@ describe("setMatchLiveConfig", () => {
 describe("setMatchOnAir", () => {
   it("ouvre l'antenne d'un match MANUAL jouable", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL" })]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL" })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchOnAir(42, true);
@@ -254,9 +255,9 @@ describe("setMatchOnAir", () => {
 
   it("referme l'antenne en reposant NULL", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", live_started_at: new Date() })]])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await setMatchOnAir(42, false);
@@ -266,18 +267,20 @@ describe("setMatchOnAir", () => {
 
   it("referme l'antenne même sur un match déjà noté — nettoyage toujours permis", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [matchRow({ live_trigger: "MANUAL", status: "COMPLETED", live_started_at: new Date() })],
-      ] as never)
-      .mockResolvedValueOnce([{ affectedRows: 1 }] as never);
+      ])
+      .mockResolvedValueOnce([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await expect(setMatchOnAir(42, false)).resolves.toBeUndefined();
   });
 
   it("refuse d'ouvrir l'antenne sur un match en AUTO", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[matchRow({ live_trigger: "AUTO" })]] as never);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ live_trigger: "AUTO" })]]);
     await mockDb(execute);
 
     await expect(setMatchOnAir(42, true)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
@@ -285,7 +288,7 @@ describe("setMatchOnAir", () => {
   });
 
   it("refuse d'ouvrir l'antenne sur un match non casté", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[matchRow()]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[matchRow()]]);
     await mockDb(execute);
 
     await expect(setMatchOnAir(42, true)).rejects.toThrow("LIVE_TRIGGER_NOT_MANUAL");
@@ -294,8 +297,8 @@ describe("setMatchOnAir", () => {
   it("refuse d'ouvrir l'antenne sur un match pas encore jouable ou déjà noté", async () => {
     for (const status of ["PENDING", "AWAITING_CONFIRMATION", "COMPLETED"]) {
       const execute = jest
-        .fn()
-        .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", status })]] as never);
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[matchRow({ live_trigger: "MANUAL", status })]]);
       await mockDb(execute);
 
       await expect(setMatchOnAir(42, true)).rejects.toThrow("MATCH_NOT_LIVE_READY");
@@ -304,7 +307,7 @@ describe("setMatchOnAir", () => {
   });
 
   it("refuse un match inconnu", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(setMatchOnAir(999, true)).rejects.toThrow("MATCH_NOT_FOUND");
@@ -326,7 +329,7 @@ describe("findBroadcastingTournament", () => {
   }
 
   it("retient le premier tournoi dont un match est réellement à l'antenne", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[row()]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[row()]]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toEqual({
@@ -337,17 +340,17 @@ describe("findBroadcastingTournament", () => {
 
   it("ignore un match seulement programmé", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[row({ live_trigger: "MANUAL", live_started_at: null })]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[row({ live_trigger: "MANUAL", live_started_at: null })]]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
   });
 
   it("retient un match dont l'heure de début est passée", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([
       [row({ live_trigger: "START_TIME", start_at: new Date(Date.now() - 60_000) })],
-    ] as never);
+    ]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toEqual({
@@ -357,9 +360,9 @@ describe("findBroadcastingTournament", () => {
   });
 
   it("ignore un match dont l'heure de début n'est pas encore atteinte", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([
       [row({ live_trigger: "START_TIME", start_at: new Date(Date.now() + 3_600_000) })],
-    ] as never);
+    ]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
@@ -367,8 +370,8 @@ describe("findBroadcastingTournament", () => {
 
   it("ignore un match programmé à l'heure mais sans date", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[row({ live_trigger: "START_TIME", start_at: null })]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[row({ live_trigger: "START_TIME", start_at: null })]]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
@@ -376,21 +379,21 @@ describe("findBroadcastingTournament", () => {
 
   it("ignore un match dont le score est saisi", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[row({ status: "AWAITING_CONFIRMATION" })]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[row({ status: "AWAITING_CONFIRMATION" })]]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
   });
 
   it("saute les tournois hors antenne et retient le premier qui diffuse", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([
       [
         row({ tournament_id: 1, live_trigger: "MANUAL", live_started_at: null }),
         row({ tournament_id: 2, status: "COMPLETED" }),
         row({ tournament_id: 3, live_url: "https://kick.com/bg" }),
       ],
-    ] as never);
+    ]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toEqual({
@@ -401,15 +404,15 @@ describe("findBroadcastingTournament", () => {
 
   it("revalide le lien à la lecture — une ligne éditée en base ne devient pas un href", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[row({ live_url: "javascript:alert(1)" })]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[row({ live_url: "javascript:alert(1)" })]]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();
   });
 
   it("ne filtre l'état du direct qu'en mémoire, jamais en SQL", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await findBroadcastingTournament();
@@ -423,7 +426,7 @@ describe("findBroadcastingTournament", () => {
   });
 
   it("renvoie null quand personne ne diffuse", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     expect(await findBroadcastingTournament()).toBeNull();

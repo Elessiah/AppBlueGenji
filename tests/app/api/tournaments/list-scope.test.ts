@@ -27,8 +27,8 @@ async function errorOf(response: Response): Promise<string> {
 describe("GET /api/tournaments — portée", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
-    (service.listTournamentBuckets as jest.Mock).mockResolvedValue(emptyBuckets as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.mocked(service.listTournamentBuckets).mockResolvedValue(emptyBuckets);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -42,7 +42,7 @@ describe("GET /api/tournaments — portée", () => {
   });
 
   it("sert les invisibles à un administrateur", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     const res = await get("/api/tournaments?scope=hidden");
 
@@ -51,7 +51,7 @@ describe("GET /api/tournaments — portée", () => {
   });
 
   it("sert les invisibles à un arbitre", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     const res = await get("/api/tournaments?scope=hidden");
 
@@ -69,7 +69,7 @@ describe("GET /api/tournaments — portée", () => {
   });
 
   it("refuse les invisibles à un rôle d'un autre domaine", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(communityManager as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(communityManager);
 
     const res = await get("/api/tournaments?scope=hidden");
 
@@ -91,7 +91,7 @@ describe("GET /api/tournaments — portée", () => {
   });
 
   it("combine portée et recherche", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     await get("/api/tournaments?scope=hidden&search=Marvel");
 
@@ -99,7 +99,7 @@ describe("GET /api/tournaments — portée", () => {
   });
 
   it("refuse un visiteur non connecté", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await get("/api/tournaments?scope=hidden");
 

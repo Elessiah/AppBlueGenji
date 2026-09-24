@@ -12,6 +12,7 @@ import {
 } from "@/lib/shared/bg-survie";
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
 import { createMatch } from "@/lib/server/tournaments/repository";
+import type { SqlMock } from "../helpers/sql-double";
 
 /**
  * **Édition d'un tour amont de l'arbre final** (BlueGenji Survie).
@@ -315,12 +316,12 @@ function makeConn(rounds: Record<number, PlayoffMatch[]>, standings: number[]) {
   });
 
   return { execute } as never as Parameters<typeof reconcileEndurance>[1] & {
-    execute: jest.Mock;
+    execute: SqlMock;
   };
 }
 
 /** Appariements réécrits ou posés par ce `reconcileEndurance`. */
-function writes(conn: { execute: jest.Mock }) {
+function writes(conn: { execute: SqlMock }) {
   return conn.execute.mock.calls
     .filter(([sql]) => String(sql).includes("team1_id = ?, team2_id = ?, status = ?"))
     .map(([, params]) => params as unknown[]);
@@ -339,7 +340,7 @@ const RANKING = [1, 2, 3, 4, 5, 6, 7, 8];
 describe("reconcileEndurance — réparation de l'arbre final", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (createMatch as jest.Mock).mockResolvedValue(900 as never);
+    jest.mocked(createMatch).mockResolvedValue(900);
   });
   afterEach(() => {
     jest.restoreAllMocks();

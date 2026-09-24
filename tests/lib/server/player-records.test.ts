@@ -1,5 +1,6 @@
 import { beforeEach, afterEach, describe, expect, it, jest } from "@jest/globals";
 import { getPlayerStats, loadPlayerRecords } from "@/lib/server/stats-service";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
@@ -83,9 +84,9 @@ function fakeDb(memberships: Row[], matches: Row[], registrations: Row[]) {
   });
 }
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 

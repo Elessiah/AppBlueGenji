@@ -10,12 +10,13 @@ import { createOrGetGoogleUser, type GoogleProfilePayload } from "@/lib/server/u
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo } from "@/lib/server/auth";
+import { fakePool } from "../../helpers/sql-double";
 
 // Un compte créé annonce sa naissance au journal Discord
 // (`tests/lib/server/player-signup-log.test.ts`). Rien à mesurer ici, mais
 // l'envoi est bien tenté : sans promesse en retour, l'auto-mock ferait échouer
 // la création. `clearAllMocks` ne défait pas les implémentations.
-(sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+jest.mocked(sendBotLog).mockResolvedValue(undefined);
 
 /**
  * **Une identité Google ne revendique plus aucun compte du site.**
@@ -75,8 +76,8 @@ function fakeDb(
     return [[], []];
   });
 
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  (ensureUniquePseudo as jest.Mock).mockImplementation(async (source: unknown) => String(source));
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  jest.mocked(ensureUniquePseudo).mockImplementation(async (source: unknown) => String(source));
   return { execute, statements };
 }
 

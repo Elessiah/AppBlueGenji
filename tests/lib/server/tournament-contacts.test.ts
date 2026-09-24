@@ -10,6 +10,9 @@ import {
 import { GET } from "@/app/api/admin/tournaments/[id]/contacts/route";
 import { getDatabase } from "@/lib/server/database";
 import { getCurrentUser } from "@/lib/server/auth";
+import { fakePool } from "../../helpers/sql-double";
+import { authUser } from "../../helpers/auth-user";
+import type { PlatformRole } from "@/lib/shared/permissions";
 
 /**
  * Les contacts Discord d'un plateau.
@@ -42,7 +45,7 @@ function fakeDb(rows: ContactRow[], state: string | null = "RUNNING") {
     }
     return [rows];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { execute };
 }
 
@@ -130,15 +133,16 @@ describe("GET /api/admin/tournaments/[id]/contacts", () => {
   const request = new Request("http://localhost:3000/api/admin/tournaments/5/contacts");
 
   it("refuse un visiteur sans session", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     expect((await GET(request, { params })).status).toBe(401);
   });
 
   it("refuse un compte sans la permission `tournaments`", async () => {
     // Le cast en fait partie : diffuser n'est pas joindre.
-    for (const roles of [[], ["CASTER"], ["COMMUNITY_MANAGER"], ["RECRUTEUR"]]) {
-      (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, roles } as never);
+    const refused: PlatformRole[][] = [[], ["CASTER"], ["COMMUNITY_MANAGER"], ["RECRUTEUR"]];
+    for (const roles of refused) {
+      jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9, roles }));
       expect((await GET(request, { params })).status).toBe(403);
     }
   });
@@ -147,10 +151,10 @@ describe("GET /api/admin/tournaments/[id]/contacts", () => {
     fakeDb([]);
 
     for (const user of [
-      { id: 9, roles: ["ARBITRE"] },
-      { id: 9, roles: ["ADMIN"], isAdmin: true },
+      authUser({ id: 9, roles: ["ARBITRE"] }),
+      authUser({ id: 9, isAdmin: true }),
     ]) {
-      (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(user);
       const response = await GET(request, { params });
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ entrants: [] });
@@ -166,7 +170,7 @@ describe("GET /api/admin/tournaments/[id]/contacts", () => {
    * endroit.
    */
   it("refuse sur un tournoi terminé, sans lire aucun contact", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, isAdmin: true } as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9, isAdmin: true }));
     const { execute } = fakeDb([], "FINISHED");
 
     const response = await GET(request, { params });
@@ -180,7 +184,7 @@ describe("GET /api/admin/tournaments/[id]/contacts", () => {
   it.each(["UPCOMING", "REGISTRATION", "RUNNING"])(
     "accorde l'accès sur un tournoi %s",
     async (state) => {
-      (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, isAdmin: true } as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9, isAdmin: true }));
       fakeDb([], state);
 
       expect((await GET(request, { params })).status).toBe(200);
@@ -188,14 +192,14 @@ describe("GET /api/admin/tournaments/[id]/contacts", () => {
   );
 
   it("rend 404 sur un tournoi inexistant", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, isAdmin: true } as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9, isAdmin: true }));
     fakeDb([], null);
 
     expect((await GET(request, { params })).status).toBe(404);
   });
 
   it("refuse un identifiant de tournoi invalide", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 9, isAdmin: true } as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 9, isAdmin: true }));
 
     for (const id of ["0", "-3", "abc"]) {
       const response = await GET(request, { params: Promise.resolve({ id }) });

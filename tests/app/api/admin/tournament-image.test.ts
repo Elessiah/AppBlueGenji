@@ -10,6 +10,8 @@ import {
   setTournamentImage,
   updateTournamentImageSettings,
 } from "@/lib/server/tournaments/image";
+import type { TournamentImage } from "@/lib/shared/tournament-image";
+import { authUser } from "../../../helpers/auth-user";
 
 /**
  * `/api/admin/tournaments/[id]/image` — illustration ou logo d'un tournoi.
@@ -19,13 +21,11 @@ import {
  * décorative.
  */
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const player = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
-const caster = { id: 4, isAdmin: false, roles: ["CASTER"] } as unknown as SessionUser;
-const cm = { id: 5, isAdmin: false, roles: ["COMMUNITY_MANAGER"] } as unknown as SessionUser;
-const arbitre = { id: 3, isAdmin: false, roles: ["ARBITRE"] } as unknown as SessionUser;
-const admin = { id: 1, isAdmin: true, roles: ["ADMIN"] } as unknown as SessionUser;
+const player = authUser({ id: 2, isAdmin: false, roles: [] });
+const caster = authUser({ id: 4, isAdmin: false, roles: ["CASTER"] });
+const cm = authUser({ id: 5, isAdmin: false, roles: ["COMMUNITY_MANAGER"] });
+const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
+const admin = authUser({ id: 1, isAdmin: true, roles: ["ADMIN"] });
 
 const URL_BASE = "http://localhost/api/admin/tournaments/5/image";
 const params = (id = "5") => ({ params: Promise.resolve({ id }) });
@@ -48,13 +48,18 @@ function patchReq(body: unknown) {
 
 const deleteReq = () => new Request(URL_BASE, { method: "DELETE" });
 
-const saved = { url: "/api/uploads/tournaments/5-a.webp", fit: "COVER", focusX: 50, focusY: 50 };
+const saved: TournamentImage = {
+  url: "/api/uploads/tournaments/5-a.webp",
+  fit: "COVER",
+  focusX: 50,
+  focusY: 50,
+};
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (setTournamentImage as jest.Mock).mockResolvedValue(saved as never);
-  (updateTournamentImageSettings as jest.Mock).mockResolvedValue(saved as never);
-  (removeTournamentImage as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(setTournamentImage).mockResolvedValue(saved);
+  jest.mocked(updateTournamentImageSettings).mockResolvedValue(saved);
+  jest.mocked(removeTournamentImage).mockResolvedValue(undefined);
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -68,13 +73,13 @@ describe("accès", () => {
   ];
 
   it.each(calls)("%s rejette un visiteur anonyme avec 401", async (_, call) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await call()).status).toBe(401);
   });
 
   it.each(calls)("%s est refusé sans la permission tournaments (joueur, caster, CM)", async (_, call) => {
     for (const user of [player, caster, cm]) {
-      (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(user);
       const res = await call();
       expect(res.status).toBe(403);
     }
@@ -85,13 +90,13 @@ describe("accès", () => {
 
   it.each(calls)("%s est ouvert à l'arbitre comme à l'admin", async (_, call) => {
     for (const user of [arbitre, admin]) {
-      (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(user);
       expect((await call()).status).toBe(200);
     }
   });
 
   it("refuse un identifiant de tournoi invalide", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     for (const id of ["abc", "0", "-3", "1.5"]) {
       const res = await DELETE(deleteReq(), params(id));
       expect(res.status).toBe(400);
@@ -103,7 +108,7 @@ describe("accès", () => {
 
 describe("POST — pose ou remplace l'image", () => {
   beforeEach(() => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
   });
 
   it("transmet le fichier et son cadrage, et rend l'image", async () => {
@@ -153,21 +158,21 @@ describe("POST — pose ou remplace l'image", () => {
     "IMAGE_DIMENSIONS_INVALID",
     "IMAGE_ANIMATED_NOT_SUPPORTED",
   ])("rend le refus d'image %s en 400", async (code) => {
-    (setTournamentImage as jest.Mock).mockRejectedValue(new Error(code) as never);
+    jest.mocked(setTournamentImage).mockRejectedValue(new Error(code));
     const res = await POST(uploadReq({ file: pngFile() }), params());
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: code });
   });
 
   it("rend un tournoi inconnu en 404", async () => {
-    (setTournamentImage as jest.Mock).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND") as never);
+    jest.mocked(setTournamentImage).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
     expect((await POST(uploadReq({ file: pngFile() }), params())).status).toBe(404);
   });
 
   it("ne laisse jamais partir le message d'une erreur inattendue", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    (setTournamentImage as jest.Mock).mockRejectedValue(
-      new Error("ENOENT: no such file or directory, open '/srv/app/public/uploads/x'") as never,
+    jest.mocked(setTournamentImage).mockRejectedValue(
+      new Error("ENOENT: no such file or directory, open '/srv/app/public/uploads/x'"),
     );
     const res = await POST(uploadReq({ file: pngFile() }), params());
     expect(res.status).toBe(500);
@@ -178,7 +183,7 @@ describe("POST — pose ou remplace l'image", () => {
 
 describe("PATCH — change le cadrage seul", () => {
   beforeEach(() => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
   });
 
   it("transmet les réglages validés", async () => {
@@ -219,7 +224,9 @@ describe("PATCH — change le cadrage seul", () => {
   });
 
   it("rend une image disparue entre-temps en 409", async () => {
-    (updateTournamentImageSettings as jest.Mock).mockRejectedValue(new Error("TOURNAMENT_IMAGE_MISSING") as never);
+    jest
+      .mocked(updateTournamentImageSettings)
+      .mockRejectedValue(new Error("TOURNAMENT_IMAGE_MISSING"));
     const res = await PATCH(patchReq({ fit: "COVER", focusX: 1, focusY: 1 }), params());
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "TOURNAMENT_IMAGE_MISSING" });
@@ -228,7 +235,7 @@ describe("PATCH — change le cadrage seul", () => {
 
 describe("DELETE — retire l'image", () => {
   beforeEach(() => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
   });
 
   it("retire et rend une image nulle", async () => {
@@ -239,7 +246,7 @@ describe("DELETE — retire l'image", () => {
   });
 
   it("rend un tournoi inconnu en 404", async () => {
-    (removeTournamentImage as jest.Mock).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND") as never);
+    jest.mocked(removeTournamentImage).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
     expect((await DELETE(deleteReq(), params())).status).toBe(404);
   });
 });

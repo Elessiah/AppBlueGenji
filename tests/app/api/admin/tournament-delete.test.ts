@@ -8,13 +8,12 @@ import { DELETE } from "@/app/api/admin/tournaments/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteTournament } from "@/lib/server/tournaments-service";
 import { sendBotLog } from "@/lib/server/bot-integration";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const admin = { id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] } as unknown as SessionUser;
-const arbitre = { id: 2, pseudo: "Sifflet", isAdmin: false, roles: ["ARBITRE"] } as unknown as SessionUser;
-const caster = { id: 3, pseudo: "Micro", isAdmin: false, roles: ["CASTER"] } as unknown as SessionUser;
-const player = { id: 4, pseudo: "Joueur", isAdmin: false, roles: [] } as unknown as SessionUser;
+const admin = authUser({ id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] });
+const arbitre = authUser({ id: 2, pseudo: "Sifflet", isAdmin: false, roles: ["ARBITRE"] });
+const caster = authUser({ id: 3, pseudo: "Micro", isAdmin: false, roles: ["CASTER"] });
+const player = authUser({ id: 4, pseudo: "Joueur", isAdmin: false, roles: [] });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -25,15 +24,15 @@ function del(id: string) {
 describe("DELETE /api/admin/tournaments/[id]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (deleteTournament as jest.Mock).mockResolvedValue({ id: 7, name: "BlueGenji Open" } as never);
-    (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(deleteTournament).mockResolvedValue({ id: 7, name: "BlueGenji Open" });
+    jest.mocked(sendBotLog).mockResolvedValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
   it("supprime le tournoi pour un administrateur", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     const res = await del("7");
 
@@ -43,7 +42,7 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await del("7");
 
@@ -57,7 +56,7 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
     ["un caster", caster],
     ["un joueur ordinaire", player],
   ])("rejette %s avec 403 — la permission `tournaments` ne suffit pas", async (_label, user) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const res = await del("7");
 
@@ -67,7 +66,7 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   });
 
   it.each(["abc", "0", "-3", "1.5"])("refuse l'identifiant invalide %s", async (id) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     const res = await del(id);
 
@@ -77,8 +76,8 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   });
 
   it("répond 404 pour un tournoi inconnu", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (deleteTournament as jest.Mock).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(deleteTournament).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
 
     const res = await del("7");
 
@@ -87,8 +86,8 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   });
 
   it("répond 500 sans laisser fuir le message du moteur", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (deleteTournament as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(deleteTournament).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await del("7");
@@ -101,12 +100,12 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   });
 
   it("journalise la suppression auprès du bot — seule trace restante", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     await del("7");
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
-    const message = (sendBotLog as jest.Mock).mock.calls[0][0] as string;
+    const message = jest.mocked(sendBotLog).mock.calls[0][0] as string;
     expect(message).toContain("BlueGenji Open");
     expect(message).toContain("#7");
     // L'administrateur n'est pas nommé sur Discord…
@@ -115,7 +114,7 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   });
 
   it("nomme l'administrateur dans les journaux du serveur (pm2)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const info = jest.spyOn(console, "info").mockImplementation(() => {});
 
     await del("7");
@@ -127,8 +126,8 @@ describe("DELETE /api/admin/tournaments/[id]", () => {
   });
 
   it("reste un succès si le bot est injoignable", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
 
     // Le tournoi est déjà supprimé : un bot muet ne doit pas transformer un
     // succès en erreur côté administrateur.

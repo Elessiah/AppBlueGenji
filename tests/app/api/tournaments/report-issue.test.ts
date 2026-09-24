@@ -6,6 +6,7 @@ jest.mock("@/lib/server/tournaments/issue-reports");
 import { POST } from "@/app/api/tournaments/[id]/report-issue/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
+import { authUser } from "../../../helpers/auth-user";
 
 type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
 
@@ -16,7 +17,7 @@ type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
 let nextUserId = 1000;
 function player(): SessionUser {
   nextUserId += 1;
-  return { id: nextUserId, isAdmin: false, roles: [] } as unknown as SessionUser;
+  return authUser({ id: nextUserId, isAdmin: false, roles: [] });
 }
 
 function jsonReq(body: unknown, id = "5") {
@@ -33,7 +34,7 @@ const VALID = { message: "adversaire absent depuis 20 minutes" };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (reportTournamentIssue as jest.Mock).mockResolvedValue({ notifiedReferees: 2 } as never);
+  jest.mocked(reportTournamentIssue).mockResolvedValue({ notifiedReferees: 2 });
 });
 afterEach(() => {
   jest.restoreAllMocks();
@@ -41,14 +42,14 @@ afterEach(() => {
 
 describe("POST /api/tournaments/[id]/report-issue", () => {
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     expect((await POST(jsonReq(VALID), params("5"))).status).toBe(401);
     expect(reportTournamentIssue).not.toHaveBeenCalled();
   });
 
   it("transmet le signalement et rend le nombre d'arbitres joints", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
 
     const res = await POST(jsonReq(VALID), params("5"));
 
@@ -58,7 +59,7 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
   });
 
   it("transmet la manche visée quand elle est fournie", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
 
     await POST(jsonReq({ ...VALID, matchId: 31 }), params("5"));
 
@@ -66,7 +67,7 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
   });
 
   it("refuse un identifiant de tournoi invalide", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
 
     const res = await POST(jsonReq(VALID, "abc"), params("abc"));
 
@@ -76,7 +77,7 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
   });
 
   it("refuse un identifiant de match qui n'est pas un entier positif", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
 
     const res = await POST(jsonReq({ ...VALID, matchId: -3 }), params("5"));
 
@@ -86,7 +87,7 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
   });
 
   it("traite un matchId null comme une portée « tournoi entier »", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
 
     await POST(jsonReq({ ...VALID, matchId: null }), params("5"));
 
@@ -94,8 +95,8 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
   });
 
   it("refuse un non-inscrit avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
-    (reportTournamentIssue as jest.Mock).mockRejectedValue(new Error("NOT_REGISTERED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
+    jest.mocked(reportTournamentIssue).mockRejectedValue(new Error("NOT_REGISTERED"));
 
     const res = await POST(jsonReq(VALID), params("5"));
 
@@ -104,25 +105,25 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
   });
 
   it("refuse un message hors bornes avec 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
-    (reportTournamentIssue as jest.Mock).mockRejectedValue(
-      new Error("INVALID_ISSUE_MESSAGE") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
+    jest.mocked(reportTournamentIssue).mockRejectedValue(
+      new Error("INVALID_ISSUE_MESSAGE"),
     );
 
     expect((await POST(jsonReq({ message: "???" }), params("5"))).status).toBe(400);
   });
 
   it("signale un match introuvable avec 404", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
-    (reportTournamentIssue as jest.Mock).mockRejectedValue(new Error("MATCH_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
+    jest.mocked(reportTournamentIssue).mockRejectedValue(new Error("MATCH_NOT_FOUND"));
 
     expect((await POST(jsonReq({ ...VALID, matchId: 31 }), params("5"))).status).toBe(404);
   });
 
   it("rend 503 quand le bot est injoignable — le signalement n'est pas parti", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player() as never);
-    (reportTournamentIssue as jest.Mock).mockRejectedValue(
-      new Error("BOT_INTERNAL_UNREACHABLE") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
+    jest.mocked(reportTournamentIssue).mockRejectedValue(
+      new Error("BOT_INTERNAL_UNREACHABLE"),
     );
 
     const res = await POST(jsonReq(VALID), params("5"));
@@ -133,7 +134,7 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
 
   it("plafonne les signalements en rafale d'un même joueur", async () => {
     const kiro = player();
-    (getCurrentUser as jest.Mock).mockResolvedValue(kiro as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(kiro);
 
     for (let i = 0; i < 5; i++) {
       expect((await POST(jsonReq(VALID), params("5"))).status).toBe(200);

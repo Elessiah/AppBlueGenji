@@ -5,12 +5,13 @@ import {
   getTeamEntityStats,
   getTeamStats,
 } from "@/lib/server/stats-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 function matchRow(overrides: Record<string, unknown> = {}) {
@@ -76,7 +77,7 @@ describe("getTeamStats", () => {
 
   it("agrège les matchs de l'équipe, quel que soit son côté du tableau", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, team1_id: 5, team2_id: 9, winner_team_id: 5, team1_score: 2, team2_score: 0 }),
@@ -93,8 +94,8 @@ describe("getTeamStats", () => {
             played_at: new Date("2026-06-03T18:00:00Z"),
           }),
         ],
-      ] as never)
-      .mockResolvedValueOnce([[registrationRow()]] as never);
+      ])
+      .mockResolvedValueOnce([[registrationRow()]]);
     await mockDb(execute);
 
     const stats = await getTeamStats(5);
@@ -109,7 +110,7 @@ describe("getTeamStats", () => {
   });
 
   it("écarte byes et matchs fantômes dès la requête", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await getTeamStats(5);
@@ -122,7 +123,7 @@ describe("getTeamStats", () => {
   });
 
   it("passe les identifiants d'équipe en paramètres liés", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await getTeamStats(5);
@@ -134,14 +135,14 @@ describe("getTeamStats", () => {
 
   it("attribue le forfait au bon camp", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, forfeit_team_id: 5, winner_team_id: 9 }),
           matchRow({ id: 2, forfeit_team_id: 9, winner_team_id: 5 }),
         ],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never);
+      ])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const stats = await getTeamStats(5);
@@ -152,11 +153,11 @@ describe("getTeamStats", () => {
 
   it("compte un forfait comme une victoire pleine, séries comprises", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [matchRow({ id: 1, forfeit_team_id: 9, winner_team_id: 5, team1_score: null, team2_score: null })],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never);
+      ])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const stats = await getTeamStats(5);
@@ -169,7 +170,7 @@ describe("getTeamStats", () => {
 
   it("chiffre le bilan de maps d'un forfait au score plein du format", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           matchRow({
@@ -184,8 +185,8 @@ describe("getTeamStats", () => {
             match_format_value: 3,
           }),
         ],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never);
+      ])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const stats = await getTeamStats(5);
@@ -196,7 +197,7 @@ describe("getTeamStats", () => {
 
   it("compte 1-0 pour un forfait dans un tournoi en saisie libre", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           matchRow({
@@ -207,8 +208,8 @@ describe("getTeamStats", () => {
             team2_score: null,
           }),
         ],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never);
+      ])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const stats = await getTeamStats(5);
@@ -218,7 +219,7 @@ describe("getTeamStats", () => {
   });
 
   it("lit le format du tournoi dans la requête de matchs", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await getTeamStats(5);
@@ -230,9 +231,9 @@ describe("getTeamStats", () => {
 
   it("retombe sur des valeurs sûres quand jeu et format sont absents", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[matchRow({ game: null, format: null })]] as never)
-      .mockResolvedValueOnce([[registrationRow({ game: null, format: null })]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[matchRow({ game: null, format: null })]])
+      .mockResolvedValueOnce([[registrationRow({ game: null, format: null })]]);
     await mockDb(execute);
 
     const stats = await getTeamStats(5);
@@ -243,14 +244,14 @@ describe("getTeamStats", () => {
 
   it("reprend le palmarès depuis les inscriptions", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[]] as never)
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([
         [
           registrationRow({ tournament_id: 10, final_rank: 1 }),
           registrationRow({ tournament_id: 11, final_rank: 5 }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getTeamStats(5);
@@ -271,17 +272,17 @@ describe("historique dérivé des mêmes matchs", () => {
 
   it("recompte le bilan de chaque tournoi depuis les matchs retenus", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, tournament_id: 10, winner_team_id: 5 }),
           matchRow({ id: 2, tournament_id: 10, winner_team_id: 9 }),
           matchRow({ id: 3, tournament_id: 11, winner_team_id: 5 }),
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [registrationRow({ tournament_id: 10 }), registrationRow({ tournament_id: 11 })],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const { stats, tournaments } = await getTeamEntityStats(5);
@@ -299,14 +300,14 @@ describe("historique dérivé des mêmes matchs", () => {
 
   it("classe l'historique du plus récent au plus ancien", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[]] as never)
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([
         [
           registrationRow({ tournament_id: 10, played_at: new Date("2026-01-02T18:00:00Z") }),
           registrationRow({ tournament_id: 11, played_at: new Date("2026-06-02T18:00:00Z") }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const { tournaments } = await getTeamEntityStats(5);
@@ -318,10 +319,10 @@ describe("historique dérivé des mêmes matchs", () => {
   // équipe. Sans elle dans les engagements, ces tournois sortiraient du bilan.
   it("compte l'entrée solo du joueur parmi ses engagements", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await getPlayerEntityStats(42);
@@ -337,12 +338,12 @@ describe("historique dérivé des mêmes matchs", () => {
 
   it("crédite un tournoi joué en individuel via l'entrée solo", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [{ team_id: 77, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null }],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[registrationRow({ team_id: 77, tournament_id: 12 })]] as never);
+      ])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[registrationRow({ team_id: 77, tournament_id: 12 })]]);
     await mockDb(execute);
 
     const { tournaments } = await getPlayerEntityStats(42);
@@ -352,20 +353,20 @@ describe("historique dérivé des mêmes matchs", () => {
 
   it("ne liste qu'une fois un tournoi disputé par deux équipes du joueur", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           { team_id: 5, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null },
           { team_id: 6, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null },
         ],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never)
+      ])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([
         [
           runningRegistrationRow({ team_id: 5, tournament_id: 10 }),
           runningRegistrationRow({ team_id: 6, tournament_id: 10 }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const { tournaments } = await getPlayerEntityStats(42);
@@ -383,7 +384,7 @@ describe("getPlayerStats", () => {
   });
 
   it("renvoie un bilan vide pour un joueur sans équipe, sans requête inutile", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -394,15 +395,19 @@ describe("getPlayerStats", () => {
 
   it("n'attribue pas au joueur les tournois disputés avant son arrivée", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       // Arrivé le 1er juin 2026.
-      .mockResolvedValueOnce([[{ team_id: 5, joined_at: new Date("2026-06-01T00:00:00Z"), left_at: null }]] as never)
+      .mockResolvedValueOnce([[{
+        team_id: 5,
+        joined_at: new Date("2026-06-01T00:00:00Z"),
+        left_at: null,
+      }]])
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, tournament_id: 10, played_at: new Date("2026-01-10T18:00:00Z") }),
           matchRow({ id: 2, tournament_id: 11, played_at: new Date("2026-06-10T18:00:00Z") }),
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [
           registrationRow({
@@ -420,7 +425,7 @@ describe("getPlayerStats", () => {
             final_rank: 4,
           }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -432,10 +437,14 @@ describe("getPlayerStats", () => {
 
   it("crédite un joueur arrivé alors que le tournoi était déjà lancé", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       // Arrivé le 5 juin, tournoi commencé le 1er et terminé le 10.
-      .mockResolvedValueOnce([[{ team_id: 5, joined_at: new Date("2026-06-05T00:00:00Z"), left_at: null }]] as never)
-      .mockResolvedValueOnce([[matchRow({ id: 1, tournament_id: 10 })]] as never)
+      .mockResolvedValueOnce([[{
+        team_id: 5,
+        joined_at: new Date("2026-06-05T00:00:00Z"),
+        left_at: null,
+      }]])
+      .mockResolvedValueOnce([[matchRow({ id: 1, tournament_id: 10 })]])
       .mockResolvedValueOnce([
         [
           registrationRow({
@@ -444,7 +453,7 @@ describe("getPlayerStats", () => {
             finished_at: new Date("2026-06-10T18:00:00Z"),
           }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -455,13 +464,17 @@ describe("getPlayerStats", () => {
 
   it("crédite un tournoi encore en cours à tout membre présent", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       // Arrivé bien après le coup d'envoi, mais le tournoi n'est pas terminé.
-      .mockResolvedValueOnce([[{ team_id: 5, joined_at: new Date("2026-08-01T00:00:00Z"), left_at: null }]] as never)
-      .mockResolvedValueOnce([[matchRow({ id: 1, tournament_id: 10 })]] as never)
+      .mockResolvedValueOnce([[{
+        team_id: 5,
+        joined_at: new Date("2026-08-01T00:00:00Z"),
+        left_at: null,
+      }]])
+      .mockResolvedValueOnce([[matchRow({ id: 1, tournament_id: 10 })]])
       .mockResolvedValueOnce([
         [runningRegistrationRow({ tournament_id: 10, start_at: new Date("2026-06-01T18:00:00Z") })],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -472,7 +485,7 @@ describe("getPlayerStats", () => {
 
   it("arrête le décompte au départ du joueur", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           {
@@ -481,13 +494,13 @@ describe("getPlayerStats", () => {
             left_at: new Date("2026-03-01T00:00:00Z"),
           },
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, tournament_id: 10, played_at: new Date("2026-02-10T18:00:00Z") }),
           matchRow({ id: 2, tournament_id: 11, played_at: new Date("2026-06-10T18:00:00Z") }),
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [
           registrationRow({
@@ -503,7 +516,7 @@ describe("getPlayerStats", () => {
             finished_at: new Date("2026-06-11T18:00:00Z"),
           }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -514,7 +527,7 @@ describe("getPlayerStats", () => {
 
   it("cumule les équipes successives du joueur", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           {
@@ -524,7 +537,7 @@ describe("getPlayerStats", () => {
           },
           { team_id: 6, joined_at: new Date("2026-03-02T00:00:00Z"), left_at: null },
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, tournament_id: 10, team1_id: 5, winner_team_id: 5 }),
@@ -537,7 +550,7 @@ describe("getPlayerStats", () => {
             played_at: new Date("2026-06-10T18:00:00Z"),
           }),
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [
           registrationRow({
@@ -555,7 +568,7 @@ describe("getPlayerStats", () => {
             finished_at: new Date("2026-06-11T18:00:00Z"),
           }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -568,15 +581,15 @@ describe("getPlayerStats", () => {
 
   it("ne compte qu'une fois un match opposant deux de ses équipes", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           { team_id: 5, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null },
           { team_id: 9, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null },
         ],
-      ] as never)
-      .mockResolvedValueOnce([[matchRow({ id: 1, team1_id: 5, team2_id: 9, winner_team_id: 5 })]] as never)
-      .mockResolvedValueOnce([[registrationRow({ played_at: new Date("2026-06-02T18:00:00Z") })]] as never);
+      ])
+      .mockResolvedValueOnce([[matchRow({ id: 1, team1_id: 5, team2_id: 9, winner_team_id: 5 })]])
+      .mockResolvedValueOnce([[registrationRow({ played_at: new Date("2026-06-02T18:00:00Z") })]]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -588,20 +601,20 @@ describe("getPlayerStats", () => {
 
   it("ne compte qu'une fois un tournoi disputé par deux de ses équipes, à la meilleure place", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           { team_id: 5, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null },
           { team_id: 6, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null },
         ],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never)
+      ])
+      .mockResolvedValueOnce([[]])
       .mockResolvedValueOnce([
         [
           registrationRow({ team_id: 5, tournament_id: 10, final_rank: 7 }),
           registrationRow({ team_id: 6, tournament_id: 10, final_rank: 2 }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);
@@ -612,7 +625,7 @@ describe("getPlayerStats", () => {
 
   it("dédoublonne les équipes rejointes plusieurs fois", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           {
@@ -622,9 +635,9 @@ describe("getPlayerStats", () => {
           },
           { team_id: 5, joined_at: new Date("2026-05-01T00:00:00Z"), left_at: null },
         ],
-      ] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      ])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await getPlayerStats(42);
@@ -635,7 +648,7 @@ describe("getPlayerStats", () => {
 
   it("ignore une période d'absence entre deux passages dans la même équipe", async () => {
     const execute = jest
-      .fn()
+      .fn<SqlQuery>()
       .mockResolvedValueOnce([
         [
           {
@@ -645,14 +658,14 @@ describe("getPlayerStats", () => {
           },
           { team_id: 5, joined_at: new Date("2026-05-01T00:00:00Z"), left_at: null },
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [
           matchRow({ id: 1, tournament_id: 10 }),
           matchRow({ id: 2, tournament_id: 11 }),
           matchRow({ id: 3, tournament_id: 12 }),
         ],
-      ] as never)
+      ])
       .mockResolvedValueOnce([
         [
           registrationRow({
@@ -675,7 +688,7 @@ describe("getPlayerStats", () => {
             finished_at: new Date("2026-06-15T18:00:00Z"),
           }),
         ],
-      ] as never);
+      ]);
     await mockDb(execute);
 
     const stats = await getPlayerStats(42);

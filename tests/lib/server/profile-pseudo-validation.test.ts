@@ -4,6 +4,7 @@ jest.mock("@/lib/server/database");
 
 import { updateOwnProfile } from "@/lib/server/users-service";
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * Le pseudo d'un `PATCH /api/profile` est contrôlé **avant** d'être lu.
@@ -23,7 +24,7 @@ async function mockDb() {
     execute: jest.fn<() => Promise<unknown>>().mockResolvedValue([[], []]),
     release: () => undefined,
   }));
-  (getDatabase as jest.Mock).mockResolvedValue({ execute, getConnection } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute, getConnection }));
   return execute;
 }
 

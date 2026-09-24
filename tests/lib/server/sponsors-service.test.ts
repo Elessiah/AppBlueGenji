@@ -8,12 +8,13 @@ import {
   updateSponsor,
 } from "@/lib/server/sponsors-service";
 import { clearCache } from "@/lib/server/cache";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 describe("sponsors-service", () => {
@@ -32,7 +33,7 @@ describe("sponsors-service", () => {
       const rows = [
         { id: 1, name: "HyperX", slug: "hyperx", tier: "GOLD", logoUrl: null, websiteUrl: "https://x", description: null },
       ];
-      await mockDb(jest.fn().mockResolvedValue([rows] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([rows]));
 
       const result = await listSponsors();
       expect(result).toHaveLength(1);
@@ -40,13 +41,13 @@ describe("sponsors-service", () => {
     });
 
     it("returns the fallback when the table is empty", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[]] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await listSponsors()).toBe(FALLBACK_SPONSORS);
     });
 
     it("returns the fallback when the database is unreachable", async () => {
       const { getDatabase } = await import("@/lib/server/database");
-      (getDatabase as jest.Mock).mockRejectedValue(new Error("down") as never);
+      jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
       expect(await listSponsors()).toBe(FALLBACK_SPONSORS);
     });
   });
@@ -55,9 +56,9 @@ describe("sponsors-service", () => {
     it("derives a unique slug, inserts and returns the new sponsor", async () => {
       // 1st execute: slug uniqueness check (free) → []. 2nd: INSERT.
       const execute = jest
-        .fn()
-        .mockResolvedValueOnce([[]] as never) // slug "logitech-g" is free
-        .mockResolvedValueOnce([{ insertId: 7 }] as never);
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[]]) // slug "logitech-g" is free
+        .mockResolvedValueOnce([{ insertId: 7 }]);
       await mockDb(execute);
 
       const sponsor = await createSponsor({ name: "Logitech G", tier: "SILVER", websiteUrl: "https://l" });
@@ -74,10 +75,10 @@ describe("sponsors-service", () => {
 
     it("suffixes the slug when it already exists", async () => {
       const execute = jest
-        .fn()
-        .mockResolvedValueOnce([[{ id: 99 }]] as never) // "razer" taken
-        .mockResolvedValueOnce([[]] as never) // "razer-2" free
-        .mockResolvedValueOnce([{ insertId: 8 }] as never);
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[{ id: 99 }]]) // "razer" taken
+        .mockResolvedValueOnce([[]]) // "razer-2" free
+        .mockResolvedValueOnce([{ insertId: 8 }]);
       await mockDb(execute);
 
       const sponsor = await createSponsor({ name: "Razer" });
@@ -85,7 +86,7 @@ describe("sponsors-service", () => {
     });
 
     it("rejects invalid input before touching the database", async () => {
-      const execute = jest.fn();
+      const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
       await expect(createSponsor({ name: "" })).rejects.toThrow("NAME_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
@@ -95,9 +96,9 @@ describe("sponsors-service", () => {
   describe("updateSponsor", () => {
     it("keeps the existing slug and returns the updated sponsor", async () => {
       const execute = jest
-        .fn()
-        .mockResolvedValueOnce([[{ slug: "hyperx" }]] as never) // SELECT existing slug
-        .mockResolvedValueOnce([{ affectedRows: 1 }] as never); // UPDATE
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[{ slug: "hyperx" }]]) // SELECT existing slug
+        .mockResolvedValueOnce([{ affectedRows: 1 }]); // UPDATE
       await mockDb(execute);
 
       const sponsor = await updateSponsor(3, { name: "HyperX Pro", tier: "GOLD" });
@@ -113,12 +114,12 @@ describe("sponsors-service", () => {
     });
 
     it("throws NOT_FOUND when the sponsor does not exist", async () => {
-      await mockDb(jest.fn().mockResolvedValueOnce([[]] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[]]));
       await expect(updateSponsor(999, { name: "X" })).rejects.toThrow("SPONSOR_NOT_FOUND");
     });
 
     it("rejects invalid input", async () => {
-      const execute = jest.fn();
+      const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
       await expect(updateSponsor(1, { name: "X", tier: "BOGUS" })).rejects.toThrow("INVALID_TIER");
       expect(execute).not.toHaveBeenCalled();
@@ -127,26 +128,28 @@ describe("sponsors-service", () => {
 
   describe("getSponsorLogoUrl", () => {
     it("returns the stored logo url", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[{ logoUrl: "/uploads/sponsors/1-a.webp" }]] as never));
+      await mockDb(jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ logoUrl: "/uploads/sponsors/1-a.webp" }]]));
       expect(await getSponsorLogoUrl(1)).toBe("/uploads/sponsors/1-a.webp");
     });
 
     it("returns null when the sponsor does not exist", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[]] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await getSponsorLogoUrl(999)).toBeNull();
     });
   });
 
   describe("deleteSponsor", () => {
     it("deletes an existing sponsor", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
       await mockDb(execute);
       await expect(deleteSponsor(4)).resolves.toBeUndefined();
       expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE"), [4]);
     });
 
     it("throws NOT_FOUND when nothing is deleted", async () => {
-      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(deleteSponsor(999)).rejects.toThrow("SPONSOR_NOT_FOUND");
     });
   });

@@ -10,6 +10,7 @@ import {
   updateTeamMemberRoles,
 } from "@/lib/server/teams-service";
 import type { TeamRole } from "@/lib/shared/types";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * Gestion du roster : qui a la main, et sur qui.
@@ -49,7 +50,7 @@ function useDatabase(roster: Record<number, TeamRole[]> = ROSTER, affectedRows =
     }
     return [{ affectedRows }, []];
   });
-  jest.mocked(getDatabase).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 const updates = () =>

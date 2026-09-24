@@ -10,6 +10,7 @@ import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo } from "@/lib/server/auth";
 import { createOrGetBlizzardUser, normalizeBattletag } from "@/lib/server/users-service";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * **Le BattleTag n'a pas de colonne à lui.**
@@ -43,7 +44,7 @@ function fakeDb(rows: { id: number; blizzard_sub: string | null }[]) {
     return [{ affectedRows: 1 }, []];
   });
 
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { statements };
 }
 
@@ -52,8 +53,8 @@ const find = (statements: Statement[], fragment: string) =>
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (ensureUniquePseudo as jest.Mock).mockImplementation(async (source: unknown) => String(source));
-  (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(ensureUniquePseudo).mockImplementation(async (source: unknown) => String(source));
+  jest.mocked(sendBotLog).mockResolvedValue(undefined);
 });
 
 describe("normalizeBattletag", () => {
@@ -131,7 +132,7 @@ describe("createOrGetBlizzardUser", () => {
     expect(sendBotLog).toHaveBeenCalledTimes(1);
 
     jest.clearAllMocks();
-    (sendBotLog as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(sendBotLog).mockResolvedValue(undefined);
     fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
     await createOrGetBlizzardUser("bz-1", "Nova#2143");
     expect(sendBotLog).not.toHaveBeenCalled();

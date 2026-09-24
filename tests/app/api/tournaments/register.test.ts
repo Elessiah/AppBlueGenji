@@ -36,18 +36,18 @@ function req() {
 
 /** Le service lève son code par `message`, comme partout dans le moteur. */
 function rejectsWith(code: string) {
-  (service.registerCurrentUserTeam as jest.Mock).mockRejectedValue(new Error(code) as never);
+  jest.mocked(service.registerCurrentUserTeam).mockRejectedValue(new Error(code));
 }
 
 describe("POST /api/tournaments/[id]/register", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
-    (service.registerCurrentUserTeam as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.mocked(service.registerCurrentUserTeam).mockResolvedValue(undefined);
   });
 
   it("rejette les anonymes (401)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await POST(req(), params);
     expect(res.status).toBe(401);
     expect(service.registerCurrentUserTeam).not.toHaveBeenCalled();

@@ -6,11 +6,10 @@ jest.mock("@/lib/server/tournaments/seeding");
 import { GET, PATCH } from "@/app/api/admin/tournaments/[id]/seeding/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadSeedingBoard, reorderSeeding } from "@/lib/server/tournaments/seeding";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const player = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
-const arbitre = { id: 3, isAdmin: false, roles: ["ARBITRE"] } as unknown as SessionUser;
+const player = authUser({ id: 2, isAdmin: false, roles: [] });
+const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
 
 const board = {
   entries: [{ teamId: 4, teamName: "Alpha", seed: 1 }],
@@ -38,19 +37,19 @@ describe("GET /api/admin/tournaments/[id]/seeding", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await GET(getReq(), params("5"))).status).toBe(401);
   });
 
   it("rejette un joueur sans permission tournois avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
     expect((await GET(getReq(), params("5"))).status).toBe(403);
     expect(loadSeedingBoard).not.toHaveBeenCalled();
   });
 
   it("renvoie l'ordre courant pour un arbitre", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (loadSeedingBoard as jest.Mock).mockResolvedValue(board as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(loadSeedingBoard).mockResolvedValue(board);
 
     const res = await GET(getReq(), params("5"));
 
@@ -60,8 +59,8 @@ describe("GET /api/admin/tournaments/[id]/seeding", () => {
   });
 
   it("renvoie 404 pour un tournoi inconnu", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (loadSeedingBoard as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(loadSeedingBoard).mockResolvedValue(null);
 
     expect((await GET(getReq(), params("5"))).status).toBe(404);
   });
@@ -76,16 +75,16 @@ describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
   });
 
   it("rejette un joueur sans permission tournois avec 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
 
     expect((await PATCH(patchReq({ teamIds: [1, 2] }), params("5"))).status).toBe(403);
     expect(reorderSeeding).not.toHaveBeenCalled();
   });
 
   it("enregistre le nouvel ordre et renvoie l'état à jour", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (reorderSeeding as jest.Mock).mockResolvedValue(undefined as never);
-    (loadSeedingBoard as jest.Mock).mockResolvedValue(board as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(reorderSeeding).mockResolvedValue(undefined);
+    jest.mocked(loadSeedingBoard).mockResolvedValue(board);
 
     const res = await PATCH(patchReq({ teamIds: [4, 9] }), params("5"));
 
@@ -95,8 +94,8 @@ describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
   });
 
   it("renvoie 409 quand un score a déjà été saisi", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (reorderSeeding as jest.Mock).mockRejectedValue(new Error("SEEDING_LOCKED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(reorderSeeding).mockRejectedValue(new Error("SEEDING_LOCKED"));
 
     const res = await PATCH(patchReq({ teamIds: [4, 9] }), params("5"));
 
@@ -105,8 +104,8 @@ describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
   });
 
   it("renvoie 400 quand l'ordre proposé n'est pas une permutation", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-    (reorderSeeding as jest.Mock).mockRejectedValue(new Error("INVALID_SEED_ORDER") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(reorderSeeding).mockRejectedValue(new Error("INVALID_SEED_ORDER"));
 
     expect((await PATCH(patchReq({ teamIds: [4] }), params("5"))).status).toBe(400);
   });
@@ -118,7 +117,7 @@ describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
     [{ teamIds: [1, "x"] }],
     [{}],
   ])("rejette un corps invalide (%p) sans toucher à la base", async (body) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     const res = await PATCH(patchReq(body), params("5"));
 
@@ -127,7 +126,7 @@ describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
   });
 
   it("rejette un identifiant de tournoi invalide", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
 
     expect((await PATCH(patchReq({ teamIds: [1, 2] }), params("abc"))).status).toBe(400);
     expect(reorderSeeding).not.toHaveBeenCalled();

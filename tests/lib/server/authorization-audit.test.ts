@@ -20,6 +20,7 @@ import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { sanitizeRoles } from "@/lib/server/users-service";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 // ───────────────────────── §4.3 — écraser un résultat validé ─────────────────
 
@@ -88,17 +89,22 @@ function fakeConnection(overrides: MatchOverrides = {}): {
 }
 
 function mockRunningTournament(): void {
-  (syncTournamentState as jest.Mock).mockResolvedValue({
-    row: { id: 1, state: "RUNNING", format: "BG_SURVIE", participant_type: "TEAM" },
+  jest.mocked(syncTournamentState).mockResolvedValue({
+    row: tournamentRow({ id: 1, state: "RUNNING", format: "BG_SURVIE", participant_type: "TEAM" }),
     stateChanged: false,
-  } as never);
+    contentChanged: false,
+  });
 }
 
 describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 100, roles: ["OWNER"] } as never);
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 100,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
     mockRunningTournament();
   });
 

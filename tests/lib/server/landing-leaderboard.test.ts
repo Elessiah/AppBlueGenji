@@ -3,6 +3,7 @@ import { getLandingLeaderboard } from "@/lib/server/landing-service";
 import { clearCache } from "@/lib/server/cache";
 import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { RANKING_BASE_POINTS } from "@/lib/shared/ranking";
+import { fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
@@ -46,7 +47,7 @@ async function mockDb(teams: Row[], current: Row[], previous: Row[] = current) {
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 
@@ -143,7 +144,7 @@ describe("leaderboard de la landing", () => {
 
   it("rend une liste vide plutôt que de casser la page si la base tombe", async () => {
     const { getDatabase } = await import("@/lib/server/database");
-    (getDatabase as jest.Mock).mockRejectedValue(new Error("db down") as never);
+    jest.mocked(getDatabase).mockRejectedValue(new Error("db down"));
 
     expect(await getLandingLeaderboard(8)).toEqual([]);
   });

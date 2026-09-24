@@ -57,7 +57,7 @@ function makeBoard(matches: MatchRow[], state = "RUNNING") {
   const ranks = new Map<number, number>();
   let nextId = 900;
 
-  (createMatch as jest.Mock).mockImplementation(async (...args: unknown[]) => {
+  jest.mocked(createMatch).mockImplementation(async (...args: unknown[]) => {
     const [, , bracket, round] = args as [unknown, unknown, string, number];
     const id = nextId++;
     board.push({
@@ -75,7 +75,7 @@ function makeBoard(matches: MatchRow[], state = "RUNNING") {
       double_forfeit: 0,
       is_bye: 0,
     });
-    return id as never;
+    return id;
   });
 
   const execute = jest.fn(async (sql: unknown, params: unknown[] = []) => {

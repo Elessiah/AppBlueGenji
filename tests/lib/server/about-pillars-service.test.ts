@@ -7,12 +7,13 @@ import {
   updateAboutPillar,
 } from "@/lib/server/about-pillars-service";
 import { clearCache } from "@/lib/server/cache";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 describe("about-pillars-service", () => {
@@ -29,27 +30,27 @@ describe("about-pillars-service", () => {
   describe("listAboutPillars", () => {
     it("returns rows from the database", async () => {
       const rows = [{ id: 1, title: "Accessible", text: "Inscription gratuite." }];
-      await mockDb(jest.fn().mockResolvedValue([rows] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([rows]));
 
       const result = await listAboutPillars();
       expect(result).toEqual([{ id: 1, title: "Accessible", text: "Inscription gratuite." }]);
     });
 
     it("returns the fallback when the table is empty", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[]] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await listAboutPillars()).toBe(FALLBACK_ABOUT_PILLARS);
     });
 
     it("returns the fallback when the database is unreachable", async () => {
       const { getDatabase } = await import("@/lib/server/database");
-      (getDatabase as jest.Mock).mockRejectedValue(new Error("down") as never);
+      jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
       expect(await listAboutPillars()).toBe(FALLBACK_ABOUT_PILLARS);
     });
   });
 
   describe("createAboutPillar", () => {
     it("inserts and returns the new pillar", async () => {
-      const execute = jest.fn().mockResolvedValue([{ insertId: 42 }] as never);
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 42 }]);
       await mockDb(execute);
 
       const pillar = await createAboutPillar({ title: "Compétitif", text: "Brackets arbitrés." });
@@ -58,7 +59,7 @@ describe("about-pillars-service", () => {
     });
 
     it("rejects invalid input before touching the database", async () => {
-      const execute = jest.fn();
+      const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
       await expect(createAboutPillar({ title: "", text: "Brackets arbitrés." })).rejects.toThrow(
         "TITLE_REQUIRED",
@@ -69,7 +70,7 @@ describe("about-pillars-service", () => {
 
   describe("updateAboutPillar", () => {
     it("updates and returns the pillar", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
       await mockDb(execute);
 
       const pillar = await updateAboutPillar(7, { title: "Communautaire", text: "Watch parties." });
@@ -77,14 +78,14 @@ describe("about-pillars-service", () => {
     });
 
     it("throws NOT_FOUND when no row matches", async () => {
-      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(updateAboutPillar(999, { title: "X", text: "Y" })).rejects.toThrow(
         "ABOUT_PILLAR_NOT_FOUND",
       );
     });
 
     it("rejects invalid input", async () => {
-      const execute = jest.fn();
+      const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
       await expect(updateAboutPillar(1, { title: "X", text: "" })).rejects.toThrow("TEXT_REQUIRED");
       expect(execute).not.toHaveBeenCalled();
@@ -93,14 +94,14 @@ describe("about-pillars-service", () => {
 
   describe("deleteAboutPillar", () => {
     it("deletes an existing pillar", async () => {
-      const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
       await mockDb(execute);
       await expect(deleteAboutPillar(3)).resolves.toBeUndefined();
       expect(execute).toHaveBeenCalledWith(expect.stringContaining("DELETE"), [3]);
     });
 
     it("throws NOT_FOUND when nothing is deleted", async () => {
-      await mockDb(jest.fn().mockResolvedValue([{ affectedRows: 0 }] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 0 }]));
       await expect(deleteAboutPillar(999)).rejects.toThrow("ABOUT_PILLAR_NOT_FOUND");
     });
   });

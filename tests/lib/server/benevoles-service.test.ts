@@ -6,12 +6,13 @@ import {
   updateBenevole,
 } from "@/lib/server/benevoles-service";
 import { clearCache } from "@/lib/server/cache";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 const ROW = {
@@ -34,7 +35,7 @@ const INPUT = {
 };
 
 /** Répond aux SELECT par `rows`, aux écritures par un en-tête de résultat. */
-function db(rows: unknown[] = [ROW]): jest.Mock {
+function db(rows: unknown[] = [ROW]): SqlMock {
   return jest.fn<any>().mockImplementation(async (sql: string) => {
     const query = String(sql).trim();
     if (!query.startsWith("SELECT")) return [{ insertId: 9, affectedRows: 1 }];
@@ -105,8 +106,8 @@ describe("benevoles-service — mutualisation de la lecture", () => {
 
   it("rend une liste vide quand la base est injoignable, sans la mettre en cache", async () => {
     const execute = jest
-      .fn()
-      .mockRejectedValueOnce(new Error("DOWN") as never)
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(new Error("DOWN"))
       .mockImplementation(async () => [[ROW]]);
     await mockDb(execute);
 

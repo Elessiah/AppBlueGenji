@@ -7,11 +7,12 @@ import { POST } from "@/app/api/tournaments/[id]/penalties/route";
 import { DELETE } from "@/app/api/tournaments/[id]/penalties/[penaltyId]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
+import { authUser } from "../../../helpers/auth-user";
 
 const member = { id: 2, isAdmin: false, roles: [] } as unknown as Awaited<
   ReturnType<typeof getCurrentUser>
 >;
-const referee = { id: 9, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
+const referee = authUser({ id: 9, isAdmin: true });
 
 const VALID = { teamId: 42, points: 3, reason: "Retard au coup d'envoi" };
 
@@ -33,21 +34,21 @@ function deleteReq() {
 describe("POST /api/tournaments/[id]/penalties", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (service.applyEndurancePenalty as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(service.applyEndurancePenalty).mockResolvedValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
   it("rejette les anonymes (401)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await POST(req(), params);
     expect(res.status).toBe(401);
     expect(service.applyEndurancePenalty).not.toHaveBeenCalled();
   });
 
   it("rejette un membre sans droit d'arbitrage (403) — on ne se pénalise pas soi-même", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(member);
     const res = await POST(req(), params);
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "FORBIDDEN" });
@@ -55,7 +56,7 @@ describe("POST /api/tournaments/[id]/penalties", () => {
   });
 
   it("l'arbitrage inflige la sanction, l'auteur étant celui de la session", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const res = await POST(req(), params);
     expect(res.status).toBe(200);
     expect(service.applyEndurancePenalty).toHaveBeenCalledWith(
@@ -68,14 +69,14 @@ describe("POST /api/tournaments/[id]/penalties", () => {
   });
 
   it("refuse un identifiant de tournoi illisible (400)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const res = await POST(req(), { params: Promise.resolve({ id: "abc" }) });
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_TOURNAMENT_ID" });
   });
 
   it("refuse un engagé illisible (400)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
     for (const teamId of [undefined, 0, -3, "x"]) {
       const res = await POST(req({ ...VALID, teamId }), params);
       expect(res.status).toBe(400);
@@ -85,7 +86,7 @@ describe("POST /api/tournaments/[id]/penalties", () => {
   });
 
   it("rend le refus de forme du module partagé, et non un « invalide » unique", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
 
     const cases: [unknown, string][] = [
       [{ ...VALID, points: 0 }, "POINTS_NOT_POSITIVE"],
@@ -103,14 +104,14 @@ describe("POST /api/tournaments/[id]/penalties", () => {
   });
 
   it("refuse un motif absent du corps", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const res = await POST(req({ teamId: 42, points: 3 }), params);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "REASON_REQUIRED" });
   });
 
   it("mappe les refus du moteur sur leur statut", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
 
     const cases: [string, number][] = [
       ["NOT_BG_SURVIE", 400],
@@ -125,8 +126,8 @@ describe("POST /api/tournaments/[id]/penalties", () => {
     ];
 
     for (const [message, status] of cases) {
-      (service.applyEndurancePenalty as jest.Mock).mockRejectedValueOnce(
-        new Error(message) as never,
+      jest.mocked(service.applyEndurancePenalty).mockRejectedValueOnce(
+        new Error(message),
       );
       const res = await POST(req(), params);
       expect(res.status).toBe(status);
@@ -135,9 +136,9 @@ describe("POST /api/tournaments/[id]/penalties", () => {
   });
 
   it("remonte une panne inattendue en 500", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
-    (service.applyEndurancePenalty as jest.Mock).mockRejectedValueOnce(
-      new Error("ER_LOCK_DEADLOCK") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+    jest.mocked(service.applyEndurancePenalty).mockRejectedValueOnce(
+      new Error("ER_LOCK_DEADLOCK"),
     );
     const res = await POST(req(), params);
     expect(res.status).toBe(500);
@@ -147,35 +148,35 @@ describe("POST /api/tournaments/[id]/penalties", () => {
 describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (service.liftEndurancePenalty as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(service.liftEndurancePenalty).mockResolvedValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
   it("rejette les anonymes (401)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await DELETE(deleteReq(), deleteParams);
     expect(res.status).toBe(401);
     expect(service.liftEndurancePenalty).not.toHaveBeenCalled();
   });
 
   it("rejette un membre sans droit d'arbitrage (403)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(member);
     const res = await DELETE(deleteReq(), deleteParams);
     expect(res.status).toBe(403);
     expect(service.liftEndurancePenalty).not.toHaveBeenCalled();
   });
 
   it("l'arbitrage retire la sanction", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const res = await DELETE(deleteReq(), deleteParams);
     expect(res.status).toBe(200);
     expect(service.liftEndurancePenalty).toHaveBeenCalledWith(5, 15);
   });
 
   it("refuse un identifiant de sanction illisible (400)", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
     const res = await DELETE(deleteReq(), {
       params: Promise.resolve({ id: "5", penaltyId: "0" }),
     });
@@ -184,9 +185,9 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
   });
 
   it("mappe une sanction introuvable en 404", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
-    (service.liftEndurancePenalty as jest.Mock).mockRejectedValueOnce(
-      new Error("PENALTY_NOT_FOUND") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+    jest.mocked(service.liftEndurancePenalty).mockRejectedValueOnce(
+      new Error("PENALTY_NOT_FOUND"),
     );
     const res = await DELETE(deleteReq(), deleteParams);
     expect(res.status).toBe(404);
@@ -194,14 +195,14 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
   });
 
   it("mappe les refus d'état en 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
     for (const message of [
       "ENDURANCE_PLAYOFFS_STARTED",
       "TOURNAMENT_NOT_RUNNING",
       "NOT_BG_SURVIE",
     ]) {
-      (service.liftEndurancePenalty as jest.Mock).mockRejectedValueOnce(
-        new Error(message) as never,
+      jest.mocked(service.liftEndurancePenalty).mockRejectedValueOnce(
+        new Error(message),
       );
       const res = await DELETE(deleteReq(), deleteParams);
       expect(res.status).toBe(400);
@@ -212,9 +213,9 @@ describe("DELETE /api/tournaments/[id]/penalties/[penaltyId]", () => {
   it("mappe le verrou de manche en 409, comme le verrou de score", async () => {
     // La demande était licite, c'est l'état qui ne la permet plus : même
     // famille que `CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES`.
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
-    (service.liftEndurancePenalty as jest.Mock).mockRejectedValueOnce(
-      new Error("ENDURANCE_ROUND_ALREADY_PLAYED") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+    jest.mocked(service.liftEndurancePenalty).mockRejectedValueOnce(
+      new Error("ENDURANCE_ROUND_ALREADY_PLAYED"),
     );
     const res = await DELETE(deleteReq(), deleteParams);
     expect(res.status).toBe(409);

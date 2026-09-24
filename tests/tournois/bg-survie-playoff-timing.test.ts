@@ -4,6 +4,7 @@ jest.mock("@/lib/server/tournaments/repository");
 
 import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
 import { createMatch } from "@/lib/server/tournaments/repository";
+import type { SqlMock } from "../helpers/sql-double";
 
 /**
  * La bascule en play-offs attend la **fin de la manche**.
@@ -108,12 +109,12 @@ function makeConn(options: { completed: number; matchesInRound?: number }) {
   });
 
   return { execute } as never as Parameters<typeof reconcileEndurance>[1] & {
-    execute: jest.Mock;
+    execute: SqlMock;
   };
 }
 
 /** Le tournoi a-t-il basculé en play-offs ? */
-function playoffsStarted(conn: { execute: jest.Mock }): boolean {
+function playoffsStarted(conn: { execute: SqlMock }): boolean {
   return conn.execute.mock.calls.some(([sql]) =>
     String(sql).includes("endurance_playoffs_started = 1"),
   );
@@ -155,14 +156,14 @@ function makeStaleRoundConn() {
   });
 
   return { execute } as never as Parameters<typeof reconcileEndurance>[1] & {
-    execute: jest.Mock;
+    execute: SqlMock;
   };
 }
 
 describe("reconcileEndurance — bascule en play-offs", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (createMatch as jest.Mock).mockResolvedValue(99 as never);
+    jest.mocked(createMatch).mockResolvedValue(99);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -214,7 +215,7 @@ describe("reconcileEndurance — bascule en play-offs", () => {
 describe("reconcileEndurance — manche périmée défaite", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (createMatch as jest.Mock).mockResolvedValue(99 as never);
+    jest.mocked(createMatch).mockResolvedValue(99);
   });
   afterEach(() => {
     jest.restoreAllMocks();

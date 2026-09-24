@@ -7,6 +7,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { listAccountConnections, unlinkOAuthIdentity } from "@/lib/server/account-identities";
 import { GET } from "@/app/api/profile/connections/route";
 import { DELETE } from "@/app/api/profile/connections/[provider]/route";
+import { authUser } from "../../../helpers/auth-user";
 
 /**
  * **La route dit la même chose que le bouton.**
@@ -23,14 +24,14 @@ const params = (provider: string) => ({ params: Promise.resolve({ provider }) })
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getCurrentUser as jest.Mock).mockResolvedValue({ id: 7 } as never);
-  (listAccountConnections as jest.Mock).mockResolvedValue([] as never);
-  (unlinkOAuthIdentity as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
+  jest.mocked(listAccountConnections).mockResolvedValue([]);
+  jest.mocked(unlinkOAuthIdentity).mockResolvedValue(undefined);
 });
 
 describe("GET /api/profile/connections", () => {
   it("refuse un visiteur sans session", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const response = await GET();
 
@@ -39,21 +40,21 @@ describe("GET /api/profile/connections", () => {
   });
 
   it("rend la liste du compte connecté", async () => {
-    (listAccountConnections as jest.Mock).mockResolvedValue([
-      { provider: "DISCORD", linked: true, handle: "nova" },
-    ] as never);
+    jest.mocked(listAccountConnections).mockResolvedValue([
+      { provider: "DISCORD", linked: true, handle: "nova", method: "OAUTH" },
+    ]);
 
     const response = await GET();
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
-      connections: [{ provider: "DISCORD", linked: true, handle: "nova" }],
+      connections: [{ provider: "DISCORD", linked: true, handle: "nova", method: "OAUTH" }],
     });
     expect(listAccountConnections).toHaveBeenCalledWith(7);
   });
 
   it("rend 404 sur un compte introuvable", async () => {
-    (listAccountConnections as jest.Mock).mockRejectedValue(new Error("PROFILE_NOT_FOUND") as never);
+    jest.mocked(listAccountConnections).mockRejectedValue(new Error("PROFILE_NOT_FOUND"));
 
     const response = await GET();
 
@@ -63,7 +64,7 @@ describe("GET /api/profile/connections", () => {
 
 describe("DELETE /api/profile/connections/[provider]", () => {
   it("refuse un visiteur sans session", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const response = await DELETE(new Request("http://x"), params("discord"));
 
@@ -87,7 +88,7 @@ describe("DELETE /api/profile/connections/[provider]", () => {
   });
 
   it("rend **409** sur le dernier moyen de connexion", async () => {
-    (unlinkOAuthIdentity as jest.Mock).mockRejectedValue(new Error("LAST_CONNECTION") as never);
+    jest.mocked(unlinkOAuthIdentity).mockRejectedValue(new Error("LAST_CONNECTION"));
 
     const response = await DELETE(new Request("http://x"), params("discord"));
 
@@ -96,7 +97,7 @@ describe("DELETE /api/profile/connections/[provider]", () => {
   });
 
   it("rend 404 sur une porte qui n'était pas rattachée", async () => {
-    (unlinkOAuthIdentity as jest.Mock).mockRejectedValue(new Error("NOT_LINKED") as never);
+    jest.mocked(unlinkOAuthIdentity).mockRejectedValue(new Error("NOT_LINKED"));
 
     const response = await DELETE(new Request("http://x"), params("google"));
 
@@ -104,7 +105,7 @@ describe("DELETE /api/profile/connections/[provider]", () => {
   });
 
   it("rend 500 sur une panne inattendue", async () => {
-    (unlinkOAuthIdentity as jest.Mock).mockRejectedValue(new Error("ER_LOCK_DEADLOCK") as never);
+    jest.mocked(unlinkOAuthIdentity).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
 
     const response = await DELETE(new Request("http://x"), params("google"));
 

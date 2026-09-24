@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { discordAccountExists } from "@/lib/server/users-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 describe("discordAccountExists", () => {
@@ -17,7 +18,7 @@ describe("discordAccountExists", () => {
   });
 
   it("renvoie true quand un compte porte déjà cet identifiant Discord", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ id: 42 }]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[{ id: 42 }]]);
     await mockDb(execute);
 
     await expect(discordAccountExists("123456789012345678")).resolves.toBe(true);
@@ -28,7 +29,7 @@ describe("discordAccountExists", () => {
   });
 
   it("renvoie false quand aucun compte n'est rattaché (première connexion)", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(discordAccountExists("999888777666555444")).resolves.toBe(false);

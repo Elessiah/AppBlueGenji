@@ -47,25 +47,25 @@ function snapshotVisibleIn(offsetMs: number): TournamentSnapshot {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getUserActiveTeam as jest.Mock).mockResolvedValue(null as never);
-  (getTournamentPreview as jest.Mock).mockResolvedValue(null as never);
+  jest.mocked(getUserActiveTeam).mockResolvedValue(null);
+  jest.mocked(getTournamentPreview).mockResolvedValue(null);
 });
 
 describe("getVisibleTournamentSnapshot", () => {
   it("sert un tournoi déjà publié à un simple spectateur", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(-HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(-HOUR));
 
     expect(await getVisibleTournamentSnapshot(5, { canManage: false })).not.toBeNull();
   });
 
   it("cache un tournoi pas encore publié à un simple spectateur", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(HOUR));
 
     expect(await getVisibleTournamentSnapshot(5, { canManage: false })).toBeNull();
   });
 
   it("sert un tournoi pas encore publié au staff `tournaments`", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(HOUR));
 
     expect(await getVisibleTournamentSnapshot(5, { canManage: true })).not.toBeNull();
   });
@@ -73,13 +73,13 @@ describe("getVisibleTournamentSnapshot", () => {
   it("cache par défaut, sans droits déclarés", async () => {
     // Un appelant qui oublie les droits ne doit pas obtenir l'accès le plus
     // large : la valeur par défaut est le spectateur.
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(HOUR));
 
     expect(await getVisibleTournamentSnapshot(5)).toBeNull();
   });
 
   it("rend `null` sur un tournoi inexistant", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(null);
 
     expect(await getVisibleTournamentSnapshot(5, { canManage: true })).toBeNull();
   });
@@ -87,7 +87,7 @@ describe("getVisibleTournamentSnapshot", () => {
 
 describe("getTournamentDetail — même garde que le flux", () => {
   it("rend `null` sur un tournoi pas encore publié", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(HOUR));
 
     expect(await getTournamentDetail(5, 42, { canManage: false })).toBeNull();
   });
@@ -95,7 +95,7 @@ describe("getTournamentDetail — même garde que le flux", () => {
   it("ne calcule aucun contexte de lecteur pour un tournoi refusé", async () => {
     // Le refus doit précéder le travail : inutile d'aller chercher l'équipe du
     // lecteur et l'aperçu du plateau pour jeter le résultat.
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(HOUR));
 
     await getTournamentDetail(5, 42, { canManage: false, canPreview: true });
 
@@ -104,7 +104,7 @@ describe("getTournamentDetail — même garde que le flux", () => {
   });
 
   it("sert le détail d'un tournoi publié", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(-HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(-HOUR));
 
     const detail = await getTournamentDetail(5, 42, { canManage: false });
 
@@ -112,7 +112,7 @@ describe("getTournamentDetail — même garde que le flux", () => {
   });
 
   it("sert le détail d'un tournoi non publié au staff", async () => {
-    (getTournamentSnapshot as jest.Mock).mockResolvedValue(snapshotVisibleIn(HOUR) as never);
+    jest.mocked(getTournamentSnapshot).mockResolvedValue(snapshotVisibleIn(HOUR));
 
     const detail = await getTournamentDetail(5, 42, { canManage: true });
 

@@ -9,6 +9,8 @@ import { reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
+import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 /**
  * Connexion factice : elle reconnaît les requêtes de `reportMatchScore` à leur
@@ -16,7 +18,7 @@ import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
  * le garde-fou de format s'appliquer **avant** toute écriture.
  */
 type FakeFormat = {
-  type: string;
+  type: "BO" | "FT";
   value: number;
   maxMaps?: number | null;
   draws?: boolean;
@@ -81,24 +83,29 @@ function fakeConnection(
   return { conn, writes };
 }
 
-function mockTournament(matchFormat: FakeFormat, format = "SINGLE"): void {
-  (syncTournamentState as jest.Mock).mockResolvedValue({
-    row: {
+function mockTournament(matchFormat: FakeFormat, format: TournamentRow["format"] = "SINGLE"): void {
+  jest.mocked(syncTournamentState).mockResolvedValue({
+    row: tournamentRow({
       id: 1,
       state: "RUNNING",
       format,
       match_format_type: matchFormat?.type ?? null,
       match_format_value: matchFormat?.value ?? null,
-    },
+    }),
     stateChanged: false,
-  } as never);
+    contentChanged: false,
+  });
 }
 
 describe("reportMatchScore — respect du format de match", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 100 } as never);
-    (tryAutoResolveByes as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 100,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
+    jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 
   it("accepte un 3-1 en BO5", async () => {

@@ -6,9 +6,11 @@ jest.mock("@/lib/server/tournaments-service");
 import { GET } from "@/app/api/tournaments/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
-import type { PlatformRole } from "@/lib/shared/permissions";
+import type { AuthUser } from "@/lib/server/auth";
+import { authUser } from "../../../helpers/auth-user";
+import { tournamentDetail } from "../../../helpers/tournament-detail";
 
-type User = { id: number; isAdmin: boolean; roles: PlatformRole[] };
+type User = Pick<AuthUser, "id" | "isAdmin" | "roles">;
 
 function get(id: string) {
   return GET(new Request(`http://localhost/api/tournaments/${id}`), {
@@ -17,18 +19,18 @@ function get(id: string) {
 }
 
 function login(user: User | null) {
-  (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(user && authUser(user));
 }
 
 /** Arguments du dernier appel : [id, userId, droits du lecteur]. */
 function detailCall() {
-  return (service.getTournamentDetail as jest.Mock).mock.calls[0];
+  return jest.mocked(service.getTournamentDetail).mock.calls[0];
 }
 
 describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de suppression", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (service.getTournamentDetail as jest.Mock).mockResolvedValue({ card: {} } as never);
+    jest.mocked(service.getTournamentDetail).mockResolvedValue(tournamentDetail());
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -116,7 +118,7 @@ describe("GET /api/tournaments/[id] — droits d'aperçu, de diffusion et de sup
 
   it("répond 404 pour un tournoi inconnu", async () => {
     login({ id: 1, isAdmin: true, roles: ["ADMIN"] });
-    (service.getTournamentDetail as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(service.getTournamentDetail).mockResolvedValue(null);
 
     const res = await get("7");
 

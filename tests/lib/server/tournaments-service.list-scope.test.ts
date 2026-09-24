@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import { clearCache } from "@/lib/server/cache";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
@@ -14,7 +15,7 @@ afterEach(() => {
   clearCache();
 });
 
-type ExecuteMock = jest.Mock;
+type ExecuteMock = SqlMock;
 
 /**
  * Pose une base factice. La requête de liste passe par le pool (`db.execute`),
@@ -23,7 +24,7 @@ type ExecuteMock = jest.Mock;
  */
 async function mockDb(execute: ExecuteMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  const connectionExecute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
+  const connectionExecute: ExecuteMock = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
   const connection = {
     execute: connectionExecute,
     beginTransaction: jest.fn(),
@@ -31,10 +32,10 @@ async function mockDb(execute: ExecuteMock) {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return connectionExecute;
 }
 
@@ -58,7 +59,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("ne montre par défaut que les tournois déjà visibles", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
+    const execute: ExecuteMock = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
     await listTournamentBuckets(null);
@@ -70,7 +71,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("prend exactement le complément avec hiddenOnly", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
+    const execute: ExecuteMock = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
     await listTournamentBuckets(null, { hiddenOnly: true });
@@ -85,7 +86,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("ne filtre pas par organisateur : le staff voit tous les invisibles", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
+    const execute: ExecuteMock = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
     await listTournamentBuckets(null, { hiddenOnly: true });
@@ -95,7 +96,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("retombe sur la vue publique quand hiddenOnly est faux", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
+    const execute: ExecuteMock = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
     await listTournamentBuckets(null, { hiddenOnly: false });
@@ -105,7 +106,7 @@ describe("listTournamentBuckets — portée", () => {
   });
 
   it("garde la recherche par nom dans la portée invisible", async () => {
-    const execute: ExecuteMock = jest.fn().mockResolvedValue([[], undefined] as never);
+    const execute: ExecuteMock = jest.fn<SqlQuery>().mockResolvedValue([[], undefined]);
     await mockDb(execute);
 
     await listTournamentBuckets("  Marvel  ", { hiddenOnly: true });

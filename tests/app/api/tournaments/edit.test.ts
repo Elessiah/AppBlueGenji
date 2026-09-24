@@ -6,9 +6,12 @@ jest.mock("@/lib/server/tournaments-service");
 import { GET, PATCH } from "@/app/api/tournaments/[id]/edit/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
+import type { EditableTournamentValues } from "@/lib/server/tournaments/edit";
+import type { EditWindow } from "@/lib/shared/tournament-edit";
+import { authUser } from "../../../helpers/auth-user";
 
-const referee = { id: 1, isAdmin: false, roles: ["ARBITRE"] };
-const plainUser = { id: 2, isAdmin: false, roles: [] };
+const referee = authUser({ id: 1, roles: ["ARBITRE"] });
+const plainUser = authUser({ id: 2 });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -20,26 +23,53 @@ function patchReq(body: unknown) {
   });
 }
 
-const loaded = {
-  window: "FULL" as const,
-  values: { name: "Coupe test", maxTeams: 16 },
+const values: EditableTournamentValues = {
+  name: "Coupe test",
+  description: null,
+  game: "OW",
+  format: "SINGLE",
+  participantType: "TEAM",
+  maxTeams: 16,
+  startVisibilityAt: "2026-05-01T10:00:00.000Z",
+  registrationOpenAt: "2026-05-02T10:00:00.000Z",
+  registrationCloseAt: "2026-05-10T10:00:00.000Z",
+  startAt: "2026-05-12T10:00:00.000Z",
+  hasThirdPlaceMatch: false,
+  survivalRoundsBeforeFirstCut: null,
+  survivalRoundsPerCut: null,
+  swissTotalRounds: null,
+  swissPointsWin: null,
+  swissPointsDraw: null,
+  swissPointsLoss: null,
+  endurancePoints: null,
+  enduranceWinDelta: null,
+  enduranceLossDelta: null,
+  endurancePlayoffSize: null,
+  enduranceMaxRounds: null,
+  matchFormat: null,
+  endurancePlayoffFormat: null,
+  registrationDiscordRequirement: "ANY_PLAYER",
+  registrationBlizzardRequirement: "NONE",
+  registrationMinPlayers: 5,
+  phases: null,
 };
+const loaded: { window: EditWindow; values: EditableTournamentValues } = { window: "FULL", values };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
-  (service.loadEditableTournament as jest.Mock).mockResolvedValue(loaded as never);
-  (service.updateTournament as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(referee);
+  jest.mocked(service.loadEditableTournament).mockResolvedValue(loaded);
+  jest.mocked(service.updateTournament).mockResolvedValue(undefined);
 });
 
 describe("GET /api/tournaments/[id]/edit", () => {
   it("refuse un visiteur non connecté", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await GET(new Request("http://localhost"), params("1"))).status).toBe(401);
   });
 
   it("refuse un utilisateur sans la permission tournaments", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(plainUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(plainUser);
     expect((await GET(new Request("http://localhost"), params("1"))).status).toBe(403);
   });
 
@@ -48,7 +78,7 @@ describe("GET /api/tournaments/[id]/edit", () => {
   });
 
   it("rend 404 sur un tournoi inconnu", async () => {
-    (service.loadEditableTournament as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(service.loadEditableTournament).mockResolvedValue(null);
     expect((await GET(new Request("http://localhost"), params("1"))).status).toBe(404);
   });
 
@@ -61,7 +91,7 @@ describe("GET /api/tournaments/[id]/edit", () => {
 
 describe("PATCH /api/tournaments/[id]/edit", () => {
   it("refuse un utilisateur sans la permission tournaments", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(plainUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(plainUser);
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(403);
   });
 
@@ -102,22 +132,22 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
   });
 
   it("traduit un tournoi inconnu en 404", async () => {
-    (service.updateTournament as jest.Mock).mockRejectedValue(
-      new Error("TOURNAMENT_NOT_FOUND") as never,
+    jest.mocked(service.updateTournament).mockRejectedValue(
+      new Error("TOURNAMENT_NOT_FOUND"),
     );
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(404);
   });
 
   it("traduit un tournoi verrouillé en 409", async () => {
-    (service.updateTournament as jest.Mock).mockRejectedValue(
-      new Error("TOURNAMENT_LOCKED") as never,
+    jest.mocked(service.updateTournament).mockRejectedValue(
+      new Error("TOURNAMENT_LOCKED"),
     );
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(409);
   });
 
   it("traduit un champ interdit en 409 en nommant le champ", async () => {
-    (service.updateTournament as jest.Mock).mockRejectedValue(
-      new Error("FIELD_NOT_EDITABLE:format") as never,
+    jest.mocked(service.updateTournament).mockRejectedValue(
+      new Error("FIELD_NOT_EDITABLE:format"),
     );
     const res = await PATCH(patchReq({ name: "X" }), params("1"));
     expect(res.status).toBe(409);
@@ -125,14 +155,14 @@ describe("PATCH /api/tournaments/[id]/edit", () => {
   });
 
   it("traduit une valeur invalide en 400", async () => {
-    (service.updateTournament as jest.Mock).mockRejectedValue(
-      new Error("INVALID_DATE_ORDER") as never,
+    jest.mocked(service.updateTournament).mockRejectedValue(
+      new Error("INVALID_DATE_ORDER"),
     );
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(400);
   });
 
   it("rend 500 sur une panne inattendue", async () => {
-    (service.updateTournament as jest.Mock).mockRejectedValue(new Error("ECONNRESET") as never);
+    jest.mocked(service.updateTournament).mockRejectedValue(new Error("ECONNRESET"));
     expect((await PATCH(patchReq({ name: "X" }), params("1"))).status).toBe(500);
   });
 });

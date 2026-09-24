@@ -7,11 +7,10 @@ import { POST as resolveRoute } from "@/app/api/admin/matches/[matchId]/resolve/
 import { PATCH as scoresRoute } from "@/app/api/admin/matches/[matchId]/scores/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments-service";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const arbitre = { id: 3, isAdmin: false, roles: ["ARBITRE"] } as unknown as SessionUser;
-const player = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
+const arbitre = authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] });
+const player = authUser({ id: 2, isAdmin: false, roles: [] });
 
 function req(method: string, body: unknown) {
   return new Request("http://localhost/api/admin/matches/42/x", {
@@ -25,8 +24,8 @@ const params = { params: Promise.resolve({ matchId: "42" }) };
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
-  (adminResolveMatch as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+  jest.mocked(adminResolveMatch).mockResolvedValue(undefined);
 });
 
 describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
@@ -79,15 +78,15 @@ describe("POST /api/admin/matches/[matchId]/resolve — double forfait", () => {
   });
 
   it("réserve le geste à la permission tournois", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
     const res = await resolveRoute(req("POST", { doubleForfeit: true }), params);
     expect(res.status).toBe(403);
     expect(adminResolveMatch).not.toHaveBeenCalled();
   });
 
   it("rend 409 quand la cascade toucherait une rencontre jouée", async () => {
-    (adminResolveMatch as jest.Mock).mockRejectedValue(
-      new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES") as never,
+    jest.mocked(adminResolveMatch).mockRejectedValue(
+      new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES"),
     );
     const res = await resolveRoute(req("POST", { doubleForfeit: true }), params);
     expect(res.status).toBe(409);

@@ -8,9 +8,10 @@ import { GET as teamDetailRoute } from "@/app/api/teams/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getTeamDetail } from "@/lib/server/teams-service";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
+import { authUser } from "../../../helpers/auth-user";
+import { teamDetailResponse } from "../../../helpers/team-detail";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-const player = { id: 2, isAdmin: false, roles: [] } as unknown as SessionUser;
+const player = authUser({ id: 2, isAdmin: false, roles: [] });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 const req = (id: string) => new Request(`http://localhost/api/teams/${id}`);
@@ -26,15 +27,15 @@ const req = (id: string) => new Request(`http://localhost/api/teams/${id}`);
 describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getCurrentUser as jest.Mock).mockResolvedValue(player as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
   });
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
   it("rend le profil du joueur derrière l'entrée solo", async () => {
-    (getTeamDetail as jest.Mock).mockResolvedValue(null as never);
-    (findSoloEntryUser as jest.Mock).mockResolvedValue(77 as never);
+    jest.mocked(getTeamDetail).mockResolvedValue(null);
+    jest.mocked(findSoloEntryUser).mockResolvedValue(77);
 
     const res = await teamDetailRoute(req("15245"), params("15245"));
 
@@ -45,8 +46,8 @@ describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
   });
 
   it("garde le 404 nu pour une équipe qui n'existe pas", async () => {
-    (getTeamDetail as jest.Mock).mockResolvedValue(null as never);
-    (findSoloEntryUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getTeamDetail).mockResolvedValue(null);
+    jest.mocked(findSoloEntryUser).mockResolvedValue(null);
 
     const res = await teamDetailRoute(req("999999"), params("999999"));
 
@@ -55,8 +56,8 @@ describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
   });
 
   it("ne cherche pas d'entrée solo quand l'équipe existe", async () => {
-    const detail = { team: { id: 641, name: "Test - Cosmic Void" } };
-    (getTeamDetail as jest.Mock).mockResolvedValue(detail as never);
+    const detail = teamDetailResponse({ team: { id: 641, name: "Test - Cosmic Void" } });
+    jest.mocked(getTeamDetail).mockResolvedValue(detail);
 
     const res = await teamDetailRoute(req("641"), params("641"));
 
@@ -78,7 +79,7 @@ describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
   });
 
   it("exige une session avant tout", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await teamDetailRoute(req("641"), params("641"));
 

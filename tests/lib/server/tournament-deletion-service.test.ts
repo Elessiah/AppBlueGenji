@@ -8,8 +8,9 @@ import { deleteTournament } from "@/lib/server/tournaments/deletion";
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { deleteStoredImage } from "@/lib/server/image-upload";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
-type ExecuteMock = jest.Mock;
+type ExecuteMock = SqlMock;
 
 /** Requêtes émises sur la connexion, dans l'ordre, normalisées sur une ligne. */
 function statements(execute: ExecuteMock): string[] {
@@ -24,10 +25,10 @@ function mockConnection(execute: ExecuteMock) {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute: jest.fn(),
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return connection;
 }
 
@@ -47,7 +48,7 @@ describe("deleteTournament", () => {
     jest.clearAllMocks();
     // `clearAllMocks` garde les implémentations : un rejet posé par un test
     // déborderait sur le suivant.
-    (deleteStoredImage as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -229,7 +230,7 @@ describe("deleteTournament", () => {
     connection.commit.mockImplementation(async () => {
       committed = true;
     });
-    (deleteStoredImage as jest.Mock).mockImplementation(async () => {
+    jest.mocked(deleteStoredImage).mockImplementation(async () => {
       // Un `unlink` ne se défait pas : il ne part qu'une fois la ligne effacée.
       expect(committed).toBe(true);
     });
@@ -241,7 +242,7 @@ describe("deleteTournament", () => {
   it("un ménage de fichier raté ne fait pas échouer une suppression déjà acquise", async () => {
     mockExistingTournament("Open", "/api/uploads/tournaments/7-a.webp");
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    (deleteStoredImage as jest.Mock).mockRejectedValue(new Error("EPERM") as never);
+    jest.mocked(deleteStoredImage).mockRejectedValue(new Error("EPERM"));
 
     await expect(deleteTournament(7)).resolves.toEqual({ id: 7, name: "Open" });
     expect(log).toHaveBeenCalled();

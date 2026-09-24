@@ -38,9 +38,10 @@ import {
   updateSponsor,
 } from "@/lib/server/sponsors-service";
 import { getSiteCopy, resetSiteCopy, setSiteCopy } from "@/lib/server/site-copy-service";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /** Lignes rendues par le prochain `execute`, poussées dans l'ordre d'appel. */
-let execute: jest.Mock;
+let execute: SqlMock;
 
 /** Réponse par défaut : une ligne plausible, plus un `insertId` pour les écritures. */
 function anyRows() {
@@ -52,7 +53,7 @@ beforeEach(() => {
   clearCache();
 
   execute = jest.fn(async () => anyRows() as never);
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => ({
       release: jest.fn(),
@@ -61,7 +62,7 @@ beforeEach(() => {
       rollback: jest.fn(async () => undefined),
       execute,
     })),
-  } as never);
+  }));
 });
 
 afterEach(() => {

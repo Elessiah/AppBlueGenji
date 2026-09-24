@@ -15,6 +15,7 @@ import {
 } from "@/lib/server/teams-service";
 import { getDatabase } from "@/lib/server/database";
 import { getUserIdByPseudo } from "@/lib/server/users-service";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /**
  * Circuit des invitations : les rôles choisis voyagent jusqu'à l'arrivée du
@@ -165,12 +166,12 @@ beforeEach(() => {
   nextId = 100;
   const execute = jest.fn(async (sql: unknown, params: unknown) => run(String(sql), (params ?? []) as unknown[], false));
   connection.execute.mockImplementation((async (sql: unknown, params: unknown) =>
-    run(String(sql), (params ?? []) as unknown[], true)) as never);
-  (getDatabase as jest.Mock).mockResolvedValue({
+    run(String(sql), (params ?? []) as unknown[], true)));
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => connection),
-  } as never);
-  (getUserIdByPseudo as jest.Mock).mockResolvedValue(42 as never);
+  }));
+  jest.mocked(getUserIdByPseudo).mockResolvedValue(42);
 });
 
 const invite = (overrides: Partial<Invitation> = {}): Invitation => {
@@ -316,7 +317,7 @@ describe("acceptation atomique", () => {
     connection.execute.mockImplementationOnce((async (sql: unknown, params: unknown) => {
       inv.status = "DECLINED";
       return (originalExecute as (a: unknown, b: unknown) => unknown)(sql, params);
-    }) as never);
+    }));
 
     await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("INVITATION_NOT_PENDING");
     expect(rolesOf(42)).toBeUndefined();
@@ -410,12 +411,12 @@ describe("cancelInvitation", () => {
     // L'écriture est conditionnée à PENDING : la réponse arrivée entre la
     // lecture et l'écriture l'emporte.
     const inv = invite();
-    const db = (await getDatabase()) as unknown as { execute: jest.Mock };
+    const db = (await getDatabase()) as unknown as { execute: SqlMock };
     const original = db.execute.getMockImplementation()!;
     db.execute.mockImplementation((async (sql: unknown, params: unknown) => {
       if (/UPDATE bg_team_invitations/.test(String(sql))) inv.status = "ACCEPTED";
       return (original as (a: unknown, b: unknown) => unknown)(sql, params);
-    }) as never);
+    }));
 
     await expect(cancelInvitation(1, inv.id)).rejects.toThrow("INVITATION_NOT_PENDING");
     expect(inv.status).toBe("ACCEPTED");
@@ -443,7 +444,7 @@ describe("listTeamPendingInvitations", () => {
   });
 
   it("ne contrôle les droits qu'une fois et ne lit qu'une fois", async () => {
-    const db = (await getDatabase()) as unknown as { execute: jest.Mock };
+    const db = (await getDatabase()) as unknown as { execute: SqlMock };
     await listTeamPendingInvitations(7, 1);
     expect(db.execute).toHaveBeenCalledTimes(2);
   });

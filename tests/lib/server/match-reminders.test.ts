@@ -8,6 +8,7 @@ import {
   resetMatchReminderThrottle,
 } from "@/lib/server/tournaments/match-reminders";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
+import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 const START = new Date("2026-09-10T18:00:00Z");
 const ONE_HOUR_BEFORE = new Date("2026-09-10T17:00:00Z");
@@ -56,29 +57,29 @@ async function mockDb(options: {
     .mockResolvedValue([{ affectedRows: options.claimed === false ? 0 : 1 }]);
 
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ query, execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
   return { query, execute };
 }
 
 /** Clés réservées, dans l'ordre, pour une manche donnée. */
-function claimedKeys(execute: jest.Mock): string[] {
+function claimedKeys(execute: SqlMock): string[] {
   return execute.mock.calls.map((call) => (call as [string, unknown[]])[1][1] as string);
 }
 
 function sentMessages(): string[] {
-  return (pushDiscordDirectMessages as jest.Mock).mock.calls.map(
-    (call) => (call as [string])[0],
+  return jest.mocked(pushDiscordDirectMessages).mock.calls.map(
+    (call) => call[0],
   );
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
   resetMatchReminderThrottle();
-  (pushDiscordDirectMessages as jest.Mock).mockResolvedValue({
+  jest.mocked(pushDiscordDirectMessages).mockResolvedValue({
     sent: 0,
     unresolved: [],
     failed: [],
-  } as never);
+  });
 });
 
 afterEach(() => {
@@ -93,16 +94,13 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
     expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(2);
 
-    const [messageA, recipientsA, context] = (pushDiscordDirectMessages as jest.Mock).mock
+    const [messageA, recipientsA, context] = jest.mocked(pushDiscordDirectMessages).mock
       .calls[0] as [string, { label: string }[], string];
     expect(context).toBe("match-reminder");
     expect(messageA).toContain("**Les Renards** contre **Team Nova**");
     expect(recipientsA.map((r) => r.label)).toEqual(["Kiro", "Ayla"]);
 
-    const [messageB, recipientsB] = (pushDiscordDirectMessages as jest.Mock).mock.calls[1] as [
-      string,
-      { label: string }[],
-    ];
+    const [messageB, recipientsB] = jest.mocked(pushDiscordDirectMessages).mock.calls[1];
     expect(messageB).toContain("**Team Nova** contre **Les Renards**");
     expect(recipientsB.map((r) => r.label)).toEqual(["Nova"]);
   });
@@ -150,10 +148,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
 
     // Une seule engagée reste joignable : un seul envoi.
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(1);
-    const [, recipients] = (pushDiscordDirectMessages as jest.Mock).mock.calls[0] as [
-      string,
-      { label: string }[],
-    ];
+    const [, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(recipients.map((r) => r.label)).toEqual(["Nova"]);
   });
 
@@ -178,7 +173,7 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
   it("s'étrangle : un second passage immédiat ne relit pas la base", async () => {
     await mockDb({});
     await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
-    (pushDiscordDirectMessages as jest.Mock).mockClear();
+    jest.mocked(pushDiscordDirectMessages).mockClear();
 
     expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
@@ -193,7 +188,7 @@ describe("dispatchDueMatchReminders — date posée tardivement", () => {
 
     expect(await dispatchDueMatchReminders(THREE_DAYS_BEFORE)).toBe(2);
 
-    const [, , context] = (pushDiscordDirectMessages as jest.Mock).mock.calls[0] as [
+    const [, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0] as [
       string,
       unknown,
       string,

@@ -6,6 +6,7 @@ jest.mock("@/lib/server/tournaments/notifications");
 import { getDatabase } from "@/lib/server/database";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { loadEditableTournament, updateTournament } from "@/lib/server/tournaments/edit";
+import { fakePool } from "../../helpers/sql-double";
 
 const HOUR = 3600_000;
 const future = new Date(Date.now() + 48 * HOUR);
@@ -66,10 +67,10 @@ beforeEach(() => {
   rowToReturn = hiddenRow();
   phaseRowsToReturn = [];
   jest.clearAllMocks();
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     getConnection: async () => connection,
     execute: connection.execute,
-  } as never);
+  }));
 });
 
 describe("loadEditableTournament", () => {

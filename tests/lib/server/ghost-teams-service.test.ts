@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { claimGhostTeam, createGhostTeam, listGhostTeams } from "@/lib/server/ghost-teams-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-type ExecuteMock = jest.Mock;
+type ExecuteMock = SqlMock;
 
 async function mockDb(execute: ExecuteMock, connectionExecute?: ExecuteMock) {
   const { getDatabase } = await import("@/lib/server/database");
@@ -14,10 +15,10 @@ async function mockDb(execute: ExecuteMock, connectionExecute?: ExecuteMock) {
     rollback: jest.fn(),
     release: jest.fn(),
   };
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: jest.fn(async () => connection),
-  } as never);
+  }));
   return connection;
 }
 
@@ -32,7 +33,7 @@ describe("createGhostTeam", () => {
   it("insère une équipe marquée fantôme, sans aucun membre", async () => {
     // Deux requêtes : le sigle est cherché avant d'insérer (ici, aucun sigle
     // demandé, la recherche est donc court-circuitée).
-    const execute = jest.fn().mockResolvedValue([{ insertId: 42 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 42 }]);
     await mockDb(execute);
 
     await expect(createGhostTeam("  Les Fantômes  ", "  Équipe invitée  ")).resolves.toBe(42);
@@ -46,7 +47,7 @@ describe("createGhostTeam", () => {
   });
 
   it("normalise une description vide en NULL", async () => {
-    const execute = jest.fn().mockResolvedValue([{ insertId: 7 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 7 }]);
     await mockDb(execute);
 
     await createGhostTeam("Alpha Squad", "   ");
@@ -56,7 +57,7 @@ describe("createGhostTeam", () => {
   });
 
   it.each(["ab", "  a  ", "x".repeat(61)])("refuse un nom invalide (%s)", async (name) => {
-    const execute = jest.fn();
+    const execute = jest.fn<SqlQuery>();
     await mockDb(execute);
 
     await expect(createGhostTeam(name)).rejects.toThrow("INVALID_TEAM_NAME");
@@ -74,11 +75,11 @@ describe("claimGhostTeam", () => {
 
   it("nomme le joueur OWNER et lève le drapeau fantôme", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never) // équipe
-      .mockResolvedValueOnce([[{ id: 9 }]] as never) // utilisateur
-      .mockResolvedValueOnce([[]] as never); // aucune équipe active
-    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // équipe
+      .mockResolvedValueOnce([[{ id: 9 }]]) // utilisateur
+      .mockResolvedValueOnce([[]]); // aucune équipe active
+    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     const connection = await mockDb(execute, connectionExecute);
 
     await claimGhostTeam(3, 9);
@@ -97,21 +98,25 @@ describe("claimGhostTeam", () => {
   });
 
   it("refuse une équipe inconnue", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("TEAM_NOT_FOUND");
   });
 
   it("refuse une équipe réelle", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]] as never);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("NOT_A_GHOST_TEAM");
   });
 
   it("refuse une équipe dissoute", async () => {
-    const execute = jest.fn().mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: new Date() }]] as never);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: new Date() }]]);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("TEAM_ALREADY_DELETED");
@@ -119,9 +124,9 @@ describe("claimGhostTeam", () => {
 
   it("refuse un joueur inconnu ou anonymisé", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("USER_NOT_FOUND");
@@ -135,11 +140,11 @@ describe("claimGhostTeam", () => {
   // donc la forme de la requête.
   it("cherche le futur propriétaire sur is_deleted, jamais sur deleted_at", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
-      .mockResolvedValueOnce([[{ id: 9 }]] as never)
-      .mockResolvedValueOnce([[]] as never);
-    const connectionExecute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[{ id: 9 }]])
+      .mockResolvedValueOnce([[]]);
+    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute, connectionExecute);
 
     await claimGhostTeam(3, 9);
@@ -152,10 +157,10 @@ describe("claimGhostTeam", () => {
 
   it("refuse un joueur déjà engagé dans une équipe", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
-      .mockResolvedValueOnce([[{ id: 9 }]] as never)
-      .mockResolvedValueOnce([[{ id: 55 }]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[{ id: 9 }]])
+      .mockResolvedValueOnce([[{ id: 55 }]]);
     await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("USER_ALREADY_IN_TEAM");
@@ -163,11 +168,11 @@ describe("claimGhostTeam", () => {
 
   it("annule la transaction si l'insertion du membre échoue", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]] as never)
-      .mockResolvedValueOnce([[{ id: 9 }]] as never)
-      .mockResolvedValueOnce([[]] as never);
-    const connectionExecute = jest.fn().mockRejectedValue(new Error("DB_DOWN") as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
+      .mockResolvedValueOnce([[{ id: 9 }]])
+      .mockResolvedValueOnce([[]]);
+    const connectionExecute = jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN"));
     const connection = await mockDb(execute, connectionExecute);
 
     await expect(claimGhostTeam(3, 9)).rejects.toThrow("DB_DOWN");
@@ -190,13 +195,13 @@ describe("listGhostTeams", () => {
     // staff, son logo se colle comme celui d'une équipe réelle, et rien
     // n'empêche d'y saisir n'importe quelle adresse. Elle doit ressortir à
     // `null`, pas atteindre un `<Image>`.
-    const execute = jest.fn().mockResolvedValue([
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([
       [
         { id: 1, name: "Alpha", logo_url: null },
         { id: 2, name: "Beta", logo_url: "/api/uploads/teams/2-ab12cd34.webp" },
         { id: 3, name: "Gamma", logo_url: "https://placehold.co/128x128" },
       ],
-    ] as never);
+    ]);
     await mockDb(execute);
 
     await expect(listGhostTeams()).resolves.toEqual([
@@ -215,7 +220,9 @@ describe("listGhostTeams", () => {
   });
 
   it("écarte les fantômes déjà engagées dans le tournoi visé", async () => {
-    const execute = jest.fn().mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }]] as never);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValue([[{ id: 1, name: "Alpha", logo_url: null }]]);
     await mockDb(execute);
 
     await expect(listGhostTeams(12)).resolves.toEqual([{ id: 1, name: "Alpha", logoUrl: null }]);

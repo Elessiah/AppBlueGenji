@@ -8,8 +8,9 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 import { profilePatchRequest } from "../../../helpers/profile-request";
 import { PROFILE_INPUT_ERRORS } from "@/lib/shared/profile-input-errors";
+import { authUser, fullProfileResponse } from "../../../helpers/auth-user";
 
-const user = { id: 42 } as Awaited<ReturnType<typeof getCurrentUser>>;
+const user = authUser({ id: 42 });
 
 /**
  * La sauvegarde de profil arrivée **après** la suppression du compte.
@@ -27,8 +28,8 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
   });
 
   it("rend 409 et le code que l'écran sait traduire", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-    (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("ACCOUNT_DELETED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(updateOwnProfile).mockRejectedValue(new Error("ACCOUNT_DELETED"));
 
     const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
 
@@ -39,24 +40,25 @@ describe("PATCH /api/profile — course avec la suppression du compte", () => {
   });
 
   it("garde 409 pour le pseudo déjà pris et 400 pour le reste", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
-    (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("PSEUDO_ALREADY_USED") as never);
+    jest.mocked(updateOwnProfile).mockRejectedValue(new Error("PSEUDO_ALREADY_USED"));
     expect((await PATCH(profilePatchRequest({ pseudo: "Nova" }))).status).toBe(409);
 
     jest.spyOn(console, "error").mockImplementation(() => undefined);
-    (updateOwnProfile as jest.Mock).mockRejectedValue(new Error("BOOM") as never);
+    jest.mocked(updateOwnProfile).mockRejectedValue(new Error("BOOM"));
     expect((await PATCH(profilePatchRequest({ pseudo: "Nova" }))).status).toBe(400);
   });
 
   it("rend le profil relu quand l'écriture passe", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-    (updateOwnProfile as jest.Mock).mockResolvedValue(undefined as never);
-    (getFullProfile as jest.Mock).mockResolvedValue({ profile: { pseudo: "Nova" } } as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(updateOwnProfile).mockResolvedValue(undefined);
+    const profile = fullProfileResponse({ profile: { pseudo: "Nova" } });
+    jest.mocked(getFullProfile).mockResolvedValue(profile);
 
     const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ profile: { pseudo: "Nova" } });
+    expect(await res.json()).toEqual(JSON.parse(JSON.stringify(profile)));
   });
 });
 
@@ -78,8 +80,8 @@ describe("PATCH /api/profile — aucun message interne ne sort", () => {
   it.each([...PROFILE_INPUT_ERRORS])(
     "rend le refus de saisie %s tel quel, en 400",
     async (code) => {
-      (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-      (updateOwnProfile as jest.Mock).mockRejectedValue(new Error(code) as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(user);
+      jest.mocked(updateOwnProfile).mockRejectedValue(new Error(code));
       const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
       expect(res.status).toBe(400);
       expect(await res.json()).toEqual({ error: code });
@@ -91,8 +93,8 @@ describe("PATCH /api/profile — aucun message interne ne sort", () => {
     "Data too long for column 'pseudo' at row 1",
     "BOOM",
   ])("remplace « %s » par le code générique", async (message) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
-    (updateOwnProfile as jest.Mock).mockRejectedValue(new Error(message) as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(updateOwnProfile).mockRejectedValue(new Error(message));
     const res = await PATCH(profilePatchRequest({ pseudo: "Nova" }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "PROFILE_UPDATE_FAILED" });
@@ -101,7 +103,7 @@ describe("PATCH /api/profile — aucun message interne ne sort", () => {
   });
 
   it("ne rend pas le message d'un corps illisible", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
     const req = new Request("http://localhost/api/profile", {
       method: "PATCH",
       headers: { "content-type": "application/json" },

@@ -11,6 +11,8 @@ import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
 import type { AuthUser } from "@/lib/server/auth";
 import type { TournamentCard } from "@/lib/shared/types";
 import { tournamentCard } from "../helpers/tournament-card";
+import { authUser } from "../helpers/auth-user";
+import { tournamentSnapshot } from "../helpers/tournament-detail";
 
 /**
  * L'aperçu d'un lien de tournoi, du côté du câblage.
@@ -65,18 +67,7 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
 }
 
 function user(overrides: Partial<AuthUser> = {}): AuthUser {
-  return {
-    id: 7,
-    pseudo: "Nova",
-    avatarUrl: null,
-    discordId: null,
-    googleSub: null,
-    email: null,
-    isAdult: true,
-    isAdmin: false,
-    platformRoles: [],
-    ...overrides,
-  } as AuthUser;
+  return authUser({ id: 7, pseudo: "Nova", ...overrides });
 }
 
 const params = (id: string) => ({ params: Promise.resolve({ id }), children: null });
@@ -119,7 +110,7 @@ describe("garde de l'espace sécurisé", () => {
 describe("generateMetadata de la fiche", () => {
   it("rédige l'encart depuis l'instantané visible", async () => {
     mockedUser.mockResolvedValue(null);
-    mockedSnapshot.mockResolvedValue({ card: card() } as never);
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: card() }));
 
     const meta = await generateMetadata(params("42") as never);
 
@@ -133,7 +124,7 @@ describe("generateMetadata de la fiche", () => {
 
   it("passe la permission `tournaments` du lecteur à la porte de visibilité", async () => {
     mockedUser.mockResolvedValue(user({ isAdmin: true }));
-    mockedSnapshot.mockResolvedValue({ card: card() } as never);
+    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: card() }));
 
     await generateMetadata(params("42") as never);
 

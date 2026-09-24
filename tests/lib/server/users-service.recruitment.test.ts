@@ -1,22 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { updateOwnProfile } from "@/lib/server/users-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
   // `getConnection` sert à la resynchronisation de l'entrée solo, que
   // `updateOwnProfile` déclenche dès que le pseudo ou la visibilité de l'avatar
   // change : la ligne de l'entrée solo porte une copie des deux. Connexion
   // distincte, et sans entrée solo à resynchroniser : les assertions portent
   // sur l'écriture du profil, pas sur ce ménage.
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     execute,
     getConnection: async () => ({
       execute: jest.fn<() => Promise<unknown>>().mockResolvedValue([[], []]),
       release: () => undefined,
     }),
-  } as never);
+  }));
 }
 
 /**
@@ -27,7 +28,7 @@ async function mockDb(execute: jest.Mock) {
  * appel : le repérer par son texte plutôt que par son rang garde ces assertions
  * valables au prochain contrôle ajouté devant.
  */
-function profileUpdate(execute: jest.Mock): [string, unknown[]] {
+function profileUpdate(execute: SqlMock): [string, unknown[]] {
   const call = (execute.mock.calls as [string, unknown[]][]).find(([sql]) =>
     sql.includes("UPDATE bg_users"),
   );
@@ -44,7 +45,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
   });
 
   it("n'écrit plus jamais visible_pseudo", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await updateOwnProfile(42, { visibility: { avatar: false } });
@@ -55,7 +56,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
   });
 
   it("persiste la fermeture au recrutement", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await updateOwnProfile(42, { openToRecruitment: false });
@@ -68,7 +69,7 @@ describe("updateOwnProfile — pseudo non masquable + ouverture au recrutement",
   });
 
   it("laisse la valeur inchangée quand le champ est absent du patch", async () => {
-    const execute = jest.fn().mockResolvedValue([{ affectedRows: 1 }] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
     await mockDb(execute);
 
     await updateOwnProfile(42, { isAdult: true });

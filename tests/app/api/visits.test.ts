@@ -6,10 +6,9 @@ jest.mock("@/lib/server/site-visits-service");
 import { POST } from "@/app/api/visits/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
+import { authUser } from "../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const member = { id: 42, isAdmin: false, roles: [] } as unknown as SessionUser;
+const member = authUser({ id: 42, isAdmin: false, roles: [] });
 
 function visitReq(body: unknown, headers: Record<string, string> = {}) {
   return new Request("http://localhost/api/visits", {
@@ -20,7 +19,7 @@ function visitReq(body: unknown, headers: Record<string, string> = {}) {
 }
 
 function lastCall() {
-  return (recordSiteVisit as jest.Mock).mock.calls[0][0] as {
+  return jest.mocked(recordSiteVisit).mock.calls[0][0] as {
     userId: number | null;
     ip: string | null;
     userAgent: string | null;
@@ -31,9 +30,9 @@ function lastCall() {
 describe("POST /api/visits", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
-    (recordSiteVisit as jest.Mock).mockResolvedValue({ recorded: true } as never);
-    (syncSiteVisitStatsToBot as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
+    jest.mocked(recordSiteVisit).mockResolvedValue({ recorded: true });
+    jest.mocked(syncSiteVisitStatsToBot).mockResolvedValue(true);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -48,7 +47,7 @@ describe("POST /api/visits", () => {
   });
 
   it("rattache la visite au compte connecté", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(member as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(member);
 
     await POST(visitReq({ path: "/profil" }));
 
@@ -110,7 +109,7 @@ describe("POST /api/visits", () => {
   });
 
   it("ne réveille le bot que si une visite a réellement été créée", async () => {
-    (recordSiteVisit as jest.Mock).mockResolvedValue({ recorded: false } as never);
+    jest.mocked(recordSiteVisit).mockResolvedValue({ recorded: false });
 
     expect(await (await POST(visitReq({ path: "/" }))).json()).toEqual({ recorded: false });
     expect(syncSiteVisitStatsToBot).not.toHaveBeenCalled();
@@ -123,7 +122,7 @@ describe("POST /api/visits", () => {
   });
 
   it("reste silencieux si l'enregistrement échoue", async () => {
-    (recordSiteVisit as jest.Mock).mockRejectedValue(new Error("DB_DOWN") as never);
+    jest.mocked(recordSiteVisit).mockRejectedValue(new Error("DB_DOWN"));
 
     const res = await POST(visitReq({ path: "/" }));
 
@@ -132,7 +131,7 @@ describe("POST /api/visits", () => {
   });
 
   it("n'échoue pas si la synchronisation vers le bot casse", async () => {
-    (syncSiteVisitStatsToBot as jest.Mock).mockRejectedValue(new Error("BOT_DOWN") as never);
+    jest.mocked(syncSiteVisitStatsToBot).mockRejectedValue(new Error("BOT_DOWN"));
 
     const res = await POST(visitReq({ path: "/" }));
 

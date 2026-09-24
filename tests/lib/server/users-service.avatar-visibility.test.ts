@@ -6,6 +6,7 @@ jest.mock("@/lib/server/solo-entries-service");
 import { updateOwnProfile } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * Masquer son avatar doit l'**effacer** de l'entrée solo, pas seulement cesser
@@ -22,7 +23,7 @@ const syncMock = syncSoloEntryIdentity as jest.MockedFunction<typeof syncSoloEnt
 
 function mockDb() {
   const execute = jest.fn<() => Promise<unknown>>().mockResolvedValue([{ affectedRows: 1 }]);
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 

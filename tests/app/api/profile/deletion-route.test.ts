@@ -8,6 +8,7 @@ import { DELETE } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { clearSession } from "@/lib/server/auth";
 import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users-service";
+import { authUser } from "../../../helpers/auth-user";
 
 /**
  * Les deux bouts du geste : la route qui **annonce** ce que la suppression
@@ -25,8 +26,8 @@ const deleteMock = deleteOwnAccount as jest.MockedFunction<typeof deleteOwnAccou
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getCurrentUser as jest.Mock).mockResolvedValue({ id: 7, roles: [] } as never);
-  (clearSession as jest.Mock).mockResolvedValue(undefined as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, roles: [] }));
+  jest.mocked(clearSession).mockResolvedValue(undefined);
 });
 
 describe("GET /api/profile/deletion", () => {
@@ -49,7 +50,7 @@ describe("GET /api/profile/deletion", () => {
   });
 
   it("refuse l'appel anonyme sans rien interroger", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     expect((await GET()).status).toBe(401);
     expect(modeMock).not.toHaveBeenCalled();
@@ -82,7 +83,7 @@ describe("DELETE /api/profile", () => {
   });
 
   it("refuse l'appel anonyme sans rien écrire", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     expect((await DELETE()).status).toBe(401);
     expect(deleteMock).not.toHaveBeenCalled();
@@ -91,8 +92,8 @@ describe("DELETE /api/profile", () => {
 
 describe("DELETE /api/profile — aucun message interne ne sort", () => {
   it.each(["ACCOUNT_STILL_REFERENCED", "USER_NOT_FOUND"])("rend le refus nommé %s tel quel", async (code) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 42 } as never);
-    (deleteOwnAccount as jest.Mock).mockRejectedValue(new Error(code) as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42 }));
+    jest.mocked(deleteOwnAccount).mockRejectedValue(new Error(code));
     const res = await DELETE();
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: code });
@@ -100,9 +101,9 @@ describe("DELETE /api/profile — aucun message interne ne sort", () => {
 
   it("remplace le message d'une panne par le code générique", async () => {
     const log = jest.spyOn(console, "error").mockImplementation(() => undefined);
-    (getCurrentUser as jest.Mock).mockResolvedValue({ id: 42 } as never);
-    (deleteOwnAccount as jest.Mock).mockRejectedValue(
-      new Error("Deadlock found when trying to get lock; try restarting transaction") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 42 }));
+    jest.mocked(deleteOwnAccount).mockRejectedValue(
+      new Error("Deadlock found when trying to get lock; try restarting transaction"),
     );
     const res = await DELETE();
     expect(res.status).toBe(400);

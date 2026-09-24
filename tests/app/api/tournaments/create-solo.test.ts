@@ -6,8 +6,9 @@ jest.mock("@/lib/server/tournaments-service");
 import { POST } from "@/app/api/tournaments/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
+import { authUser } from "../../../helpers/auth-user";
 
-const referee = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
+const referee = authUser({ id: 1, isAdmin: true });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/tournaments", {
@@ -31,8 +32,8 @@ const base = {
 describe("POST /api/tournaments — tournoi individuel", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
-    (service.createTournament as jest.Mock).mockResolvedValue(42 as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(referee);
+    jest.mocked(service.createTournament).mockResolvedValue(42);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -69,8 +70,8 @@ describe("POST /api/tournaments — tournoi individuel", () => {
   it("accepte l'individuel sur tous les formats", async () => {
     for (const format of ["SINGLE", "DOUBLE", "SWISS", "BG_SURVIE"]) {
       jest.clearAllMocks();
-      (getCurrentUser as jest.Mock).mockResolvedValue(referee as never);
-      (service.createTournament as jest.Mock).mockResolvedValue(7 as never);
+      jest.mocked(getCurrentUser).mockResolvedValue(referee);
+      jest.mocked(service.createTournament).mockResolvedValue(7);
 
       const res = await POST(jsonReq({ ...base, format, participantType: "SOLO" }));
       expect(res.status).toBe(201);

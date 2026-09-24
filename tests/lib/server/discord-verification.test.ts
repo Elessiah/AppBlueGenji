@@ -29,6 +29,7 @@ import {
   createDiscordLoginChallenge,
   discardDiscordChallenge,
 } from "@/lib/server/users-service";
+import { fakePool } from "../../helpers/sql-double";
 
 /**
  * La certification du tag Discord.
@@ -91,7 +92,7 @@ function fakeDb(state: UserState, otherAccountHolds: string | null = null) {
     throw new Error(`requête inattendue : ${q}`);
   });
 
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return { state, writes, execute };
 }
 

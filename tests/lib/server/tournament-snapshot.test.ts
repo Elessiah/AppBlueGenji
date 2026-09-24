@@ -35,13 +35,17 @@ import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { getDatabase } from "@/lib/server/database";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { clearCache } from "@/lib/server/cache";
+import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
+import { fakePool } from "../../helpers/sql-double";
+import type { RowOverrides } from "../../helpers/row-overrides";
+import { tournamentListRow, tournamentRow } from "../../helpers/tournament-rows";
 
 const TOURNAMENT_ID = 5;
 
 /** Ligne de tournoi en cours, plateau déjà construit : aucun entretien requis. */
-function runningRow(overrides: Record<string, unknown> = {}) {
-  const past = new Date(Date.now() - 86_400_000).toISOString();
-  return {
+function runningRow(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
+  const past = new Date(Date.now() - 86_400_000);
+  return tournamentRow({
     id: TOURNAMENT_ID,
     state: "RUNNING",
     format: "SINGLE",
@@ -52,19 +56,15 @@ function runningRow(overrides: Record<string, unknown> = {}) {
     start_at: past,
     bracket_size: 8,
     ...overrides,
-  };
+  });
 }
 
 /** Ligne de liste, telle que `mapCard` l'attend. */
-function listRow(overrides: Record<string, unknown> = {}) {
-  const past = new Date(Date.now() - 86_400_000).toISOString();
-  return {
+function listRow(overrides: RowOverrides<TournamentListRow> = {}): TournamentListRow {
+  const past = new Date(Date.now() - 86_400_000);
+  return tournamentListRow({
     id: TOURNAMENT_ID,
     name: "Tournoi",
-    description: null,
-    format: "SINGLE",
-    game: "OW",
-    max_teams: 8,
     state: "RUNNING",
     start_visibility_at: past,
     registration_open_at: past,
@@ -72,18 +72,9 @@ function listRow(overrides: Record<string, unknown> = {}) {
     start_at: past,
     bracket_size: 8,
     created_at: past,
-    organizer_user_id: 1,
-    finished_at: null,
-    has_third_place_match: 0,
-    survival_rounds_before_first_cut: null,
-    survival_rounds_per_cut: null,
-    survival_current_round: null,
-    participant_type: "TEAM",
-    match_format_type: null,
-    match_format_value: null,
     registered_teams: 2,
     ...overrides,
-  };
+  });
 }
 
 /**
@@ -103,21 +94,22 @@ beforeEach(() => {
   clearCache();
   expiredRows = [];
 
-  (getDatabase as jest.Mock).mockResolvedValue({
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({
     getConnection: jest.fn(async () => connection),
     execute: jest.fn(async () => [expiredRows]),
-  } as never);
+  }));
 
-  (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow() as never);
-  (hasPendingStateTransition as jest.Mock).mockResolvedValue(false as never);
-  (syncTournamentState as jest.Mock).mockResolvedValue({
+  jest.mocked(loadTournamentRow).mockResolvedValue(runningRow());
+  jest.mocked(hasPendingStateTransition).mockResolvedValue(false);
+  jest.mocked(syncTournamentState).mockResolvedValue({
     row: runningRow(),
     stateChanged: false,
-  } as never);
-  (getTournamentListRow as jest.Mock).mockResolvedValue(listRow() as never);
-  (getRegistrationRows as jest.Mock).mockResolvedValue([] as never);
-  (getMatchRows as jest.Mock).mockResolvedValue([] as never);
-  (loadSwissMeta as jest.Mock).mockResolvedValue(null as never);
+    contentChanged: false,
+  });
+  jest.mocked(getTournamentListRow).mockResolvedValue(listRow());
+  jest.mocked(getRegistrationRows).mockResolvedValue([]);
+  jest.mocked(getMatchRows).mockResolvedValue([]);
+  jest.mocked(loadSwissMeta).mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -159,8 +151,8 @@ describe("getTournamentSnapshotFrame — mutualisation", () => {
     const first = await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
     invalidateTournamentSnapshot(TOURNAMENT_ID);
-    (getTournamentListRow as jest.Mock).mockResolvedValue(
-      listRow({ registered_teams: 3 }) as never,
+    jest.mocked(getTournamentListRow).mockResolvedValue(
+      listRow({ registered_teams: 3 }),
     );
     const second = await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
@@ -168,7 +160,7 @@ describe("getTournamentSnapshotFrame — mutualisation", () => {
   });
 
   it("rend null pour un tournoi inexistant", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(null);
     expect(await getTournamentSnapshot(TOURNAMENT_ID)).toBeNull();
   });
 });
@@ -183,10 +175,10 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     // Auparavant l'entretien était réservé aux tournois déjà `RUNNING` : la page
     // d'un tournoi dont l'heure de début était passée restait aux inscriptions
     // jusqu'à ce que quelqu'un aille charger la liste.
-    (loadTournamentRow as jest.Mock).mockResolvedValue(
-      runningRow({ state: "REGISTRATION" }) as never,
+    jest.mocked(loadTournamentRow).mockResolvedValue(
+      runningRow({ state: "REGISTRATION" }),
     );
-    (hasPendingStateTransition as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(hasPendingStateTransition).mockResolvedValue(true);
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
@@ -194,8 +186,8 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
   });
 
   it("construit le plateau manquant d'un tournoi en cours", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(
-      runningRow({ bracket_size: null }) as never,
+    jest.mocked(loadTournamentRow).mockResolvedValue(
+      runningRow({ bracket_size: null }),
     );
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
@@ -203,7 +195,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     expect(syncTournamentState).toHaveBeenCalled();
   });
 
-  it.each(["MULTI", "SWISS", "SURVIVAL", "BG_SURVIE"])(
+  it.each<TournamentRow["format"]>(["MULTI", "SWISS", "SURVIVAL", "BG_SURVIE"])(
     "n'ouvre aucune transaction pour un tournoi %s dont `bracket_size` est nul",
     async (format) => {
       // `bracket_size` ne décrit que les formats à plateau, et seul l'un d'eux
@@ -212,8 +204,8 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
       // format, chaque reconstruction d'instantané d'un multi-phases en cours
       // ouvrait une transaction d'entretien — juste ce que ce module promet
       // d'éviter.
-      (loadTournamentRow as jest.Mock).mockResolvedValue(
-        runningRow({ format, bracket_size: null }) as never,
+      jest.mocked(loadTournamentRow).mockResolvedValue(
+        runningRow({ format, bracket_size: null }),
       );
 
       await getTournamentSnapshotFrame(TOURNAMENT_ID);
@@ -234,11 +226,12 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     // La même bascule déclenchée depuis la liste publie un événement ; sans ce
     // pendant, un tournoi démarré parce qu'un spectateur a ouvert sa page
     // resterait annoncé « Inscriptions » dans la liste en cache.
-    (hasPendingStateTransition as jest.Mock).mockResolvedValue(true as never);
-    (syncTournamentState as jest.Mock).mockResolvedValue({
+    jest.mocked(hasPendingStateTransition).mockResolvedValue(true);
+    jest.mocked(syncTournamentState).mockResolvedValue({
       row: runningRow(),
       stateChanged: true,
-    } as never);
+      contentChanged: false,
+    });
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
@@ -249,14 +242,14 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     // Le moteur ne publie plus depuis le fond de sa transaction : il rend
     // `contentChanged`, et c'est ici — après le commit — que la liste apprend
     // que `bracket_size` a bougé.
-    (loadTournamentRow as jest.Mock).mockResolvedValue(
-      runningRow({ bracket_size: null }) as never,
+    jest.mocked(loadTournamentRow).mockResolvedValue(
+      runningRow({ bracket_size: null }),
     );
-    (syncTournamentState as jest.Mock).mockResolvedValue({
+    jest.mocked(syncTournamentState).mockResolvedValue({
       row: runningRow({ bracket_size: 8 }),
       stateChanged: false,
       contentChanged: true,
-    } as never);
+    });
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
@@ -264,7 +257,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
   });
 
   it("ne touche pas aux listes quand rien n'a basculé", async () => {
-    (hasPendingStateTransition as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(hasPendingStateTransition).mockResolvedValue(true);
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
@@ -279,12 +272,13 @@ describe("getTournamentSnapshot — provenance de l'ordre de seeding", () => {
   });
 
   it("annonce le classement du site pour un format à classement", async () => {
-    (loadTournamentRow as jest.Mock).mockResolvedValue(runningRow({ format: "SWISS" }) as never);
-    (syncTournamentState as jest.Mock).mockResolvedValue({
+    jest.mocked(loadTournamentRow).mockResolvedValue(runningRow({ format: "SWISS" }));
+    jest.mocked(syncTournamentState).mockResolvedValue({
       row: runningRow({ format: "SWISS" }),
       stateChanged: false,
-    } as never);
-    (getTournamentListRow as jest.Mock).mockResolvedValue(listRow({ format: "SWISS" }) as never);
+      contentChanged: false,
+    });
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ format: "SWISS" }));
 
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
     expect(snapshot?.seedingSource).toBe("RANKING");
@@ -293,14 +287,15 @@ describe("getTournamentSnapshot — provenance de l'ordre de seeding", () => {
   it("annonce l'ordre du staff dès que manual_seeding est posé, format à classement compris", async () => {
     // Sans quoi l'interface continuerait d'avertir « ce n'est pas le tirage »
     // alors que le staff vient précisément de le fixer.
-    (loadTournamentRow as jest.Mock).mockResolvedValue(
-      runningRow({ format: "SWISS", manual_seeding: 1 }) as never,
+    jest.mocked(loadTournamentRow).mockResolvedValue(
+      runningRow({ format: "SWISS", manual_seeding: 1 }),
     );
-    (syncTournamentState as jest.Mock).mockResolvedValue({
+    jest.mocked(syncTournamentState).mockResolvedValue({
       row: runningRow({ format: "SWISS", manual_seeding: 1 }),
       stateChanged: false,
-    } as never);
-    (getTournamentListRow as jest.Mock).mockResolvedValue(listRow({ format: "SWISS" }) as never);
+      contentChanged: false,
+    });
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ format: "SWISS" }));
 
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
     expect(snapshot?.seedingSource).toBe("MANUAL");

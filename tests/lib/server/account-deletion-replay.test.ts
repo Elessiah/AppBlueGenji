@@ -7,6 +7,7 @@ import { replayAccountDeletions } from "@/lib/server/account-deletion-replay";
 import { getDatabase } from "@/lib/server/database";
 import { deleteOwnAccount } from "@/lib/server/users-service";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
+import { fakePool } from "../../helpers/sql-double";
 
 const CREATED = "2026-01-02 03:04:05";
 const entry = (userId: number, accountCreatedAt = CREATED): AccountDeletionEntry => ({
@@ -21,7 +22,7 @@ function restoredDb(rows: Record<number, { created_at: string; is_deleted: numbe
     const row = rows[Number(params[0])];
     return [row ? [row] : []];
   });
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 
@@ -33,7 +34,7 @@ const log = (line: string) => {
 beforeEach(() => {
   jest.clearAllMocks();
   lines.length = 0;
-  (deleteOwnAccount as jest.Mock).mockResolvedValue({ mode: "ERASE", reason: null } as never);
+  jest.mocked(deleteOwnAccount).mockResolvedValue({ mode: "ERASE", reason: null });
 });
 
 describe("replayAccountDeletions", () => {
@@ -47,7 +48,7 @@ describe("replayAccountDeletions", () => {
 
   it("dit l'anonymisation quand la base restaurée retient la ligne", async () => {
     restoredDb({ 7: { created_at: CREATED, is_deleted: 0 } });
-    (deleteOwnAccount as jest.Mock).mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS" } as never);
+    jest.mocked(deleteOwnAccount).mockResolvedValue({ mode: "ANONYMIZE", reason: "TOURNAMENTS" });
     await replayAccountDeletions([entry(7)], { log });
     expect(lines.join("\n")).toContain("anonymisé");
   });
@@ -73,9 +74,9 @@ describe("replayAccountDeletions", () => {
 
   it("un échec n'arrête pas le rejeu des suivantes, et se compte", async () => {
     restoredDb({ 1: { created_at: CREATED, is_deleted: 0 }, 2: { created_at: CREATED, is_deleted: 0 } });
-    (deleteOwnAccount as jest.Mock)
-      .mockRejectedValueOnce(new Error("ACCOUNT_STILL_REFERENCED") as never)
-      .mockResolvedValueOnce({ mode: "ERASE", reason: null } as never);
+    jest.mocked(deleteOwnAccount)
+      .mockRejectedValueOnce(new Error("ACCOUNT_STILL_REFERENCED"))
+      .mockResolvedValueOnce({ mode: "ERASE", reason: null });
     const report = await replayAccountDeletions([entry(1), entry(2)], { log });
     expect(deleteOwnAccount).toHaveBeenCalledTimes(2);
     expect(report).toMatchObject({ replayed: 1, failed: 1 });

@@ -6,12 +6,13 @@ import {
   CONTACT_DISCORD_URL_KEY,
 } from "@/lib/shared/contact";
 import { clearCache } from "@/lib/server/cache";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 describe("contact-service", () => {
@@ -28,7 +29,7 @@ describe("contact-service", () => {
 
   describe("getContactInfo", () => {
     it("falls back to defaults when no row is configured", async () => {
-      await mockDb(jest.fn().mockResolvedValue([[]] as never));
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await getContactInfo()).toEqual(DEFAULT_CONTACT);
     });
 
@@ -36,9 +37,9 @@ describe("contact-service", () => {
       // Email présent mais vidé, lien Discord absent → l'email reste vide,
       // le lien retombe sur le défaut.
       await mockDb(
-        jest.fn().mockResolvedValue([
+        jest.fn<SqlQuery>().mockResolvedValue([
           [{ setting_key: CONTACT_EMAIL_KEY, setting_value: "" }],
-        ] as never),
+        ]),
       );
       const info = await getContactInfo();
       expect(info.email).toBe("");
@@ -47,13 +48,13 @@ describe("contact-service", () => {
 
     it("returns stored values, trimmed", async () => {
       await mockDb(
-        jest.fn().mockResolvedValue([
+        jest.fn<SqlQuery>().mockResolvedValue([
           [
             { setting_key: CONTACT_EMAIL_KEY, setting_value: "  a@bg.fr " },
             { setting_key: CONTACT_DISCORD_TAG_KEY, setting_value: "bluegenji" },
             { setting_key: CONTACT_DISCORD_URL_KEY, setting_value: "https://discord.gg/x" },
           ],
-        ] as never),
+        ]),
       );
       expect(await getContactInfo()).toEqual({
         email: "a@bg.fr",
@@ -64,14 +65,14 @@ describe("contact-service", () => {
 
     it("returns the full default set when the database is unreachable", async () => {
       const { getDatabase } = await import("@/lib/server/database");
-      (getDatabase as jest.Mock).mockRejectedValue(new Error("down") as never);
+      jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
       expect(await getContactInfo()).toEqual(DEFAULT_CONTACT);
     });
   });
 
   describe("setContactInfo", () => {
     it("validates then upserts the three channels", async () => {
-      const execute = jest.fn().mockResolvedValue([{}] as never);
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{}]);
       await mockDb(execute);
 
       const result = await setContactInfo({
@@ -90,7 +91,7 @@ describe("contact-service", () => {
     });
 
     it("throws the validation error and does not write on invalid input", async () => {
-      const execute = jest.fn();
+      const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
       await expect(setContactInfo({ discordUrl: "https://evil.com" })).rejects.toThrow("DISCORD_URL_INVALID");
       expect(execute).not.toHaveBeenCalled();
@@ -116,7 +117,7 @@ describe("contact-service — mutualisation de la lecture", () => {
   });
 
   it("ne lit la base qu'une fois pour cent arrivées simultanées", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await Promise.all(Array.from({ length: 100 }, () => getContactInfo()));
@@ -125,7 +126,7 @@ describe("contact-service — mutualisation de la lecture", () => {
   });
 
   it("resert les coordonnées en cache aux visites suivantes", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await getContactInfo();
@@ -136,9 +137,9 @@ describe("contact-service — mutualisation de la lecture", () => {
 
   it("ne met pas un échec en cache", async () => {
     const execute = jest
-      .fn()
-      .mockRejectedValueOnce(new Error("DOWN") as never)
-      .mockResolvedValue([[{ setting_key: CONTACT_EMAIL_KEY, setting_value: "a@bg.fr" }]] as never);
+      .fn<SqlQuery>()
+      .mockRejectedValueOnce(new Error("DOWN"))
+      .mockResolvedValue([[{ setting_key: CONTACT_EMAIL_KEY, setting_value: "a@bg.fr" }]]);
     await mockDb(execute);
 
     expect(await getContactInfo()).toEqual(DEFAULT_CONTACT);
@@ -146,7 +147,7 @@ describe("contact-service — mutualisation de la lecture", () => {
   });
 
   it("oublie les coordonnées après une écriture du staff", async () => {
-    const execute = jest.fn().mockResolvedValue([[]] as never);
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
     await mockDb(execute);
 
     await getContactInfo();

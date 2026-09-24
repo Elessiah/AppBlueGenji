@@ -7,6 +7,7 @@ import { PATCH } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
 import { profilePatchRequest } from "../../../helpers/profile-request";
+import { authUser, fullProfileResponse } from "../../../helpers/auth-user";
 
 /**
  * Le refus du tag verrouillé, traduit en HTTP.
@@ -26,13 +27,13 @@ function patch(body: unknown) {
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (getCurrentUser as jest.Mock).mockResolvedValue({ id: 7, roles: [] } as never);
-  profileMock.mockResolvedValue({ profile: { id: 7 } } as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, roles: [] }));
+  profileMock.mockResolvedValue(fullProfileResponse({ profile: { id: 7 } }));
 });
 
 describe("PATCH /api/profile — tag Discord verrouillé", () => {
   it("rend 409 sur DISCORD_TAG_LOCKED", async () => {
-    updateMock.mockRejectedValue(new Error("DISCORD_TAG_LOCKED") as never);
+    updateMock.mockRejectedValue(new Error("DISCORD_TAG_LOCKED"));
 
     const response = await patch({ discordPseudo: "quelquun_dautre" });
 
@@ -46,7 +47,7 @@ describe("PATCH /api/profile — tag Discord verrouillé", () => {
     // compte qui l'interdit. Sans cette ligne, le refus retombait sur le 400
     // générique et le joueur lisait « La sauvegarde a échoué » sur un refus
     // qu'on sait pourtant nommer.
-    updateMock.mockRejectedValue(new Error("BATTLETAG_LOCKED") as never);
+    updateMock.mockRejectedValue(new Error("BATTLETAG_LOCKED"));
 
     const response = await patch({ overwatchBattletag: "Autre#9999" });
 
@@ -58,7 +59,7 @@ describe("PATCH /api/profile — tag Discord verrouillé", () => {
     // Une **saisie** fautive, elle, reste un 400 : la valeur doit être lue pour
     // être comparée à celle de Blizzard, et le refus est nommé plutôt que laissé
     // au `TypeError`.
-    updateMock.mockRejectedValue(new Error("INVALID_OVERWATCH_BATTLETAG") as never);
+    updateMock.mockRejectedValue(new Error("INVALID_OVERWATCH_BATTLETAG"));
 
     const response = await patch({ overwatchBattletag: 123 });
 
@@ -67,25 +68,25 @@ describe("PATCH /api/profile — tag Discord verrouillé", () => {
   });
 
   it("garde 409 pour le pseudo déjà pris — les deux refus d'état cohabitent", async () => {
-    updateMock.mockRejectedValue(new Error("PSEUDO_ALREADY_USED") as never);
+    updateMock.mockRejectedValue(new Error("PSEUDO_ALREADY_USED"));
 
     expect((await patch({ pseudo: "Nova" })).status).toBe(409);
   });
 
   it("laisse les autres refus en 400", async () => {
-    updateMock.mockRejectedValue(new Error("INVALID_PSEUDO") as never);
+    updateMock.mockRejectedValue(new Error("INVALID_PSEUDO"));
 
     expect((await patch({ pseudo: "" })).status).toBe(400);
   });
 
   it("rend le profil quand rien ne refuse", async () => {
-    updateMock.mockResolvedValue(undefined as never);
+    updateMock.mockResolvedValue(undefined);
 
     expect((await patch({ isAdult: true })).status).toBe(200);
   });
 
   it("refuse toujours l'appel anonyme avant de lire le corps", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     expect((await patch({ discordPseudo: "keryan" })).status).toBe(401);
     expect(updateMock).not.toHaveBeenCalled();

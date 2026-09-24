@@ -7,9 +7,10 @@ import { GET, POST } from "@/app/api/benevoles/route";
 import { PUT, DELETE } from "@/app/api/benevoles/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/benevoles-service";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const normalUser = authUser({ id: 2, isAdmin: false });
 
 const sampleBenevole = {
   id: 1,
@@ -42,14 +43,14 @@ describe("GET /api/benevoles", () => {
   });
 
   it("returns the public list without auth", async () => {
-    (service.listBenevoles as jest.Mock).mockResolvedValue([sampleBenevole] as never);
+    jest.mocked(service.listBenevoles).mockResolvedValue([sampleBenevole]);
     const res = await GET();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ benevoles: [sampleBenevole] });
   });
 
   it("returns an empty array when no benevoles exist", async () => {
-    (service.listBenevoles as jest.Mock).mockResolvedValue([] as never);
+    jest.mocked(service.listBenevoles).mockResolvedValue([]);
     const res = await GET();
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ benevoles: [] });
@@ -72,35 +73,35 @@ describe("POST /api/benevoles", () => {
   };
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await POST(jsonReq("POST", body));
     expect(res.status).toBe(401);
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await POST(jsonReq("POST", body));
     expect(res.status).toBe(403);
   });
 
   it("creates a benevole for admins and returns 201", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.createBenevole as jest.Mock).mockResolvedValue(sampleBenevole as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockResolvedValue(sampleBenevole);
     const res = await POST(jsonReq("POST", body));
     expect(res.status).toBe(201);
     expect(await res.json()).toEqual({ benevole: sampleBenevole });
   });
 
   it("returns 400 with the validation error code", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.createBenevole as jest.Mock).mockRejectedValue(new Error("FIRST_NAME_REQUIRED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createBenevole).mockRejectedValue(new Error("FIRST_NAME_REQUIRED"));
     const res = await POST(jsonReq("POST", { ...body, firstName: "" }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "FIRST_NAME_REQUIRED" });
   });
 
   it("returns 400 for invalid JSON body", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await POST(new Request("http://localhost/api/benevoles", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -127,42 +128,42 @@ describe("PUT /api/benevoles/[id]", () => {
   };
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await PUT(jsonReq("PUT", body), params("1"));
     expect(res.status).toBe(401);
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await PUT(jsonReq("PUT", body), params("1"));
     expect(res.status).toBe(403);
   });
 
   it("rejects an invalid id with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(jsonReq("PUT", body), params("abc"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_ID" });
   });
 
   it("rejects a non-positive id with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(jsonReq("PUT", body), params("0"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_ID" });
   });
 
   it("updates a benevole for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.updateBenevole as jest.Mock).mockResolvedValue(sampleBenevole as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.updateBenevole).mockResolvedValue(sampleBenevole);
     const res = await PUT(jsonReq("PUT", body), params("1"));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ benevole: sampleBenevole });
   });
 
   it("returns 404 when benevole does not exist", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.updateBenevole as jest.Mock).mockRejectedValue(new Error("BENEVOLE_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.updateBenevole).mockRejectedValue(new Error("BENEVOLE_NOT_FOUND"));
     const res = await PUT(jsonReq("PUT", body), params("99"));
     expect(res.status).toBe(404);
   });
@@ -177,33 +178,33 @@ describe("DELETE /api/benevoles/[id]", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await DELETE(jsonReq("DELETE", {}), params("1"));
     expect(res.status).toBe(401);
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await DELETE(jsonReq("DELETE", {}), params("1"));
     expect(res.status).toBe(403);
   });
 
   it("rejects an invalid id with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await DELETE(jsonReq("DELETE", {}), params("abc"));
     expect(res.status).toBe(400);
   });
 
   it("deletes a benevole for admins and returns 200", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.deleteBenevole as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.deleteBenevole).mockResolvedValue(undefined);
     const res = await DELETE(jsonReq("DELETE", {}), params("1"));
     expect(res.status).toBe(200);
   });
 
   it("returns 404 when benevole does not exist", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.deleteBenevole as jest.Mock).mockRejectedValue(new Error("BENEVOLE_NOT_FOUND") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.deleteBenevole).mockRejectedValue(new Error("BENEVOLE_NOT_FOUND"));
     const res = await DELETE(jsonReq("DELETE", {}), params("99"));
     expect(res.status).toBe(404);
   });

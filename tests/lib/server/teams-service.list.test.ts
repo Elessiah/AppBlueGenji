@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTeams } from "@/lib/server/teams-service";
 import { clearCache } from "@/lib/server/cache";
+import { fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
@@ -64,7 +65,7 @@ async function mockDb(
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
 

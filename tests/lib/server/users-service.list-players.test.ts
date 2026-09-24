@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listPlayers } from "@/lib/server/users-service";
+import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
 
-async function mockDb(execute: jest.Mock) {
+async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
 function userRow(overrides: Record<string, unknown> = {}) {
@@ -34,10 +35,10 @@ function userRow(overrides: Record<string, unknown> = {}) {
  */
 async function runList(rows: Record<string, unknown>[], viewerId: number) {
   const execute = jest
-    .fn()
-    .mockResolvedValueOnce([rows] as never) // bg_users
-    .mockResolvedValueOnce([[]] as never) // team memberships (équipe courante)
-    .mockResolvedValueOnce([[]] as never); // appartenances (loadPlayerRecords)
+    .fn<SqlQuery>()
+    .mockResolvedValueOnce([rows]) // bg_users
+    .mockResolvedValueOnce([[]]) // team memberships (équipe courante)
+    .mockResolvedValueOnce([[]]); // appartenances (loadPlayerRecords)
   await mockDb(execute);
   return listPlayers(viewerId);
 }
@@ -84,10 +85,10 @@ describe("listPlayers visibility", () => {
   // dérivée perd l'index `user_id` et fait scanner toutes les adhésions.
   it("filtre les engagements dans les deux branches de l'union", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[userRow({ id: 7 }), userRow({ id: 9, pseudo: "Other" })]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[userRow({ id: 7 }), userRow({ id: 9, pseudo: "Other" })]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await listPlayers(999);
@@ -104,10 +105,10 @@ describe("listPlayers visibility", () => {
   // avaient fini par contredire la fiche du même joueur.
   it("ne compte plus victoires et défaites avec sa propre requête", async () => {
     const execute = jest
-      .fn()
-      .mockResolvedValueOnce([[userRow({ id: 7 })]] as never)
-      .mockResolvedValueOnce([[]] as never)
-      .mockResolvedValueOnce([[]] as never);
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[userRow({ id: 7 })]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
     await listPlayers(999);

@@ -19,7 +19,7 @@ describe("POST /api/csp-report", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetRateLimit(CSP_REPORT_RULE.name);
-    (parseCspReport as jest.Mock).mockReturnValue([]);
+    jest.mocked(parseCspReport).mockReturnValue([]);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -34,7 +34,7 @@ describe("POST /api/csp-report", () => {
 
   it("journalise ce que parseCspReport a lu du corps", async () => {
     const parsed = [{ directive: "img-src", blockedOrigin: "https://exemple.invalid", documentPath: "/" }];
-    (parseCspReport as jest.Mock).mockReturnValue(parsed as never);
+    jest.mocked(parseCspReport).mockReturnValue(parsed);
 
     await POST(cspReq({ "csp-report": {} }));
 

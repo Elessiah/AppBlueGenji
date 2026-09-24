@@ -5,6 +5,7 @@ jest.mock("@/lib/server/tournaments/phases-repository");
 import { isPreviewableState, loadTournamentPreview } from "@/lib/server/tournaments/preview";
 import { loadPhases } from "@/lib/server/tournaments/phases-repository";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
+import { phaseRow } from "../helpers/tournament-rows";
 
 type Row = Record<string, unknown>;
 
@@ -45,7 +46,7 @@ function mockQueries(entrants: Row[], settings: Row[] = settingsRows(), matches:
     if (text.includes("swiss_total_rounds")) return [settings];
     if (text.includes("FROM bg_matches")) return [matches];
     return [entrants];
-  }) as never);
+  }));
 }
 
 /** SQL de toutes les requêtes exécutées, espaces normalisés. */
@@ -79,7 +80,7 @@ describe("isPreviewableState", () => {
 describe("loadTournamentPreview", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (loadPhases as jest.Mock).mockResolvedValue([] as never);
+    jest.mocked(loadPhases).mockResolvedValue([]);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -192,8 +193,8 @@ describe("loadTournamentPreview", () => {
 
   it("prévisualise la première phase d'un multi-phases", async () => {
     mockQueries(entrantRows(["Alpha", "Beta", "Gamma", "Delta"]));
-    (loadPhases as jest.Mock).mockResolvedValue([
-      {
+    jest.mocked(loadPhases).mockResolvedValue([
+      phaseRow({
         position: 1,
         format: "SWISS",
         name: "Qualifs",
@@ -203,8 +204,8 @@ describe("loadTournamentPreview", () => {
         swiss_total_rounds: 3,
         survival_rounds_before_first_cut: null,
         survival_rounds_per_cut: null,
-      },
-      {
+      }),
+      phaseRow({
         position: 2,
         format: "SINGLE",
         name: null,
@@ -214,8 +215,8 @@ describe("loadTournamentPreview", () => {
         swiss_total_rounds: null,
         survival_rounds_before_first_cut: null,
         survival_rounds_per_cut: null,
-      },
-    ] as never);
+      }),
+    ]);
 
     const preview = await run(tournament({ format: "MULTI" }));
 

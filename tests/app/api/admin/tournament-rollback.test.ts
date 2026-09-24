@@ -8,23 +8,22 @@ import { POST } from "@/app/api/admin/tournaments/[id]/rollback/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
+import { authUser } from "../../../helpers/auth-user";
 
-type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
-
-const admin = { id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] } as unknown as SessionUser;
-const arbitre = {
+const admin = authUser({ id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] });
+const arbitre = authUser({
   id: 2,
   pseudo: "Sifflet",
   isAdmin: false,
   roles: ["ARBITRE"],
-} as unknown as SessionUser;
-const caster = {
+});
+const caster = authUser({
   id: 3,
   pseudo: "Micro",
   isAdmin: false,
   roles: ["CASTER"],
-} as unknown as SessionUser;
-const player = { id: 4, pseudo: "Joueur", isAdmin: false, roles: [] } as unknown as SessionUser;
+});
+const player = authUser({ id: 4, pseudo: "Joueur", isAdmin: false, roles: [] });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -54,8 +53,8 @@ const rolledBack = {
 describe("POST /api/admin/tournaments/[id]/rollback", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    (rollbackCurrentRound as jest.Mock).mockResolvedValue(rolledBack as never);
-    (sendBotLog as jest.Mock).mockResolvedValue(true as never);
+    jest.mocked(rollbackCurrentRound).mockResolvedValue(rolledBack);
+    jest.mocked(sendBotLog).mockResolvedValue(undefined);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -68,7 +67,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     // reste, elle, réservée aux administrateurs.
     ["un arbitre", arbitre],
   ])("défait le stade courant pour %s", async (_label, user) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const res = await rollback("7");
 
@@ -78,7 +77,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   });
 
   it("transmet le stade annoncé par l'écran", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     await rollback("7", { expectedStage: "0:4" });
 
@@ -94,7 +93,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   ])("s'en remet à la base sur %s", async (_label, body) => {
     // Le garde-fou ne peut que faire refuser le geste, jamais le déplacer : un
     // corps qu'on ne sait pas lire retombe donc sur le comportement d'origine.
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     await rollback("7", body);
 
@@ -102,7 +101,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     const res = await rollback("7");
 
@@ -115,7 +114,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     ["un caster", caster],
     ["un joueur", player],
   ])("rejette %s avec 403", async (_label, user) => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(user as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
 
     const res = await rollback("7");
 
@@ -125,7 +124,7 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   });
 
   it("refuse un identifiant qui n'est pas un entier positif", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
 
     const res = await rollback("abc");
 
@@ -135,9 +134,9 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   });
 
   it("rend 404 sur un tournoi inconnu", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (rollbackCurrentRound as jest.Mock).mockRejectedValue(
-      new Error("TOURNAMENT_NOT_FOUND") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(rollbackCurrentRound).mockRejectedValue(
+      new Error("TOURNAMENT_NOT_FOUND"),
     );
 
     const res = await rollback("7");
@@ -151,8 +150,8 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
     "ROLLBACK_ROUND_CHANGED",
   ])("rend 409 sur %s", async (code) => {
     // La demande est bien formée : c'est l'état du tournoi qui la contredit.
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (rollbackCurrentRound as jest.Mock).mockRejectedValue(new Error(code) as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(rollbackCurrentRound).mockRejectedValue(new Error(code));
 
     const res = await rollback("7");
 
@@ -161,9 +160,9 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   });
 
   it("masque une panne du moteur derrière un code du domaine", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (rollbackCurrentRound as jest.Mock).mockRejectedValue(
-      new Error("Deadlock found when trying to get lock") as never,
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(rollbackCurrentRound).mockRejectedValue(
+      new Error("Deadlock found when trying to get lock"),
     );
     jest.spyOn(console, "error").mockImplementation(() => undefined);
 
@@ -174,12 +173,12 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   });
 
   it("journalise le geste et le stade défait, l'auteur dans pm2 seulement", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(arbitre as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     const info = jest.spyOn(console, "info").mockImplementation(() => {});
 
     await rollback("7");
 
-    const line = String((sendBotLog as jest.Mock).mock.calls[0]?.[0]);
+    const line = String(jest.mocked(sendBotLog).mock.calls[0]?.[0]);
     expect(line).toContain("Retour en arrière");
     expect(line).toContain("« BlueGenji Open » (#7)");
     expect(line).toContain("la manche 4");
@@ -194,16 +193,16 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   it("reprend le libellé du serveur, jamais un libellé reconstruit", async () => {
     // Le stade que l'écran croyait effacer pouvait être périmé : seul le serveur
     // sait ce qu'il a réellement vidé.
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (rollbackCurrentRound as jest.Mock).mockResolvedValue({
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(rollbackCurrentRound).mockResolvedValue({
       ...rolledBack,
       label: "le tour 2 des play-offs",
       clearedMatches: 1,
-    } as never);
+    });
 
     await rollback("7");
 
-    const line = String((sendBotLog as jest.Mock).mock.calls[0]?.[0]);
+    const line = String(jest.mocked(sendBotLog).mock.calls[0]?.[0]);
     expect(line).toContain("tour 2 des play-offs");
     expect(line).toContain("1 rencontre effacée");
   });
@@ -211,20 +210,20 @@ describe("POST /api/admin/tournaments/[id]/rollback", () => {
   it("dit au journal qu'un tournoi terminé vient d'être rouvert", async () => {
     // Un palmarès annoncé sur ce même canal quelques lignes plus haut ne vaut
     // plus : la clôture qui suivra en annoncera un autre.
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (rollbackCurrentRound as jest.Mock).mockResolvedValue({
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(rollbackCurrentRound).mockResolvedValue({
       ...rolledBack,
       reopenedTournament: true,
-    } as never);
+    });
 
     await rollback("7");
 
-    expect(String((sendBotLog as jest.Mock).mock.calls[0]?.[0])).toContain("tournoi rouvert");
+    expect(String(jest.mocked(sendBotLog).mock.calls[0]?.[0])).toContain("tournoi rouvert");
   });
 
   it("n'échoue pas parce que le bot dort", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (sendBotLog as jest.Mock).mockRejectedValue(new Error("ECONNREFUSED") as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(sendBotLog).mockRejectedValue(new Error("ECONNREFUSED"));
 
     const res = await rollback("7");
 

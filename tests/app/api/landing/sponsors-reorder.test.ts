@@ -6,9 +6,10 @@ jest.mock("@/lib/server/sponsors-service");
 import { PUT } from "@/app/api/landing/sponsors/reorder/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/sponsors-service";
+import { authUser } from "../../../helpers/auth-user";
 
-const admin = { id: 1, isAdmin: true } as Awaited<ReturnType<typeof getCurrentUser>>;
-const normalUser = { id: 2, isAdmin: false } as Awaited<ReturnType<typeof getCurrentUser>>;
+const admin = authUser({ id: 1, isAdmin: true });
+const normalUser = authUser({ id: 2, isAdmin: false });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/landing/sponsors/reorder", {
@@ -27,20 +28,20 @@ describe("PUT /api/landing/sponsors/reorder", () => {
   });
 
   it("rejects anonymous users with 401", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
     const res = await PUT(jsonReq({ ids: [1, 2] }));
     expect(res.status).toBe(401);
     expect(service.reorderSponsors).not.toHaveBeenCalled();
   });
 
   it("rejects non-admins with 403", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(normalUser as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(normalUser);
     const res = await PUT(jsonReq({ ids: [1, 2] }));
     expect(res.status).toBe(403);
   });
 
   it("rejects an invalid id with 400", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
     const res = await PUT(jsonReq({ ids: [1, -3] }));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_ID" });
@@ -48,8 +49,8 @@ describe("PUT /api/landing/sponsors/reorder", () => {
   });
 
   it("reorders for admins", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(admin as never);
-    (service.reorderSponsors as jest.Mock).mockResolvedValue(undefined as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.reorderSponsors).mockResolvedValue(undefined);
 
     const res = await PUT(jsonReq({ ids: [5, 4, 3] }));
     expect(res.status).toBe(200);

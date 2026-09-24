@@ -13,6 +13,8 @@ import { MAX_PENDING_PER_TRANSACTION, queueBotLog } from "@/lib/server/tournamen
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { GHOST_BATCH_MAX, registrationErrorTeamId } from "@/lib/shared/ghost-registration";
+import type { SqlMock } from "../../helpers/sql-double";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 /**
  * Inscription **en lot** d'équipes fantômes, vue du moteur.
@@ -25,12 +27,12 @@ import { GHOST_BATCH_MAX, registrationErrorTeamId } from "@/lib/shared/ghost-reg
 
 type Row = Record<string, unknown>;
 
-const TOURNAMENT = {
+const TOURNAMENT = tournamentRow({
   id: 12,
   state: "REGISTRATION",
   max_teams: 4,
   participant_type: "TEAM",
-};
+});
 
 /** Fantôme active, la forme attendue par le contrôle préalable. */
 const ghost = (id: number): Row => ({ id, is_ghost: 1, deleted_at: null });
@@ -59,6 +61,11 @@ function fakeConnection(options: {
         return [{ affectedRows: 1, insertId: 1 }, []];
       }
       if (q.startsWith("SELECT id FROM bg_tournaments")) return [[{ id: 12 }], []];
+      // Roster d'une équipe réelle (chemin joueur) : cinq joueurs certifiés,
+      // de quoi remplir les conditions d'inscription par défaut.
+      if (q.includes("FROM bg_team_members")) {
+        return [Array.from({ length: 5 }, () => ({ verified: 1, blizzard: 0 })), []];
+      }
       // `loadTournamentRow` : la lecture complète du chemin joueur.
       if (q.includes("FROM bg_tournaments")) return [[TOURNAMENT], []];
       if (q.includes("FROM bg_teams")) return [options.teams, []];
@@ -75,18 +82,19 @@ function fakeConnection(options: {
 
 /** Requêtes lancées sur une connexion factice, normalisées. */
 function sqlOf(connection: PoolConnection): string[] {
-  return (connection.execute as unknown as jest.Mock).mock.calls.map((call) =>
+  return (connection.execute as unknown as SqlMock).mock.calls.map((call) =>
     String(call[0]).replace(/\s+/g, " ").trim(),
   );
 }
 
 beforeEach(() => {
   jest.clearAllMocks();
-  (queueBotLog as jest.Mock).mockReturnValue(true);
-  (syncTournamentState as jest.Mock).mockResolvedValue({
+  jest.mocked(queueBotLog).mockReturnValue(true);
+  jest.mocked(syncTournamentState).mockResolvedValue({
     row: TOURNAMENT,
     stateChanged: false,
-  } as never);
+    contentChanged: false,
+  });
 });
 
 describe("registerTeamsByIds", () => {
@@ -97,7 +105,7 @@ describe("registerTeamsByIds", () => {
 
     expect(inserted).toEqual([900, 901]);
     // Chaque inscription réserve sa ligne de journal, marquée « par le staff ».
-    expect((queueBotLog as jest.Mock).mock.calls.map((call) => call[1])).toEqual([
+    expect(jest.mocked(queueBotLog).mock.calls.map((call) => call[1])).toEqual([
       { kind: "registration", tournamentId: 12, teamId: 900, byStaff: true },
       { kind: "registration", tournamentId: 12, teamId: 901, byStaff: true },
     ]);
@@ -191,10 +199,11 @@ describe("registerTeamsByIds", () => {
   });
 
   it("refuse tout le lot hors de la fenêtre d'inscription", async () => {
-    (syncTournamentState as jest.Mock).mockResolvedValue({
+    jest.mocked(syncTournamentState).mockResolvedValue({
       row: { ...TOURNAMENT, state: "RUNNING" },
       stateChanged: true,
-    } as never);
+      contentChanged: false,
+    });
     const { connection, inserted } = fakeConnection({ teams: [ghost(900), ghost(901)] });
 
     await expect(registerTeamsByIds(connection, 12, [900, 901])).rejects.toThrow(
@@ -204,7 +213,11 @@ describe("registerTeamsByIds", () => {
   });
 
   it("refuse un tournoi inconnu", async () => {
-    (syncTournamentState as jest.Mock).mockResolvedValue({ row: null, stateChanged: false } as never);
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: null,
+      stateChanged: false,
+      contentChanged: false,
+    });
     const { connection } = fakeConnection({ teams: [ghost(900)] });
 
     await expect(registerTeamsByIds(connection, 12, [900])).rejects.toThrow("TOURNAMENT_NOT_FOUND");
@@ -296,22 +309,23 @@ describe("registerTeamsByIds", () => {
 
     await registerTeamsByIds(connection, 12, teamIds);
 
-    const kinds = (queueBotLog as jest.Mock).mock.calls.map((call) => (call[1] as { kind: string }).kind);
+    const kinds = jest.mocked(queueBotLog).mock.calls.map((call) => call[1].kind);
     expect(kinds).toEqual(["registration", "registration", "registration"]);
   });
 
   it("réserve une ligne de journal pour chaque inscription d'un lot plein", async () => {
     const teamIds = Array.from({ length: GHOST_BATCH_MAX }, (_, index) => 900 + index);
     const { connection, inserted } = fakeConnection({ teams: teamIds.map(ghost) });
-    (syncTournamentState as jest.Mock).mockResolvedValue({
+    jest.mocked(syncTournamentState).mockResolvedValue({
       row: { ...TOURNAMENT, max_teams: GHOST_BATCH_MAX },
       stateChanged: false,
-    } as never);
+      contentChanged: false,
+    });
 
     await registerTeamsByIds(connection, 12, teamIds);
 
     expect(inserted).toEqual(teamIds);
-    expect((queueBotLog as jest.Mock).mock.calls).toHaveLength(GHOST_BATCH_MAX);
+    expect(jest.mocked(queueBotLog).mock.calls).toHaveLength(GHOST_BATCH_MAX);
   });
 
   it("relit le caractère fantôme en une seule requête, quelle que soit la taille du lot", async () => {
@@ -341,7 +355,11 @@ describe("ordre de verrouillage des points d'entrée", () => {
   const firstStatement = (connection: PoolConnection) => sqlOf(connection)[0];
 
   it("verrouille avant la moindre lecture, à l'inscription d'un joueur", async () => {
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101, roles: ["OWNER"] } as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 101,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     const { connection } = fakeConnection({ teams: [] });
 
     await registerCurrentUserTeam(connection, 12, 42);
@@ -353,7 +371,11 @@ describe("ordre de verrouillage des points d'entrée", () => {
     // Verrou du tournoi en main, emprunter une *seconde* place du pool arme un
     // convoi : le porteur du verrou attend une connexion que les transactions
     // bloquées sur son verrou ne rendront pas avant `innodb_lock_wait_timeout`.
-    (getUserActiveTeam as jest.Mock).mockResolvedValue({ teamId: 101, roles: ["OWNER"] } as never);
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 101,
+      teamName: "Équipe",
+      roles: ["OWNER"],
+    });
     const { connection } = fakeConnection({ teams: [] });
 
     await registerCurrentUserTeam(connection, 12, 42);

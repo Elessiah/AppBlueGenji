@@ -9,6 +9,8 @@ import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
 import { resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration";
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
+import { fakePool, fakeConnection } from "../../helpers/sql-double";
+import { tournamentRow } from "../../helpers/tournament-rows";
 
 const ENTRANT = [
   {
@@ -35,18 +37,16 @@ async function mockDb(rows: unknown[][]) {
   for (const result of rows) execute.mockResolvedValueOnce([result]);
 
   const { getDatabase, withConnection } = await import("@/lib/server/database");
-  (getDatabase as jest.Mock).mockResolvedValue({ execute } as never);
-  (withConnection as jest.Mock).mockImplementation(
-    (run: unknown) => (run as (c: unknown) => Promise<unknown>)({}),
-  );
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  jest.mocked(withConnection).mockImplementation((run) => run(fakeConnection({})));
   return execute;
 }
 
 beforeEach(async () => {
   jest.clearAllMocks();
-  (loadTournamentRow as jest.Mock).mockResolvedValue({ participant_type: "TEAM" } as never);
-  (resolveUserEntrantTeamId as jest.Mock).mockResolvedValue(101 as never);
-  (pushRefereeAlert as jest.Mock).mockResolvedValue({ sent: 3, unresolved: [], failed: [] } as never);
+  jest.mocked(loadTournamentRow).mockResolvedValue(tournamentRow({ participant_type: "TEAM" }));
+  jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(101);
+  jest.mocked(pushRefereeAlert).mockResolvedValue({ sent: 3, unresolved: [], failed: [] });
 });
 
 describe("reportTournamentIssue", () => {
@@ -56,7 +56,7 @@ describe("reportTournamentIssue", () => {
     const result = await reportTournamentIssue(7, 42, VALID_MESSAGE, null);
 
     expect(result).toEqual({ notifiedReferees: 3 });
-    const [message, context] = (pushRefereeAlert as jest.Mock).mock.calls[0] as [string, string];
+    const [message, context] = jest.mocked(pushRefereeAlert).mock.calls[0] as [string, string];
     expect(context).toBe("issue-report");
     expect(message).toContain("Tournoi : Coupe BlueGenji");
     expect(message).toContain("Auteur : un joueur de l'équipe Les Renards");
@@ -81,7 +81,7 @@ describe("reportTournamentIssue", () => {
 
     await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
 
-    const [message] = (pushRefereeAlert as jest.Mock).mock.calls[0] as [string];
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
     expect(message).not.toContain("Kiro");
     expect(message).not.toContain("Nova");
     expect(message).toContain("Auteur : un joueur");
@@ -93,7 +93,7 @@ describe("reportTournamentIssue", () => {
 
     await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
 
-    const [message] = (pushRefereeAlert as jest.Mock).mock.calls[0] as [string];
+    const [message] = jest.mocked(pushRefereeAlert).mock.calls[0];
     expect(message).toContain("Match : Manche 2 — Les Renards vs Team Nova (#31)");
   });
 
@@ -109,7 +109,7 @@ describe("reportTournamentIssue", () => {
 
   it("refuse un tournoi inexistant", async () => {
     await mockDb([]);
-    (loadTournamentRow as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(loadTournamentRow).mockResolvedValue(null);
 
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).rejects.toThrow(
       "TOURNAMENT_NOT_FOUND",
@@ -118,7 +118,7 @@ describe("reportTournamentIssue", () => {
 
   it("refuse un joueur qui n'a rien à engager", async () => {
     await mockDb([]);
-    (resolveUserEntrantTeamId as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(null);
 
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).rejects.toThrow(
       "NOT_REGISTERED",
@@ -145,7 +145,7 @@ describe("reportTournamentIssue", () => {
 
   it("remonte l'injoignabilité du bot plutôt que de rassurer à tort", async () => {
     await mockDb([ENTRANT]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(pushRefereeAlert).mockResolvedValue(null);
 
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).rejects.toThrow(
       "BOT_INTERNAL_UNREACHABLE",
@@ -154,11 +154,11 @@ describe("reportTournamentIssue", () => {
 
   it("accepte un signalement même si aucun arbitre n'a pu être joint", async () => {
     await mockDb([ENTRANT]);
-    (pushRefereeAlert as jest.Mock).mockResolvedValue({
+    jest.mocked(pushRefereeAlert).mockResolvedValue({
       sent: 0,
       unresolved: [],
       failed: ["arbitre"],
-    } as never);
+    });
 
     // Le canal de logs, lui, a bien reçu le signalement : c'est un succès.
     expect(await reportTournamentIssue(7, 42, VALID_MESSAGE, null)).toEqual({

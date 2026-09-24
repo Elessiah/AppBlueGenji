@@ -16,6 +16,7 @@ import {
   DISCORD_VERIFY_TAG_RULE,
 } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
+import { authUser } from "../../../helpers/auth-user";
 
 /**
  * La route de certification : ses gardes, son plafond, et la **traduction des
@@ -34,7 +35,7 @@ const confirmMock = confirmDiscordVerification as jest.MockedFunction<
 >;
 const stateMock = getDiscordAccountState as jest.MockedFunction<typeof getDiscordAccountState>;
 
-const USER = { id: 7, roles: [] };
+const USER = authUser({ id: 7 });
 
 function post(body: unknown) {
   return POST(
@@ -61,12 +62,12 @@ beforeEach(() => {
   resetRateLimit(DISCORD_VERIFY_TAG_RULE.name);
   resetRateLimit(DISCORD_VERIFY_CONFIRM_RULE.name);
   resetRateLimit(DISCORD_CODE_REQUEST_RULE.name);
-  (getCurrentUser as jest.Mock).mockResolvedValue(USER as never);
+  jest.mocked(getCurrentUser).mockResolvedValue(USER);
 });
 
 describe("garde d'accès", () => {
   it("refuse les trois verbes sans session", async () => {
-    (getCurrentUser as jest.Mock).mockResolvedValue(null as never);
+    jest.mocked(getCurrentUser).mockResolvedValue(null);
 
     expect((await GET()).status).toBe(401);
     expect((await post({ handle: "keryan" })).status).toBe(401);
