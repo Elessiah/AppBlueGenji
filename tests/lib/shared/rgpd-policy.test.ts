@@ -57,7 +57,7 @@ describe("DONNEES_PROFIL", () => {
 
   it("dit qui lit encore un BattleTag masqué, et jusqu'à quand", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
-    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des joueurs de tes matchs et de l'arbitrage/);
+    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des joueurs de tes matchs, de leur caster et de l'arbitrage/);
     expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);
   });
 

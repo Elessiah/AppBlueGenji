@@ -47,6 +47,9 @@ function fakeConnection(
     next_loser_slot: null,
     winner_team_id: null,
     status: "READY",
+    // Un match se joue une fois lancé (`lib/shared/match-launch.ts`).
+    launched_at: "2026-01-01 20:00:00",
+    launch_pairing: "100:200",
   };
 
   const conn = {

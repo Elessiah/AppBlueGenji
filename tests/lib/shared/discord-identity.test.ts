@@ -72,6 +72,33 @@ describe("canViewDiscordTag — un tag non certifié n'est visible de personne",
   });
 });
 
+describe("canViewDiscordTag — parties d'un même match (lancement)", () => {
+  it("ouvre le tag certifié aux parties du match, sans aucun rôle", () => {
+    // Joueurs des deux engagées et caster : c'est par ce tag qu'ils s'ajoutent
+    // et créent le salon (`lib/shared/match-launch.ts`).
+    expect(canViewDiscordTag(viewer([]), { ...verifiedSubject, sharesMatchLobby: true })).toBe(true);
+    expect(
+      canViewDiscordTag(viewer(["CASTER"]), { ...verifiedSubject, sharesMatchLobby: true }),
+    ).toBe(true);
+  });
+
+  it("ne l'ouvre jamais sur un tag non certifié : la clause passe avant", () => {
+    for (const roles of [[], ["ADMIN"], [...PLATFORM_ROLES]] as PlatformRole[][]) {
+      expect(
+        canViewDiscordTag(viewer(roles), { ...unverifiedSubject, sharesMatchLobby: true }),
+      ).toBe(false);
+    }
+  });
+
+  it("refuse un lecteur absent, même partie supposée d'un match", () => {
+    expect(canViewDiscordTag(null, { ...verifiedSubject, sharesMatchLobby: true })).toBe(false);
+  });
+
+  it("ne vaut rien sans le fait : un joueur quelconque ne voit toujours rien", () => {
+    expect(canViewDiscordTag(viewer([]), { ...verifiedSubject, sharesMatchLobby: false })).toBe(false);
+  });
+});
+
 describe("canViewDiscordTag — tag certifié", () => {
   it("accorde l'administrateur en tout temps, tournoi ou pas", () => {
     expect(canViewDiscordTag(viewer(["ADMIN"]), verifiedSubject)).toBe(true);
@@ -185,6 +212,12 @@ describe("les textes de consentement", () => {
     // Le joueur doit lire comment revenir en arrière avant d'avancer : la
     // certification se défait en modifiant le tag, et nulle part ailleurs.
     expect(joined).toContain("modifiant ton tag");
+  });
+
+  it("nomment les parties d'un match et la durée de l'exposition", () => {
+    const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
+    expect(joined).toContain("caster de ton match");
+    expect(joined).toContain("le temps de la rencontre");
   });
 
   it("disent que rien n'est public", () => {

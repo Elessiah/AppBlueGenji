@@ -26,7 +26,7 @@ import {
  * l'ancienne lecture littérale — deux écrans ne peuvent plus promettre deux
  * choses différentes.
  */
-const SOURCE = readFileSync(join(process.cwd(), "app/connexion/page.tsx"), "utf8");
+const SOURCE = readFileSync(join(process.cwd(), "app/connexion/_components/LoginForm.tsx"), "utf8");
 
 describe("connexion Discord — annonce de la certification", () => {
   it("dit que se connecter certifie le tag", () => {

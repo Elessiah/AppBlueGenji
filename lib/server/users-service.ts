@@ -1512,6 +1512,17 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
       WHERE user_id = ? AND status = 'PENDING'`,
     [userId],
   );
+  // Un caster supprimé ne se présentera à aucun match à venir : son inscription
+  // est retirée, sans quoi le lancement attendrait un « Prêt » que plus
+  // personne ne peut donner (`lib/shared/match-launch.ts`). Les matchs joués
+  // gardent la leur — l'histoire ne se réécrit pas, et le pseudo est anonymisé.
+  // L'effacement n'a rien à faire : la clé étrangère passe à `NULL`.
+  await connection.execute(
+    `UPDATE bg_matches
+        SET caster_user_id = NULL, caster_ready_at = NULL
+      WHERE caster_user_id = ? AND status <> 'COMPLETED'`,
+    [userId],
+  );
   // Le pseudo anonymisé doit aussi remplacer le nom affiché en tournoi — sur la
   // connexion de la transaction, sans quoi le renommage survivrait à un
   // rollback de l'anonymisation qui l'a motivé.

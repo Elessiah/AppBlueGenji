@@ -84,6 +84,12 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
             publicité ciblée.
           </li>
           <li>
+            Une fois accepté, Google peut te proposer, sur cette page seulement, de continuer
+            avec ton compte Google ouvert dans le navigateur (invite <strong>Google One
+            Tap</strong>) : Google reçoit alors ton adresse IP et peut déposer un cookie{" "}
+            <strong>g_state</strong>.
+          </li>
+          <li>
             Tu peux à tout moment exporter ou supprimer tes données depuis ton profil.
           </li>
         </ul>

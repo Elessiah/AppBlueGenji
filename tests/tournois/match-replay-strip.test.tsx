@@ -35,6 +35,9 @@ function render(match: BracketMatch, canManage = false): string {
       openConfig={noop}
       openSchedule={noop}
       openReplay={noop}
+      viewerUserId={null}
+      myTeamId={null}
+      castBlock="NOT_CASTER"
     >
       <MatchReplayStrip match={match} />
     </LiveProvider>,

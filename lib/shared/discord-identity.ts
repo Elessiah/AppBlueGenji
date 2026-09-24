@@ -77,6 +77,14 @@ export type DiscordTagSubject = {
    * n'existe nulle part dans le modèle de permissions.
    */
   inActiveTournament?: boolean;
+  /**
+   * Lecteur et cible sont-ils **parties d'un même match lancé ou en lancement**
+   * — joueurs des deux engagées, ou caster inscrit — tant qu'il n'est pas
+   * terminé ? Relatif au lecteur, établi par l'appelant
+   * (`lib/server/tournaments/match-launch-info.ts`). C'est ce qui permet aux
+   * équipes de s'ajouter et d'inviter leur caster (`lib/shared/match-launch.ts`).
+   */
+  sharesMatchLobby?: boolean;
 };
 
 /**
@@ -88,10 +96,12 @@ export type DiscordTagSubject = {
  * 2. **non vérifié** — personne, administrateur compris. C'est la clause qui
  *    protège les comptes d'avant, et elle passe **avant** les rôles pour qu'on
  *    ne puisse pas l'oublier en ajoutant un rôle demain ;
- * 3. **administrateur** — toujours ;
- * 4. **permission `tournaments`** (l'arbitre) — seulement si la cible est
+ * 3. **même match** — les parties d'un match lancé ou en lancement (joueurs
+ *    des deux engagées, caster) se voient le temps de la rencontre ;
+ * 4. **administrateur** — toujours ;
+ * 5. **permission `tournaments`** (l'arbitre) — seulement si la cible est
  *    engagée dans un tournoi vivant ;
- * 5. tout le reste — non. Le tag n'est **jamais public** : aucun réglage de
+ * 6. tout le reste — non. Le tag n'est **jamais public** : aucun réglage de
  *    visibilité ne l'ouvre, parce qu'aucun écran public n'en a l'usage.
  */
 export function canViewDiscordTag(
@@ -101,6 +111,7 @@ export function canViewDiscordTag(
   if (!viewer) return false;
   if (viewer.id === subject.userId) return true;
   if (!subject.verified) return false;
+  if (subject.sharesMatchLobby) return true;
   if (viewer.isAdmin) return true;
   if (can(viewer, "tournaments")) return Boolean(subject.inActiveTournament);
   return false;
@@ -180,7 +191,8 @@ export function discordVerificationNeedsCode(linkedDiscordId: string | null | un
 export const DISCORD_VERIFICATION_EXPOSURE: readonly string[] = [
   "Les administrateurs du site voient ton tag Discord en permanence.",
   "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
-  "Personne d'autre : ton tag n'apparaît sur aucune page publique, ni pour les autres joueurs, ni pour les casters.",
+  "Les joueurs et le caster de ton match le voient le temps de la rencontre, à partir de son lancement — pour s'ajouter et créer le salon.",
+  "Personne d'autre : ton tag n'apparaît sur aucune page publique, ni pour les autres joueurs du site.",
   "Tu peux annuler à tout moment en modifiant ton tag : la certification est perdue, et l'exposition avec elle.",
 ];
 

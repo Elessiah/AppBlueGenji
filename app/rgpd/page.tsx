@@ -42,8 +42,8 @@ export default function RgpdPage() {
         </h1>
         <p style={{ marginTop: 20, fontSize: 15, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 560 }}>
           BlueGenji ne collecte que les données strictement nécessaires au fonctionnement
-          de la plateforme. Aucune revente de données, aucun traceur tiers, aucune
-          publicité ciblée.
+          de la plateforme. Aucune revente de données, aucun traceur publicitaire ni
+          analytique, aucune publicité ciblée.
         </p>
       </section>
 
@@ -217,7 +217,7 @@ export default function RgpdPage() {
             <span className="eyebrow">SECTION 05</span>
             <h2 className={styles.sectionTitle}>Cookies & traceurs</h2>
           </div>
-          <span className={styles.meta}>AUCUN TIERS</span>
+          <span className={styles.meta}>GOOGLE : CONNEXION SEULE</span>
         </header>
         <div className={styles.prose}>
           <p>
@@ -264,11 +264,32 @@ export default function RgpdPage() {
               numéro d&apos;onglet tiré au hasard et une échéance de vingt minutes au plus) ; la
               seconde retient votre choix d&apos;ignorer la détection de performances du mode éco.
             </li>
+            <li>
+              <strong>bg:last-visit-ping</strong> — une valeur du stockage de session, effacée à la
+              fermeture de l&apos;onglet : l&apos;heure du dernier signalement de visite, pour ne pas
+              compter deux fois le même chargement. Elle n&apos;identifie personne.
+            </li>
+            <li>
+              <strong>bg_rgpd_consent</strong> — une valeur du stockage local, posée sur la page de
+              connexion <strong>quand vous acceptez</strong> cette politique, pour ne pas vous la
+              redemander.
+            </li>
           </ul>
           <p>
-            Aucun bandeau de consentement cookies n'est requis pour ces cookies strictement
-            nécessaires au fonctionnement du service (directive ePrivacy, art. 5.3, exemption
-            cookies fonctionnels).
+            Aucun bandeau de consentement cookies n&apos;est requis pour ces cookies strictement
+            nécessaires au fonctionnement du service ou déposés à votre demande (directive
+            ePrivacy, art. 5.3, exemption cookies fonctionnels).
+          </p>
+          <p>
+            <strong>Une seule exception, et sur une seule page.</strong> Sur la page de connexion,
+            et seulement <strong>après</strong> que vous avez accepté cette politique, le site
+            charge l&apos;invite de connexion de Google (Google One Tap,{" "}
+            <code>accounts.google.com</code>). Google reçoit alors votre adresse IP, lit sa propre
+            session pour vous proposer de continuer avec votre compte Google, et peut déposer sur
+            notre domaine un cookie <strong>g_state</strong> retenant que vous avez fermé
+            l&apos;invite. Google agit comme responsable de son propre traitement. Aucune autre
+            page du site ne fait appel à Google, et vous pouvez toujours vous connecter par
+            Discord, Blizzard ou un code en message privé.
           </p>
         </div>
       </section>

@@ -1,0 +1,458 @@
+/* Modale de lancement d'un match (`MatchLaunchCenter`).
+   Entre la mise en avant du recrutement (1200) et les changements de
+   confidentialité (1300) : un match qui démarre passe devant une annonce, pas
+   devant un choix que le joueur doit faire sur ses données. */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1250;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: min(780px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 26px;
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid rgba(90, 200, 255, 0.3);
+  border-radius: var(--r-cy-lg, 14px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75),
+    0 0 40px rgba(90, 200, 255, calc(0.12 * var(--glow, 1)));
+}
+
+.modal[data-phase="LOBBY"] {
+  border-color: rgba(255, 176, 92, 0.45);
+}
+
+.modal[data-phase="LAUNCHED"] {
+  border-color: rgba(79, 224, 162, 0.45);
+}
+
+.modal:focus {
+  outline: none;
+}
+
+.head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 6px 14px;
+  font-family: var(--font-sans);
+  font-size: clamp(20px, 3.4vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.titleTeam {
+  overflow-wrap: anywhere;
+}
+
+.vs {
+  font-family: var(--font-mono);
+  font-size: 0.6em;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--blue-300, #5ac8ff);
+}
+
+.status {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+}
+
+.status[data-phase="LOBBY"] strong {
+  color: rgba(255, 176, 92, 0.98);
+}
+
+.status[data-phase="LAUNCHED"] {
+  color: var(--green, #4fe0a2);
+  font-weight: 600;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.divider {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--ink-dim);
+}
+
+.side,
+.caster {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--cyber-bg-2, #11151c);
+  border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+  border-radius: var(--r-cy-md, 10px);
+}
+
+/* L'équipe hôte : c'est elle qui crée le salon, on la trouve d'un coup d'œil. */
+.side[data-host="true"] {
+  border-color: rgba(90, 200, 255, 0.6);
+  background: linear-gradient(180deg, rgba(90, 200, 255, 0.1), var(--cyber-bg-2, #11151c) 70%);
+  box-shadow: 0 0 24px rgba(90, 200, 255, calc(0.18 * var(--glow, 1)));
+}
+
+.sideHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.emblem {
+  flex-shrink: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  overflow: hidden;
+  border-radius: 8px;
+  background: rgba(90, 200, 255, 0.12);
+  color: var(--blue-300, #5ac8ff);
+  font-weight: 700;
+  font-size: 15px;
+}
+
+.emblem img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.sideName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.casterLabel {
+  margin-right: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.hostBadge {
+  margin: 0;
+  align-self: flex-start;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(90, 200, 255, 0.16);
+  border: 1px solid rgba(90, 200, 255, 0.45);
+  color: var(--blue-100, #d9f3ff);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.chipReady,
+.chipWaiting {
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chipReady {
+  background: rgba(79, 224, 162, 0.16);
+  color: var(--green, #4fe0a2);
+  border: 1px solid rgba(79, 224, 162, 0.45);
+}
+
+.chipWaiting {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--ink-mute);
+  border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.12));
+}
+
+.contacts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+}
+
+.contact:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.contactHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pseudo {
+  font-weight: 600;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.role {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--ink-mute);
+  font-size: 11px;
+}
+
+.identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.identityKind {
+  width: 70px;
+  flex-shrink: 0;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.identityValue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+}
+
+.verified {
+  color: var(--green, #4fe0a2);
+  font-weight: 700;
+}
+
+.unverified {
+  font-size: 11px;
+  color: rgba(255, 176, 92, 0.95);
+}
+
+.missing {
+  color: var(--ink-dim);
+}
+
+.copy {
+  margin-left: auto;
+  padding: 1px 8px;
+  border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.12));
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink-mute);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.copy:hover {
+  color: var(--ink);
+  border-color: rgba(90, 200, 255, 0.45);
+}
+
+.copy:focus-visible {
+  outline: 2px solid var(--blue-300, #5ac8ff);
+  outline-offset: 2px;
+}
+
+.casterIds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+
+.readyButton {
+  padding: 10px 20px;
+  font-weight: 700;
+  background: rgba(79, 224, 162, 0.18);
+  border-color: rgba(79, 224, 162, 0.55);
+  color: var(--ink);
+}
+
+.readyOn {
+  padding: 10px 20px;
+  font-weight: 700;
+  background: rgba(79, 224, 162, 0.32);
+  border-color: rgba(79, 224, 162, 0.8);
+  color: var(--ink);
+}
+
+.confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border-radius: var(--r-cy-md, 10px);
+  background: rgba(79, 224, 162, 0.06);
+  border: 1px solid rgba(79, 224, 162, 0.35);
+}
+
+.confirmText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* Pastille de réouverture, au-dessus du bouton d'aide « ? » des pages de
+   tournoi, dans le coin où l'on s'attend à trouver ce qui suit la page. */
+.fab {
+  position: fixed;
+  right: 16px;
+  bottom: 84px;
+  z-index: 1100;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(90, 200, 255, 0.5);
+  background: var(--cyber-bg-1, #0c0f14);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+}
+
+.fab[data-phase="LOBBY"] {
+  border-color: rgba(255, 176, 92, 0.7);
+}
+
+.fab:focus-visible {
+  outline: 2px solid var(--blue-300, #5ac8ff);
+  outline-offset: 3px;
+}
+
+.fabTeams {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 220px;
+  font-weight: 400;
+  color: var(--ink-mute);
+}
+
+@media (max-width: 640px) {
+  .modal {
+    padding: 18px;
+  }
+
+  .sides {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .divider {
+    justify-self: center;
+  }
+
+  .footer,
+  .links {
+    justify-content: stretch;
+  }
+
+  .links {
+    margin-left: 0;
+  }
+
+  .fabTeams {
+    max-width: 120px;
+  }
+}

@@ -6,16 +6,16 @@ import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ClientPowerRoot } from "@/components/client-power-root";
-import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
+import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
 import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { siteMetadataBase } from "@/lib/server/site-url";
-import { CSP_NONCE_HEADER, PATHNAME_HEADER } from "@/lib/shared/csp";
+import { PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_MODAL_COOKIE,
@@ -131,9 +131,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const cookieName = ad?.highlight === "MODAL" ? RECRUITMENT_MODAL_COOKIE : RECRUITMENT_BANNER_COOKIE;
   const dismissed = ad === null || recruitmentDismissed(cookieStore.get(cookieName)?.value, ad.id);
 
-  // Un visiteur déjà connecté n'a rien à faire de l'invite : `getCurrentUser`
-  // est mémoïsé par requête (`cache()` de React), donc cet appel ne coûte rien
-  // de plus sur les pages où `PublicHeader`/`PublicFooter` le lisent déjà.
+  // `getCurrentUser` est mémoïsé par requête (`cache()` de React), donc cet
+  // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
+  // le lisent déjà. L'invite Google One Tap n'est **plus** montée ici : chargée
+  // sur chaque page pour tout visiteur anonyme, elle faisait appel à Google sans
+  // que personne l'ait demandé — elle vit sur `/connexion` (`app/connexion/page.tsx`).
   const user = await getCurrentUser();
   // Lus sur **toutes** les pages, `/rgpd` comprise : la modale s'y tait côté
   // client. Décidé ici, le silence survivrait à la navigation — la mise en
@@ -144,11 +146,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // rappels de match : étranglée, à vol unique, jamais attendue — la page ne
   // doit ni ralentir ni tomber à cause du bot.
   void dispatchPrivacyChangeNotifications().catch(() => undefined);
-  const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || null;
-  // Même nonce que celui que le middleware appose sur les scripts de Next :
-  // c'est lui qui rend le `<script src="…gsi/client">` recevable sous
-  // `strict-dynamic` (voir `lib/shared/csp.ts`).
-  const nonce = requestHeaders.get(CSP_NONCE_HEADER) ?? undefined;
   // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
   // quoi un contraste renforcé ferait d'abord clignoter la page dans ses
   // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.
@@ -163,7 +160,6 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <AccessibilityMenu initialSettings={a11ySettings} />
           <VisitTracker />
           <ClientPowerRoot />
-          {!user && googleClientId && <GoogleOneTap clientId={googleClientId} nonce={nonce} />}
           {/* Deux modales ne se superposent pas : tant qu'un choix de
               confidentialité est dû, la mise en avant du recrutement se tait
               (la banderole, elle, reste). */}
@@ -173,6 +169,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             onAdPage={onRecruitmentPage}
           />
           <PrivacyChangesModal changes={privacyChanges} />
+          {/* Lancement des matchs du joueur, sur toutes les pages : la modale
+              s'ouvre à l'heure du match, où qu'il se trouve sur le site. */}
+          {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}
           {children}
         </ToastProvider>
       </body>

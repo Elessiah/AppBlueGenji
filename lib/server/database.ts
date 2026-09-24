@@ -606,6 +606,14 @@ async function runMigrations(db: Pool): Promise<void> {
       live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL,
       live_url VARCHAR(255) NULL,
       live_started_at DATETIME NULL,
+      host_team_id BIGINT NULL,
+      caster_user_id BIGINT NULL,
+      lobby_opened_at DATETIME NULL,
+      launch_pairing VARCHAR(48) NULL,
+      launched_at DATETIME NULL,
+      team1_ready_at DATETIME NULL,
+      team2_ready_at DATETIME NULL,
+      caster_ready_at DATETIME NULL,
       replay_url VARCHAR(255) NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -614,6 +622,7 @@ async function runMigrations(db: Pool): Promise<void> {
       INDEX idx_bg_matches_round (round_number),
       INDEX idx_bg_matches_phase (tournament_id, phase_id),
       INDEX idx_bg_matches_live (live_trigger, status),
+      INDEX idx_bg_matches_caster (caster_user_id),
       CONSTRAINT fk_bg_matches_tournament FOREIGN KEY (tournament_id)
         REFERENCES bg_tournaments(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_matches_team1 FOREIGN KEY (team1_id)
@@ -627,7 +636,11 @@ async function runMigrations(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_matches_next_winner FOREIGN KEY (next_winner_match_id)
         REFERENCES bg_matches(id) ON DELETE SET NULL,
       CONSTRAINT fk_bg_matches_next_loser FOREIGN KEY (next_loser_match_id)
-        REFERENCES bg_matches(id) ON DELETE SET NULL
+        REFERENCES bg_matches(id) ON DELETE SET NULL,
+      CONSTRAINT fk_bg_matches_host_team FOREIGN KEY (host_team_id)
+        REFERENCES bg_teams(id) ON DELETE SET NULL,
+      CONSTRAINT fk_bg_matches_caster FOREIGN KEY (caster_user_id)
+        REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -1068,6 +1081,26 @@ async function runMigrations(db: Pool): Promise<void> {
     // attribuer une serait affirmer ce qu'on ignore.
     `ALTER TABLE bg_users ADD COLUMN discord_link_method ENUM('DM_CODE', 'OAUTH') NULL
        AFTER discord_verified_at`,
+    // Lancement d'un match (`lib/shared/match-launch.ts`) : équipe hôte, caster
+    // inscrit et les trois « Prêt ». Colonne et clé étrangère dans **une seule**
+    // instruction : rejouée sur une base qui les porte, elle bute d'abord sur la
+    // colonne (`ER_DUP_FIELDNAME`, toléré) au lieu de journaliser une contrainte
+    // en double à chaque démarrage. `launched_at` suit plus bas, à part : elle
+    // demande un remplissage.
+    `ALTER TABLE bg_matches ADD COLUMN host_team_id BIGINT NULL AFTER live_started_at,
+       ADD CONSTRAINT fk_bg_matches_host_team FOREIGN KEY (host_team_id)
+         REFERENCES bg_teams(id) ON DELETE SET NULL`,
+    `ALTER TABLE bg_matches ADD COLUMN caster_user_id BIGINT NULL AFTER host_team_id,
+       ADD INDEX idx_bg_matches_caster (caster_user_id),
+       ADD CONSTRAINT fk_bg_matches_caster FOREIGN KEY (caster_user_id)
+         REFERENCES bg_users(id) ON DELETE SET NULL`,
+    `ALTER TABLE bg_matches ADD COLUMN lobby_opened_at DATETIME NULL AFTER caster_user_id`,
+    // Appariement auquel l'état de lancement se rapporte (`launchPairingKey`) :
+    // un match réécrit sur place ne doit pas hériter des « Prêt » d'avant.
+    `ALTER TABLE bg_matches ADD COLUMN launch_pairing VARCHAR(48) NULL AFTER lobby_opened_at`,
+    `ALTER TABLE bg_matches ADD COLUMN team1_ready_at DATETIME NULL AFTER lobby_opened_at`,
+    `ALTER TABLE bg_matches ADD COLUMN team2_ready_at DATETIME NULL AFTER team1_ready_at`,
+    `ALTER TABLE bg_matches ADD COLUMN caster_ready_at DATETIME NULL AFTER team2_ready_at`,
     // Lien YouTube de la rediff d'un match terminé (`lib/shared/match-replay.ts`).
     `ALTER TABLE bg_matches ADD COLUMN replay_url VARCHAR(255) NULL AFTER live_started_at`,
   ];
@@ -1078,6 +1111,31 @@ async function runMigrations(db: Pool): Promise<void> {
     } catch (error) {
       reportSchemaFailure(error, statement.replace(/\s+/g, " ").trim());
     }
+  }
+
+  // `launched_at` : un match jouable ne se joue plus qu'une fois **lancé**
+  // (`lib/shared/match-launch.ts`). Sur une base qui tourne, les matchs déjà
+  // jouables au déploiement se jouaient sous l'ancienne règle : ils sont posés
+  // lancés, sans quoi une rencontre en cours se verrait refuser son score au
+  // milieu d'un tournoi. **Seulement ceux-là** : un match programmé plus tard
+  // passera par son lancement à l'heure dite, comme tout match à venir. Le remplissage ne suit **que** l'ajout effectif de la
+  // colonne — rejoué à chaque démarrage, il lancerait d'office tout match
+  // devenu jouable depuis.
+  const launchedAtStatement = `ALTER TABLE bg_matches ADD COLUMN launched_at DATETIME NULL AFTER lobby_opened_at`;
+  try {
+    await db.execute(launchedAtStatement);
+    // L'empreinte de l'appariement est posée avec : sans elle, le lancement
+    // serait lu comme celui d'un autre appariement, donc ignoré.
+    await db.execute(
+      `UPDATE bg_matches
+       SET launched_at = NOW(), launch_pairing = CONCAT(team1_id, ':', team2_id)
+       WHERE launched_at IS NULL
+         AND team1_id IS NOT NULL AND team2_id IS NOT NULL
+         AND (status IN ('AWAITING_CONFIRMATION', 'COMPLETED')
+              OR (status = 'READY' AND (start_at IS NULL OR start_at <= NOW())))`,
+    );
+  } catch (error) {
+    reportSchemaFailure(error, launchedAtStatement);
   }
 
   // **Un retrait de colonne ne se replie pas.** Une colonne qui part n'a aucune
