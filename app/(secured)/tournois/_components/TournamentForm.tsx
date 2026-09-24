@@ -52,6 +52,7 @@ import {
 import {
   DATE_ORDER_CODES,
   TOURNAMENT_FIELD_ERRORS,
+  describedBy,
   errorCode,
   firstMisplacedDate,
   type TournamentFormField,
@@ -348,7 +349,7 @@ export function TournamentForm({
               <label htmlFor="participant-type">Type de participants</label>
               <select
                 id="participant-type"
-                aria-describedby={`participant-type-hint${locked("participantType") && explanationId ? ` ${explanationId}` : ""}`}
+                aria-describedby={describedBy("participant-type-hint", locked("participantType") && explanationId)}
                 disabled={locked("participantType")}
                 value={values.participantType}
                 onChange={(e) => set("participantType", e.target.value as ParticipantType)}

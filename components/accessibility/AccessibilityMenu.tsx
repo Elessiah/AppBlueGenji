@@ -186,6 +186,7 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
           onToggle={(key, enabled) => update(toggleA11ySetting(settings, key, enabled))}
           onReset={() => update([])}
           onClose={close}
+          onNavigate={() => setOpen(false)}
         />
       )}
     </div>
@@ -199,10 +200,25 @@ interface AccessibilityPanelProps {
   onToggle: (key: A11ySettingKey, enabled: boolean) => void;
   onReset: () => void;
   onClose: () => void;
+  /**
+   * Un lien du menu est suivi. La mise en page racine persiste d'une page à
+   * l'autre : sans cette fermeture, la page d'arrivée s'afficherait sous le
+   * panneau encore ouvert. Le focus n'est **pas** rendu au bouton, comme le
+   * fait `onClose` — on quitte la page, il suit la navigation.
+   */
+  onNavigate?: () => void;
 }
 
 /** Contenu du menu, séparé pour être rendu et testé sans l'état d'ouverture. */
-export function AccessibilityPanel({ id, titleId, settings, onToggle, onReset, onClose }: AccessibilityPanelProps) {
+export function AccessibilityPanel({
+  id,
+  titleId,
+  settings,
+  onToggle,
+  onReset,
+  onClose,
+  onNavigate,
+}: AccessibilityPanelProps) {
   return (
     // `tabIndex={-1}` : le panneau reçoit le focus quand le menu est ouvert
     // depuis le pied de page, sans devenir un arrêt de la tabulation.
@@ -256,7 +272,7 @@ export function AccessibilityPanel({ id, titleId, settings, onToggle, onReset, o
         {/* Le menu est la seule porte d'accessibilité présente sur **toutes** les
             pages, espace connecté compris (qui n'a pas de pied de page) : la
             déclaration s'y atteint de partout. */}
-        <Link href="/accessibilite" className={styles.statementLink}>
+        <Link href="/accessibilite" className={styles.statementLink} onClick={onNavigate}>
           Déclaration d&apos;accessibilité
         </Link>
         {/* `aria-disabled` et non `disabled` : le bouton garde le focus après

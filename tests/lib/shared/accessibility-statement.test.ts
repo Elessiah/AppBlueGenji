@@ -47,7 +47,9 @@ describe("mentions de la déclaration", () => {
 
   it("la date s'écrit en toutes lettres, le même jour quel que soit le fuseau du serveur", () => {
     expect(accessibilityStatementDateLabel("2026-09-24")).toBe("24 septembre 2026");
-    expect(accessibilityStatementDateLabel("2026-01-01")).toBe("1 janvier 2026");
+    // Le premier du mois prend l'ordinal, que `Intl` n'écrit pas.
+    expect(accessibilityStatementDateLabel("2026-01-01")).toBe("1er janvier 2026");
+    expect(accessibilityStatementDateLabel("2026-10-11")).toBe("11 octobre 2026");
     expect(ACCESSIBILITY_STATEMENT_DATE).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });

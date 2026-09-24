@@ -132,6 +132,11 @@ describe("déclaration d'accessibilité", () => {
     expect(code("components/cyber/landing/PublicFooter.tsx")).toMatch(
       /href="\/accessibilite">\{accessibilityFooterLabel\(\)\}/,
     );
-    expect(code("components/accessibility/AccessibilityMenu.tsx")).toContain('href="/accessibilite"');
+    const menu = code("components/accessibility/AccessibilityMenu.tsx");
+    expect(menu).toContain('href="/accessibilite"');
+    // La mise en page racine persiste d'une page à l'autre : suivre le lien doit
+    // refermer le panneau, sans quoi il couvrirait la page d'arrivée.
+    expect(menu).toMatch(/href="\/accessibilite"[^>]*onClick=\{onNavigate\}/);
+    expect(menu).toContain("onNavigate={() => setOpen(false)}");
   });
 });

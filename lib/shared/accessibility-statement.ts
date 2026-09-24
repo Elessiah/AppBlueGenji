@@ -68,12 +68,14 @@ export function accessibilityFooterLabel(status: ConformityStatus = CONFORMITY_S
 export function accessibilityStatementDateLabel(iso: string = ACCESSIBILITY_STATEMENT_DATE): string {
   // Midi UTC : la date se lit le même jour dans tous les fuseaux, quel que soit
   // celui du serveur qui rend la page.
-  return new Intl.DateTimeFormat("fr-FR", {
+  const label = new Intl.DateTimeFormat("fr-FR", {
     day: "numeric",
     month: "long",
     year: "numeric",
     timeZone: "Europe/Paris",
   }).format(new Date(`${iso}T12:00:00Z`));
+  // Le premier du mois s'écrit « 1er » : `Intl` ne connaît pas l'ordinal.
+  return label.replace(/^1 /, "1er ");
 }
 
 export type KnownIssue = {
@@ -97,7 +99,8 @@ export const KNOWN_ISSUES: readonly KnownIssue[] = [
       "C'est un choix d'apparence assumé.",
     workaround:
       "Le réglage « Contraste renforcé » du menu d'accessibilité (bouton en bas à gauche de chaque page) " +
-      "porte tous les textes du site au-dessus de 4,5:1.",
+      "porte les textes secondaires au-dessus de 4,5:1 ; vérifié sur les pages principales du site " +
+      "(vitrine, connexion, annuaires, fiches, profil, formulaires, fiches de tournoi).",
   },
   {
     title: "Erreurs de quelques formulaires",
