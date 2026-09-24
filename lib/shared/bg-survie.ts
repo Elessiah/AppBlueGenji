@@ -311,7 +311,7 @@ export function enduranceMatchOutcome(match: EnduranceMatchRecord): EnduranceMat
   const drawn =
     completed &&
     winnerTeamId === null &&
-    match.forfeitTeamId === null &&
+    match.forfeitTeamId == null &&
     match.team1Id !== null &&
     match.team2Id !== null &&
     match.team1Score !== null &&
@@ -325,7 +325,10 @@ export function enduranceMatchOutcome(match: EnduranceMatchRecord): EnduranceMat
     loserTeamId: match.loserTeamId,
     winnerMaps: winnerScore,
     loserMaps: loserScore,
-    isForfeit: match.forfeitTeamId !== null,
+    // `!= null` couvre aussi un champ absent (instantané d'une version
+    // antérieure, appelant partiel) : un forfait doit être une information
+    // positive, jamais un défaut.
+    isForfeit: match.forfeitTeamId != null,
     drawTeamIds: drawn ? ([match.team1Id as number, match.team2Id as number] as const) : null,
     // Les deux scores sont égaux sur un nul — le critère ci-dessus l'exige —
     // donc un seul chiffre suffit.

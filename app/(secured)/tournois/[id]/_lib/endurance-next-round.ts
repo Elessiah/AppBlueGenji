@@ -77,7 +77,9 @@ function playoffStageTitle(slots: number | null): string {
   if (slots === 2) return "Demi-finales";
   if (slots === 3 || slots === 4) return "Quarts de finale";
   if (slots !== null && slots >= 5 && slots <= 8) return "8èmes de finale";
-  return "Tour suivant des play-offs";
+  // Effectif pas encore acquis : on nomme la phase, pas un tour qu'on ne sait
+  // pas situer — « tour suivant » laisserait croire à un arbre déjà tiré.
+  return "Play-offs";
 }
 
 /**
@@ -100,7 +102,7 @@ function plural(count: number, one: string, many: string): string {
  */
 export function nextRoundSummary(preview: EnduranceNextRoundPreview): string {
   const known = preview.matches.filter((match) => match.teamBId !== null).length;
-  const acquired = `${plural(known, "rencontre acquise", "rencontres acquises")}`;
+  const acquired = plural(known, "rencontre acquise", "rencontres acquises");
   if (preview.expectedMatches === null) return acquired;
   return `${acquired} sur ${preview.expectedMatches}`;
 }

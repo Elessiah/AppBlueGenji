@@ -183,7 +183,7 @@ describe("libellés de l'aperçu", () => {
     expect(playoffs(4)).toBe("Quarts de finale");
     expect(playoffs(3)).toBe("Quarts de finale");
     expect(playoffs(8)).toBe("8èmes de finale");
-    expect(playoffs(null)).toBe("Tour suivant des play-offs");
+    expect(playoffs(null)).toBe("Play-offs");
   });
 
   it("compte les rencontres acquises sans les exemptions", () => {

@@ -733,17 +733,22 @@ describe("previewEnduranceNextRound — coût", () => {
     const matches = Array.from({ length: 64 }, (_, index) =>
       record(1, index + 1, 2 * index + 1, 2 * index + 2),
     );
+    const run = () =>
+      previewEnduranceNextRound(
+        input({
+          teams: teams(128),
+          format: { type: "BO", value: 15 },
+          config: { ...DEFAULT_ENDURANCE_CONFIG, maxRounds: 5 },
+          matches,
+        }),
+      );
+    // Premier appel à froid (JIT, initialisation) : seul le second est mesuré,
+    // sans quoi un runner CI chargé ferait échouer le test sans rapport avec
+    // le code. L'ancienne version naïve prenait près d'une seconde à chaud.
+    expect(run()).not.toBeNull();
     const started = Date.now();
-    const preview = previewEnduranceNextRound(
-      input({
-        teams: teams(128),
-        format: { type: "BO", value: 15 },
-        config: { ...DEFAULT_ENDURANCE_CONFIG, maxRounds: 5 },
-        matches,
-      }),
-    );
-    expect(preview).not.toBeNull();
-    expect(Date.now() - started).toBeLessThan(1000);
+    run();
+    expect(Date.now() - started).toBeLessThan(500);
   });
 });
 
@@ -793,6 +798,13 @@ describe("enduranceMatchOutcome", () => {
     ).toMatchObject({ doubleForfeitTeamIds: [3, 4], drawTeamIds: null });
     // Un drapeau resté sur une ligne rouverte ne compte pas.
     expect(enduranceMatchOutcome(record(1, 1, 3, 4, { doubleForfeit: true })).doubleForfeitTeamIds).toBeNull();
+  });
+
+  it("tient un forfait absent pour une absence de forfait", () => {
+    const partial = { ...played(1, 1, 3, 4, 2, 2), forfeitTeamId: undefined } as unknown as ReturnType<
+      typeof played
+    >;
+    expect(enduranceMatchOutcome(partial)).toMatchObject({ isForfeit: false, drawTeamIds: [3, 4] });
   });
 
   it("n'appelle pas nul un match clos sans score ni vainqueur, ni un forfait", () => {
