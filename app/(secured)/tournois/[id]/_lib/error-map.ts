@@ -1,7 +1,7 @@
 import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
 import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
-import { PHASE_ERROR_MESSAGES } from "../../creer/phase-form";
+import { PHASE_ERROR_MESSAGES } from "@/lib/shared/tournament-phases";
 
 export const ERROR_MESSAGES: Record<string, string> = {
   // Lancement des matchs : en tête, pour que les formulations propres à cette
@@ -138,13 +138,16 @@ export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_SWISS_ROUNDS: "Nombre de rondes suisses invalide : 1 à 20 attendues.",
   INVALID_SWISS_POINTS:
     "Barème de ronde suisse invalide : des points de 0 à 99, une victoire qui rapporte plus qu'une défaite, et un nul entre les deux.",
-  // Même double emploi que les rondes suisses : tournoi en Survie ou phase de Survie.
-  INVALID_SURVIVAL_ROUNDS: "Cadence de survie invalide : 1 à 50 manches entre deux coupes.",
+  // Même double emploi que les rondes suisses : tournoi en Survie ou phase de
+  // Survie. Pour une phase, le code couvre aussi la première coupe — la phrase
+  // nomme donc les deux réglages.
+  INVALID_SURVIVAL_ROUNDS:
+    "Cadence de survie invalide : de 1 à 50 manches entre deux coupes, comme avant la première.",
   INVALID_SURVIVAL_FIRST_CUT: "Première coupe de survie invalide : 1 à 50 manches avant elle.",
   INVALID_ENDURANCE_SETTINGS:
     "Réglages d'endurance invalides : capital de 1 à 99, gain et perte de 1 à 20, play-offs de 2 à 32 équipes, plafond de 1 à 50 manches.",
-  // Plan de phases (format multi-phases) : la table vit à côté du formulaire
-  // qui la montre aussi, pour qu'un code n'ait qu'une phrase.
+  // Plan de phases (format multi-phases) : la table vit à côté du validateur
+  // qui émet ses codes, et le formulaire la lit aussi — un code, une phrase.
   ...PHASE_ERROR_MESSAGES,
   // Session expirée : le suivi en direct s'arrête, il faut se reconnecter.
   UNAUTHORIZED: "Ta session a expiré. Reconnecte-toi pour suivre le tournoi en direct.",
@@ -252,8 +255,12 @@ export const ERROR_MESSAGES: Record<string, string> = {
  * Repli d'un code que la table ne connaît pas. Une phrase générique plutôt que
  * le code : un jeton en capitales n'apprend rien au lecteur, et c'est aussi le
  * repli des autres registres du site.
+ *
+ * Elle ne promet pas qu'un nouvel essai aboutira : un code inconnu peut être un
+ * refus déterministe (400, 409), que le même geste rencontrera de nouveau.
  */
-export const UNKNOWN_ERROR_MESSAGE = "Une erreur inattendue est survenue. Réessaie dans un instant.";
+export const UNKNOWN_ERROR_MESSAGE =
+  "L'action n'a pas abouti pour une raison inattendue. Si le problème persiste, préviens le staff.";
 
 /** Forme d'un code d'erreur du serveur : `TOURNAMENT_NOT_FOUND`, `FORBIDDEN`… */
 const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;

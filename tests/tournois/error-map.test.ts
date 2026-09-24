@@ -8,9 +8,10 @@ import {
   mapError,
   UNKNOWN_ERROR_MESSAGE,
 } from "@/app/(secured)/tournois/[id]/_lib/error-map";
-import { PHASE_ERROR_MESSAGES, phaseErrorMessage } from "@/app/(secured)/tournois/creer/phase-form";
+import { phaseErrorMessage } from "@/app/(secured)/tournois/creer/phase-form";
 import { PHASE_ERROR_CODES } from "@/lib/server/tournaments/validation";
 import { REGISTRATION_FILTER_ERRORS } from "@/lib/shared/registration-filters";
+import { PHASE_ERROR_MESSAGES } from "@/lib/shared/tournament-phases";
 
 /**
  * Les codes que le serveur renvoie réellement doivent tous avoir une phrase
@@ -68,6 +69,12 @@ describe("mapError — repli", () => {
     expect(mapError("invalid_format")).toBe("invalid_format");
   });
 
+  it("ne promet pas qu'un nouvel essai aboutira", () => {
+    // Un code inconnu peut être un refus déterministe : « réessaie » enverrait
+    // refaire le même geste pour le même refus.
+    expect(UNKNOWN_ERROR_MESSAGE).not.toMatch(/réessaie/i);
+  });
+
   it("est rédigée en français et ne ressemble à aucun code", () => {
     expect(UNKNOWN_ERROR_MESSAGE).toMatch(/[a-zà-ÿ]/);
     expect(Object.values(ERROR_MESSAGES)).not.toContain(UNKNOWN_ERROR_MESSAGE);
@@ -85,9 +92,11 @@ describe("mapError — repli", () => {
 describe("mapError — refus du formulaire de tournoi", () => {
   const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
 
-  function codesIn(source: string): string[] {
+  const REFUSAL_PATTERN = /(?:error: |code: |return |fail\(|new Error\(\s*)"([A-Z][A-Z0-9_]+)"/g;
+
+  function codesIn(source: string, pattern: RegExp = REFUSAL_PATTERN): string[] {
     const found = new Set<string>();
-    for (const match of source.matchAll(/(?:error: |return )"([A-Z][A-Z0-9_]+)"/g)) {
+    for (const match of source.matchAll(pattern)) {
       found.add(match[1]);
     }
     return [...found];
@@ -98,6 +107,18 @@ describe("mapError — refus du formulaire de tournoi", () => {
   const filters = codesIn(read("lib/shared/registration-filters.ts")).filter((code) =>
     code.startsWith("INVALID_"),
   );
+  // Ce que l'édition et les deux routes ajoutent au-dessus de la validation :
+  // fenêtre d'édition, identifiant, session, échec générique.
+  const routes = [
+    ...[
+      "lib/server/tournaments/edit.ts",
+      "app/api/tournaments/route.ts",
+      "app/api/tournaments/[id]/edit/route.ts",
+    ].flatMap((file) => codesIn(read(file))),
+    // Le module pur rend aussi des **noms de fenêtre** (`return "LOCKED"`), qui
+    // ne sortent jamais vers l'interface : seuls ses `code:` sont des refus.
+    ...codesIn(read("lib/shared/tournament-edit.ts"), /code: "([A-Z][A-Z0-9_]+)"/g),
+  ];
 
   it("relève bien des codes dans chaque source", () => {
     // Garde du balayage lui-même : une expression qui ne trouverait plus rien
@@ -107,9 +128,12 @@ describe("mapError — refus du formulaire de tournoi", () => {
     );
     expect(phases).toEqual(expect.arrayContaining(["INVALID_PHASE_COUNT"]));
     expect(filters).toEqual(expect.arrayContaining(["INVALID_MIN_PLAYERS"]));
+    expect(routes).toEqual(
+      expect.arrayContaining(["TOURNAMENT_LOCKED", "EMPTY_PATCH", "MAX_TEAMS_CANNOT_DECREASE"]),
+    );
   });
 
-  it.each([...new Set([...validation, ...phases, ...filters, ...PHASE_ERROR_CODES])].map((c) => [c]))(
+  it.each([...new Set([...validation, ...phases, ...filters, ...routes, ...PHASE_ERROR_CODES])].map((c) => [c]))(
     "traduit %s",
     (code) => {
       const message = mapError(code);
@@ -126,6 +150,18 @@ describe("mapError — refus du formulaire de tournoi", () => {
   it("dit la règle du barème suisse, et non un simple « invalide »", () => {
     expect(mapError("INVALID_SWISS_POINTS")).toMatch(/victoire/);
     expect(mapError("INVALID_SWISS_POINTS")).toMatch(/nul/);
+  });
+
+  it("dit la règle de décroissance telle qu'elle s'applique, pourcentages compris", () => {
+    // 80 % après 50 % qualifie moins d'engagés et reste refusé : parler
+    // d'engagés « en plus » serait faux.
+    const message = mapError("INVALID_QUALIFIER_COUNT");
+    expect(message).toMatch(/pourcentage/);
+    expect(message).not.toMatch(/plus d'engagés/);
+  });
+
+  it("nomme la première coupe dans la cadence de survie, que le code couvre aussi en phase", () => {
+    expect(mapError("INVALID_SURVIVAL_ROUNDS")).toMatch(/première/);
   });
 
   it("distingue la cadence de survie de sa première coupe", () => {

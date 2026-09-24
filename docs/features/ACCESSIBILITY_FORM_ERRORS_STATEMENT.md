@@ -58,7 +58,7 @@ Trois points :
   qu'une partie des codes de `validateTournamentInput` (format, jeu, type de
   participants, réglages suisse, survie et endurance, plan de phases) et rendait
   les autres **tels quels**. Les phrases de phase vivent dans
-  `PHASE_ERROR_MESSAGES` (`creer/phase-form.ts`), table unique que lisent
+  `PHASE_ERROR_MESSAGES` (`lib/shared/tournament-phases.ts`, à côté de `validatePhases` qui émet ses codes), table unique que lisent
   `phaseErrorMessage` (contrôle local du plan) et `ERROR_MESSAGES` (refus du
   serveur) ; `INVALID_SWISS_ROUNDS` et `INVALID_SURVIVAL_ROUNDS`, émis aussi
   bien pour un tournoi que pour une phase, restent dans `ERROR_MESSAGES` avec

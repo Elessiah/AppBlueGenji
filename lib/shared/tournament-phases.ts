@@ -241,6 +241,41 @@ export function normalizePhaseConfigs(raw: readonly Partial<PhaseConfig>[]): Pha
   }));
 }
 
+/** Bornes de la qualification, communes au contrôle local et au contrôle serveur. */
+const QUALIFIER_BOUNDS_MESSAGE =
+  "Qualification invalide : au moins une équipe en nombre fixe, ou de 1 à 99 % en pourcentage.";
+
+/**
+ * Phrases des refus d'un plan de phases, **toutes origines confondues** : le
+ * contrôle strict ({@link validatePhases}) et le contrôle « ami » du serveur
+ * (`validateRawPhases`, `lib/server/tournaments/validation.ts`). Une seule
+ * table, lue par le formulaire (`phaseErrorMessage`) comme par la notification
+ * d'un refus serveur (`mapError`) : deux listes auraient laissé un code traduit
+ * d'un côté et affiché brut de l'autre.
+ *
+ * `INVALID_SURVIVAL_ROUNDS` et `INVALID_SWISS_ROUNDS` n'y figurent pas : le
+ * serveur les emploie aussi pour un tournoi sans phases, leur phrase vit donc
+ * dans le registre des refus de la page de tournoi, formulée pour les deux cas.
+ */
+export const PHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
+  MISSING_PHASES: "Un tournoi multi-phases doit décrire ses phases.",
+  INVALID_PHASE_COUNT: "Nombre de phases invalide : 2 à 8 phases attendues.",
+  INVALID_PHASE_POSITIONS: "Positions des phases invalides.",
+  INVALID_PHASE_FORMAT: "Format de phase invalide.",
+  DOUBLE_MUST_BE_LAST_PHASE: "La double élimination ne peut être que la dernière phase.",
+  INVALID_PHASE_QUALIFIER: QUALIFIER_BOUNDS_MESSAGE,
+  INVALID_QUALIFIER_VALUE: QUALIFIER_BOUNDS_MESSAGE,
+  // Le contrôle serveur compare les cibles **de même nature**, pourcentages
+  // compris : la phrase dit la règle telle qu'elle est appliquée, et non « plus
+  // d'engagés » — 80 % après 50 % en qualifie moins, et il est pourtant refusé.
+  INVALID_QUALIFIER_COUNT:
+    "La qualification d'une phase ne peut pas dépasser celle de la phase précédente, en nombre fixe comme en pourcentage.",
+  NON_DECREASING_PHASE_QUALIFIERS:
+    "Les qualifications en nombre fixe doivent décroître entre les phases.",
+  INVALID_PHASE_SWISS_ROUNDS: "Nombre de manches ronde suisse invalide : 1 à 20 attendues.",
+  INVALID_PHASE_SURVIVAL_ROUNDS: "Cadence de survie invalide : 1 à 50 attendues.",
+};
+
 /**
  * Valide une liste de configurations de phases.
  *
