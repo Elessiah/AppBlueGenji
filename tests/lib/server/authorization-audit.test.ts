@@ -24,7 +24,11 @@ import { tournamentRow } from "../../helpers/tournament-rows";
 
 // ───────────────────────── §4.3 — écraser un résultat validé ─────────────────
 
-type MatchOverrides = { status?: string; winner_team_id?: number | null };
+type MatchOverrides = {
+  status?: string;
+  winner_team_id?: number | null;
+  launched_at?: string | null;
+};
 
 /**
  * Connexion factice servant un match de « BlueGenji Survie », seul mode où
@@ -54,6 +58,8 @@ function fakeConnection(overrides: MatchOverrides = {}): {
     next_loser_slot: null,
     winner_team_id: null,
     status: "READY",
+    // Un match se joue une fois lancé (`lib/shared/match-launch.ts`).
+    launched_at: "2026-01-01 20:00:00",
     ...overrides,
   };
 
@@ -138,6 +144,22 @@ describe("§4.3 — un engagé ne peut pas écraser un résultat déjà validé"
 
     await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).resolves.toBeUndefined();
     expect(writes.some((q) => q.includes("team1_report_score"))).toBe(true);
+  });
+
+  it("refuse le report d'une rencontre pas encore lancée", async () => {
+    // Les parties ne se sont pas toutes déclarées prêtes : le match n'a pas
+    // commencé (`lib/shared/match-launch.ts`).
+    const { conn, writes } = fakeConnection({ launched_at: null });
+
+    await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).rejects.toThrow("MATCH_NOT_LAUNCHED");
+    expect(writes).toHaveLength(0);
+  });
+
+  it("laisse passer le second report même sans `launched_at` : un report en attente vaut lancé", async () => {
+    // C'est l'état des matchs en cours au déploiement de la règle.
+    const { conn } = fakeConnection({ status: "AWAITING_CONFIRMATION", launched_at: null });
+
+    await expect(reportMatchScore(conn, 1, 10, 42, 2, 2)).resolves.toBeUndefined();
   });
 
   it("laisse passer le report d'une rencontre encore ouverte", async () => {

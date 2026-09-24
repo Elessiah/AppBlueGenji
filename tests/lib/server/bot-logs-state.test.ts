@@ -5,6 +5,8 @@ jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/bracket-generator");
 jest.mock("@/lib/server/tournaments/finalization");
 jest.mock("@/lib/server/tournaments/byes");
+// Lancement des matchs : entretien propre, hors du sujet de ces tests.
+jest.mock("@/lib/server/tournaments/match-launch");
 
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { queueBotLog } from "@/lib/server/tournaments/bot-logs";

@@ -129,6 +129,7 @@ describe("tournaments-service: match state machine", () => {
       team1_report_opponent_score: number | null;
       team2_report_score: number | null;
       team2_report_opponent_score: number | null;
+      launched_at: string | null;
     };
     type Call = { sql: string; params: unknown[] };
 
@@ -145,6 +146,8 @@ describe("tournaments-service: match state machine", () => {
         team1_report_opponent_score: null,
         team2_report_score: null,
         team2_report_opponent_score: null,
+        // Un match se joue une fois lancé (`lib/shared/match-launch.ts`).
+        launched_at: "2026-01-01 20:00:00",
         ...overrides,
       };
       const calls: Call[] = [];
