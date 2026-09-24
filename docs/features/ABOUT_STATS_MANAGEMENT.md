@@ -69,8 +69,18 @@ Pour les admins :
 - tous les retours (succès/erreur) passent par les **toasts** bottom-left
   (`useToast()`), jamais en inline.
 
+La modale est **portée dans `document.body`** (`createPortal`) et confie focus
+initial, Échap, piège de tabulation et verrou du défilement à
+`useDialogBehavior`. Rendue dans la section, elle restait prisonnière du
+contexte d'empilement que pose `.root` d'`AboutSection` (`position: relative;
+z-index: 1`) : son `z-index: 1000` ne valait que dans la section, si bien que
+la section des partenaires, peinte après, passait par-dessus selon la position
+de défilement — et la page continuait de défiler sous le voile.
+
 ## Tests
 
+- `tests/app/about-section-dialogs.test.ts` — modale portée dans
+  `document.body` et confiée à `useDialogBehavior` (balayage de source).
 - `tests/lib/shared/about-stats.test.ts` — validation (requis, trim, longueurs).
 - `tests/lib/server/about-stats-service.test.ts` — CRUD + fallback (DB mockée).
 - `tests/app/api/association/about-stats.test.ts` — gardes d'auth, validation,
