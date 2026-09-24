@@ -252,9 +252,19 @@ describe("les textes de consentement", () => {
     const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
     expect(joined).toContain("administrateur");
     expect(joined).toContain("arbitre");
-    // Le joueur doit lire comment revenir en arrière avant d'avancer : la
-    // certification se défait en modifiant le tag, et nulle part ailleurs.
-    expect(joined).toContain("modifiant ton tag");
+    // Le joueur doit lire comment revenir en arrière avant d'avancer — et par
+    // le geste que l'écran offre : un tag certifié est en lecture seule sur
+    // `/profil`, seul le retrait y existe.
+    expect(joined).toContain("retirant ton tag");
+    expect(joined).toContain("mon profil");
+    expect(joined).not.toContain("modifiant ton tag");
+  });
+
+  it("disent que le retrait ne tient pas face à une connexion par Discord", () => {
+    // Se connecter par Discord certifie le tag tout seul : annoncer une
+    // annulation définitive serait promettre ce que le site ne tient pas.
+    const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
+    expect(joined).toMatch(/prochaine connexion par discord/);
   });
 
   it("nomment les parties d'un match et la durée de l'exposition", () => {
