@@ -117,7 +117,10 @@ export function PhaseCard({
   return (
     <div
       style={{
-        border: "1px solid var(--line-soft)",
+        // La carte en défaut se repère repliée aussi : l'encart dit « Phase 2 —
+        // … », le cadre dit laquelle, sans avoir à compter. Même teinte que
+        // l'encart d'erreur du plan.
+        border: `1px solid ${issue ? "rgba(255, 110, 130, 0.45)" : "var(--line-soft)"}`,
         borderRadius: 10,
         overflow: "hidden",
       }}
