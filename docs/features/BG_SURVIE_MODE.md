@@ -31,8 +31,11 @@ inchangé : ce sont deux formats distincts.
   reste intact. Contrairement au mode Survie, aucune victoire d'office.
 - La phase s'arrête dès que l'effectif actif retombe à `endurance_playoff_size`,
   ou — si le tournoi fixe un plafond — à la manche `endurance_max_rounds`, au
-  premier des deux. Sans plafond (`NULL`, le défaut et le comportement de tous
-  les tournois antérieurs), c'est l'endurance seule qui fait le tri.
+  premier des deux. Sans plafond (`NULL`, le comportement de tous les
+  tournois antérieurs), c'est l'endurance seule qui fait le tri. Le formulaire
+  de création propose **5 manches** (`DEFAULT_ENDURANCE_MAX_ROUNDS`) et coche
+  d'office « Égalités autorisées en qualification » ; 0 reste « aucun
+  plafond », et l'édition d'un tournoi sans plafond le garde sans plafond.
 
 ### Le départage n'est pas le seed
 
