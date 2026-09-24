@@ -1092,7 +1092,7 @@ async function runMigrations(db: Pool): Promise<void> {
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       team_id BIGINT NOT NULL,
       report_id BIGINT NULL,
-      logo_url VARCHAR(255) NOT NULL,
+      logo_url TEXT NOT NULL,
       status ENUM('HIDDEN', 'RESTORED', 'PURGED') NOT NULL DEFAULT 'HIDDEN',
       hidden_by_user_id BIGINT NULL,
       hidden_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1213,6 +1213,11 @@ async function runMigrations(db: Pool): Promise<void> {
     // remplissage** — on n'attribue pas une acceptation que personne n'a donnée.
     `ALTER TABLE bg_users ADD COLUMN terms_version INT NULL AFTER platform_roles_json`,
     `ALTER TABLE bg_users ADD COLUMN terms_accepted_at DATETIME NULL AFTER terms_version`,
+    // Même type que `bg_teams.logo_url`, dont la colonne recopie la valeur : en
+    // `VARCHAR(255)`, supprimer un ancien logo à l'adresse longue échouait
+    // (`ER_DATA_TOO_LONG`) et le laissait en ligne. Sans effet sur une base qui
+    // la porte déjà en `TEXT`.
+    `ALTER TABLE bg_logo_quarantines MODIFY logo_url TEXT NOT NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

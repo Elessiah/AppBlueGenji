@@ -176,7 +176,7 @@ function ReportsPanel() {
   const onPurge = (quarantineId: number) =>
     void run(
       () => adminFetch(`/api/admin/logo-quarantines/${quarantineId}`, { method: "DELETE" }, "LOGO_PURGE_FAILED"),
-      "Logo supprimé définitivement.",
+      "Logo supprimé définitivement. L'équipe est prévenue.",
     );
 
   return (

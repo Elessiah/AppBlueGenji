@@ -522,8 +522,15 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
   }
 
   const line = `🗑️ Logo de l'équipe « ${row.team_name} » supprimé définitivement`;
-  if (actor) publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo });
-  else console.info(`[moderation] ${line} à l'échéance de sa quarantaine.`);
+  if (actor) {
+    publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo });
+    // Avant l'échéance annoncée : l'équipe attend une date qui ne vaut plus,
+    // elle apprend la décision (DSA art. 17) comme elle apprendrait un
+    // rétablissement. À l'échéance, le message du masquage l'a déjà dite.
+    notifyTeamLogoRemoved(Number(row.team_id), row.team_name, row.report_id === null ? null : Number(row.report_id));
+  } else {
+    console.info(`[moderation] ${line} à l'échéance de sa quarantaine.`);
+  }
 }
 
 type DueRow = RowDataPacket & {

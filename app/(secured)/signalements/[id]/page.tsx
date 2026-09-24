@@ -78,7 +78,9 @@ export default function ConcernedReportPage() {
   const { report } = state;
   const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
   const hidden = report.quarantines.filter((quarantine) => quarantine.status === "HIDDEN");
-  const removed = report.quarantines.filter(isImmediateLogoRemoval);
+  // Supprimé sans délai, ou masqué puis supprimé (échéance, contestation
+  // rejetée) : la décision reste lisible, pas seulement tant qu'elle attend.
+  const removed = report.quarantines.filter((quarantine) => quarantine.status === "PURGED");
 
   return (
     <section className={`fade-in container ${styles.page}`}>
@@ -101,9 +103,10 @@ export default function ConcernedReportPage() {
 
       {removed.map((quarantine) => (
         <div key={quarantine.id} className={styles.alert} role="status">
-          <strong>Le logo de « {quarantine.teamName} » a été supprimé</strong> le {formatDate(quarantine.hiddenAt)}{" "}
-          à la suite de ce signalement. Si vous en détenez les droits, contestez-le : si la contestation aboutit,
-          vous pourrez l&apos;envoyer de nouveau.
+          <strong>Le logo de « {quarantine.teamName} » a été supprimé</strong>{" "}
+          {isImmediateLogoRemoval(quarantine) ? "sans délai " : ""}le{" "}
+          {formatDate(quarantine.closedAt ?? quarantine.hiddenAt)} à la suite de ce signalement. Si vous en détenez
+          les droits, contestez-le : si la contestation aboutit, vous pourrez l&apos;envoyer de nouveau.
         </div>
       ))}
 

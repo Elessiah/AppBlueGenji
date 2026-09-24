@@ -25,7 +25,10 @@ HIDDEN ──(contestation acceptée, « Rétablir »)──▶ RESTORED
   prévient l'équipe. Refusé si l'équipe a envoyé un autre logo entre-temps
   (`TEAM_HAS_NEW_LOGO`) : on n'écrase pas un choix fait depuis.
 - **Supprimer** (`purgeQuarantinedLogo`) efface le fichier, à la demande ou à
-  l'échéance.
+  l'échéance. Décidée **avant** l'échéance (contestation rejetée), la
+  suppression est annoncée à l'équipe, qui attendait une autre date ; à
+  l'échéance, le message du masquage l'a déjà dite. La page du signalement
+  montre tout logo supprimé, pas seulement ceux qui attendent.
 
 ## Durée : six mois (`LOGO_QUARANTINE_DAYS = 180`)
 

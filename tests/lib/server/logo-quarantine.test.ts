@@ -395,8 +395,13 @@ describe("restoreTeamLogo", () => {
 });
 
 describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
+  const members: Route = [
+    /FROM bg_team_members tm\s+JOIN bg_users u/,
+    () => [[{ pseudo: "Capitaine", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]],
+  ];
+
   it("clôt la quarantaine puis efface le fichier, après le commit", async () => {
-    install([], [[/FROM bg_logo_quarantines q/, () => [[quarantineRow()]]], [/SET status = 'PURGED'/, () => [{}]]]);
+    install([members], [[/FROM bg_logo_quarantines q/, () => [[quarantineRow()]]], [/SET status = 'PURGED'/, () => [{}]]]);
     await purgeQuarantinedLogo(30, actor);
     expect(unlink).toHaveBeenCalledWith(HIDDEN);
     expect(jest.mocked(connection.commit).mock.invocationCallOrder[0]).toBeLessThan(
@@ -406,6 +411,16 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
       id: 1,
       pseudo: "Admin",
     });
+  });
+
+  it("prévient l'équipe d'une suppression décidée avant l'échéance, lien du signalement compris", async () => {
+    install([members], [[/FROM bg_logo_quarantines q/, () => [[quarantineRow()]]], [/SET status = 'PURGED'/, () => [{}]]]);
+    await purgeQuarantinedLogo(30, actor);
+    await flush();
+    const [message, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(context).toBe("logo-removed");
+    expect(message).toContain("https://site.test/signalements/12");
+    expect(recipients).toHaveLength(1);
   });
 
   it("supprime d'office ce qui est échu et non contesté, et garde ce qui attend une décision", async () => {
@@ -428,6 +443,9 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     const purged = connection.execute.mock.calls.filter(([sql]) => /SET status = 'PURGED'/.test(sql)).map(([, p]) => p);
     expect(purged).toEqual([[30], [32]]);
     expect(publishStaffAction).not.toHaveBeenCalled();
+    // À l'échéance, le message du masquage a déjà annoncé la date.
+    await flush();
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 });
 
