@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/auth");
@@ -89,7 +92,7 @@ describe("inscription par Google", () => {
   it("annonce le compte qui vient de naître", async () => {
     fakeDb([]);
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true });
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     // Le compte n'est **pas** nommé : ni pseudo, ni identifiant (qui mène à
@@ -106,7 +109,7 @@ describe("inscription par Google", () => {
     fakeDb([{ id: 7, google_sub: "google-sub-neuf", discord_id: null }]);
 
     await expect(
-      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }),
+      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true }),
     ).resolves.toBe(7);
 
     expect(sendBotLog).not.toHaveBeenCalled();
@@ -121,7 +124,7 @@ describe("inscription par Google", () => {
     fakeDb([{ id: 7, google_sub: null, discord_id: "123456789" }]);
 
     await expect(
-      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }),
+      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true }),
     ).resolves.toBe(4242);
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
@@ -135,7 +138,7 @@ describe("inscription par Blizzard", () => {
     // est ce qu'on lit dans une URL de profil et sur une feuille de match.
     fakeDb([]);
 
-    await createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143");
+    await createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143", { termsAccepted: true });
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(lines()[0]).not.toContain("Nova");
@@ -146,7 +149,7 @@ describe("inscription par Blizzard", () => {
   it("se tait à chaque connexion suivante", async () => {
     fakeDb([{ id: 7, google_sub: null, discord_id: null, blizzard_sub: "blizzard-sub-neuf" }]);
 
-    await expect(createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143")).resolves.toBe(7);
+    await expect(createOrGetBlizzardUser("blizzard-sub-neuf", "Nova#2143", { termsAccepted: true })).resolves.toBe(7);
 
     expect(sendBotLog).not.toHaveBeenCalled();
   });
@@ -156,7 +159,7 @@ describe("inscription par Discord", () => {
   it("annonce le compte qui vient de naître", async () => {
     fakeDb([]);
 
-    await createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE" });
+    await createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE", termsAccepted: true });
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     expect(lines()[0]).not.toContain("Nova");
@@ -168,7 +171,7 @@ describe("inscription par Discord", () => {
     fakeDb([{ id: 7, google_sub: null, discord_id: "123456789" }]);
 
     await expect(
-      createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE" }),
+      createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE", termsAccepted: true }),
     ).resolves.toBe(7);
 
     expect(sendBotLog).not.toHaveBeenCalled();
@@ -184,7 +187,7 @@ describe("le journal ne tient pas la connexion en otage", () => {
     fakeDb([]);
 
     await expect(
-      createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE" }),
+      createOrGetDiscordUser("123456789", "Nova", undefined, { method: "DM_CODE", termsAccepted: true }),
     ).resolves.toBe(4242);
   });
 });

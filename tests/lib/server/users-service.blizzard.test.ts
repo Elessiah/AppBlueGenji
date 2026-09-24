@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/auth");
@@ -79,7 +82,7 @@ describe("createOrGetBlizzardUser", () => {
     // URL de profil ni sur une feuille de match.
     const { statements } = fakeDb([]);
 
-    return createOrGetBlizzardUser("bz-1", "Nova#2143").then((userId) => {
+    return createOrGetBlizzardUser("bz-1", "Nova#2143", { termsAccepted: true }).then((userId) => {
       expect(userId).toBe(4242);
       expect(ensureUniquePseudo).toHaveBeenCalledWith("Nova");
       const insert = find(statements, "INSERT INTO bg_users")!;
@@ -90,7 +93,7 @@ describe("createOrGetBlizzardUser", () => {
   it("écrase le BattleTag à chaque connexion suivante", async () => {
     const { statements } = fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
 
-    await expect(createOrGetBlizzardUser("bz-1", "Nova#9999")).resolves.toBe(7);
+    await expect(createOrGetBlizzardUser("bz-1", "Nova#9999", { termsAccepted: true })).resolves.toBe(7);
 
     const update = find(statements, "UPDATE bg_users SET overwatch_battletag")!;
     expect(update.params).toEqual(["Nova#9999", 7]);
@@ -102,7 +105,7 @@ describe("createOrGetBlizzardUser", () => {
     // que le joueur en a fait.
     const { statements } = fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
 
-    await createOrGetBlizzardUser("bz-1", "Nova#9999");
+    await createOrGetBlizzardUser("bz-1", "Nova#9999", { termsAccepted: true });
 
     expect(find(statements, "visible_overwatch")).toBeUndefined();
   });
@@ -110,7 +113,7 @@ describe("createOrGetBlizzardUser", () => {
   it("n'efface rien quand le compte Battle.net n'a pas de BattleTag", async () => {
     const { statements } = fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
 
-    await expect(createOrGetBlizzardUser("bz-1", null)).resolves.toBe(7);
+    await expect(createOrGetBlizzardUser("bz-1", null, { termsAccepted: true })).resolves.toBe(7);
 
     expect(find(statements, "UPDATE bg_users SET overwatch_battletag")).toBeUndefined();
   });
@@ -119,7 +122,7 @@ describe("createOrGetBlizzardUser", () => {
     // Un compte sans pseudo n'existe pas : la création doit aboutir.
     const { statements } = fakeDb([]);
 
-    await createOrGetBlizzardUser("bz-1", null);
+    await createOrGetBlizzardUser("bz-1", null, { termsAccepted: true });
 
     const insert = find(statements, "INSERT INTO bg_users")!;
     expect(String(insert.params[0])).toMatch(/^player\d+$/);
@@ -128,13 +131,13 @@ describe("createOrGetBlizzardUser", () => {
 
   it("annonce le compte neuf au journal, et lui seul", async () => {
     fakeDb([]);
-    await createOrGetBlizzardUser("bz-1", "Nova#2143");
+    await createOrGetBlizzardUser("bz-1", "Nova#2143", { termsAccepted: true });
     expect(sendBotLog).toHaveBeenCalledTimes(1);
 
     jest.clearAllMocks();
     jest.mocked(sendBotLog).mockResolvedValue(undefined);
     fakeDb([{ id: 7, blizzard_sub: "bz-1" }]);
-    await createOrGetBlizzardUser("bz-1", "Nova#2143");
+    await createOrGetBlizzardUser("bz-1", "Nova#2143", { termsAccepted: true });
     expect(sendBotLog).not.toHaveBeenCalled();
   });
 });

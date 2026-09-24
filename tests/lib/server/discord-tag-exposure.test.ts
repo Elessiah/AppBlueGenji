@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
@@ -192,7 +195,7 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
     );
 
     await createOrGetDiscordUser("900000000000000001", undefined, "keryan", {
-      method: "DM_CODE",
+      method: "DM_CODE", termsAccepted: true,
     });
 
     const update = find(queries, "UPDATE bg_users");
@@ -212,7 +215,7 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
     );
 
     await createOrGetDiscordUser("900000000000000001", undefined, "900000000000000001", {
-      method: "OAUTH",
+      method: "OAUTH", termsAccepted: true,
     });
 
     // L'écriture part tout de même — elle note la **porte** franchie, qui ne
@@ -232,7 +235,7 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
     });
 
     const userId = await createOrGetDiscordUser("900000000000000002", "Nova", "keryan", {
-      method: "OAUTH",
+      method: "OAUTH", termsAccepted: true,
     });
 
     expect(userId).toBe(42);
@@ -254,7 +257,7 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
     });
 
     await createOrGetDiscordUser("900000000000000002", "Nova", undefined, {
-      method: "DM_CODE",
+      method: "DM_CODE", termsAccepted: true,
     });
 
     const insert = find(queries, "INSERT INTO bg_users")!;

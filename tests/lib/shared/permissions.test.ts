@@ -75,7 +75,7 @@ describe("permissions", () => {
     it("grants every scope to ADMIN", () => {
       const perms = permissionsForRoles(["ADMIN"]);
       expect(perms).toEqual(
-        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles"]),
+        new Set(["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation"]),
       );
     });
 

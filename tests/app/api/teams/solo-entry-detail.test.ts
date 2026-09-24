@@ -62,7 +62,8 @@ describe("GET /api/teams/[id] — un identifiant d'entrée solo", () => {
     const res = await teamDetailRoute(req("641"), params("641"));
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual(detail);
+    // La fiche dit en plus si le lecteur peut modérer le logo (`moderation`).
+    expect(await res.json()).toEqual({ ...detail, canModerate: false });
     // Une requête de plus sur le chemin nominal serait payée par toutes les
     // fiches d'équipe pour le seul cas dégénéré.
     expect(findSoloEntryUser).not.toHaveBeenCalled();

@@ -59,13 +59,16 @@ describe("POST /api/auth/google/one-tap", () => {
     const res = await attempt("jeton-valide");
 
     expect(res.status).toBe(200);
-    expect(createUserMock).toHaveBeenCalledWith({
-      provider: "GOOGLE",
-      subject: "google-sub-1",
-      handle: null,
-      avatarUrl: "https://example/pic.png",
-      displayName: "Nova",
-    });
+    expect(createUserMock).toHaveBeenCalledWith(
+      {
+        provider: "GOOGLE",
+        subject: "google-sub-1",
+        handle: null,
+        avatarUrl: "https://example/pic.png",
+        displayName: "Nova",
+      },
+      { termsAccepted: false },
+    );
     expect(createSessionMock).toHaveBeenCalledWith(42);
   });
 

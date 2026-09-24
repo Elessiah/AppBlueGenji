@@ -55,7 +55,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockResolvedValue(11);
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: " drgn " }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: " drgn ", acceptTerms: true }));
 
     expect(res.status).toBe(201);
     expect(createTeam).toHaveBeenCalledWith(2, "Dragon Squad", null, "DRGN");
@@ -65,7 +65,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockResolvedValue(11);
 
-    await createTeamRoute(postReq({ name: "Dragon Squad", tag: "" }));
+    await createTeamRoute(postReq({ name: "Dragon Squad", tag: "", acceptTerms: true }));
 
     expect(createTeam).toHaveBeenCalledWith(2, "Dragon Squad", null, null);
   });
@@ -77,7 +77,7 @@ describe("POST /api/teams — sigle", () => {
   ])("refuse %s en 400 avec le motif exact", async (tag, code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag, acceptTerms: true }));
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: code });
@@ -107,7 +107,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockRejectedValue(new Error("TEAM_TAG_ALREADY_USED"));
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN" }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true }));
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "TEAM_TAG_ALREADY_USED" });
@@ -117,7 +117,7 @@ describe("POST /api/teams — sigle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockRejectedValue(new Error("TEAM_TAG_ALREADY_USED"));
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN" }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true }));
 
     expect((await res.json()).error).not.toBe("TEAM_NAME_ALREADY_USED");
   });
@@ -128,7 +128,7 @@ describe("POST /api/teams — sigle", () => {
       new Error("Duplicate entry 'Dragon Squad' for key 'bg_teams.name'"),
     );
 
-    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN" }));
+    const res = await createTeamRoute(postReq({ name: "Dragon Squad", tag: "DRGN", acceptTerms: true }));
 
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "TEAM_NAME_ALREADY_USED" });

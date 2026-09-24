@@ -2,6 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/database");
 
 import {
@@ -195,7 +198,7 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
     await mockDb(execute);
 
     await createOrGetDiscordUser("100000000000000001", undefined, "nova", {
-      method: "DM_CODE",
+      method: "DM_CODE", termsAccepted: true,
     });
 
     const update = execute.mock.calls.find(([sql]) =>
@@ -212,7 +215,7 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
       .mockResolvedValue([{ affectedRows: 0 }]);
     await mockDb(execute);
 
-    await createOrGetBlizzardUser("sub-412", "Nova#2143");
+    await createOrGetBlizzardUser("sub-412", "Nova#2143", { termsAccepted: true });
 
     const update = execute.mock.calls.find(([sql]) =>
       String(sql).includes("SET overwatch_battletag = ?"),

@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/auth");
@@ -100,7 +103,7 @@ describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
     // annonce : cela ne suffit plus, et la question n'est même plus posée.
     const { statements } = fakeDb([{ id: 7, google_sub: null, email: "nova@exemple.test" }]);
 
-    const userId = await createOrGetGoogleUser(profile());
+    const userId = await createOrGetGoogleUser(profile(), { termsAccepted: true });
 
     expect(userId).not.toBe(7);
     expect(find(statements, "SELECT id FROM bg_users WHERE email = ?")).toBeUndefined();
@@ -110,7 +113,7 @@ describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
   it("crée un compte neuf, **sans colonne d'adresse**", async () => {
     const { statements } = fakeDb([{ id: 7, google_sub: null, email: "nova@exemple.test" }]);
 
-    await expect(createOrGetGoogleUser(profile())).resolves.toBe(4242);
+    await expect(createOrGetGoogleUser(profile(), { termsAccepted: true })).resolves.toBe(4242);
 
     const insert = find(statements, "INSERT INTO bg_users")!;
     // Deux paramètres : le pseudo et le `sub`. Ni adresse — elle n'est plus
@@ -127,7 +130,7 @@ describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
       { id: 7, google_sub: "google-sub-neuf", email: "ancienne@exemple.test" },
     ]);
 
-    await expect(createOrGetGoogleUser(profile())).resolves.toBe(7);
+    await expect(createOrGetGoogleUser(profile(), { termsAccepted: true })).resolves.toBe(7);
 
     expect(find(statements, "UPDATE bg_users SET email")).toBeUndefined();
     expect(find(statements, "INSERT INTO bg_users")).toBeUndefined();
@@ -138,7 +141,7 @@ describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
       { id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" },
     ]);
 
-    await expect(createOrGetGoogleUser(profile())).resolves.toBe(7);
+    await expect(createOrGetGoogleUser(profile(), { termsAccepted: true })).resolves.toBe(7);
     expect(find(statements, "INSERT INTO bg_users")).toBeUndefined();
   });
 
@@ -147,7 +150,7 @@ describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
     // fabriquée, et la création aboutit — un compte sans pseudo n'existe pas.
     const { statements } = fakeDb([]);
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf" });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf" }, { termsAccepted: true });
 
     const insert = find(statements, "INSERT INTO bg_users")!;
     expect(String(insert.params[0])).toMatch(/^player\d+$/);
@@ -185,7 +188,7 @@ describe("createOrGetGoogleUser — photo de profil", () => {
   it("va chercher la photo quand le compte n'a pas encore d'avatar", async () => {
     fakeDb([{ id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" }], null);
 
-    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
+    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }), { termsAccepted: true });
 
     expect(globalThis.fetch).toHaveBeenCalled();
   });
@@ -198,7 +201,7 @@ describe("createOrGetGoogleUser — photo de profil", () => {
       "https://lh3.googleusercontent.com/a/ACg8ocK=s96-c",
     );
 
-    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
+    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }), { termsAccepted: true });
 
     expect(globalThis.fetch).toHaveBeenCalled();
   });
@@ -217,7 +220,7 @@ describe("createOrGetGoogleUser — photo de profil", () => {
       "/api/uploads/avatars/7-ab.webp",
     );
 
-    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }));
+    await createOrGetGoogleUser(profile({ picture: "https://exemple.test/a.png" }), { termsAccepted: true });
 
     expect(globalThis.fetch).not.toHaveBeenCalled();
     expect(find(statements, "UPDATE bg_users SET avatar_url = ?")).toBeUndefined();
@@ -226,7 +229,7 @@ describe("createOrGetGoogleUser — photo de profil", () => {
   it("ne tente rien quand Google ne donne aucune photo", async () => {
     fakeDb([{ id: 7, google_sub: "google-sub-neuf", email: "nova@exemple.test" }], null);
 
-    await createOrGetGoogleUser(profile({ picture: undefined }));
+    await createOrGetGoogleUser(profile({ picture: undefined }), { termsAccepted: true });
 
     expect(globalThis.fetch).not.toHaveBeenCalled();
   });

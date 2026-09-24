@@ -302,7 +302,13 @@ export async function restoreTeamLogo(quarantineId: number, actor: ReportPerson)
       throw error;
     }
   } catch (error) {
-    await connection.rollback().catch(() => undefined);
+    // Après un commit réussi puis un échec plus loin, le rollback n'a plus rien
+    // à défaire et peut lever : c'est l'erreur d'origine qui doit remonter.
+    try {
+      await connection.rollback();
+    } catch {
+      // Rien à ajouter à l'erreur d'origine.
+    }
     throw error;
   } finally {
     connection.release();
