@@ -125,3 +125,14 @@ describe("dossier du panneau", () => {
     expect(detail).not.toMatch(/effacé 30 jours/);
   });
 });
+
+describe("stockage déclaré sur /rgpd", () => {
+  const rgpd = read("app/rgpd/page.tsx");
+
+  it("déclare la valeur locale des conditions acceptées, et ce que porte bg_oauth", () => {
+    // `LoginForm` la pose à côté du consentement RGPD.
+    expect(read("app/connexion/_components/LoginForm.tsx")).toContain('TERMS_STORAGE_KEY = "bg_terms_consent"');
+    expect(rgpd).toContain("<strong>bg_terms_consent</strong>");
+    expect(rgpd).toMatch(/bg_oauth[\s\S]*?conditions\s+d&apos;utilisation/);
+  });
+});

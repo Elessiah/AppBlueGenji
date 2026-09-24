@@ -245,8 +245,9 @@ export default function RgpdPage() {
               <strong>bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>{" "}
               par Google, Discord ou Blizzard, et supprimé dès le retour. Il dure dix minutes
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
-              anti-CSRF), le nom du fournisseur et la page où te ramener. Aucun identifiant de
-              personne.
+              anti-CSRF), le nom du fournisseur, la page où te ramener, l&apos;objet de la
+              connexion (se connecter ou rattacher un compte) et si tu as accepté les conditions
+              d&apos;utilisation. Aucun identifiant de personne.
             </li>
             <li>
               <strong>bg_recr_modal</strong> et <strong>bg_recr_banner</strong> — déposés
@@ -278,9 +279,11 @@ export default function RgpdPage() {
               compter deux fois le même chargement. Elle n&apos;identifie personne.
             </li>
             <li>
-              <strong>bg_rgpd_consent</strong> — une valeur du stockage local, posée sur la page de
-              connexion <strong>quand vous acceptez</strong> cette politique, pour ne pas vous la
-              redemander.
+              <strong>bg_rgpd_consent</strong> et <strong>bg_terms_consent</strong> — deux valeurs
+              du stockage local, posées sur la page de connexion <strong>quand vous acceptez</strong>{" "}
+              cette politique et les conditions d&apos;utilisation, pour ne pas vous les redemander.
+              La seconde ne contient que le numéro de version des conditions acceptées : une
+              nouvelle version vous les présente de nouveau.
             </li>
           </ul>
           <p>
