@@ -304,6 +304,7 @@ export async function getMatchRows(
       m.live_trigger,
       m.live_url,
       m.live_started_at,
+      m.replay_url,
       p.position AS phase_position
      FROM bg_matches m
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id

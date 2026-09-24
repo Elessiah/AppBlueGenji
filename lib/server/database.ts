@@ -606,6 +606,7 @@ async function runMigrations(db: Pool): Promise<void> {
       live_trigger ENUM('AUTO', 'START_TIME', 'MANUAL') NULL,
       live_url VARCHAR(255) NULL,
       live_started_at DATETIME NULL,
+      replay_url VARCHAR(255) NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_matches_tournament (tournament_id),
@@ -1067,6 +1068,8 @@ async function runMigrations(db: Pool): Promise<void> {
     // attribuer une serait affirmer ce qu'on ignore.
     `ALTER TABLE bg_users ADD COLUMN discord_link_method ENUM('DM_CODE', 'OAUTH') NULL
        AFTER discord_verified_at`,
+    // Lien YouTube de la rediff d'un match terminé (`lib/shared/match-replay.ts`).
+    `ALTER TABLE bg_matches ADD COLUMN replay_url VARCHAR(255) NULL AFTER live_started_at`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
