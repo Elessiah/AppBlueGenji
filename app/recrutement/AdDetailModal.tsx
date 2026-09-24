@@ -3,11 +3,13 @@
 import { createPortal } from "react-dom";
 import { CyberButton, Pill, ScrollArea } from "@/components/cyber";
 import { ContactTags } from "@/components/recruitment/ContactTags";
+import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { RecruitmentBody } from "@/components/recruitment/RecruitmentBody";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   RECRUITMENT_DOMAIN_LABELS,
+  RECRUITMENT_PRIORITY_EXPOSURE,
   type RecruitmentAd,
   formatRecruitmentBody,
 } from "@/lib/shared/recruitment";
@@ -50,7 +52,7 @@ export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
         <header className={styles.head}>
           <div className={styles.tags}>
             <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
-            {ad.highlight !== "NONE" && <Pill variant="live">Urgent</Pill>}
+            {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
             {!ad.active && <Pill>Inactif</Pill>}
           </div>
           <button

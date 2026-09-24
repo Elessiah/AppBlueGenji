@@ -3,28 +3,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard, Pill } from "@/components/cyber";
 import { ContactTags } from "@/components/recruitment/ContactTags";
+import { UrgentPill } from "@/components/recruitment/UrgentPill";
 import { useToast } from "@/components/ui/toast";
 import {
   type RecruiterContactDefaults,
   type RecruitmentAd,
   type RecruitmentContactChannel,
   type RecruitmentDomain,
-  type RecruitmentHighlight,
-  type RecruitmentHighlightState,
+  type RecruitmentPriority,
   buildRecruitmentPreview,
+  canMoveRecruitmentAd,
   parseRecruitmentAdAnchor,
+  placeRecruitmentAd,
   recruitmentAdAnchor,
-  resolveHighlightStates,
+  sortRecruitmentAds,
+  splitRecruitmentAds,
   RECRUITMENT_BODY_MAX,
   RECRUITMENT_CONTACT_CHANNELS,
   RECRUITMENT_CONTACT_CHANNEL_LABELS,
   RECRUITMENT_DISCORD_MAX,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_DOMAIN_LABELS,
-  RECRUITMENT_HIGHLIGHTS,
-  RECRUITMENT_HIGHLIGHT_LABELS,
-  RECRUITMENT_HIGHLIGHT_SHORT_LABELS,
-  selectHighlightedAd,
+  RECRUITMENT_PRIORITIES,
+  RECRUITMENT_PRIORITY_DESCRIPTIONS,
+  RECRUITMENT_PRIORITY_EXPOSURE,
+  RECRUITMENT_PRIORITY_LABELS,
 } from "@/lib/shared/recruitment";
 import { AdDetailModal } from "./AdDetailModal";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
@@ -45,7 +48,7 @@ interface FormState {
   contactUrl: string;
   contactDiscord: string;
   contactPreferred: RecruitmentContactChannel;
-  highlight: RecruitmentHighlight;
+  priority: RecruitmentPriority;
   active: boolean;
 }
 
@@ -58,7 +61,7 @@ const EMPTY_FORM: FormState = {
   contactUrl: "",
   contactDiscord: "",
   contactPreferred: "AUTO",
-  highlight: "NONE",
+  priority: "OPTIONAL",
   active: true,
 };
 
@@ -72,32 +75,18 @@ type DomainFilter = RecruitmentDomain | typeof ALL_DOMAINS;
  */
 const FILTER_MIN_ADS = 3;
 
-/** Table d'états vide, réutilisée pour les visiteurs (aucun badge à rendre). */
-const EMPTY_HIGHLIGHT_STATES: ReadonlyMap<number, RecruitmentHighlightState> = new Map();
-
-/**
- * Suffixe du badge de mise en avant, côté gestion. `NONE` n'est jamais rendu
- * (le badge n'apparaît pas), mais la table reste exhaustive pour rester juste
- * si un état s'ajoute.
- */
-const HIGHLIGHT_STATE_SUFFIX: Record<RecruitmentHighlightState, string> = {
-  NONE: "",
-  LIVE: " en ligne",
-  QUEUED: " en attente",
-  DRAFT: " (brouillon)",
-};
-
-const HIGHLIGHT_STATE_HINTS: Record<RecruitmentHighlightState, (winner?: string) => string> = {
-  NONE: () => "",
-  LIVE: () => "Mise en avant actuellement affichée sur tout le site.",
-  QUEUED: (winner) =>
-    `Sans effet pour l'instant : « ${winner ?? "une autre annonce"} » occupe la mise en avant. Une seule annonce est affichée à la fois — remonte celle-ci au-dessus pour la faire passer.`,
-  DRAFT: () => "Annonce inactive : aucune mise en avant tant qu'elle n'est pas publiée.",
+/** Classe du badge de statut, côté gestion : une teinte par statut. */
+const PRIORITY_BADGE_CLASS: Record<RecruitmentPriority, string> = {
+  PRIORITY: styles.priorityBadgeUrgent,
+  IMPORTANT: styles.priorityBadgeImportant,
+  OPTIONAL: "",
 };
 
 export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: RecruitmentSectionProps) {
   const { showError, showSuccess } = useToast();
-  const [ads, setAds] = useState<RecruitmentAd[]>(initialAds);
+  // Toujours rangée par statut : les flèches de réordonnancement ne se lisent
+  // que sur cet ordre-là (voir `canMoveRecruitmentAd`).
+  const [ads, setAds] = useState<RecruitmentAd[]>(() => sortRecruitmentAds(initialAds));
   const [editing, setEditing] = useState<RecruitmentAd | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
@@ -177,7 +166,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
       contactUrl: ad.contactUrl ?? "",
       contactDiscord: ad.contactDiscord ?? "",
       contactPreferred: ad.contactPreferred,
-      highlight: ad.highlight,
+      priority: ad.priority,
       active: ad.active,
     });
     // L'id enregistré reste valide tant que le pseudo n'est pas modifié.
@@ -218,7 +207,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
       contactDiscord: discord || null,
       contactDiscordId,
       contactPreferred: form.contactPreferred,
-      highlight: form.highlight,
+      priority: form.priority,
       active: form.active,
     };
 
@@ -235,13 +224,11 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
         return;
       }
 
-      if (editing) {
-        setAds((prev) => prev.map((a) => (a.id === data.ad!.id ? data.ad! : a)));
-        showSuccess("Annonce mise à jour.");
-      } else {
-        setAds((prev) => [...prev, data.ad!]);
-        showSuccess("Annonce publiée.");
-      }
+      // Rangée comme le serveur la range : à sa place si son statut n'a pas
+      // changé, en fin de son groupe sinon.
+      const saved = data.ad;
+      setAds((prev) => placeRecruitmentAd(prev, saved));
+      showSuccess(editing ? "Annonce mise à jour." : "Annonce publiée.");
       close();
     } catch {
       showError("Erreur réseau, réessaye.");
@@ -271,10 +258,11 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
     }
   }
 
-  // Déplace une annonce d'un cran (admin). Mise à jour optimiste avec rollback.
+  // Déplace une annonce d'un cran (admin), **dans son statut** seulement.
+  // Mise à jour optimiste avec rollback.
   async function move(index: number, direction: -1 | 1) {
+    if (!canMoveRecruitmentAd(ads, index, direction)) return;
     const target = index + direction;
-    if (target < 0 || target >= ads.length) return;
 
     const previous = ads;
     const reordered = [...ads];
@@ -290,7 +278,13 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(data.error ? `Échec : ${data.error}` : "Échec du réordonnancement.");
+        showError(
+          data.error === "RECRUITMENT_ORDER_MIXES_PRIORITIES"
+            ? "Le statut d'une annonce a changé entre-temps : recharge la page pour réordonner."
+            : data.error
+              ? `Échec : ${data.error}`
+              : "Échec du réordonnancement.",
+        );
         setAds(previous);
         return;
       }
@@ -326,23 +320,138 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
   const filterActive = showFilter && domainFilter !== ALL_DOMAINS;
   const visibleAds = filterActive ? ads.filter((ad) => ad.domain === domainFilter) : ads;
 
-  // Une seule mise en avant est servie à la fois (la plus haute active). On dit
-  // au staff laquelle est réellement en ligne, plutôt que de le laisser croire
-  // que ses trois « modales à l'arrivée » s'affichent toutes. Les badges et
-  // l'avertissement du formulaire étant réservés à la gestion, rien n'est
-  // calculé pour un visiteur ordinaire.
-  const { highlightStates, highlightedAd } = useMemo(
-    () =>
-      isAdmin
-        ? { highlightStates: resolveHighlightStates(ads), highlightedAd: selectHighlightedAd(ads) }
-        : { highlightStates: EMPTY_HIGHLIGHT_STATES, highlightedAd: null },
-    [ads, isAdmin],
-  );
-  // Annonce qui « prend la place » de celle en cours d'édition, le cas échéant.
-  const conflictingAd =
-    form.highlight !== "NONE" && form.active && highlightedAd && highlightedAd.id !== editing?.id
-      ? highlightedAd
-      : null;
+  // Deux listes, jamais mêlées : prioritaires et importantes en tête, les
+  // facultatives à part sous « Autres recrutements ».
+  const { featured, others } = splitRecruitmentAds(visibleAds);
+
+  function renderCard(ad: RecruitmentAd) {
+    // Index dans la liste complète : le réordonnancement porte toujours
+    // sur l'ordre réel, jamais sur la vue filtrée.
+    const index = ads.indexOf(ad);
+    const preview = buildRecruitmentPreview(ad.body);
+    const canUp = canMoveRecruitmentAd(ads, index, -1);
+    const canDown = canMoveRecruitmentAd(ads, index, 1);
+    // Pourquoi une flèche est grisée : le filtre, ou la limite de son statut.
+    const moveTitle = (can: boolean, label: string) =>
+      filterActive
+        ? "Retire le filtre pour réordonner"
+        : can
+          ? label
+          : `L'ordre se règle parmi les annonces « ${RECRUITMENT_PRIORITY_LABELS[ad.priority]} »`;
+    return (
+      <CyberCard
+        key={ad.id}
+        as="article"
+        lift
+        className={styles.card}
+        id={recruitmentAdAnchor(ad.id)}
+      >
+        <div className={styles.cardHead}>
+          <div className={styles.cardTags}>
+            <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
+            {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
+            {!ad.active && <Pill>Inactif</Pill>}
+            {/* Le statut ne se lit publiquement que par ses effets (pastille,
+                section) : la gestion, elle, a besoin de le voir nommé. */}
+            {isAdmin && (
+              <span
+                className={`${styles.priorityBadge} ${PRIORITY_BADGE_CLASS[ad.priority]} ${ad.active ? "" : styles.priorityBadgeDraft}`}
+                title={
+                  ad.active
+                    ? RECRUITMENT_PRIORITY_DESCRIPTIONS[ad.priority]
+                    : "Annonce inactive : elle n'apparaît nulle part tant qu'elle n'est pas publiée."
+                }
+              >
+                {RECRUITMENT_PRIORITY_LABELS[ad.priority]}
+              </span>
+            )}
+          </div>
+          {isAdmin && (
+            <div className={styles.moveActions}>
+              <button
+                type="button"
+                className={styles.move}
+                onClick={() => move(index, -1)}
+                disabled={busy || filterActive || !canUp}
+                aria-label={`Monter l'annonce ${ad.title}`}
+                title={moveTitle(canUp, "Monter")}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className={styles.move}
+                onClick={() => move(index, 1)}
+                disabled={busy || filterActive || !canDown}
+                aria-label={`Descendre l'annonce ${ad.title}`}
+                title={moveTitle(canDown, "Descendre")}
+              >
+                ↓
+              </button>
+            </div>
+          )}
+        </div>
+
+        <h3 className={styles.cardTitle}>
+          <button
+            type="button"
+            className={styles.cardTitleButton}
+            onClick={() => openDetail(ad)}
+            aria-haspopup="dialog"
+          >
+            {ad.title}
+          </button>
+        </h3>
+        {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
+        {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
+        {preview.text && <p className={styles.cardBody}>{preview.text}</p>}
+        {preview.truncated && (
+          <button
+            type="button"
+            className={styles.readMore}
+            onClick={() => openDetail(ad)}
+            aria-haspopup="dialog"
+          >
+            Lire l&apos;annonce complète →
+          </button>
+        )}
+
+        <ContactTags ad={ad} />
+
+        <div className={styles.cardFooter}>
+          {ad.contactUrl && (
+            <CyberButton variant={ad.contactPreferred === "LINK" ? "primary" : "ghost"} asChild>
+              <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
+                Postuler →
+              </a>
+            </CyberButton>
+          )}
+          {isAdmin && (
+            <div className={styles.cardActions}>
+              <button
+                type="button"
+                className={styles.action}
+                onClick={() => openEdit(ad)}
+                disabled={busy}
+                aria-label={`Modifier ${ad.title}`}
+              >
+                Modifier
+              </button>
+              <button
+                type="button"
+                className={`${styles.action} ${styles.actionDanger}`}
+                onClick={() => remove(ad)}
+                disabled={busy}
+                aria-label={`Supprimer ${ad.title}`}
+              >
+                Supprimer
+              </button>
+            </div>
+          )}
+        </div>
+      </CyberCard>
+    );
+  }
 
   const total = ads.length;
   const shown = visibleAds.length;
@@ -402,123 +511,27 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
             )}
           </div>
         ) : (
-          <div className={styles.list}>
-            {visibleAds.map((ad) => {
-              // Index dans la liste complète : le réordonnancement porte toujours
-              // sur l'ordre réel, jamais sur la vue filtrée.
-              const index = ads.indexOf(ad);
-              const preview = buildRecruitmentPreview(ad.body);
-              const highlightState = highlightStates.get(ad.id) ?? "NONE";
-              return (
-                <CyberCard
-                  key={ad.id}
-                  as="article"
-                  lift
-                  className={styles.card}
-                  id={recruitmentAdAnchor(ad.id)}
-                >
-                  <div className={styles.cardHead}>
-                    <div className={styles.cardTags}>
-                      <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
-                      {ad.highlight !== "NONE" && <Pill variant="live">Urgent</Pill>}
-                      {!ad.active && <Pill>Inactif</Pill>}
-                      {isAdmin && highlightState !== "NONE" && (
-                        <span
-                          className={`${styles.highlightBadge} ${highlightState === "LIVE" ? "" : styles.highlightBadgeOff}`}
-                          title={HIGHLIGHT_STATE_HINTS[highlightState](highlightedAd?.title)}
-                        >
-                          {RECRUITMENT_HIGHLIGHT_SHORT_LABELS[ad.highlight]}
-                          {HIGHLIGHT_STATE_SUFFIX[highlightState]}
-                        </span>
-                      )}
-                    </div>
-                    {isAdmin && (
-                      <div className={styles.moveActions}>
-                        <button
-                          type="button"
-                          className={styles.move}
-                          onClick={() => move(index, -1)}
-                          disabled={busy || filterActive || index === 0}
-                          aria-label={`Monter l'annonce ${ad.title}`}
-                          title={filterActive ? "Retire le filtre pour réordonner" : "Monter"}
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          className={styles.move}
-                          onClick={() => move(index, 1)}
-                          disabled={busy || filterActive || index === ads.length - 1}
-                          aria-label={`Descendre l'annonce ${ad.title}`}
-                          title={filterActive ? "Retire le filtre pour réordonner" : "Descendre"}
-                        >
-                          ↓
-                        </button>
-                      </div>
-                    )}
-                  </div>
+          <>
+            {featured.length > 0 ? (
+              <div className={styles.list}>{featured.map(renderCard)}</div>
+            ) : (
+              <p className={styles.groupEmpty}>Aucun recrutement urgent en ce moment.</p>
+            )}
 
-                  <h3 className={styles.cardTitle}>
-                    <button
-                      type="button"
-                      className={styles.cardTitleButton}
-                      onClick={() => openDetail(ad)}
-                      aria-haspopup="dialog"
-                    >
-                      {ad.title}
-                    </button>
-                  </h3>
-                  {ad.teamName && <p className={styles.cardTeam}>{ad.teamName}</p>}
-                  {ad.roles && <p className={styles.cardRoles}>Missions : {ad.roles}</p>}
-                  {preview.text && <p className={styles.cardBody}>{preview.text}</p>}
-                  {preview.truncated && (
-                    <button
-                      type="button"
-                      className={styles.readMore}
-                      onClick={() => openDetail(ad)}
-                      aria-haspopup="dialog"
-                    >
-                      Lire l&apos;annonce complète →
-                    </button>
-                  )}
-
-                  <ContactTags ad={ad} />
-
-                  <div className={styles.cardFooter}>
-                    {ad.contactUrl && (
-                      <CyberButton variant={ad.contactPreferred === "LINK" ? "primary" : "ghost"} asChild>
-                        <a href={ad.contactUrl} target="_blank" rel="noopener noreferrer">
-                          Postuler →
-                        </a>
-                      </CyberButton>
-                    )}
-                    {isAdmin && (
-                      <div className={styles.cardActions}>
-                        <button
-                          type="button"
-                          className={styles.action}
-                          onClick={() => openEdit(ad)}
-                          disabled={busy}
-                          aria-label={`Modifier ${ad.title}`}
-                        >
-                          Modifier
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.action} ${styles.actionDanger}`}
-                          onClick={() => remove(ad)}
-                          disabled={busy}
-                          aria-label={`Supprimer ${ad.title}`}
-                        >
-                          Supprimer
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </CyberCard>
-              );
-            })}
-          </div>
+            {others.length > 0 && (
+              <section className={styles.others} aria-labelledby="autres-recrutements">
+                <header className={styles.othersHead}>
+                  <h2 id="autres-recrutements" className={styles.othersTitle}>
+                    Autres recrutements
+                  </h2>
+                  <span className={styles.meta}>
+                    {others.length} ANNONCE{others.length > 1 ? "S" : ""}
+                  </span>
+                </header>
+                <div className={styles.list}>{others.map(renderCard)}</div>
+              </section>
+            )}
+          </>
         )}
       </section>
 
@@ -657,25 +670,22 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
           </label>
 
           <label className={styles.modalField}>
-            <span className={styles.modalLabel}>Mise en avant (annonce urgente)</span>
+            <span className={styles.modalLabel}>Statut d&apos;importance</span>
             <select
               className={styles.modalInput}
-              value={form.highlight}
-              onChange={(e) => set("highlight", e.target.value as RecruitmentHighlight)}
+              value={form.priority}
+              onChange={(e) => set("priority", e.target.value as RecruitmentPriority)}
             >
-              {RECRUITMENT_HIGHLIGHTS.map((h) => (
-                <option key={h} value={h}>
-                  {RECRUITMENT_HIGHLIGHT_LABELS[h]}
+              {RECRUITMENT_PRIORITIES.map((p) => (
+                <option key={p} value={p}>
+                  {RECRUITMENT_PRIORITY_LABELS[p]}
                 </option>
               ))}
             </select>
-            <span className={styles.modalHint}>
-              Une seule annonce est mise en avant à la fois (la plus haute dans la liste).
-            </span>
-            {conflictingAd && (
-              <span className={styles.modalWarn} role="status">
-                « {conflictingAd.title} » occupe déjà la mise en avant. Celle-ci restera en
-                attente tant qu&apos;elle n&apos;aura pas été remontée au-dessus.
+            <span className={styles.modalHint}>{RECRUITMENT_PRIORITY_DESCRIPTIONS[form.priority]}</span>
+            {editing && editing.priority !== form.priority && (
+              <span className={styles.modalHint}>
+                En changeant de statut, l&apos;annonce passera en fin de son nouveau groupe.
               </span>
             )}
           </label>

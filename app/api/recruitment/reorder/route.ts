@@ -23,6 +23,9 @@ export async function PUT(req: Request) {
     await reorderRecruitmentAds(validation.ids);
     return ok({});
   } catch (e) {
-    return fail((e as Error).message || "RECRUITMENT_REORDER_FAILED", 400);
+    const msg = (e as Error).message;
+    // La saisie est bien formée : c'est l'état des annonces (leurs statuts) qui
+    // interdit cet ordre — typiquement un statut changé depuis un autre onglet.
+    return fail(msg || "RECRUITMENT_REORDER_FAILED", msg === "RECRUITMENT_ORDER_MIXES_PRIORITIES" ? 409 : 400);
   }
 }

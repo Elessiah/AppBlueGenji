@@ -2,22 +2,24 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import {
   createRecruitmentAd,
   deleteRecruitmentAd,
-  getHighlightedAd,
+  getRecruitmentSpotlight,
   listRecruitmentAds,
+  reorderRecruitmentAds,
   updateRecruitmentAd,
 } from "@/lib/server/recruitment-service";
-import { selectHighlightedAd } from "@/lib/shared/recruitment";
+import { selectRecruitmentSpotlight } from "@/lib/shared/recruitment";
 import { clearCache } from "@/lib/server/cache";
-import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
+import { type SqlQuery, type SqlMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/reorder", () => ({ applyDisplayOrder: jest.fn() }));
 
 async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 }
 
-/** Ligne minimale d'annonce mise en avant, telle que la remonte la requête. */
+/** Ligne minimale d'annonce mise en avant (banderole), telle que la remonte la requête. */
 const HIGHLIGHT_ROW = {
   id: 5,
   title: "URGENT",
@@ -29,7 +31,7 @@ const HIGHLIGHT_ROW = {
   contact_discord: null,
   contact_discord_id: null,
   contact_preferred: "AUTO",
-  highlight: "BANNER",
+  priority: "IMPORTANT",
   active: 1,
 };
 
@@ -60,7 +62,7 @@ describe("recruitment-service", () => {
             contact_discord: "arbitre_bg",
             contact_discord_id: "123456789012345678",
             contact_preferred: "DISCORD",
-            highlight: "NONE",
+            priority: "OPTIONAL",
             active: 1,
           },
         ],
@@ -80,11 +82,26 @@ describe("recruitment-service", () => {
           contactDiscord: "arbitre_bg",
           contactDiscordId: "123456789012345678",
           contactPreferred: "DISCORD",
-          highlight: "NONE",
+          priority: "OPTIONAL",
           active: true,
         },
       ]);
       expect(execute.mock.calls[0][0]).toContain("WHERE active = 1");
+    });
+
+    it("range par statut, l'ordre d'affichage ne valant qu'à l'intérieur d'un statut", async () => {
+      // La requête rend l'ordre d'affichage brut : une facultative placée en
+      // tête ne doit pas pour autant passer devant une prioritaire.
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([
+        [
+          { ...HIGHLIGHT_ROW, id: 1, priority: "OPTIONAL" },
+          { ...HIGHLIGHT_ROW, id: 2, priority: "IMPORTANT" },
+          { ...HIGHLIGHT_ROW, id: 3, priority: "PRIORITY" },
+          { ...HIGHLIGHT_ROW, id: 4, priority: "PRIORITY" },
+        ],
+      ]);
+      await mockDb(execute);
+      expect((await listRecruitmentAds()).map((a) => a.id)).toEqual([3, 4, 2, 1]);
     });
 
     it("includes inactive ads when asked (admin view)", async () => {
@@ -101,60 +118,58 @@ describe("recruitment-service", () => {
     });
   });
 
-  describe("getHighlightedAd", () => {
-    it("returns the first highlighted active ad", async () => {
-      const execute = jest.fn<SqlQuery>().mockResolvedValue([
-        [
-          {
-            id: 5,
-            title: "URGENT",
-            team_name: null,
-            domain: "AUTRE",
-            roles: null,
-            body: null,
-            contact_url: null,
-            highlight: "BANNER",
-            active: 1,
-          },
-        ],
-      ]);
+  describe("getRecruitmentSpotlight", () => {
+    it("ne remonte que les annonces publiées qui demandent une mise en avant", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[HIGHLIGHT_ROW]]);
       await mockDb(execute);
-      const ad = await getHighlightedAd();
-      expect(ad?.id).toBe(5);
-      expect(ad?.highlight).toBe("BANNER");
+      const spotlight = await getRecruitmentSpotlight();
+      expect(spotlight.modal).toEqual([]);
+      expect(spotlight.banner.map((a) => a.id)).toEqual([5]);
+      const sql = String(execute.mock.calls[0][0]);
+      expect(sql).toContain("active = 1");
+      expect(sql).toContain("priority <> 'OPTIONAL'");
     });
 
-    it("returns null when there is nothing to highlight", async () => {
+    it("rend des listes vides quand rien n'est mis en avant", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
-      expect(await getHighlightedAd()).toBeNull();
+      expect(await getRecruitmentSpotlight()).toEqual({ modal: [], banner: [] });
     });
 
-    it("serves a single ad when several ask for a modal, the highest one winning", async () => {
-      // Le tri est fait par la requête ; c'est `selectHighlightedAd` qui tranche.
+    it("rend des listes vides quand la base est injoignable", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      jest.mocked(getDatabase).mockRejectedValue(new Error("down"));
+      expect(await getRecruitmentSpotlight()).toEqual({ modal: [], banner: [] });
+    });
+
+    it("sert toutes les prioritaires à la modale, et non plus la seule première", async () => {
       const execute = jest.fn<SqlQuery>().mockResolvedValue([
         [
-          { ...HIGHLIGHT_ROW, id: 7, highlight: "MODAL" },
-          { ...HIGHLIGHT_ROW, id: 8, highlight: "MODAL" },
-          { ...HIGHLIGHT_ROW, id: 9, highlight: "BANNER" },
+          { ...HIGHLIGHT_ROW, id: 9, priority: "IMPORTANT" },
+          { ...HIGHLIGHT_ROW, id: 7, priority: "PRIORITY" },
+          { ...HIGHLIGHT_ROW, id: 8, priority: "PRIORITY" },
         ],
       ]);
       await mockDb(execute);
-      expect((await getHighlightedAd())?.id).toBe(7);
+      const spotlight = await getRecruitmentSpotlight();
+      expect(spotlight.modal.map((a) => a.id)).toEqual([7, 8]);
+      // Prioritaires d'abord dans la banderole, quel que soit l'ordre brut.
+      expect(spotlight.banner.map((a) => a.id)).toEqual([7, 8, 9]);
     });
 
-    it("agrees with the shared selector the admin badges use", async () => {
-      // Garde-fou anti-divergence : la route et les badges de gestion doivent
-      // désigner la même annonce, sur exactement les mêmes données.
+    it("s'accorde avec la règle pure que partagent la page et la gestion", async () => {
+      // Garde-fou anti-divergence : le site et la gestion doivent désigner les
+      // mêmes annonces, sur exactement les mêmes données.
       const rows = [
-        { ...HIGHLIGHT_ROW, id: 3, highlight: "BANNER" as const },
-        { ...HIGHLIGHT_ROW, id: 4, highlight: "MODAL" as const },
+        { ...HIGHLIGHT_ROW, id: 3, priority: "IMPORTANT" as const },
+        { ...HIGHLIGHT_ROW, id: 4, priority: "PRIORITY" as const },
       ];
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([rows]));
-      const served = await getHighlightedAd();
-      const expected = selectHighlightedAd(
-        rows.map((r) => ({ ...r, active: Boolean(r.active), id: r.id })),
+      const served = await getRecruitmentSpotlight();
+      const expected = selectRecruitmentSpotlight(
+        rows.map((r) => ({ ...r, active: Boolean(r.active) })),
       );
-      expect(served?.id).toBe(expected?.id);
+      expect(served.modal.map((a) => a.id)).toEqual(expected.modal.map((a) => a.id));
+      expect(served.banner.map((a) => a.id)).toEqual(expected.banner.map((a) => a.id));
     });
   });
 
@@ -165,7 +180,7 @@ describe("recruitment-service", () => {
       const ad = await createRecruitmentAd({ title: "Recherche caster", domain: "CASTING" });
       expect(ad.id).toBe(9);
       expect(ad.domain).toBe("CASTING");
-      expect(ad.highlight).toBe("NONE");
+      expect(ad.priority).toBe("OPTIONAL");
       expect(ad.contactPreferred).toBe("AUTO");
     });
 
@@ -189,6 +204,17 @@ describe("recruitment-service", () => {
       expect(values).toEqual(expect.arrayContaining(["123456789012345678", "DISCORD"]));
     });
 
+    it("écrit le statut demandé", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ insertId: 11 }]);
+      await mockDb(execute);
+      const ad = await createRecruitmentAd({ title: "Urgent", priority: "PRIORITY" });
+      expect(ad.priority).toBe("PRIORITY");
+      const [sql, values] = execute.mock.calls[0];
+      expect(sql).toContain("priority");
+      expect(sql).not.toContain("highlight");
+      expect(values).toContain("PRIORITY");
+    });
+
     it("rejects invalid input before touching the database", async () => {
       const execute = jest.fn<SqlQuery>();
       await mockDb(execute);
@@ -204,7 +230,7 @@ describe("recruitment-service", () => {
       // affectedRows, donc l'enregistrement identique doit réussir.
       const execute = jest
         .fn<SqlQuery>()
-        .mockResolvedValueOnce([[{ id: 3 }]]) // SELECT existence
+        .mockResolvedValueOnce([[{ id: 3, priority: "OPTIONAL" }]]) // SELECT existence
         .mockResolvedValueOnce([{ affectedRows: 0 }]); // UPDATE no-op
       await mockDb(execute);
 
@@ -212,6 +238,73 @@ describe("recruitment-service", () => {
       expect(ad.id).toBe(3);
       expect(ad.title).toBe("Inchangé");
       expect(execute).toHaveBeenCalledTimes(2);
+    });
+
+    it("garde son rang à une annonce qui garde son statut", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[{ id: 3, priority: "IMPORTANT" }]])
+        .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      await mockDb(execute);
+
+      await updateRecruitmentAd(3, { title: "Même statut", priority: "IMPORTANT" });
+
+      expect(execute).toHaveBeenCalledTimes(2);
+      const [sql, values] = execute.mock.calls[1];
+      expect(sql).toContain("display_order = COALESCE(?, display_order)");
+      // `null` : le COALESCE garde le rang en place.
+      expect(values).toEqual([
+        "Même statut",
+        null,
+        "AUTRE",
+        null,
+        null,
+        null,
+        null,
+        null,
+        "AUTO",
+        "IMPORTANT",
+        1,
+        null,
+        3,
+      ]);
+    });
+
+    it("met en fin de son nouveau groupe une annonce qui change de statut", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[{ id: 3, priority: "OPTIONAL" }]])
+        .mockResolvedValueOnce([[{ next_order: "70" }]]) // MAX(display_order) + 10
+        .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      await mockDb(execute);
+
+      const ad = await updateRecruitmentAd(3, { title: "Promue", priority: "PRIORITY" });
+
+      expect(ad.priority).toBe("PRIORITY");
+      expect(execute).toHaveBeenCalledTimes(3);
+      expect(String(execute.mock.calls[1][0])).toContain("MAX(display_order)");
+      const values = execute.mock.calls[2][1] as unknown[];
+      // Rang d'affichage, puis id : les deux derniers paramètres de l'UPDATE.
+      expect(values.slice(-2)).toEqual([70, 3]);
+    });
+
+    it("garde le statut enregistré quand la requête n'en porte pas", async () => {
+      // Un champ absent n'est pas un statut vidé : la validation retomberait
+      // sur « facultative » et rétrograderait la prioritaire en silence.
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[{ id: 3, priority: "PRIORITY" }]])
+        .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      await mockDb(execute);
+
+      const ad = await updateRecruitmentAd(3, { title: "Sans statut" });
+
+      expect(ad.priority).toBe("PRIORITY");
+      // Pas de changement de groupe, donc pas de nouveau rang d'affichage.
+      expect(execute).toHaveBeenCalledTimes(2);
+      const values = execute.mock.calls[1][1] as unknown[];
+      expect(values).toContain("PRIORITY");
+      expect(values.slice(-2)).toEqual([null, 3]);
     });
 
     it("throws NOT_FOUND when the ad does not exist", async () => {
@@ -228,6 +321,56 @@ describe("recruitment-service", () => {
         "INVALID_DOMAIN",
       );
       expect(execute).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("reorderRecruitmentAds", () => {
+    /**
+     * `applyDisplayOrder` simulé : il joue le contrôle sur la connexion de sa
+     * transaction, comme le vrai, et ne « réécrit » que s'il passe.
+     */
+    async function runReorder(rows: object[], ids: number[]) {
+      const { applyDisplayOrder } = await import("@/lib/server/reorder");
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([rows]);
+      const written: number[][] = [];
+      jest.mocked(applyDisplayOrder).mockImplementation(async (_table, order, beforeWrite) => {
+        await beforeWrite?.(fakeConnection({ execute }));
+        written.push(order);
+      });
+      await reorderRecruitmentAds(ids);
+      return { execute, written, applyDisplayOrder };
+    }
+
+    it("réécrit l'ordre quand il reste groupé par statut", async () => {
+      const { written, applyDisplayOrder } = await runReorder(
+        [
+          { id: 1, priority: "PRIORITY" },
+          { id: 2, priority: "PRIORITY" },
+          { id: 3, priority: "OPTIONAL" },
+        ],
+        [2, 1, 3],
+      );
+      expect(jest.mocked(applyDisplayOrder).mock.calls[0][0]).toBe("bg_recruitment_ads");
+      expect(written).toEqual([[2, 1, 3]]);
+    });
+
+    it("relit les statuts sous verrou, dans la transaction de l'écriture", async () => {
+      // Lus avant, un statut changé entre la lecture et l'écriture laisserait
+      // passer un ordre mêlé.
+      const { execute } = await runReorder([{ id: 1, priority: "PRIORITY" }], [1]);
+      expect(String(execute.mock.calls[0][0])).toContain("FOR UPDATE");
+    });
+
+    it("refuse un ordre qui mêle les statuts, sans rien écrire", async () => {
+      await expect(
+        runReorder(
+          [
+            { id: 1, priority: "PRIORITY" },
+            { id: 3, priority: "OPTIONAL" },
+          ],
+          [3, 1],
+        ),
+      ).rejects.toThrow("RECRUITMENT_ORDER_MIXES_PRIORITIES");
     });
   });
 
@@ -249,7 +392,7 @@ describe("recruitment-service", () => {
 /**
  * Deux lectures publiques, deux fréquences très différentes.
  *
- * `getHighlightedAd` est appelée par la **mise en page racine** : elle est donc
+ * `getRecruitmentSpotlight` est appelée par la **mise en page racine** : elle est donc
  * demandée à chaque arrivée sur le site, par chaque visiteur. L'en-tête
  * `Cache-Control` de sa route épargne les rechargements d'un même navigateur,
  * mais rien ne protégeait d'une arrivée groupée. `listRecruitmentAds` sert la
@@ -270,10 +413,10 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValue([[HIGHLIGHT_ROW]]);
     await mockDb(execute);
 
-    const results = await Promise.all(Array.from({ length: 100 }, () => getHighlightedAd()));
+    const results = await Promise.all(Array.from({ length: 100 }, () => getRecruitmentSpotlight()));
 
     expect(execute).toHaveBeenCalledTimes(1);
-    for (const ad of results) expect(ad?.id).toBe(5);
+    for (const spotlight of results) expect(spotlight.banner[0]?.id).toBe(5);
   });
 
   it("ne lit qu'une fois la liste publique pour cent visiteurs simultanés", async () => {
@@ -326,7 +469,7 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
           contactDiscord: null,
           contactDiscordId: null,
           contactPreferred: "AUTO",
-          highlight: "NONE",
+          priority: "OPTIONAL",
           active: true,
         }),
     ],
@@ -339,13 +482,13 @@ describe("recruitment-service — mutualisation des lectures publiques", () => {
     );
     await mockDb(execute);
 
-    await getHighlightedAd();
+    await getRecruitmentSpotlight();
     execute.mockClear();
 
     // Le staff vient d'écrire : la bannière du site doit suivre sans attendre la
     // fin de la fenêtre de cache.
     await write();
-    await getHighlightedAd();
+    await getRecruitmentSpotlight();
 
     expect(execute.mock.calls.some(([sql]) => String(sql).trim().startsWith("SELECT"))).toBe(true);
   });

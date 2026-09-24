@@ -1,15 +1,10 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   RECRUITMENT_BODY_PREVIEW_MAX,
-  RECRUITMENT_HIGHLIGHT_SHORT_LABELS,
-  RECRUITMENT_HIGHLIGHTS,
   buildRecruitmentPreview,
   formatRecruitmentBody,
   parseRecruitmentAdAnchor,
   recruitmentAdAnchor,
-  resolveHighlightStates,
-  selectHighlightedAd,
-  type RecruitmentHighlight,
 } from "@/lib/shared/recruitment";
 
 describe("buildRecruitmentPreview", () => {
@@ -194,100 +189,6 @@ describe("formatRecruitmentBody", () => {
       { kind: "heading", text: "Les outils à disposition" },
       { kind: "paragraph", text: "Trois serveurs Discord." },
     ]);
-  });
-});
-
-/** Fabrique minimale : seuls les champs lus par la résolution comptent. */
-function ad(id: number, highlight: RecruitmentHighlight, active = true) {
-  return { id, highlight, active };
-}
-
-describe("selectHighlightedAd", () => {
-  it("returns null when no ad asks to be highlighted", () => {
-    expect(selectHighlightedAd([ad(1, "NONE"), ad(2, "NONE")])).toBeNull();
-    expect(selectHighlightedAd([])).toBeNull();
-  });
-
-  it("returns the first highlighted ad in display order", () => {
-    const ads = [ad(1, "NONE"), ad(2, "MODAL"), ad(3, "BANNER")];
-    expect(selectHighlightedAd(ads)).toBe(ads[1]);
-  });
-
-  it("skips inactive ads: a draft never takes the site-wide slot", () => {
-    const ads = [ad(1, "MODAL", false), ad(2, "BANNER")];
-    expect(selectHighlightedAd(ads)).toBe(ads[1]);
-  });
-
-  it("serves a single ad even when several ask for a modal", () => {
-    const ads = [ad(1, "MODAL"), ad(2, "MODAL"), ad(3, "MODAL")];
-    expect(selectHighlightedAd(ads)).toBe(ads[0]);
-  });
-
-  it("does not privilege one mode over another — order decides", () => {
-    expect(selectHighlightedAd([ad(1, "BANNER"), ad(2, "MODAL")])?.id).toBe(1);
-    expect(selectHighlightedAd([ad(2, "MODAL"), ad(1, "BANNER")])?.id).toBe(2);
-  });
-});
-
-describe("resolveHighlightStates", () => {
-  it("marks every ad as NONE when none asks for a highlight", () => {
-    const states = resolveHighlightStates([ad(1, "NONE"), ad(2, "NONE")]);
-    expect(states.get(1)).toBe("NONE");
-    expect(states.get(2)).toBe("NONE");
-  });
-
-  it("returns an empty map for an empty list", () => {
-    expect(resolveHighlightStates([]).size).toBe(0);
-  });
-
-  it("puts the winner LIVE and every other highlighted ad QUEUED", () => {
-    const states = resolveHighlightStates([
-      ad(1, "BANNER"),
-      ad(2, "MODAL"),
-      ad(3, "NONE"),
-      ad(4, "MODAL"),
-    ]);
-    expect(states.get(1)).toBe("LIVE");
-    expect(states.get(2)).toBe("QUEUED");
-    expect(states.get(3)).toBe("NONE");
-    expect(states.get(4)).toBe("QUEUED");
-  });
-
-  it("answers the 'several arrival modals' case: one LIVE, the rest QUEUED", () => {
-    const states = resolveHighlightStates([ad(1, "MODAL"), ad(2, "MODAL"), ad(3, "MODAL")]);
-    expect([...states.values()]).toEqual(["LIVE", "QUEUED", "QUEUED"]);
-  });
-
-  it("marks a highlighted draft as DRAFT, never LIVE nor QUEUED", () => {
-    const states = resolveHighlightStates([ad(1, "MODAL", false), ad(2, "BANNER")]);
-    expect(states.get(1)).toBe("DRAFT");
-    // Le brouillon ne prend pas la place : l'annonce suivante est bien en ligne.
-    expect(states.get(2)).toBe("LIVE");
-  });
-
-  it("keeps a lone highlighted ad LIVE", () => {
-    expect(resolveHighlightStates([ad(1, "MODAL"), ad(2, "NONE")]).get(1)).toBe("LIVE");
-  });
-
-  it("swaps LIVE and QUEUED when the ads are reordered", () => {
-    const first = ad(1, "BANNER");
-    const second = ad(2, "MODAL");
-    expect(resolveHighlightStates([first, second]).get(2)).toBe("QUEUED");
-    expect(resolveHighlightStates([second, first]).get(2)).toBe("LIVE");
-  });
-
-  it("resolves duplicate ids by their first occurrence, like the display does", () => {
-    const states = resolveHighlightStates([ad(1, "MODAL"), ad(1, "NONE")]);
-    expect(states.size).toBe(1);
-    expect(states.get(1)).toBe("LIVE");
-  });
-});
-
-describe("RECRUITMENT_HIGHLIGHT_SHORT_LABELS", () => {
-  it("labels every highlight mode", () => {
-    for (const mode of RECRUITMENT_HIGHLIGHTS) {
-      expect(RECRUITMENT_HIGHLIGHT_SHORT_LABELS[mode]).toBeTruthy();
-    }
   });
 });
 

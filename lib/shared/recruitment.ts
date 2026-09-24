@@ -29,39 +29,69 @@ export const RECRUITMENT_DOMAIN_LABELS: Record<RecruitmentDomain, string> = {
 };
 
 /**
- * Mode de mise en avant d'une annonce urgente :
- * - `NONE` : annonce visible uniquement sur la page recrutement.
- * - `BANNER` : banderole discrète affichée en haut du site.
- * - `MODAL` : fenêtre modale affichée à l'arrivée du visiteur.
+ * Statut d'importance d'une annonce. Il décide à lui seul **où** l'annonce se
+ * montre, et remplace l'ancien mode de mise en avant (`NONE` / `BANNER` /
+ * `MODAL`), qui ne servait qu'**une** annonce à la fois : on pouvait cocher
+ * « Modale à l'arrivée » sur trois annonces, deux restaient lettre morte, et
+ * l'ordre de la liste — qui mélangeait urgentes et facultatives — décidait
+ * laquelle passait.
+ *
+ * - `PRIORITY` (« Prioritaire ») : pastille clignotante « Urgente », modale à
+ *   l'arrivée **et** banderole. Plusieurs prioritaires se partagent **une**
+ *   modale, qui se feuillette ; empiler des modales serait insupportable.
+ * - `IMPORTANT` (« Importante ») : banderole seulement, sans pastille.
+ * - `OPTIONAL` (« Facultative ») : ni modale ni banderole, rangée à part sous
+ *   « Autres recrutements » sur la page.
+ *
+ * L'ordre du tableau **est** l'ordre d'affichage des groupes : une prioritaire
+ * passe toujours devant une importante, quel que soit leur rang dans la liste.
  */
-export const RECRUITMENT_HIGHLIGHTS = ["NONE", "BANNER", "MODAL"] as const;
-export type RecruitmentHighlight = (typeof RECRUITMENT_HIGHLIGHTS)[number];
+export const RECRUITMENT_PRIORITIES = ["PRIORITY", "IMPORTANT", "OPTIONAL"] as const;
+export type RecruitmentPriority = (typeof RECRUITMENT_PRIORITIES)[number];
 
-export const RECRUITMENT_HIGHLIGHT_LABELS: Record<RecruitmentHighlight, string> = {
-  NONE: "Aucune (page uniquement)",
-  BANNER: "Banderole discrète",
-  MODAL: "Modale à l'arrivée",
+export const RECRUITMENT_PRIORITY_LABELS: Record<RecruitmentPriority, string> = {
+  PRIORITY: "Prioritaire",
+  IMPORTANT: "Importante",
+  OPTIONAL: "Facultative",
 };
 
-/**
- * Fenêtre d'anti-répétition de la modale de recrutement prioritaire : une fois
- * affichée à un utilisateur, elle ne réapparaît pas avant 7 jours (mémorisé côté
- * client par un horodatage `localStorage`). Ne concerne que la modale (`MODAL`) ;
- * la banderole reste fermée pour la seule session courante.
- */
-export const RECRUITMENT_MODAL_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Ce que chaque statut fait de l'annonce, en une phrase — aide du formulaire et bulle du badge. */
+export const RECRUITMENT_PRIORITY_DESCRIPTIONS: Record<RecruitmentPriority, string> = {
+  PRIORITY: "Pastille « Urgente », modale à l'arrivée sur le site et banderole.",
+  IMPORTANT: "Défile dans la banderole, sans pastille « Urgente ».",
+  OPTIONAL: "Page recrutement seulement, dans « Autres recrutements ».",
+};
+
+/** Où une annonce **publiée** se montre. La table est la règle ; rien ne la redit ailleurs. */
+export type RecruitmentExposure = {
+  /** Pastille clignotante « Urgente ». */
+  urgent: boolean;
+  /** Modale à l'arrivée sur le site. */
+  modal: boolean;
+  /** Banderole discrète en tête de page. */
+  banner: boolean;
+  /** Liste principale de `/recrutement` (sinon « Autres recrutements »). */
+  featured: boolean;
+};
+
+export const RECRUITMENT_PRIORITY_EXPOSURE: Record<RecruitmentPriority, RecruitmentExposure> = {
+  PRIORITY: { urgent: true, modal: true, banner: true, featured: true },
+  IMPORTANT: { urgent: false, modal: false, banner: true, featured: true },
+  OPTIONAL: { urgent: false, modal: false, banner: false, featured: false },
+};
+
+/** Rang d'affichage d'un statut : 0 pour le plus important. */
+export function recruitmentPriorityRank(priority: RecruitmentPriority): number {
+  return RECRUITMENT_PRIORITIES.indexOf(priority);
+}
 
 /**
- * Décide si la modale prioritaire doit s'afficher, à partir de l'horodatage du
- * dernier affichage (`seenAt`, ms epoch ; `null` si jamais vue) et de l'instant
- * courant `now`. Vraie si jamais vue, si l'horodatage est invalide ou situé dans
- * le futur (horloge décalée), ou si au moins `RECRUITMENT_MODAL_INTERVAL_MS` se
- * sont écoulés depuis le dernier affichage.
+ * Fenêtre d'anti-répétition de la modale d'arrivée : une prioritaire montrée à
+ * un visiteur ne lui est pas remontrée avant 7 jours — la durée du cookie
+ * ({@link RECRUITMENT_MODAL_COOKIE_MAX_AGE}) *est* cette fenêtre. La banderole,
+ * elle, se tait le temps de la visite.
  */
-export function shouldShowRecruitmentModal(seenAt: number | null, now: number): boolean {
-  if (seenAt === null || !Number.isFinite(seenAt) || seenAt > now) return true;
-  return now - seenAt >= RECRUITMENT_MODAL_INTERVAL_MS;
-}
+export const RECRUITMENT_MODAL_INTERVAL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
  * Cookies de la mise en avant, et pourquoi ce n'est plus `localStorage`.
@@ -77,29 +107,87 @@ export function shouldShowRecruitmentModal(seenAt: number | null, now: number): 
  * navigateur qu'une requete transporte. Le `localStorage` ne pouvait pas le
  * faire : il ne quitte jamais l'onglet.
  *
- * La valeur est l'**identifiant de l'annonce**, et il n'y a pas d'horodatage a
- * cote : la peremption du cookie *est* la fenetre. Changer l'annonce mise en
- * avant repart donc avec une valeur neuve, exactement comme la cle par annonce
- * de l'ancien stockage.
+ * La valeur est la **liste des identifiants** des annonces montrées (`12.15`) —
+ * pour la modale, les seules pages réellement affichées —, et il n'y a pas
+ * d'horodatage a cote : la peremption du cookie *est* la fenetre. Une annonce
+ * absente de la liste (ajoutée depuis, ou jamais feuilletée) fait donc
+ * reparaître la modale, ouverte sur elle.
  */
 export const RECRUITMENT_MODAL_COOKIE = "bg_recr_modal";
 
 /** Meme contrat, mais cookie de session : la banderole ne se tait que le temps de la visite. */
 export const RECRUITMENT_BANNER_COOKIE = "bg_recr_banner";
 
+/** Séparateur des identifiants dans la valeur d'un cookie : permis dans un cookie, absent d'un entier. */
+const SEEN_SEPARATOR = ".";
+
 /**
- * L'annonce a-t-elle deja ete ecartee par ce visiteur ?
+ * Identifiants portés par un cookie de mise en avant. Tout ce qui n'est pas un
+ * entier positif est ignoré : une valeur forgée ou abîmée ne peut rien taire
+ * d'autre que ce qu'elle nomme exactement. Une valeur à un seul identifiant
+ * (`"42"`, la forme d'avant les statuts) se lit telle quelle.
+ */
+export function parseRecruitmentSeen(cookieValue: string | undefined): Set<number> {
+  const seen = new Set<number>();
+  if (typeof cookieValue !== "string") return seen;
+  for (const part of cookieValue.split(SEEN_SEPARATOR)) {
+    const trimmed = part.trim();
+    if (!/^\d+$/.test(trimmed)) continue;
+    const id = Number(trimmed);
+    if (Number.isSafeInteger(id) && id > 0) seen.add(id);
+  }
+  return seen;
+}
+
+/** Valeur du cookie pour un jeu d'annonces montrées. */
+export function serializeRecruitmentSeen(ids: readonly number[]): string {
+  return ids.join(SEEN_SEPARATOR);
+}
+
+/**
+ * Les annonces ont-elles **toutes** déjà été écartées par ce visiteur ?
  *
- * Compare l'identifiant porte par le cookie a celui de l'annonce servie. Une
- * valeur absente, vide ou portant un autre identifiant rend `false` : dans le
- * doute on **affiche**, une mise en avant tue a tort ne se rattrape pas.
+ * Une seule absente du cookie suffit à répondre `false` : dans le doute on
+ * **affiche**, une mise en avant tue à tort ne se rattrape pas. Une liste vide
+ * n'a rien à montrer : elle rend `true`.
  *
  * @param cookieValue Valeur brute du cookie, ou `undefined` s'il est absent.
- * @param adId Identifiant de l'annonce actuellement mise en avant.
+ * @param adIds Identifiants des annonces actuellement mises en avant.
  */
-export function recruitmentDismissed(cookieValue: string | undefined, adId: number): boolean {
-  if (typeof cookieValue !== "string" || cookieValue.length === 0) return false;
-  return cookieValue.trim() === String(adId);
+export function recruitmentDismissed(cookieValue: string | undefined, adIds: readonly number[]): boolean {
+  const seen = parseRecruitmentSeen(cookieValue);
+  return adIds.every((id) => seen.has(id));
+}
+
+/**
+ * Parmi les annonces mises en avant, celles que le cookie dit déjà vues, dans
+ * l'ordre reçu. C'est la seule lecture du cookie de la modale : la page
+ * d'ouverture s'en déduit ({@link recruitmentModalStart}), et la modale les
+ * garde pour vues en réécrivant son cookie, qui ne porte ainsi que des
+ * annonces encore en ligne.
+ */
+export function recruitmentSeenAmong(
+  cookieValue: string | undefined,
+  adIds: readonly number[],
+): number[] {
+  const seen = parseRecruitmentSeen(cookieValue);
+  return adIds.filter((id) => seen.has(id));
+}
+
+/**
+ * Page d'ouverture de la modale d'arrivée, ou `null` si elle doit se taire.
+ *
+ * La modale s'ouvre sur la **première annonce jamais vue** : un visiteur qui a
+ * déjà lu les deux premières prioritaires et revient pour une troisième doit
+ * tomber sur celle-ci, pas relire les autres. Toutes restent feuilletables.
+ */
+export function recruitmentModalStart(
+  adIds: readonly number[],
+  seenIds: readonly number[],
+): number | null {
+  const seen = new Set(seenIds);
+  const index = adIds.findIndex((id) => !seen.has(id));
+  return index < 0 ? null : index;
 }
 
 /**
@@ -110,6 +198,13 @@ export function recruitmentDismissed(cookieValue: string | undefined, adId: numb
  * meme notion des deux cotes.
  */
 export const RECRUITMENT_MODAL_COOKIE_MAX_AGE = Math.floor(RECRUITMENT_MODAL_INTERVAL_MS / 1000);
+
+/**
+ * Durée d'affichage d'une annonce dans la banderole avant la suivante. Sept
+ * secondes : de quoi lire un titre et son pôle. Au-delà de cinq secondes,
+ * WCAG 2.2.2 exige un moyen de pause — la banderole en porte un.
+ */
+export const RECRUITMENT_BANNER_ROTATION_MS = 7_000;
 
 /**
  * Canal de contact mis en avant sur l'annonce. `AUTO` : aucun canal privilégié,
@@ -146,7 +241,8 @@ export type RecruitmentAd = {
   contactDiscordId: string | null;
   // Canal mis en avant (stylé en primaire). `AUTO` = aucun privilégié.
   contactPreferred: RecruitmentContactChannel;
-  highlight: RecruitmentHighlight;
+  // Statut d'importance : où l'annonce se montre (voir `RECRUITMENT_PRIORITY_EXPOSURE`).
+  priority: RecruitmentPriority;
   active: boolean;
 };
 
@@ -170,7 +266,7 @@ export type RecruitmentAdInput = {
   contactDiscord?: string | null;
   contactDiscordId?: string | null;
   contactPreferred?: RecruitmentContactChannel | string;
-  highlight?: RecruitmentHighlight | string;
+  priority?: RecruitmentPriority | string;
   active?: boolean;
 };
 
@@ -193,8 +289,8 @@ function isDomain(value: unknown): value is RecruitmentDomain {
   return typeof value === "string" && (RECRUITMENT_DOMAINS as readonly string[]).includes(value);
 }
 
-function isHighlight(value: unknown): value is RecruitmentHighlight {
-  return typeof value === "string" && (RECRUITMENT_HIGHLIGHTS as readonly string[]).includes(value);
+function isPriority(value: unknown): value is RecruitmentPriority {
+  return typeof value === "string" && (RECRUITMENT_PRIORITIES as readonly string[]).includes(value);
 }
 
 function isContactChannel(value: unknown): value is RecruitmentContactChannel {
@@ -223,7 +319,7 @@ export type RecruitmentValidationResult =
         contactDiscord: string | null;
         contactDiscordId: string | null;
         contactPreferred: RecruitmentContactChannel;
-        highlight: RecruitmentHighlight;
+        priority: RecruitmentPriority;
         active: boolean;
       };
     }
@@ -231,7 +327,7 @@ export type RecruitmentValidationResult =
 
 /**
  * Valide et normalise une annonce de recrutement. Le titre est requis ; le pôle
- * défaut « AUTRE » ; la mise en avant défaut « NONE ». Référent / missions /
+ * défaut « AUTRE » ; le statut défaut « OPTIONAL » (facultative). Référent / missions /
  * corps / lien / Discord sont optionnels et ramenés à `null` si vides.
  * Le canal préféré défaut « AUTO » (sinon `INVALID_CONTACT_CHANNEL`). L'ID Discord
  * n'est retenu que s'il ressemble à un snowflake ET qu'un pseudo l'accompagne.
@@ -248,10 +344,12 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
     domain = input.domain;
   }
 
-  let highlight: RecruitmentHighlight = "NONE";
-  if (input.highlight !== undefined && input.highlight !== null && input.highlight !== "") {
-    if (!isHighlight(input.highlight)) return { ok: false, error: "INVALID_HIGHLIGHT" };
-    highlight = input.highlight;
+  // Défaut « facultative » : une annonce ne s'impose à tous les visiteurs que
+  // si quelqu'un l'a demandé.
+  let priority: RecruitmentPriority = "OPTIONAL";
+  if (input.priority !== undefined && input.priority !== null && input.priority !== "") {
+    if (!isPriority(input.priority)) return { ok: false, error: "INVALID_PRIORITY" };
+    priority = input.priority;
   }
 
   let contactPreferred: RecruitmentContactChannel = "AUTO";
@@ -295,7 +393,7 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
       contactDiscord,
       contactDiscordId,
       contactPreferred,
-      highlight,
+      priority,
       active,
     },
   };
@@ -437,63 +535,125 @@ export function formatRecruitmentBody(body: string | null | undefined): Recruitm
 }
 
 /* ------------------------------------------------------------------ *
- * Mise en avant : résolution de l'annonce gagnante
+ * Statuts : ordre, groupes et mise en avant
  * ------------------------------------------------------------------ */
 
-/** Libellés courts du mode de mise en avant, pour les badges de gestion. */
-export const RECRUITMENT_HIGHLIGHT_SHORT_LABELS: Record<RecruitmentHighlight, string> = {
-  NONE: "Aucune",
-  BANNER: "Banderole",
-  MODAL: "Modale",
-};
+type Prioritized = { priority: RecruitmentPriority };
 
 /**
- * Annonce effectivement mise en avant sur le site : la **première** annonce
- * active dont le mode n'est pas `NONE`, dans l'ordre d'affichage fourni.
- *
- * Une seule mise en avant est servie à la fois, quel que soit le nombre
- * d'annonces marquées « Banderole » ou « Modale » — empiler des modales à
- * l'arrivée d'un visiteur serait insupportable. Miroir exact, côté pur, du
- * `LIMIT 1` de `getHighlightedAd()` : c'est ce qui permet à l'interface de
- * gestion de désigner les annonces dont la mise en avant reste lettre morte.
+ * Range les annonces par statut, **sans rien changer à l'ordre à l'intérieur
+ * d'un statut** (tri stable) : la base les rend dans l'ordre d'affichage, ce
+ * tri n'y ajoute que la règle « une prioritaire passe devant une importante ».
+ * Écrit ici plutôt qu'en `ORDER BY` : la page, la gestion et la mise en avant
+ * le partagent, et deux tris auraient fini par diverger.
  */
-export function selectHighlightedAd<
-  T extends { active: boolean; highlight: RecruitmentHighlight },
->(ads: readonly T[]): T | null {
-  return ads.find((ad) => ad.active && ad.highlight !== "NONE") ?? null;
+export function sortRecruitmentAds<T extends Prioritized>(ads: readonly T[]): T[] {
+  return ads
+    .map((ad, index) => ({ ad, index }))
+    .sort(
+      (a, b) =>
+        recruitmentPriorityRank(a.ad.priority) - recruitmentPriorityRank(b.ad.priority) ||
+        a.index - b.index,
+    )
+    .map(({ ad }) => ad);
 }
 
 /**
- * État réel de la mise en avant d'une annonce, du point de vue de la gestion :
- *
- * - `NONE` — l'annonce ne demande aucune mise en avant ;
- * - `LIVE` — c'est elle qui est servie au site ;
- * - `QUEUED` — elle en demande une, mais une annonce plus haute l'a emportée ;
- * - `DRAFT` — elle en demande une mais reste un brouillon, donc jamais publiée.
+ * Sépare la liste principale (« Recrutement en cours » : prioritaires puis
+ * importantes) des « Autres recrutements » (facultatives), en gardant l'ordre
+ * reçu. Simple partage, sans tri : la liste qu'on lui passe est déjà rangée
+ * ({@link sortRecruitmentAds} au chargement, {@link placeRecruitmentAd} à
+ * chaque écriture), et la trier de nouveau à chaque rendu ne ferait que redire
+ * cet invariant.
  */
-export type RecruitmentHighlightState = "NONE" | "LIVE" | "QUEUED" | "DRAFT";
+export function splitRecruitmentAds<T extends Prioritized>(
+  ads: readonly T[],
+): { featured: T[]; others: T[] } {
+  const featured: T[] = [];
+  const others: T[] = [];
+  for (const ad of ads) {
+    (RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].featured ? featured : others).push(ad);
+  }
+  return { featured, others };
+}
+
+/** Ce que le site met en avant : la modale d'arrivée et la banderole. */
+export type RecruitmentSpotlight<T> = {
+  /** Prioritaires publiées, dans l'ordre d'affichage — les pages de la modale. */
+  modal: T[];
+  /** Prioritaires puis importantes publiées — ce qui défile dans la banderole. */
+  banner: T[];
+};
 
 /**
- * État de mise en avant de chaque annonce, indexé par id. Sert à dire au staff
- * ce qui est réellement en ligne : une seule mise en avant est servie à la fois,
- * et rien dans le formulaire ne le montrait jusqu'ici — on pouvait cocher
- * « Modale à l'arrivée » sur trois annonces et croire les trois affichées.
- *
- * Les ids en double (jeu de données incohérent) sont résolus par la première
- * occurrence, comme le fait l'affichage.
+ * Annonces mises en avant sur le site : **toutes** les annonces publiées dont
+ * le statut le demande, et non plus la première — c'est ce qui rend le statut
+ * vrai tel qu'il est montré au staff : une prioritaire est dans la modale, sans
+ * condition de rang. Les brouillons n'y sont jamais.
  */
-export function resolveHighlightStates(
-  ads: readonly { id: number; active: boolean; highlight: RecruitmentHighlight }[],
-): Map<number, RecruitmentHighlightState> {
-  const winner = selectHighlightedAd(ads);
-  const states = new Map<number, RecruitmentHighlightState>();
-  for (const ad of ads) {
-    if (states.has(ad.id)) continue;
-    if (ad.highlight === "NONE") states.set(ad.id, "NONE");
-    else if (!ad.active) states.set(ad.id, "DRAFT");
-    else states.set(ad.id, ad === winner ? "LIVE" : "QUEUED");
+export function selectRecruitmentSpotlight<T extends Prioritized & { active: boolean }>(
+  ads: readonly T[],
+): RecruitmentSpotlight<T> {
+  const published = sortRecruitmentAds(ads).filter((ad) => ad.active);
+  return {
+    modal: published.filter((ad) => RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].modal),
+    banner: published.filter((ad) => RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].banner),
+  };
+}
+
+/**
+ * Un déplacement d'un cran est-il permis ? Seulement **dans son statut** :
+ * l'ordre se règle à l'intérieur d'un groupe, jamais d'un groupe à l'autre —
+ * c'est le statut qui fait passer une annonce devant une autre, pas une flèche.
+ * La liste est supposée triée ({@link sortRecruitmentAds}).
+ */
+export function canMoveRecruitmentAd(
+  ads: readonly Prioritized[],
+  index: number,
+  direction: -1 | 1,
+): boolean {
+  const target = index + direction;
+  if (index < 0 || index >= ads.length || target < 0 || target >= ads.length) return false;
+  return ads[index].priority === ads[target].priority;
+}
+
+/**
+ * Un nouvel ordre mélange-t-il les statuts ? Vrai dès qu'une annonce y précède
+ * une annonce d'un statut plus important qu'elle. Les identifiants inconnus
+ * sont ignorés (une annonce supprimée entre-temps n'a plus de statut à tenir).
+ * Le serveur le refuse : l'interface ne le propose pas, et un ordre qui
+ * l'affirmerait serait défait au prochain affichage par le tri par statut.
+ */
+export function recruitmentOrderMixesPriorities(
+  ids: readonly number[],
+  priorityById: ReadonlyMap<number, RecruitmentPriority>,
+): boolean {
+  let lastRank = -1;
+  for (const id of ids) {
+    const priority = priorityById.get(id);
+    if (priority === undefined) continue;
+    const rank = recruitmentPriorityRank(priority);
+    if (rank < lastRank) return true;
+    lastRank = rank;
   }
-  return states;
+  return false;
+}
+
+/**
+ * Place une annonce créée ou modifiée dans une liste triée, **comme le serveur
+ * la range** : une annonce qui garde son statut garde sa place ; une annonce
+ * neuve, ou qui change de statut, passe en **fin de son groupe** (le serveur
+ * lui donne alors le plus grand rang d'affichage).
+ */
+export function placeRecruitmentAd<T extends Prioritized & { id: number }>(
+  ads: readonly T[],
+  ad: T,
+): T[] {
+  const current = ads.find((a) => a.id === ad.id);
+  if (current && current.priority === ad.priority) {
+    return ads.map((a) => (a.id === ad.id ? ad : a));
+  }
+  return sortRecruitmentAds([...ads.filter((a) => a.id !== ad.id), ad]);
 }
 
 /* ------------------------------------------------------------------ *

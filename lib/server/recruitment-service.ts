@@ -6,7 +6,11 @@ import {
   type RecruiterContactDefaults,
   type RecruitmentAd,
   type RecruitmentAdInput,
-  selectHighlightedAd,
+  type RecruitmentPriority,
+  type RecruitmentSpotlight,
+  recruitmentOrderMixesPriorities,
+  selectRecruitmentSpotlight,
+  sortRecruitmentAds,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
 
@@ -14,6 +18,7 @@ export type {
   RecruiterContactDefaults,
   RecruitmentAd,
   RecruitmentAdInput,
+  RecruitmentSpotlight,
 } from "@/lib/shared/recruitment";
 
 interface RecruitmentRow extends RowDataPacket {
@@ -27,7 +32,7 @@ interface RecruitmentRow extends RowDataPacket {
   contact_discord: string | null;
   contact_discord_id: string | null;
   contact_preferred: RecruitmentAd["contactPreferred"];
-  highlight: RecruitmentAd["highlight"];
+  priority: RecruitmentAd["priority"];
   active: number;
 }
 
@@ -43,12 +48,12 @@ function fromRow(row: RecruitmentRow): RecruitmentAd {
     contactDiscord: row.contact_discord,
     contactDiscordId: row.contact_discord_id,
     contactPreferred: row.contact_preferred ?? "AUTO",
-    highlight: row.highlight,
+    priority: row.priority,
     active: Boolean(row.active),
   };
 }
 
-const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, contact_discord, contact_discord_id, contact_preferred, highlight, active`;
+const SELECT_COLUMNS = `id, title, team_name, domain, roles, body, contact_url, contact_discord, contact_discord_id, contact_preferred, priority, active`;
 
 /** Lecture nue, sans cache : l'assiette dépend de `includeInactive`. */
 async function loadRecruitmentAds(includeInactive: boolean): Promise<RecruitmentAd[]> {
@@ -59,7 +64,9 @@ async function loadRecruitmentAds(includeInactive: boolean): Promise<Recruitment
      ${includeInactive ? "" : "WHERE active = 1"}
      ORDER BY display_order ASC, id ASC`,
   );
-  return (rows ?? []).map(fromRow);
+  // L'ordre d'affichage ne vaut qu'**à l'intérieur** d'un statut : le tri par
+  // statut vit dans le module pur, que la mise en avant et la page partagent.
+  return sortRecruitmentAds((rows ?? []).map(fromRow));
 }
 
 /**
@@ -83,39 +90,39 @@ export async function listRecruitmentAds(includeInactive = false): Promise<Recru
   }
 }
 
+/** Aucune mise en avant : ce que rend la vitrine quand la base ne répond pas. */
+const EMPTY_SPOTLIGHT: RecruitmentSpotlight<RecruitmentAd> = { modal: [], banner: [] };
+
 /**
- * Renvoie l'annonce urgente à mettre en avant sur le site (banderole ou modale) :
- * la première annonce active dont le mode de mise en avant n'est pas `NONE`,
- * selon l'ordre d'affichage. Retourne `null` si aucune ou si la base est
- * injoignable.
+ * Renvoie les annonces mises en avant sur le site : les **prioritaires** pour
+ * la modale d'arrivée, prioritaires **et** importantes pour la banderole.
+ * Listes vides si aucune ou si la base est injoignable.
  *
- * Le choix lui-même n'est pas refait ici : la requête ne fait que remonter les
- * candidates dans l'ordre d'affichage, et c'est `selectHighlightedAd` — la même
- * fonction pure que l'interface de gestion utilise pour ses badges — qui désigne
- * la gagnante. Sans ça, un jour où l'un des deux tris change, les badges
- * annonceraient « en ligne » une autre annonce que celle réellement servie.
+ * Le choix n'est pas refait ici : la requête ne remonte que les candidates
+ * publiées dans l'ordre d'affichage, et c'est `selectRecruitmentSpotlight` — la
+ * même règle pure que la page et la gestion — qui les répartit. Sans ça, un
+ * jour où l'un des deux tris change, la gestion annoncerait « dans la modale »
+ * une annonce que le site ne montre pas.
  */
-export async function getHighlightedAd(): Promise<RecruitmentAd | null> {
+export async function getRecruitmentSpotlight(): Promise<RecruitmentSpotlight<RecruitmentAd>> {
   try {
-    // La banderole est montée dans la **mise en page racine** : elle est donc
-    // demandée à chaque arrivée sur le site, par chaque visiteur. L'en-tête
-    // `Cache-Control` de la route épargne les rechargements d'un même
-    // navigateur, mais rien ne protégeait d'une arrivée groupée — cent
-    // visiteurs, cent requêtes, sur la lecture la plus fréquente du site après
-    // la liste des tournois. Le cache à vol unique les ramène à une, sur la
-    // même fenêtre que l'en-tête (60 s).
-    return await cachedShowcase("recruitment-highlight", async () => {
+    // La mise en avant est montée dans la **mise en page racine** : elle est
+    // donc demandée à chaque arrivée sur le site, par chaque visiteur. Rien ne
+    // protégeait d'une arrivée groupée — cent visiteurs, cent requêtes, sur la
+    // lecture la plus fréquente du site après la liste des tournois. Le cache à
+    // vol unique les ramène à une (60 s).
+    return await cachedShowcase("recruitment-spotlight", async () => {
       const db = await getDatabase();
       const [rows] = await db.execute<RecruitmentRow[]>(
         `SELECT ${SELECT_COLUMNS}
          FROM bg_recruitment_ads
-         WHERE active = 1 AND highlight <> 'NONE'
+         WHERE active = 1 AND priority <> 'OPTIONAL'
          ORDER BY display_order ASC, id ASC`,
       );
-      return selectHighlightedAd((rows ?? []).map(fromRow));
+      return selectRecruitmentSpotlight((rows ?? []).map(fromRow));
     });
   } catch {
-    return null;
+    return EMPTY_SPOTLIGHT;
   }
 }
 
@@ -155,7 +162,7 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
     contactDiscord,
     contactDiscordId,
     contactPreferred,
-    highlight,
+    priority,
     active,
   } = validation.value;
 
@@ -163,7 +170,7 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
   const [res] = await db.execute<ResultSetHeader>(
     `INSERT INTO bg_recruitment_ads
        (title, team_name, domain, roles, body, contact_url, contact_discord,
-        contact_discord_id, contact_preferred, highlight, active, display_order)
+        contact_discord_id, contact_preferred, priority, active, display_order)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
        (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_recruitment_ads AS r))`,
     [
@@ -176,7 +183,7 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
       contactDiscord,
       contactDiscordId,
       contactPreferred,
-      highlight,
+      priority,
       active ? 1 : 0,
     ],
   );
@@ -194,7 +201,7 @@ export async function createRecruitmentAd(input: RecruitmentAdInput): Promise<Re
     contactDiscord,
     contactDiscordId,
     contactPreferred,
-    highlight,
+    priority,
     active,
   };
 }
@@ -213,7 +220,7 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
     contactDiscord,
     contactDiscordId,
     contactPreferred,
-    highlight,
+    priority: requestedPriority,
     active,
   } = validation.value;
 
@@ -222,17 +229,36 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
   // `CLIENT_FOUND_ROWS`, mysql2 compte les lignes *modifiées*, donc un
   // enregistrement sans changement renverrait 0 et masquerait une annonce
   // pourtant présente derrière un faux `RECRUITMENT_NOT_FOUND`.
-  const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_recruitment_ads WHERE id = ? LIMIT 1`,
+  const [existing] = await db.execute<(RowDataPacket & { id: number; priority: RecruitmentPriority })[]>(
+    `SELECT id, priority FROM bg_recruitment_ads WHERE id = ? LIMIT 1`,
     [id],
   );
   if (existing.length === 0) throw new Error("RECRUITMENT_NOT_FOUND");
+
+  // Un champ absent n'est pas un statut vidé : la validation retomberait sur
+  // « facultative », et un client qui n'envoie pas le champ rétrograderait en
+  // silence une prioritaire — pastille, modale et banderole perdues. Seule une
+  // valeur envoyée change le statut.
+  const priority = input.priority === undefined ? existing[0].priority : requestedPriority;
+
+  // Un changement de statut fait **changer de groupe** : l'annonce passe en fin
+  // du nouveau, comme une annonce neuve. Garder son rang la ferait atterrir au
+  // hasard de son ancienne position. Lu à part plutôt qu'en sous-requête de
+  // l'`UPDATE`, que MySQL refuse sur la table même qu'il modifie ; une course
+  // entre deux gestionnaires donnerait deux rangs égaux, départagés par l'id.
+  let displayOrder: number | null = null;
+  if (existing[0].priority !== priority) {
+    const [last] = await db.execute<(RowDataPacket & { next_order: number | string })[]>(
+      `SELECT COALESCE(MAX(display_order), 0) + 10 AS next_order FROM bg_recruitment_ads`,
+    );
+    displayOrder = Number(last[0]?.next_order ?? 10);
+  }
 
   await db.execute<ResultSetHeader>(
     `UPDATE bg_recruitment_ads
      SET title = ?, team_name = ?, domain = ?, roles = ?, body = ?, contact_url = ?,
          contact_discord = ?, contact_discord_id = ?, contact_preferred = ?,
-         highlight = ?, active = ?
+         priority = ?, active = ?, display_order = COALESCE(?, display_order)
      WHERE id = ?`,
     [
       title,
@@ -244,8 +270,9 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
       contactDiscord,
       contactDiscordId,
       contactPreferred,
-      highlight,
+      priority,
       active ? 1 : 0,
+      displayOrder,
       id,
     ],
   );
@@ -263,7 +290,7 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
     contactDiscord,
     contactDiscordId,
     contactPreferred,
-    highlight,
+    priority,
     active,
   };
 }
@@ -271,10 +298,25 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
 /**
  * Réordonne les annonces selon la liste d'ids fournie (premier = affiché en
  * tête). Réécrit `display_order` de façon atomique.
+ *
+ * Lève `RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre fait passer une annonce
+ * devant une autre d'un statut plus important : l'ordre se règle **dans** un
+ * statut. Les statuts sont relus en base — ceux du client ont pu vieillir
+ * depuis l'ouverture de la page — **sous verrou, dans la transaction de
+ * l'écriture** : lus avant, un statut changé entre-temps laisserait passer un
+ * ordre mêlé.
  */
 export async function reorderRecruitmentAds(ids: number[]): Promise<void> {
-  await applyDisplayOrder("bg_recruitment_ads", ids);
-  // L'ordre décide aussi de l'annonce mise en avant : la vitrine doit suivre.
+  await applyDisplayOrder("bg_recruitment_ads", ids, async (connection) => {
+    const [rows] = await connection.execute<
+      (RowDataPacket & { id: number; priority: RecruitmentPriority })[]
+    >(`SELECT id, priority FROM bg_recruitment_ads FOR UPDATE`);
+    const priorityById = new Map((rows ?? []).map((row) => [Number(row.id), row.priority] as const));
+    if (recruitmentOrderMixesPriorities(ids, priorityById)) {
+      throw new Error("RECRUITMENT_ORDER_MIXES_PRIORITIES");
+    }
+  });
+  // L'ordre décide aussi de celui de la modale et de la banderole : la vitrine doit suivre.
   invalidateShowcase();
 }
 

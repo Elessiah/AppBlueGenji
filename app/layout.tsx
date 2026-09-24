@@ -10,7 +10,7 @@ import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
-import { getHighlightedAd } from "@/lib/server/recruitment-service";
+import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
 import { dispatchPrivacyChangeNotifications } from "@/lib/server/privacy-change-notifications";
@@ -21,6 +21,7 @@ import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_MODAL_COOKIE,
   recruitmentDismissed,
+  recruitmentSeenAmong,
 } from "@/lib/shared/recruitment";
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
@@ -124,13 +125,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // 3,8 s de seul délai de rendu. Ce qui est peint tard est peint tard : aucun
   // réglage du composant n'y pouvait rien, seul l'endroit du rendu le pouvait.
   //
-  // `getHighlightedAd` est déjà en cache à vol unique (60 s) et avale ses
-  // erreurs en `null` : la mise en page ne peut pas tomber à cause d'elle.
+  // `getRecruitmentSpotlight` est déjà en cache à vol unique (60 s) et avale
+  // ses erreurs en listes vides : la mise en page ne peut pas tomber à cause
+  // d'elle. Le cookie de la modale ne se lit qu'ici : la modale en déduit sa
+  // première page (la première prioritaire jamais vue) et se tait quand toutes
+  // l'ont été ; la banderole se tait tant qu'aucune annonce qu'elle porte n'est
+  // neuve pour ce visiteur.
   const cookieStore = await cookies();
-  const ad = await getHighlightedAd();
+  const spotlight = await getRecruitmentSpotlight();
   const onRecruitmentPage = requestHeaders.get(PATHNAME_HEADER) === RECRUITMENT_PAGE;
-  const cookieName = ad?.highlight === "MODAL" ? RECRUITMENT_MODAL_COOKIE : RECRUITMENT_BANNER_COOKIE;
-  const dismissed = ad === null || recruitmentDismissed(cookieStore.get(cookieName)?.value, ad.id);
+  const modalSeen = recruitmentSeenAmong(
+    cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value,
+    spotlight.modal.map((ad) => ad.id),
+  );
+  const bannerDismissed = recruitmentDismissed(
+    cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value,
+    spotlight.banner.map((ad) => ad.id),
+  );
 
   // `getCurrentUser` est mémoïsé par requête (`cache()` de React), donc cet
   // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
@@ -168,8 +179,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               confidentialité est dû, la mise en avant du recrutement se tait
               (la banderole, elle, reste). */}
           <RecruitmentHighlight
-            ad={ad}
-            dismissed={dismissed || (privacyChanges.length > 0 && ad?.highlight === "MODAL")}
+            modalAds={spotlight.modal}
+            modalSilenced={privacyChanges.length > 0}
+            modalSeen={modalSeen}
+            bannerAds={spotlight.banner}
+            bannerDismissed={bannerDismissed}
             onAdPage={onRecruitmentPage}
           />
           <PrivacyChangesModal changes={privacyChanges} />

@@ -34,7 +34,7 @@ const sampleAd: RecruitmentAd = {
   contactDiscord: null,
   contactDiscordId: null,
   contactPreferred: "AUTO",
-  highlight: "NONE",
+  priority: "OPTIONAL",
   active: true,
 };
 
@@ -141,6 +141,24 @@ describe("POST /api/recruitment", () => {
       }),
     );
   });
+
+  it("forwards the priority to the service, and nothing named highlight", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(sampleAd);
+
+    await POST(jsonReq("POST", { title: "Urgent", priority: "PRIORITY", highlight: "MODAL" }));
+    const input = jest.mocked(service.createRecruitmentAd).mock.calls[0][0];
+    expect(input.priority).toBe("PRIORITY");
+    expect(input).not.toHaveProperty("highlight");
+  });
+
+  it("drops a non-string priority rather than passing it through", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.createRecruitmentAd).mockResolvedValue(sampleAd);
+
+    await POST(jsonReq("POST", { title: "X", priority: 3 }));
+    expect(jest.mocked(service.createRecruitmentAd).mock.calls[0][0].priority).toBeUndefined();
+  });
 });
 
 describe("PUT /api/recruitment/[id]", () => {
@@ -160,9 +178,24 @@ describe("PUT /api/recruitment/[id]", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(service.updateRecruitmentAd).mockResolvedValue(sampleAd);
 
-    const res = await PUT(jsonReq("PUT", { title: "Recherche TANK" }), params("5"));
+    const res = await PUT(
+      jsonReq("PUT", { title: "Recherche TANK", priority: "IMPORTANT" }),
+      params("5"),
+    );
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ ad: sampleAd });
+    expect(service.updateRecruitmentAd).toHaveBeenCalledWith(
+      5,
+      expect.objectContaining({ priority: "IMPORTANT" }),
+    );
+  });
+
+  it("returns 400 on an invalid priority", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.updateRecruitmentAd).mockRejectedValue(new Error("INVALID_PRIORITY"));
+    const res = await PUT(jsonReq("PUT", { title: "X", priority: "MODAL" }), params("5"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "INVALID_PRIORITY" });
   });
 
   it("returns 404 when the ad does not exist", async () => {
@@ -216,34 +249,57 @@ describe("PUT /api/recruitment/reorder", () => {
     expect(res.status).toBe(200);
     expect(service.reorderRecruitmentAds).toHaveBeenCalledWith([3, 1, 2]);
   });
+
+  it("answers 409 when the order mixes priorities", async () => {
+    // La saisie est bien formée : c'est l'état des annonces (leurs statuts) qui
+    // interdit cet ordre — typiquement un statut changé depuis un autre onglet.
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest
+      .mocked(service.reorderRecruitmentAds)
+      .mockRejectedValue(new Error("RECRUITMENT_ORDER_MIXES_PRIORITIES"));
+
+    const res = await REORDER(jsonReq("PUT", { ids: [3, 1, 2] }));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "RECRUITMENT_ORDER_MIXES_PRIORITIES" });
+  });
+
+  it("keeps 400 for any other reorder failure", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.reorderRecruitmentAds).mockRejectedValue(new Error("SOMETHING"));
+    expect((await REORDER(jsonReq("PUT", { ids: [1] }))).status).toBe(400);
+  });
 });
 
 describe("GET /api/recruitment/highlight", () => {
-  it("returns the highlighted ad without auth, cacheable", async () => {
-    const banner: RecruitmentAd = { ...sampleAd, highlight: "BANNER" };
-    jest.mocked(service.getHighlightedAd).mockResolvedValue(banner);
+  it("returns the spotlight without auth, cacheable", async () => {
+    const urgent: RecruitmentAd = { ...sampleAd, id: 6, priority: "PRIORITY" };
+    const important: RecruitmentAd = { ...sampleAd, id: 7, priority: "IMPORTANT" };
+    jest
+      .mocked(service.getRecruitmentSpotlight)
+      .mockResolvedValue({ modal: [urgent], banner: [urgent, important] });
 
     const res = await HIGHLIGHT();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ad: banner });
+    expect(await res.json()).toEqual({ modal: [urgent], banner: [urgent, important] });
     // Réponse publique mise en cache pour éviter une requête DB par page.
     expect(res.headers.get("Cache-Control")).toContain("max-age=60");
     expect(res.headers.get("Cache-Control")).toContain("stale-while-revalidate");
   });
 
-  it("returns null when there is nothing to highlight", async () => {
-    jest.mocked(service.getHighlightedAd).mockResolvedValue(null);
+  it("returns empty lists when there is nothing to highlight", async () => {
+    jest.mocked(service.getRecruitmentSpotlight).mockResolvedValue({ modal: [], banner: [] });
     const res = await HIGHLIGHT();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ ad: null });
+    expect(await res.json()).toEqual({ modal: [], banner: [] });
   });
 
   it("does not cache the degraded (error) response", async () => {
-    jest.mocked(service.getHighlightedAd).mockRejectedValue(new Error("down"));
+    jest.mocked(service.getRecruitmentSpotlight).mockRejectedValue(new Error("down"));
     const spy = jest.spyOn(console, "error").mockImplementation(() => {});
     const res = await HIGHLIGHT();
     expect(res.status).toBe(500);
     expect(res.headers.get("Cache-Control")).toBe("no-store");
+    expect(await res.json()).toEqual({ modal: [], banner: [] });
     spy.mockRestore();
   });
 });

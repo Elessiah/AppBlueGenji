@@ -1,4 +1,4 @@
-# 📣 Recrutement — Annonces & mise en avant urgente
+# 📣 Recrutement — Annonces & statut d'importance
 
 ## Vue d'ensemble
 
@@ -6,9 +6,10 @@ La page **`/recrutement`** présente les annonces de recrutement du **staff
 bénévole de l'association** (arbitres, casters, développeurs, community managers,
 graphistes, modérateurs, événementiel, administration…) plutôt que des joueurs.
 Les gestionnaires du recrutement (`ADMIN` + `RECRUTEUR`) y gèrent les annonces
-(ajout, modification, suppression, réordonnancement) et peuvent mettre en avant
-une annonce **urgente** sur l'ensemble du site, sous forme de **banderole
-discrète** ou de **modale**.
+(ajout, modification, suppression, réordonnancement) et donnent à chacune un
+**statut d'importance** — prioritaire, importante ou facultative — qui décide si
+elle apparaît dans la **modale d'arrivée**, dans la **banderole discrète** de
+toutes les pages, ou seulement sur la page, sous « Autres recrutements ».
 
 La page est publique (comme `/benevoles`, `/association`) et repose sur
 l'en-tête vitrine `PublicHeader`.
@@ -28,9 +29,9 @@ Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
 | `contact_discord` | `VARCHAR(120)` nullable              | Contact Discord : pseudo (copiable) ou lien d'invitation |
 | `contact_discord_id` | `VARCHAR(32)` nullable            | ID Discord (snowflake) pour le deep-link « Ouvrir » |
 | `contact_preferred` | `ENUM('AUTO','DISCORD','LINK')`   | Canal mis en avant (stylé en primaire) |
-| `highlight`     | `ENUM('NONE','BANNER','MODAL')`        | Mode de mise en avant urgente |
+| `priority`      | `ENUM('PRIORITY','IMPORTANT','OPTIONAL')` | Statut d'importance (défaut `OPTIONAL`) — voir plus bas |
 | `active`        | `TINYINT(1)`                           | Visible publiquement (`0` = brouillon) |
-| `display_order` | `INT`                                  | Ordre d'affichage (réordonnable) |
+| `display_order` | `INT`                                  | Ordre d'affichage, **à l'intérieur d'un statut** |
 
 > La colonne `domain` remplace l'ancienne colonne `game` (jeu OW/MR/ANY) : une
 > migration renomme et reconvertit automatiquement la colonne, les anciennes
@@ -109,8 +110,8 @@ l'annonce en grand (`parseRecruitmentAdAnchor`, qui refuse tout fragment forgé)
 ouvrir une annonce met l'URL à jour en `replaceState`, la fermer la nettoie. Le
 fragment fait foi **dans les deux sens** : s'il cesse de désigner une annonce, la
 lecture se referme. Un lien partagé vers une annonce supprimée ou dépubliée est
-signalé par un toast plutôt que par une page muette. La banderole et la modale de
-mise en avant pointent vers ce lien.
+signalé par un toast plutôt que par une page muette. La banderole et la modale
+d'arrivée pointent vers ce lien.
 
 **Comportement modal.** Les trois modales de la fonctionnalité (lecture,
 formulaire de gestion, mise en avant) partagent
@@ -133,67 +134,115 @@ pure et testée) :
   urgente — et grillait sa fenêtre d'anti-répétition de 7 jours.
 
 **Filtre par pôle.** Au-delà de 3 annonces couvrant au moins deux pôles, une
-rangée de pastilles filtre la liste. Le réordonnancement admin est désactivé tant
-qu'un filtre est actif : les flèches portent sur l'ordre réel, pas sur la vue.
+rangée de pastilles filtre la liste (les deux sections à la fois). Le
+réordonnancement admin est désactivé tant qu'un filtre est actif : les flèches
+portent sur l'ordre réel, pas sur la vue.
 
-## Mise en avant urgente (`highlight`)
+## Statut d'importance (`priority`)
 
-- `NONE` — annonce visible uniquement sur `/recrutement`.
-- `BANNER` — banderole discrète sticky en haut de **toutes** les pages.
-- `MODAL` — fenêtre modale affichée à l'arrivée du visiteur.
+Chaque annonce porte un **statut**, qui décide à lui seul où elle se montre.
+La table `RECRUITMENT_PRIORITY_EXPOSURE` (`lib/shared/recruitment.ts`) **est** la
+règle — aucun écran ne la redit :
 
-### Plusieurs annonces urgentes ?
+| Statut | Libellé | Pastille « Urgente » | Modale d'arrivée | Banderole | Sur `/recrutement` |
+| ------ | ------- | :---: | :---: | :---: | ------------------ |
+| `PRIORITY` | Prioritaire | ✅ clignotante | ✅ | ✅ | Liste principale, en tête |
+| `IMPORTANT` | Importante | — | — | ✅ | Liste principale, après les prioritaires |
+| `OPTIONAL` | Facultative (défaut) | — | — | — | Section à part « Autres recrutements » |
 
-Une **seule** annonce est mise en avant à la fois : la première annonce active
-dont `highlight <> 'NONE'`, selon `display_order`. `getHighlightedAd()` ne refait
-pas ce choix — sa requête remonte les candidates dans l'ordre d'affichage et
-délègue l'arbitrage à `selectHighlightedAd()`, **la même fonction pure** que les
-badges de gestion : les deux ne peuvent donc pas désigner des annonces
-différentes. Le composant client `RecruitmentHighlight`, monté dans le layout
-racine, récupère le résultat via `GET /api/recruitment/highlight`.
+Le statut remplace l'ancien mode de mise en avant (`highlight` : `NONE` /
+`BANNER` / `MODAL`), qui ne servait qu'**une** annonce à la fois : on pouvait
+cocher « Modale à l'arrivée » sur trois annonces, deux restaient lettre morte, et
+c'était l'ordre d'une liste mêlant urgentes et facultatives qui décidait laquelle
+passait. Désormais **toutes** les annonces publiées d'un statut obtiennent ce que
+leur statut promet, sans condition de rang. Les brouillons (`active = 0`) ne sont
+jamais mis en avant, quel que soit leur statut.
 
-Marquer trois annonces « Modale à l'arrivée » n'empile donc pas trois modales :
-la plus haute gagne, les autres **attendent leur tour**. Le mode ne joue aucun
-rôle dans l'arbitrage — une `BANNER` placée au-dessus d'une `MODAL` prend la
-place et la modale ne s'affiche pas. Remonter une annonce dans la liste suffit à
-la faire passer devant.
+### Ordre : jamais de mélange entre statuts
 
-Rien ne le montrait côté gestion : on pouvait cocher « Modale à l'arrivée » sur
-trois annonces et croire les trois affichées. `resolveHighlightStates(ads)`
-(pure, testée) rend maintenant l'état réel de chaque annonce, affiché en badge
-sur les cartes pour le staff :
+L'ordre d'affichage (`display_order`) ne vaut qu'**à l'intérieur** d'un statut.
+`sortRecruitmentAds` (tri stable, pur) range prioritaires, puis importantes, puis
+facultatives ; il est appliqué par le service (`listRecruitmentAds`), par la mise
+en avant (`selectRecruitmentSpotlight`) et par la page — écrit une fois plutôt
+qu'en `ORDER BY`, deux tris auraient fini par diverger.
 
-| État | Badge | Signification |
-| ---- | ----- | ------------- |
-| `LIVE` | « Modale en ligne » | C'est elle qui est servie au site |
-| `QUEUED` | « Modale en attente » | Une annonce plus haute occupe la place |
-| `DRAFT` | « Modale (brouillon) » | Annonce inactive : jamais mise en avant |
-| `NONE` | *(aucun badge)* | L'annonce ne demande pas de mise en avant |
+- **Flèches de réordonnancement** : `canMoveRecruitmentAd` refuse de franchir la
+  limite d'un statut. La flèche grisée le dit au survol (« L'ordre se règle parmi
+  les annonces « Importante » »). C'est le statut qui fait passer une annonce
+  devant une autre, pas une flèche.
+- **Serveur** : `PUT /api/recruitment/reorder` relit les statuts en base et
+  refuse en **409** (`RECRUITMENT_ORDER_MIXES_PRIORITIES`) un ordre qui ferait
+  passer une annonce devant une plus importante (`recruitmentOrderMixesPriorities`)
+  — typiquement un statut changé depuis un autre onglet.
+- **Changer de statut** fait passer l'annonce **en fin de son nouveau groupe** :
+  `updateRecruitmentAd` lui donne alors le plus grand rang d'affichage, et
+  `placeRecruitmentAd` rejoue la même règle côté client. Garder son rang la ferait
+  atterrir au hasard de son ancienne position. Le formulaire l'annonce dès que le
+  statut choisi diffère de l'enregistré.
 
-Le formulaire avertit en plus, à la volée, quand la mise en avant choisie est
-déjà occupée par une autre annonce.
+### Modale d'arrivée : une seule, qui se feuillette
 
-La mémorisation de l'affichage dépend du mode :
+Plusieurs prioritaires se partagent **une** modale, avec « ← Précédente »,
+« Suivante → » et un compteur (« 1 / 3 », annoncé « Annonce 1 sur 3 »). Empiler
+une modale par annonce serait insupportable ; la modale ne tourne pas d'elle-même
+(un texte qui change pendant qu'on le lit est un texte qu'on ne lit pas).
 
-- `BANNER` — la fermeture est mémorisée par annonce dans `sessionStorage` : la
-  banderole ne réapparaît pas avant une nouvelle session (ou tant que l'admin ne
-  change pas l'annonce mise en avant).
-- `MODAL` — plus intrusive, elle n'apparaît qu'**une fois par semaine et par
-  utilisateur** : à son affichage, un horodatage est enregistré par annonce dans
-  `localStorage` (`bg_recr_highlight_seen_<id>`) et elle reste masquée tant que
-  moins de `RECRUITMENT_MODAL_INTERVAL_MS` (7 jours) se sont écoulés. L'horodatage
-  est posé dès l'affichage (pas seulement à la fermeture), donc la modale « compte »
-  comme vue même si l'utilisateur quitte la page sans la fermer. La décision est
-  isolée dans le helper pur `shouldShowRecruitmentModal(seenAt, now)`
-  (`lib/shared/recruitment.ts`), testé unitairement. Changer l'annonce mise en
-  avant repart sur une clé neuve : une nouvelle annonce urgente peut donc
-  réapparaître aussitôt.
+Elle s'ouvre sur la **première prioritaire jamais vue** (`recruitmentModalStart`) :
+un visiteur qui revient pour une troisième prioritaire tombe sur celle-ci, sans
+relire les deux autres. **Seules les pages réellement affichées** comptent pour
+vues : fermée sur la page 1 de 3, la modale revient à l'arrivée suivante sur la
+page 2 — c'est le « tour à tour » des prioritaires. Compter toutes les pages dès
+l'ouverture taisait pour sept jours celles que le visiteur n'avait jamais
+feuilletées. Une fois toutes vues, elle se tait sept jours. Elle se tait sur `/recrutement` et tant qu'un choix de
+confidentialité est dû (`PrivacyChangesModal`).
 
-L'endpoint `/api/recruitment/highlight` renvoie une réponse publique identique
-pour tous les visiteurs : elle est mise en cache
-(`Cache-Control: public, max-age=60, stale-while-revalidate=300`) pour éviter une
-requête DB à chaque chargement de page. Un changement admin est répercuté en
-~1 min au plus.
+### Banderole : les annonces défilent
+
+La banderole porte prioritaires puis importantes, **une à la fois**, la suivante
+toutes les `RECRUITMENT_BANNER_ROTATION_MS` (7 s). Une prioritaire y garde sa
+pastille « Urgente », une importante porte le mot « Recrutement ». Commandes :
+précédente, position, suivante, pause (WCAG 2.2.2), fermeture.
+
+Le défilement s'arrête de lui-même au **survol** et au **focus** (on ne retire pas
+une annonce de sous le pointeur ni sous le clavier), et dès que le **régime de
+charge** coupe les animations décoratives (`useClientPower().decorativeMotion` :
+page sans focus, machine à la peine, joueur en match, mouvement réduit) — le
+bouton pause disparaît alors, rien ne défilant. Les changements automatiques ne
+sont pas lus aux lecteurs d'écran (`aria-live="off"` pendant la rotation) ; un
+changement demandé l'est (`polite`).
+
+La banderole est tenue sur **une ligne à hauteur fixe** (deux rangées fixes sous
+640 px : l'annonce, puis les commandes) : les annonces n'ayant pas la même
+longueur, une banderole qui changerait de hauteur à chaque rotation ferait sauter
+toute la page sous elle. Ce qui dépasse s'efface en « … ».
+
+### Rendu serveur et cookies
+
+La mise en page racine résout la mise en avant (`getRecruitmentSpotlight`, cache
+à vol unique de 60 s, listes vides si la base ne répond pas) **et** la décision
+d'affichage, puis les passe en props : modale et banderole sont dans le HTML
+initial (voir l'historique du LCP dans `components/recruitment-highlight.tsx`).
+
+| Cookie | Durée | Posé quand | Valeur |
+| ------ | ----- | ---------- | ------ |
+| `bg_recr_modal` | 7 jours | une page de la modale est **affichée** (même sans être fermée) | identifiants des prioritaires réellement affichées, `12.15.3` |
+| `bg_recr_banner` | la visite | la banderole est **fermée** | identifiants des annonces qu'elle portait |
+
+`parseRecruitmentSeen` ignore tout ce qui n'est pas un entier positif (une valeur
+forgée ne tait que ce qu'elle nomme exactement) et lit encore l'ancienne forme à
+un seul identifiant. `recruitmentDismissed` ne tait la banderole que si **toutes**
+ses annonces figurent au cookie : une annonce qui s'ajoute à la mise en avant la
+fait reparaître aussitôt. Aucun identifiant de personne (voir `/rgpd`).
+
+### Migration
+
+La colonne `highlight` a été reportée puis retirée au démarrage
+(`lib/server/database.ts`) : `MODAL` → `PRIORITY`, `BANNER` → `IMPORTANT`, `NONE`
+→ `OPTIONAL` (le défaut). Le report **consomme sa source** dans la même
+instruction (`highlight = 'NONE'` après lecture) : si le `DROP` qui suit échouait,
+le report rejoué au démarrage suivant ne trouverait plus rien et ne pourrait pas
+écraser un statut choisi depuis. Le `DROP` n'est tenté que si le report a réussi
+ou que la source est déjà partie.
 
 ## API
 
@@ -203,11 +252,22 @@ requête DB à chaque chargement de page. Un changement admin est répercuté en
 | `POST /api/recruitment`            | admin  | Crée une annonce |
 | `PUT /api/recruitment/[id]`        | admin  | Met à jour une annonce |
 | `DELETE /api/recruitment/[id]`     | admin  | Supprime une annonce |
-| `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) |
-| `GET /api/recruitment/highlight`   | public | Annonce urgente à mettre en avant (ou `null`) |
+| `PUT /api/recruitment/reorder`     | admin  | Réordonne (`{ ids: number[] }`) — `409 RECRUITMENT_ORDER_MIXES_PRIORITIES` si l'ordre mêle les statuts |
+| `GET /api/recruitment/highlight`   | public | Mise en avant : `{ modal, banner }` (listes d'annonces) |
 
 Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la
-validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`).
+validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`,
+`INVALID_PRIORITY` sur un statut inconnu — anciennes valeurs `MODAL` / `BANNER`
+comprises : un client resté sur l'ancien formulaire est refusé, pas rabattu en
+silence sur « facultative »). À l'inverse, un `PUT` **sans** `priority` garde
+le statut enregistré : un champ absent n'est pas un statut vidé, et une
+prioritaire ne doit pas être rétrogradée par un client qui n'envoie pas le
+champ.
+
+`GET /api/recruitment/highlight` est publique et mise en cache
+(`Cache-Control: public, max-age=60, stale-while-revalidate=300`) ; le premier
+rendu ne passe plus par elle, la mise en page racine lisant le service
+directement.
 
 ## Navigation
 
@@ -218,11 +278,12 @@ barre d'actions de l'en-tête.
 
 ## Fichiers clés
 
-- `lib/shared/recruitment.ts` — types, constantes, validation
-- `lib/server/recruitment-service.ts` — accès base (CRUD, reorder, highlight)
+- `lib/shared/recruitment.ts` — types, constantes, validation, statuts (tri, groupes, mise en avant, cookies)
+- `lib/server/recruitment-service.ts` — accès base (CRUD, reorder, mise en avant)
 - `app/api/recruitment/**` — routes REST
 - `app/recrutement/page.tsx` + `RecruitmentSection.tsx` — page publique + gestion admin
-- `components/recruitment-highlight.tsx` — banderole / modale site-wide (aperçu + lien profond)
+- `components/recruitment-highlight.tsx` — banderole tournante / modale feuilletable site-wide (aperçu + lien profond)
+- `components/recruitment/UrgentPill.tsx` — pastille clignotante « Urgente » (`.pill-urgent` dans `app/globals.css`)
 - `app/recrutement/AdDetailModal.tsx` — lecture d'une annonce en grand
 - `components/recruitment/RecruitmentBody.tsx` — rendu des blocs de description
 - `components/recruitment/ContactTags.tsx` — tags de contact partagés carte / modale
@@ -234,6 +295,8 @@ barre d'actions de l'en-tête.
 
 `npm run seed` crée cinq annonces `Test - *` couvrant la matrice :
 deux longues descriptions (aperçu tronqué + modale de lecture), une description
-courte (affichée en entier, sans lien « lire la suite »), trois mises en avant
-concurrentes — une `LIVE`, une `QUEUED`, une banderole `QUEUED` — et un
-brouillon urgent (`DRAFT`). Les pôles couverts font apparaître le filtre.
+courte (affichée en entier, sans lien « lire la suite »), les trois statuts —
+deux prioritaires (modale à deux pages, banderole qui défile), une importante,
+une facultative **placée en tête de l'ordre brut** (le tri par statut doit la
+ranger malgré tout sous « Autres recrutements ») — et un brouillon prioritaire,
+jamais mis en avant. Les pôles couverts font apparaître le filtre.

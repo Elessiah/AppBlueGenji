@@ -21,62 +21,155 @@ function ad(overrides: Partial<RecruitmentAd> = {}): RecruitmentAd {
     id: 42,
     title: "Cherche coach Overwatch",
     teamName: "Test - Eclipse",
-    domain: "STAFF",
+    domain: "AUTRE",
     roles: "Coach",
     body: "Description de l'annonce.",
-    highlight: "MODAL",
     contactUrl: null,
     contactDiscord: null,
-    contactChannel: "AUTO",
+    contactDiscordId: null,
+    contactPreferred: "AUTO",
+    priority: "PRIORITY",
     active: true,
-    displayOrder: 0,
     ...overrides,
-  } as unknown as RecruitmentAd;
+  };
 }
 
-const render = (props: Parameters<typeof RecruitmentHighlight>[0]) =>
-  renderToStaticMarkup(<RecruitmentHighlight {...props} />);
+const urgent = ad();
+const second = ad({ id: 43, title: "Cherche arbitre" });
+const important = ad({ id: 44, title: "Cherche graphiste", priority: "IMPORTANT" });
 
-describe("RecruitmentHighlight — rendu serveur", () => {
+type Props = Parameters<typeof RecruitmentHighlight>[0];
+
+const render = (props: Partial<Props>) =>
+  renderToStaticMarkup(
+    <RecruitmentHighlight
+      modalAds={[]}
+      modalSilenced={false}
+      modalSeen={[]}
+      bannerAds={[]}
+      bannerDismissed={false}
+      onAdPage={false}
+      {...props}
+    />,
+  );
+
+/** Nombre d'occurrences d'un motif dans le balisage. */
+const count = (markup: string, pattern: RegExp) => (markup.match(pattern) ?? []).length;
+
+describe("RecruitmentHighlight — modale d'arrivée", () => {
   it("place la modale dans le HTML initial", () => {
     // L'assertion qui porte la correction du LCP : le titre de l'annonce est
     // dans la réponse, pas dans un rendu ultérieur.
-    const markup = render({ ad: ad(), dismissed: false, onAdPage: false });
+    const markup = render({ modalAds: [urgent] });
     expect(markup).toContain("Cherche coach Overwatch");
     expect(markup).toMatch(/role="dialog"/);
   });
 
-  it("place aussi la banderole dans le HTML initial", () => {
-    const markup = render({ ad: ad({ highlight: "BANNER" }), dismissed: false, onAdPage: false });
-    expect(markup).toContain("Cherche coach Overwatch");
-    expect(markup).toMatch(/role="region"/);
+  it("porte la pastille « Urgente » des prioritaires", () => {
+    const markup = render({ modalAds: [urgent] });
+    expect(markup).toContain("Urgente");
+    expect(markup).toContain("pill-urgent");
   });
 
-  it("ne rend rien quand le cookie dit que le visiteur l'a écartée", () => {
+  it("réunit plusieurs prioritaires dans une seule modale qui se feuillette", () => {
+    const markup = render({ modalAds: [urgent, second] });
+    expect(count(markup, /role="dialog"/g)).toBe(1);
+    expect(markup).toContain("Annonce 1 sur 2");
+    expect(markup).toContain("Suivante");
+    expect(markup).toContain("Précédente");
+  });
+
+  it("s'ouvre sur la première prioritaire jamais vue", () => {
+    const markup = render({ modalAds: [urgent, second], modalSeen: [42] });
+    expect(markup).toContain("Cherche arbitre");
+    expect(markup).not.toContain("Cherche coach Overwatch");
+    expect(markup).toContain("Annonce 2 sur 2");
+  });
+
+  it("ignore une annonce vue qui n'est plus mise en avant", () => {
+    const markup = render({ modalAds: [urgent, second], modalSeen: [99] });
+    expect(markup).toContain("Cherche coach Overwatch");
+  });
+
+  it("n'affiche pas de pagination pour une seule prioritaire", () => {
+    const markup = render({ modalAds: [urgent] });
+    expect(markup).not.toContain("Suivante");
+  });
+
+  it("ne rend rien quand le cookie dit que le visiteur les a toutes vues", () => {
     // Décidé par le serveur, donc **sans clignotement** : l'ancienne version
     // ne pouvait le savoir qu'après avoir monté le composant.
-    expect(render({ ad: ad(), dismissed: true, onAdPage: false })).toBe("");
+    expect(render({ modalAds: [urgent, second], modalSeen: [43, 42] })).toBe("");
+  });
+
+  it("se tait tant qu'un choix de confidentialité est dû", () => {
+    expect(render({ modalAds: [urgent], modalSilenced: true })).toBe("");
   });
 
   it("se tait sur la page de recrutement, où le visiteur lit déjà les annonces", () => {
-    expect(render({ ad: ad(), dismissed: false, onAdPage: true })).toBe("");
-  });
-
-  it("laisse la banderole sur la page de recrutement", () => {
-    // Elle n'est pas modale : elle ne recouvre rien et ne se superpose pas à la
-    // lecture d'une annonce ouverte par lien profond.
-    const markup = render({ ad: ad({ highlight: "BANNER" }), dismissed: false, onAdPage: true });
-    expect(markup).toContain("Cherche coach Overwatch");
-  });
-
-  it("ne rend rien sans annonce, ni sur une annonce non mise en avant", () => {
-    expect(render({ ad: null, dismissed: false, onAdPage: false })).toBe("");
-    expect(render({ ad: ad({ highlight: "NONE" }), dismissed: false, onAdPage: false })).toBe("");
+    expect(render({ modalAds: [urgent], onAdPage: true })).toBe("");
   });
 
   it("mène à la lecture complète plutôt que de tout déverser", () => {
-    const markup = render({ ad: ad(), dismissed: false, onAdPage: false });
-    expect(markup).toContain("/recrutement#");
+    const markup = render({ modalAds: [urgent] });
+    expect(markup).toContain("/recrutement#annonce-42");
+  });
+});
+
+describe("RecruitmentHighlight — banderole", () => {
+  it("place la banderole dans le HTML initial", () => {
+    const markup = render({ bannerAds: [important] });
+    expect(markup).toContain("Cherche graphiste");
+    expect(markup).toMatch(/role="region"/);
+  });
+
+  it("n'accorde la pastille « Urgente » qu'aux prioritaires", () => {
+    expect(render({ bannerAds: [important] })).not.toContain("Urgente");
+    expect(render({ bannerAds: [urgent] })).toContain("Urgente");
+  });
+
+  it("montre une annonce à la fois, la première d'abord", () => {
+    const markup = render({ bannerAds: [urgent, important] });
+    expect(markup).toContain("Cherche coach Overwatch");
+    expect(markup).not.toContain("Cherche graphiste");
+  });
+
+  it("offre de parcourir et de mettre en pause quand plusieurs annonces défilent", () => {
+    const markup = render({ bannerAds: [urgent, important] });
+    expect(markup).toContain("Annonce précédente");
+    expect(markup).toContain("Annonce suivante");
+    expect(markup).toContain("Mettre en pause le défilement des annonces");
+    expect(markup).toContain("Annonce 1 sur 2");
+  });
+
+  it("n'encombre pas une banderole à une seule annonce de commandes inutiles", () => {
+    const markup = render({ bannerAds: [important] });
+    expect(markup).not.toContain("Annonce suivante");
+    expect(markup).not.toContain("Mettre en pause");
+  });
+
+  it("ne rend rien quand le visiteur l'a fermée pour sa visite", () => {
+    expect(render({ bannerAds: [important], bannerDismissed: true })).toBe("");
+  });
+
+  it("reste sur la page de recrutement, par une ancre native", () => {
+    // Elle n'est pas modale : elle ne recouvre rien. Et l'ancre native déclenche
+    // `hashchange`, que la page écoute pour ouvrir l'annonce.
+    const markup = render({ bannerAds: [important], onAdPage: true });
+    expect(markup).toContain("Cherche graphiste");
+    expect(markup).toContain('href="#annonce-44"');
+  });
+
+  it("se montre avec la modale : les deux ne s'excluent plus", () => {
+    const markup = render({ modalAds: [urgent], bannerAds: [urgent, important] });
+    expect(markup).toMatch(/role="region"/);
+    expect(markup).toMatch(/role="dialog"/);
+  });
+});
+
+describe("RecruitmentHighlight — rien à montrer", () => {
+  it("ne rend rien sans annonce mise en avant", () => {
+    expect(render({})).toBe("");
   });
 });
 
@@ -97,5 +190,12 @@ describe("RecruitmentHighlight — ce qui ne doit plus exister", () => {
 
   it("ne lit plus le stockage local, que le serveur ne peut pas voir", () => {
     expect(code).not.toMatch(/localStorage|sessionStorage/);
+  });
+
+  it("fait tourner la banderole sous le régime de charge, pas pour son compte", () => {
+    // Une banderole qui tourne derrière un jeu est une image prise au jeu : la
+    // rotation lit `useClientPower`, comme toute boucle d'affichage du site.
+    expect(code).toContain("useClientPower()");
+    expect(code).not.toMatch(/visibilitychange|setInterval\(/);
   });
 });

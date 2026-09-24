@@ -448,25 +448,68 @@ select.modalInput {
   color: var(--blue-300);
 }
 
-/* Badge de gestion : état réel de la mise en avant d'une annonce. */
-.highlightBadge {
+/* Badge de gestion : statut d'importance de l'annonce. */
+.priorityBadge {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
   font-size: 9.5px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--blue-300);
-  border: 1px solid rgba(90, 200, 255, 0.35);
+  color: var(--ink-mute);
+  border: 1px solid var(--line-strong-cy);
   border-radius: 999px;
   padding: 3px 9px;
   cursor: help;
 }
 
-/* Mise en avant demandée mais non servie : une autre annonce l'emporte. */
-.highlightBadgeOff {
+.priorityBadgeUrgent {
   color: var(--amber, #ffb45c);
   border-color: rgba(255, 180, 92, 0.4);
+}
+
+.priorityBadgeImportant {
+  color: var(--blue-300);
+  border-color: rgba(90, 200, 255, 0.35);
+}
+
+/* Brouillon : le statut est choisi mais n'a encore aucun effet — contour en
+   pointillé, comme un réglage en attente. */
+.priorityBadgeDraft {
+  border-style: dashed;
+}
+
+/* Liste principale vide alors que des facultatives existent. */
+.groupEmpty {
+  margin: 0;
+  padding: 8px 0 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--ink-mute);
+}
+
+/* « Autres recrutements » : les annonces facultatives, rangées à part. */
+.others {
+  margin-top: 48px;
+}
+
+.othersHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  border-top: 1px solid var(--line-soft);
+  padding: 20px 0 22px;
+}
+
+.othersTitle {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(20px, 2.2vw, 28px);
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--ink);
 }
 
 /* Compteur de signes de la description. */
@@ -482,21 +525,16 @@ select.modalInput {
   color: var(--amber, #ffb45c);
 }
 
-/* Avertissement en ligne du formulaire (mise en avant déjà occupée). */
-.modalWarn {
-  font-family: var(--font-sans);
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--amber, #ffb45c);
-  border-left: 2px solid rgba(255, 180, 92, 0.5);
-  padding-left: 10px;
-}
-
 /* Responsive */
 @media (max-width: 768px) {
-  .head {
+  .head,
+  .othersHead {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .others {
+    margin-top: 32px;
   }
 }
 
