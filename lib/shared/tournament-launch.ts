@@ -291,7 +291,8 @@ export function advanceSuccessMessage(
   if (state === "FINISHED") {
     return "Tournoi clos : il n'y avait pas assez d'engagés pour jouer un match.";
   }
-  if (state === "RUNNING") return `Tournoi lancé avec ${entrantCount} engagés.`;
+  const entrants = `${entrantCount} ${entrantCount > 1 ? "engagés" : "engagé"}`;
+  if (state === "RUNNING") return `Tournoi lancé avec ${entrants}.`;
   if (target === "REGISTRATION") return "Inscriptions ouvertes.";
-  return `Inscriptions closes avec ${entrantCount} engagés.`;
+  return `Inscriptions closes avec ${entrants}.`;
 }

@@ -37,7 +37,7 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
 
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
 
-    // Il n'y a plus rien à abréger : le tournoi a déjà démarré, ou s'est
+    // Il n'y a plus d'étape à avancer : le tournoi a déjà démarré, ou s'est
     // terminé. 409 — l'état du tournoi contredit la demande, la demande
     // elle-même est bien formée.
     if (message === "TOURNAMENT_ALREADY_STARTED" || message === "TOURNAMENT_ALREADY_FINISHED") {

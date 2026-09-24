@@ -291,6 +291,11 @@ describe("advanceSuccessMessage", () => {
     );
   });
 
+  it("accorde « engagé » au singulier jusqu'à un", () => {
+    expect(advanceSuccessMessage("LOCKED", "UPCOMING", 1)).toBe("Inscriptions closes avec 1 engagé.");
+    expect(advanceSuccessMessage("LOCKED", "UPCOMING", 0)).toBe("Inscriptions closes avec 0 engagé.");
+  });
+
   it("annonce le lancement", () => {
     expect(advanceSuccessMessage("RUNNING", "RUNNING", 8)).toBe("Tournoi lancé avec 8 engagés.");
   });
