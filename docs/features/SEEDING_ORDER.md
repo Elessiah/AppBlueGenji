@@ -124,7 +124,7 @@ Deux raisons de verrouillage, exposées à l'interface :
 | `SINGLE` / `DOUBLE` | ordre des seeds (déjà le cas avant) | idem |
 | `SWISS` | classement du site (`lib/shared/ranking.ts`) | ordre des seeds |
 | `SURVIVAL` | classement du site | ordre des seeds |
-| `BG_SURVIE` | ordre des seeds (toujours) | ordre des seeds |
+| `BG_SURVIE` | classement du site | ordre des seeds |
 | `MULTI` (phase 1) | classement du site | ordre des seeds |
 
 Tant que personne n'a réordonné, chaque format garde donc exactement le
