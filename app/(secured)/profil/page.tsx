@@ -899,8 +899,8 @@ export default function ProfilePage() {
               />
             </div>
             <p className={s.hint}>
-              Décoché, tu n&apos;apparais plus dans le filtre « Free agents » de
-              l&apos;annuaire et ta carte n&apos;annonce plus que tu cherches une équipe.
+              Décochée par défaut. Cochée, tu apparais dans le filtre « Free agents » de
+              l&apos;annuaire et ta carte annonce « FREE AGENT » tant que tu es sans équipe.
             </p>
           </div>
 
