@@ -349,7 +349,8 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 - **Toutes** les lectures des pages de vitrine passent par `showcase-cache`.
   Cinq y manquaient encore, dont les deux plus chaudes : `getContactInfo`,
   appelée par `PublicFooter` — donc par *chaque* page publique, à chaque rendu —
-  et `getHighlightedAd`, appelée par la mise en page racine. Les trois autres
+  et la mise en avant du recrutement (aujourd'hui `getRecruitmentSpotlight`),
+  appelée par la mise en page racine. Les trois autres
   sont le bureau (`/association`), les bénévoles et la liste publique des
   annonces de recrutement. Ces pages sont rendues à chaque visite (elles lisent
   la session) et ne sont pas des routes API : elles ne peuvent pas répondre 429,

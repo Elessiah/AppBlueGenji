@@ -16,6 +16,7 @@ import {
   type RecruitmentAd,
   buildRecruitmentPreview,
   recruitmentAdAnchor,
+  recruitmentModalStart,
   serializeRecruitmentSeen,
 } from "@/lib/shared/recruitment";
 import styles from "./recruitment-highlight.module.css";
@@ -85,18 +86,18 @@ function adHref(ad: RecruitmentAd): string {
  */
 export function RecruitmentHighlight({
   modalAds,
-  modalStart,
-  modalSeen = [],
+  modalSilenced,
+  modalSeen,
   bannerAds,
   bannerDismissed,
   onAdPage,
 }: {
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
   modalAds: readonly RecruitmentAd[];
-  /** Page d'ouverture de la modale, `null` si elle se tait (déjà vue, ou choix de confidentialité dû). */
-  modalStart: number | null;
+  /** La modale doit se taire quoi qu'il arrive (choix de confidentialité dû). */
+  modalSilenced: boolean;
   /** Prioritaires que ce visiteur a déjà vues (cookie) : elles le restent. */
-  modalSeen?: readonly number[];
+  modalSeen: readonly number[];
   /** Prioritaires puis importantes publiées : ce qui défile dans la banderole. */
   bannerAds: readonly RecruitmentAd[];
   /** Le cookie dit que ce visiteur a déjà fermé la banderole telle qu'elle est. */
@@ -104,7 +105,9 @@ export function RecruitmentHighlight({
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
 }) {
-  const showModal = modalStart !== null && modalAds.length > 0 && !onAdPage;
+  // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
+  const modalStart = recruitmentModalStart(modalAds.map((ad) => ad.id), modalSeen);
+  const showModal = modalStart !== null && !modalSilenced && !onAdPage;
   return (
     <>
       {!bannerDismissed && bannerAds.length > 0 && (
@@ -114,7 +117,7 @@ export function RecruitmentHighlight({
         <RecruitmentArrivalModal
           ads={modalAds}
           seenIds={modalSeen}
-          startIndex={Math.min(Math.max(modalStart, 0), modalAds.length - 1)}
+          startIndex={modalStart}
         />
       )}
     </>
@@ -128,10 +131,9 @@ export function RecruitmentHighlight({
  * Le défilement s'arrête de lui-même dans trois cas, et aucun n'est une option
  * à cocher : au **survol à la souris** ou au **focus clavier** (on ne retire pas
  * une annonce de sous le pointeur ni sous le clavier), et dès que le **régime de
- * charge** coupe
- * les animations décoratives — page sans focus, machine à la peine, joueur en
- * match, mouvement réduit demandé (`useClientPower`) : une banderole qui tourne
- * derrière un jeu est une image prise au jeu. Un bouton pause le fige pour de
+ * charge** coupe les animations décoratives — page sans focus, machine à la
+ * peine, joueur en match, mouvement réduit demandé (`useClientPower`) : une
+ * banderole qui tourne derrière un jeu est une image prise au jeu. Un bouton pause le fige pour de
  * bon (WCAG 2.2.2), et les flèches parcourent les annonces à la main.
  */
 function RecruitmentBanner({

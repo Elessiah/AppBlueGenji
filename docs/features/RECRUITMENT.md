@@ -189,7 +189,11 @@ une modale par annonce serait insupportable ; la modale ne tourne pas d'elle-mê
 
 Elle s'ouvre sur la **première prioritaire jamais vue** (`recruitmentModalStart`) :
 un visiteur qui revient pour une troisième prioritaire tombe sur celle-ci, sans
-relire les deux autres. Elle se tait sur `/recrutement` et tant qu'un choix de
+relire les deux autres. **Seules les pages réellement affichées** comptent pour
+vues : fermée sur la page 1 de 3, la modale revient à l'arrivée suivante sur la
+page 2 — c'est le « tour à tour » des prioritaires. Compter toutes les pages dès
+l'ouverture taisait pour sept jours celles que le visiteur n'avait jamais
+feuilletées. Une fois toutes vues, elle se tait sept jours. Elle se tait sur `/recrutement` et tant qu'un choix de
 confidentialité est dû (`PrivacyChangesModal`).
 
 ### Banderole : les annonces défilent
@@ -221,7 +225,7 @@ initial (voir l'historique du LCP dans `components/recruitment-highlight.tsx`).
 
 | Cookie | Durée | Posé quand | Valeur |
 | ------ | ----- | ---------- | ------ |
-| `bg_recr_modal` | 7 jours | la modale est **montrée** (même sans être fermée) | identifiants des prioritaires montrées, `12.15.3` |
+| `bg_recr_modal` | 7 jours | une page de la modale est **affichée** (même sans être fermée) | identifiants des prioritaires réellement affichées, `12.15.3` |
 | `bg_recr_banner` | la visite | la banderole est **fermée** | identifiants des annonces qu'elle portait |
 
 `parseRecruitmentSeen` ignore tout ce qui n'est pas un entier positif (une valeur

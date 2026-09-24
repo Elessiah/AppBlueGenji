@@ -283,22 +283,27 @@ describe("recruitmentDismissed", () => {
 
 describe("recruitmentModalStart", () => {
   it("ouvre sur la première page quand rien n'a été vu", () => {
-    expect(recruitmentModalStart(undefined, [5, 6, 7])).toBe(0);
+    expect(recruitmentModalStart([5, 6, 7], [])).toBe(0);
   });
 
   it("ouvre sur la première prioritaire jamais vue", () => {
     // Revenir pour une troisième prioritaire ne fait pas relire les deux autres.
-    expect(recruitmentModalStart("5.6", [5, 6, 7])).toBe(2);
-    expect(recruitmentModalStart("6", [5, 6, 7])).toBe(0);
+    expect(recruitmentModalStart([5, 6, 7], [5, 6])).toBe(2);
+    expect(recruitmentModalStart([5, 6, 7], [6])).toBe(0);
   });
 
   it("se tait quand toutes ont été vues", () => {
-    expect(recruitmentModalStart("5.6.7", [5, 6, 7])).toBeNull();
-    expect(recruitmentModalStart("7.5.6.9", [5, 6, 7])).toBeNull();
+    expect(recruitmentModalStart([5, 6, 7], [5, 6, 7])).toBeNull();
+    expect(recruitmentModalStart([5, 6, 7], [7, 5, 6, 9])).toBeNull();
   });
 
   it("se tait sans prioritaire", () => {
-    expect(recruitmentModalStart(undefined, [])).toBeNull();
+    expect(recruitmentModalStart([], [])).toBeNull();
+  });
+
+  it("s'enchaîne avec la lecture du cookie", () => {
+    const ids = [5, 6, 7];
+    expect(recruitmentModalStart(ids, recruitmentSeenAmong("5.9", ids))).toBe(1);
   });
 });
 

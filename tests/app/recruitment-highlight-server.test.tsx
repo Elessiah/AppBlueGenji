@@ -44,7 +44,8 @@ const render = (props: Partial<Props>) =>
   renderToStaticMarkup(
     <RecruitmentHighlight
       modalAds={[]}
-      modalStart={null}
+      modalSilenced={false}
+      modalSeen={[]}
       bannerAds={[]}
       bannerDismissed={false}
       onAdPage={false}
@@ -59,54 +60,58 @@ describe("RecruitmentHighlight — modale d'arrivée", () => {
   it("place la modale dans le HTML initial", () => {
     // L'assertion qui porte la correction du LCP : le titre de l'annonce est
     // dans la réponse, pas dans un rendu ultérieur.
-    const markup = render({ modalAds: [urgent], modalStart: 0 });
+    const markup = render({ modalAds: [urgent] });
     expect(markup).toContain("Cherche coach Overwatch");
     expect(markup).toMatch(/role="dialog"/);
   });
 
   it("porte la pastille « Urgente » des prioritaires", () => {
-    const markup = render({ modalAds: [urgent], modalStart: 0 });
+    const markup = render({ modalAds: [urgent] });
     expect(markup).toContain("Urgente");
     expect(markup).toContain("pill-urgent");
   });
 
   it("réunit plusieurs prioritaires dans une seule modale qui se feuillette", () => {
-    const markup = render({ modalAds: [urgent, second], modalStart: 0 });
+    const markup = render({ modalAds: [urgent, second] });
     expect(count(markup, /role="dialog"/g)).toBe(1);
     expect(markup).toContain("Annonce 1 sur 2");
     expect(markup).toContain("Suivante");
     expect(markup).toContain("Précédente");
   });
 
-  it("s'ouvre sur la page que le serveur désigne — la première jamais vue", () => {
-    const markup = render({ modalAds: [urgent, second], modalStart: 1 });
+  it("s'ouvre sur la première prioritaire jamais vue", () => {
+    const markup = render({ modalAds: [urgent, second], modalSeen: [42] });
     expect(markup).toContain("Cherche arbitre");
     expect(markup).not.toContain("Cherche coach Overwatch");
     expect(markup).toContain("Annonce 2 sur 2");
   });
 
-  it("borne une page d'ouverture hors de la liste plutôt que de ne rien montrer", () => {
-    const markup = render({ modalAds: [urgent, second], modalStart: 9 });
-    expect(markup).toContain("Cherche arbitre");
+  it("ignore une annonce vue qui n'est plus mise en avant", () => {
+    const markup = render({ modalAds: [urgent, second], modalSeen: [99] });
+    expect(markup).toContain("Cherche coach Overwatch");
   });
 
   it("n'affiche pas de pagination pour une seule prioritaire", () => {
-    const markup = render({ modalAds: [urgent], modalStart: 0 });
+    const markup = render({ modalAds: [urgent] });
     expect(markup).not.toContain("Suivante");
   });
 
   it("ne rend rien quand le cookie dit que le visiteur les a toutes vues", () => {
     // Décidé par le serveur, donc **sans clignotement** : l'ancienne version
     // ne pouvait le savoir qu'après avoir monté le composant.
-    expect(render({ modalAds: [urgent], modalStart: null })).toBe("");
+    expect(render({ modalAds: [urgent, second], modalSeen: [43, 42] })).toBe("");
+  });
+
+  it("se tait tant qu'un choix de confidentialité est dû", () => {
+    expect(render({ modalAds: [urgent], modalSilenced: true })).toBe("");
   });
 
   it("se tait sur la page de recrutement, où le visiteur lit déjà les annonces", () => {
-    expect(render({ modalAds: [urgent], modalStart: 0, onAdPage: true })).toBe("");
+    expect(render({ modalAds: [urgent], onAdPage: true })).toBe("");
   });
 
   it("mène à la lecture complète plutôt que de tout déverser", () => {
-    const markup = render({ modalAds: [urgent], modalStart: 0 });
+    const markup = render({ modalAds: [urgent] });
     expect(markup).toContain("/recrutement#annonce-42");
   });
 });
@@ -156,7 +161,7 @@ describe("RecruitmentHighlight — banderole", () => {
   });
 
   it("se montre avec la modale : les deux ne s'excluent plus", () => {
-    const markup = render({ modalAds: [urgent], modalStart: 0, bannerAds: [urgent, important] });
+    const markup = render({ modalAds: [urgent], bannerAds: [urgent, important] });
     expect(markup).toMatch(/role="region"/);
     expect(markup).toMatch(/role="dialog"/);
   });

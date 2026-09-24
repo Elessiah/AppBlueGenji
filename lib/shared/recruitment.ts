@@ -161,8 +161,10 @@ export function recruitmentDismissed(cookieValue: string | undefined, adIds: rea
 
 /**
  * Parmi les annonces mises en avant, celles que le cookie dit déjà vues, dans
- * l'ordre reçu. La modale d'arrivée les garde pour vues en réécrivant son
- * cookie, qui ne porte ainsi que des annonces encore en ligne.
+ * l'ordre reçu. C'est la seule lecture du cookie de la modale : la page
+ * d'ouverture s'en déduit ({@link recruitmentModalStart}), et la modale les
+ * garde pour vues en réécrivant son cookie, qui ne porte ainsi que des
+ * annonces encore en ligne.
  */
 export function recruitmentSeenAmong(
   cookieValue: string | undefined,
@@ -180,10 +182,10 @@ export function recruitmentSeenAmong(
  * tomber sur celle-ci, pas relire les autres. Toutes restent feuilletables.
  */
 export function recruitmentModalStart(
-  cookieValue: string | undefined,
   adIds: readonly number[],
+  seenIds: readonly number[],
 ): number | null {
-  const seen = parseRecruitmentSeen(cookieValue);
+  const seen = new Set(seenIds);
   const index = adIds.findIndex((id) => !seen.has(id));
   return index < 0 ? null : index;
 }

@@ -20,7 +20,6 @@ import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_MODAL_COOKIE,
   recruitmentDismissed,
-  recruitmentModalStart,
   recruitmentSeenAmong,
 } from "@/lib/shared/recruitment";
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
@@ -127,16 +126,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   //
   // `getRecruitmentSpotlight` est déjà en cache à vol unique (60 s) et avale
   // ses erreurs en listes vides : la mise en page ne peut pas tomber à cause
-  // d'elle. La modale s'ouvre sur la première prioritaire que ce visiteur n'a
-  // jamais vue (`null` : il les a toutes vues, elle se tait) ; la banderole se
-  // tait tant qu'aucune annonce qu'elle porte n'est neuve pour lui.
+  // d'elle. Le cookie de la modale ne se lit qu'ici : la modale en déduit sa
+  // première page (la première prioritaire jamais vue) et se tait quand toutes
+  // l'ont été ; la banderole se tait tant qu'aucune annonce qu'elle porte n'est
+  // neuve pour ce visiteur.
   const cookieStore = await cookies();
   const spotlight = await getRecruitmentSpotlight();
   const onRecruitmentPage = requestHeaders.get(PATHNAME_HEADER) === RECRUITMENT_PAGE;
-  const modalCookie = cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value;
-  const modalIds = spotlight.modal.map((ad) => ad.id);
-  const modalStart = recruitmentModalStart(modalCookie, modalIds);
-  const modalSeen = recruitmentSeenAmong(modalCookie, modalIds);
+  const modalSeen = recruitmentSeenAmong(
+    cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value,
+    spotlight.modal.map((ad) => ad.id),
+  );
   const bannerDismissed = recruitmentDismissed(
     cookieStore.get(RECRUITMENT_BANNER_COOKIE)?.value,
     spotlight.banner.map((ad) => ad.id),
@@ -176,7 +176,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               (la banderole, elle, reste). */}
           <RecruitmentHighlight
             modalAds={spotlight.modal}
-            modalStart={privacyChanges.length > 0 ? null : modalStart}
+            modalSilenced={privacyChanges.length > 0}
             modalSeen={modalSeen}
             bannerAds={spotlight.banner}
             bannerDismissed={bannerDismissed}
