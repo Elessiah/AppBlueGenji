@@ -29,7 +29,6 @@ export const SEEDING_SOURCE_LABELS: Record<SeedingSource, string> = {
 const REGISTRATION_ORDER_FORMATS: ReadonlySet<TournamentFormat> = new Set<TournamentFormat>([
   "SINGLE",
   "DOUBLE",
-  "BG_SURVIE",
 ]);
 
 /**

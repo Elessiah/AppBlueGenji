@@ -245,10 +245,18 @@ existait à l'écran et pas en base.
 
 ## Classement de départ
 
-Il n'est **pas** calculé depuis le classement du site : il vient de l'ordre de
-seeding des inscriptions, que l'arbitre fixe à la main avant le lancement
-(voir `SEEDING_ORDER.md`). C'est le seul mode où le classement initial est une
-décision humaine.
+Il vient du **classement du site** (la cote Elo, par le chargeur unique
+`loadEntrantsBySiteRanking`), comme en Survie et en Ronde suisse : seed 1 =
+meilleure cote au lancement. Si l'arbitre a **réordonné** les inscrites
+(`manual_seeding = 1`, voir `SEEDING_ORDER.md`), son ordre prime.
+
+Le mode partait auparavant de l'ordre d'inscription quand personne n'avait
+réordonné : le règlement veut un classement décidé en amont, mais l'ordre
+d'arrivée n'en est pas un — c'était un tirage que personne n'avait choisi.
+`seedingSource` (`lib/shared/seeding.ts`) rend désormais `RANKING` pour ce
+format, si bien que l'aperçu du plateau, la mention sous les flèches de seeding
+et la carte du direct de l'accueil (qui tait un seed qui n'est pas le tirage)
+suivent sans code propre.
 
 ## Architecture
 

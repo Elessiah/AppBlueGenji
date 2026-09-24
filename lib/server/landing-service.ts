@@ -238,9 +238,10 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       null;
     // La colonne `seed` porte l'ordre d'inscription ; elle n'est le **tirage**
     // du tournoi que dans les formats qui seedent depuis elle (ou dès que le
-    // staff a réordonné à la main). En Suisse, en Survie et en multi-phases, le
-    // moteur seede depuis le classement du site : afficher « SEED 3 » y serait
-    // la même invention que le « SEED 1 » écrit en dur qu'on remplace.
+    // staff a réordonné à la main). En Suisse, en Survie, en BG Survie et en
+    // multi-phases, le moteur seede depuis le classement du site : afficher
+    // « SEED 3 » y serait la même invention que le « SEED 1 » écrit en dur
+    // qu'on remplace.
     const seedOrderIsTheDraw =
       currentRow !== null &&
       isSeedOrderEffective(

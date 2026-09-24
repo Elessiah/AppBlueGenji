@@ -133,12 +133,23 @@ describe("loadTournamentPreview", () => {
     expect((await run(tournament({ format: "SURVIVAL" })))?.seedingSource).toBe("RANKING");
   });
 
-  it("garde l'ordre d'inscription pour la BlueGenji Survie", async () => {
+  it("ordonne une BlueGenji Survie par le classement du site", async () => {
     mockQueries(entrantRows(["Alpha", "Beta"]));
 
     const preview = await run(tournament({ format: "BG_SURVIE" }));
 
-    expect(preview?.seedingSource).toBe("REGISTRATION");
+    expect(preview?.seedingSource).toBe("RANKING");
+    // Le classement lui-même peut sortir du cache mutualisé (lecture seule) :
+    // seule compte ici l'absence de tri par la colonne `seed`.
+    expect(entrantsSql()).not.toContain("ORDER BY COALESCE(r.seed");
+  });
+
+  it("garde l'ordre saisi à la main d'une BlueGenji Survie", async () => {
+    mockQueries(entrantRows(["Alpha", "Beta"]));
+
+    const preview = await run(tournament({ format: "BG_SURVIE", manual_seeding: 1 }));
+
+    expect(preview?.seedingSource).toBe("MANUAL");
     expect(entrantsSql()).toContain("ORDER BY COALESCE(r.seed, 1000000), r.registered_at ASC");
   });
 

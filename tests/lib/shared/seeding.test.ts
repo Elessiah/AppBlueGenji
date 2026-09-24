@@ -132,14 +132,14 @@ describe("applySeedOrder", () => {
 });
 
 describe("seedingSource", () => {
-  it.each<[TournamentFormat]>([["SINGLE"], ["DOUBLE"], ["BG_SURVIE"]])(
+  it.each<[TournamentFormat]>([["SINGLE"], ["DOUBLE"]])(
     "%s lit la colonne seed, donc l'ordre d'inscription tant que personne n'a réordonné",
     (format) => {
       expect(seedingSource(format, false)).toBe("REGISTRATION");
     },
   );
 
-  it.each<[TournamentFormat]>([["SWISS"], ["SURVIVAL"], ["MULTI"]])(
+  it.each<[TournamentFormat]>([["SWISS"], ["SURVIVAL"], ["BG_SURVIE"], ["MULTI"]])(
     "%s seede depuis le classement du site",
     (format) => {
       expect(seedingSource(format, false)).toBe("RANKING");

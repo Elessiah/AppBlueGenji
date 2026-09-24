@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments/repository");
+jest.mock("@/lib/server/ranking-service");
 
 import {
   forfeitEnduranceTeam,
@@ -9,7 +10,12 @@ import {
   reconcileEndurance,
   startEndurancePlayoffs,
 } from "@/lib/server/tournaments/bg-survie";
-import { createMatch, finishTournament } from "@/lib/server/tournaments/repository";
+import {
+  createMatch,
+  finishTournament,
+  loadRegisteredTeamIds,
+} from "@/lib/server/tournaments/repository";
+import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import type { SqlMock } from "../helpers/sql-double";
 
 type Row = Record<string, unknown>;
@@ -27,6 +33,7 @@ function tournamentRow(overrides: Row = {}): Row {
     endurance_current_round: 0,
     endurance_playoffs_started: 0,
     has_third_place_match: 0,
+    manual_seeding: 0,
     ...overrides,
   };
 }
@@ -92,25 +99,36 @@ describe("initializeEnduranceTournament", () => {
     jest.restoreAllMocks();
   });
 
-  it("sème le classement dans l'ordre du seeding et fige le barème", async () => {
+  /** Seeds posés par les `INSERT` du classement, sous la forme [équipe, seed]. */
+  function insertedSeeds(conn: ReturnType<typeof makeConn>): [unknown, unknown][] {
+    return conn.execute.mock.calls
+      .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
+      .map(([, params]) => [(params as unknown[])[1], (params as unknown[])[2]]);
+  }
+
+  it("sème le classement depuis le classement du site et fige le barème", async () => {
+    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue([
+      { teamId: 20, teamName: "Cote haute" },
+      { teamId: 30, teamName: "Cote moyenne" },
+      { teamId: 10, teamName: "Cote basse" },
+    ]);
     const conn = makeConn([
       [[tournamentRow({ endurance_start_points: null })]], // tournoi
-      [[{ team_id: 30 }, { team_id: 10 }, { team_id: 20 }]], // inscriptions triées par seed
     ]);
 
     await initializeEnduranceTournament(5, conn);
 
-    const seedQuery = conn.execute.mock.calls[1][0] as string;
-    expect(seedQuery).toMatch(/ORDER BY COALESCE\(seed, 1000000\)/);
-
-    const inserts = conn.execute.mock.calls.filter(([sql]) =>
-      String(sql).includes("INSERT INTO bg_endurance_standings"),
-    );
-    // Seed 1, 2, 3 attribués dans l'ordre des inscriptions.
-    expect(inserts.map(([, params]) => [(params as unknown[])[1], (params as unknown[])[2]])).toEqual([
-      [30, 1],
-      [10, 2],
-      [20, 3],
+    // Le chargeur unique, sur la connexion de la transaction de lancement.
+    expect(loadEntrantsBySiteRanking).toHaveBeenCalledWith(conn, 5);
+    // L'ordre d'inscription n'est pas relu : il n'est pas le tirage.
+    expect(
+      conn.execute.mock.calls.some(([sql]) => String(sql).includes("ORDER BY COALESCE(seed")),
+    ).toBe(false);
+    // Seed 1 = meilleure cote.
+    expect(insertedSeeds(conn)).toEqual([
+      [20, 1],
+      [30, 2],
+      [10, 3],
     ]);
 
     const settings = conn.execute.mock.calls.find(([sql]) =>
@@ -120,11 +138,38 @@ describe("initializeEnduranceTournament", () => {
     expect((settings?.[1] as unknown[]).slice(0, 4)).toEqual([9, 1, 1, 8]);
   });
 
-  it("fige le plafond de manches avec le reste du barème", async () => {
-    const conn = makeConn([
-      [[tournamentRow({ endurance_max_rounds: 5 })]],
-      [[{ team_id: 1 }, { team_id: 2 }]],
+  it("fait primer l'ordre fixé à la main sur le classement du site", async () => {
+    jest.mocked(loadRegisteredTeamIds).mockResolvedValue([30, 10, 20]);
+    const conn = makeConn([[[tournamentRow({ manual_seeding: 1 })]]]);
+
+    await initializeEnduranceTournament(5, conn);
+
+    expect(loadEntrantsBySiteRanking).not.toHaveBeenCalled();
+    // Le chargeur des tableaux à élimination, qui trie par la colonne `seed`.
+    expect(loadRegisteredTeamIds).toHaveBeenCalledWith(conn, 5);
+    // Seed 1, 2, 3 attribués dans l'ordre saisi par le staff.
+    expect(insertedSeeds(conn)).toEqual([
+      [30, 1],
+      [10, 2],
+      [20, 3],
     ]);
+  });
+
+  it("sème un classement vide sans inscrite", async () => {
+    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue([]);
+    const conn = makeConn([[[tournamentRow()]]]);
+
+    await initializeEnduranceTournament(5, conn);
+
+    expect(insertedSeeds(conn)).toEqual([]);
+  });
+
+  it("fige le plafond de manches avec le reste du barème", async () => {
+    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue([
+      { teamId: 1, teamName: "A" },
+      { teamId: 2, teamName: "B" },
+    ]);
+    const conn = makeConn([[[tournamentRow({ endurance_max_rounds: 5 })]]]);
 
     await initializeEnduranceTournament(5, conn);
 
@@ -140,6 +185,8 @@ describe("initializeEnduranceTournament", () => {
     await initializeEnduranceTournament(5, conn);
 
     expect(conn.execute).toHaveBeenCalledTimes(1);
+    expect(loadEntrantsBySiteRanking).not.toHaveBeenCalled();
+    expect(loadRegisteredTeamIds).not.toHaveBeenCalled();
   });
 });
 

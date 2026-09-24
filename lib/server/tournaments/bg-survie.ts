@@ -4,8 +4,8 @@
  * Découpage identique à la Survie et à la Ronde suisse : la logique est pure
  * (`lib/shared/bg-survie.ts`), ce module ne fait que lire/écrire la base.
  *
- * - `initializeEnduranceTournament` — sème le classement depuis l'ordre de
- *   seeding (défini à la main par l'arbitre) et pose le barème.
+ * - `initializeEnduranceTournament` — sème le classement depuis le classement
+ *   du site (ou l'ordre fixé à la main par le staff) et pose le barème.
  * - `generateEnduranceRound` — apparie et crée les matchs de la manche suivante.
  * - `reconcileEndurance` — **rejoue** tout depuis l'historique, persiste le
  *   classement, enchaîne la manche suivante ou bascule en play-offs.
@@ -52,8 +52,9 @@ import {
   rowsOrEmptyIfMissingTable,
 } from "@/lib/server/mysql-errors";
 import { appendSequentialRanks, podiumRanks } from "@/lib/shared/double-forfeit";
-import { createMatch, finishTournament, reopenTournament } from "./repository";
+import { createMatch, finishTournament, loadRegisteredTeamIds, reopenTournament } from "./repository";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 
 type TournamentEnduranceRow = RowDataPacket & {
   format: string;
@@ -70,6 +71,7 @@ type TournamentEnduranceRow = RowDataPacket & {
   endurance_current_round: number;
   endurance_playoffs_started: number;
   has_third_place_match: number;
+  manual_seeding: number;
 };
 
 /**
@@ -92,7 +94,7 @@ async function loadTournament(
             match_format_max_maps, match_format_draws,
             endurance_start_points, endurance_win_delta, endurance_loss_delta,
             endurance_playoff_size, endurance_max_rounds, endurance_current_round,
-            endurance_playoffs_started, has_third_place_match
+            endurance_playoffs_started, has_third_place_match, manual_seeding
      FROM bg_tournaments WHERE id = ? LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
     [tournamentId],
   );
@@ -203,9 +205,13 @@ async function persistStandings(
 }
 
 /**
- * Sème le classement initial depuis l'**ordre de seeding** des inscriptions —
- * celui que l'arbitre a fixé à la main (`docs/features/SEEDING_ORDER.md`), le
- * règlement demandant un classement de départ décidé en amont.
+ * Sème le classement initial.
+ *
+ * Même règle que la Survie et la Ronde suisse : le **classement du site**
+ * (`loadEntrantsBySiteRanking`, la cote Elo), sauf si le staff a fixé l'ordre à
+ * la main (`manual_seeding`, `docs/features/SEEDING_ORDER.md`) — l'ordre des
+ * inscriptions prime alors. `seedingSource` (`lib/shared/seeding.ts`) dit la
+ * même chose à l'interface et à l'aperçu du plateau.
  */
 export async function initializeEnduranceTournament(
   tournamentId: number,
@@ -216,16 +222,15 @@ export async function initializeEnduranceTournament(
 
   const config = configOf(tournament);
 
-  const [rows] = await conn.execute<(RowDataPacket & { team_id: number })[]>(
-    `SELECT team_id
-     FROM bg_tournament_registrations
-     WHERE tournament_id = ?
-     ORDER BY COALESCE(seed, 1000000), registered_at ASC`,
-    [tournamentId],
-  );
+  // Ordre saisi par le staff, sinon classement du site par le chargeur unique :
+  // mêmes matchs comptés et même ordre que l'annuaire et l'aperçu du plateau.
+  const teamIds =
+    Number(tournament.manual_seeding ?? 0) === 1
+      ? await loadRegisteredTeamIds(conn, tournamentId)
+      : (await loadEntrantsBySiteRanking(conn, tournamentId)).map((entrant) => entrant.teamId);
 
-  const standings: EnduranceStanding[] = rows.map((row, index) => ({
-    teamId: Number(row.team_id),
+  const standings: EnduranceStanding[] = teamIds.map((teamId, index) => ({
+    teamId,
     seed: index + 1,
     points: config.startPoints,
     wins: 0,
