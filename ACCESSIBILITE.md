@@ -45,31 +45,6 @@ pipeline de `CLAUDE.md`.
 
 ---
 
-## 10. Erreurs de formulaire liées aux champs
-
-- **Critère** : WCAG 3.3.1 / 3.3.3 · RGAA 11.10 / 11.11.
-- **Constat** : la convention du projet fait passer **toutes** les erreurs par
-  une notification. Une erreur de saisie doit aussi être rattachée au champ.
-- **À faire** : garder la notification, et ajouter sur le champ fautif
-  `aria-invalid="true"` + `aria-describedby` vers une aide existante. Décision
-  de conception à valider avant de toucher aux formulaires.
-
-## 11. Contraste par défaut de `--ink-dim`
-
-- **Critère** : WCAG 1.4.3 · RGAA 3.2.
-- **Constat** : `--ink-dim` (`#55636f`) plafonne à 3,3:1 et sert 52 fois de
-  couleur de texte. Le menu le corrige **à la demande** (réglage « Contraste
-  renforcé ») ; le rendu par défaut reste non conforme, par choix esthétique.
-- **À décider** : relever la valeur par défaut (≈ `#7d8b98`, à vérifier sur
-  `--cyber-bg-3`) ou assumer la non-conformité dans la déclaration (tâche 12).
-
-## 12. Déclaration d'accessibilité
-
-- **Critère** : RGAA, obligation légale selon la taille de l'organisme.
-- **À faire** : décider si l'association y est tenue ; si oui, une page
-  `/accessibilite` (état de conformité, contenus non accessibles, contact) et
-  un lien dans le pied de page.
-
 ## 13. Passe au lecteur d'écran
 
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
