@@ -50,6 +50,15 @@ describe("mapError — repli", () => {
     },
   );
 
+  it.each([["constructor"], ["toString"], ["__proto__"], ["hasOwnProperty"]])(
+    "ne remonte pas la chaîne de prototypes pour %s",
+    (key) => {
+      expect(typeof mapError(key)).toBe("string");
+      expect(mapError(key)).toBe(key);
+      expect(phaseErrorMessage(key)).toBe("Erreur de configuration des phases.");
+    },
+  );
+
   it("laisse passer une phrase déjà rédigée", () => {
     const sentence = "Tournoi créé, mais son image n'a pas été enregistrée.";
     expect(mapError(sentence)).toBe(sentence);

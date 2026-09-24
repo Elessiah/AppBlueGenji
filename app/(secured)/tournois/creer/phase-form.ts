@@ -75,5 +75,7 @@ export function phaseSummary(phase: PhaseConfig, isLast: boolean): string {
  * notification des refus serveur (`PHASE_ERROR_MESSAGES`).
  */
 export function phaseErrorMessage(code: string): string {
-  return PHASE_ERROR_MESSAGES[code] ?? "Erreur de configuration des phases.";
+  return Object.hasOwn(PHASE_ERROR_MESSAGES, code)
+    ? PHASE_ERROR_MESSAGES[code]
+    : "Erreur de configuration des phases.";
 }

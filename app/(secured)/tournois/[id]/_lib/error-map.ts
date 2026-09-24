@@ -275,8 +275,9 @@ const ERROR_CODE_PATTERN = /^[A-Z][A-Z0-9_]*$/;
  * générique ferait perdre une explication sans rien gagner.
  */
 export function mapError(errorCode: string): string {
-  const message = ERROR_MESSAGES[errorCode];
-  if (message) return message;
+  // `Object.hasOwn` et non un simple accès : `ERROR_MESSAGES["constructor"]`
+  // remonterait la chaîne de prototypes et rendrait une fonction.
+  if (Object.hasOwn(ERROR_MESSAGES, errorCode)) return ERROR_MESSAGES[errorCode];
   return ERROR_CODE_PATTERN.test(errorCode) ? UNKNOWN_ERROR_MESSAGE : errorCode;
 }
 
