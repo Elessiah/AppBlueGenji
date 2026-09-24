@@ -361,7 +361,7 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 
 ### Accessibilité (`ACCESSIBILITE.md`)
 - Tout problème d'accessibilité **repéré au cours du développement** (contraste, focus, nom accessible, rôle ARIA, titre de page, langue, ordre de tabulation, cible trop petite…) et **non réglé dans la PR en cours** — parce qu'il préexiste ou sort du périmètre — s'ajoute à `ACCESSIBILITE.md`, à la racine du dépôt, pour être retravaillé plus tard. Même règle que `ERREUR.txt` : ne pas élargir la tâche en silence, consigner, le signaler dans le résumé de fin, poursuivre.
-- Une section par problème, **à la suite**, avec le numéro suivant (les numéros existants ne sont jamais réattribués : d'autres sessions désignent une tâche par son numéro), au format du fichier : titre, **Critère** (WCAG / RGAA), **Constat** (fichier et symptôme), **À faire**.
+- Une section par problème, **à la suite**, avec le numéro suivant — celui qui suit le plus grand jamais attribué, noté en tête du fichier (les numéros, même de tâches retirées, ne sont jamais réattribués : d'autres sessions désignent une tâche par son numéro) —, au format du fichier : titre, **Critère** (WCAG / RGAA), **Constat** (fichier et symptôme), **À faire**.
 - Vérifier d'abord qu'il n'y figure pas déjà ; le cas échéant, compléter la section existante.
 - Retirer la section dans la PR qui règle le problème.
 
@@ -397,7 +397,7 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <norepl
 2. **Commit fonctionnel** : ≤ 5 mots, impératif minuscule — `add swiss pairing` — *avec Co-Authored-By*
 3. **Commit docs** : README / JSDoc limité à ce qui a été construit — *avec Co-Authored-By*
 4. **Commit tests** : `jest` — *avec Co-Authored-By*
-5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*
+5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*. Tout problème d'accessibilité repéré pendant la tâche et **non réglé** dans la PR s'ajoute à `ACCESSIBILITE.md` avant ce commit (voir « Accessibilité » plus haut) ; une tâche de ce fichier réglée par la PR en est retirée dans ce commit.
 6. **Push** : `git push -u origin feature/<short-name>`
 7. **Revue de PR — en boucle jusqu'à zéro finding** : ouvrir la PR (`gh pr create`), puis lancer une revue du diff avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR.
 

@@ -14,6 +14,13 @@ Puis par la PR `feature/accessibility-quick-wins` : lien d'évitement
 du bot (3), page courante et pictogrammes des navigations (4), indicateur de
 développement de Next (14).
 
+Puis par la PR `feature/deploy-accessibility-features` : modales de la vitrine
+(5 — déjà passées par `LandingDialog` et `useDialogBehavior`, la tâche était
+restée ouverte), lien « Voir » de la bannière de recrutement (6), focus des
+champs hors `.field` (7, recherche de l'annuaire comprise), ordre des titres de
+`/connexion` et repères de `/association` (8), menu burger fermé quand le focus
+en sort (17).
+
 Chaque tâche ci-dessous est indépendante et peut être confiée à une session
 séparée. Une branche `feature/<nom>` par tâche, avec ses tests, selon le
 pipeline de `CLAUDE.md`. Retirer la tâche de ce fichier dans la PR qui la règle.
@@ -23,42 +30,11 @@ sur une tâche en parallèle et la désigner par son numéro.
 **Tout problème d'accessibilité repéré en cours de développement et non réglé
 dans la PR en cours s'ajoute ici**, à la suite, avec le numéro suivant et le
 même format (critère, constat, à faire) — voir `CLAUDE.md`, « Accessibilité ».
+Le numéro suivant est celui qui suit le **plus grand jamais attribué**, tâches
+retirées comprises : **dernier numéro attribué — 17**, à avancer avec chaque
+ajout.
 
 ---
-
-## 5. Modales de la vitrine sans piège de focus
-
-- **Critère** : WCAG 2.4.3 · RGAA 7.1 / 12.8.
-- **Constat** : `AboutPillars`, `AboutStats`, `SponsorsGrid`, `FooterContact`
-  (`components/cyber/landing/`), `BureauSection` (`app/association/`),
-  `BenevolesSection` (`app/benevoles/`) gèrent Échap à la main : Tab sort de la
-  modale et le focus ne revient pas au bouton d'ouverture.
-- **À faire** : passer par `useDialogBehavior` (`lib/shared/hooks/useDialogBehavior.ts`),
-  comme les 17 autres modales.
-
-## 6. Lien « Voir → » de la bannière de recrutement
-
-- **Critère** : WCAG 2.4.4 / 2.5.8 · RGAA 6.1.
-- **Constat** : intitulé sans contexte, cible de 57 × 14 px
-  (`components/recruitment-highlight.tsx`).
-- **À faire** : nom accessible qui **commence** par « Voir » (WCAG 2.5.3) et
-  nomme l'annonce ; zone cliquable d'au moins 24 px de haut.
-
-## 7. Focus des champs hors `.field`
-
-- **Critère** : WCAG 2.4.7 / 1.4.11 · RGAA 10.7.
-- **Constat** : `outline: none` avec pour seul repère un changement de couleur
-  de bordure — `modalInput` (`app/recrutement/page.module.css`,
-  `app/association/page.module.css`) et `.searchbar-input` (`app/globals.css`).
-  Le repère disparaît en contrastes forcés.
-- **À faire** : même anneau que `.field` au focus, plus une `outline` en
-  `@media (forced-colors: active)`.
-
-## 8. Ordre des titres de `/connexion` et repères de `/association`
-
-- **Critère** : RGAA 9.1 / 12.6.
-- **Constat** : `/connexion` a un `h2` (« Avant de continuer ») avant son `h1` ;
-  `/association` imbrique deux `<aside>` dans un autre repère (signalé par axe).
 
 ## 9. Fiche tournoi : attributs ARIA à vérifier
 
@@ -123,13 +99,3 @@ même format (critère, constat, à faire) — voir `CLAUDE.md`, « Accessibilit
   modèle de `app/(secured)/tournois/[id]/layout.tsx` — nom de l'équipe, pseudo
   du joueur, en respectant la visibilité du profil (un compte anonymisé ou
   masqué ne doit pas nommer quelqu'un dans l'onglet).
-
-## 17. Menu burger de la vitrine laissé ouvert quand le focus en sort
-
-- **Critère** : WCAG 2.4.3 · RGAA 12.8.
-- **Constat** : `PublicNavMenu` se ferme au clic dehors, sur un lien et avec
-  Échap (qui rend désormais le focus au bouton), mais pas quand la tabulation
-  quitte le panneau : il reste ouvert par-dessus le contenu où le focus est
-  parti.
-- **À faire** : fermer au `focusout` quand la nouvelle cible
-  (`relatedTarget`) est hors du composant.
