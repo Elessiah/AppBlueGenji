@@ -1,4 +1,12 @@
-import type { CSSProperties, ElementType, ReactNode } from "react";
+"use client";
+
+import { useEffect, useRef, useState, type CSSProperties, type ElementType, type FocusEvent, type ReactNode } from "react";
+import {
+  isOwnFocusEvent,
+  releasesFocus,
+  scrollAreaAccessibility,
+  watchScrollOverflow,
+} from "@/lib/shared/scroll-overflow";
 
 type ScrollOrientation = "x" | "y" | "both";
 
@@ -16,7 +24,11 @@ interface ScrollAreaProps {
   as?: ElementType;
   className?: string;
   style?: CSSProperties;
-  /** Repris tel quel sur l'élément (utile pour `aria-label`, `role`, `tabIndex`). */
+  /**
+   * Nom de la zone. Posé, avec `role="region"`, **seulement** quand la zone
+   * déborde : une zone qui ne défile pas n'est ni un arrêt de tabulation ni un
+   * repère (`lib/shared/scroll-overflow.ts`).
+   */
   ariaLabel?: string;
 }
 
@@ -38,9 +50,12 @@ const FADE_MASK =
  * style des barres est global (`app/globals.css`), ce composant ajoute la
  * variante discrète, le dégradé de bord et le comportement de défilement.
  *
- * Le contenu défilable reste focalisable au clavier : `tabIndex={0}` est posé
- * automatiquement pour que la zone soit atteignable et pilotable aux flèches,
- * conformément aux règles d'accessibilité sur les régions défilantes.
+ * Une zone qui **déborde** est focalisable au clavier (`tabIndex={0}`), pour
+ * être atteinte et pilotée aux flèches, et devient une région nommée dès qu'un
+ * `ariaLabel` est fourni. Une zone dont le contenu tient n'est ni l'un ni
+ * l'autre : le débordement est relu à chaque changement de taille de la zone ou
+ * de ses enfants. Avant toute mesure — rendu serveur, hydratation — la zone est
+ * focalisable : c'est le sens qui ne bloque personne.
  */
 export function ScrollArea({
   children,
@@ -52,6 +67,31 @@ export function ScrollArea({
   style,
   ariaLabel,
 }: ScrollAreaProps) {
+  const ref = useRef<HTMLElement>(null);
+  // `true` tant que rien n'est mesuré : le rendu serveur et le premier rendu
+  // client doivent coïncider, et le défaut prudent est « atteignable ».
+  const [overflowing, setOverflowing] = useState(true);
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element) return;
+    return watchScrollOverflow(
+      element,
+      ({ overflowing: next, active }) => {
+        setOverflowing(next);
+        if (active) setFocused(true);
+      },
+      {
+        ResizeObserver: typeof ResizeObserver === "undefined" ? undefined : ResizeObserver,
+        MutationObserver: typeof MutationObserver === "undefined" ? undefined : MutationObserver,
+        root: document.documentElement,
+        fonts: document.fonts,
+        activeElement: () => document.activeElement,
+      },
+    );
+  }, []);
+
   const classes = ["scroll-area", subtle ? "scroll-subtle" : null, className]
     .filter(Boolean)
     .join(" ");
@@ -63,10 +103,16 @@ export function ScrollArea({
 
   return (
     <Tag
+      ref={ref}
       className={classes}
-      tabIndex={0}
-      role={ariaLabel ? "region" : undefined}
-      aria-label={ariaLabel}
+      {...scrollAreaAccessibility({ overflowing, focused, ariaLabel })}
+      onFocus={(event: FocusEvent<HTMLElement>) => {
+        if (isOwnFocusEvent(event)) setFocused(true);
+      }}
+      onBlur={(event: FocusEvent<HTMLElement>) => {
+        const { target, currentTarget } = event;
+        if (releasesFocus({ target, currentTarget, activeElement: document.activeElement })) setFocused(false);
+      }}
       style={{ ...OVERFLOW[orientation], ...fadeStyle, ...style }}
     >
       {children}
