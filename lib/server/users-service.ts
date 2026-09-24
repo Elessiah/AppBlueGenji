@@ -10,6 +10,7 @@ import {
 } from "@/lib/shared/account-deletion";
 import { isDuplicateEntryError, isReferencedRowError } from "@/lib/server/mysql-errors";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
+import type { PlayerPageIdentity } from "@/lib/shared/entity-page-titles";
 import { BATTLETAG_LOCKED, isBattletagLocked } from "@/lib/shared/battletag-lock";
 import {
   DISCORD_TAG_LOCKED,
@@ -1835,6 +1836,22 @@ async function sharesLiveMatch(userId: number, otherUserId: number): Promise<boo
     [userId, userId, otherUserId, otherUserId],
   );
   return rows.length > 0;
+}
+
+/**
+ * Ce que l'onglet d'une fiche de joueur a le droit de nommer : le pseudo, et le
+ * fait que le compte soit supprimé — `playerPageTitle` tait alors le pseudo
+ * d'emprunt. Lecture d'une ligne, sans les statistiques ni les règles de
+ * visibilité de {@link getFullProfile} : aucun des champs réglables n'y figure.
+ */
+export async function getPlayerPageIdentity(userId: number): Promise<PlayerPageIdentity | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { pseudo: string; is_deleted: 0 | 1 })[]>(
+    `SELECT pseudo, is_deleted FROM bg_users WHERE id = ? LIMIT 1`,
+    [userId],
+  );
+  if (rows.length === 0) return null;
+  return { pseudo: rows[0].pseudo, isDeleted: Boolean(rows[0].is_deleted) };
 }
 
 /** Le lecteur d'une fiche, tel que les règles de visibilité le demandent. */

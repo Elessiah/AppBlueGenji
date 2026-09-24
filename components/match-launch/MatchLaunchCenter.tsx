@@ -311,9 +311,13 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
           </span>
           <h2 id={titleId} className={styles.title}>
             <span className={styles.titleTeam}>{current.team1.name}</span>
-            <span className={styles.vs} aria-label="contre">
+            {/* « VS » se lit « vé-esse » : l'oreille reçoit « contre », hors
+                écran. Un `aria-label` sur ce `<span>` sans rôle serait interdit
+                (`aria-prohibited-attr`) — et c'est ce titre qui nomme la modale. */}
+            <span className={styles.vs} aria-hidden="true">
               VS
             </span>
+            <span className="sr-only"> contre </span>
             <span className={styles.titleTeam}>{current.team2.name}</span>
           </h2>
           <p id={statusId} className={styles.status} data-phase={current.phase} role="status">

@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { type CSSProperties, FormEvent } from "react";
 import type { BracketMatch, SwissMeta, SwissStandingRow } from "@/lib/shared/types";
 import { formatPoints } from "@/lib/shared/swiss";
 import { MatchScoreDraft } from "./BracketTree";
@@ -35,6 +35,18 @@ interface SwissViewProps {
    */
   emptyLabel?: string;
 }
+
+/** Bouton d'abandon du classement — partagé avec son fantôme d'en-tête. */
+const FORFEIT_BUTTON_STYLE: CSSProperties = {
+  flexShrink: 0,
+  padding: "3px 8px",
+  fontSize: 10,
+  textTransform: "uppercase",
+  letterSpacing: "0.04em",
+  background: "rgba(255,157,46,0.12)",
+  borderColor: "rgba(255,157,46,0.4)",
+  color: AMBER,
+};
 
 const STATUS_META: Record<SwissStandingRow["status"], { label: string; color: string }> = {
   ACTIVE: { label: "En lice", color: ACCENT },
@@ -73,6 +85,12 @@ export function SwissView({
   const champion = isFinished
     ? swiss.standings.find((s) => s.rank === 1 && s.status === "ACTIVE")
     : null;
+
+  const isForfeitable = (team: SwissStandingRow) =>
+    !isFinished && team.status === "ACTIVE" && canForfeit(team.teamId);
+  // La colonne d'action n'existe que si une ligne au moins porte le bouton :
+  // un en-tête « Action » au-dessus de cellules toutes vides n'annoncerait rien.
+  const anyForfeitable = swiss.standings.some(isForfeitable);
 
   const scoreLabel = `Victoire ${swiss.pointsForWin} pt${swiss.pointsForWin > 1 ? "s" : ""} · Nul ${swiss.pointsForDraw} · Défaite ${swiss.pointsForLoss}`;
 
@@ -127,163 +145,218 @@ export function SwissView({
             Classement
           </div>
 
-          {/* En-tête de colonnes : sans elle, « 9 · 3-0-1 · 24 » est illisible. La
-              colonne de statut y est réservée elle aussi, sinon les chiffres
-              dérivent d'un cran vers la droite sous leur intitulé. */}
-          <div
-            aria-hidden="true"
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              padding: "4px 10px",
-              fontSize: 10,
-              textTransform: "uppercase",
-              letterSpacing: "0.05em",
-              color: "var(--text-2)",
-            }}
-          >
-            <span style={{ width: 22 }}>#</span>
-            <span style={{ flex: 1 }}>Équipe</span>
-            <span style={{ width: 34, textAlign: "right" }} title="Points">
-              Pts
-            </span>
-            <span style={{ width: 52, textAlign: "right" }} title="Victoires-Nuls-Défaites">
-              V-N-D
-            </span>
-            <span
-              style={{ width: 38, textAlign: "right" }}
-              title="Buchholz : somme des points des adversaires rencontrés"
-            >
-              Bch
-            </span>
-            <span style={{ width: 10 }} />
-            <span style={{ minWidth: 62, textAlign: "right" }}>Statut</span>
-          </div>
-
-          <div
-            role="list"
-            aria-label="Classement du tournoi"
-            style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}
-          >
-            {swiss.standings.map((team, idx) => {
-              // Tournoi clos : la tête du classement est championne, pas « en lice ».
-              const meta =
-                isFinished && team.status === "ACTIVE" && team.rank === 1
-                  ? { label: "Championne", color: ACCENT }
-                  : isFinished && team.status === "ACTIVE"
-                    ? { label: "Classée", color: "var(--text-2)" }
-                    : STATUS_META[team.status];
-              const isMine = team.teamId === myTeamId;
-              const forfeitable =
-                !isFinished && team.status === "ACTIVE" && canForfeit(team.teamId);
-              return (
+          {/* Un **tableau**, et non une liste : l'en-tête de colonnes est ce qui
+              rend « 9 · 3-0-1 · 24 » lisible, et une liste le laissait à l'œil
+              seul (`aria-hidden`), chaque ligne répétant ses intitulés dans un
+              `aria-label` qui écrasait son contenu. Les rôles ARIA gardent la
+              mise en page en `flex` des lignes ; `role="list"` rendu vide (aucune
+              équipe classée) laissait en outre `aria-required-children` à
+              vérifier. La colonne de statut est réservée dans l'en-tête, sinon
+              les chiffres dérivent d'un cran vers la droite sous leur intitulé. */}
+          {swiss.standings.length === 0 ? (
+            <p style={{ margin: 0, fontSize: 13, color: "var(--text-2)" }}>
+              Aucune équipe classée pour l&apos;instant.
+            </p>
+          ) : (
+            <div role="table" aria-label="Classement du tournoi">
+              <div role="rowgroup">
                 <div
-                  key={team.teamId}
-                  role="listitem"
-                  aria-label={`${team.rank}. ${team.teamName}, ${formatPoints(team.points)} points, ${team.wins} victoires ${team.draws} nuls ${team.losses} défaites`}
+                  role="row"
                   style={{
                     display: "flex",
                     alignItems: "center",
                     gap: 10,
-                    padding: "7px 10px",
-                    borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,
-                    background: isMine ? "rgba(89,212,255,0.06)" : undefined,
-                    opacity: team.status === "FORFEIT" ? 0.55 : 1,
-                    fontSize: 13,
+                    padding: "4px 10px",
+                    fontSize: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: "0.05em",
+                    color: "var(--text-2)",
                   }}
                 >
-                  <span
-                    className="num"
-                    style={{ width: 22, color: "var(--text-2)", fontWeight: 600 }}
-                  >
-                    {team.rank}
+                  <span role="columnheader" aria-label="Rang" style={{ width: 22 }}>
+                    #
                   </span>
-                  <EntrantName
-                    teamId={team.teamId}
-                    name={team.teamName}
-                    title={team.teamName}
-                    truncate
-                    // Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
-                    // rien dans la negociation d'espace et se faisait rogner a
-                    // quelques pixels par les colonnes fixes et le bouton
-                    // d'abandon. Il retrecit desormais comme les autres.
-                    style={{ flex: "1 1 72px" }}
-                    textStyle={{ fontWeight: isMine ? 700 : 500 }}
-                  />
-                  <span
-                    className="num"
-                    style={{ width: 34, textAlign: "right", fontWeight: 700 }}
-                  >
-                    {formatPoints(team.points)}
+                  <span role="columnheader" style={{ flex: "1 1 72px", minWidth: 0 }}>
+                    Équipe
                   </span>
                   <span
-                    className="mono"
-                    style={{ width: 52, textAlign: "right", fontSize: 12, color: "var(--text-2)" }}
+                    role="columnheader"
+                    aria-label="Points"
+                    style={{ width: 34, textAlign: "right" }}
+                    title="Points"
                   >
-                    {team.wins}-{team.draws}-{team.losses}
+                    Pts
                   </span>
                   <span
-                    className="mono"
-                    style={{ width: 38, textAlign: "right", fontSize: 12, color: "var(--text-2)" }}
-                    title="Buchholz"
+                    role="columnheader"
+                    aria-label="Victoires-Nuls-Défaites"
+                    style={{ width: 52, textAlign: "right" }}
+                    title="Victoires-Nuls-Défaites"
                   >
-                    {formatPoints(team.buchholz)}
-                  </span>
-                  {/* Emplacement réservé même sans bye : sinon la colonne de
-                      statut se décale d'une ligne à l'autre. */}
-                  <span
-                    aria-hidden={team.byes === 0}
-                    title={team.byes > 0 ? "Victoire d'office reçue (effectif impair)" : undefined}
-                    style={{ width: 10, fontSize: 10, color: AMBER, flexShrink: 0 }}
-                  >
-                    {team.byes > 0 ? "✓" : ""}
+                    V-N-D
                   </span>
                   <span
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.04em",
-                      color: meta.color,
-                      minWidth: 62,
-                      textAlign: "right",
-                    }}
+                    role="columnheader"
+                    aria-label="Buchholz"
+                    style={{ width: 38, textAlign: "right" }}
+                    title="Buchholz : somme des points des adversaires rencontrés"
                   >
-                    {meta.label}
+                    Bch
                   </span>
-                  {forfeitable && (
-                    <button
-                      type="button"
-                      onClick={() => onForfeit(team.teamId, team.teamName)}
-                      className="btn"
-                      title={
-                        isMine
-                          ? "Abandonner : votre équipe quitte définitivement le tournoi"
-                          : `Déclarer l'abandon de ${team.teamName}`
-                      }
-                      aria-label={
-                        isMine
-                          ? "Abandonner avec mon équipe"
-                          : `Déclarer l'abandon de ${team.teamName}`
-                      }
-                      style={{
-                        flexShrink: 0,
-                        padding: "3px 8px",
-                        fontSize: 10,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.04em",
-                        background: "rgba(255,157,46,0.12)",
-                        borderColor: "rgba(255,157,46,0.4)",
-                        color: AMBER,
-                      }}
-                    >
-                      Abandonner
-                    </button>
+                  <span role="columnheader" style={{ width: 10, flexShrink: 0 }}>
+                    <span className="sr-only">Victoire d&apos;office</span>
+                  </span>
+                  <span role="columnheader" style={{ minWidth: 62, textAlign: "right" }}>
+                    Statut
+                  </span>
+                  {anyForfeitable && (
+                    // La colonne prend la largeur du bouton : un fantôme invisible
+                    // du même bouton la réserve, sans quoi « Statut » glissait à
+                    // l'aplomb du bouton plutôt que du statut.
+                    <span role="columnheader" style={{ display: "flex", flexShrink: 0 }}>
+                      <span className="sr-only">Action</span>
+                      <span
+                        className="btn"
+                        aria-hidden="true"
+                        style={{ ...FORFEIT_BUTTON_STYLE, visibility: "hidden", height: 0, paddingBlock: 0, borderBlockWidth: 0 }}
+                      >
+                        Abandonner
+                      </span>
+                    </span>
                   )}
                 </div>
-              );
-            })}
-          </div>
+              </div>
+
+              <div
+                role="rowgroup"
+                style={{ border: `1px solid ${BORDER}`, borderRadius: 8, overflow: "hidden" }}
+              >
+                {swiss.standings.map((team, idx) => {
+                  // Tournoi clos : la tête du classement est championne, pas « en lice ».
+                  const meta =
+                    isFinished && team.status === "ACTIVE" && team.rank === 1
+                      ? { label: "Championne", color: ACCENT }
+                      : isFinished && team.status === "ACTIVE"
+                        ? { label: "Classée", color: "var(--text-2)" }
+                        : STATUS_META[team.status];
+                  const isMine = team.teamId === myTeamId;
+                  const forfeitable = isForfeitable(team);
+                  return (
+                    <div
+                      key={team.teamId}
+                      role="row"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 10,
+                        padding: "7px 10px",
+                        borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,
+                        background: isMine ? "rgba(89,212,255,0.06)" : undefined,
+                        opacity: team.status === "FORFEIT" ? 0.55 : 1,
+                        fontSize: 13,
+                      }}
+                    >
+                      <span
+                        role="cell"
+                        className="num"
+                        style={{ width: 22, color: "var(--text-2)", fontWeight: 600 }}
+                      >
+                        {team.rank}
+                      </span>
+                      {/* Base non nulle : avec `flex: 1` (base 0), le nom ne pesait
+                          rien dans la negociation d'espace et se faisait rogner a
+                          quelques pixels par les colonnes fixes et le bouton
+                          d'abandon. Il retrecit desormais comme les autres. La
+                          cellule porte la place, le nom s'y tronque. */}
+                      <span role="cell" style={{ flex: "1 1 72px", minWidth: 0, display: "flex" }}>
+                        <EntrantName
+                          teamId={team.teamId}
+                          name={team.teamName}
+                          title={team.teamName}
+                          truncate
+                          style={{ minWidth: 0 }}
+                          textStyle={{ fontWeight: isMine ? 700 : 500 }}
+                        />
+                      </span>
+                      <span
+                        role="cell"
+                        className="num"
+                        style={{ width: 34, textAlign: "right", fontWeight: 700 }}
+                      >
+                        {formatPoints(team.points)}
+                      </span>
+                      <span
+                        role="cell"
+                        className="mono"
+                        style={{ width: 52, textAlign: "right", fontSize: 12, color: "var(--text-2)" }}
+                      >
+                        {team.wins}-{team.draws}-{team.losses}
+                      </span>
+                      <span
+                        role="cell"
+                        className="mono"
+                        style={{ width: 38, textAlign: "right", fontSize: 12, color: "var(--text-2)" }}
+                      >
+                        {formatPoints(team.buchholz)}
+                      </span>
+                      {/* Emplacement réservé même sans bye : sinon la colonne de
+                          statut se décale d'une ligne à l'autre. La coche est
+                          décorative, la cellule dit le fait en toutes lettres. */}
+                      <span
+                        role="cell"
+                        title={team.byes > 0 ? "Victoire d'office reçue (effectif impair)" : undefined}
+                        style={{ width: 10, fontSize: 10, color: AMBER, flexShrink: 0 }}
+                      >
+                        {team.byes > 0 && (
+                          <>
+                            <span aria-hidden="true">✓</span>
+                            <span className="sr-only">Oui</span>
+                          </>
+                        )}
+                      </span>
+                      <span
+                        role="cell"
+                        style={{
+                          fontSize: 10,
+                          textTransform: "uppercase",
+                          letterSpacing: "0.04em",
+                          color: meta.color,
+                          minWidth: 62,
+                          textAlign: "right",
+                        }}
+                      >
+                        {meta.label}
+                      </span>
+                      {anyForfeitable && (
+                        <span role="cell" style={{ display: "flex", flexShrink: 0 }}>
+                          {forfeitable && (
+                            <button
+                              type="button"
+                              onClick={() => onForfeit(team.teamId, team.teamName)}
+                              className="btn"
+                              title={
+                                isMine
+                                  ? "Abandonner : votre équipe quitte définitivement le tournoi"
+                                  : `Déclarer l'abandon de ${team.teamName}`
+                              }
+                              aria-label={
+                                isMine
+                                  ? "Abandonner avec mon équipe"
+                                  : `Abandonner : déclarer l'abandon de ${team.teamName}`
+                              }
+                              style={FORFEIT_BUTTON_STYLE}
+                            >
+                              Abandonner
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           <p style={{ margin: "8px 2px 0", fontSize: 12, color: "var(--text-2)" }}>
             À points égaux :{" "}
