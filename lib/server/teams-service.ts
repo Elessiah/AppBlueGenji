@@ -389,13 +389,6 @@ export async function createTeam(
 }
 
 /**
- * Détail d'une équipe.
- *
- * `viewerManagesGhostTeams` = le viewer dispose de la permission `tournaments`.
- * Il administre alors les équipes **fantômes** (sans joueur rattaché) sans en
- * être membre ; ça ne lui donne aucun droit sur les équipes réelles.
- */
-/**
  * Ce que l'onglet d'une fiche d'équipe a le droit de nommer — le nom, et rien
  * d'autre. Lecture d'une ligne, sans les membres ni les statistiques de
  * {@link getTeamDetail} : elle sert à `generateMetadata`, jouée à chaque
@@ -413,6 +406,13 @@ export async function getTeamPageIdentity(teamId: number): Promise<TeamPageIdent
   return rows.length === 0 ? null : { name: rows[0].name };
 }
 
+/**
+ * Détail d'une équipe.
+ *
+ * `viewerManagesGhostTeams` = le viewer dispose de la permission `tournaments`.
+ * Il administre alors les équipes **fantômes** (sans joueur rattaché) sans en
+ * être membre ; ça ne lui donne aucun droit sur les équipes réelles.
+ */
 /**
  * Fiche complète d'une équipe.
  *
