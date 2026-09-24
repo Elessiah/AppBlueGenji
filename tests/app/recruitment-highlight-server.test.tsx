@@ -220,4 +220,13 @@ describe("RecruitmentHighlight — ce qui ne doit plus exister", () => {
     expect(code).toContain("useClientPower()");
     expect(code).not.toMatch(/visibilitychange|setInterval\(/);
   });
+
+  it("décide du défilement par la règle pure, que le bouton pause alimente", () => {
+    // La règle elle-même est testée dans `tests/lib/shared/recruitment.test.ts` ;
+    // ici, seulement que la banderole la lit et que « Reprendre » pose le choix
+    // explicite qui prime sur le survol et le focus.
+    expect(code).toContain("isRecruitmentBannerRotating(");
+    expect(code).toMatch(/setOverride\(paused \? "RUNNING" : "PAUSED"\)/);
+    expect(code).not.toMatch(/!hovered && !focused/);
+  });
 });
