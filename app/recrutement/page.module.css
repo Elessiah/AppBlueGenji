@@ -486,6 +486,12 @@ select.modalInput {
   border-color: rgba(90, 200, 255, 0.35);
 }
 
+/* Brouillon : le statut est choisi mais n'a encore aucun effet — contour en
+   pointillé, comme un réglage en attente. */
+.priorityBadgeDraft {
+  border-style: dashed;
+}
+
 /* Liste principale vide alors que des facultatives existent. */
 .groupEmpty {
   margin: 0;
@@ -534,9 +540,14 @@ select.modalInput {
 
 /* Responsive */
 @media (max-width: 768px) {
-  .head {
+  .head,
+  .othersHead {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .others {
+    margin-top: 32px;
   }
 }
 

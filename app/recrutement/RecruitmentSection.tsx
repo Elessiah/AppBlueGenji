@@ -360,7 +360,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                 section) : la gestion, elle, a besoin de le voir nommé. */}
             {isAdmin && (
               <span
-                className={`${styles.priorityBadge} ${PRIORITY_BADGE_CLASS[ad.priority]}`}
+                className={`${styles.priorityBadge} ${PRIORITY_BADGE_CLASS[ad.priority]} ${ad.active ? "" : styles.priorityBadgeDraft}`}
                 title={
                   ad.active
                     ? RECRUITMENT_PRIORITY_DESCRIPTIONS[ad.priority]

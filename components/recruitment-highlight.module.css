@@ -163,6 +163,12 @@
   border-color: var(--line-soft);
 }
 
+/* Pause enclenchée : le bouton dit l'état posé, pas l'action qu'il offre. */
+.bannerButton[aria-pressed="true"] {
+  color: var(--blue-300);
+  border-color: rgba(90, 200, 255, 0.35);
+}
+
 .bannerButton:focus-visible,
 .bannerClose:focus-visible,
 .bannerLink:focus-visible {
@@ -328,6 +334,18 @@
 
   .bannerLink {
     margin-left: auto;
+  }
+
+  /* Les commandes restent atteignables au doigt : 32 px plutôt que 24. */
+  .bannerButton,
+  .bannerClose {
+    width: 32px;
+    height: 32px;
+  }
+
+  .pagerButton {
+    padding: 8px 10px;
+    letter-spacing: 0.06em;
   }
 }
 
