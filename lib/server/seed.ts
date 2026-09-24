@@ -55,6 +55,7 @@ import sharp from "sharp";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { PLAYED_MATCH_SQL } from "@/lib/shared/ranking";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 
 // ---------------------------------------------------------------------------
 // Déterminisme
@@ -1743,6 +1744,23 @@ async function createTournament(
 
 // ---------------------------------------------------------------------------
 
+/**
+ * Les comptes du jeu de test ont accepté les conditions d'utilisation en
+ * vigueur, comme tout compte né par la page de connexion : sans cela, chaque
+ * gérant de la matrice verrait la modale d'acceptation au premier chargement,
+ * et chaque geste de gestion d'équipe serait refusé en 409. Pour éprouver la
+ * modale, remettre `terms_version` à `NULL` sur un propriétaire d'équipe.
+ * Le compte supprimé n'accepte rien.
+ */
+async function acceptTermsForSeededAccounts(db: Pool): Promise<void> {
+  await db.execute(
+    `UPDATE bg_users
+     SET terms_version = ?, terms_accepted_at = NOW()
+     WHERE pseudo LIKE 'Test_%' AND is_deleted = 0`,
+    [TERMS_VERSION],
+  );
+}
+
 async function main(): Promise<void> {
   console.log("🚀 Seed BlueGenji Esport\n");
 
@@ -1832,6 +1850,7 @@ async function seed(db: Pool): Promise<void> {
   }
   await applyMatchLaunchCases(db, specialUserIds.get("Caster") ?? null);
   await attachDeletedAccountToPlayedTeam(db, specialUserIds.get("CompteSupprime") ?? null);
+  await acceptTermsForSeededAccounts(db);
 
   const byState = (state: TournamentDef["state"]) =>
     TOURNAMENTS.filter((t) => t.state === state).length;

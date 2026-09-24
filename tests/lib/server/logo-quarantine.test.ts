@@ -78,6 +78,8 @@ describe("logoFileLocations", () => {
 describe("hideTeamLogo", () => {
   const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'TEAM'/, () => [[{ id: 12 }]]];
   const team: Route = [/SELECT name, logo_url FROM bg_teams/, () => [[{ name: "Alpha", logo_url: LOGO }]]];
+  const notShared: Route = [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \? AND id <> \?/, () => [[{ total: 0 }]]];
+  const shared: Route = [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \? AND id <> \?/, () => [[{ total: 2 }]]];
   const members: Route = [
     /FROM bg_team_members tm\s+JOIN bg_users u/,
     () => [
@@ -90,7 +92,7 @@ describe("hideTeamLogo", () => {
 
   it("déplace le fichier hors ligne, vide la colonne, date l'échéance et prévient l'équipe", async () => {
     install(
-      [reportTargets, team, members],
+      [reportTargets, team, notShared, members],
       [
         [/SELECT logo_url FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: LOGO }]]],
         [/UPDATE bg_teams SET logo_url = NULL/, () => [{}]],
@@ -118,7 +120,7 @@ describe("hideTeamLogo", () => {
 
   it("remet le fichier en ligne si le logo a changé pendant le geste", async () => {
     install(
-      [reportTargets, team],
+      [reportTargets, team, notShared],
       [[/SELECT logo_url FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: "/api/uploads/teams/4-new.webp" }]]]],
     );
     await expect(hideTeamLogo(12, 4, actor)).rejects.toThrow("LOGO_CHANGED");
@@ -131,7 +133,7 @@ describe("hideTeamLogo", () => {
   it("déplace d'un disque à l'autre quand un renommage n'y suffit pas", async () => {
     jest.mocked(rename).mockRejectedValueOnce(Object.assign(new Error("cross-device"), { code: "EXDEV" }));
     install(
-      [reportTargets, team, members],
+      [reportTargets, team, notShared, members],
       [
         [/FOR UPDATE/, () => [[{ logo_url: LOGO }]]],
         [/UPDATE bg_teams/, () => [{}]],
@@ -141,6 +143,28 @@ describe("hideTeamLogo", () => {
     await hideTeamLogo(12, 4, actor);
     expect(copyFile).toHaveBeenCalledWith(LIVE, HIDDEN);
     expect(unlink).toHaveBeenCalledWith(LIVE);
+  });
+
+  it("copie un fichier que d'autres équipes désignent, sans le retirer d'elles", async () => {
+    install(
+      [reportTargets, team, shared, members],
+      [
+        [/FOR UPDATE/, () => [[{ logo_url: LOGO }]]],
+        [/UPDATE bg_teams/, () => [{}]],
+        [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 32 }]],
+      ],
+    );
+    await hideTeamLogo(12, 4, actor);
+    expect(copyFile).toHaveBeenCalledWith(LIVE, HIDDEN);
+    expect(rename).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalledWith(LIVE);
+  });
+
+  it("n'efface que la copie si l'écriture échoue sur un fichier partagé", async () => {
+    install([reportTargets, team, shared], [[/FOR UPDATE/, () => [[{ logo_url: "/api/uploads/teams/autre.webp" }]]]]);
+    await expect(hideTeamLogo(12, 4, actor)).rejects.toThrow("LOGO_CHANGED");
+    expect(unlink).toHaveBeenCalledWith(HIDDEN);
+    expect(rename).not.toHaveBeenCalled();
   });
 
   it("refuse une équipe que le signalement ne vise pas, et un signalement inconnu", async () => {

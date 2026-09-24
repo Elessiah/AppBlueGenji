@@ -150,7 +150,22 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
   const files = logoFileLocations(logoUrl);
   if (!files) throw new Error("LOGO_NOT_MOVABLE");
 
-  await moveFile(files.live, files.quarantined);
+  // Un même fichier peut être désigné par plusieurs équipes (le jeu de test en
+  // partage un) : le déplacer ferait disparaître le logo des autres. Il est
+  // alors **copié** — l'équipe signalée ne l'affiche plus, les autres gardent
+  // le leur, et la copie suit le cycle de la quarantaine.
+  const [sharing] = await db.execute<(RowDataPacket & { total: number })[]>(
+    `SELECT COUNT(*) AS total FROM bg_teams WHERE logo_url = ? AND id <> ?`,
+    [logoUrl, teamId],
+  );
+  const shared = Number(sharing[0]?.total ?? 0) > 0;
+
+  if (shared) {
+    await mkdir(path.dirname(files.quarantined), { recursive: true });
+    await copyFile(files.live, files.quarantined);
+  } else {
+    await moveFile(files.live, files.quarantined);
+  }
 
   const hiddenAt = new Date();
   const purgeAfter = logoQuarantinePurgeDate(hiddenAt);
@@ -173,8 +188,10 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
     await connection.commit();
   } catch (error) {
     await connection.rollback();
-    // Le fichier revient en ligne : la base n'a rien retenu du masquage.
-    await moveFile(files.quarantined, files.live).catch((moveError) => {
+    // Le fichier revient en ligne : la base n'a rien retenu du masquage. Une
+    // copie, elle, n'a qu'à disparaître — l'original n'a pas bougé.
+    const undo = shared ? unlinkIfPresent(files.quarantined) : moveFile(files.quarantined, files.live);
+    await undo.catch((moveError) => {
       console.error("[moderation] logo non remis en place après échec", moveError);
     });
     throw error;
