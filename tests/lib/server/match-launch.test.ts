@@ -497,6 +497,21 @@ describe("maintainMatchLaunches", () => {
     expect(state.writes.some((w) => w.includes("SET launch_pairing = ?"))).toBe(false);
   });
 
+  it("parcourt les candidats dans un ordre fixe, pour verrouiller sans interblocage", async () => {
+    const queries: string[] = [];
+    const base = connectionFor(state);
+    await maintainMatchLaunches(
+      fakeConnection({
+        execute: async (sql: string, params: unknown[] = []) => {
+          queries.push(sql.replace(/\s+/g, " "));
+          return base.execute(sql, params);
+        },
+      }),
+      7,
+    );
+    expect(queries.find((q) => q.includes("WHERE m.tournament_id = ?"))).toMatch(/ORDER BY m\.id/);
+  });
+
   it("ne touche pas un match programmé plus tard", async () => {
     state.match = matchState({ start_at: new Date(Date.now() + 3_600_000).toISOString() });
     await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(0);

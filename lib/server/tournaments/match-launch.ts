@@ -478,12 +478,17 @@ export async function maintainMatchLaunches(
      WHERE m.tournament_id = ? AND m.status = 'READY'
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        AND (m.launched_at IS NULL
-            OR NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id)))`,
+            OR NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id)))
+     ORDER BY m.id`,
     [tournamentId],
   );
   const now = Date.now();
   let changed = 0;
   for (const candidate of rows) {
+    // Les candidats sont parcourus par identifiant croissant (`ORDER BY`) : deux
+    // entretiens du même tournoi — balayage passif et relève de la modale —
+    // prennent ainsi leurs verrous dans le même ordre, sans interblocage.
+    //
     // Premier tri sur la lecture ordinaire, puis **relecture sous verrou**
     // avant toute écriture : un « Prêt » validé entre les deux serait sinon
     // effacé par la remise à zéro d'un appariement lu périmé, ou un lancement
