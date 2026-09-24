@@ -21,7 +21,11 @@ function applySettings(keys: A11ySettingKey[]): void {
   const attribute = a11yAttribute(keys);
   if (attribute) root.setAttribute("data-a11y", attribute);
   else root.removeAttribute("data-a11y");
-  document.cookie = a11yCookieString(keys, window.location.protocol === "https:");
+  try {
+    document.cookie = a11yCookieString(keys, window.location.protocol === "https:");
+  } catch {
+    // Cookies refusés : le réglage vaut pour la page ouverte, pas au-delà.
+  }
 }
 
 /** Intitulé du bouton flottant : il dit combien de réglages sont actifs. */
@@ -58,10 +62,16 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
 
   useEffect(() => {
     if (!open) return;
+    // Échap ne répond que si le focus est dans le menu, ou nulle part : une
+    // modale ouverte par-dessus (lancement de match) traite son propre Échap,
+    // et le focus ne doit pas lui être repris.
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      const active = document.activeElement;
+      const inside = active !== null && rootRef.current?.contains(active) === true;
+      if (!inside && active !== null && active !== document.body) return;
       setOpen(false);
-      buttonRef.current?.focus();
+      if (inside) buttonRef.current?.focus();
     };
     const onPointer = (event: PointerEvent) => {
       if (!rootRef.current?.contains(event.target as Node)) setOpen(false);

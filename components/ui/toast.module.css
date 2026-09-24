@@ -1,6 +1,9 @@
 /* Pile des notifications, en bas à gauche — **au-dessus** du bouton
    d'accessibilité (`components/accessibility/AccessibilityMenu.module.css`),
-   qui occupe le coin : 24 px de marge + 54 px de bouton + 14 px d'écart. */
+   qui occupe le coin : 24 px de marge + 54 px de bouton + 14 px d'écart.
+   Sa largeur s'arrête à la moitié de l'écran : la pastille de réouverture du
+   lancement de match (`MatchLaunchCenter`, en bas à droite, 84 px du bas)
+   occupe la même hauteur de l'autre côté, et la pile passerait dessus. */
 .stack {
   position: fixed;
   bottom: 92px;
@@ -9,7 +12,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: 420px;
+  max-width: min(420px, calc(50vw - 40px));
   pointer-events: none;
 }
 
@@ -156,11 +159,14 @@
   }
 }
 
+/* Sous 720 px la pile prend toute la largeur : elle monte donc au-dessus de
+   **tout** ce qui flotte en bas, pastille de lancement de match comprise
+   (84 px du bas + ~40 px de haut + 12 px d'écart). */
 @media (max-width: 720px) {
   .stack {
     left: 16px;
     right: 16px;
-    bottom: 76px;
+    bottom: 136px;
     max-width: none;
   }
 }

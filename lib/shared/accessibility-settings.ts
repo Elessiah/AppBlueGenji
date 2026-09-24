@@ -69,7 +69,16 @@ export const A11Y_SETTINGS: readonly A11ySettingDefinition[] = [
   },
 ];
 
-/** Nom du cookie qui porte le choix. */
+/**
+ * Nom du cookie qui porte le choix.
+ *
+ * Il est déclaré sur `/rgpd` mais **pas** dans `PRIVACY_CHANGES`, et c'est
+ * voulu : il ne porte aucune donnée sur une personne (seulement des clés de
+ * réglage, sans identifiant), n'est déposé qu'à la demande du lecteur et reste
+ * dans le périmètre déjà annoncé à tous (« seuls des cookies techniques sont
+ * déposés »). Une modale imposée à chaque compte pour une préférence
+ * d'affichage n'informerait de rien.
+ */
 export const A11Y_COOKIE = "bg_a11y";
 
 /** Durée de vie du cookie : un an, renouvelée à chaque changement. */

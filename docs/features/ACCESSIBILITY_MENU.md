@@ -39,7 +39,10 @@ chargement — précisément chez qui ne les lit pas. D'où un **cookie** plutô
 `localStorage` : c'est le seul état du navigateur qu'une requête transporte.
 Le cookie n'existe que si un réglage est actif, ne contient que les clés
 (`contrast.focus`), dure un an, et il est effacé quand tout est désactivé. Une
-valeur inconnue est ignorée (`parseA11yCookie`). Il est mentionné sur `/rgpd`.
+valeur inconnue est ignorée (`parseA11yCookie`). Il est mentionné sur `/rgpd`,
+mais n'a **pas** d'entrée dans `PRIVACY_CHANGES` : il ne porte aucune donnée sur
+une personne, n'est déposé qu'à la demande du lecteur et reste dans ce qui est
+déjà annoncé à tous (« seuls des cookies techniques sont déposés »).
 
 Deux pièges de spécificité, tenus dans la feuille :
 
@@ -61,7 +64,8 @@ Deux pièges de spécificité, tenus dans la feuille :
 - **Premier arrêt du clavier** sur chaque page.
 - Panneau **non modal** (motif « disclosure ») : on voit l'effet d'un réglage
   en le cochant. Échap et un clic à côté le referment, Échap rend le focus au
-  bouton. Panneau opaque — un texte qui transparaît derrière des réglages de
+  bouton — mais Échap ne répond que si le focus est dans le menu ou nulle part :
+  une modale ouverte par-dessus (lancement de match) garde son focus. Panneau opaque — un texte qui transparaît derrière des réglages de
   lisibilité serait un contresens.
 - « Tout désactiver » est désactivé par `aria-disabled` et non `disabled` : il
   garde le focus après avoir servi au lieu de le jeter au `<body>`.
@@ -70,7 +74,12 @@ Deux pièges de spécificité, tenus dans la feuille :
 
 - Bouton **pause** et bouton **fermer** sur chaque notification, barre de
   progression qui s'arrête avec le décompte (masquée en mouvement réduit).
-- Décompte suspendu au survol et au **focus clavier** (`:focus-visible` : un
+- Une notification fermée avec le focus le rend à l'élément d'où il venait,
+  au lieu de le laisser tomber sur `<body>`.
+- La pile s'arrête à la moitié de l'écran, et sous 720 px elle monte au-dessus
+  de la pastille de lancement de match (`MatchLaunchCenter`).
+- Décompte suspendu au survol **à la souris** (un tap tactile émule l'entrée
+  du pointeur sans sa sortie) et au **focus clavier** (`:focus-visible` : un
   clic de souris laisse le focus sur le bouton cliqué, et le décompte ne
   reprendrait jamais). Le bouton pose un choix explicite qui prime sur les deux
   (`isCountdownHeld`) : « Reprendre » relance même sous le pointeur qui vient

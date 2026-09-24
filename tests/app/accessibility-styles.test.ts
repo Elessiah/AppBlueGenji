@@ -158,6 +158,18 @@ describe("éléments flottants — pas de chevauchement", () => {
     expect(px(toast, ".stack", "bottom", mobile(toast))).toBeGreaterThan(top);
   });
 
+  it("sous 720 px, la pile passe aussi au-dessus de la pastille de lancement de match", () => {
+    const launch = stripComments(readSource("components/match-launch/MatchLaunchCenter.module.css"));
+    // La pastille : son bas, plus sa hauteur (rembourrage 2 × 10 px, une ligne
+    // de 13 px, bordures) — 40 px au moins.
+    const pillTop = px(launch, ".fab", "bottom") + 40;
+    expect(px(toast, ".stack", "bottom", mobile(toast))).toBeGreaterThan(pillTop);
+  });
+
+  it("sur ordinateur, la pile s'arrête à la moitié de l'écran, loin de la pastille de droite", () => {
+    expect(toast).toMatch(/\.stack \{[^}]*max-width: min\(420px, calc\(50vw - 40px\)\)/);
+  });
+
   it("le panneau ouvert passe devant les autres boutons flottants", () => {
     const zMenu = Number(menu.match(/\.root \{[^}]*z-index: (\d+)/)?.[1]);
     const zBadge = Number(badge.match(/\.root \{[^}]*z-index: (\d+)/)?.[1]);

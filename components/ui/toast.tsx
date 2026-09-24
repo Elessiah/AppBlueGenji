@@ -105,6 +105,20 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
   const manualPause = override === "PAUSED";
   // Un nouveau survol ou focus rend la main à la règle ordinaire.
   const releaseResume = () => setOverride((value) => (value === "RUNNING" ? null : value));
+  const rootRef = useRef<HTMLDivElement>(null);
+  // L'élément qui avait le focus avant qu'il n'entre dans la notification.
+  const returnFocus = useRef<HTMLElement | null>(null);
+
+  // Une notification qui part avec le focus le rend à l'endroit d'où il
+  // venait : démonté, le bouton cliqué laisserait le clavier sur `<body>`,
+  // et la tabulation suivante repartirait du haut de la page.
+  const dismissSelf = useCallback(() => {
+    const active = document.activeElement;
+    const hadFocus = active !== null && rootRef.current?.contains(active) === true;
+    const target = returnFocus.current;
+    onDismiss(toast.id);
+    if (hadFocus && target?.isConnected) target.focus();
+  }, [onDismiss, toast.id]);
 
   useEffect(() => {
     const now = Date.now();
@@ -114,23 +128,32 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
       return;
     }
     countdown.current = resumeCountdown(countdown.current, now);
-    const timer = window.setTimeout(() => onDismiss(toast.id), countdownRemaining(countdown.current, now));
+    const timer = window.setTimeout(dismissSelf, countdownRemaining(countdown.current, now));
     return () => window.clearTimeout(timer);
-  }, [paused, onDismiss, toast.id]);
+  }, [paused, dismissSelf]);
 
   const kind = toast.type === "error" ? "Erreur" : "Succès";
 
   return (
     <div
+      ref={rootRef}
       className={styles.toast}
       data-type={toast.type}
       data-paused={paused ? "true" : undefined}
-      onMouseEnter={() => {
+      // Le survol ne vaut que pour une souris : sur écran tactile, un tap émule
+      // l'entrée du pointeur sans jamais sa sortie, et la notification ne
+      // partirait plus.
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "mouse") return;
         releaseResume();
         setHovered(true);
       }}
-      onMouseLeave={() => setHovered(false)}
+      onPointerLeave={(event) => {
+        if (event.pointerType === "mouse") setHovered(false);
+      }}
       onFocus={(event) => {
+        const from = event.relatedTarget;
+        if (from instanceof HTMLElement && !event.currentTarget.contains(from)) returnFocus.current = from;
         if (!event.target.matches(":focus-visible")) return;
         releaseResume();
         setFocused(true);
@@ -158,7 +181,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number)
           className={styles.action}
           aria-label="Fermer la notification"
           title="Fermer"
-          onClick={() => onDismiss(toast.id)}
+          onClick={dismissSelf}
         >
           <span aria-hidden="true">×</span>
         </button>

@@ -122,9 +122,17 @@ describe("AccessibilityMenu — comportement (source)", () => {
     expect(source).toMatch(/document\.cookie = a11yCookieString\(keys, window\.location\.protocol === "https:"\)/);
   });
 
+  it("survit à des cookies refusés : l'écriture est gardée", () => {
+    expect(source).toMatch(/try \{\s*document\.cookie = a11yCookieString[\s\S]*?\} catch \{/);
+  });
+
   it("se referme à Échap en rendant le focus au bouton, et au clic à côté", () => {
-    expect(source).toMatch(/event\.key !== "Escape"[\s\S]*?buttonRef\.current\?\.focus\(\)/);
+    expect(source).toMatch(/event\.key !== "Escape"[\s\S]*?if \(inside\) buttonRef\.current\?\.focus\(\)/);
     expect(source).toMatch(/rootRef\.current\?\.contains\(event\.target as Node\)/);
+  });
+
+  it("laisse Échap à une modale ouverte par-dessus, sans lui reprendre le focus", () => {
+    expect(source).toMatch(/if \(!inside && active !== null && active !== document\.body\) return;/);
   });
 
   it("place le panneau après le bouton dans le document : Tab y entre", () => {

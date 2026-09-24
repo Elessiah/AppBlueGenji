@@ -54,6 +54,20 @@ describe("ToastItem — comportement (source)", () => {
     expect(source).toMatch(/setOverride\(manualPause \? "RUNNING" : "PAUSED"\)/);
   });
 
+  it("ne suspend au survol qu'à la souris — un tap tactile n'a pas de sortie", () => {
+    expect(source).toMatch(/onPointerEnter=\{\(event\) => \{\s*if \(event\.pointerType !== "mouse"\) return;/);
+    expect(source).toMatch(/onPointerLeave=\{\(event\) => \{\s*if \(event\.pointerType === "mouse"\) setHovered\(false\);/);
+    expect(source).not.toContain("onMouseEnter");
+  });
+
+  it("rend le focus à l'élément d'où il venait quand la notification part avec", () => {
+    expect(source).toMatch(/if \(from instanceof HTMLElement && !event\.currentTarget\.contains\(from\)\) returnFocus\.current = from;/);
+    expect(source).toMatch(/if \(hadFocus && target\?\.isConnected\) target\.focus\(\);/);
+    // Les deux sorties passent par là : le bouton et la fin du décompte.
+    expect(source).toContain("onClick={dismissSelf}");
+    expect(source).toMatch(/window\.setTimeout\(dismissSelf,/);
+  });
+
   it("ne suspend au focus que s'il vient du clavier", () => {
     expect(source).toMatch(/if \(!event\.target\.matches\(":focus-visible"\)\) return;/);
   });
