@@ -474,6 +474,29 @@ describe("maintainMatchLaunches", () => {
     expect(state.match?.lobby_opened_at).toBe(STAMP);
   });
 
+  it("relit chaque candidat sous verrou : un « Prêt » validé entre-temps n'est pas effacé", async () => {
+    // La lecture ordinaire voit l'empreinte vide ; le temps que l'entretien
+    // écrive, un capitaine a validé son « Prêt » (empreinte posée).
+    state.match = matchState({ launch_pairing: null, lobby_opened_at: null });
+    const base = connectionFor(state);
+    const connection = fakeConnection({
+      execute: async (sql: string, params: unknown[] = []) => {
+        if (sql.includes("FOR UPDATE OF m") && state.match) {
+          state.match = {
+            ...state.match,
+            launch_pairing: `${TEAM1}:${TEAM2}`,
+            lobby_opened_at: STAMP,
+            team1_ready_at: STAMP,
+          };
+        }
+        return base.execute(sql, params);
+      },
+    });
+    await maintainMatchLaunches(connection, 7);
+    expect(state.match?.team1_ready_at).toBe(STAMP);
+    expect(state.writes.some((w) => w.includes("SET launch_pairing = ?"))).toBe(false);
+  });
+
   it("ne touche pas un match programmé plus tard", async () => {
     state.match = matchState({ start_at: new Date(Date.now() + 3_600_000).toISOString() });
     await expect(maintainMatchLaunches(connection(), 7)).resolves.toBe(0);

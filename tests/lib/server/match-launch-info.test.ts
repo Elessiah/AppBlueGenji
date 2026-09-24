@@ -81,7 +81,7 @@ type World = {
 let state: World;
 
 function connectionFor(world: World): PoolConnection {
-  const execute = async (rawSql: string) => {
+  const execute = async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     if (sql.startsWith("UPDATE")) {
       world.writes.push(sql);
@@ -91,6 +91,10 @@ function connectionFor(world: World): PoolConnection {
       return [world.viewerMemberships, []];
     }
     if (sql.startsWith("SELECT id FROM bg_teams WHERE solo_user_id")) return [world.viewerSolo, []];
+    if (sql.includes("FOR UPDATE OF m")) {
+      // Relecture sous verrou d'un candidat par l'entretien.
+      return [world.candidates.filter((c) => c.id === Number(params[0])), []];
+    }
     if (sql.includes("WHERE m.tournament_id = ?")) {
       // Entretien : candidats au lancement du tournoi.
       return [world.candidates.filter((c) => c.launched_at === null), []];

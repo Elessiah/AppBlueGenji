@@ -483,8 +483,16 @@ export async function maintainMatchLaunches(
   );
   const now = Date.now();
   let changed = 0;
-  for (const row of rows) {
-    if (matchLaunchPhase(toLaunchInput(row), now) !== "LOBBY") continue;
+  for (const candidate of rows) {
+    // Premier tri sur la lecture ordinaire, puis **relecture sous verrou**
+    // avant toute écriture : un « Prêt » validé entre les deux serait sinon
+    // effacé par la remise à zéro d'un appariement lu périmé, ou un lancement
+    // décidé sur un « Prêt » tout juste retiré.
+    if (matchLaunchPhase(toLaunchInput(candidate), now) !== "LOBBY") continue;
+    const row = await lockLaunchMatch(connection, Number(candidate.id));
+    if (!row || row.status !== "READY" || matchLaunchPhase(toLaunchInput(row), now) !== "LOBBY") {
+      continue;
+    }
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
     await adoptCurrentPairing(connection, row);
     const launch =
