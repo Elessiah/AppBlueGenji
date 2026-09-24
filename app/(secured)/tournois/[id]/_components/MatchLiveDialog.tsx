@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   isValidStreamUrl,
@@ -41,6 +43,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const urlTouched = liveUrl.trim().length > 0;
   // Conditionné à `streamed`, comme `triggerNeedsDate` : décocher la case
@@ -88,12 +91,10 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
     }
   };
 
-  return (
+  return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -111,7 +112,6 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
         aria-modal="true"
         aria-labelledby="match-live-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 460,
@@ -247,6 +247,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

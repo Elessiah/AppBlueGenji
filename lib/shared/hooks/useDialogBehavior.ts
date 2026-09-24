@@ -42,8 +42,8 @@ const FOCUSABLE_SELECTOR =
  * et restitution du focus à l'élément qui l'avait avant l'ouverture.
  *
  * Renvoie une `ref` à poser sur le conteneur de la modale : le focus y est
- * déplacé à l'ouverture (sur le premier élément focalisable, sinon sur le
- * conteneur lui-même), et le focus clavier y est **piégé** — `Tab` et
+ * déplacé à l'ouverture (sur l'élément marqué `data-autofocus`, sinon le premier
+ * élément focalisable, sinon le conteneur lui-même), et le focus clavier y est **piégé** — `Tab` et
  * `Maj+Tab` bouclent à l'intérieur au lieu de repartir dans la page derrière.
  *
  * Plusieurs modales peuvent se superposer (la mise en avant urgente par-dessus
@@ -66,14 +66,20 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     const previouslyFocused = document.activeElement as HTMLElement | null;
     dialogStack.push(token);
 
-    // Focus initial : premier élément focalisable de la modale, sinon le
-    // conteneur (rendu focalisable par `tabIndex={-1}` côté appelant).
+    // Focus initial : l'élément marqué `data-autofocus` s'il y en a un (le champ
+    // à remplir d'abord n'est pas toujours le premier de la modale — un bouton
+    // d'aperçu peut le précéder), sinon le premier élément focalisable, sinon
+    // le conteneur (rendu focalisable par `tabIndex={-1}` côté appelant). Le
+    // champ marqué est pris **parmi** les focalisables : désactivé ou masqué,
+    // `focus()` échouerait en silence et laisserait le focus derrière le voile.
     const focusables = () =>
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
         (el) => el.offsetParent !== null || el === document.activeElement,
       );
+    const candidates = focusables();
+    const preferred = candidates.find((el) => el.hasAttribute("data-autofocus"));
 
-    (focusables()[0] ?? containerRef.current)?.focus();
+    (preferred ?? candidates[0] ?? containerRef.current)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       // Les écouteurs de toutes les couches vivent sur `window` : seule celle du

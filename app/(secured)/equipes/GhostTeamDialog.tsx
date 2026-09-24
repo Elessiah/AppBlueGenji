@@ -1,7 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   TEAM_TAG_MAX_LENGTH,
   TEAM_TAG_MIN_LENGTH,
@@ -28,6 +31,8 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
   const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
+  const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -60,9 +65,19 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
     }
   };
 
-  return (
-    <div className={s.backdrop} role="dialog" aria-modal="true" aria-labelledby="ghost-team-title">
-      <div className={s.panel}>
+  // Portée dans <body> : rendue dans la page, elle restait dans le contexte
+  // d'empilement de `main.page-shell` (`z-index: 1`), sous la barre de
+  // navigation (`z-index: 50`), qui restait nette et cliquable par-dessus le voile.
+  return createPortal(
+    <div className={s.backdrop} role="presentation" {...backdrop}>
+      <div
+        ref={dialogRef}
+        className={s.panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ghost-team-title"
+        tabIndex={-1}
+      >
         <h2 id="ghost-team-title" className={s.title}>
           Nouvelle équipe fantôme
         </h2>
@@ -82,7 +97,7 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
               // Bornes contrôlées par `checkTeamName` à l'envoi : les
               // `minLength`/`maxLength` natifs comptent des unités UTF-16,
               // la base des caractères.
-              autoFocus
+              data-autofocus
             />
           </div>
           <div className="field">
@@ -122,6 +137,7 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

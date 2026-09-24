@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -9,6 +9,7 @@ import {
   FALLBACK_BUREAU,
   randomBureauColor,
 } from "@/lib/shared/bureau";
+import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
 import styles from "./page.module.css";
 
 interface BureauSectionProps {
@@ -32,22 +33,9 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
 
   // Les membres de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (m: BureauMember) => isAdmin && m.id > 0;
-
-  // Fermeture au clavier (Échap) + focus initial sur le champ Nom à l'ouverture.
-  useEffect(() => {
-    if (!open) return;
-    nameInputRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy]);
 
   function openCreate() {
     setEditing(null);
@@ -252,73 +240,70 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
       </div>
 
       {open && (
-        <div className={styles.modalOverlay} onClick={close} role="presentation">
-          <div
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={editing ? "Modifier un membre du bureau" : "Ajouter un membre du bureau"}
-          >
-            <h3 className={styles.modalTitle}>
-              {editing ? "Modifier le membre" : "Ajouter un membre"}
-            </h3>
+        <LandingDialog
+          onClose={close}
+          busy={busy}
+          className={styles.modal}
+          label={editing ? "Modifier un membre du bureau" : "Ajouter un membre du bureau"}
+        >
+          <h3 className={styles.modalTitle}>
+            {editing ? "Modifier le membre" : "Ajouter un membre"}
+          </h3>
 
-            <div className={styles.modalPreview}>
-              <TeamSigil label={previewInitials} color={form.color || "var(--blue-500)"} size={40} />
-              <button
-                type="button"
-                className={styles.bureauAction}
-                onClick={() => setForm((f) => ({ ...f, color: randomBureauColor() }))}
-              >
-                Couleur aléatoire
-              </button>
-            </div>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Nom</span>
-              <input
-                ref={nameInputRef}
-                className={styles.modalInput}
-                value={form.name}
-                maxLength={120}
-                placeholder="Léo Perreaut"
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Rôle</span>
-              <input
-                className={styles.modalInput}
-                value={form.role}
-                maxLength={120}
-                placeholder="Président"
-                onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
-              />
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Initiales (auto si vide)</span>
-              <input
-                className={styles.modalInput}
-                value={form.initials}
-                maxLength={4}
-                placeholder={computeInitials(form.name) || "LP"}
-                onChange={(e) => setForm((f) => ({ ...f, initials: e.target.value }))}
-              />
-            </label>
-
-            <div className={styles.modalActions}>
-              <CyberButton variant="ghost" onClick={close} disabled={busy}>
-                Annuler
-              </CyberButton>
-              <CyberButton variant="primary" onClick={submit} disabled={busy}>
-                {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
-              </CyberButton>
-            </div>
+          <div className={styles.modalPreview}>
+            <TeamSigil label={previewInitials} color={form.color || "var(--blue-500)"} size={40} />
+            <button
+              type="button"
+              className={styles.bureauAction}
+              onClick={() => setForm((f) => ({ ...f, color: randomBureauColor() }))}
+            >
+              Couleur aléatoire
+            </button>
           </div>
-        </div>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Nom</span>
+            <input
+              data-autofocus
+              className={styles.modalInput}
+              value={form.name}
+              maxLength={120}
+              placeholder="Léo Perreaut"
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Rôle</span>
+            <input
+              className={styles.modalInput}
+              value={form.role}
+              maxLength={120}
+              placeholder="Président"
+              onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
+            />
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Initiales (auto si vide)</span>
+            <input
+              className={styles.modalInput}
+              value={form.initials}
+              maxLength={4}
+              placeholder={computeInitials(form.name) || "LP"}
+              onChange={(e) => setForm((f) => ({ ...f, initials: e.target.value }))}
+            />
+          </label>
+
+          <div className={styles.modalActions}>
+            <CyberButton variant="ghost" onClick={close} disabled={busy}>
+              Annuler
+            </CyberButton>
+            <CyberButton variant="primary" onClick={submit} disabled={busy}>
+              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+            </CyberButton>
+          </div>
+        </LandingDialog>
       )}
     </section>
   );

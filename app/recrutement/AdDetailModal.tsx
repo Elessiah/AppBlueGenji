@@ -1,8 +1,10 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { CyberButton, Pill, ScrollArea } from "@/components/cyber";
 import { ContactTags } from "@/components/recruitment/ContactTags";
 import { RecruitmentBody } from "@/components/recruitment/RecruitmentBody";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   RECRUITMENT_DOMAIN_LABELS,
@@ -27,13 +29,16 @@ interface AdDetailModalProps {
  */
 export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
   const dialogRef = useDialogBehavior({ open: true, onClose });
+  const backdrop = useBackdropDismiss(onClose);
   const titleId = `annonce-titre-${ad.id}`;
   // Même source de vérité que le rendu : une description faite d'une seule puce
   // vide se trime en « non vide » mais ne produit aucun bloc affichable.
   const hasBody = formatRecruitmentBody(ad.body).length > 0;
 
-  return (
-    <div className={styles.overlay} role="presentation" onClick={onClose}>
+  // Portée dans <body>, comme toutes les modales de page : son `z-index` ne
+  // doit pas dépendre de ce que contient le `<main>` qui la rend.
+  return createPortal(
+    <div className={styles.overlay} role="presentation" {...backdrop}>
       <div
         ref={dialogRef}
         className={styles.modal}
@@ -41,7 +46,6 @@ export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <header className={styles.head}>
           <div className={styles.tags}>
@@ -95,6 +99,7 @@ export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

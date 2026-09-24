@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -84,6 +85,7 @@ export function RollbackRoundDialog({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -116,9 +118,7 @@ export function RollbackRoundDialog({
   return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -136,7 +136,6 @@ export function RollbackRoundDialog({
         aria-modal="true"
         aria-labelledby="rollback-round-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 520,

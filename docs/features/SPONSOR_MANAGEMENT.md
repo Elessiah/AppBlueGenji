@@ -59,8 +59,12 @@ et le flag `isAdmin` (`getCurrentUser()`). Pour les admins :
 - chaque case expose **« Modifier »** et **« Supprimer »** en superposition (sans
   déclencher le lien du logo) ;
 - la modale propose nom, palier (select), site web, URL de logo et description ;
-- fermeture à `Échap`, focus initial sur le champ Nom, boutons désactivés
-  pendant les requêtes ;
+- la modale passe par **`LandingDialog`** (cadre partagé avec la section 03) :
+  portée dans `document.body`, fermeture à `Échap` et focus initial sur le
+  champ Nom par `useDialogBehavior`, dont la pile partagée tient aussi le
+  verrou du défilement (un `overflow` sauvegardé à la main était levé sous la
+  modale par la fermeture d'une autre) ; boutons désactivés pendant les
+  requêtes ;
 - tous les retours passent par les **toasts** bottom-left (`useToast()`).
 
 ### Logos externes

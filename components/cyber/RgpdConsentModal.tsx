@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber/CyberButton";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 
 interface RgpdConsentModalProps {
   onAccept: () => void;
@@ -16,11 +17,17 @@ interface RgpdConsentModalProps {
  * que l'utilisateur n'a pas accepté.
  */
 export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) {
+  // Focus initial dans la modale, tabulation piégée et défilement figé : sans
+  // eux, le clavier atteignait le formulaire de connexion derrière le voile
+  // avant tout consentement. `locked` : Échap ne tranche pas un consentement,
+  // il faut l'un des deux boutons. Pas de portail — la modale est rendue dès
+  // le rendu serveur, au niveau de `<main>`, qui ne crée aucun contexte
+  // d'empilement.
+  const dialogRef = useDialogBehavior({ open: true, onClose: onRefuse, locked: true });
+
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="rgpd-consent-title"
+      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -33,6 +40,11 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="rgpd-consent-title"
+        tabIndex={-1}
         style={{
           width: "min(520px, calc(100vw - 32px))",
           maxHeight: "calc(100vh - 32px)",

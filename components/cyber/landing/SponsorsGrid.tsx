@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
@@ -14,6 +13,7 @@ import {
 } from "@/lib/shared/sponsors";
 import { sponsorLogoSrc } from "@/lib/shared/sponsor-logo";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
+import { LandingDialog } from "./LandingDialog";
 import styles from "./SponsorsGrid.module.css";
 
 type SponsorsGridProps = {
@@ -49,36 +49,12 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  const nameInputRef = useRef<HTMLInputElement>(null);
   const logoFileRef = useRef<HTMLInputElement>(null);
-
-  // La modale est rendue via portail sur <body> : sans ça, elle reste piégée
-  // dans le contexte d'empilement de la section (z-index local) et passe
-  // derrière les sections suivantes (« Rejoindre la scène ») quand on défile.
-  useEffect(() => setMounted(true), []);
 
   // Les sponsors de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (s: Sponsor) => isAdmin && s.id > 0;
   // Vitrine publique limitée à 6 ; les admins voient/ gèrent l'ensemble.
   const displaySponsors = isAdmin ? items : items.slice(0, 6);
-
-  useEffect(() => {
-    if (!open) return;
-    nameInputRef.current?.focus();
-    // Verrouille le défilement de l'arrière-plan tant que la modale est ouverte.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = previousOverflow;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy]);
 
   function openCreate() {
     setEditing(null);
@@ -349,128 +325,123 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
         })}
       </div>
 
-      {open && mounted && createPortal(
-        <div className={styles.modalOverlay} onClick={close} role="presentation">
-          <div
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={editing ? "Modifier un partenaire" : "Ajouter un partenaire"}
-          >
-            <h3 className={styles.modalTitle}>{editing ? "Modifier le partenaire" : "Ajouter un partenaire"}</h3>
+      {open && (
+        <LandingDialog
+          onClose={close}
+          busy={busy}
+          className={styles.modal}
+          label={editing ? "Modifier un partenaire" : "Ajouter un partenaire"}
+        >
+          <h3 className={styles.modalTitle}>{editing ? "Modifier le partenaire" : "Ajouter un partenaire"}</h3>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Nom</span>
-              <input
-                ref={nameInputRef}
-                className={styles.modalInput}
-                value={form.name}
-                maxLength={120}
-                placeholder="LOGITECH G"
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Nom</span>
+            <input
+              className={styles.modalInput}
+              value={form.name}
+              maxLength={120}
+              placeholder="LOGITECH G"
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+            />
+          </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Palier</span>
-              <select
-                className={styles.modalInput}
-                value={form.tier}
-                onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as SponsorTier }))}
-              >
-                {SPONSOR_TIERS.map((tier) => (
-                  <option key={tier} value={tier}>
-                    {SPONSOR_TIER_LABELS[tier]}
-                  </option>
-                ))}
-              </select>
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Palier</span>
+            <select
+              className={styles.modalInput}
+              value={form.tier}
+              onChange={(e) => setForm((f) => ({ ...f, tier: e.target.value as SponsorTier }))}
+            >
+              {SPONSOR_TIERS.map((tier) => (
+                <option key={tier} value={tier}>
+                  {SPONSOR_TIER_LABELS[tier]}
+                </option>
+              ))}
+            </select>
+          </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Site web (optionnel)</span>
-              <input
-                className={styles.modalInput}
-                value={form.websiteUrl}
-                maxLength={2048}
-                placeholder="https://exemple.com"
-                onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Site web (optionnel)</span>
+            <input
+              className={styles.modalInput}
+              value={form.websiteUrl}
+              maxLength={2048}
+              placeholder="https://exemple.com"
+              onChange={(e) => setForm((f) => ({ ...f, websiteUrl: e.target.value }))}
+            />
+          </label>
 
-            <div className={styles.modalField}>
-              <span className={styles.modalLabel}>Logo (optionnel)</span>
-              <div className={styles.logoUpload}>
-                {form.logoUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={toServedUploadUrl(form.logoUrl)} alt="Aperçu du logo" className={styles.logoPreview} />
-                ) : (
-                  <div className={styles.logoPreviewEmpty} aria-hidden="true">
-                    600 × 200
-                  </div>
-                )}
-                <div className={styles.logoUploadActions}>
-                  <input
-                    ref={logoFileRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className={styles.logoFileInput}
-                    onChange={onLogoFile}
-                  />
+          <div className={styles.modalField}>
+            <span className={styles.modalLabel}>Logo (optionnel)</span>
+            <div className={styles.logoUpload}>
+              {form.logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={toServedUploadUrl(form.logoUrl)} alt="Aperçu du logo" className={styles.logoPreview} />
+              ) : (
+                <div className={styles.logoPreviewEmpty} aria-hidden="true">
+                  600 × 200
+                </div>
+              )}
+              <div className={styles.logoUploadActions}>
+                <input
+                  ref={logoFileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className={styles.logoFileInput}
+                  onChange={onLogoFile}
+                />
+                <button
+                  type="button"
+                  className={styles.logoUploadBtn}
+                  onClick={() => logoFileRef.current?.click()}
+                  disabled={logoBusy || busy}
+                >
+                  {logoBusy ? "Envoi…" : form.logoUrl ? "Changer le fichier" : "Importer un fichier"}
+                </button>
+                {form.logoUrl && (
                   <button
                     type="button"
-                    className={styles.logoUploadBtn}
-                    onClick={() => logoFileRef.current?.click()}
+                    className={`${styles.logoUploadBtn} ${styles.logoUploadBtnDanger}`}
+                    onClick={() => setForm((f) => ({ ...f, logoUrl: "" }))}
                     disabled={logoBusy || busy}
                   >
-                    {logoBusy ? "Envoi…" : form.logoUrl ? "Changer le fichier" : "Importer un fichier"}
+                    Retirer
                   </button>
-                  {form.logoUrl && (
-                    <button
-                      type="button"
-                      className={`${styles.logoUploadBtn} ${styles.logoUploadBtnDanger}`}
-                      onClick={() => setForm((f) => ({ ...f, logoUrl: "" }))}
-                      disabled={logoBusy || busy}
-                    >
-                      Retirer
-                    </button>
-                  )}
-                </div>
+                )}
               </div>
-              <span className={styles.logoHint}>
-                Résolution idéale : 600 × 200 px (ratio 3:1), PNG ou WebP à fond transparent, 5 Mo max.
-              </span>
-              <input
-                className={styles.modalInput}
-                value={form.logoUrl}
-                maxLength={2048}
-                placeholder="… ou colle une URL https://exemple.com/logo.png"
-                onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
-              />
             </div>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Description (optionnel)</span>
-              <input
-                className={styles.modalInput}
-                value={form.description}
-                maxLength={1000}
-                placeholder="Périphériques gaming"
-                onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              />
-            </label>
-
-            <div className={styles.modalActions}>
-              <CyberButton variant="ghost" onClick={close} disabled={busy}>
-                Annuler
-              </CyberButton>
-              <CyberButton variant="primary" onClick={submit} disabled={busy}>
-                {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
-              </CyberButton>
-            </div>
+            <span className={styles.logoHint}>
+              Résolution idéale : 600 × 200 px (ratio 3:1), PNG ou WebP à fond transparent, 5 Mo max.
+            </span>
+            <input
+              className={styles.modalInput}
+              value={form.logoUrl}
+              maxLength={2048}
+              placeholder="… ou colle une URL https://exemple.com/logo.png"
+              onChange={(e) => setForm((f) => ({ ...f, logoUrl: e.target.value }))}
+            />
           </div>
-        </div>,
-        document.body
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Description (optionnel)</span>
+            <input
+              className={styles.modalInput}
+              value={form.description}
+              maxLength={1000}
+              placeholder="Périphériques gaming"
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+            />
+          </label>
+
+          <div className={styles.modalActions}>
+            <CyberButton variant="ghost" onClick={close} disabled={busy}>
+              Annuler
+            </CyberButton>
+            <CyberButton variant="primary" onClick={submit} disabled={busy}>
+              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+            </CyberButton>
+          </div>
+        </LandingDialog>
       )}
     </section>
   );

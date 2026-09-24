@@ -117,21 +117,8 @@
 }
 
 /* Modale d'ajout / édition */
-.modalOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(3px);
-}
-
 .modal {
   width: min(460px, 100%);
-  max-height: calc(100vh - 40px);
-  overflow-y: auto;
   background: var(--cyber-bg-1, #0c0f14);
   border: 1px solid var(--line-strong-cy, var(--line-soft));
   border-radius: var(--r-cy-lg, 14px);
