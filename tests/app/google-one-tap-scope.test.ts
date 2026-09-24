@@ -99,8 +99,14 @@ describe("Google One Tap — ce qui en est dit aux visiteurs", () => {
     const change = PRIVACY_CHANGES.find((c) => c.id === "2026-09-google-one-tap-connexion");
     expect(change).toBeDefined();
     expect(change?.details.join(" ")).toContain("g_state");
-    // Dernière entrée : l'ordre du registre est celui de publication.
-    expect(PRIVACY_CHANGES[PRIVACY_CHANGES.length - 1]).toBe(change);
+    // L'ordre du registre est celui de publication : l'entrée suit celles
+    // publiées avant elle. « Dernière » ne tiendrait qu'à la prochaine entrée.
+    const index = PRIVACY_CHANGES.indexOf(change!);
+    const previous = PRIVACY_CHANGES.findIndex((c) => c.id === "2026-09-battletag-masque-matchs");
+    expect(index).toBeGreaterThan(previous);
+    for (const later of PRIVACY_CHANGES.slice(index + 1)) {
+      expect(later.publishedAt >= change!.publishedAt).toBe(true);
+    }
   });
 
   it("le registre des traitements compte les visiteurs de la page de connexion", () => {

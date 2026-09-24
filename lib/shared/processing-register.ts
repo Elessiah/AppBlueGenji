@@ -24,7 +24,7 @@ import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-24";
+export const REGISTER_UPDATED_AT = "2026-09-25";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -192,22 +192,36 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait)",
     subPurposes: [
       "Exposer le pseudo Discord certifié aux administrateurs, et aux arbitres tant que le joueur est engagé dans un tournoi en cours",
+      "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
+      "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
       "Envoyer des rappels de match en message privé Discord (une semaine, 24 h et 1 h avant)",
       "Alerter le rôle arbitre (conflit de score, report expiré, signalement d'un joueur)",
     ],
     legalBasis: "Consentement (certification du pseudo Discord par le joueur) et intérêt légitime (bon déroulement des tournois)",
-    dataSubjects: ["Joueurs engagés dans un tournoi", "Arbitres"],
-    dataCategories: ["Pseudo et identifiant Discord", "Date et adversaire du match", "Motif d'un signalement"],
+    dataSubjects: ["Joueurs engagés dans un tournoi", "Arbitres", "Casters inscrits sur un match"],
+    dataCategories: [
+      "Pseudo et identifiant Discord",
+      "BattleTag",
+      "Date et adversaire du match",
+      "Heure à laquelle chaque partie s'est déclarée prête, caster inscrit",
+      "Motif d'un signalement",
+    ],
     sensitiveData: "Aucune",
     retention: [
       "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
       "Traces d'envoi des rappels et alertes (match et palier, sans contenu) : conservées avec le match, donc sans limite de durée",
+      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués",
     ],
-    recipients: ["Administrateurs et arbitres de l'association", "Discord, qui achemine les messages"],
+    recipients: [
+      "Administrateurs et arbitres de l'association",
+      "Joueurs et caster d'un même match, de son lancement à sa fin",
+      "Discord, qui achemine les messages",
+    ],
     transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
     security: [
       ...COMMON_SECURITY,
       "Pseudo non certifié invisible de tous, administrateurs compris ; jamais public",
+      "Contacts d'un match servis aux seules parties du match, jamais dans l'instantané public du tournoi",
     ],
   },
   {

@@ -2,6 +2,8 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, matchWinnerSide } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
+import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
 import {
   dropQueuedRefereeAlerts,
@@ -215,7 +217,10 @@ export async function reportMatchScore(
       next_loser_match_id,
       next_loser_slot,
       winner_team_id,
-      status
+      status,
+      start_at,
+      launched_at,
+      launch_pairing
      FROM bg_matches
      WHERE id = ?
        AND tournament_id = ?
@@ -247,6 +252,30 @@ export async function reportMatchScore(
 
   if (!isTeam1Reporter && !isTeam2Reporter) {
     throw new Error("NOT_IN_MATCH");
+  }
+
+  // Un match se joue une fois **lancé** : les deux équipes (et le caster) se
+  // sont déclarées prêtes, l'arbitrage l'a forcé, ou le délai l'a fait partir
+  // (`lib/shared/match-launch.ts`). Le report d'un joueur n'y déroge pas ;
+  // l'arbitrage, qui passe par un autre chemin, garde la main.
+  if (
+    !canPlayersReportScore(
+      {
+        status: match.status,
+        team1Id: Number(match.team1_id),
+        team2Id: Number(match.team2_id),
+        startAt: toIso(match.start_at ?? null),
+        // Un lancement posé pour un autre appariement ne lance pas celui-ci.
+        launchedAt:
+          launchPairingKey(Number(match.team1_id), Number(match.team2_id)) ===
+          (match.launch_pairing ?? null)
+            ? toIso(match.launched_at ?? null)
+            : null,
+      },
+      Date.now(),
+    )
+  ) {
+    throw new Error("MATCH_NOT_LAUNCHED");
   }
 
   // Un report d'équipe **clôt** la rencontre : le score doit donc constituer un

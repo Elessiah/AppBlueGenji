@@ -66,6 +66,18 @@ export function requestClientIp(req: Request): string | null {
   return trustsRealIpHeader() ? req.headers.get("x-real-ip") : null;
 }
 
+/**
+ * Interrogation de la modale de lancement des matchs, par utilisateur. Elle
+ * suit la page du joueur partout sur le site : quelques secondes d'intervalle
+ * pendant un lancement, une minute sinon — soixante par minute laissent
+ * plusieurs onglets ouverts sans jamais rien refuser à un usage normal.
+ */
+export const MATCH_LAUNCH_READ_RULE: RateLimitRule = {
+  name: "match-launch-read",
+  limit: 60,
+  windowMs: 60_000,
+};
+
 /** Lectures d'un utilisateur connecté : liste et détail des tournois. */
 export const TOURNAMENT_READ_RULE: RateLimitRule = {
   name: "tournament-read",

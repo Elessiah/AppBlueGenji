@@ -31,6 +31,7 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
+import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
 import { computeTournamentState } from "./state";
 import type { TournamentRow } from "./_internal";
 
@@ -65,6 +66,8 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  * - plateau d'élimination absent (`createBracketIfMissing`) ;
  * - report de score dont le délai a expiré (`resolveExpiredScoreReports`) ;
  * - bye ou match fantôme encore ouvert (`tryAutoResolveByes`) ;
+ * - match entré en lancement sans que son délai ait été ouvert, ou dont le
+ *   délai de lancement d'office est écoulé (`maintainMatchLaunches`) ;
  * - élimination dont toutes les rencontres sont jouées : la clôture reste à
  *   prononcer (`finalizeTournamentIfDone`) — un double forfait est joué sans
  *   vainqueur, même exception que `isEliminationPhaseComplete` ;
@@ -73,8 +76,9 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  */
 async function findDueMaintenance(connection: PoolConnection): Promise<number[]> {
   const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    // `MIN_ENTRANTS_FOR_MATCHES` est une constante du module, jamais une
-    // entrée : rien d'externe n'atteint cette interpolation.
+    // `MIN_ENTRANTS_FOR_MATCHES` et `LAUNCH_AUTO_DELAY_MINUTES` sont des
+    // constantes de module, jamais une entrée : rien d'externe n'atteint ces
+    // interpolations.
     `SELECT t.id
      FROM bg_tournaments t
      WHERE t.state = 'RUNNING'
@@ -89,6 +93,15 @@ async function findDueMaintenance(connection: PoolConnection): Promise<number[]>
                       AND m.score_deadline_at IS NOT NULL
                       AND m.score_deadline_at <= NOW()
                       AND m.winner_team_id IS NULL)
+         OR EXISTS (SELECT 1 FROM bg_matches m
+                    WHERE m.tournament_id = t.id
+                      AND m.status = 'READY'
+                      AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+                      AND (m.start_at IS NULL OR m.start_at <= NOW())
+                      AND (NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id))
+                           OR (m.launched_at IS NULL
+                               AND (m.lobby_opened_at IS NULL
+                                    OR m.lobby_opened_at <= NOW() - INTERVAL ${LAUNCH_AUTO_DELAY_MINUTES} MINUTE))))
          OR EXISTS (SELECT 1 FROM bg_matches m
                     WHERE m.tournament_id = t.id AND m.phase_id = 0
                       AND m.status <> 'COMPLETED'

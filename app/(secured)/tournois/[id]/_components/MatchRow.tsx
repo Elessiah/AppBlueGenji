@@ -10,6 +10,7 @@ import { useMatchFormat } from "../_lib/match-format-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { MatchLiveStrip } from "./MatchLiveStrip";
+import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip } from "./MatchReplayStrip";
 import { EntrantName } from "./EntrantName";
 
@@ -180,6 +181,7 @@ export function MatchRow({
       )}
 
       <MatchLiveStrip match={match} />
+      <MatchLaunchStrip match={match} />
 
       <MatchReplayStrip match={match} />
 

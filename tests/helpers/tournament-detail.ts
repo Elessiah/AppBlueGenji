@@ -44,6 +44,8 @@ export function tournamentViewerContext(
     isAdmin: false,
     canDelete: false,
     canManageLive: false,
+    viewerUserId: 1,
+    castBlock: "NOT_CASTER",
     ...overrides,
   };
 }

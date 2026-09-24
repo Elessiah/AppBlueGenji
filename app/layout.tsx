@@ -7,6 +7,7 @@ import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ClientPowerRoot } from "@/components/client-power-root";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
+import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
@@ -159,6 +160,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             onAdPage={onRecruitmentPage}
           />
           <PrivacyChangesModal changes={privacyChanges} />
+          {/* Lancement des matchs du joueur, sur toutes les pages : la modale
+              s'ouvre à l'heure du match, où qu'il se trouve sur le site. */}
+          {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}
           {children}
         </ToastProvider>
       </body>

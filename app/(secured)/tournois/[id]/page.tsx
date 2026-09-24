@@ -32,6 +32,7 @@ import { MatchLiveDialog } from "./_components/MatchLiveDialog";
 import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
 import { MatchReplayDialog } from "./_components/MatchReplayDialog";
 import { LiveProvider } from "./_lib/live-context";
+import { canPlayersReportScore } from "@/lib/shared/match-launch";
 import { IssueReportProvider } from "./_lib/issue-report-context";
 import { IssueReportDialog } from "./_components/IssueReportDialog";
 import { RegistrationsPanel } from "./_components/RegistrationsPanel";
@@ -315,6 +316,10 @@ export default function TournamentDetailPage() {
     if (!detail?.myTeamId) return false;
     if (isMatchPlayed(match)) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
+    // Un match se joue une fois lancé (`lib/shared/match-launch.ts`) : le
+    // formulaire n'apparaît qu'alors, comme le serveur l'exige. Le lancement est
+    // toujours une écriture, que le flux apporte — l'horloge n'y joue aucun rôle.
+    if (!canPlayersReportScore(match, Date.now())) return false;
     return (
       detail.canCreateReportsForTeamIds.includes(detail.myTeamId) &&
       (detail.myTeamId === match.team1Id || detail.myTeamId === match.team2Id)
@@ -558,6 +563,9 @@ export default function TournamentDetailPage() {
         canSchedule={detail.isAdmin}
         openConfig={openMatchLive}
         openSchedule={openMatchSchedule}
+        viewerUserId={detail.viewerUserId}
+        myTeamId={detail.myTeamId}
+        castBlock={detail.castBlock}
         openReplay={openMatchReplay}
       >
       {/* Le bouton **par match** suit la règle de `frozen` : le plateau affiché

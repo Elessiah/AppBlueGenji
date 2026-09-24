@@ -49,6 +49,14 @@ export type PrivacyChange = {
   details: readonly string[];
 };
 
+/**
+ * Événement de fenêtre émis quand le joueur a accepté les changements
+ * présentés. Les autres modales de la mise en page racine (lancement d'un match)
+ * attendent ce signal pour s'ouvrir : deux modales ouvertes ensemble se
+ * disputeraient le piège de focus, et celle du dessous le gagnerait.
+ */
+export const PRIVACY_CHANGES_ANSWERED_EVENT = "bg:privacy-changes-answered";
+
 /** Forme d'un identifiant de changement. */
 export const PRIVACY_CHANGE_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -122,6 +130,22 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Auparavant, tout visiteur non connecté chargeait l'invite de connexion de Google (Google One Tap) sur chaque page : Google recevait son adresse IP et la page consultée.",
       "Désormais, aucune page du site ne fait appel à Google, sauf la page de connexion, une fois la politique acceptée. Google peut y déposer un cookie « g_state » pour retenir que tu as fermé l'invite.",
       "Rien ne change pour ton compte : les moyens de connexion et les données conservées restent les mêmes.",
+    ],
+  },
+  // Lancement des matchs : la modale présente à chaque partie d'un match les
+  // contacts des autres — c'est un public de plus pour le tag Discord certifié,
+  // et un nouveau public (le caster) pour le BattleTag.
+  {
+    id: "2026-09-lancement-des-matchs",
+    publishedAt: "2026-09-25",
+    title: "Lancement des matchs : tes contacts présentés à ton adversaire et au caster",
+    summary:
+      "Au lancement d'un match, les joueurs des deux équipes et le caster voient le tag Discord certifié et le BattleTag d'un ou deux joueurs de chaque équipe, le temps de la rencontre.",
+    details: [
+      "Pour chaque équipe, le site présente le capitaine, un manager ou le propriétaire — en priorité un joueur dont le tag Discord ou le BattleTag est vérifié —, et un second joueur si c'est le seul moyen d'avoir à la fois un contact Discord et un BattleTag.",
+      "Un tag Discord non certifié n'est jamais montré. Un BattleTag l'est même non vérifié, avec la mention « non vérifié » : c'est par lui qu'on s'ajoute en jeu.",
+      "Le caster inscrit sur un match se présente de la même façon aux deux équipes, et voit leurs contacts : s'inscrire pour caster exige un tag Discord certifié et un compte Battle.net rattaché.",
+      "Ces informations ne sont visibles qu'entre les parties du match, à partir de son lancement et jusqu'à ce qu'il soit terminé. Le site garde aussi l'heure à laquelle chaque partie s'est déclarée prête, avec le match.",
     ],
   },
 ];

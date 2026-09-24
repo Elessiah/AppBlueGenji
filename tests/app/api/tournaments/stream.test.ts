@@ -67,6 +67,8 @@ function viewerWith(overrides: Partial<TournamentViewerContext> = {}): Tournamen
     isAdmin: false,
     canDelete: false,
     canManageLive: false,
+    viewerUserId: 1,
+    castBlock: "NOT_CASTER",
     preview: null,
     ...overrides,
   };

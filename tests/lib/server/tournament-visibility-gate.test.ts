@@ -13,6 +13,7 @@ jest.mock("@/lib/server/tournaments/snapshot");
 jest.mock("@/lib/server/teams-service");
 jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/tournaments/match-launch");
 
 import {
   getTournamentDetail,

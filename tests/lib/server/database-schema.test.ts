@@ -215,6 +215,17 @@ describe("Schéma — la règle des deux endroits", () => {
     expect(migrations).toContain("await db.execute(statement);");
   });
 
+  it("ne pose lancés, au déploiement, que les matchs déjà jouables", () => {
+    // Un match programmé plus tard doit passer par son lancement à l'heure
+    // dite : le lancer d'office au déploiement ferait taire la modale et les
+    // « Prêt » pour lui (`lib/shared/match-launch.ts`).
+    const backfill = migrations.slice(migrations.indexOf("const launchedAtStatement"));
+    const update = backfill.slice(backfill.indexOf("UPDATE bg_matches"), backfill.indexOf("} catch"));
+    expect(update).toMatch(/status = 'READY' AND \(start_at IS NULL OR start_at <= NOW\(\)\)/);
+    expect(update).toContain("launch_pairing = CONCAT(team1_id, ':', team2_id)");
+    expect(update).not.toContain("status <> 'PENDING'");
+  });
+
   it("ne laisse aucun échec de migration passer en silence", () => {
     // Un droit `ALTER` manquant ou un verrou de métadonnées laisserait le schéma
     // en arrière du code : la base démarre, et la panne se lit plus tard sur une
@@ -225,9 +236,10 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    // Cinq : la boucle des changements récents, les trois retraits de colonne
-    // et le report `user_id` → `authenticated` des visites qui précède le sien.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(5);
+    // Six : la boucle des changements récents, les trois retraits de colonne,
+    // le report `user_id` → `authenticated` des visites qui précède le sien, et
+    // `launched_at`, dont le remplissage ne suit que l'ajout effectif.
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(6);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });

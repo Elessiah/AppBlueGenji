@@ -28,7 +28,7 @@
  * c'est la seule phrase qui le dise au joueur.
  */
 export const DISCORD_TAG_AUDIENCE =
-  "les administrateurs le voient, et les arbitres tant que tu es engagé dans un tournoi. Jamais personne d'autre.";
+  "les administrateurs le voient, les arbitres tant que tu es engagé dans un tournoi, et les joueurs et le caster de ton match le temps de la rencontre, à partir de son lancement. Jamais personne d'autre.";
 
 /**
  * Ce qu'un tag **non** certifié vaut : rien, pour personne.
