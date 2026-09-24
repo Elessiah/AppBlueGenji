@@ -28,6 +28,26 @@ export const DEFAULT_ENDURANCE_MAX_ROUNDS = 5;
 export const DEFAULT_QUALIFICATION_DRAWS = true;
 
 /**
+ * Format de match **effectif** d'un format de tournoi : égalités et plafond de
+ * maps n'existent qu'en qualification BG Survie (le serveur les ferme ou les
+ * ignore ailleurs). Les égalités étant cochées par défaut, c'est ce format-ci —
+ * et non la valeur gardée en mémoire pour une bascule — qu'affichent l'aide du
+ * formulaire et le champ de plafond, et que `toApiPayload` envoie.
+ */
+export function effectiveMatchFormat(
+  format: TournamentFormat,
+  matchFormat: MatchFormat | null,
+): MatchFormat | null {
+  if (matchFormat === null) return null;
+  const drawsApply = format === "BG_SURVIE";
+  return {
+    ...matchFormat,
+    maxMaps: drawsApply ? (matchFormat.maxMaps ?? null) : null,
+    drawsAllowed: drawsApply && (matchFormat.drawsAllowed ?? false),
+  };
+}
+
+/**
  * Miroir client des valeurs éditables (`EditableTournamentValues`), à deux
  * différences près, imposées par les contrôles HTML :
  *
@@ -203,6 +223,7 @@ function isoToLocalInput(iso: string): string {
  */
 export function toApiPayload(values: TournamentFormValues): Record<string, unknown> {
   const { format } = values;
+  const matchFormat = effectiveMatchFormat(format, values.matchFormat);
   return {
     name: values.name,
     description: values.description,
@@ -242,15 +263,12 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // Le plafond de maps et les égalités voyagent **aplatis** eux aussi, comme
     // le type et le nombre de manches : un seul champ éditable, `matchFormat`,
     // quatre clés dans le corps.
-    // Comme les égalités dont il est la fenêtre, le plafond n'existe qu'en BG
-    // Survie : le serveur l'ignore ailleurs, l'envoyer n'y dirait rien.
-    matchFormatMaxMaps:
-      format === "BG_SURVIE" ? (values.matchFormat?.maxMaps ?? null) : null,
     // Les égalités n'ont de sens qu'en qualification de BG Survie : ailleurs,
     // la validation les refuse, et les envoyer ferait échouer la création d'un
-    // tournoi dont le formulaire n'affiche même pas la case.
-    matchFormatDraws:
-      format === "BG_SURVIE" ? (values.matchFormat?.drawsAllowed ?? false) : false,
+    // tournoi dont le formulaire n'affiche même pas la case. Le plafond, qui
+    // en est la fenêtre, suit (`effectiveMatchFormat`).
+    matchFormatMaxMaps: matchFormat?.maxMaps ?? null,
+    matchFormatDraws: matchFormat?.drawsAllowed ?? false,
     endurancePlayoffFormatType:
       format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.type ?? null) : null,
     endurancePlayoffFormatValue:

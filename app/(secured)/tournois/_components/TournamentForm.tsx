@@ -45,6 +45,7 @@ import {
 import {
   DEFAULT_QUALIFICATION_DRAWS,
   defaultTournamentFormValues,
+  effectiveMatchFormat,
   toApiPayload,
   toFormValues,
   type TournamentApiValues,
@@ -164,14 +165,18 @@ export function TournamentForm({
   const matchFormatType: MatchFormatType | "LIBRE" = values.matchFormat?.type ?? "LIBRE";
   const matchFormatValue = values.matchFormat?.value ?? lastMatchFormatValue;
   const isLibre = matchFormatType === "LIBRE";
+  // Le format **effectif**, celui que `toApiPayload` enverra : lire
+  // `values.matchFormat` tel quel annoncerait « map nulle » sous le format d'un
+  // tournoi à élimination (les égalités sont cochées par défaut) et y offrirait
+  // un plafond ignoré. `values.matchFormat` garde les réglages pour une bascule.
   const matchFormat: MatchFormat | null = isLibre
     ? null
-    : {
+    : effectiveMatchFormat(format, {
         type: matchFormatType,
         value: matchFormatValue,
         maxMaps: values.matchFormat?.maxMaps ?? null,
         drawsAllowed: values.matchFormat?.drawsAllowed ?? false,
-      };
+      });
   const matchFormatValid = isLibre || isValidMatchFormat(matchFormatType, matchFormatValue);
 
   /**
@@ -468,13 +473,10 @@ export function TournamentForm({
               exige un vainqueur ne retire que des issues, au point qu'une
               rencontre arrivée à égalité n'a plus aucun score enregistrable
               (`matchMaxMapsNeedsDraws`, refusé côté serveur). La case qui
-              l'ouvre est plus bas, dans les réglages de BlueGenji Survie — et comme
-              elle, il n'existe qu'en BG Survie : les égalités étant cochées par
-              défaut, ne tester qu'elles l'offrirait sur tout format, où le
-              serveur l'ignore.
+              l'ouvre est plus bas, dans les réglages de BlueGenji Survie (le
+              format effectif n'a donc d'égalités qu'en BG Survie).
             */}
-            {format === "BG_SURVIE" &&
-              !isLibre &&
+            {!isLibre &&
               matchFormatValid &&
               matchAllowsDraw(matchFormat) &&
               naturalMaxMaps(matchFormat!) > matchWinsRequired(matchFormat!) && (

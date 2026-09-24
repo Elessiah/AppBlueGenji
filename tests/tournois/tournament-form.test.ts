@@ -11,6 +11,8 @@ import {
   toApiPayload,
   toFormValues,
 } from "@/app/(secured)/tournois/_components/TournamentForm";
+import { effectiveMatchFormat } from "@/app/(secured)/tournois/_lib/tournament-form-values";
+import { matchFormatDescription } from "@/lib/shared/match-format";
 
 describe("defaultTournamentFormValues", () => {
   it("propose un tournoi à élimination simple par équipes", () => {
@@ -46,6 +48,29 @@ describe("defaultTournamentFormValues", () => {
     expect(t(v.startVisibilityAt)).toBeLessThanOrEqual(t(v.registrationOpenAt));
     expect(t(v.registrationOpenAt)).toBeLessThanOrEqual(t(v.registrationCloseAt));
     expect(t(v.registrationCloseAt)).toBeLessThanOrEqual(t(v.startAt));
+  });
+});
+
+describe("effectiveMatchFormat", () => {
+  const withDraws = { type: "FT" as const, value: 3, maxMaps: 4, drawsAllowed: true };
+
+  it("garde égalités et plafond en BG Survie", () => {
+    expect(effectiveMatchFormat("BG_SURVIE", withDraws)).toEqual(withDraws);
+  });
+
+  // Les égalités sont cochées par défaut : l'aide sous le format d'un tournoi
+  // à élimination ne doit pas pour autant annoncer un match nul.
+  it("ferme égalités et plafond hors BG Survie", () => {
+    for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI"] as const) {
+      const effective = effectiveMatchFormat(format, withDraws);
+      expect(effective).toEqual({ type: "FT", value: 3, maxMaps: null, drawsAllowed: false });
+      expect(matchFormatDescription(effective)).not.toMatch(/nulle/);
+    }
+  });
+
+  it("laisse la saisie libre telle quelle", () => {
+    expect(effectiveMatchFormat("BG_SURVIE", null)).toBeNull();
+    expect(effectiveMatchFormat("SINGLE", null)).toBeNull();
   });
 });
 
