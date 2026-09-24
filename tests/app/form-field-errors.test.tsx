@@ -10,6 +10,10 @@ jest.mock("@/components/cyber/landing/PublicFooter", () => ({
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { PlayerPseudoCombobox } from "@/app/(secured)/equipes/[id]/_components/PlayerPseudoCombobox";
+import { PhaseCard } from "@/app/(secured)/tournois/creer/PhaseCard";
+import { fieldAria } from "@/lib/shared/field-errors";
+import type { PhaseConfig, PhaseIssueField } from "@/lib/shared/tournament-phases";
 import AccessibilityStatementPage from "@/app/accessibilite/page";
 import { KNOWN_ISSUES } from "@/lib/shared/accessibility-statement";
 import { blockFor, globals, stripComments } from "./_lib/style-sweep";
@@ -42,6 +46,9 @@ const WIRED_FORMS: { file: string; fields: string[] }[] = [
   { file: "app/(secured)/equipes/[id]/_components/TeamSettings.tsx", fields: ["name", "tag"] },
   { file: "app/(secured)/profil/page.tsx", fields: ["pseudo", "battletag", "discord"] },
   { file: "app/connexion/_components/LoginForm.tsx", fields: ["handle", "code"] },
+  { file: "app/(secured)/equipes/[id]/_components/MembersSection.tsx", fields: ["pseudo"] },
+  { file: "app/(secured)/equipes/[id]/_components/ClaimGhostTeamDialog.tsx", fields: ["pseudo"] },
+  { file: "app/(secured)/profil/DiscordVerificationDialog.tsx", fields: ["handle", "code"] },
   {
     file: "app/(secured)/tournois/_components/TournamentForm.tsx",
     fields: [
@@ -101,6 +108,127 @@ describe("formulaires — erreurs rattachées aux champs", () => {
     // la fait gagner.
     const css = stripComments(globals);
     expect(css.indexOf('.field textarea[aria-invalid="true"]:focus')).toBeGreaterThan(css.indexOf(".field textarea:focus"));
+  });
+});
+
+describe("pseudo d'un joueur — liste de suggestions et focus ramené", () => {
+  const COMBOBOX = "app/(secured)/equipes/[id]/_components/PlayerPseudoCombobox.tsx";
+
+  it("le hook ramène le focus par la fonction qui le marque", () => {
+    const src = code("lib/shared/hooks/useFieldErrors.ts");
+    expect(src).toContain("focusFlaggedField(");
+    expect(src).not.toMatch(/\.focus\(\)/);
+  });
+
+  it("la liste ne s'ouvre pas sur le focus ramené par un refus", () => {
+    const src = code(COMBOBOX);
+    expect(src).toMatch(/onFocus=\{\(e\) => \{\s*if \(!isFieldErrorFocus\(e\.currentTarget\)\) setOpen\(true\);/);
+  });
+
+  it("le champ reçoit aria-invalid et la phrase du refus avec son aide", () => {
+    const html = renderToStaticMarkup(
+      <PlayerPseudoCombobox
+        id="team-invite-pseudo"
+        value="Nova"
+        onChange={() => {}}
+        aria={fieldAria("team-invite-pseudo", true, "team-invite-help")}
+      />,
+    );
+    expect(html).toContain('aria-invalid="true"');
+    expect(html).toContain('aria-describedby="team-invite-pseudo-error team-invite-help"');
+  });
+
+  it("sans refus, le champ garde sa seule aide", () => {
+    const html = renderToStaticMarkup(
+      <PlayerPseudoCombobox
+        id="claim-pseudo"
+        value=""
+        onChange={() => {}}
+        aria={fieldAria("claim-pseudo", false, "claim-pseudo-help")}
+      />,
+    );
+    expect(html).not.toContain("aria-invalid");
+    expect(html).toContain('aria-describedby="claim-pseudo-help"');
+  });
+
+  it("l'invitation reçoit le code du refus, que le hook des gestes lui transmet", () => {
+    const hook = code("app/(secured)/equipes/[id]/_hooks/useMemberManagement.ts");
+    expect(hook).toMatch(/onRefused\?\.\(code, message\)/);
+    expect(code("app/(secured)/equipes/[id]/_components/MembersSection.tsx")).toContain(
+      "addMember(memberPseudo.trim(), memberRoles, fieldErrors.report)",
+    );
+  });
+});
+
+describe("phases d'un tournoi multi-phases", () => {
+  const phase: PhaseConfig = {
+    position: 2,
+    format: "SURVIVAL",
+    name: null,
+    qualifierMode: "COUNT",
+    qualifierValue: 8,
+    hasThirdPlaceMatch: false,
+    swissTotalRounds: null,
+    survivalRoundsBeforeFirstCut: 0,
+    survivalRoundsPerCut: 3,
+  };
+  const render = (issue: { field: PhaseIssueField; message: string } | null) =>
+    renderToStaticMarkup(
+      <PhaseCard
+        phase={phase}
+        isLast={false}
+        isExpanded
+        totalPhases={3}
+        maxTeams={16}
+        issue={issue}
+        onToggleExpand={() => {}}
+        onMoveUp={() => {}}
+        onMoveDown={() => {}}
+        onRemove={() => {}}
+        onUpdate={() => {}}
+      />,
+    );
+  /** Balise ouvrante du contrôle portant cet `id`. */
+  const control = (html: string, id: string) => html.match(new RegExp(`<(?:input|select)[^>]*id="${id}"[^>]*>`))?.[0] ?? "";
+
+  it("signale le réglage désigné, avec la phrase du défaut puis son aide", () => {
+    const html = render({ field: "survivalRoundsBeforeFirstCut", message: "Phase 2 — Cadence invalide." });
+    const input = control(html, "phase-survival-before-2");
+    expect(input).toContain('aria-invalid="true"');
+    expect(input).toContain('aria-describedby="phase-survival-before-2-error phase-survival-before-2-help"');
+    expect(html).toContain('<span id="phase-survival-before-2-error" class="sr-only">Phase 2 — Cadence invalide.</span>');
+  });
+
+  it("ne signale que ce réglage", () => {
+    const html = render({ field: "survivalRoundsBeforeFirstCut", message: "Phase 2 — Cadence invalide." });
+    for (const id of ["phase-format-2", "phase-qualifier-2", "phase-survival-per-2"]) {
+      expect(control(html, id)).not.toContain("aria-invalid");
+    }
+  });
+
+  it("montre la valeur refusée, pas une valeur par défaut", () => {
+    // `|| 3` affichait « 3 » pour une cadence à 0 : le champ signalé aurait
+    // montré une valeur valide.
+    expect(control(render(null), "phase-survival-before-2")).toContain('value="0"');
+  });
+
+  it("sans défaut, aucun champ n'est signalé", () => {
+    const html = render(null);
+    expect(html).not.toContain("aria-invalid");
+    expect(html).not.toContain("sr-only");
+  });
+
+  it("l'envoi refusé demande le focus, que le constructeur porte au réglage fautif", () => {
+    const form = code("app/(secured)/tournois/_components/TournamentForm.tsx");
+    expect(form).toMatch(/findPhaseIssue\(phases\)/);
+    expect(form).toContain("setPhaseFocusRequest((n) => n + 1)");
+    expect(code("app/(secured)/tournois/_components/FormatSettings.tsx")).toContain(
+      "focusRequest={phaseFocusRequest}",
+    );
+    const builder = code("app/(secured)/tournois/creer/PhaseBuilder.tsx");
+    expect(builder).toContain("setExpandedIndex(current.phaseIndex)");
+    expect(builder).toContain("phaseFieldId(current.phaseIndex + 1, current.field)");
+    expect(builder).toMatch(/getElementById\(pendingFocusId\)\?\.focus\(\)/);
   });
 });
 

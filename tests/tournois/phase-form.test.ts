@@ -4,7 +4,9 @@ import {
   createDefaultPhase,
   movePhase,
   phaseErrorMessage,
+  phaseFieldId,
   phaseFormatLabel,
+  phaseIssueMessage,
   phaseSummary,
   removePhase,
 } from "@/app/(secured)/tournois/creer/phase-form";
@@ -259,5 +261,29 @@ describe("phase-form — phaseErrorMessage", () => {
   it("retourne du texte français pour DOUBLE_MUST_BE_LAST_PHASE", () => {
     const msg = phaseErrorMessage("DOUBLE_MUST_BE_LAST_PHASE");
     expect(msg).toMatch(/double.*dernière/i);
+  });
+});
+
+describe("phase-form — phaseFieldId", () => {
+  it("suffixe chaque réglage par la position de la phase", () => {
+    expect(phaseFieldId(1, "format")).toBe("phase-format-1");
+    expect(phaseFieldId(2, "qualifierValue")).toBe("phase-qualifier-2");
+    expect(phaseFieldId(3, "swissTotalRounds")).toBe("phase-swiss-3");
+    expect(phaseFieldId(4, "survivalRoundsBeforeFirstCut")).toBe("phase-survival-before-4");
+    expect(phaseFieldId(5, "survivalRoundsPerCut")).toBe("phase-survival-per-5");
+  });
+});
+
+describe("phase-form — phaseIssueMessage", () => {
+  it("situe le défaut d'une phase", () => {
+    expect(phaseIssueMessage({ code: "DOUBLE_MUST_BE_LAST_PHASE", phaseIndex: 1, field: "format" })).toBe(
+      `Phase 2 — ${phaseErrorMessage("DOUBLE_MUST_BE_LAST_PHASE")}`,
+    );
+  });
+
+  it("garde la phrase seule pour un défaut du plan entier", () => {
+    expect(phaseIssueMessage({ code: "INVALID_PHASE_COUNT", phaseIndex: null, field: null })).toBe(
+      phaseErrorMessage("INVALID_PHASE_COUNT"),
+    );
   });
 });
