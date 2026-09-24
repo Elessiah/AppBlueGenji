@@ -252,6 +252,29 @@ describe("deleteOwnAccount — les défis de connexion par message privé", () =
   });
 });
 
+/**
+ * Un signalement qui vise le compte garde sa cible, mais pas le pseudo relevé à
+ * l'envoi : le panneau retombe sur ce relevé dès que le compte n'est plus
+ * vivant, et la suppression promet justement de le retirer.
+ */
+describe("deleteOwnAccount — les signalements qui visent le compte", () => {
+  it.each([
+    ["un compte effacé", EMPTY],
+    ["un compte anonymisé", { ...EMPTY, played: 1 }],
+  ])("efface le pseudo relevé sur leurs cibles (%s)", async (_label, trace) => {
+    const { queries, connection } = fakeDb(trace);
+
+    await deleteOwnAccount(7);
+
+    const scrub = queries.find((q) => q.sql.includes("bg_report_targets"));
+    expect(scrub).toBeDefined();
+    expect(scrub!.sql).toContain("label_snapshot = NULL");
+    expect(scrub!.sql).toContain("target_type = 'USER'");
+    expect(scrub!.params).toEqual([7]);
+    expect(connection.commit).toHaveBeenCalled();
+  });
+});
+
 describe("deleteOwnAccount — l'effacement emporte l'entrée solo orpheline", () => {
   it("efface une entrée solo jamais inscrite ni jouée, avant la ligne du compte", async () => {
     const { queries } = fakeDb(EMPTY);

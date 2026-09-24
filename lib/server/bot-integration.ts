@@ -551,3 +551,27 @@ export async function fetchBotActivity(
   }
 }
 
+
+/**
+ * Alerte la direction de l'association : canal de logs du bot **et** message
+ * privé au propriétaire (`OWNER_ID`) et au président (`PRESIDENT`), tels que
+ * le bot les connaît — le site ne détient pas leurs identifiants Discord.
+ *
+ * Sert aux signalements (`lib/server/content-reports.ts`). Le coupe-circuit est
+ * ignoré, comme pour l'alerte des arbitres : chaque appel suit l'action d'une
+ * personne, qui mérite sa tentative.
+ *
+ * @param message Texte déjà rédigé, sans donnée nominative d'un joueur.
+ * @param context Étiquette de journalisation côté bot.
+ * @returns Le bilan du bot, ou `null` s'il est injoignable — jamais d'exception.
+ */
+export async function pushLeadershipAlert(
+  message: string,
+  context: string,
+): Promise<DiscordDeliveryReport | null> {
+  return postDiscordNotification(
+    "/internal/notify/leadership",
+    { message, context },
+    { timeoutMs: BOT_NOTIFY_FETCH_TIMEOUT_MS, honourCircuit: false },
+  );
+}

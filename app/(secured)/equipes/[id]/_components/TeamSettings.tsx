@@ -10,6 +10,8 @@ import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib
 import { teamErrorMessage } from "../../_lib/team-errors";
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
+import { LOGO_RIGHTS_FIELD, LOGO_RIGHTS_LABEL, LOGO_RIGHTS_TERMS_ANCHOR } from "@/lib/shared/terms-of-use";
+import Link from "next/link";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
@@ -53,6 +55,10 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
+  // Garantie des droits sur **ce** logo : cochée avant le choix du fichier, et
+  // décochée après chaque envoi — chaque image certifiée est la sienne.
+  const [logoRights, setLogoRights] = useState(false);
+  const logoRightsRef = useRef<HTMLInputElement | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -118,8 +124,10 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
     try {
       const formData = new FormData();
       formData.append("file", file);
+      formData.append(LOGO_RIGHTS_FIELD, logoRights ? "1" : "0");
       await teamApi(`/api/teams/${team.team.id}/logo`, { method: "POST", body: formData }, "LOGO_UPLOAD_FAILED");
       showSuccess("Logo mis à jour.");
+      setLogoRights(false);
       onChanged();
     } catch (e) {
       showError(teamErrorMessage((e as Error).message));
@@ -275,7 +283,14 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                 type="button"
                 className="btn"
                 disabled={logoBusy}
-                onClick={() => logoFileRef.current?.click()}
+                onClick={() => {
+                  if (!logoRights) {
+                    showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
+                    logoRightsRef.current?.focus();
+                    return;
+                  }
+                  logoFileRef.current?.click();
+                }}
               >
                 {logoBusy ? "Envoi…" : team.team.logoUrl ? "Changer le logo" : "Ajouter un logo"}
               </button>
@@ -287,6 +302,20 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
             </div>
           </div>
           <p className={styles.help}>PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo au maximum.</p>
+          <label className="consent-check">
+            <input
+              ref={logoRightsRef}
+              type="checkbox"
+              checked={logoRights}
+              onChange={(e) => setLogoRights(e.target.checked)}
+            />
+            <span>
+              {LOGO_RIGHTS_LABEL}{" "}
+              <Link href={LOGO_RIGHTS_TERMS_ANCHOR} target="_blank" rel="noreferrer">
+                En savoir plus
+              </Link>
+            </span>
+          </label>
         </div>
 
         {ownsIdentity ? (

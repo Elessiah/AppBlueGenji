@@ -75,7 +75,16 @@ describe("startOAuth", () => {
       state: STATE,
       redirectTo: "/tournois",
       intent: "LOGIN",
+      termsAccepted: false,
     });
+  });
+
+  it("scelle l'acceptation des conditions d'utilisation, et seulement `terms=1`", async () => {
+    await startOAuth(request("http://localhost:3000/api/auth/x/start?terms=1"), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: true }));
+
+    await startOAuth(request("http://localhost:3000/api/auth/x/start?terms=true"), "GOOGLE");
+    expect(saveOAuthState).toHaveBeenLastCalledWith(expect.objectContaining({ termsAccepted: false }));
   });
 
   it("filtre la destination avant de l'écrire dans le cookie", async () => {
@@ -167,6 +176,7 @@ describe("completeOAuth — contrôles d'état", () => {
       state: "un-autre-etat",
       redirectTo: "/tournois",
       intent: "LOGIN",
+      termsAccepted: true,
     });
 
     const response = await callback("GOOGLE");
@@ -185,6 +195,7 @@ describe("completeOAuth — contrôles d'état", () => {
       state: STATE,
       redirectTo: "/tournois",
       intent: "LOGIN",
+      termsAccepted: true,
     });
 
     const response = await callback("BLIZZARD");
@@ -212,6 +223,7 @@ describe("completeOAuth — connexion", () => {
       state: STATE,
       redirectTo: "/tournois",
       intent: "LOGIN",
+      termsAccepted: true,
     });
     return completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),
@@ -228,13 +240,16 @@ describe("completeOAuth — connexion", () => {
 
     const response = await login("GOOGLE");
 
-    expect(createOrGetOAuthUser).toHaveBeenCalledWith({
-      provider: "GOOGLE",
-      subject: "sub-1",
-      handle: null,
-      avatarUrl: "https://exemple.test/a.png",
-      displayName: "Nova",
-    });
+    expect(createOrGetOAuthUser).toHaveBeenCalledWith(
+      {
+        provider: "GOOGLE",
+        subject: "sub-1",
+        handle: null,
+        avatarUrl: "https://exemple.test/a.png",
+        displayName: "Nova",
+      },
+      { termsAccepted: true },
+    );
     expect(createSession).toHaveBeenCalledWith(7);
     expect(response.headers.get("location")).toBe("http://localhost:3000/tournois");
   });
@@ -254,6 +269,7 @@ describe("completeOAuth — connexion", () => {
 
     expect(createOrGetOAuthUser).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "DISCORD", subject: "123456789012345678", handle: "nova" }),
+      { termsAccepted: true },
     );
   });
 
@@ -267,7 +283,20 @@ describe("completeOAuth — connexion", () => {
 
     expect(createOrGetOAuthUser).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "BLIZZARD", subject: "blizz-1", handle: "Nova#2143" }),
+      { termsAccepted: true },
     );
+  });
+
+  it("renvoie sur la connexion avec `error=terms` quand un compte neuf arrive sans les conditions", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-neuf" });
+    jest.mocked(createOrGetOAuthUser).mockRejectedValueOnce(new Error("TERMS_REQUIRED"));
+
+    const response = await login("GOOGLE");
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/connexion?error=terms&provider=google",
+    );
+    expect(createSession).not.toHaveBeenCalled();
   });
 
   it("refiltre la destination à la sortie du cookie, qui n'est pas signé", async () => {
@@ -277,6 +306,7 @@ describe("completeOAuth — connexion", () => {
       state: STATE,
       redirectTo: "https://exemple.invalid/phishing",
       intent: "LOGIN",
+      termsAccepted: true,
     });
 
     const response = await completeOAuth(
@@ -307,6 +337,7 @@ describe("completeOAuth — rattachement", () => {
       state: STATE,
       redirectTo: "/tournois",
       intent: "LINK",
+      termsAccepted: true,
     });
     return completeOAuth(
       request(`http://localhost:3000/api/auth/x/callback?code=abc&state=${STATE}`),

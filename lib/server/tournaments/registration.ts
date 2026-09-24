@@ -3,6 +3,7 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import {
   assertRegistrationEligibility,
   checkEntrantEligibility,
@@ -215,6 +216,11 @@ export async function registerCurrentUserTeam(
   if (!hasTeamManagementRole(activeTeam.roles)) {
     throw new Error("NOT_TEAM_MANAGER");
   }
+  // Engager l'équipe est un geste de gestion (`lib/shared/team-roles.ts`) : il
+  // attend les conditions d'utilisation comme les autres. Le **retrait** et
+  // l'abandon, eux, n'y sont pas soumis — on ne retient pas une équipe dans un
+  // tournoi faute d'une case cochée.
+  await assertTermsAccepted(userId, connection);
 
   // **Ici et pas dans `registerTeam`** : le tronc commun sert aussi à l'inscription
   // d'une équipe fantôme par le staff, qui n'a par définition aucun joueur. Les

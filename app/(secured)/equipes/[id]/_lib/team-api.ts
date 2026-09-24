@@ -1,3 +1,5 @@
+import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
+
 /**
  * Appel d'une route d'équipe, refus compris.
  *
@@ -20,7 +22,12 @@ export async function teamApi<T = Record<string, unknown>>(
     throw new Error("NETWORK_ERROR");
   }
   const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new Error(payload.error || fallbackCode);
+  if (!response.ok) {
+    // Un geste de gestion refusé faute d'avoir accepté les conditions : la
+    // modale d'acceptation (mise en page racine) s'ouvre, le toast dit pourquoi.
+    if (payload.error === TERMS_ACCEPTANCE_REQUIRED) window.dispatchEvent(new Event(TERMS_REQUIRED_EVENT));
+    throw new Error(payload.error || fallbackCode);
+  }
   return payload;
 }
 

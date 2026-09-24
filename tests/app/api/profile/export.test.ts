@@ -42,6 +42,8 @@ function sampleExport(): PersonalDataExport {
     teamsTimeline: [],
     tournaments: [],
     privacyAcknowledgments: [],
+    termsAcceptances: [],
+    reports: [],
   };
 }
 

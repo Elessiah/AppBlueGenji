@@ -99,11 +99,14 @@ export function oauthProviderFromSlug(slug: string | null | undefined): OAuthPro
  */
 export function oauthStartPath(
   provider: OAuthProvider,
-  options: { redirect?: string; intent?: OAuthIntent } = {},
+  options: { redirect?: string; intent?: OAuthIntent; termsAccepted?: boolean } = {},
 ): string {
   const params = new URLSearchParams();
   if (options.redirect) params.set("redirect", options.redirect);
   if (options.intent === "LINK") params.set("intent", "link");
+  // Les conditions d'utilisation, cochées à l'entrée de `/connexion` : sans
+  // elles, la porte refuse de **créer** un compte (`TERMS_REQUIRED`).
+  if (options.termsAccepted) params.set("terms", "1");
   const query = params.toString();
   return `/api/auth/${OAUTH_PROVIDER_SLUGS[provider]}/start${query ? `?${query}` : ""}`;
 }

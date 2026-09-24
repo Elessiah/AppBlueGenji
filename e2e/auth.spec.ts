@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { TERMS_VERSION } from "../lib/shared/terms-of-use";
 
 /**
  * E2E auth — ne dépend ni de la DB ni du bypass DEV_AUTH.
@@ -21,10 +22,22 @@ test.describe("Consentement RGPD", () => {
     const dialog = page.getByRole("dialog", { name: /Avant de continuer/ });
     await expect(dialog).toBeVisible();
 
+    // L'acceptation exige les conditions d'utilisation, case à part : sans
+    // elle le bouton reste fermé (un compte naît à la première connexion).
+    const accept = page.getByRole("button", { name: /accepte et je continue/i });
+    await expect(accept).toBeDisabled();
+    await dialog.getByRole("checkbox").check();
+
     // Tant que la popup est ouverte, la voie Discord est masquée derrière.
-    await page.getByRole("button", { name: /accepte et je continue/i }).click();
+    await accept.click();
     await expect(dialog).toBeHidden();
     await expect(page.getByRole("button", { name: /Recevoir un code/ })).toBeVisible();
+    // Les deux accords sont retenus : les conditions à leur version.
+    const stored = await page.evaluate(() => [
+      window.localStorage.getItem("bg_rgpd_consent"),
+      window.localStorage.getItem("bg_terms_consent"),
+    ]);
+    expect(stored).toEqual(["1", String(TERMS_VERSION)]);
   });
 
   test("le refus ramène à l'accueil sans enregistrer de consentement", async ({ page }) => {
@@ -41,13 +54,15 @@ test.describe("Consentement RGPD", () => {
 });
 
 test.describe("Connexion", () => {
-  // L'utilisateur a déjà consenti (RGPD) : la popup ne s'affiche pas et les
-  // voies d'authentification sont directement actionnables. Le gate de
-  // consentement est couvert séparément ci-dessus.
+  // L'utilisateur a déjà consenti (RGPD et conditions d'utilisation en
+  // vigueur) : la popup ne s'affiche pas et les voies d'authentification sont
+  // directement actionnables. Le gate de consentement est couvert séparément
+  // ci-dessus.
   test.beforeEach(async ({ page }) => {
-    await page.addInitScript(() => {
+    await page.addInitScript((termsVersion) => {
       window.localStorage.setItem("bg_rgpd_consent", "1");
-    });
+      window.localStorage.setItem("bg_terms_consent", termsVersion);
+    }, String(TERMS_VERSION));
   });
 
   test("affiche les deux voies d'authentification", async ({ page }) => {

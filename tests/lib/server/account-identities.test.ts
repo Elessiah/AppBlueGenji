@@ -138,6 +138,8 @@ beforeEach(() => {
   jest.mocked(adoptRemoteAvatar).mockResolvedValue(undefined);
 });
 
+const CONSENT = { termsAccepted: true };
+
 describe("createOrGetOAuthUser", () => {
   it("aiguille vers la fonction du fournisseur, sans en oublier un", async () => {
     jest.mocked(createOrGetGoogleUser).mockResolvedValue(1);
@@ -145,28 +147,32 @@ describe("createOrGetOAuthUser", () => {
     jest.mocked(createOrGetBlizzardUser).mockResolvedValue(3);
 
     await expect(
-      createOrGetOAuthUser(identity({ provider: "GOOGLE", subject: "sub", handle: null })),
+      createOrGetOAuthUser(identity({ provider: "GOOGLE", subject: "sub", handle: null }), CONSENT),
     ).resolves.toBe(1);
-    expect(createOrGetGoogleUser).toHaveBeenCalledWith({
-      sub: "sub",
-      name: "Nova",
-      picture: undefined,
-    });
+    expect(createOrGetGoogleUser).toHaveBeenCalledWith(
+      {
+        sub: "sub",
+        name: "Nova",
+        picture: undefined,
+      },
+      CONSENT,
+    );
 
-    await expect(createOrGetOAuthUser(identity())).resolves.toBe(2);
+    await expect(createOrGetOAuthUser(identity(), CONSENT)).resolves.toBe(2);
     // La porte est **nommée** : un aller-retour OAuth laisse une autorisation
     // d'application chez Discord, le code en message privé n'en laisse aucune.
     expect(createOrGetDiscordUser).toHaveBeenCalledWith(
       "123456789012345678",
       undefined,
       "nova",
-      { avatarUrl: null, method: "OAUTH" },
+      // L'acceptation des conditions suit la porte jusqu'à la création.
+      { avatarUrl: null, method: "OAUTH", termsAccepted: true },
     );
 
     await expect(
-      createOrGetOAuthUser(identity({ provider: "BLIZZARD", subject: "bz", handle: "Nova#2143" })),
+      createOrGetOAuthUser(identity({ provider: "BLIZZARD", subject: "bz", handle: "Nova#2143" }), CONSENT),
     ).resolves.toBe(3);
-    expect(createOrGetBlizzardUser).toHaveBeenCalledWith("bz", "Nova#2143");
+    expect(createOrGetBlizzardUser).toHaveBeenCalledWith("bz", "Nova#2143", CONSENT);
   });
 });
 

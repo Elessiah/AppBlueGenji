@@ -4,6 +4,9 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ArenaNav } from "@/components/arena-nav";
 import { AuthGate } from "./_shared/AuthGate";
+import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
+import { countOpenReports } from "@/lib/server/content-reports";
+import { can } from "@/lib/shared/permissions";
 
 /**
  * L'espace sécurisé répond `200` aux visiteurs non connectés — une carte
@@ -28,20 +31,32 @@ export default async function SecuredLayout({ children }: { children: React.Reac
   // exactement ce qu'on veut — c'est ce que lit le robot d'aperçu de Discord.
   if (!user) {
     return (
-      <main className="page-shell">
-        <Suspense>
-          <AuthGate />
-        </Suspense>
-      </main>
+      <>
+        <main className="page-shell">
+          <Suspense>
+            <AuthGate />
+          </Suspense>
+        </main>
+        <SiteFooterBar authenticated={false} />
+      </>
     );
   }
 
   const activeTeam = await getUserActiveTeam(user.id);
+  // Le compteur ne doit jamais faire tomber la page : une lecture ratée
+  // l'affiche à zéro, le panneau dira la vérité.
+  const openReports = can(user, "moderation") ? await countOpenReports().catch(() => 0) : null;
 
   return (
     <>
-      <ArenaNav pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam} />
+      <ArenaNav
+        pseudo={user.pseudo}
+        avatarUrl={user.avatarUrl}
+        activeTeam={activeTeam}
+        openReports={openReports}
+      />
       <main className="page-shell">{children}</main>
+      <SiteFooterBar authenticated />
     </>
   );
 }

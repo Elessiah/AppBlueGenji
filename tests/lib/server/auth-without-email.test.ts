@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
@@ -80,7 +83,7 @@ describe("createOrGetGoogleUser — l'identité est le `sub`, jamais l'adresse",
       sql.startsWith("SELECT id FROM bg_users WHERE google_sub") ? [[{ id: 7 }]] : undefined,
     );
 
-    expect(await createOrGetGoogleUser({ sub: "google-sub" })).toBe(7);
+    expect(await createOrGetGoogleUser({ sub: "google-sub" }, { termsAccepted: true })).toBe(7);
     expect(queries[0].sql).toContain("WHERE google_sub = ?");
     expect(queries.every((q) => !q.sql.includes("email"))).toBe(true);
   });
@@ -90,7 +93,7 @@ describe("createOrGetGoogleUser — l'identité est le `sub`, jamais l'adresse",
       sql.startsWith("INSERT INTO bg_users") ? [{ insertId: 12 }] : undefined,
     );
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true });
 
     expect(queries.some((q) => q.sql.includes("WHERE email"))).toBe(false);
   });
@@ -100,7 +103,7 @@ describe("createOrGetGoogleUser — l'identité est le `sub`, jamais l'adresse",
       sql.startsWith("INSERT INTO bg_users") ? [{ insertId: 12 }] : undefined,
     );
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true });
 
     const insert = queries.find((q) => q.sql.startsWith("INSERT INTO bg_users"))!;
     expect(insert.sql).toContain("(pseudo, avatar_url, google_sub)");

@@ -2,6 +2,7 @@
 import { fail, ok } from "@/lib/server/http";
 import { registerCurrentUserTeam } from "@/lib/server/tournaments-service";
 import { isRegistrationFilterError } from "@/lib/shared/registration-filters";
+import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -22,6 +23,9 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
     // a bien une équipe, il n'a simplement pas la charge de l'engager
     // (`OWNER`/`MANAGER`, voir `lib/shared/team-roles.ts`).
     if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
+    // Gérant qui n'a pas accepté les conditions d'utilisation : la saisie est
+    // bonne, l'état du compte ne convient pas — et il se corrige d'un clic.
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
 
     // Conditions d'inscription non remplies (`lib/shared/registration-filters.ts`).
     // **409 et non 400** : la saisie est bonne, c'est l'état de l'équipe qui ne

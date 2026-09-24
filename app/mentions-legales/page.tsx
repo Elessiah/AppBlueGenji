@@ -6,6 +6,8 @@ import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import { TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 
 /**
  * Lien externe vers le règlement intérieur (Google Docs).
@@ -47,7 +49,7 @@ export default function MentionsLegalesPage() {
             </div>
             <div className={styles.heroFact}>
               <span className={styles.heroFactLabel}>MISE À JOUR</span>
-              <span style={{ fontSize: 17 }}>Juin 2026</span>
+              <span style={{ fontSize: 17 }}>Septembre 2026</span>
             </div>
           </div>
         </div>
@@ -200,13 +202,49 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
     body: (
       <>
         <p>
-          L&apos;ensemble des éléments composant le site (textes, logos, images, éléments graphiques,
-          mise en page) est la propriété exclusive de l&apos;association Bluegenji Esport, sauf
-          mention contraire.
+          Les éléments propres au site — textes éditoriaux, logo et identité visuelle de
+          l&apos;association, mise en page, code — sont la propriété de l&apos;association Bluegenji
+          Esport. Leur reproduction, représentation, modification ou diffusion, totale ou partielle,
+          est interdite sans son autorisation écrite préalable.
         </p>
         <p>
-          Toute reproduction, représentation, modification ou diffusion, totale ou partielle, est
-          strictement interdite sans autorisation écrite préalable de l&apos;association.
+          <strong>Ne lui appartiennent pas</strong> les contenus publiés par les membres (avatars,
+          logos, noms et descriptions d&apos;équipe, pseudos), qui restent la propriété de leurs
+          auteurs ou de leurs titulaires, ni les marques et visuels des jeux Overwatch (Blizzard
+          Entertainment) et Marvel Rivals (NetEase, Marvel), qui appartiennent à leurs titulaires.
+          Le site n&apos;est affilié à aucun de ces éditeurs.
+        </p>
+      </>
+    ),
+  },
+  {
+    id: "contenus-membres",
+    title: "Contenus des membres et signalement",
+    meta: "HÉBERGEUR · DSA ART. 16",
+    body: (
+      <>
+        <p>
+          Pour les contenus que publient ses membres, l&apos;association agit en qualité
+          d&apos;<strong>hébergeur</strong> (loi pour la confiance dans l&apos;économie numérique,
+          art. 6 ; règlement européen sur les services numériques, art. 6) : elle ne les contrôle pas
+          avant publication, et chaque membre garantit détenir les droits sur ce qu&apos;il publie,
+          comme le prévoient les{" "}
+          <Link href={TERMS_PATH}>conditions d&apos;utilisation</Link>.
+        </p>
+        <p>
+          <strong>Toute personne</strong>, membre ou non, peut signaler un contenu illicite — une
+          atteinte au droit d&apos;auteur notamment — par le bouton <strong>« Signaler un
+          problème »</strong> présent en bas de chaque page. Le signalement d&apos;un droit
+          d&apos;auteur indique le nom et l&apos;adresse de son auteur, sa qualité, le contenu visé
+          et la raison de la demande.
+        </p>
+        <p>
+          Un logo signalé peut être <strong>masqué</strong> sans délai : il cesse d&apos;être en
+          ligne, et l&apos;équipe en est prévenue. Elle dispose alors de{" "}
+          <strong>{LOGO_QUARANTINE_DAYS / 30} mois</strong> pour contester depuis la page du
+          signalement ; sans contestation, le logo est supprimé définitivement, et si la
+          contestation aboutit, il est rétabli. Le détail du traitement de vos données dans ce
+          cadre figure dans la <Link href="/rgpd#signalements">politique de confidentialité</Link>.
         </p>
       </>
     ),
@@ -228,7 +266,8 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           2016/679), vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement
           et de portabilité des données vous concernant, ainsi que d&apos;un droit d&apos;opposition
           au traitement. Ces droits peuvent être exercés en contactant l&apos;association via son
-          serveur Discord.
+          serveur Discord. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
+          <Link href="/rgpd">politique de confidentialité</Link>.
         </p>
       </>
     ),
@@ -236,18 +275,21 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
   {
     id: "cookies",
     title: "Cookies",
-    meta: "COOKIES STRICTEMENT NÉCESSAIRES",
+    meta: "COOKIES TECHNIQUES",
     body: (
       <>
         <p>
-          Le site utilise uniquement un cookie de session strictement nécessaire à son
-          fonctionnement, destiné à maintenir votre authentification une fois connecté. Ce cookie ne
-          permet aucun suivi publicitaire.
+          Le site n&apos;utilise que des cookies <strong>techniques</strong> : la session d&apos;un
+          membre connecté, l&apos;état d&apos;une connexion en cours, vos réglages
+          d&apos;accessibilité et le souvenir des annonces de recrutement déjà vues. Aucun ne permet
+          de suivi publicitaire. Leur liste complète, avec leur durée, figure dans la{" "}
+          <Link href="/rgpd#cookies">politique de confidentialité</Link>.
         </p>
         <p>
-          Aucun cookie tiers, traceur publicitaire ou outil de mesure d&apos;audience externe
-          n&apos;est utilisé. La communication entre votre navigateur et le serveur est sécurisée
-          via le protocole HTTPS.
+          Aucun traceur publicitaire ni outil de mesure d&apos;audience externe n&apos;est utilisé.
+          Seule exception, sur la page de connexion et après votre accord : l&apos;invite de
+          connexion de Google peut déposer un cookie <code>g_state</code>. La communication entre
+          votre navigateur et le serveur est chiffrée (HTTPS).
         </p>
       </>
     ),

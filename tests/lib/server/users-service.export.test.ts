@@ -2,6 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { exportOwnData } from "@/lib/server/users-service";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
+jest.mock("@/lib/server/content-reports", () => ({
+  listReportsByAuthor: jest.fn(async () => []),
+}));
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/database");
 
 async function mockDb(execute: SqlMock) {

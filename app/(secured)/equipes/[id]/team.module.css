@@ -634,3 +634,24 @@
     transition: none;
   }
 }
+
+/* Bandeau de modération (permission `moderation`) : ambre, à part des gestes
+   de l'équipe — c'est l'association qui agit, pas la gestion. */
+.moderationBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(245, 165, 36, 0.35);
+  border-radius: var(--r-cy-md, 10px);
+  background: rgba(245, 165, 36, 0.06);
+}
+
+.moderationLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--amber, #f5a524);
+}

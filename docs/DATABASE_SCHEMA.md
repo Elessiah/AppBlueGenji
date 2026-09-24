@@ -309,6 +309,17 @@ création de l'index unique), ou réparaient un défaut corrigé depuis (backfil
 seed suisse, `forfeit_team_id` invalides, `visible_pseudo` forcé à 1, conversion
 `OW2` → `OW`, renommage `game` → `domain`).
 
+## Tables des signalements et des conditions d'utilisation
+
+Nouvelles tables, déclarées par `CREATE TABLE` seulement (aucune base ne les
+porte encore) : `bg_reports` (dont `parent_report_id`, contestation rattachée à
+son signalement, `ON DELETE CASCADE`), `bg_report_targets` (sans clé étrangère
+vers la cible), `bg_logo_quarantines` (logo masqué, `report_id` en
+`SET NULL`), `bg_terms_acceptances`. Les deux colonnes ajoutées à une table
+existante, `bg_users.terms_version` et `terms_accepted_at`, sont écrites aux
+**deux** endroits (`CREATE TABLE` et `RECENT_SCHEMA_CHANGES`), sans remplissage :
+on n'attribue pas une acceptation que personne n'a donnée.
+
 ## Voir aussi
 
 - `lib/server/migration-lock.ts` — la porte à passage unique et le verrou nommé

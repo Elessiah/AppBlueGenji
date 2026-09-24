@@ -29,7 +29,7 @@ describe("boutons OAuth de la page de connexion", () => {
   });
 
   it("pose des ancres ordinaires vers la route de départ", () => {
-    expect(buttons).toMatch(/<a\s+href=\{oauthStartPath\(provider, \{ redirect \}\)\}/);
+    expect(buttons).toMatch(/<a\s+href=\{oauthStartPath\(provider, \{ redirect, termsAccepted \}\)\}/);
   });
 
   it("garde la page de connexion capable d'annoncer le refus qu'elle reçoit", () => {

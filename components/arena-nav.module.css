@@ -260,3 +260,50 @@
     letter-spacing: 0.14em;
   }
 }
+
+/* Lien de la modération : ambre, comme tout ce qui attend une décision. */
+.navReports {
+  color: var(--amber, #f5a524);
+  border-color: rgba(245, 165, 36, 0.45);
+  background: rgba(245, 165, 36, 0.08);
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.navReports:hover {
+  color: #ffc566;
+  border-color: rgba(245, 165, 36, 0.7);
+  background: rgba(245, 165, 36, 0.14);
+  box-shadow: none;
+}
+
+.navBadge {
+  min-width: 18px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--amber, #f5a524);
+  color: #111;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+/* Sous 1100 px, la barre ne tient plus « Accueil » sur une ligne avec ce lien
+   en toutes lettres : le libellé passe en lecture seule pour les technologies
+   d'assistance (le nom accessible reste « Signalements »), le drapeau et le
+   compteur restent visibles. */
+@media (max-width: 1100px) {
+  .navReportsLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

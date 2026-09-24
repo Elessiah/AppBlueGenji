@@ -1,8 +1,9 @@
-﻿import { getCurrentUser } from "@/lib/server/auth";
+import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { createTeam, getUserActiveTeam, listTeams } from "@/lib/server/teams-service";
 import { createGhostTeam } from "@/lib/server/ghost-teams-service";
 import { can } from "@/lib/shared/permissions";
+import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { TEAM_TAG_ALREADY_USED, checkTeamTag } from "@/lib/shared/team-tag";
 import {
   INVALID_TEAM_FIELDS,
@@ -34,6 +35,7 @@ export async function POST(req: Request) {
       description?: string | null;
       tag?: string | null;
       ghost?: boolean;
+      acceptTerms?: boolean;
     };
     if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
     // Mêmes bornes qu'au renommage (`updateTeamMeta`) : une seule règle.
@@ -54,6 +56,9 @@ export async function POST(req: Request) {
       return ok({ teamId: ghostTeamId, ghost: true }, 201);
     }
 
+    // Créer une équipe, c'est accepter les conditions d'utilisation — la case
+    // du formulaire. Refusé avant toute écriture, pas après.
+    if (body.acceptTerms !== true) return fail(TERMS_REQUIRED, 400);
     const teamId = await createTeam(user.id, name, body.description ?? null, tagCheck.tag);
     return ok({ teamId }, 201);
   } catch (error) {

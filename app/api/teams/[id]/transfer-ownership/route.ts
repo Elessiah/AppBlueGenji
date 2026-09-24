@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { getTeamDetail, transferTeamOwnership } from "@/lib/server/teams-service";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -24,6 +25,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     if (message === "MEMBER_NOT_FOUND") return fail(message, 404);
     if (message === "TRANSFER_TO_SELF") return fail(message, 400);
     if (message === "MEMBER_ACCOUNT_DELETED") return fail(message, 409);

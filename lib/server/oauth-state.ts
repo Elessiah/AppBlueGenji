@@ -35,6 +35,8 @@ export type OAuthStatePayload = {
   state: string;
   redirectTo: string;
   intent: OAuthIntent;
+  /** Conditions d'utilisation acceptées à l'aller (case de `/connexion`). */
+  termsAccepted: boolean;
 };
 
 function baseCookieOptions() {
@@ -75,7 +77,13 @@ export async function consumeOAuthState(): Promise<OAuthStatePayload | null> {
     if (typeof parsed.state !== "string" || parsed.state.length === 0) return null;
     if (typeof parsed.redirectTo !== "string" || parsed.redirectTo.length === 0) return null;
     const intent: OAuthIntent = parsed.intent === "LINK" ? "LINK" : "LOGIN";
-    return { provider: parsed.provider, state: parsed.state, redirectTo: parsed.redirectTo, intent };
+    return {
+      provider: parsed.provider,
+      state: parsed.state,
+      redirectTo: parsed.redirectTo,
+      intent,
+      termsAccepted: parsed.termsAccepted === true,
+    };
   } catch {
     return null;
   }

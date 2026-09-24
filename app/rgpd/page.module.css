@@ -54,6 +54,24 @@
   font-weight: 500;
 }
 
+.prose h3 {
+  margin: 10px 0 0;
+  font-family: var(--font-sans);
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.prose h3:first-child {
+  margin-top: 0;
+}
+
+.prose a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .prose ul {
   margin: 0;
   padding: 0 0 0 18px;

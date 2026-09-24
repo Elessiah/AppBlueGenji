@@ -1,5 +1,6 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
@@ -34,7 +35,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
     return fail("TEAM_NOT_FOUND", 404);
   }
 
-  return ok(detail);
+  return ok({ ...detail, canModerate: can(user, "moderation") });
 }
 
 export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -63,6 +64,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     if (message === TEAM_TAG_ALREADY_USED) return fail(message, 409);
     if (message === TEAM_NAME_ALREADY_USED) return fail(message, 409);
     if (message === INVALID_TEAM_NAME) return fail(message, 400);

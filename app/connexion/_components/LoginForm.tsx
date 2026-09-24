@@ -12,6 +12,7 @@ import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { loginErrorMessage, oauthErrorMessage } from "../_lib/login-errors";
 import { OAuthButtons } from "./OAuthButtons";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
 import {
   DISCORD_CERTIFICATION_UNDO,
@@ -22,6 +23,12 @@ import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
+/**
+ * Version des conditions d'utilisation acceptée dans ce navigateur, gardée à
+ * côté du consentement RGPD : une nouvelle version fait réapparaître la
+ * modale, là où une simple case « déjà vu » l'aurait tue pour toujours.
+ */
+const TERMS_STORAGE_KEY = "bg_terms_consent";
 
 /**
  * Contrôles de la connexion par code. Le compte Discord garde le même `id` sur
@@ -75,23 +82,31 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     let stored: string | null = null;
+    let terms: string | null = null;
     try {
       stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
+      terms = window.localStorage.getItem(TERMS_STORAGE_KEY);
     } catch {
       // localStorage indisponible (mode privé) : la modale redemande.
     }
-    setConsentGiven(stored === "1");
+    setConsentGiven(stored === "1" && terms === String(TERMS_VERSION));
     setConsentRead(true);
   }, []);
 
   const acceptConsent = () => {
     try {
       window.localStorage.setItem(CONSENT_STORAGE_KEY, "1");
+      window.localStorage.setItem(TERMS_STORAGE_KEY, String(TERMS_VERSION));
     } catch {
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
     setConsentGiven(true);
   };
+
+  // Les conditions ne voyagent qu'une fois le stockage **lu** et le
+  // consentement **donné** : `consentGiven` part à `true` pour ne pas faire
+  // clignoter la modale, il ne vaut donc acceptation qu'après la lecture.
+  const termsAccepted = consentRead && consentGiven;
 
   const refuseConsent = () => {
     // Retour en arrière total : aucune donnée n'a été enregistrée.
@@ -150,7 +165,12 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
       const response = await fetch("/api/auth/discord/verify", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ discordId: resolvedId, code, pseudo: isNewAccount ? pseudo : undefined }),
+        body: JSON.stringify({
+          discordId: resolvedId,
+          code,
+          pseudo: isNewAccount ? pseudo : undefined,
+          termsAccepted,
+        }),
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
@@ -170,7 +190,12 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
       {oneTap && consentRead && consentGiven && (
-        <GoogleOneTap clientId={oneTap.clientId} nonce={oneTap.nonce} redirect={redirect} />
+        <GoogleOneTap
+          clientId={oneTap.clientId}
+          nonce={oneTap.nonce}
+          redirect={redirect}
+          termsAccepted={termsAccepted}
+        />
       )}
       <div className="fabric" />
       <CyberCard ticks style={{ padding: 48, width: "min(480px, calc(100vw - 32px))" }}>
@@ -185,7 +210,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
         {!requested ? (
           <>
-            <OAuthButtons redirect={redirect} />
+            <OAuthButtons redirect={redirect} termsAccepted={termsAccepted} />
 
             {/*
               Le séparateur **nomme** ce qui suit. « OU » seul laissait croire à
@@ -247,7 +272,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
           </>
         ) : (
           <>
-            <OAuthButtons redirect={redirect} />
+            <OAuthButtons redirect={redirect} termsAccepted={termsAccepted} />
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />

@@ -248,6 +248,8 @@ async function runMigrations(db: Pool): Promise<void> {
       visible_discord TINYINT(1) NOT NULL DEFAULT 0,
       open_to_recruitment TINYINT(1) NOT NULL DEFAULT 0,
       platform_roles_json JSON NULL,
+      terms_version INT NULL,
+      terms_accepted_at DATETIME NULL,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       is_deleted TINYINT(1) NOT NULL DEFAULT 0,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1010,6 +1012,105 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Acceptations des conditions d'utilisation (`lib/shared/terms-of-use.ts`) :
+  // une ligne par acceptation, avec la version et l'écran où elle a été donnée.
+  // `bg_users.terms_version` n'en garde que la dernière — c'est elle qu'on
+  // consulte avant un geste de gestion ; cette table est la **preuve**.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_terms_acceptances (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      version INT NOT NULL,
+      context ENUM('SIGNUP', 'LOGIN', 'TEAM_CREATION', 'TEAM_MANAGEMENT') NOT NULL,
+      accepted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_bg_terms_acceptances_user (user_id),
+      CONSTRAINT fk_bg_terms_acceptances_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Signalements adressés à l'association (`lib/shared/content-reports.ts`).
+  // Le signalant peut être anonyme : `reporter_user_id` est facultatif, et
+  // **détaché** si son compte disparaît — le signalement reste à traiter.
+  // `resolved_at` fixe l'effacement (`REPORT_RETENTION_DAYS_AFTER_RESOLUTION`),
+  // d'où l'index sur le couple que la purge balaie. Une contestation
+  // (`CONTEST`) pend à son signalement d'origine (`parent_report_id`) et part
+  // avec lui : elle n'a pas de sens seule.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_reports (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      category ENUM('COPYRIGHT', 'MODERATION', 'BUG', 'OTHER', 'CONTEST') NOT NULL,
+      status ENUM('OPEN', 'IN_PROGRESS', 'RESOLVED') NOT NULL DEFAULT 'OPEN',
+      parent_report_id BIGINT NULL,
+      description TEXT NOT NULL,
+      page_path VARCHAR(300) NULL,
+      reporter_user_id BIGINT NULL,
+      contact_name VARCHAR(120) NULL,
+      contact_email VARCHAR(191) NULL,
+      rights_relation ENUM('HOLDER', 'AGENT', 'THIRD_PARTY') NULL,
+      consent_at DATETIME NOT NULL,
+      assignee_user_id BIGINT NULL,
+      resolution_note TEXT NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      resolved_at DATETIME NULL,
+      INDEX idx_bg_reports_status (status, resolved_at),
+      INDEX idx_bg_reports_created (created_at),
+      INDEX idx_bg_reports_parent (parent_report_id),
+      CONSTRAINT fk_bg_reports_parent FOREIGN KEY (parent_report_id)
+        REFERENCES bg_reports(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_reports_reporter FOREIGN KEY (reporter_user_id)
+        REFERENCES bg_users(id) ON DELETE SET NULL,
+      CONSTRAINT fk_bg_reports_assignee FOREIGN KEY (assignee_user_id)
+        REFERENCES bg_users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Ce qu'un signalement désigne. **Aucune clé étrangère vers la cible** : une
+  // équipe dissoute ou un compte effacé ne doivent pas emporter le signalement
+  // qui les visait. Le libellé est relevé à l'envoi pour la même raison — le
+  // panneau dit encore de quoi il s'agissait quand la fiche n'existe plus.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_report_targets (
+      report_id BIGINT NOT NULL,
+      target_type ENUM('USER', 'TEAM', 'TOURNAMENT') NOT NULL,
+      target_id BIGINT NOT NULL,
+      label_snapshot VARCHAR(191) NULL,
+      PRIMARY KEY (report_id, target_type, target_id),
+      INDEX idx_bg_report_targets_target (target_type, target_id),
+      CONSTRAINT fk_bg_report_targets_report FOREIGN KEY (report_id)
+        REFERENCES bg_reports(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
+  // Logos d'équipe masqués après un signalement (`lib/shared/logo-quarantine.ts`).
+  // Le fichier quitte `public/uploads` pour `data/quarantine` — il n'est plus
+  // servi — et la ligne dit d'où il vient pour le rétablir tel quel, ou quand le
+  // supprimer définitivement. La ligne survit à la purge du signalement
+  // (`SET NULL`) : c'est elle qui porte l'échéance.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_logo_quarantines (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      team_id BIGINT NOT NULL,
+      report_id BIGINT NULL,
+      logo_url TEXT NOT NULL,
+      status ENUM('HIDDEN', 'RESTORED', 'PURGED') NOT NULL DEFAULT 'HIDDEN',
+      hidden_by_user_id BIGINT NULL,
+      hidden_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      purge_after DATETIME NOT NULL,
+      closed_at DATETIME NULL,
+      INDEX idx_bg_logo_quarantines_due (status, purge_after),
+      INDEX idx_bg_logo_quarantines_report (report_id),
+      INDEX idx_bg_logo_quarantines_team (team_id),
+      CONSTRAINT fk_bg_logo_quarantines_team FOREIGN KEY (team_id)
+        REFERENCES bg_teams(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_logo_quarantines_report FOREIGN KEY (report_id)
+        REFERENCES bg_reports(id) ON DELETE SET NULL,
+      CONSTRAINT fk_bg_logo_quarantines_hidden_by FOREIGN KEY (hidden_by_user_id)
+        REFERENCES bg_users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // ───────────────────────────────────────────────────────────────────────────
   // Migrations
   // ───────────────────────────────────────────────────────────────────────────
@@ -1113,6 +1214,16 @@ async function runMigrations(db: Pool): Promise<void> {
     // le public sous lequel il a été saisi.
     `ALTER TABLE bg_users ADD COLUMN visible_discord TINYINT(1) NOT NULL DEFAULT 0
        AFTER visible_major`,
+    // Conditions d'utilisation : dernière version acceptée par le compte
+    // (`lib/shared/terms-of-use.ts`). `NULL` = jamais acceptées, et **aucun
+    // remplissage** — on n'attribue pas une acceptation que personne n'a donnée.
+    `ALTER TABLE bg_users ADD COLUMN terms_version INT NULL AFTER platform_roles_json`,
+    `ALTER TABLE bg_users ADD COLUMN terms_accepted_at DATETIME NULL AFTER terms_version`,
+    // Même type que `bg_teams.logo_url`, dont la colonne recopie la valeur : en
+    // `VARCHAR(255)`, supprimer un ancien logo à l'adresse longue échouait
+    // (`ER_DATA_TOO_LONG`) et le laissait en ligne. Sans effet sur une base qui
+    // la porte déjà en `TEXT`.
+    `ALTER TABLE bg_logo_quarantines MODIFY logo_url TEXT NOT NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

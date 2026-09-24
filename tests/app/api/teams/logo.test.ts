@@ -7,16 +7,17 @@ jest.mock("@/lib/server/teams-service");
 import { DELETE, POST } from "@/app/api/teams/[id]/logo/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
-import { canManageTeam, getTeamLogoUrl, updateTeamLogo } from "@/lib/server/teams-service";
+import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
 import { authUser } from "../../../helpers/auth-user";
 
 const user = authUser({ id: 7 });
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
-function fileReq(file?: File) {
+function fileReq(file?: File, rightsCertified: string | null = "1") {
   const form = new FormData();
   if (file) form.append("file", file);
+  if (rightsCertified !== null) form.append("rightsCertified", rightsCertified);
   return new Request("http://localhost/api/teams/3/logo", { method: "POST", body: form });
 }
 
@@ -102,6 +103,54 @@ describe("POST /api/teams/[id]/logo", () => {
     const res = await POST(fileReq(pngFile()), params("3"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "IMAGE_TOO_LARGE" });
+  });
+});
+
+describe("POST /api/teams/[id]/logo — droits et conditions", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(canManageTeam).mockResolvedValue(true);
+    jest.mocked(getTeamLogoUrl).mockResolvedValue(null);
+    jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/3-new.webp");
+  });
+
+  it.each<[string, string | null]>([
+    ["case absente", null],
+    ["case décochée", "0"],
+    ["valeur quelconque", "true"],
+  ])("refuse l'envoi sans la garantie des droits (%s), avant tout traitement du fichier", async (_label, value) => {
+    const res = await POST(fileReq(pngFile(), value), params("3"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "LOGO_RIGHTS_NOT_CERTIFIED" });
+    expect(processAndStoreImage).not.toHaveBeenCalled();
+  });
+
+  it("refuse en 409 à qui gère l'équipe sans avoir accepté les conditions, et efface le fichier neuf", async () => {
+    jest.mocked(updateTeamLogo).mockRejectedValueOnce(new Error("TERMS_ACCEPTANCE_REQUIRED"));
+    const res = await POST(fileReq(pngFile()), params("3"));
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "TERMS_ACCEPTANCE_REQUIRED" });
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/3-new.webp");
+  });
+
+  it("n'interroge la fantôme que si le rôle manque", async () => {
+    await POST(fileReq(pngFile()), params("3"));
+    expect(isGhostTeam).not.toHaveBeenCalled();
+
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, isAdmin: true, roles: ["ADMIN"] }));
+    jest.mocked(canManageTeam).mockResolvedValue(false);
+    jest.mocked(isGhostTeam).mockResolvedValue(true);
+    const res = await POST(fileReq(pngFile()), params("3"));
+    expect(res.status).toBe(200);
+    expect(updateTeamLogo).toHaveBeenLastCalledWith(7, 3, "/api/uploads/teams/3-new.webp", true);
+  });
+
+  it("efface le fichier neuf quand l'écriture est refusée entre-temps", async () => {
+    jest.mocked(updateTeamLogo).mockRejectedValueOnce(new Error("FORBIDDEN"));
+    const res = await POST(fileReq(pngFile()), params("3"));
+    expect(res.status).toBe(403);
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/3-new.webp");
   });
 });
 

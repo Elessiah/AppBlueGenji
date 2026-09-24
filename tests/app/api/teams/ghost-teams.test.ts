@@ -63,7 +63,7 @@ describe("POST /api/teams — création d'équipe fantôme", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(createTeam).mockResolvedValue(11);
 
-    const res = await createTeamRoute(jsonReq({ name: "Vraie équipe" }));
+    const res = await createTeamRoute(jsonReq({ name: "Vraie équipe", acceptTerms: true }));
 
     expect(res.status).toBe(201);
     expect(createTeam).toHaveBeenCalledWith(2, "Vraie équipe", null, null);

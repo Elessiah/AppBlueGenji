@@ -57,6 +57,7 @@ describe("saveOAuthState", () => {
       state: "abc",
       redirectTo: "/tournois",
       intent: "LINK",
+      termsAccepted: false,
     }).then(() => {
       const [name, value, options] = store.set.mock.calls[0] as [
         string,
@@ -69,6 +70,7 @@ describe("saveOAuthState", () => {
         state: "abc",
         redirectTo: "/tournois",
         intent: "LINK",
+        termsAccepted: false,
       });
       expect(options.httpOnly).toBe(true);
       expect(options.sameSite).toBe("lax");
@@ -79,12 +81,12 @@ describe("saveOAuthState", () => {
   it("pose `secure` en production, et pas en développement", async () => {
     (process.env as Record<string, string | undefined>).NODE_ENV = "production";
     let store = fakeCookies();
-    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN" });
+    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: false });
     expect((store.set.mock.calls[0][2] as Record<string, unknown>).secure).toBe(true);
 
     (process.env as Record<string, string | undefined>).NODE_ENV = "development";
     store = fakeCookies();
-    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN" });
+    await saveOAuthState({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: false });
     expect((store.set.mock.calls[0][2] as Record<string, unknown>).secure).toBe(false);
   });
 });
@@ -100,6 +102,7 @@ describe("consumeOAuthState", () => {
       state: "abc",
       redirectTo: "/tournois",
       intent: "LOGIN",
+      termsAccepted: false,
     });
     expect(store.set).toHaveBeenCalledWith(
       "bg_oauth",
@@ -129,6 +132,17 @@ describe("consumeOAuthState", () => {
   ])("refuse un contenu trafiqué : %s", async (_label, payload) => {
     fakeCookies(encode(payload));
     await expect(consumeOAuthState()).resolves.toBeNull();
+  });
+
+  it("rend l'acceptation des conditions scellée à l'aller, et seulement un `true` strict", async () => {
+    // Scellée dans le cookie comme l'intention : lue dans l'URL du rappel, elle
+    // serait choisie par l'appelant — et c'est elle qui autorise la création
+    // d'un compte.
+    fakeCookies(encode({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: true }));
+    await expect(consumeOAuthState()).resolves.toEqual(expect.objectContaining({ termsAccepted: true }));
+
+    fakeCookies(encode({ provider: "GOOGLE", state: "a", redirectTo: "/", intent: "LOGIN", termsAccepted: "1" }));
+    await expect(consumeOAuthState()).resolves.toEqual(expect.objectContaining({ termsAccepted: false }));
   });
 
   it("retombe sur `LOGIN` devant une intention inconnue", async () => {

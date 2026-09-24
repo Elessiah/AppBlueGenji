@@ -10,6 +10,9 @@ import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
 import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
+import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
+import { needsTermsForTeamManagement } from "@/lib/server/terms-acceptance";
+import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
 import { loadPendingPrivacyChanges } from "@/lib/server/privacy-consent";
@@ -87,6 +90,22 @@ async function pendingChangesFor(userId: number | undefined): Promise<PrivacyCha
 }
 
 /**
+ * Le compte gère-t-il une équipe sans avoir accepté les conditions en vigueur ?
+ * Même tolérance que la lecture des changements de confidentialité : une panne
+ * ne fait pas tomber la page, la question sera reposée au chargement suivant —
+ * et les gestes de gestion restent refusés côté serveur entre-temps.
+ */
+async function termsRequiredFor(userId: number | undefined): Promise<boolean> {
+  if (userId === undefined) return false;
+  try {
+    return await needsTermsForTeamManagement(userId);
+  } catch (error) {
+    console.error("[terms] lecture impossible", error);
+    return false;
+  }
+}
+
+/**
  * Mise en page racine.
  *
  * Elle est `async` et lit les en-têtes de requête, et c'est **cette lecture**
@@ -158,6 +177,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // rappels de match : étranglée, à vol unique, jamais attendue — la page ne
   // doit ni ralentir ni tomber à cause du bot.
   void dispatchPrivacyChangeNotifications().catch(() => undefined);
+  // Effacement des signalements archivés depuis plus de trente jours, entraîné
+  // par le trafic (au plus une fois par heure) : la durée annoncée au
+  // signalant doit tenir même quand personne n'ouvre le panneau.
+  schedulePurgeExpiredReports();
+  const termsRequired = await termsRequiredFor(user?.id);
   // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
   // quoi un contraste renforcé ferait d'abord clignoter la page dans ses
   // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.
@@ -187,6 +211,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             onAdPage={onRecruitmentPage}
           />
           <PrivacyChangesModal changes={privacyChanges} />
+          {user && (
+            <TermsAcceptanceModal initiallyRequired={termsRequired} privacyPending={privacyChanges.length > 0} />
+          )}
           {/* Lancement des matchs du joueur, sur toutes les pages : la modale
               s'ouvre à l'heure du match, où qu'il se trouve sur le site. */}
           {user && <MatchLaunchCenter privacyPending={privacyChanges.length > 0} />}

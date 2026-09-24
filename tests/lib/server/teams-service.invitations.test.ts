@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/users-service", () => {
   const actual = jest.requireActual("@/lib/server/users-service") as Record<string, unknown>;

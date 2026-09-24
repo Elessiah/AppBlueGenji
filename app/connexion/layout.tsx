@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { pageMetadata } from "@/lib/shared/page-metadata";
+import { getCurrentUser } from "@/lib/server/auth";
+import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
 
 /**
  * La page de connexion est une page cliente : elle ne peut pas exporter de
@@ -25,6 +27,17 @@ export const metadata: Metadata = {
   robots: { index: false, follow: true },
 };
 
-export default function ConnexionLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+/**
+ * La page porte aussi le pied de page léger : le moyen de signaler un problème
+ * et les conditions d'utilisation doivent s'y trouver comme partout — ce sont
+ * d'ailleurs ces conditions qu'on accepte en créant un compte ici.
+ */
+export default async function ConnexionLayout({ children }: { children: React.ReactNode }) {
+  const user = await getCurrentUser().catch(() => null);
+  return (
+    <>
+      {children}
+      <SiteFooterBar authenticated={Boolean(user)} />
+    </>
+  );
 }

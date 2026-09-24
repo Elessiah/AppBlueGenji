@@ -133,6 +133,9 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
     // d'application chez Discord, à la différence du bouton.
     expect(createUserMock).toHaveBeenCalledWith(VICTIM, undefined, "keryan", {
       method: "DM_CODE",
+      // Aucune case cochée dans ce corps : un compte existant se connecte, un
+      // compte neuf serait refusé par le service (`TERMS_REQUIRED`).
+      termsAccepted: false,
     });
   });
 

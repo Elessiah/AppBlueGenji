@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 
+jest.mock("@/lib/server/terms-acceptance", () =>
+  jest.requireActual<typeof import("../helpers/terms-acceptance-double")>("../helpers/terms-acceptance-double").termsAcceptanceDouble(),
+);
 jest.mock("@/lib/server/teams-service");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/tournaments/repository");

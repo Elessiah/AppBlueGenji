@@ -51,6 +51,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // l'inscrire à un tournoi » à qui venait de cliquer « Déclarer forfait ».
   NOT_TEAM_MANAGER:
     "Seuls le propriétaire et les managers de l'équipe peuvent l'engager dans un tournoi ou l'en retirer.",
+  // Gérant qui n'a pas accepté les conditions d'utilisation (la modale
+  // d'acceptation s'ouvre en même temps).
+  TERMS_ACCEPTANCE_REQUIRED:
+    "Pour engager ton équipe, accepte d'abord les conditions d'utilisation (fenêtre ouverte à l'instant).",
   // Tournoi individuel : le nom d'inscription du joueur est déjà pris.
   SOLO_ENTRY_NAME_UNAVAILABLE:
     "Ton pseudo est déjà utilisé comme nom d'équipe : change-le avant de t'inscrire.",

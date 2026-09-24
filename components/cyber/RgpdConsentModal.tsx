@@ -1,7 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber/CyberButton";
+import { TERMS_CHECKBOX_LABEL, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 
 interface RgpdConsentModalProps {
@@ -17,6 +19,12 @@ interface RgpdConsentModalProps {
  * que l'utilisateur n'a pas accepté.
  */
 export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) {
+  // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
+  // données : le site n'a pas de formulaire d'inscription, un compte naît à la
+  // première connexion — l'entrée de cette page est donc le seul endroit où les
+  // présenter avant qu'il existe. Une case à part, et non un « en continuant,
+  // tu acceptes » : c'est une acceptation qu'on doit pouvoir prouver.
+  const [termsChecked, setTermsChecked] = useState(false);
   // Focus initial dans la modale, tabulation piégée et défilement figé : sans
   // eux, le clavier atteignait le formulaire de connexion derrière le voile
   // avant tout consentement. `locked` : Échap ne tranche pas un consentement,
@@ -119,11 +127,44 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
           . Si tu refuses, aucune donnée ne sera enregistrée.
         </p>
 
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            margin: "0 0 20px",
+            fontSize: 13.5,
+            lineHeight: 1.5,
+            color: "var(--ink)",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={termsChecked}
+            onChange={(event) => setTermsChecked(event.target.checked)}
+            style={{ marginTop: 3 }}
+          />
+          <span>
+            {TERMS_CHECKBOX_LABEL} (
+            <Link
+              href={TERMS_PATH}
+              target="_blank"
+              rel="noreferrer"
+              style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+            >
+              lire les conditions
+            </Link>
+            ).
+          </span>
+        </label>
+
         <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
           <CyberButton
             variant="primary"
             type="button"
             onClick={onAccept}
+            disabled={!termsChecked}
             style={{ flex: 1, minWidth: 160 }}
           >
             J&apos;accepte et je continue

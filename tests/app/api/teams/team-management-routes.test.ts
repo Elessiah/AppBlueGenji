@@ -179,9 +179,18 @@ describe("POST /api/teams — mêmes bornes qu'au renommage", () => {
   it("compte un emoji pour un caractère, comme la colonne", async () => {
     jest.mocked(createTeam).mockResolvedValue(11);
     const name = "🐉".repeat(60);
-    const res = await teamCreate(req("POST", { name }));
+    const res = await teamCreate(req("POST", { name, acceptTerms: true }));
     expect(res.status).toBe(201);
     expect(createTeam).toHaveBeenCalledWith(2, name, null, null);
+  });
+
+  it("refuse la création sans l'acceptation des conditions d'utilisation, avant toute écriture", async () => {
+    for (const body of [{ name: "Rolex" }, { name: "Rolex", acceptTerms: false }, { name: "Rolex", acceptTerms: "true" }]) {
+      const res = await teamCreate(req("POST", body));
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "TERMS_REQUIRED" });
+    }
+    expect(createTeam).not.toHaveBeenCalled();
   });
 });
 

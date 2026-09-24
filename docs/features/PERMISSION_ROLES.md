@@ -31,6 +31,10 @@ s'additionnent.
 - `showcase` — `/api/landing/sponsors/*`, `/api/association/*`, `/api/benevoles/*`.
 - `recruitment` — `/api/recruitment/*`.
 - `roles` — `POST /api/admin/users/[id]/roles` (réservé `ADMIN`).
+- `moderation` — panneau `/admin/signalements`, `/api/admin/reports/*`,
+  `/api/admin/logo-quarantines/*`, `DELETE /api/admin/teams/[id]/logo` (réservé
+  `ADMIN` : retirer le contenu d'un membre engage la responsabilité de
+  l'association). Voir `CONTENT_REPORTS.md`.
 
 ## Implémentation
 
