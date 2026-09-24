@@ -1,4 +1,9 @@
-import { PHASE_ERROR_MESSAGES, type PhaseConfig } from "@/lib/shared/tournament-phases";
+import {
+  PHASE_ERROR_MESSAGES,
+  type PhaseConfig,
+  type PhaseIssue,
+  type PhaseIssueField,
+} from "@/lib/shared/tournament-phases";
 import type { PhaseFormat } from "@/lib/shared/types";
 
 export function createDefaultPhase(position: number, format: PhaseFormat): PhaseConfig {
@@ -78,4 +83,34 @@ export function phaseErrorMessage(code: string): string {
   return Object.hasOwn(PHASE_ERROR_MESSAGES, code)
     ? PHASE_ERROR_MESSAGES[code]
     : "Erreur de configuration des phases.";
+}
+
+/**
+ * Préfixe de l'`id` de chaque réglage d'une phase, suffixé par sa position.
+ *
+ * Écrit une fois pour deux lecteurs : `PhaseCard`, qui pose les `id`, et le
+ * rattachement d'un refus à son champ (`PhaseBuilder`), qui les focalise — un
+ * `id` recopié à la main dériverait, et le focus partirait nulle part sans
+ * erreur.
+ */
+const PHASE_FIELD_ID_PREFIX: Record<PhaseIssueField, string> = {
+  format: "phase-format",
+  qualifierValue: "phase-qualifier",
+  swissTotalRounds: "phase-swiss",
+  survivalRoundsBeforeFirstCut: "phase-survival-before",
+  survivalRoundsPerCut: "phase-survival-per",
+};
+
+/** `id` du contrôle d'un réglage de la phase `position` (1..n). */
+export function phaseFieldId(position: number, field: PhaseIssueField): string {
+  return `${PHASE_FIELD_ID_PREFIX[field]}-${position}`;
+}
+
+/**
+ * Phrase d'un défaut du plan, **située** : « Phase 2 — … ». La phrase seule ne
+ * disait pas laquelle reprendre, sur un plan qui peut en compter huit.
+ */
+export function phaseIssueMessage(issue: PhaseIssue): string {
+  const message = phaseErrorMessage(issue.code);
+  return issue.phaseIndex === null ? message : `Phase ${issue.phaseIndex + 1} — ${message}`;
 }

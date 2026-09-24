@@ -35,6 +35,8 @@ export type FormatSettingsProps = {
    * formulaire connaît.
    */
   onSwissTotalRoundsChange: (value: number) => void;
+  /** Demande de focus sur le réglage de phase fautif (voir `PhaseBuilder`). */
+  phaseFocusRequest?: number;
 };
 
 export function FormatSettings({
@@ -43,6 +45,7 @@ export function FormatSettings({
   locked,
   lockedAttr,
   onSwissTotalRoundsChange,
+  phaseFocusRequest,
 }: FormatSettingsProps) {
   const { format, maxTeams, phases } = values;
   const wording = participantWording(values.participantType);
@@ -56,6 +59,7 @@ export function FormatSettings({
             phases={phases}
             maxTeams={maxTeams}
             disabled={locked("phases")}
+            focusRequest={phaseFocusRequest}
             onChange={(next) => set("phases", next)}
           />
         </div>

@@ -276,8 +276,36 @@ export const PHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_PHASE_SURVIVAL_ROUNDS: "Cadence de survie invalide : 1 à 50 attendues.",
 };
 
+/** Réglage d'une phase qu'un refus de `findPhaseIssue` peut désigner. */
+export type PhaseIssueField =
+  | "format"
+  | "qualifierValue"
+  | "swissTotalRounds"
+  | "survivalRoundsBeforeFirstCut"
+  | "survivalRoundsPerCut";
+
 /**
- * Valide une liste de configurations de phases.
+ * Premier défaut d'un plan de phases : son code, la phase en cause (index dans
+ * le tableau) et le réglage à reprendre. `phaseIndex` et `field` sont `null`
+ * quand le défaut tient au plan entier (nombre ou numérotation des phases) —
+ * aucun champ n'y peut rien, en signaler un enverrait corriger ce qui est juste.
+ */
+export type PhaseIssue = {
+  code: string;
+  phaseIndex: number | null;
+  field: PhaseIssueField | null;
+};
+
+function issue(code: string, phaseIndex: number | null = null, field: PhaseIssueField | null = null): PhaseIssue {
+  return { code, phaseIndex, field };
+}
+
+/**
+ * Valide une liste de configurations de phases et **situe** le premier défaut.
+ *
+ * Unique implémentation de la règle : `validatePhases` n'en rend que le code
+ * (serveur, contrôle d'envoi), le formulaire s'en sert pour rattacher le refus
+ * au réglage fautif (WCAG 3.3.1) — deux lectures qui ne peuvent pas diverger.
  *
  * Codes d'erreur (SCREAMING_SNAKE) :
  * - `INVALID_PHASE_COUNT` : < MIN_PHASES ou > MAX_PHASES.
@@ -285,17 +313,18 @@ export const PHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
  * - `INVALID_PHASE_FORMAT` : format invalide.
  * - `DOUBLE_MUST_BE_LAST_PHASE` : DOUBLE n'est pas la dernière.
  * - `INVALID_PHASE_QUALIFIER` : COUNT < 1 ou PERCENT hors 1..99.
- * - `NON_DECREASING_PHASE_QUALIFIERS` : deux COUNT consécutives non-décroissantes.
+ * - `NON_DECREASING_PHASE_QUALIFIERS` : deux COUNT consécutives non-décroissantes
+ *   — la **seconde** est désignée : c'est elle qui devait être plus petite.
  * - `INVALID_PHASE_SWISS_ROUNDS` : SWISS sans rounds en 1..20.
  * - `INVALID_PHASE_SURVIVAL_ROUNDS` : SURVIVAL avec cadence hors 1..50.
  *
  * @param phases Configurations des phases à valider.
- * @returns Message d'erreur (code en majuscules) ou null si valides.
+ * @returns Le premier défaut, ou `null` si le plan est valide.
  */
-export function validatePhases(phases: PhaseConfig[]): string | null {
+export function findPhaseIssue(phases: PhaseConfig[]): PhaseIssue | null {
   // Nombre de phases.
   if (phases.length < MIN_PHASES || phases.length > MAX_PHASES) {
-    return "INVALID_PHASE_COUNT";
+    return issue("INVALID_PHASE_COUNT");
   }
 
   // Positions : exactement 1..n **dans l'ordre du tableau**. On ne trie pas, car
@@ -304,7 +333,7 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
   // deux sources de vérité contradictoires.
   for (let i = 0; i < phases.length; i++) {
     if (phases[i].position !== i + 1) {
-      return "INVALID_PHASE_POSITIONS";
+      return issue("INVALID_PHASE_POSITIONS");
     }
   }
 
@@ -315,23 +344,23 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
 
     // Format.
     if (!["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"].includes(phase.format)) {
-      return "INVALID_PHASE_FORMAT";
+      return issue("INVALID_PHASE_FORMAT", i, "format");
     }
 
     // DOUBLE doit être la dernière phase.
     if (phase.format === "DOUBLE" && !isLast) {
-      return "DOUBLE_MUST_BE_LAST_PHASE";
+      return issue("DOUBLE_MUST_BE_LAST_PHASE", i, "format");
     }
 
     // Qualifiants.
     if (!isLast) {
       if (phase.qualifierMode === "COUNT") {
         if (phase.qualifierValue < 1) {
-          return "INVALID_PHASE_QUALIFIER";
+          return issue("INVALID_PHASE_QUALIFIER", i, "qualifierValue");
         }
       } else if (phase.qualifierMode === "PERCENT") {
         if (phase.qualifierValue < 1 || phase.qualifierValue > 99) {
-          return "INVALID_PHASE_QUALIFIER";
+          return issue("INVALID_PHASE_QUALIFIER", i, "qualifierValue");
         }
       }
     }
@@ -342,7 +371,7 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
         phase.swissTotalRounds !== null &&
         (typeof phase.swissTotalRounds !== "number" || phase.swissTotalRounds < 1 || phase.swissTotalRounds > 20)
       ) {
-        return "INVALID_PHASE_SWISS_ROUNDS";
+        return issue("INVALID_PHASE_SWISS_ROUNDS", i, "swissTotalRounds");
       }
     }
 
@@ -354,7 +383,7 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
           phase.survivalRoundsBeforeFirstCut < 1 ||
           phase.survivalRoundsBeforeFirstCut > 50)
       ) {
-        return "INVALID_PHASE_SURVIVAL_ROUNDS";
+        return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsBeforeFirstCut");
       }
       if (
         phase.survivalRoundsPerCut !== null &&
@@ -362,7 +391,7 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
           phase.survivalRoundsPerCut < 1 ||
           phase.survivalRoundsPerCut > 50)
       ) {
-        return "INVALID_PHASE_SURVIVAL_ROUNDS";
+        return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsPerCut");
       }
     }
   }
@@ -379,11 +408,19 @@ export function validatePhases(phases: PhaseConfig[]): string | null {
       next.qualifierMode === "COUNT" &&
       current.qualifierValue <= next.qualifierValue
     ) {
-      return "NON_DECREASING_PHASE_QUALIFIERS";
+      return issue("NON_DECREASING_PHASE_QUALIFIERS", i + 1, "qualifierValue");
     }
   }
 
   return null;
+}
+
+/**
+ * Valide une liste de configurations de phases : le code du premier défaut
+ * (voir `findPhaseIssue`), ou `null` si le plan est valide.
+ */
+export function validatePhases(phases: PhaseConfig[]): string | null {
+  return findPhaseIssue(phases)?.code ?? null;
 }
 
 /**

@@ -2,6 +2,7 @@
 
 import { KeyboardEvent, useEffect, useId, useMemo, useState } from "react";
 import type { PublicUserProfile } from "@/lib/shared/types";
+import { isFieldErrorFocus, type FieldAria } from "@/lib/shared/field-errors";
 import { UserAvatar } from "@/components/user-avatar";
 import styles from "../team.module.css";
 
@@ -40,7 +41,11 @@ interface PlayerPseudoComboboxProps {
   onChange: (value: string) => void;
   placeholder?: string;
   autoFocus?: boolean;
-  describedBy?: string;
+  /**
+   * `aria-invalid` et `aria-describedby` du champ (`useFieldErrors().aria`) :
+   * l'aide, et la phrase du refus quand le pseudo en a essuyé un.
+   */
+  aria?: FieldAria;
   /** Joueurs à ne pas proposer (déjà invités, par exemple). */
   excludeUserIds?: readonly number[];
 }
@@ -65,7 +70,7 @@ export function PlayerPseudoCombobox({
   onChange,
   placeholder,
   autoFocus,
-  describedBy,
+  aria,
   excludeUserIds = [],
 }: PlayerPseudoComboboxProps) {
   const listId = useId();
@@ -146,14 +151,20 @@ export function PlayerPseudoCombobox({
         aria-controls={expanded ? listId : undefined}
         aria-autocomplete="list"
         aria-activedescendant={expanded && active >= 0 ? optionId(active) : undefined}
-        aria-describedby={describedBy}
+        {...aria}
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
           setOpen(true);
           setActive(-1);
         }}
-        onFocus={() => setOpen(true)}
+        // Le focus ramené par le rattachement d'un refus n'ouvre pas la liste :
+        // le lecteur d'écran doit entendre pourquoi le pseudo est refusé, pas
+        // des suggestions surgies par-dessus. Un clic, une frappe ou une flèche
+        // l'ouvrent comme avant.
+        onFocus={(e) => {
+          if (!isFieldErrorFocus(e.currentTarget)) setOpen(true);
+        }}
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}

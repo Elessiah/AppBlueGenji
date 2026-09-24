@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   describePhasePlan,
+  findPhaseIssue,
   MAX_PHASES,
   MIN_PHASES,
   previousPowerOfTwo,
@@ -743,5 +744,95 @@ describe("tournament-phases — describePhasePlan", () => {
 
     expect(descriptions[0]).toContain("ignorée");
     expect(descriptions[0]).toContain("effectif insuffisant");
+  });
+});
+
+describe("tournament-phases — findPhaseIssue", () => {
+  const plan = (...overrides: Partial<PhaseConfig>[]): PhaseConfig[] =>
+    overrides.map((o, i) => phaseConfig({ position: i + 1, ...o }));
+
+  it("rend null sur un plan valide", () => {
+    expect(findPhaseIssue(plan({ qualifierValue: 8 }, { format: "DOUBLE" }))).toBeNull();
+  });
+
+  it("ne désigne aucun champ pour un défaut du plan entier", () => {
+    expect(findPhaseIssue(plan({}))).toEqual({ code: "INVALID_PHASE_COUNT", phaseIndex: null, field: null });
+    const misnumbered = [phaseConfig({ position: 2 }), phaseConfig({ position: 1 })];
+    expect(findPhaseIssue(misnumbered)).toEqual({
+      code: "INVALID_PHASE_POSITIONS",
+      phaseIndex: null,
+      field: null,
+    });
+  });
+
+  it("désigne le format d'une double élimination qui n'est pas la dernière", () => {
+    expect(findPhaseIssue(plan({ qualifierValue: 16 }, { format: "DOUBLE", qualifierValue: 8 }, {}))).toEqual({
+      code: "DOUBLE_MUST_BE_LAST_PHASE",
+      phaseIndex: 1,
+      field: "format",
+    });
+  });
+
+  it("désigne le format d'une phase au format inconnu", () => {
+    const issue = findPhaseIssue(plan({}, { format: "BOGUS" as PhaseConfig["format"] }));
+    expect(issue).toEqual({ code: "INVALID_PHASE_FORMAT", phaseIndex: 1, field: "format" });
+  });
+
+  it("désigne la qualification hors bornes", () => {
+    expect(findPhaseIssue(plan({ qualifierValue: 0 }, {}))).toEqual({
+      code: "INVALID_PHASE_QUALIFIER",
+      phaseIndex: 0,
+      field: "qualifierValue",
+    });
+    expect(findPhaseIssue(plan({}, { qualifierMode: "PERCENT", qualifierValue: 100 }, {}))).toEqual({
+      code: "INVALID_PHASE_QUALIFIER",
+      phaseIndex: 1,
+      field: "qualifierValue",
+    });
+  });
+
+  it("désigne la seconde de deux qualifications qui ne décroissent pas", () => {
+    // C'est elle qui devait être plus petite.
+    expect(findPhaseIssue(plan({ qualifierValue: 16 }, { qualifierValue: 16 }, {}))).toEqual({
+      code: "NON_DECREASING_PHASE_QUALIFIERS",
+      phaseIndex: 1,
+      field: "qualifierValue",
+    });
+  });
+
+  it("désigne le nombre de manches suisses", () => {
+    expect(findPhaseIssue(plan({ format: "SWISS", swissTotalRounds: 0 }, {}))).toEqual({
+      code: "INVALID_PHASE_SWISS_ROUNDS",
+      phaseIndex: 0,
+      field: "swissTotalRounds",
+    });
+  });
+
+  it("désigne celle des deux cadences de survie qui est hors bornes", () => {
+    expect(findPhaseIssue(plan({ format: "SURVIVAL", survivalRoundsBeforeFirstCut: 0 }, {}))?.field).toBe(
+      "survivalRoundsBeforeFirstCut",
+    );
+    expect(
+      findPhaseIssue(plan({ format: "SURVIVAL", survivalRoundsBeforeFirstCut: 3, survivalRoundsPerCut: 51 }, {}))
+        ?.field,
+    ).toBe("survivalRoundsPerCut");
+  });
+
+  it("rend le premier défaut, dans l'ordre des phases", () => {
+    const issue = findPhaseIssue(plan({ qualifierValue: 0 }, { format: "SWISS", swissTotalRounds: 0 }, {}));
+    expect(issue?.phaseIndex).toBe(0);
+  });
+
+  it("validatePhases rend toujours le code de findPhaseIssue", () => {
+    const cases: PhaseConfig[][] = [
+      plan({ qualifierValue: 8 }, { format: "DOUBLE" }),
+      plan({}),
+      plan({}, { format: "DOUBLE" }, {}),
+      plan({ qualifierValue: 0 }, {}),
+      plan({ qualifierValue: 16 }, { qualifierValue: 16 }, {}),
+      plan({ format: "SWISS", swissTotalRounds: 21 }, {}),
+      plan({ format: "SURVIVAL", survivalRoundsPerCut: 0 }, {}),
+    ];
+    for (const phases of cases) expect(validatePhases(phases)).toBe(findPhaseIssue(phases)?.code ?? null);
   });
 });

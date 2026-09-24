@@ -101,7 +101,8 @@ describe("mapError — repli", () => {
 describe("mapError — refus du formulaire de tournoi", () => {
   const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
 
-  const REFUSAL_PATTERN = /(?:error: |code: |return |fail\(|new Error\(\s*)"([A-Z][A-Z0-9_]+)"/g;
+  // `issue(` : `findPhaseIssue` rend ses refus situés par un constructeur.
+  const REFUSAL_PATTERN = /(?:error: |code: |return |issue\(|fail\(|new Error\(\s*)"([A-Z][A-Z0-9_]+)"/g;
 
   function codesIn(source: string, pattern: RegExp = REFUSAL_PATTERN): string[] {
     const found = new Set<string>();
