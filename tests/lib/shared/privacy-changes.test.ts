@@ -9,6 +9,8 @@ import {
   PRIVACY_CHANGE_ID_MAX_LENGTH,
   PRIVACY_CHANGE_ID_PATTERN,
   PRIVACY_DM_MAX_LENGTH,
+  PRIVACY_DM_MIN_INTERVAL_DAYS,
+  PRIVACY_DM_SETTLE_DAYS,
   PRIVACY_DM_WINDOW_DAYS,
   UNKNOWN_PRIVACY_CHANGE,
   announceablePrivacyChanges,
@@ -17,7 +19,9 @@ import {
   formatPrivacyChangeDate,
   pendingPrivacyChanges,
   privacyChangesHeading,
+  privacyDmBatch,
   privacyPolicyUpdatedLabel,
+  settledPrivacyChanges,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
 
@@ -216,5 +220,48 @@ describe("announceablePrivacyChanges", () => {
   it("inclut la borne exacte", () => {
     const now = new Date(Date.parse("2026-03-05T00:00:00Z") + PRIVACY_DM_WINDOW_DAYS * 86_400_000);
     expect(announceablePrivacyChanges(now, REGISTRY)).toContain(B);
+  });
+});
+
+describe("anti-spam des messages privés", () => {
+  const day = (iso: string, plus = 0) => new Date(Date.parse(`${iso}T12:00:00Z`) + plus * 86_400_000);
+
+  it("le délai et l'intervalle tiennent dans la fenêtre d'annonce", () => {
+    // Sinon un changement retenu en sortirait sans avoir jamais été annoncé.
+    expect(PRIVACY_DM_SETTLE_DAYS).toBeGreaterThan(0);
+    expect(PRIVACY_DM_MIN_INTERVAL_DAYS).toBeGreaterThan(0);
+    expect(PRIVACY_DM_SETTLE_DAYS + PRIVACY_DM_MIN_INTERVAL_DAYS).toBeLessThan(PRIVACY_DM_WINDOW_DAYS);
+  });
+
+  describe("settledPrivacyChanges", () => {
+    it("n'autorise un changement qu'après le délai de la modale, borne comprise", () => {
+      expect(settledPrivacyChanges(day(C.publishedAt, PRIVACY_DM_SETTLE_DAYS - 1), [C])).toEqual([]);
+      expect(settledPrivacyChanges(day(C.publishedAt, PRIVACY_DM_SETTLE_DAYS), [C])).toEqual([C]);
+    });
+
+    it("rien le jour de la publication", () => {
+      expect(settledPrivacyChanges(day(C.publishedAt), REGISTRY)).toEqual([A, B]);
+    });
+  });
+
+  describe("privacyDmBatch", () => {
+    const burst = [change("x", "2026-09-23"), change("y", "2026-09-24"), change("z", "2026-09-25")];
+
+    it("ne rend rien tant qu'aucun changement dû n'a passé le délai", () => {
+      expect(privacyDmBatch(burst, day("2026-09-25", 3))).toEqual([]);
+    });
+
+    it("regroupe une rafale : tout part avec le plus ancien, récents compris", () => {
+      expect(privacyDmBatch(burst, day("2026-09-23", PRIVACY_DM_SETTLE_DAYS))).toEqual(burst);
+    });
+
+    it("un changement accepté entre-temps ne déclenche plus rien", () => {
+      // Le 23 est acquitté : il reste deux changements trop récents.
+      expect(privacyDmBatch(burst.slice(1), day("2026-09-23", PRIVACY_DM_SETTLE_DAYS))).toEqual([]);
+    });
+
+    it("rien à envoyer à qui n'a rien de dû", () => {
+      expect(privacyDmBatch([], day("2027-01-01"))).toEqual([]);
+    });
   });
 });

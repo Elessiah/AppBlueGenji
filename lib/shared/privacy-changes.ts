@@ -12,8 +12,11 @@
  * - les changements **se cumulent** — un joueur revenu après trois entrées les
  *   voit toutes les trois dans la même modale, et une acceptation les acquitte
  *   ensemble (`bg_privacy_acknowledgments`, une ligne par changement) ;
- * - chaque compte joignable sur Discord en reçoit un résumé en message privé,
- *   une seule fois par changement (`lib/server/privacy-change-notifications.ts`) ;
+ * - chaque compte joignable sur Discord qui ne l'a pas accepté sur le site
+ *   en reçoit un résumé en message privé, une seule fois par changement, une
+ *   semaine après sa publication et au plus un message par mois — les
+ *   changements rapprochés partent ensemble
+ *   (`lib/server/privacy-change-notifications.ts`) ;
  * - la mention « Dernière mise à jour » de `/rgpd` suit la dernière entrée.
  *
  * Module **pur** : le registre, la décision « qu'est-ce que ce compte n'a pas
@@ -326,11 +329,74 @@ export function buildPrivacyChangesMessage(
  */
 export const PRIVACY_DM_WINDOW_DAYS = 60;
 
+/**
+ * Délai laissé à la modale avant d'écrire sur Discord.
+ *
+ * Discord est le seul canal de l'association : un message de plus sur la
+ * confidentialité à chaque déploiement apprend aux joueurs à rendre le bot
+ * muet, et le jour où il annonce un match, personne ne le lit plus. Or la
+ * modale informe déjà tout joueur qui revient sur le site — le message privé
+ * ne sert qu'à celui qui ne revient pas. On lui laisse donc une semaine : un
+ * joueur actif accepte dans la modale et ne reçoit **rien**, et les changements
+ * publiés en rafale pendant ce délai partent dans **un** message.
+ */
+export const PRIVACY_DM_SETTLE_DAYS = 7;
+
+/**
+ * Intervalle minimal entre deux messages de confidentialité à un même compte.
+ *
+ * Un changement publié le lendemain d'un message attend le suivant, au plus un
+ * mois, et s'y ajoute ; la modale, elle, le présente dès la prochaine visite.
+ * La somme avec {@link PRIVACY_DM_SETTLE_DAYS} reste sous
+ * {@link PRIVACY_DM_WINDOW_DAYS}, sans quoi un changement retenu sortirait de
+ * la fenêtre sans jamais avoir été annoncé.
+ */
+export const PRIVACY_DM_MIN_INTERVAL_DAYS = 30;
+
+/** `now − days`, au jour (`AAAA-MM-JJ`, UTC — comme la comparaison des publications). */
+function dayBefore(now: Date, days: number): string {
+  return new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
+}
+
 /** Les changements encore à annoncer sur Discord à l'instant `now`. */
 export function announceablePrivacyChanges(
   now: Date,
   changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
 ): PrivacyChange[] {
-  const cutoff = new Date(now.getTime() - PRIVACY_DM_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const cutoff = dayBefore(now, PRIVACY_DM_WINDOW_DAYS);
   return changes.filter((change) => change.publishedAt >= cutoff);
+}
+
+/**
+ * Les changements publiés depuis au moins {@link PRIVACY_DM_SETTLE_DAYS} jours :
+ * ceux dont l'attente autorise à écrire. Un compte n'est prévenu que s'il en a
+ * au moins un en souffrance — et le message porte alors **aussi** les plus
+ * récents (`privacyDmBatch`).
+ */
+export function settledPrivacyChanges(
+  now: Date,
+  changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
+): PrivacyChange[] {
+  const cutoff = dayBefore(now, PRIVACY_DM_SETTLE_DAYS);
+  return changes.filter((change) => change.publishedAt <= cutoff);
+}
+
+/**
+ * Ce qu'un compte doit recevoir maintenant : **tous** ses changements dus dès
+ * que l'un d'eux a passé le délai de la modale, rien sinon.
+ *
+ * Tout ou rien, et c'est ce qui regroupe : attendre que chaque changement ait
+ * son propre délai enverrait un message par jour de publication. Un joueur qui
+ * n'a pas ouvert le site depuis une semaine ne l'ouvrira pas davantage pour le
+ * changement d'hier, autant qu'il l'apprenne dans le même message.
+ *
+ * L'intervalle entre deux messages ({@link PRIVACY_DM_MIN_INTERVAL_DAYS}) se
+ * juge en base, sur la date des annonces déjà faites : le balayage doit écarter
+ * ces comptes **avant** sa limite de lot, sous peine de ne plus voir les autres.
+ *
+ * @param due Changements dus au compte (`pendingPrivacyChanges`, déjà annoncés exclus).
+ */
+export function privacyDmBatch(due: readonly PrivacyChange[], now: Date): PrivacyChange[] {
+  const cutoff = dayBefore(now, PRIVACY_DM_SETTLE_DAYS);
+  return due.some((change) => change.publishedAt <= cutoff) ? [...due] : [];
 }
