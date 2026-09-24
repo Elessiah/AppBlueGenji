@@ -81,14 +81,17 @@ describe("ScrollArea — contrat du composant", () => {
     expect(html).not.toContain("aria-label=");
   });
 
-  it("ne compte que le focus posé sur la zone elle-même", () => {
-    // Le focus d'un bouton contenu bouillonne jusqu'à la zone.
-    expect(COMPONENT.match(/event\.target === event\.currentTarget/g)).toHaveLength(2);
+  it("décide du focus par les règles pures, testées dans scroll-overflow", () => {
+    expect(COMPONENT).toContain("isOwnFocusEvent(event)");
+    expect(COMPONENT).toContain("releasesFocus({ target, currentTarget, activeElement: document.activeElement })");
+    // Une zone active à la mesure (focus() en arrière-plan, sans évènement) reste focalisable.
+    expect(COMPONENT).toContain("if (active) setFocused(true)");
   });
 
-  it("reste focalisable quand seule la fenêtre perd le focus", () => {
-    // La zone reste alors l'élément actif : `blur` seul ne suffit pas.
-    expect(COMPONENT).toContain("document.activeElement !== event.currentTarget");
+  it("donne à la surveillance les réglages d'accessibilité, les polices et l'élément actif", () => {
+    expect(COMPONENT).toContain("root: document.documentElement");
+    expect(COMPONENT).toContain("fonts: document.fonts");
+    expect(COMPONENT).toContain("activeElement: () => document.activeElement");
   });
 
   it("applique la variante discrète par défaut", () => {

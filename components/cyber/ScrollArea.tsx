@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState, type CSSProperties, type ElementType, type FocusEvent, type ReactNode } from "react";
-import { scrollAreaAccessibility, watchScrollOverflow } from "@/lib/shared/scroll-overflow";
+import {
+  isOwnFocusEvent,
+  releasesFocus,
+  scrollAreaAccessibility,
+  watchScrollOverflow,
+} from "@/lib/shared/scroll-overflow";
 
 type ScrollOrientation = "x" | "y" | "both";
 
@@ -71,10 +76,20 @@ export function ScrollArea({
   useEffect(() => {
     const element = ref.current;
     if (!element) return;
-    return watchScrollOverflow(element, setOverflowing, {
-      ResizeObserver: typeof ResizeObserver === "undefined" ? undefined : ResizeObserver,
-      MutationObserver: typeof MutationObserver === "undefined" ? undefined : MutationObserver,
-    });
+    return watchScrollOverflow(
+      element,
+      ({ overflowing: next, active }) => {
+        setOverflowing(next);
+        if (active) setFocused(true);
+      },
+      {
+        ResizeObserver: typeof ResizeObserver === "undefined" ? undefined : ResizeObserver,
+        MutationObserver: typeof MutationObserver === "undefined" ? undefined : MutationObserver,
+        root: document.documentElement,
+        fonts: document.fonts,
+        activeElement: () => document.activeElement,
+      },
+    );
   }, []);
 
   const classes = ["scroll-area", subtle ? "scroll-subtle" : null, className]
@@ -91,17 +106,12 @@ export function ScrollArea({
       ref={ref}
       className={classes}
       {...scrollAreaAccessibility({ overflowing, focused, ariaLabel })}
-      // Seul le focus posé sur la zone elle-même compte : celui d'un bouton
-      // qu'elle contient remonte jusqu'ici (`onFocus` de React bouillonne).
       onFocus={(event: FocusEvent<HTMLElement>) => {
-        if (event.target === event.currentTarget) setFocused(true);
+        if (isOwnFocusEvent(event)) setFocused(true);
       }}
-      // Quitter la fenêtre émet aussi `blur`, mais la zone reste l'élément
-      // actif et le retrouvera au retour : elle doit rester focalisable.
       onBlur={(event: FocusEvent<HTMLElement>) => {
-        if (event.target === event.currentTarget && document.activeElement !== event.currentTarget) {
-          setFocused(false);
-        }
+        const { target, currentTarget } = event;
+        if (releasesFocus({ target, currentTarget, activeElement: document.activeElement })) setFocused(false);
       }}
       style={{ ...OVERFLOW[orientation], ...fadeStyle, ...style }}
     >

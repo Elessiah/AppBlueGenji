@@ -39,9 +39,13 @@ tient dans la zone, cela faisait :
   client coïncident ainsi, sans écart d'hydratation.
 - **Une zone qui a le focus le garde** : retirer le `tabindex` d'un élément
   focalisé renvoie le focus en tête de document. Seul compte le focus posé sur la
-  zone elle-même (celui d'un bouton qu'elle contient remonte par `onFocus`), et
-  un `blur` dû à la seule perte de focus de la **fenêtre** ne compte pas — la zone
-  reste alors l'élément actif et le retrouvera au retour.
+  zone elle-même (`isOwnFocusEvent` — celui d'un bouton qu'elle contient remonte
+  par `onFocus`), et un `blur` dû à la seule perte de focus de la **fenêtre** ne
+  compte pas (`releasesFocus`) — la zone reste alors l'élément actif et le
+  retrouvera au retour. Chaque mesure relit aussi `document.activeElement` : un
+  `focus()` appelé dans un onglet ouvert en arrière-plan (la modale RGPD) n'émet
+  **aucun** évènement, et sans cette relecture la première mesure retirait le
+  `tabindex` sous le focus.
 
 ## La surveillance
 
@@ -49,13 +53,23 @@ tient dans la zone, cela faisait :
 
 - la **zone** change de taille (fenêtre, panneau replié) ;
 - un **enfant direct** change de taille — le flux SSE ajoute une ronde, la zone
-  garde la sienne ;
-- un enfant direct **apparaît ou disparaît** (`MutationObserver`, `childList`),
-  pour être observé à son tour.
+  garde la sienne ; un enfant ajouté est observé à son tour, un enfant retiré
+  cesse de l'être (d'après les `MutationRecord`, sans tout réinscrire) ;
+- le **contenu** change sans qu'aucune boîte observée ne bouge
+  (`MutationObserver` sur tout le sous-arbre) : les pistes en `em` d'une grille
+  débordent de la grille, dont la largeur reste celle de la zone ;
+- le **texte** s'élargit sans aucune écriture dans la zone : réglage
+  d'accessibilité posé sur `<html data-a11y>` (« Espacement du texte »,
+  « Police simplifiée »), ou police web chargée après la première mesure
+  (`document.fonts`, `loadingdone`).
 
-Les constructeurs du navigateur lui sont passés en argument : le module se teste
-sans DOM. Sans `ResizeObserver`, rien n'est mesuré et la zone garde le défaut
-prudent.
+Les deux derniers cas sont ceux où se tromper coûte le plus : ils font
+**apparaître** un débordement, et une zone restée non focalisable serait
+inatteignable au clavier.
+
+Tout ce que la surveillance lit du navigateur lui est passé en argument : le
+module se teste sans DOM. Sans `ResizeObserver`, rien n'est mesuré et la zone
+garde le défaut prudent.
 
 ## Appelants
 
