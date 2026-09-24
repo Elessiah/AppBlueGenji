@@ -19,6 +19,13 @@ interface EnduranceNextRoundPanelProps {
   teamNames: Map<number, string>;
 }
 
+/**
+ * Pourquoi une affiche sûre peut avoir des côtés incertains. Écrite sans
+ * « équipe » : un tournoi individuel oppose des joueurs.
+ */
+const SIDES_HINT =
+  "L'affiche est sûre, mais les matchs restants décideront qui, mieux classé, part à gauche et accueille la partie.";
+
 /** Accent de l'aperçu : distinct du bleu des manches réelles, qu'il ne doit pas imiter. */
 const PREVIEW_ACCENT = "var(--blue-300, #8fd5ff)";
 
@@ -87,9 +94,13 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Endur
                     </span>
                   ) : (
                     <>
-                      <span className={styles.versus} aria-label="contre">
+                      {/* « vs » se lit « versus » ou pas du tout selon le
+                          lecteur d'écran : la phrase est écrite pour de bon,
+                          et masquée à l'œil. */}
+                      <span className={styles.versus} aria-hidden="true">
                         vs
                       </span>
+                      <span className="sr-only"> contre </span>
                       <EntrantName
                         teamId={match.teamBId}
                         name={name(match.teamBId)}
@@ -99,11 +110,9 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Endur
                     </>
                   )}
                   {!match.sidesKnown && (
-                    <span
-                      className={styles.tag}
-                      title="Les deux équipes s'affrontent quoi qu'il arrive ; les matchs restants décideront laquelle, mieux classée, part à gauche et accueille la partie."
-                    >
+                    <span className={styles.tag} title={SIDES_HINT}>
                       Côtés à confirmer
+                      <span className="sr-only">{`. ${SIDES_HINT}`}</span>
                     </span>
                   )}
                 </li>
