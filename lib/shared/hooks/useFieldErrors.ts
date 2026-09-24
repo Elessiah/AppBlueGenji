@@ -5,6 +5,7 @@ import {
   clearFlag,
   fieldAria,
   flagFromCode,
+  focusFlaggedField,
   type FieldAria,
   type FieldErrorMap,
   type FlaggedField,
@@ -38,7 +39,9 @@ export type FieldErrors<F extends string> = {
  * et c'est aussi ce que dit la notification. Le signalement ramène le **focus**
  * sur le champ, une fois le rendu fait (le champ pouvait être désactivé pendant
  * l'envoi) — c'est ce qui rend la consigne utile au clavier et au lecteur
- * d'écran, qui arrivent alors sur le champ en entendant pourquoi.
+ * d'écran, qui arrivent alors sur le champ en entendant pourquoi. Ce focus est
+ * marqué (`focusFlaggedField`), pour qu'un contrôle qui s'ouvre au focus ne
+ * le prenne pas pour un geste du joueur.
  *
  * `ids` associe chaque champ à l'`id` de son contrôle : c'est lui qui porte
  * les attributs, et lui qu'on focalise.
@@ -57,7 +60,7 @@ export function useFieldErrors<F extends string>(
   // reprend le focus la seconde fois aussi.
   useEffect(() => {
     if (!flagged) return;
-    document.getElementById(idsRef.current[flagged.field])?.focus();
+    focusFlaggedField(document.getElementById(idsRef.current[flagged.field]));
   }, [flagged]);
 
   const flag = useCallback((field: F, message: string) => setFlagged({ field, message }), []);

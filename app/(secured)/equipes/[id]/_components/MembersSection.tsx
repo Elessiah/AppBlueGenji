@@ -7,6 +7,9 @@ import { formatLocalDate } from "@/lib/shared/dates";
 import type { TeamMember, TeamRole, TeamSentInvitation } from "@/lib/shared/types";
 import { DEFAULT_INVITE_ROLES, sortTeamMembers } from "@/lib/shared/team-role-display";
 import { useToast } from "@/components/ui/toast";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+import { PLAYER_PSEUDO_FIELD_ERRORS } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { teamErrorMessage } from "../../_lib/team-errors";
 import { useMemberManagement } from "../_hooks/useMemberManagement";
 import { RolesDialog, type RolesDialogTarget } from "./RolesDialog";
@@ -15,6 +18,8 @@ import { RolePicker } from "./RolePicker";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
 import styles from "../team.module.css";
+
+const INVITE_FIELD_IDS = { pseudo: "team-invite-pseudo" } as const;
 
 interface MembersSectionProps {
   teamId: number;
@@ -45,6 +50,7 @@ export function MembersSection({
   const [kickTarget, setKickTarget] = useState<TeamMember | null>(null);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
   const { showError } = useToast();
+  const fieldErrors = useFieldErrors(PLAYER_PSEUDO_FIELD_ERRORS, INVITE_FIELD_IDS);
 
   const refreshAll = () => {
     onChanged();
@@ -58,13 +64,16 @@ export function MembersSection({
   const invite = async (event: FormEvent) => {
     event.preventDefault();
     if (!canInvite) return;
+    fieldErrors.clear();
     // Refus dit en notification, pas par un bouton grisé muet.
     if (memberRoles.length === 0) {
       showError(teamErrorMessage("MISSING_ROLE"));
       return;
     }
     setInviting(true);
-    const ok = await addMember(memberPseudo.trim(), memberRoles);
+    // Un pseudo refusé (introuvable, déjà invité…) est signalé sur le champ,
+    // qui reprend le focus sans rouvrir ses suggestions.
+    const ok = await addMember(memberPseudo.trim(), memberRoles, fieldErrors.report);
     setInviting(false);
     // Refus : la saisie reste, pour corriger une faute de frappe sans tout
     // retaper.
@@ -197,13 +206,17 @@ export function MembersSection({
               <div className="field">
                 <label htmlFor="team-invite-pseudo">Pseudo du joueur</label>
                 <PlayerPseudoCombobox
-                  id="team-invite-pseudo"
+                  id={INVITE_FIELD_IDS.pseudo}
                   value={memberPseudo}
-                  onChange={setMemberPseudo}
+                  onChange={(value) => {
+                    setMemberPseudo(value);
+                    fieldErrors.clear("pseudo");
+                  }}
                   placeholder="Commence à taper un pseudo…"
-                  describedBy="team-invite-help"
+                  aria={fieldErrors.aria("pseudo", "team-invite-help")}
                   excludeUserIds={invitations.map((inv) => inv.userId)}
                 />
+                <FieldErrorText fieldId={INVITE_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />
                 <p id="team-invite-help" className={styles.help}>
                   Seuls les joueurs sans équipe sont proposés. Le joueur rejoint l&apos;équipe quand
                   il accepte l&apos;invitation — tout de suite s&apos;il l&apos;avait lui-même demandé.

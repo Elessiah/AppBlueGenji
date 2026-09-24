@@ -38,6 +38,11 @@ Création d'équipe, équipe fantôme, identité d'une équipe (mode gestion), p
 (pseudo, BattleTag, tag Discord), connexion par code Discord (tag, code),
 formulaire de tournoi (nom, effectif, format de match, quatre dates).
 
+Puis, par la tâche 10 (`feature/accessibilite-item-10-72b62f`) : invitation d'un
+joueur et attribution d'une fantôme (pseudo), certification du tag Discord (tag,
+code), et les réglages de chaque phase d'un tournoi multi-phases. Voir
+[§ 1 bis](#1-bis-formulaires-restants--tâche-10).
+
 Trois points :
 
 - **Un code inconnu ne marque rien.** Session expirée, réseau, droits : aucun
@@ -59,6 +64,80 @@ Trois points :
 Au passage aussi, les étiquettes de `/connexion` n'étaient associées à **aucun**
 champ (`<label>` sans `htmlFor`) : elles le sont, et le code porte
 `inputMode="numeric"` et `autoComplete="one-time-code"`.
+
+## 1 bis. Formulaires restants — tâche 10
+
+### Le pseudo d'un joueur (`PlayerPseudoCombobox`)
+
+Invitation dans une équipe (`MembersSection`) et attribution d'une fantôme
+(`ClaimGhostTeamDialog`) partagent le même champ et les mêmes refus sur le
+pseudo : `PLAYER_PSEUDO_FIELD_ERRORS` (introuvable, compte supprimé, déjà dans
+une équipe, déjà invité, pseudo vide). `useMemberManagement` ne remontait que
+`true` / `false` : `addMember` prend désormais un `RefusalListener` — le hook
+garde la notification, le formulaire y branche `fieldErrors.report`.
+
+**Le piège annoncé** : la liste de suggestions s'ouvre **au focus**, si bien que
+ramener le focus sur le champ refusé y aurait fait surgir des suggestions
+par-dessus la phrase du refus. `useFieldErrors` ramène donc le focus par
+`focusFlaggedField`, qui **marque** le champ le temps de l'appel
+(`data-field-error-focus`) — `focus()` déclenche ses évènements pendant l'appel,
+`focusin` de React compris — et le combobox, qui lit `isFieldErrorFocus`, ne
+s'ouvre pas sur ce focus-là. Un clic, une frappe ou une flèche l'ouvrent comme
+avant. La marque vaut pour **tout** contrôle qui réagirait à son focus, pas
+seulement celui-ci.
+
+Le combobox reçoit ses attributs par `aria={fieldErrors.aria("pseudo", …)}` (et
+non plus un `describedBy` seul) : la phrase du refus s'y joint à l'aide.
+
+### La certification du tag Discord (`DiscordVerificationDialog`)
+
+`DISCORD_VERIFICATION_FIELD_ERRORS` : le tag (invalide, introuvable, appartenant
+à un autre compte Discord) et le code (invalide, faux ou expiré). Restent sans
+champ les refus du bot et les plafonds de débit — y compris
+`BOT_RESOLVE_TIMEOUT`, qui peut tenir au tag comme à la charge du bot. Le code
+porte au passage `autoComplete="one-time-code"`, comme celui de `/connexion`.
+
+Un code **brûlé** (cinq essais) ou expiré est rattaché au champ du code, mais ne
+se corrige pas en le retapant : la seconde étape offre donc **« Nouveau code »**,
+qui ramène à la première, tag conservé — le geste que nomme le refus
+(« Recommence la certification »). Changer d'étape démonte le bouton qui vient
+d'être activé : le dialogue porte alors le focus sur le champ de la nouvelle
+étape (`previousStep`, rien au montage, où `useDialogBehavior` s'en charge),
+sans quoi il tombait sur `<body>`. La rangée de trois boutons passe à la ligne à
+la largeur d'un téléphone.
+
+### Les phases d'un tournoi multi-phases (`PhaseBuilder`)
+
+`validatePhases` ne rendait qu'un code, sans dire **quelle** phase. La règle est
+désormais `findPhaseIssue` (`lib/shared/tournament-phases.ts`), qui situe le
+premier défaut — phase en cause et réglage (`format`, `qualifierValue`,
+`swissTotalRounds`, cadences de survie) — et `validatePhases` n'en est plus que
+le code : serveur et formulaire lisent la même règle. Deux défauts tiennent au
+plan entier (nombre, numérotation) et ne désignent aucun champ ; une
+qualification qui ne décroît pas désigne la **seconde** phase, celle qui devait
+être plus petite.
+
+Ce n'est pas un refus du serveur mais une validation **en direct** : le champ
+fautif porte `aria-invalid` et la phrase du défaut tant que le défaut existe,
+sans état à lever. La phrase est **située** (`phaseIssueMessage` : « Phase 2 —
+… ») dans l'encart comme dans la notification. À l'envoi refusé,
+`TournamentForm` incrémente `phaseFocusRequest` : `PhaseBuilder` déplie la phase
+en cause (son champ n'existe pas repliée), puis y porte le focus au rendu
+suivant. Les `id` des réglages viennent de `phaseFieldId` (`phase-form.ts`),
+partagé par la carte qui les pose et le constructeur qui les focalise.
+
+Deux gardes sur cette demande : la dernière servie est relevée **au montage**
+(`handledRequest`) — le constructeur se démonte quand on quitte le format
+multi-phases, et y revenir rejouait sinon l'ancienne demande, le focus quittant
+le sélecteur de format sans aucun envoi ; et un plan **figé** par la fenêtre
+d'édition n'en émet aucune, ses champs désactivés ne prenant pas le focus — la
+notification reste seule à parler. Le focus passe par `focusFlaggedField`, comme
+celui de `useFieldErrors`.
+
+Au passage, deux champs affichaient autre chose que la valeur refusée :
+`value={x || 3}` montrait « 3 » pour une cadence de survie à 0, et
+`value={x || ""}` un champ vide pour 0 manche suisse — le champ désigné aurait
+montré une valeur valide. Ils lisent désormais `??`.
 
 ## 2. Contraste par défaut de `--ink-dim` (WCAG 1.4.3 · RGAA 3.2)
 
@@ -102,4 +181,5 @@ RGAA 4.1.
 et avance `ACCESSIBILITY_STATEMENT_DATE` ; une limite laissée pour plus tard qui
 gêne réellement un visiteur s'y ajoute. Les formulaires que cette PR ne câble
 pas encore (tâche 10, remise dans `ACCESSIBILITE.md` pour sa part restante) y
-figurent : la PR qui les règle retire l'entrée.
+figurent : la PR qui les règle retire l'entrée — ce qu'a fait celle de la
+tâche 10.
