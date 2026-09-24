@@ -8,3 +8,10 @@
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(3px);
 }
+
+/* Le panneau défile en lui-même quand il dépasse l'écran : la page, elle, est
+   verrouillée tant que la modale est ouverte. */
+.panel {
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}

@@ -54,7 +54,7 @@ export function LandingDialog({ onClose, busy = false, className, labelledBy, la
     >
       <div
         ref={dialogRef}
-        className={className}
+        className={`${styles.panel} ${className}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={labelledBy}
