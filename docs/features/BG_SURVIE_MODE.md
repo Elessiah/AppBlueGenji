@@ -264,6 +264,8 @@ décision humaine.
 | Plafond de manches | `enduranceEliminationCut` / `roundLimitReached` (`lib/shared/bg-survie.ts`) |
 | Relecture de l'arbre | `repairPlayoffBracket` (`lib/server/tournaments/bg-survie.ts`) |
 | Pénalités d'arbitrage | `ENDURANCE_PENALTIES.md` (`lib/shared/endurance-penalty.ts`, table `bg_endurance_penalties`) |
+| Aperçu de la manche suivante (arbitrage) | `ENDURANCE_NEXT_ROUND_PREVIEW.md` (`lib/shared/endurance-next-round.ts`) |
+| Lecture d'un match en résultat rejouable | `enduranceMatchOutcome` (`lib/shared/bg-survie.ts`) |
 | Règles publiques | `/regles/bluegenji-survie` |
 
 Comme la Survie et la Ronde suisse, **tout est rejoué** depuis l'historique des
