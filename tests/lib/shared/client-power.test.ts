@@ -55,6 +55,13 @@ describe("resolvePowerMode — le régime", () => {
     expect(resolvePowerMode(input({ reducedMotion: true }))).toBe("ECO");
   });
 
+  it("passe en éco quand le menu d'accessibilité demande de réduire les animations", () => {
+    // Sans cela, les boucles JS (fond animé, inclinaison du logo) ignoraient
+    // le réglage que seules les animations CSS respectaient.
+    expect(resolvePowerMode(input({ motionSetting: true }))).toBe("ECO");
+    expect(powerPolicy(input({ motionSetting: true }))).toMatchObject({ decorativeMotion: false, canvas: "STILL" });
+  });
+
   it("passe en match, que la page ait le focus ou non", () => {
     expect(resolvePowerMode(input({ matchFocus: true }))).toBe("MATCH");
     expect(resolvePowerMode(input({ matchFocus: true, attention: "BACKGROUND" }))).toBe("MATCH");
@@ -329,6 +336,9 @@ describe("témoin", () => {
     expect(showsPowerBadge("ECO", [])).toBe(false);
     expect(showsPowerBadge("ECO", ["BACKGROUND", "SLOW_FRAMES"])).toBe(true);
     expect(showsPowerBadge("ECO", ["REDUCED_MOTION"])).toBe(true);
+    // Le menu d'accessibilité dit déjà ce qu'on vient d'y cocher.
+    expect(showsPowerBadge("ECO", ["MOTION_SETTING"])).toBe(false);
+    expect(showsPowerBadge("ECO", ["MOTION_SETTING", "LOW_CORES"])).toBe(true);
     expect(showsPowerBadge("MATCH", ["MATCH", "BACKGROUND"])).toBe(true);
   });
 
@@ -360,6 +370,11 @@ describe("témoin", () => {
     expect(powerReasons(input({ reducedMotion: true }), [])).toEqual(["REDUCED_MOTION"]);
   });
 
+  it("distingue le mouvement réduit choisi dans le menu d'accessibilité", () => {
+    expect(powerReasons(input({ motionSetting: true }), [])).toEqual(["MOTION_SETTING"]);
+    expect(powerReasonLabel("MOTION_SETTING", UNKNOWN_PROBE)).toContain("menu d'accessibilité");
+  });
+
   it("donne la cadence mesurée en images par seconde", () => {
     const probe = { cores: 2, memoryGb: 2, frameIntervalMs: 33.3 };
     expect(powerReasonLabel("SLOW_FRAMES", probe)).toContain("≈ 30 images/s");
@@ -385,6 +400,7 @@ describe("témoin", () => {
       "MATCH",
       "BACKGROUND",
       "REDUCED_MOTION",
+      "MOTION_SETTING",
       "LOW_CORES",
       "LOW_MEMORY",
       "SLOW_FRAMES",

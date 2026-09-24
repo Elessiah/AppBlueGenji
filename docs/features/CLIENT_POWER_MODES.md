@@ -13,7 +13,7 @@ l'utilisateur. Règle écrite une fois, dans `lib/shared/client-power.ts` (pur).
 | Régime | Quand | Animations décoratives | Fond animé | Rendu d'un instantané reçu | Flux SSE |
 |---|---|---|---|---|---|
 | `FULL` | page regardée, pas de match, machine à l'aise | oui | animé (30 i/s max) | immédiat | palier normal |
-| `ECO` | page **sans focus** (second écran), **ou** machine à la peine, **ou** mouvement réduit demandé | figées | image fixe | immédiat | palier normal |
+| `ECO` | page **sans focus** (second écran), **ou** machine à la peine, **ou** mouvement réduit demandé (par le système, ou par « Réduire les animations » du menu d'accessibilité — `motionSetting`, qui n'affiche pas le témoin : le menu le dit déjà) | figées | image fixe | immédiat | palier normal |
 | `MATCH` | le lecteur a une rencontre en cours (de « prête » au résultat) | figées | **mémoire rendue** | immédiat si la page a le focus ; sinon regroupé toutes les 5 s, **sauf son propre match** | palier normal |
 | `SLEEP` | onglet caché | figées | mémoire rendue | **au retour** seulement | palier spectateur après 60 s, hors match |
 

@@ -1,6 +1,16 @@
 "use client";
 
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  countdownRemaining,
+  isCountdownHeld,
+  pauseCountdown,
+  resumeCountdown,
+  startCountdown,
+  type Countdown,
+  type CountdownOverride,
+} from "@/lib/shared/pausable-countdown";
+import styles from "./toast.module.css";
 
 type ToastType = "error" | "success";
 
@@ -15,8 +25,23 @@ interface ToastContextValue {
   showSuccess: (message: string) => void;
 }
 
+/** Durée d'affichage d'une notification, décompte suspendu exclu. */
+export const TOAST_DURATION_MS = 5000;
+
 const ToastContext = createContext<ToastContextValue | null>(null);
 
+/**
+ * Notifications du site, en bas à gauche.
+ *
+ * Deux publics, deux chemins. À l'œil, la pile visible : chaque notification
+ * porte un bouton **pause** et un bouton **fermer**, et son décompte se
+ * suspend aussi au survol et au focus (WCAG 2.2.1) — un message qui part avant
+ * d'être lu n'a rien dit. À l'oreille, deux zones d'annonce **permanentes** et
+ * invisibles (`role="status"` pour les réussites, `role="alert"` pour les
+ * erreurs) : un lecteur d'écran n'annonce de façon fiable que ce qui change
+ * *dans* une zone déjà présente, jamais une zone qui vient d'apparaître — d'où
+ * des zones montées une fois, que chaque notification remplit d'une ligne.
+ */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
@@ -24,9 +49,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const add = useCallback((message: string, type: ToastType) => {
     const id = ++nextId.current;
     setToasts((prev) => [...prev, { id, message, type }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 5000);
+  }, []);
+
+  const dismiss = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
   const showError = useCallback((message: string) => add(message, "error"), [add]);
@@ -35,47 +61,151 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ showError, showSuccess }}>
       {children}
-      <div
-        style={{
-          position: "fixed",
-          bottom: 24,
-          left: 24,
-          zIndex: 9999,
-          display: "flex",
-          flexDirection: "column",
-          gap: 10,
-          maxWidth: 420,
-          pointerEvents: "none",
-        }}
-      >
-        {toasts.map((toast) => (
-          <div
-            key={toast.id}
-            style={{
-              pointerEvents: "auto",
-              borderRadius: 8,
-              padding: "10px 14px",
-              boxShadow: "0 4px 20px rgba(0,0,0,0.6)",
-              fontSize: 14,
-              lineHeight: 1.5,
-              ...(toast.type === "error"
-                ? {
-                    color: "#ffd2db",
-                    background: "#2a0c13",
-                    border: "1px solid rgba(255, 110, 130, 0.5)",
-                  }
-                : {
-                    color: "#d6ffeb",
-                    background: "#0b2318",
-                    border: "1px solid rgba(79, 224, 162, 0.45)",
-                  }),
-            }}
-          >
-            {toast.message}
-          </div>
-        ))}
+      <div className="sr-only" role="status" aria-live="polite">
+        {toasts
+          .filter((toast) => toast.type === "success")
+          .map((toast) => (
+            <p key={toast.id}>{toast.message}</p>
+          ))}
       </div>
+      <div className="sr-only" role="alert" aria-live="assertive">
+        {toasts
+          .filter((toast) => toast.type === "error")
+          .map((toast) => (
+            <p key={toast.id}>{toast.message}</p>
+          ))}
+      </div>
+      {toasts.length > 0 && (
+        <section className={styles.stack} aria-label="Notifications">
+          {toasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} onDismiss={dismiss} />
+          ))}
+        </section>
+      )}
     </ToastContext.Provider>
+  );
+}
+
+/**
+ * Le focus vient-il du clavier ? `:focus-visible` le dit, mais un navigateur
+ * qui ne connaît pas la pseudo-classe (Safari avant 15.4) fait **lever**
+ * `matches` là où une feuille de style ignorerait simplement la règle. On
+ * répond alors non : le décompte se suspend encore au survol et au bouton.
+ */
+function isKeyboardFocus(element: Element): boolean {
+  try {
+    return element.matches(":focus-visible");
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Une notification. Le décompte se suspend au survol et au focus clavier, et
+ * le bouton pause pose un choix explicite qui prime sur les deux
+ * (`isCountdownHeld`) : « Pause » le tient arrêté jusqu'au clic suivant,
+ * « Reprendre » le relance même sous le pointeur qui vient de cliquer. Ce
+ * « Reprendre » s'efface au prochain survol ou focus, qui suspendent de
+ * nouveau. Le focus ne compte que s'il est visible (clavier) : un clic de
+ * souris laisse le focus sur le bouton cliqué, et le décompte ne reprendrait
+ * jamais. La barre de progression lit le même état par `data-paused`.
+ */
+function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
+  const [override, setOverride] = useState<CountdownOverride>(null);
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const countdown = useRef<Countdown | null>(null);
+  const paused = isCountdownHeld(override, hovered, focused);
+  const manualPause = override === "PAUSED";
+  // Un nouveau survol ou focus rend la main à la règle ordinaire.
+  const releaseResume = () => setOverride((value) => (value === "RUNNING" ? null : value));
+  const rootRef = useRef<HTMLDivElement>(null);
+  // L'élément qui avait le focus avant qu'il n'entre dans la notification.
+  const returnFocus = useRef<HTMLElement | null>(null);
+
+  // Une notification qui part avec le focus le rend à l'endroit d'où il
+  // venait : démonté, le bouton cliqué laisserait le clavier sur `<body>`,
+  // et la tabulation suivante repartirait du haut de la page.
+  const dismissSelf = useCallback(() => {
+    const active = document.activeElement;
+    const hadFocus = active !== null && rootRef.current?.contains(active) === true;
+    const target = returnFocus.current;
+    onDismiss(toast.id);
+    if (hadFocus && target?.isConnected) target.focus();
+  }, [onDismiss, toast.id]);
+
+  useEffect(() => {
+    const now = Date.now();
+    countdown.current ??= startCountdown(TOAST_DURATION_MS, now);
+    if (paused) {
+      countdown.current = pauseCountdown(countdown.current, now);
+      return;
+    }
+    countdown.current = resumeCountdown(countdown.current, now);
+    const timer = window.setTimeout(dismissSelf, countdownRemaining(countdown.current, now));
+    return () => window.clearTimeout(timer);
+  }, [paused, dismissSelf]);
+
+  const kind = toast.type === "error" ? "Erreur" : "Succès";
+
+  return (
+    <div
+      ref={rootRef}
+      className={styles.toast}
+      data-type={toast.type}
+      data-paused={paused ? "true" : undefined}
+      // Le survol ne vaut que pour une souris : sur écran tactile, un tap émule
+      // l'entrée du pointeur sans jamais sa sortie, et la notification ne
+      // partirait plus.
+      onPointerEnter={(event) => {
+        if (event.pointerType !== "mouse") return;
+        releaseResume();
+        setHovered(true);
+      }}
+      onPointerLeave={(event) => {
+        if (event.pointerType === "mouse") setHovered(false);
+      }}
+      onFocus={(event) => {
+        const from = event.relatedTarget;
+        if (from instanceof HTMLElement && !event.currentTarget.contains(from)) returnFocus.current = from;
+        if (!isKeyboardFocus(event.target)) return;
+        releaseResume();
+        setFocused(true);
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
+      }}
+    >
+      <p className={styles.message}>
+        <span className="sr-only">{kind} : </span>
+        {toast.message}
+      </p>
+      <div className={styles.actions}>
+        <button
+          type="button"
+          className={styles.action}
+          aria-label={manualPause ? "Reprendre le décompte de la notification" : "Mettre en pause la notification"}
+          title={manualPause ? "Reprendre" : "Pause"}
+          onClick={() => setOverride(manualPause ? "RUNNING" : "PAUSED")}
+        >
+          <span aria-hidden="true">{manualPause ? "▶" : "❚❚"}</span>
+        </button>
+        <button
+          type="button"
+          className={styles.action}
+          aria-label="Fermer la notification"
+          title="Fermer"
+          onClick={dismissSelf}
+        >
+          <span aria-hidden="true">×</span>
+        </button>
+      </div>
+      <span
+        className={styles.progress}
+        aria-hidden="true"
+        style={{ animationDuration: `${TOAST_DURATION_MS}ms` }}
+      />
+    </div>
   );
 }
 

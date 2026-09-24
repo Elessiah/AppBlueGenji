@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useSyncExternalStore } from "react";
+import { hasA11ySetting } from "@/lib/shared/accessibility-settings";
 import {
   activeMatchFocusUntil,
   FRAME_SAMPLE_SIZE,
@@ -54,7 +55,7 @@ export type ClientPowerState = {
 };
 
 const SERVER_STATE: ClientPowerState = {
-  input: { attention: "FOCUSED", matchFocus: false, reducedMotion: false, performanceLimited: false },
+  input: { attention: "FOCUSED", matchFocus: false, reducedMotion: false, motionSetting: false, performanceLimited: false },
   probe: UNKNOWN_PROBE,
   limits: [],
   ignorePerformance: false,
@@ -132,6 +133,11 @@ function readReducedMotion(): boolean {
   } catch {
     return false;
   }
+}
+
+/** « Réduire les animations » coché dans le menu d'accessibilité (attribut de `<html>`). */
+function readMotionSetting(): boolean {
+  return hasA11ySetting(document.documentElement.getAttribute("data-a11y"), "motion");
 }
 
 /** Ce que le navigateur déclare de la machine ; lu une fois, ça ne bouge pas. */
@@ -231,6 +237,7 @@ function refresh(force = false): void {
     attention,
     matchFocus: localMatchFocus || leaseUntil !== null,
     reducedMotion: readReducedMotion(),
+    motionSetting: readMotionSetting(),
     performanceLimited: limits.length > 0 && !ignorePerformance,
   };
   const previous = current.input;
@@ -238,6 +245,7 @@ function refresh(force = false): void {
     input.attention === previous.attention &&
     input.matchFocus === previous.matchFocus &&
     input.reducedMotion === previous.reducedMotion &&
+    input.motionSetting === previous.motionSetting &&
     input.performanceLimited === previous.performanceLimited &&
     ignorePerformance === current.ignorePerformance &&
     limits.join() === current.limits.join();
@@ -281,6 +289,10 @@ function attach(): () => void {
   window.addEventListener("pageshow", onChange);
   window.addEventListener("storage", onStorage);
   motion?.addEventListener?.("change", onChange);
+  // Le menu d'accessibilité change l'attribut de `<html>` sans rien publier :
+  // on l'observe plutôt que de lui faire connaître ce module.
+  const settings = new MutationObserver(onChange);
+  settings.observe(document.documentElement, { attributes: true, attributeFilter: ["data-a11y"] });
 
   return () => {
     document.removeEventListener("visibilitychange", onChange);
@@ -289,6 +301,7 @@ function attach(): () => void {
     window.removeEventListener("pageshow", onChange);
     window.removeEventListener("storage", onStorage);
     motion?.removeEventListener?.("change", onChange);
+    settings.disconnect();
     cancelSample();
     if (expiryTimer !== null) {
       clearTimeout(expiryTimer);

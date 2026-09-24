@@ -1,0 +1,172 @@
+/* Pile des notifications, en bas à gauche — **au-dessus** du bouton
+   d'accessibilité (`components/accessibility/AccessibilityMenu.module.css`),
+   qui occupe le coin : 24 px de marge + 54 px de bouton + 14 px d'écart.
+   Sa largeur s'arrête à la moitié de l'écran : la pastille de réouverture du
+   lancement de match (`MatchLaunchCenter`, en bas à droite, 84 px du bas)
+   occupe la même hauteur de l'autre côté, et la pile passerait dessus. */
+.stack {
+  position: fixed;
+  bottom: 92px;
+  left: 24px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: min(420px, calc(50vw - 40px));
+  pointer-events: none;
+}
+
+.toast {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  overflow: hidden;
+  padding: 10px 8px 12px 14px;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+  font-size: 14px;
+  line-height: 1.5;
+  pointer-events: auto;
+  animation: toastIn 0.18s ease-out;
+}
+
+/* Arrivée depuis le bord gauche, là où la pile est ancrée. */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.toast[data-type="error"] {
+  color: #ffd2db;
+  background: #2a0c13;
+  border: 1px solid rgba(255, 110, 130, 0.5);
+  --toast-accent: 255, 110, 130;
+}
+
+.toast[data-type="success"] {
+  color: #d6ffeb;
+  background: #0b2318;
+  border: 1px solid rgba(79, 224, 162, 0.45);
+  --toast-accent: 79, 224, 162;
+}
+
+.message {
+  flex: 1;
+  margin: 0;
+  padding-top: 3px;
+}
+
+.actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 2px;
+}
+
+/* 28 px : au-dessus des 24 px de la WCAG 2.5.8, sans épaissir la pile. */
+.action {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.8;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
+}
+
+.action:hover {
+  opacity: 1;
+  background: rgba(var(--toast-accent), 0.14);
+}
+
+.action:focus-visible {
+  opacity: 1;
+  outline: 2px solid rgb(var(--toast-accent));
+  outline-offset: 1px;
+}
+
+/* Le temps qui reste, en un trait qui se vide. Il s'arrête avec le décompte
+   (`data-paused`) : c'est ce qui dit, sans un mot, que la pause a pris. */
+.progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  background: rgba(var(--toast-accent), 0.7);
+  transform-origin: left center;
+  animation-name: toastDrain;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+
+.toast[data-paused] .progress {
+  animation-play-state: paused;
+}
+
+@keyframes toastDrain {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+/* Mouvement réduit : la barre se tait (le décompte, lui, continue — et se
+   suspend toujours au survol, au focus et au bouton pause). */
+@media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+
+  .progress {
+    display: none;
+  }
+
+  .action {
+    transition: none;
+  }
+}
+
+:global(:root[data-a11y~="motion"]) .progress {
+  display: none;
+}
+
+@media (forced-colors: active) {
+  .toast {
+    border-color: CanvasText;
+  }
+
+  .action:focus-visible {
+    outline-color: Highlight;
+  }
+}
+
+/* Sous 720 px la pile prend toute la largeur : elle monte donc au-dessus de
+   **tout** ce qui flotte en bas, pastille de lancement de match comprise
+   (84 px du bas + ~40 px de haut + 12 px d'écart). */
+@media (max-width: 720px) {
+  .stack {
+    left: 16px;
+    right: 16px;
+    bottom: 136px;
+    max-width: none;
+  }
+}

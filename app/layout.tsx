@@ -7,6 +7,7 @@ import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ClientPowerRoot } from "@/components/client-power-root";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
+import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
 import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -20,6 +21,7 @@ import {
   RECRUITMENT_MODAL_COOKIE,
   recruitmentDismissed,
 } from "@/lib/shared/recruitment";
+import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import { DEFAULT_SHARE_IMAGE } from "@/lib/shared/page-metadata";
 
@@ -144,11 +146,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // rappels de match : étranglée, à vol unique, jamais attendue — la page ne
   // doit ni ralentir ni tomber à cause du bot.
   void dispatchPrivacyChangeNotifications().catch(() => undefined);
+  // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
+  // quoi un contraste renforcé ferait d'abord clignoter la page dans ses
+  // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.
+  const a11ySettings = parseA11yCookie(cookieStore.get(A11Y_COOKIE)?.value);
 
   return (
-    <html lang="fr">
+    <html lang="fr" data-a11y={a11yAttribute(a11ySettings)}>
       <body style={FONT_VARIABLES}>
         <ToastProvider>
+          {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
+              réglages ne doit pas traverser toute la page pour les trouver. */}
+          <AccessibilityMenu initialSettings={a11ySettings} />
           <VisitTracker />
           <ClientPowerRoot />
           {/* Deux modales ne se superposent pas : tant qu'un choix de
