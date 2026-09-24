@@ -374,7 +374,7 @@ select {
   background: rgba(var(--search-color), 0.05);
   color: var(--text-0);
   padding: 9px 18px;
-  transition: border-color 0.18s ease, background 0.18s ease;
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   outline: none;
 }
 
@@ -382,9 +382,12 @@ select {
   color: var(--text-2);
 }
 
+/* Un anneau, pas seulement une bordure un peu plus opaque : ce seul
+   changement de teinte ne se voyait pas (WCAG 2.4.7 / 1.4.11). */
 .searchbar-input:focus {
   border-color: rgba(var(--search-color), 0.55);
   background: rgba(var(--search-color), 0.09);
+  box-shadow: 0 0 0 3px rgba(var(--search-color), 0.28);
 }
 
 .searchbar-btn {
@@ -1753,6 +1756,21 @@ html {
 @media (forced-colors: active) {
   .skip-link {
     border-color: CanvasText;
+  }
+}
+
+/* Champs de saisie en contrastes forcés : leur repère de focus est un
+   `box-shadow` (halo de `.field`, anneau de `.searchbar-input`), que le mode
+   supprime, et une bordure dont il impose la couleur — le champ focalisé ne se
+   distinguait plus des autres. L'`outline` native le remplace, peinte dans la
+   couleur système du focus. */
+@media (forced-colors: active) {
+  .field input:not([type="checkbox"]):not([type="radio"]):focus,
+  .field textarea:focus,
+  .field select:focus,
+  .searchbar-input:focus {
+    outline: 2px solid;
+    outline-offset: 2px;
   }
 }
 

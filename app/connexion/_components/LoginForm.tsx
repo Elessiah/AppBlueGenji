@@ -147,9 +147,6 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
-      {!consentGiven && (
-        <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
-      )}
       {oneTap && consentRead && consentGiven && (
         <GoogleOneTap clientId={oneTap.clientId} nonce={oneTap.nonce} redirect={redirect} />
       )}
@@ -336,6 +333,13 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
           </Link>
         </div>
       </CyberCard>
+      {/* Rendue **après** la carte : c'est une surcouche fixe, sa place dans le
+          document ne change rien à l'écran, mais elle fixe l'ordre des titres.
+          Placée en tête, son « Avant de continuer » (h2) précédait le h1
+          « Connexion » de la page (RGAA 9.1). */}
+      {!consentGiven && (
+        <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
+      )}
     </main>
   );
 }

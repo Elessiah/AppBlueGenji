@@ -65,6 +65,16 @@ function adHref(ad: RecruitmentAd): string {
 }
 
 /**
+ * Nom accessible du lien de la banderole : « Voir → » seul ne dit pas où il
+ * mène (WCAG 2.4.4), surtout lu hors contexte dans une liste de liens. Il
+ * **commence** par le mot affiché, sans quoi la commande vocale « cliquer sur
+ * Voir » ne le trouverait plus (WCAG 2.5.3).
+ */
+export function bannerLinkLabel(ad: Pick<RecruitmentAd, "title">): string {
+  return `Voir l'annonce : ${ad.title}`;
+}
+
+/**
  * Met en avant les annonces de recrutement selon leur **statut** : la modale
  * d'arrivée porte les prioritaires, la banderole discrète fait défiler
  * prioritaires et importantes. Les facultatives n'apparaissent qu'en page.
@@ -223,12 +233,12 @@ function RecruitmentBanner({
         // fragment que par `pushState`, qui n'émet aucun événement — la modale
         // de lecture ne s'ouvrirait pas. L'ancre native, elle, déclenche bien
         // `hashchange`.
-        <a href={`#${anchor}`} className={styles.bannerLink}>
-          Voir →
+        <a href={`#${anchor}`} className={styles.bannerLink} aria-label={bannerLinkLabel(ad)}>
+          Voir <span aria-hidden="true">→</span>
         </a>
       ) : (
-        <Link href={adHref(ad)} className={styles.bannerLink}>
-          Voir →
+        <Link href={adHref(ad)} className={styles.bannerLink} aria-label={bannerLinkLabel(ad)}>
+          Voir <span aria-hidden="true">→</span>
         </Link>
       )}
       {multiple && (

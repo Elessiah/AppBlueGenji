@@ -96,7 +96,11 @@ export default async function AssociationPage() {
                 </h1>
               </EditableCopy>
             </div>
-            <aside className={styles.heroSide}>
+            {/* Un `div` et non un `aside` : ces faits font partie de la section,
+                ils ne sont pas un contenu complémentaire à part — et un repère
+                `complementary` imbriqué dans `<main>` n'est pas au premier
+                niveau (RGAA 12.6). */}
+            <div className={styles.heroSide}>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
                   FONDÉE EN
@@ -115,7 +119,7 @@ export default async function AssociationPage() {
                 </span>
                 <span style={{ fontSize: 17 }}>Association loi 1901</span>
               </div>
-            </aside>
+            </div>
           </div>
         </section>
 
@@ -180,7 +184,7 @@ export default async function AssociationPage() {
                   : "Gratuit, sans engagement, sans limite de durée. Il suffit de créer un compte pour commencer."}
               </p>
             </div>
-            <aside className={styles.adhererSide}>
+            <div className={styles.adhererSide}>
               <div className={styles.adhererPerks}>
                 {[
                   ["00 €", "Cotisation"],
@@ -209,7 +213,7 @@ export default async function AssociationPage() {
                   </a>
                 </CyberButton>
               </div>
-            </aside>
+            </div>
           </div>
         </section>
 

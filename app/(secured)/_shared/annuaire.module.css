@@ -147,9 +147,20 @@
   background: var(--cyber-bg-1);
   transition: border-color 0.15s;
 }
+/* Le champ retire son outline : c'est la boîte qui signale le focus. À 6 %
+   d'opacité, l'anneau ne se voyait pas, et la bordure seule n'est qu'un trait
+   qui change de teinte (WCAG 2.4.7 / 1.4.11). */
 .search:focus-within {
-  border-color: rgba(var(--g-rgb, 90, 200, 255), 0.4);
-  box-shadow: 0 0 0 3px rgba(var(--g-rgb, 90, 200, 255), 0.06);
+  border-color: rgba(var(--g-rgb, 90, 200, 255), 0.55);
+  box-shadow: 0 0 0 3px rgba(var(--g-rgb, 90, 200, 255), 0.28);
+}
+/* Contrastes forcés : l'anneau (`box-shadow`) disparaît et la couleur de la
+   bordure est imposée — l'`outline` native prend le relais. */
+@media (forced-colors: active) {
+  .search:focus-within {
+    outline: 2px solid;
+    outline-offset: 2px;
+  }
 }
 .searchIcon {
   padding: 0 14px;

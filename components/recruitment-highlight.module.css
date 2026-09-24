@@ -108,8 +108,19 @@
   color: var(--ink-dim);
 }
 
+/* Cible d'au moins 24 px de haut (WCAG 2.5.8) : réduite à sa ligne de texte en
+   11 px, elle ne mesurait que 14 px — la plus petite de la banderole, à côté de
+   boutons de 24 px. La hauteur est prise sur le rembourrage de la banderole,
+   qui ne grandit donc pas. */
 .bannerLink {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-height: 24px;
+  padding: 0 6px;
+  margin: 0 -6px;
+  border-radius: var(--r-cy-sm, 8px);
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.14em;
