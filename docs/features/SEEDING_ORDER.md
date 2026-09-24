@@ -92,15 +92,17 @@ Deux points de mise en œuvre qui ne se devinent pas :
 
 En `RANKING`, **avant le coup d'envoi** (masqué, annoncé, aux inscriptions ou
 inscriptions closes — `isPreLaunchState`), l'instantané range lui-même la liste
-dans l'ordre du classement du site (`registrationsFollowRanking` +
-`orderByRanking`, `lib/shared/seeding.ts`), par **le même chargeur** que
-l'aperçu du plateau et que le moteur au lancement (`loadEntrantsBySiteRanking`,
-lecture mutualisée) : chaque nouvelle inscrite prend sa place de cote au lieu de
+dans l'ordre du classement du site (`registrationsFollowRanking`,
+`lib/shared/seeding.ts`), par **le même tri** que l'aperçu du plateau et que le
+moteur au lancement : `rankEntrantsBySiteRanking`, celui que
+`loadEntrantsBySiteRanking` applique après sa lecture des inscriptions, appelé
+ici sur les lignes que l'instantané a déjà en main (lecture mutualisée du
+classement). Chaque nouvelle inscrite prend sa place de cote au lieu de
 s'ajouter en queue, et les rangs affichés sont renumérotés de 1 à N. La colonne
 `seed` n'est pas réécrite — le classement peut encore bouger d'ici le lancement
 (matchs d'autres tournois), c'est donc une **lecture**, refaite à chaque
-instantané. Une inscrite absente du classement (inscrite entre les deux
-lectures) reste en fin de liste plutôt que de disparaître. Corollaire utile : le
+instantané ; le battement d'entretien de la salle (30 s) rattrape une cote qui
+bouge ailleurs. Corollaire utile : le
 premier geste du staff part de cet ordre, un déplacement ne jette donc pas le
 classement pour revenir à l'ordre d'arrivée. Le bloc le dit, et rappelle que
 réordonner fige l'ordre.

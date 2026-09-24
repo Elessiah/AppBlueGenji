@@ -32,8 +32,8 @@ import { cached, invalidateCached } from "@/lib/server/cache";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { toIso } from "@/lib/server/serialization";
 import { isSoloTournament } from "@/lib/shared/participants";
-import { orderByRanking, registrationsFollowRanking, seedingSource } from "@/lib/shared/seeding";
-import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
+import { registrationsFollowRanking, seedingSource } from "@/lib/shared/seeding";
+import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { mapCard, mapMatch, type TournamentRow } from "./_internal";
 import {
   getMatchRows,
@@ -269,16 +269,16 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
 
     // Avant le coup d'envoi d'un tournoi seedé par le classement du site, la
     // liste des inscrites **est** ce classement : chaque nouvelle engagée y
-    // prend sa place de cote, et non la dernière. Même chargeur que l'aperçu du
-    // plateau et que le moteur au lancement — lecture mutualisée
-    // (`transactional: false`), l'instantané n'écrivant rien. Le rang affiché
-    // est renuméroté de 1 à N, comme celui de l'aperçu.
+    // prend sa place de cote, et non la dernière. Même tri que l'aperçu du
+    // plateau et que le moteur au lancement (`rankEntrantsBySiteRanking`, que
+    // `loadEntrantsBySiteRanking` appelle), sur les lignes déjà lues — lecture
+    // mutualisée (`transactional: false`), l'instantané n'écrivant rien. Le
+    // rang affiché est renuméroté de 1 à N, comme celui de l'aperçu. Une cote
+    // qui bouge ailleurs (score d'un autre tournoi) est rattrapée par le
+    // battement d'entretien de la salle, qui relit l'instantané.
     const orderedRegistrations = registrationsFollowRanking(source, card.state)
-      ? orderByRanking(
-          registrationRows,
-          (await loadEntrantsBySiteRanking(connection, tournamentId, { transactional: false })).map(
-            (entrant) => entrant.teamId,
-          ),
+      ? (
+          await rankEntrantsBySiteRanking(connection, registrationRows, { transactional: false })
         ).map((row, index) => ({ ...row, seed: index + 1 }))
       : registrationRows;
 

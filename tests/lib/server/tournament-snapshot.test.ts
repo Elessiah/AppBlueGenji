@@ -41,7 +41,7 @@ import { getDatabase } from "@/lib/server/database";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
 import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie";
-import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
+import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { clearCache } from "@/lib/server/cache";
 import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
 import { fakePool } from "../../helpers/sql-double";
@@ -343,11 +343,10 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
   beforeEach(() => {
     jest.mocked(getRegistrationRows).mockResolvedValue(arrivals);
     // Classement du site : Gamma, Alpha, Beta.
-    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue([
-      { teamId: 3, teamName: "Gamma" },
-      { teamId: 1, teamName: "Alpha" },
-      { teamId: 2, teamName: "Beta" },
-    ]);
+    const rank: Record<string, number> = { Gamma: 0, Alpha: 1, Beta: 2 };
+    jest.mocked(rankEntrantsBySiteRanking).mockImplementation(async (_connection, entrants) =>
+      [...entrants].sort((a, b) => rank[a.teamName] - rank[b.teamName]),
+    );
   });
 
   const order = (snapshot: Awaited<ReturnType<typeof getTournamentSnapshot>>) =>
@@ -372,9 +371,13 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
     // tout `bg_matches` à chaque construction.
     // Double partiel de connexion : Jest 30 confronte les arguments à la
     // signature simulée, d'où le `as never` (cf. CLAUDE.md, « Tests »).
-    expect(loadEntrantsBySiteRanking).toHaveBeenCalledWith(connection as never, TOURNAMENT_ID, {
-      transactional: false,
-    });
+    // Les lignes déjà lues sont triées telles quelles : pas de seconde lecture
+    // des inscriptions.
+    expect(rankEntrantsBySiteRanking).toHaveBeenCalledWith(
+      connection as never,
+      expect.arrayContaining([expect.objectContaining({ teamName: "Alpha" })]),
+      { transactional: false },
+    );
   });
 
   it("garde l'ordre d'arrivée d'un format à plateau", async () => {
@@ -387,7 +390,7 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
       ["Beta", 2],
       ["Gamma", 3],
     ]);
-    expect(loadEntrantsBySiteRanking).not.toHaveBeenCalled();
+    expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
   });
 
   it("garde l'ordre saisi par le staff", async () => {
@@ -397,7 +400,7 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
 
     expect(snapshot?.seedingSource).toBe("MANUAL");
     expect(order(snapshot)?.map(([name]) => name)).toEqual(["Alpha", "Beta", "Gamma"]);
-    expect(loadEntrantsBySiteRanking).not.toHaveBeenCalled();
+    expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
   });
 
   it("ne suit plus le classement une fois le tournoi lancé", async () => {
@@ -407,23 +410,6 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
     expect(order(snapshot)?.map(([name]) => name)).toEqual(["Alpha", "Beta", "Gamma"]);
-    expect(loadEntrantsBySiteRanking).not.toHaveBeenCalled();
-  });
-
-  it("garde en fin de liste une inscrite que le classement n'a pas encore vue", async () => {
-    // Inscrite entre les deux lectures : elle ne doit pas disparaître.
-    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue([
-      { teamId: 2, teamName: "Beta" },
-      { teamId: 1, teamName: "Alpha" },
-    ]);
-    preLaunch("BG_SURVIE");
-
-    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
-
-    expect(order(snapshot)).toEqual([
-      ["Beta", 1],
-      ["Alpha", 2],
-      ["Gamma", 3],
-    ]);
+    expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
   });
 });

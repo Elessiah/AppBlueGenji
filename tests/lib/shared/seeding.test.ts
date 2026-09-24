@@ -6,7 +6,6 @@ import {
   isSeedOrderEffective,
   isValidSeedOrder,
   moveInOrder,
-  orderByRanking,
   registrationsFollowRanking,
   seedingLockReason,
   SEEDING_SOURCE_LABELS,
@@ -197,45 +196,5 @@ describe("registrationsFollowRanking", () => {
   it("ne le suit jamais quand l'ordre vient du staff ou des inscriptions", () => {
     expect(registrationsFollowRanking("MANUAL", "REGISTRATION")).toBe(false);
     expect(registrationsFollowRanking("REGISTRATION", "REGISTRATION")).toBe(false);
-  });
-});
-
-describe("orderByRanking", () => {
-  const rows = [
-    { teamId: 1, name: "Alpha" },
-    { teamId: 2, name: "Beta" },
-    { teamId: 3, name: "Gamma" },
-  ];
-
-  it("range les inscriptions dans l'ordre du classement", () => {
-    expect(orderByRanking(rows, [3, 1, 2]).map((row) => row.name)).toEqual([
-      "Gamma",
-      "Alpha",
-      "Beta",
-    ]);
-  });
-
-  it("place une nouvelle inscrite à son rang de cote, pas en dernier", () => {
-    const withNewcomer = [...rows, { teamId: 4, name: "Delta" }];
-    expect(orderByRanking(withNewcomer, [3, 4, 1, 2]).map((row) => row.name)).toEqual([
-      "Gamma",
-      "Delta",
-      "Alpha",
-      "Beta",
-    ]);
-  });
-
-  it("garde après les classées, dans leur ordre relatif, les inscrites absentes du classement", () => {
-    expect(orderByRanking(rows, [2]).map((row) => row.name)).toEqual(["Beta", "Alpha", "Gamma"]);
-  });
-
-  it("ignore un identifiant classé qui n'est pas inscrit, sans muter l'entrée", () => {
-    const input = [...rows];
-    expect(orderByRanking(input, [99, 2, 3, 1]).map((row) => row.name)).toEqual([
-      "Beta",
-      "Gamma",
-      "Alpha",
-    ]);
-    expect(input).toEqual(rows);
   });
 });

@@ -79,29 +79,6 @@ export function registrationsFollowRanking(
   return source === "RANKING" && isPreLaunchState(state);
 }
 
-/**
- * Range des inscriptions dans l'ordre du classement du site.
- *
- * `rankedTeamIds` vient de `loadEntrantsBySiteRanking`, qui relit lui-même les
- * inscriptions : une engagée qui en serait absente (inscrite entre les deux
- * lectures) garde sa place relative, **après** les classées, plutôt que de
- * disparaître de la liste.
- */
-export function orderByRanking<T extends { teamId: number }>(
-  rows: readonly T[],
-  rankedTeamIds: readonly number[],
-): T[] {
-  const position = new Map(rankedTeamIds.map((teamId, index) => [teamId, index]));
-  return rows
-    .map((row, index) => ({ row, index }))
-    .sort((a, b) => {
-      const pa = position.get(a.row.teamId) ?? rankedTeamIds.length + a.index;
-      const pb = position.get(b.row.teamId) ?? rankedTeamIds.length + b.index;
-      return pa - pb;
-    })
-    .map(({ row }) => row);
-}
-
 export type SeedingEntry = {
   teamId: number;
   teamName: string;
