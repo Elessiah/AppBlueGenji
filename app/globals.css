@@ -1625,7 +1625,8 @@ input[type="radio"]:disabled:checked {
    juste. Le mode force la `background-color` mais **pas** l'image de fond, si
    bien qu'une coche presque noire se retrouverait sur un fond noir imposé —
    cochée et décochée deviennent alors indiscernables. L'anneau de focus étant
-   un `box-shadow`, lui aussi supprimé, l'`outline` native le remplace. */
+   un `box-shadow`, lui aussi supprimé, l'`outline` le remplace — par la règle
+   globale sur `:focus-visible`, plus bas, qui vaut pour tout élément. */
 @media (forced-colors: active) {
   input[type="checkbox"],
   input[type="radio"] {
@@ -1664,12 +1665,6 @@ input[type="radio"]:disabled:checked {
   input[type="checkbox"]:checked,
   input[type="radio"]:checked {
     background-image: none;
-  }
-
-  input[type="checkbox"]:focus-visible,
-  input[type="radio"]:focus-visible {
-    outline: 2px solid;
-    outline-offset: 2px;
   }
 }
 
