@@ -50,7 +50,12 @@ export { deleteTournament } from "./deletion";
 export type { DeletedTournament } from "./deletion";
 
 // Notifications
-export { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent } from "./notifications";
+export {
+  publishMatchUpdatedEvent,
+  publishUpdatedEvent,
+  publishScoreReportedEvent,
+  publishScoreResolvedEvent,
+} from "./notifications";
 
 // Journal Discord (voir ./bot-logs)
 export { queueBotLog, flushBotLogs, discardBotLogs } from "./bot-logs";
@@ -160,7 +165,12 @@ import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
 import { loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
-import { publishUpdatedEvent, publishScoreReportedEvent, publishScoreResolvedEvent } from "./notifications";
+import {
+  publishMatchUpdatedEvent,
+  publishUpdatedEvent,
+  publishScoreReportedEvent,
+  publishScoreResolvedEvent,
+} from "./notifications";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "./bot-logs";
 import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
@@ -211,6 +221,7 @@ async function syncVisibleTournaments(): Promise<void> {
     const db = await getDatabase();
     const connection = await db.getConnection();
     const changedIds: number[] = [];
+    const launchIds: number[] = [];
 
     try {
       // Hors transaction : c'est une lecture de repérage, et l'ouvrir dans une
@@ -220,7 +231,7 @@ async function syncVisibleTournaments(): Promise<void> {
       for (const tournamentId of candidates) {
         try {
           await connection.beginTransaction();
-          const { stateChanged, contentChanged } = await syncTournamentState(
+          const { stateChanged, contentChanged, launchesChanged } = await syncTournamentState(
             connection,
             tournamentId,
           );
@@ -232,6 +243,9 @@ async function syncVisibleTournaments(): Promise<void> {
           // publication reste **après le commit** — c'est tout l'objet de ce
           // retour plutôt qu'un événement publié depuis le fond du moteur.
           if (stateChanged || contentChanged) changedIds.push(tournamentId);
+          // Un lancement ne concerne que le plateau de ce tournoi : ni la liste,
+          // ni la vitrine, ni le classement n'ont à être vidés pour lui.
+          else if (launchesChanged) launchIds.push(tournamentId);
         } catch {
           await connection.rollback().catch(() => undefined);
         } finally {
@@ -244,6 +258,9 @@ async function syncVisibleTournaments(): Promise<void> {
 
     for (const id of changedIds) {
       publishUpdatedEvent(id);
+    }
+    for (const id of launchIds) {
+      publishMatchUpdatedEvent(id);
     }
   })();
 
