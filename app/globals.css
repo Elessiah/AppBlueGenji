@@ -1374,6 +1374,27 @@ html {
   }
 }
 
+/* Pastille « Urgente » d'une annonce prioritaire (`components/recruitment/UrgentPill.tsx`) :
+   la pastille entière clignote, pas seulement son point. L'essentiel du cycle
+   est à pleine opacité — figée par le régime de charge, elle a toutes les
+   chances de l'être lisible —, et une période de 1,4 s reste loin des trois
+   éclats par seconde de WCAG 2.3.1. */
+.pill-urgent {
+  animation: pill-urgent-blink 1.4s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+@keyframes pill-urgent-blink {
+  0%,
+  55%,
+  100% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.45;
+  }
+}
+
 .pill-blue {
   color: var(--blue-300);
   border-color: rgba(90, 200, 255, 0.3);

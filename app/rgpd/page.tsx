@@ -244,11 +244,13 @@ export default function RgpdPage() {
             </li>
             <li>
               <strong>bg_recr_modal</strong> et <strong>bg_recr_banner</strong> — déposés
-              uniquement <strong>si vous fermez une annonce de recrutement</strong> mise en
-              avant, pour ne pas vous la réafficher. Ils ne contiennent que le numéro de
-              l'annonce concernée, jamais d'identifiant de personne : ils ne permettent ni de
-              vous reconnaître, ni de vous suivre d'un site à l'autre (sameSite=strict). Le
-              premier dure sept jours, le second le temps de votre visite.
+              uniquement <strong>quand la fenêtre des annonces de recrutement urgentes vous
+              est montrée</strong> (le premier) ou <strong>si vous fermez la banderole de
+              recrutement</strong> (le second), pour ne pas vous les réafficher. Ils ne
+              contiennent que les numéros des annonces concernées, jamais d'identifiant de
+              personne : ils ne permettent ni de vous reconnaître, ni de vous suivre d'un site
+              à l'autre (sameSite=strict). Le premier dure sept jours, le second le temps de
+              votre visite.
             </li>
             <li>
               <strong>bg_a11y</strong> — déposé uniquement <strong>si vous activez un réglage

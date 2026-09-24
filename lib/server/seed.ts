@@ -364,9 +364,11 @@ const FICTIONAL_SPONSORS = [
 ];
 
 // Annonces de recrutement : couvre l'aperçu tronqué des longues descriptions
-// (le cas qui a motivé la modale de lecture), les deux modes de mise en avant,
-// le cas « plusieurs annonces urgentes » — une seule est servie, les autres
-// attendent leur tour — et le brouillon inactif.
+// (le cas qui a motivé la modale de lecture), les trois statuts, le cas
+// « plusieurs prioritaires » — une seule modale qui se feuillette, et une
+// banderole qui défile —, le brouillon inactif, et une facultative placée en
+// tête de l'ordre d'affichage : le tri par statut doit la ranger malgré tout
+// sous « Autres recrutements ».
 const FICTIONAL_RECRUITMENT_ADS = [
   {
     title: "Test - BlueGenji recrute des Admins",
@@ -378,7 +380,7 @@ const FICTIONAL_RECRUITMENT_ADS = [
     contact_discord: "recrutement_bg",
     contact_discord_id: "123456789012345678",
     contact_preferred: "DISCORD" as const,
-    highlight: "MODAL" as const,
+    priority: "PRIORITY" as const,
     active: 1,
   },
   {
@@ -391,8 +393,8 @@ const FICTIONAL_RECRUITMENT_ADS = [
     contact_discord: DISCORD_INVITE_URL,
     contact_discord_id: null,
     contact_preferred: "LINK" as const,
-    // Deuxième « modale à l'arrivée » : masquée par celle du dessus.
-    highlight: "MODAL" as const,
+    // Deuxième prioritaire : seconde page de la modale d'arrivée.
+    priority: "PRIORITY" as const,
     active: 1,
   },
   {
@@ -405,8 +407,8 @@ const FICTIONAL_RECRUITMENT_ADS = [
     contact_discord: "arbitrage_bg",
     contact_discord_id: null,
     contact_preferred: "AUTO" as const,
-    // Troisième mise en avant, en banderole : masquée elle aussi.
-    highlight: "BANNER" as const,
+    // Importante : banderole seulement, sans pastille « Urgente ».
+    priority: "IMPORTANT" as const,
     active: 1,
   },
   {
@@ -420,7 +422,7 @@ const FICTIONAL_RECRUITMENT_ADS = [
     contact_discord: null,
     contact_discord_id: null,
     contact_preferred: "AUTO" as const,
-    highlight: "NONE" as const,
+    priority: "OPTIONAL" as const,
     active: 1,
   },
   {
@@ -433,8 +435,8 @@ const FICTIONAL_RECRUITMENT_ADS = [
     contact_discord: null,
     contact_discord_id: null,
     contact_preferred: "AUTO" as const,
-    // Brouillon urgent : inactif, donc jamais mis en avant.
-    highlight: "MODAL" as const,
+    // Brouillon prioritaire : inactif, donc jamais mis en avant.
+    priority: "PRIORITY" as const,
     active: 0,
   },
 ];
@@ -807,7 +809,7 @@ async function createRecruitmentAds(db: Pool): Promise<void> {
       await db.execute(
         `INSERT INTO bg_recruitment_ads
            (title, team_name, domain, roles, body, contact_url, contact_discord,
-            contact_discord_id, contact_preferred, highlight, active, display_order)
+            contact_discord_id, contact_preferred, priority, active, display_order)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           ad.title,
@@ -819,18 +821,21 @@ async function createRecruitmentAds(db: Pool): Promise<void> {
           ad.contact_discord,
           ad.contact_discord_id,
           ad.contact_preferred,
-          ad.highlight,
+          ad.priority,
           ad.active,
-          (i + 1) * 10,
+          // La facultative passe en tête de l'ordre brut (voir plus haut).
+          ad.priority === "OPTIONAL" ? 0 : (i + 1) * 10,
         ]
       );
     } catch (error) {
       console.error(`  \u2717 ${ad.title}:`, (error as Error).message);
     }
   }
-  const urgent = FICTIONAL_RECRUITMENT_ADS.filter((a) => a.active === 1 && a.highlight !== "NONE");
+  const published = FICTIONAL_RECRUITMENT_ADS.filter((a) => a.active === 1);
+  const count = (priority: string) => published.filter((a) => a.priority === priority).length;
   console.log(
-    `  \u2713 ${FICTIONAL_RECRUITMENT_ADS.length} annonces créées (dont 1 brouillon · ${urgent.length} urgentes, 1 seule réellement mise en avant)`
+    `  ✓ ${FICTIONAL_RECRUITMENT_ADS.length} annonces créées (dont 1 brouillon · ` +
+      `${count("PRIORITY")} prioritaires, ${count("IMPORTANT")} importante, ${count("OPTIONAL")} facultative)`
   );
 }
 
@@ -1797,7 +1802,7 @@ async function seed(db: Pool): Promise<void> {
   console.log(`  · ${userIds.length} joueurs + ${specialUserIds.size} comptes de test (Test_*)`);
   console.log(`  · ${teamIds.length} équipes (Test - *), dont solo / staff / roster complet`);
   console.log(`  · ${FICTIONAL_SPONSORS.length} sponsors (dont 1 inactif) · ${FICTIONAL_BUREAU.length} membres du bureau`);
-  console.log(`  · ${FICTIONAL_RECRUITMENT_ADS.length} annonces de recrutement (longues descriptions, mises en avant concurrentes, brouillon)`);
+  console.log(`  · ${FICTIONAL_RECRUITMENT_ADS.length} annonces de recrutement (longues descriptions, trois statuts, plusieurs prioritaires, brouillon)`);
   console.log(`  · ${TOURNAMENTS.length} tournois :`);
   console.log(`    - états : ${byState("UPCOMING")} à venir · ${byState("REGISTRATION")} inscriptions · ${byState("RUNNING")} en cours · ${byState("FINISHED")} terminés`);
   console.log(`    - formats : ${byFormat("SINGLE")} simple · ${byFormat("DOUBLE")} double · ${byFormat("SWISS")} suisse · ${byFormat("SURVIVAL")} survie · ${byFormat("MULTI")} multi-phase · ${byFormat("BG_SURVIE")} BG Survie`);

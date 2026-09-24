@@ -954,13 +954,12 @@ async function runMigrations(db: Pool): Promise<void> {
       contact_discord VARCHAR(120) NULL,
       contact_discord_id VARCHAR(32) NULL,
       contact_preferred ENUM('AUTO', 'DISCORD', 'LINK') NOT NULL DEFAULT 'AUTO',
-      highlight ENUM('NONE', 'BANNER', 'MODAL') NOT NULL DEFAULT 'NONE',
+      priority ENUM('PRIORITY', 'IMPORTANT', 'OPTIONAL') NOT NULL DEFAULT 'OPTIONAL',
       active TINYINT(1) NOT NULL DEFAULT 1,
       display_order INT NOT NULL DEFAULT 100,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-      INDEX idx_bg_recruitment_active_order (active, display_order),
-      INDEX idx_bg_recruitment_highlight (highlight)
+      INDEX idx_bg_recruitment_active_order (active, display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -1103,6 +1102,11 @@ async function runMigrations(db: Pool): Promise<void> {
     `ALTER TABLE bg_matches ADD COLUMN caster_ready_at DATETIME NULL AFTER team2_ready_at`,
     // Lien YouTube de la rediff d'un match terminé (`lib/shared/match-replay.ts`).
     `ALTER TABLE bg_matches ADD COLUMN replay_url VARCHAR(255) NULL AFTER live_started_at`,
+    // Statut d'importance d'une annonce de recrutement, qui remplace la mise en
+    // avant `highlight` (report et retrait de l'ancienne colonne plus bas).
+    `ALTER TABLE bg_recruitment_ads ADD COLUMN priority
+       ENUM('PRIORITY', 'IMPORTANT', 'OPTIONAL') NOT NULL DEFAULT 'OPTIONAL'
+       AFTER contact_preferred`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
@@ -1141,7 +1145,7 @@ async function runMigrations(db: Pool): Promise<void> {
   // **Un retrait de colonne ne se replie pas.** Une colonne qui part n'a aucune
   // contrepartie dans un `CREATE TABLE` : elle y est simplement absente, si bien
   // qu'une table neuve ne la porte jamais et qu'une base existante la garde pour
-  // toujours. Les trois ci-dessous restent donc ici quoi qu'il arrive ; les deux premières
+  // toujours. Les quatre ci-dessous restent donc ici quoi qu'il arrive ; les deux premières
   // disent la même chose : une adresse que plus personne ne lit.
   //
   // Celle des annonces de recrutement a perdu son lecteur quand le contact est
@@ -1233,6 +1237,47 @@ async function runMigrations(db: Pool): Promise<void> {
           fallbackError,
         );
       }
+    }
+  }
+
+  // La mise en avant d'une annonce de recrutement (`highlight` : `NONE` /
+  // `BANNER` / `MODAL`) est devenue un **statut d'importance** (`priority`,
+  // `lib/shared/recruitment.ts`) : modale → prioritaire, banderole → importante,
+  // rien → facultative (le défaut de la colonne, donc rien à écrire).
+  //
+  // Le report **consomme** sa source : `highlight` est remise à `NONE` dans la
+  // même instruction, après avoir été lue (MySQL affecte de gauche à droite).
+  // Si le `DROP` qui suit échouait, le report rejoué au démarrage suivant ne
+  // trouverait donc plus rien à faire, et ne pourrait pas écraser un statut
+  // choisi depuis par le staff. Une base neuve n'a jamais eu la colonne :
+  // l'`UPDATE` y bute sur une colonne inconnue, c'est la réussite attendue —
+  // à condition que l'inconnue soit bien `highlight` : si c'est `priority`
+  // (ajout refusé plus haut), la source est tout ce qui reste.
+  //
+  // Le `DROP` ne suit que si le report n'a pas échoué pour une autre raison :
+  // il emporterait la seule trace de ce qui était mis en avant.
+  let highlightCarriedOver = true;
+  try {
+    await db.execute(
+      `UPDATE bg_recruitment_ads
+       SET priority = CASE highlight WHEN 'MODAL' THEN 'PRIORITY' WHEN 'BANNER' THEN 'IMPORTANT' ELSE priority END,
+           highlight = 'NONE'
+       WHERE highlight <> 'NONE'`,
+    );
+  } catch (error) {
+    const sourceGone =
+      isUnknownColumnError(error) && String((error as Error).message).includes("'highlight'");
+    if (!sourceGone) {
+      highlightCarriedOver = false;
+      reportSchemaFailure(error, "UPDATE bg_recruitment_ads SET priority (report depuis highlight)");
+    }
+  }
+  const DROP_RECRUITMENT_HIGHLIGHT = "ALTER TABLE bg_recruitment_ads DROP COLUMN highlight";
+  if (highlightCarriedOver) {
+    try {
+      await db.execute(DROP_RECRUITMENT_HIGHLIGHT);
+    } catch (error) {
+      reportSchemaFailure(error, DROP_RECRUITMENT_HIGHLIGHT);
     }
   }
 

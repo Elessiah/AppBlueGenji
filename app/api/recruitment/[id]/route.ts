@@ -36,7 +36,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       contactDiscord: typeof body.contactDiscord === "string" ? body.contactDiscord : null,
       contactDiscordId: typeof body.contactDiscordId === "string" ? body.contactDiscordId : null,
       contactPreferred: typeof body.contactPreferred === "string" ? body.contactPreferred : undefined,
-      highlight: typeof body.highlight === "string" ? body.highlight : undefined,
+      priority: typeof body.priority === "string" ? body.priority : undefined,
       active: typeof body.active === "boolean" ? body.active : undefined,
     });
     return ok({ ad });

@@ -42,12 +42,41 @@
 }
 
 .bannerText {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  flex-wrap: wrap;
   min-width: 0;
   flex: 1;
+}
+
+/* Une annonce de la banderole. Remontée à chaque changement (`key`), elle
+   rejoue ce fondu court : le passage d'une annonce à l'autre se voit sans rien
+   faire bouger autour. */
+.bannerSlide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  /* Une seule ligne, à hauteur fixe : les annonces n'ont pas la même longueur,
+     et une banderole qui changerait de hauteur à chaque rotation ferait
+     sauter toute la page sous elle. Ce qui dépasse s'efface en « … ». */
+  flex-wrap: nowrap;
+  min-height: 24px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: bannerSlideIn 0.32s ease;
+}
+
+.bannerSlide > :first-child {
+  flex-shrink: 0;
+}
+
+@keyframes bannerSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .bannerTag {
@@ -63,9 +92,16 @@
   font-weight: 500;
   color: var(--ink);
   letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .bannerMeta {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -86,6 +122,24 @@
   color: var(--ink);
 }
 
+/* Parcours à la main : précédente, position, suivante, pause. */
+.bannerControls {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.bannerCount {
+  min-width: 30px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
+.bannerButton,
 .bannerClose {
   flex: 0 0 auto;
   width: 24px;
@@ -103,11 +157,13 @@
   transition: color 0.16s ease, border-color 0.16s ease;
 }
 
+.bannerButton:hover,
 .bannerClose:hover {
   color: var(--ink);
   border-color: var(--line-soft);
 }
 
+.bannerButton:focus-visible,
 .bannerClose:focus-visible,
 .bannerLink:focus-visible {
   outline: 2px solid var(--blue-500);
@@ -163,6 +219,13 @@
   }
 }
 
+.modalEyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 .modalTitle {
   margin: 8px 0 0;
   font-family: var(--font-sans);
@@ -190,6 +253,51 @@
   white-space: pre-wrap;
 }
 
+/* Plusieurs prioritaires : une seule modale, qui se feuillette. */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.pagerButton {
+  padding: 6px 10px;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+  background: transparent;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm, 8px);
+  cursor: pointer;
+  transition: color 0.16s ease, border-color 0.16s ease;
+}
+
+.pagerButton:hover {
+  color: var(--ink);
+  border-color: rgba(90, 200, 255, 0.4);
+}
+
+.pagerButton:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.pagerCount {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  color: var(--ink-dim);
+  text-align: center;
+  white-space: nowrap;
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;
@@ -198,9 +306,35 @@
   margin-top: 12px;
 }
 
+/* Sur un téléphone, deux rangées fixes : l'annonce sur toute la largeur, les
+   commandes en dessous, calées à droite. Sur une seule, les commandes ne
+   laissaient au titre que sa première lettre. La hauteur reste la même d'une
+   annonce à l'autre : chaque rangée tient sur une ligne. */
+@media (max-width: 640px) {
+  .banner {
+    flex-wrap: wrap;
+    gap: 4px 8px;
+    padding: 8px 12px;
+  }
+
+  .bannerDot,
+  .bannerMeta {
+    display: none;
+  }
+
+  .bannerText {
+    flex: 1 1 100%;
+  }
+
+  .bannerLink {
+    margin-left: auto;
+  }
+}
+
 /* Respecte la préférence système « animations réduites ». */
 @media (prefers-reduced-motion: reduce) {
   .bannerDot,
+  .bannerSlide,
   .modalOverlay,
   .modal {
     animation: none;
