@@ -31,7 +31,9 @@ test.describe("Compte vierge (authentifié, DEV_AUTH=fresh)", () => {
 
     await discordField.fill("genji_test#0001");
     await page.getByRole("button", { name: "Sauvegarder" }).click();
-    await expect(page.getByText("Profil mis à jour.")).toBeVisible();
+    // Le texte d'une notification figure aussi dans la zone d'annonce des
+    // lecteurs d'écran : on vise la pile visible.
+    await expect(page.getByRole("region", { name: "Notifications" }).getByText("Profil mis à jour.")).toBeVisible();
   });
 
   test("le bouton de suppression de compte est présent", async ({ page }) => {
@@ -44,7 +46,7 @@ test.describe("Compte vierge (authentifié, DEV_AUTH=fresh)", () => {
     await page.goto("/profil");
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: "Supprimer mon compte" }).click();
-    await expect(page.getByText(/Compte supprimé/)).toBeVisible();
+    await expect(page.getByRole("region", { name: "Notifications" }).getByText(/Compte supprimé/)).toBeVisible();
     await page.waitForURL("**/");
   });
 });

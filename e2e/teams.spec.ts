@@ -49,7 +49,11 @@ test.describe("Gestion d'équipe (authentifié)", () => {
     // Dissolution (propriétaire).
     page.on("dialog", (dialog) => dialog.accept());
     await page.getByRole("button", { name: /Dissoudre l'équipe/ }).click();
-    await expect(page.getByText(/Équipe dissoute\. Ses statistiques/)).toBeVisible();
+    // Le texte d'une notification figure aussi dans la zone d'annonce des
+    // lecteurs d'écran : on vise la pile visible.
+    await expect(
+      page.getByRole("region", { name: "Notifications" }).getByText(/Équipe dissoute\. Ses statistiques/),
+    ).toBeVisible();
     await page.waitForURL("**/equipes");
 
     // La fiche reste consultable mais affiche le bandeau « dissoute ».
