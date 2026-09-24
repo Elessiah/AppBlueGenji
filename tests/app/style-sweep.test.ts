@@ -148,10 +148,7 @@ describe("subjectCompound — l'élément que le sélecteur habille", () => {
 
 describe("cssRules — règles d'une feuille", () => {
   it("rend les règles d'un @media sans son en-tête, et découpe les listes", () => {
-    const css = "/* c */ .a, .b:focus { color: red; }
-@media (forced-colors: active) {
-  .c { outline: 0; }
-}";
+    const css = "/* c */ .a, .b:focus { color: red; }\n@media (forced-colors: active) {\n  .c { outline: 0; }\n}";
     expect(cssRules(css)).toEqual([
       { selectors: [".a", ".b:focus"], body: " color: red; " },
       { selectors: [".c"], body: " outline: 0; " },
