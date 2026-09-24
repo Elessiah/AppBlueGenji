@@ -10,6 +10,7 @@ import {
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   announceablePrivacyChanges,
   buildPrivacyChangesMessage,
+  privacyChangesForOneMessage,
   pendingPrivacyChanges,
   privacyDmBatch,
   settledPrivacyChanges,
@@ -24,7 +25,10 @@ import {
  * (`POST /internal/notify/dm`), aucune route nouvelle côté bot. Chaque compte
  * joignable reçoit **un** message par lot de changements qu'il n'a ni acceptés
  * ni déjà reçus : un joueur absent pendant trois changements en reçoit un seul
- * message qui les nomme tous les trois.
+ * message qui les nomme tous les trois. Quand ils ne tiennent pas tous sous le
+ * plafond du bot, le message nomme ce qui tient et le reste part au balayage
+ * suivant (`privacyChangesForOneMessage`) — jamais un changement seulement
+ * compté mais tenu pour annoncé.
  *
  * **Discord est le seul canal de l'association, il ne se spamme pas.** Le
  * message attend que le plus ancien changement dû ait une semaine
@@ -170,6 +174,8 @@ async function runSweep(now: Date): Promise<number> {
   // Un message par **ensemble** de changements : deux comptes qui ont les mêmes
   // à recevoir partagent un seul appel au bot.
   const groups = new Map<string, { changes: PrivacyChange[]; recipients: DiscordRecipient[]; userIds: number[] }>();
+  const siteUrl = siteBaseUrl();
+  const batchByDue = new Map<string, PrivacyChange[]>();
   for (const row of candidates) {
     const recipient = toRecipient(row);
     if (!recipient) continue;
@@ -181,7 +187,19 @@ async function runSweep(now: Date): Promise<number> {
       now,
     );
     if (due.length === 0) continue;
-    const reserved = await reserve(userId, due);
+    // Seulement ce qu'un message peut **nommer** : un changement réservé mais
+    // seulement compté (« … et 1 autre ») serait tenu pour annoncé sans que son
+    // titre ait été écrit. Le reste demeure dû et part au message suivant,
+    // donc après l'intervalle minimal (`PRIVACY_DM_MIN_INTERVAL_DAYS`).
+    // Calculé une fois par ensemble de changements dus : la plupart des comptes
+    // du lot ont le même.
+    const dueKey = due.map((change) => change.id).join("|");
+    let batch = batchByDue.get(dueKey);
+    if (!batch) {
+      batch = privacyChangesForOneMessage(due, siteUrl);
+      batchByDue.set(dueKey, batch);
+    }
+    const reserved = await reserve(userId, batch);
     if (reserved.length === 0) continue;
     const key = reserved.map((change) => change.id).join("|");
     const group = groups.get(key) ?? { changes: reserved, recipients: [], userIds: [] };
@@ -193,7 +211,7 @@ async function runSweep(now: Date): Promise<number> {
   let sent = 0;
   for (const group of groups.values()) {
     const report = await pushDiscordDirectMessages(
-      buildPrivacyChangesMessage(group.changes, siteBaseUrl()),
+      buildPrivacyChangesMessage(group.changes, siteUrl),
       group.recipients,
       "privacy-changes",
     );

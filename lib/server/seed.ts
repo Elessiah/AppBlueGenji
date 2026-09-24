@@ -166,6 +166,7 @@ interface SpecialUserDef {
     overwatch: 0 | 1;
     marvel: 0 | 1;
     major: 0 | 1;
+    discord: 0 | 1;
   }>;
   /** Ouvert au recrutement (défaut 0, comme la colonne) — 1 = free agent s'il est sans équipe. */
   openToRecruitment?: 0 | 1;
@@ -238,13 +239,13 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     pseudo: "ProfilPrive",
     purpose: "toutes les visibilités coupées",
     isAdult: 1,
-    visibility: { avatar: 0, overwatch: 0, marvel: 0, major: 0 },
+    visibility: { avatar: 0, overwatch: 0, marvel: 0, major: 0, discord: 0 },
   },
   {
     pseudo: "ProfilPublic",
     purpose: "toutes les visibilités actives, majorité affichée",
     isAdult: 1,
-    visibility: { avatar: 1, overwatch: 1, marvel: 1, major: 1 },
+    visibility: { avatar: 1, overwatch: 1, marvel: 1, major: 1, discord: 1 },
   },
   { pseudo: "Mineur", purpose: "compte mineur (is_adult = 0)", isAdult: 0 },
   { pseudo: "AgeInconnu", purpose: "majorité non renseignée (is_adult NULL)", isAdult: null },
@@ -278,6 +279,22 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     discordId: "900000000000000003",
     discordTag: "tag_prouve",
     discordVerified: true,
+  },
+  {
+    pseudo: "DiscordVisible",
+    purpose: "tag Discord certifié et rendu visible (lisible de tout joueur connecté)",
+    isAdult: 1,
+    discordId: "900000000000000010",
+    discordTag: "tag_visible",
+    discordVerified: true,
+    visibility: { discord: 1 },
+  },
+  {
+    pseudo: "DiscordVisibleNonCertifie",
+    purpose: "case « Tag Discord » cochée sur un tag non certifié (reste masqué de tous)",
+    isAdult: 1,
+    discordTag: "tag_visible_non_prouve",
+    visibility: { discord: 1 },
   },
   {
     pseudo: "CompteSupprime",
@@ -576,6 +593,8 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
       overwatch: def.visibility?.overwatch ?? 1,
       marvel: def.visibility?.marvel ?? 1,
       major: def.visibility?.major ?? 0,
+      // Défaut de la colonne : l'exposition du tag est un choix.
+      discord: def.visibility?.discord ?? 0,
     };
     const withTags = def.withGameTags !== false;
 
@@ -584,9 +603,9 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
         `INSERT INTO bg_users
          (pseudo, discord_id, discord_pseudo, discord_verified_at,
           blizzard_sub, overwatch_battletag, marvel_rivals_tag,
-          visible_avatar, visible_overwatch, visible_marvel, visible_major,
+          visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
           open_to_recruitment, is_adult, is_admin, is_deleted, platform_roles_json)
-         VALUES (?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ${def.discordVerified ? "NOW()" : "NULL"}, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         [
           pseudo,
           def.discordId ?? null,
@@ -598,6 +617,7 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
           visibility.overwatch,
           visibility.marvel,
           visibility.major,
+          visibility.discord,
           def.openToRecruitment ?? 0,
           def.isAdult === undefined ? 1 : def.isAdult,
           def.isAdmin ? 1 : 0,

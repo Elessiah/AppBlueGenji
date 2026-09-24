@@ -34,6 +34,9 @@ import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/up
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_NO_TAG,
+  DISCORD_PLAYER_VISIBILITY_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_PENDING,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
   GAME_TAG_NOTICE,
 } from "@/lib/shared/identity-sharing";
@@ -64,6 +67,7 @@ const VISIBILITY_LABELS: Record<string, string> = {
   avatar: "Avatar",
   overwatch: "BattleTag OW",
   marvel: "Tag Marvel",
+  discord: "Tag Discord",
   major: "Majorité",
 };
 
@@ -115,6 +119,7 @@ export default function ProfilePage() {
     avatar: false,
     overwatch: false,
     marvel: false,
+    discord: false,
     major: false,
   });
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -232,6 +237,7 @@ export default function ProfilePage() {
         avatar: !!v.avatar,
         overwatch: !!v.overwatch,
         marvel: !!v.marvel,
+        discord: !!v.discord,
         major: !!v.major,
       });
     };
@@ -910,8 +916,14 @@ export default function ProfilePage() {
             </div>
             <p className={s.hint}>
               Ton pseudo reste toujours visible : c&apos;est lui qui t&apos;identifie dans les
-              brackets, les rosters et les feuilles de match. Ton tag Discord, lui, ne suit
-              pas ces réglages — il a les siens, ci-dessus.
+              brackets, les rosters et les feuilles de match. {DISCORD_PLAYER_VISIBILITY_NOTICE}
+              {/* Seulement sur un état **lu** (`linked` n'est plus `null`) :
+                  avant la lecture, ou quand elle échoue, `verified` vaut
+                  `false` par défaut et l'avertissement accuserait à tort un
+                  joueur certifié. */}
+              {visibility.discord && discordState.linked !== null && !discordState.verified
+                ? ` ${discordState.tag ? DISCORD_PLAYER_VISIBILITY_PENDING : DISCORD_PLAYER_VISIBILITY_NO_TAG}`
+                : null}
             </p>
           </div>
 

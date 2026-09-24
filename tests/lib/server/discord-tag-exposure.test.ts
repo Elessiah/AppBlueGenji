@@ -175,6 +175,8 @@ describe("deleteOwnAccount — anonymisation", () => {
     const update = find(queries, "UPDATE bg_users")!;
     expect(update.sql).toContain("discord_pseudo = NULL");
     expect(update.sql).toContain("discord_verified_at = NULL");
+    // Le réglage part avec le tag : un compte anonymisé n'a rien à publier.
+    expect(update.sql).toContain("visible_discord = 0");
   });
 
   it("garde la ligne d'un compte qui a joué", async () => {
@@ -398,6 +400,83 @@ describe("getFullProfile — ce qui sort du tag", () => {
 
     // Le tag, lui, reste filtré : c'est la coordonnée, pas l'état.
     expect(profile?.profile.discordPseudo).toBeNull();
+  });
+
+  it("rend le tag certifié à tout joueur quand le titulaire l'a rendu visible", async () => {
+    const { queries } = profileDb(userRow({ visible_discord: 1 }));
+
+    const profile = await getFullProfile({ id: 99, roles: [] }, 7);
+
+    expect(profile?.profile.discordPseudo).toBe("keryan");
+    expect(profile?.profile.visibility.discord).toBe(true);
+    // Aucune question de tournoi : le réglage suffit à la réponse.
+    expect(find(queries, "FROM bg_tournament_registrations r")).toBeUndefined();
+  });
+
+  it("n'interroge pas les tournois pour l'arbitre quand le tag est déjà visible", async () => {
+    const { queries } = profileDb(userRow({ visible_discord: 1 }), false);
+
+    const profile = await getFullProfile({ id: 99, roles: ["ARBITRE"] }, 7);
+
+    expect(profile?.profile.discordPseudo).toBe("keryan");
+    expect(find(queries, "FROM bg_tournament_registrations r")).toBeUndefined();
+  });
+
+  it("ne publie jamais un tag non certifié, case cochée ou non", async () => {
+    profileDb(userRow({ visible_discord: 1, discord_verified_at: null }));
+
+    const profile = await getFullProfile({ id: 99, roles: [] }, 7);
+
+    expect(profile?.profile.discordPseudo).toBeNull();
+    expect(profile?.profile.discordVerified).toBe(false);
+  });
+
+  it("garde le tag masqué quand la case est décochée", async () => {
+    profileDb(userRow({ visible_discord: 0 }));
+
+    const profile = await getFullProfile({ id: 99, roles: [] }, 7);
+
+    expect(profile?.profile.discordPseudo).toBeNull();
+    expect(profile?.profile.visibility.discord).toBe(false);
+  });
+});
+
+describe("updateOwnProfile — la case « Tag Discord »", () => {
+  const ASSIGNMENT = "visible_discord = COALESCE(?, visible_discord)";
+
+  /**
+   * Le paramètre lié à l'affectation, retrouvé en comptant les `?` qui la
+   * précèdent dans la requête : un indice écrit à la main se décalerait sans
+   * bruit au premier champ ajouté devant ou derrière.
+   */
+  function visibleDiscordParam(update: Query): unknown {
+    const at = update.sql.indexOf(ASSIGNMENT);
+    expect(at).toBeGreaterThanOrEqual(0);
+    return update.params[(update.sql.slice(0, at).match(/\?/g) ?? []).length];
+  }
+
+  it("écrit le réglage par COALESCE, comme ses voisins", async () => {
+    const { queries } = fakeDb();
+
+    await updateOwnProfile(7, { visibility: { discord: true } });
+
+    expect(visibleDiscordParam(find(queries, "UPDATE bg_users")!)).toBe(true);
+  });
+
+  it("écrit aussi le décochage — `false` n'est pas une absence", async () => {
+    const { queries } = fakeDb();
+
+    await updateOwnProfile(7, { visibility: { discord: false } });
+
+    expect(visibleDiscordParam(find(queries, "UPDATE bg_users")!)).toBe(false);
+  });
+
+  it("ne touche pas au réglage quand le patch n'en parle pas", async () => {
+    const { queries } = fakeDb();
+
+    await updateOwnProfile(7, { visibility: { avatar: true } });
+
+    expect(visibleDiscordParam(find(queries, "UPDATE bg_users")!)).toBeNull();
   });
 });
 

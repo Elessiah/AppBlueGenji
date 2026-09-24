@@ -35,7 +35,7 @@ export function publicUserProfile(overrides: Partial<PublicUserProfile> = {}): P
     overwatchBattletag: null,
     marvelRivalsTag: null,
     isAdult: true,
-    visibility: { avatar: true, overwatch: true, marvel: true, major: true },
+    visibility: { avatar: true, overwatch: true, marvel: true, major: true, discord: false },
     openToRecruitment: true,
     createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
