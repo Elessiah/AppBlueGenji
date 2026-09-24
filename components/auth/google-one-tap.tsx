@@ -5,10 +5,12 @@
  * `accounts.google.com/gsi/client` — chargé ici, jamais ailleurs, pour qu'il
  * n'y ait qu'un seul endroit à revoir si Google en change les termes.
  *
- * Le composant ne s'affiche que pour un visiteur **sans session** : c'est la
- * mise en page racine qui le décide (elle seule connaît `getCurrentUser()`) et
- * le rend, ou non — jamais un `if` côté client, qui laisserait le script
- * chargé pour rien à chaque visite d'un membre déjà connecté.
+ * Le composant n'est monté que par **`/connexion`**, pour un visiteur **sans
+ * session** et **après** son consentement (`app/connexion/_components/LoginForm.tsx`).
+ * Il était auparavant monté par la mise en page racine, donc chargé sur chaque
+ * page pour tout visiteur anonyme : Google recevait l'IP et la page consultée,
+ * et pouvait poser son cookie `g_state` sur notre domaine, sans que personne
+ * n'ait rien demandé. Ne pas le remonter ailleurs sans repasser par `/rgpd`.
  *
  * Le jeton (`credential`) que Google rend au navigateur est un JWT signé, pas
  * une preuve pour notre serveur : il doit être vérifié avant d'ouvrir quoi que
@@ -19,7 +21,6 @@ import Script from "next/script";
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
-import { safeRedirectPath } from "@/lib/shared/safe-redirect";
 
 type CredentialResponse = { credential?: string };
 
@@ -32,6 +33,7 @@ type GoogleAccountsId = {
     itp_support?: boolean;
   }) => void;
   prompt: () => void;
+  cancel: () => void;
 };
 
 declare global {
@@ -40,12 +42,26 @@ declare global {
   }
 }
 
-export function GoogleOneTap({ clientId, nonce }: { clientId: string; nonce?: string }) {
+export function GoogleOneTap({
+  clientId,
+  nonce,
+  redirect,
+}: {
+  clientId: string;
+  nonce?: string;
+  /** Destination d'après connexion, **déjà filtrée** par `safeRedirectPath`. */
+  redirect: string;
+}) {
   const router = useRouter();
+  // Relue au moment de la réponse de Google, pas figée à l'`initialize` : la
+  // page lit son `?redirect=` dans un effet, et l'invite ne s'initialise qu'une fois.
+  const redirectRef = useRef(redirect);
+  redirectRef.current = redirect;
   const { showError, showSuccess } = useToast();
   // Un seul `initialize` par montage : le script peut se recharger sur une
-  // navigation client sans que l'effet ne reparte, React 18 `StrictMode` en
-  // développement l'exécutant même deux fois pour un seul montage réel.
+  // navigation client sans que l'effet ne reparte. Le nettoyage le remet à
+  // `false` après avoir retiré l'invite, si bien que le second passage de
+  // `StrictMode` en développement la repose au lieu de la laisser retirée.
   const initialized = useRef(false);
 
   useEffect(() => {
@@ -80,11 +96,8 @@ export function GoogleOneTap({ clientId, nonce }: { clientId: string; nonce?: st
             }
 
             showSuccess("Connexion réussie via Google.");
-            // Sur `/connexion`, un `?redirect=` attend d'être honoré, comme pour
-            // les trois autres portes. Ailleurs, il n'y en a pas : on reste sur
-            // la page, `router.refresh()` suffisant à y refléter la session.
-            const redirectParam = new URLSearchParams(window.location.search).get("redirect");
-            if (redirectParam) router.push(safeRedirectPath(redirectParam));
+            // Même destination que les trois autres portes de la page.
+            router.push(redirectRef.current);
             router.refresh();
           } catch {
             // Échec réseau : même silence que la panne d'un bouton OAuth
@@ -114,6 +127,13 @@ export function GoogleOneTap({ clientId, nonce }: { clientId: string; nonce?: st
     return () => {
       cancelled = true;
       if (pollId !== undefined) window.clearInterval(pollId);
+      // Le script survit à une navigation client, et son invite avec : sans ce
+      // retrait, elle suivrait le visiteur hors de `/connexion`, sur des pages
+      // où le site ne doit plus rien afficher de Google.
+      if (initialized.current) {
+        window.google?.accounts.id.cancel();
+        initialized.current = false;
+      }
     };
   }, [clientId, router, showError, showSuccess]);
 
