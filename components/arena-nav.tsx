@@ -82,7 +82,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
               className={`${s.navHome} ${s.navReports}`}
               aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
             >
-              <span aria-hidden="true">⚑</span> Signalements
+              <span aria-hidden="true">⚑</span> <span className={s.navReportsLabel}>Signalements</span>
               {openReports > 0 && (
                 <span className={s.navBadge}>
                   {openReports}

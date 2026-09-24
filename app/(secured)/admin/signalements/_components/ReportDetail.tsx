@@ -139,7 +139,9 @@ export function ReportDetail({
           </dd>
         </div>
         <div>
-          <dt>Pris en charge par</dt>
+          {/* Rouvert, un dossier garde qui l'avait pris : « pris en charge »
+              tout court contredirait l'état « À traiter » juste au-dessus. */}
+          <dt>{report.status === "OPEN" && report.assignee ? "Précédemment pris par" : "Pris en charge par"}</dt>
           <dd>{report.assignee ? report.assignee.pseudo : "Personne"}</dd>
         </div>
         <div>
@@ -167,7 +169,11 @@ export function ReportDetail({
 
       {report.resolutionNote && (
         <>
-          <h3 className={styles.sectionTitle}>Décision</h3>
+          {/* Un dossier rouvert (contestation) garde la décision d'avant : elle
+              se lit comme telle, pas comme celle du jour. */}
+          <h3 className={styles.sectionTitle}>
+            {report.status === "RESOLVED" ? "Décision" : "Décision précédente"}
+          </h3>
           <blockquote className={styles.quote}>{report.resolutionNote}</blockquote>
         </>
       )}

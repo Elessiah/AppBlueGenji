@@ -25,6 +25,17 @@
   color: var(--ink-mute);
 }
 
+.heroLead a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.heroLead a:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+}
+
 .version {
   display: inline-flex;
   flex-wrap: wrap;

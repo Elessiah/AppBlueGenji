@@ -91,6 +91,17 @@ function ReportsPanel() {
   }, [reports, selectedId]);
 
   const visible = useMemo(() => (reports ? filterReports(reports, filters) : []), [reports, filters]);
+
+  // Sur grand écran, le premier dossier de la liste (le plus urgent) s'ouvre
+  // d'office : un clic de moins pour qui vient traiter. Sur mobile, le dossier
+  // est sous la liste, l'ouvrir d'office ferait défiler sans qu'on l'ait demandé.
+  useEffect(() => {
+    if (selectedId !== null || visible.length === 0) return;
+    if (window.matchMedia("(max-width: 900px)").matches) return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("id", String(visible[0].id));
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [selectedId, visible, searchParams, router, pathname]);
   const counts = useMemo(() => activeCountsByTab(reports ?? []), [reports]);
   const summary = useMemo(() => statusSummary(reports ?? []), [reports]);
   const selected = reports?.find((report) => report.id === selectedId) ?? null;

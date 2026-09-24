@@ -123,7 +123,7 @@ export function TargetPicker({ type, selected, onChange, full }: TargetPickerPro
   const labels = REPORT_TARGET_LABELS[type];
 
   return (
-    <div className={styles.picker}>
+    <div className={`field ${styles.picker}`}>
       <label htmlFor={inputId}>{labels.picker}</label>
       {selected.length > 0 && (
         <ul className={styles.chips} aria-label={`${labels.picker} (sélection)`}>
@@ -143,7 +143,7 @@ export function TargetPicker({ type, selected, onChange, full }: TargetPickerPro
           ))}
         </ul>
       )}
-      <div className={`field ${styles.combobox}`}>
+      <div className={styles.combobox}>
         <input
           id={inputId}
           role="combobox"

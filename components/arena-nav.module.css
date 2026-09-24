@@ -289,3 +289,21 @@
   letter-spacing: 0;
   text-align: center;
 }
+
+/* Sous 1100 px, la barre ne tient plus « Accueil » sur une ligne avec ce lien
+   en toutes lettres : le libellé passe en lecture seule pour les technologies
+   d'assistance (le nom accessible reste « Signalements »), le drapeau et le
+   compteur restent visibles. */
+@media (max-width: 1100px) {
+  .navReportsLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+}

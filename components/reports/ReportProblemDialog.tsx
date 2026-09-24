@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useId, useState } from "react";
+import { FormEvent, useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
@@ -129,7 +129,14 @@ export function ReportProblemDialog({
   // premier geste de l'étape (la description, ou la première catégorie au
   // retour), sans quoi il tombe sur `<body>` et le clavier sort de la modale.
   const choosing = category === null;
+  // À l'ouverture, c'est `useDialogBehavior` qui pose le focus (sur l'élément
+  // marqué `data-autofocus`) : cet effet ne sert qu'aux changements d'étape.
+  const mountedStep = useRef(true);
   useEffect(() => {
+    if (mountedStep.current) {
+      mountedStep.current = false;
+      return;
+    }
     const dialog = dialogRef.current;
     if (!dialog) return;
     const target = dialog.querySelector<HTMLElement>(choosing ? "button[data-category]" : "textarea");
@@ -238,6 +245,7 @@ export function ReportProblemDialog({
                     className={styles.categoryCard}
                     onClick={() => chooseCategory(key)}
                     data-category={key}
+                    data-autofocus={key === REPORT_CATEGORIES[0] ? "" : undefined}
                   >
                     <span className={styles.categoryIcon} aria-hidden="true">
                       {item.icon}
@@ -332,6 +340,7 @@ export function ReportProblemDialog({
                   placeholder={definition.descriptionPlaceholder}
                   aria-invalid={descriptionTooShort}
                   aria-describedby={`${titleId}-description-hint`}
+                  data-autofocus={contestOf !== undefined ? "" : undefined}
                 />
                 <p
                   id={`${titleId}-description-hint`}
