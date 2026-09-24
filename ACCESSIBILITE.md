@@ -31,17 +31,17 @@ pipeline de `CLAUDE.md`.
 **Choisir ou ajouter une tâche se pousse directement sur `main`, sur-le-champ**
 — jamais dans une branche de feature (voir `CLAUDE.md`, « Accessibilité ») :
 
-1. **Choisir ses tâches** : partir de `origin/main` à jour, écarter celles qui
-   portent une ligne « En cours », poser sous le titre de chaque tâche retenue
-   `` - **En cours** : `feature/<branche>` (AAAA-MM-JJ) ``, commiter et pousser
-   vers `main` **avant** d'écrire le moindre code. Puis résoudre dans la
-   branche de feature.
+1. **Choisir ses tâches** : partir de `origin/main` à jour, **retirer** la
+   section de chaque tâche retenue, commiter et pousser vers `main` **avant**
+   d'écrire le moindre code. Puis résoudre dans la branche de feature — une
+   tâche absente d'ici est prise.
 2. **Ajouter une tâche** : même chemin, à la suite, même format (critère,
    constat, à faire), avec le numéro qui suit le dernier attribué — relu sur
    `main` au moment du push et avancé dans le même commit. Les numéros ne
    sont **pas** réattribués : **dernier numéro attribué — 17**.
-3. **Retirer une tâche** : dans la PR qui la règle, et seulement là. Une tâche
-   abandonnée perd sa ligne « En cours » par un commit direct sur `main`.
+3. **Abandonner une tâche** (ou ne la régler qu'en partie) : la remettre ici
+   par un commit direct sur `main`, sous son numéro d'origine. La PR qui règle
+   une tâche n'a rien à retirer de ce fichier.
 
 ---
 
