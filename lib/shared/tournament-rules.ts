@@ -214,7 +214,8 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Classement de départ",
         body: [
-          "Contrairement aux autres modes, le classement initial n'est pas calculé : il est **fixé par l'arbitre** avant le lancement, dans l'ordre de son choix. C'est lui qui décide des premiers appariements.",
+          RANKING_SEEDING_RULE,
+          "L'arbitre peut **réordonner** ce classement avant le lancement : son ordre prime alors. C'est lui qui décide des premiers appariements.",
         ],
       },
       {
