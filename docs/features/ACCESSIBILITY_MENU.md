@@ -66,7 +66,7 @@ Deux pièges de spécificité, tenus dans la feuille :
   classe `.a11y-always-contrast`, ajoutée à la règle même du réglage
   (`:root[data-a11y~="contrast"], .a11y-always-contrast`) — mêmes jetons,
   aucune seconde liste de valeurs à tenir. C'est la seule règle de la section
-  qui vaille sans l'attribut.
+  qui vaille sans l'attribut (elle habille aussi le pied de page, voir plus bas).
 - **Premier arrêt du clavier** sur chaque page.
 - Panneau **non modal** (motif « disclosure ») : on voit l'effet d'un réglage
   en le cochant. Échap, un clic à côté **et le focus clavier qui en sort** le
@@ -81,6 +81,46 @@ Deux pièges de spécificité, tenus dans la feuille :
   lisibilité serait un contresens.
 - « Tout désactiver » est désactivé par `aria-disabled` et non `disabled` : il
   garde le focus après avoir servi au lieu de le jeter au `<body>`.
+
+## Seconde porte : « Accessibilité » dans le pied de page
+
+Le bouton flottant se manque, et c'est dans le pied de page qu'on cherche
+d'abord « accessibilité ». La colonne « Légal » de `PublicFooter` porte donc
+une entrée **Accessibilité** (`components/accessibility/AccessibilityFooterLink.tsx`)
+qui ouvre **le même menu** — jamais une seconde copie, qui aurait son propre
+état. C'est un **bouton** et non un lien : il n'emmène nulle part.
+
+- **Un évènement de la fenêtre**, pas un contexte React
+  (`lib/shared/accessibility-menu-request.ts` : `requestAccessibilityMenu()`,
+  `OPEN_ACCESSIBILITY_MENU_EVENT`). Le pied de page est un composant serveur,
+  sans ancêtre client commun avec le menu monté par `app/layout.tsx`. Sans
+  menu à l'écoute, la demande ne fait rien et ne casse rien.
+- Ouvert ainsi, le menu **prend le focus** (le panneau, `tabIndex={-1}`, sans
+  devenir un arrêt de tabulation) : il ne suit pas le pied de page dans l'ordre
+  du document, et le focus resté en bas de page l'aurait refermé à la première
+  tabulation. Échap et « × » **rendent le focus à qui l'a demandé** — le bouton
+  du pied de page — et au bouton flottant à défaut. Le déclencheur voyage
+  **dans l'évènement** (`CustomEvent`, `detail.opener`) plutôt que d'être lu
+  sur `document.activeElement` : Safari ne donne pas le focus à un bouton
+  cliqué. Les deux décisions sont pures (`resolveMenuOpener`,
+  `focusReturnTarget`).
+- Seules les pages vitrine ont un pied de page : l'espace connecté n'a que le
+  bouton flottant.
+
+## Contraste du pied de page
+
+Le pied de page porte `.a11y-always-contrast`, comme le menu : ses textes
+secondaires (`--ink-mute`, `--ink-dim`, jusqu'aux étiquettes 10 px du bloc
+Contact) prennent les valeurs du réglage « Contraste renforcé », toutes au-dessus
+de 4,5:1. On y cherche les mentions légales et l'accessibilité : il doit se lire
+sans réglage, quitte à être moins discret. Il pose aussi son **fond opaque**
+(`--cyber-bg`) pour que le contraste ne dépende pas du décor de la page, souligne
+ses liens et leur donne un anneau de focus explicite. C'est une **exception
+voulue** à la règle « tout ce qui change l'apparence est désactivé par défaut » :
+le pied de page est justement l'endroit où l'on cherche le menu, il ne peut pas
+dépendre d'un réglage. Enfin son rembourrage du bas (92 px, 76 px sous 720 px,
+comme le `scroll-padding-bottom` global) sort sa dernière ligne de sous le
+bouton flottant, que rien ne peut plus faire défiler en fin de page.
 
 ## Notifications (`components/ui/toast.tsx`)
 

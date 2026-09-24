@@ -107,6 +107,13 @@
   animation: a11yPanelIn 0.16s ease-out;
 }
 
+/* Le panneau ne reçoit le focus que pour y faire entrer le clavier quand il
+   est ouvert depuis le pied de page : sa bordure le situe déjà, un anneau de
+   plus autour d'un conteneur ferait croire à un contrôle. */
+.panel:focus {
+  outline: none;
+}
+
 /* Le panneau naît du bouton : un fondu court, depuis son coin. */
 @keyframes a11yPanelIn {
   from {
