@@ -17,6 +17,36 @@ import {
 import type { ParticipantType } from "@/lib/shared/participants";
 import { createDefaultPhase } from "../creer/phase-form";
 
+/** Plafond de manches qualificatives BG Survie proposé à la création. */
+export const DEFAULT_ENDURANCE_MAX_ROUNDS = 5;
+
+/**
+ * « Égalités autorisées en qualification » est cochée d'office : la
+ * qualification BG Survie se joue sans tiebreaker. La case n'a d'effet qu'en
+ * BG Survie — `toApiPayload` ferme les égalités ailleurs.
+ */
+export const DEFAULT_QUALIFICATION_DRAWS = true;
+
+/**
+ * Format de match **effectif** d'un format de tournoi : égalités et plafond de
+ * maps n'existent qu'en qualification BG Survie (le serveur les ferme ou les
+ * ignore ailleurs). Les égalités étant cochées par défaut, c'est ce format-ci —
+ * et non la valeur gardée en mémoire pour une bascule — qu'affichent l'aide du
+ * formulaire et le champ de plafond, et que `toApiPayload` envoie.
+ */
+export function effectiveMatchFormat(
+  format: TournamentFormat,
+  matchFormat: MatchFormat | null,
+): MatchFormat | null {
+  if (matchFormat === null) return null;
+  const drawsApply = format === "BG_SURVIE";
+  return {
+    ...matchFormat,
+    maxMaps: drawsApply ? (matchFormat.maxMaps ?? null) : null,
+    drawsAllowed: drawsApply && (matchFormat.drawsAllowed ?? false),
+  };
+}
+
 /**
  * Miroir client des valeurs éditables (`EditableTournamentValues`), à deux
  * différences près, imposées par les contrôles HTML :
@@ -140,12 +170,13 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     enduranceWinDelta: 1,
     enduranceLossDelta: 1,
     endurancePlayoffSize: 8,
-    // Aucun plafond de manches : la phase s'arrête sur l'effectif, comme elle
-    // l'a toujours fait.
-    enduranceMaxRounds: 0,
+    // Cinq manches qualificatives au plus : c'est le déroulé habituel d'une
+    // soirée. 0 (aucun plafond, la phase s'arrête sur l'effectif) reste un
+    // choix explicite.
+    enduranceMaxRounds: DEFAULT_ENDURANCE_MAX_ROUNDS,
     // « Libre » (`null`) conserve la saisie de score sans contrainte, comme les
     // tournois créés avant la fonctionnalité.
-    matchFormat: { ...DEFAULT_MATCH_FORMAT },
+    matchFormat: { ...DEFAULT_MATCH_FORMAT, drawsAllowed: DEFAULT_QUALIFICATION_DRAWS },
     // `null` = l'arbre final reprend le format du tournoi. C'est le défaut, et
     // il vaut pour tous les tournois créés avant ce réglage.
     endurancePlayoffFormat: null,
@@ -192,6 +223,7 @@ function isoToLocalInput(iso: string): string {
  */
 export function toApiPayload(values: TournamentFormValues): Record<string, unknown> {
   const { format } = values;
+  const matchFormat = effectiveMatchFormat(format, values.matchFormat);
   return {
     name: values.name,
     description: values.description,
@@ -231,12 +263,12 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // Le plafond de maps et les égalités voyagent **aplatis** eux aussi, comme
     // le type et le nombre de manches : un seul champ éditable, `matchFormat`,
     // quatre clés dans le corps.
-    matchFormatMaxMaps: values.matchFormat?.maxMaps ?? null,
     // Les égalités n'ont de sens qu'en qualification de BG Survie : ailleurs,
     // la validation les refuse, et les envoyer ferait échouer la création d'un
-    // tournoi dont le formulaire n'affiche même pas la case.
-    matchFormatDraws:
-      format === "BG_SURVIE" ? (values.matchFormat?.drawsAllowed ?? false) : false,
+    // tournoi dont le formulaire n'affiche même pas la case. Le plafond, qui
+    // en est la fenêtre, suit (`effectiveMatchFormat`).
+    matchFormatMaxMaps: matchFormat?.maxMaps ?? null,
+    matchFormatDraws: matchFormat?.drawsAllowed ?? false,
     endurancePlayoffFormatType:
       format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.type ?? null) : null,
     endurancePlayoffFormatValue:
@@ -285,9 +317,22 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     enduranceWinDelta: or(apiValues.enduranceWinDelta, defaults.enduranceWinDelta),
     enduranceLossDelta: or(apiValues.enduranceLossDelta, defaults.enduranceLossDelta),
     endurancePlayoffSize: or(apiValues.endurancePlayoffSize, defaults.endurancePlayoffSize),
-    // `null` en base = pas de plafond : le champ retombe sur 0, qui le dit.
-    enduranceMaxRounds: apiValues.enduranceMaxRounds ?? 0,
-    matchFormat: apiValues.matchFormat,
+    // En BG Survie, `null` en base = pas de plafond : le champ retombe sur 0,
+    // qui le dit — surtout pas sur le défaut de création, qui poserait un
+    // plafond que personne n'a choisi. Hors du mode, `null` veut seulement
+    // dire « pas ce format » : basculer vers BG Survie présente le défaut.
+    enduranceMaxRounds:
+      apiValues.format === "BG_SURVIE"
+        ? (apiValues.enduranceMaxRounds ?? 0)
+        : defaults.enduranceMaxRounds,
+    // Même règle pour les égalités : hors BG Survie, la valeur stockée est
+    // toujours fermée (le serveur la ferme), elle ne dit pas un choix — une
+    // bascule vers le mode présente donc le défaut de création, comme le
+    // plafond de manches juste au-dessus.
+    matchFormat:
+      apiValues.format === "BG_SURVIE" || apiValues.matchFormat === null
+        ? apiValues.matchFormat
+        : { ...apiValues.matchFormat, drawsAllowed: DEFAULT_QUALIFICATION_DRAWS },
     endurancePlayoffFormat: apiValues.endurancePlayoffFormat,
     registrationDiscordRequirement: apiValues.registrationDiscordRequirement,
     registrationBlizzardRequirement: apiValues.registrationBlizzardRequirement,

@@ -11,6 +11,8 @@ import {
   toApiPayload,
   toFormValues,
 } from "@/app/(secured)/tournois/_components/TournamentForm";
+import { effectiveMatchFormat } from "@/app/(secured)/tournois/_lib/tournament-form-values";
+import { matchFormatDescription } from "@/lib/shared/match-format";
 
 describe("defaultTournamentFormValues", () => {
   it("propose un tournoi à élimination simple par équipes", () => {
@@ -21,12 +23,54 @@ describe("defaultTournamentFormValues", () => {
     expect(v.maxTeams).toBe(16);
   });
 
+  it("propose un plafond de cinq manches qualificatives en BG Survie", () => {
+    const v = defaultTournamentFormValues();
+    expect(v.enduranceMaxRounds).toBe(5);
+    expect(toApiPayload({ ...v, name: "Coupe", format: "BG_SURVIE" }).enduranceMaxRounds).toBe(5);
+  });
+
+  it("coche d'office les égalités en qualification", () => {
+    const v = defaultTournamentFormValues();
+    expect(v.matchFormat?.drawsAllowed).toBe(true);
+    expect(toApiPayload({ ...v, name: "Coupe", format: "BG_SURVIE" }).matchFormatDraws).toBe(true);
+  });
+
+  // La case n'existe qu'en BG Survie : cochée par défaut, elle ne doit pas
+  // faire refuser la création d'un tournoi d'un autre format.
+  it("n'envoie pas les égalités par défaut hors BG Survie", () => {
+    const v = defaultTournamentFormValues();
+    expect(toApiPayload({ ...v, name: "Coupe", format: "SINGLE" }).matchFormatDraws).toBe(false);
+  });
+
   it("propose quatre jalons dans l'ordre chronologique", () => {
     const v = defaultTournamentFormValues();
     const t = (s: string) => new Date(s).getTime();
     expect(t(v.startVisibilityAt)).toBeLessThanOrEqual(t(v.registrationOpenAt));
     expect(t(v.registrationOpenAt)).toBeLessThanOrEqual(t(v.registrationCloseAt));
     expect(t(v.registrationCloseAt)).toBeLessThanOrEqual(t(v.startAt));
+  });
+});
+
+describe("effectiveMatchFormat", () => {
+  const withDraws = { type: "FT" as const, value: 3, maxMaps: 4, drawsAllowed: true };
+
+  it("garde égalités et plafond en BG Survie", () => {
+    expect(effectiveMatchFormat("BG_SURVIE", withDraws)).toEqual(withDraws);
+  });
+
+  // Les égalités sont cochées par défaut : l'aide sous le format d'un tournoi
+  // à élimination ne doit pas pour autant annoncer un match nul.
+  it("ferme égalités et plafond hors BG Survie", () => {
+    for (const format of ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL", "MULTI"] as const) {
+      const effective = effectiveMatchFormat(format, withDraws);
+      expect(effective).toEqual({ type: "FT", value: 3, maxMaps: null, drawsAllowed: false });
+      expect(matchFormatDescription(effective)).not.toMatch(/nulle/);
+    }
+  });
+
+  it("laisse la saisie libre telle quelle", () => {
+    expect(effectiveMatchFormat("BG_SURVIE", null)).toBeNull();
+    expect(effectiveMatchFormat("SINGLE", null)).toBeNull();
   });
 });
 
@@ -133,6 +177,42 @@ describe("toFormValues", () => {
     expect(v.phases).toEqual(defaults.phases);
   });
 
+  // Un tournoi BG Survie enregistré sans plafond doit le rester à l'édition :
+  // retomber sur le défaut de création poserait un plafond que personne n'a
+  // choisi à la prochaine sauvegarde.
+  it("garde « aucun plafond » d'un tournoi BG Survie existant", () => {
+    const v = toFormValues({ ...apiValues, format: "BG_SURVIE", enduranceMaxRounds: null });
+    expect(v.enduranceMaxRounds).toBe(0);
+  });
+
+  it("garde le plafond enregistré d'un tournoi BG Survie", () => {
+    const v = toFormValues({ ...apiValues, format: "BG_SURVIE", enduranceMaxRounds: 7 });
+    expect(v.enduranceMaxRounds).toBe(7);
+  });
+
+  it("propose le plafond par défaut hors BG Survie, pour une bascule de format", () => {
+    const v = toFormValues({ ...apiValues, format: "SINGLE", enduranceMaxRounds: null });
+    expect(v.enduranceMaxRounds).toBe(defaultTournamentFormValues().enduranceMaxRounds);
+  });
+
+  it("propose les égalités par défaut hors BG Survie, pour une bascule de format", () => {
+    const v = toFormValues({ ...apiValues, format: "SINGLE", matchFormat: { type: "BO", value: 5 } });
+    expect(v.matchFormat?.drawsAllowed).toBe(true);
+  });
+
+  it("garde les égalités fermées d'un tournoi BG Survie existant", () => {
+    const v = toFormValues({
+      ...apiValues,
+      format: "BG_SURVIE",
+      matchFormat: { type: "BO", value: 5, drawsAllowed: false },
+    });
+    expect(v.matchFormat?.drawsAllowed).toBe(false);
+  });
+
+  it("garde la saisie libre hors BG Survie", () => {
+    expect(toFormValues({ ...apiValues, format: "SINGLE", matchFormat: null }).matchFormat).toBeNull();
+  });
+
   it("rend une description absente comme une saisie vide", () => {
     expect(toFormValues(apiValues).description).toBe("");
   });
@@ -183,7 +263,10 @@ describe("format de match — les deux notations", () => {
         endurancePoints: null,
         phases: null,
       });
-      expect(back.matchFormat).toEqual(matchFormat);
+      // Hors BG Survie, `toFormValues` ajoute le défaut des égalités (pour une
+      // bascule de format) : seule la notation doit traverser intacte ici.
+      if (matchFormat === null) expect(back.matchFormat).toBeNull();
+      else expect(back.matchFormat).toMatchObject(matchFormat);
     }
   });
 
@@ -235,8 +318,8 @@ describe("toApiPayload — réglages du match nul", () => {
 
   it("aplatit le format de match en quatre clés", () => {
     const payload = toApiPayload({
-      ...values,
-      matchFormat: { type: "FT", value: 3, maxMaps: 4 },
+      ...survie,
+      matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
     });
 
     expect(payload.matchFormatType).toBe("FT");
@@ -260,6 +343,18 @@ describe("toApiPayload — réglages du match nul", () => {
     expect(payload.matchFormatDraws).toBe(false);
     expect(payload.endurancePlayoffFormatType).toBeNull();
     expect(payload.endurancePlayoffFormatValue).toBeNull();
+  });
+
+  // Les égalités étant cochées par défaut, le plafond qu'elles ouvrent pourrait
+  // rester en mémoire sur n'importe quel format : il ne part qu'en BG Survie,
+  // seul mode où le serveur le lit.
+  it("n'envoie pas le plafond de maps hors BlueGenji Survie", () => {
+    const payload = toApiPayload({
+      ...survie,
+      format: "SINGLE",
+      matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
+    });
+    expect(payload.matchFormatMaxMaps).toBeNull();
   });
 
   it("laisse le plafond de maps absent quand il n'est pas réglé", () => {
