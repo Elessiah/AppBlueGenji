@@ -378,6 +378,15 @@ describe("getLandingLive — seeds du match mis en avant", () => {
     expect(live?.currentMatch?.team2Seed).toBe(8);
   });
 
+  it("rend son seed à une BG Survie réordonnée à la main", async () => {
+    await mockDb([matchRow({ team1_seed: 4, team2_seed: 5, manual_seeding: 1 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A", "BG_SURVIE")]));
+
+    expect(live?.currentMatch?.team1Seed).toBe(4);
+    expect(live?.currentMatch?.team2Seed).toBe(5);
+  });
+
   it("laisse le seed à null sur une place vide, et sur une colonne non renseignée", async () => {
     await mockDb([matchRow({ team2_id: null, team2_name: null, team2_seed: null })]);
 

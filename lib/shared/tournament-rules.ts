@@ -215,7 +215,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
         title: "Classement de départ",
         body: [
           RANKING_SEEDING_RULE,
-          "L'arbitre peut **réordonner** ce classement avant le lancement : son ordre prime alors. C'est lui qui décide des premiers appariements.",
+          "L'arbitre peut **réordonner** ce classement tant qu'aucun score n'a été saisi : son ordre prime alors. C'est ce classement qui décide des premiers appariements.",
         ],
       },
       {

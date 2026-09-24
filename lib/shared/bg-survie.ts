@@ -30,9 +30,10 @@
  * des matchs : l'endurance, les éliminations et le classement sont dérivés, ce
  * qui rend une correction de score idempotente. Seules les **décisions
  * humaines** sont fournies en entrée — le classement initial (classement du
- * site au lancement, ou ordre fixé par l'arbitre), les abandons et les **pénalités d'endurance**
- * (`lib/shared/endurance-penalty.ts`) : rien de tout cela ne se déduit d'un
- * match, et rien de tout cela ne s'accumule ailleurs que dans sa propre table.
+ * site au lancement, ou ordre fixé par l'arbitre), les abandons et les
+ * **pénalités d'endurance** (`lib/shared/endurance-penalty.ts`) : rien de tout
+ * cela ne se déduit d'un match, et rien de tout cela ne s'accumule ailleurs que
+ * dans sa propre table.
  * Retirer une pénalité défait donc la sanction *et* tout ce qu'elle a entraîné,
  * élimination comprise, comme une correction de score défait une coupe.
  *

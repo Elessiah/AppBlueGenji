@@ -10,7 +10,11 @@ import {
   reconcileEndurance,
   startEndurancePlayoffs,
 } from "@/lib/server/tournaments/bg-survie";
-import { createMatch, finishTournament } from "@/lib/server/tournaments/repository";
+import {
+  createMatch,
+  finishTournament,
+  loadRegisteredTeamIds,
+} from "@/lib/server/tournaments/repository";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import type { SqlMock } from "../helpers/sql-double";
 
@@ -135,31 +139,20 @@ describe("initializeEnduranceTournament", () => {
   });
 
   it("fait primer l'ordre fixé à la main sur le classement du site", async () => {
-    const conn = makeConn([
-      [[tournamentRow({ manual_seeding: 1 })]], // tournoi
-      [[{ team_id: 30 }, { team_id: 10 }, { team_id: 20 }]], // inscriptions triées par seed
-    ]);
+    jest.mocked(loadRegisteredTeamIds).mockResolvedValue([30, 10, 20]);
+    const conn = makeConn([[[tournamentRow({ manual_seeding: 1 })]]]);
 
     await initializeEnduranceTournament(5, conn);
 
     expect(loadEntrantsBySiteRanking).not.toHaveBeenCalled();
-    const seedQuery = conn.execute.mock.calls[1][0] as string;
-    expect(seedQuery).toMatch(/ORDER BY COALESCE\(seed, 1000000\), registered_at ASC/);
+    // Le chargeur des tableaux à élimination, qui trie par la colonne `seed`.
+    expect(loadRegisteredTeamIds).toHaveBeenCalledWith(conn, 5);
     // Seed 1, 2, 3 attribués dans l'ordre saisi par le staff.
     expect(insertedSeeds(conn)).toEqual([
       [30, 1],
       [10, 2],
       [20, 3],
     ]);
-  });
-
-  it("lit le drapeau sur la ligne du tournoi", async () => {
-    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue([]);
-    const conn = makeConn([[[tournamentRow()]]]);
-
-    await initializeEnduranceTournament(5, conn);
-
-    expect(String(conn.execute.mock.calls[0][0])).toContain("manual_seeding");
   });
 
   it("sème un classement vide sans inscrite", async () => {
@@ -193,6 +186,7 @@ describe("initializeEnduranceTournament", () => {
 
     expect(conn.execute).toHaveBeenCalledTimes(1);
     expect(loadEntrantsBySiteRanking).not.toHaveBeenCalled();
+    expect(loadRegisteredTeamIds).not.toHaveBeenCalled();
   });
 });
 

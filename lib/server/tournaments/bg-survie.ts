@@ -52,7 +52,7 @@ import {
   rowsOrEmptyIfMissingTable,
 } from "@/lib/server/mysql-errors";
 import { appendSequentialRanks, podiumRanks } from "@/lib/shared/double-forfeit";
-import { createMatch, finishTournament, reopenTournament } from "./repository";
+import { createMatch, finishTournament, loadRegisteredTeamIds, reopenTournament } from "./repository";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 
@@ -222,21 +222,12 @@ export async function initializeEnduranceTournament(
 
   const config = configOf(tournament);
 
-  let teamIds: number[];
-  if (Number(tournament.manual_seeding ?? 0) === 1) {
-    const [rows] = await conn.execute<(RowDataPacket & { team_id: number })[]>(
-      `SELECT team_id
-       FROM bg_tournament_registrations
-       WHERE tournament_id = ?
-       ORDER BY COALESCE(seed, 1000000), registered_at ASC`,
-      [tournamentId],
-    );
-    teamIds = rows.map((row) => Number(row.team_id));
-  } else {
-    // Classement du site, par le chargeur unique : mêmes matchs comptés et même
-    // ordre que l'annuaire, les fiches et l'aperçu du plateau.
-    teamIds = (await loadEntrantsBySiteRanking(conn, tournamentId)).map((entrant) => entrant.teamId);
-  }
+  // Ordre saisi par le staff, sinon classement du site par le chargeur unique :
+  // mêmes matchs comptés et même ordre que l'annuaire et l'aperçu du plateau.
+  const teamIds =
+    Number(tournament.manual_seeding ?? 0) === 1
+      ? await loadRegisteredTeamIds(conn, tournamentId)
+      : (await loadEntrantsBySiteRanking(conn, tournamentId)).map((entrant) => entrant.teamId);
 
   const standings: EnduranceStanding[] = teamIds.map((teamId, index) => ({
     teamId,
