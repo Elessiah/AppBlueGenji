@@ -14,7 +14,7 @@ jest.mock("@/components/cyber/landing/PublicFooter", () => ({
 import { renderToStaticMarkup } from "react-dom/server";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { focusLeftMenu } from "@/components/cyber/landing/PublicNavMenu";
-import { ROOT, globals, splitSelectorList, stripComments, walk } from "./_lib/style-sweep";
+import { ROOT, cssRules, globals, stripComments, subjectCompound, walk } from "./_lib/style-sweep";
 import { readSource } from "../helpers/read-source";
 
 const sources = (dir: string, suffix: string) =>
@@ -72,12 +72,13 @@ describe("pages vitrine — repères de premier niveau", () => {
     );
   });
 
-  // Toute page a son `<main>` : un `<aside>` écrit dans une page y est donc
-  // imbriqué, et n'est pas un repère de premier niveau (RGAA 12.6).
-  it("aucune page ne pose d'<aside> dans son contenu", () => {
-    const offenders = pages
+  // Toute page a son `<main>`, et le contenu y vient surtout de composants de
+  // section : un `<aside>` écrit dans une page **ou** dans un composant y serait
+  // imbriqué, et ne serait pas un repère de premier niveau (RGAA 12.6).
+  it("aucune page ni aucun composant ne pose d'<aside>", () => {
+    const offenders = [...pages, ...sources("components", ".tsx")]
       // Les commentaires JSX peuvent nommer la balise pour expliquer son absence.
-      .filter(({ file, src }) => file.endsWith("/page.tsx") && /<aside[\s>]/.test(src.replace(/\{\/\*[\s\S]*?\*\/\}/g, "")))
+      .filter(({ src }) => /<aside[\s>]/.test(src.replace(/\{\/\*[\s\S]*?\*\/\}/g, "")))
       .map(({ file }) => file);
     expect(offenders).toEqual([]);
   });
@@ -122,24 +123,13 @@ describe("PublicNavMenu — fermeture quand la tabulation en sort", () => {
   });
 });
 
-/** Les règles d'une feuille : sélecteurs et corps, commentaires retirés. */
-function rules(css: string): { selectors: string[]; body: string }[] {
-  const found: { selectors: string[]; body: string }[] = [];
-  const pattern = /([^{}]+)\{([^{}]*)\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(stripComments(css))) !== null) {
-    found.push({ selectors: splitSelectorList(match[1].trim()), body: match[2] });
-  }
-  return found;
-}
-
 describe("focus des champs — un repère qui ne tient pas à la seule bordure", () => {
   const sheets = [...sources("app", ".css"), ...sources("components", ".css")];
 
   it("rétablit un contour de focus en contrastes forcés, pour tout contrôle", () => {
     const css = stripComments(globals).replace(/\r\n/g, "\n");
     expect(css).toMatch(
-      /@media \(forced-colors: active\) \{\s*:focus-visible:not\(\[tabindex="-1"\]\) \{\s*outline: 2px solid CanvasText !important;\s*outline-offset: 2px !important;\s*\}\s*\}/,
+      /@media \(forced-colors: active\) \{\s*:focus-visible:not\(\[tabindex="-1"\]\) \{\s*outline: 2px solid CanvasText !important;\s*\}\s*\}/,
     );
   });
 
@@ -154,14 +144,10 @@ describe("focus des champs — un repère qui ne tient pas à la seule bordure",
   // dans une feuille : `.a:hover, .a:focus-visible { border-color }` suivi de
   // `.a:focus-visible { box-shadow }` est un anneau, écrit en deux fois.
   it("aucune règle de focus ne se contente de changer la couleur de la bordure", () => {
-    const focusesSelf = (selector: string) => {
-      const flat = selector.replace(/:(not|has)\([^()]*\)/g, "");
-      const last = flat.split(/[\s>+~]+/).filter(Boolean).pop() ?? "";
-      return last.includes(":focus");
-    };
+    const focusesSelf = (selector: string) => subjectCompound(selector).includes(":focus");
     const offenders = sheets.flatMap(({ file, src }) => {
       const bodies = new Map<string, string>();
-      for (const { selectors, body } of rules(src)) {
+      for (const { selectors, body } of cssRules(src)) {
         for (const selector of selectors.filter(focusesSelf)) {
           bodies.set(selector, `${bodies.get(selector) ?? ""};${body}`);
         }
@@ -185,7 +171,7 @@ describe("focus des champs — un repère qui ne tient pas à la seule bordure",
     ["components/cyber/landing/EditableCopy.module.css", ".input:focus-visible"],
     ["app/globals.css", ".searchbar-input:focus"],
   ])("%s — %s pose un anneau", (file, selector) => {
-    const rule = rules(readSource(file)).find(({ selectors }) => selectors.includes(selector));
+    const rule = cssRules(readSource(file)).find(({ selectors }) => selectors.includes(selector));
     expect(rule?.body).toMatch(/box-shadow:\s*0 0 0 3px rgba\(/);
   });
 });

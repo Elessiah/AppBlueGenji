@@ -1688,11 +1688,13 @@ input[type="radio"]:disabled:checked {
    personne y pense — d'où `!important`, qui ne vaut que dans ce mode, choisi par
    le lecteur. Un conteneur focalisé par programme (`tabindex="-1"` : modale,
    cible du lien d'évitement) en est exclu : il n'a pas été atteint au clavier,
-   un cadre autour de tout le panneau ne dirait rien. */
+   un cadre autour de tout le panneau ne dirait rien. Le décalage, lui, reste
+   celui de chaque règle : imposé vers l'extérieur, le contour serait rogné par
+   un ancêtre `overflow: hidden` ou une zone défilante — et une règle qui le
+   rentre (`outline-offset: -2px`) le fait justement pour cela. */
 @media (forced-colors: active) {
   :focus-visible:not([tabindex="-1"]) {
     outline: 2px solid CanvasText !important;
-    outline-offset: 2px !important;
   }
 }
 

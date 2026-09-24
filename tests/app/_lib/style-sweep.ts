@@ -393,3 +393,64 @@ export function inlineOffenders(path: string, source: string): Offender[] {
   return offenders;
 }
 
+export type CssRule = { selectors: string[]; body: string };
+
+/**
+ * Les règles d'une feuille, commentaires retirés : chaque sélecteur de la
+ * liste, et le corps. Le motif ne prend que les blocs **les plus internes** —
+ * une règle posée dans un `@media` en sort avec son seul sélecteur, jamais
+ * précédée de l'en-tête du `@media`.
+ */
+export function cssRules(css: string): CssRule[] {
+  const found: CssRule[] = [];
+  const pattern = /([^{}]+)\{([^{}]*)\}/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(stripComments(css))) !== null) {
+    found.push({ selectors: splitSelectorList(match[1].trim()), body: match[2] });
+  }
+  return found;
+}
+
+/**
+ * Le sélecteur sans ses `:not(…)` ni ses `:has(…)`, parenthèses imbriquées
+ * comprises (`:not(:is(:focus))`) : ce qu'ils nomment n'est pas l'élément que le
+ * sélecteur habille. `:is(…)` et `:where(…)` restent — ils le décrivent.
+ */
+export function withoutNegationsAndRelations(selector: string): string {
+  let out = "";
+  let i = 0;
+  while (i < selector.length) {
+    const opener = /^:(not|has)\(/.exec(selector.slice(i));
+    if (!opener) {
+      out += selector[i];
+      i += 1;
+      continue;
+    }
+    let depth = 0;
+    let j = i + opener[0].length - 1;
+    for (; j < selector.length; j += 1) {
+      if (selector[j] === "(") depth += 1;
+      else if (selector[j] === ")" && --depth === 0) break;
+    }
+    i = j + 1;
+  }
+  return out;
+}
+
+/**
+ * Le dernier compound du sélecteur — l'élément qu'il habille —, négations et
+ * relations retirées. Un combinateur écrit dans un `:is(…)` ne sépare pas deux
+ * éléments du sélecteur : seuls ceux de premier niveau comptent.
+ */
+export function subjectCompound(selector: string): string {
+  let depth = 0;
+  let last = "";
+  for (const char of withoutNegationsAndRelations(selector).trim()) {
+    if (char === "(") depth += 1;
+    else if (char === ")") depth -= 1;
+    if (depth === 0 && /[\s>+~]/.test(char)) last = "";
+    else last += char;
+  }
+  return last;
+}
+

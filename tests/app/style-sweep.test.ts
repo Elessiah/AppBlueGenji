@@ -1,5 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
-import { bareInputOffenders, inlineOffenders, splitSelectorList } from "./_lib/style-sweep";
+import {
+  bareInputOffenders,
+  cssRules,
+  inlineOffenders,
+  splitSelectorList,
+  subjectCompound,
+} from "./_lib/style-sweep";
 
 /**
  * Les cas limites du **moteur** de balayage, séparés de ce qu'on lui fait dire.
@@ -122,5 +128,33 @@ describe("balayage en ligne — ce qu'il laisse passer", () => {
     ],
   ])("laisse %s", (_label, jsx) => {
     expect(inline(jsx)).toEqual([]);
+  });
+});
+
+describe("subjectCompound — l'élément que le sélecteur habille", () => {
+  it.each<[string, string]>([
+    [".a:focus-visible", ".a:focus-visible"],
+    [".ligne:focus-visible .avatar", ".avatar"],
+    [".a > .b:focus", ".b:focus"],
+    ["input:hover:not(:disabled):not(:focus-visible)", "input:hover"],
+    [".x:not(:is(:focus-visible))", ".x"],
+    [".option:has(input:focus-visible)", ".option"],
+    [":is(.a .b):focus", ":is(.a .b):focus"],
+    [".a:where(:focus-visible)", ".a:where(:focus-visible)"],
+  ])("%s → %s", (selector, subject) => {
+    expect(subjectCompound(selector)).toBe(subject);
+  });
+});
+
+describe("cssRules — règles d'une feuille", () => {
+  it("rend les règles d'un @media sans son en-tête, et découpe les listes", () => {
+    const css = "/* c */ .a, .b:focus { color: red; }
+@media (forced-colors: active) {
+  .c { outline: 0; }
+}";
+    expect(cssRules(css)).toEqual([
+      { selectors: [".a", ".b:focus"], body: " color: red; " },
+      { selectors: [".c"], body: " outline: 0; " },
+    ]);
   });
 });

@@ -52,7 +52,8 @@ Les champs des modales de la vitrine (`.modalInput` de `/recrutement`,
 `.input` du contact du pied de page et des textes éditables), la barre de
 recherche `.searchbar-input` et celle des annuaires posaient `outline: none`
 avec, pour seul repère, une bordure qui change de couleur (ou un halo à 6 %
-d'opacité pour l'annuaire). Deux corrections :
+d'opacité pour l'annuaire ; la barre jumelle de `/tournois`, dont le champ garde
+son propre contour, reçoit le même anneau par cohérence). Deux corrections :
 
 - **Un anneau** (`box-shadow: 0 0 0 3px …`) au focus, comme les champs `.field`
   — dans la teinte de chaque écran.
@@ -63,7 +64,6 @@ d'opacité pour l'annuaire). Deux corrections :
   @media (forced-colors: active) {
     :focus-visible:not([tabindex="-1"]) {
       outline: 2px solid CanvasText !important;
-      outline-offset: 2px !important;
     }
   }
   ```
@@ -74,7 +74,10 @@ d'opacité pour l'annuaire). Deux corrections :
   à toutes les spécificités (`.field input…:focus` pèse (0,4,1)) et que celui
   qu'on écrira demain doit être couvert — d'où `!important`, qui ne vaut que dans
   ce mode, choisi par le lecteur. Les conteneurs focalisés par programme
-  (`tabindex="-1"` : modales, cible du lien d'évitement) en sont exclus.
+  (`tabindex="-1"` : modales, cible du lien d'évitement) en sont exclus. Le
+  décalage n'est **pas** imposé : vers l'extérieur, le contour serait rogné par
+  un ancêtre `overflow: hidden` ou une zone défilante, et une règle qui le
+  rentre (`outline-offset: -2px`) le fait justement pour cela.
 
 ## Menu burger (WCAG 2.4.3 · RGAA 12.8)
 
@@ -92,7 +95,7 @@ clic dans le vide, que l'écouteur de clic extérieur traite déjà.
 
 - le gabarit rend en-tête, `<main>` et pied de page en frères ;
 - **balayage** : toute page qui rend `PublicHeader` ou `PublicFooter` les place
-  hors de son `<main>`, et aucune page ne pose d'`<aside>` ;
+  hors de son `<main>`, et aucune page ni aucun composant ne pose d'`<aside>` ;
 - `/connexion` rend la modale de consentement après la carte du `h1` ;
 - `focusLeftMenu` (sortie, passage d'un lien à l'autre, fenêtre qui perd le
   focus, racine absente) et son branchement ;
