@@ -4,7 +4,6 @@ import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-uplo
 import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { can } from "@/lib/shared/permissions";
-import { hasAcceptedCurrentTerms } from "@/lib/server/terms-acceptance";
 import {
   LOGO_RIGHTS_FIELD,
   LOGO_RIGHTS_NOT_CERTIFIED,
@@ -22,8 +21,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const managesGhostTeams = can(user, "tournaments");
-  const asGhostStaff = managesGhostTeams && (await isGhostTeam(teamId));
-  if (!(await canManageTeam(teamId, user.id)) && !asGhostStaff) {
+  if (!(await canManageTeam(teamId, user.id)) && !(managesGhostTeams && (await isGhostTeam(teamId)))) {
     return fail("FORBIDDEN", 403);
   }
 
@@ -37,13 +35,11 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);
 
-  // Les deux refus qui ne tiennent pas au fichier passent **avant** son
-  // traitement : refusé après, le logo converti resterait sur le disque sans
-  // qu'aucune ligne ne le désigne.
+  // La garantie des droits passe **avant** le traitement du fichier : c'est une
+  // saisie du formulaire, rien à convertir pour la refuser. Les conditions
+  // d'utilisation, elles, sont jugées par `updateTeamLogo` (règle unique des
+  // gestes de gestion) ; un refus y efface le fichier tout juste écrit.
   if (form.get(LOGO_RIGHTS_FIELD) !== "1") return fail(LOGO_RIGHTS_NOT_CERTIFIED, 400);
-  if (!asGhostStaff && !(await hasAcceptedCurrentTerms(user.id))) {
-    return fail(TERMS_ACCEPTANCE_REQUIRED, 409);
-  }
 
   try {
     const currentLogo = await getTeamLogoUrl(teamId);

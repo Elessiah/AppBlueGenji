@@ -9,6 +9,7 @@
  */
 import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { cached, invalidateCached } from "@/lib/server/cache";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import {
@@ -44,6 +45,7 @@ export async function recordTermsAcceptance(
     [TERMS_VERSION, userId],
   );
   if (Number(result.affectedRows) === 0) return false;
+  invalidateCached(termsNeedKey(userId));
   await db.execute(
     `INSERT INTO bg_terms_acceptances (user_id, version, context) VALUES (?, ?, ?)`,
     [userId, TERMS_VERSION, context],
@@ -91,31 +93,42 @@ export async function assertTermsAccepted(userId: number, executor?: Executor): 
  * permette de lui demander son accord à ce moment-là, on le lui demande donc
  * au passage suivant. Une équipe dissoute, une entrée solo (sans membre) ne
  * comptent pas.
+ *
+ * Posée à **chaque page**, elle tient en une requête — version acceptée et
+ * rôles en cours, par une jointure — et sa réponse est gardée
+ * `TERMS_NEED_TTL_MS` par compte : un rôle reçu à l'instant fait paraître la
+ * modale au plus une demi-minute plus tard, ce qui ne change rien à la règle
+ * (les gestes de gestion sont refusés côté serveur dans l'intervalle).
+ * L'acceptation vide la réponse gardée.
  */
 export async function needsTermsForTeamManagement(userId: number): Promise<boolean> {
-  const db = await getDatabase();
-  const [users] = await db.execute<(RowDataPacket & { terms_version: number | null })[]>(
-    `SELECT terms_version FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
-    [userId],
-  );
-  if (users.length === 0) return false;
-  const version = users[0].terms_version === null ? null : Number(users[0].terms_version);
-  if (coversCurrentTerms(version)) return false;
+  return cached(termsNeedKey(userId), TERMS_NEED_TTL_MS, async () => {
+    const db = await getDatabase();
+    const [rows] = await db.execute<
+      (RowDataPacket & { terms_version: number | null; roles_json: unknown; team_id: number | null })[]
+    >(
+      `SELECT u.terms_version, tm.roles_json, t.id AS team_id
+       FROM bg_users u
+       LEFT JOIN bg_team_members tm ON tm.user_id = u.id AND tm.left_at IS NULL
+       LEFT JOIN bg_teams t ON t.id = tm.team_id AND t.deleted_at IS NULL AND t.solo_user_id IS NULL
+       WHERE u.id = ? AND u.is_deleted = 0`,
+      [userId],
+    );
+    if (rows.length === 0) return false;
+    const version = rows[0].terms_version === null ? null : Number(rows[0].terms_version);
+    if (coversCurrentTerms(version)) return false;
+    // Les rôles sont jugés par `hasTeamManagementRole`, l'unique implémentation
+    // de « qui gère une équipe » : réécrite en SQL, la règle aurait une seconde
+    // version.
+    return rows.some((row) => row.team_id !== null && hasTeamManagementRole(parseRoles(row.roles_json)));
+  });
+}
 
-  // Les rôles sont relus puis jugés par `hasTeamManagementRole`, l'unique
-  // implémentation de « qui gère une équipe » : réécrite en SQL, la règle
-  // aurait une seconde version.
-  const [memberships] = await db.execute<(RowDataPacket & { roles_json: unknown })[]>(
-    `SELECT tm.roles_json
-     FROM bg_team_members tm
-     JOIN bg_teams t ON t.id = tm.team_id
-     WHERE tm.user_id = ?
-       AND tm.left_at IS NULL
-       AND t.deleted_at IS NULL
-       AND t.solo_user_id IS NULL`,
-    [userId],
-  );
-  return memberships.some((row) => hasTeamManagementRole(parseRoles(row.roles_json)));
+/** Durée pendant laquelle la réponse de `needsTermsForTeamManagement` est gardée. */
+export const TERMS_NEED_TTL_MS = 30_000;
+
+function termsNeedKey(userId: number): string {
+  return `terms-need:${userId}`;
 }
 
 /** Les acceptations du compte, pour l'export de ses données. */

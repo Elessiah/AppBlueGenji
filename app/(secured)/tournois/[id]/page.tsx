@@ -1,5 +1,6 @@
 "use client";
 
+import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { FormEvent, useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -460,7 +461,12 @@ export default function TournamentDetailPage() {
         method: "POST",
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "REGISTRATION_FAILED");
+      if (!response.ok) {
+        // Refus faute des conditions d'utilisation : la modale d'acceptation
+        // (mise en page racine) s'ouvre, le toast dit pourquoi.
+        if (payload.error === TERMS_ACCEPTANCE_REQUIRED) window.dispatchEvent(new Event(TERMS_REQUIRED_EVENT));
+        throw new Error(payload.error || "REGISTRATION_FAILED");
+      }
       showSuccess("Inscription validée.");
       void refresh();
     } catch (e) {

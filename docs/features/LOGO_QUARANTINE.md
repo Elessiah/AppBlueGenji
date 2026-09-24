@@ -45,6 +45,12 @@ copiée. L'aperçu du panneau passe par
 `GET /api/admin/logo-quarantines/[id]/image` (permission `moderation`, jamais mis
 en cache).
 
+Le nom en quarantaine porte l'équipe (`team-<id>-<fichier>`). Un fichier
+**partagé** par plusieurs équipes (le jeu de test en partage un) n'est pas
+déplacé mais **copié** : le déplacer effacerait le logo des autres. Un
+`logo_url` qui désigne un fichier absent est refusé (`LOGO_FILE_MISSING`) : il
+n'y a rien à garder, le retrait immédiat vide la colonne.
+
 Un déplacement de fichier ne se défait pas avec une transaction : il est fait
 **avant** l'écriture en base, et défait si l'écriture échoue. L'inverse
 laisserait une base annonçant un logo masqué pendant que le site le sert encore.

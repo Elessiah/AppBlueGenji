@@ -31,9 +31,19 @@ rouvre la fenêtre (`TERMS_REQUIRED_EVENT`).
 ## Gestes de gestion soumis aux conditions
 
 Nom, sigle et description ; envoi d'un logo ; rôles ; exclusion ; invitation ;
-acceptation d'une demande d'adhésion ; transfert de propriété. **Pas** : retirer
-un logo (le geste qu'on veut voir faire à qui doute de ses droits), refuser une
-demande, dissoudre l'équipe, et rien de ce que fait le staff sur une fantôme.
+acceptation d'une demande d'adhésion ; transfert de propriété ; **inscription à
+un tournoi**. **Pas** : retirer un logo (le geste qu'on veut voir faire à qui
+doute de ses droits), refuser une demande, dissoudre l'équipe, retirer l'équipe
+d'un tournoi ou y déclarer forfait (on ne retient pas une équipe faute d'une
+case cochée), et rien de ce que fait le staff sur une fantôme.
+
+Le contrôle est posé geste par geste (`assertTermsAccepted`), **après** celui du
+rôle, et non dans `userCanManageTeam` : ce dernier sert aussi à la **lecture**
+(`canManage` de la fiche), qu'une case non cochée ne doit pas fermer.
+
+La question « ce compte doit-il accepter ? » que pose la mise en page racine
+tient en **une** requête (version acceptée et rôles, par jointure) et sa réponse
+est gardée 30 s par compte, vidée à l'acceptation.
 
 ## Envoi d'un logo
 

@@ -34,7 +34,9 @@ export async function POST(req: Request) {
   } catch (error) {
     const message = (error as Error).message;
     if (message === "REPORT_TARGET_NOT_FOUND") return fail(message, 400);
-    if (message === "REPORT_CONTEST_LOGIN_REQUIRED") return fail(message, 401);
+    if (message === "REPORT_CONTEST_LOGIN_REQUIRED" || message === "REPORT_TARGETS_REQUIRE_LOGIN") {
+      return fail(message, 401);
+    }
     // Même refus pour un signalement inexistant et pour un signalement qui ne
     // vise pas l'appelant : les identifiants sont consécutifs.
     if (message === "REPORT_NOT_CONCERNED") return fail(message, 403);

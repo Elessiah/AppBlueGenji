@@ -13,6 +13,8 @@ const ADMIN_REPORT_ERRORS: Record<string, string> = {
   TEAM_HAS_NO_LOGO: "L'équipe n'a déjà plus de logo.",
   LOGO_CHANGED: "L'équipe vient de changer de logo : vérifie le nouveau avant d'agir.",
   LOGO_NOT_MOVABLE: "Ce logo n'est pas un fichier du site : il ne peut pas être masqué.",
+  LOGO_FILE_MISSING:
+    "Le fichier de ce logo n'existe plus : il n'y a rien à masquer. Utilise « Supprimer le logo » pour vider la fiche.",
   QUARANTINE_NOT_FOUND: "Ce logo masqué n'existe plus.",
   QUARANTINE_CLOSED: "Ce logo a déjà été rétabli ou supprimé.",
   TEAM_HAS_NEW_LOGO: "L'équipe a envoyé un nouveau logo depuis : l'ancien ne peut pas le remplacer.",

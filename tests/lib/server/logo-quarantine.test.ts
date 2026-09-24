@@ -41,7 +41,7 @@ const flush = () => new Promise((resolve) => setImmediate(resolve));
 const actor = { userId: 1, pseudo: "Admin" };
 const LOGO = "/api/uploads/teams/4-abc.webp";
 const LIVE = path.join(process.cwd(), "public", "uploads", "teams", "4-abc.webp");
-const HIDDEN = path.join(quarantineDirectory(), "4-abc.webp");
+const HIDDEN = path.join(quarantineDirectory(), "team-4-4-abc.webp");
 
 let pool: { execute: jest.Mock<SqlQuery>; getConnection: () => Promise<unknown> };
 let connection: ReturnType<typeof connectionMock>;
@@ -60,7 +60,9 @@ beforeEach(() => {
 
 describe("logoFileLocations", () => {
   it("situe un logo téléversé en ligne et en quarantaine", () => {
-    expect(logoFileLocations(LOGO)).toEqual({ live: LIVE, quarantined: HIDDEN });
+    expect(logoFileLocations(LOGO, 4)).toEqual({ live: LIVE, quarantined: HIDDEN });
+    // Deux équipes qui partagent un fichier ne se disputent pas la copie.
+    expect(logoFileLocations(LOGO, 5)?.quarantined).not.toBe(HIDDEN);
     expect(HIDDEN).toContain(path.join("data", "quarantine", "teams"));
   });
 
@@ -71,7 +73,7 @@ describe("logoFileLocations", () => {
     "/api/uploads/teams/sous/dossier.webp",
     "/api/uploads/teams/4-abc.png",
   ])("refuse ce qui n'est pas un logo d'équipe du site : %s", (url) => {
-    expect(logoFileLocations(url)).toBeNull();
+    expect(logoFileLocations(url, 4)).toBeNull();
   });
 });
 
@@ -165,6 +167,13 @@ describe("hideTeamLogo", () => {
     await expect(hideTeamLogo(12, 4, actor)).rejects.toThrow("LOGO_CHANGED");
     expect(unlink).toHaveBeenCalledWith(HIDDEN);
     expect(rename).not.toHaveBeenCalled();
+  });
+
+  it("refuse clairement un logo dont le fichier n'existe plus, sans rien écrire", async () => {
+    jest.mocked(rename).mockRejectedValueOnce(Object.assign(new Error("absent"), { code: "ENOENT" }));
+    install([reportTargets, team, notShared], []);
+    await expect(hideTeamLogo(12, 4, actor)).rejects.toThrow("LOGO_FILE_MISSING");
+    expect(connection.execute).not.toHaveBeenCalled();
   });
 
   it("refuse une équipe que le signalement ne vise pas, et un signalement inconnu", async () => {
@@ -303,9 +312,9 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
 
 describe("quarantinedLogoFile", () => {
   it("ne sert que l'aperçu d'un logo encore masqué", async () => {
-    install([[/SELECT logo_url, status FROM bg_logo_quarantines/, () => [[{ logo_url: LOGO, status: "HIDDEN" }]]]]);
+    install([[/SELECT logo_url, team_id, status FROM bg_logo_quarantines/, () => [[{ logo_url: LOGO, team_id: 4, status: "HIDDEN" }]]]]);
     await expect(quarantinedLogoFile(30)).resolves.toBe(HIDDEN);
-    install([[/SELECT logo_url, status FROM bg_logo_quarantines/, () => [[{ logo_url: LOGO, status: "RESTORED" }]]]]);
+    install([[/SELECT logo_url, team_id, status FROM bg_logo_quarantines/, () => [[{ logo_url: LOGO, team_id: 4, status: "RESTORED" }]]]]);
     await expect(quarantinedLogoFile(30)).resolves.toBeNull();
   });
 });

@@ -49,15 +49,22 @@ export function quarantineDirectory(): string {
  * Les deux emplacements d'un logo — en ligne et en quarantaine —, ou `null` si
  * l'adresse n'est pas celle d'un logo d'équipe téléversé (une adresse étrangère
  * ne se déplace pas, elle n'est pas à nous).
+ *
+ * Le nom en quarantaine porte **l'équipe** : un même fichier partagé par deux
+ * équipes masquées l'une après l'autre y ferait sinon deux copies au même
+ * chemin, et supprimer l'une effacerait celle dont l'autre a encore besoin.
  */
-export function logoFileLocations(logoUrl: string): { live: string; quarantined: string } | null {
+export function logoFileLocations(
+  logoUrl: string,
+  teamId: number,
+): { live: string; quarantined: string } | null {
   const relative = toDiskUploadPath(logoUrl);
   if (!relative || !relative.startsWith(TEAM_UPLOAD_PREFIX)) return null;
   const filename = relative.slice(TEAM_UPLOAD_PREFIX.length);
-  if (!LOGO_FILENAME.test(filename)) return null;
+  if (!LOGO_FILENAME.test(filename) || !Number.isSafeInteger(teamId) || teamId <= 0) return null;
   return {
     live: path.join(process.cwd(), "public", "uploads", "teams", filename),
-    quarantined: path.join(quarantineDirectory(), filename),
+    quarantined: path.join(quarantineDirectory(), `team-${teamId}-${filename}`),
   };
 }
 
@@ -121,6 +128,7 @@ async function teamMemberRecipients(teamId: number): Promise<DiscordRecipient[]>
  * @throws TEAM_NOT_TARGETED
  * @throws TEAM_HAS_NO_LOGO
  * @throws LOGO_NOT_MOVABLE Le logo n'est pas un fichier du site.
+ * @throws LOGO_FILE_MISSING Le fichier désigné n'existe plus sur le disque.
  * @throws LOGO_CHANGED
  */
 export async function hideTeamLogo(reportId: number, teamId: number, actor: ReportPerson): Promise<LogoQuarantineView> {
@@ -147,7 +155,7 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
   if (teams.length === 0 || !teams[0].logo_url) throw new Error("TEAM_HAS_NO_LOGO");
   const logoUrl = teams[0].logo_url;
   const teamName = teams[0].name;
-  const files = logoFileLocations(logoUrl);
+  const files = logoFileLocations(logoUrl, teamId);
   if (!files) throw new Error("LOGO_NOT_MOVABLE");
 
   // Un même fichier peut être désigné par plusieurs équipes (le jeu de test en
@@ -160,11 +168,19 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
   );
   const shared = Number(sharing[0]?.total ?? 0) > 0;
 
-  if (shared) {
-    await mkdir(path.dirname(files.quarantined), { recursive: true });
-    await copyFile(files.live, files.quarantined);
-  } else {
-    await moveFile(files.live, files.quarantined);
+  try {
+    if (shared) {
+      await mkdir(path.dirname(files.quarantined), { recursive: true });
+      await copyFile(files.live, files.quarantined);
+    } else {
+      await moveFile(files.live, files.quarantined);
+    }
+  } catch (error) {
+    // La colonne désigne un fichier absent (sauvegarde restaurée, ménage à la
+    // main) : il n'y a rien à garder pour un rétablissement. Le refus le dit, et
+    // le retrait immédiat reste le geste qui vide la colonne.
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("LOGO_FILE_MISSING");
+    throw error;
   }
 
   const hiddenAt = new Date();
@@ -300,7 +316,7 @@ export async function restoreTeamLogo(quarantineId: number, actor: ReportPerson)
     );
     if (teams.length === 0) throw new Error("QUARANTINE_NOT_FOUND");
     if (teams[0].logo_url) throw new Error("TEAM_HAS_NEW_LOGO");
-    const located = logoFileLocations(row.logo_url);
+    const located = logoFileLocations(row.logo_url, Number(row.team_id));
     if (!located) throw new Error("LOGO_NOT_MOVABLE");
     files = located;
 
@@ -373,7 +389,7 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
 
   // Après le commit : un `unlink` ne se défait pas. Un échec laisse un résidu
   // dans un dossier que rien ne sert.
-  const files = logoFileLocations(row.logo_url);
+  const files = logoFileLocations(row.logo_url, Number(row.team_id));
   if (files) {
     await unlinkIfPresent(files.quarantined).catch((error) => {
       console.error("[moderation] fichier en quarantaine non effacé", error);
@@ -431,10 +447,9 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
 /** Chemin du fichier d'un logo en quarantaine, pour l'aperçu du panneau. */
 export async function quarantinedLogoFile(quarantineId: number): Promise<string | null> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { logo_url: string; status: LogoQuarantineStatus })[]>(
-    `SELECT logo_url, status FROM bg_logo_quarantines WHERE id = ? LIMIT 1`,
-    [quarantineId],
-  );
+  const [rows] = await db.execute<
+    (RowDataPacket & { logo_url: string; team_id: number; status: LogoQuarantineStatus })[]
+  >(`SELECT logo_url, team_id, status FROM bg_logo_quarantines WHERE id = ? LIMIT 1`, [quarantineId]);
   if (rows.length === 0 || rows[0].status !== "HIDDEN") return null;
-  return logoFileLocations(rows[0].logo_url)?.quarantined ?? null;
+  return logoFileLocations(rows[0].logo_url, Number(rows[0].team_id))?.quarantined ?? null;
 }

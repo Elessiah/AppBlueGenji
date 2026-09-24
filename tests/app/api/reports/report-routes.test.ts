@@ -106,6 +106,7 @@ describe("POST /api/reports", () => {
   it.each<[string, number]>([
     ["REPORT_TARGET_NOT_FOUND", 400],
     ["REPORT_CONTEST_LOGIN_REQUIRED", 401],
+    ["REPORT_TARGETS_REQUIRE_LOGIN", 401],
     ["REPORT_NOT_CONCERNED", 403],
     ["REPORTS_SATURATED", 429],
   ])("traduit %s en %i", async (code, status) => {

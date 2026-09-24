@@ -3,17 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/teams-service");
-jest.mock("@/lib/server/terms-acceptance", () =>
-  jest.requireActual<typeof import("../../../helpers/terms-acceptance-double")>(
-    "../../../helpers/terms-acceptance-double",
-  ).termsAcceptanceDouble(),
-);
 
 import { DELETE, POST } from "@/app/api/teams/[id]/logo/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
-import { hasAcceptedCurrentTerms } from "@/lib/server/terms-acceptance";
 import { authUser } from "../../../helpers/auth-user";
 
 const user = authUser({ id: 7 });
@@ -118,7 +112,6 @@ describe("POST /api/teams/[id]/logo — droits et conditions", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(canManageTeam).mockResolvedValue(true);
     jest.mocked(getTeamLogoUrl).mockResolvedValue(null);
-    jest.mocked(hasAcceptedCurrentTerms).mockResolvedValue(true);
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/teams/3-new.webp");
   });
 
@@ -133,22 +126,24 @@ describe("POST /api/teams/[id]/logo — droits et conditions", () => {
     expect(processAndStoreImage).not.toHaveBeenCalled();
   });
 
-  it("refuse en 409 à qui gère l'équipe sans avoir accepté les conditions, sans rien écrire", async () => {
-    jest.mocked(hasAcceptedCurrentTerms).mockResolvedValue(false);
+  it("refuse en 409 à qui gère l'équipe sans avoir accepté les conditions, et efface le fichier neuf", async () => {
+    jest.mocked(updateTeamLogo).mockRejectedValueOnce(new Error("TERMS_ACCEPTANCE_REQUIRED"));
     const res = await POST(fileReq(pngFile()), params("3"));
     expect(res.status).toBe(409);
     expect(await res.json()).toEqual({ error: "TERMS_ACCEPTANCE_REQUIRED" });
-    expect(processAndStoreImage).not.toHaveBeenCalled();
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/3-new.webp");
   });
 
-  it("n'exige pas les conditions du staff qui gère une fantôme", async () => {
+  it("n'interroge la fantôme que si le rôle manque", async () => {
+    await POST(fileReq(pngFile()), params("3"));
+    expect(isGhostTeam).not.toHaveBeenCalled();
+
     jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7, isAdmin: true, roles: ["ADMIN"] }));
     jest.mocked(canManageTeam).mockResolvedValue(false);
     jest.mocked(isGhostTeam).mockResolvedValue(true);
-    jest.mocked(hasAcceptedCurrentTerms).mockResolvedValue(false);
     const res = await POST(fileReq(pngFile()), params("3"));
     expect(res.status).toBe(200);
-    expect(hasAcceptedCurrentTerms).not.toHaveBeenCalled();
+    expect(updateTeamLogo).toHaveBeenLastCalledWith(7, 3, "/api/uploads/teams/3-new.webp", true);
   });
 
   it("efface le fichier neuf quand l'écriture est refusée entre-temps", async () => {

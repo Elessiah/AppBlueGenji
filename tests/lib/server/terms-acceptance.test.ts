@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 
 import { getDatabase } from "@/lib/server/database";
+import { clearCache } from "@/lib/server/cache";
 import {
   assertTermsAccepted,
   hasAcceptedCurrentTerms,
@@ -17,6 +18,7 @@ import { fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-doubl
 const execute = jest.fn<SqlQuery>();
 
 beforeEach(() => {
+  clearCache();
   execute.mockReset();
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
 });
@@ -94,30 +96,48 @@ describe("recordTermsAcceptanceIfBehind", () => {
 });
 
 describe("needsTermsForTeamManagement", () => {
+  const row = (terms_version: number | null, roles_json: unknown, team_id: number | null) => ({
+    terms_version,
+    roles_json,
+    team_id,
+  });
+
   it("ne demande rien à un compte absent ou supprimé", async () => {
     execute.mockResolvedValueOnce([[]]);
-    await expect(needsTermsForTeamManagement(4)).resolves.toBe(false);
+    await expect(needsTermsForTeamManagement(40)).resolves.toBe(false);
   });
 
-  it("ne demande rien à qui a déjà accepté, sans même lire ses équipes", async () => {
-    execute.mockResolvedValueOnce([[{ terms_version: TERMS_VERSION }]]);
-    await expect(needsTermsForTeamManagement(4)).resolves.toBe(false);
+  it("ne demande rien à qui a déjà accepté", async () => {
+    execute.mockResolvedValueOnce([[row(TERMS_VERSION, '["OWNER"]', 3)]]);
+    await expect(needsTermsForTeamManagement(41)).resolves.toBe(false);
+  });
+
+  it("demande à un gérant qui n'a pas accepté, en une seule requête", async () => {
+    execute.mockResolvedValueOnce([[row(null, '["DPS","MANAGER"]', 3)]]);
+    await expect(needsTermsForTeamManagement(42)).resolves.toBe(true);
     expect(execute).toHaveBeenCalledTimes(1);
-  });
-
-  it("demande à un propriétaire ou un gérant qui n'a pas accepté", async () => {
-    execute.mockResolvedValueOnce([[{ terms_version: null }]]).mockResolvedValueOnce([[{ roles_json: '["DPS","MANAGER"]' }]]);
-    await expect(needsTermsForTeamManagement(4)).resolves.toBe(true);
-    const [sql] = execute.mock.calls[1];
+    const [sql] = execute.mock.calls[0];
     // Équipe vivante, appartenance en cours, jamais une entrée solo.
-    expect(sql).toMatch(/left_at IS NULL/);
-    expect(sql).toMatch(/deleted_at IS NULL/);
-    expect(sql).toMatch(/solo_user_id IS NULL/);
+    expect(sql).toMatch(/tm.left_at IS NULL/);
+    expect(sql).toMatch(/t.deleted_at IS NULL/);
+    expect(sql).toMatch(/t.solo_user_id IS NULL/);
   });
 
-  it("ne demande rien à un simple joueur", async () => {
-    execute.mockResolvedValueOnce([[{ terms_version: null }]]).mockResolvedValueOnce([[{ roles_json: ["TANK", "CAPITAINE"] }]]);
-    await expect(needsTermsForTeamManagement(4)).resolves.toBe(false);
+  it("ne compte ni un simple joueur, ni le rôle d'une équipe dissoute", async () => {
+    execute.mockResolvedValueOnce([[row(null, ["TANK", "CAPITAINE"], 3), row(null, '["OWNER"]', null)]]);
+    await expect(needsTermsForTeamManagement(43)).resolves.toBe(false);
+  });
+
+  it("garde sa réponse un moment, et l'oublie dès que le compte accepte", async () => {
+    execute.mockResolvedValueOnce([[row(null, '["OWNER"]', 3)]]);
+    await expect(needsTermsForTeamManagement(44)).resolves.toBe(true);
+    await expect(needsTermsForTeamManagement(44)).resolves.toBe(true);
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    execute.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{}]);
+    await recordTermsAcceptance(44, "TEAM_MANAGEMENT");
+    execute.mockResolvedValueOnce([[row(TERMS_VERSION, '["OWNER"]', 3)]]);
+    await expect(needsTermsForTeamManagement(44)).resolves.toBe(false);
   });
 });
 

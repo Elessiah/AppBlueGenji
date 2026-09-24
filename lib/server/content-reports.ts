@@ -262,11 +262,19 @@ export async function resolveReportTargets(
  * que le signalant doit savoir, et le panneau le montre qu'elle soit partie ou
  * non. Un bot injoignable ne doit ni ralentir ni faire échouer l'envoi.
  *
+ * **Désigner des cibles exige un compte.** Chaque cible désignée reçoit un
+ * message privé : ouvert aux visiteurs anonymes, le formulaire ferait écrire le
+ * bot à n'importe quel joueur dont on devine l'identifiant, sans autre borne
+ * qu'un plafond par IP. Un visiteur sans compte décrit ce qu'il signale — le
+ * formulaire ne lui propose d'ailleurs aucun sélecteur.
+ *
+ * @throws REPORT_TARGETS_REQUIRE_LOGIN Des cibles désignées sans compte.
  * @throws REPORTS_SATURATED Trop de signalements reçus dans l'heure.
  * @throws REPORT_TARGET_NOT_FOUND Une cible n'existe pas ou n'est pas visible.
  */
 export async function createReport(submission: ReportSubmission, viewer: ReportViewer): Promise<number> {
   if (submission.category === "CONTEST") return createContest(submission, viewer);
+  if (viewer.userId === null && submission.targets.length > 0) throw new Error("REPORT_TARGETS_REQUIRE_LOGIN");
   const db = await getDatabase();
   const connection = await db.getConnection();
   let reportId: number;

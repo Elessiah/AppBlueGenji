@@ -4,7 +4,7 @@ import { useEffect, useId, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createPortal } from "react-dom";
-import { CyberButton } from "@/components/cyber";
+import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -103,15 +103,17 @@ export function TermsAcceptanceModal({ initiallyRequired, privacyPending }: Term
         <h2 id={titleId} className={styles.title}>
           Tu gères désormais une équipe
         </h2>
-        <p className={styles.text}>
-          Tu es propriétaire ou gérant d&apos;une équipe. Avant de la gérer — logo, membres, invitations —,
-          accepte les conditions d&apos;utilisation du site.
-        </p>
-        <p className={styles.text}>
-          Elles rappellent notamment que <strong>tu garantis détenir les droits</strong> sur le logo et les
-          contenus que tu publies pour ton équipe : un logo de club, de marque ou d&apos;éditeur de jeu ne se
-          reprend pas sans l&apos;accord de son titulaire.
-        </p>
+        <ScrollArea orientation="y" className={styles.body} ariaLabel="Présentation des conditions">
+          <p className={styles.text}>
+            Tu es propriétaire ou gérant d&apos;une équipe. Avant de la gérer — logo, membres, invitations —,
+            accepte les conditions d&apos;utilisation du site.
+          </p>
+          <p className={styles.text}>
+            Elles rappellent notamment que <strong>tu garantis détenir les droits</strong> sur le logo et les
+            contenus que tu publies pour ton équipe : un logo de club, de marque ou d&apos;éditeur de jeu ne se
+            reprend pas sans l&apos;accord de son titulaire.
+          </p>
+        </ScrollArea>
         <label className={styles.check}>
           <input type="checkbox" checked={checked} onChange={(event) => setChecked(event.target.checked)} />
           <span>

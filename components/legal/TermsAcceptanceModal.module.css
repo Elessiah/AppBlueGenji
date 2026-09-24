@@ -14,7 +14,6 @@
 .modal {
   width: min(540px, 100%);
   max-height: calc(100dvh - 32px);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -28,6 +27,16 @@
 
 .modal:focus {
   outline: none;
+}
+
+/* Seuls les paragraphes défilent (par `ScrollArea`) : sur un petit écran, la
+   case et les deux boutons restent en vue. */
+.body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 .title {

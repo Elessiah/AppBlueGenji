@@ -14,7 +14,10 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
    **toutes** les pages : `PublicFooter` (vitrine), `SiteFooterBar` (espace
    connecté et `/connexion`). Il ouvre `ReportProblemDialog`, en deux étapes :
    la catégorie, puis le détail. Ouvert **à tous** — un titulaire de droits n'a
-   pas de compte.
+   pas de compte. **Désigner des cibles exige un compte**
+   (`REPORT_TARGETS_REQUIRE_LOGIN`) : chaque cible reçoit un message privé, et
+   ouvert aux anonymes le formulaire ferait écrire le bot à n'importe quel
+   joueur dont on devine l'identifiant. Sans compte, on décrit ce qu'on signale.
 2. **Prévenir.** L'enregistrement déclenche, sans être attendus :
    - une alerte à la **direction** (`POST /internal/notify/leadership` du bot :
      salon de logs + message privé à `OWNER_ID` et `PRESIDENT`) ;

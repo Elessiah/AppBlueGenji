@@ -25,7 +25,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "REPORT_NOT_FOUND") return fail(message, 404);
-    if (["TEAM_NOT_TARGETED", "TEAM_HAS_NO_LOGO", "LOGO_CHANGED", "LOGO_NOT_MOVABLE"].includes(message)) {
+    if (["TEAM_NOT_TARGETED", "TEAM_HAS_NO_LOGO", "LOGO_CHANGED", "LOGO_NOT_MOVABLE", "LOGO_FILE_MISSING"].includes(message)) {
       return fail(message, 409);
     }
     console.error("[moderation] masquage du logo impossible", error);

@@ -22,7 +22,7 @@
  * contenir n'importe quoi, ne part jamais.
  */
 
-import type { LogoQuarantineView } from "./logo-quarantine";
+import { LOGO_QUARANTINE_DAYS, type LogoQuarantineView } from "./logo-quarantine";
 
 /**
  * Catégories d'un signalement.
@@ -536,7 +536,9 @@ export const REPORT_PRIVACY_NOTICE = {
     "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ton adresse, ta description ni le pseudo d'un joueur. Les joueurs et les membres des équipes visés sont prévenus et peuvent lire ta description pour y répondre — jamais ton nom, ton adresse ni ton compte.",
   contestRecipients:
     "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. L'auteur du signalement n'est pas informé de ta contestation.",
-  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé.`,
+  // La prolongation est dite ici, et non seulement sur `/rgpd` : c'est cette
+  // phrase-là que la case de consentement accepte.
+  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo est masqué à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_DAYS / 30} mois au plus).`,
   legalBasis:
     "Base légale : ton consentement, et pour un contenu illicite l'obligation faite à l'hébergeur de traiter les notifications (règlement européen sur les services numériques, art. 16).",
   rights:
@@ -575,6 +577,8 @@ export function reportErrorMessage(code: string | null | undefined): string {
       return "Choisis le signalement que tu contestes.";
     case "REPORT_CONTEST_LOGIN_REQUIRED":
       return "Connecte-toi pour contester un signalement qui te concerne.";
+    case "REPORT_TARGETS_REQUIRE_LOGIN":
+      return "Connecte-toi pour désigner des joueurs, équipes ou tournois — ou décris-les dans ton message.";
     case "REPORT_NOT_CONCERNED":
       return "Tu ne peux contester qu'un signalement qui te vise, toi ou une équipe dont tu es membre.";
     case "REPORTS_SATURATED":

@@ -100,14 +100,14 @@ describe("createReport", () => {
       ],
     );
 
-    await expect(createReport(submission(), { userId: null, managesTournaments: false })).resolves.toBe(12);
+    await expect(createReport(submission(), { userId: 3, managesTournaments: false })).resolves.toBe(12);
 
     const insert = connection.execute.mock.calls.find(([sql]) => /INSERT INTO bg_reports/.test(sql));
     expect(insert?.[1]).toEqual([
       "COPYRIGHT",
       "Le logo de cette équipe reprend celui de notre club.",
       "/equipes/4",
-      null,
+      3,
       "Club Exemple",
       "juridique@exemple.fr",
       "HOLDER",
@@ -197,9 +197,28 @@ describe("createReport", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
+  it("refuse qu'un visiteur sans compte désigne des cibles — chacune recevrait un message privé", async () => {
+    install([], []);
+    await expect(createReport(submission(), { userId: null, managesTournaments: false })).rejects.toThrow(
+      "REPORT_TARGETS_REQUIRE_LOGIN",
+    );
+    expect(pool.execute).not.toHaveBeenCalled();
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("accepte le signalement sans cible d'un visiteur sans compte", async () => {
+    install(
+      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 15 }]]],
+    );
+    await expect(
+      createReport(submission({ category: "OTHER", targets: [] }), { userId: null, managesTournaments: false }),
+    ).resolves.toBe(15);
+  });
+
   it("refuse au-delà du plafond horaire, sans rien écrire", async () => {
     install([], [countRoute(60)]);
-    await expect(createReport(submission(), { userId: null, managesTournaments: false })).rejects.toThrow(
+    await expect(createReport(submission(), { userId: 3, managesTournaments: false })).rejects.toThrow(
       "REPORTS_SATURATED",
     );
     expect(connection.rollback).toHaveBeenCalled();
@@ -209,7 +228,7 @@ describe("createReport", () => {
 
   it("refuse une cible disparue ou invisible", async () => {
     install([], [countRoute(0), [/FROM bg_teams/, () => [[TEAM_ROW]]], [/FROM bg_users/, () => [[]]]]);
-    await expect(createReport(submission(), { userId: null, managesTournaments: false })).rejects.toThrow(
+    await expect(createReport(submission(), { userId: 3, managesTournaments: false })).rejects.toThrow(
       "REPORT_TARGET_NOT_FOUND",
     );
     expect(connection.rollback).toHaveBeenCalled();

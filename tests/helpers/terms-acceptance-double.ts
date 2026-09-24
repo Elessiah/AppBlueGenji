@@ -26,5 +26,6 @@ export function termsAcceptanceDouble(): typeof TermsAcceptance {
     assertTermsAccepted: jest.fn<typeof TermsAcceptance.assertTermsAccepted>(async () => undefined),
     needsTermsForTeamManagement: jest.fn<typeof TermsAcceptance.needsTermsForTeamManagement>(async () => false),
     listTermsAcceptances: jest.fn<typeof TermsAcceptance.listTermsAcceptances>(async () => []),
+    TERMS_NEED_TTL_MS: 30_000,
   };
 }

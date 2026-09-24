@@ -22,6 +22,8 @@
  * Voir `docs/features/PRIVACY_CHANGES_CONSENT.md`.
  */
 
+import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
+import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -140,7 +142,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     publishedAt: "2026-09-25",
     title: "Lancement des matchs : tes contacts présentés à ton adversaire et au caster",
     summary:
-      "Au lancement d'un match, les joueurs des deux équipes et le caster voient le tag Discord certifié et le BattleTag d'un ou deux joueurs de chaque équipe, le temps de la rencontre.",
+      "Au lancement d'un match, les deux équipes et le caster voient le tag Discord certifié et le BattleTag d'un ou deux joueurs de chaque équipe.",
     details: [
       "Pour chaque équipe, le site présente le capitaine, un manager ou le propriétaire — en priorité un joueur dont le tag Discord ou le BattleTag est vérifié —, et un second joueur si c'est le seul moyen d'avoir à la fois un contact Discord et un BattleTag.",
       "Un tag Discord non certifié n'est jamais montré. Un BattleTag l'est même non vérifié, avec la mention « non vérifié » : c'est par lui qu'on s'ajoute en jeu.",
@@ -156,12 +158,28 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     publishedAt: "2026-09-25",
     title: "Suppression de compte : effacement élargi, pseudo de remplacement",
     summary:
-      "Un compte supprimé qui n'a joué aucun match est désormais effacé entièrement. Un compte qui a joué garde ses résultats sous un pseudo d'emprunt, sans plus rien qui te désigne.",
+      "Un compte supprimé qui n'a joué aucun match est désormais effacé entièrement. Un compte qui a joué garde ses résultats sous un pseudo d'emprunt.",
     details: [
       "Si tu n'as disputé aucun match (et que tu n'as organisé aucun tournoi, ne possèdes aucune équipe ni n'es inscrit à un tournoi individuel), la suppression efface ton compte entièrement — y compris si ton équipe avait été inscrite à un tournoi sans que tu joues.",
       "Si tu as joué, tes résultats restent, parce qu'ils appartiennent aussi aux équipes que tu as affrontées. Ton pseudo est alors remplacé par un pseudo d'emprunt tiré au hasard, et ta fiche indique clairement que le compte a été supprimé.",
       "Tout ce qui te désigne est effacé : tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles sur le site et historique de tes consentements.",
       "Les comptes déjà supprimés suivent la même règle : ceux sans match sont effacés, les autres reçoivent un pseudo d'emprunt.",
+    ],
+  },
+  // Trois traitements nouveaux d'un coup : les signalements (et ce qu'on en dit
+  // aux personnes visées), le masquage d'un logo, et la trace de l'acceptation
+  // des conditions d'utilisation. Durées lues sur les constantes du code.
+  {
+    id: "2026-09-signalements-conditions",
+    publishedAt: "2026-09-25",
+    title: "Signalements et contestation",
+    summary: "Tu es prévenu d'un signalement qui te vise, et tu peux le contester.",
+    details: [
+      "Un signalement garde sa catégorie, sa description, les joueurs, équipes ou tournois désignés, le compte de son auteur et, s'il les indique, son nom et son adresse. Il est lu par les administrateurs, puis effacé " +
+        `${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après son archivage — plus tard s'il tient un logo masqué, jusqu'à l'échéance de la contestation.`,
+      "Si un signalement te vise, toi ou une équipe dont tu es membre, tu reçois un message privé Discord (si ton compte Discord est rattaché ou ton tag certifié). Tu lis ce qui est reproché — jamais qui l'a signalé — et tu peux le contester ; une contestation rouvre un signalement archivé.",
+      `Un logo d'équipe signalé peut être masqué : il n'est plus en ligne, et il est supprimé définitivement au bout de ${LOGO_QUARANTINE_DAYS / 30} mois sans contestation, ou rétabli si la contestation aboutit. Tes coéquipiers et toi en êtes prévenus.`,
+      "L'acceptation des conditions d'utilisation (à la création du compte, d'une équipe, ou en recevant la gestion d'une équipe) est enregistrée avec sa date et sa version ; elle figure dans l'export de tes données.",
     ],
   },
 ];
