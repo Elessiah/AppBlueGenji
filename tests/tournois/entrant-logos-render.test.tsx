@@ -172,6 +172,7 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     liveTrigger: null,
     liveUrl: null,
     liveStartedAt: null,
+    replayUrl: null,
     ...overrides,
   };
 }

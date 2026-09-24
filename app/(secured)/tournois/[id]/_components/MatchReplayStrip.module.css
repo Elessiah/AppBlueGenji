@@ -1,0 +1,73 @@
+/* Bandeau de rediff d'un match terminé — voir `MatchReplayStrip.tsx`.
+   Bleu glacier, la couleur d'accent du site : le rouge reste réservé à ce qui
+   est réellement à l'antenne, et une rediff ne l'est plus. */
+
+.banner {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid rgba(90, 200, 255, 0.45);
+  background: rgba(90, 200, 255, 0.14);
+}
+
+.link {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #bfe9ff;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.link:hover {
+  background: rgba(90, 200, 255, 0.12);
+  color: #ffffff;
+}
+
+.link:focus-visible {
+  outline: 2px solid #5ac8ff;
+  outline-offset: -2px;
+}
+
+.icon {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #5ac8ff;
+  color: #06080c;
+  font-size: 8px;
+  line-height: 1;
+}
+
+.staffOnly {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 6px;
+  border-top: 1px solid var(--border, #444);
+}
+
+.edit {
+  align-self: center;
+  margin: 0 6px 0 0;
+  padding: 2px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.staffOnly .edit {
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .link {
+    transition: none;
+  }
+}

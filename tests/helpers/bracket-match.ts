@@ -37,6 +37,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     liveTrigger: null,
     liveUrl: null,
     liveStartedAt: null,
+    replayUrl: null,
     ...overrides,
   };
 }

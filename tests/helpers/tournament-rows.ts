@@ -116,6 +116,7 @@ export function matchRow(overrides: RowOverrides<MatchRow> = {}): MatchRow {
     live_trigger: null,
     live_url: null,
     live_started_at: null,
+    replay_url: null,
   };
   return { ...columns, ...overrides } as MatchRow;
 }

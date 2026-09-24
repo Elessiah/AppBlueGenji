@@ -16,6 +16,11 @@ type LiveControls = {
   openConfig: (match: BracketMatch) => void;
   /** Ouvre la date de début d'un match. */
   openSchedule: (match: BracketMatch) => void;
+  /**
+   * Ouvre le lien de rediff d'un match terminé — même public que la diffusion
+   * (`canManage`), dont la rediff est la suite.
+   */
+  openReplay: (match: BracketMatch) => void;
 };
 
 const LiveContext = createContext<LiveControls>({
@@ -23,6 +28,7 @@ const LiveContext = createContext<LiveControls>({
   canSchedule: false,
   openConfig: () => undefined,
   openSchedule: () => undefined,
+  openReplay: () => undefined,
 });
 
 /**
@@ -38,11 +44,12 @@ export function LiveProvider({
   canSchedule,
   openConfig,
   openSchedule,
+  openReplay,
   children,
 }: LiveControls & { children: ReactNode }) {
   const value = useMemo(
-    () => ({ canManage, canSchedule, openConfig, openSchedule }),
-    [canManage, canSchedule, openConfig, openSchedule],
+    () => ({ canManage, canSchedule, openConfig, openSchedule, openReplay }),
+    [canManage, canSchedule, openConfig, openSchedule, openReplay],
   );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }
