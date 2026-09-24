@@ -46,9 +46,16 @@ export function seedingSource(format: TournamentFormat, manualSeeding: boolean):
 /**
  * L'ordre affiché (celui de la colonne `seed`) est-il bien celui qui sera joué ?
  *
- * Non en `RANKING` : la liste montre alors l'ordre d'arrivée des inscriptions
- * alors que le moteur seedera depuis le classement du site. Le dire évite le
- * malentendu — le staff croit lire le tirage, il ne lit que des inscriptions.
+ * Non en `RANKING` : la colonne `seed` y garde l'ordre d'arrivée des
+ * inscriptions alors que le moteur seede depuis le classement du site. Le dire
+ * évite le malentendu — le staff croit lire le tirage, il ne lit que des
+ * inscriptions.
+ *
+ * Ne suffit pas, seul, à décider d'un avertissement : avant le coup d'envoi,
+ * l'instantané range lui-même la liste par le classement
+ * (`registrationsFollowRanking`), qui **est** alors le tirage prévu. Seule une
+ * liste en `RANKING` qui ne suit pas le classement (tournoi lancé) mérite
+ * l'avertissement.
  */
 export function isSeedOrderEffective(source: SeedingSource): boolean {
   return source !== "RANKING";
