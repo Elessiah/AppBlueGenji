@@ -218,11 +218,20 @@ describe("pauses — feuilles des notifications et du bandeau", () => {
     expect(toast).toMatch(/:global\(:root\[data-a11y~="motion"\]\) \.progress \{[^}]*display: none/);
   });
 
-  it("le bandeau s'arrête au survol, au focus et au bouton pause — après la règle de la piste", () => {
+  it("le bandeau s'arrête au survol de la piste et au bouton pause — après la règle de la piste", () => {
     const track = ticker.indexOf(".track {");
     const pause = ticker.indexOf(".ticker[data-paused] .track");
-    expect(ticker).toMatch(/\.ticker:hover \.track,\s*\.ticker:focus-within \.track,\s*\.ticker\[data-paused\] \.track \{[^}]*animation-play-state: paused/);
+    expect(ticker).toMatch(/\.track:hover,\s*\.ticker\[data-paused\] \.track \{[^}]*animation-play-state: paused/);
     expect(pause).toBeGreaterThan(track);
+  });
+
+  // Le bouton est le seul élément focalisable du bandeau, et un clic le
+  // focalise : un arrêt au focus (ou au survol du bandeau entier, bouton
+  // compris) tenait la piste figée après « ▶ » — la reprise ne reprenait rien.
+  it("ni le focus ni le survol du bouton ne figent la piste", () => {
+    expect(ticker).not.toMatch(/:focus-within/);
+    expect(ticker).not.toMatch(/:focus-visible[^{]*\.track/);
+    expect(ticker).not.toMatch(/\.ticker:hover/);
   });
 
   it("les boutons pause tiennent au moins 24 px", () => {
