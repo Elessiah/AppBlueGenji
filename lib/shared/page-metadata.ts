@@ -14,6 +14,17 @@
 import type { Metadata } from "next";
 import { SITE_NAME } from "./share-metadata";
 
+/** Le gabarit de titre du site, celui que déclare la mise en page racine. */
+export const SITE_TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
+
+/**
+ * Un titre écrit **avec** le nom du site, là où le gabarit ne s'applique pas :
+ * un encart de partage, ou un `title.absolute`.
+ */
+export function siteTitle(title: string): string {
+  return SITE_TITLE_TEMPLATE.replace("%s", title);
+}
+
 /**
  * L'image d'aperçu par défaut du site, rendue par `app/opengraph-image.tsx`.
  *
@@ -61,7 +72,7 @@ export function pageMetadata({
   const share = shareDescription ?? description;
   // L'encart, lui, n'hérite d'aucun gabarit : son titre porte le nom du site,
   // sans quoi « Bénévoles » collé seul dans un salon ne dit pas de qui il parle.
-  const shareTitle = `${title} · ${SITE_NAME}`;
+  const shareTitle = siteTitle(title);
 
   return {
     // `absolute` court-circuite le gabarit : ici non pour l'éviter — il ne
@@ -85,4 +96,20 @@ export function pageMetadata({
       images: [DEFAULT_SHARE_IMAGE],
     },
   };
+}
+
+/**
+ * Le titre d'une **mise en page** de segment, qui nomme sa page et laisse le
+ * gabarit du site aux pages qu'elle contient.
+ *
+ * Un titre en chaîne ne suffit pas, et la panne ne se voit que sur les
+ * sous-pages : Next transmet aux segments enfants le gabarit du titre **résolu**
+ * de la mise en page, qu'une chaîne remet à `null`. Posé en `"Tournois"`,
+ * `/tournois` s'intitulait bien « Tournois · BlueGenji Esport », mais
+ * `/tournois/creer` devenait « Créer un tournoi » tout court. `default` nomme la
+ * page du segment (en passant par le gabarit de la racine), `template` le
+ * repose pour les suivantes.
+ */
+export function segmentTitle(title: string): { default: string; template: string } {
+  return { default: title, template: SITE_TITLE_TEMPLATE };
 }

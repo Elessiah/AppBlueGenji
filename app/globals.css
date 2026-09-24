@@ -1687,6 +1687,54 @@ html {
   }
 }
 
+/* ── Lien d'évitement « Aller au contenu » ──────────────────────────────────
+   `components/accessibility/SkipLink.tsx`. Hors de l'écran tant qu'il n'a pas
+   le focus — aucun effet visuel sinon —, et **pas** `display: none` ni
+   `visibility: hidden`, qui le retireraient de l'ordre de tabulation. Toujours
+   en contraste renforcé : il doit se lire avant qu'on ait pu régler quoi que ce
+   soit. Au-dessus du bouton d'accessibilité (z-index 120) et des en-têtes. */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 200;
+  padding: 10px 16px;
+  border: 2px solid var(--blue-500);
+  border-radius: 8px;
+  background: #05060a;
+  color: #f4f8fb;
+  font-weight: 600;
+  text-decoration: none;
+  transform: translateY(calc(-100% - 24px));
+}
+
+.skip-link:focus {
+  transform: none;
+  outline: 3px solid #ffffff;
+  outline-offset: 2px;
+}
+
+/* La cible reçoit le focus par programme : un anneau autour de tout le
+   contenu ne dirait rien de plus que le défilement. L'attribut n'existe que le
+   temps de ce focus. Une cible déjà focalisable (`tabindex="0"`, une zone
+   défilante) garde son anneau : elle l'aurait eu au clavier. */
+[data-skip-target][tabindex="-1"]:focus {
+  outline: none;
+}
+
+/* Les en-têtes de la vitrine et de l'espace connecté sont collants : une cible
+   ramenée en haut de la vue passerait dessous (WCAG 2.4.11). La marge couvre
+   la hauteur de l'en-tête, bannière de recrutement comprise. */
+[data-skip-target] {
+  scroll-margin-top: 96px;
+}
+
+@media (forced-colors: active) {
+  .skip-link {
+    border-color: CanvasText;
+  }
+}
+
 /* ── Réglages d'accessibilité du lecteur ─────────────────────────────────────
    Menu du bouton flottant (`components/accessibility/AccessibilityMenu.tsx`,
    registre `lib/shared/accessibility-settings.ts`). Chaque réglage change

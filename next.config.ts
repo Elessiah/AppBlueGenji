@@ -56,6 +56,13 @@ const nextConfig: NextConfig = {
    */
   poweredByHeader: false,
 
+  /**
+   * Le bouton « N » des outils de développement de Next occupait le coin
+   * bas-gauche, **sous** le bouton d'accessibilité, et interceptait ses clics.
+   * Sans effet en production, où l'indicateur n'existe pas.
+   */
+  devIndicators: { position: "top-right" },
+
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

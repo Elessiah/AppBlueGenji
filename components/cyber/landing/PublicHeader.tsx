@@ -58,9 +58,12 @@ export async function PublicHeader() {
                   <span className={styles.ctaShort}>Compétition →</span>
                 </Link>
               </CyberButton>
+              {/* Le libellé **commence** par le pseudo affiché (WCAG 2.5.3) :
+                  « Mon profil » seul remplaçait le texte visible, et la
+                  commande vocale ne répondait plus à ce qu'on lit. */}
               <Link
                 href="/profil"
-                aria-label="Mon profil"
+                aria-label={`${user.pseudo}, mon profil`}
                 style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
               >
                 <UserAvatar

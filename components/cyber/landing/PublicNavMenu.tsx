@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isNavLinkActive } from "@/lib/shared/nav-active";
 import styles from "./PublicNavMenu.module.css";
 
 type NavLink = { href: string; label: string };
@@ -19,6 +20,58 @@ const LINKS: NavLink[] = [
 ];
 
 /**
+ * Échap ferme le panneau et, si le focus y était, le rend au bouton : le
+ * panneau fermé emporte le lien qui avait le focus, et sans ce retour le
+ * clavier repartirait du haut de la page. Rend `true` quand la touche a été
+ * traitée.
+ */
+export function handleMenuEscape(
+  key: string,
+  focused: Element | null,
+  root: { contains(node: Node | null): boolean } | null,
+  button: { focus(): void } | null,
+  close: () => void,
+): boolean {
+  if (key !== "Escape") return false;
+  close();
+  if (root?.contains(focused)) button?.focus();
+  return true;
+}
+
+/**
+ * Le panneau ouvert : les liens de la vitrine, la page courante signalée
+ * autrement que par le style (`aria-current`, WCAG 1.3.1).
+ */
+export function PublicNavPanel({
+  id,
+  pathname,
+  onNavigate,
+}: {
+  id: string;
+  pathname: string | null;
+  onNavigate: () => void;
+}) {
+  return (
+    <nav id={id} className={styles.panel} aria-label="Navigation principale">
+      {LINKS.map((link) => {
+        const isActive = isNavLinkActive(pathname, link.href);
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={isActive ? "page" : undefined}
+            className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
+            onClick={onNavigate}
+          >
+            {link.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
  * Menu de navigation principal des pages vitrine, présenté sous forme de menu
  * burger : un bouton ouvre un panneau listant tous les liens. Se ferme au clic
  * en dehors, sur un lien, ou avec la touche Échap.
@@ -31,11 +84,15 @@ export function PublicNavMenu() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      handleMenuEscape(e.key, document.activeElement, rootRef.current, buttonRef.current, () =>
+        setOpen(false),
+      );
     };
     const onClick = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
@@ -52,12 +109,15 @@ export function PublicNavMenu() {
 
   return (
     <div className={styles.root} ref={rootRef}>
+      {/* Pas d'`aria-haspopup` : il annonce un `role="menu"`, dont le lecteur
+          d'écran attend les flèches — le panneau est une simple navigation. */}
       <button
+        ref={buttonRef}
         type="button"
         className={`${styles.burger} ${open ? styles.burgerOpen : ""}`}
         aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         <span className={styles.bars} aria-hidden="true">
@@ -69,24 +129,7 @@ export function PublicNavMenu() {
       </button>
 
       {open && (
-        <nav className={styles.panel} aria-label="Navigation principale">
-          {LINKS.map((link) => {
-            const isActive =
-              link.href.startsWith("/") &&
-              !link.href.includes("#") &&
-              (pathname === link.href || pathname.startsWith(`${link.href}/`));
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <PublicNavPanel id={panelId} pathname={pathname} onNavigate={() => setOpen(false)} />
       )}
     </div>
   );

@@ -17,6 +17,11 @@ import styles from "./BotLegalDoc.module.css";
  *
  * Composant client : il ne rend PAS `PublicHeader`/`PublicFooter` (qui tirent du
  * code serveur) — ceux-ci restent dans la page serveur qui l'enveloppe.
+ *
+ * Chaque section déclare la langue du texte qu'elle affiche (WCAG 3.1.2) : la
+ * page est `lang="fr"`, et un lecteur d'écran lisait sinon la version anglaise
+ * avec la prononciation française. Posée sur les sections et non sur un
+ * conteneur ajouté, pour ne rien changer à la mise en page de la page hôte.
  */
 export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
   const [lang, setLang] = useState<Lang>("fr");
@@ -26,7 +31,7 @@ export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
   return (
     <>
       {/* HERO */}
-      <section className={`${styles.section} ${styles.heroSection}`}>
+      <section lang={lang} className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <div className={styles.heroTop}>
           <span className="eyebrow">{content.eyebrow}</span>
@@ -49,7 +54,7 @@ export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
       </section>
 
       {content.sections.map((section) => (
-        <section key={section.num} className={styles.section}>
+        <section key={section.num} lang={lang} className={styles.section}>
           <header className={styles.head}>
             <div>
               <span className="eyebrow">SECTION {section.num}</span>
@@ -66,7 +71,7 @@ export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
       ))}
 
       {/* HÉBERGEUR — renvoi vers les mentions légales */}
-      <section className={styles.section}>
+      <section lang={lang} className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">
@@ -98,6 +103,9 @@ function LangSwitch({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => voi
             type="button"
             className={`${styles.langBtn} ${active ? styles.langBtnActive : ""}`}
             aria-pressed={active}
+            // Chaque bouton est écrit dans **sa** langue, quelle que soit celle
+            // de la section qui l'entoure : « English » se prononce en anglais.
+            lang={code}
             onClick={() => onChange(code)}
           >
             {code === "fr" ? "Français" : "English"}
