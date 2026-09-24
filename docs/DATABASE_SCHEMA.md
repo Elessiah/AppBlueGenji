@@ -256,6 +256,14 @@ même chose — une adresse que plus personne ne lit :
   d'une annonce est passé en « AUTO / DISCORD / LIEN » ;
 - `bg_users.email`, détaillé ci-dessous.
 
+S'y ajoute `bg_recruitment_ads.highlight`, pour une autre raison : la mise en
+avant d'une annonce est devenue un **statut d'importance** (`priority`, voir
+`docs/features/RECRUITMENT.md`). Son retrait est précédé d'un report
+(`MODAL` → `PRIORITY`, `BANNER` → `IMPORTANT`) qui **consomme sa source** dans la
+même instruction, et il n'est tenté que si ce report a réussi : un `DROP` refusé
+ne laisse donc rien que le démarrage suivant pourrait réécrire par-dessus un
+statut choisi depuis.
+
 La distinction n'est pas de la coquetterie sur le `DROP COLUMN email`, elle y est
 même plus forte : ce `DROP` **est** l'effacement des adresses. Rien ne lit plus la
 colonne, donc la base démarrerait parfaitement sans lui, et `anonymizeOwnAccount`
