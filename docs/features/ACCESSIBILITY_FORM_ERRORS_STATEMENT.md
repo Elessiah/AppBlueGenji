@@ -97,6 +97,15 @@ champ les refus du bot et les plafonds de débit — y compris
 `BOT_RESOLVE_TIMEOUT`, qui peut tenir au tag comme à la charge du bot. Le code
 porte au passage `autoComplete="one-time-code"`, comme celui de `/connexion`.
 
+Un code **brûlé** (cinq essais) ou expiré est rattaché au champ du code, mais ne
+se corrige pas en le retapant : la seconde étape offre donc **« Nouveau code »**,
+qui ramène à la première, tag conservé — le geste que nomme le refus
+(« Recommence la certification »). Changer d'étape démonte le bouton qui vient
+d'être activé : le dialogue porte alors le focus sur le champ de la nouvelle
+étape (`previousStep`, rien au montage, où `useDialogBehavior` s'en charge),
+sans quoi il tombait sur `<body>`. La rangée de trois boutons passe à la ligne à
+la largeur d'un téléphone.
+
 ### Les phases d'un tournoi multi-phases (`PhaseBuilder`)
 
 `validatePhases` ne rendait qu'un code, sans dire **quelle** phase. La règle est
@@ -116,6 +125,14 @@ sans état à lever. La phrase est **située** (`phaseIssueMessage` : « Phase 2
 en cause (son champ n'existe pas repliée), puis y porte le focus au rendu
 suivant. Les `id` des réglages viennent de `phaseFieldId` (`phase-form.ts`),
 partagé par la carte qui les pose et le constructeur qui les focalise.
+
+Deux gardes sur cette demande : la dernière servie est relevée **au montage**
+(`handledRequest`) — le constructeur se démonte quand on quitte le format
+multi-phases, et y revenir rejouait sinon l'ancienne demande, le focus quittant
+le sélecteur de format sans aucun envoi ; et un plan **figé** par la fenêtre
+d'édition n'en émet aucune, ses champs désactivés ne prenant pas le focus — la
+notification reste seule à parler. Le focus passe par `focusFlaggedField`, comme
+celui de `useFieldErrors`.
 
 Au passage, deux champs affichaient autre chose que la valeur refusée :
 `value={x || 3}` montrait « 3 » pour une cadence de survie à 0, et
