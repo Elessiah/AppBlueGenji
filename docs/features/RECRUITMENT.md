@@ -259,7 +259,10 @@ Les mutations vérifient la session (`401` si anonyme, `403` si non-admin) et la
 validation partagée `validateRecruitmentAdInput` (`lib/shared/recruitment.ts`,
 `INVALID_PRIORITY` sur un statut inconnu — anciennes valeurs `MODAL` / `BANNER`
 comprises : un client resté sur l'ancien formulaire est refusé, pas rabattu en
-silence sur « facultative »).
+silence sur « facultative »). À l'inverse, un `PUT` **sans** `priority` garde
+le statut enregistré : un champ absent n'est pas un statut vidé, et une
+prioritaire ne doit pas être rétrogradée par un client qui n'envoie pas le
+champ.
 
 `GET /api/recruitment/highlight` est publique et mise en cache
 (`Cache-Control: public, max-age=60, stale-while-revalidate=300`) ; le premier

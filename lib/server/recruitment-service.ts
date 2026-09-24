@@ -220,7 +220,7 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
     contactDiscord,
     contactDiscordId,
     contactPreferred,
-    priority,
+    priority: requestedPriority,
     active,
   } = validation.value;
 
@@ -234,6 +234,12 @@ export async function updateRecruitmentAd(id: number, input: RecruitmentAdInput)
     [id],
   );
   if (existing.length === 0) throw new Error("RECRUITMENT_NOT_FOUND");
+
+  // Un champ absent n'est pas un statut vidé : la validation retomberait sur
+  // « facultative », et un client qui n'envoie pas le champ rétrograderait en
+  // silence une prioritaire — pastille, modale et banderole perdues. Seule une
+  // valeur envoyée change le statut.
+  const priority = input.priority === undefined ? existing[0].priority : requestedPriority;
 
   // Un changement de statut fait **changer de groupe** : l'annonce passe en fin
   // du nouveau, comme une annonce neuve. Garder son rang la ferait atterrir au

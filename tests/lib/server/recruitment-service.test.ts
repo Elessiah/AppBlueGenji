@@ -288,6 +288,25 @@ describe("recruitment-service", () => {
       expect(values.slice(-2)).toEqual([70, 3]);
     });
 
+    it("garde le statut enregistré quand la requête n'en porte pas", async () => {
+      // Un champ absent n'est pas un statut vidé : la validation retomberait
+      // sur « facultative » et rétrograderait la prioritaire en silence.
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[{ id: 3, priority: "PRIORITY" }]])
+        .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      await mockDb(execute);
+
+      const ad = await updateRecruitmentAd(3, { title: "Sans statut" });
+
+      expect(ad.priority).toBe("PRIORITY");
+      // Pas de changement de groupe, donc pas de nouveau rang d'affichage.
+      expect(execute).toHaveBeenCalledTimes(2);
+      const values = execute.mock.calls[1][1] as unknown[];
+      expect(values).toContain("PRIORITY");
+      expect(values.slice(-2)).toEqual([null, 3]);
+    });
+
     it("throws NOT_FOUND when the ad does not exist", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValueOnce([[]]));
       await expect(updateRecruitmentAd(999, { title: "X" })).rejects.toThrow(
