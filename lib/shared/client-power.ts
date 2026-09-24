@@ -52,6 +52,13 @@ export type ClientPowerInput = {
   /** `prefers-reduced-motion: reduce` — l'utilisateur a déjà demandé le calme. */
   reducedMotion?: boolean;
   /**
+   * « Réduire les animations » coché dans le menu d'accessibilité
+   * (`lib/shared/accessibility-settings.ts`) : même effet que la préférence
+   * système, pour les boucles JS (fond animé, inclinaison du logo) comme pour
+   * les animations CSS.
+   */
+  motionSetting?: boolean;
+  /**
    * Machine ou navigateur à la peine (voir {@link performanceLimits}), et le
    * lecteur n'a pas demandé d'ignorer la détection.
    */
@@ -113,7 +120,7 @@ export const QUIET_STREAM_AFTER_MS = 60_000;
 export function resolvePowerMode(input: ClientPowerInput): ClientPowerMode {
   if (input.attention === "HIDDEN") return "SLEEP";
   if (input.matchFocus) return "MATCH";
-  if (input.attention === "BACKGROUND" || input.performanceLimited || input.reducedMotion) {
+  if (input.attention === "BACKGROUND" || input.performanceLimited || input.reducedMotion || input.motionSetting) {
     return "ECO";
   }
   return "FULL";
@@ -281,6 +288,7 @@ export type PowerReason =
   | "MATCH"
   | "BACKGROUND"
   | "REDUCED_MOTION"
+  | "MOTION_SETTING"
   | "LOW_CORES"
   | "LOW_MEMORY"
   | "SLOW_FRAMES";
@@ -295,6 +303,7 @@ export function powerReasons(input: ClientPowerInput, limits: readonly Performan
   if (input.matchFocus) reasons.push("MATCH");
   if (input.attention === "BACKGROUND") reasons.push("BACKGROUND");
   if (input.reducedMotion) reasons.push("REDUCED_MOTION");
+  if (input.motionSetting) reasons.push("MOTION_SETTING");
   if (input.performanceLimited) reasons.push(...limits);
   return reasons;
 }
@@ -357,6 +366,8 @@ export function powerReasonLabel(reason: PowerReason, probe: PerformanceProbe): 
       return "La page n'a pas le focus (jeu, autre fenêtre ou second écran)";
     case "REDUCED_MOTION":
       return "Ton système demande de réduire les animations";
+    case "MOTION_SETTING":
+      return "Tu as choisi de réduire les animations (menu d'accessibilité)";
     case "LOW_CORES":
       return `Processeur modeste (${coresLabel(probe.cores)})`;
     case "LOW_MEMORY":
@@ -388,7 +399,10 @@ export function showsPowerBadge(
   if (mode === "SLEEP") return false;
   if (ignoredLimits) return true;
   if (mode !== "ECO" && mode !== "MATCH") return false;
-  return reasons.some((reason) => reason !== "BACKGROUND" && reason !== "HIDDEN");
+  // Le choix fait dans le menu d'accessibilité ne suffit pas à l'afficher :
+  // le bouton du menu dit déjà qu'un réglage est actif, et un témoin qui
+  // apparaît pour annoncer ce qu'on vient de cocher n'informe de rien.
+  return reasons.some((reason) => reason !== "BACKGROUND" && reason !== "HIDDEN" && reason !== "MOTION_SETTING");
 }
 
 /** Clé `localStorage` : le lecteur a demandé d'ignorer la détection de performances. */

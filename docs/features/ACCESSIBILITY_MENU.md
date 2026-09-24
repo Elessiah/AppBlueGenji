@@ -19,7 +19,7 @@ réglages d'accessibilité. Deux règles de conception, voulues ensemble :
 | `links` | Liens soulignés | Tous les liens de texte soulignés (WCAG 1.4.1) ; les liens habillés en bouton (`.btn`, `CyberButton`) et les plaques `cardOverlay` ne le sont pas |
 | `font` | Police simplifiée | Toutes les familles (`--font-title`, `--font-body`, `--font-mono`, `--font-display`) ramenées à Inter, sans capitales forcées ni lettres écartées |
 | `spacing` | Espacement du texte | Interlignage 1,7 sur les blocs de lecture, écart des mots et des lettres, respiration entre paragraphes (WCAG 1.4.12) |
-| `motion` | Réduire les animations | Même effet que la préférence système : animations décoratives figées, transitions et animations finies sautées |
+| `motion` | Réduire les animations | Même effet que la préférence système : animations décoratives figées, transitions et animations finies sautées, **et** régime éco pour les boucles JS (fond animé, inclinaison du logo) — `useClientPower` observe l'attribut (`motionSetting`), sans faire paraître le témoin du régime de charge |
 
 Il n'y a **pas** de réglage de taille du texte : le site est écrit en pixels,
 et le zoom du navigateur (Ctrl +) fait déjà ce travail sans casser la mise en

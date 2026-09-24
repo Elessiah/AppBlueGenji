@@ -126,6 +126,14 @@ export function a11yAttribute(keys: Iterable<A11ySettingKey>): string | undefine
   return normalized.length > 0 ? normalized.join(" ") : undefined;
 }
 
+/**
+ * La valeur de l'attribut `data-a11y` porte-t-elle ce réglage ? Lecture
+ * côté client, pour les boucles JS qui ne passent pas par la feuille de style.
+ */
+export function hasA11ySetting(attribute: string | null | undefined, key: A11ySettingKey): boolean {
+  return typeof attribute === "string" && attribute.split(/\s+/).includes(key);
+}
+
 /** Active ou désactive une clé et rend la liste normalisée. */
 export function toggleA11ySetting(
   keys: Iterable<A11ySettingKey>,

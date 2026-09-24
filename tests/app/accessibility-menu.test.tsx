@@ -145,6 +145,19 @@ describe("AccessibilityMenu — comportement (source)", () => {
   });
 });
 
+describe("régime de charge — le réglage « Réduire les animations »", () => {
+  const store = readSource("lib/shared/hooks/useClientPower.ts");
+
+  it("est lu sur l'attribut de <html> et observé, pour les boucles JS", () => {
+    expect(store).toContain('hasA11ySetting(document.documentElement.getAttribute("data-a11y"), "motion")');
+    expect(store).toContain(
+      'settings.observe(document.documentElement, { attributes: true, attributeFilter: ["data-a11y"] })',
+    );
+    expect(store).toContain("settings.disconnect()");
+    expect(store).toContain("input.motionSetting === previous.motionSetting");
+  });
+});
+
 describe("icône du bouton", () => {
   it("existe dans public/ et sert de masque, colorable par la feuille", () => {
     expect(existsSync(join(__dirname, "..", "..", "public", "accessibility-icon.webp"))).toBe(true);

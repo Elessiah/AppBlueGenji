@@ -6,6 +6,7 @@ import {
   A11Y_SETTING_KEYS,
   a11yAttribute,
   a11yCookieString,
+  hasA11ySetting,
   isA11ySettingKey,
   normalizeA11ySettings,
   parseA11yCookie,
@@ -108,6 +109,24 @@ describe("serializeA11ySettings / a11yAttribute", () => {
 
   it("écrit une liste de mots lisible par le sélecteur `~=`", () => {
     expect(a11yAttribute(["motion", "contrast"])).toBe("contrast motion");
+  });
+});
+
+describe("hasA11ySetting", () => {
+  it("lit un mot de l'attribut, et pas une sous-chaîne", () => {
+    expect(hasA11ySetting("contrast motion", "motion")).toBe(true);
+    expect(hasA11ySetting("contrast", "motion")).toBe(false);
+    expect(hasA11ySetting("contrastmotion", "motion")).toBe(false);
+  });
+
+  it("ne lit rien d'un attribut absent", () => {
+    expect(hasA11ySetting(null, "motion")).toBe(false);
+    expect(hasA11ySetting(undefined, "motion")).toBe(false);
+    expect(hasA11ySetting("", "motion")).toBe(false);
+  });
+
+  it("relit ce que a11yAttribute écrit", () => {
+    for (const key of A11Y_SETTING_KEYS) expect(hasA11ySetting(a11yAttribute([key]), key)).toBe(true);
   });
 });
 
