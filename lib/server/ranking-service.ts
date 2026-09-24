@@ -362,9 +362,13 @@ type EntrantRow = RowDataPacket & { team_id: number; team_name: string };
 /**
  * Inscrites d'un tournoi, **dans l'ordre du classement du site**.
  *
- * Seule porte du seeding par classement : Survie, Ronde suisse, Multi-phases et
- * l'aperçu du plateau l'appellent tous, si bien qu'un aperçu ne peut pas
- * diverger du tirage réel, ni deux formats se seeder différemment.
+ * Porte du seeding par classement : Survie, Ronde suisse, BG Survie,
+ * Multi-phases et l'aperçu du plateau l'appellent tous. Son tri est
+ * `rankEntrantsBySiteRanking`, que l'instantané d'un tournoi applique aussi,
+ * directement, aux inscrites qu'il a déjà lues (liste rangée par le classement
+ * avant le coup d'envoi) : c'est ce tri unique qui garantit qu'un aperçu, la
+ * liste des inscrites et le tirage réel ne divergent pas, ni deux formats ne se
+ * seedent différemment.
  *
  * Les quatre requêtes qu'elle remplace triaient sur une expression SQL
  * (`points DESC, wins DESC, team_id ASC`) : une cote rejouée ne s'écrit pas en
