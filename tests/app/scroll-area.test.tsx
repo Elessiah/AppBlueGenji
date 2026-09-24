@@ -1,6 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { renderToStaticMarkup } from "react-dom/server";
+import { ScrollArea } from "@/components/cyber/ScrollArea";
 
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
@@ -59,9 +61,34 @@ describe("ScrollArea — contrat du composant", () => {
     expect(COMPONENT).toContain('orientation = "x"');
   });
 
-  it("reste atteignable au clavier et nommable", () => {
-    expect(COMPONENT).toContain("tabIndex={0}");
-    expect(COMPONENT).toContain('role={ariaLabel ? "region" : undefined}');
+  it("ne pose l'arrêt de tabulation et la région que selon le débordement mesuré", () => {
+    // Plus aucun attribut inconditionnel : ils passent tous par la règle pure.
+    expect(COMPONENT).not.toMatch(/^\s*tabIndex=\{0\}\s*$/m);
+    expect(COMPONENT).not.toMatch(/role=\{ariaLabel/);
+    expect(COMPONENT).toContain("scrollAreaAccessibility({ overflowing, focused, ariaLabel })");
+    expect(COMPONENT).toContain("watchScrollOverflow(");
+  });
+
+  it("est focalisable et nommée au rendu serveur, avant toute mesure", () => {
+    const html = renderToStaticMarkup(<ScrollArea ariaLabel="Rondes du tournoi">contenu</ScrollArea>);
+    expect(html).toMatch(/^<div class="scroll-area scroll-subtle" tabindex="0" role="region" aria-label="Rondes du tournoi"/);
+  });
+
+  it("reste focalisable sans nom, mais n'est alors pas une région", () => {
+    const html = renderToStaticMarkup(<ScrollArea>contenu</ScrollArea>);
+    expect(html).toContain('tabindex="0"');
+    expect(html).not.toContain("role=");
+    expect(html).not.toContain("aria-label=");
+  });
+
+  it("ne compte que le focus posé sur la zone elle-même", () => {
+    // Le focus d'un bouton contenu bouillonne jusqu'à la zone.
+    expect(COMPONENT.match(/event\.target === event\.currentTarget/g)).toHaveLength(2);
+  });
+
+  it("reste focalisable quand seule la fenêtre perd le focus", () => {
+    // La zone reste alors l'élément actif : `blur` seul ne suffit pas.
+    expect(COMPONENT).toContain("document.activeElement !== event.currentTarget");
   });
 
   it("applique la variante discrète par défaut", () => {
