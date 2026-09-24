@@ -10,13 +10,27 @@
 
 .track {
   display: flex;
-  gap: 48px;
+  width: max-content;
   white-space: nowrap;
   height: 100%;
   align-items: center;
   animation: cy-tk 58s linear infinite;
   animation-play-state: var(--deco-anim-state);
+}
+
+/* Deux copies identiques, chacune avec son espacement de tête : la piste fait
+   exactement deux copies de large, et reculer de moitié boucle sans saut. */
+.copy {
+  display: flex;
+  gap: 48px;
   padding-left: 48px;
+}
+
+/* Arrêt au survol, au focus et au bouton pause (WCAG 2.2.2). */
+.ticker:hover .track,
+.ticker:focus-within .track,
+.ticker[data-paused] .track {
+  animation-play-state: paused;
 }
 
 @keyframes cy-tk {
@@ -39,4 +53,66 @@
   margin-left: 48px;
   color: var(--blue-500);
   font-style: normal;
+}
+
+/* Fondu du bord droit : le texte s'y efface avant d'atteindre le bouton pause,
+   au lieu de passer derrière lui et de reparaître de l'autre côté. */
+.ticker::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 96px;
+  background: linear-gradient(to right, rgba(5, 6, 10, 0), rgba(5, 6, 10, 0.96) 55%);
+  pointer-events: none;
+}
+
+/* Bouton pause, au bout du fondu. 28 px de côté (WCAG 2.5.8 en demande 24)
+   dans un bandeau de 38 px. */
+.pause {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  right: 8px;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  transform: translateY(-50%);
+  border: 1px solid var(--line-strong-cy);
+  border-radius: 6px;
+  background: rgba(5, 6, 10, 0.92);
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.pause:hover {
+  color: var(--ink);
+  border-color: rgba(90, 200, 255, 0.5);
+}
+
+.pause:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pause {
+    transition: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .pause {
+    border-color: ButtonText;
+  }
 }

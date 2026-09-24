@@ -1672,3 +1672,121 @@ input[type="radio"]:disabled:checked {
     outline-offset: 2px;
   }
 }
+
+/* ── Réglages d'accessibilité du lecteur ─────────────────────────────────────
+   Menu du bouton flottant (`components/accessibility/AccessibilityMenu.tsx`,
+   registre `lib/shared/accessibility-settings.ts`). Chaque réglage change
+   l'apparence du site : il est **désactivé par défaut**, et ne vaut que sous
+   `<html data-a11y="…">`, posé par le serveur depuis le cookie `bg_a11y`.
+   Sans l'attribut, aucune de ces règles ne s'applique — le site est celui
+   d'avant le menu. Une clé ajoutée au registre doit avoir sa règle ici
+   (`tests/app/accessibility-styles.test.ts`). */
+
+/* Contraste renforcé : les jetons de texte secondaire passent au-dessus de
+   4,5:1 sur tous les fonds du site (`--ink-dim` n'atteignait que 2,8:1 sur
+   `--cyber-bg-3`), et les traits cessent d'être presque transparents. Les
+   jetons étant déclarés sur `:root`, les redéfinir ici (plus spécifique)
+   atteint tout ce qui les lit, sans toucher un composant. */
+:root[data-a11y~="contrast"] {
+  --ink: #f4f8fb;
+  --ink-mute: #b9c6d2;
+  --ink-dim: #95a3b1;
+  --text-0: #f4f8fb;
+  --text-1: #dfe5ee;
+  --text-2: #b3bccb;
+  --blue-700: #62b6e0;
+  --line: rgba(255, 255, 255, 0.3);
+  --line-strong: rgba(255, 255, 255, 0.5);
+  --line-soft: rgba(180, 210, 230, 0.28);
+  --line-strong-cy: rgba(180, 210, 230, 0.42);
+}
+
+:root[data-a11y~="contrast"] ::placeholder {
+  color: var(--ink-mute) !important;
+  opacity: 1;
+}
+
+/* Focus très visible : un double anneau — blanc, puis bleu sur un liseré
+   sombre — qui se détache sur n'importe quel fond, clair ou foncé. Il
+   l'emporte sur les anneaux propres aux composants (`!important`). La case
+   `Coche` masque son input : l'anneau passe sur sa pastille, comme le relais
+   ordinaire. */
+:root[data-a11y~="focus"] :focus-visible,
+:root[data-a11y~="focus"] .coche-input:focus-visible ~ .coche-pill {
+  outline: 3px solid #ffffff !important;
+  outline-offset: 3px !important;
+  box-shadow:
+    0 0 0 7px #05060a,
+    0 0 0 9px var(--blue-500) !important;
+}
+
+/* Liens soulignés : la couleur seule ne distingue pas un lien pour qui la
+   perçoit mal (WCAG 1.4.1). Les liens habillés en bouton restent des boutons. */
+:root[data-a11y~="links"] a[href]:not(.btn):not([class*="CyberButton"]):not([class*="cardOverlay"]) {
+  text-decoration-line: underline !important;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+}
+
+/* Police simplifiée : une seule famille sans empattement (Inter), sans
+   capitales forcées ni lettres écartées — les deux gênent la lecture des
+   personnes dyslexiques. Les jetons de police sont posés en ligne sur `body` :
+   seule une déclaration `!important` les surcharge. */
+:root[data-a11y~="font"] body {
+  --font-title: var(--font-sans) !important;
+  --font-body: var(--font-sans) !important;
+  --font-mono: var(--font-sans) !important;
+  --font-display: var(--font-sans) !important;
+}
+
+:root[data-a11y~="font"] body * {
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
+/* Espacement du texte (WCAG 1.4.12) : interlignage des blocs de texte, écart
+   entre les mots et les lettres, respiration entre paragraphes. L'interlignage
+   ne vise que les blocs de lecture : imposé partout, il déborderait des
+   pastilles et des cartes de match à hauteur fixe. */
+:root[data-a11y~="spacing"] body {
+  letter-spacing: 0.04em;
+  word-spacing: 0.16em;
+}
+
+:root[data-a11y~="spacing"] :is(p, li, dd, dt, blockquote, figcaption, label) {
+  line-height: 1.7 !important;
+}
+
+:root[data-a11y~="spacing"] p:not(:last-child) {
+  margin-bottom: 1.25em !important;
+}
+
+/* Avec la police simplifiée, qui remet l'espacement à zéro partout, celui-ci
+   doit être reposé élément par élément. */
+:root[data-a11y~="font"][data-a11y~="spacing"] body * {
+  letter-spacing: 0.04em !important;
+}
+
+/* Réduire les animations : même effet que la préférence système, sans avoir à
+   la régler — les animations décoratives s'arrêtent, les transitions et les
+   animations finies sautent à leur état final. La carte visée par un lien
+   profond garde son repère, en contour fixe. */
+:root[data-a11y~="motion"] {
+  --deco-anim-state: paused;
+  scroll-behavior: auto !important;
+}
+
+:root[data-a11y~="motion"] *,
+:root[data-a11y~="motion"] *::before,
+:root[data-a11y~="motion"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  transition-delay: 0s !important;
+  scroll-behavior: auto !important;
+}
+
+:root[data-a11y~="motion"] .match-anchor-target {
+  animation: none !important;
+  box-shadow: 0 0 0 2px var(--blue-300, #5ac8ff);
+}

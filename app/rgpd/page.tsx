@@ -251,6 +251,13 @@ export default function RgpdPage() {
               premier dure sept jours, le second le temps de votre visite.
             </li>
             <li>
+              <strong>bg_a11y</strong> — déposé uniquement <strong>si vous activez un réglage
+              d&apos;accessibilité</strong> (bouton en bas à gauche : contraste, police, focus…),
+              pour l&apos;appliquer dès l&apos;affichage des pages suivantes. Il ne contient que la
+              liste des réglages choisis, jamais d&apos;identifiant de personne, dure un an et
+              disparaît quand vous les désactivez tous.
+            </li>
+            <li>
               <strong>bg_match_focus</strong> et <strong>bg_power_ignore_perf</strong> — deux
               valeurs du stockage local de votre navigateur, <strong>jamais transmises</strong> au
               serveur. La première allège les autres onglets du site pendant votre match (un
