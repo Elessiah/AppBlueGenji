@@ -142,7 +142,11 @@ bouton flottant, que rien ne peut plus faire défiler en fin de page.
 
 ## Bandeau défilant (`components/cyber/Ticker.tsx`)
 
-- Bouton pause au bout d'un fondu, arrêt au survol et au focus (WCAG 2.2.2).
+- Bouton pause au bout d'un fondu, arrêt au survol du texte (WCAG 2.2.2).
+  Ni le survol ni le focus du **bouton** ne figent la piste : c'est le seul
+  élément focalisable du bandeau, et un clic le focalise — un arrêt au
+  `:focus-within` tenait le bandeau figé après « ▶ », si bien que la reprise ne
+  reprenait rien.
 - La copie qui fait boucler la piste est `aria-hidden` : chaque élément n'est
   plus lu deux fois. Le bandeau est un `role="marquee"` nommé.
 
