@@ -11,6 +11,8 @@ import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import { fakePool } from "../../helpers/sql-double";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 /**
  * Le rattrapage des comptes **déjà** supprimés : la règle a changé sous eux
@@ -272,5 +274,37 @@ describe("reconcileDeletedAccounts", () => {
 
     expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
     expect(connections).toHaveLength(0);
+  });
+});
+
+/**
+ * Le déclenchement, relu sur la source : il ne s'exerce qu'au démarrage du
+ * serveur Next, qu'aucun test unitaire ne lance.
+ */
+describe("scheduleDeletedAccountsReconciliation — une fois par processus", () => {
+  const source = readFileSync(join(__dirname, "..", "..", "..", "lib", "server", "database.ts"), "utf8");
+
+  it("ne tourne que dans le serveur du site, jamais dans un script", () => {
+    expect(source).toContain('if (process.env.NEXT_RUNTIME !== "nodejs") return;');
+  });
+
+  it("garde son drapeau sur globalThis : un rechargement à chaud ne relance pas la passe", () => {
+    expect(source).toContain("reconciliationState.__bgDeletedAccountsReconciliation ??= import(");
+    expect(source).not.toMatch(/^let deletedAccountsReconciliation/m);
+  });
+});
+
+describe("la politique publiée annonce l'exception de l'entrée solo", () => {
+  it("dans la modale des changements, sur /rgpd et au registre", async () => {
+    const { PRIVACY_CHANGES } = await import("@/lib/shared/privacy-changes");
+    const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-09-suppression-pseudo-emprunt")!;
+    expect(entry.details.join(" ")).toContain("tournoi individuel");
+    const rgpd = readFileSync(join(__dirname, "..", "..", "..", "app", "rgpd", "page.tsx"), "utf8");
+    expect(rgpd).toContain("inscrit à aucun tournoi individuel");
+    const register = readFileSync(
+      join(__dirname, "..", "..", "..", "lib", "shared", "processing-register.ts"),
+      "utf8",
+    );
+    expect(register).toContain("aucune inscription en tournoi individuel");
   });
 });

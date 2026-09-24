@@ -158,7 +158,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "Un compte supprimé qui n'a joué aucun match est désormais effacé entièrement. Un compte qui a joué garde ses résultats sous un pseudo d'emprunt, sans plus rien qui te désigne.",
     details: [
-      "Si tu n'as disputé aucun match (et que tu n'organises aucun tournoi ni ne possèdes d'équipe), la suppression efface ton compte entièrement — y compris si ton équipe avait été inscrite à un tournoi sans que tu joues.",
+      "Si tu n'as disputé aucun match (et que tu n'as organisé aucun tournoi, ne possèdes aucune équipe ni n'es inscrit à un tournoi individuel), la suppression efface ton compte entièrement — y compris si ton équipe avait été inscrite à un tournoi sans que tu joues.",
       "Si tu as joué, tes résultats restent, parce qu'ils appartiennent aussi aux équipes que tu as affrontées. Ton pseudo est alors remplacé par un pseudo d'emprunt tiré au hasard, et ta fiche indique clairement que le compte a été supprimé.",
       "Tout ce qui te désigne est effacé : tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles sur le site et historique de tes consentements.",
       "Les comptes déjà supprimés suivent la même règle : ceux sans match sont effacés, les autres reçoivent un pseudo d'emprunt.",

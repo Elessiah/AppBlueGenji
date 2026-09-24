@@ -1546,7 +1546,15 @@ export async function getDatabase(): Promise<Pool> {
   return pool;
 }
 
-let deletedAccountsReconciliation: Promise<void> | null = null;
+/**
+ * La garde « une fois par processus » vit sur `globalThis` et non dans une
+ * variable de module : `next dev` réévalue ce fichier à chaque rechargement à
+ * chaud, et une variable de module relançait la passe — irréversible — à
+ * chaque modification du code, sur la base locale que les worktrees partagent.
+ */
+const reconciliationState = globalThis as typeof globalThis & {
+  __bgDeletedAccountsReconciliation?: Promise<void>;
+};
 
 /**
  * Applique aux comptes **déjà** supprimés la règle de suppression du jour
@@ -1569,7 +1577,7 @@ let deletedAccountsReconciliation: Promise<void> | null = null;
  */
 function scheduleDeletedAccountsReconciliation(): void {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  deletedAccountsReconciliation ??= import("@/lib/server/users-service")
+  reconciliationState.__bgDeletedAccountsReconciliation ??= import("@/lib/server/users-service")
     .then(({ reconcileDeletedAccounts }) => reconcileDeletedAccounts())
     .then(({ erased, renamed, failed }) => {
       if (erased + renamed + failed > 0) {

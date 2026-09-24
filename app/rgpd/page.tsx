@@ -121,8 +121,9 @@ export default function RgpdPage() {
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
-          * Un compte qui n'a joué aucun match, n'a organisé aucun tournoi et n'est
-          propriétaire d'aucune équipe est <strong>entièrement effacé</strong> à sa suppression.
+          * Un compte qui n'a joué aucun match, n'a organisé aucun tournoi, n'est
+          propriétaire d'aucune équipe et n'est inscrit à aucun tournoi individuel est{" "}
+          <strong>entièrement effacé</strong> à sa suppression.
           Sinon, ses données de profil sont effacées immédiatement et son pseudo remplacé par un
           pseudo d'emprunt. Les sessions
           (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
@@ -161,11 +162,12 @@ export default function RgpdPage() {
           est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
           subsiste sous ce faux nom, et la fiche du joueur indique que le compte a été supprimé.
           Un compte qui n'a jamais disputé de match n'a, lui, aucun palmarès à préserver : il est effacé
-          entièrement, sans ligne résiduelle — à deux réserves près, où sa ligne reste parce
+          entièrement, sans ligne résiduelle — à trois réserves près, où sa ligne reste parce
           qu'elle est le titulaire de quelque chose qui survit : s'il a{" "}
-          <strong>organisé</strong> un tournoi, ou s'il est{" "}
+          <strong>organisé</strong> un tournoi, s'il est{" "}
           <strong>propriétaire d'une équipe</strong> (transférer ou
-          dissoudre l'équipe avant la suppression rétablit l'effacement complet).
+          dissoudre l'équipe avant la suppression rétablit l'effacement complet), ou s'il est
+          inscrit à un <strong>tournoi individuel</strong>, dont l'engagé porte son nom.
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>
