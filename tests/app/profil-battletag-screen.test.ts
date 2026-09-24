@@ -163,12 +163,18 @@ describe("modale de visibilité du BattleTag", () => {
     expect(modal).toContain("administrateurs");
   });
 
-  it("prend le focus et se ferme par Échap", () => {
+  it("prend le focus et se ferme par Échap, par la pile commune des modales", () => {
     // Sans cela, un lecteur d'écran resterait sur la case à cocher et le clavier
     // n'aurait aucun moyen de refermer ce qu'il vient d'ouvrir.
-    expect(modal).toContain("closeRef.current?.focus()");
-    expect(modal).toContain('event.key === "Escape"');
+    expect(modal).toContain("useDialogBehavior({ open: true, onClose })");
+    expect(modal).toContain("ref={dialogRef}");
     expect(modal).toContain('role="dialog"');
     expect(modal).toContain('aria-modal="true"');
+  });
+
+  it("est portée dans document.body, hors de la section animée de /profil", () => {
+    // Le `transform` laissé par `.fade-in` faisait de la section la référence
+    // de `position: fixed` : la notice se centrait hors de l'écran.
+    expect(modal).toMatch(/createPortal\([\s\S]*document\.body\s*,?\s*\)/);
   });
 });
