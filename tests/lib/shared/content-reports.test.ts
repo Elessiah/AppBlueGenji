@@ -21,6 +21,7 @@ import {
   reportConcernedHref,
   reportErrorMessage,
   reportPurgeDate,
+  reportRetainedUntil,
   reportTargetFromPath,
   reportTargetHref,
   validateReportSubmission,
@@ -240,6 +241,22 @@ describe("cycle de vie", () => {
 
   it(`efface un signalement ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution`, () => {
     expect(reportPurgeDate(new Date("2026-09-01T10:00:00Z")).toISOString()).toBe("2026-10-01T10:00:00.000Z");
+  });
+
+  it("repousse l'effacement annoncé tant qu'un logo masqué ou supprimé tient au dossier", () => {
+    const resolvedAt = new Date("2026-09-01T10:00:00Z");
+    const later = "2027-02-28T10:00:00.000Z";
+    expect(reportRetainedUntil(resolvedAt, []).toISOString()).toBe("2026-10-01T10:00:00.000Z");
+    expect(reportRetainedUntil(resolvedAt, [{ status: "HIDDEN", purgeAfter: later }]).toISOString()).toBe(later);
+    expect(reportRetainedUntil(resolvedAt, [{ status: "PURGED", purgeAfter: later }]).toISOString()).toBe(later);
+    // Rétabli : plus rien à contester, le signalement suit la règle ordinaire.
+    expect(reportRetainedUntil(resolvedAt, [{ status: "RESTORED", purgeAfter: later }]).toISOString()).toBe(
+      "2026-10-01T10:00:00.000Z",
+    );
+    // Une échéance déjà dépassée ne raccourcit rien.
+    expect(
+      reportRetainedUntil(resolvedAt, [{ status: "PURGED", purgeAfter: "2026-09-02T10:00:00.000Z" }]).toISOString(),
+    ).toBe("2026-10-01T10:00:00.000Z");
   });
 });
 

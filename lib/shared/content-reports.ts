@@ -374,6 +374,26 @@ export function reportPurgeDate(resolvedAt: Date): Date {
 }
 
 /**
+ * Date d'effacement d'un signalement archivé, **telle que la purge la tient**
+ * (`purgeExpiredReports`) : trente jours après l'archivage, repoussés tant
+ * qu'un logo masqué — ou supprimé, le temps que sa décision se conteste —
+ * reste attaché au dossier. Le panneau l'annonce ; sans les quarantaines, il
+ * annoncerait une date que la purge ne respecte pas.
+ */
+export function reportRetainedUntil(
+  resolvedAt: Date,
+  quarantines: readonly Pick<LogoQuarantineView, "status" | "purgeAfter">[],
+): Date {
+  let until = reportPurgeDate(resolvedAt);
+  for (const quarantine of quarantines) {
+    if (quarantine.status === "RESTORED") continue;
+    const end = new Date(quarantine.purgeAfter);
+    if (end.getTime() > until.getTime()) until = end;
+  }
+  return until;
+}
+
+/**
  * Cible déduite de la page d'où l'on signale : ouvert depuis la fiche d'une
  * équipe, le formulaire la propose déjà. Seules les trois fiches publiques d'une
  * entité sont reconnues.

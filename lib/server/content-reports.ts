@@ -42,7 +42,7 @@ import {
   nextReportStatus,
   reportAdminHref,
   reportConcernedHref,
-  reportPurgeDate,
+  reportRetainedUntil,
   type ConcernedReportView,
   type ContestableReportOption,
   type ReportAction,
@@ -809,6 +809,7 @@ export async function listReports(): Promise<ReportView[]> {
 
   return rows.map((row) => {
     const resolvedAt = row.resolved_at ? new Date(row.resolved_at) : null;
+    const held = quarantines.filter((quarantine) => quarantine.reportId === Number(row.id));
     return {
       id: Number(row.id),
       category: row.category,
@@ -818,7 +819,7 @@ export async function listReports(): Promise<ReportView[]> {
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
       updatedAt: toIso(row.updated_at) ?? new Date().toISOString(),
       resolvedAt: resolvedAt ? resolvedAt.toISOString() : null,
-      purgeAt: row.status === "RESOLVED" && resolvedAt ? reportPurgeDate(resolvedAt).toISOString() : null,
+      purgeAt: row.status === "RESOLVED" && resolvedAt ? reportRetainedUntil(resolvedAt, held).toISOString() : null,
       reporter: person(row.reporter_user_id, row.reporter_pseudo),
       contactName: row.contact_name,
       contactEmail: row.contact_email,
@@ -827,7 +828,7 @@ export async function listReports(): Promise<ReportView[]> {
       resolutionNote: row.resolution_note,
       targets: targetsByReport.get(Number(row.id)) ?? [],
       contests: contestsByReport.get(Number(row.id)) ?? [],
-      quarantines: quarantines.filter((quarantine) => quarantine.reportId === Number(row.id)),
+      quarantines: held,
     };
   });
 }

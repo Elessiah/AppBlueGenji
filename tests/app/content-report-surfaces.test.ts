@@ -110,3 +110,18 @@ describe("politique de confidentialité et registre", () => {
     expect(fiche?.legalBasis).toContain("2022/2065");
   });
 });
+
+describe("dossier du panneau", () => {
+  const detail = read("app/(secured)/admin/signalements/_components/ReportDetail.tsx");
+
+  it("referme la boîte d'archivage une fois le dossier archivé", () => {
+    // Laissée ouverte, elle offrait « Archiver » sur un dossier archivé : un 409.
+    expect(detail).toContain("{resolving && !archived && (");
+    expect(detail).toMatch(/if \(!archived\) return;\s*setResolving\(false\);/);
+  });
+
+  it("annonce la durée de conservation par la constante, pas par un nombre écrit", () => {
+    expect(detail).toContain("{REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard");
+    expect(detail).not.toMatch(/effacé 30 jours/);
+  });
+});

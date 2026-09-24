@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   REPORT_CATEGORY_DEFINITIONS,
   REPORT_RESOLUTION_NOTE_MAX_LENGTH,
+  REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_STATUS_LABELS,
   RIGHTS_RELATION_LABELS,
   type ReportAction,
@@ -57,6 +58,16 @@ export function ReportDetail({
     setNote("");
   }, [report.id]);
 
+  // Archivé (ici ou par un autre administrateur), le dossier n'a plus rien à
+  // archiver : la boîte se referme, sans quoi « Archiver » mènerait à un refus.
+  // Les autres changements d'état (prise en charge) laissent la note en cours.
+  const archived = report.status === "RESOLVED";
+  useEffect(() => {
+    if (!archived) return;
+    setResolving(false);
+    setNote("");
+  }, [archived]);
+
   return (
     <article className={styles.detail} aria-labelledby={titleId}>
       <header className={styles.detailHead}>
@@ -97,7 +108,7 @@ export function ReportDetail({
             Rouvrir
           </button>
         )}
-        {resolving && (
+        {resolving && !archived && (
           <div className={styles.resolveBox}>
             <div className="field">
               <label htmlFor={noteId}>Décision prise (facultatif, visible des seuls administrateurs)</label>
@@ -124,8 +135,8 @@ export function ReportDetail({
               </button>
             </div>
             <p className={styles.muted}>
-              Archivé, le signalement est effacé 30 jours plus tard — sauf s&apos;il tient encore un logo masqué, qu&apos;il
-              garde jusqu&apos;à l&apos;échéance.
+              Archivé, le signalement est effacé {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard — ou plus tard,
+              s&apos;il tient un logo masqué ou supprimé dont l&apos;équipe peut encore contester la décision.
             </p>
           </div>
         )}
