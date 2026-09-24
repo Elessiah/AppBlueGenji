@@ -94,6 +94,25 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
 - **Destinataires** : comptes vivants avec un identifiant Discord, ou un tag
   **certifié** — un tag non certifié n'est qu'une saisie, peut-être celle d'un
   autre ; on n'écrit pas à un inconnu au sujet du compte de quelqu'un.
+- **Pas de spam — Discord est le seul canal de l'association.** Chaque
+  déploiement qui touche aux données ajoute une entrée, et une annonce par
+  entrée apprendrait aux joueurs à rendre le bot muet, rappels de match
+  compris. Deux règles, dans le module pur :
+  - **délai de la modale** (`PRIVACY_DM_SETTLE_DAYS`, 7 jours) : un compte n'est
+    prévenu que lorsque son plus ancien changement dû a une semaine. Un joueur
+    qui revient sur le site dans l'intervalle accepte dans la modale et ne
+    reçoit **rien** — le message ne sert qu'à qui ne revient pas ;
+  - **un message par mois au plus** (`PRIVACY_DM_MIN_INTERVAL_DAYS`, 30 jours,
+    jugé en base sur `sent_at`) : un changement publié le lendemain d'un
+    message attend le suivant.
+
+  Le message porte alors **tous** les changements dus, récents compris
+  (`privacyDmBatch`, tout ou rien) : trois entrées publiées sur trois jours
+  partent ensemble, là où attendre le délai de chacune ferait trois messages.
+  Les deux filtres sont posés **dans la requête**, avant la limite du lot — des
+  comptes écartés après coup occuperaient ses vingt places à chaque balayage.
+  Leur somme reste sous la fenêtre de 60 jours (tenu par un test), sans quoi un
+  changement retenu en sortirait sans avoir été annoncé.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
   changements qu'il n'a ni acceptés ni déjà reçus, et renvoie au site pour
   décider. Borné à 1 800 caractères (plafond du bot) : au-delà, les derniers
