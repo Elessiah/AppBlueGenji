@@ -8,6 +8,7 @@ import { VisitTracker } from "@/components/visit-tracker";
 import { ClientPowerRoot } from "@/components/client-power-root";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
+import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { getHighlightedAd } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -23,7 +24,7 @@ import {
 } from "@/lib/shared/recruitment";
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
-import { DEFAULT_SHARE_IMAGE } from "@/lib/shared/page-metadata";
+import { DEFAULT_SHARE_IMAGE, SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
 
 /**
  * Socle des métadonnées de partage, hérité par toutes les pages.
@@ -42,7 +43,7 @@ import { DEFAULT_SHARE_IMAGE } from "@/lib/shared/page-metadata";
  */
 export const metadata: Metadata = {
   metadataBase: siteMetadataBase(),
-  title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
+  title: { default: SITE_NAME, template: SITE_TITLE_TEMPLATE },
   description: SITE_DESCRIPTION,
   applicationName: SITE_NAME,
   openGraph: {
@@ -158,6 +159,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {/* Premier arrêt du clavier sur chaque page : qui a besoin de ces
               réglages ne doit pas traverser toute la page pour les trouver. */}
           <AccessibilityMenu initialSettings={a11ySettings} />
+          {/* Deuxième arrêt : le lien d'évitement, qui mène au contenu sans
+              traverser la bannière de recrutement ni la navigation. */}
+          <SkipLink />
           <VisitTracker />
           <ClientPowerRoot />
           {/* Deux modales ne se superposent pas : tant qu'un choix de

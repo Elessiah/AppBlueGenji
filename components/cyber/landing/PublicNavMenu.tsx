@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { isNavLinkActive } from "@/lib/shared/nav-active";
 import styles from "./PublicNavMenu.module.css";
 
 type NavLink = { href: string; label: string };
@@ -31,11 +32,17 @@ export function PublicNavMenu() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelId = useId();
 
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      // Le panneau fermé emporte le lien qui avait le focus : sans ce retour,
+      // le clavier repartirait du haut de la page.
+      if (rootRef.current?.contains(document.activeElement)) buttonRef.current?.focus();
     };
     const onClick = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
@@ -52,12 +59,15 @@ export function PublicNavMenu() {
 
   return (
     <div className={styles.root} ref={rootRef}>
+      {/* Pas d'`aria-haspopup` : il annonce un `role="menu"`, dont le lecteur
+          d'écran attend les flèches — le panneau est une simple navigation. */}
       <button
+        ref={buttonRef}
         type="button"
         className={`${styles.burger} ${open ? styles.burgerOpen : ""}`}
         aria-label={open ? "Fermer le menu" : "Ouvrir le menu"}
         aria-expanded={open}
-        aria-haspopup="true"
+        aria-controls={open ? panelId : undefined}
         onClick={() => setOpen((v) => !v)}
       >
         <span className={styles.bars} aria-hidden="true">
@@ -69,16 +79,14 @@ export function PublicNavMenu() {
       </button>
 
       {open && (
-        <nav className={styles.panel} aria-label="Navigation principale">
+        <nav id={panelId} className={styles.panel} aria-label="Navigation principale">
           {LINKS.map((link) => {
-            const isActive =
-              link.href.startsWith("/") &&
-              !link.href.includes("#") &&
-              (pathname === link.href || pathname.startsWith(`${link.href}/`));
+            const isActive = isNavLinkActive(pathname, link.href);
             return (
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={isActive ? "page" : undefined}
                 className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
                 onClick={() => setOpen(false)}
               >

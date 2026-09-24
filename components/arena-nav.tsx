@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoWithGlow } from "./logo-with-glow";
 import { UserAvatar } from "./user-avatar";
+import { isNavLinkActive } from "@/lib/shared/nav-active";
 import s from "./arena-nav.module.css";
 
 type ArenaNavProps = {
@@ -22,16 +23,16 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
   const pathname = usePathname();
 
   return (
-    <nav className={s.nav}>
+    <nav className={s.nav} aria-label="Navigation principale">
       <div className={`container ${s.navInner}`}>
         <div className={s.navLeft}>
           {links.map((link) => {
-            const isActive =
-              pathname === link.href || pathname.startsWith(`${link.href}/`);
+            const isActive = isNavLinkActive(pathname, link.href);
             return (
               <Link
                 key={link.href}
                 href={link.href}
+                aria-current={isActive ? "page" : undefined}
                 className={`${s.navLink} ${isActive ? s.navLinkActive : ""}`}
                 style={{ "--nav-rgb": link.rgb } as React.CSSProperties}
               >
@@ -54,8 +55,10 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
         </Link>
 
         <div className={s.navRight}>
+          {/* Les pictogrammes sont décoratifs : lus à voix haute, « ⌂ » et
+              « 🛡 » précédaient le nom du lien d'un mot sans rapport. */}
           <Link href="/" className={s.navHome}>
-            ⌂ Accueil
+            <span aria-hidden="true">⌂</span> Accueil
           </Link>
           {activeTeam && (
             <Link
@@ -64,7 +67,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
               aria-label={`Mon équipe : ${activeTeam.teamName}`}
               title={activeTeam.teamName}
             >
-              🛡 Mon équipe
+              <span aria-hidden="true">🛡</span> Mon équipe
             </Link>
           )}
           <Link href="/profil" className={s.avatarChip}>

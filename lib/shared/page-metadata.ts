@@ -86,3 +86,22 @@ export function pageMetadata({
     },
   };
 }
+
+/** Le gabarit de titre du site, celui que déclare la mise en page racine. */
+export const SITE_TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
+
+/**
+ * Le titre d'une **mise en page** de segment, qui nomme sa page et laisse le
+ * gabarit du site aux pages qu'elle contient.
+ *
+ * Un titre en chaîne ne suffit pas, et la panne ne se voit que sur les
+ * sous-pages : Next transmet aux segments enfants le gabarit du titre **résolu**
+ * de la mise en page, qu'une chaîne remet à `null`. Posé en `"Tournois"`,
+ * `/tournois` s'intitulait bien « Tournois · BlueGenji Esport », mais
+ * `/tournois/creer` devenait « Créer un tournoi » tout court. `default` nomme la
+ * page du segment (en passant par le gabarit de la racine), `template` le
+ * repose pour les suivantes.
+ */
+export function segmentTitle(title: string): { default: string; template: string } {
+  return { default: title, template: SITE_TITLE_TEMPLATE };
+}
