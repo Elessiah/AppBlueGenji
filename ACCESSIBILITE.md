@@ -14,10 +14,11 @@ Puis par la PR `feature/accessibility-quick-wins` : lien d'évitement
 du bot (3), page courante et pictogrammes des navigations (4), indicateur de
 développement de Next (14).
 
-Puis par la PR `feature/deploy-accessibility-features` : modales de la vitrine
+Puis par la PR #183 (`feature/deploy-accessibility-features-fe6371`) : modales de la vitrine
 (5 — déjà passées par `LandingDialog` et `useDialogBehavior`, la tâche était
 restée ouverte), lien « Voir » de la bannière de recrutement (6), focus des
-champs hors `.field` (7, recherche de l'annuaire comprise), ordre des titres de
+champs hors `.field` (7, recherche de l'annuaire comprise, et repère de focus
+de **tout** élément en contrastes forcés), ordre des titres de
 `/connexion` et repères de `/association` (8), menu burger fermé quand le focus
 en sort (17).
 

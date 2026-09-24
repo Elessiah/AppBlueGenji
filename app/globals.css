@@ -1759,17 +1759,20 @@ html {
   }
 }
 
-/* Champs de saisie en contrastes forcés : leur repère de focus est un
-   `box-shadow` (halo de `.field`, anneau de `.searchbar-input`), que le mode
-   supprime, et une bordure dont il impose la couleur — le champ focalisé ne se
-   distinguait plus des autres. L'`outline` native le remplace, peinte dans la
+/* Focus en contrastes forcés — règle **unique**, posée sur l'état et non sur
+   un composant. Le mode supprime les `box-shadow` et impose la couleur des
+   bordures : tout repère de focus fait d'un anneau en ombre (halo de `.field`,
+   `.searchbar-input`, `.modalInput`, recherche de l'annuaire, liens de
+   navigation de `/profil`, recherche du dialogue des fantômes…) disparaissait,
+   et dix-neuf feuilles posent `outline: none`. Une correction classe par classe
+   laissait la suivante sans repère ; celle-ci couvre aussi l'élément ajouté
+   demain. `!important` parce qu'elle doit l'emporter sur chacun de ces
+   `outline: none`, quelle que soit leur spécificité ; le réglage « Focus très
+   visible », plus spécifique, garde la main. L'`outline` est peinte dans la
    couleur système du focus. */
 @media (forced-colors: active) {
-  .field input:not([type="checkbox"]):not([type="radio"]):focus,
-  .field textarea:focus,
-  .field select:focus,
-  .searchbar-input:focus {
-    outline: 2px solid;
+  :focus-visible {
+    outline: 2px solid !important;
     outline-offset: 2px;
   }
 }

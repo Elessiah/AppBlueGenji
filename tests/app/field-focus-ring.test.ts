@@ -8,7 +8,9 @@ import { readSource } from "../helpers/read-source";
  * bordure recolorée — un trait d'un pixel qui change de teinte, invisible à
  * l'œil (WCAG 2.4.7 / 1.4.11) et **effacé** en contrastes forcés, où le système
  * impose la couleur des bordures et supprime les `box-shadow`. Deux gardes :
- * un anneau au focus, et une `outline` sous `forced-colors`.
+ * un anneau au focus, et une `outline` sous `forced-colors` — posée **une
+ * fois** sur `:focus-visible` dans `app/globals.css`, et non classe par classe :
+ * dix-neuf feuilles posent `outline: none`.
  *
  * Contrôle au niveau de la source, faute de pouvoir monter la cascade en test.
  */
@@ -68,26 +70,27 @@ describe.each(MODULES)("%s — champ de modale", (path) => {
   it("pose un anneau au focus, pas seulement une bordure recolorée", () => {
     expect(ruleBody(css, ".modalInput:focus")).toMatch(/box-shadow:\s*0 0 0 3px/);
   });
-
-  it("rend un repère en contrastes forcés, où l'anneau disparaît", () => {
-    expect(forcedOutlineFor(css, ".modalInput:focus")).toBe(true);
-  });
 });
 
-describe("app/globals.css — barre de recherche et champs `.field`", () => {
+describe("app/globals.css — barre de recherche", () => {
   const css = stripComments(readSource("app/globals.css"));
 
   it("pose un anneau au focus de la barre de recherche", () => {
     expect(ruleBody(css, ".searchbar-input:focus")).toMatch(/box-shadow:\s*0 0 0 3px/);
   });
+});
 
-  it.each([
-    ".searchbar-input:focus",
-    '.field input:not([type="checkbox"]):not([type="radio"]):focus',
-    ".field textarea:focus",
-    ".field select:focus",
-  ])("rend un repère en contrastes forcés : %s", (selector) => {
-    expect(forcedOutlineFor(css, selector)).toBe(true);
+describe("contrastes forcés — repère de focus unique", () => {
+  const css = stripComments(readSource("app/globals.css"));
+
+  it("pose une outline sur tout élément focalisé au clavier", () => {
+    expect(forcedOutlineFor(css, ":focus-visible")).toBe(true);
+  });
+
+  it("l'emporte sur les `outline: none` des composants, quelle que soit leur spécificité", () => {
+    const blocks = forcedColorsBlocks(css);
+    const rule = [...blocks.matchAll(/([^{}]+)\{([^{}]*)\}/g)].find(([, sel]) => sel.trim() === ":focus-visible");
+    expect(rule?.[2]).toMatch(/outline:\s*2px solid\s*!important/);
   });
 });
 
@@ -102,9 +105,5 @@ describe("annuaire des équipes et des joueurs — recherche", () => {
     expect(Number(alpha?.[1])).toBeLessThanOrEqual(1);
     expect(alpha).not.toBeNull();
     expect(Number(alpha?.[1])).toBeGreaterThanOrEqual(0.25);
-  });
-
-  it("rend un repère en contrastes forcés", () => {
-    expect(forcedOutlineFor(css, ".search:focus-within")).toBe(true);
   });
 });

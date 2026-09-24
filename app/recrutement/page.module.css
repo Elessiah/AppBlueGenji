@@ -357,20 +357,11 @@
 /* Au focus, un **anneau** et pas seulement une bordure recolorée : un
    changement de teinte d'un trait d'un pixel ne se voit pas (WCAG 2.4.7 /
    1.4.11). Même anneau que `.searchbar-input` et que le halo de `.field`,
-   dans le bleu de la vitrine. */
+   dans le bleu de la vitrine. En contrastes forcés, la règle globale de
+   `app/globals.css` prend le relais. */
 .modalInput:focus {
   border-color: var(--blue-500);
   box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.28);
-}
-
-/* Contrastes forcés : le mode supprime les `box-shadow` et impose la couleur
-   des bordures — il ne resterait aucun repère. L'`outline` native, elle, est
-   peinte dans la couleur système du focus. */
-@media (forced-colors: active) {
-  .modalInput:focus {
-    outline: 2px solid;
-    outline-offset: 2px;
-  }
 }
 
 select.modalInput {

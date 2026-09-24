@@ -55,6 +55,24 @@ export function focusLeavesMenu(
 }
 
 /**
+ * Sortie de focus de la racine du menu (`onBlur`, qui remonte depuis chaque
+ * lien) : ferme le panneau ouvert quand le focus part hors du menu. Rend `true`
+ * quand il l'a fermé.
+ */
+export function handleMenuBlur(
+  event: {
+    relatedTarget: EventTarget | null;
+    currentTarget: { contains(node: Node | null): boolean };
+  },
+  open: boolean,
+  close: () => void,
+): boolean {
+  if (!open || !focusLeavesMenu(event.relatedTarget, event.currentTarget)) return false;
+  close();
+  return true;
+}
+
+/**
  * Le panneau ouvert : les liens de la vitrine, la page courante signalée
  * autrement que par le style (`aria-current`, WCAG 1.3.1).
  */
@@ -127,9 +145,7 @@ export function PublicNavMenu() {
     <div
       className={styles.root}
       ref={rootRef}
-      onBlur={(event) => {
-        if (open && focusLeavesMenu(event.relatedTarget, event.currentTarget)) setOpen(false);
-      }}
+      onBlur={(event) => handleMenuBlur(event, open, () => setOpen(false))}
     >
       {/* Pas d'`aria-haspopup` : il annonce un `role="menu"`, dont le lecteur
           d'écran attend les flèches — le panneau est une simple navigation. */}

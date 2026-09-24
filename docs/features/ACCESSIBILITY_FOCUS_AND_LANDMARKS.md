@@ -27,8 +27,14 @@ un anneau à 6 % d'opacité, invisible. Tous portent désormais un anneau de 3 p
 à 28 %.
 
 En **contrastes forcés**, le mode supprime les `box-shadow` et impose la couleur
-des bordures : il ne restait aucun repère — halo de `.field` compris. Une
-`outline: 2px solid` (couleur système) le remplace pour tous ces champs.
+des bordures : il ne restait aucun repère — halo de `.field` compris, et de même
+pour tout anneau fait d'une ombre (liens de navigation de `/profil`, recherche
+du dialogue des fantômes…). Plutôt qu'un repli par classe — dix-neuf feuilles
+posent `outline: none` —, une **règle unique** dans `app/globals.css` pose
+`outline: 2px solid !important` sur `:focus-visible` sous
+`@media (forced-colors: active)` : elle couvre aussi l'élément ajouté demain.
+`!important` pour l'emporter sur chaque `outline: none` ; le réglage « Focus
+très visible » du menu, plus spécifique, garde la main.
 
 ## 8. Titres de `/connexion`, repères de `/association`
 
@@ -42,7 +48,7 @@ des bordures : il ne restait aucun repère — halo de `.field` compris. Une
 ## 17. Menu burger de la vitrine
 
 `PublicNavMenu` se ferme quand la tabulation quitte le panneau
-(`focusLeavesMenu`, sur l'`onBlur` de la racine). Seule une cible **connue et
+(`handleMenuBlur` → `focusLeavesMenu`, sur l'`onBlur` de la racine). Seule une cible **connue et
 extérieure** ferme : `relatedTarget` vaut `null` pour la barre du navigateur ou
 un clic sur une zone inerte — y compris dans le panneau —, et le clic dehors a
 déjà son écouteur.
