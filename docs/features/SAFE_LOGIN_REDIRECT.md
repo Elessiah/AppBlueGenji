@@ -5,7 +5,7 @@ fiche de tournoi partagée, par exemple : c'est `AuthGate` qui le pose quand
 l'espace sécurisé refuse une page à un visiteur non connecté.
 
 - Décision pure : `lib/shared/safe-redirect.ts`
-- Portes : `app/connexion/page.tsx`, `app/api/auth/google/start/route.ts`,
+- Portes : `app/connexion/_components/LoginForm.tsx`, `app/api/auth/google/start/route.ts`,
   `app/api/auth/google/callback/route.ts`
 
 ## Le défaut

@@ -79,7 +79,7 @@ aussi un résumé en message privé. Déclencher = ajouter une entrée à
 | `lib/shared/rgpd-policy.ts` | Source des données affichées sur `/rgpd` |
 | `app/rgpd/page.tsx` | Page politique de confidentialité |
 | `components/cyber/RgpdConsentModal.tsx` | Popup de consentement |
-| `app/connexion/page.tsx` | Montage du consentement avant login |
+| `app/connexion/_components/LoginForm.tsx` | Montage du consentement avant login (et de Google One Tap, après lui) |
 | `app/api/profile/export/route.ts` | Endpoint d'export RGPD |
 | `lib/server/users-service.ts` | `exportOwnData()` / `deleteOwnAccount()` |
 | `app/(secured)/profil/page.tsx` | Bouton d'export + mentions OW/Marvel |

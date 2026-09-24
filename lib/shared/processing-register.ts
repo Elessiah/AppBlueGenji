@@ -124,11 +124,15 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Connecter un joueur à son compte sans mot de passe",
     subPurposes: [
       "Connexion par Google, Discord ou Blizzard (OAuth)",
+      "Invite de connexion Google One Tap, sur la seule page de connexion et après acceptation de la politique de confidentialité",
       "Connexion par code à six chiffres envoyé en message privé Discord par le bot",
       "Rattachement de plusieurs moyens de connexion à un même compte",
     ],
     legalBasis: "Exécution du service demandé par le joueur (contrat)",
-    dataSubjects: ["Joueurs inscrits sur le site"],
+    dataSubjects: [
+      "Joueurs inscrits sur le site",
+      "Visiteurs de la page de connexion ayant accepté la politique (invite Google One Tap)",
+    ],
     dataCategories: [
       "Identifiants techniques opaques Google, Discord et Blizzard",
       "Identifiant Discord et pseudo Discord (connexion par code)",
