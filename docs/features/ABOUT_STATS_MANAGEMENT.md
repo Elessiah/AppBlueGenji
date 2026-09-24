@@ -69,18 +69,23 @@ Pour les admins :
 - tous les retours (succès/erreur) passent par les **toasts** bottom-left
   (`useToast()`), jamais en inline.
 
-La modale est **portée dans `document.body`** (`createPortal`) et confie focus
+La modale passe par **`LandingDialog`** (`components/cyber/landing/LandingDialog.tsx`,
+partagé avec les partenaires) : portée dans `document.body`, elle confie focus
 initial, Échap, piège de tabulation et verrou du défilement à
 `useDialogBehavior`. Rendue dans la section, elle restait prisonnière du
 contexte d'empilement que pose `.root` d'`AboutSection` (`position: relative;
 z-index: 1`) : son `z-index: 1000` ne valait que dans la section, si bien que
 la section des partenaires, peinte après, passait par-dessus selon la position
-de défilement — et la page continuait de défiler sous le voile.
+de défilement — et la page continuait de défiler sous le voile. Le voile ne se
+ferme que sur un appui **commencé** sur lui (`isBackdropDismiss`,
+`lib/shared/backdrop-dismiss.ts`) : une sélection de texte relâchée hors du
+panneau ne jette plus la saisie.
 
 ## Tests
 
-- `tests/app/about-section-dialogs.test.ts` — modale portée dans
-  `document.body` et confiée à `useDialogBehavior` (balayage de source).
+- `tests/app/landing-dialogs.test.ts` — modales de la vitrine passées par
+  `LandingDialog`, lui-même porté dans `document.body` (balayage de source).
+- `tests/lib/shared/backdrop-dismiss.test.ts` — fermeture par le voile.
 - `tests/lib/shared/about-stats.test.ts` — validation (requis, trim, longueurs).
 - `tests/lib/server/about-stats-service.test.ts` — CRUD + fallback (DB mockée).
 - `tests/app/api/association/about-stats.test.ts` — gardes d'auth, validation,
