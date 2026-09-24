@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { UserX } from "lucide-react";
 import type { PublicUserProfile } from "@/lib/shared/types";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { getPaletteColor } from "@/lib/shared/palette";
@@ -70,7 +71,12 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
           </div>
         </div>
         <div className={s.plPseudo}>{player.pseudo}</div>
-        {player.isDeleted && <div className={s.plDeletedMark}>Compte supprimé</div>}
+        {player.isDeleted && (
+          <div className={s.plDeletedMark}>
+            <UserX size={10} aria-hidden="true" />
+            Compte supprimé
+          </div>
+        )}
         <div className={s.plTeam}>
           {/* Le statut est demandé **une fois** : brancher ici sur `player.team`
               et là sur le statut partagé remettrait la règle à deux endroits,

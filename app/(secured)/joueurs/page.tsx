@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
-import { Coche } from "@/components/Coche";
+import { UserX } from "lucide-react";
 import { PlayerCard } from "./cards/PlayerCard";
 import s from "../_shared/annuaire.module.css";
 
@@ -31,10 +31,10 @@ export default function PlayersPage() {
   const [roleFilter, setRoleFilter] = useState<RoleFilter>("all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sort, setSort] = useState<SortKey>("pseudo");
-  // Les comptes anonymisés sortent de l'annuaire **par défaut** : « compte_supprime_412 »
-  // n'est plus personne, et la ligne n'existe que pour qui remonte un ancien
-  // match. Décoché par défaut, donc, mais jamais retiré — c'est le seul moyen de
-  // retrouver un adversaire d'un tournoi passé.
+  // Les comptes anonymisés sortent de l'annuaire **par défaut** : sous leur
+  // pseudo d'emprunt, ils ne sont plus personne, et la ligne n'existe que pour
+  // qui remonte un ancien match. Masqués par défaut, donc, mais jamais retirés
+  // — c'est le seul moyen de retrouver un adversaire d'un tournoi passé.
   const [showDeleted, setShowDeleted] = useState(false);
 
   useEffect(() => {
@@ -187,17 +187,6 @@ export default function PlayersPage() {
                   </button>
                 ))}
               </div>
-              {deletedCount > 0 && (
-                <>
-                  <span style={{ color: "var(--ink-dim)" }}>·</span>
-                  <Coche
-                    label={`Comptes supprimés (${deletedCount})`}
-                    checked={showDeleted}
-                    onChange={setShowDeleted}
-                    theme="joueur"
-                  />
-                </>
-              )}
             </div>
             <div className={s.sortOpts}>
               <span style={{ color: "var(--ink-dim)" }}>Trier :</span>
@@ -215,6 +204,26 @@ export default function PlayersPage() {
                   {l}
                 </button>
               ))}
+              {/* Volontairement effacé : un bouton libellé « Comptes
+                  supprimés (N) » en tête d'annuaire invitait à y cliquer, et
+                  emmenait le lecteur loin des joueurs qu'il cherchait. Une
+                  icône seule, en retrait, au bout de la rangée — son nom
+                  accessible et son infobulle disent ce qu'elle fait. */}
+              {deletedCount > 0 && (
+                <button
+                  type="button"
+                  className={`${s.deletedToggle} ${showDeleted ? s.deletedToggleOn : ""}`}
+                  // Un nom **constant**, l'état porté par `aria-pressed` : une
+                  // infobulle qui passerait à « Masquer » contredirait le nom
+                  // accessible, et les deux publics liraient deux actions.
+                  aria-pressed={showDeleted}
+                  aria-label={`Afficher les comptes supprimés (${deletedCount})`}
+                  title={`Afficher les comptes supprimés (${deletedCount})`}
+                  onClick={() => setShowDeleted((shown) => !shown)}
+                >
+                  <UserX size={14} aria-hidden="true" />
+                </button>
+              )}
             </div>
           </div>
         </div>

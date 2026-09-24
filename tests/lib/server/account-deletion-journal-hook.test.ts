@@ -22,7 +22,7 @@ function fakeDb(options: { failOn?: string } = {}) {
   const execute = jest.fn(async (sql: string) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
     if (options.failOn && q.includes(options.failOn)) throw new Error("DB_DOWN");
-    if (q.includes("AS tournaments")) return [[{ tournaments: 0, organized: 0, owned: 0 }]];
+    if (q.includes("AS played")) return [[{ played: 0, organized: 0, owned: 0 }]];
     if (q.includes("created_at FROM bg_users")) {
       return [[{ avatar_url: null, discord_id: null, created_at: "2026-01-02 03:04:05" }]];
     }

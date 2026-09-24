@@ -32,6 +32,8 @@ import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-iden
 import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
+import { playedMatchSql } from "@/lib/shared/ranking";
+import { isLegacyDeletedPseudo, pickAnonymousPseudo, ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import type {
   FullProfileResponse,
   PersonalDataExport,
@@ -1229,6 +1231,69 @@ export async function updateOwnProfile(
 type SqlRunner = Pick<PoolConnection, "execute">;
 
 /**
+ * Les trois questions qui décident du sort d'un compte, en fragments SQL
+ * portant sur une colonne `u.id`.
+ *
+ * « A joué » se lit comme les statistiques le lisent : un match **compté**
+ * (`playedMatchSql` — ni exemption, ni match fantôme, ni double forfait) d'une
+ * équipe dont il était membre **pendant le tournoi** (même fenêtre
+ * d'appartenance que `stats-service`, close comprise : un joueur parti d'une
+ * équipe a tout de même joué ses matchs sous ses couleurs), ou de son entrée
+ * solo. Être seulement au roster d'une équipe engagée ne suffit plus : sans
+ * match, la fiche du joueur n'a aucune statistique à garder sous un faux nom.
+ *
+ * Les deux côtés d'un match sont lus en deux branches : une jointure
+ * `team1_id = … OR team2_id = …` n'utilise aucun des deux index.
+ *
+ * Les trois questions sont écrites **une fois**, sur une colonne `u.id` : la
+ * suppression les pose pour un compte (`FROM (SELECT ? AS id) u`), le
+ * rattrapage des comptes supprimés pour tous d'un coup (`FROM bg_users u`).
+ */
+function accountTraceSql(): { played: string; organized: string; owned: string } {
+  const played = playedMatchSql("m");
+  const teamSide = (column: "team1_id" | "team2_id") => `EXISTS (
+           SELECT 1
+           FROM bg_team_members tm
+           JOIN bg_matches m ON m.${column} = tm.team_id
+           JOIN bg_tournaments t ON t.id = m.tournament_id
+           WHERE tm.user_id = u.id
+             AND (t.finished_at IS NULL OR tm.joined_at <= t.finished_at)
+             AND (tm.left_at IS NULL OR tm.left_at >= t.start_at)
+             AND ${played}
+         )`;
+  return {
+    played: `(
+         ${teamSide("team1_id")}
+         OR ${teamSide("team2_id")}
+         -- L'entrée solo compte dès qu'elle est **inscrite**, jouée ou non : son
+         -- nom d'engagé est le pseudo du joueur, et elle n'a pas de clé
+         -- étrangère (une cascade effacerait l'engagé, et avec lui l'historique
+         -- des matchs) — effacer le compte la laisserait nommer quelqu'un qui
+         -- n'existe plus. Ses matchs n'ont pas à être relus : une entrée solo
+         -- n'en a qu'inscrite, et une inscription ne se retire plus après le
+         -- coup d'envoi. Une entrée jamais inscrite part avec le compte
+         -- (eraseAccount).
+         OR EXISTS (
+           SELECT 1
+           FROM bg_teams s
+           JOIN bg_tournament_registrations r ON r.team_id = s.id
+           WHERE s.solo_user_id = u.id
+         )
+       )`,
+    organized: `EXISTS (
+         SELECT 1 FROM bg_tournaments WHERE organizer_user_id = u.id
+       )`,
+    owned: `EXISTS (
+         SELECT 1
+         FROM bg_team_members om
+         JOIN bg_teams ot ON ot.id = om.team_id AND ot.deleted_at IS NULL
+         WHERE om.user_id = u.id AND om.left_at IS NULL
+           AND JSON_CONTAINS(om.roles_json, '"OWNER"')
+       )`,
+  };
+}
+
+/**
  * Ce que ce compte laisse derrière lui, en **une** requête.
  *
  * Trois `EXISTS` indexés plutôt que trois allers-retours : la suppression est
@@ -1236,54 +1301,34 @@ type SqlRunner = Pick<PoolConnection, "execute">;
  * instantané. Les poser séparément laisserait un `await` entre elles — un
  * tournoi créé entre la deuxième et la troisième et la ligne partirait quand
  * même, sur une base qui la refuse.
- *
- * L'engagement se lit sur **toute** appartenance, close comprise : un joueur
- * parti d'une équipe a tout de même joué ses matchs sous ses couleurs.
  */
 async function loadAccountTrace(
   runner: SqlRunner,
   userId: number,
 ): Promise<AccountTrace> {
+  const trace = accountTraceSql();
   const [rows] = await runner.execute<(RowDataPacket & {
-    tournaments: number;
+    played: number;
     organized: number;
     owned: number;
   })[]>(
     `SELECT
-       (
-         EXISTS (
-           SELECT 1
-           FROM bg_tournament_registrations r
-           JOIN bg_team_members tm ON tm.team_id = r.team_id AND tm.user_id = ?
-         )
-         -- L'entrée solo compte **par elle-même** : elle n'a pas de clé
-         -- étrangère (une cascade effacerait l'engagé, et avec lui l'historique
-         -- des matchs), donc l'effacement du compte la laisserait pendre sur un
-         -- identifiant disparu.
-         OR EXISTS (SELECT 1 FROM bg_teams WHERE solo_user_id = ?)
-       ) AS tournaments,
-       EXISTS (
-         SELECT 1 FROM bg_tournaments WHERE organizer_user_id = ?
-       ) AS organized,
-       EXISTS (
-         SELECT 1
-         FROM bg_team_members m
-         JOIN bg_teams t ON t.id = m.team_id AND t.deleted_at IS NULL
-         WHERE m.user_id = ? AND m.left_at IS NULL
-           AND JSON_CONTAINS(m.roles_json, '"OWNER"')
-       ) AS owned`,
-    [userId, userId, userId, userId],
+       ${trace.played} AS played,
+       ${trace.organized} AS organized,
+       ${trace.owned} AS owned
+     FROM (SELECT ? AS id) u`,
+    [userId],
   );
   const row = rows[0];
   // Une ligne absente **n'est pas** une absence de trace : lue en booléens, elle
   // donnerait trois `false`, donc `ERASE` — le seul dénouement qui ne se défait
   // pas, et l'exact contraire de la règle conservatrice du module pur. La
-  // requête en rend toujours une aujourd'hui (des sous-requêtes scalaires, sans
-  // `FROM`) ; le jour où elle porte un `FROM bg_users`, l'anomalie doit lever et
-  // non effacer.
+  // requête en rend toujours une aujourd'hui (une table dérivée d'une ligne) ;
+  // le jour où elle porte un `FROM bg_users`, l'anomalie doit lever et non
+  // effacer.
   if (!row) throw new Error("ACCOUNT_TRACE_UNAVAILABLE");
   return {
-    tournaments: Boolean(row.tournaments),
+    playedMatches: Boolean(row.played),
     organizedTournaments: Boolean(row.organized),
     ownedTeams: Boolean(row.owned),
   };
@@ -1448,6 +1493,109 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   return plan;
 }
 
+/** Ce que le rattrapage des comptes supprimés a fait. */
+export type DeletedAccountsReconciliation = {
+  /** Comptes supprimés sans match joué, effacés entièrement. */
+  erased: number;
+  /** Comptes renommés sous un pseudo d'emprunt (ancienne règle `compte_supprime_<id>`). */
+  renamed: number;
+  /** Comptes laissés en l'état faute d'avoir pu être traités (reportés au prochain démarrage). */
+  failed: number;
+};
+
+/**
+ * Applique la règle de suppression **en vigueur** aux comptes déjà supprimés.
+ *
+ * La règle a changé deux fois sous des comptes qui l'avaient déjà subie : un
+ * compte n'est plus conservé que s'il a **joué** (il suffisait d'avoir été au
+ * roster d'une équipe engagée), et le compte conservé porte un **pseudo
+ * d'emprunt** (il s'appelait `compte_supprime_<id>`, et gardait ses rôles de
+ * plateforme). Une suppression ne se rejoue pas à la demande du joueur — il est
+ * parti —, d'où ce rattrapage, lancé une fois par processus après les
+ * migrations (`getDatabase`).
+ *
+ * Il ne fait rien dans le cas nominal : une suppression faite sous la règle
+ * actuelle ne laisse ni compte effaçable ni ancien pseudo. D'où **une seule
+ * lecture** pour repérer les comptes à traiter — les mêmes questions que la
+ * suppression (`accountTraceSql`), posées à tous les comptes supprimés d'un
+ * coup —, sans quoi chaque démarrage de chaque processus verrouillerait et
+ * relirait un à un des comptes qu'il n'y a plus à toucher. Chaque compte repéré est
+ * traité dans **sa** transaction, sous le verrou de sa ligne et après relecture
+ * de `is_deleted` — deux processus qui démarrent ensemble ne se marchent pas
+ * dessus —, et l'échec de l'un n'empêche pas les autres.
+ *
+ * Aucune ligne au journal des suppressions (`account-deletion-journal`) : ces
+ * comptes y figurent depuis leur suppression, et le rejeu après restauration
+ * redécide déjà le mode sur la base restaurée, avec la règle du jour.
+ */
+export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconciliation> {
+  const db = await getDatabase();
+  const trace = accountTraceSql();
+  const [candidates] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT u.id
+       FROM bg_users u
+      WHERE u.is_deleted = 1
+        AND (
+          u.pseudo LIKE 'compte\\_supprime\\_%'
+          OR u.is_admin = 1
+          OR u.platform_roles_json IS NOT NULL
+          OR NOT (${trace.played} OR ${trace.organized} OR ${trace.owned})
+        )
+      ORDER BY u.id`,
+  );
+  const outcome: DeletedAccountsReconciliation = { erased: 0, renamed: 0, failed: 0 };
+
+  for (const candidate of candidates) {
+    const userId = Number(candidate.id);
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+      const [locked] = await connection.execute<(RowDataPacket & {
+        pseudo: string;
+        is_deleted: 0 | 1;
+        is_admin: 0 | 1;
+        platform_roles_json: unknown;
+      })[]>(
+        `SELECT pseudo, is_deleted, is_admin, platform_roles_json
+           FROM bg_users WHERE id = ? FOR UPDATE`,
+        [userId],
+      );
+      const row = locked[0];
+      if (!row || Number(row.is_deleted) !== 1) {
+        await connection.rollback();
+        continue;
+      }
+      const plan = accountDeletionPlan(await loadAccountTrace(connection, userId));
+      if (plan.mode === "ERASE") {
+        await eraseAccount(connection, userId);
+        outcome.erased += 1;
+      } else if (
+        isLegacyDeletedPseudo(row.pseudo)
+        || Number(row.is_admin) === 1
+        || row.platform_roles_json !== null
+      ) {
+        await anonymizeAccount(connection, userId);
+        outcome.renamed += 1;
+      }
+      await connection.commit();
+    } catch (error) {
+      // Sur une connexion morte — la panne même qu'on traite —, l'annulation
+      // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
+      // tous les comptes suivants au prochain démarrage.
+      await connection.rollback().catch(() => {});
+      outcome.failed += 1;
+      console.error(
+        `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
+        error instanceof Error ? error.message : error,
+      );
+    } finally {
+      connection.release();
+    }
+  }
+
+  return outcome;
+}
+
 /**
  * L'effacement pur et simple, sous le verrou de `deleteOwnAccount`.
  *
@@ -1458,39 +1606,94 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
  * désignent aucun compte.
  */
 async function eraseAccount(connection: PoolConnection, userId: number): Promise<void> {
+  // Une entrée solo jamais inscrite ni jouée part avec le compte : elle n'a pas
+  // de clé étrangère, et son nom d'engagé est le pseudo du joueur — laissée en
+  // place, elle le nommerait encore. Les deux `NOT EXISTS` ne sont pas une
+  // redite de la trace : ils gardent l'entrée qu'une inscription aurait reprise
+  // entre-temps, la suppression tournant alors en anonymisation au second essai.
+  await connection.execute(
+    `DELETE FROM bg_teams
+      WHERE solo_user_id = ?
+        AND NOT EXISTS (SELECT 1 FROM bg_tournament_registrations r WHERE r.team_id = bg_teams.id)
+        AND NOT EXISTS (SELECT 1 FROM bg_matches m WHERE m.team1_id = bg_teams.id)
+        AND NOT EXISTS (SELECT 1 FROM bg_matches m WHERE m.team2_id = bg_teams.id)`,
+    [userId],
+  );
   await connection.execute(`DELETE FROM bg_users WHERE id = ?`, [userId]);
 }
 
-/** L'anonymisation : la ligne reste, tout ce qui désigne une personne part. */
+/** Tentatives de pose d'un pseudo d'emprunt avant d'abandonner. */
+const ANONYMOUS_PSEUDO_ATTEMPTS = 5;
+
+/**
+ * L'anonymisation : la ligne reste — ses matchs et son palmarès en dépendent —,
+ * sous un **pseudo d'emprunt** (`lib/shared/anonymous-pseudos.ts`), et tout ce
+ * qui désigne une personne part : tags de jeu et Discord, identités de
+ * connexion, avatar, majorité, rôles de plateforme, consentements. Rien ne
+ * relie plus la ligne à quelqu'un ; c'est la fiche du joueur qui annonce le
+ * compte supprimé, jamais le nom, qu'un plateau affiche sans contexte.
+ *
+ * Le pseudo est posé **dans la même instruction** que le reste : les pseudos
+ * déjà portés sont relus sur la connexion de la transaction, puis l'écriture
+ * est tentée. Deux suppressions simultanées peuvent tirer le même nom, et
+ * c'est l'index unique de `bg_users.pseudo` qui tranche — le perdant retire
+ * son tirage et recommence. Sous MySQL, une instruction refusée n'annule pas
+ * la transaction, seulement elle-même.
+ */
 async function anonymizeAccount(connection: PoolConnection, userId: number): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_users
-     SET pseudo = CONCAT('compte_supprime_', id),
-         avatar_url = NULL,
-         overwatch_battletag = NULL,
-         marvel_rivals_tag = NULL,
-         discord_pseudo = NULL,
-         -- Le tag part, sa certification avec : elle ne certifie rien d'autre
-         -- que lui, et une date restée seule ferait d'un compte anonymisé un
-         -- compte « vérifié » sans tag.
-         discord_verified_at = NULL,
-         is_adult = NULL,
-         discord_id = NULL,
-         -- La méthode décrit un rattachement, pas un compte : les trois portes
-         -- partant, il n'en reste aucun à décrire.
-         discord_link_method = NULL,
-         google_sub = NULL,
-         blizzard_sub = NULL,
-         visible_avatar = 0,
-         visible_overwatch = 0,
-         visible_marvel = 0,
-         visible_major = 0,
-         open_to_recruitment = 0,
-         is_deleted = 1
-     WHERE id = ?`,
-    [userId],
+  const [takenRows] = await connection.execute<(RowDataPacket & { pseudo: string })[]>(
+    `SELECT pseudo FROM bg_users
+      WHERE id <> ?
+        AND pseudo IN (${ANONYMOUS_PSEUDOS.map(() => "?").join(", ")})`,
+    [userId, ...ANONYMOUS_PSEUDOS],
   );
+  const taken = new Set(takenRows.map((row) => row.pseudo));
+  for (let attempt = 0; ; attempt += 1) {
+    const pseudo = pickAnonymousPseudo(taken);
+    try {
+      await connection.execute(
+        `UPDATE bg_users
+         SET pseudo = ?,
+             avatar_url = NULL,
+             overwatch_battletag = NULL,
+             marvel_rivals_tag = NULL,
+             discord_pseudo = NULL,
+             -- Le tag part, sa certification avec : elle ne certifie rien d'autre
+             -- que lui, et une date restée seule ferait d'un compte anonymisé un
+             -- compte « vérifié » sans tag.
+             discord_verified_at = NULL,
+             is_adult = NULL,
+             discord_id = NULL,
+             -- La méthode décrit un rattachement, pas un compte : les trois portes
+             -- partant, il n'en reste aucun à décrire.
+             discord_link_method = NULL,
+             google_sub = NULL,
+             blizzard_sub = NULL,
+             visible_avatar = 0,
+             visible_overwatch = 0,
+             visible_marvel = 0,
+             visible_major = 0,
+             open_to_recruitment = 0,
+             -- Un titre de staff est public (displayRoles) : il désignerait la
+             -- personne derrière le pseudo d'emprunt aussi sûrement que son nom.
+             is_admin = 0,
+             platform_roles_json = NULL,
+             is_deleted = 1
+         WHERE id = ?`,
+        [pseudo, userId],
+      );
+      break;
+    } catch (error) {
+      if (!isDuplicateEntryError(error) || attempt + 1 >= ANONYMOUS_PSEUDO_ATTEMPTS) throw error;
+      taken.add(pseudo);
+    }
+  }
   await connection.execute(`DELETE FROM bg_user_sessions WHERE user_id = ?`, [userId]);
+  // Les consentements aux changements de traitement et la trace des messages
+  // privés envoyés : ils ne concernent plus personne, et le compte ne sera plus
+  // jamais sollicité (`is_deleted = 0` borne les deux lectures).
+  await connection.execute(`DELETE FROM bg_privacy_acknowledgments WHERE user_id = ?`, [userId]);
+  await connection.execute(`DELETE FROM bg_privacy_change_notifications WHERE user_id = ?`, [userId]);
   // Les invitations et demandes **en attente** sont annulées, et c'est le seul
   // chemin par lequel un compte supprimé rejoignait encore une équipe vivante.
   // Une demande d'adhésion (`REQUEST`) déposée avant la suppression reste
@@ -1666,6 +1869,7 @@ export async function getFullProfile(
       open_to_recruitment,
       is_admin,
       platform_roles_json,
+      is_deleted,
       created_at
     FROM bg_users
     WHERE id = ?
@@ -1676,9 +1880,15 @@ export async function getFullProfile(
   if (userRows.length === 0) return null;
 
   const isSelf = viewerId === targetUserId;
+  const isDeleted = Boolean(userRows[0].is_deleted);
+  // Un compte supprimé n'a plus de titre de staff à afficher : l'anonymisation
+  // les efface en base, et `reconcileDeletedAccounts` rattrape les comptes
+  // supprimés avant la règle — la lecture n'a pas de cas particulier à tenir.
   const targetIsAdmin = Boolean(userRows[0].is_admin);
   const targetRoles = resolveRoles(targetIsAdmin, userRows[0].platform_roles_json);
-  const profile = mapPublicUser(userRows[0]);
+  // `isDeleted` voyage jusqu'à la fiche, qui doit **annoncer** le compte
+  // supprimé : son pseudo d'emprunt se lit comme un pseudo ordinaire.
+  const profile: PublicUserProfile = { ...mapPublicUser(userRows[0]), isDeleted };
   const discordVerified = userRows[0].discord_verified_at != null;
 
   if (!isSelf) applyVisibility(profile, false);
@@ -1916,7 +2126,7 @@ export async function setUserRoles(
  *
  * Ses deux appelants nomment un joueur pour l'**attacher à une équipe** —
  * `inviteToTeam` et la reprise d'une équipe fantôme, qui en fait un `OWNER`. Un
- * compte anonymisé garde une ligne et donc un pseudo (`compte_supprime_412`) :
+ * compte anonymisé garde une ligne et donc un pseudo (d'emprunt) :
  * sans la condition, il restait invitable, et une demande d'adhésion déposée
  * avant la suppression le faisait même **rejoindre** le roster séance tenante —
  * soit rattacher à une équipe vivante un compte dont on vient de promettre
