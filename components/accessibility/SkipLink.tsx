@@ -8,7 +8,8 @@ const SKIP_LINK_HREF = "#contenu";
 
 /**
  * Pose le focus au début du contenu de la page. Rend `false` quand la page n'a
- * pas de `<main>` : le lien laisse alors le navigateur suivre son ancre.
+ * pas de `<main>`, ou que la cible refuse le focus : le lien laisse alors le
+ * navigateur suivre son ancre.
  *
  * La cible reçoit `tabindex="-1"` — un élément non interactif ne prend pas le
  * focus sans lui —, retiré dès qu'elle le perd : laissé en place, un clic dans
@@ -27,15 +28,20 @@ export function focusMainContent(
   const addedTabIndex = !target.hasAttribute("tabindex");
   if (addedTabIndex) target.setAttribute("tabindex", "-1");
   target.setAttribute("data-skip-target", "");
-  target.addEventListener(
-    "blur",
-    () => {
-      if (addedTabIndex) target.removeAttribute("tabindex");
-      target.removeAttribute("data-skip-target");
-    },
-    { once: true },
-  );
+  const cleanup = () => {
+    if (addedTabIndex) target.removeAttribute("tabindex");
+    target.removeAttribute("data-skip-target");
+  };
+  target.addEventListener("blur", cleanup, { once: true });
   target.focus();
+
+  // Une cible masquée par une feuille de style refuse le focus sans rien dire :
+  // aucun `blur` ne viendrait alors retirer ce qui vient d'être posé.
+  if (target.ownerDocument.activeElement !== target) {
+    target.removeEventListener("blur", cleanup);
+    cleanup();
+    return false;
+  }
   return true;
 }
 

@@ -12,6 +12,9 @@ class FakeElement {
   readonly listeners = new Map<string, () => void>();
   focused = false;
   textContent = "contenu";
+  /** Faux quand une feuille de style masque l'élément : `focus()` n'y fait rien. */
+  focusable = true;
+  readonly ownerDocument: { activeElement: FakeElement | null } = { activeElement: null };
 
   constructor(
     readonly tagName: string,
@@ -33,11 +36,17 @@ class FakeElement {
   addEventListener(type: string, listener: () => void) {
     this.listeners.set(type, listener);
   }
+  removeEventListener(type: string, listener: () => void) {
+    if (this.listeners.get(type) === listener) this.listeners.delete(type);
+  }
   focus() {
+    if (!this.focusable) return;
     this.focused = true;
+    this.ownerDocument.activeElement = this;
   }
   blur() {
     this.focused = false;
+    this.ownerDocument.activeElement = null;
     const listener = this.listeners.get("blur");
     this.listeners.delete("blur");
     listener?.();
@@ -88,6 +97,16 @@ describe("focusMainContent", () => {
     expect(css).toContain('[data-skip-target][tabindex="-1"]:focus {\n  outline: none;');
     expect(css).not.toMatch(/\[data-skip-target\]:focus \{/);
     expect(css).toMatch(/\[data-skip-target\] \{\s*scroll-margin-top:/);
+  });
+
+  it("défait tout et rend `false` quand la cible refuse le focus", () => {
+    const page = new FakeElement("DIV");
+    page.focusable = false;
+
+    expect(focusMainContent(fakeDocument(new FakeElement("MAIN", [page])))).toBe(false);
+    expect(page.hasAttribute("tabindex")).toBe(false);
+    expect(page.hasAttribute("data-skip-target")).toBe(false);
+    expect(page.listeners.size).toBe(0);
   });
 
   it("rend `false` sur une page sans <main>, pour laisser le navigateur suivre l'ancre", () => {
