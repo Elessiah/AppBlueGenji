@@ -90,10 +90,26 @@ Deux points de mise en œuvre qui ne se devinent pas :
 `MANUAL`, `RANKING` ou `REGISTRATION` (règle dans `seedingSource()`,
 `lib/shared/seeding.ts` — la même que celle de l'aperçu du plateau).
 
-En `RANKING`, la liste triée par `seed` **n'est pas** le tirage : le moteur
-seedera depuis le classement du site tant que personne n'a réordonné. Le bloc le
-dit alors explicitement, à côté des flèches qui permettent d'y remédier — sans
-quoi le staff lit un ordre d'inscription en croyant lire un tirage.
+En `RANKING`, **avant le coup d'envoi** (masqué, annoncé, aux inscriptions ou
+inscriptions closes — `isPreLaunchState`), l'instantané range lui-même la liste
+dans l'ordre du classement du site (`registrationsFollowRanking` +
+`orderByRanking`, `lib/shared/seeding.ts`), par **le même chargeur** que
+l'aperçu du plateau et que le moteur au lancement (`loadEntrantsBySiteRanking`,
+lecture mutualisée) : chaque nouvelle inscrite prend sa place de cote au lieu de
+s'ajouter en queue, et les rangs affichés sont renumérotés de 1 à N. La colonne
+`seed` n'est pas réécrite — le classement peut encore bouger d'ici le lancement
+(matchs d'autres tournois), c'est donc une **lecture**, refaite à chaque
+instantané. Une inscrite absente du classement (inscrite entre les deux
+lectures) reste en fin de liste plutôt que de disparaître. Corollaire utile : le
+premier geste du staff part de cet ordre, un déplacement ne jette donc pas le
+classement pour revenir à l'ordre d'arrivée. Le bloc le dit, et rappelle que
+réordonner fige l'ordre.
+
+Une fois le tournoi **lancé**, la liste retombe sur la colonne `seed` (ordre
+d'arrivée) : les matchs du tournoi font bouger les cotes, alors que le tirage,
+lui, est fait. Elle **n'est** alors **pas** le tirage, et le bloc le dit
+explicitement, à côté des flèches qui permettent d'y remédier — sans quoi le
+staff lit un ordre d'inscription en croyant lire un tirage.
 
 ## Fenêtre d'édition
 

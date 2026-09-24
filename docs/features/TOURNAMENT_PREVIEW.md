@@ -37,6 +37,13 @@ lire le tirage d'avance en inspectant la réponse.
 `REGISTRATION`). Dès `RUNNING`, le vrai plateau est la seule vérité : afficher
 en plus ce qu'il « aurait été » n'apporterait que de la confusion.
 
+La page l'affiche sur **tout** cet avant-course, inscriptions closes comprises
+(`isPreLaunchState`, `lib/shared/seeding.ts`) : la branche est testée **avant**
+les vues des formats à classement. Elle ne l'était qu'en `REGISTRATION`, si bien
+qu'une Survie, une Ronde suisse ou une BG Survie aux inscriptions closes — dont
+les métadonnées existent dès la création, vides — tombait dans la vue de son
+format : ni match ni aperçu, au moment précis où le staff relit le tirage.
+
 ## Fidélité au moteur
 
 L'aperçu ne serait pas seulement inutile mais **nuisible** s'il montrait autre
@@ -88,8 +95,8 @@ L'aperçu applique la règle du moteur, pas la sienne (cf.
 | `seedingSource` | Quand | Ordre |
 | --- | --- | --- |
 | `MANUAL` | `manual_seeding = 1` | colonne `seed`, fixée par le staff |
-| `REGISTRATION` | `SINGLE` / `DOUBLE` / `BG_SURVIE` sans réordonnancement | colonne `seed` = ordre d'arrivée |
-| `RANKING` | `SWISS` / `SURVIVAL` / `MULTI` sans réordonnancement | classement du site (`lib/shared/ranking.ts`) |
+| `REGISTRATION` | `SINGLE` / `DOUBLE` sans réordonnancement | colonne `seed` = ordre d'arrivée |
+| `RANKING` | `SWISS` / `SURVIVAL` / `BG_SURVIE` / `MULTI` sans réordonnancement | classement du site (`lib/shared/ranking.ts`) |
 
 La requête de classement est **la même** que celle de
 `initializeSwissTournament`, `initializeSurvivalTournament` et
