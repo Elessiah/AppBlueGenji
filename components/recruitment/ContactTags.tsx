@@ -47,7 +47,8 @@ export function ContactTags({ ad }: ContactTagsProps) {
   const primary = ad.contactPreferred === "DISCORD" ? styles.contactTagPrimary : "";
 
   return (
-    <div className={styles.contactTags} aria-label="Contacts">
+    // `group` : sans rôle, le nom « Contacts » serait interdit (`aria-prohibited-attr`).
+    <div className={styles.contactTags} role="group" aria-label="Contacts">
       {ad.contactDiscord &&
         (isUrl(ad.contactDiscord) ? (
           <a
