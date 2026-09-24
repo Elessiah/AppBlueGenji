@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/tournaments/launch");
+jest.mock("@/lib/server/tournaments/advance");
 
-import { POST } from "@/app/api/admin/tournaments/[id]/launch/route";
+import { POST } from "@/app/api/admin/tournaments/[id]/advance/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { launchTournamentNow, type LaunchedTournament } from "@/lib/server/tournaments/launch";
+import { advanceTournamentNow, type AdvancedTournament } from "@/lib/server/tournaments/advance";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, pseudo: "Root", isAdmin: true, roles: ["ADMIN"] });
@@ -17,22 +17,23 @@ const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
 function launch(id: string) {
   return POST(
-    new Request(`http://localhost/api/admin/tournaments/${id}/launch`, { method: "POST" }),
+    new Request(`http://localhost/api/admin/tournaments/${id}/advance`, { method: "POST" }),
     params(id),
   );
 }
 
-const launched: LaunchedTournament = {
+const advanced: AdvancedTournament = {
   id: 7,
   name: "BlueGenji Open",
+  target: "RUNNING",
   state: "RUNNING",
   entrantCount: 12,
 };
 
-describe("POST /api/admin/tournaments/[id]/launch", () => {
+describe("POST /api/admin/tournaments/[id]/advance", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.mocked(launchTournamentNow).mockResolvedValue(launched);
+    jest.mocked(advanceTournamentNow).mockResolvedValue(advanced);
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -50,8 +51,8 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
     const res = await launch("7");
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ launched });
-    expect(launchTournamentNow).toHaveBeenCalledWith(7);
+    expect(await res.json()).toEqual({ advanced });
+    expect(advanceTournamentNow).toHaveBeenCalledWith(7);
   });
 
   it("rejette un visiteur anonyme avec 401", async () => {
@@ -61,7 +62,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
 
     expect(res.status).toBe(401);
     expect(await res.json()).toEqual({ error: "UNAUTHORIZED" });
-    expect(launchTournamentNow).not.toHaveBeenCalled();
+    expect(advanceTournamentNow).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -75,7 +76,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
 
     expect(res.status).toBe(403);
     expect(await res.json()).toEqual({ error: "FORBIDDEN" });
-    expect(launchTournamentNow).not.toHaveBeenCalled();
+    expect(advanceTournamentNow).not.toHaveBeenCalled();
   });
 
   it.each(["abc", "0", "-3", "1.5"])("refuse l'identifiant invalide %s", async (id) => {
@@ -85,12 +86,12 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_TOURNAMENT_ID" });
-    expect(launchTournamentNow).not.toHaveBeenCalled();
+    expect(advanceTournamentNow).not.toHaveBeenCalled();
   });
 
   it("répond 404 pour un tournoi inconnu", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(launchTournamentNow).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
+    jest.mocked(advanceTournamentNow).mockRejectedValue(new Error("TOURNAMENT_NOT_FOUND"));
 
     const res = await launch("7");
 
@@ -102,7 +103,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
     "répond 409 quand il n'y a plus rien à abréger (%s)",
     async (code) => {
       jest.mocked(getCurrentUser).mockResolvedValue(admin);
-      jest.mocked(launchTournamentNow).mockRejectedValue(new Error(code));
+      jest.mocked(advanceTournamentNow).mockRejectedValue(new Error(code));
 
       const res = await launch("7");
 
@@ -113,7 +114,7 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
 
   it.each(["INVALID_DATES", "INVALID_DATE_ORDER"])("répond 400 sur %s", async (code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(launchTournamentNow).mockRejectedValue(new Error(code));
+    jest.mocked(advanceTournamentNow).mockRejectedValue(new Error(code));
 
     const res = await launch("7");
 
@@ -123,13 +124,13 @@ describe("POST /api/admin/tournaments/[id]/launch", () => {
 
   it("répond 500 sans laisser fuir le message du moteur", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(launchTournamentNow).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
+    jest.mocked(advanceTournamentNow).mockRejectedValue(new Error("ER_LOCK_DEADLOCK"));
     const logged = jest.spyOn(console, "error").mockImplementation(() => undefined);
 
     const res = await launch("7");
 
     expect(res.status).toBe(500);
-    expect(await res.json()).toEqual({ error: "TOURNAMENT_LAUNCH_FAILED" });
+    expect(await res.json()).toEqual({ error: "TOURNAMENT_ADVANCE_FAILED" });
     expect(logged).toHaveBeenCalled();
   });
 });

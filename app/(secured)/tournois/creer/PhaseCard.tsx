@@ -13,6 +13,7 @@ import {
   phaseSummary,
 } from "./phase-form";
 import { checkboxCardChrome } from "../_lib/form-styles";
+import { NumberInput } from "@/components/ui/number-input";
 
 const HINT: CSSProperties = {
   margin: "2px 0 0",
@@ -422,18 +423,17 @@ export function PhaseCard({
                       ? "Nombre d'équipes qualifiées"
                       : "Pourcentage qualifié"}
                   </label>
-                  <input
+                  <NumberInput
                     id={fieldId("qualifierValue")}
                     {...invalidAttrs("qualifierValue")}
-                    type="number"
                     min={phase.qualifierMode === "COUNT" ? 1 : 1}
                     max={phase.qualifierMode === "COUNT" ? maxTeams : 99}
                     disabled={disabled}
                     value={phase.qualifierValue}
-                    onChange={(e) =>
+                    onValueChange={(next) =>
                       onUpdate({
                         ...phase,
-                        qualifierValue: Number(e.target.value),
+                        qualifierValue: next,
                       })
                     }
                   />
@@ -480,20 +480,19 @@ export function PhaseCard({
                   <label htmlFor={fieldId("survivalRoundsBeforeFirstCut")}>
                     Rounds avant la première coupe
                   </label>
-                  <input
+                  <NumberInput
                     id={fieldId("survivalRoundsBeforeFirstCut")}
                     {...invalidAttrs("survivalRoundsBeforeFirstCut", helpId("survivalRoundsBeforeFirstCut"))}
-                    type="number"
                     min={1}
                     max={50}
                     disabled={disabled}
                     // `??` et non `||` : un 0 saisi s'affichait « 3 », si bien que
                     // le champ désigné par le refus montrait une valeur valide.
                     value={phase.survivalRoundsBeforeFirstCut ?? 3}
-                    onChange={(e) =>
+                    onValueChange={(next) =>
                       onUpdate({
                         ...phase,
-                        survivalRoundsBeforeFirstCut: Number(e.target.value),
+                        survivalRoundsBeforeFirstCut: next,
                       })
                     }
                   />
@@ -507,18 +506,17 @@ export function PhaseCard({
                   <label htmlFor={fieldId("survivalRoundsPerCut")}>
                     Rounds entre les coupes suivantes
                   </label>
-                  <input
+                  <NumberInput
                     id={fieldId("survivalRoundsPerCut")}
                     {...invalidAttrs("survivalRoundsPerCut", helpId("survivalRoundsPerCut"))}
-                    type="number"
                     min={1}
                     max={50}
                     disabled={disabled}
                     value={phase.survivalRoundsPerCut ?? 3}
-                    onChange={(e) =>
+                    onValueChange={(next) =>
                       onUpdate({
                         ...phase,
-                        survivalRoundsPerCut: Number(e.target.value),
+                        survivalRoundsPerCut: next,
                       })
                     }
                   />

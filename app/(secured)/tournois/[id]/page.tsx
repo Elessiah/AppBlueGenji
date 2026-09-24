@@ -12,6 +12,7 @@ import type {
 } from "@/lib/shared/types";
 import { participantWording } from "@/lib/shared/participants";
 import { remainingSlots } from "@/lib/shared/ghost-registration";
+import { advanceSuccessMessage } from "@/lib/shared/tournament-launch";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
@@ -59,7 +60,7 @@ import { TournamentProgress } from "./_components/TournamentProgress";
 import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
 import { RollbackRoundDialog } from "./_components/RollbackRoundDialog";
 import { EndurancePenaltyDialog } from "./_components/EndurancePenaltyDialog";
-import { LaunchTournamentDialog } from "./_components/LaunchTournamentDialog";
+import { AdvanceTournamentDialog } from "./_components/AdvanceTournamentDialog";
 import { TournamentHeader } from "./_components/TournamentHeader";
 import { TournamentImageDialog } from "./_components/TournamentImageDialog";
 
@@ -89,7 +90,7 @@ export default function TournamentDetailPage() {
   const [ghostRegistrationOpen, setGhostRegistrationOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
-  const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
+  const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
   // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
   // la page se recharge par SSE, et un objet capturé à l'ouverture deviendrait
@@ -149,7 +150,7 @@ export default function TournamentDetailPage() {
   useEffect(() => setDeleteDialogOpen(false), [tournamentId]);
   // Même précaution : lancer le tournoi qu'on croyait regarder serait pire
   // encore qu'un dialogue de suppression laissé ouvert sur la mauvaise cible.
-  useEffect(() => setLaunchDialogOpen(false), [tournamentId]);
+  useEffect(() => setAdvanceDialogOpen(false), [tournamentId]);
   // L'image enregistrée depuis ce dialogue irait sinon habiller un autre tournoi.
   useEffect(() => setImageDialogOpen(false), [tournamentId]);
   useEffect(() => setIssueTarget(undefined), [tournamentId]);
@@ -595,7 +596,7 @@ export default function TournamentDetailPage() {
           onRegister={registerTeam}
           onReportIssue={() => openIssueReport(null)}
           onGuestRegister={() => setGhostRegistrationOpen(true)}
-          onLaunchNow={() => setLaunchDialogOpen(true)}
+          onAdvance={() => setAdvanceDialogOpen(true)}
           onLiveSaved={() => void refresh()}
           onEditImage={() => setImageDialogOpen(true)}
         />
@@ -989,20 +990,13 @@ export default function TournamentDetailPage() {
         />
       )}
 
-      {launchDialogOpen && detail.isAdmin && !frozen && (
-        <LaunchTournamentDialog
+      {advanceDialogOpen && detail.isAdmin && !frozen && (
+        <AdvanceTournamentDialog
           card={detail.card}
-          onClose={() => setLaunchDialogOpen(false)}
-          onLaunched={({ state, entrantCount }) => {
-            setLaunchDialogOpen(false);
-            // Deux issues, deux messages : le moteur clôt sur-le-champ un
-            // plateau de moins de deux engagés, et annoncer « tournoi lancé »
-            // devant une fiche déjà terminée serait un démenti immédiat.
-            showSuccess(
-              state === "FINISHED"
-                ? "Tournoi clos : il n'y avait pas assez d'engagés pour jouer un match."
-                : `Tournoi lancé avec ${entrantCount} engagés.`,
-            );
+          onClose={() => setAdvanceDialogOpen(false)}
+          onAdvanced={({ target, state, entrantCount }) => {
+            setAdvanceDialogOpen(false);
+            showSuccess(advanceSuccessMessage(target, state, entrantCount));
             void refresh();
           }}
         />

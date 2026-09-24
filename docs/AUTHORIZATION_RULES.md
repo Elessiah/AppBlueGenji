@@ -531,7 +531,8 @@ Réservé à `ADMIN` et `ARBITRE` :
 - l'éditer (`PATCH /api/tournaments/[id]/edit`) — dans la fenêtre autorisée :
   tout tant qu'il est caché, cinq champs une fois annoncé, **rien** une fois
   lancé ou terminé ;
-- le lancer par anticipation (`POST /api/admin/tournaments/[id]/launch`) ;
+- l'avancer d'une étape par anticipation — ouverture des inscriptions, clôture,
+  coup d'envoi (`POST /api/admin/tournaments/[id]/advance`) ;
 - réordonner le seeding (`PATCH .../seeding`), jusqu'à la première saisie de
   score ;
 - **retirer un engagé du plateau**

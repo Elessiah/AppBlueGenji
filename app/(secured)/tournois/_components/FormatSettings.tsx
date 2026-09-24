@@ -11,6 +11,7 @@ import type { TournamentField } from "@/lib/shared/tournament-edit";
 import { PhaseBuilder } from "../creer/PhaseBuilder";
 import { checkboxCardChrome, FULL_WIDTH, HINT } from "../_lib/form-styles";
 import type { TournamentFormValues } from "../_lib/tournament-form-values";
+import { NumberInput } from "@/components/ui/number-input";
 
 /**
  * Réglages propres au format choisi : phases (MULTI), endurance (BG Survie),
@@ -69,14 +70,13 @@ export function FormatSettings({
         <>
           <div className="field">
             <label htmlFor="endurance-points">Capital d&apos;endurance</label>
-            <input
+            <NumberInput
               id="endurance-points"
-              type="number"
               min={1}
               max={99}
               disabled={locked("endurancePoints")}
               value={values.endurancePoints}
-              onChange={(e) => set("endurancePoints", Number(e.target.value))}
+              onValueChange={(next) => set("endurancePoints", next)}
               {...lockedAttr("endurancePoints")}
             />
             <p style={HINT}>
@@ -86,42 +86,39 @@ export function FormatSettings({
 
           <div className="field">
             <label htmlFor="endurance-win">Points par victoire de map</label>
-            <input
+            <NumberInput
               id="endurance-win"
-              type="number"
               min={1}
               max={20}
               disabled={locked("enduranceWinDelta")}
               value={values.enduranceWinDelta}
-              onChange={(e) => set("enduranceWinDelta", Number(e.target.value))}
+              onValueChange={(next) => set("enduranceWinDelta", next)}
               {...lockedAttr("enduranceWinDelta")}
             />
           </div>
 
           <div className="field">
             <label htmlFor="endurance-loss">Points par défaite de map</label>
-            <input
+            <NumberInput
               id="endurance-loss"
-              type="number"
               min={1}
               max={20}
               disabled={locked("enduranceLossDelta")}
               value={values.enduranceLossDelta}
-              onChange={(e) => set("enduranceLossDelta", Number(e.target.value))}
+              onValueChange={(next) => set("enduranceLossDelta", next)}
               {...lockedAttr("enduranceLossDelta")}
             />
           </div>
 
           <div className="field">
             <label htmlFor="endurance-playoff">Équipes en play-offs</label>
-            <input
+            <NumberInput
               id="endurance-playoff"
-              type="number"
               min={2}
               max={32}
               disabled={locked("endurancePlayoffSize")}
               value={values.endurancePlayoffSize}
-              onChange={(e) => set("endurancePlayoffSize", Number(e.target.value))}
+              onValueChange={(next) => set("endurancePlayoffSize", next)}
               {...lockedAttr("endurancePlayoffSize")}
             />
             <p style={HINT}>
@@ -132,14 +129,13 @@ export function FormatSettings({
 
           <div className="field">
             <label htmlFor="endurance-max-rounds">Manches maximum</label>
-            <input
+            <NumberInput
               id="endurance-max-rounds"
-              type="number"
               min={0}
               max={50}
               disabled={locked("enduranceMaxRounds")}
               value={values.enduranceMaxRounds}
-              onChange={(e) => set("enduranceMaxRounds", Number(e.target.value))}
+              onValueChange={(next) => set("enduranceMaxRounds", next)}
               {...lockedAttr("enduranceMaxRounds")}
             />
             <p style={HINT}>
@@ -220,23 +216,21 @@ export function FormatSettings({
                   ? "Play-offs : manches jouées (impair)"
                   : "Play-offs : manches à gagner"}
               </label>
-              <input
+              <NumberInput
                 id="endurance-playoff-format-value"
-                type="number"
                 min={MATCH_FORMAT_BOUNDS[values.endurancePlayoffFormat.type].min}
                 max={MATCH_FORMAT_BOUNDS[values.endurancePlayoffFormat.type].max}
                 step={values.endurancePlayoffFormat.type === "BO" ? 2 : 1}
                 disabled={locked("endurancePlayoffFormat")}
                 value={values.endurancePlayoffFormat.value}
-                onChange={(e) => {
+                onValueChange={(raw) => {
                   if (!values.endurancePlayoffFormat) return;
-                  // Un champ vidé rend `0`, que le `?? null` de `toApiPayload`
+                  // Un zéro ou une valeur hors bornes, que le `?? null` de `toApiPayload`
                   // ne rattrape pas : il partait au serveur et revenait en
                   // `INVALID_ENDURANCE_PLAYOFF_FORMAT` brut dans un toast, là où
                   // le format principal est intercepté avant l'aller-retour.
                   const type = values.endurancePlayoffFormat.type;
                   const bounds = MATCH_FORMAT_BOUNDS[type];
-                  const raw = Number(e.target.value);
                   const value = Number.isInteger(raw)
                     ? Math.min(Math.max(raw, bounds.min), bounds.max)
                     : values.endurancePlayoffFormat.value;
@@ -254,15 +248,14 @@ export function FormatSettings({
         <>
           <div className="field">
             <label htmlFor="survival-first-cut">Rounds avant la première coupe</label>
-            <input
+            <NumberInput
               id="survival-first-cut"
-              type="number"
               min={1}
               max={50}
               disabled={locked("survivalRoundsBeforeFirstCut")}
               value={values.survivalRoundsBeforeFirstCut}
-              onChange={(e) =>
-                set("survivalRoundsBeforeFirstCut", Number(e.target.value))
+              onValueChange={(next) =>
+                set("survivalRoundsBeforeFirstCut", next)
               }
               {...lockedAttr("survivalRoundsBeforeFirstCut")}
             />
@@ -273,14 +266,13 @@ export function FormatSettings({
 
           <div className="field">
             <label htmlFor="survival-rounds">Rounds entre les coupes suivantes</label>
-            <input
+            <NumberInput
               id="survival-rounds"
-              type="number"
               min={1}
               max={50}
               disabled={locked("survivalRoundsPerCut")}
               value={values.survivalRoundsPerCut}
-              onChange={(e) => set("survivalRoundsPerCut", Number(e.target.value))}
+              onValueChange={(next) => set("survivalRoundsPerCut", next)}
               {...lockedAttr("survivalRoundsPerCut")}
             />
             <p style={HINT}>
@@ -302,14 +294,13 @@ export function FormatSettings({
         <>
           <div className="field">
             <label htmlFor="swiss-rounds">Nombre de rondes</label>
-            <input
+            <NumberInput
               id="swiss-rounds"
-              type="number"
               min={1}
               max={20}
               disabled={locked("swissTotalRounds")}
               value={values.swissTotalRounds}
-              onChange={(e) => onSwissTotalRoundsChange(Number(e.target.value))}
+              onValueChange={(next) => onSwissTotalRoundsChange(next)}
               {...lockedAttr("swissTotalRounds")}
             />
             <p style={HINT}>
@@ -321,35 +312,32 @@ export function FormatSettings({
           <div className="field">
             <label htmlFor="swiss-points-win">Barème (victoire / nul / défaite)</label>
             <div style={{ display: "flex", gap: 8 }}>
-              <input
+              <NumberInput
                 id="swiss-points-win"
-                type="number"
                 min={0}
                 max={99}
                 aria-label="Points par victoire"
                 disabled={locked("swissPointsWin")}
                 value={values.swissPointsWin}
-                onChange={(e) => set("swissPointsWin", Number(e.target.value))}
+                onValueChange={(next) => set("swissPointsWin", next)}
                 {...lockedAttr("swissPointsWin")}
               />
-              <input
-                type="number"
+              <NumberInput
                 min={0}
                 max={99}
                 aria-label="Points par match nul"
                 disabled={locked("swissPointsDraw")}
                 value={values.swissPointsDraw}
-                onChange={(e) => set("swissPointsDraw", Number(e.target.value))}
+                onValueChange={(next) => set("swissPointsDraw", next)}
                 {...lockedAttr("swissPointsDraw")}
               />
-              <input
-                type="number"
+              <NumberInput
                 min={0}
                 max={99}
                 aria-label="Points par défaite"
                 disabled={locked("swissPointsLoss")}
                 value={values.swissPointsLoss}
-                onChange={(e) => set("swissPointsLoss", Number(e.target.value))}
+                onValueChange={(next) => set("swissPointsLoss", next)}
                 {...lockedAttr("swissPointsLoss")}
               />
             </div>

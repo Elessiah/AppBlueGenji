@@ -2,15 +2,18 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   LAUNCH_BACKDATE_MS,
-  abridgedStagesForLaunch,
-  canLaunchNow,
+  advanceSuccessMessage,
+  advanceTarget,
   launchBlockReason,
+  shortenScheduleForAdvance,
   shortenScheduleForLaunch,
   willCloseWithoutMatches,
+  type AdvanceTarget,
   type LaunchableTournament,
 } from "@/lib/shared/tournament-launch";
 import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
+import { computeTournamentProgress } from "@/lib/shared/tournament-progress";
 import type { TournamentState } from "@/lib/shared/types";
 
 type DateField = "startVisibilityAt" | "registrationOpenAt" | "registrationCloseAt" | "startAt";
@@ -76,7 +79,7 @@ function stateAfterLaunch(tournament: LaunchableTournament): TournamentState {
 describe("launchBlockReason", () => {
   it.each(STAGE_NAMES)("laisse abréger depuis l'étape %s", (name) => {
     expect(launchBlockReason(STAGES[name], NOW)).toBeNull();
-    expect(canLaunchNow(STAGES[name], NOW)).toBe(true);
+    expect(advanceTarget(STAGES[name], NOW)).not.toBeNull();
   });
 
   it("refuse un tournoi dont le coup d'envoi est passé", () => {
@@ -173,27 +176,27 @@ describe("shortenScheduleForLaunch", () => {
   });
 });
 
-describe("abridgedStagesForLaunch", () => {
-  it.each([
-    ["HIDDEN", ["HIDDEN", "ANNOUNCED", "REGISTRATION", "LOCKED"]],
-    ["ANNOUNCED", ["ANNOUNCED", "REGISTRATION", "LOCKED"]],
-    ["REGISTRATION", ["REGISTRATION", "LOCKED"]],
-    ["LOCKED", ["LOCKED"]],
-  ])("énumère ce qui saute depuis %s", (name, expected) => {
-    expect(abridgedStagesForLaunch(STAGES[name as string], NOW)).toEqual(expected);
+describe("advanceTarget", () => {
+  it.each<[string, AdvanceTarget]>([
+    // Masqué comme annoncé mènent aux inscriptions : « annoncé » n'est pas une
+    // étape où l'on s'arrête exprès.
+    ["HIDDEN", "REGISTRATION"],
+    ["ANNOUNCED", "REGISTRATION"],
+    ["REGISTRATION", "LOCKED"],
+    ["LOCKED", "RUNNING"],
+  ])("depuis %s mène à %s", (name, expected) => {
+    expect(advanceTarget(STAGES[name], NOW)).toBe(expected);
   });
 
-  it("n'énumère plus rien une fois le tournoi lancé", () => {
-    // Exactement les cas où `launchBlockReason` refuse : les deux fonctions
-    // s'accordent, l'interface ne peut pas proposer d'abréger le vide.
+  it("ne mène plus nulle part une fois le tournoi lancé", () => {
     const running: LaunchableTournament = { ...STAGES.LOCKED, state: "RUNNING" };
 
-    expect(abridgedStagesForLaunch(running, NOW)).toEqual([]);
+    expect(advanceTarget(running, NOW)).toBeNull();
     expect(launchBlockReason(running, NOW)).toBe("TOURNAMENT_ALREADY_STARTED");
   });
 
-  it("n'énumère plus rien sur un tournoi terminé", () => {
-    expect(abridgedStagesForLaunch({ ...STAGES.REGISTRATION, state: "FINISHED" }, NOW)).toEqual([]);
+  it("ne mène plus nulle part sur un tournoi terminé", () => {
+    expect(advanceTarget({ ...STAGES.REGISTRATION, state: "FINISHED" }, NOW)).toBeNull();
   });
 
   it.each<[DateField]>([
@@ -201,22 +204,107 @@ describe("abridgedStagesForLaunch", () => {
     ["registrationOpenAt"],
     ["registrationCloseAt"],
     ["startAt"],
-  ])("n'énumère plus rien quand %s est illisible", (field) => {
-    // `computeTournamentProgress` tolère une date abîmée (elle emprunte celle
-    // de son voisin, pour que la frise reste dessinable) là où abréger s'y
-    // refuse. Sans l'alignement sur `launchBlockReason`, la confirmation
-    // listerait des étapes sur une action que le serveur refuse en 400.
+  ])("ne mène nulle part quand %s est illisible", (field) => {
+    // `computeTournamentProgress` tolère une date abîmée là où avancer s'y
+    // refuse : sans l'alignement sur `launchBlockReason`, le bouton
+    // s'afficherait sur une action que le serveur refuse en 400.
     const broken = { ...STAGES.REGISTRATION, [field]: "pas une date" };
 
-    expect(abridgedStagesForLaunch(broken, NOW)).toEqual([]);
+    expect(advanceTarget(broken, NOW)).toBeNull();
     expect(launchBlockReason(broken, NOW)).toBe("INVALID_DATES");
   });
 
-  it.each(STAGE_NAMES)("est vide si et seulement si le lancement est refusé — %s", (name) => {
-    const tournament = STAGES[name];
-    const blocked = launchBlockReason(tournament, NOW) !== null;
+  it("suit l'état stocké quand il devance les dates", () => {
+    // Inscriptions ouvertes à la main avant l'heure : l'étape suivante est la
+    // clôture, pas une seconde ouverture.
+    expect(advanceTarget({ ...STAGES.ANNOUNCED, state: "REGISTRATION" }, NOW)).toBe("LOCKED");
+  });
+});
 
-    expect(abridgedStagesForLaunch(tournament, NOW).length === 0).toBe(blocked);
+describe("shortenScheduleForAdvance", () => {
+  it.each(STAGE_NAMES)("place le tournoi exactement dans l'étape suivante — depuis %s", (name) => {
+    const before = STAGES[name];
+    const target = advanceTarget(before, NOW)!;
+    const after = { state: before.state, ...shortenScheduleForAdvance(before, target, NOW) };
+
+    // L'état que la synchronisation écrira, puis l'étape qu'on lira sur la
+    // frise une fois cet état en base.
+    const state = computeTournamentState(after, NOW);
+    expect(state).toBe({ REGISTRATION: "REGISTRATION", LOCKED: "UPCOMING", RUNNING: "RUNNING" }[target]);
+    expect(computeTournamentProgress({ ...after, state }, { now: NOW }).current).toBe(target);
+  });
+
+  it.each(STAGE_NAMES)("ne fait jamais avancer une date — depuis %s", (name) => {
+    const before = STAGES[name];
+    const after = shortenScheduleForAdvance(before, advanceTarget(before, NOW)!, NOW);
+
+    for (const field of [
+      "startVisibilityAt",
+      "registrationOpenAt",
+      "registrationCloseAt",
+      "startAt",
+    ] as const) {
+      expect(Date.parse(after[field])).toBeLessThanOrEqual(Date.parse(before[field]));
+    }
+  });
+
+  it("ouvre les inscriptions d'un tournoi masqué en le publiant, sans toucher la suite", () => {
+    const after = shortenScheduleForAdvance(STAGES.HIDDEN, "REGISTRATION", NOW);
+
+    expect(Date.parse(after.registrationOpenAt)).toBe(NOW - LAUNCH_BACKDATE_MS);
+    // La visibilité précède toujours l'ouverture : un tournoi aux inscriptions
+    // n'est jamais invisible.
+    expect(Date.parse(after.startVisibilityAt)).toBeLessThanOrEqual(NOW - LAUNCH_BACKDATE_MS);
+    expect(after.registrationCloseAt).toBe(STAGES.HIDDEN.registrationCloseAt);
+    expect(after.startAt).toBe(STAGES.HIDDEN.startAt);
+    expect(
+      computeTournamentState({ state: "UPCOMING", ...after }, NOW),
+    ).toBe("REGISTRATION");
+  });
+
+  it("clôt les inscriptions sans avancer le coup d'envoi", () => {
+    const after = shortenScheduleForAdvance(STAGES.REGISTRATION, "LOCKED", NOW);
+
+    expect(Date.parse(after.registrationCloseAt)).toBe(NOW - LAUNCH_BACKDATE_MS);
+    expect(after.registrationOpenAt).toBe(STAGES.REGISTRATION.registrationOpenAt);
+    expect(after.startAt).toBe(STAGES.REGISTRATION.startAt);
+    expect(computeTournamentState({ state: "REGISTRATION", ...after }, NOW)).toBe("UPCOMING");
+  });
+
+  it("cible « en cours » : identique à shortenScheduleForLaunch", () => {
+    for (const name of STAGE_NAMES) {
+      expect(shortenScheduleForAdvance(STAGES[name], "RUNNING", NOW)).toEqual(
+        shortenScheduleForLaunch(STAGES[name], NOW),
+      );
+    }
+  });
+});
+
+describe("advanceSuccessMessage", () => {
+  it("annonce l'ouverture des inscriptions", () => {
+    expect(advanceSuccessMessage("REGISTRATION", "REGISTRATION", 0)).toBe("Inscriptions ouvertes.");
+  });
+
+  it("annonce la clôture avec l'effectif figé", () => {
+    expect(advanceSuccessMessage("LOCKED", "UPCOMING", 12)).toBe(
+      "Inscriptions closes avec 12 engagés.",
+    );
+  });
+
+  it("accorde « engagé » au singulier jusqu'à un", () => {
+    expect(advanceSuccessMessage("LOCKED", "UPCOMING", 1)).toBe("Inscriptions closes avec 1 engagé.");
+    expect(advanceSuccessMessage("LOCKED", "UPCOMING", 0)).toBe("Inscriptions closes avec 0 engagé.");
+  });
+
+  it("annonce le lancement", () => {
+    expect(advanceSuccessMessage("RUNNING", "RUNNING", 8)).toBe("Tournoi lancé avec 8 engagés.");
+  });
+
+  it("se règle sur l'état atteint, pas sur la cible", () => {
+    // Plateau désert : le moteur clôt le tournoi au coup d'envoi.
+    expect(advanceSuccessMessage("RUNNING", "FINISHED", 1)).toMatch(/^Tournoi clos/);
+    // Clôture tombée à l'heure même du coup d'envoi : le tournoi est parti.
+    expect(advanceSuccessMessage("LOCKED", "RUNNING", 6)).toBe("Tournoi lancé avec 6 engagés.");
   });
 });
 

@@ -1060,7 +1060,7 @@ async function acceptIntoTeam(
     const [teams] = await connection.execute<
       (RowDataPacket & { id: number; deleted_at: Date | null; is_ghost: 0 | 1; solo_user_id: number | null })[]
     >(
-      `SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams WHERE id = ? FOR SHARE`,
+      `SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams WHERE id = ? LOCK IN SHARE MODE`,
       [teamId],
     );
     if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
