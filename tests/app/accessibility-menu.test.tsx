@@ -59,6 +59,13 @@ describe("AccessibilityMenu — rendu serveur", () => {
     expect(html).toMatch(/<span[^>]*aria-hidden="true"[^>]*>2<\/span>/);
   });
 
+  it("se rend toujours en contraste renforcé, réglage coché ou non", () => {
+    for (const settings of [[], ["contrast"]] as A11ySettingKey[][]) {
+      const html = renderToStaticMarkup(<AccessibilityMenu initialSettings={settings} />);
+      expect(html).toMatch(/^<div class="root a11y-always-contrast">/);
+    }
+  });
+
   it("garde le logo décoratif — le bouton est nommé par son intitulé", () => {
     const html = renderToStaticMarkup(<AccessibilityMenu initialSettings={[]} />);
     expect(html).toMatch(/<span class="[^"]*icon[^"]*" aria-hidden="true"><\/span>/);

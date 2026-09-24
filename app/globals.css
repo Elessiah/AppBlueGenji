@@ -1700,8 +1700,12 @@ html {
    4,5:1 sur tous les fonds du site (`--ink-dim` n'atteignait que 2,8:1 sur
    `--cyber-bg-3`), et les traits cessent d'être presque transparents. Les
    jetons étant déclarés sur `:root`, les redéfinir ici (plus spécifique)
-   atteint tout ce qui les lit, sans toucher un composant. */
-:root[data-a11y~="contrast"] {
+   atteint tout ce qui les lit, sans toucher un composant.
+   `.a11y-always-contrast` porte les mêmes jetons **en permanence** sur un
+   sous-arbre : le menu d'accessibilité lui-même, qui doit se lire avant qu'on
+   ait pu y cocher quoi que ce soit. Même règle, donc mêmes valeurs. */
+:root[data-a11y~="contrast"],
+.a11y-always-contrast {
   --ink: #f4f8fb;
   --ink-mute: #b9c6d2;
   --ink-dim: #95a3b1;

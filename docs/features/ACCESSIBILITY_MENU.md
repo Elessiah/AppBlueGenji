@@ -61,6 +61,12 @@ Deux pièges de spécificité, tenus dans la feuille :
   n'apporte que la forme, la couleur est celle de la feuille — y compris en
   contrastes forcés, où elle devient `ButtonText`.
 - Une pastille compte les réglages actifs, et l'intitulé du bouton le dit aussi.
+- **Le menu est toujours en contraste renforcé**, réglage coché ou non : c'est
+  lui qui permet de l'activer, il doit donc se lire avant. Sa racine porte la
+  classe `.a11y-always-contrast`, ajoutée à la règle même du réglage
+  (`:root[data-a11y~="contrast"], .a11y-always-contrast`) — mêmes jetons,
+  aucune seconde liste de valeurs à tenir. C'est la seule règle de la section
+  qui vaille sans l'attribut.
 - **Premier arrêt du clavier** sur chaque page.
 - Panneau **non modal** (motif « disclosure ») : on voit l'effet d'un réglage
   en le cochant. Échap, un clic à côté **et le focus clavier qui en sort** le

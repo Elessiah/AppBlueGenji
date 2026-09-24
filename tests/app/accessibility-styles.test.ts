@@ -77,9 +77,18 @@ describe("réglages d'accessibilité — feuille globale", () => {
     expect(sheet).toContain(`:root[data-a11y~="${key}"]`);
   });
 
-  it("n'applique aucune règle de la section sans l'attribut data-a11y", () => {
-    const unscoped = sectionSelectors().filter((selector) => !selector.startsWith(':root[data-a11y~="'));
+  it("n'applique aucune règle de la section sans l'attribut data-a11y — menu excepté", () => {
+    // Seule exception : le menu d'accessibilité, qui porte le contraste
+    // renforcé en permanence pour se lire avant qu'on y ait rien coché.
+    const unscoped = sectionSelectors().filter(
+      (selector) => !selector.startsWith(':root[data-a11y~="') && selector !== ".a11y-always-contrast",
+    );
     expect(unscoped).toEqual([]);
+  });
+
+  it("le menu porte le contraste renforcé par la même règle, donc les mêmes valeurs", () => {
+    expect(sheet).toMatch(/:root\[data-a11y~="contrast"\],\s*\.a11y-always-contrast \{/);
+    expect(sheet.match(/\.a11y-always-contrast/g)).toHaveLength(1);
   });
 
   it("ne mentionne data-a11y nulle part ailleurs que sous :root", () => {
@@ -90,7 +99,7 @@ describe("réglages d'accessibilité — feuille globale", () => {
   });
 
   it("le contraste renforcé porte les textes secondaires au-dessus de 4,5:1 sur le fond le plus clair", () => {
-    const block = declarations(':root[data-a11y~="contrast"]');
+    const block = declarations(':root[data-a11y~="contrast"],\n.a11y-always-contrast');
     const surface = "#161a22"; // --cyber-bg-3, le fond le plus clair du site
     for (const token of ["--ink-dim", "--ink-mute", "--text-1", "--text-2", "--blue-700"]) {
       const value = block.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`))?.[1];

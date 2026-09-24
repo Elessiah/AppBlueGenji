@@ -102,7 +102,9 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
   const label = accessibilityButtonLabel(settings.length);
 
   return (
-    <div ref={rootRef} className={styles.root}>
+    // `a11y-always-contrast` : le menu se lit toujours en contraste renforcé,
+    // réglage coché ou non — c'est lui qui permet de l'activer.
+    <div ref={rootRef} className={`${styles.root} a11y-always-contrast`}>
       <button
         ref={buttonRef}
         type="button"
