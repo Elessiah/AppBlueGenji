@@ -2,6 +2,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getContactInfo } from "@/lib/server/contact-service";
+import { AccessibilityFooterLink } from "@/components/accessibility/AccessibilityFooterLink";
 import { FooterContact } from "./FooterContact";
 import styles from "./PublicFooter.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
@@ -17,7 +18,10 @@ export async function PublicFooter() {
   const isAdmin = Boolean(user?.isAdmin);
 
   return (
-    <footer className={styles.root}>
+    // `a11y-always-contrast` : le pied de page se lit toujours en contraste
+    // renforcé (mêmes jetons que le réglage du menu). C'est là qu'on cherche
+    // l'accessibilité et les mentions légales ; il doit se lire sans réglage.
+    <footer className={`${styles.root} a11y-always-contrast`}>
       <div className={styles.inner}>
         <div className={styles.brand}>
           <div className={styles.brandTop}>
@@ -70,6 +74,7 @@ export async function PublicFooter() {
               <li><Link href="/rgpd">RGPD</Link></li>
               <li><a href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
               <li><Link href="/rgpd#cookies">Cookies</Link></li>
+              <li><AccessibilityFooterLink className={styles.linkButton} /></li>
             </ul>
           </div>
         </div>

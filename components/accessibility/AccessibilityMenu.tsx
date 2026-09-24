@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { ScrollArea } from "@/components/cyber/ScrollArea";
 import {
   A11Y_SETTINGS,
@@ -9,6 +9,7 @@ import {
   toggleA11ySetting,
   type A11ySettingKey,
 } from "@/lib/shared/accessibility-settings";
+import { OPEN_ACCESSIBILITY_MENU_EVENT } from "@/lib/shared/accessibility-menu-request";
 import styles from "./AccessibilityMenu.module.css";
 
 /**
@@ -51,14 +52,55 @@ interface AccessibilityMenuProps {
  * Échap et un clic à côté le referment ; Échap rend le focus au bouton. Le
  * panneau suit le bouton dans l'ordre du document, si bien que `Tab` y entre
  * directement.
+ *
+ * Le menu s'ouvre aussi **à la demande** d'un autre point de la page — le lien
+ * « Accessibilité » du pied de page (`requestAccessibilityMenu`). Il prend alors
+ * le focus, puisque le panneau ne suit pas ce lien dans l'ordre du document, et
+ * le rend en se fermant à l'élément qui l'a demandé plutôt qu'au bouton flottant.
  */
 export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
   const [settings, setSettings] = useState<A11ySettingKey[]>(initialSettings);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  // Élément à qui rendre le focus à la fermeture, quand le menu a été ouvert
+  // d'ailleurs que par son bouton ; `null` = le bouton flottant.
+  const returnFocusRef = useRef<HTMLElement | null>(null);
+  // Ouvert à la demande, le menu doit prendre le focus une fois le panneau rendu.
+  const pendingFocusRef = useRef(false);
   const panelId = useId();
   const titleId = useId();
+
+  useEffect(() => {
+    const onRequest = () => {
+      const active = document.activeElement;
+      returnFocusRef.current =
+        active instanceof HTMLElement && active !== document.body && !rootRef.current?.contains(active)
+          ? active
+          : null;
+      const panel = document.getElementById(panelId);
+      if (panel) panel.focus();
+      else pendingFocusRef.current = true;
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_ACCESSIBILITY_MENU_EVENT, onRequest);
+    return () => window.removeEventListener(OPEN_ACCESSIBILITY_MENU_EVENT, onRequest);
+  }, [panelId]);
+
+  // Le panneau n'existe qu'une fois rendu ouvert : le focus attend ce rendu.
+  useEffect(() => {
+    if (!open || !pendingFocusRef.current) return;
+    pendingFocusRef.current = false;
+    document.getElementById(panelId)?.focus();
+  }, [open, panelId]);
+
+  /** Rend le focus à qui a ouvert le menu, s'il est encore dans la page. */
+  const restoreFocus = useCallback(() => {
+    const opener = returnFocusRef.current;
+    returnFocusRef.current = null;
+    if (opener?.isConnected) opener.focus();
+    else buttonRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -71,13 +113,16 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
       const inside = active !== null && rootRef.current?.contains(active) === true;
       if (!inside && active !== null && active !== document.body) return;
       setOpen(false);
-      if (inside) buttonRef.current?.focus();
+      if (inside) restoreFocus();
+      else returnFocusRef.current = null;
     };
     // Un clic à côté, ou le focus clavier qui quitte le menu, le referment :
     // laissé ouvert, le panneau masquerait le bas de la page où la tabulation
     // continue (WCAG 2.4.11).
     const onOutside = (event: Event) => {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+      returnFocusRef.current = null;
     };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onOutside);
@@ -87,7 +132,7 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
       document.removeEventListener("pointerdown", onOutside);
       document.removeEventListener("focusin", onOutside);
     };
-  }, [open]);
+  }, [open, restoreFocus]);
 
   const update = (next: A11ySettingKey[]) => {
     setSettings(next);
@@ -96,7 +141,7 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
 
   const close = () => {
     setOpen(false);
-    buttonRef.current?.focus();
+    restoreFocus();
   };
 
   const label = accessibilityButtonLabel(settings.length);
@@ -113,7 +158,10 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
         title={label}
         aria-expanded={open}
         aria-controls={open ? panelId : undefined}
-        onClick={() => setOpen((value) => !value)}
+        onClick={() => {
+          returnFocusRef.current = null;
+          setOpen((value) => !value);
+        }}
       >
         <span className={styles.icon} aria-hidden="true" />
         {settings.length > 0 && (
@@ -148,7 +196,9 @@ interface AccessibilityPanelProps {
 /** Contenu du menu, séparé pour être rendu et testé sans l'état d'ouverture. */
 export function AccessibilityPanel({ id, titleId, settings, onToggle, onReset, onClose }: AccessibilityPanelProps) {
   return (
-    <div id={id} className={styles.panel} role="region" aria-labelledby={titleId}>
+    // `tabIndex={-1}` : le panneau reçoit le focus quand le menu est ouvert
+    // depuis le pied de page, sans devenir un arrêt de la tabulation.
+    <div id={id} className={styles.panel} role="region" aria-labelledby={titleId} tabIndex={-1}>
       <div className={styles.head}>
         <p id={titleId} className={styles.title}>
           Accessibilité
