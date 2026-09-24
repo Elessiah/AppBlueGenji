@@ -103,6 +103,24 @@ describe("modales du site", () => {
   });
 });
 
+describe("useDialogBehavior — focus initial", () => {
+  const hook = stripComments(readFileSync(join(ROOT, "lib", "shared", "hooks", "useDialogBehavior.ts"), "utf8"));
+
+  it("vise le champ marqué data-autofocus, pris parmi les focalisables", () => {
+    // Pris ailleurs, un champ marqué mais désactivé ou masqué ferait échouer
+    // `focus()` en silence : le focus resterait derrière le voile.
+    expect(hook).toMatch(/candidates\.find\(\(el\) => el\.hasAttribute\("data-autofocus"\)\)/);
+    expect(hook).toContain("(preferred ?? candidates[0] ?? containerRef.current)?.focus()");
+  });
+
+  it.each(["app/association/BureauSection.tsx", "app/benevoles/BenevolesSection.tsx"])(
+    "%s marque son premier champ, précédé d'un bouton d'aperçu",
+    (file) => {
+      expect(sources.find((s) => s.file === file)?.src).toContain("data-autofocus");
+    },
+  );
+});
+
 describe("modales de gestion des pages publiques", () => {
   it.each([
     "components/cyber/landing/AboutStats.tsx",
