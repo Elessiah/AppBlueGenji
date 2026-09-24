@@ -18,9 +18,10 @@ export type PlayerRosterStatus = "ROSTER" | "FREE_AGENT" | "UNAFFILIATED";
  * Ce que le statut demande d'un joueur — rien de plus, pour qu'il se calcule
  * aussi bien sur une fiche que sur une ligne d'annuaire.
  *
- * `openToRecruitment` absent vaut **ouvert** : c'est le défaut de la colonne
- * (`open_to_recruitment TINYINT(1) NOT NULL DEFAULT 1`), et une charge utile
- * qui ne porte pas le champ ne dit pas que le joueur s'est fermé.
+ * `openToRecruitment` absent vaut **fermé** : c'est le défaut de la colonne
+ * (`open_to_recruitment TINYINT(1) NOT NULL DEFAULT 0`) — un compte neuf n'est
+ * pas free agent tant que le joueur n'a pas coché la case, et une charge utile
+ * qui ne porte pas le champ ne dit pas qu'il l'a cochée.
  */
 export type PlayerRosterInput = {
   team?: { id: number } | null;
@@ -29,7 +30,7 @@ export type PlayerRosterInput = {
 
 export function playerRosterStatus(player: PlayerRosterInput): PlayerRosterStatus {
   if (player.team) return "ROSTER";
-  return player.openToRecruitment === false ? "UNAFFILIATED" : "FREE_AGENT";
+  return player.openToRecruitment === true ? "FREE_AGENT" : "UNAFFILIATED";
 }
 
 /**
