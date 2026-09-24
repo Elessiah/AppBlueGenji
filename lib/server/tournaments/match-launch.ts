@@ -132,6 +132,21 @@ async function adoptCurrentPairing(connection: PoolConnection, row: LaunchMatchR
   row.team1_ready_at = null;
   row.team2_ready_at = null;
   row.caster_ready_at = null;
+
+  // Un caster peut s'inscrire sur un match dont les créneaux sont encore vides
+  // — l'inscription ne peut alors rien vérifier. Si l'appariement qui arrive
+  // compte son équipe, il joue ce match : il ne peut plus le caster.
+  if (row.caster_user_id !== null) {
+    const casterId = Number(row.caster_user_id);
+    const playing = await resolveTeamParty(connection, row, casterId);
+    if (playing) {
+      await connection.execute(
+        `UPDATE bg_matches SET caster_user_id = NULL, caster_ready_at = NULL WHERE id = ?`,
+        [row.id],
+      );
+      row.caster_user_id = null;
+    }
+  }
 }
 
 /**
@@ -176,9 +191,22 @@ export async function resolveMatchParty(
   match: { team1_id: number | null; team2_id: number | null; caster_user_id: number | null },
   userId: number,
 ): Promise<MatchParty | null> {
+  // Le rôle de joueur prime : qui joue le match ne le caste pas, même si une
+  // inscription faite avant que son équipe n'arrive est encore en base.
+  const team = await resolveTeamParty(connection, match, userId);
+  if (team) return team;
   if (match.caster_user_id !== null && Number(match.caster_user_id) === userId) {
     return { role: "CASTER", canDeclareReady: true };
   }
+  return null;
+}
+
+/** Le lecteur joue-t-il ce match — appartenance en cours, ou entrée solo ? */
+async function resolveTeamParty(
+  connection: PoolConnection,
+  match: { team1_id: number | null; team2_id: number | null },
+  userId: number,
+): Promise<MatchParty | null> {
   const team1Id = nullableId(match.team1_id);
   const team2Id = nullableId(match.team2_id);
   const teamIds = [team1Id, team2Id].filter((id): id is number => id !== null);

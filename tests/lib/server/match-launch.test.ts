@@ -283,6 +283,29 @@ describe("setMatchReady — appariement réécrit sur place", () => {
   });
 });
 
+describe("caster inscrit avant que son équipe n'atteigne le match", () => {
+  it("le désinscrit quand l'appariement qui arrive compte son équipe", async () => {
+    // Inscrit sur un match aux créneaux vides, puis son équipe (TEAM1) l'atteint.
+    state.memberships.push({ userId: CASTER, teamId: TEAM1, roles: ["DPS"] });
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    await maintainMatchLaunches(connectionFor(state), 7);
+    expect(state.match?.caster_user_id).toBeNull();
+  });
+
+  it("garde un caster étranger aux deux équipes", async () => {
+    state.match = matchState({ launch_pairing: null, caster_user_id: CASTER });
+    await maintainMatchLaunches(connectionFor(state), 7);
+    expect(state.match?.caster_user_id).toBe(CASTER);
+  });
+
+  it("fait agir en joueur celui qui est à la fois inscrit comme caster et joueur", async () => {
+    state.match = matchState({ caster_user_id: 1 });
+    await setMatchReady(42, 1, true);
+    expect(state.match?.team1_ready_at).toBe(STAMP);
+    expect(state.match?.caster_ready_at).toBeNull();
+  });
+});
+
 describe("forceLaunchMatch", () => {
   it("lance un match en lancement sans attendre", async () => {
     await forceLaunchMatch(42);

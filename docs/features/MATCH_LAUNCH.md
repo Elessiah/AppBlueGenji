@@ -95,7 +95,11 @@ Trois conditions de plus que la permission :
   aux deux équipes, un tag saisi à la main ne dirait rien de qui l'on invite
   dans son salon. Le bouton reste visible mais annonce ce qui manque, plutôt que
   de mener à un 409 ;
-- un joueur du match ne le caste pas (`CASTER_IS_PLAYER`) ;
+- un joueur du match ne le caste pas (`CASTER_IS_PLAYER`). L'inscription se
+  fait aussi sur un match aux créneaux encore vides, où rien ne peut être
+  vérifié : quand l'appariement arrive et compte l'équipe du caster, son
+  inscription est retirée (`adoptCurrentPairing`), et d'ici là le rôle de joueur
+  prime partout (`resolveMatchParty`) ;
 - un seul caster par match (`MATCH_ALREADY_CASTED`).
 
 Le motif voyage dans `TournamentViewerContext.castBlock`, par les deux portes

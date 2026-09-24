@@ -183,6 +183,12 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
     });
   });
 
+  it("fait primer le rôle de joueur sur une inscription de caster", async () => {
+    state.candidates = [candidate({ caster_user_id: VIEWER })];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.viewer.role).toBe("TEAM1");
+  });
+
   it("donne le « Prêt » au joueur d'une entrée solo", async () => {
     state.viewerMemberships = [];
     state.viewerSolo = [{ id: TEAM2 }];

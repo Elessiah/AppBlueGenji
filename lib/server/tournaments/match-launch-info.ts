@@ -190,9 +190,7 @@ function viewerRole(
   userId: number,
   teams: ViewerTeams,
 ): { role: LaunchViewerRole; canDeclareReady: boolean } | null {
-  if (row.caster_user_id !== null && Number(row.caster_user_id) === userId) {
-    return { role: "CASTER", canDeclareReady: true };
-  }
+  // Le rôle de joueur prime, comme dans `resolveMatchParty`.
   for (const [role, teamId] of [
     ["TEAM1", row.team1_id],
     ["TEAM2", row.team2_id],
@@ -201,6 +199,9 @@ function viewerRole(
     if (membership) {
       return { role, canDeclareReady: membership.solo || canDeclareTeamReady(membership.roles) };
     }
+  }
+  if (row.caster_user_id !== null && Number(row.caster_user_id) === userId) {
+    return { role: "CASTER", canDeclareReady: true };
   }
   return null;
 }
