@@ -5,7 +5,11 @@ jest.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { ArenaNav } from "@/components/arena-nav";
-import { PublicNavMenu } from "@/components/cyber/landing/PublicNavMenu";
+import {
+  PublicNavMenu,
+  PublicNavPanel,
+  handleMenuEscape,
+} from "@/components/cyber/landing/PublicNavMenu";
 import { readSource } from "../helpers/read-source";
 
 const arenaNav = (activeTeam: { teamId: number; teamName: string } | null = null) =>
@@ -51,11 +55,58 @@ describe("PublicNavMenu — bouton du menu", () => {
     expect(html).not.toContain("aria-controls");
   });
 
-  it("signale la page courante dans le panneau et rend le focus au bouton sur Échap", () => {
-    const source = readSource("components/cyber/landing/PublicNavMenu.tsx");
-    expect(source).toContain('aria-current={isActive ? "page" : undefined}');
-    expect(source).toContain("isNavLinkActive(pathname, link.href)");
-    expect(source).toContain("buttonRef.current?.focus()");
+});
+
+describe("PublicNavPanel — page courante", () => {
+  const panel = (pathname: string | null) =>
+    renderToStaticMarkup(<PublicNavPanel id="menu" pathname={pathname} onNavigate={() => undefined} />);
+
+  it("signale la section courante, sous-pages comprises", () => {
+    expect(currentLinks(panel("/regles/ronde-suisse"))).toEqual(["Règles des tournois"]);
+    expect(currentLinks(panel("/bot"))).toEqual(["Bot"]);
+  });
+
+  it("ne désigne jamais une ancre de l'accueil, même sur l'accueil", () => {
+    expect(currentLinks(panel("/"))).toEqual([]);
+  });
+
+  it("porte l'identifiant que le bouton désigne", () => {
+    expect(panel("/")).toContain('<nav id="menu"');
+  });
+});
+
+describe("handleMenuEscape", () => {
+  const inside = { id: "lien" } as unknown as Element;
+  const outside = { id: "ailleurs" } as unknown as Element;
+  const root = { contains: (node: Node | null) => node === (inside as unknown as Node) };
+
+  function run(key: string, focused: Element | null) {
+    const calls: string[] = [];
+    const handled = handleMenuEscape(
+      key,
+      focused,
+      root,
+      { focus: () => calls.push("focus") },
+      () => calls.push("close"),
+    );
+    return { handled, calls };
+  }
+
+  it("ferme et rend le focus au bouton quand il était dans le panneau", () => {
+    expect(run("Escape", inside)).toEqual({ handled: true, calls: ["close", "focus"] });
+  });
+
+  it("ferme sans déplacer un focus qui était ailleurs", () => {
+    expect(run("Escape", outside)).toEqual({ handled: true, calls: ["close"] });
+    expect(run("Escape", null)).toEqual({ handled: true, calls: ["close"] });
+  });
+
+  it("ignore les autres touches", () => {
+    expect(run("Enter", inside)).toEqual({ handled: false, calls: [] });
+  });
+
+  it("tolère des références pas encore montées", () => {
+    expect(handleMenuEscape("Escape", inside, null, null, () => undefined)).toBe(true);
   });
 });
 

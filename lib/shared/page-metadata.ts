@@ -14,6 +14,17 @@
 import type { Metadata } from "next";
 import { SITE_NAME } from "./share-metadata";
 
+/** Le gabarit de titre du site, celui que déclare la mise en page racine. */
+export const SITE_TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
+
+/**
+ * Un titre écrit **avec** le nom du site, là où le gabarit ne s'applique pas :
+ * un encart de partage, ou un `title.absolute`.
+ */
+export function siteTitle(title: string): string {
+  return SITE_TITLE_TEMPLATE.replace("%s", title);
+}
+
 /**
  * L'image d'aperçu par défaut du site, rendue par `app/opengraph-image.tsx`.
  *
@@ -61,7 +72,7 @@ export function pageMetadata({
   const share = shareDescription ?? description;
   // L'encart, lui, n'hérite d'aucun gabarit : son titre porte le nom du site,
   // sans quoi « Bénévoles » collé seul dans un salon ne dit pas de qui il parle.
-  const shareTitle = `${title} · ${SITE_NAME}`;
+  const shareTitle = siteTitle(title);
 
   return {
     // `absolute` court-circuite le gabarit : ici non pour l'éviter — il ne
@@ -86,9 +97,6 @@ export function pageMetadata({
     },
   };
 }
-
-/** Le gabarit de titre du site, celui que déclare la mise en page racine. */
-export const SITE_TITLE_TEMPLATE = `%s · ${SITE_NAME}`;
 
 /**
  * Le titre d'une **mise en page** de segment, qui nomme sa page et laisse le

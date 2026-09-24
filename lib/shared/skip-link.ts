@@ -20,14 +20,31 @@
 export type SkipLinkNode = {
   readonly tagName: string;
   readonly children: ArrayLike<SkipLinkNode>;
+  readonly textContent: string | null;
   getAttribute(name: string): string | null;
+  hasAttribute(name: string): boolean;
 };
 
 /** Balises qui précèdent le contenu sans en faire partie. */
 const LEADING_CHROME = new Set(["SCRIPT", "STYLE", "TEMPLATE", "NOSCRIPT", "HEADER", "NAV"]);
 
+/**
+ * Un élément vide — ni enfant ni texte — est un décor : le fond `.fabric` de
+ * `/connexion` est le premier enfant de son `<main>`. Y poser le focus ferait
+ * partir la lecture d'un rien. Un élément `hidden` ne peut pas le recevoir du
+ * tout : `focus()` y échouerait sans bruit.
+ */
+function isEmpty(node: SkipLinkNode): boolean {
+  return node.children.length === 0 && !node.textContent?.trim();
+}
+
 function isLeadingChrome(node: SkipLinkNode): boolean {
-  return LEADING_CHROME.has(node.tagName.toUpperCase()) || node.getAttribute("aria-hidden") === "true";
+  return (
+    LEADING_CHROME.has(node.tagName.toUpperCase()) ||
+    node.getAttribute("aria-hidden") === "true" ||
+    node.hasAttribute("hidden") ||
+    isEmpty(node)
+  );
 }
 
 /**

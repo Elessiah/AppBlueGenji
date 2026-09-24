@@ -21,18 +21,21 @@ focus (`.skip-link` dans `app/globals.css`, par `transform` — jamais
 repartir la tabulation du menu et de la marque — précisément ce que le lien
 promet d'éviter. `skipLinkTarget` (`lib/shared/skip-link.ts`, pur) descend donc
 sur le premier enfant de `<main>` qui n'est ni un script, ni un `<header>`, ni
-une `<nav>`, ni un élément `aria-hidden="true"` — **en tête seulement** : un
+une `<nav>`, ni un élément `aria-hidden="true"` ou `hidden` (où `focus()`
+échouerait sans bruit), ni un **décor vide** — sans enfant ni texte, comme le
+fond `.fabric` qui ouvre le `<main>` de `/connexion` — **en tête seulement** : un
 en-tête placé plus bas fait partie du contenu. Sans enfant de contenu, `<main>`
 lui-même. Le défaut de repères qui rend ce détour nécessaire est consigné à
 `ACCESSIBILITE.md` (§15) ; la règle restera juste une fois corrigé.
 
-La cible reçoit `tabindex="-1"` (et `data-skip-target`, qui éteint l'anneau
-autour du contenu entier) **le temps du focus seulement** : laissé en place, un
-clic dans une zone vide du contenu y ramènerait le focus. Une cible déjà
-focalisable garde son `tabindex`. Sans `<main>`, le lien laisse le navigateur
-suivre son ancre (`#contenu`). Les en-têtes étant collants, la cible porte une
-marge de défilement : ramenée en haut de la vue, elle ne passe pas dessous
-(WCAG 2.4.11).
+La cible reçoit `tabindex="-1"` **le temps du focus seulement** : laissé en
+place, un clic dans une zone vide du contenu y ramènerait le focus. Une cible
+déjà focalisable garde son `tabindex` — et son anneau. Toutes reçoivent
+`data-skip-target`, retiré au `blur` : combiné à `tabindex="-1"`, il éteint
+l'anneau autour du contenu entier, et il porte une marge de défilement — les
+en-têtes étant collants, une cible ramenée en haut de la vue passerait sinon
+dessous (WCAG 2.4.11). Sans `<main>`, le lien laisse le navigateur suivre son
+ancre (`#contenu`).
 
 ## Titres des espaces connectés (WCAG 2.4.2 · RGAA 8.6)
 
@@ -72,7 +75,9 @@ bouton du sélecteur est écrit dans **sa** langue (`lang="en"` sur « English �
   `ArenaNav` et `PublicNavMenu`, qui en tenaient chacun une copie. La réponse
   sert le style **et** `aria-current="page"`. Une ancre de l'accueil
   (`/#tournois`) ne désigne jamais la page courante, `/` ne l'est que sur
-  l'accueil.
+  l'accueil. Le panneau du menu burger est extrait (`PublicNavPanel`), et la
+  règle d'Échap écrite à part (`handleMenuEscape`) : les deux se testent sans
+  navigateur.
 - Les pictogrammes « ⌂ » et « 🛡 » de `ArenaNav` passent dans un
   `<span aria-hidden="true">`, et la navigation est nommée.
 - `PublicNavMenu` perd son `aria-haspopup="true"` (il annonçait un

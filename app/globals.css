@@ -1716,8 +1716,9 @@ html {
 
 /* La cible reçoit le focus par programme : un anneau autour de tout le
    contenu ne dirait rien de plus que le défilement. L'attribut n'existe que le
-   temps de ce focus. */
-[data-skip-target]:focus {
+   temps de ce focus. Une cible déjà focalisable (`tabindex="0"`, une zone
+   défilante) garde son anneau : elle l'aurait eu au clavier. */
+[data-skip-target][tabindex="-1"]:focus {
   outline: none;
 }
 

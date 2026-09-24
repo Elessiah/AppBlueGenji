@@ -21,18 +21,20 @@ export function focusMainContent(
   if (!main) return false;
 
   const target = skipLinkTarget(main);
-  if (!target.hasAttribute("tabindex")) {
-    target.setAttribute("tabindex", "-1");
-    target.setAttribute("data-skip-target", "");
-    target.addEventListener(
-      "blur",
-      () => {
-        target.removeAttribute("tabindex");
-        target.removeAttribute("data-skip-target");
-      },
-      { once: true },
-    );
-  }
+  // Le marqueur est posé même sur une cible déjà focalisable : c'est lui qui
+  // porte la marge de défilement sous l'en-tête collant. Le `tabindex`, lui,
+  // n'est retiré que s'il a été ajouté ici.
+  const addedTabIndex = !target.hasAttribute("tabindex");
+  if (addedTabIndex) target.setAttribute("tabindex", "-1");
+  target.setAttribute("data-skip-target", "");
+  target.addEventListener(
+    "blur",
+    () => {
+      if (addedTabIndex) target.removeAttribute("tabindex");
+      target.removeAttribute("data-skip-target");
+    },
+    { once: true },
+  );
   target.focus();
   return true;
 }

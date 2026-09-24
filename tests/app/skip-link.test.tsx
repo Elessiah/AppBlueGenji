@@ -11,6 +11,7 @@ class FakeElement {
   readonly attrs = new Map<string, string>();
   readonly listeners = new Map<string, () => void>();
   focused = false;
+  textContent = "contenu";
 
   constructor(
     readonly tagName: string,
@@ -68,16 +69,25 @@ describe("focusMainContent", () => {
     expect(page.hasAttribute("data-skip-target")).toBe(false);
   });
 
-  it("ne touche pas au `tabindex` d'une cible déjà focalisable", () => {
+  it("ne touche pas au `tabindex` d'une cible déjà focalisable, mais la marque", () => {
     const page = new FakeElement("DIV");
     page.setAttribute("tabindex", "0");
     focusMainContent(fakeDocument(new FakeElement("MAIN", [page])));
 
     expect(page.focused).toBe(true);
     expect(page.getAttribute("tabindex")).toBe("0");
-    expect(page.hasAttribute("data-skip-target")).toBe(false);
+    // Le marqueur porte la marge de défilement sous l'en-tête collant.
+    expect(page.hasAttribute("data-skip-target")).toBe(true);
     page.blur();
     expect(page.getAttribute("tabindex")).toBe("0");
+    expect(page.hasAttribute("data-skip-target")).toBe(false);
+  });
+
+  it("n'éteint l'anneau que sur une cible rendue focalisable par le lien", () => {
+    const css = readSource("app/globals.css");
+    expect(css).toContain('[data-skip-target][tabindex="-1"]:focus {\n  outline: none;');
+    expect(css).not.toMatch(/\[data-skip-target\]:focus \{/);
+    expect(css).toMatch(/\[data-skip-target\] \{\s*scroll-margin-top:/);
   });
 
   it("rend `false` sur une page sans <main>, pour laisser le navigateur suivre l'ancre", () => {

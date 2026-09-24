@@ -7,7 +7,8 @@ import { metadata as teamsMetadata } from "@/app/(secured)/equipes/layout";
 import { metadata as createTeamMetadata } from "@/app/(secured)/equipes/creer/layout";
 import { metadata as playersMetadata } from "@/app/(secured)/joueurs/layout";
 import { metadata as profileMetadata } from "@/app/(secured)/profil/layout";
-import { SITE_TITLE_TEMPLATE, segmentTitle } from "@/lib/shared/page-metadata";
+import { metadata as editTournamentMetadata } from "@/app/(secured)/tournois/[id]/modifier/layout";
+import { SITE_TITLE_TEMPLATE, pageMetadata, segmentTitle, siteTitle } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
 import { readSource } from "../helpers/read-source";
 
@@ -91,5 +92,17 @@ describe("segmentTitle", () => {
     expect(resolveChain(root, segmentTitle("Tournois"), "Créer un tournoi")).toBe(
       `Créer un tournoi · ${SITE_NAME}`,
     );
+  });
+});
+
+describe("siteTitle", () => {
+  it("écrit le titre avec le nom du site, par le même gabarit", () => {
+    expect(siteTitle("Bénévoles")).toBe(`Bénévoles · ${SITE_NAME}`);
+  });
+
+  it("sert l'encart de partage et le titre absolu du formulaire d'édition", () => {
+    const shared = pageMetadata({ title: "Règles", description: "d", path: "/regles" });
+    expect(shared.openGraph?.title).toBe(siteTitle("Règles"));
+    expect(editTournamentMetadata.title).toEqual({ absolute: siteTitle("Modifier le tournoi") });
   });
 });

@@ -20,6 +20,58 @@ const LINKS: NavLink[] = [
 ];
 
 /**
+ * Échap ferme le panneau et, si le focus y était, le rend au bouton : le
+ * panneau fermé emporte le lien qui avait le focus, et sans ce retour le
+ * clavier repartirait du haut de la page. Rend `true` quand la touche a été
+ * traitée.
+ */
+export function handleMenuEscape(
+  key: string,
+  focused: Element | null,
+  root: { contains(node: Node | null): boolean } | null,
+  button: { focus(): void } | null,
+  close: () => void,
+): boolean {
+  if (key !== "Escape") return false;
+  close();
+  if (root?.contains(focused)) button?.focus();
+  return true;
+}
+
+/**
+ * Le panneau ouvert : les liens de la vitrine, la page courante signalée
+ * autrement que par le style (`aria-current`, WCAG 1.3.1).
+ */
+export function PublicNavPanel({
+  id,
+  pathname,
+  onNavigate,
+}: {
+  id: string;
+  pathname: string | null;
+  onNavigate: () => void;
+}) {
+  return (
+    <nav id={id} className={styles.panel} aria-label="Navigation principale">
+      {LINKS.map((link) => {
+        const isActive = isNavLinkActive(pathname, link.href);
+        return (
+          <Link
+            key={link.href}
+            href={link.href}
+            aria-current={isActive ? "page" : undefined}
+            className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
+            onClick={onNavigate}
+          >
+            {link.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
+
+/**
  * Menu de navigation principal des pages vitrine, présenté sous forme de menu
  * burger : un bouton ouvre un panneau listant tous les liens. Se ferme au clic
  * en dehors, sur un lien, ou avec la touche Échap.
@@ -38,11 +90,9 @@ export function PublicNavMenu() {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key !== "Escape") return;
-      setOpen(false);
-      // Le panneau fermé emporte le lien qui avait le focus : sans ce retour,
-      // le clavier repartirait du haut de la page.
-      if (rootRef.current?.contains(document.activeElement)) buttonRef.current?.focus();
+      handleMenuEscape(e.key, document.activeElement, rootRef.current, buttonRef.current, () =>
+        setOpen(false),
+      );
     };
     const onClick = (e: MouseEvent) => {
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
@@ -79,22 +129,7 @@ export function PublicNavMenu() {
       </button>
 
       {open && (
-        <nav id={panelId} className={styles.panel} aria-label="Navigation principale">
-          {LINKS.map((link) => {
-            const isActive = isNavLinkActive(pathname, link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                aria-current={isActive ? "page" : undefined}
-                className={`${styles.link} ${isActive ? styles.linkActive : ""}`}
-                onClick={() => setOpen(false)}
-              >
-                {link.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <PublicNavPanel id={panelId} pathname={pathname} onNavigate={() => setOpen(false)} />
       )}
     </div>
   );

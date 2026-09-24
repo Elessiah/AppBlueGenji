@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { SITE_NAME } from "@/lib/shared/share-metadata";
+import { siteTitle } from "@/lib/shared/page-metadata";
 
 /**
  * Le formulaire d'édition n'est pas la fiche du tournoi.
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   // ce qui **retire** le gabarit de la racine pour ses enfants — un simple
   // « Modifier le tournoi » se serait retrouvé seul dans l'onglet, sans le nom
   // du site.
-  title: { absolute: `Modifier le tournoi · ${SITE_NAME}` },
+  title: { absolute: siteTitle("Modifier le tournoi") },
   openGraph: null,
   twitter: null,
 };

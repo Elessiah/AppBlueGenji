@@ -6,9 +6,22 @@ type FakeNode = SkipLinkNode & { name: string; children: FakeNode[] };
 /** Un élément réduit à ce que lit la résolution. */
 function node(
   tagName: string,
-  { name = tagName, attrs = {}, children = [] }: { name?: string; attrs?: Record<string, string>; children?: FakeNode[] } = {},
+  {
+    name = tagName,
+    attrs = {},
+    children = [],
+    text = "texte",
+  }: { name?: string; attrs?: Record<string, string>; children?: FakeNode[]; text?: string } = {},
 ): FakeNode {
-  return { tagName, name, children, getAttribute: (key) => attrs[key] ?? null };
+  return {
+    tagName,
+    name,
+    children,
+    // Par défaut, un élément porte du texte : seuls les cas « vide » le retirent.
+    textContent: text,
+    getAttribute: (key) => attrs[key] ?? null,
+    hasAttribute: (key) => key in attrs,
+  };
 }
 
 describe("skipLinkTarget", () => {
@@ -33,6 +46,34 @@ describe("skipLinkTarget", () => {
       ],
     });
     expect(skipLinkTarget(main).name).toBe("contenu");
+  });
+
+  it("saute le décor vide qui précède le contenu (fond `.fabric` de /connexion)", () => {
+    const main = node("MAIN", {
+      children: [node("DIV", { name: "fabric", text: "" }), node("DIV", { name: "carte" })],
+    });
+    expect(skipLinkTarget(main).name).toBe("carte");
+  });
+
+  it("tient un élément ne contenant que des blancs pour vide", () => {
+    const main = node("MAIN", {
+      children: [node("DIV", { name: "blanc", text: "  \n " }), node("SECTION", { name: "hero" })],
+    });
+    expect(skipLinkTarget(main).name).toBe("hero");
+  });
+
+  it("garde un élément sans texte propre qui a des enfants", () => {
+    const main = node("MAIN", {
+      children: [node("DIV", { name: "grille", text: "", children: [node("IMG", { text: "" })] })],
+    });
+    expect(skipLinkTarget(main).name).toBe("grille");
+  });
+
+  it("saute un élément `hidden`, où `focus()` échouerait sans bruit", () => {
+    const main = node("MAIN", {
+      children: [node("DIV", { name: "caché", attrs: { hidden: "" } }), node("SECTION", { name: "hero" })],
+    });
+    expect(skipLinkTarget(main).name).toBe("hero");
   });
 
   it("ne saute qu'en tête : un en-tête placé après le contenu en fait partie", () => {
