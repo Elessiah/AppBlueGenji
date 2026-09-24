@@ -397,5 +397,6 @@ export function settledPrivacyChanges(
  * @param due Changements dus au compte (`pendingPrivacyChanges`, déjà annoncés exclus).
  */
 export function privacyDmBatch(due: readonly PrivacyChange[], now: Date): PrivacyChange[] {
-  return settledPrivacyChanges(now, due).length > 0 ? [...due] : [];
+  const cutoff = dayBefore(now, PRIVACY_DM_SETTLE_DAYS);
+  return due.some((change) => change.publishedAt <= cutoff) ? [...due] : [];
 }

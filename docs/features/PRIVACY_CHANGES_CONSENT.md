@@ -113,6 +113,18 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   comptes écartés après coup occuperaient ses vingt places à chaque balayage.
   Leur somme reste sous la fenêtre de 60 jours (tenu par un test), sans quoi un
   changement retenu en sortirait sans avoir été annoncé.
+
+  **Le revers, assumé** : un joueur qui ne revient pas sur le site apprend un
+  changement jusqu'à un mois plus tard, y compris un changement qui élargit qui
+  lit ses données (les contacts présentés au lancement d'un match, par
+  exemple). La modale reste l'information de référence et n'attend jamais ;
+  le message privé n'est qu'un rappel pour qui ne la verra pas. Le choix
+  inverse — un drapeau par entrée qui court-circuite délai et intervalle —
+  rouvrirait le spam au premier changement qu'on jugerait important.
+
+  Le balayage suppose **un seul processus** (pm2 en mode `fork`, voir
+  `docs/DEPLOYMENT.md`) : l'intervalle est lu avant la réservation, et deux
+  processus concurrents pourraient tous deux l'enjamber.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
   changements qu'il n'a ni acceptés ni déjà reçus, et renvoie au site pour
   décider. Borné à 1 800 caractères (plafond du bot) : au-delà, les derniers

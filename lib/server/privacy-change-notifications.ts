@@ -214,7 +214,12 @@ async function runSweep(now: Date): Promise<number> {
  *
  * Meilleur effort et jamais bloquant : l'appelant est le rendu d'une page.
  *
- * @param now Instant de référence, injectable pour les tests.
+ * @param now Instant de référence des décisions **sur les dates de publication**
+ *   (fenêtre d'annonce, délai de la modale), injectable pour les tests.
+ *   L'intervalle entre deux messages, lui, se juge sur l'horloge de MySQL,
+ *   **délibérément** : `sent_at` est daté par `CURRENT_TIMESTAMP`, et le
+ *   comparer à un instant venu de Node ferait dépendre la règle du fuseau que
+ *   le pilote applique aux dates qu'il envoie.
  * @returns Le nombre de messages remis (0 si le balayage a été étranglé).
  */
 export async function dispatchPrivacyChangeNotifications(now: Date = new Date()): Promise<number> {

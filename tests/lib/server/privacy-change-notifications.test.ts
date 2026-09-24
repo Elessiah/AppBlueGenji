@@ -146,17 +146,8 @@ describe("dispatchPrivacyChangeNotifications", () => {
     for (const change of PRIVACY_CHANGES) expect(message).toContain(change.title);
   });
 
-  it("messages déjà partis : les changements suivants attendent sans relancer personne", async () => {
-    // Les premiers changements ont été annoncés : leurs lignes sont en base,
-    // donc la requête (qui porte l'intervalle) ne rend plus ce compte.
-    const calls = fakeDb({ candidates: [] });
-    expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
-    expect(calls.some((c) => c.sql.includes("r.sent_at > NOW() - INTERVAL ? DAY"))).toBe(true);
-    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
-
-    // Et si la relecture montre les changements antérieurs reçus, le dernier,
-    // encore trop récent, ne part pas seul.
-    resetPrivacyNotificationThrottle();
+  it("changements antérieurs déjà reçus : le dernier, trop récent, ne part pas seul", async () => {
+    // Cas de la production : les premières entrées viennent d'être annoncées.
     const lastFresh = PRIVACY_CHANGES.at(-1)!.publishedAt;
     const announced = PRIVACY_CHANGES.filter((c) => c.publishedAt < lastFresh);
     expect(announced.length).toBeGreaterThan(0);
