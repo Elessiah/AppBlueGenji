@@ -11,8 +11,10 @@ interface TickerProps {
  * Bandeau défilant.
  *
  * Un contenu qui bouge plus de cinq secondes doit pouvoir être arrêté
- * (WCAG 2.2.2, RGAA 13.8) : le bandeau se fige au survol et au focus, et porte
- * un bouton **pause** qui le tient arrêté jusqu'au clic suivant. Il se fige
+ * (WCAG 2.2.2, RGAA 13.8) : le bandeau se fige au survol de son texte, et porte
+ * un bouton **pause** qui le tient arrêté jusqu'au clic suivant — et ne tient
+ * que lui : ni le survol du bouton ni son focus ne figent la piste, sans quoi
+ * « ▶ » ne relancerait rien tant que le pointeur ou le focus y restent. Il se fige
  * aussi seul avec le régime de charge (`--deco-anim-state`) et le réglage
  * « Réduire les animations ».
  *

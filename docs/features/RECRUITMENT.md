@@ -207,7 +207,13 @@ Le défilement s'arrête de lui-même au **survol** et au **focus** (on ne retir
 une annonce de sous le pointeur ni sous le clavier), et dès que le **régime de
 charge** coupe les animations décoratives (`useClientPower().decorativeMotion` :
 page sans focus, machine à la peine, joueur en match, mouvement réduit) — le
-bouton pause disparaît alors, rien ne défilant. Les changements automatiques ne
+bouton pause disparaît alors, rien ne défilant. Le bouton pose un **choix
+explicite qui prime** sur le survol et le focus (`isRecruitmentBannerRotating`,
+sur la règle `isCountdownHeld` des notifications) : « Pause » tient la banderole
+arrêtée, « Reprendre » la relance sur-le-champ — sans quoi la reprise ne
+reprenait rien, le pointeur qui vient de cliquer survolant la banderole et le
+focus clavier restant sur le bouton. « Reprendre » s'efface au prochain survol
+ou focus. Les changements automatiques ne
 sont pas lus aux lecteurs d'écran (`aria-live="off"` pendant la rotation) ; un
 changement demandé l'est (`polite`).
 

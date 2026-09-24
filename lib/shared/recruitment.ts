@@ -1,3 +1,5 @@
+import { type CountdownOverride, isCountdownHeld } from "./pausable-countdown";
+
 /**
  * Pôles de bénévolat de l'association : le recrutement vise le staff (arbitres,
  * casters, dev, com…) plutôt que les joueurs. `AUTRE` sert de valeur par défaut
@@ -205,6 +207,30 @@ export const RECRUITMENT_MODAL_COOKIE_MAX_AGE = Math.floor(RECRUITMENT_MODAL_INT
  * WCAG 2.2.2 exige un moyen de pause — la banderole en porte un.
  */
 export const RECRUITMENT_BANNER_ROTATION_MS = 7_000;
+
+/**
+ * La banderole doit-elle passer d'elle-même à l'annonce suivante ?
+ *
+ * Il faut plusieurs annonces, et que le régime de charge autorise les
+ * animations décoratives. Ensuite, le **choix explicite prime** sur le survol et
+ * le focus — la règle des notifications, `isCountdownHeld` : « Pause » tient la
+ * banderole arrêtée, « Reprendre » la relance même sous le pointeur ou le focus.
+ * Sans cette priorité la reprise ne reprenait rien : le pointeur qui vient de
+ * cliquer survole la banderole, et le focus clavier est posé sur le bouton.
+ */
+export function isRecruitmentBannerRotating(state: {
+  count: number;
+  decorativeMotion: boolean;
+  override: CountdownOverride;
+  hovered: boolean;
+  focused: boolean;
+}): boolean {
+  return (
+    state.count > 1 &&
+    state.decorativeMotion &&
+    !isCountdownHeld(state.override, state.hovered, state.focused)
+  );
+}
 
 /**
  * Canal de contact mis en avant sur l'annonce. `AUTO` : aucun canal privilégié,

@@ -9,6 +9,7 @@ import {
   RECRUITMENT_MODAL_COOKIE_MAX_AGE,
   RECRUITMENT_MODAL_INTERVAL_MS,
   RECRUITMENT_PRIORITIES,
+  isRecruitmentBannerRotating,
   parseRecruitmentSeen,
   recruitmentDismissed,
   recruitmentModalStart,
@@ -334,5 +335,37 @@ describe("RECRUITMENT_BANNER_ROTATION_MS", () => {
   it("laisse le temps de lire, au-delà du seuil où WCAG 2.2.2 exige une pause", () => {
     expect(RECRUITMENT_BANNER_ROTATION_MS).toBeGreaterThan(5_000);
     expect(RECRUITMENT_BANNER_ROTATION_MS).toBeLessThanOrEqual(10_000);
+  });
+});
+
+describe("isRecruitmentBannerRotating", () => {
+  const base = { count: 3, decorativeMotion: true, override: null, hovered: false, focused: false } as const;
+
+  it("défile quand rien ne le retient", () => {
+    expect(isRecruitmentBannerRotating(base)).toBe(true);
+  });
+
+  it("ne défile pas avec une seule annonce, ni quand le régime de charge coupe les animations", () => {
+    expect(isRecruitmentBannerRotating({ ...base, count: 1 })).toBe(false);
+    expect(isRecruitmentBannerRotating({ ...base, count: 0 })).toBe(false);
+    expect(isRecruitmentBannerRotating({ ...base, decorativeMotion: false })).toBe(false);
+    expect(isRecruitmentBannerRotating({ ...base, decorativeMotion: false, override: "RUNNING" })).toBe(false);
+  });
+
+  it("s'arrête au survol et au focus quand le lecteur n'a rien choisi", () => {
+    expect(isRecruitmentBannerRotating({ ...base, hovered: true })).toBe(false);
+    expect(isRecruitmentBannerRotating({ ...base, focused: true })).toBe(false);
+  });
+
+  it("« Pause » tient la banderole arrêtée, pointeur et focus partis", () => {
+    expect(isRecruitmentBannerRotating({ ...base, override: "PAUSED" })).toBe(false);
+  });
+
+  // Le défaut corrigé : le pointeur qui vient de cliquer « Reprendre » survole
+  // la banderole, le focus clavier est sur le bouton — la reprise ne reprenait rien.
+  it("« Reprendre » relance sous le pointeur et sous le focus clavier", () => {
+    expect(isRecruitmentBannerRotating({ ...base, override: "RUNNING", hovered: true })).toBe(true);
+    expect(isRecruitmentBannerRotating({ ...base, override: "RUNNING", focused: true })).toBe(true);
+    expect(isRecruitmentBannerRotating({ ...base, override: "RUNNING", hovered: true, focused: true })).toBe(true);
   });
 });
