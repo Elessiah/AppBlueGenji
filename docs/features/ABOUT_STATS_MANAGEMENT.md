@@ -77,7 +77,7 @@ contexte d'empilement que pose `.root` d'`AboutSection` (`position: relative;
 z-index: 1`) : son `z-index: 1000` ne valait que dans la section, si bien que
 la section des partenaires, peinte après, passait par-dessus selon la position
 de défilement — et la page continuait de défiler sous le voile. Le voile ne se
-ferme que sur un appui **commencé** sur lui (`isBackdropDismiss`,
+ferme que sur un appui **commencé et relâché** sur lui (`isBackdropDismiss`,
 `lib/shared/backdrop-dismiss.ts`) : une sélection de texte relâchée hors du
 panneau ne jette plus la saisie.
 

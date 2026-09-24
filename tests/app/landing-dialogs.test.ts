@@ -31,8 +31,9 @@ describe("LandingDialog", () => {
     expect(src).toContain("ref={dialogRef}");
   });
 
-  it("ne ferme le voile que sur un appui commencé sur lui, et jamais pendant un envoi", () => {
+  it("ne ferme le voile que sur un appui commencé et relâché sur lui, et jamais pendant un envoi", () => {
     expect(src).toContain("onPointerDown");
+    expect(src).toContain("onPointerUp");
     expect(src).toContain("isBackdropDismiss(");
     expect(src).toMatch(/dismiss && !busy/);
   });
