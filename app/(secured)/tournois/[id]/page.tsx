@@ -683,6 +683,11 @@ export default function TournamentDetailPage() {
               // mais un verrou de score se lirait faux le jour où ils
               // divergeraient.
               format={detail.card.format}
+              // Aperçu de la manche suivante : un outil d'arbitrage, pour un
+              // tournoi qui se joue. `isAdmin` vaut la permission
+              // `tournaments` (administrateurs et arbitres).
+              showNextRound={detail.isAdmin && detail.card.state === "RUNNING" && !frozen}
+              qualificationFormat={detail.card.matchFormat}
             />
           ) : detail.card.format === "SWISS" && detail.swiss ? (
             <SwissView
