@@ -256,6 +256,21 @@ describe("certification Discord — code refusé", () => {
     expect(src).toMatch(/onClick=\{restartVerification\}>\s*Nouveau code/);
     expect(src).toMatch(/const restartVerification = \(\) => \{\s*setDiscordId\(""\);\s*setCode\(""\);\s*fieldErrors\.clear\(\);/);
   });
+
+  it("changer d'étape porte le focus sur le champ de la nouvelle étape, jamais au montage", () => {
+    // Le bouton activé se démonte avec son étape : sans relais, le focus
+    // tomberait sur `<body>`.
+    const src = code("app/(secured)/profil/DiscordVerificationDialog.tsx");
+    expect(src).toContain("const previousStep = useRef(awaitingCode)");
+    expect(src).toMatch(/if \(previousStep\.current === awaitingCode\) return;/);
+    expect(src).toContain("getElementById(awaitingCode ? FIELD_IDS.code : FIELD_IDS.handle)?.focus()");
+  });
+
+  it("la rangée de trois boutons passe à la ligne plutôt que de déborder", () => {
+    const src = code("app/(secured)/profil/DiscordVerificationDialog.tsx");
+    const row = src.slice(0, src.indexOf("Nouveau code"));
+    expect(row.slice(row.lastIndexOf("<div style="))).toContain('flexWrap: "wrap"');
+  });
 });
 
 describe("déclaration d'accessibilité", () => {

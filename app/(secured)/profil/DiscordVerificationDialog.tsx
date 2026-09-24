@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -144,6 +144,16 @@ export function DiscordVerificationDialog({
   };
 
   const awaitingCode = discordId !== "";
+
+  // Changer d'étape démonte le bouton qui vient d'être activé : sans ce relais,
+  // le focus tomberait sur `<body>` et le champ de la nouvelle étape ne serait
+  // jamais annoncé. Rien au montage — `useDialogBehavior` y pose le focus.
+  const previousStep = useRef(awaitingCode);
+  useEffect(() => {
+    if (previousStep.current === awaitingCode) return;
+    previousStep.current = awaitingCode;
+    document.getElementById(awaitingCode ? FIELD_IDS.code : FIELD_IDS.handle)?.focus();
+  }, [awaitingCode]);
 
   /** Retour à la demande de code, tag conservé : le précédent est perdu. */
   const restartVerification = () => {
@@ -328,7 +338,9 @@ export function DiscordVerificationDialog({
                 Cinq essais, puis le code est brûlé — demande-en un nouveau si tu te trompes.
               </p>
             </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            {/* Trois boutons : à la largeur d'un téléphone ils ne tiennent pas
+                sur une ligne, la rangée passe à la ligne plutôt que de déborder. */}
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
               <CyberButton variant="ghost" type="button" onClick={onClose}>
                 Annuler
               </CyberButton>
