@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import {
@@ -147,6 +149,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: form.submitting });
+  const backdrop = useBackdropDismiss(onClose, form.submitting);
   const [forfeitOpen, setForfeitOpen] = useState(false);
 
   const team1 = match.team1Name || "Équipe 1";
@@ -209,13 +212,11 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
     form.setDoubleForfeit(false);
   };
 
-  return (
+  return createPortal(
     <div
       className={styles.backdrop}
       role="presentation"
-      onClick={() => {
-        if (!form.submitting) onClose();
-      }}
+      {...backdrop}
     >
       <div
         ref={dialogRef}
@@ -224,7 +225,6 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
         aria-modal="true"
         aria-labelledby="admin-score-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <form onSubmit={onSubmitForm}>
           <div className={styles.head}>
@@ -427,6 +427,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

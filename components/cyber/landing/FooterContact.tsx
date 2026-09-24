@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { type ContactInfo, validateContactInfo } from "@/lib/shared/contact";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
+import { LandingDialog } from "./LandingDialog";
 import styles from "./FooterContact.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
@@ -24,16 +25,6 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
   const [form, setForm] = useState<ContactInfo>(initialContact);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy]);
 
   function openEdit() {
     setForm(contact);
@@ -115,61 +106,57 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
       </ul>
 
       {open && (
-        <div className={styles.overlay} onClick={close} role="presentation">
-          <div
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label="Modifier les coordonnées de contact"
-          >
-            <h3 className={styles.modalTitle}>Modifier le contact</h3>
+        <LandingDialog
+          onClose={close}
+          busy={busy}
+          className={styles.modal}
+          label="Modifier les coordonnées de contact"
+        >
+          <h3 className={styles.modalTitle}>Modifier le contact</h3>
 
-            <label className={styles.field}>
-              <span className={styles.label}>Email</span>
-              <input
-                type="email"
-                className={styles.input}
-                value={form.email}
-                maxLength={254}
-                placeholder="contact@bluegenji-esport.fr"
-                onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
-                autoFocus
-              />
-            </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Email</span>
+            <input
+              type="email"
+              className={styles.input}
+              value={form.email}
+              maxLength={254}
+              placeholder="contact@bluegenji-esport.fr"
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
+            />
+          </label>
 
-            <label className={styles.field}>
-              <span className={styles.label}>Tag Discord</span>
-              <input
-                className={styles.input}
-                value={form.discordTag}
-                maxLength={64}
-                placeholder="bluegenji"
-                onChange={(e) => setForm((f) => ({ ...f, discordTag: e.target.value }))}
-              />
-            </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Tag Discord</span>
+            <input
+              className={styles.input}
+              value={form.discordTag}
+              maxLength={64}
+              placeholder="bluegenji"
+              onChange={(e) => setForm((f) => ({ ...f, discordTag: e.target.value }))}
+            />
+          </label>
 
-            <label className={styles.field}>
-              <span className={styles.label}>Lien Discord</span>
-              <input
-                className={styles.input}
-                value={form.discordUrl}
-                maxLength={200}
-                placeholder={DISCORD_INVITE_URL}
-                onChange={(e) => setForm((f) => ({ ...f, discordUrl: e.target.value }))}
-              />
-            </label>
+          <label className={styles.field}>
+            <span className={styles.label}>Lien Discord</span>
+            <input
+              className={styles.input}
+              value={form.discordUrl}
+              maxLength={200}
+              placeholder={DISCORD_INVITE_URL}
+              onChange={(e) => setForm((f) => ({ ...f, discordUrl: e.target.value }))}
+            />
+          </label>
 
-            <div className={styles.actions}>
-              <CyberButton variant="ghost" onClick={close} disabled={busy}>
-                Annuler
-              </CyberButton>
-              <CyberButton variant="primary" onClick={submit} disabled={busy}>
-                {busy ? "…" : "Enregistrer"}
-              </CyberButton>
-            </div>
+          <div className={styles.actions}>
+            <CyberButton variant="ghost" onClick={close} disabled={busy}>
+              Annuler
+            </CyberButton>
+            <CyberButton variant="primary" onClick={submit} disabled={busy}>
+              {busy ? "…" : "Enregistrer"}
+            </CyberButton>
           </div>
-        </div>
+        </LandingDialog>
       )}
     </>
   );

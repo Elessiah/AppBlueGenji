@@ -15,11 +15,19 @@ const source = readFileSync(
  * aperçoive : les six audits qui en dépendent ne se voient qu'à l'exécution.
  * D'où ce garde-fou au niveau source, comme pour `PublicHeader`.
  */
+// Début de la modale : borne la grille publique et isole l'aperçu du logo.
+const MODAL_START = "<LandingDialog";
+
 describe("SponsorsGrid — logos servis depuis notre origine", () => {
   const publicGrid = source.slice(
     source.indexOf("displaySponsors.map"),
-    source.indexOf("{open && mounted"),
+    source.indexOf(MODAL_START),
   );
+
+  it("trouve la grille et la modale — sans quoi les tranches ci-dessous ne bornent rien", () => {
+    expect(source.indexOf("displaySponsors.map")).toBeGreaterThan(-1);
+    expect(source.indexOf(MODAL_START)).toBeGreaterThan(source.indexOf("displaySponsors.map"));
+  });
 
   it("passe par la porte unique `sponsorLogoSrc`", () => {
     expect(source).toContain('from "@/lib/shared/sponsor-logo"');
@@ -44,7 +52,7 @@ describe("SponsorsGrid — logos servis depuis notre origine", () => {
   });
 
   it("garde un <img> brut pour l'aperçu de la modale, qui montre une URL non enregistrée", () => {
-    const modal = source.slice(source.indexOf("{open && mounted"));
+    const modal = source.slice(source.indexOf(MODAL_START));
     expect(modal).toContain("<img");
     expect(modal).toContain("form.logoUrl");
   });

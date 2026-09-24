@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { CyberButton } from "@/components/cyber/CyberButton";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 
 /**
  * Ce que masquer le BattleTag **ne fait pas**, dit au moment où on le masque.
@@ -24,26 +25,19 @@ import { CyberButton } from "@/components/cyber/CyberButton";
  * à répondre pour un geste déjà fait, et suggérerait qu'un « non » existe.
  */
 export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) {
-  const closeRef = useRef<HTMLButtonElement | null>(null);
+  // Le focus entre dans la modale (sur son seul bouton) et Échap en sort :
+  // sans cela, un lecteur d'écran resterait sur la case à cocher, et le clavier
+  // n'aurait aucun moyen de refermer ce qu'il vient d'ouvrir. La pile partagée
+  // verrouille aussi le défilement et piège la tabulation.
+  const dialogRef = useDialogBehavior({ open: true, onClose });
 
-  // Le focus entre dans la modale et Échap en sort : sans cela, un lecteur
-  // d'écran resterait sur la case à cocher, et le clavier n'aurait aucun moyen
-  // de refermer ce qu'il vient d'ouvrir.
-  useEffect(() => {
-    closeRef.current?.focus();
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose]);
-
-  return (
+  // Portée dans <body> : `/profil` rend la modale dans son `<section
+  // class="fade-in">`, dont l'animation laisse un `transform` posé — la section
+  // devenait la référence de `position: fixed`, et la notice se centrait au
+  // milieu de la page (2 500 px de haut), hors de l'écran.
+  return createPortal(
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="battletag-visibility-title"
-      aria-describedby="battletag-visibility-body"
+      role="presentation"
       style={{
         position: "fixed",
         inset: 0,
@@ -56,6 +50,12 @@ export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) 
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="battletag-visibility-title"
+        aria-describedby="battletag-visibility-body"
+        tabIndex={-1}
         style={{
           width: "min(520px, calc(100vw - 32px))",
           maxHeight: "calc(100vh - 32px)",
@@ -111,11 +111,12 @@ export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) 
         </div>
 
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <CyberButton ref={closeRef} variant="primary" onClick={onClose}>
+          <CyberButton variant="primary" onClick={onClose}>
             J&apos;ai compris
           </CyberButton>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

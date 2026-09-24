@@ -4,6 +4,7 @@ import { useEffect, useState, type FocusEvent, type PointerEvent } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 import {
@@ -133,8 +134,9 @@ export function RecruitmentHighlight({
  * une annonce de sous le pointeur ni sous le clavier), et dès que le **régime de
  * charge** coupe les animations décoratives — page sans focus, machine à la
  * peine, joueur en match, mouvement réduit demandé (`useClientPower`) : une
- * banderole qui tourne derrière un jeu est une image prise au jeu. Un bouton pause le fige pour de
- * bon (WCAG 2.2.2), et les flèches parcourent les annonces à la main.
+ * banderole qui tourne derrière un jeu est une image prise au jeu. Un bouton
+ * pause le fige pour de bon (WCAG 2.2.2), et les flèches parcourent les
+ * annonces à la main.
  */
 function RecruitmentBanner({
   ads,
@@ -326,6 +328,7 @@ function RecruitmentArrivalModal({
 
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open, onClose: dismiss });
+  const backdrop = useBackdropDismiss(dismiss);
 
   // Une page « compte » comme vue dès qu'elle est affichée, même si le visiteur
   // quitte le site sans fermer la modale. La marque n'est posée qu'ici, à
@@ -346,7 +349,7 @@ function RecruitmentArrivalModal({
   const titleId = `recruitment-arrival-title-${ad.id}`;
 
   return (
-    <div className={styles.modalOverlay} role="presentation" onClick={dismiss}>
+    <div className={styles.modalOverlay} role="presentation" {...backdrop}>
       <div
         ref={dialogRef}
         className={styles.modal}
@@ -354,7 +357,6 @@ function RecruitmentArrivalModal({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.modalEyebrow}>
           <span className="eyebrow">RECRUTEMENT</span>

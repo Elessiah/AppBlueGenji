@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { VerifiedBadge } from "@/components/discord-tag";
@@ -132,15 +133,14 @@ export function DiscordVerificationDialog({
   // pas décoratif : une certification en cours d'envoi ne doit pas se faire
   // interrompre par une touche.
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: loading });
+  const backdrop = useBackdropDismiss(onClose, loading);
 
   if (!mounted) return null;
 
   return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!loading) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -162,7 +162,6 @@ export function DiscordVerificationDialog({
         // décoration.
         aria-describedby="discord-verify-exposure"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "min(520px, calc(100vw - 32px))",
           maxHeight: "calc(100vh - 32px)",
