@@ -101,9 +101,9 @@ describe("annuaire des équipes et des joueurs — recherche", () => {
     // À 6 % d'opacité, l'anneau d'origine ne se voyait pas.
     const body = ruleBody(css, ".search:focus-within");
     const alpha = body.match(/box-shadow:\s*0 0 0 3px rgba\(.*,\s*([\d.]+)\);?\s*$/m);
+    expect(alpha).not.toBeNull();
     // Le dernier argument est l'opacité — la couleur, elle, passe par `var()`.
     expect(Number(alpha?.[1])).toBeLessThanOrEqual(1);
-    expect(alpha).not.toBeNull();
     expect(Number(alpha?.[1])).toBeGreaterThanOrEqual(0.25);
   });
 });
