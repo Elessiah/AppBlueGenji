@@ -363,9 +363,11 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 
 ### Accessibilité (`ACCESSIBILITE.md`)
 - Tout problème d'accessibilité **repéré au cours du développement** (contraste, focus, nom accessible, rôle ARIA, titre de page, langue, ordre de tabulation, cible trop petite…) et **non réglé dans la PR en cours** — parce qu'il préexiste ou sort du périmètre — s'ajoute à `ACCESSIBILITE.md`, à la racine du dépôt, pour être retravaillé plus tard. Même règle que `ERREUR.txt` : ne pas élargir la tâche en silence, consigner, le signaler dans le résumé de fin, poursuivre.
-- Une section par problème, **à la suite**, avec le numéro suivant — celui qui suit le plus grand jamais attribué, noté en tête du fichier (les numéros, même de tâches retirées, ne sont jamais réattribués : d'autres sessions désignent une tâche par son numéro) —, au format du fichier : titre, **Critère** (WCAG / RGAA), **Constat** (fichier et symptôme), **À faire**.
-- Vérifier d'abord qu'il n'y figure pas déjà ; le cas échéant, compléter la section existante.
-- Retirer la section dans la PR qui règle le problème.
+- Une section par problème, **à la suite**, au format du fichier : titre, **Critère** (WCAG / RGAA), **Constat** (fichier et symptôme), **À faire**. Vérifier d'abord qu'il n'y figure pas déjà ; le cas échéant, compléter la section existante.
+- **Choisir ou ajouter une tâche ne se fait plus dans une PR : cela se pousse sur `main` sur-le-champ.** Numéroter dans la branche de feature faisait prendre le même « numéro suivant » à deux sessions parallèles, et la collision ne se voyait qu'au merge — une fois que chacune avait déjà désigné sa tâche par ce numéro. Deux gestes passent donc par un commit direct sur `main`, qui ne touche **que** `ACCESSIBILITE.md`, poussé **avant** d'écrire la moindre ligne de code :
+  - **Sélectionner des tâches à résoudre** : `git fetch origin` puis partir de `origin/main` à jour, **retirer du fichier** la section de chaque tâche retenue, commiter (`take a11y tasks N, M`), pousser vers `main` — **puis seulement** créer la branche de feature et résoudre. Une tâche absente du fichier ne peut plus être choisie par une autre session. Si le push est refusé, récupérer `main` et revérifier que les tâches y figurent toujours avant de repousser : si l'une a disparu, une autre session l'a prise. Garder le texte de la section (constat, à faire) dans la description de la PR, puisqu'il ne vit plus dans le fichier.
+  - **Ajouter une tâche** : même chemin, le numéro étant pris sur `main` **au moment du push** — celui qui suit le « dernier numéro attribué » noté en tête du fichier, avancé dans le même commit. Un push refusé se rejoue avec le numéro relu. Les numéros ne sont jamais réattribués.
+- La PR qui règle le problème n'a donc **rien** à retirer du fichier. Une tâche abandonnée ou réglée seulement en partie y est **remise** par un nouveau commit direct sur `main`, sous son numéro d'origine.
 
 ### Gestion de la complexité
 - Pour toute demande importante (≥ 2 features liées, refactoring architectural, intégration d'un nouveau service externe, ou tâche estimée > ~2h), établir d'abord un plan écrit (étapes ordonnées, fichiers touchés, points de vérification), puis l'exécuter dans cette session.
@@ -399,7 +401,7 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <norepl
 2. **Commit fonctionnel** : ≤ 5 mots, impératif minuscule — `add swiss pairing` — *avec Co-Authored-By*
 3. **Commit docs** : README / JSDoc limité à ce qui a été construit — *avec Co-Authored-By*
 4. **Commit tests** : `jest` — *avec Co-Authored-By*
-5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*. Tout problème d'accessibilité repéré pendant la tâche et **non réglé** dans la PR s'ajoute à `ACCESSIBILITE.md` avant ce commit (voir « Accessibilité » plus haut) ; une tâche de ce fichier réglée par la PR en est retirée dans ce commit.
+5. **Commit polish UI/UX** : espacements, états, accessibilité — aucun changement de logique — *avec Co-Authored-By*. Tout problème d'accessibilité repéré pendant la tâche et **non réglé** dans la PR s'ajoute à `ACCESSIBILITE.md` par un commit poussé directement sur `main`, pas dans ce commit (voir « Accessibilité » plus haut) ; les tâches que la PR règle en ont déjà été retirées sur `main` au moment de leur sélection.
 6. **Push** : `git push -u origin feature/<short-name>`
 7. **Revue de PR — en boucle jusqu'à zéro finding** : ouvrir la PR (`gh pr create`), puis lancer une revue du diff avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR.
 
