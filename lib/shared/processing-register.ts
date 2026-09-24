@@ -356,7 +356,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Informer chaque compte d'un changement du traitement de ses données, et recueillir son acceptation ou son refus",
     subPurposes: [
       "Présenter les changements non encore acceptés à la connexion (« J'accepte » ou « Je refuse, je supprime mon compte »)",
-      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables",
+      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables qui ne l'ont pas accepté sur le site, une semaine après sa publication et au plus un message par mois",
     ],
     legalBasis: "Obligation d'information (RGPD, articles 12 à 14) et consentement du joueur",
     dataSubjects: ["Joueurs inscrits sur le site"],
