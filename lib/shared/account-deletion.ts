@@ -2,18 +2,18 @@
  * Supprimer un compte : **l'effacer** quand il ne laisse rien, l'anonymiser
  * sinon.
  *
- * La suppression n'avait qu'un seul geste — anonymiser : le pseudo devient
- * `compte_supprime_<id>`, les identités et les coordonnées partent, la ligne
- * reste. C'est la bonne réponse pour un joueur qui a **joué** : ses matchs, son
- * palmarès et le bilan de ses équipes se lisent sur des lignes qui le
- * référencent, et l'effacer les emporterait — le classement du site se rejoue
- * depuis `bg_matches`, une équipe perdrait des adversaires, une manche
- * perdrait un engagé.
+ * La suppression n'avait qu'un seul geste — anonymiser : le pseudo devient un
+ * pseudo d'emprunt (`lib/shared/anonymous-pseudos.ts`), les identités et les
+ * coordonnées partent, la ligne reste. C'est la bonne réponse pour un joueur
+ * qui a **joué** : ses matchs, son palmarès et le bilan de ses équipes se
+ * lisent sur des lignes qui le référencent, et l'effacer les emporterait — le
+ * classement du site se rejoue depuis `bg_matches`, une équipe perdrait des
+ * adversaires, une manche perdrait un engagé.
  *
  * Ce n'est pas la bonne réponse pour un compte **qui n'a rien laissé**. Un
- * joueur inscrit un soir, jamais engagé nulle part, repartait en laissant une
- * ligne « compte_supprime_412 » à l'annuaire pour toujours : rien à préserver,
- * et une trace de son passage qu'il venait précisément de demander d'effacer.
+ * joueur inscrit un soir, qui n'a jamais disputé un match, repartait en
+ * laissant une ligne anonyme à l'annuaire pour toujours : rien à préserver, et
+ * une trace de son passage qu'il venait précisément de demander d'effacer.
  *
  * D'où deux modes, et **un seul critère** : reste-t-il quelque chose qui
  * référence ce compte et qui doit survivre ?
@@ -29,9 +29,15 @@
  *
  * Trois traces, et aucune n'est décorative :
  *
- * - `tournaments` — il a été **engagé** dans un tournoi, par une équipe ou par
- *   une entrée solo. C'est la trace que l'entrée d'`ERREUR.txt` nomme : elle
- *   porte des matchs, donc un classement, donc des points chez les autres.
+ * - `playedMatches` — il a **joué** : un match compté (`playedMatchSql`) de son
+ *   entrée solo, ou d'une équipe dont il était membre pendant le tournoi (la
+ *   fenêtre d'appartenance des statistiques, `stats-service`). C'est la trace
+ *   qui porte des statistiques, donc la seule qui justifie un faux nom : un
+ *   joueur dont l'équipe a été engagée mais qui n'a jamais disputé une
+ *   rencontre n'a rien à préserver. Seule exception, l'**entrée solo
+ *   inscrite** à un tournoi, jouée ou non : elle porte le pseudo du joueur comme
+ *   nom d'engagé, et l'effacement la laisserait nommer quelqu'un qui n'existe
+ *   plus.
  * - `organizedTournaments` — il a **créé** un tournoi. `bg_tournaments`
  *   .`organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT` : la base
  *   refuserait l'effacement, et un tournoi sans organisateur n'aurait de toute
@@ -45,7 +51,7 @@
  * — la base refuse, ou casse quelque chose d'autre.
  */
 export type AccountTrace = {
-  tournaments: boolean;
+  playedMatches: boolean;
   organizedTournaments: boolean;
   ownedTeams: boolean;
 };
@@ -89,7 +95,7 @@ export type AccountDeletionPlan = {
  * joueur puisse lever lui-même.
  */
 export function accountRetentionReason(trace: AccountTrace): AccountRetentionReason | null {
-  if (trace.tournaments) return "TOURNAMENTS";
+  if (trace.playedMatches) return "TOURNAMENTS";
   if (trace.organizedTournaments) return "ORGANIZED_TOURNAMENTS";
   if (trace.ownedTeams) return "OWNED_TEAMS";
   return null;
@@ -155,15 +161,15 @@ export function accountDeletionConfirmation(
   const irreversible = "Cette action est irréversible.";
   switch (reason) {
     case "TOURNAMENTS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${irreversible}`;
     case "ORGANIZED_TOURNAMENTS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${irreversible}`;
     case "OWNED_TEAMS":
-      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées (le compte devient anonyme), mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible}`;
     case null:
-      return `Supprimer définitivement ton compte ? Tu n'as participé à aucun tournoi et ne gères ni équipe ni tournoi : ton compte sera effacé entièrement, sans laisser de trace sur le site. ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte sera effacé entièrement, sans laisser de trace sur le site. ${irreversible}`;
     default:
-      return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (tournoi joué, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible}`;
   }
 }
 
@@ -182,7 +188,7 @@ export function accountDeletionOutcome(
 ): string {
   switch (reason) {
     case "TOURNAMENTS":
-      return "Compte supprimé. Tes statistiques restent conservées de façon anonyme.";
+      return "Compte supprimé. Tes statistiques restent conservées sous un pseudo d'emprunt.";
     case "ORGANIZED_TOURNAMENTS":
       return "Compte supprimé. Tes tournois gardent un organisateur anonyme.";
     case "OWNED_TEAMS":

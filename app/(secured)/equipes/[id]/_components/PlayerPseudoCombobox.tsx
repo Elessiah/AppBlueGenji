@@ -88,7 +88,7 @@ export function PlayerPseudoCombobox({
   }, []);
 
   // Un compte supprimé garde sa ligne et donc son pseudo
-  // (`compte_supprime_412`) : sans ce filtre, l'annuaire des joueurs le cachait
+  // (d'emprunt) : sans ce filtre, l'annuaire des joueurs le cachait
   // mais l'autocomplétion le proposait encore. Le serveur le refuse
   // (`getUserIdByPseudo` ignore les lignes mortes) — la liste ne doit pas
   // proposer un nom qui mène à un refus. Même raisonnement pour un joueur qui a

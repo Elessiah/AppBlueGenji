@@ -89,6 +89,38 @@ describe("users-service admin management", () => {
       expect(profile?.displayRoles).toEqual(["ARBITRE", "RECRUTEUR"]);
     });
 
+    it("annonce un compte supprimé", async () => {
+      // Tel que l'anonymisation le laisse : ni rôle ni statut d'administrateur,
+      // donc aucun titre de staff à afficher.
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 0, is_deleted: 1, platform_roles_json: null })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1, isAdmin: true }, 7);
+
+      expect(profile?.profile.isDeleted).toBe(true);
+      expect(profile?.displayRoles).toEqual([]);
+      expect(String(execute.mock.calls[0][0])).toContain("is_deleted");
+    });
+
+    it("n'annonce pas supprimé un compte vivant", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[userRow({ id: 7, is_deleted: 0 })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1 }, 7);
+
+      expect(profile?.profile.isDeleted).toBe(false);
+    });
+
     it("includes ADMIN in displayRoles for an admin target", async () => {
       const execute = jest
         .fn<SqlQuery>()

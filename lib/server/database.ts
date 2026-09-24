@@ -1676,5 +1676,54 @@ export async function getDatabase(): Promise<Pool> {
   }
 
   await ensureMigrations(pool);
+  scheduleDeletedAccountsReconciliation();
   return pool;
+}
+
+/**
+ * La garde « une fois par processus » vit sur `globalThis` et non dans une
+ * variable de module : `next dev` réévalue ce fichier à chaque rechargement à
+ * chaud, et une variable de module relançait la passe — irréversible — à
+ * chaque modification du code, sur la base locale que les worktrees partagent.
+ */
+const reconciliationState = globalThis as typeof globalThis & {
+  __bgDeletedAccountsReconciliation?: Promise<void>;
+};
+
+/**
+ * Applique aux comptes **déjà** supprimés la règle de suppression du jour
+ * (`reconcileDeletedAccounts`) — une fois par processus, en tâche de fond.
+ *
+ * Pas dans les migrations : elles tiennent un verrou que chaque requête
+ * attend, et ce rattrapage passe par le service des comptes, qui rappelle
+ * `getDatabase` — sous la porte des migrations, il s'attendrait lui-même.
+ * L'import est dynamique pour la même raison, à l'échelle des modules :
+ * `users-service` importe ce fichier.
+ *
+ * Un échec est dit et **non** retenté dans ce processus : un rattrapage qui
+ * tombe à chaque requête ferait d'une panne un déluge. Le redémarrage suivant
+ * le reprendra.
+ *
+ * Réservé au **serveur du site** (`NEXT_RUNTIME`, posé par Next) : un script
+ * (`npm run seed`, `replay:deletions`) ferme son pool en fin de course, sous
+ * un rattrapage qui tournerait encore — et le seed réécrit justement les
+ * comptes de test que celui-ci parcourt.
+ */
+function scheduleDeletedAccountsReconciliation(): void {
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  reconciliationState.__bgDeletedAccountsReconciliation ??= import("@/lib/server/users-service")
+    .then(({ reconcileDeletedAccounts }) => reconcileDeletedAccounts())
+    .then(({ erased, renamed, failed }) => {
+      if (erased + renamed + failed > 0) {
+        console.info(
+          `[deleted-accounts] Rattrapage : ${erased} effacé(s), ${renamed} renommé(s), ${failed} reporté(s).`,
+        );
+      }
+    })
+    .catch((error: unknown) => {
+      console.error(
+        "[deleted-accounts] Rattrapage des comptes supprimés impossible :",
+        error instanceof Error ? error.message : error,
+      );
+    });
 }

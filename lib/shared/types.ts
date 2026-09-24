@@ -279,14 +279,13 @@ export type PublicUserProfile = {
   /**
    * Compte anonymisé (`bg_users.is_deleted`).
    *
-   * Rendu par `listPlayers` seul : l'annuaire masque ces lignes **par défaut**
-   * derrière une case à cocher, la ligne restant nécessaire à qui remonte un
-   * ancien match.
+   * Rendu par `listPlayers`, dont l'annuaire masque ces lignes **par défaut**
+   * derrière un bouton discret — la ligne restant nécessaire à qui remonte un
+   * ancien match —, et par `getFullProfile`, dont la fiche doit **annoncer** le
+   * compte supprimé : son pseudo d'emprunt (`lib/shared/anonymous-pseudos.ts`)
+   * se lit comme un pseudo ordinaire.
    *
-   * Absent des autres lectures (`getUserById`, `getFullProfile`), qui ne
-   * filtrent pas `is_deleted` : la fiche d'un compte anonymisé **s'ouvre**
-   * encore — il n'y reste rien de personnel, et le lien vient d'un plateau ou
-   * d'un ancien match —, elle ne s'annonce simplement pas comme supprimée.
+   * Absent de `getUserById`, qui ne filtre pas `is_deleted`.
    */
   isDeleted?: boolean;
   team?: {

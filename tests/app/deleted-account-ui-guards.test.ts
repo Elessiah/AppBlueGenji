@@ -84,3 +84,52 @@ describe("interface — un compte supprimé ne se propose ni ne se raconte en co
     expect(PROFIL).not.toContain('= "TOURNAMENTS"');
   });
 });
+
+const ANNUAIRE = read("app/(secured)/joueurs/page.tsx");
+const FICHE = read("app/(secured)/joueurs/[id]/page.tsx");
+
+/**
+ * Deux demandes qui tirent en sens inverse, et chacune a son écran.
+ *
+ * - **L'annuaire** : la bascule des comptes supprimés ne doit pas se voir. Un
+ *   libellé « Comptes supprimés (N) » en tête de liste invitait au clic et
+ *   perdait le lecteur loin des joueurs qu'il cherchait ; c'est une icône seule,
+ *   que son nom accessible décrit.
+ * - **La fiche** : au contraire, un compte supprimé doit se voir au premier
+ *   regard — son pseudo d'emprunt se lit comme un pseudo ordinaire.
+ */
+describe("interface — discret dans l'annuaire, évident sur la fiche", () => {
+  it("fait de la bascule de l'annuaire une icône sans texte visible", () => {
+    expect(ANNUAIRE).not.toContain("<Coche");
+    expect(ANNUAIRE).toContain("<UserX");
+    expect(ANNUAIRE).toContain("aria-pressed={showDeleted}");
+    expect(ANNUAIRE).toMatch(/aria-label=\{`Afficher les comptes supprimés \(\$\{deletedCount\}\)`\}/);
+    // Infobulle et nom accessible disent la même action ; l'état passe par
+    // `aria-pressed`, jamais par un libellé qui changerait sous le pointeur.
+    expect(ANNUAIRE).toMatch(/title=\{`Afficher les comptes supprimés \(\$\{deletedCount\}\)`\}/);
+    expect(ANNUAIRE).not.toContain("Masquer les comptes supprimés");
+    // Aucun libellé rendu en clair entre les balises du bouton.
+    const button = ANNUAIRE.slice(
+      ANNUAIRE.indexOf("className={`${s.deletedToggle}"),
+      ANNUAIRE.indexOf("</button>", ANNUAIRE.indexOf("className={`${s.deletedToggle}")),
+    );
+    expect(button.slice(button.indexOf(">") + 1)).not.toMatch(/Comptes supprimés/);
+  });
+
+  it("garde les comptes supprimés masqués par défaut", () => {
+    expect(ANNUAIRE).toContain("useState(false);");
+    expect(ANNUAIRE).toMatch(/showDeleted \? players : players\.filter\(\(p\) => !p\.isDeleted\)/);
+  });
+
+  it("annonce le compte supprimé en tête de fiche", () => {
+    expect(FICHE).toContain("const deleted = Boolean(data.profile.isDeleted);");
+    expect(FICHE).toMatch(/\{deleted && \(\s*<span className=\{styles\.deletedBadge\}>/);
+    expect(FICHE).toContain("Compte supprimé");
+    expect(FICHE).toContain("pseudo d'emprunt");
+  });
+
+  it("n'affiche plus d'informations ni de gestion des rôles sur un compte supprimé", () => {
+    expect(FICHE).toContain("{!deleted && (");
+    expect(FICHE).toContain("{data.viewerIsAdmin && !data.isSelf && !deleted && (");
+  });
+});

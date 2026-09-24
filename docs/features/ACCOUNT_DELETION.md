@@ -6,8 +6,8 @@
 
 ## Le manque
 
-La suppression n'avait qu'un seul geste : **anonymiser**. Le pseudo devient
-`compte_supprime_<id>`, les identités (`google_sub`, `discord_id`,
+La suppression n'avait qu'un seul geste : **anonymiser**. Le pseudo devenait
+`compte_supprime_<id>` (c'est aujourd'hui un pseudo d'emprunt, voir plus bas), les identités (`google_sub`, `discord_id`,
 `blizzard_sub`), les coordonnées de jeu et la certification partent, la ligne
 reste avec `is_deleted = 1`.
 
@@ -31,7 +31,7 @@ survivre ?** Trois traces le disent, et aucune n'est décorative.
 
 | Trace | Pourquoi elle retient la ligne |
 | --- | --- |
-| `tournaments` | Il a été **engagé** — par une équipe inscrite, ou par une entrée solo. C'est la trace qui porte des matchs, donc un classement, donc des points chez les autres. |
+| `playedMatches` | Il a **joué** : un match compté (`playedMatchSql` — ni exemption, ni match fantôme, ni double forfait) d'une équipe dont il était membre pendant le tournoi (la fenêtre d'appartenance des statistiques), ou de son entrée solo. C'est la trace qui porte des statistiques, donc la seule qui justifie de garder la ligne sous un faux nom. Être au roster d'une équipe engagée ne suffit plus. Exception : une **entrée solo inscrite**, jouée ou non, retient la ligne — son nom d'engagé est le pseudo du joueur. |
 | `organizedTournaments` | Il a **créé** un tournoi. `bg_tournaments.organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT` : la base refuserait l'effacement, et un tournoi sans organisateur n'aurait plus de titulaire. |
 | `ownedTeams` | Il est `OWNER` d'une équipe vivante. `bg_team_members` s'efface en cascade : l'effacer laisserait une équipe que personne ne peut plus renommer, dissoudre ni engager. |
 
@@ -152,11 +152,78 @@ rouvre la fenêtre — deux clics, deux confirmations, deux `DELETE`, dont le se
 échoue en 400 et affiche une erreur juste après le succès. Une annulation le
 rouvre.
 
+## Le pseudo d'emprunt
+
+Un compte conservé l'est **sous un faux nom** : c'est le droit à l'oubli tel
+qu'un historique partagé le permet — les statistiques restent, plus rien ne
+remonte à la personne. Le faux nom est tiré au hasard dans une liste de mille
+pseudos (`lib/shared/anonymous-pseudos.ts`, pur) : `compte_supprime_412` portait
+l'identifiant du compte et se lisait comme une erreur dans un plateau.
+
+- **Libre au moment du tirage** : `bg_users.pseudo` est unique et sa collation
+  l'est sans casse. Les pseudos déjà portés sont relus sur la transaction, puis
+  l'écriture est tentée ; deux suppressions simultanées qui tirent le même nom
+  sont départagées par l'index unique, le perdant retire son tirage et
+  recommence (cinq fois au plus). Liste épuisée, un suffixe numérique prend le
+  relais — l'anonymisation n'échoue jamais faute de nom.
+- **Posé dans la même instruction** que tout le reste (`is_deleted = 1`
+  compris) : le balayage de `tests/lib/server/deleted-account-write-guards.test.ts`
+  exige que toute écriture de `bg_users` porte `is_deleted = 0`, sauf celle qui
+  pose le drapeau.
+- **Tout ce qui désigne la personne part avec** : tags Discord et de jeu,
+  identités de connexion, avatar, majorité, **rôles de plateforme** (un titre de
+  staff est public, il désignerait la personne aussi sûrement que son nom),
+  consentements (`bg_privacy_acknowledgments`,
+  `bg_privacy_change_notifications`).
+
+Le nom se lit comme un pseudo ordinaire, et c'est voulu : un plateau l'affiche
+sans contexte. C'est **la fiche** qui dit le compte supprimé.
+
+## La fiche d'un compte supprimé
+
+`getFullProfile` rend `isDeleted`, et `/joueurs/[id]` l'annonce au premier
+regard : l'en-tête quitte le bleu de la marque pour le gris, en tirets et
+hachures ; l'avatar est remplacé par une pastille barrée (`UserX`) ; une
+étiquette « Compte supprimé » précède le pseudo ; une phrase explique ce qui
+reste et pourquoi. Le bloc « Informations » disparaît (quatre « Masqué »
+laisseraient croire à un joueur actif), la gestion des rôles aussi (la route
+refuse un compte supprimé). `displayRoles` est vide, même pour un compte
+supprimé avant la règle qui aurait gardé ses rôles. Aucune teinte chaude : un
+compte supprimé n'est pas une alerte.
+
+## Les comptes déjà supprimés
+
+La règle a changé sous des comptes qui l'avaient déjà subie, et un joueur parti
+ne redemandera pas sa suppression. `reconcileDeletedAccounts` lui applique donc
+la règle du jour, **une fois par processus**, en tâche de fond après les
+migrations (`getDatabase` → `scheduleDeletedAccountsReconciliation`) :
+
+- un compte supprimé **sans match** (ni tournoi organisé, ni équipe possédée) est
+  **effacé** ;
+- un compte conservé qui porte encore `compte_supprime_<id>` ou des rôles de
+  plateforme est **ré-anonymisé** sous un pseudo d'emprunt ;
+- les autres ne sont pas touchés — c'est le cas nominal, une suppression faite
+  sous la règle actuelle ne laisse rien à rattraper.
+
+Chaque compte a sa transaction, sous le verrou de sa ligne et après relecture de
+`is_deleted` : deux processus qui démarrent ensemble ne se marchent pas dessus,
+et l'échec de l'un ne bloque pas les autres (il est reporté au redémarrage
+suivant). Rien n'est écrit au journal des suppressions : ces comptes y figurent
+depuis leur suppression, et le rejeu redécide déjà le mode avec la règle du
+jour. Le rattrapage ne tourne que dans le serveur du site (`NEXT_RUNTIME`) :
+un script ferme son pool en fin de course, et le seed réécrit justement les
+comptes de test qu'il parcourt. C'est par lui que les comptes supprimés de la
+production sans match joué sont effacés au déploiement.
+
 ## Les comptes anonymisés à l'annuaire
 
-`/joueurs` les masque **par défaut**, derrière une case à cocher qui les compte
-(`Comptes supprimés (3)`), rendue seulement s'il y en a — une `<Coche>`, comme
-partout ailleurs sur le site, et non la case par défaut du navigateur. La case n'est pas un
+`/joueurs` les masque **par défaut**, derrière une **icône seule** (`UserX`), en
+retrait au bout de la rangée de tri, rendue seulement s'il y en a. Un libellé
+« Comptes supprimés (3) » en tête d'annuaire invitait au clic et emmenait le
+lecteur loin des joueurs qu'il cherchait : l'icône existe pour qui la cherche.
+Son nom accessible (`aria-label`, `aria-pressed`) et son infobulle disent ce
+qu'elle fait ; son cadre n'apparaît qu'au survol, au focus et une fois
+activée. La bascule n'est pas un
 filtre de plus : tout ce que la page montre ou compte descend de la même liste,
 sans quoi elle changerait les cartes sans changer les compteurs qui les
 surmontent.

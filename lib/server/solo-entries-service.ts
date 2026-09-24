@@ -78,7 +78,7 @@ function isDuplicateNameError(error: unknown): boolean {
  * l'*anonymisation* la laisse en place avec `is_deleted = 1`. La colonne
  * voyage donc avec l'identité, et c'est `ensureSoloEntry` qui la lit — jamais
  * cette fonction, que `syncSoloEntryIdentityOn` appelle légitimement sur une
- * ligne anonymisée, dont le pseudo `compte_supprime_<id>` est précisément ce
+ * ligne anonymisée, dont le pseudo d'emprunt est précisément ce
  * qu'il faut recopier sur l'entrée solo déjà née.
  *
  * Une lecture verrouillante lit toujours la **dernière version commitée**, là
@@ -158,7 +158,7 @@ export async function ensureSoloEntry(
   // disparaître. Sur une **anonymisation** — le mode qu'obtient justement tout
   // compte portant déjà une trace de tournoi —, la ligne reste, et une
   // inscription partie avant la suppression reprend après son commit pour
-  // engager `compte_supprime_412` dans un tournoi individuel. Cet engagé-là
+  // engager un compte supprimé dans un tournoi individuel. Cet engagé-là
   // n'a plus ni session ni identité : personne ne peut plus reporter son
   // score ni l'abandonner, et il faut l'en retirer à la main. Le refus est le
   // même que pour une ligne disparue, parce que c'est le même fait.
