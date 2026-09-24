@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   RECRUITMENT_BANNER_COOKIE,
@@ -85,6 +86,7 @@ export function RecruitmentHighlight({
   const visible = Boolean(ad) && !dismissed && ad?.highlight === "MODAL" && !onAdPage;
   // Le hook doit être appelé à chaque rendu : il ne s'active que si `open`.
   const dialogRef = useDialogBehavior({ open: visible, onClose: dismiss });
+  const backdrop = useBackdropDismiss(dismiss);
 
   // Annonce déjà comptée comme vue pendant cette page.
   const recordedFor = useRef<number | null>(null);
@@ -154,7 +156,7 @@ export function RecruitmentHighlight({
   const preview = buildRecruitmentPreview(ad.body, MODAL_PREVIEW_MAX);
 
   return (
-    <div className={styles.modalOverlay} role="presentation" onClick={dismiss}>
+    <div className={styles.modalOverlay} role="presentation" {...backdrop}>
       <div
         ref={dialogRef}
         className={styles.modal}
@@ -162,7 +164,6 @@ export function RecruitmentHighlight({
         aria-modal="true"
         aria-label="Annonce de recrutement urgente"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
       >
         <span className="eyebrow">RECRUTEMENT · URGENT</span>
         <h2 className={styles.modalTitle}>{ad.title}</h2>

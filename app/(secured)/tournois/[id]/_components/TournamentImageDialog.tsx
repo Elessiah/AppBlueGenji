@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
 import { TournamentImagePicker } from "../../_components/TournamentImagePicker";
@@ -47,6 +49,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
   const [conflict, setConflict] = useState(false);
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   // Jamais pendant l'envoi : le serveur publie la nouvelle image par le flux
   // avant de répondre, et notre propre enregistrement passerait pour un conflit.
@@ -80,12 +83,10 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
     }
   };
 
-  return (
+  return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -103,7 +104,6 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
         aria-modal="true"
         aria-labelledby="tournament-image-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 760,
@@ -171,6 +171,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
           </form>
         </ScrollArea>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

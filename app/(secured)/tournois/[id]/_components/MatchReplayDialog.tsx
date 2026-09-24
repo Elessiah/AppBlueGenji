@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { canHaveReplay, isValidReplayUrl } from "@/lib/shared/match-replay";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -25,6 +27,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: MatchReplayDialog
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const touched = replayUrl.trim().length > 0;
   const invalid = touched && !isValidReplayUrl(replayUrl);
@@ -58,12 +61,10 @@ export function MatchReplayDialog({ match, onClose, onSaved }: MatchReplayDialog
     void save(touched ? replayUrl.trim() : null);
   };
 
-  return (
+  return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -81,7 +82,6 @@ export function MatchReplayDialog({ match, onClose, onSaved }: MatchReplayDialog
         aria-modal="true"
         aria-labelledby="match-replay-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 480,
@@ -187,6 +187,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: MatchReplayDialog
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentCard } from "@/lib/shared/types";
@@ -57,6 +58,7 @@ export function RemoveEntrantDialog({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   // Figé à l'ouverture, comme la liste des étapes de `LaunchTournamentDialog` :
   // le dialogue reste monté pendant que le flux SSE redessine la page, et voir
@@ -89,9 +91,7 @@ export function RemoveEntrantDialog({
   return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -113,7 +113,6 @@ export function RemoveEntrantDialog({
         // veut dire — sans lui, la modale s'annonce sans sa conséquence.
         aria-describedby="remove-entrant-summary"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 440,

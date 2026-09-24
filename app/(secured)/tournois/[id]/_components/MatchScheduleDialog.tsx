@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import {
@@ -39,6 +41,7 @@ export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDi
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const touched = startAt.trim().length > 0;
   const invalid = incomplete || (touched && !isValidMatchStartAt(startAt));
@@ -73,12 +76,10 @@ export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDi
     }
   };
 
-  return (
+  return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -96,7 +97,6 @@ export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDi
         aria-modal="true"
         aria-labelledby="match-schedule-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 460,
@@ -183,6 +183,7 @@ export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDi
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

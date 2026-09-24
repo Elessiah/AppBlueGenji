@@ -1,8 +1,11 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
+import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   batchCapacity,
   batchCounterLabel,
@@ -60,6 +63,8 @@ export function GhostRegistrationDialog({
   const [query, setQuery] = useState("");
   const [newName, setNewName] = useState("");
   const [busy, setBusy] = useState(false);
+  const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   useEffect(() => {
     let cancelled = false;
@@ -208,17 +213,19 @@ export function GhostRegistrationDialog({
       ? selected.length === 0 || overCapacity
       : newName.trim().length < 3);
 
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="ghost-registration-title"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
-      className={styles.overlay}
-    >
-      <form onClick={(e) => e.stopPropagation()} onSubmit={submit} className={styles.panel}>
+  // Portée dans <body> : rendue dans la page, elle restait sous la barre de
+  // navigation (contexte d'empilement de `main.page-shell`).
+  return createPortal(
+    <div role="presentation" {...backdrop} className={styles.overlay}>
+      <form
+        ref={dialogRef as unknown as React.Ref<HTMLFormElement>}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="ghost-registration-title"
+        tabIndex={-1}
+        onSubmit={submit}
+        className={styles.panel}
+      >
         <h3 id="ghost-registration-title" className={styles.title}>
           {wording.guestTitle}
         </h3>
@@ -275,6 +282,7 @@ export function GhostRegistrationDialog({
               placeholder="Rechercher…"
               aria-label="Filtrer la liste par nom"
               autoFocus
+              data-autofocus
             />
 
             <ScrollArea
@@ -336,6 +344,7 @@ export function GhostRegistrationDialog({
               maxLength={60}
               required
               autoFocus
+              data-autofocus
             />
           </div>
         )}
@@ -373,6 +382,7 @@ export function GhostRegistrationDialog({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 }

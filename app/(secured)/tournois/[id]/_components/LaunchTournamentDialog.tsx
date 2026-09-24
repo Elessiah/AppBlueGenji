@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { participantWording } from "@/lib/shared/participants";
@@ -49,6 +50,7 @@ export function LaunchTournamentDialog({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const wording = participantWording(card.participantType);
   const entrantCount = card.registeredTeams;
@@ -90,9 +92,7 @@ export function LaunchTournamentDialog({
   return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -114,7 +114,6 @@ export function LaunchTournamentDialog({
         // maintenant » et laisse deviner ce que « maintenant » remplace.
         aria-describedby="launch-tournament-summary"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 480,

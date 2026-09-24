@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   type AboutPillar,
@@ -8,6 +8,7 @@ import {
   ABOUT_PILLAR_TITLE_MAX,
   FALLBACK_ABOUT_PILLARS,
 } from "@/lib/shared/about-pillars";
+import { LandingDialog } from "./LandingDialog";
 import styles from "./AboutPillars.module.css";
 
 interface AboutPillarsProps {
@@ -29,22 +30,9 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const titleInputRef = useRef<HTMLInputElement>(null);
 
   // Les cartes de secours (id négatif) ne sont pas en base : non modifiables.
   const canManage = (p: AboutPillar) => isAdmin && p.id > 0;
-
-  // Fermeture au clavier (Échap) + focus initial sur le champ Titre à l'ouverture.
-  useEffect(() => {
-    if (!open) return;
-    titleInputRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy]);
 
   function openCreate() {
     setEditing(null);
@@ -225,59 +213,50 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
       )}
 
       {open && (
-        <div className={styles.modalOverlay} onClick={close} role="presentation">
-          <div
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="about-pillar-modal-title"
-          >
-            <h3 id="about-pillar-modal-title" className={styles.modalTitle}>
-              {editing ? "Modifier la carte" : "Ajouter une carte"}
-            </h3>
+        <LandingDialog onClose={close} busy={busy} className={styles.modal} labelledBy="about-pillar-modal-title">
+          <h3 id="about-pillar-modal-title" className={styles.modalTitle}>
+            {editing ? "Modifier la carte" : "Ajouter une carte"}
+          </h3>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Titre</span>
-              <input
-                ref={titleInputRef}
-                className={styles.modalInput}
-                value={form.title}
-                maxLength={ABOUT_PILLAR_TITLE_MAX}
-                placeholder="Accessible"
-                enterKeyHint="next"
-                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Titre</span>
+            <input
+              className={styles.modalInput}
+              value={form.title}
+              maxLength={ABOUT_PILLAR_TITLE_MAX}
+              placeholder="Accessible"
+              enterKeyHint="next"
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            />
+          </label>
 
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Texte</span>
-              <textarea
-                className={styles.modalInput}
-                value={form.text}
-                maxLength={ABOUT_PILLAR_TEXT_MAX}
-                placeholder="Inscription gratuite, matchmaking par niveau…"
-                rows={3}
-                onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
-              />
-            </label>
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Texte</span>
+            <textarea
+              className={styles.modalInput}
+              value={form.text}
+              maxLength={ABOUT_PILLAR_TEXT_MAX}
+              placeholder="Inscription gratuite, matchmaking par niveau…"
+              rows={3}
+              onChange={(e) => setForm((f) => ({ ...f, text: e.target.value }))}
+            />
+          </label>
 
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.action} onClick={close} disabled={busy}>
-                Annuler
-              </button>
-              <button
-                type="button"
-                className={styles.actionPrimary}
-                onClick={submit}
-                disabled={busy}
-                aria-busy={busy}
-              >
-                {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
-              </button>
-            </div>
+          <div className={styles.modalActions}>
+            <button type="button" className={styles.action} onClick={close} disabled={busy}>
+              Annuler
+            </button>
+            <button
+              type="button"
+              className={styles.actionPrimary}
+              onClick={submit}
+              disabled={busy}
+              aria-busy={busy}
+            >
+              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+            </button>
           </div>
-        </div>
+        </LandingDialog>
       )}
     </>
   );
