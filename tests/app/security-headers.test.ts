@@ -45,3 +45,9 @@ describe("en-têtes de sécurité", () => {
     expect(nextConfig.poweredByHeader).toBe(false);
   });
 });
+
+describe("indicateur de développement de Next", () => {
+  it("quitte le coin bas-gauche, où il masquait le bouton d'accessibilité", () => {
+    expect(nextConfig.devIndicators).toEqual({ position: "top-right" });
+  });
+});
