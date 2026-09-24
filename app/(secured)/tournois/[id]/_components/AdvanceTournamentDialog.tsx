@@ -24,11 +24,19 @@ interface AdvanceTournamentDialogProps {
   onAdvanced: (result: AdvanceResult) => void;
 }
 
-/** Titre et bouton de confirmation, par étape visée. */
-const TARGET_COPY: Record<AdvanceTarget, { title: string; confirm: string }> = {
-  REGISTRATION: { title: "Ouvrir les inscriptions maintenant", confirm: "Ouvrir les inscriptions" },
-  LOCKED: { title: "Clore les inscriptions maintenant", confirm: "Clore les inscriptions" },
-  RUNNING: { title: "Lancer le tournoi maintenant", confirm: "Lancer maintenant" },
+/** Titre, bouton de confirmation et libellé d'attente, par étape visée. */
+const TARGET_COPY: Record<AdvanceTarget, { title: string; confirm: string; busy: string }> = {
+  REGISTRATION: {
+    title: "Ouvrir les inscriptions maintenant",
+    confirm: "Ouvrir les inscriptions",
+    busy: "Ouverture…",
+  },
+  LOCKED: {
+    title: "Clore les inscriptions maintenant",
+    confirm: "Clore les inscriptions",
+    busy: "Clôture…",
+  },
+  RUNNING: { title: "Lancer le tournoi maintenant", confirm: "Lancer maintenant", busy: "Lancement…" },
 };
 
 /**
@@ -260,7 +268,7 @@ export function AdvanceTournamentDialog({
               disabled={busy}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
-              {busy ? "Un instant…" : empty ? "Clore le tournoi" : copy.confirm}
+              {busy ? copy.busy : empty ? "Clore le tournoi" : copy.confirm}
             </button>
           </div>
         </form>
