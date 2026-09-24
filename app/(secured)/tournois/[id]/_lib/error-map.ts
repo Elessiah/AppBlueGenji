@@ -106,6 +106,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
     "La clôture des inscriptions ne peut pas être placée dans le passé.",
   EMPTY_PATCH: "Aucune modification à enregistrer.",
   TOURNAMENT_UPDATE_FAILED: "Erreur lors de la modification du tournoi.",
+  TOURNAMENT_CREATE_FAILED: "Le tournoi n'a pas pu être créé.",
   // Retour en arrière (`lib/shared/tournament-rollback.ts`). Les trois refus
   // servent deux fois : en toast si la route tranche, et tels quels sous le
   // bouton désarmé de la zone de danger — d'où des phrases qui expliquent, et

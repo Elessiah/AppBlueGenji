@@ -6,6 +6,7 @@ import { AccessibilityFooterLink } from "@/components/accessibility/Accessibilit
 import { FooterContact } from "./FooterContact";
 import styles from "./PublicFooter.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { accessibilityFooterLabel } from "@/lib/shared/accessibility-statement";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
@@ -75,6 +76,9 @@ export async function PublicFooter() {
               <li><a href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
               <li><Link href="/rgpd#cookies">Cookies</Link></li>
               <li><AccessibilityFooterLink className={styles.linkButton} /></li>
+              {/* Mention imposée par le RGAA sur chaque page, dans ses termes
+                  exacts : l'état de conformité se lit sans ouvrir la page. */}
+              <li><Link href="/accessibilite">{accessibilityFooterLabel()}</Link></li>
             </ul>
           </div>
         </div>

@@ -19,6 +19,7 @@ import {
 } from "../../_components/TournamentForm";
 import { editLockNotice } from "../_lib/edit-entry";
 import { mapError } from "../_lib/error-map";
+import { CodedError } from "@/lib/shared/field-errors";
 
 /**
  * Édition d'un tournoi.
@@ -210,11 +211,12 @@ export default function EditTournamentPage() {
           });
           const result = (await response.json().catch(() => ({}))) as { error?: string; field?: string };
           if (!response.ok) {
-            let message = mapError(result.error ?? "TOURNAMENT_UPDATE_FAILED");
+            const code = result.error ?? "TOURNAMENT_UPDATE_FAILED";
+            let message = mapError(code);
             if (result.field && FIELD_LABELS[result.field as TournamentField]) {
               message += ` (${FIELD_LABELS[result.field as TournamentField]})`;
             }
-            throw new Error(message);
+            throw new CodedError(code, message);
           }
 
           showSuccess("Tournoi modifié.");
