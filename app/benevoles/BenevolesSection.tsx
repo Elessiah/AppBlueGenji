@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard } from "@/components/cyber";
+import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
 import { useToast } from "@/components/ui/toast";
 import {
   type Benevole,
@@ -64,20 +65,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [photoBusy, setPhotoBusy] = useState(false);
-  const pseudoRef = useRef<HTMLInputElement>(null);
   const photoFileRef = useRef<HTMLInputElement>(null);
-
-  // Focus + Escape
-  useEffect(() => {
-    if (!open) return;
-    pseudoRef.current?.focus();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, busy]);
 
   function openCreate() {
     setEditing(null);
@@ -370,158 +358,155 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
       </section>
 
       {open && (
-        <div className={styles.modalOverlay} onClick={close} role="presentation">
-          <div
-            className={styles.modal}
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-busy={busy || photoBusy}
-            aria-label={editing ? "Modifier un bénévole" : "Ajouter un bénévole"}
-          >
-            <h3 className={styles.modalTitle}>
-              {editing ? "Modifier le bénévole" : "Ajouter un bénévole"}
-            </h3>
+        <LandingDialog
+          onClose={close}
+          busy={busy}
+          ariaBusy={busy || photoBusy}
+          className={styles.modal}
+          label={editing ? "Modifier un bénévole" : "Ajouter un bénévole"}
+        >
+          <h3 className={styles.modalTitle}>
+            {editing ? "Modifier le bénévole" : "Ajouter un bénévole"}
+          </h3>
 
-            {/* Prévisualisation avatar */}
-            <div className={styles.modalPreview}>
-              {form.photoUrl ? (
-                <Image
-                  src={toServedUploadUrl(form.photoUrl)}
-                  alt="Aperçu"
-                  width={56}
-                  height={56}
-                  className={styles.avatar}
-                />
-              ) : (
-                <div className={styles.avatarFallback} style={{ width: 56, height: 56, fontSize: 20 }}>
-                  {benevoleInitials(form)}
-                </div>
-              )}
-              <div className={styles.modalPreviewName}>
-                {form.firstName || form.lastName
-                  ? `${form.firstName || "Prénom"}${form.pseudo ? ` "${form.pseudo}"` : ""} ${form.lastName ? form.lastName.toUpperCase() : "NOM"}`
-                  : (form.pseudo || "Pseudo, ou prénom et nom")}
+          {/* Prévisualisation avatar */}
+          <div className={styles.modalPreview}>
+            {form.photoUrl ? (
+              <Image
+                src={toServedUploadUrl(form.photoUrl)}
+                alt="Aperçu"
+                width={56}
+                height={56}
+                className={styles.avatar}
+              />
+            ) : (
+              <div className={styles.avatarFallback} style={{ width: 56, height: 56, fontSize: 20 }}>
+                {benevoleInitials(form)}
               </div>
-            </div>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Pseudo</span>
-              <input
-                ref={pseudoRef}
-                className={styles.modalInput}
-                value={form.pseudo}
-                maxLength={80}
-                placeholder="MarieD"
-                aria-describedby="benevole-pseudo-hint"
-                onChange={(e) => set("pseudo", e.target.value)}
-              />
-              <span id="benevole-pseudo-hint" className={styles.photoHint}>
-                Pseudo seul, ou prénom + nom ci-dessous (au moins l'un des deux).
-              </span>
-            </label>
-
-            <div className={styles.modalRow}>
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Prénom</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.firstName}
-                  maxLength={80}
-                  placeholder="Marie"
-                  onChange={(e) => set("firstName", e.target.value)}
-                />
-              </label>
-              <label className={styles.modalField}>
-                <span className={styles.modalLabel}>Nom</span>
-                <input
-                  className={styles.modalInput}
-                  value={form.lastName}
-                  maxLength={80}
-                  placeholder="DUPONT"
-                  onChange={(e) => set("lastName", e.target.value)}
-                />
-              </label>
-            </div>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Catégorie *</span>
-              <input
-                className={styles.modalInput}
-                value={form.category}
-                maxLength={120}
-                placeholder="Développeur, Arbitre, Caster…"
-                onChange={(e) => set("category", e.target.value)}
-                list="category-suggestions"
-              />
-              <datalist id="category-suggestions">
-                {[...new Set(benevoles.map((b) => b.category))].map((cat) => (
-                  <option key={cat} value={cat} />
-                ))}
-              </datalist>
-            </label>
-
-            <label className={styles.modalField}>
-              <span className={styles.modalLabel}>Date d'arrivée *</span>
-              <input
-                className={styles.modalInput}
-                type="date"
-                value={form.joinedAt}
-                onChange={(e) => set("joinedAt", e.target.value)}
-              />
-            </label>
-
-            <div className={styles.modalField}>
-              <span className={styles.modalLabel}>Photo (optionnel)</span>
-              <div className={styles.photoUploadActions}>
-                <input
-                  ref={photoFileRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className={styles.photoFileInput}
-                  onChange={onPhotoFile}
-                />
-                <button
-                  type="button"
-                  className={styles.photoUploadBtn}
-                  onClick={() => photoFileRef.current?.click()}
-                  disabled={photoBusy || busy}
-                >
-                  {photoBusy ? "Envoi…" : form.photoUrl ? "Changer la photo" : "Importer une image"}
-                </button>
-                {form.photoUrl && (
-                  <button
-                    type="button"
-                    className={`${styles.photoUploadBtn} ${styles.photoUploadBtnDanger}`}
-                    onClick={() => set("photoUrl", "")}
-                    disabled={photoBusy || busy}
-                  >
-                    Retirer
-                  </button>
-                )}
-              </div>
-              <span className={styles.photoHint}>
-                Carré recadré automatiquement, PNG / JPEG / WebP, 5 Mo max.
-              </span>
-              <input
-                className={styles.modalInput}
-                value={form.photoUrl}
-                maxLength={500}
-                placeholder="… ou colle une URL https://example.com/avatar.jpg"
-                onChange={(e) => set("photoUrl", e.target.value)}
-              />
-            </div>
-
-            <div className={styles.modalActions}>
-              <CyberButton variant="ghost" onClick={close} disabled={busy}>
-                Annuler
-              </CyberButton>
-              <CyberButton variant="primary" onClick={submit} disabled={busy}>
-                {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
-              </CyberButton>
+            )}
+            <div className={styles.modalPreviewName}>
+              {form.firstName || form.lastName
+                ? `${form.firstName || "Prénom"}${form.pseudo ? ` "${form.pseudo}"` : ""} ${form.lastName ? form.lastName.toUpperCase() : "NOM"}`
+                : (form.pseudo || "Pseudo, ou prénom et nom")}
             </div>
           </div>
-        </div>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Pseudo</span>
+            <input
+              data-autofocus
+              className={styles.modalInput}
+              value={form.pseudo}
+              maxLength={80}
+              placeholder="MarieD"
+              aria-describedby="benevole-pseudo-hint"
+              onChange={(e) => set("pseudo", e.target.value)}
+            />
+            <span id="benevole-pseudo-hint" className={styles.photoHint}>
+              Pseudo seul, ou prénom + nom ci-dessous (au moins l'un des deux).
+            </span>
+          </label>
+
+          <div className={styles.modalRow}>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Prénom</span>
+              <input
+                className={styles.modalInput}
+                value={form.firstName}
+                maxLength={80}
+                placeholder="Marie"
+                onChange={(e) => set("firstName", e.target.value)}
+              />
+            </label>
+            <label className={styles.modalField}>
+              <span className={styles.modalLabel}>Nom</span>
+              <input
+                className={styles.modalInput}
+                value={form.lastName}
+                maxLength={80}
+                placeholder="DUPONT"
+                onChange={(e) => set("lastName", e.target.value)}
+              />
+            </label>
+          </div>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Catégorie *</span>
+            <input
+              className={styles.modalInput}
+              value={form.category}
+              maxLength={120}
+              placeholder="Développeur, Arbitre, Caster…"
+              onChange={(e) => set("category", e.target.value)}
+              list="category-suggestions"
+            />
+            <datalist id="category-suggestions">
+              {[...new Set(benevoles.map((b) => b.category))].map((cat) => (
+                <option key={cat} value={cat} />
+              ))}
+            </datalist>
+          </label>
+
+          <label className={styles.modalField}>
+            <span className={styles.modalLabel}>Date d'arrivée *</span>
+            <input
+              className={styles.modalInput}
+              type="date"
+              value={form.joinedAt}
+              onChange={(e) => set("joinedAt", e.target.value)}
+            />
+          </label>
+
+          <div className={styles.modalField}>
+            <span className={styles.modalLabel}>Photo (optionnel)</span>
+            <div className={styles.photoUploadActions}>
+              <input
+                ref={photoFileRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className={styles.photoFileInput}
+                onChange={onPhotoFile}
+              />
+              <button
+                type="button"
+                className={styles.photoUploadBtn}
+                onClick={() => photoFileRef.current?.click()}
+                disabled={photoBusy || busy}
+              >
+                {photoBusy ? "Envoi…" : form.photoUrl ? "Changer la photo" : "Importer une image"}
+              </button>
+              {form.photoUrl && (
+                <button
+                  type="button"
+                  className={`${styles.photoUploadBtn} ${styles.photoUploadBtnDanger}`}
+                  onClick={() => set("photoUrl", "")}
+                  disabled={photoBusy || busy}
+                >
+                  Retirer
+                </button>
+              )}
+            </div>
+            <span className={styles.photoHint}>
+              Carré recadré automatiquement, PNG / JPEG / WebP, 5 Mo max.
+            </span>
+            <input
+              className={styles.modalInput}
+              value={form.photoUrl}
+              maxLength={500}
+              placeholder="… ou colle une URL https://example.com/avatar.jpg"
+              onChange={(e) => set("photoUrl", e.target.value)}
+            />
+          </div>
+
+          <div className={styles.modalActions}>
+            <CyberButton variant="ghost" onClick={close} disabled={busy}>
+              Annuler
+            </CyberButton>
+            <CyberButton variant="primary" onClick={submit} disabled={busy}>
+              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+            </CyberButton>
+          </div>
+        </LandingDialog>
       )}
     </>
   );

@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   MAX_ENDURANCE_PENALTY_POINTS,
@@ -47,6 +49,7 @@ export function EndurancePenaltyDialog({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const parsedPoints = Number(points);
   const violation = checkEndurancePenalty(parsedPoints, reason);
@@ -97,12 +100,10 @@ export function EndurancePenaltyDialog({
     }
   };
 
-  return (
+  return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -120,7 +121,6 @@ export function EndurancePenaltyDialog({
         aria-modal="true"
         aria-labelledby="endurance-penalty-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 480,
@@ -210,6 +210,7 @@ export function EndurancePenaltyDialog({
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

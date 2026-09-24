@@ -16,3 +16,41 @@ export function isBackdropDismiss(
 ): boolean {
   return backdrop !== null && pressTarget === backdrop && releaseTarget === backdrop;
 }
+
+/** Mémoire du geste en cours : cibles de l'appui et du relâchement. */
+export interface BackdropGesture {
+  press: EventTarget | null;
+  release: EventTarget | null;
+}
+
+/** Ce que les gestionnaires lisent d'un évènement — un évènement React suffit. */
+interface TargetedEvent {
+  target: EventTarget | null;
+  currentTarget: EventTarget | null;
+}
+
+/**
+ * Gestionnaires du voile, sans React : `useBackdropDismiss` ne fait que leur
+ * fournir une mémoire qui survit aux rendus. Séparés pour être testés tels
+ * qu'un navigateur les appelle — appui, relâchement, puis clic.
+ *
+ * `onDismiss` et `disabled` sont relus à chaque clic par l'appelant, qui
+ * reconstruit les gestionnaires à chaque rendu.
+ */
+export function backdropHandlers(gesture: BackdropGesture, onDismiss: () => void, disabled: boolean) {
+  return {
+    onPointerDown: (event: TargetedEvent) => {
+      gesture.press = event.target;
+      gesture.release = null;
+    },
+    onPointerUp: (event: TargetedEvent) => {
+      gesture.release = event.target;
+    },
+    onClick: (event: TargetedEvent) => {
+      const dismiss = isBackdropDismiss(gesture.press, gesture.release, event.currentTarget);
+      gesture.press = null;
+      gesture.release = null;
+      if (dismiss && !disabled) onDismiss();
+    },
+  };
+}

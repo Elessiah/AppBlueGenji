@@ -66,14 +66,17 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     const previouslyFocused = document.activeElement as HTMLElement | null;
     dialogStack.push(token);
 
-    // Focus initial : premier élément focalisable de la modale, sinon le
-    // conteneur (rendu focalisable par `tabIndex={-1}` côté appelant).
+    // Focus initial : l'élément marqué `data-autofocus` s'il y en a un (le champ
+    // à remplir d'abord n'est pas toujours le premier de la modale — un bouton
+    // d'aperçu peut le précéder), sinon le premier élément focalisable, sinon
+    // le conteneur (rendu focalisable par `tabIndex={-1}` côté appelant).
     const focusables = () =>
       Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
         (el) => el.offsetParent !== null || el === document.activeElement,
       );
+    const preferred = containerRef.current?.querySelector<HTMLElement>("[data-autofocus]") ?? null;
 
-    (focusables()[0] ?? containerRef.current)?.focus();
+    (preferred ?? focusables()[0] ?? containerRef.current)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       // Les écouteurs de toutes les couches vivent sur `window` : seule celle du

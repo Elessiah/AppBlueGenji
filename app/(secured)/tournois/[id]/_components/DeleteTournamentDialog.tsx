@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { isDeletionConfirmed } from "@/lib/shared/tournament-deletion";
 import { mapError } from "../_lib/error-map";
@@ -49,6 +50,7 @@ export function DeleteTournamentDialog({
   // `locked` pendant l'envoi : `Échap` ne doit pas refermer une modale en train
   // d'écrire — la suppression, elle, partirait quand même.
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const armed = isDeletionConfirmed(tournamentName, confirmation);
 
@@ -73,9 +75,7 @@ export function DeleteTournamentDialog({
   return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -93,7 +93,6 @@ export function DeleteTournamentDialog({
         aria-modal="true"
         aria-labelledby="delete-tournament-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 480,

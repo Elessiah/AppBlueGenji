@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   ISSUE_REPORT_MAX_LENGTH,
@@ -33,6 +35,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: IssueReportD
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   const valid = normalizeIssueReportMessage(message) !== null;
   const touched = message.trim().length > 0;
@@ -63,12 +66,10 @@ export function IssueReportDialog({ tournamentId, match, onClose }: IssueReportD
     }
   };
 
-  return (
+  return createPortal(
     <div
       role="presentation"
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
       style={{
         position: "fixed",
         inset: 0,
@@ -86,7 +87,6 @@ export function IssueReportDialog({ tournamentId, match, onClose }: IssueReportD
         aria-modal="true"
         aria-labelledby="issue-report-title"
         tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
         style={{
           width: "100%",
           maxWidth: 500,
@@ -155,6 +155,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: IssueReportD
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

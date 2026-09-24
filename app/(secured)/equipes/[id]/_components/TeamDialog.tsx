@@ -2,6 +2,7 @@
 
 import { FormEvent, ReactNode, useEffect, useId, useState } from "react";
 import { createPortal } from "react-dom";
+import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import styles from "../team.module.css";
 
@@ -51,6 +52,7 @@ export function TeamDialog({
   // Ouverte **une fois montée** : au premier rendu le portail n'existe pas
   // encore, et le focus initial chercherait sa cible dans un conteneur absent.
   const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
+  const backdrop = useBackdropDismiss(onClose, busy);
 
   useEffect(() => setMounted(true), []);
 
@@ -73,16 +75,13 @@ export function TeamDialog({
     tabIndex: -1,
     className: styles.dialog,
     "data-tone": tone,
-    onClick: (e: React.MouseEvent) => e.stopPropagation(),
   };
 
   return createPortal(
     <div
       role="presentation"
       className={`${styles.backdrop} ${styles.page}`}
-      onClick={() => {
-        if (!busy) onClose();
-      }}
+      {...backdrop}
     >
       {onSubmit ? (
         <form
