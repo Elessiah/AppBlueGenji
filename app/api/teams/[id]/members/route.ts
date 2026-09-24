@@ -1,6 +1,7 @@
 ﻿import type { TeamRole } from "@/lib/shared/types";
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import {
   getTeamDetail,
   inviteToTeam,
@@ -35,6 +36,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     if (message === "USER_NOT_FOUND") return fail(message, 404);
     if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
     if (message === "ALREADY_INVITED") return fail(message, 409);
@@ -66,6 +68,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     if (message === "MEMBER_NOT_FOUND") return fail(message, 404);
     if (message === "MISSING_ROLE") return fail(message, 400);
     return fail(message || "TEAM_MEMBER_UPDATE_FAILED", 400);
@@ -94,6 +97,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     if (message === "MEMBER_NOT_FOUND") return fail(message, 404);
     if (message === "OWNER_CANNOT_LEAVE") return fail(message, 400);
     if (message === "CANNOT_KICK_OWNER") return fail(message, 409);

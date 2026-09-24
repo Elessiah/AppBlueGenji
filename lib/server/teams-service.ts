@@ -24,6 +24,7 @@ import {
 } from "@/lib/server/team-tags";
 import { TEAM_NAME_ALREADY_USED, checkTeamName } from "@/lib/shared/team-name";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { assertTermsAccepted, recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 
 /**
  * Longueur de la barre de forme des cartes d'annuaire. Les fiches en montrent
@@ -124,6 +125,33 @@ export async function isGhostTeam(teamId: number): Promise<boolean> {
 async function ghostAdminOverride(teamId: number, viewerManagesGhostTeams: boolean): Promise<boolean> {
   if (!viewerManagesGhostTeams) return false;
   return isGhostTeam(teamId);
+}
+
+/**
+ * Le droit d'agir sur une équipe au titre de sa gestion **ou** de la dérogation
+ * du staff sur une fantôme — puis les conditions d'utilisation
+ * (`lib/shared/terms-of-use.ts`), exigées de qui gère **son** équipe et
+ * jamais du staff sur une fantôme : c'est alors l'association elle-même qui
+ * conduit l'équipe.
+ *
+ * La dérogation n'est interrogée que si le rôle manque, comme avant : un
+ * gérant ne paie pas la lecture de l'équipe.
+ *
+ * @throws FORBIDDEN
+ * @throws TERMS_ACCEPTANCE_REQUIRED
+ */
+async function assertCanActOnTeam(
+  hasRole: boolean,
+  requesterId: number,
+  teamId: number,
+  viewerManagesGhostTeams: boolean,
+  requireTerms = true,
+): Promise<void> {
+  if (hasRole) {
+    if (requireTerms) await assertTermsAccepted(requesterId);
+    return;
+  }
+  if (!(await ghostAdminOverride(teamId, viewerManagesGhostTeams))) throw new Error("FORBIDDEN");
 }
 
 /**
@@ -340,6 +368,10 @@ export async function createTeam(
   description?: string | null,
   tag?: string | null,
 ): Promise<number> {
+  // L'acceptation des conditions est la case du formulaire : la route la
+  // vérifie avant d'appeler, et elle est **écrite ici**, dans la transaction
+  // qui crée l'équipe — une équipe née sans sa preuve d'acceptation, ou une
+  // preuve pour une équipe qui n'a pas pu naître, seraient deux mensonges.
   const db = await getDatabase();
   const normalizedTag = resolveTeamTag(tag);
 
@@ -376,6 +408,10 @@ export async function createTeam(
        VALUES (?, ?, ?)`,
       [teamInsert.insertId, ownerUserId, ownerRoles],
     );
+
+    if (!(await recordTermsAcceptance(ownerUserId, "TEAM_CREATION", connection))) {
+      throw new Error("PROFILE_NOT_FOUND");
+    }
 
     await connection.commit();
     return Number(teamInsert.insertId);
@@ -513,12 +549,7 @@ export async function updateTeamMeta(
   viewerManagesGhostTeams = false,
 ): Promise<void> {
   const db = await getDatabase();
-  if (
-    !(await userOwnsTeam(teamId, requesterId))
-    && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
-  ) {
-    throw new Error("FORBIDDEN");
-  }
+  await assertCanActOnTeam(await userOwnsTeam(teamId, requesterId), requesterId, teamId, viewerManagesGhostTeams);
 
   const updates: string[] = [];
   const params: SqlParams = [];
@@ -568,14 +599,54 @@ export async function updateTeamLogo(
   logoPath: string | null,
   viewerManagesGhostTeams = false,
 ): Promise<void> {
-  if (
-    !(await userCanManageTeam(teamId, requesterId))
-    && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
-  ) {
-    throw new Error("FORBIDDEN");
-  }
+  // Retirer un logo n'attend aucune acceptation : c'est justement le geste
+  // qu'on veut voir faire à qui doute de ses droits sur l'image.
+  await assertCanActOnTeam(
+    await userCanManageTeam(teamId, requesterId),
+    requesterId,
+    teamId,
+    viewerManagesGhostTeams,
+    logoPath !== null,
+  );
   const db = await getDatabase();
   await db.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [logoPath, teamId]);
+}
+
+/**
+ * Retrait d'un logo d'équipe par la modération (permission `moderation`), sans
+ * être membre de l'équipe — le geste qui suit un signalement de droit d'auteur.
+ *
+ * La ligne est relue **sous verrou** : un logo téléversé à l'instant par la
+ * gestion de l'équipe serait sinon retiré à la place de celui qu'on a vu. Le
+ * fichier, lui, est effacé par l'appelant **après** le commit (un `unlink` ne
+ * se défait pas). Une entrée solo n'a pas de logo propre : c'est la copie de
+ * l'avatar d'un joueur, qui n'est pas une équipe.
+ *
+ * @throws TEAM_NOT_FOUND
+ * @throws TEAM_HAS_NO_LOGO
+ */
+export async function removeTeamLogoAsModerator(
+  teamId: number,
+): Promise<{ teamName: string; removedLogoUrl: string }> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute<
+      (RowDataPacket & { name: string; logo_url: string | null; solo_user_id: number | null })[]
+    >(`SELECT name, logo_url, solo_user_id FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
+    if (rows.length === 0 || rows[0].solo_user_id !== null) throw new Error("TEAM_NOT_FOUND");
+    const logoUrl = rows[0].logo_url;
+    if (!logoUrl) throw new Error("TEAM_HAS_NO_LOGO");
+    await connection.execute(`UPDATE bg_teams SET logo_url = NULL WHERE id = ?`, [teamId]);
+    await connection.commit();
+    return { teamName: rows[0].name, removedLogoUrl: logoUrl };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 export async function getTeamLogoUrl(teamId: number): Promise<string | null> {
@@ -605,6 +676,7 @@ export async function updateTeamMemberRoles(
   const requesterIsOwner = requesterRoles.includes("OWNER");
   const requesterIsManager = requesterRoles.includes("MANAGER");
   if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
+  await assertTermsAccepted(requesterId);
 
   const targetRoles = await getMemberRoles(teamId, memberUserId);
   if (!targetRoles) throw new Error("MEMBER_NOT_FOUND");
@@ -650,6 +722,7 @@ export async function removeTeamMember(requesterId: number, teamId: number, memb
   const requesterIsOwner = requesterRoles.includes("OWNER");
   const requesterIsManager = requesterRoles.includes("MANAGER");
   if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
+  await assertTermsAccepted(requesterId);
 
   if (memberUserId === requesterId) {
     throw new Error("OWNER_CANNOT_LEAVE");
@@ -753,6 +826,7 @@ export async function transferTeamOwnership(
   if (!requesterRoles || !requesterRoles.includes("OWNER")) {
     throw new Error("FORBIDDEN");
   }
+  await assertTermsAccepted(requesterId);
 
   const targetRoles = await getMemberRoles(teamId, newOwnerUserId);
   if (!targetRoles) {
@@ -1051,6 +1125,7 @@ export async function inviteToTeam(
   roles?: readonly TeamRole[],
 ): Promise<"INVITED" | "JOINED"> {
   if (!(await userCanManageTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
+  await assertTermsAccepted(requesterId);
   const inviteRoles = resolveInviteRoles(roles);
 
   const userId = await getUserIdByPseudo(pseudo);
@@ -1142,6 +1217,9 @@ export async function respondToInvitation(
     if (Number(inv.user_id) !== actingUserId) throw new Error("FORBIDDEN");
   } else {
     if (!(await userCanManageTeam(Number(inv.team_id), actingUserId))) throw new Error("FORBIDDEN");
+    // Faire entrer quelqu'un dans l'équipe est un geste de gestion ; refuser
+    // une demande ne l'est pas — on ne bloque pas un « non ».
+    if (accept) await assertTermsAccepted(actingUserId);
   }
 
   if (!accept) {

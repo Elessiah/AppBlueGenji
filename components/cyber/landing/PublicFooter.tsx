@@ -5,6 +5,8 @@ import { getContactInfo } from "@/lib/server/contact-service";
 import { FooterContact } from "./FooterContact";
 import styles from "./PublicFooter.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
@@ -67,6 +69,7 @@ export async function PublicFooter() {
             <div className={styles.heading}>LÉGAL</div>
             <ul>
               <li><Link href="/mentions-legales">Mentions légales</Link></li>
+              <li><Link href={TERMS_PATH}>Conditions d&apos;utilisation</Link></li>
               <li><Link href="/rgpd">RGPD</Link></li>
               <li><a href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
               <li><Link href="/rgpd#cookies">Cookies</Link></li>
@@ -77,6 +80,9 @@ export async function PublicFooter() {
 
       <div className={styles.bottom}>
         <span>© 2026 BLUEGENJI · TOUS DROITS RÉSERVÉS</span>
+        {/* Sur la ligne du bas, à part des colonnes : c'est le seul geste du
+            pied de page, et il doit se trouver sans parcourir les listes. */}
+        <ReportProblemButton authenticated={Boolean(user)} className={styles.report} icon />
       </div>
     </footer>
   );

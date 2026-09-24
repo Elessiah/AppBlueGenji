@@ -796,6 +796,13 @@ export type PersonalDataExport = {
    * du consentement (`lib/shared/privacy-changes.ts`).
    */
   privacyAcknowledgments: { changeId: string; acceptedAt: string }[];
+  /** Acceptations des conditions d'utilisation, avec la version et l'écran (`lib/shared/terms-of-use.ts`). */
+  termsAcceptances: { version: number; context: string; acceptedAt: string }[];
+  /**
+   * Signalements et contestations envoyés depuis ce compte, tant qu'ils sont
+   * conservés (`lib/shared/content-reports.ts`).
+   */
+  reports: { id: number; category: string; status: string; description: string; createdAt: string }[];
 };
 
 export type TeamDetailResponse = {
@@ -839,6 +846,12 @@ export type TeamDetailResponse = {
   viewerInvitation: "INVITED" | "REQUESTED" | "NONE";
   /** Invitation ou demande en attente du viewer — ce qui permet de retirer sa demande. */
   viewerInvitationId: number | null;
+  /**
+   * Le lecteur a la permission `moderation` : il peut retirer le logo sans
+   * gérer l'équipe. Posé par la seule lecture de la fiche (`GET`), absent des
+   * réponses des routes de mutation — la page relit la fiche après chacune.
+   */
+  canModerate?: boolean;
 };
 
 /** Invitation envoyée par une équipe, encore sans réponse (vue gestion). */

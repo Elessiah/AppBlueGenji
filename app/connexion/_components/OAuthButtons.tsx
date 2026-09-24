@@ -33,7 +33,14 @@ const PROVIDER_NOTES: Partial<Record<OAuthProvider, string>> = {
   BLIZZARD: "Renseigne ton BattleTag automatiquement.",
 };
 
-export function OAuthButtons({ redirect }: { redirect: string }): React.ReactElement {
+export function OAuthButtons({
+  redirect,
+  termsAccepted,
+}: {
+  redirect: string;
+  /** Conditions d'utilisation acceptées dans la modale d'entrée de la page. */
+  termsAccepted: boolean;
+}): React.ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {LOGIN_ORDER.map((provider, index) => {
@@ -60,7 +67,7 @@ export function OAuthButtons({ redirect }: { redirect: string }): React.ReactEle
                 `aria-describedby`, qui complète le nom au lieu de l'écraser.
               */}
               <a
-                href={oauthStartPath(provider, { redirect })}
+                href={oauthStartPath(provider, { redirect, termsAccepted })}
                 aria-describedby={note ? noteId : undefined}
               >
                 Continuer avec {OAUTH_PROVIDER_LABELS[provider]}

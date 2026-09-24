@@ -44,6 +44,7 @@ import {
   createOrGetGoogleUser,
   normalizeBattletag,
   normalizeDiscordHandle,
+  type TermsConsent,
 } from "@/lib/server/users-service";
 import {
   buildAccountConnections,
@@ -137,23 +138,27 @@ export async function listAccountConnections(userId: number): Promise<AccountCon
  * évite qu'une route ait à savoir lequel appeler, ce qui est exactement le genre
  * d'aiguillage qu'on oublie de compléter en ajoutant un fournisseur.
  */
-export async function createOrGetOAuthUser(identity: OAuthIdentity): Promise<number> {
+export async function createOrGetOAuthUser(identity: OAuthIdentity, consent: TermsConsent): Promise<number> {
   switch (identity.provider) {
     case "GOOGLE":
-      return createOrGetGoogleUser({
-        sub: identity.subject,
-        name: identity.displayName ?? undefined,
-        picture: identity.avatarUrl ?? undefined,
-      });
+      return createOrGetGoogleUser(
+        {
+          sub: identity.subject,
+          name: identity.displayName ?? undefined,
+          picture: identity.avatarUrl ?? undefined,
+        },
+        consent,
+      );
     case "DISCORD":
       // La porte est nommée, jamais devinée : c'est un aller-retour OAuth, donc
       // une autorisation d'application posée chez Discord.
       return createOrGetDiscordUser(identity.subject, undefined, identity.handle, {
         avatarUrl: identity.avatarUrl,
         method: "OAUTH",
+        termsAccepted: consent.termsAccepted,
       });
     case "BLIZZARD":
-      return createOrGetBlizzardUser(identity.subject, identity.handle);
+      return createOrGetBlizzardUser(identity.subject, identity.handle, consent);
   }
 }
 

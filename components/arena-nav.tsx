@@ -5,12 +5,18 @@ import { usePathname } from "next/navigation";
 import { LogoWithGlow } from "./logo-with-glow";
 import { UserAvatar } from "./user-avatar";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
+import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import s from "./arena-nav.module.css";
 
 type ArenaNavProps = {
   pseudo: string;
   avatarUrl: string | null;
   activeTeam?: { teamId: number; teamName: string } | null;
+  /**
+   * Signalements à traiter, pour la modération (`null` : pas de permission, le
+   * lien n'est pas rendu). Le nombre est celui du chargement de la page.
+   */
+  openReports?: number | null;
 };
 
 const links = [
@@ -19,7 +25,7 @@ const links = [
   { href: "/tournois", label: "Tournois", rgb: "79, 224, 162" },
 ];
 
-export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
+export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: ArenaNavProps) {
   const pathname = usePathname();
 
   return (
@@ -68,6 +74,21 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam }: ArenaNavProps) {
               title={activeTeam.teamName}
             >
               <span aria-hidden="true">🛡</span> Mon équipe
+            </Link>
+          )}
+          {openReports !== null && (
+            <Link
+              href={REPORTS_ADMIN_PATH}
+              className={`${s.navHome} ${s.navReports}`}
+              aria-current={isNavLinkActive(pathname, REPORTS_ADMIN_PATH) ? "page" : undefined}
+            >
+              <span aria-hidden="true">⚑</span> Signalements
+              {openReports > 0 && (
+                <span className={s.navBadge}>
+                  {openReports}
+                  <span className="sr-only"> à traiter</span>
+                </span>
+              )}
             </Link>
           )}
           <Link href="/profil" className={s.avatarChip}>

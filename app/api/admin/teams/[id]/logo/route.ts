@@ -1,0 +1,47 @@
+import { getCurrentUser } from "@/lib/server/auth";
+import { fail, ok } from "@/lib/server/http";
+import { deleteStoredImage } from "@/lib/server/image-upload";
+import { publishStaffAction } from "@/lib/server/staff-audit";
+import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
+import { can } from "@/lib/shared/permissions";
+import { toDiskUploadPath } from "@/lib/shared/uploads";
+
+/**
+ * Retire le logo d'une équipe, pour la modération (permission `moderation`) :
+ * le geste qui éteint la responsabilité d'hébergeur de l'association après un
+ * signalement de droit d'auteur. L'équipe garde tout le reste ; sa carte
+ * retombe sur l'initiale de son nom.
+ *
+ * Le fichier est effacé du disque, donc du miroir des images au passage
+ * suivant de sa synchronisation (`rclone sync`, suppression définitive).
+ */
+export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+  const user = await getCurrentUser();
+  if (!user) return fail("UNAUTHORIZED", 401);
+  if (!can(user, "moderation")) return fail("FORBIDDEN", 403);
+
+  const { id } = await context.params;
+  const teamId = Number(id);
+  if (!Number.isSafeInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
+
+  try {
+    const { teamName, removedLogoUrl } = await removeTeamLogoAsModerator(teamId);
+    await deleteStoredImage(toDiskUploadPath(removedLogoUrl)).catch((error) => {
+      // La ligne ne désigne plus le fichier : il n'est plus servi par le site.
+      // Un disque récalcitrant laisse un résidu, que l'on signale sans défaire
+      // un retrait déjà effectif.
+      console.error("[moderation] fichier du logo non effacé", error);
+    });
+    publishStaffAction(`🧹 Logo de l'équipe « ${teamName} » retiré par le staff (modération).`, {
+      id: user.id,
+      pseudo: user.pseudo,
+    });
+    return ok({ success: true });
+  } catch (error) {
+    const message = (error as Error).message;
+    if (message === "TEAM_NOT_FOUND") return fail(message, 404);
+    if (message === "TEAM_HAS_NO_LOGO") return fail(message, 409);
+    console.error("[moderation] retrait du logo impossible", error);
+    return fail("TEAM_LOGO_REMOVE_FAILED", 500);
+  }
+}

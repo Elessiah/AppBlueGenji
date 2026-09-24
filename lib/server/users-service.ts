@@ -28,6 +28,13 @@ import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { DISCORD_CODE_VALIDITY_MINUTES } from "@/lib/shared/processing-register";
 import { formatPlayerSignupLog, type PlayerSignupProvider } from "@/lib/shared/bot-logs";
+import {
+  listTermsAcceptances,
+  recordTermsAcceptance,
+  recordTermsAcceptanceIfBehind,
+} from "@/lib/server/terms-acceptance";
+import { listReportsByAuthor } from "@/lib/server/content-reports";
+import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
@@ -356,7 +363,42 @@ function announcePlayerSignup(provider: PlayerSignupProvider): void {
   void sendBotLog(formatPlayerSignupLog({ provider })).catch(() => undefined);
 }
 
-export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Promise<number> {
+/**
+ * Les conditions d'utilisation, telles que la porte d'entrée les a reçues.
+ *
+ * Paramètre **obligatoire** des trois `createOrGet…User`, pour la même raison
+ * que la porte Discord : un défaut ferait créer silencieusement des comptes
+ * sans acceptation par la prochaine porte ajoutée.
+ */
+export type TermsConsent = { termsAccepted: boolean };
+
+/**
+ * Suite commune des trois portes, une fois le compte retrouvé ou créé.
+ *
+ * - compte **neuf** : l'acceptation est sa condition de naissance, vérifiée
+ *   avant l'`INSERT` par {@link assertSignupConsent} ; ici elle est écrite ;
+ * - compte **existant**, case cochée : l'acceptation est enregistrée si la
+ *   version courante ne l'était pas encore ;
+ * - compte existant, case absente : rien — on ne ferme pas la porte à un
+ *   membre existant, les conditions lui seront demandées là où elles comptent.
+ */
+async function settleTermsAfterLogin(userId: number, created: boolean, consent: TermsConsent): Promise<void> {
+  if (created) {
+    await recordTermsAcceptance(userId, "SIGNUP");
+    return;
+  }
+  if (consent.termsAccepted) await recordTermsAcceptanceIfBehind(userId, "LOGIN");
+}
+
+/** @throws TERMS_REQUIRED Création d'un compte sans les conditions acceptées. */
+function assertSignupConsent(consent: TermsConsent): void {
+  if (!consent.termsAccepted) throw new Error(TERMS_REQUIRED);
+}
+
+export async function createOrGetGoogleUser(
+  profile: GoogleProfilePayload,
+  consent: TermsConsent,
+): Promise<number> {
   const db = await getDatabase();
 
   const [existing] = await db.execute<(RowDataPacket & { id: number })[]>(
@@ -367,8 +409,11 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
   if (existing.length > 0) {
     const userId = Number(existing[0].id);
     await adoptRemoteAvatar(userId, profile.picture);
+    await settleTermsAfterLogin(userId, false, consent);
     return userId;
   }
+
+  assertSignupConsent(consent);
 
   // **Aucune revendication d'un compte existant.**
   //
@@ -397,6 +442,7 @@ export async function createOrGetGoogleUser(profile: GoogleProfilePayload): Prom
 
   const userId = Number(created.insertId);
   announcePlayerSignup("GOOGLE");
+  await settleTermsAfterLogin(userId, true, consent);
   await adoptRemoteAvatar(userId, profile.picture);
   return userId;
 }
@@ -497,6 +543,8 @@ export async function createOrGetDiscordUser(
      * avoir.
      */
     method: ConnectionMethod;
+    /** Conditions d'utilisation cochées à l'entrée (voir {@link TermsConsent}). */
+    termsAccepted: boolean;
   },
 ): Promise<number> {
   const db = await getDatabase();
@@ -546,8 +594,11 @@ export async function createOrGetDiscordUser(
       [Boolean(handle), handle, Boolean(handle), userId],
     );
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
+    await settleTermsAfterLogin(userId, false, door);
     return userId;
   }
+
+  assertSignupConsent(door);
 
   const rawPseudo = normalizePseudo(pseudoInput || handle || `discord_${discordId.slice(-6)}`);
   const pseudo = await ensureUniquePseudo(rawPseudo);
@@ -561,6 +612,7 @@ export async function createOrGetDiscordUser(
 
   const userId = Number(created.insertId);
   announcePlayerSignup("DISCORD");
+  await settleTermsAfterLogin(userId, true, door);
   await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
   return userId;
 }
@@ -584,7 +636,11 @@ export async function createOrGetDiscordUser(
  * `null` quand le compte Battle.net n'a pas de BattleTag — le champ reste alors
  * ce qu'il était, on n'efface pas une saisie avec du vide.
  */
-export async function createOrGetBlizzardUser(sub: string, battletag: string | null): Promise<number> {
+export async function createOrGetBlizzardUser(
+  sub: string,
+  battletag: string | null,
+  consent: TermsConsent,
+): Promise<number> {
   const db = await getDatabase();
   const tag = normalizeBattletag(battletag);
 
@@ -607,8 +663,11 @@ export async function createOrGetBlizzardUser(sub: string, battletag: string | n
         [tag, userId],
       );
     }
+    await settleTermsAfterLogin(userId, false, consent);
     return userId;
   }
+
+  assertSignupConsent(consent);
 
   // Le pseudo du site se déduit du BattleTag amputé de son discriminant :
   // « Nova#2143 » donne « nova ». Le discriminant est un détail de Blizzard, il
@@ -624,6 +683,7 @@ export async function createOrGetBlizzardUser(sub: string, battletag: string | n
 
   const userId = Number(created.insertId);
   announcePlayerSignup("BLIZZARD");
+  await settleTermsAfterLogin(userId, true, consent);
   return userId;
 }
 
@@ -1694,6 +1754,11 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
   // jamais sollicité (`is_deleted = 0` borne les deux lectures).
   await connection.execute(`DELETE FROM bg_privacy_acknowledgments WHERE user_id = ?`, [userId]);
   await connection.execute(`DELETE FROM bg_privacy_change_notifications WHERE user_id = ?`, [userId]);
+  // Même raison pour les acceptations des conditions d'utilisation. Les
+  // signalements qu'il a envoyés restent à traiter — l'association en a
+  // besoin —, mais ne pointent plus vers lui.
+  await connection.execute(`DELETE FROM bg_terms_acceptances WHERE user_id = ?`, [userId]);
+  await connection.execute(`UPDATE bg_reports SET reporter_user_id = NULL WHERE reporter_user_id = ?`, [userId]);
   // Les invitations et demandes **en attente** sont annulées, et c'est le seul
   // chemin par lequel un compte supprimé rejoignait encore une équipe vivante.
   // Une demande d'adhésion (`REQUEST`) déposée avant la suppression reste
@@ -2068,6 +2133,8 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     teamsTimeline: full.teamsTimeline,
     tournaments: full.tournaments,
     privacyAcknowledgments: await listPrivacyAcknowledgments(userId),
+    termsAcceptances: await listTermsAcceptances(userId),
+    reports: await listReportsByAuthor(userId),
   };
 }
 

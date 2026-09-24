@@ -1,0 +1,85 @@
+/* Sous la modale des changements de confidentialité (1300), au-dessus de la
+   mise en avant du recrutement (1200). */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1260;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.modal {
+  width: min(540px, 100%);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid rgba(90, 200, 255, 0.3);
+  border-radius: var(--r-cy-lg, 14px);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75),
+    0 0 40px rgba(90, 200, 255, calc(0.12 * var(--glow, 1)));
+}
+
+.modal:focus {
+  outline: none;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: clamp(20px, 3vw, 25px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--ink-mute);
+}
+
+.text strong {
+  color: var(--ink);
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 4px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.check input[type="checkbox"] {
+  margin-top: 3px;
+}
+
+.check a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.check a:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}

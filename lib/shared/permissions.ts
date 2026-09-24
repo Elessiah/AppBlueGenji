@@ -25,6 +25,10 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" 
  * - `showcase` — site vitrine (sponsors) + association (bureau, stats, bénévoles, contact).
  * - `recruitment` — page recrutement.
  * - `roles` — attribution des rôles de permission aux utilisateurs (réservé ADMIN).
+ * - `moderation` — traitement des signalements et retrait d'un contenu publié
+ *   par un membre (logo d'équipe). Réservé ADMIN : retirer le contenu d'un
+ *   tiers engage la responsabilité de l'association, ce n'est pas un geste
+ *   d'arbitrage ni de vitrine.
  */
 export type Permission =
   | "tournaments"
@@ -32,7 +36,8 @@ export type Permission =
   | "live"
   | "showcase"
   | "recruitment"
-  | "roles";
+  | "roles"
+  | "moderation";
 
 /** Tous les rôles, dans un ordre d'affichage stable (ADMIN en tête). */
 export const PLATFORM_ROLES: readonly PlatformRole[] = [
@@ -62,7 +67,7 @@ export const ROLE_DESCRIPTIONS: Record<PlatformRole, string> = {
 };
 
 const ROLE_PERMISSIONS: Record<PlatformRole, readonly Permission[]> = {
-  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles"],
+  ADMIN: ["tournaments", "casting", "live", "showcase", "recruitment", "roles", "moderation"],
   // L'arbitre gère le tournoi : l'aperçu lui est acquis, sans rôle en plus, et
   // il ouvre aussi l'antenne — sans quoi il faudrait deux personnes pour lancer
   // un match casté.

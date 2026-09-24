@@ -55,6 +55,12 @@ const LOGIN_ERRORS: Record<string, string> = {
     "Trop de tentatives. Attends une quinzaine de minutes, ou connecte-toi avec Google.",
 
   DISCORD_AUTH_FAILED: "La connexion Discord a échoué. Réessaie dans un instant.",
+
+  // Compte neuf sans les conditions d'utilisation acceptées : la case de
+  // l'écran d'accueil de la page a été contournée (ou l'onglet est antérieur à
+  // la règle). Recharger la page la représente.
+  TERMS_REQUIRED:
+    "Pour créer ton compte, accepte les conditions d'utilisation. Recharge la page pour les afficher.",
 };
 
 /**
@@ -96,6 +102,8 @@ const OAUTH_ERRORS: Record<string, (provider: string) => string> = {
   oauth: (p) => `Échec de la connexion ${p}. Réessaie dans un instant.`,
   // `intent=link` sans session : la connexion a expiré pendant l'aller-retour.
   session: () => "Tu dois être connecté pour rattacher une application. Connecte-toi, puis réessaie.",
+  // Compte neuf sans les conditions d'utilisation acceptées.
+  terms: () => "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion.",
 };
 
 /** Nom du fournisseur tel qu'il s'affiche dans une phrase de refus. */

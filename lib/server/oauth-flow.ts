@@ -52,6 +52,7 @@ import {
 } from "@/lib/shared/oauth-providers";
 import { isLinkRefusal } from "@/lib/shared/account-connections";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
+import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 
 /** Où retombe un rattachement, réussi ou non. */
 const PROFILE_PATH = "/profil";
@@ -149,6 +150,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
   // Filtrée dès l'aller : rien d'étranger au site n'entre dans le cookie d'état.
   const redirectTo = safeRedirectPath(req.nextUrl.searchParams.get("redirect"));
   const intent: OAuthIntent = req.nextUrl.searchParams.get("intent") === "link" ? "LINK" : "LOGIN";
+  const termsAccepted = req.nextUrl.searchParams.get("terms") === "1";
 
   if (intent === "LINK") {
     const user = await getCurrentUser();
@@ -159,7 +161,7 @@ export async function startOAuth(req: NextRequest, provider: OAuthProvider): Pro
 
   try {
     const authorizationUrl = OAUTH_CLIENTS[provider].authorizationUrl(state);
-    await saveOAuthState({ provider, state, redirectTo, intent });
+    await saveOAuthState({ provider, state, redirectTo, intent, termsAccepted });
     return NextResponse.redirect(authorizationUrl);
   } catch (error) {
     const missing = isMissingConfiguration(error);
@@ -243,9 +245,15 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
   }
 
   try {
-    const userId = await createOrGetOAuthUser(identity);
+    // L'acceptation voyage dans le cookie d'état, scellée à l'aller comme
+    // l'intention : lue dans l'URL du rappel, elle serait choisie par
+    // l'appelant.
+    const userId = await createOrGetOAuthUser(identity, { termsAccepted: saved.termsAccepted });
     await createSession(userId);
-  } catch {
+  } catch (error) {
+    // Un compte neuf sans les conditions acceptées : la page de connexion le
+    // dit, plutôt qu'un « échec de connexion » qui ferait réessayer pour rien.
+    if ((error as Error).message === TERMS_REQUIRED) return loginFailure(base, provider, "terms");
     return loginFailure(base, provider, "oauth");
   }
 

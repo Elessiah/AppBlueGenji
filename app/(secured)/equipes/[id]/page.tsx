@@ -10,6 +10,7 @@ import { MembersSection } from "./_components/MembersSection";
 import { MembershipActions } from "./_components/MembershipActions";
 import { TeamSettings } from "./_components/TeamSettings";
 import { TeamHistory } from "./_components/TeamHistory";
+import { ModerationLogoBar } from "./_components/ModerationLogoBar";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import styles from "./team.module.css";
 
@@ -49,6 +50,7 @@ export default function TeamDetailPage() {
   return (
     <section className={`fade-in ${styles.page}`}>
       <TeamHeader team={team} />
+      <ModerationLogoBar team={team} onChanged={refresh} />
       <MembershipActions
         team={team}
         requests={pending.requests}

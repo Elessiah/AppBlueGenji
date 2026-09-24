@@ -4,6 +4,12 @@ import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-uplo
 import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { can } from "@/lib/shared/permissions";
+import { hasAcceptedCurrentTerms } from "@/lib/server/terms-acceptance";
+import {
+  LOGO_RIGHTS_FIELD,
+  LOGO_RIGHTS_NOT_CERTIFIED,
+  TERMS_ACCEPTANCE_REQUIRED,
+} from "@/lib/shared/terms-of-use";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -16,7 +22,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   const managesGhostTeams = can(user, "tournaments");
-  if (!(await canManageTeam(teamId, user.id)) && !(managesGhostTeams && (await isGhostTeam(teamId)))) {
+  const asGhostStaff = managesGhostTeams && (await isGhostTeam(teamId));
+  if (!(await canManageTeam(teamId, user.id)) && !asGhostStaff) {
     return fail("FORBIDDEN", 403);
   }
 
@@ -30,16 +37,36 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);
 
+  // Les deux refus qui ne tiennent pas au fichier passent **avant** son
+  // traitement : refusé après, le logo converti resterait sur le disque sans
+  // qu'aucune ligne ne le désigne.
+  if (form.get(LOGO_RIGHTS_FIELD) !== "1") return fail(LOGO_RIGHTS_NOT_CERTIFIED, 400);
+  if (!asGhostStaff && !(await hasAcceptedCurrentTerms(user.id))) {
+    return fail(TERMS_ACCEPTANCE_REQUIRED, 409);
+  }
+
   try {
     const currentLogo = await getTeamLogoUrl(teamId);
     const diskPath = await processAndStoreImage(file, "team-logo", teamId);
     const servedUrl = toServedUploadUrl(diskPath);
-    await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams);
+    try {
+      await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams);
+    } catch (error) {
+      // Refusé entre-temps (rôle retiré, course) : le fichier neuf ne désigne
+      // rien, il part.
+      try {
+        await deleteStoredImage(diskPath);
+      } catch {
+        // Résidu sur le disque, que rien ne désigne : le refus d'origine prime.
+      }
+      throw error;
+    }
     await deleteStoredImage(toDiskUploadPath(currentLogo));
     return ok({ logoUrl: servedUrl });
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     return fail(message || "LOGO_UPLOAD_FAILED", 400);
   }
 }
@@ -62,6 +89,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);
+    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
     return fail(message || "LOGO_DELETE_FAILED", 400);
   }
 }

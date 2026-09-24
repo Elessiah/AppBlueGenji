@@ -13,6 +13,8 @@ import {
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
+import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
+import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
@@ -293,6 +295,107 @@ export default function RgpdPage() {
             l&apos;invite. Google agit comme responsable de son propre traitement. Aucune autre
             page du site ne fait appel à Google, et vous pouvez toujours vous connecter par
             Discord, Blizzard ou un code en message privé.
+          </p>
+        </div>
+      </section>
+
+      {/* SIGNALEMENTS — droit d'auteur, contestation, masquage d'un logo */}
+      <section id="signalements" className={styles.section}>
+        <header className={styles.head}>
+          <div>
+            <span className="eyebrow">SIGNALEMENTS</span>
+            <h2 className={styles.sectionTitle}>Signalements, droit d&apos;auteur et contestation</h2>
+          </div>
+          <span className={styles.meta}>DSA ART. 16 ET 20</span>
+        </header>
+        <div className={styles.prose}>
+          <h3>1. Signaler un problème</h3>
+          <p>
+            Le bouton <strong>« Signaler un problème »</strong>, en bas de chaque page, est ouvert à{" "}
+            <strong>tous</strong>, avec ou sans compte. On y choisit une catégorie — droit
+            d&apos;auteur, modération, bug, autre —, on décrit le problème et, connecté, on désigne les
+            joueurs, équipes ou tournois concernés. Un signalement de <strong>droit d&apos;auteur</strong>{" "}
+            exige en plus le nom et l&apos;adresse électronique de son auteur, sa qualité (titulaire des
+            droits, représentant, tiers) et une déclaration de bonne foi : c&apos;est ce que le règlement
+            européen sur les services numériques demande à une notification de contenu illicite
+            (art. 16).
+          </p>
+          <ul>
+            <li>
+              <strong>Données</strong> : la catégorie, la description, les éléments désignés, la page
+              d&apos;où part le signalement, le compte du signalant s&apos;il est connecté, et le nom et
+              l&apos;adresse qu&apos;il indique.
+            </li>
+            <li>
+              <strong>Base légale</strong> : le consentement, recueilli par une case à l&apos;envoi ;
+              pour un contenu illicite, l&apos;obligation faite à l&apos;hébergeur de traiter les
+              notifications.
+            </li>
+            <li>
+              <strong>Destinataires</strong> : les administrateurs de l&apos;association. Une alerte
+              part sur Discord (salon du staff, message privé au propriétaire et au président) sans le
+              nom, l&apos;adresse ni la description du signalant, et sans le pseudo d&apos;aucun joueur.
+            </li>
+            <li>
+              <strong>Durée</strong> : le temps du traitement, puis{" "}
+              {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l&apos;archivage — prolongée tant
+              qu&apos;un logo masqué au titre du signalement attend son échéance, pour que
+              l&apos;équipe puisse encore le contester.
+            </li>
+          </ul>
+
+          <h3>2. Les personnes visées sont prévenues</h3>
+          <p>
+            Les joueurs désignés et les membres des équipes désignées reçoivent un{" "}
+            <strong>message privé Discord</strong> (s&apos;ils ont rattaché leur compte Discord ou
+            certifié leur tag) qui mène à la page du signalement. Ils y lisent le motif et la
+            description — <strong>jamais l&apos;identité du signalant</strong> (ni compte, ni nom, ni
+            adresse) — et seulement les éléments qui les concernent.
+          </p>
+
+          <h3>3. Le droit de contestation</h3>
+          <p>
+            Seule une personne visée peut contester — un joueur désigné, ou un membre actuel d&apos;une
+            équipe désignée —, depuis la page du signalement ou par la catégorie{" "}
+            <strong>« Contestation »</strong> du même formulaire. La contestation est rangée sous le
+            signalement d&apos;origine et lue par les administrateurs, qui en sont prévenus sur Discord.
+            Contester un signalement <strong>déjà archivé le rouvre</strong>. L&apos;auteur du
+            signalement n&apos;est pas informé de la contestation ; elle est conservée et effacée avec
+            le signalement qu&apos;elle vise.
+          </p>
+
+          <h3>4. Un logo signalé : masqué, puis rétabli ou supprimé</h3>
+          <p>
+            Plutôt que de supprimer tout de suite un logo d&apos;équipe signalé, l&apos;association peut
+            le <strong>masquer</strong> : il cesse aussitôt d&apos;être en ligne (le fichier quitte le
+            dossier servi par le site), et il est gardé à part, hors ligne. Les membres de
+            l&apos;équipe reçoivent un message privé qui annonce la{" "}
+            <strong>date de suppression définitive</strong>.
+          </p>
+          <ul>
+            <li>
+              <strong>Délai</strong> : {LOGO_QUARANTINE_DAYS / 30} mois, la durée pendant laquelle le
+              règlement européen sur les services numériques impose de pouvoir contester une décision
+              de modération (art. 20).
+            </li>
+            <li>
+              <strong>Sans contestation</strong>, le logo est supprimé définitivement à l&apos;échéance,
+              du site comme de ses sauvegardes.
+            </li>
+            <li>
+              <strong>Contesté</strong>, il n&apos;est jamais supprimé d&apos;office : il attend la
+              décision de l&apos;association. Si la contestation aboutit, il est{" "}
+              <strong>rétabli</strong> tel quel et l&apos;équipe en est prévenue.
+            </li>
+            <li>
+              Un contenu <strong>manifestement illicite</strong> peut être supprimé sans délai de
+              masquage.
+            </li>
+          </ul>
+          <p>
+            Ces règles s&apos;appliquent aussi au regard des{" "}
+            <Link href="/conditions-utilisation#signalement">conditions d&apos;utilisation</Link>, que
+            chacun accepte en créant un compte ou une équipe.
           </p>
         </div>
       </section>

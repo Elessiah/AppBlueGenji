@@ -371,6 +371,46 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
     security: [...COMMON_SECURITY, "Une annonce réservée avant l'envoi, pour qu'aucun compte ne la reçoive deux fois"],
   },
+  {
+    ref: "T11",
+    name: "Signalements, contestations et modération des contenus",
+    purpose: "Recevoir et traiter les signalements adressés à l'association, dont les notifications de contenu illicite",
+    subPurposes: [
+      "Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, autre)",
+      "Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester",
+      "Masquer un logo d'équipe signalé, puis le rétablir ou le supprimer définitivement",
+      "Alerter les administrateurs sur Discord, sans donnée nominative",
+    ],
+    legalBasis:
+      "Consentement du signalant (case à l'envoi) ; obligation légale de l'hébergeur de traiter les notifications de contenu illicite (règlement (UE) 2022/2065, art. 16) et d'en permettre la contestation (art. 20)",
+    dataSubjects: [
+      "Signalants, membres ou non (titulaires de droits, représentants, visiteurs)",
+      "Joueurs et membres des équipes visés par un signalement",
+    ],
+    dataCategories: [
+      "Catégorie, description, éléments désignés et page d'origine du signalement",
+      "Compte du signalant s'il est connecté ; nom et adresse électronique qu'il indique, et sa qualité (droit d'auteur)",
+      "Contestations : texte, compte de leur auteur et adresse facultative",
+      "Logos d'équipe masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      "Signalement et contestations : durée du traitement, puis 30 jours après l'archivage — prolongée tant qu'un logo masqué au titre du signalement attend son échéance",
+      "Logo masqué : 6 mois au plus sans contestation (délai de contestation du règlement (UE) 2022/2065, art. 20), puis suppression définitive ; contesté, jusqu'à la décision",
+    ],
+    recipients: [
+      "Administrateurs de l'association",
+      "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
+      "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
+    ],
+    transfers: ["États-Unis : Discord (acheminement des alertes et des messages privés), dans le cadre des garanties propres à Discord"],
+    security: [
+      ...COMMON_SECURITY,
+      "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
+      "Plafonds d'envoi par personne et par heure",
+      "Logo masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
+    ],
+  },
 ];
 
 // --- Export tableur ------------------------------------------------------------

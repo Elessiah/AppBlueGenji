@@ -46,17 +46,22 @@ export function GoogleOneTap({
   clientId,
   nonce,
   redirect,
+  termsAccepted,
 }: {
   clientId: string;
   nonce?: string;
   /** Destination d'après connexion, **déjà filtrée** par `safeRedirectPath`. */
   redirect: string;
+  /** Conditions d'utilisation acceptées dans la modale d'entrée de `/connexion`. */
+  termsAccepted: boolean;
 }) {
   const router = useRouter();
   // Relue au moment de la réponse de Google, pas figée à l'`initialize` : la
   // page lit son `?redirect=` dans un effet, et l'invite ne s'initialise qu'une fois.
   const redirectRef = useRef(redirect);
   redirectRef.current = redirect;
+  const termsRef = useRef(termsAccepted);
+  termsRef.current = termsAccepted;
   const { showError, showSuccess } = useToast();
   // Un seul `initialize` par montage : le script peut se recharger sur une
   // navigation client sans que l'effet ne reparte. Le nettoyage le remet à
@@ -84,7 +89,7 @@ export function GoogleOneTap({
             const res = await fetch("/api/auth/google/one-tap", {
               method: "POST",
               headers: { "content-type": "application/json" },
-              body: JSON.stringify({ credential: response.credential }),
+              body: JSON.stringify({ credential: response.credential, termsAccepted: termsRef.current }),
             });
             if (!res.ok) {
               // Un jeton qui échoue la vérification ne casse rien : le joueur

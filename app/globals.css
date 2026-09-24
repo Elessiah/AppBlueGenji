@@ -1781,6 +1781,35 @@ html {
   }
 }
 
+/* Case d'engagement : acceptation des conditions d'utilisation, garantie des
+   droits sur un logo. Une ligne à part, texte à côté de la case, lien souligné
+   — elle se lit comme ce qu'elle est, un engagement, pas une option d'affichage. */
+.consent-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.consent-check input[type="checkbox"] {
+  margin-top: 2px;
+}
+
+.consent-check a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.consent-check a:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
 /* ── Réglages d'accessibilité du lecteur ─────────────────────────────────────
    Menu du bouton flottant (`components/accessibility/AccessibilityMenu.tsx`,
    registre `lib/shared/accessibility-settings.ts`). Chaque réglage change

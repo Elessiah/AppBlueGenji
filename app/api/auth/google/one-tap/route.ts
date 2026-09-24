@@ -13,10 +13,11 @@ import { GOOGLE_ONE_TAP_RULE, enforceRateLimit, requestClientIp } from "@/lib/se
 import { fail, ok } from "@/lib/server/http";
 import { createOrGetOAuthUser } from "@/lib/server/account-identities";
 import { verifyGoogleOneTapCredential } from "@/lib/server/google-one-tap";
+import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { credential?: string };
+    const body = (await req.json()) as { credential?: string; termsAccepted?: boolean };
     const credential = (body.credential ?? "").trim();
     if (!credential) return fail("MISSING_CREDENTIAL", 400);
 
@@ -33,17 +34,21 @@ export async function POST(req: Request) {
       return fail("GOOGLE_ONE_TAP_INVALID", 401);
     }
 
-    const userId = await createOrGetOAuthUser({
-      provider: "GOOGLE",
-      subject: profile.sub,
-      handle: null,
-      avatarUrl: profile.picture ?? null,
-      displayName: profile.name ?? null,
-    });
+    const userId = await createOrGetOAuthUser(
+      {
+        provider: "GOOGLE",
+        subject: profile.sub,
+        handle: null,
+        avatarUrl: profile.picture ?? null,
+        displayName: profile.name ?? null,
+      },
+      { termsAccepted: body.termsAccepted === true },
+    );
     await createSession(userId);
 
     return ok({ success: true });
   } catch (error) {
+    if ((error as Error).message === TERMS_REQUIRED) return fail(TERMS_REQUIRED, 400);
     return fail((error as Error).message || "GOOGLE_ONE_TAP_FAILED", 500);
   }
 }

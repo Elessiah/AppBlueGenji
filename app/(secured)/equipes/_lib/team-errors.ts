@@ -96,6 +96,14 @@ const TEAM_ERRORS: Record<string, string> = {
   TEAM_OWNERSHIP_TRANSFER_FAILED: "La propriété n'a pas pu être transférée.",
   LOGO_UPLOAD_FAILED: "Le logo n'a pas pu être envoyé.",
   LOGO_DELETE_FAILED: "Le logo n'a pas pu être supprimé.",
+  // Conditions d'utilisation : non acceptées par qui gère l'équipe (la modale
+  // s'ouvre en même temps, `teamApi`), ou case décochée à la création.
+  TERMS_ACCEPTANCE_REQUIRED:
+    "Pour gérer ton équipe, accepte d'abord les conditions d'utilisation (fenêtre ouverte à l'instant).",
+  TERMS_REQUIRED: "Coche l'acceptation des conditions d'utilisation pour créer ton équipe.",
+  LOGO_RIGHTS_NOT_CERTIFIED: "Certifie détenir les droits sur ce logo pour l'envoyer.",
+  TEAM_HAS_NO_LOGO: "Cette équipe n'a déjà plus de logo.",
+  TEAM_LOGO_REMOVE_FAILED: "Le logo n'a pas pu être retiré.",
 };
 
 const FALLBACK = "L'opération a échoué.";

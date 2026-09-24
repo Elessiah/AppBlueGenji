@@ -2,6 +2,7 @@
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { consumeDiscordChallenge, createOrGetDiscordUser } from "@/lib/server/users-service";
+import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 
 function normalizeDiscordId(raw: string): string {
   return raw.trim();
@@ -9,7 +10,12 @@ function normalizeDiscordId(raw: string): string {
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { discordId?: string; code?: string; pseudo?: string };
+    const body = (await req.json()) as {
+      discordId?: string;
+      code?: string;
+      pseudo?: string;
+      termsAccepted?: boolean;
+    };
     const discordId = normalizeDiscordId(body.discordId ?? "");
     const code = (body.code ?? "").trim();
 
@@ -55,11 +61,16 @@ export async function POST(req: Request) {
     // appelée qui tient cette règle (`lib/shared/account-connections.ts`).
     const userId = await createOrGetDiscordUser(discordId, body.pseudo, proof.handle, {
       method: "DM_CODE",
+      termsAccepted: body.termsAccepted === true,
     });
     await createSession(userId);
 
     return ok({ success: true });
   } catch (error) {
+    // Le code vient d'être consommé : un compte neuf refusé faute de conditions
+    // acceptées devra en redemander un. Le cas ne se présente qu'à un client qui
+    // contourne la case de `/connexion`.
+    if ((error as Error).message === TERMS_REQUIRED) return fail(TERMS_REQUIRED, 400);
     return fail((error as Error).message || "DISCORD_AUTH_FAILED", 500);
   }
 }

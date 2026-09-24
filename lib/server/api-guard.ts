@@ -178,6 +178,34 @@ export const ISSUE_REPORT_RULE: RateLimitRule = {
 };
 
 /**
+ * Envois du formulaire « Signaler un problème », par compte ou, sans compte,
+ * par IP.
+ *
+ * Étroit pour la même raison que le signalement d'un tournoi : chaque envoi
+ * écrit en privé au propriétaire et au président de l'association. Une
+ * personne en envoie un, deux si elle précise ; au-delà, c'est du bruit. Le
+ * plafond global, lui, est en base (`REPORTS_HOURLY_CAP`) : il tient aussi
+ * quand l'appelant n'a pas d'identité.
+ */
+export const REPORT_SUBMIT_RULE: RateLimitRule = {
+  name: "content-report-submit",
+  limit: 5,
+  windowMs: 30 * 60_000,
+};
+
+/**
+ * Recherche de joueurs, d'équipes ou de tournois dans le formulaire de
+ * signalement, par compte. Une frappe au clavier en déclenche une (après
+ * temporisation) : soixante par minute ne gênent aucune saisie, et bornent un
+ * script qui voudrait parcourir l'annuaire par là.
+ */
+export const REPORT_TARGET_SEARCH_RULE: RateLimitRule = {
+  name: "content-report-target-search",
+  limit: 60,
+  windowMs: 60_000,
+};
+
+/**
  * Demandes d'un code de connexion Discord, **par compte Discord visé**.
  *
  * Étroit, comme le signalement de problème et pour une raison voisine : chaque

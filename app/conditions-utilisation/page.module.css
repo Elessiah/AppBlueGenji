@@ -1,0 +1,144 @@
+.section {
+  position: relative;
+  z-index: 1;
+  width: min(1240px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 40px 0;
+}
+
+.heroSection {
+  padding: 80px 0 32px;
+}
+
+.heroTitle {
+  font-size: clamp(36px, 6vw, 68px);
+  line-height: 1.05;
+  margin: 14px 0 0;
+  letter-spacing: -0.02em;
+}
+
+.heroLead {
+  max-width: 720px;
+  margin: 20px 0 0;
+  font-size: 16px;
+  line-height: 1.7;
+  color: var(--ink-mute);
+}
+
+.version {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  margin-top: 22px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--ink-dim);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+.toc {
+  position: sticky;
+  top: 96px;
+  border-left: 1px solid var(--line-soft);
+  padding-left: 18px;
+}
+
+@media (max-width: 900px) {
+  .toc {
+    position: static;
+  }
+}
+
+.tocTitle {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  color: var(--ink-mute);
+  margin: 0 0 12px;
+}
+
+.toc ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  counter-reset: toc;
+}
+
+.toc a {
+  color: var(--ink-mute);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.toc a:hover {
+  color: var(--ink);
+}
+
+.toc a:focus-visible,
+.article a:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+}
+
+.article {
+  max-width: 780px;
+}
+
+.clause {
+  scroll-margin-top: 96px;
+  padding: 24px 0 28px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.clauseNumber {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--blue-300);
+}
+
+.clauseTitle {
+  margin: 6px 0 14px;
+  font-family: var(--font-sans);
+  font-size: clamp(21px, 2.2vw, 28px);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+.clause p {
+  margin: 0 0 14px;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+.clause p:last-child {
+  margin-bottom: 0;
+}
+
+.clause strong {
+  font-weight: 600;
+}
+
+.article a {
+  color: var(--blue-300);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

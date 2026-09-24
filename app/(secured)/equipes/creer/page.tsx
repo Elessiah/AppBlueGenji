@@ -10,6 +10,13 @@ import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib
 import { membershipErrorMessage, teamErrorMessage } from "../_lib/team-errors";
 import { precheckImageUpload } from "@/lib/shared/image-upload-errors";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
+import {
+  LOGO_RIGHTS_FIELD,
+  LOGO_RIGHTS_LABEL,
+  LOGO_RIGHTS_TERMS_ANCHOR,
+  TERMS_CHECKBOX_LABEL,
+  TERMS_PATH,
+} from "@/lib/shared/terms-of-use";
 
 export default function CreateTeamPage() {
   const router = useRouter();
@@ -18,6 +25,10 @@ export default function CreateTeamPage() {
   const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  // Créer une équipe, c'est accepter les conditions d'utilisation ; envoyer son
+  // logo, c'est garantir en détenir les droits. Deux cases, deux engagements.
+  const [acceptTerms, setAcceptTerms] = useState(false);
+  const [logoRights, setLogoRights] = useState(false);
   const [loading, setLoading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -31,6 +42,7 @@ export default function CreateTeamPage() {
       return;
     }
     setLogoFile(file);
+    setLogoRights(false);
   };
 
   const onSubmit = async (event: FormEvent) => {
@@ -38,6 +50,14 @@ export default function CreateTeamPage() {
     const nameCheck = checkTeamName(name);
     if (!nameCheck.ok) {
       showError(teamErrorMessage(nameCheck.reason));
+      return;
+    }
+    if (logoFile && !logoRights) {
+      showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
+      return;
+    }
+    if (!acceptTerms) {
+      showError(teamErrorMessage("TERMS_REQUIRED"));
       return;
     }
     setLoading(true);
@@ -49,6 +69,7 @@ export default function CreateTeamPage() {
           name,
           description: description.trim() || null,
           tag: tag.trim() || null,
+          acceptTerms,
         }),
       });
       const payload = (await response.json()) as { error?: string; teamId?: number };
@@ -57,6 +78,7 @@ export default function CreateTeamPage() {
       if (logoFile) {
         const formData = new FormData();
         formData.append("file", logoFile);
+        formData.append(LOGO_RIGHTS_FIELD, logoRights ? "1" : "0");
         const logoResponse = await fetch(`/api/teams/${payload.teamId}/logo`, {
           method: "POST",
           body: formData,
@@ -175,8 +197,30 @@ export default function CreateTeamPage() {
               <p style={{ fontSize: 11, color: "var(--ink-mute)", margin: "6px 0 0" }}>
                 PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo max
               </p>
+              {logoFile ? (
+                <label className="consent-check">
+                  <input type="checkbox" checked={logoRights} onChange={(e) => setLogoRights(e.target.checked)} />
+                  <span>
+                    {LOGO_RIGHTS_LABEL}{" "}
+                    <Link href={LOGO_RIGHTS_TERMS_ANCHOR} target="_blank" rel="noreferrer">
+                      En savoir plus
+                    </Link>
+                  </span>
+                </label>
+              ) : null}
             </div>
           </div>
+
+          <label className="consent-check">
+            <input type="checkbox" checked={acceptTerms} onChange={(e) => setAcceptTerms(e.target.checked)} />
+            <span>
+              {TERMS_CHECKBOX_LABEL} (
+              <Link href={TERMS_PATH} target="_blank" rel="noreferrer">
+                lire les conditions
+              </Link>
+              ) — notamment la garantie des droits sur le nom, le logo et la description de l&apos;équipe.
+            </span>
+          </label>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 12 }}>
             <CyberButton variant="ghost" asChild>
