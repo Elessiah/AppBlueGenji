@@ -45,12 +45,6 @@ pipeline de `CLAUDE.md`.
 
 ---
 
-## 9. Fiche tournoi : attributs ARIA à vérifier
-
-- **Constat** : axe laisse `aria-required-children` et `aria-prohibited-attr`
-  « à vérifier » sur `/tournois/[id]` (probablement une liste ou des onglets
-  du plateau). Identifier les nœuds et corriger les rôles.
-
 ## 10. Erreurs de formulaire liées aux champs
 
 - **Critère** : WCAG 3.3.1 / 3.3.3 · RGAA 11.10 / 11.11.
@@ -81,14 +75,3 @@ pipeline de `CLAUDE.md`.
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
-
-## 16. Titres des fiches d'équipe et de joueur
-
-- **Critère** : WCAG 2.4.2 · RGAA 8.6.
-- **Constat** : `/equipes/[id]` et `/joueurs/[id]` s'intitulent « Équipes » et
-  « Joueurs », hérités de l'annuaire : deux onglets ouverts sur deux fiches
-  portent le même titre.
-- **À faire** : un `generateMetadata` dans une mise en page de segment, sur le
-  modèle de `app/(secured)/tournois/[id]/layout.tsx` — nom de l'équipe, pseudo
-  du joueur, en respectant la visibilité du profil (un compte anonymisé ou
-  masqué ne doit pas nommer quelqu'un dans l'onglet).
