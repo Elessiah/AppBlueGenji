@@ -61,8 +61,10 @@ annonce.
 - `lobby_opened_at` est posé à la **première observation** du lancement
   (entretien du tournoi, premier « Prêt », ou lecture de la modale) : c'est
   l'origine du délai de lancement d'office.
-- Au déploiement, les matchs déjà jouables sont posés **lancés** — une
-  rencontre en cours ne doit pas se voir refuser son score. Le remplissage ne
+- Au déploiement, les matchs déjà jouables — sans horaire ou à l'horaire
+  passé, et ceux dont un report attend — sont posés **lancés** : une rencontre
+  en cours ne doit pas se voir refuser son score. Un match programmé plus tard
+  n'est pas touché et passera par son lancement à l'heure dite. Le remplissage ne
   suit que l'ajout effectif de la colonne (`docs/DATABASE_SCHEMA.md`).
 
 ## Qui clique « Prêt »

@@ -1114,7 +1114,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // (`lib/shared/match-launch.ts`). Sur une base qui tourne, les matchs déjà
   // jouables au déploiement se jouaient sous l'ancienne règle : ils sont posés
   // lancés, sans quoi une rencontre en cours se verrait refuser son score au
-  // milieu d'un tournoi. Le remplissage ne suit **que** l'ajout effectif de la
+  // milieu d'un tournoi. **Seulement ceux-là** : un match programmé plus tard
+  // passera par son lancement à l'heure dite, comme tout match à venir. Le remplissage ne suit **que** l'ajout effectif de la
   // colonne — rejoué à chaque démarrage, il lancerait d'office tout match
   // devenu jouable depuis.
   const launchedAtStatement = `ALTER TABLE bg_matches ADD COLUMN launched_at DATETIME NULL AFTER lobby_opened_at`;
@@ -1125,8 +1126,10 @@ async function runMigrations(db: Pool): Promise<void> {
     await db.execute(
       `UPDATE bg_matches
        SET launched_at = NOW(), launch_pairing = CONCAT(team1_id, ':', team2_id)
-       WHERE status <> 'PENDING' AND launched_at IS NULL
-         AND team1_id IS NOT NULL AND team2_id IS NOT NULL`,
+       WHERE launched_at IS NULL
+         AND team1_id IS NOT NULL AND team2_id IS NOT NULL
+         AND (status IN ('AWAITING_CONFIRMATION', 'COMPLETED')
+              OR (status = 'READY' AND (start_at IS NULL OR start_at <= NOW())))`,
     );
   } catch (error) {
     reportSchemaFailure(error, launchedAtStatement);
