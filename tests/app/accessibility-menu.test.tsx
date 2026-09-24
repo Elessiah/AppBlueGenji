@@ -90,6 +90,15 @@ describe("AccessibilityPanel", () => {
     expect(checkboxFor(html, "contrast")).not.toContain("checked");
   });
 
+  it("nomme chaque case par son seul intitulé, la description à part", () => {
+    const html = panel([]);
+    for (const setting of A11Y_SETTINGS) {
+      const box = checkboxFor(html, setting.key);
+      expect(box).toContain(`aria-labelledby="a11y-panel-${setting.key}-label"`);
+      expect(html).toMatch(new RegExp(`id="a11y-panel-${setting.key}-label"[^>]*>${setting.label}</span>`));
+    }
+  });
+
   it("porte des cases natives, sans rôle ajouté", () => {
     const html = panel([]);
     expect(html).not.toContain('role="switch"');

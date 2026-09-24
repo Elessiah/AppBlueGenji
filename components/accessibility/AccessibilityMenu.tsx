@@ -160,17 +160,25 @@ export function AccessibilityPanel({ id, titleId, settings, onToggle, onReset, o
         <ul className={styles.options}>
           {A11Y_SETTINGS.map((setting) => {
             const descriptionId = `${id}-${setting.key}`;
+            const labelId = `${descriptionId}-label`;
             return (
               <li key={setting.key}>
+                {/* Le `<label>` rend toute la ligne cliquable, mais le nom de
+                    la case est son seul intitulé (`aria-labelledby`) : sans
+                    cela il contiendrait aussi la description, que
+                    `aria-describedby` fait déjà lire — deux fois donc. */}
                 <label className={styles.option}>
                   <input
                     type="checkbox"
                     checked={settings.includes(setting.key)}
+                    aria-labelledby={labelId}
                     aria-describedby={descriptionId}
                     onChange={(event) => onToggle(setting.key, event.target.checked)}
                   />
                   <span className={styles.optionText}>
-                    <span className={styles.optionLabel}>{setting.label}</span>
+                    <span id={labelId} className={styles.optionLabel}>
+                      {setting.label}
+                    </span>
                     <span id={descriptionId} className={styles.optionDescription}>
                       {setting.description}
                     </span>
