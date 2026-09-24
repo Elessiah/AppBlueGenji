@@ -99,6 +99,49 @@ describe("canViewDiscordTag — parties d'un même match (lancement)", () => {
   });
 });
 
+describe("canViewDiscordTag — rendu visible des autres joueurs", () => {
+  it("ouvre le tag certifié à tout joueur connecté, sans aucun rôle", () => {
+    expect(canViewDiscordTag(viewer([]), { ...verifiedSubject, visible: true })).toBe(true);
+    expect(canViewDiscordTag(viewer(["CASTER"]), { ...verifiedSubject, visible: true })).toBe(true);
+  });
+
+  it("ouvre sans tournoi : le réglage ne dépend pas de l'arbitrage", () => {
+    expect(
+      canViewDiscordTag(viewer(["ARBITRE"]), {
+        ...verifiedSubject,
+        visible: true,
+        inActiveTournament: false,
+      }),
+    ).toBe(true);
+  });
+
+  it("n'ouvre jamais un tag non certifié : la clause passe avant", () => {
+    // Publier un tag que personne n'a prouvé ferait écrire à un inconnu au nom
+    // d'un autre — la case cochée n'y change rien.
+    for (const roles of [[], ["ADMIN"], [...PLATFORM_ROLES]] as PlatformRole[][]) {
+      expect(canViewDiscordTag(viewer(roles), { ...unverifiedSubject, visible: true })).toBe(false);
+    }
+  });
+
+  it("n'ouvre jamais au visiteur sans compte", () => {
+    expect(canViewDiscordTag(null, { ...verifiedSubject, visible: true })).toBe(false);
+    expect(canViewDiscordTag(undefined, { ...verifiedSubject, visible: true })).toBe(false);
+  });
+
+  it("case décochée : un joueur quelconque ne voit rien, l'organisation garde son accès", () => {
+    const hidden = { ...verifiedSubject, visible: false };
+    expect(canViewDiscordTag(viewer([]), hidden)).toBe(false);
+    expect(canViewDiscordTag(viewer(["ADMIN"]), hidden)).toBe(true);
+    expect(canViewDiscordTag(viewer(["ARBITRE"]), { ...hidden, inActiveTournament: true })).toBe(true);
+  });
+
+  it("visibleDiscordTag rend le tag au joueur quelconque seulement si la case est cochée", () => {
+    expect(visibleDiscordTag("tag", viewer([]), { ...verifiedSubject, visible: true })).toBe("tag");
+    expect(visibleDiscordTag("tag", viewer([]), verifiedSubject)).toBeNull();
+    expect(visibleDiscordTag(null, viewer([]), { ...verifiedSubject, visible: true })).toBeNull();
+  });
+});
+
 describe("canViewDiscordTag — tag certifié", () => {
   it("accorde l'administrateur en tout temps, tournoi ou pas", () => {
     expect(canViewDiscordTag(viewer(["ADMIN"]), verifiedSubject)).toBe(true);
@@ -223,6 +266,16 @@ describe("les textes de consentement", () => {
   it("disent que rien n'est public", () => {
     const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
     expect(joined).toContain("publique");
+  });
+
+  it("disent que les autres joueurs ne le voient que sur choix du joueur", () => {
+    // La certification ouvre le tag à l'organisation, pas aux joueurs : la
+    // phrase qui disait « ni pour les autres joueurs du site » serait devenue
+    // fausse le jour où la case existe.
+    const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
+    expect(joined).toContain("autres joueurs");
+    expect(joined).toContain("rends visible");
+    expect(joined).not.toContain("ni pour les autres joueurs");
   });
 
   it("donnent une raison, pas seulement une liste", () => {

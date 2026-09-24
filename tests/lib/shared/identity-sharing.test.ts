@@ -2,6 +2,8 @@ import { describe, expect, it } from "@jest/globals";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
   DISCORD_CERTIFICATION_UNDO,
+  DISCORD_PLAYER_VISIBILITY_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_PENDING,
   DISCORD_TAG_AUDIENCE,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
   GAME_TAG_NOTICE,
@@ -26,6 +28,28 @@ describe("DISCORD_TAG_AUDIENCE", () => {
 
   it("ferme la liste : le tag n'est jamais public", () => {
     expect(DISCORD_TAG_AUDIENCE).toMatch(/jamais personne d'autre/i);
+  });
+
+  it("nomme les autres joueurs comme un public choisi, pas acquis", () => {
+    expect(DISCORD_TAG_AUDIENCE).toMatch(/les autres joueurs, seulement si tu le rends visible/i);
+  });
+});
+
+describe("DISCORD_PLAYER_VISIBILITY_NOTICE", () => {
+  it("dit que la certification ouvre le tag à l'organisation, pas aux joueurs", () => {
+    // C'est la phrase qui manquait : l'ancienne renvoyait le tag à « ses propres
+    // réglages », comme si la certification décidait aussi pour les joueurs.
+    expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toMatch(/à l'organisation/i);
+    expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toMatch(/pas aux autres joueurs/i);
+  });
+
+  it("nomme la case qui ouvre le tag aux joueurs", () => {
+    expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toContain("« Tag Discord »");
+  });
+
+  it("dit qu'un tag non certifié reste masqué, case cochée ou non", () => {
+    expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toMatch(/non certifié reste masqué/i);
+    expect(DISCORD_PLAYER_VISIBILITY_PENDING).toMatch(/pas certifié/i);
   });
 });
 

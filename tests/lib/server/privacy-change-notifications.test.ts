@@ -9,7 +9,8 @@ import {
   dispatchPrivacyChangeNotifications,
   resetPrivacyNotificationThrottle,
 } from "@/lib/server/privacy-change-notifications";
-import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { PRIVACY_CHANGES, privacyChangesForOneMessage } from "@/lib/shared/privacy-changes";
+import { siteBaseUrl } from "@/lib/server/site-url";
 import { fakePool } from "../../helpers/sql-double";
 
 const NOW = new Date(`${PRIVACY_CHANGES.at(-1)!.publishedAt}T12:00:00Z`);
@@ -81,13 +82,33 @@ describe("dispatchPrivacyChangeNotifications", () => {
       unknown[],
       string,
     ];
-    for (const change of PRIVACY_CHANGES) expect(message).toContain(change.title);
+    const batch = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    for (const change of batch) expect(message).toContain(change.title);
+    expect(message).not.toContain("autre(s) changement(s)");
     expect(recipients).toEqual([{ discordId: "100000000000000001", handle: null, label: "Nova" }]);
     expect(context).toBe("privacy-changes");
 
-    // Réservé **avant** l'envoi, une ligne par changement.
+    // Réservé **avant** l'envoi, une ligne par changement nommé — et rien de ce
+    // que le message n'a pas pu nommer.
     const reservations = calls.filter((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
-    expect(reservations.map((c) => c.params[1])).toEqual(PRIVACY_CHANGES.map((c) => c.id));
+    expect(reservations.map((c) => c.params[1])).toEqual(batch.map((c) => c.id));
+  });
+
+  it("envoie au balayage suivant ce qu'un message n'a pas pu nommer", async () => {
+    // Le registre entier ne tient plus dans un message : le plus récent tombait
+    // dans « … et 1 autre » et était pourtant marqué annoncé.
+    const first = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    expect(first.length).toBeLessThan(PRIVACY_CHANGES.length);
+    fakeDb({
+      candidates: [candidate()],
+      done: first.map((change) => ({ user_id: 1, change_id: change.id })),
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
+    for (const change of PRIVACY_CHANGES.slice(first.length)) expect(message).toContain(change.title);
+    for (const change of first) expect(message).not.toContain(change.title);
   });
 
   it("filtre en base : compte vivant, joignable, antérieur, ni accepté ni prévenu", async () => {
@@ -145,7 +166,10 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
     const release = calls.find((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"));
     expect(release).toBeDefined();
-    expect(release!.params).toEqual([1, ...PRIVACY_CHANGES.map((c) => c.id)]);
+    expect(release!.params).toEqual([
+      1,
+      ...privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl()).map((c) => c.id),
+    ]);
   });
 
   it("membre introuvable : la réservation reste (la modale prend le relais)", async () => {
