@@ -16,25 +16,82 @@ import { AccessibilityPanel } from "@/components/accessibility/AccessibilityMenu
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import {
   OPEN_ACCESSIBILITY_MENU_EVENT,
+  focusReturnTarget,
   requestAccessibilityMenu,
+  resolveMenuOpener,
+  type AccessibilityMenuRequest,
 } from "@/lib/shared/accessibility-menu-request";
 import { readSource } from "../helpers/read-source";
 
 const noop = () => undefined;
 
 describe("requestAccessibilityMenu", () => {
-  it("émet l'évènement d'ouverture sur la cible donnée", () => {
+  it("émet l'évènement d'ouverture sur la cible donnée, déclencheur joint", () => {
     const target = new EventTarget();
-    const listener = jest.fn();
-    target.addEventListener(OPEN_ACCESSIBILITY_MENU_EVENT, listener);
+    const received: Array<AccessibilityMenuRequest | null> = [];
+    target.addEventListener(OPEN_ACCESSIBILITY_MENU_EVENT, (event) => {
+      received.push((event as CustomEvent<AccessibilityMenuRequest>).detail);
+    });
+    const opener = {} as HTMLElement;
 
-    requestAccessibilityMenu(target);
+    requestAccessibilityMenu(opener, target);
 
-    expect(listener).toHaveBeenCalledTimes(1);
+    expect(received).toEqual([{ opener }]);
+  });
+
+  it("sans déclencheur, la demande porte `null`", () => {
+    const target = new EventTarget();
+    const received: Array<AccessibilityMenuRequest | null> = [];
+    target.addEventListener(OPEN_ACCESSIBILITY_MENU_EVENT, (event) => {
+      received.push((event as CustomEvent<AccessibilityMenuRequest>).detail);
+    });
+
+    requestAccessibilityMenu(null, target);
+
+    expect(received).toEqual([{ opener: null }]);
   });
 
   it("ne lève rien quand aucun menu n'écoute", () => {
-    expect(() => requestAccessibilityMenu(new EventTarget())).not.toThrow();
+    expect(() => requestAccessibilityMenu(null, new EventTarget())).not.toThrow();
+  });
+});
+
+describe("resolveMenuOpener", () => {
+  const body = "body";
+  const outside = () => false;
+
+  it("préfère le déclencheur nommé à l'élément actif", () => {
+    // Safari : le bouton cliqué n'a pas le focus, l'élément actif est <body>.
+    expect(resolveMenuOpener("footer", body, body, outside)).toBe("footer");
+    expect(resolveMenuOpener("footer", "autre", body, outside)).toBe("footer");
+  });
+
+  it("retombe sur l'élément actif quand la demande n'en nomme aucun", () => {
+    expect(resolveMenuOpener(null, "lien", body, outside)).toBe("lien");
+    expect(resolveMenuOpener(undefined, "lien", body, outside)).toBe("lien");
+  });
+
+  it("ne retient ni <body> ni rien — le bouton flottant sert alors de repli", () => {
+    expect(resolveMenuOpener(null, body, body, outside)).toBeNull();
+    expect(resolveMenuOpener(null, null, body, outside)).toBeNull();
+  });
+
+  it("ne retient pas un élément du menu lui-même", () => {
+    expect(resolveMenuOpener("case", null, body, (element) => element === "case")).toBeNull();
+  });
+});
+
+describe("focusReturnTarget", () => {
+  const fab = { isConnected: true, name: "fab" };
+
+  it("rend le focus au déclencheur encore dans la page", () => {
+    const opener = { isConnected: true, name: "footer" };
+    expect(focusReturnTarget(opener, fab)).toBe(opener);
+  });
+
+  it("retombe sur le bouton flottant si le déclencheur a disparu ou manque", () => {
+    expect(focusReturnTarget({ isConnected: false, name: "footer" }, fab)).toBe(fab);
+    expect(focusReturnTarget(null, fab)).toBe(fab);
   });
 });
 
@@ -53,8 +110,9 @@ describe("AccessibilityMenu — ouverture à la demande", () => {
     expect(source).toContain("window.removeEventListener(OPEN_ACCESSIBILITY_MENU_EVENT");
   });
 
-  it("rend le focus à qui a ouvert le menu, le bouton flottant à défaut", () => {
-    expect(source).toMatch(/opener\?\.isConnected\) opener\.focus\(\);\s*else buttonRef\.current\?\.focus\(\);/);
+  it("passe par les règles pures pour choisir qui reprend le focus", () => {
+    expect(source).toContain("resolveMenuOpener<HTMLElement>(");
+    expect(source).toContain("focusReturnTarget(opener, buttonRef.current)?.focus()");
   });
 
   it("le panneau peut recevoir le focus sans devenir un arrêt de tabulation", () => {
@@ -89,6 +147,14 @@ describe("PublicFooter — accessibilité", () => {
     const css = readSource("components/cyber/landing/PublicFooter.module.css");
     expect(css).toMatch(/\.root \{[^}]*background: var\(--cyber-bg\);/);
     expect(css).toMatch(/\.columns a,\s*\.linkButton \{[^}]*text-decoration: underline;/);
+  });
+
+  it("dégage sa dernière ligne du bouton flottant d'accessibilité", () => {
+    const css = readSource("components/cyber/landing/PublicFooter.module.css");
+    // Bouton : 24 px du bord + 54 px (16 + 48 sous 720 px). Mêmes valeurs que
+    // le `scroll-padding-bottom` global.
+    expect(css).toMatch(/\.root \{[^}]*padding: 30px 0 92px;/);
+    expect(css).toMatch(/@media \(max-width: 720px\) \{\s*\.root \{\s*padding-bottom: 76px;/);
   });
 
   it("ne descend plus sous --ink-mute pour le bandeau du bas", () => {

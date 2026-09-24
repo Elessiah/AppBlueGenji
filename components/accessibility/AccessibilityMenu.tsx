@@ -9,7 +9,12 @@ import {
   toggleA11ySetting,
   type A11ySettingKey,
 } from "@/lib/shared/accessibility-settings";
-import { OPEN_ACCESSIBILITY_MENU_EVENT } from "@/lib/shared/accessibility-menu-request";
+import {
+  OPEN_ACCESSIBILITY_MENU_EVENT,
+  focusReturnTarget,
+  resolveMenuOpener,
+  type AccessibilityMenuRequest,
+} from "@/lib/shared/accessibility-menu-request";
 import styles from "./AccessibilityMenu.module.css";
 
 /**
@@ -72,12 +77,15 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
   const titleId = useId();
 
   useEffect(() => {
-    const onRequest = () => {
-      const active = document.activeElement;
-      returnFocusRef.current =
-        active instanceof HTMLElement && active !== document.body && !rootRef.current?.contains(active)
-          ? active
-          : null;
+    const onRequest = (event: Event) => {
+      const requested = (event as CustomEvent<Partial<AccessibilityMenuRequest> | null>).detail?.opener;
+      const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      returnFocusRef.current = resolveMenuOpener<HTMLElement>(
+        requested,
+        active,
+        document.body,
+        (element) => rootRef.current?.contains(element) === true,
+      );
       const panel = document.getElementById(panelId);
       if (panel) panel.focus();
       else pendingFocusRef.current = true;
@@ -98,8 +106,7 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
   const restoreFocus = useCallback(() => {
     const opener = returnFocusRef.current;
     returnFocusRef.current = null;
-    if (opener?.isConnected) opener.focus();
-    else buttonRef.current?.focus();
+    focusReturnTarget(opener, buttonRef.current)?.focus();
   }, []);
 
   useEffect(() => {

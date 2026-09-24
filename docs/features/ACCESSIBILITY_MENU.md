@@ -99,7 +99,11 @@ qui ouvre **le même menu** — jamais une seconde copie, qui aurait son propre
   devenir un arrêt de tabulation) : il ne suit pas le pied de page dans l'ordre
   du document, et le focus resté en bas de page l'aurait refermé à la première
   tabulation. Échap et « × » **rendent le focus à qui l'a demandé** — le bouton
-  du pied de page — et au bouton flottant à défaut.
+  du pied de page — et au bouton flottant à défaut. Le déclencheur voyage
+  **dans l'évènement** (`CustomEvent`, `detail.opener`) plutôt que d'être lu
+  sur `document.activeElement` : Safari ne donne pas le focus à un bouton
+  cliqué. Les deux décisions sont pures (`resolveMenuOpener`,
+  `focusReturnTarget`).
 - Seules les pages vitrine ont un pied de page : l'espace connecté n'a que le
   bouton flottant.
 
@@ -111,7 +115,12 @@ Contact) prennent les valeurs du réglage « Contraste renforcé », toutes au-d
 de 4,5:1. On y cherche les mentions légales et l'accessibilité : il doit se lire
 sans réglage, quitte à être moins discret. Il pose aussi son **fond opaque**
 (`--cyber-bg`) pour que le contraste ne dépende pas du décor de la page, souligne
-ses liens et leur donne un anneau de focus explicite.
+ses liens et leur donne un anneau de focus explicite. C'est une **exception
+voulue** à la règle « tout ce qui change l'apparence est désactivé par défaut » :
+le pied de page est justement l'endroit où l'on cherche le menu, il ne peut pas
+dépendre d'un réglage. Enfin son rembourrage du bas (92 px, 76 px sous 720 px,
+comme le `scroll-padding-bottom` global) sort sa dernière ligne de sous le
+bouton flottant, que rien ne peut plus faire défiler en fin de page.
 
 ## Notifications (`components/ui/toast.tsx`)
 

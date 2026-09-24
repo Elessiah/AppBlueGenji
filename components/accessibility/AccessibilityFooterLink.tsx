@@ -13,7 +13,7 @@ interface AccessibilityFooterLinkProps {
  */
 export function AccessibilityFooterLink({ className }: AccessibilityFooterLinkProps) {
   return (
-    <button type="button" className={className} onClick={() => requestAccessibilityMenu()}>
+    <button type="button" className={className} onClick={(event) => requestAccessibilityMenu(event.currentTarget)}>
       Accessibilité
     </button>
   );

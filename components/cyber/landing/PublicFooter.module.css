@@ -2,12 +2,16 @@
    secondaire (`--ink-mute`, `--ink-dim`) et ses traits y valent ceux du
    réglage « Contraste renforcé », tous au-dessus de 4,5:1. Le fond est posé
    ici, opaque, pour que le contraste ne dépende pas de ce qui se trouve
-   derrière (dégradé du `body`, décor d'une page). */
+   derrière (dégradé du `body`, décor d'une page).
+   Le rembourrage du bas dégage la dernière ligne du bouton flottant
+   d'accessibilité (fixe en bas à gauche, 78 px du bord) : en fin de page, rien
+   ne défile plus pour la faire sortir de dessous. Mêmes valeurs que le
+   `scroll-padding-bottom` de `app/globals.css`. */
 .root {
   position: relative;
   z-index: 1;
   border-top: 1px solid var(--line-soft);
-  padding: 30px 0 18px;
+  padding: 30px 0 92px;
   background: var(--cyber-bg);
   color: var(--ink);
 }
@@ -70,7 +74,10 @@
 }
 
 /* Liens soulignés : on les reconnaît sans compter sur la couleur, et le
-   bouton « Accessibilité » se présente comme ses voisins. */
+   bouton « Accessibilité » se présente comme ses voisins. Exception voulue à
+   la règle « tout ce qui change l'apparence vit dans le menu » (réglage
+   `links`) : le pied de page doit se lire sans réglage, c'est là qu'on
+   cherche le menu. */
 .columns a,
 .linkButton {
   color: var(--ink);
@@ -127,6 +134,10 @@
 }
 
 @media (max-width: 720px) {
+  .root {
+    padding-bottom: 76px;
+  }
+
   .inner,
   .bottom {
     width: min(1240px, calc(100vw - 24px));
