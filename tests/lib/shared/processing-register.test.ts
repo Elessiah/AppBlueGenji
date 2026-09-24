@@ -17,6 +17,8 @@ import {
   registerToCsv,
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
+import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
+import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
 
 const controller = registerController("rgpd@exemple.invalid");
@@ -115,6 +117,14 @@ describe("durées : le registre cite les constantes que le code applique", () =>
   it("sessions et codes de connexion", () => {
     expect(byRef("T01").retention.join(" ")).toContain(`${SESSION_RETENTION_DAYS} jours`);
     expect(byRef("T02").retention.join(" ")).toContain(`${DISCORD_CODE_VALIDITY_MINUTES} minutes`);
+  });
+
+  it("signalements et logos signalés, aux durées que le service applique", () => {
+    const retention = byRef("T11").retention.join(" ");
+    expect(retention).toContain(`${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage`);
+    expect(retention).toContain(`${LOGO_QUARANTINE_DAYS / 30} mois`);
+    // Un logo supprimé retient lui aussi le signalement, le temps de la contestation.
+    expect(retention).toContain("masqué ou supprimé");
   });
 
   it("le serveur tire bien ces durées du registre, sans les réécrire à la main", () => {

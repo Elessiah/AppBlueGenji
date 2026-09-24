@@ -22,6 +22,8 @@
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
+import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-09-25";
@@ -395,8 +397,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Signalement et contestations : durée du traitement, puis 30 jours après l'archivage — prolongée tant qu'un logo masqué au titre du signalement attend son échéance",
-      "Logo masqué : 6 mois au plus sans contestation (délai de contestation du règlement (UE) 2022/2065, art. 20), puis suppression définitive ; contesté, jusqu'à la décision",
+      `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage — prolongée tant qu'un logo masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_DAYS / 30} mois au plus après la décision)`,
+      `Logo masqué : ${LOGO_QUARANTINE_DAYS / 30} mois au plus sans contestation (délai de contestation du règlement (UE) 2022/2065, art. 20), puis suppression définitive ; contesté, jusqu'à la décision`,
     ],
     recipients: [
       "Administrateurs de l'association",
