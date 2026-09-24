@@ -217,7 +217,7 @@ export default function RgpdPage() {
             <span className="eyebrow">SECTION 05</span>
             <h2 className={styles.sectionTitle}>Cookies & traceurs</h2>
           </div>
-          <span className={styles.meta}>GOOGLE SUR /CONNEXION SEULEMENT</span>
+          <span className={styles.meta}>GOOGLE : CONNEXION SEULE</span>
         </header>
         <div className={styles.prose}>
           <p>
