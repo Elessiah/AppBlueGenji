@@ -22,7 +22,8 @@ test.describe("Header landing", () => {
     test.skip(!authConfigured, "Définir E2E_AUTH_USER pour le header connecté.");
     await page.goto("/");
     const header = page.locator("header").first();
-    await expect(header.getByRole("link", { name: /Mon profil/ })).toBeVisible();
+    // Le nom du lien commence par le pseudo affiché (WCAG 2.5.3) : « <pseudo>, mon profil ».
+    await expect(header.getByRole("link", { name: /, mon profil$/ })).toBeVisible();
     await expect(header.getByRole("link", { name: /Rejoindre/ })).toHaveCount(0);
   });
 
