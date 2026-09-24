@@ -22,7 +22,7 @@ import {
   type PreviewSeedingSource,
   type TournamentPreview,
 } from "@/lib/shared/tournament-preview";
-import { seedingSource } from "@/lib/shared/seeding";
+import { isPreLaunchState, seedingSource } from "@/lib/shared/seeding";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import type { TournamentRow } from "./_internal";
 import { loadPhases } from "./phases-repository";
@@ -36,7 +36,7 @@ type PreviewSettingsRow = RowDataPacket & {
 
 /** L'aperçu n'a de sens qu'avant le lancement : ensuite, le vrai plateau existe. */
 export function isPreviewableState(state: TournamentRow["state"]): boolean {
-  return state === "UPCOMING" || state === "REGISTRATION";
+  return isPreLaunchState(state);
 }
 
 /**

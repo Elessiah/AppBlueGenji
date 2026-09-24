@@ -54,6 +54,54 @@ export function isSeedOrderEffective(source: SeedingSource): boolean {
   return source !== "RANKING";
 }
 
+/**
+ * Le tournoi est-il encore avant son coup d'envoi ? Masqué, annoncé, aux
+ * inscriptions ou inscriptions closes : aucun plateau n'existe encore, le
+ * tirage est celui que produirait un lancement immédiat.
+ */
+export function isPreLaunchState(state: TournamentState): boolean {
+  return state === "UPCOMING" || state === "REGISTRATION";
+}
+
+/**
+ * La liste des inscrites est-elle rangée selon le classement du site ?
+ *
+ * Oui en `RANKING` tant que le tournoi n'est pas lancé : chaque engagée prend
+ * alors, dès son inscription, la place que lui donne sa cote — celle que le
+ * moteur lui donnera au coup d'envoi si rien ne bouge d'ici là. Une fois lancé,
+ * le classement continue d'évoluer (les matchs du tournoi le font bouger) alors
+ * que le tirage, lui, est fait : la liste retombe sur la colonne `seed`.
+ */
+export function registrationsFollowRanking(
+  source: SeedingSource,
+  state: TournamentState,
+): boolean {
+  return source === "RANKING" && isPreLaunchState(state);
+}
+
+/**
+ * Range des inscriptions dans l'ordre du classement du site.
+ *
+ * `rankedTeamIds` vient de `loadEntrantsBySiteRanking`, qui relit lui-même les
+ * inscriptions : une engagée qui en serait absente (inscrite entre les deux
+ * lectures) garde sa place relative, **après** les classées, plutôt que de
+ * disparaître de la liste.
+ */
+export function orderByRanking<T extends { teamId: number }>(
+  rows: readonly T[],
+  rankedTeamIds: readonly number[],
+): T[] {
+  const position = new Map(rankedTeamIds.map((teamId, index) => [teamId, index]));
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => {
+      const pa = position.get(a.row.teamId) ?? rankedTeamIds.length + a.index;
+      const pb = position.get(b.row.teamId) ?? rankedTeamIds.length + b.index;
+      return pa - pb;
+    })
+    .map(({ row }) => row);
+}
+
 export type SeedingEntry = {
   teamId: number;
   teamName: string;
