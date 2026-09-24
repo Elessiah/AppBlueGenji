@@ -511,6 +511,25 @@ select {
   background: rgba(10, 11, 15, 0.55);
 }
 
+/* Champ signalé par un refus (`aria-invalid`, posé par `useFieldErrors`) : la
+   notification dit la faute, le liseré dit **où**. Placées après les règles de
+   focus, à spécificité égale, ces règles l'emportent : le champ reste rouge
+   quand le focus y revient — c'est justement le moment où il faut le voir. La
+   bordure seule ne porterait pas l'information (WCAG 1.4.1) : la phrase est
+   dans la notification et, pour le lecteur d'écran, dans `aria-describedby`. */
+.field input:not([type="checkbox"]):not([type="radio"])[aria-invalid="true"],
+.field textarea[aria-invalid="true"],
+.field select[aria-invalid="true"] {
+  border-color: var(--danger);
+}
+
+.field input:not([type="checkbox"]):not([type="radio"])[aria-invalid="true"]:focus,
+.field textarea[aria-invalid="true"]:focus,
+.field select[aria-invalid="true"]:focus {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgba(var(--danger-rgb), 0.25);
+}
+
 input[type="datetime-local"] {
   appearance: none;
   cursor: pointer;

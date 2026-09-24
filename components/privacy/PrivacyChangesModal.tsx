@@ -80,6 +80,8 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
   // changements au retour en lecture, jamais le bouton de refus. Rien au
   // montage : `useDialogBehavior` y a déjà placé le focus sur la liste, et le
   // premier bouton de la lecture est justement celui qui mène à la suppression.
+  // La liste n'est une région que si elle défile (`ScrollArea`) : sans elle,
+  // le focus revient à la modale, jamais au bouton de refus.
   const mountedStep = useRef(step);
   useEffect(() => {
     if (!open || mountedStep.current === step) return;

@@ -12,6 +12,8 @@ import {
   toApiPayload,
 } from "../_components/TournamentForm";
 import { applyImageChange, imagePickerChange } from "../_lib/image-picker";
+import { mapError } from "../[id]/_lib/error-map";
+import { CodedError } from "@/lib/shared/field-errors";
 
 /**
  * Création d'un tournoi.
@@ -81,7 +83,10 @@ export default function CreateTournamentPage() {
             });
             const payload = (await response.json()) as { error?: string; id?: number };
             if (!response.ok || !payload.id) {
-              throw new Error(payload.error || "TOURNAMENT_CREATE_FAILED");
+              // Le code voyage avec sa phrase : la notification lit la phrase,
+              // le formulaire tire du code le champ à signaler.
+              const code = payload.error || "TOURNAMENT_CREATE_FAILED";
+              throw new CodedError(code, mapError(code));
             }
             // L'image ne peut partir qu'une fois le tournoi né : elle se range sous
             // son identifiant. Son échec ne défait pas la création — le tournoi

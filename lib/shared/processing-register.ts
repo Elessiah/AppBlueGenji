@@ -111,6 +111,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     recipients: [
       "Public du site (seules les données que le joueur rend visibles)",
       "Joueurs d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
+      "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible",
       "Staff de l'association selon son rôle (administration, arbitrage)",
     ],
     transfers: ["Aucun"],
@@ -222,7 +223,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
     security: [
       ...COMMON_SECURITY,
-      "Pseudo non certifié invisible de tous, administrateurs compris ; jamais public",
+      "Pseudo non certifié invisible de tous, administrateurs compris ; pseudo certifié jamais montré à un visiteur sans compte",
       "Contacts d'un match servis aux seules parties du match, jamais dans l'instantané public du tournoi",
     ],
   },
@@ -358,7 +359,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Informer chaque compte d'un changement du traitement de ses données, et recueillir son acceptation ou son refus",
     subPurposes: [
       "Présenter les changements non encore acceptés à la connexion (« J'accepte » ou « Je refuse, je supprime mon compte »)",
-      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables",
+      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables qui ne l'ont pas accepté sur le site, une semaine après sa publication et au plus un message par mois",
     ],
     legalBasis: "Obligation d'information (RGPD, articles 12 à 14) et consentement du joueur",
     dataSubjects: ["Joueurs inscrits sur le site"],

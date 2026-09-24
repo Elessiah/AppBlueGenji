@@ -239,16 +239,15 @@ function MetaCell({ item }: { item: HeaderMetaItem }) {
       <dt className={s.metaLabel}>{item.label}</dt>
       <dd className={`${s.metaValue} ${isNumeric ? s.metaValueNum : ""}`} style={{ margin: 0 }}>
         {item.hint ? (
-          // `title` seul se perd au clavier et pour les lecteurs d'écran : le
-          // repère est donc aussi focusable, et son nom accessible porte
-          // l'explication en plus de la notation.
-          <span
-            className={s.metaHint}
-            title={item.hint}
-            tabIndex={0}
-            aria-label={`${item.value} — ${item.hint}`}
-          >
+          // `title` seul se perd pour les lecteurs d'écran : l'explication est
+          // donc aussi écrite dans le texte, hors écran. Pas d'`aria-label` —
+          // interdit sur un `<span>` sans rôle (`aria-prohibited-attr`), et
+          // ignoré de certains lecteurs —, ni de `tabIndex` : un repère
+          // focusable qui ne fait rien est un arrêt de tabulation pour rien, et
+          // l'infobulle n'apparaît de toute façon pas au focus clavier.
+          <span className={s.metaHint} title={item.hint}>
             {text}
+            <span className="sr-only"> — {item.hint}</span>
           </span>
         ) : (
           text

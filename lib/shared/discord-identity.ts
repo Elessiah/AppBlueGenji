@@ -27,6 +27,13 @@
  * son besoin naît du tournoi et s'éteint avec lui. Le cast (`casting`) n'y a
  * aucun droit : diffuser n'est pas joindre.
  *
+ * **Un troisième public, choisi par le joueur.** La certification ouvre le tag
+ * à l'organisation, pas aux autres joueurs : pour qu'un coéquipier ou un
+ * adversaire le trouve sur sa fiche, le joueur coche « Tag Discord » parmi les
+ * réglages de visibilité (`bg_users.visible_discord`, décoché par défaut). Le
+ * réglage ne vaut que pour un tag **certifié** : publier un tag que personne
+ * n'a prouvé ferait écrire à un inconnu au nom d'un autre.
+ *
  * Module **pur** : aucune requête, aucun accès serveur. Le `sharesTournament`
  * ci-dessous est un fait que l'appelant a déjà établi, pas une question que ce
  * module sait poser.
@@ -85,6 +92,11 @@ export type DiscordTagSubject = {
    * équipes de s'ajouter et d'inviter leur caster (`lib/shared/match-launch.ts`).
    */
   sharesMatchLobby?: boolean;
+  /**
+   * Le titulaire a-t-il rendu son tag visible des autres joueurs
+   * (`bg_users.visible_discord`) ? Sans effet sur un tag non certifié.
+   */
+  visible?: boolean;
 };
 
 /**
@@ -98,11 +110,14 @@ export type DiscordTagSubject = {
  *    ne puisse pas l'oublier en ajoutant un rôle demain ;
  * 3. **même match** — les parties d'un match lancé ou en lancement (joueurs
  *    des deux engagées, caster) se voient le temps de la rencontre ;
- * 4. **administrateur** — toujours ;
- * 5. **permission `tournaments`** (l'arbitre) — seulement si la cible est
+ * 4. **visible des autres joueurs** — tout lecteur connecté, si le titulaire l'a
+ *    choisi. La clause vient **après** « non vérifié » : le réglage n'ouvre
+ *    jamais un tag que personne n'a prouvé ;
+ * 5. **administrateur** — toujours ;
+ * 6. **permission `tournaments`** (l'arbitre) — seulement si la cible est
  *    engagée dans un tournoi vivant ;
- * 6. tout le reste — non. Le tag n'est **jamais public** : aucun réglage de
- *    visibilité ne l'ouvre, parce qu'aucun écran public n'en a l'usage.
+ * 7. tout le reste — non. Sans session, jamais : le réglage parle aux
+ *    **joueurs** du site, pas au visiteur anonyme.
  */
 export function canViewDiscordTag(
   viewer: DiscordTagViewer | null | undefined,
@@ -112,6 +127,7 @@ export function canViewDiscordTag(
   if (viewer.id === subject.userId) return true;
   if (!subject.verified) return false;
   if (subject.sharesMatchLobby) return true;
+  if (subject.visible) return true;
   if (viewer.isAdmin) return true;
   if (can(viewer, "tournaments")) return Boolean(subject.inActiveTournament);
   return false;
@@ -187,13 +203,20 @@ export function discordVerificationNeedsCode(linkedDiscordId: string | null | un
  * règle qu'elle décrit — une copie dans le dialogue aurait dérivé de
  * `canViewDiscordTag` au premier ajustement, et le joueur aurait consenti à
  * autre chose que ce que le code applique.
+ *
+ * La dernière ligne nomme le **retrait**, jamais la modification : un tag
+ * certifié appartient à un compte rattaché, dont `/profil` rend le champ en
+ * lecture seule. « En modifiant ton tag » renvoyait à un geste que l'écran
+ * n'offre pas — même raison que `DISCORD_CERTIFICATION_UNDO`. Et elle dit ce
+ * que le retrait ne tient pas : une connexion par Discord réécrit le tag
+ * certifié, ce que la confirmation du retrait annonce aussi.
  */
 export const DISCORD_VERIFICATION_EXPOSURE: readonly string[] = [
   "Les administrateurs du site voient ton tag Discord en permanence.",
   "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
   "Les joueurs et le caster de ton match le voient le temps de la rencontre, à partir de son lancement — pour s'ajouter et créer le salon.",
-  "Personne d'autre : ton tag n'apparaît sur aucune page publique, ni pour les autres joueurs du site.",
-  "Tu peux annuler à tout moment en modifiant ton tag : la certification est perdue, et l'exposition avec elle.",
+  "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique.",
+  "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle — jusqu'à ta prochaine connexion par Discord, qui le réenregistre.",
 ];
 
 /**

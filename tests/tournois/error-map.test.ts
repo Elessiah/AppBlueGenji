@@ -1,11 +1,17 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "@jest/globals";
 import {
   ERROR_MESSAGES,
   mapBatchError,
   mapEntrantError,
   mapError,
+  UNKNOWN_ERROR_MESSAGE,
 } from "@/app/(secured)/tournois/[id]/_lib/error-map";
+import { phaseErrorMessage } from "@/app/(secured)/tournois/creer/phase-form";
+import { PHASE_ERROR_CODES } from "@/lib/server/tournaments/validation";
 import { REGISTRATION_FILTER_ERRORS } from "@/lib/shared/registration-filters";
+import { PHASE_ERROR_MESSAGES } from "@/lib/shared/tournament-phases";
 
 /**
  * Les codes que le serveur renvoie réellement doivent tous avoir une phrase
@@ -26,9 +32,171 @@ describe("mapError — inscription", () => {
     expect(message).toMatch(/[a-zà-ÿ]/);
   });
 
-  it("laisse passer un code inconnu tel quel", () => {
-    expect(mapError("WAT")).toBe("WAT");
+});
+
+/**
+ * Le repli. Un code que la table ignore s'affichait **tel quel** dans la
+ * notification : c'est ce qui a laissé passer des refus de la création d'un
+ * tournoi en capitales. Il retombe désormais sur une phrase générique — mais
+ * seulement un code : les appelants passent `error.message`, qui porte parfois
+ * déjà une phrase.
+ */
+describe("mapError — repli", () => {
+  it.each([["WAT"], ["SOME_NEW_REFUSAL"], ["ERR_42"]])(
+    "rend une phrase générique pour le code inconnu %s",
+    (code) => {
+      expect(mapError(code)).toBe(UNKNOWN_ERROR_MESSAGE);
+      expect(mapError(code)).not.toContain(code);
+    },
+  );
+
+  it.each([["constructor"], ["toString"], ["__proto__"], ["hasOwnProperty"]])(
+    "ne remonte pas la chaîne de prototypes pour %s",
+    (key) => {
+      expect(typeof mapError(key)).toBe("string");
+      expect(mapError(key)).toBe(key);
+      expect(phaseErrorMessage(key)).toBe("Erreur de configuration des phases.");
+    },
+  );
+
+  it("laisse passer une phrase déjà rédigée", () => {
+    const sentence = "Tournoi créé, mais son image n'a pas été enregistrée.";
+    expect(mapError(sentence)).toBe(sentence);
   });
+
+  it("laisse passer un échec réseau du navigateur, qui n'est pas un code", () => {
+    expect(mapError("Failed to fetch")).toBe("Failed to fetch");
+  });
+
+  it("ne transforme pas une chaîne vide en phrase d'erreur", () => {
+    // `page.tsx` rend `mapError(rollbackRefusal ?? "")` dans un paragraphe
+    // d'aide : sans refus, rien ne doit s'y écrire.
+    expect(mapError("")).toBe("");
+  });
+
+  it("ne confond pas un code minuscule avec un code du serveur", () => {
+    expect(mapError("invalid_format")).toBe("invalid_format");
+  });
+
+  it("ne promet pas qu'un nouvel essai aboutira", () => {
+    // Un code inconnu peut être un refus déterministe : « réessaie » enverrait
+    // refaire le même geste pour le même refus.
+    expect(UNKNOWN_ERROR_MESSAGE).not.toMatch(/réessaie/i);
+  });
+
+  it("est rédigée en français et ne ressemble à aucun code", () => {
+    expect(UNKNOWN_ERROR_MESSAGE).toMatch(/[a-zà-ÿ]/);
+    expect(Object.values(ERROR_MESSAGES)).not.toContain(UNKNOWN_ERROR_MESSAGE);
+  });
+});
+
+/**
+ * Refus de la création et de l'édition d'un tournoi.
+ *
+ * Les codes sont relevés **dans les sources** de la validation plutôt que
+ * recopiés ici : un refus ajouté demain à `validateTournamentInput`, à
+ * `validatePhases` ou aux conditions d'inscription sans sa phrase fait échouer
+ * ce test, au lieu de retomber sur la formule générique.
+ */
+describe("mapError — refus du formulaire de tournoi", () => {
+  const read = (file: string) => readFileSync(path.join(process.cwd(), file), "utf8");
+
+  // `issue(` : `findPhaseIssue` rend ses refus situés par un constructeur.
+  const REFUSAL_PATTERN = /(?:error: |code: |return |issue\(|fail\(|new Error\(\s*)"([A-Z][A-Z0-9_]+)"/g;
+
+  function codesIn(source: string, pattern: RegExp = REFUSAL_PATTERN): string[] {
+    const found = new Set<string>();
+    for (const match of source.matchAll(pattern)) {
+      found.add(match[1]);
+    }
+    return [...found];
+  }
+
+  const validation = codesIn(read("lib/server/tournaments/validation.ts"));
+  const phases = codesIn(read("lib/shared/tournament-phases.ts"));
+  const filters = codesIn(read("lib/shared/registration-filters.ts")).filter((code) =>
+    code.startsWith("INVALID_"),
+  );
+  // Ce que l'édition et les deux routes ajoutent au-dessus de la validation :
+  // fenêtre d'édition, identifiant, session, échec générique.
+  const routes = [
+    ...[
+      "lib/server/tournaments/edit.ts",
+      "app/api/tournaments/route.ts",
+      "app/api/tournaments/[id]/edit/route.ts",
+    ].flatMap((file) => codesIn(read(file))),
+    // Le module pur rend aussi des **noms de fenêtre** (`return "LOCKED"`), qui
+    // ne sortent jamais vers l'interface : seuls ses `code:` sont des refus.
+    ...codesIn(read("lib/shared/tournament-edit.ts"), /code: "([A-Z][A-Z0-9_]+)"/g),
+  ];
+
+  it("relève bien des codes dans chaque source", () => {
+    // Garde du balayage lui-même : une expression qui ne trouverait plus rien
+    // rendrait les assertions suivantes vides, donc vertes.
+    expect(validation).toEqual(
+      expect.arrayContaining(["MISSING_NAME", "INVALID_FORMAT", "INVALID_SWISS_POINTS"]),
+    );
+    expect(phases).toEqual(expect.arrayContaining(["INVALID_PHASE_COUNT"]));
+    expect(filters).toEqual(expect.arrayContaining(["INVALID_MIN_PLAYERS"]));
+    expect(routes).toEqual(
+      expect.arrayContaining(["TOURNAMENT_LOCKED", "EMPTY_PATCH", "MAX_TEAMS_CANNOT_DECREASE"]),
+    );
+  });
+
+  it.each([...new Set([...validation, ...phases, ...filters, ...routes, ...PHASE_ERROR_CODES])].map((c) => [c]))(
+    "traduit %s",
+    (code) => {
+      const message = mapError(code);
+      expect(message).not.toBe(UNKNOWN_ERROR_MESSAGE);
+      expect(message).not.toContain(code);
+    },
+  );
+
+  it("nomme les deux jeux proposés", () => {
+    expect(mapError("INVALID_GAME")).toMatch(/Overwatch/);
+    expect(mapError("INVALID_GAME")).toMatch(/Marvel Rivals/);
+  });
+
+  it("dit la règle du barème suisse, et non un simple « invalide »", () => {
+    expect(mapError("INVALID_SWISS_POINTS")).toMatch(/victoire/);
+    expect(mapError("INVALID_SWISS_POINTS")).toMatch(/nul/);
+  });
+
+  it("dit la règle de décroissance telle qu'elle s'applique, pourcentages compris", () => {
+    // 80 % après 50 % qualifie moins d'engagés et reste refusé : parler
+    // d'engagés « en plus » serait faux.
+    const message = mapError("INVALID_QUALIFIER_COUNT");
+    expect(message).toMatch(/pourcentage/);
+    expect(message).not.toMatch(/plus d'engagés/);
+  });
+
+  it("nomme la première coupe dans la cadence de survie, que le code couvre aussi en phase", () => {
+    expect(mapError("INVALID_SURVIVAL_ROUNDS")).toMatch(/première/);
+  });
+
+  it("distingue la cadence de survie de sa première coupe", () => {
+    expect(mapError("INVALID_SURVIVAL_ROUNDS")).not.toBe(mapError("INVALID_SURVIVAL_FIRST_CUT"));
+  });
+
+  it("formule les codes partagés tournoi / phase sans parler d'une phase", () => {
+    // `INVALID_SWISS_ROUNDS` et `INVALID_SURVIVAL_ROUNDS` sortent aussi pour un
+    // tournoi sans phases : une phrase qui parlerait de phase y serait fausse.
+    expect(mapError("INVALID_SWISS_ROUNDS")).not.toMatch(/phase/i);
+    expect(mapError("INVALID_SURVIVAL_ROUNDS")).not.toMatch(/phase/i);
+  });
+});
+
+/**
+ * Une phrase par code : le formulaire (`phaseErrorMessage`, contrôle local) et
+ * la notification (`mapError`, refus du serveur) lisent la même table.
+ */
+describe("plan de phases — une seule table", () => {
+  it.each(Object.keys(PHASE_ERROR_MESSAGES).map((code) => [code]))(
+    "donne la même phrase au formulaire et à la notification pour %s",
+    (code) => {
+      expect(mapError(code)).toBe(phaseErrorMessage(code));
+    },
+  );
 });
 
 /**

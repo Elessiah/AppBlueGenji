@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent } from "react";
+import { FormEvent, useMemo } from "react";
 import { ScrollArea } from "@/components/cyber";
 import type {
   BracketMatch,
@@ -25,6 +25,10 @@ import {
   splitPlayoffBrackets,
 } from "../_lib/endurance-sections";
 import { useParticipantWording } from "../_lib/entrant-link";
+import { enduranceNextRoundInput } from "../_lib/endurance-next-round";
+import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round";
+import type { MatchFormat } from "@/lib/shared/match-format";
+import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";
 import { BracketSections } from "./BracketSections";
 import type { MatchScoreDraft } from "./BracketTree";
@@ -63,6 +67,14 @@ interface EnduranceViewProps {
   format: TournamentFormat;
   /** Phrase affichée quand le plateau ne porte encore aucune rencontre. */
   emptyLabel?: string;
+  /**
+   * Montrer l'aperçu de la manche suivante
+   * (`docs/features/ENDURANCE_NEXT_ROUND_PREVIEW.md`) ? Réservé à l'arbitrage
+   * (permission `tournaments`) d'un tournoi en cours — la page en décide.
+   */
+  showNextRound?: boolean;
+  /** Format de la qualification, qui borne ce que les matchs restants peuvent déplacer. */
+  qualificationFormat?: MatchFormat | null;
 }
 
 /**
@@ -349,8 +361,25 @@ export function EnduranceView({
   onOpenAdminModal,
   format,
   emptyLabel = "Aucun match pour l'instant.",
+  showNextRound = false,
+  qualificationFormat = null,
 }: EnduranceViewProps) {
   const wording = useParticipantWording();
+
+  // Calculé ici, sur l'instantané que le flux pousse à chaque score : l'aperçu
+  // suit le plateau sans requête de plus. Rien n'est calculé pour qui ne le
+  // voit pas.
+  const nextRound = useMemo(
+    () =>
+      showNextRound
+        ? previewEnduranceNextRound(enduranceNextRoundInput(endurance, matches, qualificationFormat))
+        : null,
+    [showNextRound, endurance, matches, qualificationFormat],
+  );
+  const teamNames = useMemo(
+    () => new Map(endurance.standings.map((standing) => [standing.teamId, standing.teamName])),
+    [endurance.standings],
+  );
   const { qualification, playoffs } = splitEnduranceMatches(matches);
   const roundSections = enduranceRoundSections(qualification);
 
@@ -578,6 +607,19 @@ export function EnduranceView({
       />
 
       <EnduranceHistory endurance={endurance} myTeamId={myTeamId} />
+
+      {/*
+        L'aperçu précède le plateau : c'est en regardant la manche en cours que
+        l'arbitrage prépare la suivante, et le volet se replie pour qui n'en a
+        pas l'usage.
+      */}
+      {nextRound && (
+        <EnduranceNextRoundPanel
+          preview={nextRound}
+          maxRounds={endurance.maxRounds}
+          teamNames={teamNames}
+        />
+      )}
 
       {/*
         Les play-offs passent devant les manches qualificatives dès qu'ils sont

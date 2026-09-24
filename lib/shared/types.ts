@@ -237,6 +237,13 @@ export type VisibilitySettings = {
   overwatch: boolean;
   marvel: boolean;
   major: boolean;
+  /**
+   * Tag Discord visible des autres joueurs connectés. **Seulement s'il est
+   * certifié** : le réglage ne publie jamais un tag que personne n'a prouvé
+   * (`canViewDiscordTag`). Indépendant de la certification, qui ouvre le tag à
+   * l'organisation et pas aux joueurs.
+   */
+  discord: boolean;
 };
 
 export type PlayerRole = TeamRole;
@@ -260,8 +267,8 @@ export type PublicUserProfile = {
    * Tag Discord, **filtré à la sortie** par `visibleDiscordTag`
    * (`lib/shared/discord-identity.ts`) : le propriétaire du compte, les
    * administrateurs si le tag est certifié, l'arbitrage si le joueur est en plus
-   * engagé dans un tournoi vivant. `null` partout ailleurs — il n'est jamais
-   * public.
+   * engagé dans un tournoi vivant, tout joueur connecté si le titulaire l'a
+   * rendu visible (`visibility.discord`). `null` partout ailleurs.
    */
   discordPseudo?: string | null;
   /**

@@ -245,6 +245,7 @@ async function runMigrations(db: Pool): Promise<void> {
       visible_overwatch TINYINT(1) NOT NULL DEFAULT 0,
       visible_marvel TINYINT(1) NOT NULL DEFAULT 0,
       visible_major TINYINT(1) NOT NULL DEFAULT 0,
+      visible_discord TINYINT(1) NOT NULL DEFAULT 0,
       open_to_recruitment TINYINT(1) NOT NULL DEFAULT 0,
       platform_roles_json JSON NULL,
       terms_version INT NULL,
@@ -1208,6 +1209,11 @@ async function runMigrations(db: Pool): Promise<void> {
     `ALTER TABLE bg_recruitment_ads ADD COLUMN priority
        ENUM('PRIORITY', 'IMPORTANT', 'OPTIONAL') NOT NULL DEFAULT 'OPTIONAL'
        AFTER contact_preferred`,
+    // Tag Discord visible des autres joueurs (`canViewDiscordTag`). Défaut `0` :
+    // l'exposition est un choix du joueur, et le tag d'un compte existant garde
+    // le public sous lequel il a été saisi.
+    `ALTER TABLE bg_users ADD COLUMN visible_discord TINYINT(1) NOT NULL DEFAULT 0
+       AFTER visible_major`,
     // Conditions d'utilisation : dernière version acceptée par le compte
     // (`lib/shared/terms-of-use.ts`). `NULL` = jamais acceptées, et **aucun
     // remplissage** — on n'attribue pas une acceptation que personne n'a donnée.

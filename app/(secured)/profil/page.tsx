@@ -34,6 +34,9 @@ import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/up
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import {
   BLIZZARD_BATTLETAG_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_NO_TAG,
+  DISCORD_PLAYER_VISIBILITY_NOTICE,
+  DISCORD_PLAYER_VISIBILITY_PENDING,
   DISCORD_TAG_UNVERIFIED_AUDIENCE,
   GAME_TAG_NOTICE,
 } from "@/lib/shared/identity-sharing";
@@ -48,18 +51,30 @@ import { ConnectedAppsSection } from "./ConnectedAppsSection";
 import { BattletagVisibilityNotice } from "./BattletagVisibilityNotice";
 import { useAccountConnections } from "./useAccountConnections";
 import s from "./profil.module.css";
+import { PROFILE_FIELD_ERRORS } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+
+/** Contrôles que peut désigner un refus de la sauvegarde du profil. */
+const PROFILE_FIELD_IDS = {
+  pseudo: "profile-pseudo",
+  battletag: "profile-battletag",
+  discord: "profile-discord",
+} as const;
 
 // Le pseudo n'est plus masquable : identité de base du joueur sur la plateforme.
 const VISIBILITY_LABELS: Record<string, string> = {
   avatar: "Avatar",
   overwatch: "BattleTag OW",
   marvel: "Tag Marvel",
+  discord: "Tag Discord",
   major: "Majorité",
 };
 
 export default function ProfilePage() {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
+  const fieldErrors = useFieldErrors(PROFILE_FIELD_ERRORS, PROFILE_FIELD_IDS);
   const [data, setData] = useState<FullProfileResponse | null>(null);
 
   const [pseudo, setPseudo] = useState("");
@@ -104,6 +119,7 @@ export default function ProfilePage() {
     avatar: false,
     overwatch: false,
     marvel: false,
+    discord: false,
     major: false,
   });
   const [avatarBusy, setAvatarBusy] = useState(false);
@@ -221,6 +237,7 @@ export default function ProfilePage() {
         avatar: !!v.avatar,
         overwatch: !!v.overwatch,
         marvel: !!v.marvel,
+        discord: !!v.discord,
         major: !!v.major,
       });
     };
@@ -266,6 +283,7 @@ export default function ProfilePage() {
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    fieldErrors.clear();
     try {
       // **On ne soumet que ce qu'on a changé.** Le formulaire renvoyait le tag
       // de son instantané de montage à chaque sauvegarde, si bien qu'un tag
@@ -343,7 +361,10 @@ export default function ProfilePage() {
       // Le registre du profil, et non celui de la certification : router ces
       // erreurs vers l'autre faisait annoncer « La certification a échoué » à un
       // pseudo déjà pris ou à une coupure réseau.
-      showError(profileErrorMessage((e as Error).message));
+      const code = (e as Error).message;
+      const message = profileErrorMessage(code);
+      fieldErrors.report(code, message);
+      showError(message);
     }
   };
 
@@ -623,9 +644,13 @@ export default function ProfilePage() {
               <input
                 id="profile-pseudo"
                 value={pseudo}
-                onChange={(e) => setPseudo(e.target.value)}
-                aria-describedby="profile-pseudo-hint"
+                onChange={(e) => {
+                  setPseudo(e.target.value);
+                  fieldErrors.clear("pseudo");
+                }}
+                {...fieldErrors.aria("pseudo", "profile-pseudo-hint")}
               />
+              <FieldErrorText fieldId={PROFILE_FIELD_IDS.pseudo} message={fieldErrors.message("pseudo")} />
               <p id="profile-pseudo-hint" className={s.hint}>
                 C&apos;est lui qui t&apos;identifie dans les brackets, les rosters et les
                 feuilles de match. Il n&apos;est pas masquable ({PSEUDO_MAX_LENGTH} caractères
@@ -705,9 +730,12 @@ export default function ProfilePage() {
               <input
                 id="profile-battletag"
                 value={overwatchBattletag}
-                onChange={(e) => setOverwatchBattletag(e.target.value)}
+                onChange={(e) => {
+                  setOverwatchBattletag(e.target.value);
+                  fieldErrors.clear("battletag");
+                }}
                 placeholder="Pseudo#1234"
-                aria-describedby="profile-battletag-hint"
+                {...fieldErrors.aria("battletag", "profile-battletag-hint")}
                 /* Un compte Blizzard rattaché possède son BattleTag : le champ
                    le montre, il ne le prend plus. `readOnly` et non `disabled`
                    — la valeur reste lisible au lecteur d'écran et atteignable
@@ -715,6 +743,7 @@ export default function ProfilePage() {
                 readOnly={battletagLocked}
                 aria-readonly={battletagLocked || undefined}
               />
+              <FieldErrorText fieldId={PROFILE_FIELD_IDS.battletag} message={fieldErrors.message("battletag")} />
               {/* Verrouillé, la phrase du module **remplace** l'annonce : celle-ci
                   prévient de ce qui arrivera si un compte Blizzard est rattaché,
                   et il l'est déjà. */}
@@ -754,9 +783,12 @@ export default function ProfilePage() {
             <input
               id="profile-discord"
               value={discordPseudo}
-              onChange={(e) => setDiscordPseudo(e.target.value)}
+              onChange={(e) => {
+                setDiscordPseudo(e.target.value);
+                fieldErrors.clear("discord");
+              }}
               placeholder="ton_pseudo"
-              aria-describedby="profile-discord-hint"
+              {...fieldErrors.aria("discord", "profile-discord-hint")}
               /* Un compte Discord rattaché possède son tag : le champ le
                  montre, il ne le prend plus. `readOnly` et non `disabled` —
                  la valeur reste lisible au lecteur d'écran et atteignable au
@@ -764,6 +796,7 @@ export default function ProfilePage() {
               readOnly={discordLocked}
               aria-readonly={discordLocked || undefined}
             />
+            <FieldErrorText fieldId={PROFILE_FIELD_IDS.discord} message={fieldErrors.message("discord")} />
             {discordLocked ? (
               // Le verrou interdit de **changer** le tag, pas de le prouver ni
               // de le retirer — et ces deux gestes doivent exister à l'écran.
@@ -883,8 +916,14 @@ export default function ProfilePage() {
             </div>
             <p className={s.hint}>
               Ton pseudo reste toujours visible : c&apos;est lui qui t&apos;identifie dans les
-              brackets, les rosters et les feuilles de match. Ton tag Discord, lui, ne suit
-              pas ces réglages — il a les siens, ci-dessus.
+              brackets, les rosters et les feuilles de match. {DISCORD_PLAYER_VISIBILITY_NOTICE}
+              {/* Seulement sur un état **lu** (`linked` n'est plus `null`) :
+                  avant la lecture, ou quand elle échoue, `verified` vaut
+                  `false` par défaut et l'avertissement accuserait à tort un
+                  joueur certifié. */}
+              {visibility.discord && discordState.linked !== null && !discordState.verified
+                ? ` ${discordState.tag ? DISCORD_PLAYER_VISIBILITY_PENDING : DISCORD_PLAYER_VISIBILITY_NO_TAG}`
+                : null}
             </p>
           </div>
 

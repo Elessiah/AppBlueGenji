@@ -18,6 +18,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import {
   assignRanks,
+  enduranceMatchOutcome,
   forfeitMapCount,
   PLAYOFF_ROUND_OFFSET,
   pairingsAreStale,
@@ -342,61 +343,25 @@ async function loadQualificationOutcomes(
     [tournamentId, PLAYOFF_ROUND_OFFSET],
   );
 
-  return rows.map((row) => {
-    const winnerTeamId = row.winner_team_id === null ? null : Number(row.winner_team_id);
-    // Les scores sont rangés par side (team1/team2) : les réordonner par
-    // vainqueur/perdant est ce qui permet au barème de se compter map par map.
-    const winnerIsTeam1 = winnerTeamId !== null && winnerTeamId === Number(row.team1_id);
-    const winnerScore = winnerIsTeam1 ? row.team1_score : row.team2_score;
-    const loserScore = winnerIsTeam1 ? row.team2_score : row.team1_score;
-
-    // Match **nul** : clos, sans vainqueur, pas par forfait, et portant deux
-    // scores égaux. Les deux camps ne se lisent alors plus sur
-    // `winner_team_id` / `loser_team_id`, vides tous les deux — ils se lisent
-    // sur les sides, comme les scores.
-    //
-    // Les scores font partie du critère, et ce n'est pas de la ceinture-et-
-    // bretelles : c'est **exactement** la définition qu'applique
-    // `playedMatchSql` au classement du site. Sans eux, une ligne close sans
-    // vainqueur *ni* score — reprise de données, écriture à la main — comptait
-    // ici pour un nul 0-0 alors que les fiches l'ignoraient, et la même
-    // rencontre était jouée d'un côté, inexistante de l'autre.
-    const drawn =
-      row.status === "COMPLETED" &&
-      winnerTeamId === null &&
-      row.forfeit_team_id == null &&
-      row.team1_id !== null &&
-      row.team2_id !== null &&
-      row.team1_score !== null &&
-      row.team2_score !== null &&
-      Number(row.team1_score) === Number(row.team2_score);
-
-    return {
+  // La lecture d'une ligne vit dans le module pur (`enduranceMatchOutcome`) :
+  // l'aperçu de la manche suivante la rejoue côté interface sur les matchs de
+  // l'instantané, et deux lectures d'un même match finiraient par diverger.
+  return rows.map((row) =>
+    enduranceMatchOutcome({
       round: Number(row.round_number),
-      completed: row.status === "COMPLETED",
-      winnerTeamId,
+      status: String(row.status),
+      team1Id: row.team1_id === null ? null : Number(row.team1_id),
+      team2Id: row.team2_id === null ? null : Number(row.team2_id),
+      team1Score: row.team1_score === null ? null : Number(row.team1_score),
+      team2Score: row.team2_score === null ? null : Number(row.team2_score),
+      winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),
       loserTeamId: row.loser_team_id === null ? null : Number(row.loser_team_id),
-      winnerMaps: winnerScore === null ? null : Number(winnerScore),
-      loserMaps: loserScore === null ? null : Number(loserScore),
       // `!= null` couvre aussi une colonne absente : un forfait doit être une
       // information positive, jamais un défaut.
-      isForfeit: row.forfeit_team_id != null,
-      drawTeamIds: drawn ? ([Number(row.team1_id), Number(row.team2_id)] as const) : null,
-      // Les deux scores sont égaux sur un nul — le critère ci-dessus l'exige —
-      // donc un seul chiffre suffit.
-      drawMaps: drawn ? Number(row.team1_score) : 0,
-      // Double forfait : deux perdantes, lues sur les sides faute de colonnes
-      // vainqueur/perdant. Le statut est exigé comme pour le nul — un drapeau
-      // resté sur une ligne rouverte ne doit rien retirer à personne.
-      doubleForfeitTeamIds:
-        row.status === "COMPLETED" &&
-        Number(row.double_forfeit ?? 0) === 1 &&
-        row.team1_id !== null &&
-        row.team2_id !== null
-          ? ([Number(row.team1_id), Number(row.team2_id)] as const)
-          : null,
-    };
-  });
+      forfeitTeamId: row.forfeit_team_id == null ? null : Number(row.forfeit_team_id),
+      doubleForfeit: Number(row.double_forfeit ?? 0) === 1,
+    }),
+  );
 }
 
 /**

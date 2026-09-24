@@ -72,6 +72,14 @@ describe("DONNEES_PROFIL", () => {
     expect(tag?.finalite).toMatch(/Non certifié/i);
   });
 
+  it("déclare le public choisi du tag Discord : les autres joueurs, sur la case « Tag Discord »", () => {
+    // La politique fait foi : la case ouvre un public que la modale annonce,
+    // `/rgpd` doit le nommer aussi.
+    const tag = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Discord");
+    expect(tag?.finalite).toMatch(/autres joueurs connectés/i);
+    expect(tag?.finalite).toContain("« Tag Discord »");
+  });
+
   it("déclare la certification elle-même, et qu'elle se perd", () => {
     const certification = DONNEES_PROFIL.find(
       (d) => d.donnee === "Certification du pseudo Discord",

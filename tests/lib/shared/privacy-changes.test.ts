@@ -9,6 +9,8 @@ import {
   PRIVACY_CHANGE_ID_MAX_LENGTH,
   PRIVACY_CHANGE_ID_PATTERN,
   PRIVACY_DM_MAX_LENGTH,
+  PRIVACY_DM_MIN_INTERVAL_DAYS,
+  PRIVACY_DM_SETTLE_DAYS,
   PRIVACY_DM_WINDOW_DAYS,
   UNKNOWN_PRIVACY_CHANGE,
   announceablePrivacyChanges,
@@ -16,8 +18,11 @@ import {
   checkPrivacyAcknowledgement,
   formatPrivacyChangeDate,
   pendingPrivacyChanges,
+  privacyChangesForOneMessage,
   privacyChangesHeading,
+  privacyDmBatch,
   privacyPolicyUpdatedLabel,
+  settledPrivacyChanges,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
 
@@ -62,6 +67,17 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
     expect(text).toMatch(/administrateur ne voit pas un BattleTag masqué/);
   });
 
+  it("déclare le tag Discord visible des joueurs : sur choix, certifié seulement, jamais sans compte", () => {
+    // La case « Tag Discord » ouvre un public de plus au tag certifié : sans
+    // cette entrée, le site traiterait une donnée d'une façon qu'il n'a pas annoncée.
+    const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-09-tag-discord-visible-joueurs");
+    expect(entry).toBeDefined();
+    const text = [entry!.summary, ...entry!.details].join(" ");
+    expect(text).toMatch(/décochée/);
+    expect(text).toMatch(/tag certifié/);
+    expect(text).toMatch(/sans compte ne le voit jamais/);
+  });
+
   it("a des identifiants uniques, bien formés et qui tiennent dans la colonne", () => {
     const ids = PRIVACY_CHANGES.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
@@ -90,10 +106,26 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
     }
   });
 
-  it("tient dans un seul message Discord, registre entier compris", () => {
+  // Le registre entier ne tient plus dans un message depuis sa huitième entrée,
+  // et ne le tiendra plus jamais : il ne fait que grandir. Ce qui doit tenir,
+  // c'est le plafond du bot, et qu'aucun changement ne disparaisse sans être
+  // compté — le repli que `buildPrivacyChangesMessage` a été écrit pour tenir.
+  it("reste sous le plafond du bot, registre entier compris, et compte ce qu'il ne nomme pas", () => {
     const message = buildPrivacyChangesMessage(PRIVACY_CHANGES, "https://bluegenji.fr");
     expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
-    for (const entry of PRIVACY_CHANGES) expect(message).toContain(entry.title);
+    const named = PRIVACY_CHANGES.filter((entry) => message.includes(entry.title)).length;
+    expect(named).toBeGreaterThan(0);
+    const omitted = PRIVACY_CHANGES.length - named;
+    if (omitted > 0) expect(message).toContain(`… et ${omitted} autre(s) changement(s).`);
+  });
+
+  it("nomme chaque changement quand il est annoncé seul", () => {
+    for (const entry of PRIVACY_CHANGES) {
+      const message = buildPrivacyChangesMessage([entry], "https://bluegenji.fr");
+      expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+      expect(message).toContain(entry.title);
+      expect(message).toContain(entry.summary);
+    }
   });
 });
 
@@ -216,5 +248,83 @@ describe("announceablePrivacyChanges", () => {
   it("inclut la borne exacte", () => {
     const now = new Date(Date.parse("2026-03-05T00:00:00Z") + PRIVACY_DM_WINDOW_DAYS * 86_400_000);
     expect(announceablePrivacyChanges(now, REGISTRY)).toContain(B);
+  });
+});
+
+describe("privacyChangesForOneMessage", () => {
+  const long = (id: string) => change(id, "2026-01-10", { summary: "x".repeat(700) });
+
+  it("garde tout ce qui tient dans un message", () => {
+    expect(privacyChangesForOneMessage([A, B, C], "https://bluegenji.fr")).toEqual([A, B, C]);
+  });
+
+  it("s'arrête au premier changement qui ne serait plus nommé, dans l'ordre", () => {
+    const batch = privacyChangesForOneMessage([long("a"), long("b"), long("c")], "https://bluegenji.fr");
+    expect(batch.map((c) => c.id)).toEqual(["a", "b"]);
+    const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
+    expect(message.length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(message).not.toContain("autre(s) changement(s)");
+  });
+
+  it("rend toujours au moins un changement quand il y en a", () => {
+    const huge = change("z", "2026-01-10", { summary: "x".repeat(5000) });
+    expect(privacyChangesForOneMessage([huge, A], null)).toEqual([huge]);
+  });
+
+  it("ne rend rien quand il n'y a rien", () => {
+    expect(privacyChangesForOneMessage([], null)).toEqual([]);
+  });
+
+  it("partage le registre réel en lots qui nomment chacun tous leurs changements", () => {
+    let rest = [...PRIVACY_CHANGES];
+    while (rest.length > 0) {
+      const batch = privacyChangesForOneMessage(rest, "https://bluegenji.fr");
+      const message = buildPrivacyChangesMessage(batch, "https://bluegenji.fr");
+      for (const entry of batch) expect(message).toContain(entry.title);
+      rest = rest.slice(batch.length);
+    }
+  });
+});
+
+describe("anti-spam des messages privés", () => {
+  const day = (iso: string, plus = 0) => new Date(Date.parse(`${iso}T12:00:00Z`) + plus * 86_400_000);
+
+  it("le délai et l'intervalle tiennent dans la fenêtre d'annonce", () => {
+    // Sinon un changement retenu en sortirait sans avoir jamais été annoncé.
+    expect(PRIVACY_DM_SETTLE_DAYS).toBeGreaterThan(0);
+    expect(PRIVACY_DM_MIN_INTERVAL_DAYS).toBeGreaterThan(0);
+    expect(PRIVACY_DM_SETTLE_DAYS + PRIVACY_DM_MIN_INTERVAL_DAYS).toBeLessThan(PRIVACY_DM_WINDOW_DAYS);
+  });
+
+  describe("settledPrivacyChanges", () => {
+    it("n'autorise un changement qu'après le délai de la modale, borne comprise", () => {
+      expect(settledPrivacyChanges(day(C.publishedAt, PRIVACY_DM_SETTLE_DAYS - 1), [C])).toEqual([]);
+      expect(settledPrivacyChanges(day(C.publishedAt, PRIVACY_DM_SETTLE_DAYS), [C])).toEqual([C]);
+    });
+
+    it("rien le jour de la publication", () => {
+      expect(settledPrivacyChanges(day(C.publishedAt), REGISTRY)).toEqual([A, B]);
+    });
+  });
+
+  describe("privacyDmBatch", () => {
+    const burst = [change("x", "2026-09-23"), change("y", "2026-09-24"), change("z", "2026-09-25")];
+
+    it("ne rend rien tant qu'aucun changement dû n'a passé le délai", () => {
+      expect(privacyDmBatch(burst, day("2026-09-25", 3))).toEqual([]);
+    });
+
+    it("regroupe une rafale : tout part avec le plus ancien, récents compris", () => {
+      expect(privacyDmBatch(burst, day("2026-09-23", PRIVACY_DM_SETTLE_DAYS))).toEqual(burst);
+    });
+
+    it("un changement accepté entre-temps ne déclenche plus rien", () => {
+      // Le 23 est acquitté : il reste deux changements trop récents.
+      expect(privacyDmBatch(burst.slice(1), day("2026-09-23", PRIVACY_DM_SETTLE_DAYS))).toEqual([]);
+    });
+
+    it("rien à envoyer à qui n'a rien de dû", () => {
+      expect(privacyDmBatch([], day("2027-01-01"))).toEqual([]);
+    });
   });
 });

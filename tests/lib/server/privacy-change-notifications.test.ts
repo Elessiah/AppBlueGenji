@@ -9,10 +9,19 @@ import {
   dispatchPrivacyChangeNotifications,
   resetPrivacyNotificationThrottle,
 } from "@/lib/server/privacy-change-notifications";
-import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import {
+  PRIVACY_CHANGES,
+  PRIVACY_DM_MIN_INTERVAL_DAYS,
+  PRIVACY_DM_SETTLE_DAYS,
+  privacyChangesForOneMessage,
+} from "@/lib/shared/privacy-changes";
+import { siteBaseUrl } from "@/lib/server/site-url";
 import { fakePool } from "../../helpers/sql-double";
 
-const NOW = new Date(`${PRIVACY_CHANGES.at(-1)!.publishedAt}T12:00:00Z`);
+const DAY_MS = 86_400_000;
+const at = (iso: string, plusDays = 0) => new Date(Date.parse(`${iso}T12:00:00Z`) + plusDays * DAY_MS);
+/** Tous les changements du registre ont passé le délai de la modale. */
+const NOW = at(PRIVACY_CHANGES.at(-1)!.publishedAt, PRIVACY_DM_SETTLE_DAYS);
 const flat = (sql: unknown) => String(sql).replace(/\s+/g, " ").trim();
 
 type Candidate = {
@@ -81,13 +90,33 @@ describe("dispatchPrivacyChangeNotifications", () => {
       unknown[],
       string,
     ];
-    for (const change of PRIVACY_CHANGES) expect(message).toContain(change.title);
+    const batch = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    for (const change of batch) expect(message).toContain(change.title);
+    expect(message).not.toContain("autre(s) changement(s)");
     expect(recipients).toEqual([{ discordId: "100000000000000001", handle: null, label: "Nova" }]);
     expect(context).toBe("privacy-changes");
 
-    // Réservé **avant** l'envoi, une ligne par changement.
+    // Réservé **avant** l'envoi, une ligne par changement nommé — et rien de ce
+    // que le message n'a pas pu nommer.
     const reservations = calls.filter((c) => c.sql.startsWith("INSERT IGNORE INTO bg_privacy_change_notifications"));
-    expect(reservations.map((c) => c.params[1])).toEqual(PRIVACY_CHANGES.map((c) => c.id));
+    expect(reservations.map((c) => c.params[1])).toEqual(batch.map((c) => c.id));
+  });
+
+  it("envoie au message suivant ce qu'un message n'a pas pu nommer", async () => {
+    // Le registre entier ne tient plus dans un message : le plus récent tombait
+    // dans « … et 1 autre » et était pourtant marqué annoncé.
+    const first = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    expect(first.length).toBeLessThan(PRIVACY_CHANGES.length);
+    fakeDb({
+      candidates: [candidate()],
+      done: first.map((change) => ({ user_id: 1, change_id: change.id })),
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
+    for (const change of PRIVACY_CHANGES.slice(first.length)) expect(message).toContain(change.title);
+    for (const change of first) expect(message).not.toContain(change.title);
   });
 
   it("filtre en base : compte vivant, joignable, antérieur, ni accepté ni prévenu", async () => {
@@ -99,6 +128,59 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(select.sql).toContain("NOT EXISTS (SELECT 1 FROM bg_privacy_acknowledgments");
     expect(select.sql).toContain("NOT EXISTS (SELECT 1 FROM bg_privacy_change_notifications");
     expect(select.sql).toMatch(/LIMIT 20$/);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("écarte en base les comptes prévenus depuis moins d'un mois, avant la limite du lot", async () => {
+    const calls = fakeDb();
+    await dispatchPrivacyChangeNotifications(NOW);
+    const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
+    expect(select.sql).toContain("r.sent_at > NOW() - INTERVAL ? DAY");
+    expect(select.sql.indexOf("r.sent_at")).toBeLessThan(select.sql.indexOf("LIMIT"));
+    expect(select.params.at(-1)).toBe(PRIVACY_DM_MIN_INTERVAL_DAYS);
+  });
+
+  it("n'écrit pas avant le délai de la modale : aucune requête", async () => {
+    const first = PRIVACY_CHANGES[0].publishedAt;
+    const calls = fakeDb({ candidates: [candidate()] });
+    expect(await dispatchPrivacyChangeNotifications(at(first, PRIVACY_DM_SETTLE_DAYS - 1))).toBe(0);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("ne sélectionne que sur les changements mûrs, mais les annonce tous ensemble", async () => {
+    const first = PRIVACY_CHANGES[0].publishedAt;
+    const settled = PRIVACY_CHANGES.filter((c) => c.publishedAt === first);
+    const fresh = PRIVACY_CHANGES.filter((c) => c.publishedAt !== first);
+    expect(fresh.length).toBeGreaterThan(0);
+
+    const calls = fakeDb({ candidates: [candidate()] });
+    await dispatchPrivacyChangeNotifications(at(first, PRIVACY_DM_SETTLE_DAYS));
+
+    const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
+    expect(select.params).toEqual([
+      ...settled.flatMap((c) => [c.publishedAt, c.id, c.id]),
+      PRIVACY_DM_MIN_INTERVAL_DAYS,
+    ]);
+
+    // Un seul message, qui porte aussi les changements récents — tous ceux
+    // qu'il peut nommer sous le plafond du bot, le reste attendant le suivant.
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+    const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
+    const named = privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl());
+    expect(named.some((change) => fresh.includes(change))).toBe(true);
+    for (const change of named) expect(message).toContain(change.title);
+  });
+
+  it("changements antérieurs déjà reçus : le dernier, trop récent, ne part pas seul", async () => {
+    // Cas de la production : les premières entrées viennent d'être annoncées.
+    const lastFresh = PRIVACY_CHANGES.at(-1)!.publishedAt;
+    const announced = PRIVACY_CHANGES.filter((c) => c.publishedAt < lastFresh);
+    expect(announced.length).toBeGreaterThan(0);
+    fakeDb({
+      candidates: [candidate()],
+      done: announced.map((c) => ({ user_id: 1, change_id: c.id })),
+    });
+    expect(await dispatchPrivacyChangeNotifications(at(lastFresh, PRIVACY_DM_SETTLE_DAYS - 1))).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
@@ -145,7 +227,10 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
     const release = calls.find((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"));
     expect(release).toBeDefined();
-    expect(release!.params).toEqual([1, ...PRIVACY_CHANGES.map((c) => c.id)]);
+    expect(release!.params).toEqual([
+      1,
+      ...privacyChangesForOneMessage(PRIVACY_CHANGES, siteBaseUrl()).map((c) => c.id),
+    ]);
   });
 
   it("membre introuvable : la réservation reste (la modale prend le relais)", async () => {

@@ -17,6 +17,11 @@ import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
 import { ConfirmDialog } from "./ConfirmDialog";
 import styles from "../team.module.css";
+import { TEAM_IDENTITY_FIELD_ERRORS } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+
+const FIELD_IDS = { name: "team-meta-name", tag: "team-meta-tag" } as const;
 
 interface TeamSettingsProps {
   team: TeamDetailResponse;
@@ -57,6 +62,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
   const [transferOpen, setTransferOpen] = useState(false);
   const [claimOpen, setClaimOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const fieldErrors = useFieldErrors(TEAM_IDENTITY_FIELD_ERRORS, FIELD_IDS);
 
   // Réaligne le formulaire sur ce que le serveur a retenu (après un
   // enregistrement, il a pu retirer des espaces ou passer le sigle en
@@ -77,6 +83,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
   const saveMeta = async (event: FormEvent) => {
     event.preventDefault();
     if (!canSave) return;
+    fieldErrors.clear();
     setSaving(true);
     try {
       await teamApi(
@@ -91,7 +98,12 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
       showSuccess("Équipe mise à jour.");
       onChanged();
     } catch (e) {
-      showError(teamErrorMessage((e as Error).message));
+      // `teamApi` lève le code du refus tel quel : c'est lui qui désigne le
+      // champ (nom ou sigle déjà pris, que le contrôle local ne peut pas voir).
+      const code = (e as Error).message;
+      const message = teamErrorMessage(code);
+      fieldErrors.report(code, message);
+      showError(message);
     } finally {
       setSaving(false);
     }
@@ -166,14 +178,21 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                 <input
                   id="team-meta-name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={(e) => {
+                    setName(e.target.value);
+                    fieldErrors.clear("name");
+                  }}
                   required
                   // Pas de `minLength`/`maxLength` : le navigateur compte des
                   // unités UTF-16, la base des caractères — un emoji en vaut
                   // deux ici, un là. `checkTeamName` fait foi et arme le bouton.
-                  aria-invalid={!nameCheck.ok}
-                  aria-describedby="team-meta-name-help"
+                  {...fieldErrors.aria("name", "team-meta-name-help")}
+                  // Après la décomposition : le contrôle local (longueur)
+                  // signale aussi, sans phrase à lire — le bouton désarmé et
+                  // l'aide disent déjà la règle.
+                  aria-invalid={!nameCheck.ok || fieldErrors.invalidField === "name"}
                 />
+                <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
                 <p id="team-meta-name-help" className={styles.help}>
                   {TEAM_NAME_MIN_LENGTH} à {TEAM_NAME_MAX_LENGTH} caractères, unique sur le site.
                 </p>
@@ -184,14 +203,18 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                   id="team-meta-tag"
                   className={styles.tagInput}
                   value={tag}
-                  onChange={(e) => setTag(normalizeTeamTag(e.target.value))}
+                  onChange={(e) => {
+                    setTag(normalizeTeamTag(e.target.value));
+                    fieldErrors.clear("tag");
+                  }}
                   minLength={TEAM_TAG_MIN_LENGTH}
                   maxLength={TEAM_TAG_MAX_LENGTH}
                   pattern="[A-Za-z0-9]*"
                   placeholder="BG"
-                  aria-invalid={!tagCheck.ok}
-                  aria-describedby="team-meta-tag-help"
+                  {...fieldErrors.aria("tag", "team-meta-tag-help")}
+                  aria-invalid={!tagCheck.ok || fieldErrors.invalidField === "tag"}
                 />
+                <FieldErrorText fieldId={FIELD_IDS.tag} message={fieldErrors.message("tag")} />
                 <p id="team-meta-tag-help" className={styles.help}>
                   {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le
                   site — laisser vide pour ne pas en avoir.
@@ -214,6 +237,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                   type="button"
                   className="btn ghost"
                   onClick={() => {
+                    fieldErrors.clear();
                     setName(saved.name);
                     setTag(saved.tag);
                     setDescription(saved.description);

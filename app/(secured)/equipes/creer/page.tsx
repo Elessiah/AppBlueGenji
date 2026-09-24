@@ -17,6 +17,11 @@ import {
   TERMS_CHECKBOX_LABEL,
   TERMS_PATH,
 } from "@/lib/shared/terms-of-use";
+import { CodedError, TEAM_IDENTITY_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+
+const FIELD_IDS = { name: "team-name", tag: "team-tag" } as const;
 
 export default function CreateTeamPage() {
   const router = useRouter();
@@ -31,6 +36,7 @@ export default function CreateTeamPage() {
   const [logoRights, setLogoRights] = useState(false);
   const [loading, setLoading] = useState(false);
   const logoInputRef = useRef<HTMLInputElement | null>(null);
+  const fieldErrors = useFieldErrors(TEAM_IDENTITY_FIELD_ERRORS, FIELD_IDS);
 
   const onLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -49,9 +55,13 @@ export default function CreateTeamPage() {
     event.preventDefault();
     const nameCheck = checkTeamName(name);
     if (!nameCheck.ok) {
-      showError(teamErrorMessage(nameCheck.reason));
+      const message = teamErrorMessage(nameCheck.reason);
+      fieldErrors.flag("name", message);
+      showError(message);
       return;
     }
+    // Le nom est bon : son signalement d'erreur tombe, même si une case manque.
+    fieldErrors.clear();
     if (logoFile && !logoRights) {
       showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
       return;
@@ -73,7 +83,10 @@ export default function CreateTeamPage() {
         }),
       });
       const payload = (await response.json()) as { error?: string; teamId?: number };
-      if (!response.ok || !payload.teamId) throw new Error(payload.error || "TEAM_CREATE_FAILED");
+      if (!response.ok || !payload.teamId) {
+        const code = payload.error || "TEAM_CREATE_FAILED";
+        throw new CodedError(code, code);
+      }
 
       if (logoFile) {
         const formData = new FormData();
@@ -95,7 +108,9 @@ export default function CreateTeamPage() {
       router.refresh();
     } catch (e) {
       // Le créateur devient propriétaire : `USER_ALREADY_IN_TEAM` parle de lui.
-      showError(membershipErrorMessage((e as Error).message));
+      const message = membershipErrorMessage((e as Error).message);
+      fieldErrors.report(errorCode(e), message);
+      showError(message);
     } finally {
       setLoading(false);
     }
@@ -124,11 +139,15 @@ export default function CreateTeamPage() {
                 // Bornes contrôlées par `checkTeamName` à l'envoi, pas par
                 // `minLength`/`maxLength` : le navigateur compte des unités
                 // UTF-16, la base des caractères.
-                aria-describedby="team-name-help"
+                {...fieldErrors.aria("name", "team-name-help")}
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  fieldErrors.clear("name");
+                }}
                 placeholder="Mon équipe"
               />
+              <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
               <p id="team-name-help" style={{ fontSize: 12, color: "var(--text-1)", margin: "6px 0 0" }}>
                 {TEAM_NAME_MIN_LENGTH} à {TEAM_NAME_MAX_LENGTH} caractères, unique sur le site.
               </p>
@@ -141,21 +160,26 @@ export default function CreateTeamPage() {
               <input
                 id="team-tag"
                 value={tag}
-                onChange={(e) => setTag(normalizeTeamTag(e.target.value))}
+                onChange={(e) => {
+                  setTag(normalizeTeamTag(e.target.value));
+                  fieldErrors.clear("tag");
+                }}
                 placeholder="BG"
                 minLength={TEAM_TAG_MIN_LENGTH}
                 maxLength={TEAM_TAG_MAX_LENGTH}
                 pattern="[A-Za-z0-9]*"
-                aria-describedby="team-tag-help"
+                {...fieldErrors.aria("tag", "team-tag-help")}
                 style={{ textTransform: "uppercase", letterSpacing: "0.12em", maxWidth: 160 }}
               />
+              <FieldErrorText fieldId={FIELD_IDS.tag} message={fieldErrors.message("tag")} />
               <p id="team-tag-help" style={{ fontSize: 11, color: "var(--ink-mute)", margin: "6px 0 0" }}>
                 {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le site
               </p>
             </div>
             <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <label>Description (optionnel)</label>
+              <label htmlFor="team-description">Description (optionnel)</label>
               <textarea
+                id="team-description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Présente ton équipe, vos objectifs, votre ambiance…"

@@ -38,9 +38,10 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // n'est plus seulement un moyen technique, il devient une **coordonnée de
     // contact** exposée à l'organisation — mais uniquement une fois certifié, et
     // uniquement à deux publics. La phrase dit les deux régimes, parce que les
-    // deux existent en base au même instant.
+    // deux existent en base au même instant — et le troisième public, les autres
+    // joueurs, qui n'existe que si le titulaire coche « Tag Discord ».
     finalite:
-      "Authentification Discord, notifications bot. Une fois certifié : contact par l'organisation pendant un tournoi (administrateurs en permanence, arbitres tant que le joueur est engagé) et entre les parties d'un match (joueurs des deux équipes et caster), de son lancement à sa fin. Non certifié : visible de son seul titulaire",
+      "Authentification Discord, notifications bot. Une fois certifié : contact par l'organisation pendant un tournoi (administrateurs en permanence, arbitres tant que le joueur est engagé) et entre les parties d'un match (joueurs des deux équipes et caster), de son lancement à sa fin ; visible des autres joueurs connectés seulement si tu coches « Tag Discord » dans Mon profil. Non certifié : visible de son seul titulaire, case cochée ou non",
     base: "Consentement",
     duree: "Durée du compte",
   },

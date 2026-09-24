@@ -40,6 +40,7 @@ export async function PATCH(req: Request) {
         overwatch?: boolean;
         marvel?: boolean;
         major?: boolean;
+        discord?: boolean;
       };
       openToRecruitment?: boolean;
     };

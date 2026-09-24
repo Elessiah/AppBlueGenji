@@ -148,6 +148,10 @@ export default function PlayerDetailPage() {
                   {data.profile.pseudo}
                 </h1>
                 <div
+                  // `group` : un nom n'est admis que sur un élément qui a un rôle
+                  // (`aria-prohibited-attr`), et c'en est un — l'équipe et les
+                  // rôles du joueur, lus ensemble.
+                  role="group"
                   aria-label="Équipe et rôles du joueur"
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >

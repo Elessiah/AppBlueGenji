@@ -5,6 +5,13 @@ import { teamErrorMessage } from "../../_lib/team-errors";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 
 /**
+ * Reçoit le code d'un refus et sa phrase, pour le rattacher au champ qu'il
+ * désigne (`useFieldErrors().report`). Le hook garde la notification : c'est
+ * la convention, et le rattachement s'y ajoute sans la remplacer.
+ */
+export type RefusalListener = (code: string, message: string) => void;
+
+/**
  * Gestes de la gestion sur le roster.
  *
  * Chacun **rend son issue** (`true` si le serveur a accepté). Ils avalaient
@@ -17,14 +24,17 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
   const { showError, showSuccess } = useToast();
 
   const run = useCallback(
-    async (action: () => Promise<string>): Promise<boolean> => {
+    async (action: () => Promise<string>, onRefused?: RefusalListener): Promise<boolean> => {
       try {
         const message = await action();
         showSuccess(message);
         onChanged();
         return true;
       } catch (e) {
-        showError(teamErrorMessage((e as Error).message));
+        const code = (e as Error).message;
+        const message = teamErrorMessage(code);
+        showError(message);
+        onRefused?.(code, message);
         return false;
       }
     },
@@ -32,7 +42,7 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
   );
 
   const addMember = useCallback(
-    (pseudo: string, roles: TeamRole[]) =>
+    (pseudo: string, roles: TeamRole[], onRefused?: RefusalListener) =>
       run(async () => {
         const payload = await teamApi<{ result?: "INVITED" | "JOINED" }>(
           `/api/teams/${teamId}/members`,
@@ -42,7 +52,7 @@ export function useMemberManagement(teamId: number, onChanged: () => void) {
         return payload.result === "JOINED"
           ? `${pseudo} avait demandé à rejoindre l'équipe : c'est fait.`
           : `Invitation envoyée à ${pseudo}.`;
-      }),
+      }, onRefused),
     [run, teamId],
   );
 

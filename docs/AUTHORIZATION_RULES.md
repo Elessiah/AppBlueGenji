@@ -243,7 +243,7 @@ modifier le profil d'autrui.
 | Battletag Overwatch         | ✅        | `visible_overwatch`          |
 | Tag Marvel Rivals           | ✅        | `visible_marvel`             |
 | Majorité (`isAdult`)        | ✅        | `visible_major`              |
-| Pseudo Discord              | —         | **règle propre** : certifié → administration et arbitrage ; non certifié → personne (§2.4) |
+| Pseudo Discord              | ✅        | `visible_discord`, **certifié seulement** — et en plus une règle propre : certifié → administration et arbitrage ; non certifié → personne (§2.4) |
 | Pseudo                      | ❌        | jamais masqué — il identifie le joueur en bracket, roster et feuille de match |
 
 Le masquage est appliqué **côté serveur, à la source** : le champ masqué vaut
@@ -305,11 +305,15 @@ Ni l'e-mail, ni le `google_sub`, ni le `discord_id` ne sortent jamais d'un profi
 consulté par un tiers ; ils n'apparaissent que dans l'export RGPD du
 propriétaire.
 
-### 2.4 Le tag Discord — un public, pas un réglage
+### 2.4 Le tag Discord — un public, et un réglage qui ne vaut que certifié
 
-Le tag Discord n'a **pas** de case de visibilité : il a un public, décidé par
-`canViewDiscordTag` (`lib/shared/discord-identity.ts`), et l'ordre des cas *est*
-la règle :
+Le tag Discord a un public, décidé par `canViewDiscordTag`
+(`lib/shared/discord-identity.ts`), et l'ordre des cas *est* la règle. La
+certification l'ouvre à l'**organisation**, jamais aux autres joueurs : ceux-là
+ne le lisent que si le propriétaire coche « Tag Discord » parmi ses réglages de
+visibilité (`bg_users.visible_discord`, décochée par défaut). La case ne vaut
+que pour un tag **certifié** — publier un tag que personne n'a prouvé ferait
+écrire à un inconnu au nom d'un autre — et jamais pour un visiteur sans compte.
 
 | Lecteur                              | Voit le tag                                    |
 | ------------------------------------ | ---------------------------------------------- |
@@ -318,7 +322,8 @@ la règle :
 | Partie d'un même match lancé         | Du lancement à la fin du match (joueurs des deux engagées, caster inscrit) |
 | Administrateur                       | Toujours (tag certifié)                         |
 | Permission `tournaments`             | Si le joueur est engagé dans un tournoi vivant  |
-| `casting`, joueur, visiteur          | Jamais — le tag n'est **pas** public            |
+| Joueur connecté quelconque           | Si le propriétaire a coché « Tag Discord » (`visible_discord`) |
+| `casting`, joueur (case décochée), visiteur sans compte | Jamais |
 
 La clause « non certifié » passe **avant** les rôles, et ce n'est pas un détail
 d'écriture : c'est elle qui protège les comptes qui ont saisi leur tag sous le

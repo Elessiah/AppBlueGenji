@@ -107,6 +107,13 @@
   animation: a11yPanelIn 0.16s ease-out;
 }
 
+/* Le panneau ne reçoit le focus que pour y faire entrer le clavier quand il
+   est ouvert depuis le pied de page : sa bordure le situe déjà, un anneau de
+   plus autour d'un conteneur ferait croire à un contrôle. */
+.panel:focus {
+  outline: none;
+}
+
 /* Le panneau naît du bouton : un fondu court, depuis son coin. */
 @keyframes a11yPanelIn {
   from {
@@ -239,13 +246,34 @@
 
 .foot {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px solid var(--line-soft, rgba(180, 210, 230, 0.08));
 }
 
+/* Lien vers la déclaration : souligné d'office — le menu est lu avant qu'on
+   ait pu cocher « Liens soulignés ». */
+.statementLink {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--blue-300, #8fd5ff);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  border-radius: 4px;
+}
+
+.statementLink:focus-visible {
+  outline: 2px solid var(--blue-500, #5ac8ff);
+  outline-offset: 2px;
+}
+
 .reset {
+  flex-shrink: 0;
   min-height: 32px;
   padding: 6px 12px;
   border: 1px solid var(--line-strong-cy, rgba(180, 210, 230, 0.14));

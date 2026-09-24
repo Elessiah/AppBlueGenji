@@ -1,4 +1,9 @@
-import type { PhaseConfig } from "@/lib/shared/tournament-phases";
+import {
+  PHASE_ERROR_MESSAGES,
+  type PhaseConfig,
+  type PhaseIssue,
+  type PhaseIssueField,
+} from "@/lib/shared/tournament-phases";
 import type { PhaseFormat } from "@/lib/shared/types";
 
 export function createDefaultPhase(position: number, format: PhaseFormat): PhaseConfig {
@@ -70,25 +75,42 @@ export function phaseSummary(phase: PhaseConfig, isLast: boolean): string {
   return `${formatLabel} — ${phase.qualifierValue} % qualifiées`;
 }
 
+/**
+ * Phrase d'un refus du plan de phases. La table est partagée avec la
+ * notification des refus serveur (`PHASE_ERROR_MESSAGES`).
+ */
 export function phaseErrorMessage(code: string): string {
-  switch (code) {
-    case "INVALID_PHASE_COUNT":
-      return "Nombre de phases invalide : 2 à 8 phases attendues.";
-    case "INVALID_PHASE_POSITIONS":
-      return "Positions des phases invalides.";
-    case "INVALID_PHASE_FORMAT":
-      return "Format de phase invalide.";
-    case "DOUBLE_MUST_BE_LAST_PHASE":
-      return "La double élimination ne peut être que la dernière phase.";
-    case "INVALID_PHASE_QUALIFIER":
-      return "Qualification invalide : COUNT ≥ 1 ou PERCENT ∈ 1..99.";
-    case "NON_DECREASING_PHASE_QUALIFIERS":
-      return "Les qualifications en nombre fixe doivent décroître entre les phases.";
-    case "INVALID_PHASE_SWISS_ROUNDS":
-      return "Nombre de manches ronde suisse invalide : 1 à 20 attendues.";
-    case "INVALID_PHASE_SURVIVAL_ROUNDS":
-      return "Cadence de survie invalide : 1 à 50 attendues.";
-    default:
-      return "Erreur de configuration des phases.";
-  }
+  return Object.hasOwn(PHASE_ERROR_MESSAGES, code)
+    ? PHASE_ERROR_MESSAGES[code]
+    : "Erreur de configuration des phases.";
+}
+
+/**
+ * Préfixe de l'`id` de chaque réglage d'une phase, suffixé par sa position.
+ *
+ * Écrit une fois pour deux lecteurs : `PhaseCard`, qui pose les `id`, et le
+ * rattachement d'un refus à son champ (`PhaseBuilder`), qui les focalise — un
+ * `id` recopié à la main dériverait, et le focus partirait nulle part sans
+ * erreur.
+ */
+const PHASE_FIELD_ID_PREFIX: Record<PhaseIssueField, string> = {
+  format: "phase-format",
+  qualifierValue: "phase-qualifier",
+  swissTotalRounds: "phase-swiss",
+  survivalRoundsBeforeFirstCut: "phase-survival-before",
+  survivalRoundsPerCut: "phase-survival-per",
+};
+
+/** `id` du contrôle d'un réglage de la phase `position` (1..n). */
+export function phaseFieldId(position: number, field: PhaseIssueField): string {
+  return `${PHASE_FIELD_ID_PREFIX[field]}-${position}`;
+}
+
+/**
+ * Phrase d'un défaut du plan, **située** : « Phase 2 — … ». La phrase seule ne
+ * disait pas laquelle reprendre, sur un plan qui peut en compter huit.
+ */
+export function phaseIssueMessage(issue: PhaseIssue): string {
+  const message = phaseErrorMessage(issue.code);
+  return issue.phaseIndex === null ? message : `Phase ${issue.phaseIndex + 1} — ${message}`;
 }

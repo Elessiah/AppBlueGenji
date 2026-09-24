@@ -35,7 +35,7 @@ function sampleExport(): PersonalDataExport {
       avatarUrl: null,
       overwatchBattletag: "Player#1234",
       marvelRivalsTag: null,
-      visibility: { avatar: false, overwatch: false, marvel: false, major: false },
+      visibility: { avatar: false, overwatch: false, marvel: false, major: false, discord: false },
       openToRecruitment: true,
     },
     stats: emptyDeepStats(new Date("2026-07-04T00:00:00.000Z")),

@@ -4,7 +4,9 @@ import {
   createDefaultPhase,
   movePhase,
   phaseErrorMessage,
+  phaseFieldId,
   phaseFormatLabel,
+  phaseIssueMessage,
   phaseSummary,
   removePhase,
 } from "@/app/(secured)/tournois/creer/phase-form";
@@ -246,6 +248,20 @@ describe("phase-form — phaseErrorMessage", () => {
     }
   });
 
+  it("traduit les refus du contrôle serveur, pas seulement ceux du formulaire", () => {
+    // `validateRawPhases` rend ses propres codes, qui arrivaient bruts dans la
+    // notification de la création.
+    for (const code of ["MISSING_PHASES", "INVALID_QUALIFIER_VALUE", "INVALID_QUALIFIER_COUNT"]) {
+      expect(phaseErrorMessage(code)).not.toBe("Erreur de configuration des phases.");
+    }
+  });
+
+  it("dit les bornes de la qualification en français, sans jargon", () => {
+    const msg = phaseErrorMessage("INVALID_PHASE_QUALIFIER");
+    expect(msg).not.toMatch(/COUNT|PERCENT|∈/);
+    expect(msg).toMatch(/99 %/);
+  });
+
   it("retourne un message par défaut pour un code inconnu", () => {
     const msg = phaseErrorMessage("UNKNOWN_CODE");
     expect(msg).toBe("Erreur de configuration des phases.");
@@ -259,5 +275,29 @@ describe("phase-form — phaseErrorMessage", () => {
   it("retourne du texte français pour DOUBLE_MUST_BE_LAST_PHASE", () => {
     const msg = phaseErrorMessage("DOUBLE_MUST_BE_LAST_PHASE");
     expect(msg).toMatch(/double.*dernière/i);
+  });
+});
+
+describe("phase-form — phaseFieldId", () => {
+  it("suffixe chaque réglage par la position de la phase", () => {
+    expect(phaseFieldId(1, "format")).toBe("phase-format-1");
+    expect(phaseFieldId(2, "qualifierValue")).toBe("phase-qualifier-2");
+    expect(phaseFieldId(3, "swissTotalRounds")).toBe("phase-swiss-3");
+    expect(phaseFieldId(4, "survivalRoundsBeforeFirstCut")).toBe("phase-survival-before-4");
+    expect(phaseFieldId(5, "survivalRoundsPerCut")).toBe("phase-survival-per-5");
+  });
+});
+
+describe("phase-form — phaseIssueMessage", () => {
+  it("situe le défaut d'une phase", () => {
+    expect(phaseIssueMessage({ code: "DOUBLE_MUST_BE_LAST_PHASE", phaseIndex: 1, field: "format" })).toBe(
+      `Phase 2 — ${phaseErrorMessage("DOUBLE_MUST_BE_LAST_PHASE")}`,
+    );
+  });
+
+  it("garde la phrase seule pour un défaut du plan entier", () => {
+    expect(phaseIssueMessage({ code: "INVALID_PHASE_COUNT", phaseIndex: null, field: null })).toBe(
+      phaseErrorMessage("INVALID_PHASE_COUNT"),
+    );
   });
 });

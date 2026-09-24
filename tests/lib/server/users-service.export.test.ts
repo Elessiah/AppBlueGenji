@@ -31,6 +31,7 @@ function exportRow(overrides: Record<string, unknown> = {}) {
     visible_overwatch: 0,
     visible_marvel: 0,
     visible_major: 0,
+    visible_discord: 1,
     open_to_recruitment: 1,
     created_at: new Date("2026-01-01T00:00:00Z"),
     ...overrides,
@@ -51,6 +52,7 @@ function fullProfileRow(overrides: Record<string, unknown> = {}) {
     visible_overwatch: 0,
     visible_marvel: 0,
     visible_major: 0,
+    visible_discord: 1,
     open_to_recruitment: 1,
     is_admin: 0,
     created_at: new Date("2026-01-01T00:00:00Z"),
@@ -92,6 +94,8 @@ describe("exportOwnData", () => {
       overwatch: false,
       marvel: false,
       major: false,
+      // Le réglage exporté est la valeur brute, choix du joueur compris.
+      discord: true,
     });
     expect(data.profile.openToRecruitment).toBe(true);
     expect(data.exportedAt).toEqual(expect.any(String));

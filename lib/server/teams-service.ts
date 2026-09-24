@@ -25,6 +25,7 @@ import {
 import { TEAM_NAME_ALREADY_USED, checkTeamName } from "@/lib/shared/team-name";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { assertTermsAccepted, recordTermsAcceptance } from "@/lib/server/terms-acceptance";
+import type { TeamPageIdentity } from "@/lib/shared/entity-page-titles";
 
 /**
  * Longueur de la barre de forme des cartes d'annuaire. Les fiches en montrent
@@ -421,6 +422,24 @@ export async function createTeam(
   } finally {
     connection.release();
   }
+}
+
+/**
+ * Ce que l'onglet d'une fiche d'équipe a le droit de nommer — le nom, et rien
+ * d'autre. Lecture d'une ligne, sans les membres ni les statistiques de
+ * {@link getTeamDetail} : elle sert à `generateMetadata`, jouée à chaque
+ * ouverture de la fiche en plus de la lecture de la page.
+ *
+ * Une entrée solo rend `null`, comme `getTeamDetail` : c'est un joueur, sa
+ * fiche est son profil. Une équipe dissoute garde son nom, sa fiche aussi.
+ */
+export async function getTeamPageIdentity(teamId: number): Promise<TeamPageIdentity | null> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { name: string })[]>(
+    `SELECT name FROM bg_teams WHERE id = ? AND solo_user_id IS NULL LIMIT 1`,
+    [teamId],
+  );
+  return rows.length === 0 ? null : { name: rows[0].name };
 }
 
 /**

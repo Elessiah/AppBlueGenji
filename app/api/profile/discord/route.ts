@@ -6,10 +6,11 @@
  * le code reçu. La règle vit dans `lib/server/discord-verification.ts` ; la
  * route ne fait que garder l'accès, plafonner et traduire en HTTP.
  *
- * Aucun `DELETE` : la certification **se perd en modifiant le tag**, par
- * `PATCH /api/profile` — c'est le même geste que « je ne veux plus être exposé »,
- * et un second chemin laisserait un compte certifié sur un tag qu'il vient de
- * changer.
+ * Aucun `DELETE` : la certification **se perd avec le tag**, par
+ * `PATCH /api/profile` — le retrait (`discordPseudo: null`, seul geste offert à
+ * un compte rattaché, dont le tag est verrouillé) est le même que « je ne veux
+ * plus être exposé », et un second chemin laisserait un compte certifié sur un
+ * tag qu'il vient de changer.
  */
 import { getCurrentUser } from "@/lib/server/auth";
 import {
