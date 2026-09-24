@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { RecruitmentHighlight } from "@/components/recruitment-highlight";
+import { RecruitmentHighlight, bannerLinkLabel } from "@/components/recruitment-highlight";
+import { readSource } from "../helpers/read-source";
 import type { RecruitmentAd } from "@/lib/shared/recruitment";
 
 /**
@@ -158,6 +159,27 @@ describe("RecruitmentHighlight — banderole", () => {
     const markup = render({ bannerAds: [important], onAdPage: true });
     expect(markup).toContain("Cherche graphiste");
     expect(markup).toContain('href="#annonce-44"');
+  });
+
+  it("nomme l'annonce dans le lien, en commençant par le mot affiché", () => {
+    // « Voir → » seul ne dit pas où il mène (WCAG 2.4.4) ; le nom accessible
+    // commence par « Voir » pour que la commande vocale le trouve (2.5.3).
+    expect(bannerLinkLabel(important)).toBe("Voir l'annonce : Cherche graphiste");
+    const markup = render({ bannerAds: [important] });
+    expect(markup).toContain(`aria-label="Voir l&#x27;annonce : Cherche graphiste"`);
+    expect(markup).toContain('Voir <span aria-hidden="true">→</span>');
+  });
+
+  it("nomme aussi l'annonce quand le lien reste sur la page de recrutement", () => {
+    const markup = render({ bannerAds: [important], onAdPage: true });
+    expect(markup).toMatch(/<a href="#annonce-44"[^>]*aria-label="Voir l&#x27;annonce : Cherche graphiste"/);
+  });
+
+  it("donne au lien une cible d'au moins 24 px de haut (WCAG 2.5.8)", () => {
+    const css = readSource("components/recruitment-highlight.module.css").replace(/\/\*[\s\S]*?\*\//g, "");
+    const body = css.slice(css.indexOf(".bannerLink {"), css.indexOf("}", css.indexOf(".bannerLink {")));
+    expect(body).toMatch(/min-height:\s*24px/);
+    expect(body).toMatch(/display:\s*inline-flex/);
   });
 
   it("se montre avec la modale : les deux ne s'excluent plus", () => {

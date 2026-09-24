@@ -21,6 +21,9 @@ en-tête et pied de page des pages vitrine hors de `<main>` (15), fermeture du
 menu burger quand le focus en sort (17). La tâche 5 (modales de la vitrine)
 était déjà réglée par `LandingDialog`, qui passe par `useDialogBehavior`.
 
+Puis par la PR #183 (`docs/features/ACCESSIBILITY_RECRUITMENT_BANNER_LINK.md`) :
+lien « Voir » de la bannière de recrutement (6).
+
 Chaque tâche ci-dessous est indépendante et peut être confiée à une session
 séparée. Une branche `feature/<nom>` par tâche, avec ses tests, selon le
 pipeline de `CLAUDE.md`. Retirer la tâche de ce fichier dans la PR qui la règle.
@@ -30,16 +33,11 @@ sur une tâche en parallèle et la désigner par son numéro.
 **Tout problème d'accessibilité repéré en cours de développement et non réglé
 dans la PR en cours s'ajoute ici**, à la suite, avec le numéro suivant et le
 même format (critère, constat, à faire) — voir `CLAUDE.md`, « Accessibilité ».
+Le numéro suivant est celui qui suit le **plus grand jamais attribué**, tâches
+retirées comprises : **dernier numéro attribué — 17**, à avancer avec chaque
+ajout.
 
 ---
-
-## 6. Lien « Voir → » de la bannière de recrutement
-
-- **Critère** : WCAG 2.4.4 / 2.5.8 · RGAA 6.1.
-- **Constat** : intitulé sans contexte, cible de 57 × 14 px
-  (`components/recruitment-highlight.tsx`).
-- **À faire** : nom accessible qui **commence** par « Voir » (WCAG 2.5.3) et
-  nomme l'annonce ; zone cliquable d'au moins 24 px de haut.
 
 ## 9. Fiche tournoi : attributs ARIA à vérifier
 
