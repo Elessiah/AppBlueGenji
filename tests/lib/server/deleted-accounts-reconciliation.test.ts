@@ -30,7 +30,24 @@ type Account = {
 
 type Query = { userId: number | null; sql: string; params: unknown[] };
 
-function fakeDb(accounts: Record<number, Account>, options: { failFor?: number } = {}) {
+/**
+ * Ce que la lecture de repérage retient : ce que la base rendrait pour
+ * `is_deleted = 1 AND (ancien pseudo OU rôle OU aucune trace)`.
+ */
+function needsWork(account: Account): boolean {
+  if (account.isDeleted === false) return false;
+  return (
+    account.pseudo.startsWith("compte_supprime_")
+    || Boolean(account.isAdmin)
+    || (account.roles ?? null) !== null
+    || !(account.played || account.organized || account.owned)
+  );
+}
+
+function fakeDb(
+  accounts: Record<number, Account>,
+  options: { failFor?: number; rollbackFails?: boolean } = {},
+) {
   const queries: Query[] = [];
   const connections: {
     commit: jest.Mock<() => Promise<void>>;
@@ -41,10 +58,10 @@ function fakeDb(accounts: Record<number, Account>, options: { failFor?: number }
   const poolExecute = jest.fn(async (sql: string) => {
     const q = sql.replace(/\s+/g, " ").trim();
     queries.push({ userId: null, sql: q, params: [] });
-    if (q.startsWith("SELECT id FROM bg_users WHERE is_deleted = 1")) {
+    if (q.startsWith("SELECT u.id FROM bg_users u WHERE u.is_deleted = 1")) {
       return [
         Object.entries(accounts)
-          .filter(([, account]) => account.isDeleted !== false)
+          .filter(([, account]) => needsWork(account))
           .map(([id]) => ({ id: Number(id) })),
       ];
     }
@@ -84,7 +101,9 @@ function fakeDb(accounts: Record<number, Account>, options: { failFor?: number }
       }),
       beginTransaction: jest.fn(async () => {}),
       commit: jest.fn(async () => {}),
-      rollback: jest.fn(async () => {}),
+      rollback: jest.fn(async () => {
+        if (options.rollbackFails) throw new Error("CONNECTION_LOST");
+      }),
       release: jest.fn(() => {}),
     };
     connections.push(connection);
@@ -141,12 +160,41 @@ describe("reconcileDeletedAccounts", () => {
     }
   });
 
-  it("ne touche à rien quand la suppression suit déjà la règle — le cas nominal", async () => {
+  it("ne verrouille rien quand la suppression suit déjà la règle — le cas nominal", async () => {
+    // Le repérage écarte le compte d'une seule lecture : aucune connexion,
+    // aucun verrou, à chaque démarrage de chaque processus.
     const { queries, connections } = fakeDb({ 11: { pseudo: "AlphaGod", played: true } });
 
     expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
     expect(writesFor(queries, 11)).toEqual([]);
-    expect(connections[0].commit).toHaveBeenCalled();
+    expect(connections).toHaveLength(0);
+  });
+
+  it("repère d'une seule lecture, avec les questions de la suppression", async () => {
+    const { queries } = fakeDb({});
+
+    await reconcileDeletedAccounts();
+
+    const listing = queries.find((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"))!;
+    expect(listing.sql).toContain("u.is_deleted = 1");
+    // Littéral, pas joker : `_` échappé dans le LIKE.
+    expect(listing.sql).toContain(String.raw`u.pseudo LIKE 'compte\_supprime\_%'`);
+    expect(listing.sql).toContain("u.platform_roles_json IS NOT NULL");
+    expect(listing.sql).toContain("OR NOT (");
+    expect(listing.sql).toContain("tm.user_id = u.id");
+    expect(listing.sql).toContain("organizer_user_id = u.id");
+  });
+
+  it("ne relit pas un compte déjà en règle entre deux passages", async () => {
+    // Renommé au premier passage, il n'a plus rien d'un ancien compte.
+    const accounts: Record<number, Account> = { 15: { pseudo: "compte_supprime_15", played: true } };
+    fakeDb(accounts);
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 1, failed: 0 });
+
+    accounts[15] = { pseudo: "AlphaOne", played: true };
+    const { connections } = fakeDb(accounts);
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
+    expect(connections).toHaveLength(0);
   });
 
   it.each([
@@ -198,6 +246,17 @@ describe("reconcileDeletedAccounts", () => {
     // Chaque connexion est rendue, échec compris : le pool n'en compte que 25.
     for (const connection of connections) expect(connection.release).toHaveBeenCalled();
     expect(console.error).toHaveBeenCalledTimes(1);
+  });
+
+  it("poursuit même quand l'annulation lève sur une connexion perdue", async () => {
+    const { queries, connections } = fakeDb(
+      { 40: { pseudo: "compte_supprime_40" }, 41: { pseudo: "compte_supprime_41" } },
+      { failFor: 40, rollbackFails: true },
+    );
+
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 1 });
+    expect(writesFor(queries, 41).some((q) => q.sql.startsWith("DELETE FROM bg_users"))).toBe(true);
+    expect(connections[0].release).toHaveBeenCalled();
   });
 
   it("n'écrit rien au journal des suppressions : ces comptes y figurent déjà", async () => {

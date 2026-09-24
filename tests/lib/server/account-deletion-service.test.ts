@@ -8,6 +8,7 @@ jest.mock("@/lib/server/image-upload");
 import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
+import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { fakePool } from "../../helpers/sql-double";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 
@@ -111,12 +112,23 @@ describe("deleteOwnAccount — effacement complet", () => {
     expect(has(queries, "bg_site_visits")).toBe(false);
   });
 
-  it("ne resynchronise aucune entrée solo — un compte effaçable n'en a pas", async () => {
+  it("ne resynchronise aucune entrée solo : l'orpheline part avec le compte", async () => {
+    // Un compte effaçable n'a au plus qu'une entrée solo jamais inscrite :
+    // elle est supprimée, pas renommée.
     const { queries } = fakeDb(EMPTY);
 
     await deleteOwnAccount(7);
 
-    expect(has(queries, "UPDATE bg_users SET pseudo")).toBe(false);
+    expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
+    expect(has(queries, "DELETE FROM bg_teams WHERE solo_user_id = ?")).toBe(true);
+  });
+
+  it("resynchronise l'entrée solo d'un compte anonymisé sous son pseudo d'emprunt", async () => {
+    fakeDb({ ...EMPTY, played: 1 });
+
+    await deleteOwnAccount(7);
+
+    expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 7);
   });
 });
 
@@ -363,7 +375,7 @@ describe("loadAccountTrace — ce qu'on interroge", () => {
 
     const trace = queries.find((q) => q.sql.includes("AS played"))!;
     expect(trace.sql).toContain(
-      "FROM bg_teams s JOIN bg_tournament_registrations r ON r.team_id = s.id WHERE s.solo_user_id = ?",
+      "FROM bg_teams s JOIN bg_tournament_registrations r ON r.team_id = s.id WHERE s.solo_user_id = u.id",
     );
   });
 

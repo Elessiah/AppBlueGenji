@@ -213,13 +213,12 @@ export default function PlayersPage() {
                 <button
                   type="button"
                   className={`${s.deletedToggle} ${showDeleted ? s.deletedToggleOn : ""}`}
+                  // Un nom **constant**, l'état porté par `aria-pressed` : une
+                  // infobulle qui passerait à « Masquer » contredirait le nom
+                  // accessible, et les deux publics liraient deux actions.
                   aria-pressed={showDeleted}
                   aria-label={`Afficher les comptes supprimés (${deletedCount})`}
-                  title={
-                    showDeleted
-                      ? "Masquer les comptes supprimés"
-                      : `Afficher les comptes supprimés (${deletedCount})`
-                  }
+                  title={`Afficher les comptes supprimés (${deletedCount})`}
                   onClick={() => setShowDeleted((shown) => !shown)}
                 >
                   <UserX size={14} aria-hidden="true" />

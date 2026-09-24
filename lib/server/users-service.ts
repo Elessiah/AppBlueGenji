@@ -1249,77 +1249,79 @@ type SqlRunner = Pick<PoolConnection, "execute">;
  *
  * Les deux côtés d'un match sont lus en deux branches : une jointure
  * `team1_id = … OR team2_id = …` n'utilise aucun des deux index.
+ *
+ * Les trois questions sont écrites **une fois**, sur une colonne `u.id` : la
+ * suppression les pose pour un compte (`FROM (SELECT ? AS id) u`), le
+ * rattrapage des comptes supprimés pour tous d'un coup (`FROM bg_users u`).
  */
+function accountTraceSql(): { played: string; organized: string; owned: string } {
+  const played = playedMatchSql("m");
+  const teamSide = (column: "team1_id" | "team2_id") => `EXISTS (
+           SELECT 1
+           FROM bg_team_members tm
+           JOIN bg_matches m ON m.${column} = tm.team_id
+           JOIN bg_tournaments t ON t.id = m.tournament_id
+           WHERE tm.user_id = u.id
+             AND (t.finished_at IS NULL OR tm.joined_at <= t.finished_at)
+             AND (tm.left_at IS NULL OR tm.left_at >= t.start_at)
+             AND ${played}
+         )`;
+  return {
+    played: `(
+         ${teamSide("team1_id")}
+         OR ${teamSide("team2_id")}
+         -- L'entrée solo compte dès qu'elle est **inscrite**, jouée ou non : son
+         -- nom d'engagé est le pseudo du joueur, et elle n'a pas de clé
+         -- étrangère (une cascade effacerait l'engagé, et avec lui l'historique
+         -- des matchs) — effacer le compte la laisserait nommer quelqu'un qui
+         -- n'existe plus. Ses matchs n'ont pas à être relus : une entrée solo
+         -- n'en a qu'inscrite, et une inscription ne se retire plus après le
+         -- coup d'envoi. Une entrée jamais inscrite part avec le compte
+         -- (eraseAccount).
+         OR EXISTS (
+           SELECT 1
+           FROM bg_teams s
+           JOIN bg_tournament_registrations r ON r.team_id = s.id
+           WHERE s.solo_user_id = u.id
+         )
+       )`,
+    organized: `EXISTS (
+         SELECT 1 FROM bg_tournaments WHERE organizer_user_id = u.id
+       )`,
+    owned: `EXISTS (
+         SELECT 1
+         FROM bg_team_members om
+         JOIN bg_teams ot ON ot.id = om.team_id AND ot.deleted_at IS NULL
+         WHERE om.user_id = u.id AND om.left_at IS NULL
+           AND JSON_CONTAINS(om.roles_json, '"OWNER"')
+       )`,
+  };
+}
+
 async function loadAccountTrace(
   runner: SqlRunner,
   userId: number,
 ): Promise<AccountTrace> {
-  const played = playedMatchSql("m");
+  const trace = accountTraceSql();
   const [rows] = await runner.execute<(RowDataPacket & {
     played: number;
     organized: number;
     owned: number;
   })[]>(
     `SELECT
-       (
-         EXISTS (
-           SELECT 1
-           FROM bg_team_members tm
-           JOIN bg_matches m ON m.team1_id = tm.team_id
-           JOIN bg_tournaments t ON t.id = m.tournament_id
-           WHERE tm.user_id = ?
-             AND (t.finished_at IS NULL OR tm.joined_at <= t.finished_at)
-             AND (tm.left_at IS NULL OR t.start_at IS NULL OR tm.left_at >= t.start_at)
-             AND ${played}
-         )
-         OR EXISTS (
-           SELECT 1
-           FROM bg_team_members tm
-           JOIN bg_matches m ON m.team2_id = tm.team_id
-           JOIN bg_tournaments t ON t.id = m.tournament_id
-           WHERE tm.user_id = ?
-             AND (t.finished_at IS NULL OR tm.joined_at <= t.finished_at)
-             AND (tm.left_at IS NULL OR t.start_at IS NULL OR tm.left_at >= t.start_at)
-             AND ${played}
-         )
-         -- L'entrée solo compte dès qu'elle est **inscrite**, jouée ou non : son
-         -- nom d'engagé est le pseudo du joueur, et elle n'a pas de clé
-         -- étrangère (une cascade effacerait l'engagé, et avec lui l'historique
-         -- des matchs) — effacer le compte la laisserait nommer quelqu'un qui
-         -- n'existe plus. Une entrée jamais inscrite, elle, part avec le compte
-         -- (eraseAccount).
-         OR EXISTS (
-           SELECT 1
-           FROM bg_teams s
-           JOIN bg_tournament_registrations r ON r.team_id = s.id
-           WHERE s.solo_user_id = ?
-         )
-         OR EXISTS (
-           SELECT 1
-           FROM bg_teams s
-           JOIN bg_matches m ON m.team1_id = s.id OR m.team2_id = s.id
-           WHERE s.solo_user_id = ?
-         )
-       ) AS played,
-       EXISTS (
-         SELECT 1 FROM bg_tournaments WHERE organizer_user_id = ?
-       ) AS organized,
-       EXISTS (
-         SELECT 1
-         FROM bg_team_members m
-         JOIN bg_teams t ON t.id = m.team_id AND t.deleted_at IS NULL
-         WHERE m.user_id = ? AND m.left_at IS NULL
-           AND JSON_CONTAINS(m.roles_json, '"OWNER"')
-       ) AS owned`,
-    [userId, userId, userId, userId, userId, userId],
+       ${trace.played} AS played,
+       ${trace.organized} AS organized,
+       ${trace.owned} AS owned
+     FROM (SELECT ? AS id) u`,
+    [userId],
   );
   const row = rows[0];
   // Une ligne absente **n'est pas** une absence de trace : lue en booléens, elle
   // donnerait trois `false`, donc `ERASE` — le seul dénouement qui ne se défait
   // pas, et l'exact contraire de la règle conservatrice du module pur. La
-  // requête en rend toujours une aujourd'hui (des sous-requêtes scalaires, sans
-  // `FROM`) ; le jour où elle porte un `FROM bg_users`, l'anomalie doit lever et
-  // non effacer.
+  // requête en rend toujours une aujourd'hui (une table dérivée d'une ligne) ;
+  // le jour où elle porte un `FROM bg_users`, l'anomalie doit lever et non
+  // effacer.
   if (!row) throw new Error("ACCOUNT_TRACE_UNAVAILABLE");
   return {
     playedMatches: Boolean(row.played),
@@ -1509,7 +1511,11 @@ export type DeletedAccountsReconciliation = {
  * migrations (`getDatabase`).
  *
  * Il ne fait rien dans le cas nominal : une suppression faite sous la règle
- * actuelle ne laisse ni compte effaçable ni ancien pseudo. Chaque compte est
+ * actuelle ne laisse ni compte effaçable ni ancien pseudo. D'où **une seule
+ * lecture** pour repérer les comptes à traiter — les mêmes questions que la
+ * suppression (`accountTraceSql`), posées à tous les comptes supprimés d'un
+ * coup —, sans quoi chaque démarrage de chaque processus verrouillerait et
+ * relirait un à un des comptes qu'il n'y a plus à toucher. Chaque compte repéré est
  * traité dans **sa** transaction, sous le verrou de sa ligne et après relecture
  * de `is_deleted` — deux processus qui démarrent ensemble ne se marchent pas
  * dessus —, et l'échec de l'un n'empêche pas les autres.
@@ -1520,8 +1526,18 @@ export type DeletedAccountsReconciliation = {
  */
 export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconciliation> {
   const db = await getDatabase();
+  const trace = accountTraceSql();
   const [candidates] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE is_deleted = 1 ORDER BY id`,
+    `SELECT u.id
+       FROM bg_users u
+      WHERE u.is_deleted = 1
+        AND (
+          u.pseudo LIKE 'compte\\_supprime\\_%'
+          OR u.is_admin = 1
+          OR u.platform_roles_json IS NOT NULL
+          OR NOT (${trace.played} OR ${trace.organized} OR ${trace.owned})
+        )
+      ORDER BY u.id`,
   );
   const outcome: DeletedAccountsReconciliation = { erased: 0, renamed: 0, failed: 0 };
 
@@ -1559,7 +1575,10 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
       }
       await connection.commit();
     } catch (error) {
-      await connection.rollback();
+      // Sur une connexion morte — la panne même qu'on traite —, l'annulation
+      // lève à son tour : sans garde, elle sortirait de la boucle et laisserait
+      // tous les comptes suivants au prochain démarrage.
+      await connection.rollback().catch(() => {});
       outcome.failed += 1;
       console.error(
         `[deleted-accounts] Rattrapage du compte #${userId} reporté au prochain démarrage :`,
@@ -1858,12 +1877,11 @@ export async function getFullProfile(
 
   const isSelf = viewerId === targetUserId;
   const isDeleted = Boolean(userRows[0].is_deleted);
-  const targetIsAdmin = !isDeleted && Boolean(userRows[0].is_admin);
-  // Un compte supprimé n'a plus de titre de staff : l'anonymisation les
-  // retire, et un compte supprimé avant cette règle n'a pas à les afficher en
-  // attendant le rattrapage — un titre désignerait la personne derrière le
-  // pseudo d'emprunt.
-  const targetRoles = isDeleted ? [] : resolveRoles(targetIsAdmin, userRows[0].platform_roles_json);
+  // Un compte supprimé n'a plus de titre de staff à afficher : l'anonymisation
+  // les efface en base, et `reconcileDeletedAccounts` rattrape les comptes
+  // supprimés avant la règle — la lecture n'a pas de cas particulier à tenir.
+  const targetIsAdmin = Boolean(userRows[0].is_admin);
+  const targetRoles = resolveRoles(targetIsAdmin, userRows[0].platform_roles_json);
   // `isDeleted` voyage jusqu'à la fiche, qui doit **annoncer** le compte
   // supprimé : son pseudo d'emprunt se lit comme un pseudo ordinaire.
   const profile: PublicUserProfile = { ...mapPublicUser(userRows[0]), isDeleted };

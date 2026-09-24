@@ -89,15 +89,12 @@ describe("users-service admin management", () => {
       expect(profile?.displayRoles).toEqual(["ARBITRE", "RECRUTEUR"]);
     });
 
-    it("annonce un compte supprimé, et ne lui prête aucun titre de staff", async () => {
-      // Un compte supprimé avant la règle a pu garder ses rôles en attendant le
-      // rattrapage : un titre public désignerait la personne derrière le pseudo
-      // d'emprunt.
+    it("annonce un compte supprimé", async () => {
+      // Tel que l'anonymisation le laisse : ni rôle ni statut d'administrateur,
+      // donc aucun titre de staff à afficher.
       const execute = jest
         .fn<SqlQuery>()
-        .mockResolvedValueOnce([
-          [userRow({ id: 7, is_admin: 1, is_deleted: 1, platform_roles_json: JSON.stringify(["ARBITRE"]) })],
-        ])
+        .mockResolvedValueOnce([[userRow({ id: 7, is_admin: 0, is_deleted: 1, platform_roles_json: null })]])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]])
         .mockResolvedValueOnce([[]]);
@@ -107,8 +104,6 @@ describe("users-service admin management", () => {
 
       expect(profile?.profile.isDeleted).toBe(true);
       expect(profile?.displayRoles).toEqual([]);
-      expect(profile?.roles).toEqual([]);
-      expect(profile?.isAdmin).toBe(false);
       expect(String(execute.mock.calls[0][0])).toContain("is_deleted");
     });
 

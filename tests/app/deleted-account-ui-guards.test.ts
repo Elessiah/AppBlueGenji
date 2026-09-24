@@ -104,6 +104,10 @@ describe("interface — discret dans l'annuaire, évident sur la fiche", () => {
     expect(ANNUAIRE).toContain("<UserX");
     expect(ANNUAIRE).toContain("aria-pressed={showDeleted}");
     expect(ANNUAIRE).toMatch(/aria-label=\{`Afficher les comptes supprimés \(\$\{deletedCount\}\)`\}/);
+    // Infobulle et nom accessible disent la même action ; l'état passe par
+    // `aria-pressed`, jamais par un libellé qui changerait sous le pointeur.
+    expect(ANNUAIRE).toMatch(/title=\{`Afficher les comptes supprimés \(\$\{deletedCount\}\)`\}/);
+    expect(ANNUAIRE).not.toContain("Masquer les comptes supprimés");
     // Aucun libellé rendu en clair entre les balises du bouton.
     const button = ANNUAIRE.slice(
       ANNUAIRE.indexOf("className={`${s.deletedToggle}"),
