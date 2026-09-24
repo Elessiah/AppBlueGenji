@@ -25,6 +25,19 @@
   font-size: 14px;
   line-height: 1.5;
   pointer-events: auto;
+  animation: toastIn 0.18s ease-out;
+}
+
+/* Arrivée depuis le bord gauche, là où la pile est ancrée. */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .toast[data-type="error"] {
@@ -116,6 +129,10 @@
 /* Mouvement réduit : la barre se tait (le décompte, lui, continue — et se
    suspend toujours au survol, au focus et au bouton pause). */
 @media (prefers-reduced-motion: reduce) {
+  .toast {
+    animation: none;
+  }
+
   .progress {
     display: none;
   }
