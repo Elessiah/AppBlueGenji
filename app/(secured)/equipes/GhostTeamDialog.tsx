@@ -13,6 +13,11 @@ import {
 import s from "./GhostTeamDialog.module.css";
 import { teamErrorMessage } from "./_lib/team-errors";
 import { checkTeamName } from "@/lib/shared/team-name";
+import { CodedError, TEAM_IDENTITY_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+
+const FIELD_IDS = { name: "ghost-team-name", tag: "ghost-team-tag" } as const;
 
 type GhostTeamDialogProps = {
   onClose: () => void;
@@ -33,14 +38,18 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
   const [busy, setBusy] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
+  const fieldErrors = useFieldErrors(TEAM_IDENTITY_FIELD_ERRORS, FIELD_IDS);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     const nameCheck = checkTeamName(name);
     if (!nameCheck.ok) {
-      showError(teamErrorMessage(nameCheck.reason));
+      const message = teamErrorMessage(nameCheck.reason);
+      fieldErrors.flag("name", message);
+      showError(message);
       return;
     }
+    fieldErrors.clear();
     setBusy(true);
     try {
       const response = await fetch("/api/teams", {
@@ -54,12 +63,17 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
         }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "GHOST_TEAM_CREATE_FAILED");
+      if (!response.ok) {
+        const code = payload.error || "GHOST_TEAM_CREATE_FAILED";
+        throw new CodedError(code, code);
+      }
       showSuccess("Équipe fantôme créée.");
       onCreated();
       onClose();
     } catch (e) {
-      showError(teamErrorMessage((e as Error).message));
+      const message = teamErrorMessage((e as Error).message);
+      fieldErrors.report(errorCode(e), message);
+      showError(message);
     } finally {
       setBusy(false);
     }
@@ -92,27 +106,36 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
             <input
               id="ghost-team-name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                fieldErrors.clear("name");
+              }}
               required
+              {...fieldErrors.aria("name")}
               // Bornes contrôlées par `checkTeamName` à l'envoi : les
               // `minLength`/`maxLength` natifs comptent des unités UTF-16,
               // la base des caractères.
               data-autofocus
             />
+            <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
           </div>
           <div className="field">
             <label htmlFor="ghost-team-tag">Sigle (facultatif)</label>
             <input
               id="ghost-team-tag"
               value={tag}
-              onChange={(e) => setTag(normalizeTeamTag(e.target.value))}
+              onChange={(e) => {
+                setTag(normalizeTeamTag(e.target.value));
+                fieldErrors.clear("tag");
+              }}
               minLength={TEAM_TAG_MIN_LENGTH}
               maxLength={TEAM_TAG_MAX_LENGTH}
               pattern="[A-Za-z0-9]*"
               placeholder="BG"
-              aria-describedby="ghost-team-tag-help"
+              {...fieldErrors.aria("tag", "ghost-team-tag-help")}
               style={{ textTransform: "uppercase", letterSpacing: "0.12em", maxWidth: 160 }}
             />
+            <FieldErrorText fieldId={FIELD_IDS.tag} message={fieldErrors.message("tag")} />
             <p id="ghost-team-tag-help" style={{ fontSize: 11, color: "var(--ink-mute)", margin: "6px 0 0" }}>
               {TEAM_TAG_MIN_LENGTH} à {TEAM_TAG_MAX_LENGTH} lettres ou chiffres, unique sur le site
             </p>

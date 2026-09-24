@@ -49,6 +49,27 @@ import {
   type TournamentApiValues,
   type TournamentFormValues,
 } from "../_lib/tournament-form-values";
+import {
+  DATE_ORDER_CODES,
+  TOURNAMENT_FIELD_ERRORS,
+  describedBy,
+  errorCode,
+  firstMisplacedDate,
+  type TournamentFormField,
+} from "@/lib/shared/field-errors";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
+import { FieldErrorText } from "@/components/ui/field-error-text";
+
+/** Contrôles que peut désigner un refus de l'envoi. */
+const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
+  name: "tournament-name",
+  maxTeams: "max-teams",
+  matchFormatValue: "match-format-value",
+  startVisibilityAt: "visibility-at",
+  registrationOpenAt: "registration-open-at",
+  registrationCloseAt: "registration-close-at",
+  startAt: "start-at",
+};
 
 // Les valeurs et leurs conversions vivent dans `_lib/tournament-form-values`.
 // Réexportées ici : les deux pages qui montent ce formulaire (création et
@@ -94,13 +115,23 @@ export function TournamentForm({
   explanationId,
 }: TournamentFormProps) {
   const { showError } = useToast();
+  const fieldErrors = useFieldErrors(TOURNAMENT_FIELD_ERRORS, FIELD_IDS);
 
   const [values, setValues] = useState<TournamentFormValues>(initialValues);
-  const set = <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) =>
+  const set = <K extends keyof TournamentFormValues>(key: K, value: TournamentFormValues[K]) => {
     setValues((prev) => ({ ...prev, [key]: value }));
+    if (key in FIELD_IDS) fieldErrors.clear(key as TournamentFormField);
+  };
 
   const locked = (field: TournamentField) => !editableFields.has(field);
   const lockedAttr = (field: TournamentField) => (locked(field) && explanationId ? { "aria-describedby": explanationId } : {});
+  /**
+   * Attributs d'un champ qu'un refus peut désigner : le signalement **et**
+   * l'explication du verrou, dans un seul `aria-describedby` — deux
+   * décompositions successives feraient perdre l'une à l'autre.
+   */
+  const fieldAttrs = (key: TournamentField & TournamentFormField, ...helpIds: string[]) =>
+    fieldErrors.aria(key, locked(key) && explanationId, ...helpIds);
 
   // Ronde suisse : le nombre de rondes suit la recommandation ⌈log₂(N)⌉ + 1 tant
   // que l'organisateur n'a pas saisi la sienne — sinon un changement d'effectif
@@ -182,14 +213,16 @@ export function TournamentForm({
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    fieldErrors.clear();
     setLoading(true);
     try {
       if (!matchFormatValid) {
-        showError(
+        const message =
           matchFormatType === "BO"
             ? "Un Best of doit se jouer en nombre impair de manches (BO1, BO3, BO5…)."
-            : "Nombre de manches du format de match invalide.",
-        );
+            : "Nombre de manches du format de match invalide.";
+        fieldErrors.flag("matchFormatValue", message);
+        showError(message);
         setLoading(false);
         return;
       }
@@ -206,7 +239,22 @@ export function TournamentForm({
 
       await onSubmit(values, image);
     } catch (e) {
-      showError((e as Error).message);
+      const message = (e as Error).message;
+      const code = errorCode(e);
+      // Les deux refus de date ne disent pas **laquelle** : le premier jalon
+      // mal placé se relit sur les valeurs qui viennent de partir.
+      const dateField =
+        code && DATE_ORDER_CODES.has(code)
+          ? firstMisplacedDate<TournamentFormField>([
+              ["startVisibilityAt", values.startVisibilityAt],
+              ["registrationOpenAt", values.registrationOpenAt],
+              ["registrationCloseAt", values.registrationCloseAt],
+              ["startAt", values.startAt],
+            ])
+          : null;
+      if (dateField) fieldErrors.flag(dateField, message);
+      else fieldErrors.report(code, message);
+      showError(message);
     } finally {
       setLoading(false);
     }
@@ -229,8 +277,9 @@ export function TournamentForm({
                 value={values.name}
                 onChange={(e) => set("name", e.target.value)}
                 placeholder="Mon tournoi"
-                {...lockedAttr("name")}
+                {...fieldAttrs("name")}
               />
+              <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
             </div>
             <div className="field">
               <label htmlFor="tournament-game">Jeu</label>
@@ -300,7 +349,7 @@ export function TournamentForm({
               <label htmlFor="participant-type">Type de participants</label>
               <select
                 id="participant-type"
-                aria-describedby={`participant-type-hint${locked("participantType") && explanationId ? ` ${explanationId}` : ""}`}
+                aria-describedby={describedBy("participant-type-hint", locked("participantType") && explanationId)}
                 disabled={locked("participantType")}
                 value={values.participantType}
                 onChange={(e) => set("participantType", e.target.value as ParticipantType)}
@@ -322,9 +371,13 @@ export function TournamentForm({
                 max={256}
                 disabled={locked("maxTeams")}
                 value={maxTeams}
-                onChange={(e) => setMaxTeams(Number(e.target.value))}
-                {...lockedAttr("maxTeams")}
+                onChange={(e) => {
+                  setMaxTeams(Number(e.target.value));
+                  fieldErrors.clear("maxTeams");
+                }}
+                {...fieldAttrs("maxTeams")}
               />
+              <FieldErrorText fieldId={FIELD_IDS.maxTeams} message={fieldErrors.message("maxTeams")} />
             </div>
 
             <div className="field">
@@ -383,10 +436,19 @@ export function TournamentForm({
                     const value = Number(e.target.value);
                     setLastMatchFormatValue(value);
                     patchMatchFormat({ value });
+                    fieldErrors.clear("matchFormatValue");
                   }}
-                  {...lockedAttr("matchFormat")}
+                  {...fieldErrors.aria(
+                    "matchFormatValue",
+                    locked("matchFormat") && explanationId,
+                    "match-format-value-hint",
+                  )}
                 />
-                <p style={HINT}>
+                <FieldErrorText
+                  fieldId={FIELD_IDS.matchFormatValue}
+                  message={fieldErrors.message("matchFormatValue")}
+                />
+                <p id="match-format-value-hint" style={HINT}>
                   {matchFormatType === "BO"
                     ? "Le score d'une équipe ne peut pas dépasser la moitié supérieure : 3 en BO5."
                     : "Objectif à atteindre pour remporter le match : 3 en FT3."}
@@ -565,8 +627,9 @@ export function TournamentForm({
                 disabled={locked("startVisibilityAt")}
                 value={values.startVisibilityAt}
                 onChange={(e) => set("startVisibilityAt", e.target.value)}
-                {...lockedAttr("startVisibilityAt")}
+                {...fieldAttrs("startVisibilityAt")}
               />
+              <FieldErrorText fieldId={FIELD_IDS.startVisibilityAt} message={fieldErrors.message("startVisibilityAt")} />
             </div>
             <div className="field">
               <label htmlFor="registration-open-at">Début inscriptions</label>
@@ -576,8 +639,9 @@ export function TournamentForm({
                 disabled={locked("registrationOpenAt")}
                 value={values.registrationOpenAt}
                 onChange={(e) => set("registrationOpenAt", e.target.value)}
-                {...lockedAttr("registrationOpenAt")}
+                {...fieldAttrs("registrationOpenAt")}
               />
+              <FieldErrorText fieldId={FIELD_IDS.registrationOpenAt} message={fieldErrors.message("registrationOpenAt")} />
             </div>
             <div className="field">
               <label htmlFor="registration-close-at">Fin inscriptions</label>
@@ -587,8 +651,9 @@ export function TournamentForm({
                 disabled={locked("registrationCloseAt")}
                 value={values.registrationCloseAt}
                 onChange={(e) => set("registrationCloseAt", e.target.value)}
-                {...lockedAttr("registrationCloseAt")}
+                {...fieldAttrs("registrationCloseAt")}
               />
+              <FieldErrorText fieldId={FIELD_IDS.registrationCloseAt} message={fieldErrors.message("registrationCloseAt")} />
             </div>
             <div className="field">
               <label htmlFor="start-at">Début tournoi</label>
@@ -598,8 +663,9 @@ export function TournamentForm({
                 disabled={locked("startAt")}
                 value={values.startAt}
                 onChange={(e) => set("startAt", e.target.value)}
-                {...lockedAttr("startAt")}
+                {...fieldAttrs("startAt")}
               />
+              <FieldErrorText fieldId={FIELD_IDS.startAt} message={fieldErrors.message("startAt")} />
             </div>
           </div>
         </section>

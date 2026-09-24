@@ -45,23 +45,24 @@ pipeline de `CLAUDE.md`.
 
 ---
 
+## 10. Erreurs de formulaire liées aux champs — formulaires restants
+
+- **Critère** : WCAG 3.3.1 / 3.3.3 · RGAA 11.10 / 11.11.
+- **Constat** : réglée en partie par `feature/accessibility-form-errors-statement`
+  (`docs/features/ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`) : création d'équipe,
+  équipe fantôme, identité d'une équipe, profil, connexion par code, formulaire
+  de tournoi. Restent sans rattachement au champ : l'invitation d'un joueur et
+  l'attribution d'une fantôme (`PlayerPseudoCombobox` — `USER_NOT_FOUND`,
+  `ALREADY_INVITED` ; le refus est rendu par `useMemberManagement`, qui ne
+  remonte que `true`/`false`), la saisie du tag de `DiscordVerificationDialog`,
+  et les phases d'un tournoi multi-phases (`PhaseBuilder`, refus de
+  `validatePhases`).
+- **À faire** : même mécanique (`useFieldErrors`, `FieldErrorText`, table dans
+  `lib/shared/field-errors.ts`) ; pour la liste déroulante du pseudo, ne pas
+  ramener le focus sans empêcher l'ouverture des suggestions qu'il déclenche.
+
 ## 13. Passe au lecteur d'écran
 
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
-
-## 18. Zones défilantes focusables même sans rien à faire défiler
-
-- **Critère** : WCAG 2.4.3 / 2.1.1 · RGAA 12.8 (ordre de tabulation), 12.6 (repères).
-- **Constat** : `components/cyber/ScrollArea.tsx` pose toujours `tabIndex={0}`
-  et, dès qu'un `ariaLabel` est fourni, `role="region"`. Quand le contenu tient
-  dans la zone (grand écran), c'est un arrêt de tabulation qui ne fait rien et
-  un repère de plus autour d'un contenu souvent déjà nommé — ex. le classement
-  de la ronde suisse (`SwissView.tsx`), « Classement du tournoi — défilement
-  horizontal » autour du tableau « Classement du tournoi », ou les rondes du
-  même écran.
-- **À faire** : ne rendre la zone focusable (et n'en faire une région) que
-  lorsqu'elle déborde réellement (`scrollWidth > clientWidth`, relu par un
-  `ResizeObserver`), en gardant le rendu serveur sûr (focusable par défaut ou
-  non — à trancher) ; vérifier chaque appelant qui compte sur le `role`.

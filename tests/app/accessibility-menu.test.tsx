@@ -142,8 +142,8 @@ describe("AccessibilityMenu — comportement (source)", () => {
     expect(source).toMatch(/try \{\s*document\.cookie = a11yCookieString[\s\S]*?\} catch \{/);
   });
 
-  it("se referme à Échap en rendant le focus au bouton, et au clic à côté", () => {
-    expect(source).toMatch(/event\.key !== "Escape"[\s\S]*?if \(inside\) buttonRef\.current\?\.focus\(\)/);
+  it("se referme à Échap en rendant le focus à qui l'a ouvert, et au clic à côté", () => {
+    expect(source).toMatch(/event\.key !== "Escape"[\s\S]*?if \(inside\) restoreFocus\(\)/);
     expect(source).toMatch(/rootRef\.current\?\.contains\(event\.target as Node\)/);
   });
 
