@@ -15,6 +15,7 @@ import {
   launchPairingKey,
   launchReadiness,
   matchLaunchPhase,
+  nextLaunchMatchId,
   nextLaunchPhaseChangeAt,
   pickLaunchContacts,
   readyCount,
@@ -429,6 +430,24 @@ describe("launchModalWaits", () => {
 
   it("n'attend pas sur la page de la politique, où la modale de confidentialité se tait", () => {
     expect(launchModalWaits({ privacyPending: true, privacyAnswered: false, onPrivacyPage: true })).toBe(false);
+  });
+});
+
+describe("nextLaunchMatchId", () => {
+  it("parcourt tous les matchs en boucle, sans alterner entre les deux premiers", () => {
+    const ids = [1, 2, 3];
+    expect(nextLaunchMatchId(ids, 1)).toBe(2);
+    expect(nextLaunchMatchId(ids, 2)).toBe(3);
+    expect(nextLaunchMatchId(ids, 3)).toBe(1);
+  });
+
+  it("n'a pas de suivant quand le match est seul", () => {
+    expect(nextLaunchMatchId([4], 4)).toBeNull();
+    expect(nextLaunchMatchId([], 4)).toBeNull();
+  });
+
+  it("repart du premier quand le match affiché n'est plus dans la liste", () => {
+    expect(nextLaunchMatchId([5, 6], 9)).toBe(5);
   });
 });
 

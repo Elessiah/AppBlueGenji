@@ -455,6 +455,21 @@ export function launchModalWaits(input: {
 }
 
 /**
+ * Match suivant à présenter depuis « Autre match » : celui qui suit le match
+ * affiché dans la liste, en boucle — prendre toujours le premier des autres
+ * ferait alterner les deux premiers sans jamais atteindre le troisième.
+ * `null` s'il n'y a pas d'autre match.
+ */
+export function nextLaunchMatchId(matchIds: readonly number[], currentId: number): number | null {
+  const others = matchIds.filter((id) => id !== currentId);
+  if (others.length === 0) return null;
+  const index = matchIds.indexOf(currentId);
+  // Identifiants uniques : avec au moins un autre match, le suivant en boucle
+  // n'est jamais le match affiché.
+  return index === -1 ? others[0] : matchIds[(index + 1) % matchIds.length];
+}
+
+/**
  * Événement de fenêtre qui ouvre la modale de lancement sur un match
  * (`detail.matchId`) depuis n'importe quel écran — la carte d'un match sur la
  * fiche du tournoi, par exemple. La modale vit dans la mise en page racine :

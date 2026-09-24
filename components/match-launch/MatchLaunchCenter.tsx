@@ -13,6 +13,7 @@ import {
   launchModalKey,
   launchModalWaits,
   MATCH_LAUNCH_OPEN_EVENT,
+  nextLaunchMatchId,
   MATCH_LAUNCH_REFRESH_EVENT,
   readyCount,
   type LaunchCaster,
@@ -284,7 +285,10 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   const startAt = formatTime(current.startAt);
   const titleId = `match-launch-title-${current.matchId}`;
   const statusId = `match-launch-status-${current.matchId}`;
-  const others = pending.filter((info) => info.matchId !== current.matchId);
+  const nextMatchId = nextLaunchMatchId(
+    pending.map((info) => info.matchId),
+    current.matchId,
+  );
   const partyWord = current.viewer.role === "CASTER" ? "Je suis prêt" : "Mon équipe est prête";
 
   return (
@@ -342,7 +346,9 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
           <CasterCard caster={current.caster} phase={current.phase} onCopy={copy} />
         </div>
 
-        {confirming ? (
+        {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
+            (arbitrage, délai) la referme d'elle-même. */}
+        {confirming && current.phase === "LOBBY" ? (
           <div className={styles.confirm}>
             <p className={styles.confirmText}>
               {current.viewer.role === "CASTER"
@@ -396,16 +402,16 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
               </p>
             )}
             <div className={styles.links}>
-              {others.length > 0 && (
+              {nextMatchId !== null && (
                 <button
                   type="button"
                   className="btn ghost"
                   onClick={() => {
                     setConfirming(false);
-                    setOpenMatchId(others[0].matchId);
+                    setOpenMatchId(nextMatchId);
                   }}
                 >
-                  Autre match ({others.length})
+                  Autre match ({pending.filter((info) => info.matchId !== current.matchId).length})
                 </button>
               )}
               <Link
