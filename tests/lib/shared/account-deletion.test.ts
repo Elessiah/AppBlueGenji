@@ -13,7 +13,7 @@ import {
 } from "@/lib/shared/account-deletion";
 
 const nothing: AccountTrace = {
-  tournaments: false,
+  playedMatches: false,
   organizedTournaments: false,
   ownedTeams: false,
 };
@@ -24,7 +24,7 @@ describe("accountDeletionMode", () => {
   });
 
   it("anonymise dès qu'un tournoi a été joué", () => {
-    expect(accountDeletionMode({ ...nothing, tournaments: true })).toBe("ANONYMIZE");
+    expect(accountDeletionMode({ ...nothing, playedMatches: true })).toBe("ANONYMIZE");
   });
 
   it("anonymise un organisateur — la base refuserait l'effacement", () => {
@@ -40,9 +40,9 @@ describe("accountDeletionMode", () => {
 
   it("suffit d'une seule trace", () => {
     const traces: AccountTrace[] = [
-      { tournaments: true, organizedTournaments: true, ownedTeams: true },
-      { tournaments: false, organizedTournaments: true, ownedTeams: true },
-      { tournaments: true, organizedTournaments: false, ownedTeams: false },
+      { playedMatches: true, organizedTournaments: true, ownedTeams: true },
+      { playedMatches: false, organizedTournaments: true, ownedTeams: true },
+      { playedMatches: true, organizedTournaments: false, ownedTeams: false },
     ];
     for (const trace of traces) expect(accountDeletionMode(trace)).toBe("ANONYMIZE");
   });
@@ -54,7 +54,7 @@ describe("accountRetentionReason", () => {
   });
 
   it("nomme la trace qui retient la ligne", () => {
-    expect(accountRetentionReason({ ...nothing, tournaments: true })).toBe("TOURNAMENTS");
+    expect(accountRetentionReason({ ...nothing, playedMatches: true })).toBe("TOURNAMENTS");
     expect(accountRetentionReason({ ...nothing, organizedTournaments: true }))
       .toBe("ORGANIZED_TOURNAMENTS");
     expect(accountRetentionReason({ ...nothing, ownedTeams: true })).toBe("OWNED_TEAMS");
@@ -62,12 +62,12 @@ describe("accountRetentionReason", () => {
 
   it("préfère le tournoi joué : c'est la trace qui appartient aussi aux autres", () => {
     expect(accountRetentionReason({
-      tournaments: true,
+      playedMatches: true,
       organizedTournaments: true,
       ownedTeams: true,
     })).toBe("TOURNAMENTS");
     expect(accountRetentionReason({
-      tournaments: false,
+      playedMatches: false,
       organizedTournaments: true,
       ownedTeams: true,
     })).toBe("ORGANIZED_TOURNAMENTS");
@@ -78,7 +78,7 @@ describe("accountDeletionPlan", () => {
   it("accorde toujours le mode et le motif — deux calculs séparés pourraient mentir", () => {
     const traces: AccountTrace[] = [
       nothing,
-      { ...nothing, tournaments: true },
+      { ...nothing, playedMatches: true },
       { ...nothing, organizedTournaments: true },
       { ...nothing, ownedTeams: true },
     ];
@@ -94,7 +94,7 @@ describe("accountDeletionPlan", () => {
 describe("accountDeletionConfirmation", () => {
   it("ne promet pas la conservation de statistiques inexistantes", () => {
     const erase = accountDeletionConfirmation(null);
-    expect(erase).toContain("aucun tournoi");
+    expect(erase).toContain("aucun match");
     expect(erase).not.toContain("statistiques de tournoi resteront");
   });
 
@@ -152,19 +152,19 @@ describe("accountDeletionConfirmation", () => {
     expect(accountDeletionConfirmation(null)).toContain("effacé entièrement");
   });
 
-  it("annonce l'anonymat dès qu'une ligne reste, et jamais sinon", () => {
+  it("annonce le pseudo d'emprunt dès qu'une ligne reste, et jamais sinon", () => {
     for (const reason of ["TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS"] as const) {
-      expect(accountDeletionConfirmation(reason)).toContain("anonyme");
+      expect(accountDeletionConfirmation(reason)).toContain("pseudo d'emprunt");
     }
-    expect(accountDeletionConfirmation(null)).not.toContain("anonyme");
+    expect(accountDeletionConfirmation(null)).not.toContain("pseudo d'emprunt");
   });
 });
 
 describe("accountDeletionOutcome", () => {
   it("décrit ce qui vient d'être fait, et pas l'autre cas", () => {
     expect(accountDeletionOutcome(null)).toContain("aucune trace");
-    expect(accountDeletionOutcome("TOURNAMENTS")).toContain("anonyme");
-    expect(accountDeletionOutcome(null)).not.toContain("anonyme");
+    expect(accountDeletionOutcome("TOURNAMENTS")).toContain("pseudo d'emprunt");
+    expect(accountDeletionOutcome(null)).not.toContain("pseudo d'emprunt");
   });
 
   it("ne promet pas de statistiques conservées à qui n'en a pas", () => {

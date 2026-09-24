@@ -89,6 +89,43 @@ describe("users-service admin management", () => {
       expect(profile?.displayRoles).toEqual(["ARBITRE", "RECRUTEUR"]);
     });
 
+    it("annonce un compte supprimé, et ne lui prête aucun titre de staff", async () => {
+      // Un compte supprimé avant la règle a pu garder ses rôles en attendant le
+      // rattrapage : un titre public désignerait la personne derrière le pseudo
+      // d'emprunt.
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([
+          [userRow({ id: 7, is_admin: 1, is_deleted: 1, platform_roles_json: JSON.stringify(["ARBITRE"]) })],
+        ])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1, isAdmin: true }, 7);
+
+      expect(profile?.profile.isDeleted).toBe(true);
+      expect(profile?.displayRoles).toEqual([]);
+      expect(profile?.roles).toEqual([]);
+      expect(profile?.isAdmin).toBe(false);
+      expect(String(execute.mock.calls[0][0])).toContain("is_deleted");
+    });
+
+    it("n'annonce pas supprimé un compte vivant", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[userRow({ id: 7, is_deleted: 0 })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1 }, 7);
+
+      expect(profile?.profile.isDeleted).toBe(false);
+    });
+
     it("includes ADMIN in displayRoles for an admin target", async () => {
       const execute = jest
         .fn<SqlQuery>()

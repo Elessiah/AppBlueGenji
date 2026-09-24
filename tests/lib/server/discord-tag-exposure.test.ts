@@ -160,8 +160,8 @@ describe("deleteOwnAccount — anonymisation", () => {
   /** Un compte qui a joué : la ligne doit rester, donc elle est anonymisée. */
   const playedDb = () =>
     fakeDb((sql) =>
-      sql.includes("AS tournaments")
-        ? [[{ tournaments: 1, organized: 0, owned: 0 }]]
+      sql.includes("AS played")
+        ? [[{ played: 1, organized: 0, owned: 0 }]]
         : undefined,
     );
 

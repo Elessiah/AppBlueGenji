@@ -9,6 +9,7 @@ import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users-ser
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { fakePool } from "../../helpers/sql-double";
+import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 
 /**
  * L'écriture de la suppression : ce qu'elle efface, ce qu'elle garde, et ce
@@ -22,7 +23,7 @@ import { fakePool } from "../../helpers/sql-double";
  */
 type Query = { sql: string; params: unknown[] };
 
-type Trace = { tournaments: number; organized: number; owned: number };
+type Trace = { played: number; organized: number; owned: number };
 
 /**
  * La base, et la transaction qui la porte.
@@ -39,6 +40,8 @@ function fakeDb(
     missing?: boolean;
     failOn?: string;
     failWith?: Error;
+    /** Pseudos d'emprunt dont l'écriture rend `ER_DUP_ENTRY` (une fois chacun). */
+    duplicatePseudos?: string[];
   } = {},
 ) {
   const queries: Query[] = [];
@@ -50,7 +53,14 @@ function fakeDb(
     if (options.failOn && q.includes(options.failOn)) {
       throw options.failWith ?? new Error("DB_DOWN");
     }
-    if (q.includes("AS tournaments")) return [[trace]];
+    if (q.startsWith("UPDATE bg_users SET pseudo = ?")) {
+      const index = options.duplicatePseudos?.indexOf(String(params[0])) ?? -1;
+      if (index >= 0) {
+        options.duplicatePseudos!.splice(index, 1);
+        throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
+      }
+    }
+    if (q.includes("AS played")) return [[trace]];
     if (q.includes("SELECT avatar_url, discord_id, created_at FROM bg_users")) {
       return [
         options.missing ? [] : [{ avatar_url: avatarUrl, discord_id: options.discordId ?? null, created_at: "2026-01-02 03:04:05" }],
@@ -76,7 +86,7 @@ function fakeDb(
 
 const has = (queries: Query[], needle: string) => queries.some((q) => q.sql.includes(needle));
 
-const EMPTY = { tournaments: 0, organized: 0, owned: 0 };
+const EMPTY = { played: 0, organized: 0, owned: 0 };
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -106,13 +116,13 @@ describe("deleteOwnAccount — effacement complet", () => {
 
     await deleteOwnAccount(7);
 
-    expect(has(queries, "compte_supprime_")).toBe(false);
+    expect(has(queries, "UPDATE bg_users SET pseudo")).toBe(false);
   });
 });
 
 describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
   it.each([
-    ["un tournoi joué", { ...EMPTY, tournaments: 1 }, "TOURNAMENTS"],
+    ["un tournoi joué", { ...EMPTY, played: 1 }, "TOURNAMENTS"],
     ["un tournoi organisé", { ...EMPTY, organized: 1 }, "ORGANIZED_TOURNAMENTS"],
     ["une équipe possédée", { ...EMPTY, owned: 1 }, "OWNED_TEAMS"],
   ])("anonymise sur %s, et le dit", async (_label, trace, reason) => {
@@ -122,11 +132,11 @@ describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
     // rien dire à qui n'en a aucune.
     expect(await deleteOwnAccount(7)).toEqual({ mode: "ANONYMIZE", reason });
     expect(has(queries, "DELETE FROM bg_users")).toBe(false);
-    expect(has(queries, "compte_supprime_")).toBe(true);
+    expect(has(queries, "UPDATE bg_users SET pseudo = ?")).toBe(true);
   });
 
   it("ferme les sessions de la ligne anonymisée", async () => {
-    const { queries } = fakeDb({ ...EMPTY, tournaments: 1 });
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
 
     await deleteOwnAccount(7);
 
@@ -142,7 +152,7 @@ describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
    * l'annuaire.
    */
   it("annule les invitations et demandes restées en attente", async () => {
-    const { queries } = fakeDb({ ...EMPTY, tournaments: 1 });
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
 
     await deleteOwnAccount(7);
 
@@ -154,7 +164,7 @@ describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
   });
 
   it("annule dans la transaction, jamais après le commit", async () => {
-    const { queries, connection } = fakeDb({ ...EMPTY, tournaments: 1 });
+    const { queries, connection } = fakeDb({ ...EMPTY, played: 1 });
 
     await deleteOwnAccount(7);
 
@@ -186,7 +196,7 @@ describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
 describe("deleteOwnAccount — les défis de connexion par message privé", () => {
   it.each([
     ["un compte effacé", EMPTY],
-    ["un compte anonymisé", { ...EMPTY, tournaments: 1 }],
+    ["un compte anonymisé", { ...EMPTY, played: 1 }],
   ])("efface les défis portant l'identifiant Discord (%s)", async (_label, trace) => {
     const { queries } = fakeDb(trace, { discordId: "900000000000000001" });
 
@@ -230,14 +240,131 @@ describe("deleteOwnAccount — les défis de connexion par message privé", () =
   });
 });
 
-describe("loadAccountTrace — ce qu'on interroge", () => {
-  it("compte l'entrée solo par elle-même : aucune cascade ne la couvre", async () => {
+describe("deleteOwnAccount — l'effacement emporte l'entrée solo orpheline", () => {
+  it("efface une entrée solo jamais inscrite ni jouée, avant la ligne du compte", async () => {
     const { queries } = fakeDb(EMPTY);
 
     await deleteOwnAccount(7);
 
-    const trace = queries.find((q) => q.sql.includes("AS tournaments"))!;
-    expect(trace.sql).toContain("FROM bg_teams WHERE solo_user_id = ?");
+    const solo = queries.findIndex((q) => q.sql.startsWith("DELETE FROM bg_teams WHERE solo_user_id = ?"));
+    const user = queries.findIndex((q) => q.sql.startsWith("DELETE FROM bg_users"));
+    expect(solo).toBeGreaterThan(-1);
+    expect(user).toBeGreaterThan(solo);
+    // Une inscription ou un match repris entre-temps la garde en place.
+    expect(queries[solo].sql).toContain("NOT EXISTS (SELECT 1 FROM bg_tournament_registrations");
+    expect(queries[solo].sql).toContain("m.team1_id = bg_teams.id");
+    expect(queries[solo].sql).toContain("m.team2_id = bg_teams.id");
+    expect(queries[solo].params).toEqual([7]);
+  });
+
+  it("n'y touche pas quand le compte est anonymisé", async () => {
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
+
+    await deleteOwnAccount(7);
+
+    expect(has(queries, "DELETE FROM bg_teams")).toBe(false);
+  });
+});
+
+describe("deleteOwnAccount — l'anonymisation sous un pseudo d'emprunt", () => {
+  const anonymization = (queries: Query[]) =>
+    queries.find((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"))!;
+
+  it("remplace le pseudo par un pseudo de la liste, jamais par l'identifiant", async () => {
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
+
+    await deleteOwnAccount(7);
+
+    const update = anonymization(queries);
+    expect(ANONYMOUS_PSEUDOS).toContain(update.params[0]);
+    expect(update.params[1]).toBe(7);
+    expect(update.sql).not.toContain("compte_supprime_");
+  });
+
+  it("relit les pseudos déjà portés par les autres comptes, sur la transaction", async () => {
+    const { queries, connection } = fakeDb({ ...EMPTY, played: 1 });
+
+    await deleteOwnAccount(7);
+
+    const taken = queries.find((q) => q.sql.startsWith("SELECT pseudo FROM bg_users WHERE id <> ?"))!;
+    expect(taken.params[0]).toBe(7);
+    expect(taken.params).toHaveLength(ANONYMOUS_PSEUDOS.length + 1);
+    expect(connection.execute).toHaveBeenCalled();
+  });
+
+  it("efface tags, identités, majorité, rôles de plateforme et avatar dans la même instruction", async () => {
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
+
+    await deleteOwnAccount(7);
+
+    const sql = anonymization(queries).sql;
+    for (const cleared of [
+      "avatar_url = NULL",
+      "overwatch_battletag = NULL",
+      "marvel_rivals_tag = NULL",
+      "discord_pseudo = NULL",
+      "discord_verified_at = NULL",
+      "discord_id = NULL",
+      "google_sub = NULL",
+      "blizzard_sub = NULL",
+      "is_adult = NULL",
+      "is_admin = 0",
+      "platform_roles_json = NULL",
+      "is_deleted = 1",
+    ]) {
+      expect(sql).toContain(cleared);
+    }
+  });
+
+  it("efface les consentements et la trace des messages privés", async () => {
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
+
+    await deleteOwnAccount(7);
+
+    expect(has(queries, "DELETE FROM bg_privacy_acknowledgments WHERE user_id = ?")).toBe(true);
+    expect(has(queries, "DELETE FROM bg_privacy_change_notifications WHERE user_id = ?")).toBe(true);
+  });
+
+  it("retire son tirage et recommence quand un autre compte vient de prendre le nom", async () => {
+    // Aucun pseudo n'est relu comme pris : le premier tirage part à l'écriture,
+    // qui le refuse — la course qu'une suppression simultanée ouvre.
+    const { queries } = fakeDb(
+      { ...EMPTY, played: 1 },
+      { duplicatePseudos: [ANONYMOUS_PSEUDOS[0]] },
+    );
+    const random = jest.spyOn(Math, "random");
+    random.mockReturnValueOnce(0).mockReturnValueOnce(0.5);
+
+    await deleteOwnAccount(7);
+
+    const writes = queries.filter((q) => q.sql.startsWith("UPDATE bg_users SET pseudo = ?"));
+    expect(writes.map((w) => w.params[0])).toEqual([ANONYMOUS_PSEUDOS[0], ANONYMOUS_PSEUDOS[500]]);
+    random.mockRestore();
+  });
+
+  it("renonce après cinq collisions plutôt que de boucler", async () => {
+    const random = jest.spyOn(Math, "random").mockReturnValue(0);
+    // Tirage figé sur le premier pseudo libre : chaque refus le retire, le
+    // suivant est tiré — cinq refus de suite épuisent les tentatives.
+    const { connection } = fakeDb({ ...EMPTY, played: 1 }, { duplicatePseudos: ANONYMOUS_PSEUDOS.slice(0, 5) });
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("Duplicate entry");
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+    random.mockRestore();
+  });
+});
+
+describe("loadAccountTrace — ce qu'on interroge", () => {
+  it("compte l'entrée solo inscrite, jouée ou non : son nom d'engagé est le pseudo du joueur", async () => {
+    const { queries } = fakeDb(EMPTY);
+
+    await deleteOwnAccount(7);
+
+    const trace = queries.find((q) => q.sql.includes("AS played"))!;
+    expect(trace.sql).toContain(
+      "FROM bg_teams s JOIN bg_tournament_registrations r ON r.team_id = s.id WHERE s.solo_user_id = ?",
+    );
   });
 
   it("écarte les équipes dissoutes et les appartenances closes du critère OWNER", async () => {
@@ -245,20 +372,41 @@ describe("loadAccountTrace — ce qu'on interroge", () => {
 
     await deleteOwnAccount(7);
 
-    const trace = queries.find((q) => q.sql.includes("AS tournaments"))!;
+    const trace = queries.find((q) => q.sql.includes("AS played"))!;
     expect(trace.sql).toContain("t.deleted_at IS NULL");
     expect(trace.sql).toContain("m.left_at IS NULL");
   });
 
-  it("retient toute appartenance, close comprise, pour l'engagement en tournoi", async () => {
+  /**
+   * Être au roster d'une équipe engagée ne suffit plus : sans match, la fiche
+   * du joueur n'a aucune statistique à garder sous un faux nom. Le match doit
+   * être **compté** (ni exemption ni match fantôme) et tomber dans la fenêtre
+   * d'appartenance des statistiques — close comprise.
+   */
+  it("exige un match compté, joué pendant l'appartenance, des deux côtés du match", async () => {
     const { queries } = fakeDb(EMPTY);
 
     await deleteOwnAccount(7);
 
-    const trace = queries.find((q) => q.sql.includes("AS tournaments"))!;
-    const engagement = trace.sql.slice(0, trace.sql.indexOf("AS tournaments"));
-    expect(engagement).toContain("bg_tournament_registrations");
-    expect(engagement).not.toContain("left_at");
+    const trace = queries.find((q) => q.sql.includes("AS played"))!;
+    const played = trace.sql.slice(0, trace.sql.indexOf("AS played"));
+    expect(played).toContain("JOIN bg_matches m ON m.team1_id = tm.team_id");
+    expect(played).toContain("JOIN bg_matches m ON m.team2_id = tm.team_id");
+    expect(played).toContain("m.status = 'COMPLETED'");
+    expect(played).toContain("m.is_bye = 0");
+    expect(played).toContain("tm.joined_at <= t.finished_at");
+    expect(played).toContain("tm.left_at IS NULL OR");
+    // Une simple inscription de l'équipe ne retient plus la ligne.
+    expect(played).not.toContain("JOIN bg_team_members tm ON tm.team_id = r.team_id");
+  });
+
+  it("lie chaque paramètre à l'identifiant du compte", async () => {
+    const { queries } = fakeDb(EMPTY);
+
+    await getAccountDeletionPlan(7);
+
+    const placeholders = (queries[0].sql.match(/\?/g) ?? []).length;
+    expect(queries[0].params).toEqual(Array(placeholders).fill(7));
   });
 
   it("pose les trois questions en une requête — un await entre elles les désaccorderait", async () => {
@@ -277,7 +425,7 @@ describe("loadAccountTrace — ce qu'on interroge", () => {
     await deleteOwnAccount(7);
 
     const lock = queries.findIndex((q) => q.sql.includes("FOR UPDATE"));
-    const trace = queries.findIndex((q) => q.sql.includes("AS tournaments"));
+    const trace = queries.findIndex((q) => q.sql.includes("AS played"));
     expect(lock).toBe(0);
     expect(trace).toBeGreaterThan(lock);
   });
@@ -337,7 +485,7 @@ describe("deleteOwnAccount — le fichier de l'avatar", () => {
   });
 
   it("efface aussi la photo d'un compte anonymisé — `avatar_url` passe à NULL", async () => {
-    fakeDb({ ...EMPTY, tournaments: 1 }, { avatarUrl: "/api/uploads/avatars/7-cd.webp" });
+    fakeDb({ ...EMPTY, played: 1 }, { avatarUrl: "/api/uploads/avatars/7-cd.webp" });
 
     await deleteOwnAccount(7);
 
