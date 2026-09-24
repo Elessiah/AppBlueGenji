@@ -54,6 +54,7 @@ import { mkdir, readdir, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { PLAYED_MATCH_SQL } from "@/lib/shared/ranking";
 
 // ---------------------------------------------------------------------------
 // Déterminisme
@@ -276,9 +277,12 @@ const SPECIAL_USERS: SpecialUserDef[] = [
   },
   {
     pseudo: "CompteSupprime",
-    purpose: "compte anonymisé (is_deleted = 1)",
-    isAdult: 1,
+    purpose: "compte anonymisé (is_deleted = 1), membre d'une équipe qui a joué",
+    // Tel que l'anonymisation le laisse : ni tag, ni majorité, ni recrutement.
+    isAdult: null,
     isDeleted: true,
+    withGameTags: false,
+    openToRecruitment: 0,
   },
 ];
 
@@ -604,6 +608,38 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
   }
 
   return ids;
+}
+
+/**
+ * Place le compte supprimé du jeu de test dans une équipe qui a **joué**.
+ *
+ * Un compte supprimé n'est conservé que s'il a disputé un match
+ * (`lib/shared/account-deletion.ts`) : sans match, le rattrapage des comptes
+ * supprimés (`reconcileDeletedAccounts`, lancé au démarrage du site)
+ * l'effacerait, et le cas « fiche d'un compte supprimé » disparaîtrait de la
+ * matrice. Il est membre depuis 2020 — la fenêtre d'appartenance couvre donc
+ * tous les tournois seedés — et reste au roster, comme l'anonymisation le
+ * laisse.
+ */
+async function attachDeletedAccountToPlayedTeam(db: Pool, userId: number | null): Promise<void> {
+  if (userId === null) return;
+  const [rows] = await db.execute<(RowDataPacket & { team_id: number })[]>(
+    `SELECT m.team1_id AS team_id
+       FROM bg_matches m
+       JOIN bg_teams t ON t.id = m.team1_id
+      WHERE ${PLAYED_MATCH_SQL}
+        AND t.solo_user_id IS NULL
+        AND t.is_ghost = 0
+        AND t.name LIKE 'Test - %'
+      ORDER BY m.id
+      LIMIT 1`,
+  );
+  if (rows.length === 0) return;
+  await db.execute(
+    `INSERT INTO bg_team_members (team_id, user_id, roles_json, joined_at)
+     VALUES (?, ?, ?, '2020-01-01 00:00:00')`,
+    [rows[0].team_id, userId, '["DPS"]'],
+  );
 }
 
 /**
@@ -1786,6 +1822,7 @@ async function seed(db: Pool): Promise<void> {
     await createTournament(db, organizerId, teamIds, soloEntryIds, TOURNAMENTS[i], i);
   }
   await applyMatchLaunchCases(db, specialUserIds.get("Caster") ?? null);
+  await attachDeletedAccountToPlayedTeam(db, specialUserIds.get("CompteSupprime") ?? null);
 
   const byState = (state: TournamentDef["state"]) =>
     TOURNAMENTS.filter((t) => t.state === state).length;

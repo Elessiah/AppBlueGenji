@@ -7,3 +7,65 @@
   margin: 7px 0 0;
   max-width: 68ch;
 }
+
+/* ---------- Compte supprimé ----------
+   La fiche d'un compte supprimé porte un pseudo d'emprunt, qui se lit comme
+   un pseudo ordinaire : c'est la page qui doit dire le compte supprimé, et le
+   dire au premier regard. Trois signes qui ne se confondent avec aucun état
+   d'un compte vivant — la page quitte le bleu de la marque pour le gris,
+   l'avatar s'éteint en une pastille barrée, et une étiquette en tirets nomme
+   l'état. Aucune teinte chaude : un compte supprimé n'est pas une alerte. */
+.deletedHeader {
+  border-style: dashed;
+  border-color: var(--ink-dim);
+  background: repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.018) 0 10px,
+      transparent 10px 20px
+    ),
+    var(--cyber-bg-1);
+}
+
+.deletedAvatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 1px dashed var(--ink-dim);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink-mute);
+}
+
+.deletedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border: 1px dashed var(--ink-mute);
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+/* `.ds-title` peint son texte d'un dégradé (texte transparent, fond découpé) :
+   la couleur seule n'y change rien, il faut défaire les deux. */
+.deletedTitle {
+  background: none;
+  -webkit-text-fill-color: currentColor;
+  color: var(--ink-mute);
+}
+
+.deletedNotice {
+  margin: 18px 0 0;
+  max-width: 72ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-1);
+}

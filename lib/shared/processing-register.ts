@@ -103,7 +103,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      "À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun tournoi, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon",
+      "À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt",
       `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
     recipients: [
@@ -176,7 +176,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Résultats et palmarès : sans limite de durée (mémoire sportive) ; un compte supprimé y apparaît anonymisé",
+      "Résultats et palmarès : sans limite de durée (mémoire sportive) ; un compte supprimé y apparaît sous un pseudo d'emprunt",
       "Droit d'opposition ouvert sur demande",
     ],
     recipients: ["Public du site", "Staff d'arbitrage et d'administration"],

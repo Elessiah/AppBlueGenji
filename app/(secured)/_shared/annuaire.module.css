@@ -261,6 +261,41 @@
   background: rgba(var(--g-rgb, 90, 200, 255), 0.10);
 }
 
+/* Bascule des comptes supprimés de `/joueurs` : une icône seule, sans cadre
+   au repos, dans la couleur la plus effacée de la rangée — elle existe pour qui
+   la cherche, pas pour attirer le regard. Son cadre n'apparaît qu'au survol,
+   au focus clavier et une fois activée, qui sont les trois moments où il faut
+   qu'on la voie. */
+.deletedToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  color: var(--ink-dim);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.deletedToggle:hover {
+  color: var(--ink-mute);
+  border-color: rgba(180, 210, 230, 0.18);
+}
+.deletedToggle:focus-visible {
+  color: var(--ink-mute);
+  outline: 2px solid var(--g-300, var(--blue-300));
+  outline-offset: 2px;
+}
+.deletedToggleOn,
+.deletedToggleOn:hover {
+  color: var(--g-300, var(--blue-300));
+  border-color: rgba(var(--g-rgb, 90, 200, 255), 0.5);
+  background: rgba(var(--g-rgb, 90, 200, 255), 0.10);
+}
+
 /* ---------- SECTIONS GRID ---------- */
 .sections {
   padding: 40px 0 80px;

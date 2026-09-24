@@ -121,9 +121,10 @@ export default function RgpdPage() {
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
-          * Un compte qui n'a participé à aucun tournoi, n'en a organisé aucun et n'est
+          * Un compte qui n'a joué aucun match, n'a organisé aucun tournoi et n'est
           propriétaire d'aucune équipe est <strong>entièrement effacé</strong> à sa suppression.
-          Sinon, ses données de profil sont anonymisées immédiatement. Les sessions
+          Sinon, ses données de profil sont effacées immédiatement et son pseudo remplacé par un
+          pseudo d'emprunt. Les sessions
           (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
         </p>
         <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
@@ -155,10 +156,11 @@ export default function RgpdPage() {
         <div className={styles.highlight} style={{ marginTop: 20 }}>
           <strong>Ce que cela signifie concrètement :</strong> les statistiques
           (nombre de tournois joués, scores, placements) ne sont pas effacées lors de
-          la suppression du compte. En revanche, les données de profil liées (pseudo,
-          avatar) sont anonymisées — le palmarès subsiste sous une forme neutre
-          («&nbsp;Joueur supprimé&nbsp;») dans les archives. Un compte qui n'a jamais été
-          engagé dans un tournoi n'a, lui, aucun palmarès à préserver : il est effacé
+          la suppression du compte. En revanche, tout ce qui désigne la personne est effacé
+          (tags Discord et de jeu, comptes de connexion, avatar, majorité, rôles) et le pseudo
+          est remplacé par un <strong>pseudo d'emprunt</strong> tiré au hasard : le palmarès
+          subsiste sous ce faux nom, et la fiche du joueur indique que le compte a été supprimé.
+          Un compte qui n'a jamais disputé de match n'a, lui, aucun palmarès à préserver : il est effacé
           entièrement, sans ligne résiduelle — à deux réserves près, où sa ligne reste parce
           qu'elle est le titulaire de quelque chose qui survit : s'il a{" "}
           <strong>organisé</strong> un tournoi, ou s'il est{" "}
