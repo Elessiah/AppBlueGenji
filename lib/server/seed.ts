@@ -166,7 +166,7 @@ interface SpecialUserDef {
     marvel: 0 | 1;
     major: 0 | 1;
   }>;
-  /** Ouvert au recrutement (défaut 1) — 0 = ne veut pas être démarché. */
+  /** Ouvert au recrutement (défaut 0, comme la colonne) — 1 = free agent s'il est sans équipe. */
   openToRecruitment?: 0 | 1;
   withGameTags?: boolean;
   discordId?: string;
@@ -253,12 +253,16 @@ const SPECIAL_USERS: SpecialUserDef[] = [
     isAdult: 1,
     withGameTags: false,
   },
-  { pseudo: "SansEquipe", purpose: "joueur libre, aucune équipe", isAdult: 1 },
   {
-    pseudo: "PasDeRecrutement",
-    purpose: "sans équipe mais fermé au recrutement (hors filtre free agents)",
+    pseudo: "SansEquipe",
+    purpose: "sans équipe, réglage par défaut : « SANS ÉQUIPE », hors filtre free agents",
     isAdult: 1,
-    openToRecruitment: 0,
+  },
+  {
+    pseudo: "FreeAgent",
+    purpose: "sans équipe et ouvert au recrutement (filtre free agents)",
+    isAdult: 1,
+    openToRecruitment: 1,
   },
   {
     pseudo: "DiscordNonCertifie",
@@ -588,7 +592,7 @@ async function createSpecialUsers(db: Pool): Promise<Map<string, number>> {
           visibility.overwatch,
           visibility.marvel,
           visibility.major,
-          def.openToRecruitment ?? 1,
+          def.openToRecruitment ?? 0,
           def.isAdult === undefined ? 1 : def.isAdult,
           def.isAdmin ? 1 : 0,
           def.isDeleted ? 1 : 0,

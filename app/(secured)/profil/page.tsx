@@ -99,7 +99,7 @@ export default function ProfilePage() {
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
-  const [openToRecruitment, setOpenToRecruitment] = useState(true);
+  const [openToRecruitment, setOpenToRecruitment] = useState(false);
   const [visibility, setVisibility] = useState({
     avatar: false,
     overwatch: false,
@@ -216,7 +216,7 @@ export default function ProfilePage() {
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
       setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
       const v = payload.profile.visibility;
-      setOpenToRecruitment(payload.profile.openToRecruitment !== false);
+      setOpenToRecruitment(payload.profile.openToRecruitment === true);
       setVisibility({
         avatar: !!v.avatar,
         overwatch: !!v.overwatch,
@@ -899,8 +899,8 @@ export default function ProfilePage() {
               />
             </div>
             <p className={s.hint}>
-              Décoché, tu n&apos;apparais plus dans le filtre « Free agents » de
-              l&apos;annuaire et ta carte n&apos;annonce plus que tu cherches une équipe.
+              Décochée par défaut. Cochée, tu apparais dans le filtre « Free agents » de
+              l&apos;annuaire et ta carte annonce « FREE AGENT » tant que tu es sans équipe.
             </p>
           </div>
 
