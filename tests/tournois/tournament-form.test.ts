@@ -170,6 +170,24 @@ describe("toFormValues", () => {
     expect(v.enduranceMaxRounds).toBe(defaultTournamentFormValues().enduranceMaxRounds);
   });
 
+  it("propose les égalités par défaut hors BG Survie, pour une bascule de format", () => {
+    const v = toFormValues({ ...apiValues, format: "SINGLE", matchFormat: { type: "BO", value: 5 } });
+    expect(v.matchFormat?.drawsAllowed).toBe(true);
+  });
+
+  it("garde les égalités fermées d'un tournoi BG Survie existant", () => {
+    const v = toFormValues({
+      ...apiValues,
+      format: "BG_SURVIE",
+      matchFormat: { type: "BO", value: 5, drawsAllowed: false },
+    });
+    expect(v.matchFormat?.drawsAllowed).toBe(false);
+  });
+
+  it("garde la saisie libre hors BG Survie", () => {
+    expect(toFormValues({ ...apiValues, format: "SINGLE", matchFormat: null }).matchFormat).toBeNull();
+  });
+
   it("rend une description absente comme une saisie vide", () => {
     expect(toFormValues(apiValues).description).toBe("");
   });
@@ -220,7 +238,10 @@ describe("format de match — les deux notations", () => {
         endurancePoints: null,
         phases: null,
       });
-      expect(back.matchFormat).toEqual(matchFormat);
+      // Hors BG Survie, `toFormValues` ajoute le défaut des égalités (pour une
+      // bascule de format) : seule la notation doit traverser intacte ici.
+      if (matchFormat === null) expect(back.matchFormat).toBeNull();
+      else expect(back.matchFormat).toMatchObject(matchFormat);
     }
   });
 
@@ -272,8 +293,8 @@ describe("toApiPayload — réglages du match nul", () => {
 
   it("aplatit le format de match en quatre clés", () => {
     const payload = toApiPayload({
-      ...values,
-      matchFormat: { type: "FT", value: 3, maxMaps: 4 },
+      ...survie,
+      matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
     });
 
     expect(payload.matchFormatType).toBe("FT");
@@ -297,6 +318,18 @@ describe("toApiPayload — réglages du match nul", () => {
     expect(payload.matchFormatDraws).toBe(false);
     expect(payload.endurancePlayoffFormatType).toBeNull();
     expect(payload.endurancePlayoffFormatValue).toBeNull();
+  });
+
+  // Les égalités étant cochées par défaut, le plafond qu'elles ouvrent pourrait
+  // rester en mémoire sur n'importe quel format : il ne part qu'en BG Survie,
+  // seul mode où le serveur le lit.
+  it("n'envoie pas le plafond de maps hors BlueGenji Survie", () => {
+    const payload = toApiPayload({
+      ...survie,
+      format: "SINGLE",
+      matchFormat: { type: "FT", value: 3, maxMaps: 4, drawsAllowed: true },
+    });
+    expect(payload.matchFormatMaxMaps).toBeNull();
   });
 
   it("laisse le plafond de maps absent quand il n'est pas réglé", () => {

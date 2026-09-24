@@ -43,6 +43,7 @@ import {
   SECTION_STACK,
 } from "../_lib/form-styles";
 import {
+  DEFAULT_QUALIFICATION_DRAWS,
   defaultTournamentFormValues,
   toApiPayload,
   toFormValues,
@@ -190,7 +191,9 @@ export function TournamentForm({
       type: matchFormatType === "LIBRE" ? DEFAULT_MATCH_FORMAT.type : matchFormatType,
       value: matchFormatValue,
       maxMaps: values.matchFormat?.maxMaps ?? null,
-      drawsAllowed: values.matchFormat?.drawsAllowed ?? false,
+      // Au retour de « Libre », rien n'est en mémoire : on repart du défaut de
+      // création plutôt que de décocher la case en silence.
+      drawsAllowed: values.matchFormat?.drawsAllowed ?? DEFAULT_QUALIFICATION_DRAWS,
       ...patch,
     };
 
@@ -465,9 +468,13 @@ export function TournamentForm({
               exige un vainqueur ne retire que des issues, au point qu'une
               rencontre arrivée à égalité n'a plus aucun score enregistrable
               (`matchMaxMapsNeedsDraws`, refusé côté serveur). La case qui
-              l'ouvre est plus bas, dans les réglages de BlueGenji Survie.
+              l'ouvre est plus bas, dans les réglages de BlueGenji Survie — et comme
+              elle, il n'existe qu'en BG Survie : les égalités étant cochées par
+              défaut, ne tester qu'elles l'offrirait sur tout format, où le
+              serveur l'ignore.
             */}
-            {!isLibre &&
+            {format === "BG_SURVIE" &&
+              !isLibre &&
               matchFormatValid &&
               matchAllowsDraw(matchFormat) &&
               naturalMaxMaps(matchFormat!) > matchWinsRequired(matchFormat!) && (
