@@ -25,8 +25,10 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (!Number.isSafeInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    const { teamName, removedLogoUrl } = await removeTeamLogoAsModerator(teamId);
-    await deleteStoredImage(toDiskUploadPath(removedLogoUrl)).catch((error) => {
+    const { teamName, removedLogoUrl, sharedWithOtherTeams } = await removeTeamLogoAsModerator(teamId);
+    // Désigné par d'autres équipes, le fichier reste : il est aussi le leur.
+    const toDelete = sharedWithOtherTeams ? null : toDiskUploadPath(removedLogoUrl);
+    await deleteStoredImage(toDelete).catch((error) => {
       // La ligne ne désigne plus le fichier : il n'est plus servi par le site.
       // Un disque récalcitrant laisse un résidu, que l'on signale sans défaire
       // un retrait déjà effectif.

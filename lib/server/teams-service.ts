@@ -627,7 +627,7 @@ export async function updateTeamLogo(
  */
 export async function removeTeamLogoAsModerator(
   teamId: number,
-): Promise<{ teamName: string; removedLogoUrl: string }> {
+): Promise<{ teamName: string; removedLogoUrl: string; sharedWithOtherTeams: boolean }> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   try {
@@ -639,8 +639,19 @@ export async function removeTeamLogoAsModerator(
     const logoUrl = rows[0].logo_url;
     if (!logoUrl) throw new Error("TEAM_HAS_NO_LOGO");
     await connection.execute(`UPDATE bg_teams SET logo_url = NULL WHERE id = ?`, [teamId]);
+    // Un même fichier peut être désigné par plusieurs équipes (le jeu de test
+    // en partage un) : l'effacer retirerait aussi le logo des autres. Même
+    // règle que le masquage (`hideTeamLogo`).
+    const [sharing] = await connection.execute<(RowDataPacket & { total: number })[]>(
+      `SELECT COUNT(*) AS total FROM bg_teams WHERE logo_url = ? AND id <> ?`,
+      [logoUrl, teamId],
+    );
     await connection.commit();
-    return { teamName: rows[0].name, removedLogoUrl: logoUrl };
+    return {
+      teamName: rows[0].name,
+      removedLogoUrl: logoUrl,
+      sharedWithOtherTeams: Number(sharing[0]?.total ?? 0) > 0,
+    };
   } catch (error) {
     await connection.rollback();
     throw error;

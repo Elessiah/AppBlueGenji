@@ -277,13 +277,30 @@ describe("routes du panneau — permission `moderation`", () => {
 describe("DELETE /api/admin/teams/[id]/logo", () => {
   it("retire le logo, efface le fichier après l'écriture et trace le geste", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(removeTeamLogoAsModerator).mockResolvedValue({ teamName: "Alpha", removedLogoUrl: "/api/uploads/teams/4-a.webp" });
+    jest.mocked(removeTeamLogoAsModerator).mockResolvedValue({
+      teamName: "Alpha",
+      removedLogoUrl: "/api/uploads/teams/4-a.webp",
+      sharedWithOtherTeams: false,
+    });
     jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
 
     const res = await removeTeamLogo(new Request("http://localhost"), params("4"));
     expect(res.status).toBe(200);
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/4-a.webp");
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha »"), { id: 1, pseudo: "Admin" });
+  });
+
+  it("garde le fichier que d'autres équipes désignent encore", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(removeTeamLogoAsModerator).mockResolvedValue({
+      teamName: "Alpha",
+      removedLogoUrl: "/api/uploads/teams/4-a.webp",
+      sharedWithOtherTeams: true,
+    });
+    jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
+
+    expect((await removeTeamLogo(new Request("http://localhost"), params("4"))).status).toBe(200);
+    expect(deleteStoredImage).not.toHaveBeenCalledWith("/uploads/teams/4-a.webp");
   });
 
   it.each<[string, number]>([

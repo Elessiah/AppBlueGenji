@@ -57,8 +57,10 @@ const EMPTY_SELECTION: Selection = { USER: [], TEAM: [], TOURNAMENT: [] };
  *
  * Deux étapes : la **catégorie** d'abord (elle décide de tout le reste — ce
  * qu'on peut désigner, ce qu'on exige), puis le détail. La validation est celle
- * de la route (`validateReportSubmission`), rejouée ici pour fermer le bouton :
- * un bouton qui mène à un 400 est un bouton qui ment.
+ * de la route (`validateReportSubmission`), rejouée ici avant l'envoi : la
+ * saisie incomplète est refusée par une notification qui nomme le champ en
+ * cause, sans aller-retour — le bouton, lui, n'est jamais grisé (un bouton
+ * éteint ne dit pas ce qui manque).
  *
  * Ouvert depuis la fiche d'un joueur, d'une équipe ou d'un tournoi, le
  * formulaire la désigne déjà (`reportTargetFromPath`), si la catégorie le

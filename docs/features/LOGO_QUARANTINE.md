@@ -54,6 +54,10 @@ n'y a rien à garder, le retrait immédiat vide la colonne.
 Un déplacement de fichier ne se défait pas avec une transaction : il est fait
 **avant** l'écriture en base, et défait si l'écriture échoue. L'inverse
 laisserait une base annonçant un logo masqué pendant que le site le sert encore.
+Une exception : si l'équipe a **changé de logo** pendant le geste
+(`LOGO_CHANGED`), plus rien ne désigne le fichier — l'envoi du nouveau a voulu
+l'effacer sans le trouver. Il est alors effacé, pas remis en ligne : il
+resterait sinon servi à son ancienne adresse, sans que rien ne le retire jamais.
 
 ## Sauvegarde
 
@@ -72,6 +76,7 @@ signalements ensuite (`schedulePurgeExpiredReports`).
 ## Retrait immédiat
 
 `DELETE /api/admin/teams/[id]/logo` (permission `moderation`) supprime un logo
-sans quarantaine, pour un contenu manifestement illicite — depuis le panneau ou
+sans quarantaine, pour un contenu manifestement illicite ; un fichier que
+d'autres équipes désignent encore n'est pas effacé (même règle que le masquage) — depuis le panneau ou
 depuis la fiche de l'équipe (`ModerationLogoBar`). Trace dans les journaux du
 staff (`publishStaffAction`), sans nom de joueur sur Discord.

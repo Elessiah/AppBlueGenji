@@ -27,10 +27,12 @@ import { localUploadUrl } from "@/lib/shared/uploads";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { canViewTournament, isTournamentPublished } from "@/lib/shared/tournament-visibility";
 import { displayTeamTag } from "@/lib/shared/team-tag";
+import type { PersonalDataExport } from "@/lib/shared/types";
 import {
   REPORTS_HOURLY_CAP,
   REPORT_RESOLUTION_NOTE_MAX_LENGTH,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
+  REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
   REPORT_TARGET_SEARCH_LIMIT,
   REPORT_TARGET_SEARCH_MIN_LENGTH,
   formatContestAlert,
@@ -382,7 +384,10 @@ type RecipientRow = RowDataPacket & {
  * joindre (identifiant Discord, ou tag certifié) — un tag saisi à la main peut
  * désigner n'importe qui. L'auteur du signalement n'est pas prévenu de son
  * propre signalement. Un tournoi désigné ne prévient personne : il n'a pas de
- * membres, il est organisé par l'association.
+ * membres, il est organisé par l'association. Une cible déjà visée dans les
+ * `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` dernières heures n'est pas reprévenue :
+ * le message part avant toute lecture par l'association, et sans cette borne
+ * le formulaire servirait à faire écrire le bot en boucle à une équipe.
  *
  * Meilleur effort : un bot injoignable laisse le signalement intact, les
  * personnes visées le découvriront quand l'association les contactera.
@@ -393,8 +398,10 @@ export async function notifyReportTargets(
   targets: readonly ReportTargetRef[],
   reporterUserId: number | null,
 ): Promise<void> {
-  const userIds = targets.filter((target) => target.type === "USER").map((target) => target.id);
-  const teamIds = targets.filter((target) => target.type === "TEAM").map((target) => target.id);
+  const cooled = await recentlyNotifiedTargets(reportId, targets);
+  const notYetWarned = (target: ReportTargetRef) => !cooled.has(`${target.type}:${target.id}`);
+  const userIds = targets.filter((target) => target.type === "USER" && notYetWarned(target)).map((target) => target.id);
+  const teamIds = targets.filter((target) => target.type === "TEAM" && notYetWarned(target)).map((target) => target.id);
   if (userIds.length === 0 && teamIds.length === 0) return;
 
   const clauses: string[] = [];
@@ -430,6 +437,30 @@ export async function notifyReportTargets(
 
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   await pushDiscordDirectMessages(formatTargetNotice({ category, url }), recipients, "content-report-target");
+}
+
+/**
+ * Cibles de ce signalement déjà visées par un **autre** signalement depuis
+ * moins de `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` : elles ont été prévenues, le
+ * message de plus est retenu (clés `TYPE:id`).
+ */
+async function recentlyNotifiedTargets(
+  reportId: number,
+  targets: readonly ReportTargetRef[],
+): Promise<Set<string>> {
+  const refs = targets.filter((target) => target.type === "USER" || target.type === "TEAM");
+  if (refs.length === 0) return new Set();
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { target_type: ReportTargetType; target_id: number })[]>(
+    `SELECT DISTINCT t.target_type, t.target_id
+     FROM bg_report_targets t
+     JOIN bg_reports r ON r.id = t.report_id
+     WHERE r.id <> ?
+       AND r.created_at > NOW() - INTERVAL ${Number(REPORT_TARGET_NOTICE_COOLDOWN_HOURS)} HOUR
+       AND (${refs.map(() => "(t.target_type = ? AND t.target_id = ?)").join(" OR ")})`,
+    [reportId, ...refs.flatMap((target) => [target.type, target.id])],
+  );
+  return new Set(rows.map((row) => `${row.target_type}:${Number(row.target_id)}`));
 }
 
 /**
@@ -518,15 +549,30 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
   return contestId;
 }
 
-/** Signalements et contestations envoyés depuis ce compte, pour l'export de ses données. */
-export async function listReportsByAuthor(
-  userId: number,
-): Promise<{ id: number; category: string; status: string; description: string; createdAt: string }[]> {
+/**
+ * Signalements et contestations envoyés depuis ce compte, pour l'export de ses
+ * données — **tout** ce que la ligne garde de lui, coordonnées saisies
+ * comprises : un export qui les tairait ne répondrait pas au droit d'accès.
+ */
+export async function listReportsByAuthor(userId: number): Promise<PersonalDataExport["reports"]> {
   const db = await getDatabase();
   const [rows] = await db.execute<
-    (RowDataPacket & { id: number; category: string; status: string; description: string; created_at: Date | string })[]
+    (RowDataPacket & {
+      id: number;
+      category: string;
+      status: string;
+      description: string;
+      page_path: string | null;
+      contact_name: string | null;
+      contact_email: string | null;
+      rights_relation: string | null;
+      parent_report_id: number | null;
+      created_at: Date | string;
+    })[]
   >(
-    `SELECT id, category, status, description, created_at FROM bg_reports
+    `SELECT id, category, status, description, page_path, contact_name, contact_email,
+            rights_relation, parent_report_id, created_at
+     FROM bg_reports
      WHERE reporter_user_id = ? ORDER BY created_at, id`,
     [userId],
   );
@@ -535,6 +581,11 @@ export async function listReportsByAuthor(
     category: row.category,
     status: row.status,
     description: row.description,
+    pagePath: row.page_path,
+    contactName: row.contact_name,
+    contactEmail: row.contact_email,
+    rightsRelation: row.rights_relation,
+    parentReportId: row.parent_report_id === null ? null : Number(row.parent_report_id),
     createdAt: toIso(row.created_at) ?? new Date().toISOString(),
   }));
 }

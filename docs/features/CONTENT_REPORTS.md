@@ -23,7 +23,12 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
      salon de logs + message privé à `OWNER_ID` et `PRESIDENT`) ;
    - un message privé aux **personnes visées** — joueurs désignés et membres
      actuels des équipes désignées, joignables par un moyen prouvé (identifiant
-     Discord ou tag certifié) —, avec le lien de `/signalements/[id]`.
+     Discord ou tag certifié) —, avec le lien de `/signalements/[id]`. Une
+     cible déjà visée par un autre signalement depuis moins de
+     `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` (24 h) n'est **pas reprévenue** : le
+     message part avant que l'association ait rien lu, et sans cette borne le
+     formulaire servirait à faire écrire le bot en boucle à une équipe entière.
+     Le signalement de plus reste contestable depuis le formulaire.
 3. **Contester.** Seule une personne visée peut contester
    (`isConcernedByReport`), depuis `/signalements/[id]` ou par la catégorie
    « Contestation » du même formulaire. Une contestation d'un signalement
@@ -107,6 +112,7 @@ et au plus une fois par heure depuis la mise en page racine
 `bg_reports` (dont `parent_report_id` pour une contestation) et
 `bg_report_targets` (sans clé étrangère vers la cible : une équipe dissoute
 n'emporte pas le signalement ; `label_snapshot` garde le nom). L'export RGPD
-d'un compte rend ses signalements et contestations ; l'anonymisation les
+d'un compte rend ses signalements et contestations, **coordonnées saisies
+comprises** (nom, adresse, qualité, page) ; l'anonymisation les
 détache de lui. Fiche `T11` du registre des traitements ; section
 « Signalements » de `/rgpd`.

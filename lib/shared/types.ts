@@ -802,7 +802,19 @@ export type PersonalDataExport = {
    * Signalements et contestations envoyés depuis ce compte, tant qu'ils sont
    * conservés (`lib/shared/content-reports.ts`).
    */
-  reports: { id: number; category: string; status: string; description: string; createdAt: string }[];
+  reports: {
+    id: number;
+    category: string;
+    status: string;
+    description: string;
+    pagePath: string | null;
+    contactName: string | null;
+    contactEmail: string | null;
+    rightsRelation: string | null;
+    /** Signalement contesté, pour une contestation. */
+    parentReportId: number | null;
+    createdAt: string;
+  }[];
 };
 
 export type TeamDetailResponse = {

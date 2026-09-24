@@ -17,6 +17,7 @@ import {
   getConcernedReport,
   listContestableReports,
   listReports,
+  listReportsByAuthor,
   purgeExpiredReports,
   schedulePurgeExpiredReports,
   searchReportTargets,
@@ -85,10 +86,16 @@ describe("createReport", () => {
     [/FROM bg_teams/, () => [[TEAM_ROW]]],
     [/FROM bg_users\s+WHERE is_deleted = 0 AND id IN/, () => [[USER_ROW]]],
   ];
+  /** Cibles déjà visées par un autre signalement récent (délai de reprévenance). */
+  const cooldownRoute = (rows: { target_type: string; target_id: number }[] = []): Route => [
+    /SELECT DISTINCT t.target_type, t.target_id\s+FROM bg_report_targets t/,
+    () => [rows],
+  ];
 
   it("enregistre le signalement et ses cibles, libellé relevé, dans une transaction", async () => {
     install(
       [
+        cooldownRoute(),
         [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
@@ -124,6 +131,7 @@ describe("createReport", () => {
   it("alerte la direction sans jamais nommer le joueur visé", async () => {
     install(
       [
+        cooldownRoute(),
         [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
@@ -147,6 +155,7 @@ describe("createReport", () => {
   it("prévient les personnes visées joignables par un moyen prouvé, jamais l'auteur", async () => {
     install(
       [
+        cooldownRoute(),
         [
           /FROM bg_users u\s+WHERE u.is_deleted = 0/,
           () => [
@@ -185,6 +194,62 @@ describe("createReport", () => {
       { discordId: "900000000000000008", handle: null, label: "PseudoSecret" },
       { discordId: null, handle: "membre", label: "Membre" },
     ]);
+  });
+
+  it("ne reprévient pas une cible déjà visée par un signalement récent", async () => {
+    install(
+      [
+        cooldownRoute([{ target_type: "TEAM", target_id: 4 }]),
+        [
+          /FROM bg_users u\s+WHERE u.is_deleted = 0/,
+          () => [[{ id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null }]],
+        ],
+        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+      ],
+      [
+        countRoute(0),
+        ...targetRoutes,
+        [/INSERT INTO bg_reports/, () => [{ insertId: 12 }]],
+        [/INSERT INTO bg_report_targets/, () => [{}]],
+      ],
+    );
+
+    await createReport(submission(), { userId: 3, managesTournaments: false });
+    await flush();
+
+    const cooldown = pool.execute.mock.calls.find(([sql]) => /SELECT DISTINCT t.target_type/.test(sql));
+    // Autre signalement que celui-ci, dans les 24 dernières heures, sur ces cibles.
+    expect(cooldown?.[0]).toMatch(/r.id <> \?/);
+    expect(cooldown?.[0]).toMatch(/INTERVAL 24 HOUR/);
+    expect(cooldown?.[1]).toEqual([12, "TEAM", 4, "USER", 8]);
+    // L'équipe, déjà prévenue, n'est plus cherchée : seul le joueur l'est.
+    const lookup = pool.execute.mock.calls.find(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0/.test(sql));
+    expect(lookup?.[1]).toEqual([8]);
+    expect(lookup?.[0]).not.toMatch(/bg_team_members/);
+    expect(jest.mocked(pushDiscordDirectMessages)).toHaveBeenCalledTimes(1);
+  });
+
+  it("n'écrit à personne quand toutes les cibles ont déjà été prévenues", async () => {
+    install(
+      [
+        cooldownRoute([
+          { target_type: "TEAM", target_id: 4 },
+          { target_type: "USER", target_id: 8 },
+        ]),
+        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+      ],
+      [
+        countRoute(0),
+        ...targetRoutes,
+        [/INSERT INTO bg_reports/, () => [{ insertId: 12 }]],
+        [/INSERT INTO bg_report_targets/, () => [{}]],
+      ],
+    );
+    await createReport(submission(), { userId: 3, managesTournaments: false });
+    await flush();
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    // La direction, elle, est toujours alertée.
+    expect(pushLeadershipAlert).toHaveBeenCalled();
   });
 
   it("ne prévient personne pour un signalement sans joueur ni équipe", async () => {
@@ -501,6 +566,60 @@ describe("listContestableReports", () => {
     const [sql, params] = pool.execute.mock.calls[1];
     expect(sql).toMatch(/r.category <> 'CONTEST'/);
     expect(params).toEqual([5, 4, 6]);
+  });
+});
+
+describe("listReportsByAuthor", () => {
+  it("rend à l'export tout ce que la ligne garde de son auteur, coordonnées comprises", async () => {
+    install([
+      [
+        /WHERE reporter_user_id = \?/,
+        () => [
+          [
+            {
+              id: 12,
+              category: "COPYRIGHT",
+              status: "OPEN",
+              description: "Notre logo.",
+              page_path: "/equipes/4",
+              contact_name: "Club Exemple",
+              contact_email: "juridique@exemple.fr",
+              rights_relation: "HOLDER",
+              parent_report_id: null,
+              created_at: new Date("2026-09-20T10:00:00Z"),
+            },
+            {
+              id: 13,
+              category: "CONTEST",
+              status: "OPEN",
+              description: "Nous avons les droits.",
+              page_path: null,
+              contact_name: null,
+              contact_email: null,
+              rights_relation: null,
+              parent_report_id: 9,
+              created_at: new Date("2026-09-21T10:00:00Z"),
+            },
+          ],
+        ],
+      ],
+    ]);
+    await expect(listReportsByAuthor(3)).resolves.toEqual([
+      {
+        id: 12,
+        category: "COPYRIGHT",
+        status: "OPEN",
+        description: "Notre logo.",
+        pagePath: "/equipes/4",
+        contactName: "Club Exemple",
+        contactEmail: "juridique@exemple.fr",
+        rightsRelation: "HOLDER",
+        parentReportId: null,
+        createdAt: "2026-09-20T10:00:00.000Z",
+      },
+      expect.objectContaining({ id: 13, parentReportId: 9, contactEmail: null }),
+    ]);
+    expect(pool.execute.mock.calls[0][1]).toEqual([3]);
   });
 });
 

@@ -205,8 +205,14 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
   } catch (error) {
     await connection.rollback();
     // Le fichier revient en ligne : la base n'a rien retenu du masquage. Une
-    // copie, elle, n'a qu'à disparaître — l'original n'a pas bougé.
-    const undo = shared ? unlinkIfPresent(files.quarantined) : moveFile(files.quarantined, files.live);
+    // copie, elle, n'a qu'à disparaître — l'original n'a pas bougé. Et si
+    // l'équipe a changé de logo pendant le geste, plus rien ne désigne le
+    // fichier : l'envoi du nouveau a voulu l'effacer sans le trouver. Le
+    // remettre en ligne republierait le logo signalé sous son ancienne adresse,
+    // à jamais — il est effacé, comme l'envoi l'aurait fait.
+    const abandoned = (error as Error).message === "LOGO_CHANGED";
+    const undo =
+      shared || abandoned ? unlinkIfPresent(files.quarantined) : moveFile(files.quarantined, files.live);
     await undo.catch((moveError) => {
       console.error("[moderation] logo non remis en place après échec", moveError);
     });

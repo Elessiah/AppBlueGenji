@@ -120,16 +120,39 @@ describe("hideTeamLogo", () => {
     expect(recipients).toEqual([{ discordId: "900000000000000005", handle: null, label: "Capitaine" }]);
   });
 
-  it("remet le fichier en ligne si le logo a changé pendant le geste", async () => {
+  it("efface le fichier, sans le republier, si l'équipe a changé de logo pendant le geste", async () => {
     install(
       [reportTargets, team, notShared],
       [[/SELECT logo_url FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: "/api/uploads/teams/4-new.webp" }]]]],
     );
     await expect(hideTeamLogo(12, 4, actor)).rejects.toThrow("LOGO_CHANGED");
     expect(connection.rollback).toHaveBeenCalled();
+    // Plus rien ne le désigne : le remettre en ligne republierait le logo
+    // signalé sous son ancienne adresse, que l'envoi du nouveau n'a pas trouvé.
+    expect(rename).toHaveBeenCalledTimes(1);
+    expect(rename).toHaveBeenCalledWith(LIVE, HIDDEN);
+    expect(unlink).toHaveBeenCalledWith(HIDDEN);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("remet le fichier en ligne si l'écriture échoue sur un logo toujours désigné", async () => {
+    install(
+      [reportTargets, team, notShared],
+      [
+        [/SELECT logo_url FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ logo_url: LOGO }]]],
+        [/UPDATE bg_teams SET logo_url = NULL/, () => [{}]],
+        [
+          /INSERT INTO bg_logo_quarantines/,
+          () => {
+            throw new Error("ER_LOCK_DEADLOCK");
+          },
+        ],
+      ],
+    );
+    await expect(hideTeamLogo(12, 4, actor)).rejects.toThrow("ER_LOCK_DEADLOCK");
     expect(rename).toHaveBeenNthCalledWith(1, LIVE, HIDDEN);
     expect(rename).toHaveBeenNthCalledWith(2, HIDDEN, LIVE);
-    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(unlink).not.toHaveBeenCalled();
   });
 
   it("déplace d'un disque à l'autre quand un renommage n'y suffit pas", async () => {

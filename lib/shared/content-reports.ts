@@ -601,6 +601,19 @@ export function reportErrorMessage(code: string | null | undefined): string {
  */
 export const REPORTS_HOURLY_CAP = 60;
 
+/**
+ * Délai pendant lequel une cible déjà visée par un signalement n'est **pas**
+ * reprévenue par un nouveau.
+ *
+ * Le message privé part avant que quiconque ait lu le signalement : sans cette
+ * borne, le formulaire ferait écrire le bot à une équipe entière à chaque envoi
+ * — cinq fois par demi-heure et par compte, davantage avec des comptes
+ * secondaires. Un signalement de plus dans la journée reste visible, et
+ * contestable, depuis le formulaire (catégorie « Contestation ») ; seul le
+ * message de plus est retenu.
+ */
+export const REPORT_TARGET_NOTICE_COOLDOWN_HOURS = 24;
+
 /** Une cible telle que le panneau la montre, relue au moment de l'affichage. */
 export interface ReportTargetView {
   type: ReportTargetType;
