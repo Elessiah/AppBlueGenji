@@ -802,14 +802,23 @@
   color: var(--c, var(--blue-300));
 }
 
+/* Le pseudo d'emprunt se lit comme un pseudo ordinaire : c'est cette étiquette
+   qui dit le compte supprimé, d'où un cadre en tirets — la seule forme de la
+   carte qu'aucune autre étiquette ne prend. */
 .plDeletedMark {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: center;
   font-family: var(--font-mono);
   font-size: 9px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-mute);
-  text-align: center;
-  margin-top: 2px;
+  border: 1px dashed var(--ink-dim);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-top: 4px;
 }
 
 .plTeam {
