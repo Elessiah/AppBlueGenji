@@ -120,7 +120,7 @@ describe("câblage des trois portes", () => {
   const source = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
 
   it("la page de connexion filtre le paramètre d'URL", () => {
-    const page = source(join("app", "connexion", "page.tsx"));
+    const page = source(join("app", "connexion", "_components", "LoginForm.tsx"));
     expect(page).toMatch(/setRedirect\(safeRedirectPath\(params\.get\("redirect"\)\)\)/);
     expect(page).not.toMatch(/params\.get\("redirect"\) \|\|/);
   });
