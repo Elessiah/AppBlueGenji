@@ -245,7 +245,7 @@ async function runMigrations(db: Pool): Promise<void> {
       visible_overwatch TINYINT(1) NOT NULL DEFAULT 0,
       visible_marvel TINYINT(1) NOT NULL DEFAULT 0,
       visible_major TINYINT(1) NOT NULL DEFAULT 0,
-      open_to_recruitment TINYINT(1) NOT NULL DEFAULT 1,
+      open_to_recruitment TINYINT(1) NOT NULL DEFAULT 0,
       platform_roles_json JSON NULL,
       is_admin TINYINT(1) NOT NULL DEFAULT 0,
       is_deleted TINYINT(1) NOT NULL DEFAULT 0,
@@ -1136,6 +1136,54 @@ async function runMigrations(db: Pool): Promise<void> {
     );
   } catch (error) {
     reportSchemaFailure(error, launchedAtStatement);
+  }
+
+  // `open_to_recruitment` : un compte neuf ne s'annonce plus « free agent »
+  // (`lib/shared/player-roster-status.ts`). Le défaut était « ouvert », si bien
+  // que tout joueur sans équipe se présentait disponible sans l'avoir jamais
+  // dit — c'est une case qu'on **coche**, pas qu'on découvre cochée.
+  //
+  // Sur une base qui tourne, le changement de défaut ne touche aucune ligne :
+  // les joueurs sans équipe sont donc passés « sans équipe » **une fois**, au
+  // moment où le défaut bascule, et jamais plus — rejoué à chaque démarrage, le
+  // remplissage refermerait la case de qui l'a cochée depuis. La condition se lit
+  // sur le **défaut de la colonne**, seule trace durable de ce passage : il n'y a
+  // pas de colonne neuve dont l'ajout effectif ferait foi, comme pour
+  // `launched_at`.
+  //
+  // Le remplissage **précède** le changement de défaut : s'il échoue (verrou de
+  // ligne sur `bg_users`), le défaut reste à 1 et tout se retente au démarrage
+  // suivant ; dans l'ordre inverse, un remplissage raté ne serait jamais rejoué.
+  // « Sans équipe » est la lecture de l'annuaire (`listPlayers`) : aucune
+  // appartenance en cours.
+  const OPEN_TO_RECRUITMENT_DEFAULT = "ALTER TABLE bg_users ALTER COLUMN open_to_recruitment SET DEFAULT 0";
+  try {
+    const [defaultRows] = await db.execute<(RowDataPacket & { columnDefault: string | null })[]>(
+      `SELECT COLUMN_DEFAULT AS columnDefault
+         FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'bg_users'
+          AND COLUMN_NAME = 'open_to_recruitment'`,
+    );
+    const currentDefault = defaultRows[0]?.columnDefault ?? null;
+    if (currentDefault !== null && currentDefault !== "0") {
+      const [closed] = await db.execute<ResultSetHeader>(
+        `UPDATE bg_users u
+            SET u.open_to_recruitment = 0
+          WHERE u.open_to_recruitment = 1
+            AND NOT EXISTS (
+              SELECT 1 FROM bg_team_members tm
+               WHERE tm.user_id = u.id AND tm.left_at IS NULL
+            )`,
+      );
+      await db.execute(OPEN_TO_RECRUITMENT_DEFAULT);
+      console.log(
+        `[migrations] Défaut de bg_users.open_to_recruitment passé à 0 : ` +
+          `${closed.affectedRows} joueur(s) sans équipe passé(s) « sans équipe ».`,
+      );
+    }
+  } catch (error) {
+    reportSchemaFailure(error, OPEN_TO_RECRUITMENT_DEFAULT);
   }
 
   // **Un retrait de colonne ne se replie pas.** Une colonne qui part n'a aucune
