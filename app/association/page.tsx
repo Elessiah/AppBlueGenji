@@ -66,7 +66,6 @@ export default async function AssociationPage() {
           qu'il connaît déjà plutôt qu'une seconde du même nom.
         */}
         <JsonLd data={organizationJsonLd(siteCanonicalBase(), ASSOCIATION_DESCRIPTION)} />
-
         {/* HERO */}
         <section className={`${styles.section} ${styles.heroSection}`}>
           <div className="fabric" />

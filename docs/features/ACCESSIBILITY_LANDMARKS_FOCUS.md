@@ -26,8 +26,8 @@ propre `<main className="bot-main">`, et sont laissées telles quelles.
 **Empilement.** `<main>` garde `position: relative; z-index: 1`. L'en-tête
 collant (`z-index: 30`), sorti de ce contexte, reste au-dessus du contenu au
 défilement, et son panneau de menu (`z-index: 50`, dans le contexte de
-l'en-tête) aussi. La banderole de recrutement (`z-index: 40`) reste au-dessus de
-l'en-tête. Vérifié dans le navigateur.
+l'en-tête) aussi. Vérifié dans le navigateur (en-tête
+collant au défilement, panneau du menu par-dessus le héros).
 
 Le lien d'évitement (`lib/shared/skip-link.ts`) sautait les en-têtes en tête de
 `<main>` pour contourner ce défaut ; la règle reste juste — `<main>` s'ouvre
