@@ -9,6 +9,7 @@ import { siteBaseUrl } from "@/lib/server/site-url";
 import {
   announceablePrivacyChanges,
   buildPrivacyChangesMessage,
+  privacyChangesForOneMessage,
   pendingPrivacyChanges,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
@@ -21,7 +22,10 @@ import {
  * (`POST /internal/notify/dm`), aucune route nouvelle côté bot. Chaque compte
  * joignable reçoit **un** message par lot de changements qu'il n'a ni acceptés
  * ni déjà reçus : un joueur absent pendant trois changements en reçoit un seul
- * message qui les nomme tous les trois.
+ * message qui les nomme tous les trois. Quand ils ne tiennent pas tous sous le
+ * plafond du bot, le message nomme ce qui tient et le reste part au balayage
+ * suivant (`privacyChangesForOneMessage`) — jamais un changement seulement
+ * compté mais tenu pour annoncé.
  *
  * Joignable veut dire : un **identifiant Discord** rattaché, ou un tag
  * **certifié**. Un tag non certifié n'est qu'une saisie, qui peut être celle
@@ -157,7 +161,10 @@ async function runSweep(now: Date): Promise<number> {
     const userId = Number(row.id);
     const due = pendingPrivacyChanges(row.created_at ? String(row.created_at) : null, done.get(userId) ?? [], changes);
     if (due.length === 0) continue;
-    const reserved = await reserve(userId, due);
+    // Seulement ce qu'un message peut **nommer** : un changement réservé mais
+    // seulement compté (« … et 1 autre ») serait tenu pour annoncé sans que son
+    // titre ait été écrit. Le reste demeure dû et part au balayage suivant.
+    const reserved = await reserve(userId, privacyChangesForOneMessage(due, siteBaseUrl()));
     if (reserved.length === 0) continue;
     const key = reserved.map((change) => change.id).join("|");
     const group = groups.get(key) ?? { changes: reserved, recipients: [], userIds: [] };

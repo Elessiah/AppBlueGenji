@@ -23,12 +23,34 @@
  * Qui voit un tag Discord **certifié**, et personne d'autre.
  *
  * L'ordre suit `canViewDiscordTag` : soi-même toujours, les administrateurs
- * toujours, l'arbitrage seulement pendant un tournoi vivant. « Jamais personne
- * d'autre » n'est pas une formule de style — le tag n'est **jamais** public, et
- * c'est la seule phrase qui le dise au joueur.
+ * toujours, l'arbitrage seulement pendant un tournoi vivant, les autres joueurs
+ * seulement si le titulaire a coché « Tag Discord ». « Jamais personne
+ * d'autre » n'est pas une formule de style — le tag n'est **jamais** montré à
+ * un visiteur sans compte, et c'est la seule phrase qui le dise au joueur.
  */
 export const DISCORD_TAG_AUDIENCE =
-  "les administrateurs le voient, les arbitres tant que tu es engagé dans un tournoi, et les joueurs et le caster de ton match le temps de la rencontre, à partir de son lancement. Jamais personne d'autre.";
+  "les administrateurs le voient, les arbitres tant que tu es engagé dans un tournoi, et les joueurs et le caster de ton match le temps de la rencontre, à partir de son lancement ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
+
+/**
+ * Ce que la case « Tag Discord » des réglages de visibilité ouvre, et ce
+ * qu'elle n'ouvre pas.
+ *
+ * La phrase qu'elle remplace renvoyait le tag à « ses propres réglages », la
+ * certification — or la certification l'ouvre à l'**organisation**
+ * (administrateurs, arbitres), jamais aux autres joueurs : un joueur qui
+ * voulait être trouvé par ses coéquipiers n'avait aucun geste pour cela. La
+ * case est ce geste, et elle ne vaut que pour un tag certifié
+ * (`canViewDiscordTag`), ce que le joueur doit lire avant de la cocher.
+ */
+export const DISCORD_PLAYER_VISIBILITY_NOTICE =
+  "La certification ouvre ton tag Discord à l'organisation (administrateurs, arbitres pendant un tournoi), pas aux autres joueurs : coche « Tag Discord » pour qu'ils le voient sur ta fiche. Un tag non certifié reste masqué, case cochée ou non.";
+
+/**
+ * Ajout à la phrase précédente quand la case est cochée sur un tag **non**
+ * certifié : le joueur croit s'être rendu joignable, et il ne l'est pas.
+ */
+export const DISCORD_PLAYER_VISIBILITY_PENDING =
+  "Ton tag n'est pas certifié : il restera masqué aux autres joueurs tant que tu ne l'auras pas certifié.";
 
 /**
  * Ce qu'un tag **non** certifié vaut : rien, pour personne.

@@ -164,6 +164,20 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Les comptes déjà supprimés suivent la même règle : ceux sans match sont effacés, les autres reçoivent un pseudo d'emprunt.",
     ],
   },
+  // Un public de plus pour le tag Discord certifié — les autres joueurs —, sur
+  // choix du joueur seulement : la case naît décochée.
+  {
+    id: "2026-09-tag-discord-visible-joueurs",
+    publishedAt: "2026-09-25",
+    title: "Tag Discord : visible des autres joueurs, si tu le choisis",
+    summary:
+      "Une case « Tag Discord » dans Mon profil permet de montrer ton tag Discord certifié aux autres joueurs du site. Elle est décochée : rien ne change tant que tu ne la coches pas.",
+    details: [
+      "Cochée, elle rend ton tag Discord lisible sur ta fiche par tout joueur connecté, pour qu'on puisse t'ajouter sans passer par l'organisation. Un visiteur sans compte ne le voit jamais.",
+      "Elle ne vaut que pour un tag certifié : un tag que tu n'as pas prouvé reste masqué de tous, case cochée ou non.",
+      "La certification ne change pas : elle ouvre ton tag aux administrateurs, et aux arbitres pendant un tournoi — pas aux autres joueurs.",
+    ],
+  },
 ];
 
 /**
@@ -314,6 +328,32 @@ export function buildPrivacyChangesMessage(
     lines.push(line);
   }
   return assemble(lines, 0);
+}
+
+/**
+ * Les changements qu'**un** message privé peut nommer tous, dans l'ordre.
+ *
+ * Le registre entier ne tient plus sous le plafond du bot, et le repli de
+ * `buildPrivacyChangesMessage` — compter ce qui ne tient pas — convient à un
+ * aperçu, pas à l'envoi : le balayage réserve chaque changement **avant**
+ * l'envoi, si bien qu'un changement seulement compté était marqué annoncé sans
+ * que son titre ait jamais été écrit. Et c'est toujours le **plus récent** qui
+ * tombait ainsi. Le balayage n'envoie donc que ce lot, et le reste part au
+ * suivant.
+ *
+ * Toujours au moins un changement quand il y en a : une entrée seule tient dans
+ * un message (le registre le vérifie).
+ */
+export function privacyChangesForOneMessage(
+  changes: readonly PrivacyChange[],
+  siteUrl: string | null,
+): PrivacyChange[] {
+  for (let count = changes.length; count > 1; count -= 1) {
+    const batch = changes.slice(0, count);
+    const message = buildPrivacyChangesMessage(batch, siteUrl);
+    if (batch.every((change) => message.includes(`**${change.title}**`))) return batch;
+  }
+  return changes.slice(0, 1);
 }
 
 /**

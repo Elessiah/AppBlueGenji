@@ -98,6 +98,7 @@ type UserRow = RowDataPacket & {
   visible_overwatch: 0 | 1;
   visible_marvel: 0 | 1;
   visible_major: 0 | 1;
+  visible_discord: 0 | 1;
   open_to_recruitment: 0 | 1;
   is_admin?: 0 | 1;
   is_deleted?: 0 | 1;
@@ -126,6 +127,7 @@ function mapPublicUser(row: UserRow): PublicUserProfile {
       overwatch: Boolean(row.visible_overwatch),
       marvel: Boolean(row.visible_marvel),
       major: Boolean(row.visible_major),
+      discord: Boolean(row.visible_discord),
     },
     openToRecruitment: Boolean(row.open_to_recruitment),
     createdAt: toIso(row.created_at)!,
@@ -221,6 +223,7 @@ export async function getUserById(userId: number): Promise<PublicUserProfile | n
       visible_overwatch,
       visible_marvel,
       visible_major,
+      visible_discord,
       open_to_recruitment,
       created_at
      FROM bg_users
@@ -247,6 +250,7 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
       visible_overwatch,
       visible_marvel,
       visible_major,
+      visible_discord,
       open_to_recruitment,
       is_deleted,
       created_at
@@ -956,6 +960,7 @@ export async function updateOwnProfile(
       overwatch?: boolean;
       marvel?: boolean;
       major?: boolean;
+      discord?: boolean;
     };
     openToRecruitment?: boolean;
   },
@@ -1174,6 +1179,7 @@ export async function updateOwnProfile(
            visible_overwatch = COALESCE(?, visible_overwatch),
            visible_marvel = COALESCE(?, visible_marvel),
            visible_major = COALESCE(?, visible_major),
+           visible_discord = COALESCE(?, visible_discord),
            open_to_recruitment = COALESCE(?, open_to_recruitment)
        WHERE id = ? AND is_deleted = 0`,
       [
@@ -1194,6 +1200,7 @@ export async function updateOwnProfile(
         patch.visibility?.overwatch ?? null,
         patch.visibility?.marvel ?? null,
         patch.visibility?.major ?? null,
+        patch.visibility?.discord ?? null,
         patch.openToRecruitment ?? null,
         userId,
       ],
@@ -1673,6 +1680,7 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
              visible_overwatch = 0,
              visible_marvel = 0,
              visible_major = 0,
+             visible_discord = 0,
              open_to_recruitment = 0,
              -- Un titre de staff est public (displayRoles) : il désignerait la
              -- personne derrière le pseudo d'emprunt aussi sûrement que son nom.
@@ -1866,6 +1874,7 @@ export async function getFullProfile(
       visible_overwatch,
       visible_marvel,
       visible_major,
+      visible_discord,
       open_to_recruitment,
       is_admin,
       platform_roles_json,
@@ -1894,20 +1903,28 @@ export async function getFullProfile(
   if (!isSelf) applyVisibility(profile, false);
 
   // **Le tag Discord passe par sa propre règle**, et pas par `applyVisibility` :
-  // il n'a pas de réglage de visibilité, il a un public (voir
+  // son réglage de visibilité ne vaut que pour un tag certifié, et il a en plus
+  // un public que le réglage ne commande pas — l'organisation (voir
   // `lib/shared/discord-identity.ts`). La question du tournoi n'est posée que
   // lorsqu'elle peut changer la réponse — un administrateur voit de toute façon,
-  // le lecteur ordinaire ne voit de toute façon pas, et une requête de plus sur
-  // chaque fiche consultée n'aurait servi à personne.
+  // un tag rendu visible aussi, le lecteur ordinaire ne voit de toute façon
+  // pas, et une requête de plus sur chaque fiche consultée n'aurait servi à
+  // personne.
   // La question est partagée avec le BattleTag ci-dessous : posée une fois au plus.
   let activeTournament: Promise<boolean> | null = null;
   const targetInActiveTournament = () => (activeTournament ??= isInActiveTournament(targetUserId));
 
+  const discordVisible = profile.visibility.discord;
   const needsTournamentCheck =
-    !isSelf && !viewerIsAdmin && can(viewer, "tournaments") && discordVerified;
+    !isSelf &&
+    !viewerIsAdmin &&
+    !discordVisible &&
+    can(viewer, "tournaments") &&
+    discordVerified;
   profile.discordPseudo = visibleDiscordTag(userRows[0].discord_pseudo, viewer, {
     userId: targetUserId,
     verified: discordVerified,
+    visible: discordVisible,
     inActiveTournament: needsTournamentCheck ? await targetInActiveTournament() : false,
   });
 
@@ -2007,6 +2024,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
       visible_overwatch: 0 | 1;
       visible_marvel: 0 | 1;
       visible_major: 0 | 1;
+      visible_discord: 0 | 1;
       open_to_recruitment: 0 | 1;
       created_at: Date;
     })[]
@@ -2014,7 +2032,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     `SELECT id, pseudo, avatar_url, overwatch_battletag, marvel_rivals_tag,
             discord_pseudo, discord_verified_at, discord_id, discord_link_method,
             google_sub, blizzard_sub, is_adult, is_admin,
-            visible_avatar, visible_overwatch, visible_marvel, visible_major,
+            visible_avatar, visible_overwatch, visible_marvel, visible_major, visible_discord,
             open_to_recruitment, created_at
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
@@ -2061,6 +2079,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
         overwatch: Boolean(row.visible_overwatch),
         marvel: Boolean(row.visible_marvel),
         major: Boolean(row.visible_major),
+        discord: Boolean(row.visible_discord),
       },
       openToRecruitment: Boolean(row.open_to_recruitment),
     },
