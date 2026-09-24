@@ -235,8 +235,10 @@ export function TournamentForm({
         if (issue) {
           showError(phaseIssueMessage(issue));
           // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
-          // la phase et y porte le focus.
-          setPhaseFocusRequest((n) => n + 1);
+          // la phase et y porte le focus — sauf plan figé par la fenêtre
+          // d'édition, dont les champs désactivés ne prennent pas le focus :
+          // la notification reste alors seule à parler.
+          if (!locked("phases")) setPhaseFocusRequest((n) => n + 1);
           setLoading(false);
           return;
         }

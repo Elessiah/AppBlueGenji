@@ -9,6 +9,7 @@ import {
   findPhaseIssue,
 } from "@/lib/shared/tournament-phases";
 import { CyberButton } from "@/components/cyber";
+import { focusFlaggedField } from "@/lib/shared/field-errors";
 import { PhaseCard } from "./PhaseCard";
 import {
   movePhase,
@@ -85,9 +86,15 @@ export function PhaseBuilder({
   // demande, pas à chaque frappe qui change le défaut du plan.
   const issueRef = useRef(issue);
   issueRef.current = issue;
+  // Dernière demande déjà servie, relevée au montage : le constructeur se
+  // démonte quand on quitte le format multi-phases, et une demande ancienne ne
+  // doit pas être rejouée à son retour — le focus quitterait le sélecteur de
+  // format sans qu'aucun envoi ne l'ait demandé.
+  const handledRequest = useRef(focusRequest);
 
   useEffect(() => {
-    if (focusRequest === 0) return;
+    if (focusRequest === handledRequest.current) return;
+    handledRequest.current = focusRequest;
     const current = issueRef.current;
     if (!current || current.phaseIndex === null || current.field === null) return;
     setExpandedIndex(current.phaseIndex);
@@ -97,7 +104,9 @@ export function PhaseBuilder({
   // Second temps : le champ n'existe qu'une fois la phase dépliée et rendue.
   useEffect(() => {
     if (!pendingFocusId) return;
-    document.getElementById(pendingFocusId)?.focus();
+    // Même geste que `useFieldErrors` : un focus marqué, qu'un contrôle réagissant
+    // au focus ne prend pas pour un geste du joueur.
+    focusFlaggedField(document.getElementById(pendingFocusId));
     setPendingFocusId(null);
   }, [pendingFocusId]);
 

@@ -144,6 +144,13 @@ export function DiscordVerificationDialog({
   };
 
   const awaitingCode = discordId !== "";
+
+  /** Retour à la demande de code, tag conservé : le précédent est perdu. */
+  const restartVerification = () => {
+    setDiscordId("");
+    setCode("");
+    fieldErrors.clear();
+  };
   // Comportement commun des modales du site : `Échap` ferme (sauf pendant une
   // écriture), le défilement de l'arrière-plan est verrouillé, le focus entre
   // dans la boîte et y reste, puis retourne d'où il venait. Le `locked` n'est
@@ -324,6 +331,12 @@ export function DiscordVerificationDialog({
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <CyberButton variant="ghost" type="button" onClick={onClose}>
                 Annuler
+              </CyberButton>
+              {/* Un code brûlé (cinq essais) ou expiré ne se corrige pas en le
+                  retapant : le refus le dit (« Recommence la certification »),
+                  et ce retour à la première étape est le geste qu'il nomme. */}
+              <CyberButton variant="ghost" type="button" disabled={loading} onClick={restartVerification}>
+                Nouveau code
               </CyberButton>
               <CyberButton variant="primary" type="submit" disabled={loading}>
                 {loading ? "Certification…" : "Certifier mon tag"}

@@ -228,7 +228,33 @@ describe("phases d'un tournoi multi-phases", () => {
     const builder = code("app/(secured)/tournois/creer/PhaseBuilder.tsx");
     expect(builder).toContain("setExpandedIndex(current.phaseIndex)");
     expect(builder).toContain("phaseFieldId(current.phaseIndex + 1, current.field)");
-    expect(builder).toMatch(/getElementById\(pendingFocusId\)\?\.focus\(\)/);
+    // Même geste que `useFieldErrors` : le focus est marqué.
+    expect(builder).toContain("focusFlaggedField(document.getElementById(pendingFocusId))");
+    expect(builder).not.toMatch(/\.focus\(\)/);
+  });
+
+  it("une demande déjà servie n'est pas rejouée quand le constructeur se remonte", () => {
+    // Quitter le format multi-phases puis y revenir démonte et remonte le
+    // constructeur : la dernière demande, relevée au montage, ne vaut pas une
+    // nouvelle.
+    const builder = code("app/(secured)/tournois/creer/PhaseBuilder.tsx");
+    expect(builder).toContain("const handledRequest = useRef(focusRequest)");
+    expect(builder).toMatch(/if \(focusRequest === handledRequest\.current\) return;\s*handledRequest\.current = focusRequest;/);
+  });
+
+  it("un plan figé par la fenêtre d'édition ne demande pas de focus", () => {
+    // Ses champs sont désactivés : le focus n'irait nulle part.
+    expect(code("app/(secured)/tournois/_components/TournamentForm.tsx")).toContain(
+      'if (!locked("phases")) setPhaseFocusRequest((n) => n + 1)',
+    );
+  });
+});
+
+describe("certification Discord — code refusé", () => {
+  it("la seconde étape offre de redemander un code, geste que nomme le refus d'un code brûlé", () => {
+    const src = code("app/(secured)/profil/DiscordVerificationDialog.tsx");
+    expect(src).toMatch(/onClick=\{restartVerification\}>\s*Nouveau code/);
+    expect(src).toMatch(/const restartVerification = \(\) => \{\s*setDiscordId\(""\);\s*setCode\(""\);\s*fieldErrors\.clear\(\);/);
   });
 });
 
