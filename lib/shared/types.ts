@@ -360,7 +360,7 @@ export type TeamHistoryRow = {
  * `bg_tournaments.manual_seeding` :
  *
  * - `MANUAL` — ordre fixé à la main par le staff, il fait autorité partout ;
- * - `RANKING` — classement du site (survie, ronde suisse, multi-phases) ;
+ * - `RANKING` — classement du site (survie, ronde suisse, BG Survie, multi-phases) ;
  * - `REGISTRATION` — ordre d'arrivée des inscriptions (formats à plateau).
  *
  * La règle qui le calcule vit dans `lib/shared/seeding.ts` ; le type est ici
