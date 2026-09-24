@@ -4,11 +4,15 @@ import {
   RECRUITMENT_BODY_MAX,
   RECRUITMENT_CONTACT_CHANNELS,
   RECRUITMENT_DOMAINS,
-  RECRUITMENT_HIGHLIGHTS,
+  RECRUITMENT_BANNER_ROTATION_MS,
   RECRUITMENT_MODAL_COOKIE,
   RECRUITMENT_MODAL_COOKIE_MAX_AGE,
   RECRUITMENT_MODAL_INTERVAL_MS,
+  RECRUITMENT_PRIORITIES,
+  parseRecruitmentSeen,
   recruitmentDismissed,
+  recruitmentModalStart,
+  serializeRecruitmentSeen,
   shouldShowRecruitmentModal,
   validateRecruitmentAdInput,
 } from "@/lib/shared/recruitment";
@@ -28,7 +32,9 @@ describe("validateRecruitmentAdInput", () => {
         contactDiscord: null,
         contactDiscordId: null,
         contactPreferred: "AUTO",
-        highlight: "NONE",
+        // Facultative par défaut : une annonce ne s'impose à tous les
+        // visiteurs que si quelqu'un l'a demandé.
+        priority: "OPTIONAL",
         active: true,
       });
     }
@@ -60,11 +66,11 @@ describe("validateRecruitmentAdInput", () => {
     }
   });
 
-  it("accepts every valid highlight mode", () => {
-    for (const highlight of RECRUITMENT_HIGHLIGHTS) {
-      const result = validateRecruitmentAdInput({ title: "X", highlight });
+  it("accepts every valid priority", () => {
+    for (const priority of RECRUITMENT_PRIORITIES) {
+      const result = validateRecruitmentAdInput({ title: "X", priority });
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.value.highlight).toBe(highlight);
+      if (result.ok) expect(result.value.priority).toBe(priority);
     }
   });
 
@@ -74,12 +80,12 @@ describe("validateRecruitmentAdInput", () => {
     if (result.ok) expect(result.value.active).toBe(false);
   });
 
-  it("falls back to defaults when domain/highlight are empty strings", () => {
-    const result = validateRecruitmentAdInput({ title: "X", domain: "", highlight: "" });
+  it("falls back to defaults when domain/priority are empty strings", () => {
+    const result = validateRecruitmentAdInput({ title: "X", domain: "", priority: "" });
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.domain).toBe("AUTRE");
-      expect(result.value.highlight).toBe("NONE");
+      expect(result.value.priority).toBe("OPTIONAL");
     }
   });
 
@@ -113,11 +119,16 @@ describe("validateRecruitmentAdInput", () => {
     });
   });
 
-  it("rejects an invalid highlight", () => {
-    expect(validateRecruitmentAdInput({ title: "X", highlight: "POPUP" })).toEqual({
-      ok: false,
-      error: "INVALID_HIGHLIGHT",
-    });
+  it("rejects an invalid priority, legacy highlight values included", () => {
+    // Les anciennes valeurs de mise en avant ne sont pas des statuts : un
+    // client resté sur l'ancien formulaire doit se faire refuser, pas se voir
+    // rabattre en silence sur « facultative ».
+    for (const priority of ["POPUP", "MODAL", "BANNER", "NONE", "priority"]) {
+      expect(validateRecruitmentAdInput({ title: "X", priority })).toEqual({
+        ok: false,
+        error: "INVALID_PRIORITY",
+      });
+    }
   });
 
   it("trims and keeps the Discord contact", () => {
@@ -228,37 +239,73 @@ describe("shouldShowRecruitmentModal", () => {
  * et `localStorage` ne quitte jamais l'onglet. C'est ce qui fait tomber le LCP
  * de l'accueil, la modale n'étant plus peinte après l'hydratation.
  */
-describe("recruitmentDismissed", () => {
-  it("reconnaît l'annonce que le visiteur a fermée", () => {
-    expect(recruitmentDismissed("42", 42)).toBe(true);
+describe("parseRecruitmentSeen / serializeRecruitmentSeen", () => {
+  it("lit la liste des identifiants montrés", () => {
+    expect([...parseRecruitmentSeen("12.15.3")]).toEqual([12, 15, 3]);
   });
 
-  it("réaffiche dès que l'annonce mise en avant change", () => {
-    // La valeur est l'identifiant : changer d'annonce repart avec une clé
-    // neuve, exactement comme la clé par annonce de l'ancien stockage.
-    expect(recruitmentDismissed("41", 42)).toBe(false);
+  it("lit encore une valeur à un seul identifiant, la forme d'avant les statuts", () => {
+    expect([...parseRecruitmentSeen("42")]).toEqual([42]);
+  });
+
+  it("écarte tout ce qui n'est pas un entier positif", () => {
+    // Une valeur forgée ou abîmée ne peut taire que ce qu'elle nomme exactement.
+    expect([...parseRecruitmentSeen("abc.0.-3.4 2.42x.0x2a.7")]).toEqual([7]);
+    expect([...parseRecruitmentSeen("..")]).toEqual([]);
+    expect([...parseRecruitmentSeen("99999999999999999999")]).toEqual([]);
+  });
+
+  it("rend un ensemble vide sans cookie", () => {
+    expect(parseRecruitmentSeen(undefined).size).toBe(0);
+    expect(parseRecruitmentSeen("").size).toBe(0);
+  });
+
+  it("fait l'aller-retour", () => {
+    expect(serializeRecruitmentSeen([3, 1, 2])).toBe("3.1.2");
+    expect([...parseRecruitmentSeen(serializeRecruitmentSeen([3, 1, 2]))]).toEqual([3, 1, 2]);
+    expect(serializeRecruitmentSeen([])).toBe("");
+  });
+});
+
+describe("recruitmentDismissed", () => {
+  it("reconnaît les annonces que le visiteur a fermées", () => {
+    expect(recruitmentDismissed("42", [42])).toBe(true);
+    expect(recruitmentDismissed("1.2.3", [3, 1])).toBe(true);
+  });
+
+  it("réaffiche dès qu'une annonce jamais vue s'ajoute", () => {
+    // La valeur est la liste des identifiants : une annonce neuve n'y figure
+    // pas, et suffit à rouvrir.
+    expect(recruitmentDismissed("41", [42])).toBe(false);
+    expect(recruitmentDismissed("1.2", [1, 2, 3])).toBe(false);
   });
 
   it("affiche quand aucun cookie n'a été posé", () => {
-    expect(recruitmentDismissed(undefined, 42)).toBe(false);
-    expect(recruitmentDismissed("", 42)).toBe(false);
+    expect(recruitmentDismissed(undefined, [42])).toBe(false);
+    expect(recruitmentDismissed("", [42])).toBe(false);
+  });
+
+  it("n'a rien à taire quand rien n'est mis en avant", () => {
+    expect(recruitmentDismissed(undefined, [])).toBe(true);
   });
 
   it("tolère les espaces que peut laisser un client", () => {
-    expect(recruitmentDismissed(" 42 ", 42)).toBe(true);
+    expect(recruitmentDismissed(" 42 ", [42])).toBe(true);
+    expect(recruitmentDismissed("1. 2", [1, 2])).toBe(true);
   });
 
   it("affiche sur une valeur incompréhensible plutôt que de se taire", () => {
     // Dans le doute on montre : une mise en avant tue à tort ne se rattrape
     // pas, alors qu'une modale montrée une fois de trop se referme.
     for (const valeur of ["abc", "4 2", "[]", "42x", "0x2a"]) {
-      expect(recruitmentDismissed(valeur, 42)).toBe(false);
+      expect(recruitmentDismissed(valeur, [42])).toBe(false);
     }
   });
 
   it("ne confond pas deux identifiants dont l'un préfixe l'autre", () => {
-    expect(recruitmentDismissed("4", 42)).toBe(false);
-    expect(recruitmentDismissed("420", 42)).toBe(false);
+    expect(recruitmentDismissed("4", [42])).toBe(false);
+    expect(recruitmentDismissed("420", [42])).toBe(false);
+    expect(recruitmentDismissed("4.20", [42])).toBe(false);
   });
 
   it("tire la durée du cookie de la fenêtre, sans la réécrire", () => {
@@ -269,5 +316,33 @@ describe("recruitmentDismissed", () => {
 
   it("nomme deux cookies distincts, la banderole et la modale ne durant pas pareil", () => {
     expect(RECRUITMENT_MODAL_COOKIE).not.toBe(RECRUITMENT_BANNER_COOKIE);
+  });
+});
+
+describe("recruitmentModalStart", () => {
+  it("ouvre sur la première page quand rien n'a été vu", () => {
+    expect(recruitmentModalStart(undefined, [5, 6, 7])).toBe(0);
+  });
+
+  it("ouvre sur la première prioritaire jamais vue", () => {
+    // Revenir pour une troisième prioritaire ne fait pas relire les deux autres.
+    expect(recruitmentModalStart("5.6", [5, 6, 7])).toBe(2);
+    expect(recruitmentModalStart("6", [5, 6, 7])).toBe(0);
+  });
+
+  it("se tait quand toutes ont été vues", () => {
+    expect(recruitmentModalStart("5.6.7", [5, 6, 7])).toBeNull();
+    expect(recruitmentModalStart("7.5.6.9", [5, 6, 7])).toBeNull();
+  });
+
+  it("se tait sans prioritaire", () => {
+    expect(recruitmentModalStart(undefined, [])).toBeNull();
+  });
+});
+
+describe("RECRUITMENT_BANNER_ROTATION_MS", () => {
+  it("laisse le temps de lire, au-delà du seuil où WCAG 2.2.2 exige une pause", () => {
+    expect(RECRUITMENT_BANNER_ROTATION_MS).toBeGreaterThan(5_000);
+    expect(RECRUITMENT_BANNER_ROTATION_MS).toBeLessThanOrEqual(10_000);
   });
 });

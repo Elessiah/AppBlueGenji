@@ -120,6 +120,8 @@ describe("mise en page racine", () => {
     // joueur d'un lien à l'autre (la mise en page n'est pas re-rendue).
     expect(layout).toContain("const privacyChanges = await pendingChangesFor(user?.id);");
     expect(layout).not.toContain("PRIVACY_POLICY_PAGE");
-    expect(layout).toMatch(/privacyChanges\.length > 0 && ad\?\.highlight === "MODAL"/);
+    // Seule la modale d'arrivée se tait : la banderole n'est pas modale et reste.
+    expect(layout).toMatch(/modalStart=\{privacyChanges\.length > 0 \? null : modalStart\}/);
+    expect(layout).not.toMatch(/bannerDismissed=\{[^}]*privacyChanges/);
   });
 });

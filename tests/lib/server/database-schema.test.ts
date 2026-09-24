@@ -236,10 +236,11 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    // Six : la boucle des changements récents, les trois retraits de colonne,
-    // le report `user_id` → `authenticated` des visites qui précède le sien, et
+    // Huit : la boucle des changements récents, les quatre retraits de colonne,
+    // les deux reports qui précèdent un retrait (`user_id` → `authenticated`
+    // des visites, `highlight` → `priority` des annonces de recrutement), et
     // `launched_at`, dont le remplissage ne suit que l'ajout effectif.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(6);
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(8);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });
@@ -301,11 +302,40 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       'const DROP_EMAIL = "ALTER TABLE bg_users DROP COLUMN email";',
       // Les visites ne désignent plus de compte : seul `authenticated` reste.
       'const DROP_VISIT_USER = "ALTER TABLE bg_site_visits DROP COLUMN user_id";',
+      // La mise en avant d'une annonce est devenue un statut d'importance.
+      'const DROP_RECRUITMENT_HIGHLIGHT = "ALTER TABLE bg_recruitment_ads DROP COLUMN highlight";',
     ]);
     // Et la liste des changements récents, jouée par la boucle.
     expect(code).toContain("for (const statement of RECENT_SCHEMA_CHANGES)");
     expect(code).toContain("await db.execute(DROP_EMAIL);");
     expect(code).toContain("await db.execute(DROP_VISIT_USER);");
+    expect(code).toContain("await db.execute(DROP_RECRUITMENT_HIGHLIGHT);");
+  });
+
+  it("reporte la mise en avant des annonces en statut avant de retirer la colonne", () => {
+    const section = sql.slice(
+      sql.indexOf("SET priority = CASE highlight"),
+      sql.indexOf("await db.execute(DROP_RECRUITMENT_HIGHLIGHT);"),
+    );
+    // Modale → prioritaire, banderole → importante ; le reste garde le défaut.
+    expect(section).toContain("WHEN 'MODAL' THEN 'PRIORITY' WHEN 'BANNER' THEN 'IMPORTANT' ELSE priority END");
+    // Le report consomme sa source dans la même instruction, **après** l'avoir
+    // lue : rejoué après un DROP refusé, il ne trouverait plus rien et ne
+    // pourrait pas écraser un statut choisi depuis.
+    expect(section.indexOf("SET priority =")).toBeLessThan(section.indexOf("highlight = 'NONE'"));
+    expect(section).toContain("WHERE highlight <> 'NONE'");
+    // Le retrait attend un report réussi (ou une source déjà partie) : sinon il
+    // emporterait la seule trace de ce qui était mis en avant.
+    expect(section).toContain("if (highlightCarriedOver) {");
+    expect(section).toContain(".includes(\"'highlight'\")");
+  });
+
+  it("déclare le statut dans la table neuve et l'ajoute aux bases qui tournent", () => {
+    expect(table("bg_recruitment_ads")).toContain(
+      "priority ENUM('PRIORITY', 'IMPORTANT', 'OPTIONAL') NOT NULL DEFAULT 'OPTIONAL'",
+    );
+    expect(table("bg_recruitment_ads")).not.toContain("highlight");
+    expect(sql).toMatch(/ALTER TABLE bg_recruitment_ads ADD COLUMN priority\s+ENUM\('PRIORITY', 'IMPORTANT', 'OPTIONAL'\)/);
   });
 
   it("garde les trois tables tolérantes, dont des chemins accessoires dépendent", () => {
