@@ -12,6 +12,7 @@
 /* Le panneau défile en lui-même quand il dépasse l'écran : la page, elle, est
    verrouillée tant que la modale est ouverte. */
 .panel {
+  max-height: calc(100vh - 40px); /* repli : navigateurs sans `dvh` */
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
 }

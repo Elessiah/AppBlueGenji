@@ -37,7 +37,10 @@ interface LandingDialogProps {
  */
 export function LandingDialog({ onClose, busy = false, className, labelledBy, label, children }: LandingDialogProps) {
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
+  // Cibles de l'appui et du relâchement : celle du `click` est l'ancêtre commun
+  // des deux, elle ne dit pas où le geste a commencé ni fini.
   const pressTarget = useRef<EventTarget | null>(null);
+  const releaseTarget = useRef<EventTarget | null>(null);
 
   return createPortal(
     <div
@@ -45,10 +48,15 @@ export function LandingDialog({ onClose, busy = false, className, labelledBy, la
       role="presentation"
       onPointerDown={(e) => {
         pressTarget.current = e.target;
+        releaseTarget.current = null;
+      }}
+      onPointerUp={(e) => {
+        releaseTarget.current = e.target;
       }}
       onClick={(e) => {
-        const dismiss = isBackdropDismiss(pressTarget.current, e.target, e.currentTarget);
+        const dismiss = isBackdropDismiss(pressTarget.current, releaseTarget.current, e.currentTarget);
         pressTarget.current = null;
+        releaseTarget.current = null;
         if (dismiss && !busy) onClose();
       }}
     >
