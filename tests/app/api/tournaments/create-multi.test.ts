@@ -370,6 +370,75 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
       expect(service.createTournament).not.toHaveBeenCalled();
     });
 
+    // Preuve que la boucle ne s'arrête pas après la première paire conforme :
+    // sur un plan à 4 phases, la violation ne porte que sur la **deuxième**
+    // paire comparée (i=1), la première (i=0) étant correctement décroissante.
+    it("rejette une violation qui n'apparaît qu'à la deuxième paire comparée (plan à 4 phases)", async () => {
+      const res = await POST(
+        jsonReq({
+          ...baseMulti,
+          format: "MULTI",
+          phases: [
+            {
+              format: "SURVIVAL",
+              qualifierMode: "COUNT",
+              qualifierValue: 32,
+              survivalRoundsPerCut: 1,
+            },
+            {
+              format: "SWISS",
+              qualifierMode: "COUNT",
+              qualifierValue: 16, // < 32 : première paire conforme
+              swissTotalRounds: 4,
+            },
+            {
+              format: "SINGLE",
+              qualifierMode: "COUNT",
+              qualifierValue: 16, // égal à la phase précédente : deuxième paire en défaut
+            },
+            {
+              format: "DOUBLE",
+              qualifierMode: "COUNT",
+              qualifierValue: 1, // phase finale — jamais comparée
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "INVALID_QUALIFIER_COUNT" });
+      expect(service.createTournament).not.toHaveBeenCalled();
+    });
+
+    // Deux phases non-terminales adjacentes de mode **différent** ne sont
+    // jamais comparées entre elles, quelles que soient leurs valeurs brutes —
+    // comparer « 16 équipes » à « 90 % » n'a pas de sens.
+    it("accepte un plan qui alterne COUNT et PERCENT entre phases non-terminales", async () => {
+      const res = await POST(
+        jsonReq({
+          ...baseMulti,
+          format: "MULTI",
+          phases: [
+            {
+              format: "SURVIVAL",
+              qualifierMode: "COUNT",
+              qualifierValue: 16,
+              survivalRoundsPerCut: 1,
+            },
+            {
+              format: "SWISS",
+              qualifierMode: "PERCENT",
+              qualifierValue: 90, // modes différents : jamais comparé à la phase 1
+              swissTotalRounds: 4,
+            },
+            phase2, // phase finale
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(201);
+    });
+
     it("rejette un tableau de phases vide", async () => {
       const res = await POST(
         jsonReq({
