@@ -4,6 +4,7 @@ import type {
   EnduranceNextRoundInput,
   EnduranceNextRoundPreview,
 } from "@/lib/shared/endurance-next-round";
+import { plural } from "@/lib/shared/plural";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 
 /**
@@ -89,10 +90,6 @@ function playoffStageTitle(slots: number | null): string {
 export function nextRoundTitle(preview: EnduranceNextRoundPreview, maxRounds: number | null): string {
   if (preview.stage === "PLAYOFFS") return playoffStageTitle(preview.decisiveSlots);
   return maxRounds === null ? `Manche ${preview.round}` : `Manche ${preview.round}/${maxRounds}`;
-}
-
-function plural(count: number, one: string, many: string): string {
-  return `${count} ${count > 1 ? many : one}`;
 }
 
 /**
