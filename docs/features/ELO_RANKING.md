@@ -245,6 +245,38 @@ de 60 s, et surtout invalidation à l'écriture depuis
 score, ce qui est nouveau : c'est le seul cache global qu'un score doive vider,
 puisque la cote en dépend directement.
 
+### Filtre par jeu (leaderboard de la landing)
+
+`TeamRankingOptions.game` restreint le rejeu aux matchs et clôtures des
+tournois d'**un seul** jeu (`t.game = ?` sur les deux collectes,
+`loadRankedMatches` et `loadRankedPlacements`) — c'est ce que servent les
+pastilles Général / Overwatch / Marvel Rivals de `Leaderboard.tsx`. Par défaut
+(`undefined`), le rejeu porte sur **tous** les jeux ensemble, comme partout
+ailleurs (annuaire, fiche, seeding) : **la** cote d'une équipe reste toujours
+ce calcul-là. Poser `game` lance un **second** rejeu, sur une assiette plus
+étroite — le nombre qu'il rend n'est vrai que pour l'onglet qui l'affiche,
+jamais la cote de l'équipe. La clé du cache mutualisé (`state:${jours}:${jeu}`)
+et celle du cache de la landing (`leaderboard:${limite}:${jeu}`) portent donc le
+jeu : un classement filtré et le classement général vivent côte à côte sans se
+percuter, chacun invalidé par le même préfixe que l'autre.
+
+**Un onglet par jeu n'inclut pas les équipes qui n'ont pas joué ce jeu.**
+`loadLandingLeaderboard` pose `includeUnplayed: game === undefined` : l'onglet
+« Général » garde toute équipe du site (jouée ou non, cote de départ pour
+qui n'a rien joué — la garantie tenue par `compareRankedTeams`, voir plus
+haut), mais un onglet par jeu **exclut** toute équipe sans match dans ce
+jeu-là. Sans ce garde-fou, l'onglet « Marvel Rivals » aurait affiché une
+équipe qui ne joue qu'à Overwatch, à la cote de départ, comme si elle
+attendait simplement son premier match — alors qu'elle n'en jouera jamais un
+dans ce jeu.
+
+Le paramètre `?game=` de `GET /api/landing/leaderboard` arrivait jusqu'à la
+route et s'y arrêtait (`console.warn`, classement général renvoyé quoi qu'il
+arrive) : cliquer une pastille ne changeait donc jamais les lignes affichées.
+`parseGame` (dans la route) traduit `ow`/`mr` reçus du client en `OW`/`MR`
+tels que `bg_tournaments.game` les porte, et retombe sur « aucun filtre » pour
+toute valeur absente ou inconnue plutôt que de refuser la requête.
+
 ## Ce que voit l'utilisateur
 
 - La tuile « Points de classement » de la fiche d'équipe vient désormais du
@@ -283,4 +315,10 @@ puisque la cote en dépend directement.
   matchs, et la même cote lue sur la carte d'annuaire, sur la fiche, au
   classement et sur le leaderboard.
 - `tests/lib/server/landing-leaderboard.test.ts` — égalité avec le chargeur
-  partagé, équipes sans match, tendance, dégradation si la base tombe.
+  partagé, équipes sans match, tendance, dégradation si la base tombe, et le
+  filtre par jeu transmis aux deux photos (courante et de référence).
+- `tests/lib/server/ranking-service.test.ts` couvre aussi le filtre par jeu :
+  absent par défaut, `t.game = ?` lié après la fenêtre, cache distinct par
+  jeu.
+- `tests/app/api/landing/leaderboard.test.ts` — traduction `ow`/`mr` → `OW`/`MR`,
+  repli sur « aucun filtre » pour une valeur absente ou inconnue.

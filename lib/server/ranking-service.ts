@@ -48,6 +48,7 @@ import {
 import { MIN_PLACEMENT_ENTRANTS } from "@/lib/shared/tournament-placement";
 import type { TeamRankingPosition } from "@/lib/shared/stats";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import type { TournamentGame } from "@/lib/shared/types";
 
 export type { TeamRankingPosition };
 
@@ -90,6 +91,18 @@ export type TeamRankingOptions = {
    * Paris, et la fenêtre se décale sans que rien ne le signale.
    */
   completedMoreThanDaysAgo?: number;
+  /**
+   * Ne rejouer que les matchs et clôtures des tournois de **ce jeu** — sert au
+   * filtre du leaderboard de la landing (pastilles Général / Overwatch / Marvel
+   * Rivals). Par défaut (`undefined`), tous les jeux sont rejoués ensemble,
+   * comme partout ailleurs (annuaire, fiche, seeding) : **la** cote d'une
+   * équipe — celle de sa fiche, de l'annuaire, du seeding — est toujours ce
+   * calcul-là, tous jeux confondus. Poser `game` produit un **second** rejeu,
+   * sur une assiette plus étroite : le nombre qu'il rend n'est vrai que pour
+   * cet onglet-là, jamais la cote de l'équipe — ne pas le confondre avec
+   * `TournamentCard.game`, qui décrit un tournoi, pas une équipe.
+   */
+  game?: TournamentGame;
   /**
    * Lire sur une connexion précise plutôt que sur le pool.
    *
@@ -160,9 +173,14 @@ function isoOrEpoch(value: Date | string | null): string {
 async function loadRankedMatches(
   db: Queryable,
   days: number | undefined,
+  game: TournamentGame | undefined,
 ): Promise<RankedMatch[]> {
   const before =
     days === undefined ? "" : `\n       AND m.updated_at < DATE_SUB(NOW(), INTERVAL ? DAY)`;
+  const gameFilter = game === undefined ? "" : `\n       AND t.game = ?`;
+  const params: (number | TournamentGame)[] = [];
+  if (days !== undefined) params.push(days);
+  if (game !== undefined) params.push(game);
   const [rows] = await db.execute<RankedMatchRow[]>(
     `SELECT
       m.id,
@@ -172,9 +190,9 @@ async function loadRankedMatches(
       COALESCE(m.updated_at, t.finished_at, t.start_at) AS played_at
      FROM bg_matches m
      JOIN bg_tournaments t ON t.id = m.tournament_id
-     WHERE ${PLAYED_MATCH_SQL}${before}
+     WHERE ${PLAYED_MATCH_SQL}${before}${gameFilter}
      ORDER BY played_at ASC, m.id ASC`,
-    days === undefined ? [] : [days],
+    params,
   );
 
   return rows.map((row) => {
@@ -226,10 +244,15 @@ async function loadRankedMatches(
 async function loadRankedPlacements(
   db: Queryable,
   days: number | undefined,
+  game: TournamentGame | undefined,
 ): Promise<RankedPlacement[]> {
   const awardedAt = "COALESCE(t.finished_at, t.updated_at, t.start_at)";
   const before = days === undefined ? "" : `
        AND ${awardedAt} < DATE_SUB(NOW(), INTERVAL ? DAY)`;
+  const gameFilter = game === undefined ? "" : `\n       AND t.game = ?`;
+  const params: (number | TournamentGame)[] = [];
+  if (days !== undefined) params.push(days);
+  if (game !== undefined) params.push(game);
 
   const [rows] = await db.execute<PlacementRow[]>(
     `SELECT
@@ -240,9 +263,9 @@ async function loadRankedPlacements(
      FROM bg_tournaments t
      JOIN bg_tournament_registrations r ON r.tournament_id = t.id
      WHERE t.state = 'FINISHED'
-       AND r.final_rank IS NOT NULL${before}
+       AND r.final_rank IS NOT NULL${before}${gameFilter}
      ORDER BY awarded_at ASC, t.id ASC, r.final_rank ASC`,
-    days === undefined ? [] : [days],
+    params,
   );
 
   const byTournament = new Map<number, RankedPlacement>();
@@ -273,9 +296,10 @@ async function loadRankedPlacements(
  * rejeu.
  */
 export async function loadRankingState(
-  options: Pick<TeamRankingOptions, "completedMoreThanDaysAgo" | "connection" | "shared"> = {},
+  options: Pick<TeamRankingOptions, "completedMoreThanDaysAgo" | "connection" | "shared" | "game"> = {},
 ): Promise<Map<number, RankedTeamState>> {
   const days = options.completedMoreThanDaysAgo;
+  const game = options.game;
   validateWindow(days);
 
   // Une connexion donnée reste la source de données ; ce que `shared` décide,
@@ -287,8 +311,8 @@ export async function loadRankingState(
     // Deux lectures **enchaînées** et non parallèles : `db` peut être la
     // connexion d'une transaction en cours (le seeding), qui n'exécute qu'une
     // requête à la fois.
-    const matches = await loadRankedMatches(db, days);
-    const placements = await loadRankedPlacements(db, days);
+    const matches = await loadRankedMatches(db, days, game);
+    const placements = await loadRankedPlacements(db, days, game);
     return replayRanking(matches, placements);
   };
 
@@ -296,7 +320,7 @@ export async function loadRankingState(
   const shared = options.shared ?? options.connection === undefined;
   if (!shared) return replay();
 
-  return cachedRanking(`state:${days ?? "all"}`, replay);
+  return cachedRanking(`state:${days ?? "all"}:${game ?? "all"}`, replay);
 }
 
 /**

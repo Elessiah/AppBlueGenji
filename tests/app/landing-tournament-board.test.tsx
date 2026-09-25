@@ -75,10 +75,11 @@ describe("TournamentBoard", () => {
     expect(text).not.toMatch(/S(&#x27;|')inscrire/);
   });
 
-  it("propose l'inscription quand il reste une place", () => {
+  it("ne propose jamais l'inscription, même avec une place libre : le tableau ne connaît pas le lecteur", () => {
     const open = tournamentCard({ id: 5, name: "Coupe ouverte", state: "REGISTRATION", registeredTeams: 2 });
     const text = cardText(render(null, buckets({ registration: [open] })), "Coupe ouverte");
-    expect(text).toMatch(/S(&#x27;|')inscrire/);
+    expect(text).not.toMatch(/S(&#x27;|')inscrire/);
+    expect(text).toContain("Voir le tournoi");
     expect(text).toContain("Inscriptions ouvertes");
   });
 

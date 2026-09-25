@@ -178,6 +178,50 @@ describe("loadRankingState — collecte", () => {
     const [, params] = execute.mock.calls[0] as [string, unknown[]];
     expect(params).toEqual([0]);
   });
+
+  // Le filtre du leaderboard de la landing (pastilles Général / Overwatch /
+  // Marvel Rivals) : sans lui, `t.game = ?` n'apparaît nulle part et aucune
+  // équipe classée pour un jeu n'affecte celle de l'autre.
+  it("ne filtre par jeu ni les matchs ni les classements finaux, par défaut", async () => {
+    const execute = await mockDb(fakeDb([], []));
+
+    await loadRankingState();
+
+    for (const call of execute.mock.calls) {
+      expect(String(call[0])).not.toContain("t.game = ?");
+    }
+  });
+
+  it("filtre les matchs et les classements finaux sur le jeu demandé", async () => {
+    const execute = await mockDb(fakeDb([], []));
+
+    await loadRankingState({ game: "MR" });
+
+    const matchesCall = execute.mock.calls.find((call) => String(call[0]).includes("AS played_at"))!;
+    const placementsCall = execute.mock.calls.find((call) => String(call[0]).includes("AS awarded_at"))!;
+    expect(String(matchesCall[0])).toContain("t.game = ?");
+    expect(matchesCall[1]).toEqual(["MR"]);
+    expect(String(placementsCall[0])).toContain("t.game = ?");
+    expect(placementsCall[1]).toEqual(["MR"]);
+  });
+
+  it("lie la fenêtre puis le jeu, dans cet ordre", async () => {
+    const execute = await mockDb(fakeDb([], []));
+
+    await loadRankingState({ completedMoreThanDaysAgo: 7, game: "OW" });
+
+    const [, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(params).toEqual([7, "OW"]);
+  });
+
+  it("distingue le classement filtré par jeu du classement général, dans le cache", async () => {
+    const execute = await mockDb(fakeDb([matchRow(1, 1, 2, 1)], []));
+
+    await loadRankingState();
+    await loadRankingState({ game: "OW" });
+
+    expect(execute.mock.calls.filter((call) => String(call[0]).includes("AS played_at"))).toHaveLength(2);
+  });
 });
 
 describe("loadRankingState — mutualisation", () => {

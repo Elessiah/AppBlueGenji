@@ -34,13 +34,17 @@ function teamRow(id: number, name: string, logo: string | null = null): Row {
 
 /**
  * Le classement courant et celui d'il y a une semaine passent par la **même**
- * requête de rejeu ; on les distingue par la présence d'une borne de date.
+ * requête de rejeu ; on les distingue par la présence d'une borne de date
+ * dans le **texte** de la requête — jamais par la simple longueur de
+ * `params`, qui porte aussi le filtre par jeu et vaudrait alors « bornée »
+ * pour la photo courante d'un onglet filtré.
  */
 async function mockDb(teams: Row[], current: Row[], previous: Row[] = current) {
   const execute = jest.fn(async (sql: unknown, params: unknown) => {
+    void params;
     const text = String(sql);
     if (text.includes("AS played_at")) {
-      const bounded = Array.isArray(params) && params.length > 0;
+      const bounded = text.includes("DATE_SUB(NOW()");
       return [bounded ? previous : current];
     }
     if (text.includes("FROM bg_teams")) return [teams];
@@ -147,5 +151,70 @@ describe("leaderboard de la landing", () => {
     jest.mocked(getDatabase).mockRejectedValue(new Error("db down"));
 
     expect(await getLandingLeaderboard(8)).toEqual([]);
+  });
+
+  // Les pastilles Général / Overwatch / Marvel Rivals de `Leaderboard.tsx` :
+  // sans ce filtre relu jusqu'au bout, cliquer « Overwatch » rendait toujours
+  // le classement général.
+  it("transmet le jeu au chargeur partagé, sur les deux photos", async () => {
+    const execute = await mockDb([teamRow(1, "Alpha")], [matchRow(1, 1, 2, 1)]);
+
+    await getLandingLeaderboard(8, "MR");
+
+    const playedAtCalls = execute.mock.calls.filter((call) => String(call[0]).includes("AS played_at"));
+    // La photo courante *et* celle d'il y a une semaine doivent porter le même
+    // filtre — sans quoi la tendance comparerait un classement par jeu à un
+    // classement général.
+    expect(playedAtCalls).toHaveLength(2);
+    const current = playedAtCalls.find((call) => !String(call[0]).includes("DATE_SUB(NOW()"))!;
+    const previous = playedAtCalls.find((call) => String(call[0]).includes("DATE_SUB(NOW()"))!;
+    expect(current[0]).toContain("t.game = ?");
+    expect(current[1]).toEqual(["MR"]);
+    expect(previous[0]).toContain("t.game = ?");
+    expect(previous[1]).toEqual([7, "MR"]);
+  });
+
+  it("ne filtre rien sans jeu demandé (« Général »)", async () => {
+    const execute = await mockDb([teamRow(1, "Alpha")], [matchRow(1, 1, 2, 1)]);
+
+    await getLandingLeaderboard(8);
+
+    for (const call of execute.mock.calls) {
+      expect(String(call[0])).not.toContain("t.game = ?");
+    }
+  });
+
+  // Sans ce garde-fou, l'onglet « Marvel Rivals » listait une équipe qui n'a
+  // jamais joué ce jeu, à la cote de départ, comme si elle attendait
+  // simplement son premier match — alors qu'elle n'en jouera jamais un dans
+  // ce jeu-là. L'onglet « Général », lui, doit continuer à la montrer : c'est
+  // sa raison d'être.
+  it("exclut d'un onglet par jeu les équipes qui n'ont joué aucun match de ce jeu", async () => {
+    const teams = [teamRow(1, "Alpha"), teamRow(2, "Jamais engagée dans ce jeu")];
+    // Représente ce que la base renvoie déjà filtrée par `t.game = ?` : seule
+    // Alpha a un match dans le jeu demandé.
+    const matches = [matchRow(1, 1, 3, 1)];
+
+    await mockDb(teams, matches);
+    const filtered = await getLandingLeaderboard(8, "MR");
+    expect(filtered.map((row) => row.teamName)).toEqual(["Alpha"]);
+
+    clearCache();
+    await mockDb(teams, matches);
+    const general = await getLandingLeaderboard(8);
+    expect(general.map((row) => row.teamName)).toEqual(["Alpha", "Jamais engagée dans ce jeu"]);
+  });
+
+  it("garde deux classements distincts en cache selon le jeu demandé", async () => {
+    const execute = await mockDb([teamRow(1, "Alpha")], [matchRow(1, 1, 2, 1)]);
+
+    await getLandingLeaderboard(8);
+    await getLandingLeaderboard(8, "OW");
+    await getLandingLeaderboard(8);
+    await getLandingLeaderboard(8, "OW");
+
+    // Un rejeu par jeu distinct, pas un par appel : la mutualisation tient
+    // toujours, seulement sur des clés séparées.
+    expect(execute.mock.calls.filter((call) => String(call[0]).includes("AS played_at"))).toHaveLength(4);
   });
 });
