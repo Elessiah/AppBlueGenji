@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
@@ -234,7 +234,10 @@ export default function TournamentsPage() {
           )}
         </header>
 
-        <div className={s.metrics}>
+        <div
+          className={s.metrics}
+          style={{ "--metric-cols": metrics.length } as CSSProperties}
+        >
           {metrics.map((m) => (
             <div className={s.metric} key={m.label}>
               <div className={s.metricNum}>
