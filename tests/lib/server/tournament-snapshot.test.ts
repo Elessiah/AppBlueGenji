@@ -47,6 +47,7 @@ import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/
 import { fakePool } from "../../helpers/sql-double";
 import type { RowOverrides } from "../../helpers/row-overrides";
 import {
+  matchRow,
   registrationRow,
   tournamentListRow,
   tournamentRow,
@@ -433,5 +434,54 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
 
     expect(order(snapshot)?.map(([name]) => name)).toEqual(["Alpha", "Beta", "Gamma"]);
     expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
+  });
+});
+
+describe("getTournamentSnapshot — résumé de la carte", () => {
+  // Les mêmes règles que la liste (`list-summary.ts`), rejouées sur les lignes
+  // que l'instantané a déjà chargées : la carte dit la même chose aux deux.
+
+  it("nomme le vainqueur d'un tournoi terminé", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(
+      listRow({ state: "FINISHED", finished_at: new Date("2026-09-01T20:00:00.000Z") }),
+    );
+    jest.mocked(getRegistrationRows).mockResolvedValue([
+      registrationRow({ team_id: 1, team_name: "Alpha", final_rank: 2 }),
+      registrationRow({ team_id: 2, team_name: "Beta", final_rank: 1 }),
+    ]);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(snapshot?.card.finishedAt).toBe("2026-09-01T20:00:00.000Z");
+    expect(snapshot?.card.champion).toEqual({ teamId: 2, name: "Beta" });
+    expect(snapshot?.card.runningProgress).toBeNull();
+  });
+
+  it("situe le déroulement d'un tournoi en cours", async () => {
+    jest.mocked(getMatchRows).mockResolvedValue([
+      matchRow({ id: 1, status: "COMPLETED" }),
+      matchRow({ id: 2, status: "READY" }),
+      matchRow({ id: 3, round_number: 2, status: "PENDING" }),
+      matchRow({ id: 4, round_number: 2, status: "PENDING" }),
+    ]);
+    jest.mocked(getRegistrationRows).mockResolvedValue([
+      // Un rang final résiduel ne sacre personne tant que le tournoi court.
+      registrationRow({ team_id: 1, team_name: "Alpha", final_rank: 1 }),
+    ]);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(snapshot?.card.runningProgress).toBeCloseTo(1 / 4);
+    expect(snapshot?.card.champion).toBeNull();
+  });
+
+  it("ne résume rien avant le coup d'envoi", async () => {
+    jest.mocked(getTournamentListRow).mockResolvedValue(listRow({ state: "REGISTRATION" }));
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(snapshot?.card.champion).toBeNull();
+    expect(snapshot?.card.runningProgress).toBeNull();
+    expect(snapshot?.card.finishedAt).toBeNull();
   });
 });
