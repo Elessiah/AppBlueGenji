@@ -71,7 +71,8 @@ export function FinishedCard({ t, priority }: FinishedCardProps) {
         <div className={s.cardFoot}>
           <div className={s.cardFootMain}>
             <div className={s.cardFootLbl}>Vainqueur</div>
-            <div className={`${s.cardFootVal} ${s.cardChampion}`}>
+            {/* Le nom peut être coupé (ellipse) : il reste entier au survol. */}
+            <div className={`${s.cardFootVal} ${s.cardChampion}`} title={t.champion?.name}>
               {t.champion ? (
                 <>
                   <span aria-hidden="true">🏆 </span>

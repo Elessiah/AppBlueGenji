@@ -76,7 +76,7 @@ export function RegistrationCard({ t, priority }: RegistrationCardProps) {
           </div>
         </div>
 
-        <div className={s.progress}>
+        <div className={s.progress} aria-hidden="true">
           <div className={s.progressBar} style={{ width: `${fill.percent}%` }} />
         </div>
 

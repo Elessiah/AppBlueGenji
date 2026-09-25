@@ -68,7 +68,7 @@ export function RunningCard({ t, priority }: RunningCardProps) {
         </div>
 
         {percent !== null ? (
-          <div className={s.progress}>
+          <div className={s.progress} aria-hidden="true">
             <div className={s.progressBar} style={{ width: `${percent}%` }} />
           </div>
         ) : null}
