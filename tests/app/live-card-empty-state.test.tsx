@@ -24,7 +24,7 @@ function render(nextUpcomingISO: string | null | undefined) {
 describe("LiveCard — message sans tournoi en cours", () => {
   it("sans aucun tournoi à venir", () => {
     const html = render(null);
-    expect(html).toContain("Aucun tournoi programmé.");
+    expect(html).toContain("Aucun tournoi en cours, et rien n&#x27;est encore programmé.");
     expect(html).not.toContain("dans bientôt");
   });
 

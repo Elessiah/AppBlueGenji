@@ -49,7 +49,7 @@ function sigilFor(name: string | null): string {
  * faute de construction commune avec « dans N jours ».
  */
 function noLiveTournamentMessage(iso: string | null | undefined): string {
-  if (!iso) return "Aucun tournoi en cours. Aucun tournoi programmé.";
+  if (!iso) return "Aucun tournoi en cours, et rien n'est encore programmé.";
   const diff = Math.max(0, new Date(iso).getTime() - Date.now());
   const days = Math.max(0, Math.ceil(diff / 86400000));
   if (days <= 0) return "Aucun tournoi en cours. Le prochain démarre aujourd'hui.";
