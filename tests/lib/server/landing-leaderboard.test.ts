@@ -148,4 +148,45 @@ describe("leaderboard de la landing", () => {
 
     expect(await getLandingLeaderboard(8)).toEqual([]);
   });
+
+  // Les pastilles Général / Overwatch / Marvel Rivals de `Leaderboard.tsx` :
+  // sans ce filtre relu jusqu'au bout, cliquer « Overwatch » rendait toujours
+  // le classement général.
+  it("transmet le jeu au chargeur partagé, sur les deux photos", async () => {
+    const execute = await mockDb([teamRow(1, "Alpha")], [matchRow(1, 1, 2, 1)]);
+
+    await getLandingLeaderboard(8, "MR");
+
+    const gameCalls = execute.mock.calls.filter((call) => String(call[0]).includes("t.game = ?"));
+    // La photo courante *et* celle d'il y a une semaine doivent porter le même
+    // filtre — sans quoi la tendance comparerait un classement par jeu à un
+    // classement général.
+    expect(gameCalls.length).toBeGreaterThanOrEqual(2);
+    for (const call of gameCalls) {
+      expect(call[1]).toContain("MR");
+    }
+  });
+
+  it("ne filtre rien sans jeu demandé (« Général »)", async () => {
+    const execute = await mockDb([teamRow(1, "Alpha")], [matchRow(1, 1, 2, 1)]);
+
+    await getLandingLeaderboard(8);
+
+    for (const call of execute.mock.calls) {
+      expect(String(call[0])).not.toContain("t.game = ?");
+    }
+  });
+
+  it("garde deux classements distincts en cache selon le jeu demandé", async () => {
+    const execute = await mockDb([teamRow(1, "Alpha")], [matchRow(1, 1, 2, 1)]);
+
+    await getLandingLeaderboard(8);
+    await getLandingLeaderboard(8, "OW");
+    await getLandingLeaderboard(8);
+    await getLandingLeaderboard(8, "OW");
+
+    // Un rejeu par jeu distinct, pas un par appel : la mutualisation tient
+    // toujours, seulement sur des clés séparées.
+    expect(execute.mock.calls.filter((call) => String(call[0]).includes("AS played_at"))).toHaveLength(4);
+  });
 });
