@@ -16,6 +16,7 @@ Marvel Rivals. Corrections apportées à un audit UI/UX antérieur
 | Le classement était une grille de `<div>` : en-têtes « V–D / PTS / TR » non associés aux cellules aux technologies d'assistance, « TR » non expliqué. | Rôles ARIA de tableau (`role="table"/"row"/"columnheader"/"cell"`) posés sur la même grille CSS, sans toucher à la mise en page ; la colonne « TR » porte `aria-label="Tendance"` (RGAA 5). |
 | Les filtres Général / Overwatch / Marvel Rivals n'exposaient pas leur état sélectionné autrement que par la couleur. | `aria-pressed` sur chaque bouton (WCAG 1.4.1 / 4.1.2). |
 | « Voir le classement complet » et « ICS → » (`CalendarCard`) mesuraient 236×14 px et 49×14 px : sous les 24 px minimum. | Zone cliquable élargie par `padding` compensé d'une `margin` négative égale, sans agrandir le texte visible (WCAG 2.5.8). |
+| Cliquer « Overwatch » ou « Marvel Rivals » n'a jamais rien filtré : `GET /api/landing/leaderboard?game=…` lisait le paramètre, l'ignorait (`console.warn`) et rendait toujours le classement général. | Le filtre est câblé jusqu'au rejeu (`TeamRankingOptions.game`, voir `docs/features/ELO_RANKING.md`) : la route traduit `ow`/`mr` en `OW`/`MR`, la landing rejoue les deux photos (courante et de référence) sur la seule assiette de ce jeu. |
 
 ## Règles
 
