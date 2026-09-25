@@ -40,7 +40,7 @@ test.describe("Dashboard tournois (authentifié)", () => {
     const search = page.getByPlaceholder(/Rechercher un tournoi/);
     await expect(search).toBeVisible();
     await search.fill("xyz-aucun-resultat-attendu");
-    await expect(page.getByText(/Aucun tournoi/).first()).toBeVisible();
+    await expect(page.getByText(/Aucun résultat/).first()).toBeVisible();
     await search.clear();
 
     // Bascule sur un filtre de jeu sans erreur.
@@ -56,7 +56,9 @@ test.describe("Dashboard tournois (authentifié)", () => {
     const me = await page.request.get("/api/auth/me");
     const isAdmin = me.ok() ? Boolean((await me.json())?.user?.isAdmin) : false;
 
-    const createBtn = page.getByRole("button", { name: /Créer un tournoi/ });
+    // Fusionné en un seul <a> par `CyberButton asChild` (rôle implicite "link",
+    // plus de <button> imbriqué dans le <Link>).
+    const createBtn = page.getByRole("link", { name: /Créer un tournoi/ });
     if (isAdmin) {
       await expect(createBtn).toBeVisible();
       await createBtn.click();

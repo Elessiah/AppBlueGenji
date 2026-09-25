@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import s from "./tournois.module.css";
 
 interface SectionProps {
@@ -26,33 +26,44 @@ export function Section({
   children,
 }: SectionProps) {
   const [expanded, setExpanded] = useState(defaultOpen);
+  const bodyId = useId();
 
   return (
     <div className={s.section} data-cols={dataCols}>
-      <button
-        className={s.sectionHead}
-        aria-expanded={expanded}
-        onClick={() => setExpanded((x) => !x)}
-      >
-        <span className={s.sectionIx}>{ix}</span>
-        <h2 className={s.sectionTtl}>
-          {title}
-          {accent && <span className={s.sectionAccent}> {accent}</span>}
-        </h2>
-        <span className={s.sectionCount}>{count}</span>
-        <svg className={s.sectionCaret} width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path d="M10 6L8 9L6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-        </svg>
-      </button>
+      {/* Un `<h2>` n'est pas du contenu phrasé : posé à l'intérieur d'un
+          `<button>`, il n'y était pas autorisé. C'est le bouton qui va dans le
+          titre, jamais l'inverse — mais le `<h2>` engloberait alors aussi
+          l'index et le compte (« 01 EN COURS 46 »), bruit qu'un `aria-label`
+          retranche au seul titre ; le bouton, lui, garde le texte complet. */}
+      <h2 className={s.sectionH2} aria-label={accent ? `${title} ${accent}` : title}>
+        <button
+          className={s.sectionHead}
+          aria-expanded={expanded}
+          // Sans élément à désigner une fois repliée, une section fermée par
+          // défaut (« Terminés ») pointerait vers un id absent du DOM.
+          aria-controls={expanded ? bodyId : undefined}
+          onClick={() => setExpanded((x) => !x)}
+        >
+          <span className={s.sectionIx}>{ix}</span>
+          <span className={s.sectionTtl}>
+            {title}
+            {accent && <span className={s.sectionAccent}> {accent}</span>}
+          </span>
+          <span className={s.sectionCount}>{count}</span>
+          <svg className={s.sectionCaret} width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path d="M10 6L8 9L6 6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+          </svg>
+        </button>
+      </h2>
 
       {expanded &&
         (count === 0 ? (
-          <div className={`${s.sectionBody} ${s.empty}`}>
+          <div id={bodyId} className={`${s.sectionBody} ${s.empty}`}>
             <div className={s.emptyTitle}>Vide</div>
             <div className={s.emptyMsg}>{emptyMsg}</div>
           </div>
         ) : (
-          <div className={s.sectionBody}>{children}</div>
+          <div id={bodyId} className={s.sectionBody}>{children}</div>
         ))}
     </div>
   );

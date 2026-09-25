@@ -31,72 +31,75 @@ export function UpcomingCard({ t, priority }: UpcomingCardProps) {
   const locked = upcomingCardFace(t, Date.now()) === "LOCKED";
 
   return (
-    <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
-      <article className={s.card} data-state="soon">
-        <TournamentImageBanner
-          image={t.image}
-          sizes={CARD_IMAGE_SIZES}
-          className={s.cardBanner}
-          priority={priority}
-        />
-        <div className={`${s.cardRibbon} ${s.cardRibbonSoon}`}>
-          {locked ? "Inscriptions closes" : "À venir"}
+    <article className={s.card} data-state="soon">
+      <Link
+        href={`/tournois/${t.id}`}
+        className={s.cardOverlay}
+        aria-label={`Voir le tournoi ${t.name}`}
+      />
+      <TournamentImageBanner
+        image={t.image}
+        sizes={CARD_IMAGE_SIZES}
+        className={s.cardBanner}
+        priority={priority}
+      />
+      <div className={`${s.cardRibbon} ${s.cardRibbonSoon}`}>
+        {locked ? "Inscriptions closes" : "À venir"}
+      </div>
+
+      <div className={s.cardHead}>
+        <div className={s.cardGame}>
+          {gameLabel(t.game)}
+          <span className={s.dot}>◆</span>
+          {formatLabel(t.format)}
         </div>
+        <TournamentImageEmblem image={t.image} size={40} />
+      </div>
 
-        <div className={s.cardHead}>
-          <div className={s.cardGame}>
-            {gameLabel(t.game)}
-            <span className={s.dot}>◆</span>
-            {formatLabel(t.format)}
-          </div>
-          <TournamentImageEmblem image={t.image} size={40} />
+      <h3 className={s.cardTitle}>{t.name}</h3>
+      {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
+
+      <div className={s.cardMeta}>
+        <div>
+          <div className={s.cardMetaLbl}>Début</div>
+          <div className={s.cardMetaVal}>{formatCardDate(t.startAt, true)}</div>
         </div>
-
-        <h3 className={s.cardTitle}>{t.name}</h3>
-        {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
-
-        <div className={s.cardMeta}>
+        {locked ? (
           <div>
-            <div className={s.cardMetaLbl}>Début</div>
-            <div className={s.cardMetaVal}>{formatCardDate(t.startAt, true)}</div>
+            <div className={s.cardMetaLbl}>Inscriptions closes le</div>
+            <div className={s.cardMetaVal}>{formatCardDate(t.registrationCloseAt, true)}</div>
           </div>
-          {locked ? (
-            <div>
-              <div className={s.cardMetaLbl}>Inscriptions closes le</div>
-              <div className={s.cardMetaVal}>{formatCardDate(t.registrationCloseAt, true)}</div>
-            </div>
-          ) : (
-            <div>
-              <div className={s.cardMetaLbl}>Ouverture inscriptions</div>
-              <div className={s.cardMetaVal}>{formatCardDate(t.registrationOpenAt, true)}</div>
-            </div>
-          )}
+        ) : (
           <div>
-            <div className={s.cardMetaLbl}>{wording.manyCapitalized}</div>
-            <div className={`${s.cardMetaVal} ${s.num}`}>
-              {t.registeredTeams}/{t.maxTeams}
-            </div>
+            <div className={s.cardMetaLbl}>Ouverture inscriptions</div>
+            <div className={s.cardMetaVal}>{formatCardDate(t.registrationOpenAt, true)}</div>
           </div>
-          <div>
-            <div className={s.cardMetaLbl}>Matchs</div>
-            <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
+        )}
+        <div>
+          <div className={s.cardMetaLbl}>{wording.manyCapitalized}</div>
+          <div className={`${s.cardMetaVal} ${s.num}`}>
+            {t.registeredTeams}/{t.maxTeams}
           </div>
         </div>
+        <div>
+          <div className={s.cardMetaLbl}>Matchs</div>
+          <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
+        </div>
+      </div>
 
-        <div className={s.progress} aria-hidden="true">
-          <div className={s.progressBar} style={{ width: `${fill.percent}%` }} />
-        </div>
+      <div className={s.progress} aria-hidden="true">
+        <div className={s.progressBar} style={{ width: `${fill.percent}%` }} />
+      </div>
 
-        <div className={s.cardFoot}>
-          <div>
-            <div className={s.cardFootLbl}>Statut</div>
-            <div className={`${s.cardFootVal} ${s.cardFootValSoon}`}>
-              {locked ? "En attente du coup d'envoi" : "Inscriptions bientôt"}
-            </div>
+      <div className={s.cardFoot}>
+        <div>
+          <div className={s.cardFootLbl}>Statut</div>
+          <div className={`${s.cardFootVal} ${s.cardFootValSoon}`}>
+            {locked ? "En attente du coup d'envoi" : "Inscriptions bientôt"}
           </div>
-          <span className={`${s.cardCta} ${s.cardCtaMuted}`}>Détails</span>
         </div>
-      </article>
-    </Link>
+        <span className={`${s.cardCta} ${s.cardCtaMuted}`}>Détails</span>
+      </div>
+    </article>
   );
 }

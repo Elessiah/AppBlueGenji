@@ -15,7 +15,8 @@ test.describe("Création de tournoi réservée aux admins", () => {
   test("le bouton « Créer un tournoi » est masqué pour un non-admin", async ({ page }) => {
     await page.goto("/tournois");
     await expect(page).toHaveURL(/\/tournois/);
-    await expect(page.getByRole("button", { name: /Créer un tournoi/ })).toHaveCount(0);
+    // Rendu par `CyberButton asChild` en <a> (rôle "link"), pas un <button>.
+    await expect(page.getByRole("link", { name: /Créer un tournoi/ })).toHaveCount(0);
   });
 
   test("l'accès direct à /tournois/creer redirige un non-admin", async ({ page }) => {

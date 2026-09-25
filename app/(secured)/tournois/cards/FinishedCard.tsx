@@ -29,63 +29,66 @@ export function FinishedCard({ t, priority }: FinishedCardProps) {
   const finishDate = formatCardDate(t.finishedAt ?? t.startAt, false);
 
   return (
-    <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
-      <article className={s.card} data-state="done">
-        <TournamentImageBanner
-          image={t.image}
-          sizes={CARD_IMAGE_SIZES}
-          className={s.cardBanner}
-          priority={priority}
-        />
-        <div className={`${s.cardRibbon} ${s.cardRibbonDone}`}>
-          Terminé · {finishDate}
-        </div>
+    <article className={s.card} data-state="done">
+      <Link
+        href={`/tournois/${t.id}`}
+        className={s.cardOverlay}
+        aria-label={`Voir le tournoi ${t.name}`}
+      />
+      <TournamentImageBanner
+        image={t.image}
+        sizes={CARD_IMAGE_SIZES}
+        className={s.cardBanner}
+        priority={priority}
+      />
+      <div className={`${s.cardRibbon} ${s.cardRibbonDone}`}>
+        Terminé · {finishDate}
+      </div>
 
-        <div className={s.cardHead}>
-          <div className={s.cardGame}>
-            {gameLabel(t.game)}
-            <span className={s.dot}>◆</span>
-            {formatLabel(t.format)}
-          </div>
-          <TournamentImageEmblem image={t.image} size={40} />
+      <div className={s.cardHead}>
+        <div className={s.cardGame}>
+          {gameLabel(t.game)}
+          <span className={s.dot}>◆</span>
+          {formatLabel(t.format)}
         </div>
+        <TournamentImageEmblem image={t.image} size={40} />
+      </div>
 
-        <h3 className={s.cardTitle}>{t.name}</h3>
-        {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
+      <h3 className={s.cardTitle}>{t.name}</h3>
+      {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
 
-        <div className={s.cardMeta}>
-          <div>
-            <div className={s.cardMetaLbl}>Début</div>
-            <div className={s.cardMetaVal}>{formatCardDate(t.startAt, false)}</div>
-          </div>
-          <div>
-            <div className={s.cardMetaLbl}>{wording.manyParticipating}</div>
-            <div className={`${s.cardMetaVal} ${s.num}`}>{t.registeredTeams}</div>
-          </div>
-          <div>
-            <div className={s.cardMetaLbl}>Matchs</div>
-            <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
+      <div className={s.cardMeta}>
+        <div>
+          <div className={s.cardMetaLbl}>Début</div>
+          <div className={s.cardMetaVal}>{formatCardDate(t.startAt, false)}</div>
+        </div>
+        <div>
+          <div className={s.cardMetaLbl}>{wording.manyParticipating}</div>
+          <div className={`${s.cardMetaVal} ${s.num}`}>{t.registeredTeams}</div>
+        </div>
+        <div>
+          <div className={s.cardMetaLbl}>Matchs</div>
+          <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
+        </div>
+      </div>
+
+      <div className={s.cardFoot}>
+        <div className={s.cardFootMain}>
+          <div className={s.cardFootLbl}>Vainqueur</div>
+          {/* Le nom peut être coupé (ellipse) : il reste entier au survol. */}
+          <div className={`${s.cardFootVal} ${s.cardChampion}`} title={t.champion?.name}>
+            {t.champion ? (
+              <>
+                <span aria-hidden="true">🏆 </span>
+                {t.champion.name}
+              </>
+            ) : (
+              "—"
+            )}
           </div>
         </div>
-
-        <div className={s.cardFoot}>
-          <div className={s.cardFootMain}>
-            <div className={s.cardFootLbl}>Vainqueur</div>
-            {/* Le nom peut être coupé (ellipse) : il reste entier au survol. */}
-            <div className={`${s.cardFootVal} ${s.cardChampion}`} title={t.champion?.name}>
-              {t.champion ? (
-                <>
-                  <span aria-hidden="true">🏆 </span>
-                  {t.champion.name}
-                </>
-              ) : (
-                "—"
-              )}
-            </div>
-          </div>
-          <span className={s.cardCta}>Voir les résultats</span>
-        </div>
-      </article>
-    </Link>
+        <span className={s.cardCta}>Voir les résultats</span>
+      </div>
+    </article>
   );
 }

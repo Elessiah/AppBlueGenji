@@ -56,33 +56,6 @@
   text-transform: uppercase;
 }
 
-.create {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  background: var(--blue-500);
-  color: #001520;
-  font-family: var(--font-sans);
-  font-weight: 500;
-  font-size: 13px;
-  border: none;
-  border-radius: var(--r-cy-md);
-  cursor: pointer;
-  box-shadow:
-    0 0 0 1px rgba(90, 200, 255, 0.35),
-    0 calc(10px * var(--glow, 1)) calc(40px * var(--glow, 1)) rgba(90, 200, 255, calc(0.2 * var(--glow, 1)));
-  transition: transform 0.15s;
-}
-
-.create:hover {
-  transform: translateY(-1px);
-}
-
-.create svg {
-  stroke: currentColor;
-}
-
 /* ---------- METRICS STRIP ---------- */
 .metrics {
   display: grid;
@@ -261,6 +234,13 @@
   margin-bottom: 28px;
 }
 
+/* Le `<h2>` n'est là que pour le niveau de titre : sa mise en forme vient
+   entièrement du bouton qu'il enveloppe, ses marges par défaut n'ont donc
+   rien à faire ici. */
+.sectionH2 {
+  margin: 0;
+}
+
 .sectionHead {
   width: 100%;
   display: grid;
@@ -374,6 +354,16 @@
   font-size: 13px;
 }
 
+/* Ligne du bouton « Voir plus » / « Voir moins » d'une section : un grid item
+   de plus dans `.sectionBody`, mais qui occupe toute la largeur de la
+   rangée quel que soit le nombre de colonnes. */
+.showMoreRow {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
 /* ---------- TOURNAMENT CARD (Running/Live) ---------- */
 .card {
   position: relative;
@@ -384,10 +374,10 @@
   display: flex;
   flex-direction: column;
   min-height: 260px;
-  /* Remplit la cellule de grille (le lien qui l'enveloppe y est étiré) : une
-     carte portant un bandeau d'illustration est plus haute que ses voisines, et
-     la rangée se lisait en escalier. Le pied, en `margin-top: auto`, reste
-     aligné d'une carte à l'autre. */
+  /* Remplit la cellule de grille (la carte est elle-même l'item de la grille,
+     étiré par défaut) : une carte portant un bandeau d'illustration est plus
+     haute que ses voisines, et la rangée se lisait en escalier. Le pied, en
+     `margin-top: auto`, reste aligné d'une carte à l'autre. */
   height: 100%;
   overflow: hidden;
   transition: border-color 0.2s, transform 0.2s;
@@ -396,6 +386,25 @@
 .card:hover {
   border-color: rgba(90, 200, 255, 0.3);
   transform: translateY(-2px);
+}
+
+/* Plaque transparente qui porte le lien de la carte : une carte n'enveloppe
+   plus tout son texte dans un `<a>` unique (nom accessible de 170 à 240
+   caractères mesuré, ruban et méta compris) — son nom accessible se limite
+   au titre, comme sur les annuaires d'équipes et de joueurs (`.cardOverlay`).
+   Au-dessus des enfants décoratifs de la carte (`.card::before/::after`,
+   `z-index: 1`, `pointer-events: none`) : peu importe l'ordre puisqu'ils
+   n'interceptent jamais le clic. */
+.cardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.cardOverlay:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: -3px;
 }
 
 .card[data-state="running"] {
@@ -584,7 +593,15 @@
   transition: all 0.15s;
 }
 
-.cardCta:hover {
+/* À l'intérieur d'une carte, la pastille d'action est décorative — le clic
+   passe par `.cardOverlay`, posé par-dessus elle — si bien que la souris
+   n'atteint jamais la pastille elle-même et un simple `:hover` ne s'y
+   déclenche plus. `.card:hover` rallume donc la même pastille, à côté du
+   survol direct dont les boutons « Voir plus »/« Voir moins » de
+   `.showMoreRow` (hors carte, réellement survolables) ont toujours besoin —
+   une seule déclaration pour les deux cas, jamais deux copies. */
+.cardCta:hover,
+.card:hover .cardCta {
   background: rgba(90, 200, 255, 0.1);
   border-color: rgba(90, 200, 255, 0.45);
 }
@@ -600,7 +617,8 @@
   border-color: var(--blue-500);
 }
 
-.cardCtaPrimary:hover {
+.cardCtaPrimary:hover,
+.card:hover .cardCtaPrimary {
   background: var(--blue-300);
   border-color: var(--blue-300);
 }
@@ -611,7 +629,8 @@
   background: transparent;
 }
 
-.cardCtaMuted:hover {
+.cardCtaMuted:hover,
+.card:hover .cardCtaMuted {
   color: var(--ink);
   background: rgba(90, 200, 255, 0.04);
   border-color: rgba(90, 200, 255, 0.25);
