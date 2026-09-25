@@ -18,7 +18,13 @@ import {
   type LandingStats,
   type LandingTickerPayload,
 } from "@/lib/shared/landing";
-import type { BracketType, MatchStatus, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type {
+  BracketType,
+  MatchStatus,
+  TournamentBuckets,
+  TournamentCard,
+  TournamentGame,
+} from "@/lib/shared/types";
 import { gameLabel } from "@/lib/shared/tournament-labels";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
 import {
@@ -312,20 +318,31 @@ async function loadLandingLive(): Promise<LandingLive | null> {
  */
 const TREND_WINDOW_DAYS = 7;
 
-export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboardRow[]> {
+/**
+ * `game` restreint le rejeu aux tournois de ce jeu (pastilles Overwatch /
+ * Marvel Rivals de `Leaderboard.tsx`) ; `undefined` (« Général ») rejoue tous
+ * les jeux ensemble, comme le reste du site.
+ */
+export async function getLandingLeaderboard(
+  limit = 8,
+  game?: TournamentGame,
+): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  return cachedLanding(`leaderboard:${safeLimit}`, LANDING_TTL_MS, () =>
-    loadLandingLeaderboard(safeLimit),
+  return cachedLanding(`leaderboard:${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
+    loadLandingLeaderboard(safeLimit, game),
   );
 }
 
-async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderboardRow[]> {
+async function loadLandingLeaderboard(
+  safeLimit: number,
+  game: TournamentGame | undefined,
+): Promise<LandingLeaderboardRow[]> {
   try {
     const [currentRows, previousRows] = await Promise.all([
-      loadTeamRanking({ includeUnplayed: true }),
+      loadTeamRanking({ includeUnplayed: true, game }),
       // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
       // compare deux photos du même calcul plutôt que deux barèmes.
-      loadTeamRanking({ includeUnplayed: true, completedMoreThanDaysAgo: TREND_WINDOW_DAYS }),
+      loadTeamRanking({ includeUnplayed: true, completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
     ]);
     const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
 
