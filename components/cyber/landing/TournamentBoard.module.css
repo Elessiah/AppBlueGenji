@@ -54,6 +54,24 @@
   gap: 12px;
 }
 
+/* « Inscriptions ouvertes » et « Marvel Rivals » ne tiennent pas côte à côte
+   sur une carte étroite : le jeu passe alors sous la pastille. */
+.badgeRow,
+.cardTop {
+  flex-wrap: wrap;
+}
+
+/* Jeu du tournoi : sa seule mention sur la carte, en sur-titre discret à
+   droite de la pastille d'état. */
+.game {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+  white-space: nowrap;
+}
+
 /* Le pied ne porte plus que l'action : elle se range à droite. */
 .footerRow {
   justify-content: flex-end;

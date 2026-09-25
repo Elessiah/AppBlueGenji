@@ -52,7 +52,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
                 */}
               <div className={styles.badgeRow}>
                 <Pill variant="blue">{boardStateLabel(featured, now)}</Pill>
-                <span className="mono">{gameLabel(featured.game)}</span>
+                <span className={styles.game}>{gameLabel(featured.game)}</span>
               </div>
 
               <div className={styles.titleRow}>
@@ -95,7 +95,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
               />
               <div className={styles.cardTop}>
                 <Pill variant="blue">{boardStateLabel(card, now)}</Pill>
-                <span className="mono">{gameLabel(card.game)}</span>
+                <span className={styles.game}>{gameLabel(card.game)}</span>
               </div>
 
               <div className={styles.titleRow}>
