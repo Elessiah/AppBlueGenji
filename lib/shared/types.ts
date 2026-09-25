@@ -425,6 +425,36 @@ export type TournamentCard = {
    * lui — voir `lib/shared/tournament-image.ts`.
    */
   image: TournamentImage | null;
+  /**
+   * Instant de clôture (`bg_tournaments.finished_at`), `null` tant que le
+   * tournoi n'est pas terminé. Distinct de `startAt` : une carte « terminé »
+   * datait sinon la fin d'un tournoi par son coup d'envoi.
+   */
+  finishedAt: string | null;
+  /**
+   * Vainqueur d'un tournoi **terminé** — l'unique engagé classé premier
+   * (`pickChampion`, `lib/shared/tournament-card-summary.ts`). `null` hors
+   * `FINISHED`, et aussi quand le classement final n'en désigne pas un seul
+   * (finale en double forfait, ex æquo).
+   */
+  champion: TournamentChampion | null;
+  /**
+   * Avancement interne d'un tournoi **en cours**, de 0 à 1 : la mesure de
+   * `computeRunningRatio` (`lib/shared/tournament-progress.ts`), propre à
+   * chaque famille de formats. `null` hors `RUNNING`, ou quand rien ne permet
+   * encore de situer le déroulement.
+   *
+   * Dans la liste, il suit la durée de vie du cache (15 s) et non chaque
+   * score : un score ne vide pas les listes, par choix (`notifications.ts`).
+   */
+  runningProgress: number | null;
+};
+
+/** Vainqueur annoncé sur la carte d'un tournoi terminé. */
+export type TournamentChampion = {
+  teamId: number;
+  /** Nom de l'engagé : une équipe, ou le pseudo d'un joueur en individuel. */
+  name: string;
 };
 
 export type TournamentBuckets = {

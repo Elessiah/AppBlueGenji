@@ -395,10 +395,10 @@
   transform: translateY(-2px);
 }
 
-.card[data-state="live"] {
-  border-color: rgba(255, 77, 94, 0.25);
+.card[data-state="running"] {
+  border-color: rgba(90, 200, 255, 0.28);
   background:
-    radial-gradient(400px 300px at 100% 0%, rgba(255, 77, 94, calc(0.10 * var(--glow, 1))), transparent 60%),
+    radial-gradient(400px 300px at 100% 0%, rgba(90, 200, 255, calc(0.08 * var(--glow, 1))), transparent 60%),
     linear-gradient(180deg, var(--cyber-bg-1), var(--cyber-bg));
 }
 
@@ -440,7 +440,7 @@
   height: 112px;
 }
 
-/* live ribbon */
+/* ribbon */
 .cardRibbon {
   display: inline-flex;
   align-items: center;
@@ -457,28 +457,31 @@
   width: fit-content;
 }
 
-.cardRibbonLive {
-  color: var(--red-live);
-  border-color: rgba(255, 77, 94, 0.35);
-  background: rgba(255, 77, 94, 0.05);
+/* Tournoi en cours : bleu, jamais rouge — le rouge (`--red-live`) n'habille
+   que ce qui est réellement à l'antenne, et un tournoi en cours n'est pas une
+   diffusion (règle de vocabulaire « En cours » / « En direct »). */
+.cardRibbonRunning {
+  color: var(--blue-300);
+  border-color: rgba(90, 200, 255, 0.35);
+  background: rgba(90, 200, 255, 0.05);
 }
 
-.cardRibbonLive .dot {
+.cardRibbonRunning .dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--red-live);
-  box-shadow: 0 0 0 0 rgba(255, 77, 94, 0.6);
-  animation: pulse 1.6s infinite;
+  background: var(--blue-300);
+  box-shadow: 0 0 0 0 rgba(90, 200, 255, 0.6);
+  animation: pulseBlue 1.6s infinite;
   animation-play-state: var(--deco-anim-state);
 }
 
-@keyframes pulse {
+@keyframes pulseBlue {
   0%, 100% {
-    box-shadow: 0 0 0 0 rgba(255, 77, 94, 0.6);
+    box-shadow: 0 0 0 0 rgba(90, 200, 255, 0.6);
   }
   50% {
-    box-shadow: 0 0 0 6px rgba(255, 77, 94, 0);
+    box-shadow: 0 0 0 6px rgba(90, 200, 255, 0);
   }
 }
 
@@ -545,6 +548,10 @@
   color: var(--ink);
 }
 
+.cardMetaValWarn {
+  color: var(--amber);
+}
+
 .cardMetaVal.num {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
@@ -607,6 +614,46 @@
   border-color: rgba(90, 200, 255, 0.25);
 }
 
+/* Bloc de gauche du pied : un fait, étiqueté (remplissage, déroulement,
+   vainqueur). */
+.cardFootMain {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.cardFootLbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+  margin-bottom: 2px;
+}
+
+.cardFootVal {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.cardFootValWarn {
+  color: var(--amber);
+}
+
+.cardFootValSoon {
+  color: var(--blue-300);
+}
+
+/* Le nom du vainqueur peut être long (60 caractères) : il se coupe plutôt que
+   de pousser l'action hors de la carte. */
+.cardChampion {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* progress bar */
 .progress {
   height: 2px;
@@ -667,13 +714,17 @@
   border-color: rgba(90, 200, 255, 0.15);
 }
 
+/* Terminé : terni par les couleurs, jamais par une opacité — elle se
+   multipliait avec celle des textes atténués et les passait sous 4,5:1. Le
+   fond perd son dégradé et l'illustration sa couleur ; les textes, eux,
+   gardent leur contraste. */
 .card[data-state="done"] {
   border-color: var(--line-soft);
-  opacity: 0.65;
+  background: var(--cyber-bg);
 }
 
-.cardDone {
-  opacity: 0.65;
+.card[data-state="done"] .cardBanner {
+  filter: grayscale(0.8) brightness(0.75);
 }
 
 /* Cartes de la section « tournois invisibles » : cadre pointillé, pour que la

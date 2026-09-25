@@ -331,7 +331,7 @@ export default function TournamentsPage() {
             title="PROCHAINEMENT"
             count={totalUpcoming}
             defaultOpen={true}
-            emptyMsg="Aucun tournoi prévu pour les prochains jours."
+            emptyMsg="Aucun tournoi à venir pour le moment."
           >
             {filteredBuckets.upcoming.map((t) => (
               <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
