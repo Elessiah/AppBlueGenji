@@ -23,17 +23,14 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
   const [rows, setRows] = useState(initialRows);
   const [loading, setLoading] = useState(false);
   const { showError } = useToast();
-  const isFirstRender = useRef(true);
   // Dernier filtre chargé avec succès : `initialRows` couvre déjà « all » au
-  // premier rendu, et un échec y revient plutôt que de laisser la pastille
+  // premier rendu (le même que cette valeur initiale), donc la garde ci-dessous
+  // saute aussi bien la requête au montage qu'un retour au filtre précédent
+  // après un échec — et un échec y revient plutôt que de laisser la pastille
   // allumée sur des données qui ne lui correspondent pas.
   const lastLoadedGame = useRef<GameFilter>("all");
 
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
-    }
     if (game === lastLoadedGame.current) return;
 
     let mounted = true;
@@ -101,7 +98,9 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
         </div>
 
         {rows.length === 0 ? (
-          <p className={styles.empty}>Aucune équipe classée pour le moment.</p>
+          <div role="row">
+            <p className={styles.empty} role="cell">Aucune équipe classée pour le moment.</p>
+          </div>
         ) : (
           rows.map((row) => {
             const trend = row.trend === "flat" ? "—" : row.trend === "up" ? `+${row.trendValue}` : `-${row.trendValue}`;

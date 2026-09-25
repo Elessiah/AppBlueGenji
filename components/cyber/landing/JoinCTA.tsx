@@ -28,7 +28,7 @@ export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false }: 
               <span className="eyebrow">{copy["home.join.eyebrow"]}</span>
             </EditableCopy>
             <EditableCopy copyKey="home.join.title" value={copy["home.join.title"]} canEdit={canEditCopy}>
-              <h2 className="display" style={{ fontSize: "clamp(32px, 4vw, 40px)" }}>
+              <h2 className="display" style={{ fontSize: "clamp(32px, 4vw, 40px)", margin: "1em 0" }}>
                 {copy["home.join.title"].split("\n").map((line, index, lines) => (
                   <span key={line + index} className={index === lines.length - 1 ? styles.accent : undefined}>
                     {line}
