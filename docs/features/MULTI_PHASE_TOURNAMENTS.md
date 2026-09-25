@@ -61,8 +61,10 @@ et selon le format `swissTotalRounds`, `survivalRoundsBeforeFirstCut`,
 
 Codes d'erreur (400) : `MISSING_PHASES`, `INVALID_PHASE_FORMAT`,
 `DOUBLE_MUST_BE_LAST_PHASE`, `INVALID_QUALIFIER_VALUE`, `INVALID_QUALIFIER_COUNT`
-(une phase qualifie plus que celle qui la précède), `INVALID_SURVIVAL_ROUNDS`,
-`INVALID_SWISS_ROUNDS`.
+(deux phases `COUNT` consécutives dont la seconde qualifie autant ou plus que la
+première — comparaison qui ne porte jamais sur la **dernière** phase, dont la
+cible n'est jamais lue, ni sur `PERCENT`, dont l'assiette rétrécit d'une phase à
+l'autre), `INVALID_SURVIVAL_ROUNDS`, `INVALID_SWISS_ROUNDS`.
 
 ## Architecture
 

@@ -78,14 +78,24 @@ function validateRawPhases(phases: unknown): string | null {
     }
   }
 
-  // Une phase ne peut pas qualifier PLUS que celle qui la précède. On ne compare
-  // que des cibles de même nature : opposer « 16 équipes » à « 50 % » n'a pas de sens.
-  for (let i = 0; i + 1 < list.length; i += 1) {
+  // Décroissance stricte des COUNT consécutifs, sur les seules phases
+  // non-terminales : la **dernière** phase couronne toujours une seule
+  // championne (sa valeur de qualification n'est jamais lue, voir
+  // `resolvePhasePlan`), la comparer produirait un refus sur un plan pourtant
+  // valide (« 64 qualifiées puis finale »). Le pourcentage n'entre pas dans la
+  // comparaison : il s'applique à l'effectif de la phase, qui rétrécit d'une
+  // phase à l'autre, si bien qu'une hausse de pourcentage ne dit rien du
+  // nombre absolu de qualifiées (80 % d'un effectif déjà réduit de moitié
+  // qualifie moins d'équipes que 50 % de l'effectif de départ). Borne et règle
+  // reprises de `validatePhases` (`lib/shared/tournament-phases.ts`) : les
+  // deux contrôles doivent rester identiques.
+  for (let i = 0; i + 2 < list.length; i += 1) {
     const current = list[i];
     const next = list[i + 1];
     if (
-      current.qualifierMode === next.qualifierMode &&
-      Number(next.qualifierValue) > Number(current.qualifierValue)
+      current.qualifierMode === "COUNT" &&
+      next.qualifierMode === "COUNT" &&
+      Number(current.qualifierValue) <= Number(next.qualifierValue)
     ) {
       return "INVALID_QUALIFIER_COUNT";
     }
