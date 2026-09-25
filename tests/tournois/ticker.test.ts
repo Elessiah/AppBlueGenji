@@ -37,9 +37,63 @@ describe("ticker", () => {
         ],
       });
       const result = buildTickerItems(buckets);
-      expect(result[0]).toContain("RÉSULTAT");
+      expect(result[0]).toContain("EN COURS");
+      expect(result[0]).not.toContain("RÉSULTAT");
       expect(result[0]).toContain("Championship");
       expect(result[0]).toContain("8 équipes engagées");
+    });
+
+    it("includes up to 3 running tournaments", () => {
+      const buckets = mockBuckets({
+        running: [
+          card({
+            id: 1,
+            name: "Live 1",
+            description: "",
+            game: "OW",
+            state: "RUNNING",
+            startAt: "2026-05-12T10:00:00Z",
+            registeredTeams: 8,
+            maxTeams: 8,
+          }),
+          card({
+            id: 2,
+            name: "Live 2",
+            description: "",
+            game: "MR",
+            state: "RUNNING",
+            startAt: "2026-05-13T10:00:00Z",
+            registeredTeams: 6,
+            maxTeams: 8,
+          }),
+          card({
+            id: 3,
+            name: "Live 3",
+            description: "",
+            game: "OW",
+            state: "RUNNING",
+            startAt: "2026-05-14T10:00:00Z",
+            registeredTeams: 4,
+            maxTeams: 8,
+          }),
+          card({
+            id: 4,
+            name: "Live 4",
+            description: "",
+            game: "MR",
+            state: "RUNNING",
+            startAt: "2026-05-15T10:00:00Z",
+            registeredTeams: 2,
+            maxTeams: 8,
+          }),
+        ],
+      });
+      const result = buildTickerItems(buckets);
+      const runningItems = result.filter((item) => item.includes("EN COURS"));
+      expect(runningItems).toHaveLength(3);
+      expect(runningItems[0]).toContain("Live 1");
+      expect(runningItems[1]).toContain("Live 2");
+      expect(runningItems[2]).toContain("Live 3");
     });
 
     it("includes up to 3 registration tournaments", () => {
@@ -197,7 +251,7 @@ describe("ticker", () => {
       });
       const result = buildTickerItems(buckets);
       expect(result.length).toBe(3);
-      expect(result[0]).toContain("RÉSULTAT");
+      expect(result[0]).toContain("EN COURS");
       expect(result[1]).toContain("INSCRIPTIONS");
       expect(result[2]).toContain("À VENIR");
     });

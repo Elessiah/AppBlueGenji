@@ -7,9 +7,9 @@ administrateurs** peuvent désormais **réordonner** les cartes des trois sectio
 gérables de la page, directement depuis l'interface et sans déploiement :
 
 - **Bureau** (`SECTION 05`, `BureauSection`) — membres du bureau ;
-- **L'association** (`SECTION 03`, `AboutStats`) — cartes chiffrées ;
-- **L'association** (`SECTION 03`, `AboutPillars`) — piliers (colonne droite) ;
-- **Partenaires et soutiens** (`SECTION 04`, `SponsorsGrid`) — sponsors.
+- **L'association** (`AboutStats`) — cartes chiffrées ;
+- **L'association** (`AboutPillars`) — piliers (colonne droite) ;
+- **Partenaires et soutiens** (`SponsorsGrid`) — sponsors.
 
 Chaque carte gérable expose deux flèches **↑ / ↓** à côté de « Modifier » /
 « Supprimer ». Un déplacement met à jour l'ordre de façon **optimiste** (l'UI

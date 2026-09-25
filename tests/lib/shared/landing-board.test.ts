@@ -70,8 +70,10 @@ describe("boardStateLabel", () => {
 });
 
 describe("boardActionLabel", () => {
-  it("propose l'inscription seulement aux inscriptions ouvertes avec une place libre", () => {
-    expect(boardActionLabel(card("REGISTRATION", { registeredTeams: 3 }), REGISTRATION_AT)).toBe("S'inscrire");
+  it("ne propose jamais l'inscription : le tableau ne connaît pas le lecteur", () => {
+    expect(boardActionLabel(card("REGISTRATION", { registeredTeams: 3 }), REGISTRATION_AT)).toBe(
+      "Voir le tournoi",
+    );
     expect(boardActionLabel(card("REGISTRATION", { registeredTeams: 8 }), REGISTRATION_AT)).toBe(
       "Voir le tournoi",
     );

@@ -86,17 +86,19 @@ export function boardStateLabel(card: BoardCard, now: number = Date.now()): stri
 
 /**
  * Action de la carte. Elle mène toujours à la fiche du tournoi ; seul le
- * libellé change, pour ne jamais promettre ce que la fiche ne fera pas :
- * « S'inscrire » seulement quand les inscriptions sont ouvertes et qu'il reste
- * une place, « Voir le bracket » seulement sur un tournoi lancé dont le plateau
- * est un arbre (la Suisse, la Survie ou BlueGenji Survie n'en ont pas — ou pas
- * encore), « Voir le tournoi » sinon.
+ * libellé change, pour ne jamais promettre ce que la fiche ne fera pas.
+ *
+ * Jamais « S'inscrire » : le tableau ne connaît pas le lecteur (visiteur sans
+ * compte, sans équipe, sans rôle de gestion, ou déjà inscrit), et cliquer
+ * pouvait mener à une fiche qui refuse l'inscription (`registerBlockedNotice`)
+ * — même règle que les cartes d'inscription de `/tournois`
+ * (`RegistrationCard.tsx`), où « Complet » se lit déjà séparément sur la
+ * pastille d'état (`boardStateLabel`). « Voir le bracket » seulement sur un
+ * tournoi lancé dont le plateau est un arbre (la Suisse, la Survie ou
+ * BlueGenji Survie n'en ont pas — ou pas encore), « Voir le tournoi » sinon.
  */
 export function boardActionLabel(card: BoardCard, now: number = Date.now()): string {
   const stage = boardStage(card, now);
-  if (stage === "REGISTRATION" && !isTournamentFull(card)) {
-    return "S'inscrire";
-  }
   if (stage === "RUNNING") {
     return BRACKET_FORMATS.has(card.format) ? "Voir le bracket" : "Suivre le tournoi";
   }

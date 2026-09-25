@@ -418,3 +418,43 @@ describe("getLandingLive — seeds du match mis en avant", () => {
     expect(live?.currentMatch?.team2Seed).toBeNull();
   });
 });
+
+/**
+ * Libellé de la manche du match mis en avant.
+ *
+ * Finale/demies/quarts ont un nom dédié ; au-delà, le repli s'écrivait
+ * « Round N » — anglais, sur la seule page francisée de bout en bout.
+ */
+describe("getLandingLive — libellé de la manche", () => {
+  beforeEach(() => {
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+  });
+
+  it("nomme la finale, les demies et les quarts", async () => {
+    await mockDb([matchRow()]);
+    expect((await liveFrom(buckets([card(1, "Coupe A")])))?.currentMatch?.roundLabel).toBe("Finale");
+
+    clearCache();
+    await mockDb([matchRow({ id: 200 }), matchRow({ id: 201 })]);
+    expect((await liveFrom(buckets([card(1, "Coupe B")])))?.currentMatch?.roundLabel).toBe("Demi-finale");
+
+    clearCache();
+    await mockDb([
+      matchRow({ id: 300 }),
+      matchRow({ id: 301 }),
+      matchRow({ id: 302 }),
+      matchRow({ id: 303 }),
+    ]);
+    expect((await liveFrom(buckets([card(1, "Coupe C")])))?.currentMatch?.roundLabel).toBe("Quarts de finale");
+  });
+
+  it("francise le repli au-delà des quarts : « Manche N », pas « Round N »", async () => {
+    await mockDb(
+      Array.from({ length: 8 }, (_, index) => matchRow({ id: 400 + index, round_number: 1 })),
+    );
+
+    const live = await liveFrom(buckets([card(1, "Coupe D")]));
+
+    expect(live?.currentMatch?.roundLabel).toBe("Manche 1");
+  });
+});

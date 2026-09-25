@@ -85,7 +85,8 @@ const render = (value: LandingLive | null) =>
   renderToStaticMarkup(<LiveCard live={value} nextUpcomingISO={null} />);
 
 /**
- * Notation lue **dans la ligne du match**, et non dans la page entière.
+ * Notation lue **dans la ligne du match** (`.vs`, qui porte le libellé de la
+ * manche puis, séparée par « · », la notation), et non dans la page entière.
  *
  * Chercher « BO » dans tout le rendu paraissait plus sévère ; ça l'était trop :
  * un tournoi nommé « Bootcamp Genji », dont le titre est mis en capitales,
@@ -93,9 +94,10 @@ const render = (value: LandingLive | null) =>
  * positif qui accuse le correctif au lieu du nom.
  */
 function notationOf(html: string): string | null {
-  const text = html.replace(/<[^>]*>/g, "");
-  const found = /MATCH\s+\d+(?:\s*·\s*((?:BO|FT)\d+))?/.exec(text);
-  expect(found).not.toBeNull(); // la ligne du match doit exister
+  const line = /<div class="vs mono">([\s\S]*?)<\/div>/.exec(html);
+  expect(line).not.toBeNull(); // la ligne du match doit exister
+  const text = (line?.[1] ?? "").replace(/<[^>]*>/g, "");
+  const found = /·\s*((?:BO|FT)\d+)/.exec(text);
   return found?.[1] ?? null;
 }
 
@@ -112,9 +114,9 @@ describe("LiveCard — notation du format de match", () => {
     const html = render(live(null));
     expect(notationOf(html)).toBeNull();
     // Le libellé de repli de `matchFormatLabel` n'a rien à faire dans une ligne
-    // qui attend une notation : la carte se réduit au numéro du match.
+    // qui attend une notation : la carte se réduit au libellé de la manche.
     expect(html).not.toContain("Score libre");
-    expect(html.replace(/<[^>]*>/g, "")).toContain("MATCH 42");
+    expect(html.replace(/<[^>]*>/g, "")).toContain("Quart de finale");
   });
 
   it("ne déduit plus la notation du nom de la manche", () => {

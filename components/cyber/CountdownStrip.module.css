@@ -33,6 +33,10 @@
   color: var(--ink);
 }
 
+.valPending {
+  color: var(--ink-mute);
+}
+
 .lbl {
   font-size: 9px;
   letter-spacing: 0.2em;

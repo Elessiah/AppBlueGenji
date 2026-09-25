@@ -18,17 +18,17 @@ export const FALLBACK_ABOUT_PILLARS: AboutPillar[] = [
   {
     id: -1,
     title: "Accessible",
-    text: "Inscription gratuite, matchmaking par niveau et support francophone sur Discord.",
+    text: "Inscription gratuite, ouverte à tous les niveaux, et support francophone sur Discord.",
   },
   {
     id: -2,
     title: "Compétitif",
-    text: "Brackets arbitrés, admins formés et rulebook versionné. On prend le jeu au sérieux.",
+    text: "Tableaux arbitrés, admins formés et règlement clair pour chaque format. On prend le jeu au sérieux.",
   },
   {
     id: -3,
     title: "Communautaire",
-    text: "Watch parties, coaching ouvert et entraide entre équipes. L'asso avant le scoreboard.",
+    text: "Discord actif, coaching ouvert et entraide entre équipes. L'asso avant le classement.",
   },
 ];
 

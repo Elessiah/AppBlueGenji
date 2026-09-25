@@ -18,7 +18,13 @@ import {
   type LandingStats,
   type LandingTickerPayload,
 } from "@/lib/shared/landing";
-import type { BracketType, MatchStatus, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type {
+  BracketType,
+  MatchStatus,
+  TournamentBuckets,
+  TournamentCard,
+  TournamentGame,
+} from "@/lib/shared/types";
 import { gameLabel } from "@/lib/shared/tournament-labels";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
 import {
@@ -156,7 +162,7 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
   }
   if (matchCount === 2) return "Demi-finale";
   if (matchCount === 4) return "Quarts de finale";
-  return `Round ${roundNumber}`;
+  return `Manche ${roundNumber}`;
 }
 
 /**
@@ -312,20 +318,40 @@ async function loadLandingLive(): Promise<LandingLive | null> {
  */
 const TREND_WINDOW_DAYS = 7;
 
-export async function getLandingLeaderboard(limit = 8): Promise<LandingLeaderboardRow[]> {
+/**
+ * `game` restreint le rejeu aux tournois de ce jeu (pastilles Overwatch /
+ * Marvel Rivals de `Leaderboard.tsx`) ; `undefined` (« Général ») rejoue tous
+ * les jeux ensemble, comme le reste du site.
+ */
+export async function getLandingLeaderboard(
+  limit = 8,
+  game?: TournamentGame,
+): Promise<LandingLeaderboardRow[]> {
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
-  return cachedLanding(`leaderboard:${safeLimit}`, LANDING_TTL_MS, () =>
-    loadLandingLeaderboard(safeLimit),
+  return cachedLanding(`leaderboard:${safeLimit}:${game ?? "all"}`, LANDING_TTL_MS, () =>
+    loadLandingLeaderboard(safeLimit, game),
   );
 }
 
-async function loadLandingLeaderboard(safeLimit: number): Promise<LandingLeaderboardRow[]> {
+async function loadLandingLeaderboard(
+  safeLimit: number,
+  game: TournamentGame | undefined,
+): Promise<LandingLeaderboardRow[]> {
+  // « Général » (pas de jeu demandé) garde toutes les équipes du site, jouées
+  // ou non — c'est le classement général, il les concerne toutes. Un onglet
+  // par jeu, lui, ne doit garder que les équipes qui ont **joué ce jeu** :
+  // sans ce garde-fou, l'onglet « Marvel Rivals » aurait affiché les équipes
+  // qui ne jouent qu'à Overwatch, à la cote de départ, comme si elles étaient
+  // simplement en attente de leur premier match — alors qu'elles n'en auront
+  // jamais dans ce jeu.
+  const includeUnplayed = game === undefined;
+
   try {
     const [currentRows, previousRows] = await Promise.all([
-      loadTeamRanking({ includeUnplayed: true }),
+      loadTeamRanking({ includeUnplayed, game }),
       // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
       // compare deux photos du même calcul plutôt que deux barèmes.
-      loadTeamRanking({ includeUnplayed: true, completedMoreThanDaysAgo: TREND_WINDOW_DAYS }),
+      loadTeamRanking({ includeUnplayed, completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
     ]);
     const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
 

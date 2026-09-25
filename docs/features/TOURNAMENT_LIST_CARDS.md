@@ -81,3 +81,26 @@ choix (`notifications.ts` — les scores tombent en rafales). Le déroulement d'
 carte peut donc retarder d'au plus 15 s sur la fiche ; de même le vainqueur
 après une correction de la finale d'un tournoi déjà clos (sa clôture, elle,
 change l'état et vide la liste).
+
+## Bandeau de chiffres et ticker
+
+Le haut de `/tournois` annonçait deux faits inventés. Le premier chiffre
+disait « N EN DIRECT · Diffusés sur Twitch » en comptant les tournois
+`RUNNING` : aucune chaîne n'y est vérifiée, et Twitch n'est qu'une des trois
+plateformes acceptées (`lib/shared/live-streams.ts`). Le dernier chiffre
+affichait « — / Prizepool · à venir » à tout visiteur non-staff — un
+emplacement réservé pour une fonctionnalité qui n'existe pas. Le bandeau se
+construit désormais par `tournamentsPageMetrics`
+(`app/(secured)/tournois/_lib/metrics.ts`) : le premier chiffre dit « Tournois
+en cours », sans rien affirmer sur une diffusion, et la case « Invisibles ·
+staff » n'apparaît que pour le staff — trois cases pour tout le monde, quatre
+pour le staff, jamais un repli inventé.
+
+Le ticker (`_lib/ticker.ts`) faisait le même genre d'annonce fausse : chaque
+tournoi en cours donnait « RÉSULTAT · <nom> · N équipes engagées », alors
+qu'aucun résultat n'y est porté — c'est `lib/server/landing-service.ts` qui
+tient le vrai ticker de résultats, avec un score. La ligne dit maintenant
+« EN COURS · … », comme le libellé de section juste en dessous, et se borne à
+3 tournois comme les inscriptions ouvertes se bornent à 3 et les à venir à 2 —
+un tournoi à 46 entrées `RUNNING` (le cas du jeu de test) ne monopolisait
+sinon plus le bandeau.

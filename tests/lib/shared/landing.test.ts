@@ -3,6 +3,7 @@ import {
   activeTournamentCards,
   chooseFeaturedTournament,
   compareByStartAt,
+  visibleLiveViewerCount,
 } from "@/lib/shared/landing";
 import type { TournamentBuckets, TournamentCard, TournamentState } from "@/lib/shared/types";
 import { tournamentCard } from "../../helpers/tournament-card";
@@ -148,6 +149,20 @@ describe("ordre chronologique de l'accueil", () => {
     activeTournamentCards(buckets({ upcoming }));
     chooseFeaturedTournament(buckets({ upcoming }));
     expect(upcoming.map((entry) => entry.id)).toEqual([1, 2, 3]);
+  });
+});
+
+describe("visibleLiveViewerCount", () => {
+  it("masque une audience nulle ou trop faible pour convaincre", () => {
+    // « 👁 0 » sur la carte du direct décourage plus qu'il n'informe — c'est
+    // souvent le staff qui vérifie la page, pas une vraie audience.
+    expect(visibleLiveViewerCount(0)).toBeNull();
+    expect(visibleLiveViewerCount(1)).toBeNull();
+  });
+
+  it("affiche l'audience dès qu'elle dépasse le seuil", () => {
+    expect(visibleLiveViewerCount(2)).toBe(2);
+    expect(visibleLiveViewerCount(47)).toBe(47);
   });
 });
 

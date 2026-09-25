@@ -1,6 +1,7 @@
 "use client";
 
 import { useClock } from "@/lib/shared/hooks/useClock";
+import { computeCountdown, countdownAccessibleLabel } from "@/lib/shared/countdown";
 import styles from "./CountdownStrip.module.css";
 
 interface CountdownStripProps {
@@ -8,44 +9,49 @@ interface CountdownStripProps {
   label?: string;
 }
 
-function useCountdown(targetISO: string) {
+const PLACEHOLDER_UNITS = [
+  { label: "J", value: "--" },
+  { label: "H", value: "--" },
+  { label: "M", value: "--" },
+  { label: "S", value: "--" },
+];
+
+const pad = (n: number) => String(n).padStart(2, "0");
+
+export function CountdownStrip({ targetISO, label }: CountdownStripProps) {
   // Horloge soumise au régime de charge : arrêtée onglet caché, recalée au retour.
   const now = useClock(1000);
 
-  const pad = (n: number) => String(n).padStart(2, "0");
+  const parts = now === null ? null : computeCountdown(targetISO, now);
 
-  if (!now) {
-    return { d: "00", h: "00", m: "00", s: "00" };
-  }
+  const units = parts
+    ? [
+        { label: "J", value: pad(parts.d) },
+        { label: "H", value: pad(parts.h) },
+        { label: "M", value: pad(parts.m) },
+        { label: "S", value: pad(parts.s) },
+      ]
+    : PLACEHOLDER_UNITS;
 
-  const target = new Date(targetISO);
-  let delta = Math.max(0, target.getTime() - now);
-  const d = Math.floor(delta / 86400000);
-  delta -= d * 86400000;
-  const h = Math.floor(delta / 3600000);
-  delta -= h * 3600000;
-  const m = Math.floor(delta / 60000);
-  delta -= m * 60000;
-  const s = Math.floor(delta / 1000);
-
-  return { d: pad(d), h: pad(h), m: pad(m), s: pad(s) };
-}
-
-export function CountdownStrip({ targetISO, label }: CountdownStripProps) {
-  const { d, h, m, s } = useCountdown(targetISO);
+  const accessibleLabel = parts ? countdownAccessibleLabel(parts) : "Chargement du compte à rebours";
 
   return (
     <div className={styles.root}>
       {label && <div className={styles.label}>{label}</div>}
-      <div className={styles.countdown}>
-        {[
-          { label: "J", value: d },
-          { label: "H", value: h },
-          { label: "M", value: m },
-          { label: "S", value: s },
-        ].map(({ label: lbl, value }) => (
+      {/* Le rôle ARIA `time` interdit le nom par `aria-label` (« Name
+          Prohibited ») : la phrase doit être un vrai contenu, retiré du flux
+          visuel par `.sr-only`, pas une étiquette posée par-dessus un élément
+          vide. Les cases numériques sont un bloc voisin, purement visuel —
+          `<time>` (contenu de phrase) ne peut de toute façon pas contenir de `<div>`. */}
+      <time dateTime={targetISO}>
+        <span className="sr-only">{accessibleLabel}</span>
+      </time>
+      <div className={styles.countdown} aria-hidden="true">
+        {units.map(({ label: lbl, value }) => (
           <div key={lbl} className={styles.unit}>
-            <div className={`num ${styles.val}`}>{value}</div>
+            <div className={parts ? `num ${styles.val}` : `num ${styles.val} ${styles.valPending}`}>
+              {value}
+            </div>
             <div className={`mono ${styles.lbl}`}>{lbl}</div>
           </div>
         ))}

@@ -211,6 +211,19 @@ export function chooseFeaturedTournament(buckets: TournamentBuckets): Tournament
  * Overwatch sur toute la vitrine. Libellés : `lib/shared/tournament-labels.ts`.
  */
 
+/**
+ * Sous ce nombre de spectateurs, l'audience de la carte du direct n'est
+ * jamais montrée : un visiteur qui tombe sur un tournoi tout juste lancé
+ * lirait « 0 » ou « 1 » — le staff qui vérifie la page — ce qui décourage
+ * plutôt que ça n'informe.
+ */
+const MIN_DISPLAYED_LIVE_VIEWERS = 2;
+
+/** Audience à afficher sur la carte du direct, ou `null` sous le seuil. */
+export function visibleLiveViewerCount(viewers: number): number | null {
+  return viewers >= MIN_DISPLAYED_LIVE_VIEWERS ? viewers : null;
+}
+
 export function inferPhaseLabel(match: LandingLiveMatch | null): string {
   if (!match) {
     return "EN ATTENTE";

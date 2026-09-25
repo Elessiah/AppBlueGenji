@@ -1,12 +1,12 @@
-# 🧱 Piliers « L'association » (SECTION 03, colonne droite)
+# 🧱 Piliers « L'association » (colonne droite)
 
 ## Vue d'ensemble
 
-Les **piliers** affichés à droite de la **SECTION 03 — « L'association »**
-(titre + texte, ex. « Accessible / Inscription gratuite, matchmaking par
-niveau… ») sont dynamiques : ils sont stockés en base et **les administrateurs**
-peuvent les **ajouter, modifier, réordonner et supprimer** directement depuis la
-page, sans déploiement.
+Les **piliers** affichés à droite de la section **« L'association »**
+(titre + texte, ex. « Accessible / Inscription gratuite, ouverte à tous les
+niveaux… ») sont dynamiques : ils sont stockés en base et **les
+administrateurs** peuvent les **ajouter, modifier, réordonner et supprimer**
+directement depuis la page, sans déploiement.
 
 Cette section (`AboutSection`) est **partagée** entre la page d'accueil `/` et
 la page `/association` : les piliers proviennent de la même source et toute
@@ -33,7 +33,11 @@ Tant que la table est vide (ou en cas de base injoignable), `listAboutPillars()`
 renvoie des **piliers de secours** (`FALLBACK_ABOUT_PILLARS` — les 3 piliers
 historiques : Accessible / Compétitif / Communautaire) afin que la section
 reste toujours peuplée. Les piliers de secours ont un `id` négatif et **ne sont
-pas modifiables** dans l'interface.
+pas modifiables** dans l'interface. Leur texte ne promet que ce que le site
+tient réellement, en français : les défauts d'origine annonçaient un
+« matchmaking par niveau » que le site ne fait pas et du jargon anglais
+(« rulebook », « watch parties », « scoreboard ») sur la seule page
+entièrement francisée du site.
 
 ## Validation partagée
 
