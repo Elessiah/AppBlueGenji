@@ -156,7 +156,7 @@ function roundLabelFor(bracket: BracketType, roundNumber: number, matchCount: nu
   }
   if (matchCount === 2) return "Demi-finale";
   if (matchCount === 4) return "Quarts de finale";
-  return `Round ${roundNumber}`;
+  return `Manche ${roundNumber}`;
 }
 
 /**

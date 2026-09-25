@@ -18,7 +18,6 @@ export function AboutSection({ stats, pillars, isAdmin, copy }: AboutSectionProp
     <section id="assoc" className={styles.root}>
       <div className={styles.head}>
         <div>
-          <span className="eyebrow">SECTION 03</span>
           <EditableCopy copyKey="home.about.title" value={copy["home.about.title"]} canEdit={isAdmin}>
             <h2 className={styles.sectionTitle}>{copy["home.about.title"]}</h2>
           </EditableCopy>

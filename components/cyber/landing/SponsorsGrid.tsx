@@ -227,7 +227,6 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
     <section id="sponsors" className={styles.root}>
       <div className={styles.head}>
         <div>
-          <span className="eyebrow">SECTION 04</span>
           <h2 className={styles.sectionTitle}>Partenaires et soutiens</h2>
         </div>
         <div className={styles.headActions}>
