@@ -119,21 +119,53 @@ describe("TournamentBoard", () => {
   });
 });
 
+function calendarEvent(overrides: Partial<LandingCalendarEvent> = {}): LandingCalendarEvent {
+  return {
+    tournamentId: 1,
+    name: "Coupe du printemps",
+    game: "MR",
+    startAt: "2026-05-12T18:30:00.000Z",
+    registrationOpenAt: "2026-05-02T10:00:00.000Z",
+    registrationCloseAt: "2026-05-10T10:00:00.000Z",
+    state: "REGISTRATION",
+    maxTeams: 8,
+    registeredTeams: 2,
+    ...overrides,
+  };
+}
+
 describe("CalendarCard", () => {
   it("lit le jeu sur l'événement, jamais sur le nom", () => {
-    const event: LandingCalendarEvent = {
-      tournamentId: 1,
-      name: "Coupe du printemps",
-      game: "MR",
-      startAt: "2026-05-12T18:30:00.000Z",
-      registrationOpenAt: "2026-05-02T10:00:00.000Z",
-      registrationCloseAt: "2026-05-10T10:00:00.000Z",
-      state: "REGISTRATION",
-      maxTeams: 8,
-      registeredTeams: 2,
-    };
-    const markup = renderToStaticMarkup(<CalendarCard events={[event]} />);
+    const markup = renderToStaticMarkup(<CalendarCard events={[calendarEvent()]} />);
     expect(markup).toContain(">MR<");
     expect(markup).not.toContain(">OW<");
+  });
+
+  it("annonce l'absence d'événement plutôt qu'un en-tête vide", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[]} />);
+    expect(markup).toContain("Aucun tournoi programmé.");
+  });
+
+  it("n'annonce plus l'absence d'événement dès qu'il y en a un", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[calendarEvent()]} />);
+    expect(markup).not.toContain("Aucun tournoi programmé.");
+  });
+
+  it("étiquette les inscriptions ouvertes en français", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[calendarEvent({ state: "REGISTRATION" })]} />);
+    expect(markup).toContain("INSCRIPTIONS OUVERTES");
+    expect(markup).not.toContain(">OPEN<");
+  });
+
+  it("n'étiquette plus un tournoi pas encore ouvert comme « OPEN »", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[calendarEvent({ state: "UPCOMING" })]} />);
+    expect(markup).toContain("BIENTÔT");
+    expect(markup).not.toContain(">OPEN<");
+  });
+
+  it("propose l'agenda dans un libellé compréhensible, pas « ICS → »", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[calendarEvent()]} />);
+    expect(markup).toContain("Ajouter à mon agenda (.ics)");
+    expect(markup).not.toContain("ICS →");
   });
 });
