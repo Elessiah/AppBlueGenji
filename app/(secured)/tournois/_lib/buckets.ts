@@ -1,4 +1,4 @@
-import { FORMAT_LABELS } from "@/lib/shared/tournament-labels";
+import { formatLabel } from "@/lib/shared/tournament-labels";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
 export type GameFilter = "all" | "ow" | "mr";
@@ -7,15 +7,20 @@ export type GameFilter = "all" | "ow" | "mr";
  * Nom, description et **format** (« ronde suisse », « survie »… au lieu du
  * code `SWISS`) : c'est tout ce qu'une carte annonce sans requête à part —
  * les équipes engagées n'y figurent pas, une recherche ne les couvre donc
- * pas non plus.
+ * pas non plus. Par `formatLabel`, qui retombe sur la valeur brute plutôt que
+ * de lever — `TournamentCard.format` n'est typé qu'à la compilation, une
+ * réponse JSON ne le garantit pas à l'exécution, et un format que
+ * `FORMAT_LABELS` ignorerait encore ferait planter toute la page à la
+ * première recherche.
  */
 export function filterTournamentsByQuery(tournaments: TournamentCard[], query: string): TournamentCard[] {
-  if (!query) return tournaments;
-  const lowerQuery = query.toLowerCase();
+  const trimmed = query.trim();
+  if (!trimmed) return tournaments;
+  const lowerQuery = trimmed.toLowerCase();
   return tournaments.filter((t) => {
     const nameMatch = t.name.toLowerCase().includes(lowerQuery);
     const descMatch = (t.description || "").toLowerCase().includes(lowerQuery);
-    const formatMatch = FORMAT_LABELS[t.format].toLowerCase().includes(lowerQuery);
+    const formatMatch = formatLabel(t.format).toLowerCase().includes(lowerQuery);
     return nameMatch || descMatch || formatMatch;
   });
 }

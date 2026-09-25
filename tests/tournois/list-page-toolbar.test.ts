@@ -51,12 +51,20 @@ describe("page tournois — barre de recherche et filtres", () => {
 describe("page tournois — volume des sections", () => {
   it("chaque section bornée peut se déplier puis se replier", () => {
     for (const key of ["running", "registration", "upcoming", "finished"]) {
-      expect(page).toContain(`onExpand={() => expandSection("${key}", total${key[0].toUpperCase()}${key.slice(1)})}`);
-      expect(page).toContain(`onCollapse={() => collapseSection("${key}")}`);
+      expect(page).toContain(`expanded={expandedSections.has("${key}")}`);
+      expect(page).toContain(`onToggle={() => toggleSection("${key}")}`);
     }
   });
 
-  it("la limite se remet à sa valeur de départ à chaque changement de filtre", () => {
-    expect(page).toMatch(/setDisplayLimits\(initialDisplayLimits\);\s*\}, \[query, gameFilter\]\);/);
+  it("l'état déplié se remet à zéro à chaque changement de filtre", () => {
+    expect(page).toMatch(/setExpandedSections\(new Set\(\)\);\s*\}, \[query, gameFilter\]\);/);
+  });
+
+  it("une section dépliée montre le total réel, jamais un compte figé au moment du clic", () => {
+    // `displayLimits` capturait le total au clic : un rafraîchissement de fond
+    // qui fait grossir la section le laissait périmé, cachant les arrivées
+    // récentes derrière un « Voir plus » qui semblait pourtant déplié.
+    expect(page).not.toContain("displayLimits");
+    expect(page).toMatch(/expandedSections\.has\("running"\) \? totalRunning : SECTION_DISPLAY_LIMIT/);
   });
 });

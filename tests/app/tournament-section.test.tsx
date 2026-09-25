@@ -20,6 +20,18 @@ describe("Section — en-tête accessible", () => {
     expect((markup.match(/<h2/g) ?? []).length).toBe(1);
   });
 
+  it("le nom accessible du titre se limite au titre, sans l'index ni le compte", () => {
+    const markup = renderToStaticMarkup(
+      <Section ix="01" title="EN COURS" count={46} emptyMsg="Vide">
+        <div>contenu</div>
+      </Section>,
+    );
+    // Le <h2> englobe le bouton entier (index, compte, chevron) : sans
+    // aria-label, son nom accessible collerait « 01EN COURS46 ».
+    const h2 = markup.match(/<h2[^>]*>/)?.[0] ?? "";
+    expect(h2).toMatch(/aria-label="EN COURS"/);
+  });
+
   it("le bouton porte aria-expanded et aria-controls, qui désigne le corps affiché", () => {
     const markup = renderToStaticMarkup(
       <Section ix="01" title="EN COURS" count={2} defaultOpen={true} emptyMsg="Vide">
@@ -40,6 +52,17 @@ describe("Section — en-tête accessible", () => {
     );
     expect(markup).toContain('aria-expanded="false"');
     expect(markup).not.toContain("contenu qui ne doit pas apparaître replié");
+  });
+
+  it("replié : aria-controls ne désigne plus un id absent du DOM", () => {
+    const markup = renderToStaticMarkup(
+      <Section ix="04" title="TERMINÉS" count={3} defaultOpen={false} emptyMsg="Vide">
+        <div>contenu</div>
+      </Section>,
+    );
+    // Rien n'est rendu replié : un aria-controls posé quand même pointerait
+    // vers un id que le DOM ne porte pas.
+    expect(markup).not.toContain("aria-controls");
   });
 
   it("section vide : titre « Vide » et message dédié, sous le même id référencé", () => {

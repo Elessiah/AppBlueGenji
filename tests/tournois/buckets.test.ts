@@ -69,6 +69,20 @@ describe("buckets", () => {
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("Alpha");
     });
+
+    it("ne plante jamais sur un format que FORMAT_LABELS ignore", () => {
+      // Le format n'est garanti qu'à la compilation : une réponse JSON ne
+      // l'assure pas à l'exécution — un format ajouté côté serveur avant que
+      // le front ne le connaisse ne doit pas planter toute la recherche.
+      const cards = [mockCard({ name: "Alpha", format: "INCONNU" as TournamentCard["format"] })];
+      expect(() => filterTournamentsByQuery(cards, "alpha")).not.toThrow();
+      expect(filterTournamentsByQuery(cards, "alpha")).toHaveLength(1);
+    });
+
+    it("ignore une recherche faite seulement d'espaces, comme une recherche vide", () => {
+      const cards = [mockCard({ name: "Tournament A" })];
+      expect(filterTournamentsByQuery(cards, "   ")).toEqual(cards);
+    });
   });
 
   describe("filterTournamentsByGame", () => {

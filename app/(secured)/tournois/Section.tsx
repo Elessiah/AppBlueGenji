@@ -32,12 +32,16 @@ export function Section({
     <div className={s.section} data-cols={dataCols}>
       {/* Un `<h2>` n'est pas du contenu phrasé : posé à l'intérieur d'un
           `<button>`, il n'y était pas autorisé. C'est le bouton qui va dans le
-          titre, jamais l'inverse. */}
-      <h2 className={s.sectionH2}>
+          titre, jamais l'inverse — mais le `<h2>` engloberait alors aussi
+          l'index et le compte (« 01 EN COURS 46 »), bruit qu'un `aria-label`
+          retranche au seul titre ; le bouton, lui, garde le texte complet. */}
+      <h2 className={s.sectionH2} aria-label={title}>
         <button
           className={s.sectionHead}
           aria-expanded={expanded}
-          aria-controls={bodyId}
+          // Sans élément à désigner une fois repliée, une section fermée par
+          // défaut (« Terminés ») pointerait vers un id absent du DOM.
+          aria-controls={expanded ? bodyId : undefined}
           onClick={() => setExpanded((x) => !x)}
         >
           <span className={s.sectionIx}>{ix}</span>

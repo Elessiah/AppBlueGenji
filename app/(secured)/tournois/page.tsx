@@ -44,39 +44,36 @@ const emptyBuckets: TournamentBuckets = {
  * pas cette limite : c'est un choix d'affichage, pas un fait sur les données). */
 type LimitedSectionKey = "running" | "registration" | "upcoming" | "finished";
 const SECTION_DISPLAY_LIMIT = 12;
-const initialDisplayLimits: Record<LimitedSectionKey, number> = {
-  running: SECTION_DISPLAY_LIMIT,
-  registration: SECTION_DISPLAY_LIMIT,
-  upcoming: SECTION_DISPLAY_LIMIT,
-  finished: SECTION_DISPLAY_LIMIT,
-};
 
 /**
  * Bouton « Voir plus » / « Voir moins » d'une section : absent tant que tout
  * tient sous la limite, et **réversible** — la version d'origine (section
  * « Terminés » seule) ne savait que déplier, jamais replier.
+ *
+ * `expanded` est un drapeau, pas un compte figé : la page se rafraîchit de
+ * fond en fond, et une section dépliée sur « 46 » ne doit pas se retrouver
+ * bornée à ce chiffre quand un rafraîchissement en apporte 50 — elle montre
+ * alors les 50 sans qu'on ait besoin de redéplier.
  */
 function ShowMoreRow({
   total,
-  limit,
-  onExpand,
-  onCollapse,
+  expanded,
+  onToggle,
 }: {
   total: number;
-  limit: number;
-  onExpand: () => void;
-  onCollapse: () => void;
+  expanded: boolean;
+  onToggle: () => void;
 }) {
   if (total <= SECTION_DISPLAY_LIMIT) return null;
   return (
     <div className={s.showMoreRow}>
-      {limit < total ? (
-        <button onClick={onExpand} className={s.cardCta}>
-          Voir plus ({total - limit})
+      {expanded ? (
+        <button onClick={onToggle} className={s.cardCta}>
+          Voir moins
         </button>
       ) : (
-        <button onClick={onCollapse} className={s.cardCta}>
-          Voir moins
+        <button onClick={onToggle} className={s.cardCta}>
+          Voir plus ({total - SECTION_DISPLAY_LIMIT})
         </button>
       )}
     </div>
@@ -102,7 +99,7 @@ export default function TournamentsPage() {
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
-  const [displayLimits, setDisplayLimits] = useState(initialDisplayLimits);
+  const [expandedSections, setExpandedSections] = useState<ReadonlySet<LimitedSectionKey>>(new Set());
   const [isAdmin, setIsAdmin] = useState(false);
   // « Ctrl+K » par défaut (sûr pour le rendu serveur) : la vraie plateforme
   // ne se lit que côté client, une fois montée.
@@ -204,13 +201,16 @@ export default function TournamentsPage() {
   }, []);
 
   useEffect(() => {
-    setDisplayLimits(initialDisplayLimits);
+    setExpandedSections(new Set());
   }, [query, gameFilter]);
 
-  const expandSection = (key: LimitedSectionKey, total: number) =>
-    setDisplayLimits((prev) => ({ ...prev, [key]: total }));
-  const collapseSection = (key: LimitedSectionKey) =>
-    setDisplayLimits((prev) => ({ ...prev, [key]: SECTION_DISPLAY_LIMIT }));
+  const toggleSection = (key: LimitedSectionKey) =>
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
 
   // Les cartes portent leur horaire : le client fait basculer « Prochainement »
   // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
@@ -381,14 +381,15 @@ export default function TournamentsPage() {
             emptyMsg={emptyMsg("Aucun tournoi en cours actuellement.")}
             dataCols="2"
           >
-            {filteredBuckets.running.slice(0, displayLimits.running).map((t) => (
-              <RunningCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
-            ))}
+            {filteredBuckets.running
+              .slice(0, expandedSections.has("running") ? totalRunning : SECTION_DISPLAY_LIMIT)
+              .map((t) => (
+                <RunningCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
+              ))}
             <ShowMoreRow
               total={totalRunning}
-              limit={displayLimits.running}
-              onExpand={() => expandSection("running", totalRunning)}
-              onCollapse={() => collapseSection("running")}
+              expanded={expandedSections.has("running")}
+              onToggle={() => toggleSection("running")}
             />
           </Section>
 
@@ -399,14 +400,15 @@ export default function TournamentsPage() {
             defaultOpen={true}
             emptyMsg={emptyMsg("Aucun tournoi en phase d'inscription pour le moment.")}
           >
-            {filteredBuckets.registration.slice(0, displayLimits.registration).map((t) => (
-              <RegistrationCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
-            ))}
+            {filteredBuckets.registration
+              .slice(0, expandedSections.has("registration") ? totalRegistration : SECTION_DISPLAY_LIMIT)
+              .map((t) => (
+                <RegistrationCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
+              ))}
             <ShowMoreRow
               total={totalRegistration}
-              limit={displayLimits.registration}
-              onExpand={() => expandSection("registration", totalRegistration)}
-              onCollapse={() => collapseSection("registration")}
+              expanded={expandedSections.has("registration")}
+              onToggle={() => toggleSection("registration")}
             />
           </Section>
 
@@ -417,14 +419,15 @@ export default function TournamentsPage() {
             defaultOpen={true}
             emptyMsg={emptyMsg("Aucun tournoi à venir pour le moment.")}
           >
-            {filteredBuckets.upcoming.slice(0, displayLimits.upcoming).map((t) => (
-              <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
-            ))}
+            {filteredBuckets.upcoming
+              .slice(0, expandedSections.has("upcoming") ? totalUpcoming : SECTION_DISPLAY_LIMIT)
+              .map((t) => (
+                <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
+              ))}
             <ShowMoreRow
               total={totalUpcoming}
-              limit={displayLimits.upcoming}
-              onExpand={() => expandSection("upcoming", totalUpcoming)}
-              onCollapse={() => collapseSection("upcoming")}
+              expanded={expandedSections.has("upcoming")}
+              onToggle={() => toggleSection("upcoming")}
             />
           </Section>
 
@@ -436,15 +439,16 @@ export default function TournamentsPage() {
             emptyMsg={emptyMsg("Aucun tournoi terminé pour le moment.")}
           >
             <div>
-              {filteredBuckets.finished.slice(0, displayLimits.finished).map((t) => (
-                <FinishedCard key={t.id} t={t} />
-              ))}
+              {filteredBuckets.finished
+                .slice(0, expandedSections.has("finished") ? totalFinished : SECTION_DISPLAY_LIMIT)
+                .map((t) => (
+                  <FinishedCard key={t.id} t={t} />
+                ))}
             </div>
             <ShowMoreRow
               total={totalFinished}
-              limit={displayLimits.finished}
-              onExpand={() => expandSection("finished", totalFinished)}
-              onCollapse={() => collapseSection("finished")}
+              expanded={expandedSections.has("finished")}
+              onToggle={() => toggleSection("finished")}
             />
           </Section>
         </div>
