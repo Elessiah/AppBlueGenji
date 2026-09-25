@@ -54,12 +54,10 @@
   gap: 12px;
 }
 
-.gameEyebrow {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  color: var(--blue-300);
-  text-transform: uppercase;
+/* Le pied ne porte plus que l'action : elle se range à droite. */
+.footerRow {
+  justify-content: flex-end;
+  margin-top: auto;
 }
 
 .featuredTitle {
@@ -82,14 +80,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.cardGame {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  color: var(--blue-300);
-  text-transform: uppercase;
 }
 
 .cardTitle {
