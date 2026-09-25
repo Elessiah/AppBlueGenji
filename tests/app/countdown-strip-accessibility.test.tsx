@@ -22,8 +22,10 @@ describe("CountdownStrip avant hydratation", () => {
     expect(matches.length).toBe(4);
   });
 
-  it("porte un `<time>` vide, sans `<div>` (contenu de phrase uniquement)", () => {
-    expect(html).toContain('<time dateTime="2030-01-01T00:00:00Z" aria-label="Chargement du compte à rebours"></time>');
+  it("porte la phrase en contenu réel, jamais en `aria-label` (rôle `time` = Name Prohibited)", () => {
+    expect(html).toContain('<time dateTime="2030-01-01T00:00:00Z">');
+    expect(html).toContain('<span class="sr-only">Chargement du compte à rebours</span>');
+    expect(html).not.toContain('aria-label="Chargement du compte à rebours"');
   });
 
   it("cache le bloc visuel aux technologies d'assistance, en une seule fois", () => {

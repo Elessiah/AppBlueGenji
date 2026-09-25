@@ -38,11 +38,14 @@ export function CountdownStrip({ targetISO, label }: CountdownStripProps) {
   return (
     <div className={styles.root}>
       {label && <div className={styles.label}>{label}</div>}
-      {/* `<time>` ne porte que la date machine-lisible et la phrase pour les
-          lecteurs d'écran ; son contenu (phrasing content) ne peut pas être
-          des `<div>` — les cases numériques sont donc un bloc voisin, purement
-          visuel, que `aria-hidden` retire de l'arbre d'accessibilité. */}
-      <time dateTime={targetISO} aria-label={accessibleLabel} />
+      {/* Le rôle ARIA `time` interdit le nom par `aria-label` (« Name
+          Prohibited ») : la phrase doit être un vrai contenu, retiré du flux
+          visuel par `.sr-only`, pas une étiquette posée par-dessus un élément
+          vide. Les cases numériques sont un bloc voisin, purement visuel —
+          `<time>` (contenu de phrase) ne peut de toute façon pas contenir de `<div>`. */}
+      <time dateTime={targetISO}>
+        <span className="sr-only">{accessibleLabel}</span>
+      </time>
       <div className={styles.countdown} aria-hidden="true">
         {units.map(({ label: lbl, value }) => (
           <div key={lbl} className={styles.unit}>
