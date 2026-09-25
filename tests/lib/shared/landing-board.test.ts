@@ -26,9 +26,10 @@ describe("isTournamentFull", () => {
     expect(isTournamentFull({ maxTeams: 8, registeredTeams: 7 })).toBe(false);
   });
 
-  it("un plafond à zéro ne ferme rien", () => {
-    expect(isTournamentFull({ maxTeams: 0, registeredTeams: 0 })).toBe(false);
-    expect(isTournamentFull({ maxTeams: 0, registeredTeams: 40 })).toBe(false);
+  it("compare comme le refus serveur (`registeredTeams >= max_teams`)", () => {
+    // La validation impose au moins deux places ; un plafond nul, s'il existait,
+    // serait plein côté serveur — la carte ne doit pas y annoncer une place.
+    expect(isTournamentFull({ maxTeams: 0, registeredTeams: 0 })).toBe(true);
   });
 });
 
@@ -56,10 +57,13 @@ describe("boardStateLabel", () => {
     expect(boardStateLabel(card("RUNNING"), REGISTRATION_AT)).toBe("En cours");
   });
 
-  it("n'emploie jamais la valeur brute de l'état", () => {
+  it("ne rend qu'un des libellés français attendus, jamais la valeur brute", () => {
+    const labels = new Set(["Bientôt", "Inscriptions ouvertes", "Complet", "Inscriptions closes", "En cours", "Terminé"]);
     for (const state of ["UPCOMING", "REGISTRATION", "RUNNING", "FINISHED"] as const) {
       for (const now of [ANNOUNCED_AT, REGISTRATION_AT, LOCKED_AT, RUNNING_AT]) {
-        expect(boardStateLabel(card(state), now)).not.toMatch(/^[A-Z_]+$/);
+        for (const registeredTeams of [0, 8]) {
+          expect(labels.has(boardStateLabel(card(state, { registeredTeams }), now))).toBe(true);
+        }
       }
     }
   });

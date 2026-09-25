@@ -35,12 +35,28 @@ type BoardCard = Pick<
  */
 export const BOARD_TIME_ZONE = "Europe/Paris";
 
+// Formateurs construits une fois : leurs options ne varient pas, et une
+// construction coûte bien plus qu'un formatage.
+const YEAR_FORMAT = new Intl.DateTimeFormat("fr-FR", { year: "numeric", timeZone: BOARD_TIME_ZONE });
+const DAY_FORMAT = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", timeZone: BOARD_TIME_ZONE });
+const DAY_YEAR_FORMAT = new Intl.DateTimeFormat("fr-FR", {
+  day: "numeric",
+  month: "short",
+  year: "numeric",
+  timeZone: BOARD_TIME_ZONE,
+});
+const TIME_FORMAT = new Intl.DateTimeFormat("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: BOARD_TIME_ZONE });
+
 /** Formats dont le plateau est un arbre : « Voir le bracket » y a un sens. */
 const BRACKET_FORMATS: ReadonlySet<TournamentFormat> = new Set<TournamentFormat>(["SINGLE", "DOUBLE"]);
 
-/** Un plateau plein ne prend plus d'inscription ; `maxTeams` à 0 = sans limite. */
+/**
+ * Un plateau plein ne prend plus d'inscription. Même comparaison que le refus
+ * serveur (`registerTeam` → `TOURNAMENT_FULL`) : la carte ne doit pas annoncer
+ * une place que l'inscription refusera.
+ */
 export function isTournamentFull(card: Pick<TournamentCard, "maxTeams" | "registeredTeams">): boolean {
-  return card.maxTeams > 0 && card.registeredTeams >= card.maxTeams;
+  return card.registeredTeams >= card.maxTeams;
 }
 
 /**
@@ -97,20 +113,7 @@ export function formatBoardStartAt(iso: string, now: number = Date.now()): strin
   const date = new Date(iso);
   if (!Number.isFinite(date.getTime())) return "";
 
-  const yearOf = (value: Date): string =>
-    new Intl.DateTimeFormat("fr-FR", { year: "numeric", timeZone: BOARD_TIME_ZONE }).format(value);
-  const sameYear = yearOf(date) === yearOf(new Date(now));
-
-  const day = new Intl.DateTimeFormat("fr-FR", {
-    day: "numeric",
-    month: "short",
-    ...(sameYear ? {} : { year: "numeric" }),
-    timeZone: BOARD_TIME_ZONE,
-  }).format(date);
-  const time = new Intl.DateTimeFormat("fr-FR", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: BOARD_TIME_ZONE,
-  }).format(date);
-  return `${day} · ${time}`;
+  const sameYear = YEAR_FORMAT.format(date) === YEAR_FORMAT.format(new Date(now));
+  const day = (sameYear ? DAY_FORMAT : DAY_YEAR_FORMAT).format(date);
+  return `${day} · ${TIME_FORMAT.format(date)}`;
 }

@@ -4,7 +4,7 @@ import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tourn
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { activeTournamentCards } from "@/lib/shared/landing";
 import { boardActionLabel, boardStateLabel, formatBoardStartAt } from "@/lib/shared/landing-board";
-import { FORMAT_LABELS, gameLabel } from "@/lib/shared/tournament-labels";
+import { formatLabel, gameLabel } from "@/lib/shared/tournament-labels";
 import styles from "./TournamentBoard.module.css";
 
 type TournamentBoardProps = {
@@ -59,7 +59,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
                 <TournamentImageEmblem image={featured.image} size={56} />
                 <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
               </div>
-              <div className={styles.phase}>{FORMAT_LABELS[featured.format]}</div>
+              <div className={styles.format}>{formatLabel(featured.format)}</div>
               {/* Un tournoi aux inscriptions n'a pas encore de plateau : pas de cases vides. */}
               {miniBracket.length > 0 && <MiniBracket matches={miniBracket} />}
 
