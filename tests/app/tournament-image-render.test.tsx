@@ -85,7 +85,10 @@ describe("cartes de /tournois", () => {
     const imgs = imgTags(markup);
     expect(imgs).toHaveLength(1);
     expect(imgs[0]).toMatch(/object-position:20% 75%/);
-    expect(markup.indexOf("<img")).toBeLessThan(markup.indexOf("BlueGenji Open"));
+    // Le nom figure aussi dans le nom accessible de la plaque de la carte
+    // (`aria-label="Voir le tournoi …"`), avant le bandeau : c'est le titre
+    // **visible** (`<h3>`), pas la première occurrence du nom, qui doit le suivre.
+    expect(markup.indexOf("<img")).toBeLessThan(markup.indexOf("<h3"));
   });
 
   it.each(cards)("carte %s : un logo en pastille, sans bandeau", (_, Card, state) => {

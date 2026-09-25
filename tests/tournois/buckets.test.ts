@@ -6,6 +6,9 @@ import {
   filterBuckets,
   flattenBuckets,
   countByGame,
+  searchShortcutLabel,
+  hasActiveFilter,
+  sectionEmptyMessage,
 } from "@/app/(secured)/tournois/_lib/buckets";
 import { tournamentCard } from "../helpers/tournament-card";
 
@@ -55,6 +58,16 @@ describe("buckets", () => {
       const cards = [mockCard({ name: "TOURNAMENT" })];
       const result = filterTournamentsByQuery(cards, "tournament");
       expect(result).toHaveLength(1);
+    });
+
+    it("filters tournaments by format label", () => {
+      const cards = [
+        mockCard({ name: "Alpha", format: "SWISS" }),
+        mockCard({ name: "Beta", format: "SINGLE" }),
+      ];
+      const result = filterTournamentsByQuery(cards, "suisse");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Alpha");
     });
   });
 
@@ -182,5 +195,47 @@ describe("flattenBuckets", () => {
 
   it("renvoie une liste vide pour des paniers vides", () => {
     expect(flattenBuckets(mockBuckets())).toEqual([]);
+  });
+});
+
+describe("searchShortcutLabel", () => {
+  it("dit ⌘K sur un clavier Apple", () => {
+    expect(searchShortcutLabel("MacIntel")).toBe("⌘K");
+    expect(searchShortcutLabel("iPhone")).toBe("⌘K");
+    expect(searchShortcutLabel("iPad")).toBe("⌘K");
+  });
+
+  it("dit Ctrl+K partout ailleurs, Windows compris", () => {
+    expect(searchShortcutLabel("Win32")).toBe("Ctrl+K");
+    expect(searchShortcutLabel("Linux x86_64")).toBe("Ctrl+K");
+  });
+});
+
+describe("hasActiveFilter", () => {
+  it("est faux sans recherche et sur le jeu « Tous »", () => {
+    expect(hasActiveFilter("", "all")).toBe(false);
+    expect(hasActiveFilter("   ", "all")).toBe(false);
+  });
+
+  it("est vrai dès qu'une recherche ou un jeu est choisi", () => {
+    expect(hasActiveFilter("marvel", "all")).toBe(true);
+    expect(hasActiveFilter("", "ow")).toBe(true);
+  });
+});
+
+describe("sectionEmptyMessage", () => {
+  it("garde le message d'origine sans filtre actif", () => {
+    expect(sectionEmptyMessage("Aucun tournoi en cours actuellement.", "", "all")).toBe(
+      "Aucun tournoi en cours actuellement.",
+    );
+  });
+
+  it("dit qu'aucun résultat ne correspond dès qu'un filtre est actif", () => {
+    expect(sectionEmptyMessage("Aucun tournoi en cours actuellement.", "marvel", "all")).toBe(
+      "Aucun résultat pour cette recherche.",
+    );
+    expect(sectionEmptyMessage("Aucun tournoi en cours actuellement.", "", "mr")).toBe(
+      "Aucun résultat pour cette recherche.",
+    );
   });
 });

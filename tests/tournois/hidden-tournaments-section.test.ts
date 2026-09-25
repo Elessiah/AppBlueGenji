@@ -56,9 +56,9 @@ describe("page tournois — section « Tournois invisibles »", () => {
     );
   });
 
-  it("compte les invisibles dans les pastilles de jeu du staff", () => {
+  it("compte les invisibles dans les pastilles de jeu du staff, filtrés par la recherche en cours", () => {
     expect(page).toMatch(
-      /countByGame\(buckets, key\) \+\s*\(showHidden \? filterTournamentsByGame\(hiddenTournaments, key\)\.length : 0\)/,
+      /countByGame\(queryFilteredBuckets, key\) \+\s*\(showHidden \? filterTournamentsByGame\(queryFilteredHidden, key\)\.length : 0\)/,
     );
   });
 

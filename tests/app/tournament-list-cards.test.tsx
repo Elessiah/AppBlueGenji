@@ -192,3 +192,31 @@ describe("FinishedCard", () => {
     expect(markup).not.toMatch(/cardDone|opacity/);
   });
 });
+
+describe("nom accessible de la carte", () => {
+  const cards: [string, (t: TournamentCard) => string][] = [
+    ["en cours", (t) => renderToStaticMarkup(<RunningCard t={{ ...t, state: "RUNNING" }} />)],
+    ["inscriptions", (t) => renderToStaticMarkup(<RegistrationCard t={{ ...t, state: "REGISTRATION" }} />)],
+    ["à venir", (t) => renderToStaticMarkup(<UpcomingCard t={{ ...t, state: "UPCOMING" }} />)],
+    ["terminé", (t) => renderToStaticMarkup(<FinishedCard t={{ ...t, state: "FINISHED" }} />)],
+  ];
+
+  it.each(cards)(
+    "carte %s : le lien de la carte se limite au titre, jamais à tout son texte",
+    (_label, render) => {
+      const markup = render(
+        tournamentCard({ name: "Cyber Cup", description: "Une description assez longue pour compter" }),
+      );
+      // Un seul lien : la plaque transparente qui couvre la carte (pas un
+      // `<a>` enveloppant tout le texte, ni un second lien à l'intérieur).
+      expect(count(markup, "<a ")).toBe(1);
+      const link = markup.match(/<a [^>]*>/)?.[0] ?? "";
+      expect(link).toContain('href="/tournois/');
+      expect(link).toContain('aria-label="Voir le tournoi Cyber Cup"');
+      // Un lien vide : son texte visible ne recoupe pas le titre, la
+      // description ou le ruban — sinon le nom accessible concatènerait de
+      // nouveau tout le texte de la carte.
+      expect(markup).toMatch(/<a [^>]*><\/a>/);
+    },
+  );
+});
