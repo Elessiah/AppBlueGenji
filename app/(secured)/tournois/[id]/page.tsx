@@ -22,7 +22,7 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
-import { scoreSubmittedMessage } from "@/lib/shared/match-card-viewer";
+import { isMyTeamTeam1, scoreSubmittedMessage, teamLabel } from "@/lib/shared/match-card-viewer";
 import { isPreLaunchState } from "@/lib/shared/seeding";
 import {
   planRoundRollback,
@@ -376,11 +376,11 @@ export default function TournamentDetailPage() {
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
       showSuccess(
         scoreSubmittedMessage(
-          detail.myTeamId === match.team1Id,
+          isMyTeamTeam1(detail.myTeamId, match.team1Id),
           Number(draft.myScore),
           Number(draft.opponentScore),
-          match.team1Name || "Équipe 1",
-          match.team2Name || "Équipe 2",
+          teamLabel(match.team1Name, match.team1Placeholder, "Équipe 1"),
+          teamLabel(match.team2Name, match.team2Placeholder, "Équipe 2"),
         ),
       );
       // Retour immédiat pour qui agit : le flux, lui, sert tout le monde à la
@@ -591,7 +591,6 @@ export default function TournamentDetailPage() {
           arbitre. */}
       <IssueReportProvider
         canReport={detail.myTeamId !== null && !frozen}
-        myTeamId={detail.myTeamId}
         openReport={openIssueReport}
       >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />

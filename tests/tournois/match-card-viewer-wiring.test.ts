@@ -10,7 +10,9 @@ import { join } from "node:path";
  *
  * Restent les branchements : que les deux fichiers appellent bien ce module
  * pur plutôt que de recopier la comparaison d'identifiants chacun de leur
- * côté, ce qui les ferait diverger sans qu'aucun test ne s'en aperçoive.
+ * côté, ce qui les ferait diverger sans qu'aucun test ne s'en aperçoive — et
+ * que `myTeamId` vienne du contexte qui le porte déjà (`LiveContext`), plutôt
+ * que d'en garder une seconde copie sur le contexte de signalement.
  */
 const ROOT = join(__dirname, "..", "..");
 const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
@@ -27,29 +29,35 @@ describe("bouton « Signaler un problème » — réservé au match du lecteur",
     expect(MATCH_ROW).toContain("canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id)");
   });
 
-  it("le contexte de signalement porte l'identifiant de l'équipe du lecteur", () => {
-    // Sans cette valeur, `canReportOwnMatch` ne pourrait distinguer « le
-    // lecteur est engagé dans le tournoi » de « ce match est le sien ».
-    expect(ISSUE_REPORT_CONTEXT).toContain("myTeamId: number | null");
-  });
-
-  it("la page fournit myTeamId au contexte", () => {
-    expect(PAGE).toMatch(/<IssueReportProvider[\s\S]{0,120}myTeamId=\{detail\.myTeamId\}/);
+  it("lit myTeamId depuis LiveContext, qui le porte déjà, plutôt que de le dupliquer", () => {
+    // `LiveProvider` enveloppe déjà `IssueReportProvider` dans `page.tsx` et
+    // reçoit `myTeamId={detail.myTeamId}` : une seconde copie sur le contexte
+    // de signalement décrirait la même donnée depuis deux sources.
+    expect(MATCH_ROW).toContain('from "../_lib/live-context"');
+    expect(MATCH_ROW).toContain("useLiveControls()");
+    expect(ISSUE_REPORT_CONTEXT).not.toContain("myTeamId");
+    expect(PAGE).not.toMatch(/<IssueReportProvider[\s\S]{0,120}myTeamId=/);
   });
 });
 
 describe("formulaire de score — champs ordonnés comme la carte", () => {
   it("MatchRow ordonne ses deux champs avec le module pur", () => {
-    expect(MATCH_ROW).toContain(
-      "orderedScoreFields(myTeamIsTeam1, myScore, opponentScore, team1Display, team2Display)",
-    );
+    expect(MATCH_ROW).toContain("isMyTeamTeam1(myTeamId, match.team1Id)");
+    expect(MATCH_ROW).toContain("[topField, bottomField]");
   });
 
   it("chaque champ porte le nom de son équipe, pas « Moi »/« Eux »", () => {
     expect(MATCH_ROW).not.toContain('placeholder="Moi"');
     expect(MATCH_ROW).not.toContain('placeholder="Eux"');
     expect(MATCH_ROW).toContain("placeholder={field.label}");
-    expect(MATCH_ROW).toContain("aria-label={`Score de ${field.label}`}");
+  });
+
+  it("l'aria-label garde la distinction « mon score »/« score adverse », en plus du nom d'équipe", () => {
+    // Le nom de l'équipe seul ne dit pas lequel des deux champs est le mien —
+    // sans cette distinction, un lecteur d'écran entend deux champs nommés
+    // par équipe sans savoir dans lequel écrire son propre score.
+    expect(MATCH_ROW).toContain("`Votre score (${field.label})`");
+    expect(MATCH_ROW).toContain("`Score de l'adversaire (${field.label})`");
   });
 
   it("le bouton d'envoi porte un nom accessible", () => {
@@ -59,10 +67,18 @@ describe("formulaire de score — champs ordonnés comme la carte", () => {
   });
 });
 
+describe("nom d'équipe — même repli sur la carte et dans le message d'envoi", () => {
+  it("MatchRow et page.tsx passent par le même repli à trois niveaux", () => {
+    expect(MATCH_ROW).toMatch(/teamLabel\(\s*match\.team1Name,\s*match\.team1Placeholder,/);
+    expect(PAGE).toMatch(/teamLabel\(match\.team1Name, match\.team1Placeholder,/);
+  });
+});
+
 describe("notification d'envoi — nomme les équipes, pas l'identifiant du match", () => {
   it("page.tsx construit le message avec le module pur", () => {
     expect(PAGE).toContain('from "@/lib/shared/match-card-viewer"');
     expect(PAGE).toContain("scoreSubmittedMessage(");
+    expect(PAGE).toContain("isMyTeamTeam1(detail.myTeamId, match.team1Id)");
     // Le repli exact que dénonçait ERREUR.txt.
     expect(PAGE).not.toMatch(/Score transmis pour le match #\$\{match\.id\}/);
   });

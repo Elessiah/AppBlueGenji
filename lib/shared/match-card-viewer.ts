@@ -7,6 +7,11 @@
  * « mienne » sans dupliquer la comparaison d'identifiants.
  */
 
+/** Le lecteur est-il l'équipe 1 de la carte, plutôt que l'équipe 2 ? */
+export function isMyTeamTeam1(myTeamId: number | null, team1Id: number | null): boolean {
+  return myTeamId !== null && myTeamId === team1Id;
+}
+
 /**
  * Le bouton « Signaler un problème » d'une carte ne doit s'afficher que sur
  * le match du **lecteur** : le bouton de l'en-tête couvre déjà tout le reste
@@ -29,35 +34,14 @@ export function canReportOwnMatch(
   );
 }
 
-export interface ScoreFieldDescriptor {
-  key: "myScore" | "opponentScore";
-  value: string;
-  label: string;
-}
-
 /**
- * Les deux champs du formulaire de score, dans l'ordre où les noms des
- * équipes apparaissent sur la carte (équipe 1 puis équipe 2) — jamais « Moi »
- * en premier par défaut, qui inversait l'ordre visuel des champs dès que le
- * lecteur était l'équipe 2 de la carte. Nommés par l'équipe plutôt que par
- * « Moi »/« Eux », pour rester justes quelle que soit la place du lecteur.
+ * Nom d'une équipe pour l'affichage, dans l'ordre où une carte le résout —
+ * nom saisi, puis emplacement réservé (« Vainqueur QF1 »), puis un repli
+ * propre à l'appelant. Partagé pour que la carte et le message qui suit une
+ * saisie de score ne nomment pas différemment la même équipe.
  */
-export function orderedScoreFields(
-  myTeamIsTeam1: boolean,
-  myScore: string,
-  opponentScore: string,
-  team1Label: string,
-  team2Label: string,
-): ScoreFieldDescriptor[] {
-  return myTeamIsTeam1
-    ? [
-        { key: "myScore", value: myScore, label: team1Label },
-        { key: "opponentScore", value: opponentScore, label: team2Label },
-      ]
-    : [
-        { key: "opponentScore", value: opponentScore, label: team1Label },
-        { key: "myScore", value: myScore, label: team2Label },
-      ];
+export function teamLabel(name: string | null, placeholder: string | null, fallback: string): string {
+  return name || placeholder || fallback;
 }
 
 /**

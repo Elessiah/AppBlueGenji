@@ -10,20 +10,12 @@ type IssueReportControls = {
    * téléphone des arbitres.
    */
   canReport: boolean;
-  /**
-   * Engagé du lecteur dans ce tournoi, `null` s'il n'y joue pas. Décide quelles
-   * cartes portent le bouton **par match** : `canReport` seul ne dit que « le
-   * lecteur est engagé », pas « ce match est le sien » — sans cette valeur,
-   * chaque carte du plateau porterait le bouton, engagé du lecteur ou pas.
-   */
-  myTeamId: number | null;
   /** Ouvre le signalement sur une manche, ou sur le tournoi entier (`null`). */
   openReport: (match: BracketMatch | null) => void;
 };
 
 const IssueReportContext = createContext<IssueReportControls>({
   canReport: false,
-  myTeamId: null,
   openReport: () => undefined,
 });
 
@@ -37,14 +29,10 @@ const IssueReportContext = createContext<IssueReportControls>({
  */
 export function IssueReportProvider({
   canReport,
-  myTeamId,
   openReport,
   children,
 }: IssueReportControls & { children: ReactNode }) {
-  const value = useMemo(
-    () => ({ canReport, myTeamId, openReport }),
-    [canReport, myTeamId, openReport],
-  );
+  const value = useMemo(() => ({ canReport, openReport }), [canReport, openReport]);
   return <IssueReportContext.Provider value={value}>{children}</IssueReportContext.Provider>;
 }
 

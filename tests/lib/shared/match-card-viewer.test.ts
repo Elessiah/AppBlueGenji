@@ -1,9 +1,27 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   canReportOwnMatch,
-  orderedScoreFields,
+  isMyTeamTeam1,
   scoreSubmittedMessage,
+  teamLabel,
 } from "@/lib/shared/match-card-viewer";
+
+describe("isMyTeamTeam1", () => {
+  it("dit vrai quand le lecteur est l'équipe 1", () => {
+    expect(isMyTeamTeam1(10, 10)).toBe(true);
+  });
+
+  it("dit faux quand le lecteur est l'équipe 2, ou n'est engagé nulle part", () => {
+    expect(isMyTeamTeam1(20, 10)).toBe(false);
+    expect(isMyTeamTeam1(null, 10)).toBe(false);
+  });
+
+  it("ne confond jamais deux absences pour une correspondance", () => {
+    // Un lecteur non engagé (`null`) sur une case encore vide (`team1Id`
+    // aussi `null`) ne doit jamais se lire comme « je suis l'équipe 1 ».
+    expect(isMyTeamTeam1(null, null)).toBe(false);
+  });
+});
 
 describe("canReportOwnMatch", () => {
   it("refuse quand le lecteur n'est pas engagé du tout", () => {
@@ -32,28 +50,17 @@ describe("canReportOwnMatch", () => {
   });
 });
 
-describe("orderedScoreFields", () => {
-  it("place le champ de l'équipe 1 en premier, celui de l'équipe 2 en second", () => {
-    // Quelle que soit la place du lecteur : l'ordre suit la carte, pas « Moi »
-    // en premier par défaut.
-    const asTeam1 = orderedScoreFields(true, "3", "1", "Les Foudres", "Team Nova");
-    expect(asTeam1).toEqual([
-      { key: "myScore", value: "3", label: "Les Foudres" },
-      { key: "opponentScore", value: "1", label: "Team Nova" },
-    ]);
-
-    const asTeam2 = orderedScoreFields(false, "3", "1", "Les Foudres", "Team Nova");
-    expect(asTeam2).toEqual([
-      { key: "opponentScore", value: "1", label: "Les Foudres" },
-      { key: "myScore", value: "3", label: "Team Nova" },
-    ]);
+describe("teamLabel", () => {
+  it("préfère le nom saisi", () => {
+    expect(teamLabel("Les Foudres", "Vainqueur QF1", "TBD")).toBe("Les Foudres");
   });
 
-  it("garde toujours deux champs, sous les deux clés de soumission", () => {
-    for (const myTeamIsTeam1 of [true, false]) {
-      const fields = orderedScoreFields(myTeamIsTeam1, "0", "0", "A", "B");
-      expect(fields.map((f) => f.key).sort()).toEqual(["myScore", "opponentScore"]);
-    }
+  it("retombe sur l'emplacement réservé si aucun nom n'est encore connu", () => {
+    expect(teamLabel(null, "Vainqueur QF1", "TBD")).toBe("Vainqueur QF1");
+  });
+
+  it("retombe sur le repli de l'appelant en dernier recours", () => {
+    expect(teamLabel(null, null, "TBD")).toBe("TBD");
   });
 });
 
