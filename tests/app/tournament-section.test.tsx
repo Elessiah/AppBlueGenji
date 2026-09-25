@@ -32,6 +32,19 @@ describe("Section — en-tête accessible", () => {
     expect(h2).toMatch(/aria-label="EN COURS"/);
   });
 
+  it("l'accent (« · STAFF ») reste dans le nom accessible, pas seulement le titre", () => {
+    const markup = renderToStaticMarkup(
+      <Section ix="01" title="TOURNOIS INVISIBLES" accent="· STAFF" count={4} emptyMsg="Vide">
+        <div>contenu</div>
+      </Section>,
+    );
+    // Visible dans le bouton (span dédié) ET dans le nom accessible du titre :
+    // sans lui, un parcours par titres ferait disparaître la mention « staff »
+    // qui distingue cette section des autres.
+    const h2 = markup.match(/<h2[^>]*>/)?.[0] ?? "";
+    expect(h2).toMatch(/aria-label="TOURNOIS INVISIBLES · STAFF"/);
+  });
+
   it("le bouton porte aria-expanded et aria-controls, qui désigne le corps affiché", () => {
     const markup = renderToStaticMarkup(
       <Section ix="01" title="EN COURS" count={2} defaultOpen={true} emptyMsg="Vide">

@@ -46,6 +46,15 @@ describe("page tournois — barre de recherche et filtres", () => {
     expect(page).toMatch(/<CyberButton asChild variant="primary">\s*<Link href="\/tournois\/creer">/);
     expect(page).not.toMatch(/<Link href="\/tournois\/creer">\s*<button/);
   });
+
+  it("la recherche (coûteuse) ne s'exécute qu'une fois par rendu, le filtre de jeu par-dessus", () => {
+    // `filteredBuckets` dérive de `queryFilteredBuckets` plutôt que de relire
+    // la recherche une seconde fois avec `filterBuckets(..., gameFilter)` :
+    // sur ~150 tournois, ça évite de repasser deux fois sur nom/description/
+    // format à chaque frappe.
+    expect(page).not.toMatch(/filterBuckets\(scheduledBuckets, query, gameFilter\)/);
+    expect(page).toMatch(/gameFilter === "all"\s*\?\s*queryFilteredBuckets/);
+  });
 });
 
 describe("page tournois — volume des sections", () => {

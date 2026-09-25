@@ -35,7 +35,7 @@ export function Section({
           titre, jamais l'inverse — mais le `<h2>` engloberait alors aussi
           l'index et le compte (« 01 EN COURS 46 »), bruit qu'un `aria-label`
           retranche au seul titre ; le bouton, lui, garde le texte complet. */}
-      <h2 className={s.sectionH2} aria-label={title}>
+      <h2 className={s.sectionH2} aria-label={accent ? `${title} ${accent}` : title}>
         <button
           className={s.sectionHead}
           aria-expanded={expanded}

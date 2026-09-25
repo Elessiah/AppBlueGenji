@@ -590,7 +590,15 @@
   transition: all 0.15s;
 }
 
-.cardCta:hover {
+/* À l'intérieur d'une carte, la pastille d'action est décorative — le clic
+   passe par `.cardOverlay`, posé par-dessus elle — si bien que la souris
+   n'atteint jamais la pastille elle-même et un simple `:hover` ne s'y
+   déclenche plus. `.card:hover` rallume donc la même pastille, à côté du
+   survol direct dont les boutons « Voir plus »/« Voir moins » de
+   `.showMoreRow` (hors carte, réellement survolables) ont toujours besoin —
+   une seule déclaration pour les deux cas, jamais deux copies. */
+.cardCta:hover,
+.card:hover .cardCta {
   background: rgba(90, 200, 255, 0.1);
   border-color: rgba(90, 200, 255, 0.45);
 }
@@ -606,7 +614,8 @@
   border-color: var(--blue-500);
 }
 
-.cardCtaPrimary:hover {
+.cardCtaPrimary:hover,
+.card:hover .cardCtaPrimary {
   background: var(--blue-300);
   border-color: var(--blue-300);
 }
@@ -617,29 +626,7 @@
   background: transparent;
 }
 
-.cardCtaMuted:hover {
-  color: var(--ink);
-  background: rgba(90, 200, 255, 0.04);
-  border-color: rgba(90, 200, 255, 0.25);
-}
-
-/* À l'intérieur d'une carte, la pastille d'action est décorative — le clic
-   passe par `.cardOverlay`, posé par-dessus elle — si bien que la souris
-   n'atteint jamais la pastille elle-même et `.cardCta:hover` ne se déclenche
-   plus. Le survol du `.card` entier rallume la même pastille ; ces règles ne
-   visent que ce cas, les boutons « Voir plus »/« Voir moins » de
-   `.showMoreRow` (hors carte, réellement survolables) gardent leur
-   `:hover` ci-dessus. */
-.card:hover .cardCta {
-  background: rgba(90, 200, 255, 0.1);
-  border-color: rgba(90, 200, 255, 0.45);
-}
-
-.card:hover .cardCtaPrimary {
-  background: var(--blue-300);
-  border-color: var(--blue-300);
-}
-
+.cardCtaMuted:hover,
 .card:hover .cardCtaMuted {
   color: var(--ink);
   background: rgba(90, 200, 255, 0.04);

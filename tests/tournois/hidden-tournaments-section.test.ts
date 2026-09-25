@@ -51,9 +51,10 @@ describe("page tournois — section « Tournois invisibles »", () => {
   });
 
   it("applique la recherche et le filtre de jeu aux invisibles", () => {
-    expect(page).toMatch(
-      /filterTournamentsByGame\(\s*filterTournamentsByQuery\(hiddenTournaments, query\),\s*gameFilter,\s*\)/,
-    );
+    // La recherche (coûteuse) n'est faite qu'une fois, dans `queryFilteredHidden` ;
+    // le filtre de jeu (une comparaison de chaîne) s'applique ensuite par-dessus.
+    expect(page).toContain("filterTournamentsByQuery(hiddenTournaments, query)");
+    expect(page).toContain("filterTournamentsByGame(queryFilteredHidden, gameFilter)");
   });
 
   it("compte les invisibles dans les pastilles de jeu du staff, filtrés par la recherche en cours", () => {

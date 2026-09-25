@@ -217,11 +217,24 @@ export default function TournamentsPage() {
   // serveur (`lib/shared/tournament-schedule.ts`).
   const scheduledBuckets = useScheduledBuckets(buckets);
 
-  const filteredBuckets = filterBuckets(scheduledBuckets, query, gameFilter);
-  const filteredHidden = filterTournamentsByGame(
-    filterTournamentsByQuery(hiddenTournaments, query),
-    gameFilter,
-  );
+  // La recherche (le passage coûteux : nom, description, format sur chaque
+  // tournoi) n'est faite qu'une fois — le filtre de jeu, lui, ne fait que
+  // comparer une chaîne déjà connue, appliqué séparément pour le panier
+  // affiché (`filteredBuckets`) et pour les pastilles, qui veulent le compte
+  // de CHAQUE jeu sans se soucier de celui déjà choisi (`queryFilteredBuckets`).
+  const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all");
+  const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query);
+
+  const filteredBuckets: TournamentBuckets =
+    gameFilter === "all"
+      ? queryFilteredBuckets
+      : {
+          upcoming: filterTournamentsByGame(queryFilteredBuckets.upcoming, gameFilter),
+          registration: filterTournamentsByGame(queryFilteredBuckets.registration, gameFilter),
+          running: filterTournamentsByGame(queryFilteredBuckets.running, gameFilter),
+          finished: filterTournamentsByGame(queryFilteredBuckets.finished, gameFilter),
+        };
+  const filteredHidden = filterTournamentsByGame(queryFilteredHidden, gameFilter);
 
   const totalHidden = filteredHidden.length;
   const totalRunning = filteredBuckets.running.length;
@@ -247,8 +260,6 @@ export default function TournamentsPage() {
   // en font partie ; la recherche filtre les sections en dessous, les compteurs
   // doivent donc en tenir compte eux aussi (seul le jeu reste libre : chaque
   // pastille dit ce que donnerait SON filtre, pas celui déjà actif).
-  const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all");
-  const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query);
   const countGame = (key: GameFilter) =>
     countByGame(queryFilteredBuckets, key) +
     (showHidden ? filterTournamentsByGame(queryFilteredHidden, key).length : 0);
