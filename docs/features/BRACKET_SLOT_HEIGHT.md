@@ -21,7 +21,7 @@ hauteur fixe : elle grandit d'une rangée par action offerte au lecteur.
 | horaire, chaîne du caster, « en direct » | `MatchLiveStrip`, selon la programmation |
 | saisie du score (format + deux champs) | engagé, manche jouable |
 | « ✎ Éditer le score » | permission `tournaments`, score non verrouillé |
-| « ⚠ Signaler un problème » | engagé, deux adversaires connus |
+| « ⚠ Signaler un problème » | le match du lecteur, deux adversaires connus (`canReportOwnMatch`) |
 | « 🔒 Score verrouillé » | permission `tournaments`, manche suivante entamée |
 
 Passé 140 px, la carte débordait de son créneau **par le haut et par le bas** (un
