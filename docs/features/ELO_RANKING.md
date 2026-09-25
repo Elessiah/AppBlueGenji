@@ -252,12 +252,23 @@ tournois d'**un seul** jeu (`t.game = ?` sur les deux collectes,
 `loadRankedMatches` et `loadRankedPlacements`) — c'est ce que servent les
 pastilles Général / Overwatch / Marvel Rivals de `Leaderboard.tsx`. Par défaut
 (`undefined`), le rejeu porte sur **tous** les jeux ensemble, comme partout
-ailleurs (annuaire, fiche, seeding) : une équipe n'a qu'**une** cote, pas une
-par jeu — le filtre ne change que l'assiette du rejeu qui la calcule, jamais le
-nombre de cotes qui existent. La clé du cache mutualisé (`state:${jours}:${jeu}`)
+ailleurs (annuaire, fiche, seeding) : **la** cote d'une équipe reste toujours
+ce calcul-là. Poser `game` lance un **second** rejeu, sur une assiette plus
+étroite — le nombre qu'il rend n'est vrai que pour l'onglet qui l'affiche,
+jamais la cote de l'équipe. La clé du cache mutualisé (`state:${jours}:${jeu}`)
 et celle du cache de la landing (`leaderboard:${limite}:${jeu}`) portent donc le
 jeu : un classement filtré et le classement général vivent côte à côte sans se
 percuter, chacun invalidé par le même préfixe que l'autre.
+
+**Un onglet par jeu n'inclut pas les équipes qui n'ont pas joué ce jeu.**
+`loadLandingLeaderboard` pose `includeUnplayed: game === undefined` : l'onglet
+« Général » garde toute équipe du site (jouée ou non, cote de départ pour
+qui n'a rien joué — la garantie tenue par `compareRankedTeams`, voir plus
+haut), mais un onglet par jeu **exclut** toute équipe sans match dans ce
+jeu-là. Sans ce garde-fou, l'onglet « Marvel Rivals » aurait affiché une
+équipe qui ne joue qu'à Overwatch, à la cote de départ, comme si elle
+attendait simplement son premier match — alors qu'elle n'en jouera jamais un
+dans ce jeu.
 
 Le paramètre `?game=` de `GET /api/landing/leaderboard` arrivait jusqu'à la
 route et s'y arrêtait (`console.warn`, classement général renvoyé quoi qu'il

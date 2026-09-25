@@ -337,12 +337,21 @@ async function loadLandingLeaderboard(
   safeLimit: number,
   game: TournamentGame | undefined,
 ): Promise<LandingLeaderboardRow[]> {
+  // « Général » (pas de jeu demandé) garde toutes les équipes du site, jouées
+  // ou non — c'est le classement général, il les concerne toutes. Un onglet
+  // par jeu, lui, ne doit garder que les équipes qui ont **joué ce jeu** :
+  // sans ce garde-fou, l'onglet « Marvel Rivals » aurait affiché les équipes
+  // qui ne jouent qu'à Overwatch, à la cote de départ, comme si elles étaient
+  // simplement en attente de leur premier match — alors qu'elles n'en auront
+  // jamais dans ce jeu.
+  const includeUnplayed = game === undefined;
+
   try {
     const [currentRows, previousRows] = await Promise.all([
-      loadTeamRanking({ includeUnplayed: true, game }),
+      loadTeamRanking({ includeUnplayed, game }),
       // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
       // compare deux photos du même calcul plutôt que deux barèmes.
-      loadTeamRanking({ includeUnplayed: true, completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
+      loadTeamRanking({ includeUnplayed, completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
     ]);
     const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
 

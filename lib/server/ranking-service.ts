@@ -94,10 +94,13 @@ export type TeamRankingOptions = {
   /**
    * Ne rejouer que les matchs et clôtures des tournois de **ce jeu** — sert au
    * filtre du leaderboard de la landing (pastilles Général / Overwatch / Marvel
-   * Rivals). Par défaut, tous les jeux sont rejoués ensemble, comme partout
-   * ailleurs (annuaire, fiche, seeding) : c'est **une** cote par équipe, pas une
-   * par jeu — ne pas confondre avec `TournamentCard.game`, qui décrit un
-   * tournoi, pas une équipe.
+   * Rivals). Par défaut (`undefined`), tous les jeux sont rejoués ensemble,
+   * comme partout ailleurs (annuaire, fiche, seeding) : **la** cote d'une
+   * équipe — celle de sa fiche, de l'annuaire, du seeding — est toujours ce
+   * calcul-là, tous jeux confondus. Poser `game` produit un **second** rejeu,
+   * sur une assiette plus étroite : le nombre qu'il rend n'est vrai que pour
+   * cet onglet-là, jamais la cote de l'équipe — ne pas le confondre avec
+   * `TournamentCard.game`, qui décrit un tournoi, pas une équipe.
    */
   game?: TournamentGame;
   /**
