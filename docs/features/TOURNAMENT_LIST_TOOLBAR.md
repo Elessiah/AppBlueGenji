@@ -54,10 +54,14 @@ et sur le message d'origine sinon.
 Un `<h2>` n'est pas du contenu phrasé : il ne pouvait pas vivre à l'intérieur
 du `<button>` qui bascule l'ouverture. C'est désormais le bouton qui va dans
 le titre — `<h2><button aria-expanded aria-controls>…</button></h2>` — jamais
-l'inverse. `aria-controls` (un `useId()`) désigne le corps de la section
-quand il est rendu ; replié, `count === 0` ou la section fermée, l'id cesse
-d'exister dans le DOM (comme le corps lui-même, jamais monté replié — pour ne
-pas payer le rendu d'une section fermée par défaut, « Terminés »).
+l'inverse. Englober tout le bouton dans le `<h2>` en pollue le nom accessible
+(index, compte, chevron : « 01 EN COURS 46 ») ; un `aria-label` sur le `<h2>`
+le retranche au seul titre — **et à l'accent** (`title` puis, s'il y en a un,
+` ${accent}` — « TOURNOIS INVISIBLES · STAFF », pas juste « TOURNOIS
+INVISIBLES », qui tairait à un parcours par titres que la section est réservée
+au staff). `aria-controls` (un `useId()`) n'est posé que **section dépliée** :
+repliée par défaut (« Terminés »), le corps n'est jamais monté — poser
+`aria-controls` quand même désignerait un id absent du DOM.
 
 ## Volume d'une section
 
@@ -65,11 +69,14 @@ Les quatre sections à cartes (« En cours », « Inscriptions ouvertes »,
 « Prochainement », « Terminés ») sont bornées à `SECTION_DISPLAY_LIMIT` (12)
 cartes par défaut, avec un bouton **réversible** « Voir plus (+N) » /
 « Voir moins » (`ShowMoreRow`) — la version d'origine, propre à la section
-« Terminés » seule, ne savait que déplier, jamais replier. La limite de
-chaque section vit dans un état commun (`displayLimits`, une valeur par
-section) remis à `SECTION_DISPLAY_LIMIT` à chaque changement de recherche ou
-de filtre de jeu, pour ne pas laisser une section dépliée sur un résultat
-qu'on ne cherche plus.
+« Terminés » seule, ne savait que déplier, jamais replier. L'état déplié vit
+dans un `expandedSections: Set<LimitedSectionKey>` (un **drapeau**, pas un
+compte figé au clic) vidé à chaque changement de recherche ou de filtre de
+jeu, pour ne pas laisser une section dépliée sur un résultat qu'on ne cherche
+plus. Un drapeau plutôt qu'un total capturé : la page se rafraîchit de fond en
+fond, et une section dépliée sur « 46 » ne doit pas rester bornée à ce chiffre
+quand un rafraîchissement en apporte 50 — elle montre alors les 50 sans qu'on
+ait besoin de redéplier.
 
 ## « Créer un tournoi »
 
