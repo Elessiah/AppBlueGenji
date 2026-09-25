@@ -46,20 +46,18 @@
 }
 
 .badgeRow,
-.cardTop,
-.footerRow {
+.cardTop {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.gameEyebrow {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  color: var(--blue-300);
-  text-transform: uppercase;
+.footerRow {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
 .featuredTitle {
@@ -69,27 +67,11 @@
   font-weight: 500;
 }
 
-.phase {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  color: var(--ink-mute);
-  text-transform: uppercase;
-}
-
 .upcoming {
   padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 14px;
-}
-
-.cardGame {
-  font-family: var(--font-mono);
-  font-size: 10px;
-  letter-spacing: 0.18em;
-  color: var(--blue-300);
-  text-transform: uppercase;
 }
 
 .cardTitle {

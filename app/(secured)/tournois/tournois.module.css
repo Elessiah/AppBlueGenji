@@ -395,10 +395,12 @@
   transform: translateY(-2px);
 }
 
-.card[data-state="live"] {
-  border-color: rgba(255, 77, 94, 0.25);
+/* Un tournoi « en cours » n'est pas une diffusion : le glow rouge, réservé au
+   direct, ne s'applique pas ici. */
+.card[data-state="running"] {
+  border-color: rgba(90, 200, 255, 0.25);
   background:
-    radial-gradient(400px 300px at 100% 0%, rgba(255, 77, 94, calc(0.10 * var(--glow, 1))), transparent 60%),
+    radial-gradient(400px 300px at 100% 0%, rgba(90, 200, 255, calc(0.10 * var(--glow, 1))), transparent 60%),
     linear-gradient(180deg, var(--cyber-bg-1), var(--cyber-bg));
 }
 
@@ -482,6 +484,33 @@
   }
 }
 
+/* Un tournoi « en cours » n'est pas une diffusion : le rouge de
+   `.cardRibbonLive` lui est réservé, ce ruban reste bleu. */
+.cardRibbonRunning {
+  color: var(--blue-300);
+  border-color: rgba(90, 200, 255, 0.30);
+  background: rgba(90, 200, 255, 0.05);
+}
+
+.cardRibbonRunning .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--blue-500);
+  box-shadow: 0 0 0 0 rgba(90, 200, 255, 0.6);
+  animation: pulseBlue 1.6s infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+@keyframes pulseBlue {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(90, 200, 255, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(90, 200, 255, 0);
+  }
+}
+
 .cardHead {
   display: flex;
   align-items: center;
@@ -495,11 +524,6 @@
   letter-spacing: 0.22em;
   color: var(--ink-mute);
   text-transform: uppercase;
-}
-
-.cardGame .dot {
-  color: var(--blue-500);
-  margin: 0 6px;
 }
 
 .cardTitle {
@@ -556,6 +580,13 @@
   justify-content: space-between;
   margin-top: auto;
   gap: 12px;
+}
+
+/* Pied à un seul enfant (le CTA), quand la carte n'a pas de second fait à
+   afficher à côté : `space-between` alignerait sinon un enfant unique à
+   gauche plutôt qu'à droite. */
+.cardFootEnd {
+  justify-content: flex-end;
 }
 
 .cardCta {
@@ -669,11 +700,14 @@
 
 .card[data-state="done"] {
   border-color: var(--line-soft);
-  opacity: 0.65;
 }
 
-.cardDone {
-  opacity: 0.65;
+/* Un tournoi terminé se ternit par ses couleurs, jamais par une opacité posée
+   sur toute la carte : elle multipliait le contraste déjà réduit d'
+   `--ink-mute` et le faisait passer sous 4,5:1 (WCAG 1.4.3). Seule
+   l'illustration, qui ne porte pas de texte, est assourdie. */
+.cardDone .cardBanner {
+  filter: grayscale(0.35) brightness(0.85);
 }
 
 /* Cartes de la section « tournois invisibles » : cadre pointillé, pour que la
