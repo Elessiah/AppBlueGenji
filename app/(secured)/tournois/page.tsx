@@ -56,10 +56,15 @@ const SECTION_DISPLAY_LIMIT = 12;
  * alors les 50 sans qu'on ait besoin de redéplier.
  */
 function ShowMoreRow({
+  sectionTitle,
   total,
   expanded,
   onToggle,
 }: {
+  /** Nomme la section dans le bouton : jusqu'à quatre « Voir moins »
+   * identiques cohabitent sur la page, indistinguables dans une liste de
+   * contrôles hors contexte (lecteur d'écran, navigation par éléments). */
+  sectionTitle: string;
   total: number;
   expanded: boolean;
   onToggle: () => void;
@@ -68,11 +73,15 @@ function ShowMoreRow({
   return (
     <div className={s.showMoreRow}>
       {expanded ? (
-        <button onClick={onToggle} className={s.cardCta}>
+        <button onClick={onToggle} className={s.cardCta} aria-label={`Voir moins · ${sectionTitle}`}>
           Voir moins
         </button>
       ) : (
-        <button onClick={onToggle} className={s.cardCta}>
+        <button
+          onClick={onToggle}
+          className={s.cardCta}
+          aria-label={`Voir plus (${total - SECTION_DISPLAY_LIMIT}) · ${sectionTitle}`}
+        >
           Voir plus ({total - SECTION_DISPLAY_LIMIT})
         </button>
       )}
@@ -398,6 +407,7 @@ export default function TournamentsPage() {
                 <RunningCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
               ))}
             <ShowMoreRow
+              sectionTitle="EN COURS"
               total={totalRunning}
               expanded={expandedSections.has("running")}
               onToggle={() => toggleSection("running")}
@@ -417,6 +427,7 @@ export default function TournamentsPage() {
                 <RegistrationCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
               ))}
             <ShowMoreRow
+              sectionTitle="INSCRIPTIONS OUVERTES"
               total={totalRegistration}
               expanded={expandedSections.has("registration")}
               onToggle={() => toggleSection("registration")}
@@ -436,6 +447,7 @@ export default function TournamentsPage() {
                 <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
               ))}
             <ShowMoreRow
+              sectionTitle="PROCHAINEMENT"
               total={totalUpcoming}
               expanded={expandedSections.has("upcoming")}
               onToggle={() => toggleSection("upcoming")}
@@ -457,6 +469,7 @@ export default function TournamentsPage() {
                 ))}
             </div>
             <ShowMoreRow
+              sectionTitle="TERMINÉS"
               total={totalFinished}
               expanded={expandedSections.has("finished")}
               onToggle={() => toggleSection("finished")}

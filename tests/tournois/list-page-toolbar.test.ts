@@ -76,4 +76,19 @@ describe("page tournois — volume des sections", () => {
     expect(page).not.toContain("displayLimits");
     expect(page).toMatch(/expandedSections\.has\("running"\) \? totalRunning : SECTION_DISPLAY_LIMIT/);
   });
+
+  it("chaque bouton « Voir plus »/« Voir moins » nomme sa section", () => {
+    // Jusqu'à quatre boutons « Voir moins » identiques cohabitent sur la
+    // page : sans le nom de la section, une navigation par liste de contrôles
+    // (lecteur d'écran) ne peut pas les distinguer.
+    const titles: Record<string, string> = {
+      running: "EN COURS",
+      registration: "INSCRIPTIONS OUVERTES",
+      upcoming: "PROCHAINEMENT",
+      finished: "TERMINÉS",
+    };
+    for (const [key, title] of Object.entries(titles)) {
+      expect(page).toMatch(new RegExp(`sectionTitle="${title}"[\\s\\S]{0,80}total=\\{total${key[0].toUpperCase()}${key.slice(1)}\\}`));
+    }
+  });
 });

@@ -67,7 +67,7 @@ repliée par défaut (« Terminés »), le corps n'est jamais monté — poser
 
 Les quatre sections à cartes (« En cours », « Inscriptions ouvertes »,
 « Prochainement », « Terminés ») sont bornées à `SECTION_DISPLAY_LIMIT` (12)
-cartes par défaut, avec un bouton **réversible** « Voir plus (+N) » /
+cartes par défaut, avec un bouton **réversible** « Voir plus (N) » /
 « Voir moins » (`ShowMoreRow`) — la version d'origine, propre à la section
 « Terminés » seule, ne savait que déplier, jamais replier. L'état déplié vit
 dans un `expandedSections: Set<LimitedSectionKey>` (un **drapeau**, pas un
