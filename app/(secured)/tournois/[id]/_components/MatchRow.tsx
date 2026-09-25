@@ -229,6 +229,10 @@ export function MatchRow({
               max={maxScore}
               placeholder={field.label}
               aria-label={`Score de ${field.label}`}
+              // Un nom d'équipe long se coupe dans les 52 px du champ : le
+              // `title` le rend lisible en entier au survol, comme les deux
+              // lignes de noms au-dessus (`EntrantName`, `title={teamDisplay}`).
+              title={field.label}
               value={field.value}
               onChange={(e) => onScoreChange(match.id, field.key, e.target.value)}
               style={{ width: 52, fontSize: 12 }}
