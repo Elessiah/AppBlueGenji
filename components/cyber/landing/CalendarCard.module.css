@@ -14,9 +14,13 @@
 }
 
 .head a {
+  display: inline-block;
   color: var(--blue-300);
   letter-spacing: 0.14em;
   font-size: 11px;
+  /* Zone cliquable >= 24px (WCAG 2.5.8) sans agrandir le texte visible. */
+  padding: 7px 4px;
+  margin: -7px -4px;
 }
 
 .list {

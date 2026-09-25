@@ -3,6 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { TeamSigil } from "@/components/cyber/TeamSigil";
 import { Leaderboard } from "@/components/cyber/landing/Leaderboard";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
+import { ToastProvider } from "@/components/ui/toast";
 import type { LandingLeaderboardRow, LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
 import type { TournamentCard } from "@/lib/shared/types";
 
@@ -66,12 +67,14 @@ function row(overrides: Partial<LandingLeaderboardRow> = {}): LandingLeaderboard
 describe("Leaderboard — logos des équipes classées", () => {
   it("rend le logo de l'équipe qui en a un, l'initiale sinon", () => {
     const html = renderToStaticMarkup(
-      <Leaderboard
-        initialRows={[
-          row({ logoUrl: "/api/uploads/teams/dragon.webp" }),
-          row({ rank: 2, teamId: 6, teamName: "Ember Core" }),
-        ]}
-      />,
+      <ToastProvider>
+        <Leaderboard
+          initialRows={[
+            row({ logoUrl: "/api/uploads/teams/dragon.webp" }),
+            row({ rank: 2, teamId: 6, teamName: "Ember Core" }),
+          ]}
+        />
+      </ToastProvider>,
     );
 
     expect(imgTags(html)).toHaveLength(1);
