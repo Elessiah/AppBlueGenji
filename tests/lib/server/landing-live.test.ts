@@ -108,6 +108,17 @@ describe("getLandingLive", () => {
     expect(await liveFrom(buckets([]))).toBeNull();
   });
 
+  it("nomme le jeu d'après la donnée du tournoi, jamais d'après son nom", async () => {
+    // Le jeu était deviné sur le nom, repli sur « Overwatch » : un tournoi
+    // Marvel Rivals au nom neutre s'annonçait Overwatch sur la carte du direct.
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([matchRow()]);
+
+    const live = await liveFrom(buckets([{ ...card(1, "Coupe du printemps"), game: "MR" }]));
+
+    expect(live?.game).toBe("Marvel Rivals");
+  });
+
   it("n'expose aucune cible tant que personne n'est à l'antenne", async () => {
     jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([matchRow()]);

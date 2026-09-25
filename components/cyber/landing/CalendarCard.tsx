@@ -1,5 +1,5 @@
 import { formatLocalDateTime } from "@/lib/shared/dates";
-import { inferGameShortLabel, type LandingCalendarEvent } from "@/lib/shared/landing";
+import type { LandingCalendarEvent } from "@/lib/shared/landing";
 import styles from "./CalendarCard.module.css";
 
 type CalendarCardProps = {
@@ -43,7 +43,7 @@ export function CalendarCard({ events }: CalendarCardProps) {
               <div className={styles.bar} />
               <div className={styles.body}>
                 <div className={styles.pills}>
-                  <span className={styles.pill}>{inferGameShortLabel(event.name)}</span>
+                  <span className={styles.pill}>{event.game}</span>
                   <span className={styles.tag}>{tagLabel(event.state)}</span>
                 </div>
                 <div className={styles.title} title={formatLocalDateTime(date)}>
