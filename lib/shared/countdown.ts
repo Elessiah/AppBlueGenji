@@ -1,3 +1,8 @@
+/**
+ * Extrait de `CountdownStrip` pour rester testable sans horloge ni DOM : le
+ * composant ne fait plus que choisir entre l'affichage réel et le repli
+ * « chargement » selon que `useClock` a déjà résolu l'heure du lecteur.
+ */
 export interface CountdownParts {
   d: number;
   h: number;

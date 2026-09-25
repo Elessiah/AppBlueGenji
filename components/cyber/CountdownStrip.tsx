@@ -22,25 +22,24 @@ export function CountdownStrip({ targetISO, label }: CountdownStripProps) {
   // Horloge soumise au régime de charge : arrêtée onglet caché, recalée au retour.
   const now = useClock(1000);
 
-  const units =
-    now === null
-      ? PLACEHOLDER_UNITS
-      : (() => {
-          const { d, h, m, s } = computeCountdown(targetISO, now);
-          return [
-            { label: "J", value: pad(d) },
-            { label: "H", value: pad(h) },
-            { label: "M", value: pad(m) },
-            { label: "S", value: pad(s) },
-          ];
-        })();
+  const parts = now === null ? null : computeCountdown(targetISO, now);
 
-  const accessibleLabel =
-    now === null ? "Chargement du compte à rebours" : countdownAccessibleLabel(computeCountdown(targetISO, now));
+  const units = parts
+    ? [
+        { label: "J", value: pad(parts.d) },
+        { label: "H", value: pad(parts.h) },
+        { label: "M", value: pad(parts.m) },
+        { label: "S", value: pad(parts.s) },
+      ]
+    : PLACEHOLDER_UNITS;
+
+  const accessibleLabel = parts ? countdownAccessibleLabel(parts) : "Chargement du compte à rebours";
 
   return (
     <div className={styles.root}>
       {label && <div className={styles.label}>{label}</div>}
+      {/* `aria-label` porte la phrase lisible ; les cases numériques ne sont
+          qu'un rendu visuel du même fait, répété une seconde fois pour qui l'entend. */}
       <time dateTime={targetISO} aria-label={accessibleLabel} className={styles.countdown}>
         {units.map(({ label: lbl, value }) => (
           <div key={lbl} className={styles.unit} aria-hidden="true">
