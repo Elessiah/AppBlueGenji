@@ -25,7 +25,9 @@ export function CalendarCard({ events }: CalendarCardProps) {
   return (
     <div id="calendrier" className={styles.root}>
       <div className={styles.head}>
-        <span className="mono" style={{ fontSize: 11, letterSpacing: "0.2em", color: "var(--ink-mute)" }}>PROCHAINS ÉVÉNEMENTS</span>
+        <h3 className="mono" style={{ fontSize: 11, letterSpacing: "0.2em", color: "var(--ink-mute)", margin: 0, fontWeight: 400 }}>
+          PROCHAINS ÉVÉNEMENTS
+        </h3>
         <a className="mono" href="/api/landing/calendar?format=ics" download="bluegenji.ics">
           ICS →
         </a>

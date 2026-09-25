@@ -28,14 +28,14 @@ export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false }: 
               <span className="eyebrow">{copy["home.join.eyebrow"]}</span>
             </EditableCopy>
             <EditableCopy copyKey="home.join.title" value={copy["home.join.title"]} canEdit={canEditCopy}>
-              <h3 className="display" style={{ fontSize: "clamp(32px, 4vw, 40px)" }}>
+              <h2 className="display" style={{ fontSize: "clamp(32px, 4vw, 40px)" }}>
                 {copy["home.join.title"].split("\n").map((line, index, lines) => (
                   <span key={line + index} className={index === lines.length - 1 ? styles.accent : undefined}>
                     {line}
                     {index < lines.length - 1 ? <br /> : null}
                   </span>
                 ))}
-              </h3>
+              </h2>
             </EditableCopy>
             {/* Connecté, le compte existe déjà : la phrase d'appel change. Les
                 deux versions sont éditables — un éditeur étant par définition
