@@ -3,56 +3,10 @@ import {
   activeTournamentCards,
   chooseFeaturedTournament,
   compareByStartAt,
-  inferGameCode,
-  inferGameLabel,
-  inferGameShortLabel,
+  landingCardActionLabel,
 } from "@/lib/shared/landing";
 import type { TournamentBuckets, TournamentCard, TournamentState } from "@/lib/shared/types";
 import { tournamentCard } from "../../helpers/tournament-card";
-
-describe("inferGameLabel", () => {
-  it("detects Marvel Rivals from either keyword", () => {
-    expect(inferGameLabel("Marvel Rivals Open")).toBe("Marvel Rivals");
-    expect(inferGameLabel("Rivals Winter Cup")).toBe("Marvel Rivals");
-  });
-
-  it("is case-insensitive", () => {
-    expect(inferGameLabel("MARVEL RIVALS PRO SERIES")).toBe("Marvel Rivals");
-  });
-
-  it("falls back to Overwatch for anything else", () => {
-    expect(inferGameLabel("OW Spring Clash")).toBe("Overwatch");
-    expect(inferGameLabel("Genji Clash #14")).toBe("Overwatch");
-  });
-
-  it("tolerates null and undefined", () => {
-    expect(inferGameLabel(null)).toBe("Overwatch");
-    expect(inferGameLabel(undefined)).toBe("Overwatch");
-    expect(inferGameLabel("")).toBe("Overwatch");
-  });
-});
-
-describe("inferGameCode", () => {
-  it("maps to the filter keys used by the landing endpoints", () => {
-    expect(inferGameCode("Marvel Rivals Cup S1")).toBe("mr");
-    expect(inferGameCode("OW Champions League")).toBe("ow");
-    expect(inferGameCode(null)).toBe("ow");
-  });
-});
-
-describe("inferGameShortLabel", () => {
-  it("abbreviates the label for narrow pills", () => {
-    expect(inferGameShortLabel("Marvel Rivals Open")).toBe("MR");
-    expect(inferGameShortLabel("OW Winter Cup")).toBe("OW");
-  });
-
-  it("stays aligned with inferGameLabel", () => {
-    for (const name of ["Marvel Rivals Open", "Genji Clash", "", null]) {
-      const expected = inferGameLabel(name) === "Marvel Rivals" ? "MR" : "OW";
-      expect(inferGameShortLabel(name)).toBe(expected);
-    }
-  });
-});
 
 function card(id: number, state: TournamentState, startAt = "2026-01-04T00:00:00.000Z"): TournamentCard {
   return tournamentCard({
@@ -81,6 +35,28 @@ function card(id: number, state: TournamentState, startAt = "2026-01-04T00:00:00
 function buckets(partial: Partial<TournamentBuckets>): TournamentBuckets {
   return { upcoming: [], registration: [], running: [], finished: [], ...partial };
 }
+
+describe("landingCardActionLabel", () => {
+  it("propose de s'inscrire sur un tournoi aux inscriptions ouvertes", () => {
+    expect(landingCardActionLabel(card(1, "REGISTRATION"))).toBe("S'inscrire");
+  });
+
+  it("ne propose jamais de s'inscrire sur un tournoi en cours", () => {
+    // Régression : le bouton « S'inscrire » restait affiché sur les tournois
+    // déjà lancés, panier `running` compris dans la grille de l'accueil.
+    expect(
+      landingCardActionLabel(tournamentCard({ state: "RUNNING", format: "SINGLE" })),
+    ).toBe("Voir le bracket");
+    expect(
+      landingCardActionLabel(tournamentCard({ state: "RUNNING", format: "SWISS" })),
+    ).toBe("Voir le classement");
+  });
+
+  it("retombe sur une consultation neutre pour le reste", () => {
+    expect(landingCardActionLabel(card(1, "UPCOMING"))).toBe("Voir le tournoi");
+    expect(landingCardActionLabel(card(1, "FINISHED"))).toBe("Voir le tournoi");
+  });
+});
 
 describe("activeTournamentCards", () => {
   it("laisse dehors les tournois terminés", () => {

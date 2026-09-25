@@ -102,6 +102,25 @@ describe("mapCard — dates", () => {
   });
 });
 
+describe("mapCard — clôture et championne", () => {
+  it("rend finishedAt en ISO et championName tels que fournis par la requête", () => {
+    const row = cardRow({
+      state: "FINISHED",
+      finished_at: new Date("2026-06-01T18:00:00.000Z"),
+      winner_name: "Team Alpha",
+    });
+    const card = mapCard(row);
+    expect(card.finishedAt).toBe("2026-06-01T18:00:00.000Z");
+    expect(card.championName).toBe("Team Alpha");
+  });
+
+  it("rend les deux à null quand le tournoi n'est pas terminé ou sans championne", () => {
+    const card = mapCard(cardRow());
+    expect(card.finishedAt).toBeNull();
+    expect(card.championName).toBeNull();
+  });
+});
+
 describe("mapMatch — dates", () => {
   it("sérialise updatedAt et garde scoreDeadlineAt nul", () => {
     const match = mapMatch(matchRow());

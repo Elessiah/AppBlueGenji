@@ -48,6 +48,8 @@ function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
     registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
     image: null,
+    finishedAt: null,
+    championName: null,
     ...overrides,
   };
 }
@@ -113,6 +115,101 @@ describe("cartes de /tournois", () => {
   it("l'image reste dans la carte : aucune seconde ancre", () => {
     const markup = renderToStaticMarkup(<RegistrationCard t={card({ image: cover })} />);
     expect(markup.match(/<a\b/g)).toHaveLength(1);
+  });
+});
+
+describe("cartes de /tournois — format, état et actions", () => {
+  it("traduit chaque format via FORMAT_LABELS, pas seulement DOUBLE", () => {
+    // Régression : toute carte d'un format autre que DOUBLE s'annonçait
+    // « Élimination simple », Suisse/Survie/BG Survie/Multi compris.
+    const swiss = renderToStaticMarkup(<RunningCard t={card({ state: "RUNNING", format: "SWISS" })} />);
+    expect(swiss).toContain("Ronde suisse");
+    expect(swiss).not.toContain("Élimination simple");
+
+    const survival = renderToStaticMarkup(<UpcomingCard t={card({ state: "UPCOMING", format: "SURVIVAL" })} />);
+    expect(survival).toContain("Survie");
+
+    const bgSurvie = renderToStaticMarkup(<RegistrationCard t={card({ state: "REGISTRATION", format: "BG_SURVIE" })} />);
+    expect(bgSurvie).toContain("BlueGenji Survie");
+  });
+
+  it("carte en cours : ruban bleu, jamais rouge — le rouge est réservé au direct", () => {
+    const markup = renderToStaticMarkup(<RunningCard t={card({ state: "RUNNING" })} />);
+    expect(markup).not.toContain("cardRibbonLive");
+    expect(markup).toContain("cardRibbonRunning");
+    expect(markup).not.toContain('data-state="live"');
+  });
+
+  it("carte en cours : l'action dépend du format, jamais toujours « Voir bracket »", () => {
+    expect(renderToStaticMarkup(<RunningCard t={card({ state: "RUNNING", format: "DOUBLE" })} />)).toContain(
+      "Voir le bracket",
+    );
+    expect(renderToStaticMarkup(<RunningCard t={card({ state: "RUNNING", format: "SURVIVAL" })} />)).toContain(
+      "Voir le classement",
+    );
+  });
+
+  it("carte d'inscriptions : « Complet » sur un plateau plein, sinon une consultation neutre", () => {
+    const full = renderToStaticMarkup(
+      <RegistrationCard t={card({ state: "REGISTRATION", registeredTeams: 8, maxTeams: 8 })} />,
+    );
+    expect(full).toContain("Complet");
+    expect(full).not.toContain("S&#x27;inscrire");
+
+    const open = renderToStaticMarkup(
+      <RegistrationCard t={card({ state: "REGISTRATION", registeredTeams: 4, maxTeams: 8 })} />,
+    );
+    expect(open).toContain("Voir le tournoi");
+  });
+
+  it("carte terminée : nomme la championne et sa date de clôture réelle", () => {
+    const markup = renderToStaticMarkup(
+      <FinishedCard
+        t={card({
+          state: "FINISHED",
+          startAt: "2026-08-25T18:00:00.000Z",
+          finishedAt: "2026-09-02T20:00:00.000Z",
+          championName: "Team Alpha",
+        })}
+      />,
+    );
+    expect(markup).toContain("Team Alpha");
+    // La date affichée est celle de la clôture, pas celle du coup d'envoi.
+    expect(markup).toContain("02 sept. 2026");
+    expect(markup).not.toContain("25 août 2026");
+  });
+
+  it("carte terminée sans championne (finale en double forfait) : un tiret, pas un texte vide", () => {
+    const markup = renderToStaticMarkup(
+      <FinishedCard t={card({ state: "FINISHED", championName: null })} />,
+    );
+    expect(markup).toContain("—");
+  });
+
+  it("carte à venir : distingue inscriptions pas encore ouvertes et déjà closes", () => {
+    const notYetOpen = renderToStaticMarkup(
+      <UpcomingCard
+        t={card({
+          state: "UPCOMING",
+          registrationOpenAt: "2099-01-01T00:00:00.000Z",
+          registrationCloseAt: "2099-01-10T00:00:00.000Z",
+        })}
+      />,
+    );
+    expect(notYetOpen).toContain("Ouverture inscriptions");
+    expect(notYetOpen).toContain("Inscriptions bientôt");
+
+    const closed = renderToStaticMarkup(
+      <UpcomingCard
+        t={card({
+          state: "UPCOMING",
+          registrationOpenAt: "2020-01-01T00:00:00.000Z",
+          registrationCloseAt: "2020-01-10T00:00:00.000Z",
+        })}
+      />,
+    );
+    expect(closed).toContain("Clôture inscriptions");
+    expect(closed).toContain("Inscriptions closes");
   });
 });
 

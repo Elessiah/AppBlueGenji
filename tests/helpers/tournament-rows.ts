@@ -71,11 +71,15 @@ export function tournamentRow(overrides: RowOverrides<TournamentRow> = {}): Tour
   return { ...columns, ...overrides } as TournamentRow;
 }
 
-/** La même, telle que la lit la liste (`registered_teams` en plus). */
+/** La même, telle que la lit la liste (`registered_teams` et `winner_name` en plus). */
 export function tournamentListRow(
   overrides: RowOverrides<TournamentListRow> = {},
 ): TournamentListRow {
-  return { ...tournamentRow(overrides), registered_teams: overrides.registered_teams ?? 0 };
+  return {
+    ...tournamentRow(overrides),
+    registered_teams: overrides.registered_teams ?? 0,
+    winner_name: overrides.winner_name ?? null,
+  };
 }
 
 /** Une ligne `bg_matches` **complète** : match prêt entre les engagés 1 et 2. */
