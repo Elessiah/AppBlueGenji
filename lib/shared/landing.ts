@@ -137,7 +137,9 @@ export type LandingTickerPayload = {
  *
  * La règle est écrite ici, une fois, plutôt qu'à chacun des deux endroits qui
  * lisent les paniers : une exclusion recopiée est une exclusion qu'on oublie
- * au troisième appelant. `getLandingCalendar` suit déjà la même règle.
+ * au troisième appelant. `getLandingCalendar` exclut `finished` de même, mais
+ * pas `activeTournamentCards` tel quel : « Prochains événements » ne montre
+ * rien de déjà lancé (voir sa propre règle, dans `landing-service.ts`).
  */
 
 /**

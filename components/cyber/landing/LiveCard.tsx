@@ -43,13 +43,18 @@ function sigilFor(name: string | null): string {
   return name.trim().charAt(0).toUpperCase() || "?";
 }
 
-function nextDaysLabel(iso: string | null | undefined): string {
-  if (!iso) return "bientôt";
+/**
+ * Phrase entière de la carte sans tournoi en cours — jamais un simple
+ * complément : « dans bientôt » et « dans aujourd'hui » ne se lisent pas,
+ * faute de construction commune avec « dans N jours ».
+ */
+function noLiveTournamentMessage(iso: string | null | undefined): string {
+  if (!iso) return "Aucun tournoi en cours. Aucun tournoi programmé.";
   const diff = Math.max(0, new Date(iso).getTime() - Date.now());
   const days = Math.max(0, Math.ceil(diff / 86400000));
-  if (days <= 0) return "aujourd'hui";
-  if (days === 1) return "1 jour";
-  return `${days} jours`;
+  if (days <= 0) return "Aucun tournoi en cours. Le prochain démarre aujourd'hui.";
+  if (days === 1) return "Aucun tournoi en cours. Le prochain démarre dans 1 jour.";
+  return `Aucun tournoi en cours. Le prochain démarre dans ${days} jours.`;
 }
 
 /**
@@ -71,7 +76,7 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
       <CyberCard ticks className={styles.root}>
         <div className={styles.empty}>
           <span className="pill pill-blue">INFO TOURNOI</span>
-          <p>Aucun tournoi en cours. Le prochain démarre dans {nextDaysLabel(nextUpcomingISO)}.</p>
+          <p>{noLiveTournamentMessage(nextUpcomingISO)}</p>
         </div>
       </CyberCard>
     );
