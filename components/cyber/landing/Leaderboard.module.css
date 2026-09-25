@@ -121,6 +121,14 @@
   color: var(--ink-dim);
 }
 
+.empty {
+  padding: 24px 0;
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  text-align: center;
+}
+
 .footer {
   margin-top: 18px;
 }
