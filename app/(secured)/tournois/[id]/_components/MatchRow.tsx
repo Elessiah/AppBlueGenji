@@ -119,13 +119,13 @@ export function MatchRow({
   // Les deux champs du formulaire, dans l'ordre de la carte (équipe 1 puis
   // équipe 2) et nommés par l'équipe : l'aria-label garde tout de même la
   // distinction « mon score »/« score adverse », que le seul nom d'équipe ne
-  // porte pas pour qui n'a pas vu la carte au-dessus.
-  const topField = myTeamIsTeam1
-    ? { key: "myScore" as const, value: myScore, label: team1Display, mine: true }
-    : { key: "opponentScore" as const, value: opponentScore, label: team1Display, mine: false };
-  const bottomField = myTeamIsTeam1
-    ? { key: "opponentScore" as const, value: opponentScore, label: team2Display, mine: false }
-    : { key: "myScore" as const, value: myScore, label: team2Display, mine: true };
+  // porte pas pour qui n'a pas vu la carte au-dessus. La paire clé/valeur/mine
+  // n'est écrite qu'une fois chacune, pour qu'un futur champ (`disabled`, un
+  // autre `aria-label`) n'ait pas quatre branches à tenir à jour ensemble.
+  const myField = { key: "myScore" as const, value: myScore, mine: true };
+  const opponentField = { key: "opponentScore" as const, value: opponentScore, mine: false };
+  const topField = { ...(myTeamIsTeam1 ? myField : opponentField), label: team1Display };
+  const bottomField = { ...(myTeamIsTeam1 ? opponentField : myField), label: team2Display };
 
   const isBye = match.team1Id === null || match.team2Id === null;
   // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :

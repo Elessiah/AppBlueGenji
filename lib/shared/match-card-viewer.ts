@@ -1,10 +1,12 @@
 /**
  * Ce qu'une carte de match doit décider en fonction de **qui la regarde** —
- * le lecteur engagé dans ce tournoi, identifié par son `myTeamId`.
+ * le lecteur engagé dans ce tournoi, identifié par son `myTeamId` — et le nom
+ * qu'elle donne à chaque équipe.
  *
  * Module pur, partagé par `MatchRow` (rendu) et `page.tsx` (message de
  * confirmation à l'envoi), pour que les deux s'accordent sur l'équipe
- * « mienne » sans dupliquer la comparaison d'identifiants.
+ * « mienne » et sur le nom de chaque équipe sans dupliquer ni la comparaison
+ * d'identifiants ni le repli d'affichage.
  */
 
 /** Le lecteur est-il l'équipe 1 de la carte, plutôt que l'équipe 2 ? */
@@ -29,8 +31,7 @@ export function canReportOwnMatch(
     canReport &&
     team1Id !== null &&
     team2Id !== null &&
-    myTeamId !== null &&
-    (myTeamId === team1Id || myTeamId === team2Id)
+    (isMyTeamTeam1(myTeamId, team1Id) || isMyTeamTeam1(myTeamId, team2Id))
   );
 }
 
