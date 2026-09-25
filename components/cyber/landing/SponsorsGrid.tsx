@@ -226,9 +226,7 @@ export function SponsorsGrid({ sponsors, isAdmin = false }: SponsorsGridProps) {
   return (
     <section id="sponsors" className={styles.root}>
       <div className={styles.head}>
-        <div>
-          <h2 className={styles.sectionTitle}>Partenaires et soutiens</h2>
-        </div>
+        <h2 className={styles.sectionTitle}>Partenaires et soutiens</h2>
         <div className={styles.headActions}>
           <span className={styles.meta}>{displaySponsors.length} PARTENAIRES</span>
           {isAdmin && (

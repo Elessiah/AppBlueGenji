@@ -13,9 +13,7 @@ export function LeaderCal({ leaderboard, events }: LeaderCalProps) {
   return (
     <section id="equipes" className={styles.root}>
       <div className={styles.head}>
-        <div>
-          <h2 className={styles.sectionTitle}>Classement et calendrier</h2>
-        </div>
+        <h2 className={styles.sectionTitle}>Classement et calendrier</h2>
         <div className={styles.meta}>
           {rankedCount} {rankedCount > 1 ? "ÉQUIPES CLASSÉES" : "ÉQUIPE CLASSÉE"}
         </div>

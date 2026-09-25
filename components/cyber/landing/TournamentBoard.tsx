@@ -30,9 +30,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
   return (
     <section id="tournois" className={styles.root}>
       <div className={styles.head}>
-        <div>
-          <h2 className={styles.sectionTitle}>Tournois en cours et à venir</h2>
-        </div>
+        <h2 className={styles.sectionTitle}>Tournois en cours et à venir</h2>
         <div className={styles.meta}>
           {openCount} {openCount > 1 ? "TOURNOIS OUVERTS" : "TOURNOI OUVERT"}
         </div>
