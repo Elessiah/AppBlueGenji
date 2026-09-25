@@ -21,6 +21,7 @@ import {
   resolveEnduranceConfig,
   type EnduranceStanding,
 } from "./bg-survie";
+import { plural } from "./plural";
 import type { SeedingSource } from "./seeding";
 import { planSurvivalRound, type SurvivalStanding } from "./survival";
 import { computeRecommendedRounds } from "./swiss";
@@ -120,11 +121,6 @@ export type TournamentPreview = {
 };
 
 const DEFAULT_SURVIVAL_ROUNDS_PER_CUT = 3;
-
-/** Accord en nombre : « 1 équipe », « 4 équipes ». */
-function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
-  return `${count} ${count > 1 ? pluralForm : singular}`;
-}
 
 function indexEntrants(entrants: readonly PreviewEntrant[]): Map<number, PreviewEntrant> {
   return new Map(entrants.map((entrant) => [entrant.teamId, entrant]));
