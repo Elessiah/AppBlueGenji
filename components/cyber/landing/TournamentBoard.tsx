@@ -25,15 +25,15 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
   const upcomingCards = activeTournamentCards(buckets)
     .filter((card) => !featured || card.id !== featured.id)
     .slice(0, 3);
+  const openCount = buckets.registration.length + buckets.running.length;
 
   return (
     <section id="tournois" className={styles.root}>
       <div className={styles.head}>
-        <div>
-          <span className="eyebrow">SECTION 01</span>
-          <h2 className={styles.sectionTitle}>Tournois en cours et à venir</h2>
+        <h2 className={styles.sectionTitle}>Tournois en cours et à venir</h2>
+        <div className={styles.meta}>
+          {openCount} {openCount > 1 ? "TOURNOIS OUVERTS" : "TOURNOI OUVERT"}
         </div>
-        <div className={styles.meta}>EN COURS · INSCRIPTIONS · BRACKETS</div>
       </div>
 
       <div className={styles.grid}>

@@ -12,6 +12,13 @@ import { EditableCopy } from "./EditableCopy";
 import type { SiteCopy } from "@/lib/shared/site-copy";
 import styles from "./Hero.module.css";
 
+/**
+ * Tournois organisés avant que le site ne les compte lui-même (LAN et
+ * ligues jouées sur Discord/Challonge avant le lancement de la plateforme).
+ * Valeur figée au lancement, à ne plus faire évoluer.
+ */
+const LEGACY_TOURNAMENT_COUNT = 19;
+
 type HeroProps = {
   stats: LandingStats;
   live: LandingLive | null;
@@ -93,7 +100,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
             </div>
             <span className={styles.sep} />
             <div className={styles.stat}>
-              <div className="num" style={{ fontSize: 28, color: "var(--blue-500)" }}>{19 + stats.tournaments}</div>
+              <div className="num" style={{ fontSize: 28, color: "var(--blue-500)" }}>{LEGACY_TOURNAMENT_COUNT + stats.tournaments}</div>
               <div className="mono">Tournois organisés</div>
             </div>
           </div>

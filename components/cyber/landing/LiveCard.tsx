@@ -5,7 +5,7 @@ import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
-import { inferPhaseLabel } from "@/lib/shared/landing";
+import { inferPhaseLabel, visibleLiveViewerCount } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
@@ -102,6 +102,7 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
   // « Regarder le live » du hero, qui ne se rend qu'à l'antenne ouverte.
   const streamHref = matchIsLive ? currentMatch?.liveUrl ?? null : null;
 
+  const visibleViewers = visibleLiveViewerCount(live.viewers);
   const team1Label = currentMatch?.team1Name ?? "Équipe 1";
   const team2Label = currentMatch?.team2Name ?? "Équipe 2";
   const href = tournamentMatchHref(live.tournament.id, currentMatch?.id ?? null);
@@ -126,10 +127,12 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
             trois lignes d'ici, avec lequel il se confondait. */}
         <Pill variant="blue">EN COURS</Pill>
         <span className="mono">{live.game.toUpperCase()} · {inferPhaseLabel(currentMatch)}</span>
-        <span className={styles.viewers}>
-          <Eye size={12} />
-          <span className="mono">{live.viewers}</span>
-        </span>
+        {visibleViewers !== null && (
+          <span className={styles.viewers}>
+            <Eye size={12} />
+            <span className="mono">{visibleViewers}</span>
+          </span>
+        )}
       </div>
 
       <div className={styles.title}>{title}</div>
@@ -174,7 +177,7 @@ export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
           </div>
 
           <div className={`${styles.vs} mono`}>
-            MATCH {String(currentMatch.id).padStart(2, "0")}
+            {currentMatch.roundLabel}
             {matchFormat && (
               <>
                 {" · "}

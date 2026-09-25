@@ -2,7 +2,7 @@
 
 ## Vue d'ensemble
 
-La section **« Partenaires et soutiens »** (SECTION 04) de la page d'accueil `/`
+La section **« Partenaires et soutiens »** de la page d'accueil `/`
 est éditable par les **administrateurs** : ajout, modification et suppression de
 partenaires, avec la même mécanique que la [gestion du bureau](BUREAU_MANAGEMENT.md).
 
