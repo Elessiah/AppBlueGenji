@@ -6,8 +6,10 @@ import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
+import { canReportOwnMatch, isMyTeamTeam1, teamLabel } from "@/lib/shared/match-card-viewer";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { useIssueReport } from "../_lib/issue-report-context";
+import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
@@ -49,10 +51,21 @@ export function MatchRow({
   const matchFormat = useMatchFormat(match);
   // Signalement : réservé aux engagés du tournoi, et seulement sur une manche
   // dont les deux adversaires sont connus — il n'y a rien à arbitrer sur une
-  // case encore vide.
+  // case encore vide. Réservé de plus au **match du lecteur** : le bouton
+  // d'en-tête couvre déjà le reste du plateau, et répéter le bouton sur cent
+  // vingt-sept cartes qui ne concernent pas le lecteur ne fait que les
+  // alourdir toutes.
   const { canReport, openReport } = useIssueReport();
-  const canReportMatch =
-    canReport && match.team1Id !== null && match.team2Id !== null;
+  // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
+  // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
+  // signalement, qui décrirait la même donnée depuis deux sources.
+  const { myTeamId } = useLiveControls();
+  const canReportMatch = canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id);
+  // Le formulaire de score liste ses deux champs dans l'ordre de la carte
+  // (équipe 1 en haut, équipe 2 en bas), quelle que soit la place du lecteur —
+  // sans cela, « Moi » apparaissait toujours en premier et l'ordre des champs
+  // pouvait être l'inverse de celui des noms juste au-dessus.
+  const myTeamIsTeam1 = isMyTeamTeam1(myTeamId, match.team1Id);
   // Cible d'une ancre `#match-[id]` : la carte est surlignée quelques secondes
   // à l'arrivée. Sans ce repère, la page s'ouvre défilée au bon endroit mais le
   // lecteur ne sait pas laquelle des cartes visibles il venait voir.
@@ -92,8 +105,27 @@ export function MatchRow({
     fontWeight: win ? 600 : 400,
   });
 
-  const team1Display = match.team1Name || match.team1Placeholder || (roundNumber === 1 && match.team1Id === null && match.team2Id !== null ? "BYE" : "TBD");
-  const team2Display = match.team2Name || match.team2Placeholder || (roundNumber === 1 && match.team2Id === null && match.team1Id !== null ? "BYE" : "TBD");
+  const team1Display = teamLabel(
+    match.team1Name,
+    match.team1Placeholder,
+    roundNumber === 1 && match.team1Id === null && match.team2Id !== null ? "BYE" : "TBD",
+  );
+  const team2Display = teamLabel(
+    match.team2Name,
+    match.team2Placeholder,
+    roundNumber === 1 && match.team2Id === null && match.team1Id !== null ? "BYE" : "TBD",
+  );
+
+  // Les deux champs du formulaire, dans l'ordre de la carte (équipe 1 puis
+  // équipe 2) et nommés par l'équipe : l'aria-label garde tout de même la
+  // distinction « mon score »/« score adverse », que le seul nom d'équipe ne
+  // porte pas pour qui n'a pas vu la carte au-dessus. La paire clé/valeur/mine
+  // n'est écrite qu'une fois chacune, pour qu'un futur champ (`disabled`, un
+  // autre `aria-label`) n'ait pas quatre branches à tenir à jour ensemble.
+  const myField = { key: "myScore" as const, value: myScore, mine: true };
+  const opponentField = { key: "opponentScore" as const, value: opponentScore, mine: false };
+  const topField = { ...(myTeamIsTeam1 ? myField : opponentField), label: team1Display };
+  const bottomField = { ...(myTeamIsTeam1 ? opponentField : myField), label: team2Display };
 
   const isBye = match.team1Id === null || match.team2Id === null;
   // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :
@@ -211,28 +243,25 @@ export function MatchRow({
               {matchFormatLabel(matchFormat)} · premier à {maxScore}
             </p>
           )}
-          <input
-            type="number"
-            min={0}
-            max={maxScore}
-            placeholder="Moi"
-            aria-label="Mon score"
-            value={myScore}
-            onChange={(e) => onScoreChange(match.id, "myScore", e.target.value)}
-            style={{ width: 52, fontSize: 12 }}
-          />
-          <input
-            type="number"
-            min={0}
-            max={maxScore}
-            placeholder="Eux"
-            aria-label="Score adverse"
-            value={opponentScore}
-            onChange={(e) => onScoreChange(match.id, "opponentScore", e.target.value)}
-            style={{ width: 52, fontSize: 12 }}
-          />
+          {[topField, bottomField].map((field) => (
+            <input
+              key={field.key}
+              type="number"
+              min={0}
+              max={maxScore}
+              placeholder={field.label}
+              aria-label={field.mine ? `Votre score (${field.label})` : `Score de l'adversaire (${field.label})`}
+              // Un nom d'équipe long se coupe dans les 52 px du champ : le
+              // `title` le rend lisible en entier au survol, comme les deux
+              // lignes de noms au-dessus (`EntrantName`, `title={teamDisplay}`).
+              title={field.label}
+              value={field.value}
+              onChange={(e) => onScoreChange(match.id, field.key, e.target.value)}
+              style={{ width: 52, fontSize: 12 }}
+            />
+          ))}
           <button className="btn" type="submit" style={{ padding: "3px 10px", fontSize: 12 }}>
-            ✓
+            Envoyer le score
           </button>
         </form>
       )}

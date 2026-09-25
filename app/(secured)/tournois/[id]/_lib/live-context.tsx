@@ -42,7 +42,9 @@ const LiveContext = createContext<LiveControls>({
 });
 
 /**
- * Contrôles de diffusion, diffusés par contexte.
+ * Contrôles de diffusion, diffusés par contexte — `myTeamId` mis à part, seul
+ * fait générique du lecteur ici (pas de portée diffusion), et déjà relu à ce
+ * titre par `MatchLaunchStrip` comme par `MatchRow`.
  *
  * `MatchRow` est rendu depuis six vues différentes (arbre, survie, suisse,
  * endurance, sections, phases) : faire descendre les droits et l'ouverture des
