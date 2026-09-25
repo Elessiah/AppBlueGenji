@@ -1,7 +1,7 @@
 import type { DiscordCommunityStats } from "@/lib/shared/discord";
 import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { MatchFormat } from "@/lib/shared/match-format";
-import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
+import type { TournamentBuckets, TournamentCard, TournamentGame } from "@/lib/shared/types";
 
 export type LandingStats = {
   players: number;
@@ -111,6 +111,8 @@ export type LandingLeaderboardRow = {
 export type LandingCalendarEvent = {
   tournamentId: number;
   name: string;
+  /** Jeu du tournoi, lu sur la donnée — jamais déduit du nom. */
+  game: TournamentGame;
   startAt: string;
   registrationOpenAt: string;
   registrationCloseAt: string;
@@ -199,22 +201,13 @@ export function chooseFeaturedTournament(buckets: TournamentBuckets): Tournament
   return soonest(buckets.upcoming) ?? soonest(buckets.registration) ?? soonest(buckets.running) ?? null;
 }
 
-export function inferGameLabel(value: string | null | undefined): "Overwatch" | "Marvel Rivals" {
-  const text = (value ?? "").toLowerCase();
-  if (text.includes("marvel") || text.includes("rivals")) {
-    return "Marvel Rivals";
-  }
-  return "Overwatch";
-}
-
-export function inferGameCode(value: string | null | undefined): "ow" | "mr" {
-  return inferGameLabel(value) === "Marvel Rivals" ? "mr" : "ow";
-}
-
-/** Abréviation du jeu, pour les pastilles trop étroites pour le libellé complet. */
-export function inferGameShortLabel(value: string | null | undefined): "OW" | "MR" {
-  return inferGameLabel(value) === "Marvel Rivals" ? "MR" : "OW";
-}
+/*
+ * Pas de `inferGameLabel` ici : le jeu est une donnée du tournoi
+ * (`TournamentCard.game`). Les fonctions qui vivaient à cet endroit le
+ * devinaient d'après le nom, repli sur « Overwatch » — un tournoi Marvel
+ * Rivals dont le nom ne contenait ni « marvel » ni « rivals » s'affichait donc
+ * Overwatch sur toute la vitrine. Libellés : `lib/shared/tournament-labels.ts`.
+ */
 
 export function inferPhaseLabel(match: LandingLiveMatch | null): string {
   if (!match) {
