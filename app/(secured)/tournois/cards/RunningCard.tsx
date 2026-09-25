@@ -27,62 +27,65 @@ export function RunningCard({ t, priority }: RunningCardProps) {
   const percent = progressPercent(t.runningProgress);
 
   return (
-    <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
-      <article className={s.card} data-state="running">
-        <TournamentImageBanner
-          image={t.image}
-          sizes={CARD_IMAGE_SIZES}
-          className={s.cardBanner}
-          priority={priority}
-        />
-        <div className={`${s.cardRibbon} ${s.cardRibbonRunning}`}>
-          <span className={s.dot} />
-          En cours
+    <article className={s.card} data-state="running">
+      <Link
+        href={`/tournois/${t.id}`}
+        className={s.cardOverlay}
+        aria-label={`Voir le tournoi ${t.name}`}
+      />
+      <TournamentImageBanner
+        image={t.image}
+        sizes={CARD_IMAGE_SIZES}
+        className={s.cardBanner}
+        priority={priority}
+      />
+      <div className={`${s.cardRibbon} ${s.cardRibbonRunning}`}>
+        <span className={s.dot} />
+        En cours
+      </div>
+
+      <div className={s.cardHead}>
+        <div className={s.cardGame}>
+          {gameLabel(t.game)}
+          <span className={s.dot}>◆</span>
+          {formatLabel(t.format)}
         </div>
+        <TournamentImageEmblem image={t.image} size={40} />
+      </div>
 
-        <div className={s.cardHead}>
-          <div className={s.cardGame}>
-            {gameLabel(t.game)}
-            <span className={s.dot}>◆</span>
-            {formatLabel(t.format)}
-          </div>
-          <TournamentImageEmblem image={t.image} size={40} />
+      <h3 className={s.cardTitle}>{t.name}</h3>
+      {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
+
+      <div className={s.cardMeta}>
+        <div>
+          <div className={s.cardMetaLbl}>Début</div>
+          <div className={s.cardMetaVal}>{formatCardDate(t.startAt, true)}</div>
         </div>
+        <div>
+          <div className={s.cardMetaLbl}>{wording.manyParticipating}</div>
+          <div className={`${s.cardMetaVal} ${s.num}`}>{t.registeredTeams}</div>
+        </div>
+        <div>
+          <div className={s.cardMetaLbl}>Matchs</div>
+          <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
+        </div>
+      </div>
 
-        <h3 className={s.cardTitle}>{t.name}</h3>
-        {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
+      {percent !== null ? (
+        <div className={s.progress} aria-hidden="true">
+          <div className={s.progressBar} style={{ width: `${percent}%` }} />
+        </div>
+      ) : null}
 
-        <div className={s.cardMeta}>
-          <div>
-            <div className={s.cardMetaLbl}>Début</div>
-            <div className={s.cardMetaVal}>{formatCardDate(t.startAt, true)}</div>
-          </div>
-          <div>
-            <div className={s.cardMetaLbl}>{wording.manyParticipating}</div>
-            <div className={`${s.cardMetaVal} ${s.num}`}>{t.registeredTeams}</div>
-          </div>
-          <div>
-            <div className={s.cardMetaLbl}>Matchs</div>
-            <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
+      <div className={s.cardFoot}>
+        <div>
+          <div className={s.cardFootLbl}>Déroulement</div>
+          <div className={`${s.cardFootVal} ${s.num}`}>
+            {percent !== null ? `${percent} %` : "—"}
           </div>
         </div>
-
-        {percent !== null ? (
-          <div className={s.progress} aria-hidden="true">
-            <div className={s.progressBar} style={{ width: `${percent}%` }} />
-          </div>
-        ) : null}
-
-        <div className={s.cardFoot}>
-          <div>
-            <div className={s.cardFootLbl}>Déroulement</div>
-            <div className={`${s.cardFootVal} ${s.num}`}>
-              {percent !== null ? `${percent} %` : "—"}
-            </div>
-          </div>
-          <span className={s.cardCta}>{runningCardAction(t.format)}</span>
-        </div>
-      </article>
-    </Link>
+        <span className={s.cardCta}>{runningCardAction(t.format)}</span>
+      </div>
+    </article>
   );
 }

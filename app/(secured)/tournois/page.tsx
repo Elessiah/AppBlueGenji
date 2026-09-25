@@ -10,6 +10,7 @@ import { useAutoRefresh } from "@/lib/shared/hooks/useAutoRefresh";
 import { useScheduledBuckets } from "@/lib/shared/hooks/useScheduledBuckets";
 import { useToast } from "@/components/ui/toast";
 import { BgCanvas } from "../_shared/BgCanvas";
+import { CyberButton } from "@/components/cyber/CyberButton";
 import { Ticker } from "@/components/cyber/Ticker";
 import { RunningCard } from "./cards/RunningCard";
 import { RegistrationCard } from "./cards/RegistrationCard";
@@ -24,6 +25,8 @@ import {
   filterTournamentsByQuery,
   flattenBuckets,
   countByGame,
+  searchShortcutLabel,
+  sectionEmptyMessage,
   type GameFilter,
 } from "./_lib/buckets";
 import { buildTickerItems } from "./_lib/ticker";
@@ -36,6 +39,49 @@ const emptyBuckets: TournamentBuckets = {
   running: [],
   finished: [],
 };
+
+/** Sections dont la liste est bornée par défaut (`_lib/buckets.ts` ne connaît
+ * pas cette limite : c'est un choix d'affichage, pas un fait sur les données). */
+type LimitedSectionKey = "running" | "registration" | "upcoming" | "finished";
+const SECTION_DISPLAY_LIMIT = 12;
+const initialDisplayLimits: Record<LimitedSectionKey, number> = {
+  running: SECTION_DISPLAY_LIMIT,
+  registration: SECTION_DISPLAY_LIMIT,
+  upcoming: SECTION_DISPLAY_LIMIT,
+  finished: SECTION_DISPLAY_LIMIT,
+};
+
+/**
+ * Bouton « Voir plus » / « Voir moins » d'une section : absent tant que tout
+ * tient sous la limite, et **réversible** — la version d'origine (section
+ * « Terminés » seule) ne savait que déplier, jamais replier.
+ */
+function ShowMoreRow({
+  total,
+  limit,
+  onExpand,
+  onCollapse,
+}: {
+  total: number;
+  limit: number;
+  onExpand: () => void;
+  onCollapse: () => void;
+}) {
+  if (total <= SECTION_DISPLAY_LIMIT) return null;
+  return (
+    <div className={s.showMoreRow}>
+      {limit < total ? (
+        <button onClick={onExpand} className={s.cardCta}>
+          Voir plus ({total - limit})
+        </button>
+      ) : (
+        <button onClick={onCollapse} className={s.cardCta}>
+          Voir moins
+        </button>
+      )}
+    </div>
+  );
+}
 
 async function fetchBuckets(url: string, signal?: AbortSignal): Promise<TournamentBuckets> {
   const response = await fetch(url, { cache: "no-store", signal });
@@ -56,8 +102,11 @@ export default function TournamentsPage() {
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
-  const [finishedDisplayLimit, setFinishedDisplayLimit] = useState(12);
+  const [displayLimits, setDisplayLimits] = useState(initialDisplayLimits);
   const [isAdmin, setIsAdmin] = useState(false);
+  // « Ctrl+K » par défaut (sûr pour le rendu serveur) : la vraie plateforme
+  // ne se lit que côté client, une fois montée.
+  const [shortcutLabel, setShortcutLabel] = useState("Ctrl+K");
 
   // `silent` : les rafraîchissements de fond ne doivent pas couvrir l'écran de
   // notifications pour un incident réseau passager. Seul le premier chargement,
@@ -151,8 +200,17 @@ export default function TournamentsPage() {
   }, []);
 
   useEffect(() => {
-    setFinishedDisplayLimit(12);
+    setShortcutLabel(searchShortcutLabel(navigator.platform || navigator.userAgent));
+  }, []);
+
+  useEffect(() => {
+    setDisplayLimits(initialDisplayLimits);
   }, [query, gameFilter]);
+
+  const expandSection = (key: LimitedSectionKey, total: number) =>
+    setDisplayLimits((prev) => ({ ...prev, [key]: total }));
+  const collapseSection = (key: LimitedSectionKey) =>
+    setDisplayLimits((prev) => ({ ...prev, [key]: SECTION_DISPLAY_LIMIT }));
 
   // Les cartes portent leur horaire : le client fait basculer « Prochainement »
   // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
@@ -186,10 +244,16 @@ export default function TournamentsPage() {
   ]);
 
   // Les pastilles comptent ce que la page montre : pour le staff, les invisibles
-  // en font partie.
+  // en font partie ; la recherche filtre les sections en dessous, les compteurs
+  // doivent donc en tenir compte eux aussi (seul le jeu reste libre : chaque
+  // pastille dit ce que donnerait SON filtre, pas celui déjà actif).
+  const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all");
+  const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query);
   const countGame = (key: GameFilter) =>
-    countByGame(buckets, key) +
-    (showHidden ? filterTournamentsByGame(hiddenTournaments, key).length : 0);
+    countByGame(queryFilteredBuckets, key) +
+    (showHidden ? filterTournamentsByGame(queryFilteredHidden, key).length : 0);
+
+  const emptyMsg = (whenUnfiltered: string) => sectionEmptyMessage(whenUnfiltered, query, gameFilter);
 
   return (
     <div className={s.page}>
@@ -207,8 +271,8 @@ export default function TournamentsPage() {
             <div className={s.subtitle}>SUIVI TEMPS RÉEL · PHASES MULTIPLES · BRACKETS ARBITRÉS</div>
           </div>
           {isAdmin && (
-            <Link href="/tournois/creer">
-              <button className={s.create}>
+            <CyberButton asChild variant="primary">
+              <Link href="/tournois/creer">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
                   <path
                     d="M8 3v10M3 8h10"
@@ -218,8 +282,8 @@ export default function TournamentsPage() {
                   />
                 </svg>
                 Créer un tournoi
-              </button>
-            </Link>
+              </Link>
+            </CyberButton>
           )}
         </header>
 
@@ -254,27 +318,35 @@ export default function TournamentsPage() {
             </span>
             <input
               ref={searchInputRef}
-              placeholder="Rechercher un tournoi, une équipe, un format…"
+              aria-label="Rechercher un tournoi"
+              placeholder="Rechercher un tournoi, un format…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
             />
-            <span className={s.searchKbd}>⌘K</span>
+            <span className={s.searchKbd}>{shortcutLabel}</span>
           </div>
           <div className={s.filterRow}>
             {[
               ["all", "Tous"],
               ["ow", "Overwatch"],
               ["mr", "Marvel Rivals"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
-                onClick={() => setGameFilter(key as GameFilter)}
-              >
-                {label}
-                <span className={s.num}>{countGame(key as GameFilter)}</span>
-              </button>
-            ))}
+            ].map(([key, label]) => {
+              const count = countGame(key as GameFilter);
+              return (
+                <button
+                  key={key}
+                  className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
+                  aria-pressed={gameFilter === key}
+                  aria-label={`${label} (${count})`}
+                  onClick={() => setGameFilter(key as GameFilter)}
+                >
+                  {label}
+                  <span className={s.num} aria-hidden="true">
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -306,12 +378,18 @@ export default function TournamentsPage() {
             title="EN COURS"
             count={totalRunning}
             defaultOpen={true}
-            emptyMsg="Aucun tournoi en cours actuellement."
+            emptyMsg={emptyMsg("Aucun tournoi en cours actuellement.")}
             dataCols="2"
           >
-            {filteredBuckets.running.map((t) => (
+            {filteredBuckets.running.slice(0, displayLimits.running).map((t) => (
               <RunningCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
             ))}
+            <ShowMoreRow
+              total={totalRunning}
+              limit={displayLimits.running}
+              onExpand={() => expandSection("running", totalRunning)}
+              onCollapse={() => collapseSection("running")}
+            />
           </Section>
 
           <Section
@@ -319,11 +397,17 @@ export default function TournamentsPage() {
             title="INSCRIPTIONS OUVERTES"
             count={totalRegistration}
             defaultOpen={true}
-            emptyMsg="Aucun tournoi en phase d'inscription pour le moment."
+            emptyMsg={emptyMsg("Aucun tournoi en phase d'inscription pour le moment.")}
           >
-            {filteredBuckets.registration.map((t) => (
+            {filteredBuckets.registration.slice(0, displayLimits.registration).map((t) => (
               <RegistrationCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
             ))}
+            <ShowMoreRow
+              total={totalRegistration}
+              limit={displayLimits.registration}
+              onExpand={() => expandSection("registration", totalRegistration)}
+              onCollapse={() => collapseSection("registration")}
+            />
           </Section>
 
           <Section
@@ -331,11 +415,17 @@ export default function TournamentsPage() {
             title="PROCHAINEMENT"
             count={totalUpcoming}
             defaultOpen={true}
-            emptyMsg="Aucun tournoi à venir pour le moment."
+            emptyMsg={emptyMsg("Aucun tournoi à venir pour le moment.")}
           >
-            {filteredBuckets.upcoming.map((t) => (
+            {filteredBuckets.upcoming.slice(0, displayLimits.upcoming).map((t) => (
               <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
             ))}
+            <ShowMoreRow
+              total={totalUpcoming}
+              limit={displayLimits.upcoming}
+              onExpand={() => expandSection("upcoming", totalUpcoming)}
+              onCollapse={() => collapseSection("upcoming")}
+            />
           </Section>
 
           <Section
@@ -343,24 +433,19 @@ export default function TournamentsPage() {
             title="TERMINÉS"
             count={totalFinished}
             defaultOpen={false}
-            emptyMsg="Aucun tournoi terminé pour le moment."
+            emptyMsg={emptyMsg("Aucun tournoi terminé pour le moment.")}
           >
             <div>
-              {filteredBuckets.finished.slice(0, finishedDisplayLimit).map((t) => (
+              {filteredBuckets.finished.slice(0, displayLimits.finished).map((t) => (
                 <FinishedCard key={t.id} t={t} />
               ))}
-              {filteredBuckets.finished.length > 12 && finishedDisplayLimit === 12 && (
-                <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
-                  <button
-                    onClick={() => setFinishedDisplayLimit(filteredBuckets.finished.length)}
-                    className={s.cardCta}
-                    style={{ padding: "10px 18px" }}
-                  >
-                    Voir tout ({filteredBuckets.finished.length})
-                  </button>
-                </div>
-              )}
             </div>
+            <ShowMoreRow
+              total={totalFinished}
+              limit={displayLimits.finished}
+              onExpand={() => expandSection("finished", totalFinished)}
+              onCollapse={() => collapseSection("finished")}
+            />
           </Section>
         </div>
         </div>
