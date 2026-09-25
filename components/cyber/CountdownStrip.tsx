@@ -38,18 +38,21 @@ export function CountdownStrip({ targetISO, label }: CountdownStripProps) {
   return (
     <div className={styles.root}>
       {label && <div className={styles.label}>{label}</div>}
-      {/* `aria-label` porte la phrase lisible ; les cases numériques ne sont
-          qu'un rendu visuel du même fait, répété une seconde fois pour qui l'entend. */}
-      <time dateTime={targetISO} aria-label={accessibleLabel} className={styles.countdown}>
+      {/* `<time>` ne porte que la date machine-lisible et la phrase pour les
+          lecteurs d'écran ; son contenu (phrasing content) ne peut pas être
+          des `<div>` — les cases numériques sont donc un bloc voisin, purement
+          visuel, que `aria-hidden` retire de l'arbre d'accessibilité. */}
+      <time dateTime={targetISO} aria-label={accessibleLabel} />
+      <div className={styles.countdown} aria-hidden="true">
         {units.map(({ label: lbl, value }) => (
-          <div key={lbl} className={styles.unit} aria-hidden="true">
+          <div key={lbl} className={styles.unit}>
             <div className={parts ? `num ${styles.val}` : `num ${styles.val} ${styles.valPending}`}>
               {value}
             </div>
             <div className={`mono ${styles.lbl}`}>{lbl}</div>
           </div>
         ))}
-      </time>
+      </div>
     </div>
   );
 }
