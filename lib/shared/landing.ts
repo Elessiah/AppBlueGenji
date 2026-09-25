@@ -1,6 +1,7 @@
 import type { DiscordCommunityStats } from "@/lib/shared/discord";
 import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { MatchFormat } from "@/lib/shared/match-format";
+import { runningTournamentActionLabel } from "@/lib/shared/tournament-labels";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 
 export type LandingStats = {
@@ -117,6 +118,7 @@ export type LandingCalendarEvent = {
   state: "UPCOMING" | "REGISTRATION" | "RUNNING" | "FINISHED";
   maxTeams: number;
   registeredTeams: number;
+  game: TournamentCard["game"];
 };
 
 export type LandingTickerPayload = {
@@ -199,22 +201,29 @@ export function chooseFeaturedTournament(buckets: TournamentBuckets): Tournament
   return soonest(buckets.upcoming) ?? soonest(buckets.registration) ?? soonest(buckets.running) ?? null;
 }
 
-export function inferGameLabel(value: string | null | undefined): "Overwatch" | "Marvel Rivals" {
-  const text = (value ?? "").toLowerCase();
-  if (text.includes("marvel") || text.includes("rivals")) {
-    return "Marvel Rivals";
-  }
-  return "Overwatch";
+/**
+ * Libellé de l'action principale d'une carte de l'accueil, selon ce que son
+ * état permet réellement de faire : un tournoi en cours mène à ce que son
+ * format sait montrer (bracket ou classement, {@link runningTournamentActionLabel}),
+ * un tournoi aux inscriptions ouvertes propose de s'inscrire, et le reste (à
+ * venir) n'offre qu'une consultation — jamais « S'inscrire » sur un tournoi où
+ * personne ne peut plus le faire.
+ */
+export function landingCardActionLabel(card: TournamentCard): string {
+  if (card.state === "RUNNING") return runningTournamentActionLabel(card.format);
+  if (card.state === "REGISTRATION") return "S'inscrire";
+  return "Voir le tournoi";
 }
 
-export function inferGameCode(value: string | null | undefined): "ow" | "mr" {
-  return inferGameLabel(value) === "Marvel Rivals" ? "mr" : "ow";
-}
-
-/** Abréviation du jeu, pour les pastilles trop étroites pour le libellé complet. */
-export function inferGameShortLabel(value: string | null | undefined): "OW" | "MR" {
-  return inferGameLabel(value) === "Marvel Rivals" ? "MR" : "OW";
-}
+/*
+ * Pas d'inférence du jeu depuis le nom du tournoi ici : `TournamentCard.game`
+ * (et `LandingCalendarEvent.game`) portent la vraie valeur depuis toujours, et
+ * les fonctions qui vivaient à cet endroit (`inferGameLabel`, `inferGameCode`,
+ * `inferGameShortLabel`) la devinaient sur des mots-clés du nom, avec un repli
+ * silencieux sur Overwatch — un tournoi Marvel Rivals dont le nom ne contenait
+ * ni « marvel » ni « rivals » s'affichait Overwatch sur l'accueil. Lire le
+ * champ (`gameLabel`, `lib/shared/tournament-labels.ts`) au lieu de le deviner.
+ */
 
 export function inferPhaseLabel(match: LandingLiveMatch | null): string {
   if (!match) {

@@ -131,6 +131,8 @@ export type MatchRow = RowDataPacket & {
 
 export type TournamentListRow = TournamentRow & {
   registered_teams: number;
+  /** Nom de la championne (`final_rank = 1`), `null` sans classement final. */
+  winner_name: string | null;
 };
 
 export type PhaseRow = RowDataPacket & {
@@ -235,6 +237,8 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     liveUrl: normalizeStreamUrl(row.live_url),
     // Filtrée à la sortie (`localUploadUrl`) : seul un fichier du site ressort.
     image: parseTournamentImage(row.image_url, row.image_fit, row.image_focus_x, row.image_focus_y),
+    finishedAt: toIso(row.finished_at),
+    championName: row.winner_name ?? null,
   };
 }
 

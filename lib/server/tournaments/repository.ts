@@ -375,7 +375,12 @@ export async function getTournamentListRow(
       t.image_fit,
       t.image_focus_x,
       t.image_focus_y,
-      COALESCE(COUNT(r.id), 0) AS registered_teams
+      COALESCE(COUNT(r.id), 0) AS registered_teams,
+      (SELECT w.name
+        FROM bg_tournament_registrations wr
+        JOIN bg_teams w ON w.id = wr.team_id
+        WHERE wr.tournament_id = t.id AND wr.final_rank = 1
+        LIMIT 1) AS winner_name
      FROM bg_tournaments t
      LEFT JOIN bg_tournament_registrations r ON r.tournament_id = t.id
      WHERE t.id = ?

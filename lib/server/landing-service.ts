@@ -10,7 +10,6 @@ import {
 import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import {
   compareByStartAt,
-  inferGameLabel,
   inferPhaseLabel,
   type LandingCalendarEvent,
   type LandingLeaderboardRow,
@@ -19,6 +18,7 @@ import {
   type LandingStats,
   type LandingTickerPayload,
 } from "@/lib/shared/landing";
+import { gameLabel } from "@/lib/shared/tournament-labels";
 import type { BracketType, MatchStatus, TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { findBroadcastingTournament } from "@/lib/server/tournaments/live-streams";
 import {
@@ -288,7 +288,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       tournament,
       currentMatch,
       viewers: tournamentAudience(tournament.id),
-      game: inferGameLabel(tournament.name),
+      game: gameLabel(tournament.game),
       phase: inferPhaseLabel(currentMatch),
       stream:
         broadcasting && broadcasting.tournamentId === tournament.id
@@ -373,6 +373,7 @@ function toCalendarEvent(card: TournamentCard): LandingCalendarEvent {
     state: card.state,
     maxTeams: card.maxTeams,
     registeredTeams: card.registeredTeams,
+    game: card.game,
   };
 }
 

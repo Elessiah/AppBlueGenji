@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { CyberButton, CyberCard, MiniBracket, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
+import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
-import { activeTournamentCards, inferGameCode, inferGameLabel, inferGameShortLabel } from "@/lib/shared/landing";
+import { activeTournamentCards, landingCardActionLabel } from "@/lib/shared/landing";
+import { tournamentStateLabel } from "@/lib/shared/tournament-labels";
 import styles from "./TournamentBoard.module.css";
 
 type TournamentBoardProps = {
@@ -41,27 +43,19 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
                 className={styles.featuredBanner}
               />
               <div className={styles.badgeRow}>
-                <Pill variant={featured.state === "RUNNING" ? "live" : "blue"}>
-                  {featured.state === "RUNNING" ? "EN COURS" : inferGameShortLabel(featured.name)}
-                </Pill>
-                <span className="mono">{inferGameLabel(featured.name).toUpperCase()}</span>
+                <Pill variant="blue">{featured.game}</Pill>
+                <span className="mono">{tournamentStateLabel(featured.state).toUpperCase()}</span>
               </div>
 
-              <div className={styles.gameEyebrow}>{inferGameLabel(featured.name).toUpperCase()}</div>
               <div className={styles.titleRow}>
                 <TournamentImageEmblem image={featured.image} size={56} />
                 <h3 className={styles.featuredTitle}>{makeTitle(featured)}</h3>
               </div>
-              <div className={styles.phase}>{featured.state} · BRACKET</div>
               <MiniBracket matches={miniBracket} />
 
               <div className={styles.footerRow}>
-                <div>
-                  <div className="mono" style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-mute)" }}>CASH PRIZE</div>
-                  <div className="num" style={{ fontSize: 18 }}>—</div>
-                </div>
                 <CyberButton variant="primary" asChild>
-                  <Link href={`/tournois/${featured.id}`}>Voir le bracket →</Link>
+                  <Link href={`/tournois/${featured.id}`}>{landingCardActionLabel(featured)} →</Link>
                 </CyberButton>
               </div>
             </>
@@ -81,8 +75,6 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
 
         {upcomingCards.map((card) => {
           const progress = card.maxTeams > 0 ? Math.min(100, Math.round((card.registeredTeams / card.maxTeams) * 100)) : 0;
-          const game = inferGameLabel(card.name);
-          const code = inferGameCode(card.name);
 
           return (
             <CyberCard key={card.id} ticks className={styles.upcoming}>
@@ -92,11 +84,10 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
                 className={styles.upcomingBanner}
               />
               <div className={styles.cardTop}>
-                <Pill variant="blue">{code.toUpperCase()}</Pill>
-                <span className="mono">{game.toUpperCase()}</span>
+                <Pill variant="blue">{card.game}</Pill>
+                <span className="mono">{tournamentStateLabel(card.state).toUpperCase()}</span>
               </div>
 
-              <div className={styles.cardGame}>{game}</div>
               <div className={styles.titleRow}>
                 <TournamentImageEmblem image={card.image} size={40} />
                 <h3 className={styles.cardTitle}>{card.name}</h3>
@@ -105,7 +96,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
               <div className={styles.metaGrid}>
                 <div>
                   <div className="mono">DÉBUT</div>
-                  <div>{new Date(card.startAt).toLocaleString("fr-FR")}</div>
+                  <div>{formatLocalDateTime(card.startAt)}</div>
                 </div>
                 <div>
                   <div className="mono">ÉQUIPES</div>
@@ -118,12 +109,8 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
               </div>
 
               <div className={styles.footerRow}>
-                <div>
-                  <div className="mono" style={{ fontSize: 10, letterSpacing: "0.14em", color: "var(--ink-mute)" }}>CASH PRIZE</div>
-                  <div className="num" style={{ fontSize: 16 }}>—</div>
-                </div>
                 <CyberButton variant="ghost" asChild>
-                  <Link href={`/tournois/${card.id}`}>S&apos;inscrire</Link>
+                  <Link href={`/tournois/${card.id}`}>{landingCardActionLabel(card)}</Link>
                 </CyberButton>
               </div>
             </CyberCard>

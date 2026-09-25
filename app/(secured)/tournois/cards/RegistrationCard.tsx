@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { participantWording } from "@/lib/shared/participants";
 import type { TournamentCard } from "@/lib/shared/types";
+import { formatLabel as sharedFormatLabel, gameLabel as sharedGameLabel } from "@/lib/shared/tournament-labels";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { CARD_IMAGE_SIZES } from "./card-image";
 import s from "../tournois.module.css";
@@ -15,8 +16,13 @@ interface RegistrationCardProps {
 
 export function RegistrationCard({ t, priority }: RegistrationCardProps) {
   const wording = participantWording(t.participantType);
-  const gameLabel = t.game === "OW" ? "OVERWATCH" : "MARVEL RIVALS";
-  const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
+  const gameLabel = sharedGameLabel(t.game).toUpperCase();
+  const formatLabel = sharedFormatLabel(t.format);
+  // Sans le contexte du lecteur (déjà inscrit ? staff ? sans équipe ?), la
+  // liste ne peut affirmer qu'un seul fait sûr : le plateau est plein ou non.
+  // « S'inscrire » est donc remplacé par un défaut neutre — voir la fiche pour
+  // ce que le lecteur peut réellement y faire (`registerBlockedNotice`).
+  const isFull = t.maxTeams > 0 && t.registeredTeams >= t.maxTeams;
 
   const startDate = new Date(t.startAt).toLocaleDateString("fr-FR", {
     day: "2-digit",
@@ -51,11 +57,7 @@ export function RegistrationCard({ t, priority }: RegistrationCardProps) {
         </div>
 
         <div className={s.cardHead}>
-          <div className={s.cardGame}>
-            {gameLabel}
-            <span className={s.dot}>◆</span>
-            {formatLabel}
-          </div>
+          <div className={s.cardGame}>{gameLabel}</div>
           <TournamentImageEmblem image={t.image} size={40} />
         </div>
 
@@ -94,9 +96,11 @@ export function RegistrationCard({ t, priority }: RegistrationCardProps) {
             <div style={{ fontSize: "9px", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--ink-mute)", marginBottom: "2px" }}>Remplissage</div>
             <div style={{ fontSize: "13px", color: "var(--ink)" }}>{pct}%</div>
           </div>
-          <span className={`${s.cardCta} ${s.cardCtaPrimary}`}>
-            S'inscrire →
-          </span>
+          {isFull ? (
+            <span className={`${s.cardCta} ${s.cardCtaMuted}`}>Complet</span>
+          ) : (
+            <span className={`${s.cardCta} ${s.cardCtaPrimary}`}>Voir le tournoi →</span>
+          )}
         </div>
       </article>
     </Link>

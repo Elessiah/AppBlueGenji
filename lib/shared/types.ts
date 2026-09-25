@@ -425,6 +425,18 @@ export type TournamentCard = {
    * lui — voir `lib/shared/tournament-image.ts`.
    */
   image: TournamentImage | null;
+  /**
+   * Date de clôture réelle, `null` tant que le tournoi n'est pas `FINISHED`.
+   * La carte « Terminé » l'affichait à tort avec `startAt` : les deux dates
+   * divergent dès qu'un tournoi programmé prend du retard.
+   */
+  finishedAt: string | null;
+  /**
+   * Nom de l'engagée classée première, `null` tant qu'aucun classement final
+   * n'a été écrit — un tournoi `FINISHED` peut rester sans championne (finale
+   * en double forfait, voir `lib/shared/double-forfeit.ts`).
+   */
+  championName: string | null;
 };
 
 export type TournamentBuckets = {

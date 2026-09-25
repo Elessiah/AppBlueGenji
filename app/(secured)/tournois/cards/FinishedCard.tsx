@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { participantWording } from "@/lib/shared/participants";
 import type { TournamentCard } from "@/lib/shared/types";
+import { formatLabel as sharedFormatLabel, gameLabel as sharedGameLabel } from "@/lib/shared/tournament-labels";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { CARD_IMAGE_SIZES } from "./card-image";
 import s from "../tournois.module.css";
@@ -15,10 +16,12 @@ interface FinishedCardProps {
 
 export function FinishedCard({ t, priority }: FinishedCardProps) {
   const wording = participantWording(t.participantType);
-  const gameLabel = t.game === "OW" ? "OVERWATCH" : "MARVEL RIVALS";
-  const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
+  const gameLabel = sharedGameLabel(t.game).toUpperCase();
+  const formatLabel = sharedFormatLabel(t.format);
 
-  const finishDate = new Date(t.startAt).toLocaleDateString("fr-FR", {
+  // `finishedAt` (date réelle de clôture) plutôt que `startAt` : un tournoi
+  // programmé peut prendre du retard, les deux dates divergent alors.
+  const finishDate = new Date(t.finishedAt ?? t.startAt).toLocaleDateString("fr-FR", {
     day: "2-digit",
     month: "short",
     year: "numeric",
@@ -38,11 +41,7 @@ export function FinishedCard({ t, priority }: FinishedCardProps) {
         </div>
 
         <div className={s.cardHead}>
-          <div className={s.cardGame}>
-            {gameLabel}
-            <span className={s.dot}>◆</span>
-            {formatLabel}
-          </div>
+          <div className={s.cardGame}>{gameLabel}</div>
           <TournamentImageEmblem image={t.image} size={40} />
         </div>
 
@@ -65,7 +64,7 @@ export function FinishedCard({ t, priority }: FinishedCardProps) {
             </div>
           </div>
           <div>
-            <div className={s.cardMetaLbl}>Date</div>
+            <div className={s.cardMetaLbl}>Terminé le</div>
             <div className={s.cardMetaVal}>{finishDate}</div>
           </div>
         </div>
@@ -81,9 +80,9 @@ export function FinishedCard({ t, priority }: FinishedCardProps) {
                 marginBottom: "2px",
               }}
             >
-              Statut
+              {t.participantType === "SOLO" ? "Champion" : "Championne"}
             </div>
-            <div style={{ fontSize: "13px", color: "var(--ink-mute)" }}>Terminé</div>
+            <div style={{ fontSize: "13px", color: "var(--ink)" }}>{t.championName ?? "—"}</div>
           </div>
           <span className={`${s.cardCta}`}>
             Voir le récap
