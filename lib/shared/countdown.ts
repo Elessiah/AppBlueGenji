@@ -3,6 +3,8 @@
  * composant ne fait plus que choisir entre l'affichage réel et le repli
  * « chargement » selon que `useClock` a déjà résolu l'heure du lecteur.
  */
+import { plural } from "./plural";
+
 export interface CountdownParts {
   d: number;
   h: number;
@@ -24,12 +26,6 @@ export function computeCountdown(targetISO: string, now: number): CountdownParts
   const s = Math.floor(delta / 1000);
 
   return { d, h, m, s };
-}
-
-// Même forme que `plural()` dans `lib/shared/tournament-preview.ts` : toutes
-// les unités d'ici sont régulières au pluriel, le repli par défaut suffit.
-function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
-  return `${count} ${count > 1 ? pluralForm : singular}`;
 }
 
 /**
