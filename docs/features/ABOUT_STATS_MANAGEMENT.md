@@ -1,9 +1,9 @@
-# 📊 Cartes « L'association » (SECTION 03)
+# 📊 Cartes « L'association »
 
 ## Vue d'ensemble
 
-Les **cartes chiffrées** affichées sous le titre de la **SECTION 03 —
-« L'association »** (valeur + titre, ex. `100% / Bénévole`, `€4 200 /
+Les **cartes chiffrées** affichées sous le titre de la section
+**« L'association »** (valeur + titre, ex. `100% / Bénévole`, `€4 200 /
 Prizepool 2025`) sont désormais dynamiques : elles sont stockées en base et **les
 administrateurs** peuvent les **ajouter, modifier et supprimer** directement
 depuis la page, sans déploiement.
