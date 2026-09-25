@@ -245,6 +245,13 @@ export function normalizePhaseConfigs(raw: readonly Partial<PhaseConfig>[]): Pha
 const QUALIFIER_BOUNDS_MESSAGE =
   "Qualification invalide : au moins une équipe en nombre fixe, ou de 1 à 99 % en pourcentage.";
 
+// Les deux contrôles (« ami » du serveur, strict côté client) portent la même
+// règle : seul le nombre fixe est comparé entre deux phases non-terminales —
+// jamais le pourcentage, dont l'assiette rétrécit d'une phase à l'autre (une
+// hausse ne dit rien du nombre absolu de qualifiées), ni la dernière phase,
+// dont la cible n'est jamais lue.
+const NON_DECREASING_QUALIFIER_MESSAGE = "Les qualifications en nombre fixe doivent décroître entre les phases.";
+
 /**
  * Phrases des refus d'un plan de phases, **toutes origines confondues** : le
  * contrôle strict ({@link validatePhases}) et le contrôle « ami » du serveur
@@ -265,13 +272,8 @@ export const PHASE_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   DOUBLE_MUST_BE_LAST_PHASE: "La double élimination ne peut être que la dernière phase.",
   INVALID_PHASE_QUALIFIER: QUALIFIER_BOUNDS_MESSAGE,
   INVALID_QUALIFIER_VALUE: QUALIFIER_BOUNDS_MESSAGE,
-  // Le contrôle serveur compare les cibles **de même nature**, pourcentages
-  // compris : la phrase dit la règle telle qu'elle est appliquée, et non « plus
-  // d'engagés » — 80 % après 50 % en qualifie moins, et il est pourtant refusé.
-  INVALID_QUALIFIER_COUNT:
-    "La qualification d'une phase ne peut pas dépasser celle de la phase précédente, en nombre fixe comme en pourcentage.",
-  NON_DECREASING_PHASE_QUALIFIERS:
-    "Les qualifications en nombre fixe doivent décroître entre les phases.",
+  INVALID_QUALIFIER_COUNT: NON_DECREASING_QUALIFIER_MESSAGE,
+  NON_DECREASING_PHASE_QUALIFIERS: NON_DECREASING_QUALIFIER_MESSAGE,
   INVALID_PHASE_SWISS_ROUNDS: "Nombre de manches ronde suisse invalide : 1 à 20 attendues.",
   INVALID_PHASE_SURVIVAL_ROUNDS: "Cadence de survie invalide : 1 à 50 attendues.",
 };

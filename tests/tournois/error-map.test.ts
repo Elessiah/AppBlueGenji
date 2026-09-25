@@ -162,12 +162,14 @@ describe("mapError — refus du formulaire de tournoi", () => {
     expect(mapError("INVALID_SWISS_POINTS")).toMatch(/nul/);
   });
 
-  it("dit la règle de décroissance telle qu'elle s'applique, pourcentages compris", () => {
-    // 80 % après 50 % qualifie moins d'engagés et reste refusé : parler
-    // d'engagés « en plus » serait faux.
+  it("dit la règle telle qu'elle s'applique : nombre fixe seulement, jamais le pourcentage", () => {
+    // Le pourcentage n'est jamais comparé (son assiette rétrécit d'une phase à
+    // l'autre — 80 % après 50 % qualifie moins d'engagés, pas plus), ni la
+    // dernière phase (sa cible n'est jamais lue) : la phrase ne doit donc plus
+    // parler de pourcentage, et coïncide avec celle du contrôle strict.
     const message = mapError("INVALID_QUALIFIER_COUNT");
-    expect(message).toMatch(/pourcentage/);
-    expect(message).not.toMatch(/plus d'engagés/);
+    expect(message).not.toMatch(/pourcentage/);
+    expect(message).toBe(mapError("NON_DECREASING_PHASE_QUALIFIERS"));
   });
 
   it("nomme la première coupe dans la cadence de survie, que le code couvre aussi en phase", () => {
