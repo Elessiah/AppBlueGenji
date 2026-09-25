@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
@@ -27,6 +27,7 @@ import {
   type GameFilter,
 } from "./_lib/buckets";
 import { buildTickerItems } from "./_lib/ticker";
+import { tournamentsPageMetrics } from "./_lib/metrics";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import s from "./tournois.module.css";
 
@@ -191,6 +192,16 @@ export default function TournamentsPage() {
     countByGame(buckets, key) +
     (showHidden ? filterTournamentsByGame(hiddenTournaments, key).length : 0);
 
+  const metrics = tournamentsPageMetrics(
+    {
+      running: totalRunning,
+      registration: totalRegistration,
+      upcoming: totalUpcoming,
+      hidden: totalHidden,
+    },
+    isAdmin,
+  );
+
   return (
     <div className={s.page}>
       <RulesHelpFab />
@@ -223,25 +234,18 @@ export default function TournamentsPage() {
           )}
         </header>
 
-        <div className={s.metrics}>
-          <div className={s.metric}>
-            <div className={s.metricNum}>
-              <em>{totalRunning}</em> EN DIRECT
+        <div
+          className={s.metrics}
+          style={{ "--metric-cols": metrics.length } as CSSProperties}
+        >
+          {metrics.map((m) => (
+            <div className={s.metric} key={m.label}>
+              <div className={s.metricNum}>
+                {m.highlighted ? <em>{m.value}</em> : m.value}
+              </div>
+              <div className={s.metricLbl}>{m.label}</div>
             </div>
-            <div className={s.metricLbl}>Diffusés sur Twitch</div>
-          </div>
-          <div className={s.metric}>
-            <div className={s.metricNum}>{totalRegistration}</div>
-            <div className={s.metricLbl}>Inscriptions ouvertes</div>
-          </div>
-          <div className={s.metric}>
-            <div className={s.metricNum}>{totalUpcoming}</div>
-            <div className={s.metricLbl}>Programmés à venir</div>
-          </div>
-          <div className={s.metric}>
-            <div className={s.metricNum}>{isAdmin ? totalHidden : "—"}</div>
-            <div className={s.metricLbl}>{isAdmin ? "Invisibles · staff" : "Prizepool · à venir"}</div>
-          </div>
+          ))}
         </div>
 
         <div className={s.toolbar}>

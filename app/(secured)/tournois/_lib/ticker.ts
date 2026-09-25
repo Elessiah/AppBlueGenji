@@ -5,9 +5,9 @@ import { participantWording } from "@/lib/shared/participants";
 export function buildTickerItems(buckets: TournamentBuckets): string[] {
   const items: string[] = [];
 
-  buckets.running.forEach((t) => {
+  buckets.running.slice(0, 3).forEach((t) => {
     items.push(
-      `RÉSULTAT · ${t.name} · ${t.registeredTeams} ${participantWording(t.participantType).manyEngaged}`,
+      `EN COURS · ${t.name} · ${t.registeredTeams} ${participantWording(t.participantType).manyEngaged}`,
     );
   });
 

@@ -86,7 +86,10 @@
 /* ---------- METRICS STRIP ---------- */
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  /* Le nombre de cases varie avec le lecteur (staff ou non, voir
+     `tournamentsPageMetrics`) : la piste fixe à 4 laissait une colonne vide
+     à droite pour tout visiteur non-staff. */
+  grid-template-columns: repeat(var(--metric-cols, 4), 1fr);
   gap: 0;
   border-top: 1px solid var(--line-soft);
   border-bottom: 1px solid var(--line-soft);
