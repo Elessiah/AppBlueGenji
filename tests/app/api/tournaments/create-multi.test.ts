@@ -196,7 +196,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
       expect(service.createTournament).not.toHaveBeenCalled();
     });
 
-    it("rejette un plan de qualification non-décroissant", async () => {
+    it("rejette un plan de qualification non-décroissant entre deux phases non-terminales", async () => {
       const res = await POST(
         jsonReq({
           ...baseMulti,
@@ -206,12 +206,15 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
               format: "SURVIVAL",
               qualifierMode: "COUNT",
               qualifierValue: 16,
+              survivalRoundsPerCut: 1,
             },
             {
-              format: "SINGLE",
+              format: "SWISS",
               qualifierMode: "COUNT",
               qualifierValue: 32, // ❌ Plus de 16 qualifiés de la phase 1
+              swissTotalRounds: 4,
             },
+            phase2, // phase finale — sa valeur n'entre pas dans la comparaison
           ],
         }),
       );
@@ -221,7 +224,42 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
       expect(service.createTournament).not.toHaveBeenCalled();
     });
 
-    it("rejette un plan avec PERCENT qui monte", async () => {
+    // La dernière phase ne qualifie jamais qu'une championne : sa cible n'est
+    // jamais lue (`resolvePhasePlan`), donc jamais comparée. Exemple réel :
+    // une ronde suisse à 50 % suivie d'une finale Survie créée avec le
+    // pourcentage par défaut (100 %) — un plan parfaitement valide qui était
+    // refusé avant que la borne ne s'aligne sur `validatePhases`.
+    it("accepte un plan à deux phases : la dernière qualifierait « plus », mais sa cible n'est jamais comparée", async () => {
+      const res = await POST(
+        jsonReq({
+          ...baseMulti,
+          format: "MULTI",
+          phases: [
+            {
+              format: "SWISS",
+              qualifierMode: "PERCENT",
+              qualifierValue: 50,
+              swissTotalRounds: 4,
+            },
+            {
+              format: "SURVIVAL",
+              qualifierMode: "PERCENT",
+              qualifierValue: 100,
+              survivalRoundsPerCut: 1,
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(201);
+    });
+
+    // Le pourcentage s'applique à l'effectif de la phase, qui rétrécit d'une
+    // phase à l'autre : une hausse de pourcentage ne dit rien du nombre absolu
+    // de qualifiées (80 % d'un effectif déjà réduit de moitié qualifie moins
+    // d'équipes que 50 % de l'effectif de départ). Seul COUNT compare des
+    // effectifs sur la même échelle, PERCENT n'est donc jamais comparé.
+    it("accepte un plan avec PERCENT qui monte entre deux phases non-terminales", async () => {
       const res = await POST(
         jsonReq({
           ...baseMulti,
@@ -231,18 +269,20 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
               format: "SURVIVAL",
               qualifierMode: "PERCENT",
               qualifierValue: 25,
+              survivalRoundsPerCut: 1,
             },
             {
-              format: "SINGLE",
+              format: "SWISS",
               qualifierMode: "PERCENT",
-              qualifierValue: 50, // ❌ 50% > 25%
+              qualifierValue: 50, // pas comparé : PERCENT n'entre jamais dans la règle
+              swissTotalRounds: 4,
             },
+            phase2,
           ],
         }),
       );
 
-      expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "INVALID_QUALIFIER_COUNT" });
+      expect(res.status).toBe(201);
     });
 
     it("accepte un plan égal (même nombre de qualifiés)", async () => {
