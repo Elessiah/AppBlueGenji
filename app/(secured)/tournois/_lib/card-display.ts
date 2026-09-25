@@ -66,7 +66,9 @@ export function registrationFill(
   if (!(max > 0)) return { ratio: 0, percent: 0, full: false };
 
   const ratio = Math.min(1, registered / max);
-  return { ratio, percent: Math.round(ratio * 100), full: registered >= max };
+  // Tronqué : arrondi, 199/200 afficherait « 100 % » sur un plateau qui
+  // accepte encore une inscription.
+  return { ratio, percent: Math.floor(ratio * 100), full: registered >= max };
 }
 
 /**

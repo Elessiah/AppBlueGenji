@@ -104,7 +104,7 @@ describe("RegistrationCard", () => {
     );
     expect(shown).not.toMatch(/S'inscrire/);
     expect(shown).toContain("Voir le tournoi");
-    expect(shown).toMatch(/Remplissage 38 %/);
+    expect(shown).toMatch(/Remplissage 37 %/);
   });
 
   it("dit « Complet » sur un plateau plein", () => {

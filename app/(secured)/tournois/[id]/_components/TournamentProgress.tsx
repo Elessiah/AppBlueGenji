@@ -3,7 +3,6 @@
 import { useClock } from "@/lib/shared/hooks/useClock";
 import { ScrollArea } from "@/components/cyber";
 import {
-  computeRunningRatio,
   computeTournamentProgress,
   formatStageCountdown,
 } from "@/lib/shared/tournament-progress";
@@ -50,19 +49,12 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
   // la frise ne doit pas passer par un état vide.
   const now = clock ?? Date.now();
 
-  const playedRatio = computeRunningRatio({
-    format: detail.card.format,
-    matches: detail.matches,
-    swiss: detail.swiss,
-    survivalStandings: detail.survival?.standings ?? null,
-    enduranceStandings: detail.endurance?.standings ?? null,
-    phases: detail.phases,
-    currentPhaseId: detail.currentPhaseId,
-  });
-
+  // Avancement déjà mesuré par l'instantané (`computeRunningRatio`, même
+  // valeur que la carte de la liste) : le recalculer ici en ferait une seconde
+  // source, libre de diverger.
   const progress = computeTournamentProgress(detail.card, {
     now,
-    playedRatio: playedRatio ?? undefined,
+    playedRatio: detail.card.runningProgress ?? undefined,
   });
 
   const currentStage = progress.stages[progress.currentIndex];
@@ -77,10 +69,10 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
   const lastIndex = progress.stages.length - 1;
 
   // Le champion nomme mieux la fin qu'une paraphrase de l'étape courante, déjà
-  // écrite en tête du bloc.
-  const champion = showsFinished
-    ? (detail.registrations.find((reg) => reg.finalRank === 1) ?? null)
-    : null;
+  // écrite en tête du bloc. Celui de la carte (`pickChampion`) : l'unique
+  // premier — nommer l'un de deux ex æquo serait choisir à la place du
+  // classement, et la liste des tournois ne le fait pas.
+  const champion = showsFinished ? detail.card.champion : null;
 
   return (
     <div className="ds-block">
@@ -175,7 +167,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
               <span>Vainqueur :</span>
               <EntrantName
                 teamId={champion.teamId}
-                name={champion.teamName}
+                name={champion.name}
                 textClassName={styles.footStrong}
               />
             </>

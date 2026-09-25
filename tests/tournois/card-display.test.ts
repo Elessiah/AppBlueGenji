@@ -59,7 +59,14 @@ describe("registrationFill", () => {
   it("rend la part des places prises", () => {
     expect(registrationFill({ registeredTeams: 3, maxTeams: 8 })).toEqual({
       ratio: 3 / 8,
-      percent: 38,
+      percent: 37,
+      full: false,
+    });
+  });
+
+  it("n'annonce jamais 100 % sur un plateau qui a encore une place", () => {
+    expect(registrationFill({ registeredTeams: 199, maxTeams: 200 })).toMatchObject({
+      percent: 99,
       full: false,
     });
   });
