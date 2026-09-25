@@ -37,6 +37,21 @@ La logique d'affichage est pure, dans `app/(secured)/tournois/_lib/card-display.
 (`runningCardAction`, `upcomingCardFace`, `registrationFill`, `progressPercent`,
 `formatCardDate`).
 
+## Nom accessible de la carte
+
+Chaque carte enveloppait tout son texte — ruban, méta, pied — dans un `<a>`
+unique : un nom accessible de 170 à 240 caractères pour un contrôle qui ne dit
+qu'une chose, « ouvrir ce tournoi ». Le lien est désormais une plaque
+transparente posée sur la carte (`.cardOverlay`, même mécanique que les
+annuaires d'équipes et de joueurs) : `aria-label="Voir le tournoi <nom>"`, sans
+texte propre, au-dessus des enfants décoratifs de la carte (`.card::before` /
+`::after`, `z-index: 1`, `pointer-events: none` — leur ordre de peinture avec
+la plaque n'a aucune conséquence, ils n'interceptent jamais le clic). Les
+quatre cartes (`RunningCard`, `RegistrationCard`, `UpcomingCard`,
+`FinishedCard`) suivent le même schéma : un `<article className={s.card}>`
+qui n'est plus lui-même un lien, une seule `<Link className={s.cardOverlay}>`
+posée en premier enfant.
+
 ## Trois champs de `TournamentCard`
 
 - `finishedAt` — `bg_tournaments.finished_at`, rendu par `mapCard`. Une carte
