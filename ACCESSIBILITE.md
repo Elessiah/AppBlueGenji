@@ -38,7 +38,7 @@ pipeline de `CLAUDE.md`.
 2. **Ajouter une tâche** : même chemin, à la suite, même format (critère,
    constat, à faire), avec le numéro qui suit le dernier attribué — relu sur
    `main` au moment du push et avancé dans le même commit. Les numéros ne
-   sont **pas** réattribués : **dernier numéro attribué — 18**.
+   sont **pas** réattribués : **dernier numéro attribué — 19**.
 3. **Abandonner une tâche** (ou ne la régler qu'en partie) : la remettre ici
    par un commit direct sur `main`, sous son numéro d'origine. La PR qui règle
    une tâche n'a rien à retirer de ce fichier.
@@ -50,3 +50,22 @@ pipeline de `CLAUDE.md`.
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
+
+## 19. Infobulle du vainqueur inatteignable sous la plaque de la carte tournoi
+
+- **Critère** : proche de RGAA 10.7 / WCAG 1.1.1 — une information (le nom
+  complet, tronqué en ellipse dans le rendu) devient indisponible autrement
+  qu'au survol précis d'un pixel qu'aucun pointeur n'atteint plus.
+- **Constat** : `app/(secured)/tournois/cards/FinishedCard.tsx`, `.cardChampion`
+  — le nom complet d'un vainqueur tronqué se lisait au survol via
+  `title={t.champion?.name}`. Depuis que le lien de la carte est devenu une
+  plaque transparente posée par-dessus tout le reste (`.cardOverlay`,
+  `z-index: 1` — voir `docs/features/TOURNAMENT_LIST_CARDS.md`), la souris
+  n'atteint plus `.cardChampion` : l'infobulle native ne se déclenche plus.
+  Même limite déjà présente sur `TeamCard.tsx` (le `title` du bloc de points
+  de classement, sous le même patron `.cardOverlay`).
+- **À faire** : remplacer le `title` natif par une bulle déclenchée par
+  `.card:hover`/`.card:focus-within` (comme `.card:hover .cardCta` dans
+  `tournois.module.css`), ou porter le nom complet en `aria-label` du lien de
+  recouvrement en plus du titre visible tronqué — vérifier alors `TeamCard.tsx`
+  en même temps, qui porte la même limite.
