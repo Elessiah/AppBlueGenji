@@ -30,13 +30,18 @@ describe("Leaderboard", () => {
     expect(markup).not.toContain('href="/joueurs"');
   });
 
-  it("affiche un état vide plutôt qu'un tableau muet", () => {
+  it("affiche un état vide plutôt qu'un tableau muet, en structure de tableau valide", () => {
     const markup = renderToStaticMarkup(
       <ToastProvider>
         <Leaderboard initialRows={[]} />
       </ToastProvider>,
     );
     expect(markup).toContain("Aucune équipe classée pour le moment.");
+    // `role="table"` n'accepte que des `role="row"` comme enfants directs.
+    const rowIndex = markup.indexOf('role="row"', markup.indexOf("Aucune équipe classée") - 200);
+    expect(rowIndex).toBeGreaterThan(-1);
+    expect(rowIndex).toBeLessThan(markup.indexOf("Aucune équipe classée"));
+    expect(markup).toMatch(/role="cell"[^>]*>Aucune équipe classée/);
   });
 
   it("garde le classement quand il n'est pas vide", () => {
