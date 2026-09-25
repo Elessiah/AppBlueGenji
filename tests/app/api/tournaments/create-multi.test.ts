@@ -224,12 +224,13 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
       expect(service.createTournament).not.toHaveBeenCalled();
     });
 
-    // La dernière phase ne qualifie jamais qu'une championne : sa cible n'est
-    // jamais lue (`resolvePhasePlan`), donc jamais comparée. Exemple réel :
-    // une ronde suisse à 50 % suivie d'une finale Survie créée avec le
-    // pourcentage par défaut (100 %) — un plan parfaitement valide qui était
-    // refusé avant que la borne ne s'aligne sur `validatePhases`.
-    it("accepte un plan à deux phases : la dernière qualifierait « plus », mais sa cible n'est jamais comparée", async () => {
+    // Régression exacte du cas signalé : une ronde suisse à 50 % suivie d'une
+    // finale Survie créée avec le pourcentage par défaut (100 %) — un plan
+    // parfaitement valide qui était refusé avant que la borne ne s'aligne sur
+    // `validatePhases`. Deux raisons cumulées font passer ce cas précis (la
+    // dernière phase n'est jamais comparée, et PERCENT ne l'est jamais non
+    // plus) ; le test suivant isole la première à elle seule, avec COUNT.
+    it("accepte un plan à deux phases : la dernière qualifierait « plus » en PERCENT, mais sa cible n'est jamais comparée", async () => {
       const res = await POST(
         jsonReq({
           ...baseMulti,
@@ -246,6 +247,33 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
               qualifierMode: "PERCENT",
               qualifierValue: 100,
               survivalRoundsPerCut: 1,
+            },
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(201);
+    });
+
+    // Isole l'exclusion de la dernière phase, indépendamment de PERCENT : même
+    // en COUNT, un plan à deux phases n'a jamais de comparaison à faire — la
+    // seconde phase est toujours la dernière.
+    it("accepte un plan à deux phases avec COUNT qui monte : la dernière n'est jamais comparée", async () => {
+      const res = await POST(
+        jsonReq({
+          ...baseMulti,
+          format: "MULTI",
+          phases: [
+            {
+              format: "SURVIVAL",
+              qualifierMode: "COUNT",
+              qualifierValue: 16,
+              survivalRoundsPerCut: 1,
+            },
+            {
+              format: "SINGLE",
+              qualifierMode: "COUNT",
+              qualifierValue: 32, // > 16, mais phase finale : jamais comparée
             },
           ],
         }),
@@ -285,7 +313,7 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
       expect(res.status).toBe(201);
     });
 
-    it("accepte un plan égal (même nombre de qualifiés)", async () => {
+    it("accepte un plan égal à deux phases (même nombre de qualifiés) : la dernière n'est jamais comparée", async () => {
       const res = await POST(
         jsonReq({
           ...baseMulti,
@@ -307,6 +335,39 @@ describe("POST /api/tournaments — mode MULTI avec phases", () => {
       );
 
       expect(res.status).toBe(201);
+    });
+
+    // Décroissance **stricte** : une égalité de COUNT entre deux phases
+    // non-terminales est refusée comme une hausse (même règle que
+    // `findPhaseIssue`, `lib/shared/tournament-phases.ts`). Sans le troisième
+    // palier, la deuxième phase serait la dernière et l'égalité passerait —
+    // voir le test précédent.
+    it("rejette une égalité de COUNT entre deux phases non-terminales", async () => {
+      const res = await POST(
+        jsonReq({
+          ...baseMulti,
+          format: "MULTI",
+          phases: [
+            {
+              format: "SURVIVAL",
+              qualifierMode: "COUNT",
+              qualifierValue: 16,
+              survivalRoundsPerCut: 1,
+            },
+            {
+              format: "SWISS",
+              qualifierMode: "COUNT",
+              qualifierValue: 16, // égal, pas <
+              swissTotalRounds: 4,
+            },
+            phase2, // phase finale
+          ],
+        }),
+      );
+
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "INVALID_QUALIFIER_COUNT" });
+      expect(service.createTournament).not.toHaveBeenCalled();
     });
 
     it("rejette un tableau de phases vide", async () => {
