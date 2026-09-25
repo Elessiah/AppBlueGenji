@@ -46,7 +46,7 @@ test.describe("Filtres des annuaires (authentifié)", () => {
     await expect(search).toBeVisible();
 
     await search.fill("zzz-aucun-resultat-xyz");
-    await expect(page.getByText(/Aucun tournoi/).first()).toBeVisible();
+    await expect(page.getByText(/Aucun résultat/).first()).toBeVisible();
     await search.clear();
 
     await page.getByRole("button", { name: /Overwatch/ }).click();
