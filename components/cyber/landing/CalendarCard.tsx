@@ -14,11 +14,15 @@ function dayLabel(date: Date): string {
   return date.toLocaleDateString("fr-FR", { day: "2-digit" });
 }
 
+// `getLandingCalendar` n'envoie plus jamais `RUNNING` ni `FINISHED` — le
+// calendrier ne montre que ce qui arrive — mais le type accepte encore les
+// quatre états : mieux vaut un libellé qui reste juste pour tous que de
+// planter sur un état devenu impossible.
 function tagLabel(state: LandingCalendarEvent["state"]): string {
   if (state === "RUNNING") return "EN COURS";
-  if (state === "REGISTRATION") return "OPEN";
+  if (state === "REGISTRATION") return "INSCRIPTIONS OUVERTES";
   if (state === "FINISHED") return "ARCHIVE";
-  return "OPEN";
+  return "BIENTÔT";
 }
 
 export function CalendarCard({ events }: CalendarCardProps) {
@@ -29,9 +33,11 @@ export function CalendarCard({ events }: CalendarCardProps) {
           PROCHAINS ÉVÉNEMENTS
         </h3>
         <a className="mono" href="/api/landing/calendar?format=ics" download="bluegenji.ics">
-          ICS →
+          Ajouter à mon agenda (.ics)
         </a>
       </div>
+
+      {events.length === 0 && <p className={styles.empty}>Aucun tournoi programmé.</p>}
 
       <div className={styles.list}>
         {events.map((event) => {

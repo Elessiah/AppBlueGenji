@@ -394,7 +394,11 @@ export async function getLandingCalendar(bucketsOrLimit?: TournamentBuckets | nu
   const safeLimit = Math.min(50, Math.max(1, Math.trunc(limit)));
   try {
     const tournamentBuckets = buckets ?? await listTournamentBuckets(null);
-    return [...tournamentBuckets.upcoming, ...tournamentBuckets.registration, ...tournamentBuckets.running]
+    // Contrairement à `activeTournamentCards`, le panier `running` en est
+    // exclu : « Prochains événements » annonce ce qui **arrive**, et un
+    // tournoi déjà lancé est daté dans le passé — il a sa carte dans le
+    // tableau principal de l'accueil, pas ici.
+    return [...tournamentBuckets.upcoming, ...tournamentBuckets.registration]
       .sort(compareByStartAt)
       .slice(0, safeLimit)
       .map(toCalendarEvent);

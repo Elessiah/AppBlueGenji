@@ -82,13 +82,16 @@ Deux pièges de spécificité, tenus dans la feuille :
 - « Tout désactiver » est désactivé par `aria-disabled` et non `disabled` : il
   garde le focus après avoir servi au lieu de le jeter au `<body>`.
 
-## Seconde porte : « Accessibilité » dans le pied de page
+## Seconde porte : « Réglages d'accessibilité » dans le pied de page
 
 Le bouton flottant se manque, et c'est dans le pied de page qu'on cherche
 d'abord « accessibilité ». La colonne « Légal » de `PublicFooter` porte donc
-une entrée **Accessibilité** (`components/accessibility/AccessibilityFooterLink.tsx`)
+une entrée **Réglages d'accessibilité** (`components/accessibility/AccessibilityFooterLink.tsx`)
 qui ouvre **le même menu** — jamais une seconde copie, qui aurait son propre
-état. C'est un **bouton** et non un lien : il n'emmène nulle part.
+état. C'est un **bouton** et non un lien : il n'emmène nulle part. Le libellé
+se distingue à dessein de la mention RGAA voisine, « Accessibilité : non
+conforme » — deux liens presque homonymes l'un sous l'autre ne disaient pas
+lequel des deux ouvre le menu et lequel mène à la déclaration.
 
 - **Un évènement de la fenêtre**, pas un contexte React
   (`lib/shared/accessibility-menu-request.ts` : `requestAccessibilityMenu()`,

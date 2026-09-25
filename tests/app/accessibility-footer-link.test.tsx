@@ -98,7 +98,7 @@ describe("focusReturnTarget", () => {
 describe("AccessibilityFooterLink", () => {
   it("est un bouton — il ouvre un panneau, il n'emmène nulle part", () => {
     const html = renderToStaticMarkup(<AccessibilityFooterLink className="x" />);
-    expect(html).toBe('<button type="button" class="x">Accessibilité</button>');
+    expect(html).toBe('<button type="button" class="x">Réglages d&#x27;accessibilité</button>');
   });
 });
 
@@ -133,9 +133,9 @@ describe("AccessibilityMenu — ouverture à la demande", () => {
 describe("PublicFooter — accessibilité", () => {
   const render = async () => renderToStaticMarkup(await PublicFooter());
 
-  it("porte une entrée « Accessibilité » qui ouvre le menu", async () => {
+  it("porte une entrée « Réglages d'accessibilité » qui ouvre le menu", async () => {
     const html = await render();
-    expect(html).toMatch(/<li><button type="button" class="[^"]*linkButton[^"]*">Accessibilité<\/button><\/li>/);
+    expect(html).toMatch(/<li><button type="button" class="[^"]*linkButton[^"]*">Réglages d&#x27;accessibilité<\/button><\/li>/);
   });
 
   it("se lit toujours en contraste renforcé", async () => {

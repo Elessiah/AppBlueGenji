@@ -74,10 +74,10 @@
 }
 
 /* Liens soulignés : on les reconnaît sans compter sur la couleur, et le
-   bouton « Accessibilité » se présente comme ses voisins. Exception voulue à
-   la règle « tout ce qui change l'apparence vit dans le menu » (réglage
-   `links`) : le pied de page doit se lire sans réglage, c'est là qu'on
-   cherche le menu. */
+   bouton « Réglages d'accessibilité » se présente comme ses voisins.
+   Exception voulue à la règle « tout ce qui change l'apparence vit dans le
+   menu » (réglage `links`) : le pied de page doit se lire sans réglage,
+   c'est là qu'on cherche le menu. */
 .columns a,
 .linkButton {
   color: var(--ink);

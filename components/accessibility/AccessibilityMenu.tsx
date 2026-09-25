@@ -60,7 +60,7 @@ interface AccessibilityMenuProps {
  * directement.
  *
  * Le menu s'ouvre aussi **à la demande** d'un autre point de la page — le lien
- * « Accessibilité » du pied de page (`requestAccessibilityMenu`). Il prend alors
+ * « Réglages d'accessibilité » du pied de page (`requestAccessibilityMenu`). Il prend alors
  * le focus, puisque le panneau ne suit pas ce lien dans l'ordre du document, et
  * le rend en se fermant à l'élément qui l'a demandé plutôt qu'au bouton flottant.
  */
