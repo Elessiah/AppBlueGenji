@@ -17,8 +17,9 @@ describe("CountdownStrip avant hydratation", () => {
     expect(html).toContain("--</div>");
   });
 
-  it("distingue le repli par une classe de couleur dédiée", () => {
-    expect(html).toContain("valPending");
+  it("distingue le repli par une classe de couleur dédiée, posée sur les « -- »", () => {
+    const matches = html.match(/class="[^"]*valPending[^"]*">--<\/div>/g) ?? [];
+    expect(matches.length).toBe(4);
   });
 
   it("porte un `<time>` avec une date machine-lisible et un nom accessible", () => {

@@ -26,16 +26,24 @@ export function computeCountdown(targetISO: string, now: number): CountdownParts
   return { d, h, m, s };
 }
 
-function unit(value: number, singular: string, plural: string): string {
-  return `${value} ${value > 1 ? plural : singular}`;
+// Même forme que `plural()` dans `lib/shared/tournament-preview.ts` : toutes
+// les unités d'ici sont régulières au pluriel, le repli par défaut suffit.
+function plural(count: number, singular: string, pluralForm = `${singular}s`): string {
+  return `${count} ${count > 1 ? pluralForm : singular}`;
 }
 
-/** Phrase lisible par un lecteur d'écran, résumée aux deux plus grandes unités non nulles. */
+/**
+ * Phrase lisible par un lecteur d'écran, résumée aux deux plus grandes
+ * unités non nulles. Une échéance atteinte (ou déjà dépassée, `computeCountdown`
+ * plafonnant l'écart à zéro) ne dit jamais « dans 0 seconde » — une fois
+ * l'échéance passée, ce serait faux à chaque relecture tant que la page reste ouverte.
+ */
 export function countdownAccessibleLabel(parts: CountdownParts): string {
   const { d, h, m, s } = parts;
 
-  if (d > 0) return `Début dans ${unit(d, "jour", "jours")} ${unit(h, "heure", "heures")}`;
-  if (h > 0) return `Début dans ${unit(h, "heure", "heures")} ${unit(m, "minute", "minutes")}`;
-  if (m > 0) return `Début dans ${unit(m, "minute", "minutes")} ${unit(s, "seconde", "secondes")}`;
-  return `Début dans ${unit(s, "seconde", "secondes")}`;
+  if (d === 0 && h === 0 && m === 0 && s === 0) return "Début imminent";
+  if (d > 0) return `Début dans ${plural(d, "jour")} ${plural(h, "heure")}`;
+  if (h > 0) return `Début dans ${plural(h, "heure")} ${plural(m, "minute")}`;
+  if (m > 0) return `Début dans ${plural(m, "minute")} ${plural(s, "seconde")}`;
+  return `Début dans ${plural(s, "seconde")}`;
 }

@@ -30,6 +30,11 @@ describe("countdownAccessibleLabel", () => {
 
   it("retombe sur les secondes seules dans la dernière minute", () => {
     expect(countdownAccessibleLabel({ d: 0, h: 0, m: 0, s: 12 })).toBe("Début dans 12 secondes");
-    expect(countdownAccessibleLabel({ d: 0, h: 0, m: 0, s: 0 })).toBe("Début dans 0 seconde");
+  });
+
+  it("ne dit jamais « dans 0 seconde » une fois l'échéance atteinte ou dépassée", () => {
+    // `computeCountdown` plafonne l'écart à zéro : sans ce cas, la phrase
+    // resterait « dans 0 seconde » à chaque relecture après le coup d'envoi.
+    expect(countdownAccessibleLabel({ d: 0, h: 0, m: 0, s: 0 })).toBe("Début imminent");
   });
 });
