@@ -43,7 +43,9 @@ export function CountdownStrip({ targetISO, label }: CountdownStripProps) {
       <time dateTime={targetISO} aria-label={accessibleLabel} className={styles.countdown}>
         {units.map(({ label: lbl, value }) => (
           <div key={lbl} className={styles.unit} aria-hidden="true">
-            <div className={`num ${styles.val}`}>{value}</div>
+            <div className={parts ? `num ${styles.val}` : `num ${styles.val} ${styles.valPending}`}>
+              {value}
+            </div>
             <div className={`mono ${styles.lbl}`}>{lbl}</div>
           </div>
         ))}

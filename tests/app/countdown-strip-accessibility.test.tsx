@@ -17,6 +17,10 @@ describe("CountdownStrip avant hydratation", () => {
     expect(html).toContain("--</div>");
   });
 
+  it("distingue le repli par une classe de couleur dédiée", () => {
+    expect(html).toContain("valPending");
+  });
+
   it("porte un `<time>` avec une date machine-lisible et un nom accessible", () => {
     expect(html).toContain('<time dateTime="2030-01-01T00:00:00Z"');
     expect(html).toContain('aria-label="Chargement du compte à rebours"');
