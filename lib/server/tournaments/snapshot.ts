@@ -26,7 +26,7 @@
  */
 import { createHash } from "node:crypto";
 import type { RowDataPacket } from "mysql2/promise";
-import type { TournamentSnapshot } from "@/lib/shared/types";
+import type { TournamentCard, TournamentSnapshot } from "@/lib/shared/types";
 import { getDatabase } from "@/lib/server/database";
 import { cached, invalidateCached } from "@/lib/server/cache";
 import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
@@ -45,6 +45,8 @@ import { invalidateTournamentLists } from "./list-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { pickChampion } from "@/lib/shared/tournament-card-summary";
+import { computeRunningRatio } from "@/lib/shared/tournament-progress";
 
 /**
  * Durée de vie d'un instantané. Volontairement courte : elle ne sert qu'à
@@ -282,15 +284,48 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
         ).map((row, index) => ({ ...row, seed: index + 1 }))
       : registrationRows;
 
+    const mappedMatches = matches.map(mapMatch);
+    const phases = phasesDetail?.phases ?? null;
+    const currentPhaseId = phasesDetail?.currentPhaseId ?? null;
+
+    // Le résumé que la liste lit par lots (`./list-summary`), rejoué ici sur
+    // les lignes déjà chargées et par les **mêmes** règles : la carte d'un
+    // tournoi dit la même chose dans la liste et dans la fiche.
+    const summarizedCard: TournamentCard = {
+      ...card,
+      champion:
+        card.state === "FINISHED"
+          ? pickChampion(
+              registrationRows.map((row) => ({
+                teamId: row.teamId,
+                name: row.teamName,
+                finalRank: row.finalRank,
+              })),
+            )
+          : null,
+      runningProgress:
+        card.state === "RUNNING"
+          ? computeRunningRatio({
+              format: card.format,
+              matches: mappedMatches,
+              swiss,
+              survivalStandings: survival?.standings ?? null,
+              enduranceStandings: endurance?.standings ?? null,
+              phases,
+              currentPhaseId,
+            })
+          : null,
+    };
+
     const payload: Omit<TournamentSnapshot, "version"> = {
-      card,
-      matches: matches.map(mapMatch),
+      card: summarizedCard,
+      matches: mappedMatches,
       registrations: orderedRegistrations,
       survival,
       swiss,
       endurance,
-      phases: phasesDetail?.phases ?? null,
-      currentPhaseId: phasesDetail?.currentPhaseId ?? null,
+      phases,
+      currentPhaseId,
       phaseStandings: phasesDetail?.phaseStandings ?? {},
       soloUserIds,
       seedingSource: source,

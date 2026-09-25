@@ -34,6 +34,9 @@ export function tournamentCard(overrides: Partial<TournamentCard> = {}): Tournam
     registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
     liveUrl: null,
     image: null,
+    finishedAt: null,
+    champion: null,
+    runningProgress: null,
     ...overrides,
   };
 }

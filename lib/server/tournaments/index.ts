@@ -162,6 +162,7 @@ import {
 import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finalization";
 import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
+import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
 import {
@@ -687,8 +688,17 @@ async function loadTournamentBuckets(
     finished: [],
   };
 
-  for (const row of rows) {
-    const card = mapCard(row);
+  const cards = rows.map(mapCard);
+  // Décoratifs : une panne de ces lectures ne doit pas vider `/tournois` et
+  // l'accueil, qui s'en passent très bien (les cartes retombent sur leurs
+  // `null`).
+  const summaries = await loadCardSummaries(db, cards).catch((error: unknown) => {
+    console.error("[tournaments] résumé des cartes indisponible :", error);
+    return new Map<number, Partial<CardSummary>>();
+  });
+
+  for (const [index, row] of rows.entries()) {
+    const card = { ...cards[index], ...summaries.get(cards[index].id) };
     if (row.state === "UPCOMING") buckets.upcoming.push(card);
     if (row.state === "REGISTRATION") buckets.registration.push(card);
     if (row.state === "RUNNING") buckets.running.push(card);

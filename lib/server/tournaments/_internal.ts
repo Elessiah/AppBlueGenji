@@ -235,6 +235,12 @@ export function mapCard(row: TournamentListRow): TournamentCard {
     liveUrl: normalizeStreamUrl(row.live_url),
     // Filtrée à la sortie (`localUploadUrl`) : seul un fichier du site ressort.
     image: parseTournamentImage(row.image_url, row.image_fit, row.image_focus_x, row.image_focus_y),
+    finishedAt: toIso(row.finished_at),
+    // Résumés lus à part, par lots pour la liste (`./list-summary`) et sur les
+    // lignes déjà chargées pour l'instantané : une ligne de tournoi ne les porte
+    // pas.
+    champion: null,
+    runningProgress: null,
   };
 }
 

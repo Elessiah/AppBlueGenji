@@ -7,9 +7,9 @@ import { RegistrationCard } from "@/app/(secured)/tournois/cards/RegistrationCar
 import { RunningCard } from "@/app/(secured)/tournois/cards/RunningCard";
 import { UpcomingCard } from "@/app/(secured)/tournois/cards/UpcomingCard";
 import { priorityBannerIds } from "@/app/(secured)/tournois/cards/card-image";
-import { DEFAULT_REGISTRATION_FILTERS } from "@/lib/shared/registration-filters";
 import type { TournamentImage } from "@/lib/shared/tournament-image";
 import type { TournamentCard, TournamentState } from "@/lib/shared/types";
+import { tournamentCard } from "../helpers/tournament-card";
 
 /**
  * Rendu de l'image d'un tournoi : une **illustration** devient un bandeau
@@ -25,31 +25,17 @@ const logo: TournamentImage = { url: URL, fit: "CONTAIN", focusX: 50, focusY: 50
 const imgTags = (markup: string) => markup.match(/<img\b[^>]*>/g) ?? [];
 
 function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
-  return {
+  return tournamentCard({
     id: 7,
     name: "BlueGenji Open",
-    description: null,
-    format: "SINGLE",
-    game: "OW",
-    participantType: "TEAM",
-    maxTeams: 8,
     registeredTeams: 4,
     state: "REGISTRATION",
     startVisibilityAt: "2026-08-01T10:00:00.000Z",
     registrationOpenAt: "2026-08-05T10:00:00.000Z",
     registrationCloseAt: "2026-08-20T10:00:00.000Z",
     startAt: "2026-08-25T18:00:00.000Z",
-    hasThirdPlaceMatch: false,
-    survivalRoundsBeforeFirstCut: null,
-    survivalRoundsPerCut: null,
-    phases: null,
-    matchFormat: null,
-    endurancePlayoffFormat: null,
-    registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
-    liveUrl: null,
-    image: null,
     ...overrides,
-  };
+  });
 }
 
 describe("TournamentImageBanner", () => {

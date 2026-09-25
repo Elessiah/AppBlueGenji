@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { matchFormatLabel } from "@/lib/shared/match-format";
 import { participantWording } from "@/lib/shared/participants";
+import { formatLabel, gameLabel } from "@/lib/shared/tournament-labels";
 import type { TournamentCard } from "@/lib/shared/types";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
+import { formatCardDate, progressPercent, runningCardAction } from "../_lib/card-display";
 import { CARD_IMAGE_SIZES } from "./card-image";
 import s from "../tournois.module.css";
 
@@ -13,73 +16,71 @@ interface RunningCardProps {
   priority?: boolean;
 }
 
+/**
+ * Carte d'un tournoi en cours. L'état se dit **une** fois, au ruban, et en
+ * bleu : le rouge est réservé à ce qui est réellement à l'antenne, et un
+ * tournoi en cours n'est pas une diffusion. La place ainsi rendue sert à dire
+ * où en est le tournoi (`runningProgress`).
+ */
 export function RunningCard({ t, priority }: RunningCardProps) {
   const wording = participantWording(t.participantType);
-  const gameLabel = t.game === "OW" ? "OVERWATCH" : "MARVEL RIVALS";
-  const formatLabel = t.format === "DOUBLE" ? "Double élimination" : "Élimination simple";
-  const startDate = new Date(t.startAt).toLocaleDateString("fr-FR", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+  const percent = progressPercent(t.runningProgress);
 
   return (
     <Link href={`/tournois/${t.id}`} style={{ textDecoration: "none" }}>
-      <article className={s.card} data-state="live" style={{ gridColumn: "span 2" }}>
+      <article className={s.card} data-state="running">
         <TournamentImageBanner
           image={t.image}
           sizes={CARD_IMAGE_SIZES}
           className={s.cardBanner}
           priority={priority}
         />
-        <div className={`${s.cardRibbon} ${s.cardRibbonLive}`}>
+        <div className={`${s.cardRibbon} ${s.cardRibbonRunning}`}>
           <span className={s.dot} />
-          EN COURS
+          En cours
         </div>
 
         <div className={s.cardHead}>
           <div className={s.cardGame}>
-            {gameLabel}
+            {gameLabel(t.game)}
             <span className={s.dot}>◆</span>
-            {formatLabel}
+            {formatLabel(t.format)}
           </div>
           <TournamentImageEmblem image={t.image} size={40} />
         </div>
 
         <h3 className={s.cardTitle}>{t.name}</h3>
-        <div className={s.cardSub}>En cours</div>
+        {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
 
         <div className={s.cardMeta}>
           <div>
             <div className={s.cardMetaLbl}>Début</div>
-            <div className={s.cardMetaVal}>{startDate}</div>
+            <div className={s.cardMetaVal}>{formatCardDate(t.startAt, true)}</div>
           </div>
           <div>
-            <div className={s.cardMetaLbl}>Format</div>
-            <div className={s.cardMetaVal}>{formatLabel}</div>
+            <div className={s.cardMetaLbl}>{wording.manyParticipating}</div>
+            <div className={`${s.cardMetaVal} ${s.num}`}>{t.registeredTeams}</div>
           </div>
           <div>
-            <div className={s.cardMetaLbl}>{wording.manyCapitalized}</div>
-            <div className={`${s.cardMetaVal} ${s.num}`}>
-              {t.registeredTeams}/{t.maxTeams}
-            </div>
-          </div>
-          <div>
-            <div className={s.cardMetaLbl}>État</div>
-            <div className={s.cardMetaVal}>En cours</div>
+            <div className={s.cardMetaLbl}>Matchs</div>
+            <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
           </div>
         </div>
 
-        <div className={s.cardFoot}>
-          <div style={{ fontFamily: "var(--font-mono)", fontSize: "11px", color: "var(--red-live)" }}>
-            <div style={{ fontSize: "9px", letterSpacing: "0.2em", textTransform: "uppercase", color: "var(--ink-mute)", marginBottom: "2px" }}>Statut</div>
-            <div style={{ fontSize: "13px", color: "var(--ink)" }}>En cours</div>
+        {percent !== null ? (
+          <div className={s.progress}>
+            <div className={s.progressBar} style={{ width: `${percent}%` }} />
           </div>
-          <span className={`${s.cardCta}`}>
-            Voir bracket
-          </span>
+        ) : null}
+
+        <div className={s.cardFoot}>
+          <div>
+            <div className={s.cardFootLbl}>Déroulement</div>
+            <div className={`${s.cardFootVal} ${s.num}`}>
+              {percent !== null ? `${percent} %` : "—"}
+            </div>
+          </div>
+          <span className={s.cardCta}>{runningCardAction(t.format)}</span>
         </div>
       </article>
     </Link>
