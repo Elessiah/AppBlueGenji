@@ -26,7 +26,7 @@ porte côté joueur.
    encore corriger la sienne (« Revoir le score »).
 4. **Sans réponse**, la proposition fait foi à l'échéance du délai
    (`score_deadline_at`, rappelé dans la modale). Ce délai ne court qu'après une
-   fin de série plausible — 15 min par map déclarée depuis le lancement
+   fin de série plausible — 15 min par map déclarée depuis le lancement, au plus le plafond de maps du format (BO5 en saisie libre)
    (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
    lancement ne fait pas foi avant que la série ait pu se jouer. Tant que
    l'adversaire n'a rien reporté, l'échéance suit le report **en vigueur** et ne

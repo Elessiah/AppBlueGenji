@@ -524,7 +524,7 @@ Deux reports concordants closent la rencontre, deux reports contradictoires
 ouvrent un **conflit** qui part au canal arbitre. Un report **seul** fait foi à
 l'échéance de `score_deadline_at` — mais cette échéance ne court qu'après une
 **fin de série plausible** : `max(maintenant, lancement + 15 min par map
-déclarée)` plus `SCORE_REPORT_TIMEOUT_MINUTES` (`lib/shared/score-report-deadline.ts`).
+déclarée, au plus le plafond de maps du format — BO5 en saisie libre)` plus `SCORE_REPORT_TIMEOUT_MINUTES` (`lib/shared/score-report-deadline.ts`).
 Sans ce plancher, un « 3-0 pour nous » déclaré à la seconde du lancement
 l'emportait dix minutes plus tard, pendant que l'adversaire jouait encore sa
 série. Un joueur ne peut donc en aucun cas :

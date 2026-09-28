@@ -360,7 +360,7 @@ export async function reportMatchScore(
 
   // Durée de la série que ce report affirme avoir été jouée : l'échéance ne
   // court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
-  const seriesMinutes = plausibleSeriesMinutes(myScore, opponentScore);
+  const seriesMinutes = plausibleSeriesMinutes(myScore, opponentScore, matchFormat);
 
   if (isTeam1Reporter) {
     await connection.execute(
