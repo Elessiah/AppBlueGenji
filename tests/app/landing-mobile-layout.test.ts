@@ -93,3 +93,62 @@ describe("chiffres de l'association", () => {
     expect(blockFor(/\.statActions\s*\{/, aboutStats)).toMatch(/flex-wrap:\s*wrap\s*;/);
   });
 });
+
+const sponsors = readSource("components/cyber/landing/SponsorsGrid.module.css");
+const leaderboard = readSource("components/cyber/landing/Leaderboard.module.css");
+const calendar = readSource("components/cyber/landing/CalendarCard.module.css");
+const calendarTsx = readSource("components/cyber/landing/CalendarCard.tsx");
+const about = readSource("components/cyber/landing/AboutSection.module.css");
+
+describe("partenaires", () => {
+  it("gardent deux colonnes en mobile", () => {
+    expect(blockFor(/\.grid\s*\{/, mediaBlock(sponsors, "(max-width: 900px)"))).toMatch(
+      /grid-template-columns:\s*1fr 1fr\s*;/,
+    );
+    expect(mediaBlock(sponsors, "(max-width: 720px)")).not.toMatch(/\.grid\s*\{/);
+  });
+
+  it("passent les boutons du staff sous le logo à demi-largeur", () => {
+    const actions = blockFor(/\.slotActions\s*\{/, mediaBlock(sponsors, "(max-width: 720px)"));
+    expect(actions).toMatch(/position:\s*static\s*;/);
+    expect(actions).toMatch(/flex-wrap:\s*wrap\s*;/);
+  });
+});
+
+describe("classement", () => {
+  it("abrège le nom de l'équipe — le lien, dernier enfant de la cellule", () => {
+    const name = blockFor(/\.team > :last-child\s*\{/, leaderboard);
+    expect(name).toMatch(/min-width:\s*0\s*;/);
+    expect(name).toMatch(/text-overflow:\s*ellipsis\s*;/);
+    expect(name).toMatch(/white-space:\s*nowrap\s*;/);
+    expect(stripComments(leaderboard)).not.toContain("span:last-child");
+  });
+
+  it("resserre les colonnes chiffrées en mobile", () => {
+    expect(blockFor(/\.row\s*\{/, mediaBlock(leaderboard, "(max-width: 720px)"))).toMatch(
+      /grid-template-columns:\s*24px minmax\(0, 1fr\) 56px 40px 30px\s*;/,
+    );
+  });
+});
+
+describe("calendrier", () => {
+  it("nomme la cellule de l'heure", () => {
+    expect(calendarTsx).toContain("styles.time");
+  });
+
+  it("passe l'heure sous la date et borne le nom à deux lignes en mobile", () => {
+    const mobile = mediaBlock(calendar, "(max-width: 720px)");
+    expect(blockFor(/\.row\s*\{/, mobile)).toMatch(/grid-template-columns:\s*48px 1px minmax\(0, 1fr\)\s*;/);
+    const time = blockFor(/\.time\s*\{/, mobile);
+    expect(time).toMatch(/grid-column:\s*1\s*;/);
+    expect(time).toMatch(/grid-row:\s*2\s*;/);
+    expect(blockFor(/\.title\s*\{/, mobile)).toMatch(/-webkit-line-clamp:\s*2\s*;/);
+  });
+});
+
+describe("association", () => {
+  it("réduit le texte d'introduction en mobile", () => {
+    expect(blockFor(/\.lede\s*\{/, mediaBlock(about, "(max-width: 720px)"))).toMatch(/font-size:\s*18px\s*;/);
+    expect(blockFor(/\.lede\s*\{/, about)).toMatch(/font-size:\s*22px\s*;/);
+  });
+});

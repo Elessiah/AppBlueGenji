@@ -83,7 +83,11 @@
   min-width: 0;
 }
 
-.team span:last-child {
+/* Le nom est le lien (`TeamLink`), dernier enfant de la cellule : l'ancien
+   sélecteur `span:last-child` ne l'atteignait pas, si bien qu'un nom long
+   passait sur trois lignes au lieu de s'abréger (le `title` le donne entier). */
+.team > :last-child {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -143,3 +147,16 @@
   margin: -7px -4px;
 }
 
+/* En mobile, les colonnes chiffrées se resserrent pour laisser au nom la
+   largeur d'une ligne entière. */
+@media (max-width: 720px) {
+  .root {
+    padding: 16px;
+  }
+
+  .tableHead,
+  .row {
+    grid-template-columns: 24px minmax(0, 1fr) 56px 40px 30px;
+    gap: 8px;
+  }
+}

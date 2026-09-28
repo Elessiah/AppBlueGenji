@@ -1,4 +1,4 @@
-# Accueil en mobile — hero et chiffres
+# Accueil en mobile — hero, chiffres et longueur de page
 
 Trois défauts de mise en page de `/` en largeur de téléphone, relevés par l'audit UI/UX de l'accueil (2026-09-25) et réglés ensemble.
 
@@ -22,8 +22,18 @@ Les trois chiffres (joueurs, équipes, tournois) étaient une ligne flexible à 
 
 La grille de `AboutStats` passait à une colonne sous 720 px, doublant la hauteur du bloc pour des cartes qui ne portent qu'un chiffre et un intitulé. Elle garde deux colonnes jusqu'à 340 px ; les boutons d'édition du staff passent à la ligne (`flex-wrap`) dans la demi-largeur.
 
-## Ce qui reste
+## La page condensée (≈ 8 600 → 7 900 px à 375 px)
 
-La longueur totale de la page en mobile (~11 écrans) tient surtout aux sections partenaires, piliers et classement/calendrier, dont le condensé suppose un arbitrage de contenu : consigné dans `ERREUR.txt`.
+Mesuré en direct : la longueur ne tenait pas aux piliers de l'association (trois cartes, ~360 px) mais à des lignes **qui se repliaient** là où elles auraient dû tenir.
 
-Tests : `tests/app/landing-mobile-layout.test.ts` (déclarations CSS ; le débordement lui-même a été vérifié en direct à 375 px et 1366 px).
+- **Classement** : le nom d'une équipe devait s'abréger, mais la règle visait `.team span:last-child` alors que le dernier enfant de la cellule est le lien (`TeamLink`, un `<a>`) — la règle ne s'appliquait à rien, et un nom de vingt caractères passait sur trois lignes (lignes de 80 à 99 px). Elle vise désormais `.team > :last-child` (le `title` du lien donne le nom entier), et sous 720 px les colonnes chiffrées se resserrent : huit lignes de 47 px, **~390 px** de gagnés.
+- **Calendrier** : sous 720 px, l'heure passe sous la date (elle prenait une colonne à droite), si bien que jeu et état tiennent sur une ligne ; le nom du tournoi s'arrête à deux lignes.
+- **Association** : le texte d'introduction passe de 22 à 18 px en mobile (onze lignes à 22 px sur une colonne de 350 px).
+- **Partenaires** : deux colonnes jusqu'au plus petit écran — un logo 3:1 reste lisible à ~170 px. Les quatre boutons du staff, posés en absolu sur le logo, l'auraient recouvert en entier à demi-largeur : ils passent **dessous**, à la ligne.
+- Les **piliers** ne sont pas repliés : trois cartes courtes ne justifient pas un contenu masqué derrière un geste.
+
+## Le bouton d'accessibilité s'estompe au défilement
+
+En `position: fixed`, le bouton recouvre ce qui se trouve dans son coin à l'instant où un défilement tactile s'arrête — aucune marge ne l'évite, le geste s'arrête à n'importe quel pixel. Sous 720 px, il s'efface donc (`opacity`, et `pointer-events: none` : le toucher passe au contenu dessous) le temps du geste et revient après 400 ms d'immobilité (`lib/shared/floating-button-scroll.ts`). Jamais quand on l'utilise : menu ouvert, ou focus dans le menu — flèches et Espace font défiler la page sans déplacer le focus. L'attribut `data-scrolling` est posé sur le DOM, pas en état React : un défilement ne re-rend rien. En desktop, rien ne change (le contenu, centré, n'atteint pas ce coin).
+
+Tests : `tests/app/landing-mobile-layout.test.ts`, `tests/lib/shared/floating-button-scroll.test.ts` (déclarations CSS ; le débordement lui-même a été vérifié en direct à 375 px et 1366 px).

@@ -58,7 +58,7 @@ export function CalendarCard({ events }: CalendarCardProps) {
                   {event.name}
                 </div>
               </div>
-              <div className="num mono">{date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
+              <div className={`num mono ${styles.time}`}>{date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
             </div>
           );
         })}

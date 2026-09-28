@@ -34,7 +34,8 @@
   transition:
     transform 0.2s ease,
     background-color 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    opacity 0.2s ease;
 }
 
 .fab:hover {
@@ -354,5 +355,13 @@
   .panel {
     width: calc(100vw - 32px);
     max-height: calc(100dvh - 96px);
+  }
+
+  /* Pendant un défilement, le bouton s'efface et laisse passer le toucher :
+     il recouvrait le début des lignes là où le geste s'arrêtait (gouttière de
+     16 px). Il revient dès que la page est immobile (`floating-button-scroll.ts`). */
+  .root[data-scrolling="true"] .fab {
+    opacity: 0.15;
+    pointer-events: none;
   }
 }

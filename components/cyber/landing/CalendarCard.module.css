@@ -101,3 +101,50 @@
   line-height: 1.5;
 }
 
+/* En mobile, l'heure quitte sa colonne pour passer sous la date : la place
+   rendue au corps garde jeu et état sur une ligne, et le nom s'arrête à deux
+   lignes — il se lit en entier sur la fiche du tournoi. */
+@media (max-width: 720px) {
+  .root {
+    padding: 16px;
+  }
+
+  .row {
+    grid-template-columns: 48px 1px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    row-gap: 2px;
+  }
+
+  .date {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .time {
+    grid-column: 1;
+    grid-row: 2;
+    text-align: center;
+    font-size: 11px;
+    color: var(--ink-mute);
+  }
+
+  .bar {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+    height: auto;
+    align-self: stretch;
+  }
+
+  .body {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .title {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+}
