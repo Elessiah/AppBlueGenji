@@ -42,15 +42,19 @@ function toBase64Url(bytes: Uint8Array | Buffer): string {
  */
 export function vapidKeyPair(publicKey: string, privateKey: string): crypto.KeyObject | null {
   const pub = decodeBase64Url(publicKey);
-  const priv = decodeBase64Url(privateKey);
-  if (!pub || pub.length !== 65 || pub[0] !== 0x04 || !priv || priv.length !== 32) return null;
+  const raw = decodeBase64Url(privateKey);
+  if (!pub || pub.length !== 65 || pub[0] !== 0x04 || !raw || raw.length === 0 || raw.length > 32) return null;
+  // Un scalaire dont l'octet de tête est nul s'écrit parfois sur 31 octets (ou
+  // moins) : c'est ce que rendait `ECDH.getPrivateKey()` une fois sur 256. Il
+  // se complète à gauche, sans quoi une clé valide serait refusée.
+  const priv = Buffer.concat([Buffer.alloc(32 - raw.length), Buffer.from(raw)]);
   try {
     // `createPrivateKey` ne vérifie pas que `d` correspond à (x, y) — et la clé
     // publique qu'on en tirerait ne ferait que relire le (x, y) fourni. On la
     // **recalcule** donc depuis `d`, et on compare : une paire dépareillée
     // signerait des jetons que tous les services refuseraient.
     const ecdh = crypto.createECDH("prime256v1");
-    ecdh.setPrivateKey(Buffer.from(priv));
+    ecdh.setPrivateKey(priv);
     if (!ecdh.getPublicKey().equals(Buffer.from(pub))) return null;
     return crypto.createPrivateKey({
       key: {
@@ -216,8 +220,10 @@ export async function sendWebPush(
 export function generateVapidKeys(): { publicKey: string; privateKey: string } {
   const ecdh = crypto.createECDH("prime256v1");
   ecdh.generateKeys();
+  const priv = ecdh.getPrivateKey();
   return {
     publicKey: toBase64Url(ecdh.getPublicKey()),
-    privateKey: toBase64Url(ecdh.getPrivateKey()),
+    // Toujours 32 octets : `getPrivateKey()` omet les zéros de tête.
+    privateKey: toBase64Url(Buffer.concat([Buffer.alloc(32 - priv.length), priv])),
   };
 }

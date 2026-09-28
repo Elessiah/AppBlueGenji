@@ -67,6 +67,12 @@ export function PushNotificationsPanel({
 
   const deviceControl = !configured ? (
     <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>
+  ) : !push.checked ? (
+    // L'abonnement du navigateur n'est pas encore relu : proposer d'activer
+    // maintenant, ce serait le proposer un instant à qui l'est déjà.
+    <p className={s.muted} role="status">
+      Vérification de cet appareil…
+    </p>
   ) : blocked && !push.subscribed ? (
     <p className={s.notice}>{blocked}</p>
   ) : push.subscribed ? (

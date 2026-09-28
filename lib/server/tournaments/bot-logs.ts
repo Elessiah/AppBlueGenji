@@ -342,7 +342,7 @@ export function flushBotLogs(connection: PoolConnection): void {
         const report = await notifyStaff({
           topic: "REFEREE_ALERT",
           discord: () => pushRefereeAlert(message, "referee-alert", { honourCircuit: true }),
-          push: refereeAlertPush(message, `${entry.kind}-${refereeAlertMatchId(entry)}`),
+          push: refereeAlertPush(message, refereePushKey(entry)),
         });
         sent = report.discord !== null;
       } catch {
@@ -417,6 +417,17 @@ function refereeAlertClaimId(entry: PendingBotLog): number | null {
  * Les deux natures concernées portent un `matchId` ; le `switch` est là pour
  * que TypeScript le sache, pas pour trancher quoi que ce soit.
  */
+/**
+ * Étiquette push d'une alerte d'arbitrage : sa nature et sa manche quand elle
+ * en a une. Stable d'un envoi à l'autre (la réservation, `claimId`, n'y entre
+ * pas) — une alerte renvoyée après un échec du bot remplace la précédente sans
+ * resonner — et **totale** : une nature d'alerte sans manche ajoutée demain ne
+ * doit pas faire échouer son propre envoi.
+ */
+function refereePushKey(entry: PendingBotLog): string {
+  return "matchId" in entry ? `${entry.kind}-${entry.matchId}` : entry.kind;
+}
+
 function refereeAlertMatchId(entry: PendingBotLog): number {
   switch (entry.kind) {
     case "score_conflict":

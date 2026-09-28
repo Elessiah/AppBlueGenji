@@ -110,6 +110,21 @@ describe("VAPID", () => {
     expect(Buffer.from(signature, "base64url")).toHaveLength(64);
   });
 
+  it("tire toujours une clé privée de 32 octets, et accepte un scalaire écrit court", () => {
+    for (let i = 0; i < 600; i += 1) {
+      const keys = generateVapidKeys();
+      expect(Buffer.from(keys.privateKey, "base64url")).toHaveLength(32);
+    }
+    // Un scalaire dont l'octet de tête est nul, écrit sans lui (31 octets).
+    let ecdh = crypto.createECDH("prime256v1");
+    do {
+      ecdh = crypto.createECDH("prime256v1");
+      ecdh.generateKeys();
+    } while (ecdh.getPrivateKey().length === 32);
+    const short = ecdh.getPrivateKey().toString("base64url");
+    expect(vapidKeyPair(ecdh.getPublicKey().toString("base64url"), short)).not.toBeNull();
+  });
+
   it("refuse une paire dépareillée ou mal formée", () => {
     const a = generateVapidKeys();
     const b = generateVapidKeys();

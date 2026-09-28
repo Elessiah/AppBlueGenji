@@ -58,7 +58,12 @@ départ), **réserve** l'annonce dans `bg_match_start_notices` — clé unique
 fois, et un appariement réécrit sur place réannonce —, puis envoie. Il est
 déclenché par chaque publication d'évènement de tournoi
 (`tournaments/notifications.ts`, import dynamique, étranglé à 10 s) et par la
-lecture de la liste des tournois.
+lecture de la liste des tournois. Un appel étranglé — ou arrivé pendant un
+balayage en vol, dont la lecture a pu précéder le lancement — n'est pas perdu :
+une **relève** unique repasse une fois le délai écoulé.
+
+En tournoi individuel, le nom d'un engagé est un pseudo : les notifications de
+match y disent « Ton match » et « Ton adversaire », sans nommer personne.
 
 Un match lancé parce que tout le monde a cliqué « Prêt » n'est pas annoncé une
 seconde fois : l'annonce « lancé » ne part que si le lancement n'a pas été
@@ -68,7 +73,17 @@ lancement d'office : une notification tardive ferait courir un joueur vers une
 partie déjà jouée. Le caster inscrit est prévenu comme les joueurs.
 
 Sans clés VAPID, rien n'est balayé **ni réservé** : une annonce réservée sans
-canal serait perdue pour de bon.
+canal serait perdue pour de bon. Même règle pour les changements de politique :
+un compte sans Discord n'est candidat à l'annonce que push allumé, et la
+lecture retombe sur Discord seul si la table des abonnements manque.
+
+Les alertes d'arbitrage portent une étiquette par nature et par manche : deux
+conflits d'un même tournoi ne se remplacent pas, et une alerte renvoyée après un
+échec du bot remplace la précédente sans resonner. Un signalement de problème
+qui n'a pas atteint le bot mais a atteint l'appareil d'un arbitre n'est pas annoncé
+« injoignable » au joueur (qui le renverrait). Les sujets coupés s'écrivent en
+série (`lib/shared/latest-value-writer.ts`) : deux cases cochées coup sur coup
+ne peuvent plus laisser au serveur la liste la plus ancienne.
 
 ## Protocole
 
