@@ -144,7 +144,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "signalement",
     title: "Signalement et modération",
     paragraphs: [
-      "Toute personne, membre ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton **« Signaler un problème »** présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer le nom et l'adresse de son auteur, le contenu visé et la raison de la demande.",
+      "Toute personne, membre ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton **« Signaler un problème »** présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer le nom et l'adresse de son auteur, le contenu visé et la raison de la demande. Un **comportement en jeu** (insulte, triche, anti-jeu, litige sur Discord) se signale, lui, sur le portail de support de l'association, dont le lien figure dans ce même formulaire.",
       "L'association agit comme **hébergeur** des contenus de ses membres : elle ne les contrôle pas avant publication, mais **retire promptement** tout contenu manifestement illicite qui lui est signalé.",
       "Selon la gravité, l'association peut **retirer un contenu** (par exemple un logo), **retirer une équipe d'un tournoi**, ou **suspendre un compte**.",
       "Les joueurs visés par un signalement, et les membres des équipes visées, en sont **prévenus en message privé Discord** (s'ils ont rattaché leur compte Discord ou certifié leur tag). Ils lisent sur la page du signalement ce qui est reproché — jamais qui l'a signalé — et peuvent le **contester** depuis cette page ou par la catégorie « Contestation » du même formulaire ; contester un signalement archivé le rouvre.",

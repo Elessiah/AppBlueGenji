@@ -47,6 +47,17 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
 | `OTHER` — Autre | joueurs, équipes, tournois | — |
 | `CONTEST` — Contestation | aucune (rattachée à `parentReportId`) | être visé ; connecté |
 
+**La modération qui n'est pas propre au site part ailleurs.** Un comportement en
+match, une insulte d'un joueur, de la triche ou un litige sur Discord ne sont pas
+des contenus que le site héberge : ni masquage, ni contestation, ni prévenance des
+personnes visées n'y ont prise. Ils se signalent sur le portail de support de
+l'association (Spiceworks, `MODERATION_SUPPORT_PORTAL_URL`). Le choix de catégorie
+y renvoie par une carte « Comportement d'un joueur » placée juste après
+« Modération » — un **lien** (nouvel onglet), pas une catégorie : rien n'est
+enregistré ni transmis —, et l'étape « Modération » le rappelle
+(`OFF_SITE_CONDUCT_NOTICE`). La catégorie `MODERATION` ne couvre donc plus que
+les contenus du site (pseudo, nom d'équipe, logo…).
+
 La validation (`validateReportSubmission`) est **unique** et partagée par le
 formulaire et `POST /api/reports`. Le consentement RGPD est une case obligatoire
 du formulaire ; les phrases qui l'accompagnent (`REPORT_PRIVACY_NOTICE`) sont

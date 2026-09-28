@@ -18,6 +18,7 @@ import {
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { MODERATION_SUPPORT_PORTAL_URL } from "@/lib/shared/content-reports";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
@@ -324,7 +325,13 @@ export default function RgpdPage() {
             exige en plus le nom et l&apos;adresse électronique de son auteur, sa qualité (titulaire des
             droits, représentant, tiers) et une déclaration de bonne foi : c&apos;est ce que le règlement
             européen sur les services numériques demande à une notification de contenu illicite
-            (art. 16).
+            (art. 16). Un <strong>comportement en jeu</strong> (insulte, triche, anti-jeu, litige sur
+            Discord) ne se signale pas par ce formulaire mais sur le{" "}
+            <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
+              portail de support de l&apos;association
+            </a>{" "}
+            (Spiceworks), qui a ses propres conditions : le site n&apos;y transmet rien, on le rejoint par
+            un simple lien.
           </p>
           <ul>
             <li>
