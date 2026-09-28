@@ -393,6 +393,10 @@ function alertLeadership(receivedInLastHour: number, message: string, reportId: 
   // peuvent pas annoncer la saturation tous les deux.
   const mode: ReportAlertMode = reportAlertMode(receivedInLastHour, lastSaturationNoticeAt, now);
   if (mode === "SATURATION_NOTICE") lastSaturationNoticeAt = now;
+  // Le rythme est retombé sous le plafond : l'afflux annoncé est terminé, le
+  // suivant doit l'être de nouveau — sans quoi un second pic dans l'heure
+  // ferait taire les alertes sans que rien ne le dise.
+  if (mode === "ALERT") lastSaturationNoticeAt = null;
   if (mode === "SILENT") return;
   const saturated = mode === "SATURATION_NOTICE";
   const text = saturated

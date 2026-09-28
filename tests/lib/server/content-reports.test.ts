@@ -404,6 +404,15 @@ describe("createReport", () => {
     await expect(createReport(bug, { userId: 3, managesTournaments: false })).resolves.toBe(70);
     expect(connection.commit).toHaveBeenCalled();
     expect(pushLeadershipAlert).not.toHaveBeenCalled();
+
+    // Le rythme retombe, puis un second pic dans l'heure : il est annoncé à son
+    // tour, sans quoi les alertes se tairaient sans que rien ne le dise.
+    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(0));
+    await createReport(bug, { userId: 3, managesTournaments: false });
+    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(REPORTS_HOURLY_CAP + 1));
+    jest.mocked(pushLeadershipAlert).mockClear();
+    await createReport(bug, { userId: 3, managesTournaments: false });
+    expect(jest.mocked(pushLeadershipAlert).mock.calls[0]?.[0]).toContain(`Plus de ${REPORTS_HOURLY_CAP} signalements`);
   });
 
   it.each([
