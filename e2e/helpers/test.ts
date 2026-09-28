@@ -4,7 +4,7 @@ import { test as base, expect, type Page } from "@playwright/test";
  * `test` et `expect` de la suite E2E : ceux de Playwright, plus un garde contre
  * les fenêtres que le site ouvre de lui-même sur n'importe quelle page.
  *
- * Deux fenêtres sont rendues par `app/layout.tsx` sans qu'aucun geste du test
+ * Trois fenêtres sont rendues par `app/layout.tsx` sans qu'aucun geste du test
  * ne les demande, et leur voile intercepte tout clic sur la page :
  *
  * - l'**annonce de recrutement prioritaire** (`components/recruitment-highlight.tsx`),
