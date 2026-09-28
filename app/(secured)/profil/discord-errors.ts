@@ -36,6 +36,8 @@ const VERIFICATION_ERRORS: Record<string, string> = {
 
   TOO_MANY_CODE_REQUESTS:
     "Trop de codes demandés pour ce compte Discord. Attends une quinzaine de minutes.",
+  TOO_MANY_CODE_REQUESTS_TODAY:
+    "Trop de codes demandés pour ce compte Discord aujourd'hui. Réessaie demain.",
   TOO_MANY_REQUESTS: "Trop de tentatives. Attends une quinzaine de minutes.",
 
   PROFILE_NOT_FOUND: "Ton compte est introuvable. Reconnecte-toi.",

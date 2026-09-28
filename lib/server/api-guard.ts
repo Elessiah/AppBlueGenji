@@ -283,7 +283,7 @@ export const DISCORD_CODE_REQUEST_IP_RULE: RateLimitRule = {
 };
 
 /**
- * Vérifications d'un code de connexion Discord, **par couple (compte visé, IP
+ * Vérifications d'un code de connexion Discord, **par couple (défi visé, IP
  * appelante)**.
  *
  * Première ligne, gratuite — **pas** la garantie. Le secret est tenu par deux
@@ -297,10 +297,10 @@ export const DISCORD_CODE_REQUEST_IP_RULE: RateLimitRule = {
  *
  * **L'IP appelante est dans la clé, et ce n'est pas cosmétique.** Posé sur le
  * seul compte visé — l'axe de la demande de code —, ce plafond désignait la
- * **victime** : la route est anonyme, l'identifiant Discord d'un joueur se lit
- * dans la réponse de `/api/auth/discord/request`, et dix codes bidon suffisaient
- * alors à fermer la connexion Discord d'un joueur nommé pendant un quart
- * d'heure. Le compte visé est bien le seul axe qu'un attaquant ne peut pas
+ * **victime** : la route est anonyme, et dix codes bidon suffisaient alors à
+ * fermer la connexion Discord d'un joueur nommé pendant un quart d'heure. (La
+ * demande de code ne publie plus l'identifiant Discord : la vérification
+ * désigne désormais le **défi** par un jeton imprévisible.) Le compte visé est bien le seul axe qu'un attaquant ne peut pas
  * faire tourner — mais c'est précisément ce qui fait de lui un mauvais axe
  * *ici* : le refus retombe sur la personne visée, pas sur l'appelant. Le
  * décompte des essais, lui, reste porté par le code en base, où changer d'IP

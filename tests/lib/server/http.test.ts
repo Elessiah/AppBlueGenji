@@ -1,4 +1,4 @@
-import { describe, it, expect } from "@jest/globals";
+import { describe, it, expect, jest } from "@jest/globals";
 import { ok, fail } from "@/lib/server/http";
 
 describe("http", () => {
@@ -51,9 +51,45 @@ describe("http", () => {
     });
 
     it("returns error object", async () => {
-      const response = fail("something went wrong");
+      const response = fail("SOMETHING_WENT_WRONG");
       const body = await response.json();
-      expect(body).toEqual({ error: "something went wrong" });
+      expect(body).toEqual({ error: "SOMETHING_WENT_WRONG" });
+    });
+
+    // Une cinquantaine de routes écrivent `fail(error.message || …)` : tout
+    // message d'exception imprévu partait tel quel, routes anonymes comprises.
+    describe("messages d'exception", () => {
+      it("remplace un message mysql2 par un code générique, sans rien en dire", async () => {
+        const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const response = fail("Table 'bluegenji.bg_users' doesn't exist", 500);
+        const text = await response.text();
+
+        expect(response.status).toBe(500);
+        expect(JSON.parse(text)).toEqual({ error: "INTERNAL_ERROR" });
+        expect(text).not.toContain("bluegenji");
+        // Le message reste lisible côté serveur, pour le diagnostic.
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringContaining("INTERNAL_ERROR"),
+          "Table 'bluegenji.bg_users' doesn't exist",
+        );
+        errorSpy.mockRestore();
+      });
+
+      it("rend INVALID_REQUEST sur un refus client", async () => {
+        const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        const response = fail("Unexpected end of JSON input", 400);
+
+        expect(await response.json()).toEqual({ error: "INVALID_REQUEST" });
+        errorSpy.mockRestore();
+      });
+
+      it("ne journalise rien quand le message est déjà un code", async () => {
+        const errorSpy = jest.spyOn(console, "error").mockImplementation(() => {});
+        fail("TEAM_NOT_FOUND", 404);
+
+        expect(errorSpy).not.toHaveBeenCalled();
+        errorSpy.mockRestore();
+      });
     });
 
     it("sets Content-Type header to application/json", async () => {
@@ -79,14 +115,15 @@ describe("http", () => {
 
       it("laisse le corps nu quand rien n'est joint", async () => {
         expect(await fail("TEAM_NOT_FOUND", 404).json()).toEqual({ error: "TEAM_NOT_FOUND" });
-        expect(await fail("X", 400, undefined).json()).toEqual({ error: "X" });
+        expect(await fail("XY", 400, undefined).json()).toEqual({ error: "XY" });
       });
 
       it("ne laisse pas un complément écraser le message", async () => {
-        // `error` est la clé que tous les appelants lisent : elle est écrite en
-        // premier, mais un complément homonyme la remplacerait silencieusement.
+        // `error` est la clé que tous les appelants lisent, et le seul champ
+        // filtré : un complément homonyme la remplaçait silencieusement, et
+        // contournait du même coup le filtre des messages non publics.
         const body = await fail("REAL", 400, { error: "USURPATEUR" } as never).json();
-        expect(body.error).toBe("USURPATEUR");
+        expect(body.error).toBe("REAL");
       });
     });
   });

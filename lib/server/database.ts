@@ -279,6 +279,7 @@ async function runMigrations(db: Pool): Promise<void> {
       CREATE TABLE IF NOT EXISTS bg_discord_login_challenges (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       discord_id VARCHAR(40) NOT NULL,
+      lookup_hash CHAR(64) NULL,
       handle VARCHAR(64) NULL,
       code_hash CHAR(64) NOT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -286,7 +287,8 @@ async function runMigrations(db: Pool): Promise<void> {
       consumed_at DATETIME NULL,
       attempts INT NOT NULL DEFAULT 0,
       INDEX idx_bg_challenges_discord_id (discord_id),
-      INDEX idx_bg_challenges_expires_at (expires_at)
+      INDEX idx_bg_challenges_expires_at (expires_at),
+      UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -1315,6 +1317,14 @@ async function runMigrations(db: Pool): Promise<void> {
     // l'ENUM : rejoué sur une base qui le porte déjà, il ne change rien.
     `ALTER TABLE bg_reports MODIFY category
        ENUM('COPYRIGHT', 'MODERATION', 'BUG', 'RGPD', 'HOSTING', 'OTHER', 'CONTEST') NOT NULL`,
+    // Jeton d'un défi de connexion Discord, **haché** : la demande de code ne
+    // rend plus l'identifiant Discord (c'était un oracle anonyme), et désigner
+    // le défi par son numéro de ligne, séquentiel, laissait brûler les codes de
+    // tout le site. `NULL` pour les lignes d'avant, qui expirent en dix minutes.
+    // Colonne et index dans **une seule** instruction : rejouée, elle bute
+    // d'abord sur la colonne (`ER_DUP_FIELDNAME`, toléré).
+    `ALTER TABLE bg_discord_login_challenges ADD COLUMN lookup_hash CHAR(64) NULL AFTER discord_id,
+       ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

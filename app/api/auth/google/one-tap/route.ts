@@ -11,11 +11,17 @@
 import { createSession } from "@/lib/server/auth";
 import { GOOGLE_ONE_TAP_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
+import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { createOrGetOAuthUser } from "@/lib/server/account-identities";
 import { verifyGoogleOneTapCredential } from "@/lib/server/google-one-tap";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 
 export async function POST(req: Request) {
+  // Avant tout : un formulaire d'un autre site posant le jeton **de
+  // l'attaquant** connecterait la victime à son compte (CSRF de connexion).
+  const crossSite = rejectCrossSiteRequest(req, { requireJson: true });
+  if (crossSite) return crossSite;
+
   try {
     const body = (await req.json()) as { credential?: string; termsAccepted?: boolean };
     const credential = (body.credential ?? "").trim();

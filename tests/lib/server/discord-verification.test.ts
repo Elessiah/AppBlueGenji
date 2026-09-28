@@ -112,6 +112,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   createChallengeMock.mockResolvedValue({
     challengeId: 77,
+    challengeToken: "t".repeat(32),
     code: "123456",
     expiresAt: new Date("2026-09-20T12:10:00Z"),
   });
@@ -323,7 +324,7 @@ describe("startDiscordVerification — le garde d'avant-envoi", () => {
     const order: string[] = [];
     createChallengeMock.mockImplementation(async () => {
       order.push("défi");
-      return { challengeId: 77, code: "123456", expiresAt: new Date() };
+      return { challengeId: 77, challengeToken: "t".repeat(32), code: "123456", expiresAt: new Date() };
     });
     sendMock.mockImplementation(async () => {
       order.push("envoi");
