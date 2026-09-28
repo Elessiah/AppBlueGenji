@@ -4,6 +4,8 @@
   gap: 14px;
 }
 
+/* Posée dans une modale qui a déjà son fond : le cadre la détache du reste
+   sans lui donner le poids d'une action principale. */
 .compact {
   display: flex;
   flex-direction: column;
@@ -36,6 +38,7 @@
 }
 
 .dot {
+  flex-shrink: 0;
   width: 8px;
   height: 8px;
   border-radius: 50%;
@@ -108,6 +111,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
+  min-width: 0;
   cursor: pointer;
 }
 

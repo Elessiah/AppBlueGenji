@@ -50,7 +50,11 @@ export function PushNotificationsPanel({
   const listId = useId();
 
   if (push.support === null || push.server === null) {
-    return variant === "compact" ? null : <p className={s.muted}>Chargement des notifications…</p>;
+    return variant === "compact" ? null : (
+      <p className={s.muted} role="status">
+        Chargement des notifications…
+      </p>
+    );
   }
 
   const shown = push.server.topics.filter((topic) => !topics || topics.includes(topic));
@@ -67,7 +71,8 @@ export function PushNotificationsPanel({
     <p className={s.notice}>{blocked}</p>
   ) : push.subscribed ? (
     <div className={s.deviceRow}>
-      <span className={s.status}>
+      {/* Annoncé aux lecteurs d'écran : c'est l'issue du geste qu'on vient de faire. */}
+      <span className={s.status} role="status">
         <span className={s.dot} aria-hidden="true" /> Activées sur cet appareil
       </span>
       <CyberButton
@@ -85,6 +90,7 @@ export function PushNotificationsPanel({
     <div className={s.deviceRow}>
       <CyberButton
         type="button"
+        aria-busy={push.busy}
         disabled={push.busy}
         onClick={async () => {
           if (await push.enable()) showSuccess("Notifications activées sur cet appareil.");
