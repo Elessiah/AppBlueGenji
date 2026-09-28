@@ -645,7 +645,7 @@ export const REPORT_PRIVACY_NOTICE = {
   data:
     "Données : la catégorie, ta description, les joueurs, équipes ou tournois désignés, la page d'où tu signales, ton compte si tu es connecté, et le nom et l'adresse que tu indiques.",
   recipients:
-    "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ton adresse, ta description ni le pseudo d'un joueur. Les joueurs et les membres des équipes visés sont prévenus et peuvent lire ta description pour y répondre — jamais ton nom, ton adresse ni ton compte.",
+    "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ton adresse, ta description ni le pseudo d'un joueur. Les joueurs et les membres des équipes visés peuvent lire ta description pour y répondre — jamais ton nom, ton adresse ni ton compte — et en sont prévenus par message, sauf depuis un compte tout juste créé ou au-delà d'une limite quotidienne par compte.",
   contestRecipients:
     "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. L'auteur du signalement n'est pas informé de ta contestation.",
   // La prolongation est dite ici, et non seulement sur `/rgpd` : c'est cette
