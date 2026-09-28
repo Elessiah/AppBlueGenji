@@ -73,7 +73,7 @@ export async function createGhostTeam(
  *
  * Refus : équipe inconnue, déjà réelle, dissoute, joueur inconnu ou déjà engagé
  * dans une autre équipe, ou reprise déjà proposée à ce joueur
- * (`ALREADY_INVITED`).
+ * (`GHOST_CLAIM_ALREADY_PROPOSED`).
  *
  * @param createdBy membre du staff qui propose la reprise (`created_by`).
  */
@@ -126,7 +126,7 @@ export async function claimGhostTeam(
        LIMIT 1`,
       [teamId, newOwnerUserId],
     );
-    if (pending.length > 0) throw new Error("ALREADY_INVITED");
+    if (pending.length > 0) throw new Error("GHOST_CLAIM_ALREADY_PROPOSED");
 
     await connection.execute(
       `INSERT INTO bg_team_invitations (team_id, user_id, created_by, kind, roles_json, status)

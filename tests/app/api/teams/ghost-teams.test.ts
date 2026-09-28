@@ -125,12 +125,12 @@ describe("POST /api/teams/[id]/claim", () => {
   it("renvoie 409 si une reprise attend déjà la réponse de ce joueur", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(getUserIdByPseudo).mockResolvedValue(9);
-    jest.mocked(claimGhostTeam).mockRejectedValue(new Error("ALREADY_INVITED"));
+    jest.mocked(claimGhostTeam).mockRejectedValue(new Error("GHOST_CLAIM_ALREADY_PROPOSED"));
 
     const res = await claimRoute(jsonReq({ pseudo: "Kery" }), params("3"));
 
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "ALREADY_INVITED" });
+    expect(await res.json()).toEqual({ error: "GHOST_CLAIM_ALREADY_PROPOSED" });
   });
 
   it("renvoie 404 pour un pseudo inconnu", async () => {

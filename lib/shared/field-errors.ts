@@ -233,6 +233,7 @@ export const PLAYER_PSEUDO_FIELD_ERRORS: FieldErrorMap<PlayerPseudoField> = {
   USER_NOT_FOUND: "pseudo",
   USER_ALREADY_IN_TEAM: "pseudo",
   ALREADY_INVITED: "pseudo",
+  GHOST_CLAIM_ALREADY_PROPOSED: "pseudo",
   PLAYER_ACCOUNT_DELETED: "pseudo",
 };
 

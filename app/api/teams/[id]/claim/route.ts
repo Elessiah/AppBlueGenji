@@ -39,7 +39,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     if (
       message === "NOT_A_GHOST_TEAM"
       || message === "USER_ALREADY_IN_TEAM"
-      || message === "ALREADY_INVITED"
+      || message === "GHOST_CLAIM_ALREADY_PROPOSED"
     ) {
       return fail(message, 409);
     }

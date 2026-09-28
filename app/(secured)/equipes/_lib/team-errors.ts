@@ -75,6 +75,9 @@ const TEAM_ERRORS: Record<string, string> = {
   PLAYER_ACCOUNT_DELETED: "Ce joueur a supprimé son compte : il ne peut plus rejoindre d'équipe.",
   MEMBER_ACCOUNT_DELETED: "Ce compte a été supprimé : il ne peut pas recevoir la propriété de l'équipe.",
   NOT_A_GHOST_TEAM: "Cette équipe n'est plus une équipe fantôme : elle a déjà un propriétaire.",
+  // Reprise d'une fantôme déjà proposée au même joueur (staff) : distinct
+  // d'`ALREADY_INVITED`, qui parle à la gestion de « son » équipe.
+  GHOST_CLAIM_ALREADY_PROPOSED: "Cette équipe est déjà proposée à ce joueur : sa réponse est attendue.",
 
   // ── Replis des routes : chacun nomme le geste qui a échoué. ──
   TEAM_JOIN_FAILED: "La demande n'a pas pu être envoyée.",

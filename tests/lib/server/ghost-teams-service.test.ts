@@ -199,7 +199,7 @@ describe("claimGhostTeam", () => {
       .mockResolvedValueOnce([[{ id: 77 }]]);
     await mockDb(execute);
 
-    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("ALREADY_INVITED");
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("GHOST_CLAIM_ALREADY_PROPOSED");
     expect(execute).toHaveBeenCalledTimes(4);
   });
 });
