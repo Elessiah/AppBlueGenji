@@ -97,6 +97,7 @@ describe("createReport", () => {
     () => [rows],
   ];
   /** Ancienneté du compte auteur et ses signalements à cibles du jour. */
+  const markRoute: Route = [/UPDATE bg_report_targets SET notified_at = NOW\(\)/, () => [{ affectedRows: 1 }]];
   const reporterRoute = (ageHours = 24 * 30, earlier = 0): Route => [
     /TIMESTAMPDIFF\(HOUR, u.created_at, NOW\(\)\) AS age_hours/,
     () => [[{ age_hours: ageHours, earlier }]],
@@ -107,6 +108,7 @@ describe("createReport", () => {
       [
         cooldownRoute(),
         reporterRoute(),
+        markRoute,
         [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
@@ -144,6 +146,7 @@ describe("createReport", () => {
       [
         cooldownRoute(),
         reporterRoute(),
+        markRoute,
         [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
@@ -169,6 +172,7 @@ describe("createReport", () => {
       [
         cooldownRoute(),
         reporterRoute(),
+        markRoute,
         [
           /FROM bg_users u\s+WHERE u.is_deleted = 0/,
           () => [
@@ -207,6 +211,9 @@ describe("createReport", () => {
       { discordId: "900000000000000008", handle: null, label: "PseudoSecret" },
       { discordId: null, handle: "membre", label: "Membre" },
     ]);
+    // Les cibles prévenues sont marquées : c'est ce que relit la reprévenance.
+    const mark = pool.execute.mock.calls.find(([sql]) => /UPDATE bg_report_targets SET notified_at/.test(sql));
+    expect(mark?.[1]).toEqual([12, "USER", 8, "TEAM", 4]);
   });
 
   it("ne reprévient pas une cible déjà visée par un signalement récent", async () => {
@@ -214,6 +221,7 @@ describe("createReport", () => {
       [
         cooldownRoute([{ target_type: "TEAM", target_id: 4 }]),
         reporterRoute(),
+        markRoute,
         [
           /FROM bg_users u\s+WHERE u.is_deleted = 0/,
           () => [[{ id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null }]],
@@ -233,7 +241,9 @@ describe("createReport", () => {
 
     const cooldown = pool.execute.mock.calls.find(([sql]) => /SELECT DISTINCT t.target_type/.test(sql));
     // Autre signalement que celui-ci, dans les 24 dernières heures, sur ces cibles.
-    expect(cooldown?.[0]).toMatch(/r.id <> \?/);
+    expect(cooldown?.[0]).toMatch(/t.report_id <> \?/);
+    // Seules comptent les cibles réellement prévenues, pas celles seulement désignées.
+    expect(cooldown?.[0]).toMatch(/t.notified_at > NOW\(\) - INTERVAL 24 HOUR/);
     expect(cooldown?.[0]).toMatch(/INTERVAL 24 HOUR/);
     expect(cooldown?.[1]).toEqual([12, "TEAM", 4, "USER", 8]);
     // L'équipe, déjà prévenue, n'est plus cherchée : seul le joueur l'est.
@@ -373,8 +383,10 @@ describe("createReport", () => {
     expect(reporter?.[0]).toMatch(/r.id < \?/);
     expect(reporter?.[1]).toEqual([12, 3]);
     expect(reporter?.[0]).toMatch(/INTERVAL 24 HOUR/);
-    // Un signalement qui ne désigne qu'un tournoi n'a prévenu personne : il ne compte pas.
-    expect(reporter?.[0]).toMatch(/t.target_type IN \('USER', 'TEAM'\)/);
+    // Seuls comptent les signalements qui ont réellement prévenu quelqu'un.
+    expect(reporter?.[0]).toMatch(/t.notified_at > NOW\(\) - INTERVAL 24 HOUR/);
+    // Retenu, celui-ci ne marque aucune cible : il ne tiendra pas les autres au silence.
+    expect(pool.execute.mock.calls.some(([sql]) => /UPDATE bg_report_targets/.test(sql))).toBe(false);
     expect(pool.execute.mock.calls.some(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0/.test(sql))).toBe(false);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     // La direction, elle, est alertée.

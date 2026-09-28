@@ -1136,12 +1136,15 @@ async function runMigrations(db: Pool): Promise<void> {
   // équipe dissoute ou un compte effacé ne doivent pas emporter le signalement
   // qui les visait. Le libellé est relevé à l'envoi pour la même raison — le
   // panneau dit encore de quoi il s'agissait quand la fiche n'existe plus.
+  // `notified_at` : instant où la cible a été prévenue, `NULL` si rien ne lui a
+  // été envoyé (tournoi, cible déjà prévenue, auteur retenu par son plafond).
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_report_targets (
       report_id BIGINT NOT NULL,
       target_type ENUM('USER', 'TEAM', 'TOURNAMENT') NOT NULL,
       target_id BIGINT NOT NULL,
       label_snapshot VARCHAR(191) NULL,
+      notified_at DATETIME NULL,
       PRIMARY KEY (report_id, target_type, target_id),
       INDEX idx_bg_report_targets_target (target_type, target_id),
       CONSTRAINT fk_bg_report_targets_report FOREIGN KEY (report_id)
@@ -1325,6 +1328,11 @@ async function runMigrations(db: Pool): Promise<void> {
     // d'abord sur la colonne (`ER_DUP_FIELDNAME`, toléré).
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN lookup_hash CHAR(64) NULL AFTER discord_id,
        ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
+    // Cible d'un signalement réellement prévenue : le délai de reprévenance et
+    // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`
+    // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles
+    // ont reçu un message.
+    `ALTER TABLE bg_report_targets ADD COLUMN notified_at DATETIME NULL AFTER label_snapshot`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

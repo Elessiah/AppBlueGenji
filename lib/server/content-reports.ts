@@ -503,6 +503,20 @@ export async function notifyReportTargets(
     .map((row) => toNotificationRecipient(row, "proven"));
   if (recipients.length === 0) return;
 
+  // Les cibles réellement prévenues sont marquées : c'est ce que relisent le
+  // délai de reprévenance et le plafond de l'auteur. Compter toute cible
+  // **désignée** laissait un compte neuf, qui ne fait écrire à personne, rendre
+  // muet pour 24 h le signalement légitime d'un autre sur la même équipe.
+  const marked = [
+    ...userIds.map((id) => ["USER", id] as const),
+    ...teamIds.map((id) => ["TEAM", id] as const),
+  ];
+  await db.execute(
+    `UPDATE bg_report_targets SET notified_at = NOW()
+     WHERE report_id = ? AND (${marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
+    [reportId, ...marked.flat()],
+  );
+
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   await notifyUsers(recipients, {
     topic: "CONTENT_REPORT",
@@ -513,9 +527,10 @@ export async function notifyReportTargets(
 
 /**
  * L'auteur de ce signalement peut-il faire écrire aux personnes visées ?
- * Ancienneté de son compte et signalements désignant des **personnes** (joueur
- * ou équipe — un tournoi désigné ne prévient personne) des dernières 24 heures,
- * **antérieurs** à celui-ci (identifiant inférieur : la vérification ne part
+ * Ancienneté de son compte et signalements qui ont **réellement prévenu**
+ * quelqu'un (`bg_report_targets.notified_at`) dans les dernières 24 heures —
+ * un tournoi désigné, une cible déjà prévenue ou un envoi retenu ne comptent
+ * pas —, **antérieurs** à celui-ci (identifiant inférieur : la vérification ne part
  * qu'après le commit, et des envois rapprochés déposés depuis ne doivent pas
  * retirer son message à celui-ci), jugés par `reporterMayWarnTargets`. Un compte introuvable
  * ne fait écrire à personne.
@@ -528,8 +543,7 @@ async function reporterMayWarn(reportId: number, reporterUserId: number): Promis
              FROM bg_reports r
              JOIN bg_report_targets t ON t.report_id = r.id
              WHERE r.reporter_user_id = u.id AND r.id < ?
-               AND t.target_type IN ('USER', 'TEAM')
-               AND r.created_at > NOW() - INTERVAL 24 HOUR) AS earlier
+               AND t.notified_at > NOW() - INTERVAL 24 HOUR) AS earlier
      FROM bg_users u
      WHERE u.id = ?`,
     [reportId, reporterUserId],
@@ -542,9 +556,10 @@ async function reporterMayWarn(reportId: number, reporterUserId: number): Promis
 }
 
 /**
- * Cibles de ce signalement déjà visées par un **autre** signalement depuis
- * moins de `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` : elles ont été prévenues, le
- * message de plus est retenu (clés `TYPE:id`).
+ * Cibles de ce signalement déjà **prévenues** par un autre signalement depuis
+ * moins de `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` (`notified_at`) : le message
+ * de plus est retenu (clés `TYPE:id`). Une cible seulement désignée — par un
+ * compte retenu, par exemple — ne compte pas : elle n'a rien reçu.
  */
 async function recentlyNotifiedTargets(
   reportId: number,
@@ -556,9 +571,8 @@ async function recentlyNotifiedTargets(
   const [rows] = await db.execute<(RowDataPacket & { target_type: ReportTargetType; target_id: number })[]>(
     `SELECT DISTINCT t.target_type, t.target_id
      FROM bg_report_targets t
-     JOIN bg_reports r ON r.id = t.report_id
-     WHERE r.id <> ?
-       AND r.created_at > NOW() - INTERVAL ${Number(REPORT_TARGET_NOTICE_COOLDOWN_HOURS)} HOUR
+     WHERE t.report_id <> ?
+       AND t.notified_at > NOW() - INTERVAL ${Number(REPORT_TARGET_NOTICE_COOLDOWN_HOURS)} HOUR
        AND (${refs.map(() => "(t.target_type = ? AND t.target_id = ?)").join(" OR ")})`,
     [reportId, ...refs.flatMap((target) => [target.type, target.id])],
   );

@@ -162,7 +162,9 @@ et au plus une fois par heure depuis la mise en page racine
 
 `bg_reports` (dont `parent_report_id` pour une contestation) et
 `bg_report_targets` (sans clé étrangère vers la cible : une équipe dissoute
-n'emporte pas le signalement ; `label_snapshot` garde le nom). L'export RGPD
+n'emporte pas le signalement ; `label_snapshot` garde le nom ; `notified_at`
+dit si la cible a réellement été prévenue — c'est lui, et non la seule
+désignation, que relisent le délai de reprévenance et le plafond de l'auteur). L'export RGPD
 d'un compte rend ses signalements et contestations, **coordonnées saisies
 comprises** (nom, adresse, qualité, page) ; l'anonymisation les
 détache de lui. Fiche `T11` du registre des traitements ; section
