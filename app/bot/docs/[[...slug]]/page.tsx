@@ -7,17 +7,18 @@ import "../docs.css";
 import { PublicHeader } from "@/components/cyber/landing/PublicHeader";
 import { PublicFooter } from "@/components/cyber/landing/PublicFooter";
 import { CyberButton } from "@/components/cyber";
-import { findBotDocSection, loadBotDoc } from "@/lib/server/bot-docs";
+import { findBotDocSection, loadBotDocCached } from "@/lib/server/bot-docs";
 import { visibleBotDocSections, BOT_LEGAL_LINKS } from "@/lib/shared/bot-doc-sections";
 import { getCurrentUser } from "@/lib/server/auth";
 import { isStaffMember } from "@/lib/shared/permissions";
 
 /**
  * Les fichiers sources vivent dans le projet du bot (dossier voisin) et sont
- * relus à chaque revalidation : une mise à jour de la doc du bot se propage
- * ici toute seule, sans rebuild de l'app.
+ * relus au plus une fois par minute (`loadBotDocCached`) : une mise à jour de la
+ * doc du bot se propage ici toute seule, sans rebuild de l'app. Pas de
+ * `export const revalidate` : la mise en page racine lit `headers()` (nonce de
+ * la CSP), la page est rendue à chaque requête quoi qu'on y déclare.
  */
-export const revalidate = 60;
 
 interface PageProps {
   params: Promise<{ slug?: string[] }>;
@@ -51,7 +52,7 @@ export default async function BotDocsPage({ params }: PageProps) {
   const section = findBotDocSection(slug?.[0], isStaff);
   if (!section) notFound();
 
-  const doc = await loadBotDoc(section);
+  const doc = await loadBotDocCached(section);
 
   return (
     <>

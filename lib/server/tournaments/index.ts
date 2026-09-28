@@ -1,6 +1,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   TournamentBuckets,
+  TournamentCard,
   TournamentDetail,
   TournamentFormat,
   TournamentSnapshot,
@@ -19,6 +20,7 @@ import { checkEntrantEligibility } from "./registration-eligibility";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
+import { computeTournamentState as sharedComputeTournamentState } from "@/lib/shared/tournament-state";
 import { parseTournamentDates } from "./validation";
 import type { TournamentListRow } from "./_internal";
 
@@ -163,7 +165,7 @@ import { resolveExpiredScoreReports, finalizeTournamentIfDone } from "./finaliza
 import { tryAutoResolveByes } from "./byes";
 import { mapCard } from "./_internal";
 import { loadCardSummaries, type CardSummary } from "./list-summary";
-import { loadTournamentRow } from "./repository";
+import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
 import {
   publishMatchUpdatedEvent,
@@ -213,8 +215,11 @@ const SYNC_THROTTLE_MS = 15_000;
  * L'échec d'un tournoi n'emporte donc pas les suivants : sa transaction est
  * défaite, ses lignes de journal jetées, et la passe continue. L'entretien est
  * de toute façon idempotent, le prochain balayage le retrouvera.
+ *
+ * Exportée pour les tests seulement : `listTournamentBuckets` la lance sans
+ * l'attendre, si bien qu'on ne pourrait pas observer la fin d'une passe par elle.
  */
-async function syncVisibleTournaments(): Promise<void> {
+export async function syncVisibleTournaments(): Promise<void> {
   if (pendingSync) return pendingSync;
   if (Date.now() - lastSyncAt < SYNC_THROTTLE_MS) return;
 
@@ -567,12 +572,19 @@ export async function listTournamentBuckets(
   // À l'intérieur, elle jetterait le résultat qu'elle vient de rendre correct,
   // et l'agrégat repartirait pour rien à chaque bascule.
   //
-  // Son échec, lui, n'emporte pas la lecture : c'est un entretien d'arrière-plan
-  // (une transaction sur tous les tournois en cours), pas une condition pour
-  // servir une liste que le cache tient peut-être déjà prête. Un verrou ou une
-  // panne passagère de MySQL viderait sinon `/tournois` alors qu'il n'y avait
-  // rien à en faire.
-  await syncVisibleTournaments().catch(() => undefined);
+  // Elle n'est pas non plus **attendue** : c'est un entretien d'arrière-plan
+  // (une transaction par tournoi à entretenir), pas une condition pour servir
+  // la liste. L'attendre faisait payer toutes les 15 s la passe entière à la
+  // requête qui tombait dessus — rendu de l'accueil, `GET /api/tournaments` —
+  // et à toutes celles qui arrivaient pendant (`pendingSync`), alors que
+  // l'affichage n'en dépend plus : le client fait basculer les états seul
+  // (`useScheduledBuckets`), et ce que la passe écrit est publié en fin de
+  // passe (`publishUpdatedEvent`), ce qui vide la liste mise en cache — une
+  // lecture partie pendant la passe n'y range pas son résultat, le cache
+  // comptant les invalidations. Son échec n'emporte rien non plus : un verrou
+  // ou une panne passagère de MySQL viderait sinon `/tournois` alors qu'il n'y
+  // avait rien à en faire.
+  void syncVisibleTournaments().catch(() => undefined);
 
   // Les rappels de match n'ont pas d'ordonnanceur : c'est le trafic qui les
   // entraîne, comme la bascule d'état juste au-dessus. Étranglé à une minute et
@@ -959,6 +971,37 @@ export async function getVisibleTournamentSnapshot(
   if (!snapshot) return null;
   if (!canViewTournament(snapshot.card, { canManage: rights.canManage === true })) return null;
   return snapshot;
+}
+
+/**
+ * Carte d'un tournoi **que ce lecteur a le droit de lire** — la lecture légère,
+ * pour ce qui ne veut que décrire le tournoi (titre et description d'un lien
+ * partagé, image d'aperçu).
+ *
+ * `getVisibleTournamentSnapshot` construit l'instantané entier — tous les
+ * matchs, les inscrites, les classements, voire une transaction d'entretien —
+ * et l'ouverture d'une fiche le payait une première fois rien que pour ses
+ * métadonnées, le cache (3 s) étant souvent expiré quand le flux SSE ouvert
+ * après l'hydratation le redemandait. Ici : une seule requête indexée, celle de
+ * la ligne de liste, sans rien écrire.
+ *
+ * Même règle de visibilité, même module pur, même `null` pour « n'existe pas »
+ * et « pas pour vous ». Aucun entretien n'étant joué, l'état stocké peut
+ * retarder d'une bascule : il est donc **recalculé** depuis les dates, par la
+ * règle partagée (`computeTournamentState`) que le client applique aussi —
+ * l'encart ne dit pas « inscriptions à venir » d'un tournoi qui les a ouvertes.
+ */
+export async function getVisibleTournamentCard(
+  tournamentId: number,
+  rights: TournamentViewerRights = {},
+): Promise<TournamentCard | null> {
+  const row = await withConnection((connection) => getTournamentListRow(connection, tournamentId));
+  if (!row) return null;
+
+  const card = mapCard(row);
+  if (!canViewTournament(card, { canManage: rights.canManage === true })) return null;
+
+  return { ...card, state: sharedComputeTournamentState(card) };
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 import {
   SITE_DESCRIPTION,
@@ -25,14 +25,17 @@ type LayoutProps = {
  * robot d'aperçu voie autre chose que la page de connexion.
  *
  * La règle de visibilité est celle du reste du site, sans exception :
- * {@link getVisibleTournamentSnapshot} est la seule porte, et un tournoi non
- * publié n'existe que pour la permission `tournaments`. Un tournoi qu'on ne peut
+ * {@link getVisibleTournamentCard} l'applique par le même module pur que
+ * l'instantané, et un tournoi non publié n'existe que pour la permission
+ * `tournaments`. Un tournoi qu'on ne peut
  * pas lire ne produit donc pas d'encart particulier — il retombe sur celui du
  * site, plutôt qu'un « accès refusé » qui confirmerait son existence.
  *
- * La lecture est mutualisée : `getTournamentSnapshot` passe par le cache à vol
- * unique du module, celui-là même que sert le flux SSE. Un lien collé dans un
- * gros salon Discord ne déclenche donc pas une passe en base par robot.
+ * La lecture est **légère** : la carte du tournoi seule, une requête indexée,
+ * et non l'instantané entier (matchs, inscrites, classements, voire une
+ * transaction d'entretien) dont seuls le titre et la description servaient ici
+ * — l'ouverture d'une fiche le construisait une fois pour ses métadonnées, puis
+ * souvent une seconde fois pour le flux SSE, le cache ne durant que 3 s.
  */
 export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
   const fallback: Metadata = { title: "Tournoi", description: SITE_DESCRIPTION };
@@ -44,18 +47,18 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
   // Une base injoignable ne doit pas faire échouer la page entière : sans ce
   // filet, une panne de lecture rendrait la fiche inaccessible au lieu de la
   // laisser afficher son propre message d'erreur.
-  const snapshot = await getCurrentUser()
+  const card = await getCurrentUser()
     .then((user) =>
-      getVisibleTournamentSnapshot(tournamentId, {
+      getVisibleTournamentCard(tournamentId, {
         canManage: user ? can(user, "tournaments") : false,
       }),
     )
     .catch(() => null);
 
-  if (!snapshot) return fallback;
+  if (!card) return fallback;
 
-  const title = tournamentShareTitle(snapshot.card);
-  const description = tournamentShareDescription(snapshot.card);
+  const title = tournamentShareTitle(card);
+  const description = tournamentShareDescription(card);
 
   return {
     // Le gabarit de la racine ajouterait « · BlueGenji Esport » derrière un
