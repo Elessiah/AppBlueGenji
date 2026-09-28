@@ -42,6 +42,9 @@ import {
   loadTournamentRow,
 } from "./repository";
 import { invalidateTournamentLists } from "./list-cache";
+import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { localUploadUrl } from "@/lib/shared/uploads";
@@ -147,7 +150,21 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     // délai change `bracket_size` et l'avancement lus par la liste. L'instantané,
     // lui, n'est pas invalidé — il est justement en train d'être reconstruit,
     // et l'oublier ici jetterait le calcul qu'on vient de faire.
-    if (syncResult.stateChanged || syncResult.contentChanged) invalidateTournamentLists();
+    //
+    // Hors l'instantané, on vide **ce que vide `publishUpdatedEvent`** — la même
+    // bascule passée par la passe de fond y passe : une manche tranchée par le
+    // délai déplace les cotes (rejeu du classement du site), les bilans des
+    // fiches et les agrégats de la vitrine, et une clôture y ajoute les points
+    // de parcours. Ne vider que les listes laissait ces trois caches sur
+    // l'ancien résultat jusqu'à leur expiration, selon le chemin qui avait
+    // entretenu le tournoi. (L'appel direct plutôt que `publishUpdatedEvent` :
+    // ce dernier jetterait l'instantané en cours et importe ce module.)
+    if (syncResult.stateChanged || syncResult.contentChanged) {
+      invalidateTournamentLists();
+      invalidateLandingAggregates();
+      invalidateTeamRanking();
+      invalidateStats();
+    }
 
     return syncResult.row;
   } catch (error) {
