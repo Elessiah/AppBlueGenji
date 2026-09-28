@@ -61,9 +61,10 @@ export function discordQuote(value: string): string {
   return value
     .replace(/\r\n?/g, "\n")
     .split(/[\n\u2028\u2029]/)
-    .map((line) => {
-      const text = neutralize(line.replace(LINE_BREAKS, " ").trim());
-      return text ? `> ${text}` : ">";
-    })
+    .map((line) => neutralize(line.replace(LINE_BREAKS, " ").trim()))
+    // Une ligne vide ne se cite pas (`>` nu s'affiche comme un chevron et coupe
+    // la citation) : les paragraphes se suivent dans le même bloc cité.
+    .filter((text) => text.length > 0)
+    .map((text) => `> ${text}`)
     .join("\n");
 }

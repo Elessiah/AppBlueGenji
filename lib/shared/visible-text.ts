@@ -31,11 +31,12 @@ const CONTROL = /\p{Cc}/gu;
  * commandes de direction, césure conditionnelle, étiquettes Unicode…
  *
  * Seule exception, le **liant sans chasse** (U+200D) entre deux pictogrammes :
- * c'est lui qui compose une famille ou un métier en un seul emoji. Hors de ce
- * rôle, il est invisible comme les autres.
+ * c'est lui qui compose une famille ou un métier en un seul emoji, teinte de
+ * peau comprise (le modificateur se place avant le liant). Hors de ce rôle, il
+ * est invisible comme les autres.
  */
 const FORMAT = /\p{Cf}/gu;
-const EMOJI_JOINER = /(?<=\p{Extended_Pictographic}\uFE0F?)\u200D(?=\p{Extended_Pictographic})/gu;
+const EMOJI_JOINER = /(?<=\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)\u200D(?=\p{Extended_Pictographic})/gu;
 
 /**
  * Marqueur provisoire du liant d'emoji pendant le retrait des `\p{Cf}` : un

@@ -55,6 +55,9 @@ describe("visibleText", () => {
     expect(visibleText(`Clan ${family}`)).toBe(`Clan ${family}`);
     const rainbowFlag = `${cp(0x1f3f3)}${VARIATION_16}${ZERO_WIDTH_JOINER}${cp(0x1f308)}`;
     expect(visibleText(rainbowFlag)).toBe(rainbowFlag);
+    // Le modificateur de teinte se place avant le liant.
+    const technologist = `${cp(0x1f468)}${cp(0x1f3fd)}${ZERO_WIDTH_JOINER}${cp(0x1f4bb)}`;
+    expect(visibleText(`Dev ${technologist}`)).toBe(`Dev ${technologist}`);
   });
 
   it("retire le liant hors d'un emoji, où il n'est qu'un invisible de plus", () => {

@@ -59,7 +59,7 @@ describe("discordInline", () => {
 describe("discordQuote", () => {
   it("cite chaque ligne : aucune ne commence comme une ligne du site", () => {
     const out = discordQuote("Bonjour\n\n✅ Fin de match : faux\r\nmerci");
-    expect(out.split("\n")).toEqual(["> Bonjour", ">", "> ✅ Fin de match : faux", "> merci"]);
+    expect(out.split("\n")).toEqual(["> Bonjour", "> ✅ Fin de match : faux", "> merci"]);
   });
 
   it("désamorce mentions et liens masqués dans le texte libre", () => {
