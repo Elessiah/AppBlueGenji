@@ -16,6 +16,7 @@ export type SiteCopyKey =
   | "home.hero.lede"
   | "home.about.title"
   | "home.about.lede"
+  | "home.sponsors.lede"
   | "home.join.eyebrow"
   | "home.join.title"
   | "home.join.lede"
@@ -82,6 +83,15 @@ export const SITE_COPY_FIELDS: readonly SiteCopyField[] = [
       "Une structure associative à but non lucratif, gérée par des bénévoles passionnés. On organise des tournois accessibles, bien arbitrés, avec des cash prizes réinvestis dans la scène amateur française.",
     multiline: true,
     maxLength: 600,
+  },
+  {
+    key: "home.sponsors.lede",
+    page: "Accueil",
+    label: "Partenaires — introduction",
+    defaultValue:
+      "Ils soutiennent l'association : leur aide finance les cash prizes, l'organisation et la diffusion de nos tournois. Merci à eux !",
+    multiline: true,
+    maxLength: 300,
   },
   {
     key: "home.join.eyebrow",
