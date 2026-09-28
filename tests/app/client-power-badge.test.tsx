@@ -86,7 +86,7 @@ describe("ClientPowerBadge", () => {
   });
 
   it("passe devant les boutons flottants quand son panneau s'ouvre", () => {
-    // Le panneau monte dans la zone du bouton « ? » (`.cta-float-help`, 100).
+    // Le panneau monte dans la zone du bouton « ? » (`.cta-float-help`, 70).
     const css = readSource("components/client-power-badge.module.css");
     const globals = readSource("app/globals.css");
     const rootZ = Number(/\.root \{[^}]*z-index: (\d+);/.exec(css)?.[1]);

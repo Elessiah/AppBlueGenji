@@ -103,6 +103,46 @@ describe("modales du site", () => {
   });
 });
 
+/**
+ * Couche d'une modale : le plus haut `z-index` de sa source (styles en ligne)
+ * et des feuilles de module qu'elle importe — le voile est la couche la plus
+ * haute du composant, une bannière ou un détail interne restant en dessous.
+ */
+function dialogLayer(file: string, src: string): number {
+  const values = [...src.matchAll(/zIndex:\s*(\d+)/g)].map((m) => Number(m[1]));
+  for (const [, sheet] of src.matchAll(/from\s+["'](\.{1,2}\/[^"']+\.module\.css)["']/g)) {
+    const css = readFileSync(join(ROOT, file, "..", sheet), "utf8");
+    values.push(...[...css.matchAll(/z-index:\s*(\d+)/g)].map((m) => Number(m[1])));
+  }
+  return Math.max(0, ...values);
+}
+
+function zIndexOf(sheet: string, selector: string): number {
+  const css = stripComments(readFileSync(join(ROOT, sheet), "utf8"));
+  return Number(css.slice(css.indexOf(`${selector} {`)).match(/^[^}]*z-index:\s*(\d+)/)?.[1]);
+}
+
+describe("boutons flottants — sous toute modale", () => {
+  // Ouverte, la modale de suppression d'un tournoi (90) voyait la pastille
+  // « Mon match » (105) recouvrir son bouton « Supprimer » ; le « ? » des
+  // règles (100) passait de même devant les modales de la fiche tournoi.
+  const floating: [string, number][] = [
+    ["pastille « Mon match »", zIndexOf("components/match-launch/MatchLaunchCenter.module.css", ".fab")],
+    ["bouton « ? » des règles", zIndexOf("app/globals.css", ".cta-float-help")],
+  ];
+
+  it.each(floating)("%s a un z-index lisible", (_label, z) => {
+    expect(z).toBeGreaterThan(0);
+  });
+
+  it.each<[string, number]>(dialogs.map((d) => [d.file, dialogLayer(d.file, d.src)]))(
+    "%s passe devant les boutons flottants",
+    (_file, layer) => {
+      for (const [, z] of floating) expect(layer).toBeGreaterThan(z);
+    },
+  );
+});
+
 describe("useDialogBehavior — focus initial", () => {
   const hook = stripComments(readFileSync(join(ROOT, "lib", "shared", "hooks", "useDialogBehavior.ts"), "utf8"));
 
