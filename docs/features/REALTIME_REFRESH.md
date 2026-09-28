@@ -158,6 +158,28 @@ le spectateur.
 Celui qui vient d'agir ne la subit pas : sa page relit immédiatement de son
 côté.
 
+### Contre-pression par connexion — `lib/server/stream-backpressure.ts`
+
+Le budget ménage le lien de la machine ; il ne dit rien d'**une** connexion
+bloquée sans être fermée (mobile sorti du réseau, fenêtre TCP pleine). Là,
+`controller.enqueue` n'échoue jamais : chaque trame s'ajoutait à la file du flux,
+en mémoire du serveur, et le battement de cœur ne tombait jamais en erreur pour
+la libérer.
+
+La file est donc **mesurée en octets** (`STREAM_QUEUE_HIGH_WATER_BYTES`, 1 Mio —
+plusieurs gros instantanés, pour qu'une lenteur passagère ne fasse jamais
+sauter un envoi) et `decideStreamWrite` tranche avant chaque écriture :
+
+- **place disponible** → la trame part ;
+- **file pleine** → elle ne part pas, et `send` rend `false` : la salle garde
+  l'abonné en retard (ni version ni horloge ne bougent) et reprogramme un essai
+  à la fenêtre du palier. Au dégagement, il reçoit **la dernière version**, pas
+  toutes celles manquées ;
+- **file pleine depuis `STREAM_STALL_TIMEOUT_MS`** (60 s, constaté au plus tard
+  par le battement de 25 s) → le flux est mis **en erreur** — et non fermé, ce
+  qui laisserait la file attendre un lecteur qui ne lit plus —, sa place de flux
+  rendue. Un client vivant se reconnecte seul.
+
 > Le **cast** (`CASTER`, permission `casting`) est prioritaire au même titre que
 > le staff : il commente le match pendant qu'il se joue, et le laisser au palier
 > spectateur lui ferait décrire un plateau vieux de vingt secondes. C'est la
@@ -209,6 +231,12 @@ chacun. Une rafale de F5 coûte une requête SQL.
 
 Un `ttlMs` nul conserve le vol unique sans rien mémoriser — utile pour une
 donnée qui doit rester exacte tout en supportant une pointe.
+
+Au-delà de 500 entrées, l'éviction est **LRU** : une lecture replace sa clé en
+fin d'ordre. Par ordre d'insertion, une rafale de clés par compte (`terms-need:`
+à chaque page vue, fiches `player:` et `team:`) chassait lors d'un gros
+évènement des entrées partagées et chères (liste publique, rejeu du classement,
+vitrine), recalculées ensuite pour rien avant leur échéance.
 
 Une invalidation survenue *pendant* un calcul en vol empêche son résultat d'être
 conservé (compteur de génération par clé) : pas de valeur périmée réinstallée
@@ -405,10 +433,11 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 
 | Fichier | Rôle |
 | --- | --- |
-| `cache.ts` | Cache mémoire à vol unique. |
+| `cache.ts` | Cache mémoire à vol unique, éviction LRU. |
+| `stream-backpressure.ts` | Contre-pression d'un flux SSE : écrire, sauter ou fermer (pur). |
 | `rate-limit.ts` | Seaux à fenêtre fixe (contrôle et débit séparés). |
 | `api-guard.ts` | Plafonds des routes + IP client. |
-| `tournament-broadcast.ts` | Salles SSE : un calcul par tournoi, regroupement par palier, budget de sortie, battement d'entretien. |
+| `tournament-broadcast.ts` | Salles SSE : un calcul par tournoi, regroupement par palier, budget de sortie, battement d'entretien, abonné laissé en retard quand sa file est pleine. |
 | `tournaments/snapshot.ts` | Construction et mise en cache de l'instantané. |
 | `tournaments/list-cache.ts` | Cache de la liste publique. |
 | `tournaments/notifications.ts` | Publication d'événement **et** invalidation des caches. |
