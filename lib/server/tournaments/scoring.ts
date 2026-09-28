@@ -192,6 +192,29 @@ const SCORE_DEADLINE_SQL = `DATE_ADD(
              INTERVAL ? MINUTE
            )`;
 
+/**
+ * Affectation de `score_deadline_at` par le report d'un camp, `otherSide`
+ * désignant l'adversaire.
+ *
+ * Tant que l'adversaire n'a **rien** reporté, l'échéance suit le report le plus
+ * exigeant de ce camp (`GREATEST`) : elle est fixée par la série que le report
+ * **en vigueur** affirme, sans quoi un « 1-0 » posé au lancement puis réécrit en
+ * « 3-0 » garderait l'échéance courte du premier. Elle ne peut que reculer, et
+ * seul le camp qui attend sa confirmation la fait bouger — il ne retarde que
+ * son propre résultat.
+ *
+ * Dès que l'adversaire a reporté (accord ou conflit), elle est **figée** : c'est
+ * sur elle que se mesure l'escalade d'un conflit à l'arbitrage, et une engagée
+ * qui resaisirait son score en boucle ne doit pas pouvoir la repousser.
+ */
+function scoreDeadlineAssignment(otherSide: "team1" | "team2"): string {
+  return `score_deadline_at = CASE
+             WHEN ${otherSide}_report_score IS NOT NULL AND score_deadline_at IS NOT NULL
+               THEN score_deadline_at
+             ELSE GREATEST(COALESCE(score_deadline_at, NOW()), ${SCORE_DEADLINE_SQL})
+           END`;
+}
+
 function validateScoreValue(value: number): number {
   if (!Number.isFinite(value)) {
     throw new Error("INVALID_SCORE");
@@ -345,7 +368,7 @@ export async function reportMatchScore(
        SET team1_report_score = ?,
            team1_report_opponent_score = ?,
            team1_reported_at = NOW(),
-           score_deadline_at = COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL}),
+           ${scoreDeadlineAssignment("team2")},
            status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
       [myScore, opponentScore, seriesMinutes, SCORE_REPORT_TIMEOUT_MINUTES, matchId],
@@ -358,7 +381,7 @@ export async function reportMatchScore(
        SET team2_report_score = ?,
            team2_report_opponent_score = ?,
            team2_reported_at = NOW(),
-           score_deadline_at = COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL}),
+           ${scoreDeadlineAssignment("team1")},
            status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
       [myScore, opponentScore, seriesMinutes, SCORE_REPORT_TIMEOUT_MINUTES, matchId],

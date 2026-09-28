@@ -253,10 +253,12 @@ describe("tournaments-service: match state machine", () => {
       await reportMatchScore(connection, 1, 10, 42, 3, 0);
 
       const [report] = writes(calls);
-      // Posée une fois (COALESCE), par la base : max(maintenant, lancement +
-      // série) puis le délai — et le lancement ne compte que s'il appartient à
-      // cet appariement.
-      expect(report.sql).toMatch(/score_deadline_at = COALESCE\(score_deadline_at, DATE_ADD\( GREATEST\( NOW\(\),/);
+      // Calculée par la base : max(maintenant, lancement + série) puis le
+      // délai — et le lancement ne compte que s'il appartient à cet
+      // appariement.
+      expect(report.sql).toMatch(
+        /ELSE GREATEST\(COALESCE\(score_deadline_at, NOW\(\)\), DATE_ADD\( GREATEST\( NOW\(\),/,
+      );
       expect(report.sql).toMatch(
         /CASE WHEN launch_pairing = CONCAT\(team1_id, ':', team2_id\) THEN launched_at END/,
       );
@@ -267,6 +269,28 @@ describe("tournaments-service: match state machine", () => {
         SCORE_REPORT_TIMEOUT_MINUTES,
         10,
       ]);
+    });
+
+    it("l'échéance suit le report en vigueur tant que l'adversaire n'a rien dit, puis se fige", async () => {
+      // Un « 1-0 » réécrit en « 3-0 » doit prendre l'échéance du second : elle
+      // ne fait que reculer (GREATEST) tant que l'adversaire n'a pas reporté,
+      // et se fige dès qu'il l'a fait — l'escalade d'un conflit se mesure sur
+      // elle, une resaisie en boucle ne doit pas la repousser.
+      const { connection, calls } = reportConnection();
+
+      await reportMatchScore(connection, 1, 10, 42, 3, 0);
+
+      const [report] = writes(calls);
+      expect(report.sql).toMatch(
+        /score_deadline_at = CASE WHEN team2_report_score IS NOT NULL AND score_deadline_at IS NOT NULL THEN score_deadline_at ELSE GREATEST/,
+      );
+
+      reporterIs(200);
+      const second = reportConnection();
+      await reportMatchScore(second.connection, 1, 10, 42, 0, 3);
+      expect(writes(second.calls)[0].sql).toMatch(
+        /score_deadline_at = CASE WHEN team1_report_score IS NOT NULL AND score_deadline_at IS NOT NULL THEN score_deadline_at/,
+      );
     });
 
     it("refuse un membre du roster sans la charge de l'équipe, avant toute lecture du match", async () => {

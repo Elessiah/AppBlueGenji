@@ -28,7 +28,10 @@ porte côté joueur.
    (`score_deadline_at`, rappelé dans la modale). Ce délai ne court qu'après une
    fin de série plausible — 15 min par map déclarée depuis le lancement
    (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
-   lancement ne fait pas foi avant que la série ait pu se jouer.
+   lancement ne fait pas foi avant que la série ait pu se jouer. Tant que
+   l'adversaire n'a rien reporté, l'échéance suit le report **en vigueur** et ne
+   fait que reculer (un « 1-0 » réécrit en « 3-0 » prend l'échéance du second) ;
+   elle est figée dès que les deux ont reporté.
 
 Proposer, confirmer et contester demandent **qualité pour agir au nom de
 l'engagé** (`OWNER` / `MANAGER`, ou le joueur en individuel) — la même que le
