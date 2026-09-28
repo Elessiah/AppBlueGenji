@@ -1,24 +1,18 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
-import { deleteStoredImage } from "@/lib/server/image-upload";
 import { deleteSponsor, getSponsorImageUrls, updateSponsor } from "@/lib/server/sponsors-service";
-import { toDiskUploadPath } from "@/lib/shared/uploads";
+import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 
 /**
- * Supprime l'ancien fichier (logo ou bandeau) s'il était hébergé localement et a changé.
- * Best-effort : une erreur de suppression (fichier verrouillé, permissions) ne
- * doit pas faire échouer une requête dont la mutation en base a déjà réussi.
+ * Supprime l'ancien fichier (logo ou bandeau) s'il a changé, qu'il vit dans le
+ * dossier des partenaires et que plus rien ne le désigne — une adresse d'un
+ * autre dossier, collée comme logo, ne fait jamais effacer l'image d'autrui.
+ * Au mieux : la mutation en base a déjà réussi.
  */
 async function cleanupReplacedImage(previous: string | null, next: string | null) {
   if (!previous || previous === next) return;
-  const diskPath = toDiskUploadPath(previous);
-  if (!diskPath) return;
-  try {
-    await deleteStoredImage(diskPath);
-  } catch (err) {
-    console.error("Failed to delete replaced sponsor image:", err);
-  }
+  await deleteUnreferencedUpload(previous, "sponsors");
 }
 
 function parseId(raw: string): number | null {

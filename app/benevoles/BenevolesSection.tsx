@@ -55,6 +55,7 @@ const VALIDATION_ERROR_MESSAGES: Record<string, string> = {
   JOINED_AT_REQUIRED: "La date d'arrivée est requise.",
   JOINED_AT_INVALID: "La date d'arrivée est invalide.",
   PHOTO_URL_TOO_LONG: "L'URL de la photo est trop longue.",
+  INVALID_PHOTO_URL: "Cette photo est une image d'une autre partie du site : importe-la.",
 };
 
 export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionProps) {

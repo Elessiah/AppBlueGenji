@@ -64,6 +64,8 @@ function sponsorErrorMessage(code: string | undefined, fallback: string): string
       return `Description trop longue (${SPONSOR_DESCRIPTION_MAX} caractères maximum).`;
     case "INVALID_BANNER_URL":
       return "Le bandeau doit être un fichier importé.";
+    case "INVALID_LOGO_URL":
+      return "Ce logo est une image d'une autre partie du site : importe-le ou colle une adresse externe.";
     default:
       return `Échec : ${code}`;
   }

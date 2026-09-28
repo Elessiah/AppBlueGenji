@@ -6,8 +6,7 @@ import {
   getBenevolePhotoUrl,
   updateBenevole,
 } from "@/lib/server/benevoles-service";
-import { deleteStoredImage } from "@/lib/server/image-upload";
-import { toDiskUploadPath } from "@/lib/shared/uploads";
+import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -16,19 +15,13 @@ function parseId(raw: string): number | null {
 }
 
 /**
- * Supprime l'ancienne photo si elle était hébergée localement et a changé.
- * Best-effort : un échec de suppression ne doit pas faire échouer une requête
- * dont la mutation en base a déjà réussi.
+ * Supprime l'ancienne photo si elle a changé, qu'elle vit dans le dossier des
+ * bénévoles et que plus rien ne la désigne. Au mieux : la mutation en base a
+ * déjà réussi.
  */
 async function cleanupReplacedPhoto(previous: string | null, next: string | null) {
   if (!previous || previous === next) return;
-  const diskPath = toDiskUploadPath(previous);
-  if (!diskPath) return;
-  try {
-    await deleteStoredImage(diskPath);
-  } catch (err) {
-    console.error("Failed to delete replaced benevole photo:", err);
-  }
+  await deleteUnreferencedUpload(previous, "benevoles");
 }
 
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {

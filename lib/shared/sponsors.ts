@@ -1,4 +1,4 @@
-import { toDiskUploadPath } from "./uploads";
+import { isStoredUploadIn, toDiskUploadPath } from "./uploads";
 
 export const SPONSOR_TIERS = ["GOLD", "SILVER", "BRONZE", "PARTNER"] as const;
 export type SponsorTier = (typeof SPONSOR_TIERS)[number];
@@ -80,8 +80,7 @@ export function slugifySponsor(name: string): string {
  * nettoyage d'un bandeau remplacé l'effacerait alors du disque.
  */
 export function isStoredSponsorBanner(url: string): boolean {
-  const disk = toDiskUploadPath(url);
-  return disk !== null && disk.startsWith("/uploads/sponsors/") && !disk.includes("..");
+  return isStoredUploadIn(url, "sponsors");
 }
 
 function isTier(value: unknown): value is SponsorTier {
@@ -114,7 +113,8 @@ export type SponsorValidationResult =
  * Valide et normalise une entrée de sponsor. Le nom est requis ; le palier
  * (tier) défaut « PARTNER » ; logo/bandeau/site/description sont optionnels et
  * ramenés à `null` si vides. Le bandeau doit être un fichier téléversé
- * (`INVALID_BANNER_URL`), la description tenir en `SPONSOR_DESCRIPTION_MAX`
+ * (`INVALID_BANNER_URL`), un logo désignant un upload l'être du dossier des
+ * partenaires (`INVALID_LOGO_URL`), la description tenir en `SPONSOR_DESCRIPTION_MAX`
  * caractères (`DESCRIPTION_TOO_LONG`). `active` défaut `true`.
  */
 export function validateSponsorInput(input: SponsorInput): SponsorValidationResult {
@@ -129,6 +129,12 @@ export function validateSponsorInput(input: SponsorInput): SponsorValidationResu
   }
 
   const logoUrl = normalizeOptional(input.logoUrl, SPONSOR_URL_MAX);
+  // Un logo collé peut être une adresse étrangère (servie par le relais) ; mais
+  // une adresse d'upload doit être celle d'un logo de partenaire. Un avatar ou
+  // le logo d'une équipe collé ici serait effacé au remplacement du logo.
+  if (logoUrl && toDiskUploadPath(logoUrl) !== null && !isStoredUploadIn(logoUrl, "sponsors")) {
+    return { ok: false, error: "INVALID_LOGO_URL" };
+  }
   const websiteUrl = normalizeOptional(input.websiteUrl, SPONSOR_URL_MAX);
 
   const rawBanner = typeof input.bannerUrl === "string" ? input.bannerUrl.trim() : "";

@@ -1,5 +1,8 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import {
   acceptedRemoteImageContentType,
+  isPrivateImageHostname,
   parseRemoteImageUrl,
 } from "@/lib/shared/remote-image";
 
@@ -31,6 +34,42 @@ const MAX_REDIRECTS = 3;
 
 export type FetchedRemoteImage = { body: ArrayBuffer; contentType: string };
 
+/** Résout un nom d'hôte en toutes ses adresses. */
+export type HostResolver = (hostname: string) => Promise<string[]>;
+
+const resolveWithSystem: HostResolver = async (hostname) =>
+  (await lookup(hostname, { all: true, verbatim: true })).map((entry) => entry.address);
+
+/**
+ * Vrai si le nom d'hôte désigne une adresse **publique**, une fois résolu.
+ *
+ * Le filtre de `parseRemoteImageUrl` ne juge que ce qui est écrit dans l'URL :
+ * un domaine public dont l'enregistrement DNS pointe vers `127.0.0.1` passait.
+ * Chaque adresse rendue par le résolveur est donc jugée par le même prédicat —
+ * une seule adresse interne suffit à refuser, le client HTTP pouvant choisir
+ * n'importe laquelle. Une résolution qui échoue est un refus.
+ *
+ * Reste hors de portée le **rebinding** : `fetch` résout à nouveau le nom en se
+ * connectant, et un serveur DNS hostile peut répondre autre chose la seconde
+ * fois. Le fermer demande de fixer l'adresse de connexion dans l'agent HTTP,
+ * que le `fetch` intégré à Node n'expose pas sans dépendance.
+ */
+export async function hostResolvesPublicly(
+  hostname: string,
+  resolve: HostResolver = resolveWithSystem,
+): Promise<boolean> {
+  const bare = hostname.replace(/^\[|\]$/g, "");
+  // Une adresse littérale a déjà été jugée par `parseRemoteImageUrl`.
+  if (isIP(bare) !== 0) return !isPrivateImageHostname(bare);
+  let addresses: string[];
+  try {
+    addresses = await resolve(bare);
+  } catch {
+    return false;
+  }
+  return addresses.length > 0 && addresses.every((address) => !isPrivateImageHostname(address));
+}
+
 export type FetchRemoteImageOptions = {
   /** Plafond de taille. Défaut : `MAX_REMOTE_IMAGE_BYTES`. */
   maxBytes?: number;
@@ -38,11 +77,13 @@ export type FetchRemoteImageOptions = {
   timeoutMs?: number;
   /** Redirections suivies au plus. Défaut : 3. */
   maxRedirects?: number;
+  /** Résolveur DNS. Défaut : celui du système (`dns.lookup`). */
+  resolveHost?: HostResolver;
 };
 
 /**
  * Va chercher l'image, en suivant au plus `maxRedirects` redirections et en
- * revalidant l'hôte à chacune.
+ * revalidant l'hôte à chacune — nom écrit **et** adresses résolues.
  *
  * @param url URL déjà passée par `parseRemoteImageUrl`.
  * @returns Les octets et le type retenu, ou `null` sur le moindre refus.
@@ -54,10 +95,12 @@ export async function fetchRemoteImage(
   const maxBytes = options.maxBytes ?? MAX_REMOTE_IMAGE_BYTES;
   const timeoutMs = options.timeoutMs ?? FETCH_TIMEOUT_MS;
   const maxRedirects = options.maxRedirects ?? MAX_REDIRECTS;
+  const resolveHost = options.resolveHost ?? resolveWithSystem;
 
   let target = url;
 
   for (let hop = 0; hop <= maxRedirects; hop += 1) {
+    if (!(await hostResolvesPublicly(target.hostname, resolveHost))) return null;
     const controller = new AbortController();
     // Le minuteur couvre **aussi la lecture du corps**, et pas seulement les
     // en-têtes : un hôte qui répond aussitôt puis distille ses octets sans fin
