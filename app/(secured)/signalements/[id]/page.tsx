@@ -92,23 +92,40 @@ export default function ConcernedReportPage() {
         administrateurs avant toute décision définitive.
       </p>
 
-      {hidden.map((quarantine) => (
-        <div key={quarantine.id} className={styles.alert} role="status">
-          <strong>Le logo de « {quarantine.teamName} » est masqué</strong> depuis le {formatDate(quarantine.hiddenAt)}.
-          Sans contestation de votre part, il sera <strong>supprimé définitivement le{" "}
-          {formatQuarantineDate(new Date(quarantine.purgeAfter))}</strong>. Si la contestation aboutit, il est
-          rétabli tel quel.
-        </div>
-      ))}
+      {hidden.map((quarantine) =>
+        quarantine.targetType === "TEAM" ? (
+          <div key={quarantine.id} className={styles.alert} role="status">
+            <strong>Le logo de « {quarantine.targetName} » est masqué</strong> depuis le{" "}
+            {formatDate(quarantine.hiddenAt)}. Sans contestation de votre part, il sera{" "}
+            <strong>supprimé définitivement le {formatQuarantineDate(new Date(quarantine.purgeAfter))}</strong>. Si la
+            contestation aboutit, il est rétabli tel quel.
+          </div>
+        ) : (
+          <div key={quarantine.id} className={styles.alert} role="status">
+            <strong>Ton avatar est masqué</strong> depuis le {formatDate(quarantine.hiddenAt)}. Sans contestation de
+            ta part, il sera{" "}
+            <strong>supprimé définitivement le {formatQuarantineDate(new Date(quarantine.purgeAfter))}</strong>. Si la
+            contestation aboutit, il est rétabli tel quel.
+          </div>
+        ),
+      )}
 
-      {removed.map((quarantine) => (
-        <div key={quarantine.id} className={styles.alert} role="status">
-          <strong>Le logo de « {quarantine.teamName} » a été supprimé</strong>{" "}
-          {isImmediateLogoRemoval(quarantine) ? "sans délai " : ""}le{" "}
-          {formatDate(quarantine.closedAt ?? quarantine.hiddenAt)} à la suite de ce signalement. Si vous en détenez
-          les droits, contestez-le : si la contestation aboutit, vous pourrez l&apos;envoyer de nouveau.
-        </div>
-      ))}
+      {removed.map((quarantine) =>
+        quarantine.targetType === "TEAM" ? (
+          <div key={quarantine.id} className={styles.alert} role="status">
+            <strong>Le logo de « {quarantine.targetName} » a été supprimé</strong>{" "}
+            {isImmediateLogoRemoval(quarantine) ? "sans délai " : ""}le{" "}
+            {formatDate(quarantine.closedAt ?? quarantine.hiddenAt)} à la suite de ce signalement. Si vous en détenez
+            les droits, contestez-le : si la contestation aboutit, vous pourrez l&apos;envoyer de nouveau.
+          </div>
+        ) : (
+          <div key={quarantine.id} className={styles.alert} role="status">
+            <strong>Ton avatar a été supprimé</strong> {isImmediateLogoRemoval(quarantine) ? "sans délai " : ""}le{" "}
+            {formatDate(quarantine.closedAt ?? quarantine.hiddenAt)} à la suite de ce signalement. Si tu en détiens
+            les droits, conteste-le : si la contestation aboutit, tu pourras l&apos;envoyer de nouveau.
+          </div>
+        ),
+      )}
 
       <CyberCard className={styles.card}>
         <dl className={styles.facts}>

@@ -6,6 +6,7 @@ import {
   REPORT_TARGET_LABELS,
   reportTargetHref,
   type ReportCategory,
+  type ReportTargetRef,
   type ReportTargetView,
 } from "@/lib/shared/content-reports";
 import { formatQuarantineDate, isImmediateLogoRemoval, type LogoQuarantineView } from "@/lib/shared/logo-quarantine";
@@ -15,21 +16,32 @@ import styles from "../reports.module.css";
 interface ReportTargetCardProps {
   target: ReportTargetView;
   category: ReportCategory;
-  /** Logos masqués au titre du signalement, pour cette équipe. */
+  /** Images masquées au titre du signalement, pour cette cible. */
   quarantines: LogoQuarantineView[];
   busy: boolean;
-  onHideLogo: (teamId: number) => void;
-  onDeleteLogo: (teamId: number) => void;
+  onHideLogo: (target: ReportTargetRef) => void;
+  onDeleteLogo: (target: ReportTargetRef) => void;
   onRestore: (quarantineId: number) => void;
   onPurge: (quarantineId: number) => void;
 }
 
 /**
+ * « Logo » pour une équipe, « avatar » pour un joueur : les deux seules cibles
+ * qui portent une image. `withArticle` porte l'élision (« l'avatar », jamais
+ * « le avatar ») une fois pour toutes les phrases qui le répètent ci-dessous.
+ */
+const IMAGE_NOUN: Partial<Record<ReportTargetView["type"], { nounCap: string; withArticle: string }>> = {
+  TEAM: { nounCap: "Logo", withArticle: "le logo" },
+  USER: { nounCap: "Avatar", withArticle: "l'avatar" },
+};
+const DEFAULT_IMAGE_NOUN = IMAGE_NOUN.TEAM as { nounCap: string; withArticle: string };
+
+/**
  * Une cible d'un signalement, avec ce qu'on peut faire d'elle **sans quitter le
  * panneau** : ouvrir sa fiche (nouvel onglet, pour garder le dossier sous les
- * yeux), et pour une équipe, masquer son logo en attendant une contestation,
- * le supprimer tout de suite, ou — une fois masqué — le rétablir ou le
- * supprimer avant l'échéance.
+ * yeux), et pour une équipe ou un joueur, masquer son image en attendant une
+ * contestation, la supprimer tout de suite, ou — une fois masquée — la
+ * rétablir ou la supprimer avant l'échéance.
  */
 export function ReportTargetCard({
   target,
@@ -43,7 +55,9 @@ export function ReportTargetCard({
 }: ReportTargetCardProps) {
   const hidden = quarantines.find((quarantine) => quarantine.status === "HIDDEN") ?? null;
   const closed = quarantines.filter((quarantine) => quarantine.status !== "HIDDEN");
-  const canActOnLogo = target.type === "TEAM" && target.exists && category !== "BUG";
+  const image = IMAGE_NOUN[target.type];
+  const { nounCap, withArticle } = image ?? DEFAULT_IMAGE_NOUN;
+  const canActOnLogo = image !== undefined && target.exists && category !== "BUG";
 
   return (
     <li className={styles.target}>
@@ -79,13 +93,13 @@ export function ReportTargetCard({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/admin/logo-quarantines/${hidden.id}/image`}
-              alt={`Logo masqué de ${target.label}`}
+              alt={`${nounCap} masqué de ${target.label}`}
               width={44}
               height={44}
               className={styles.targetImage}
             />
             <span>
-              <strong>Logo masqué</strong> le {formatQuarantineDate(new Date(hidden.hiddenAt))}. Suppression
+              <strong>{nounCap} masqué</strong> le {formatQuarantineDate(new Date(hidden.hiddenAt))}. Suppression
               définitive le {formatQuarantineDate(new Date(hidden.purgeAfter))} sans contestation.
             </span>
           </div>
@@ -96,7 +110,7 @@ export function ReportTargetCard({
               disabled={busy}
               onClick={() => onRestore(hidden.id)}
             >
-              Rétablir le logo
+              Rétablir {withArticle}
             </button>
             <ArmedButton
               label="Supprimer maintenant"
@@ -112,11 +126,11 @@ export function ReportTargetCard({
       {closed.map((quarantine) =>
         isImmediateLogoRemoval(quarantine) ? (
           <p key={quarantine.id} className={styles.muted}>
-            Logo supprimé sans délai le {formatQuarantineDate(new Date(quarantine.hiddenAt))}.
+            {nounCap} supprimé sans délai le {formatQuarantineDate(new Date(quarantine.hiddenAt))}.
           </p>
         ) : (
           <p key={quarantine.id} className={styles.muted}>
-            Logo masqué le {formatQuarantineDate(new Date(quarantine.hiddenAt))} —{" "}
+            {nounCap} masqué le {formatQuarantineDate(new Date(quarantine.hiddenAt))} —{" "}
             {quarantine.status === "RESTORED" ? "rétabli" : "supprimé définitivement"}
             {quarantine.closedAt ? ` le ${formatQuarantineDate(new Date(quarantine.closedAt))}` : ""}.
           </p>
@@ -129,16 +143,16 @@ export function ReportTargetCard({
             type="button"
             className={`${styles.actionButton} ${styles.actionWarn}`}
             disabled={busy}
-            onClick={() => onHideLogo(target.id)}
+            onClick={() => onHideLogo({ type: target.type, id: target.id })}
           >
-            Masquer le logo
+            Masquer {withArticle}
           </button>
           <ArmedButton
-            label="Supprimer le logo"
+            label={`Supprimer ${withArticle}`}
             confirmLabel="Supprimer sans délai ?"
             className={styles.actionDanger}
             disabled={busy}
-            onConfirm={() => onDeleteLogo(target.id)}
+            onConfirm={() => onDeleteLogo({ type: target.type, id: target.id })}
           />
         </div>
       )}

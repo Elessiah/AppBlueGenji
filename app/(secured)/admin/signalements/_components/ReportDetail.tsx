@@ -9,6 +9,7 @@ import {
   REPORT_STATUS_LABELS,
   RIGHTS_RELATION_LABELS,
   type ReportAction,
+  type ReportTargetRef,
   type ReportView,
 } from "@/lib/shared/content-reports";
 import { formatQuarantineDate } from "@/lib/shared/logo-quarantine";
@@ -21,8 +22,8 @@ interface ReportDetailProps {
   report: ReportView;
   busy: boolean;
   onAction: (action: ReportAction, note?: string) => void;
-  onHideLogo: (teamId: number) => void;
-  onDeleteLogo: (teamId: number) => void;
+  onHideLogo: (target: ReportTargetRef) => void;
+  onDeleteLogo: (target: ReportTargetRef) => void;
   onRestore: (quarantineId: number) => void;
   onPurge: (quarantineId: number) => void;
 }
@@ -136,7 +137,8 @@ export function ReportDetail({
             </div>
             <p className={styles.muted}>
               Archivé, le signalement est effacé {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours plus tard — ou plus tard,
-              s&apos;il tient un logo masqué ou supprimé dont l&apos;équipe peut encore contester la décision.
+              s&apos;il tient une image (logo ou avatar) masquée ou supprimée dont la personne concernée peut encore
+              contester la décision.
             </p>
           </div>
         )}
@@ -198,11 +200,9 @@ export function ReportDetail({
                 key={`${target.type}-${target.id}`}
                 target={target}
                 category={report.category}
-                quarantines={
-                  target.type === "TEAM"
-                    ? report.quarantines.filter((quarantine) => quarantine.teamId === target.id)
-                    : []
-                }
+                quarantines={report.quarantines.filter(
+                  (quarantine) => quarantine.targetType === target.type && quarantine.targetId === target.id,
+                )}
                 busy={busy}
                 onHideLogo={onHideLogo}
                 onDeleteLogo={onDeleteLogo}

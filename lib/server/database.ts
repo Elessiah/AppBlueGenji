@@ -1088,10 +1088,16 @@ async function runMigrations(db: Pool): Promise<void> {
   // servi — et la ligne dit d'où il vient pour le rétablir tel quel, ou quand le
   // supprimer définitivement. La ligne survit à la purge du signalement
   // (`SET NULL`) : c'est elle qui porte l'échéance.
+  // `team_id` / `user_id` : mutuellement exclusifs, sans colonne « type » à
+  // côté — même principe que `bg_teams.solo_user_id`, qui distingue déjà une
+  // entrée solo d'une équipe réelle sans énumération à tenir à jour. Une ligne
+  // masque le logo d'une équipe (`team_id` posé) ou l'avatar d'un joueur
+  // (`user_id` posé) ; jamais les deux, jamais aucun.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_logo_quarantines (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      team_id BIGINT NOT NULL,
+      team_id BIGINT NULL,
+      user_id BIGINT NULL,
       report_id BIGINT NULL,
       logo_url TEXT NOT NULL,
       status ENUM('HIDDEN', 'RESTORED', 'PURGED') NOT NULL DEFAULT 'HIDDEN',
@@ -1102,8 +1108,11 @@ async function runMigrations(db: Pool): Promise<void> {
       INDEX idx_bg_logo_quarantines_due (status, purge_after),
       INDEX idx_bg_logo_quarantines_report (report_id),
       INDEX idx_bg_logo_quarantines_team (team_id),
+      INDEX idx_bg_logo_quarantines_user (user_id),
       CONSTRAINT fk_bg_logo_quarantines_team FOREIGN KEY (team_id)
         REFERENCES bg_teams(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_logo_quarantines_quarantined_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE,
       CONSTRAINT fk_bg_logo_quarantines_report FOREIGN KEY (report_id)
         REFERENCES bg_reports(id) ON DELETE SET NULL,
       CONSTRAINT fk_bg_logo_quarantines_hidden_by FOREIGN KEY (hidden_by_user_id)
@@ -1224,6 +1233,17 @@ async function runMigrations(db: Pool): Promise<void> {
     // (`ER_DATA_TOO_LONG`) et le laissait en ligne. Sans effet sur une base qui
     // la porte déjà en `TEXT`.
     `ALTER TABLE bg_logo_quarantines MODIFY logo_url TEXT NOT NULL`,
+    // Quarantaine des avatars, à côté de celle des logos d'équipe — même table,
+    // même cycle (masquage, contestation, rétablissement ou suppression), un
+    // second pointeur mutuellement exclusif du premier plutôt qu'une colonne
+    // « type » (voir le commentaire du `CREATE TABLE`). `team_id` devient
+    // nullable pour laisser la place à une ligne qui ne désigne qu'un joueur.
+    `ALTER TABLE bg_logo_quarantines MODIFY team_id BIGINT NULL`,
+    `ALTER TABLE bg_logo_quarantines ADD COLUMN user_id BIGINT NULL AFTER team_id`,
+    `ALTER TABLE bg_logo_quarantines ADD INDEX idx_bg_logo_quarantines_user (user_id)`,
+    `ALTER TABLE bg_logo_quarantines
+       ADD CONSTRAINT fk_bg_logo_quarantines_quarantined_user FOREIGN KEY (user_id)
+         REFERENCES bg_users(id) ON DELETE CASCADE`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
