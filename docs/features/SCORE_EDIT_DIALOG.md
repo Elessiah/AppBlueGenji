@@ -143,3 +143,18 @@ Les deux côtés du score partagent le même composant `ScoreStepper` : les
 boutons `−` / `+` portent un `aria-label` nommant l'équipe, et le champ signale
 `aria-invalid` sur une valeur illisible ou hors plage — mais jamais sur un champ
 vide, qui n'est pas une erreur.
+
+## Ouverture sur une proposition d'équipe en attente
+
+Face à une **équipe fantôme**, la confirmation d'un score proposé n'arrive jamais : personne ne s'y connecte. L'arbitrage devait alors ouvrir le dialogue sur des champs vides et recopier le score que les joueurs avaient déjà saisi.
+
+`pendingScoreProposal` (`_lib/score-form.ts`) rend la proposition **seule** en attente, et `scoreFormStateFor` ouvre le dialogue dessus : un clic sur « Valider le résultat » la confirme. Le bouton de la carte devient « Valider le score proposé », et le dialogue dit d'où viennent les chiffres.
+
+Pas de pré-remplissage quand :
+
+- le match est tranché, porte un score enregistré par l'arbitrage ou un forfait — ce qui est en base prime ;
+- les **deux** engagées ont proposé (désaccord) — pré-remplir avec l'une donnerait raison à une équipe sans décision de l'arbitre.
+
+La règle vaut aussi entre deux équipes réelles : pré-remplir n'écrit rien, seul le clic de l'arbitre valide.
+
+Une proposition arrivée pendant que le dialogue est ouvert a sa propre empreinte (`pendingProposalSignature`), distincte de `storedResultSignature` : elle remplace des champs intacts, mais ne lève **pas** l'alerte « un autre arbitre a enregistré un résultat » sur une saisie en cours — elle n'écrit rien.
