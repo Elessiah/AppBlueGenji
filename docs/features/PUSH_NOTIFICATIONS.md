@@ -112,8 +112,14 @@ une fois en production : la clé publique est gravée dans chaque abonnement.
   relu comme une entrée (chemin du site seulement). `pushsubscriptionchange`
   renvoie l'abonnement renouvelé au site.
 - iPhone / iPad : Safari ne livre le push qu'à un site **ajouté à l'écran
-  d'accueil** ; d'où `app/manifest.ts` (`display: "standalone"`) et un message
-  qui le dit à la place du bouton (`pushSupport` → `IOS_NEEDS_INSTALL`).
+  d'accueil et ouvert en app web** (mode autonome). Le manifeste reste en
+  `minimal-ui` (`lib/shared/web-manifest.ts`, « jamais `standalone` », pour que
+  l'OAuth garde ses cookies) : ce n'est donc pas lui qui ouvre ce mode, mais
+  l'option « Ouvrir en tant qu'app web » d'iOS 26, cochée par défaut à l'ajout.
+  Hors de ce mode, le panneau le dit à la place du bouton (`pushSupport` →
+  `IOS_NEEDS_INSTALL`) et nomme l'option. Arbitrage assumé : sous iOS 18 et
+  avant, une icône en `minimal-ui` s'ouvre dans Safari, et le push n'y est pas
+  disponible.
 - Permission bloquée : le panneau dit où la rouvrir, sans bouton qui mènerait
   à un refus.
 - Au montage du panneau, un abonnement déjà présent dans le navigateur est

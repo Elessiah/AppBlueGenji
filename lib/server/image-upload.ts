@@ -4,7 +4,13 @@ import { mkdir, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 
-export type UploadKind = "avatar" | "team-logo" | "sponsor-logo" | "benevole-photo" | "tournament-image";
+export type UploadKind =
+  | "avatar"
+  | "team-logo"
+  | "sponsor-logo"
+  | "sponsor-banner"
+  | "benevole-photo"
+  | "tournament-image";
 
 const MAX_BYTES = IMAGE_UPLOAD_MAX_BYTES;
 const MAX_DIMENSION = 8000;
@@ -30,14 +36,28 @@ const KIND_CONFIG: Record<
     fit: "contain",
     quality: 82,
   },
-  // Vitrine partenaires : emplacement large 3:1, logo « contain » sur fond
-  // transparent. Résolution cible 600×200 (cf. indice affiché dans la modale).
+  // Logo d'un partenaire : **ni recadré ni bordé**, seulement réduit au-delà de
+  // 600 px. Il s'affiche entier (`contain`) dans une zone large quand la carte
+  // n'a pas de bandeau, et en pastille carrée sur le bandeau sinon : un gabarit
+  // 3:1 figé l'aurait entouré de marges transparentes, et un logo carré serait
+  // devenu minuscule dans la pastille. Transparence gardée.
   "sponsor-logo": {
     dir: path.join(process.cwd(), "public", "uploads", "sponsors"),
     relPrefix: "/uploads/sponsors/",
     width: 600,
-    height: 200,
-    fit: "contain",
+    height: 600,
+    fit: "inside",
+    quality: 82,
+  },
+  // Bandeau d'une carte partenaire : recadré au centre en 3:1, le format exact
+  // de la zone d'image de la carte — l'aperçu de la modale montre donc ce que
+  // la vitrine affichera.
+  "sponsor-banner": {
+    dir: path.join(process.cwd(), "public", "uploads", "sponsors"),
+    relPrefix: "/uploads/sponsors/",
+    width: 1200,
+    height: 400,
+    fit: "cover",
     quality: 82,
   },
   // Photo de bénévole : portrait carré recadré « cover », rendu en cercle côté UI.

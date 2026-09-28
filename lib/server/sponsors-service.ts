@@ -19,6 +19,7 @@ interface SponsorRow extends RowDataPacket {
   slug: string;
   tier: Sponsor["tier"];
   logoUrl: string | null;
+  bannerUrl: string | null;
   websiteUrl: string | null;
   description: string | null;
 }
@@ -30,6 +31,7 @@ function fromRow(row: SponsorRow): Sponsor {
     slug: row.slug,
     tier: row.tier,
     logoUrl: row.logoUrl,
+    bannerUrl: row.bannerUrl ?? null,
     websiteUrl: row.websiteUrl,
     description: row.description,
   };
@@ -65,7 +67,7 @@ async function loadListSponsors(): Promise<Sponsor[]> {
     const db = await Promise.race([dbPromise, timeoutPromise]);
     const [rows] = await db.execute<SponsorRow[]>(
       `
-        SELECT id, name, slug, tier, logo_url as logoUrl, website_url as websiteUrl, description
+        SELECT id, name, slug, tier, logo_url as logoUrl, banner_url as bannerUrl, website_url as websiteUrl, description
         FROM bg_sponsors
         WHERE active = 1
         ORDER BY FIELD(tier, 'GOLD', 'SILVER', 'BRONZE', 'PARTNER'),
@@ -83,7 +85,7 @@ async function loadListSponsors(): Promise<Sponsor[]> {
   }
 }
 
-/** Renvoie l'URL du logo d'un sponsor (ou `null`), pour le nettoyage de fichier. */
+/** Renvoie l'URL du logo d'un sponsor (ou `null`) — lue par le relais du logo. */
 export async function getSponsorLogoUrl(id: number): Promise<string | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<SponsorRow[]>(
@@ -91,6 +93,22 @@ export async function getSponsorLogoUrl(id: number): Promise<string | null> {
     [id]
   );
   return rows.length > 0 ? rows[0].logoUrl : null;
+}
+
+export type SponsorImageUrls = { logoUrl: string | null; bannerUrl: string | null };
+
+/**
+ * Renvoie les URL du logo et du bandeau d'un sponsor (ou `null`), pour le
+ * nettoyage des fichiers remplacés ou orphelins.
+ */
+export async function getSponsorImageUrls(id: number): Promise<SponsorImageUrls> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<SponsorRow[]>(
+    `SELECT logo_url AS logoUrl, banner_url AS bannerUrl FROM bg_sponsors WHERE id = ? LIMIT 1`,
+    [id]
+  );
+  if (rows.length === 0) return { logoUrl: null, bannerUrl: null };
+  return { logoUrl: rows[0].logoUrl ?? null, bannerUrl: rows[0].bannerUrl ?? null };
 }
 
 /** Garantit un slug unique en suffixant `-2`, `-3`… si nécessaire. */
@@ -118,26 +136,26 @@ async function ensureUniqueSlug(base: string, excludeId?: number): Promise<strin
 export async function createSponsor(input: SponsorInput): Promise<Sponsor> {
   const validation = validateSponsorInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { name, tier, logoUrl, websiteUrl, description, active } = validation.value;
+  const { name, tier, logoUrl, bannerUrl, websiteUrl, description, active } = validation.value;
 
   const slug = await ensureUniqueSlug(slugifySponsor(name));
   const db = await getDatabase();
   const [res] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_sponsors (name, slug, tier, logo_url, website_url, description, display_order, active)
-     VALUES (?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_sponsors AS s), ?)`,
-    [name, slug, tier, logoUrl, websiteUrl, description, active ? 1 : 0]
+    `INSERT INTO bg_sponsors (name, slug, tier, logo_url, banner_url, website_url, description, display_order, active)
+     VALUES (?, ?, ?, ?, ?, ?, ?, (SELECT COALESCE(MAX(display_order), 0) + 10 FROM bg_sponsors AS s), ?)`,
+    [name, slug, tier, logoUrl, bannerUrl, websiteUrl, description, active ? 1 : 0]
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id: Number(res.insertId), name, slug, tier, logoUrl, websiteUrl, description };
+  return { id: Number(res.insertId), name, slug, tier, logoUrl, bannerUrl, websiteUrl, description };
 }
 
 /** Met à jour un sponsor existant et renvoie sa version mise à jour. */
 export async function updateSponsor(id: number, input: SponsorInput): Promise<Sponsor> {
   const validation = validateSponsorInput(input);
   if (!validation.ok) throw new Error(validation.error);
-  const { name, tier, logoUrl, websiteUrl, description, active } = validation.value;
+  const { name, tier, logoUrl, bannerUrl, websiteUrl, description, active } = validation.value;
 
   const db = await getDatabase();
   const [existing] = await db.execute<SponsorRow[]>(
@@ -149,14 +167,14 @@ export async function updateSponsor(id: number, input: SponsorInput): Promise<Sp
 
   await db.execute<ResultSetHeader>(
     `UPDATE bg_sponsors
-     SET name = ?, tier = ?, logo_url = ?, website_url = ?, description = ?, active = ?
+     SET name = ?, tier = ?, logo_url = ?, banner_url = ?, website_url = ?, description = ?, active = ?
      WHERE id = ?`,
-    [name, tier, logoUrl, websiteUrl, description, active ? 1 : 0, id]
+    [name, tier, logoUrl, bannerUrl, websiteUrl, description, active ? 1 : 0, id]
   );
 
   // Le staff vient d'écrire : la vitrine doit le montrer sans attendre.
   invalidateShowcase();
-  return { id, name, slug, tier, logoUrl, websiteUrl, description };
+  return { id, name, slug, tier, logoUrl, bannerUrl, websiteUrl, description };
 }
 
 /**

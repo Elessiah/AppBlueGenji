@@ -10,6 +10,12 @@ import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { loginErrorMessage, oauthErrorMessage } from "../_lib/login-errors";
+import {
+  detectLoginEnvironment,
+  loginEnvironmentNotice,
+  readLoginEnvironmentSignals,
+  type LoginEnvironment,
+} from "@/lib/shared/login-environment";
 import { OAuthButtons } from "./OAuthButtons";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
@@ -58,6 +64,8 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   // l'URL, et une redirection ouverte est l'appât classique du hameçonnage
   // (`lib/shared/safe-redirect.ts`).
   const [redirect, setRedirect] = useState(DEFAULT_REDIRECT);
+  // Lu au montage : le rendu serveur ne connaît ni l'agent ni le mode d'affichage.
+  const [environment, setEnvironment] = useState<LoginEnvironment>("BROWSER");
 
   const [handle, setHandle] = useState("");
   const [resolvedId, setResolvedId] = useState("");
@@ -120,7 +128,13 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
     // Le refus vient du module partagé, qui compose la phrase depuis le motif
     // (`?error=`) et le fournisseur (`?provider=`). Les cinq codes écrits ici en
     // dur ne parlaient que de Google : la troisième porte en aurait fait quinze.
-    const message = oauthErrorMessage(params.get("error"), params.get("provider"));
+    // Sur l'icône d'écran d'accueil d'iOS ou dans le navigateur intégré d'une
+    // application, l'aller-retour perd ses cookies : le refus le dit, et
+    // nomme les sorties (autre navigateur, code Discord).
+    const signals = readLoginEnvironmentSignals();
+    const environment = signals ? detectLoginEnvironment(signals) : "BROWSER";
+    setEnvironment(environment);
+    const message = oauthErrorMessage(params.get("error"), params.get("provider"), environment);
     if (message) showError(message);
   }, [showError]);
 
@@ -210,7 +224,11 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
         {!requested ? (
           <>
-            <OAuthButtons redirect={redirect} termsAccepted={termsAccepted} />
+            <OAuthButtons
+              redirect={redirect}
+              termsAccepted={termsAccepted}
+              environmentNotice={loginEnvironmentNotice(environment)}
+            />
 
             {/*
               Le séparateur **nomme** ce qui suit. « OU » seul laissait croire à
@@ -272,7 +290,11 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
           </>
         ) : (
           <>
-            <OAuthButtons redirect={redirect} termsAccepted={termsAccepted} />
+            <OAuthButtons
+              redirect={redirect}
+              termsAccepted={termsAccepted}
+              environmentNotice={loginEnvironmentNotice(environment)}
+            />
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />

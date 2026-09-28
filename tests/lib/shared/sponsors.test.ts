@@ -1,6 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  FALLBACK_SPONSORS,
+  SPONSOR_DESCRIPTION_MAX,
   SPONSOR_TIERS,
+  isStoredSponsorBanner,
   slugifySponsor,
   validateSponsorInput,
 } from "@/lib/shared/sponsors";
@@ -32,6 +35,7 @@ describe("validateSponsorInput", () => {
         name: "HyperX",
         tier: "PARTNER",
         logoUrl: null,
+        bannerUrl: null,
         websiteUrl: null,
         description: null,
         active: true,
@@ -85,5 +89,68 @@ describe("validateSponsorInput", () => {
     const result = validateSponsorInput({ name: "X", tier: "" });
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.tier).toBe("PARTNER");
+  });
+});
+
+describe("validateSponsorInput — bandeau", () => {
+  it("accepts an uploaded banner, served or disk form", () => {
+    for (const bannerUrl of ["/api/uploads/sponsors/1-a.webp", "/uploads/sponsors/1-a.webp"]) {
+      const result = validateSponsorInput({ name: "X", bannerUrl: ` ${bannerUrl} ` });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.bannerUrl).toBe(bannerUrl);
+    }
+  });
+
+  it("nulls an empty banner", () => {
+    const result = validateSponsorInput({ name: "X", bannerUrl: "  " });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.bannerUrl).toBeNull();
+  });
+
+  it.each([
+    "https://cdn.example.com/banner.png",
+    "//cdn.example.com/banner.png",
+    "/api/uploads/avatars/1-a.webp",
+    "/uploads/teams/1-a.webp",
+    "/api/uploads/sponsors/../avatars/1-a.webp",
+    `/api/uploads/sponsors/${"a".repeat(260)}.webp`,
+  ])("refuses %s (not a sponsor upload)", (bannerUrl) => {
+    expect(validateSponsorInput({ name: "X", bannerUrl })).toEqual({ ok: false, error: "INVALID_BANNER_URL" });
+  });
+});
+
+describe("validateSponsorInput — description", () => {
+  it("accepts a description at the limit", () => {
+    const description = "d".repeat(SPONSOR_DESCRIPTION_MAX);
+    const result = validateSponsorInput({ name: "X", description });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.description).toBe(description);
+  });
+
+  it("refuses rather than truncates a description over the limit", () => {
+    expect(validateSponsorInput({ name: "X", description: "d".repeat(SPONSOR_DESCRIPTION_MAX + 1) })).toEqual({
+      ok: false,
+      error: "DESCRIPTION_TOO_LONG",
+    });
+  });
+
+  it("measures the trimmed description", () => {
+    const result = validateSponsorInput({ name: "X", description: `  ${"d".repeat(SPONSOR_DESCRIPTION_MAX)}  ` });
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe("isStoredSponsorBanner", () => {
+  it("only accepts the sponsors upload folder", () => {
+    expect(isStoredSponsorBanner("/api/uploads/sponsors/x.webp")).toBe(true);
+    expect(isStoredSponsorBanner("/uploads/sponsors/x.webp")).toBe(true);
+    expect(isStoredSponsorBanner("/api/uploads/tournaments/x.webp")).toBe(false);
+    expect(isStoredSponsorBanner("https://x/y.webp")).toBe(false);
+  });
+});
+
+describe("FALLBACK_SPONSORS", () => {
+  it("carry no banner", () => {
+    expect(FALLBACK_SPONSORS.every((s) => s.bannerUrl === null)).toBe(true);
   });
 });

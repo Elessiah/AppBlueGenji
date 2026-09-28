@@ -29,14 +29,27 @@ describe("SponsorsGrid — logos servis depuis notre origine", () => {
     expect(source.indexOf(MODAL_START)).toBeGreaterThan(source.indexOf("displaySponsors.map"));
   });
 
-  it("passe par la porte unique `sponsorLogoSrc`", () => {
-    expect(source).toContain('from "@/lib/shared/sponsor-logo"');
-    expect(publicGrid).toContain("sponsorLogoSrc(sponsor)");
+  it("passe par `sponsorCardMedia`, qui délègue le logo à la porte unique `sponsorLogoSrc`", () => {
+    expect(source).toContain('from "@/lib/shared/sponsor-card"');
+    expect(publicGrid).toContain("sponsorCardMedia(sponsor)");
+    const cardModule = readFileSync(join(ROOT, "lib/shared/sponsor-card.ts"), "utf8");
+    expect(cardModule).toContain("sponsorLogoSrc(sponsor)");
   });
 
-  it("ne met jamais `sponsor.logoUrl` dans le src de la vitrine", () => {
+  it("ne met jamais `sponsor.logoUrl` ni `sponsor.bannerUrl` dans le src de la vitrine", () => {
     expect(publicGrid).not.toContain("sponsor.logoUrl");
+    expect(publicGrid).not.toContain("sponsor.bannerUrl");
     expect(publicGrid).not.toContain("toServedUploadUrl(sponsor");
+  });
+
+  it("n'écrit plus de lien vers « # » pour un partenaire sans site", () => {
+    expect(publicGrid).not.toContain('"#"');
+    expect(publicGrid).toContain("sponsorWebsiteHref(");
+  });
+
+  it("affiche le nom et la description du partenaire", () => {
+    expect(publicGrid).toContain("{sponsor.name}");
+    expect(publicGrid).toContain("{sponsor.description}");
   });
 
   it("rend le logo public avec next/image, jamais avec un <img> brut", () => {
@@ -47,13 +60,15 @@ describe("SponsorsGrid — logos servis depuis notre origine", () => {
 
   it("déclare `sizes` — sans lui, `fill` demande la plus grande variante à tout le monde", () => {
     expect(publicGrid).toContain("sizes=");
-    // Les deux points de rupture de la grille (3 colonnes, puis 2 sous 900 px).
+    // Les points de rupture de la grille (3 colonnes, 2 sous 900 px, 1 sous 560 px).
     expect(publicGrid).toContain("max-width: 900px");
+    expect(publicGrid).toContain("max-width: 560px");
   });
 
   it("garde un <img> brut pour l'aperçu de la modale, qui montre une URL non enregistrée", () => {
     const modal = source.slice(source.indexOf(MODAL_START));
     expect(modal).toContain("<img");
     expect(modal).toContain("form.logoUrl");
+    expect(modal).toContain("form.bannerUrl");
   });
 });

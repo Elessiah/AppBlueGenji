@@ -325,10 +325,13 @@ export const PUSH_SERVICE_WORKER_PATH = "/push-sw.js";
 
 /**
  * - `UNSUPPORTED` : pas de service worker ou pas d'API Push ;
- * - `IOS_NEEDS_INSTALL` : iPhone ou iPad hors de l'écran d'accueil — Safari ne
- *   livre les notifications qu'au site **ajouté à l'écran d'accueil**, et
- *   n'expose même pas l'API avant : sans ce cas, le panneau dirait « navigateur
- *   non compatible » à qui n'a qu'un geste à faire ;
+ * - `IOS_NEEDS_INSTALL` : iPhone ou iPad hors du mode app web — Safari ne
+ *   livre les notifications qu'au site **ajouté à l'écran d'accueil et ouvert
+ *   en app web**, et n'expose même pas l'API avant : sans ce cas, le panneau
+ *   dirait « navigateur non compatible » à qui n'a qu'un geste à faire. Le
+ *   manifeste reste en `minimal-ui` (`lib/shared/web-manifest.ts`, pour
+ *   l'OAuth) : c'est l'option « Ouvrir en tant qu'app web » d'iOS 26, cochée
+ *   par défaut, qui ouvre le mode autonome ;
  * - `DENIED` : le joueur a bloqué les notifications du site dans son navigateur
  *   — seul lui peut les rouvrir, dans les réglages ; un bouton n'y peut rien ;
  * - `AVAILABLE` : on peut s'abonner.
@@ -358,7 +361,7 @@ export function isIosUserAgent(userAgent: string, maxTouchPoints: number): boole
 export const PUSH_SUPPORT_NOTICES: Record<Exclude<PushSupport, "AVAILABLE">, string> = {
   UNSUPPORTED: "Ce navigateur ne sait pas recevoir de notifications push.",
   IOS_NEEDS_INSTALL:
-    "Sur iPhone et iPad, ajoute d'abord le site à l'écran d'accueil (bouton Partager, puis « Sur l'écran d'accueil »), puis ouvre-le depuis son icône.",
+    "Sur iPhone et iPad, ajoute d'abord le site à l'écran d'accueil (bouton Partager, puis « Sur l'écran d'accueil », option « Ouvrir en tant qu'app web » cochée), puis ouvre-le depuis son icône.",
   DENIED:
     "Tu as bloqué les notifications de ce site dans ton navigateur. Autorise-les dans ses réglages (icône à gauche de l'adresse), puis recharge la page.",
 };

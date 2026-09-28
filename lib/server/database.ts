@@ -932,6 +932,7 @@ async function runMigrations(db: Pool): Promise<void> {
       slug VARCHAR(140) NOT NULL UNIQUE,
       tier ENUM('GOLD', 'SILVER', 'BRONZE', 'PARTNER') NOT NULL DEFAULT 'PARTNER',
       logo_url TEXT NULL,
+      banner_url VARCHAR(255) NULL,
       website_url TEXT NULL,
       description TEXT NULL,
       display_order INT NOT NULL DEFAULT 100,
@@ -1276,6 +1277,8 @@ async function runMigrations(db: Pool): Promise<void> {
     `ALTER TABLE bg_matches ADD COLUMN caster_ready_at DATETIME NULL AFTER team2_ready_at`,
     // Lien YouTube de la rediff d'un match terminé (`lib/shared/match-replay.ts`).
     `ALTER TABLE bg_matches ADD COLUMN replay_url VARCHAR(255) NULL AFTER live_started_at`,
+    // Bandeau d'une carte partenaire (`lib/shared/sponsor-card.ts`), facultatif.
+    `ALTER TABLE bg_sponsors ADD COLUMN banner_url VARCHAR(255) NULL AFTER logo_url`,
     // Statut d'importance d'une annonce de recrutement, qui remplace la mise en
     // avant `highlight` (report et retrait de l'ancienne colonne plus bas).
     `ALTER TABLE bg_recruitment_ads ADD COLUMN priority

@@ -251,11 +251,6 @@ describe("déclaration du traitement", () => {
     const change = PRIVACY_CHANGES.find((entry) => entry.id === "2026-09-notifications-push");
     expect(change?.details.join(" ")).toContain(`${PUSH_SUBSCRIPTION_RETENTION_DAYS} jours`);
   });
-
-  it("déclare un manifeste en mode autonome, condition du push sur iPhone", async () => {
-    const { default: manifest } = await import("@/app/manifest");
-    expect(manifest().display).toBe("standalone");
-  });
 });
 
 describe("isSameServerKey", () => {
