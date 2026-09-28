@@ -1,0 +1,117 @@
+/* Grand écran : colonne collante sous l'en-tête. */
+.toc {
+  position: sticky;
+  top: 96px;
+  max-height: calc(100vh - 120px);
+  overflow-y: auto;
+  /* Aligné sur le haut du premier bloc de contenu. */
+  padding: 28px 4px 0 0;
+}
+
+.heading {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.list,
+.children {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--line-soft);
+}
+
+.children {
+  margin: 2px 0 6px;
+}
+
+.link,
+.childLink {
+  display: block;
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  color: var(--ink-mute);
+  text-decoration: none;
+  line-height: 1.4;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.link {
+  padding: 6px 0 6px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+
+.childLink {
+  padding: 4px 0 4px 24px;
+  font-size: 12.5px;
+}
+
+.link:hover,
+.childLink:hover {
+  color: var(--ink);
+}
+
+.link:focus-visible,
+.childLink:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.link[data-within="true"] {
+  color: var(--ink);
+}
+
+.link[aria-current],
+.childLink[aria-current] {
+  color: var(--blue-300);
+  border-left-color: var(--blue-300);
+}
+
+/* Mobile : un bloc de liens en tête de contenu, sans les sous-entrées — la
+   colonne n'existe plus et une liste de quinze lignes repousserait le texte. */
+@media (max-width: 959px) {
+  .toc {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding: 14px 16px;
+    border: 1px solid var(--line-soft);
+    border-radius: var(--r-cy-md);
+    background: var(--cyber-bg-1);
+  }
+
+  .list {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    border-left: 0;
+  }
+
+  .children {
+    display: none;
+  }
+
+  .link {
+    margin-left: 0;
+    padding: 6px 12px;
+    border: 1px solid var(--line-strong-cy);
+    border-radius: 999px;
+    font-size: 13px;
+  }
+
+  .link[aria-current] {
+    border-color: var(--blue-300);
+  }
+}

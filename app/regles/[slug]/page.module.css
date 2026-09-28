@@ -1,13 +1,13 @@
-.section {
+/* Largeur commune de l'en-tête et du corps de page. */
+.shell {
   position: relative;
   z-index: 1;
-  width: min(1080px, calc(100vw - 40px));
+  width: min(1120px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 40px 0;
 }
 
-.heroSection {
-  padding: 72px 0 28px;
+.hero {
+  padding: 64px 0 36px;
 }
 
 .back {
@@ -32,7 +32,7 @@
 
 .tagline {
   max-width: 62ch;
-  margin: 0 0 20px;
+  margin: 0 0 24px;
   color: var(--ink-mute);
   font-size: 16px;
   line-height: 1.6;
@@ -72,54 +72,200 @@
   color: var(--ink);
 }
 
-.principles {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 16px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.principle {
+.soonBanner {
   display: flex;
-  gap: 12px;
-  padding: 18px;
-  border: 1px solid var(--line-soft);
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 72ch;
+  margin: 0 0 20px;
+  padding: 14px 16px;
+  border: 1px solid rgba(245, 165, 36, 0.4);
   border-radius: var(--r-cy-md);
-  background: var(--cyber-bg-1);
+  background: rgba(245, 165, 36, 0.07);
   color: var(--ink-mute);
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.6;
 }
 
-.principleNum {
-  font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--blue-500);
-  flex-shrink: 0;
-  padding-top: 2px;
+.soonBanner strong {
+  color: var(--amber);
+}
+
+/* Corps : sommaire à gauche, contenu à droite. Le sommaire passe au-dessus du
+   contenu sous 960 px (voir RulesToc.module.css). */
+.layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+  padding-bottom: 80px;
+}
+
+.content {
+  min-width: 0;
+}
+
+@media (max-width: 959px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+/* Toute cible d'ancre du sommaire s'arrête sous l'en-tête collant. */
+.content [id] {
+  scroll-margin-top: 96px;
+}
+
+.section {
+  padding: 28px 0 12px;
 }
 
 .sectionHead {
   display: flex;
   align-items: baseline;
   gap: 14px;
+  margin-bottom: 18px;
+  padding-top: 20px;
   border-top: 1px solid var(--line-soft);
-  margin-bottom: 20px;
-  padding-top: 22px;
 }
 
 .sectionTitle {
   margin: 0;
-  font-size: clamp(22px, 2.4vw, 32px);
+  font-size: clamp(22px, 2.4vw, 30px);
   font-weight: 500;
   letter-spacing: -0.02em;
 }
 
+.sectionIntro {
+  max-width: 72ch;
+  margin: -6px 0 16px;
+  color: var(--ink-mute);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* Réglages du tournoi (`?tournoi=<id>`) : le seul bloc mis en avant — c'est ce
+   que vient chercher un joueur qui arrive depuis la fiche de son tournoi. */
+.tournamentPanel {
+  padding: 22px 24px;
+  border: 1px solid var(--blue-500);
+  border-radius: var(--r-cy-lg);
+  background: linear-gradient(180deg, rgba(90, 200, 255, 0.07), var(--cyber-bg-1));
+  box-shadow: 0 0 0 1px rgba(90, 200, 255, 0.08), 0 12px 40px -24px var(--blue-glow);
+}
+
+@media (max-width: 559px) {
+  .tournamentPanel {
+    padding: 18px 16px;
+  }
+}
+
+.tournamentHead {
+  margin-bottom: 18px;
+}
+
+.tournamentTitle {
+  margin: 8px 0 6px;
+  font-size: clamp(20px, 2.2vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.settingsIntro {
+  max-width: 70ch;
+  margin: 0 0 10px;
+  color: var(--ink-mute);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.backToTournament {
+  font-size: 13.5px;
+  color: var(--blue-300);
+}
+
+.settingsGroup {
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.settingsGroup + .settingsGroup {
+  margin-top: 16px;
+}
+
+.settingsGroupTitle {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settingValue {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* L'essentiel : une liste numérotée, puis le schéma. */
+.principles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 22px;
+  padding: 0;
+  list-style: none;
+}
+
+.principle {
+  display: flex;
+  gap: 14px;
+  max-width: 76ch;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.principleNum {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  margin-top: 1px;
+  border: 1px solid var(--blue-500);
+  border-radius: 50%;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--blue-300);
+}
+
+/* Règles du mode : des blocs de texte séparés par un filet, pas une pile de
+   cartes — le poids visuel reste aux titres. */
 .rule {
-  padding: 20px 22px;
-  margin-bottom: 14px;
+  padding: 18px 0 20px;
+}
+
+.rule + .rule {
+  border-top: 1px solid var(--line-soft);
 }
 
 .ruleTitle {
@@ -130,6 +276,7 @@
 }
 
 .ruleBody {
+  max-width: 76ch;
   margin: 0 0 10px;
   color: var(--ink-mute);
   font-size: 14.5px;
@@ -141,6 +288,7 @@
 }
 
 .bullets {
+  max-width: 76ch;
   margin: 0;
   padding-left: 20px;
   color: var(--ink-mute);
@@ -148,8 +296,66 @@
   line-height: 1.75;
 }
 
+.bullets li + li {
+  margin-top: 4px;
+}
+
 .bullets li::marker {
   color: var(--blue-500);
+}
+
+/* Règles communes : repliées, un titre par ligne. */
+.accordion {
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md);
+  background: var(--cyber-bg-1);
+  overflow: hidden;
+}
+
+.commonRule + .commonRule {
+  border-top: 1px solid var(--line-soft);
+}
+
+.commonSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 18px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink);
+  cursor: pointer;
+  list-style: none;
+}
+
+.commonSummary::-webkit-details-marker {
+  display: none;
+}
+
+.commonSummary::after {
+  content: "+";
+  flex-shrink: 0;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: var(--blue-300);
+}
+
+.commonRule[open] > .commonSummary::after {
+  content: "−";
+}
+
+.commonSummary:hover {
+  background: var(--cyber-bg-2);
+}
+
+.commonSummary:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: -2px;
+}
+
+.commonBody {
+  padding: 0 18px 16px;
 }
 
 .otherModes {
@@ -176,48 +382,7 @@
   color: var(--ink);
 }
 
-.soonBanner {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin: 18px 0 0;
-  padding: 14px 16px;
-  border: 1px solid rgba(245, 165, 36, 0.4);
-  border-radius: var(--r-cy-md);
-  background: rgba(245, 165, 36, 0.07);
-  color: var(--ink-mute);
-  font-size: 13.5px;
-  line-height: 1.6;
-}
-
-/* Réglages d'un tournoi (`?tournoi=<id>`) : une grille d'étiquettes et de
-   valeurs par groupe, lisible à la largeur d'un téléphone. */
-.settingsIntro {
-  max-width: 70ch;
-  margin: 0 0 16px;
-  color: var(--ink-mute);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.settings {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 14px 24px;
-  margin: 0;
-}
-
-.setting {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.settingValue {
-  margin: 0;
-  font-size: 14px;
-  line-height: 1.5;
-  color: var(--ink);
-  overflow-wrap: anywhere;
+.soonTag {
+  color: var(--amber);
+  font-size: 11px;
 }
