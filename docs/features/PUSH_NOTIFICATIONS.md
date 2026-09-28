@@ -124,7 +124,12 @@ une fois en production : la clé publique est gravée dans chaque abonnement.
   à un refus.
 - Au montage du panneau, un abonnement déjà présent dans le navigateur est
   renvoyé (upsert) : c'est ce qui rattache un navigateur partagé au compte qui
-  s'y connecte.
+  s'y connecte — **sur preuve** : un appareil rangé sous un autre compte ne
+  change de titulaire que si les clés `p256dh`/`auth` envoyées sont celles déjà
+  rangées (un navigateur rend le même abonnement à quiconque s'y connecte).
+  L'adresse seule n'est pas un secret suffisant, comme pour le désabonnement ;
+  sans preuve, rien n'est touché et la route répond 409
+  `PUSH_SUBSCRIPTION_CLAIMED`.
 - CSP : `worker-src 'self' blob:` couvre déjà le service worker.
 
 ## Routes
@@ -132,7 +137,7 @@ une fois en production : la clé publique est gravée dans chaque abonnement.
 | Route | Rôle |
 |---|---|
 | `GET /api/push` | Clé publique (`null` = push éteint), sujets visibles, sujets coupés, nombre d'appareils |
-| `POST /api/push/subscriptions` | Range l'abonnement de l'appareil (`{ subscription }`), 503 sans clés |
+| `POST /api/push/subscriptions` | Range l'abonnement de l'appareil (`{ subscription }`), 503 sans clés, 409 si l'appareil est à un autre compte sans preuve des clés |
 | `DELETE /api/push/subscriptions` | Retire l'abonnement (`{ endpoint }`), borné au compte connecté |
 | `PUT /api/push/topics` | Remplace la liste des sujets coupés (`{ disabledTopics }`) |
 

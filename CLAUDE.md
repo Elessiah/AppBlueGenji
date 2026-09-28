@@ -45,7 +45,7 @@ npx jest tests/path/to/file.test.ts
 - `/api/*` — REST API routes (no tRPC, no server actions)
 
 ### Auth System (`lib/server/auth.ts`)
-Sessions are stored in `bg_user_sessions` with SHA-256 hashed tokens, 30-day TTL, cookie `bg_session` (httpOnly, sameSite=lax). Quatre chemins d'entrée, **aucun mot de passe** :
+Sessions are stored in `bg_user_sessions` with SHA-256 hashed tokens, 30-day TTL, cookie `bg_session` (httpOnly, sameSite=lax). Une session se ferme aussi **à distance** : « Déconnecter mes autres sessions » sur `/profil` (`revokeOtherSessions`, `/api/profile/sessions`) et le détachement d'une porte ferment toutes les sessions du compte sauf la courante (`docs/features/SESSION_REVOCATION.md`). Quatre chemins d'entrée, **aucun mot de passe** :
 1. **OAuth Google** — `/api/auth/google/{start,callback}`
 2. **OAuth Discord** — `/api/auth/discord/{start,callback}` (certifie le tag au passage)
 3. **OAuth Blizzard** — `/api/auth/blizzard/{start,callback}` (renseigne le BattleTag)

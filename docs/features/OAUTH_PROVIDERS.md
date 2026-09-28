@@ -160,6 +160,11 @@ redevient une saisie ordinaire — invisible de tous, administrateurs compris. L
 BattleTag, lui, survit au détachement de Blizzard : il n'est ni une porte
 d'entrée ni une attestation.
 
+**Détacher une porte ferme les autres sessions du compte**, sauf celle qui fait
+le geste : c'est le réflexe de qui croit ce fournisseur compromis, et les
+sessions qu'il a pu ouvrir n'en gardaient aucune trace. Voir
+`docs/features/SESSION_REVOCATION.md`.
+
 **La ligne Discord dit par quelle porte elle est passée**
 (`bg_users.discord_link_method`, `ENUM('DM_CODE','OAUTH')`). Discord est le seul
 fournisseur à en avoir deux — le bouton, et le code à six chiffres reçu en
