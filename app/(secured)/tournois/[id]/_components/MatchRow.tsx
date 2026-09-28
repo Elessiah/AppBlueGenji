@@ -202,9 +202,11 @@ export function MatchRow({
 
       <MatchReplayStrip match={match} />
 
+      {/* Pas de région live : un plateau de cent vingt-sept cartes en
+          annoncerait autant à chaque instantané du flux. L'annonce qui compte,
+          celle du lecteur engagé, vit dans sa modale. */}
       {reportNotice && (
         <p
-          role="status"
           style={{
             margin: 0,
             padding: "4px 8px",
