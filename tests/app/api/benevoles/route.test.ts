@@ -2,11 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/benevoles-service");
+jest.mock("@/lib/server/stored-upload-cleanup");
 
 import { GET, POST } from "@/app/api/benevoles/route";
 import { PUT, DELETE } from "@/app/api/benevoles/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/benevoles-service";
+import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });
@@ -207,5 +209,22 @@ describe("DELETE /api/benevoles/[id]", () => {
     jest.mocked(service.deleteBenevole).mockRejectedValue(new Error("BENEVOLE_NOT_FOUND"));
     const res = await DELETE(jsonReq("DELETE", {}), params("99"));
     expect(res.status).toBe(404);
+  });
+});
+
+describe("DELETE /api/benevoles/[id] — photo", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.deleteBenevole).mockResolvedValue(undefined);
+  });
+
+  // Le nettoyage ne touche qu'au dossier des bénévoles : une photo désignant
+  // l'avatar d'un joueur ne fait plus effacer cet avatar.
+  it("délègue au nettoyage borné au dossier des bénévoles", async () => {
+    jest.mocked(service.getBenevolePhotoUrl).mockResolvedValue("/api/uploads/avatars/12-abc.webp");
+    const res = await DELETE(jsonReq("DELETE", {}), params("1"));
+    expect(res.status).toBe(200);
+    expect(deleteUnreferencedUpload).toHaveBeenCalledWith("/api/uploads/avatars/12-abc.webp", "benevoles");
   });
 });

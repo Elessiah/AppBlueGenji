@@ -1,4 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+// Le nom est résolu avant chaque saut : un hôte de test doit résoudre vers une
+// adresse publique, sans dépendre du réseau de la machine qui lance les tests.
+jest.mock("node:dns/promises", () => ({
+  lookup: jest.fn(async () => [{ address: "93.184.215.14", family: 4 }]),
+}));
 import { fetchRemoteImage } from "@/lib/server/remote-image-fetch";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { localUploadUrl, toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
+import { isStoredUploadIn, localUploadUrl, toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 
 describe("toServedUploadUrl", () => {
   it("maps a disk path to the served api path", () => {
@@ -75,5 +75,20 @@ describe("localUploadUrl", () => {
     // deux préfixes, donc elle tombe — mais le cas mérite d'être fixé.
     expect(localUploadUrl("//evil.test/api/uploads/x.webp")).toBeNull();
     expect(localUploadUrl("https://evil.test/api/uploads/x.webp")).toBeNull();
+  });
+});
+
+describe("isStoredUploadIn", () => {
+  it("reconnaît un fichier du dossier, sous ses deux formes", () => {
+    expect(isStoredUploadIn("/api/uploads/teams/3-a.webp", "teams")).toBe(true);
+    expect(isStoredUploadIn("/uploads/teams/3-a.webp", "teams")).toBe(true);
+  });
+
+  it("refuse un autre dossier, une adresse étrangère, une traversée et le vide", () => {
+    expect(isStoredUploadIn("/api/uploads/avatars/3-a.webp", "teams")).toBe(false);
+    expect(isStoredUploadIn("/api/uploads/teamsx/3-a.webp", "teams")).toBe(false);
+    expect(isStoredUploadIn("https://exemple.fr/api/uploads/teams/3-a.webp", "teams")).toBe(false);
+    expect(isStoredUploadIn("/api/uploads/teams/../avatars/3-a.webp", "teams")).toBe(false);
+    expect(isStoredUploadIn(null, "teams")).toBe(false);
   });
 });

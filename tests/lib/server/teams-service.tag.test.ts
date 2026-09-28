@@ -217,7 +217,7 @@ describe("softDeleteTeam — sigle", () => {
 
     await softDeleteTeam(1, 12);
 
-    const [anonymize] = connectionExecute.mock.calls[0] as [string, unknown[]];
+    const [anonymize] = connectionExecute.mock.calls[1] as [string, unknown[]];
     // Une équipe dissoute garde sa ligne pour ses statistiques : sans cette
     // remise à NULL, son sigle resterait pris à jamais sur tout le site.
     expect(anonymize).toMatch(/SET deleted_at = NOW\(\)/);

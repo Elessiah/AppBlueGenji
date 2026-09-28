@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+// Le nom est résolu avant chaque saut : un hôte de test doit résoudre vers une
+// adresse publique, sans dépendre du réseau de la machine qui lance les tests.
+jest.mock("node:dns/promises", () => ({
+  lookup: jest.fn(async () => [{ address: "93.184.215.14", family: 4 }]),
+}));
 jest.mock("@/lib/server/sponsors-service");
 jest.mock("@/lib/server/api-guard", () => ({
   enforceRateLimit: jest.fn(() => null),

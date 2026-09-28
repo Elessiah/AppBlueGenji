@@ -286,3 +286,26 @@ describe("formatJoinedAt", () => {
     expect(formatJoinedAt("invalid")).toBe("invalid");
   });
 });
+
+describe("validateBenevoleInput — photo", () => {
+  const valid = { firstName: "Marie", lastName: "Dupont", category: "Développeur", joinedAt: "2024-03-15" };
+
+  it("accepte une photo importée, servie ou disque", () => {
+    for (const photoUrl of ["/api/uploads/benevoles/1-a.webp", "/uploads/benevoles/1-a.webp"]) {
+      expect(validateBenevoleInput({ ...valid, photoUrl }).ok).toBe(true);
+    }
+  });
+
+  // Rien à effacer chez nous : l'adresse est tue à la sortie par `localUploadUrl`.
+  it("laisse passer une adresse étrangère", () => {
+    expect(validateBenevoleInput({ ...valid, photoUrl: "https://cdn.exemple.fr/p.png" }).ok).toBe(true);
+  });
+
+  it.each([
+    "/api/uploads/avatars/12-a.webp",
+    "/api/uploads/teams/3-a.webp",
+    "/uploads/sponsors/1-a.webp",
+  ])("refuse l'adresse d'upload d'un autre dossier %s — le remplacement l'effacerait", (photoUrl) => {
+    expect(validateBenevoleInput({ ...valid, photoUrl })).toEqual({ ok: false, error: "INVALID_PHOTO_URL" });
+  });
+});

@@ -3,11 +3,16 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/sponsors-service");
 jest.mock("@/lib/server/image-upload");
+// Le nettoyage demande à la base si un fichier est encore désigné : par défaut,
+// plus rien ne le désigne.
+jest.mock("@/lib/server/database");
 
 import { GET, POST } from "@/app/api/landing/sponsors/route";
 import { PUT, DELETE } from "@/app/api/landing/sponsors/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteStoredImage } from "@/lib/server/image-upload";
+import { getDatabase } from "@/lib/server/database";
+import { fakePool, type SqlQuery } from "../../../helpers/sql-double";
 import * as service from "@/lib/server/sponsors-service";
 import type { Sponsor } from "@/lib/shared/sponsors";
 import { authUser } from "../../../helpers/auth-user";
@@ -106,6 +111,7 @@ describe("PUT /api/landing/sponsors/[id]", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(service.getSponsorImageUrls).mockResolvedValue({ logoUrl: null, bannerUrl: null });
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>(async () => [[], []]) }));
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -216,9 +222,38 @@ describe("PUT /api/landing/sponsors/[id]", () => {
 });
 
 describe("DELETE /api/landing/sponsors/[id]", () => {
+  let referenced = false;
   beforeEach(() => {
     jest.clearAllMocks();
+    referenced = false;
     jest.mocked(service.getSponsorImageUrls).mockResolvedValue({ logoUrl: null, bannerUrl: null });
+    jest.mocked(getDatabase).mockResolvedValue(
+      fakePool({ execute: jest.fn<SqlQuery>(async () => [referenced ? [{ 1: 1 }] : [], []]) }),
+    );
+  });
+
+  // Le logo accepte une adresse collée : celle de l'avatar d'un joueur partait
+  // du disque avec le partenaire.
+  it("n'efface jamais l'image d'un autre dossier collée comme logo", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.getSponsorImageUrls).mockResolvedValue({
+      logoUrl: "/api/uploads/avatars/12-abc.webp",
+      bannerUrl: null,
+    });
+    jest.mocked(service.deleteSponsor).mockResolvedValue(undefined);
+
+    expect((await DELETE(jsonReq("DELETE", {}), params("4"))).status).toBe(200);
+    expect(deleteStoredImage).not.toHaveBeenCalled();
+  });
+
+  it("garde un logo de partenaire que désigne encore une autre ligne", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(service.getSponsorImageUrls).mockResolvedValue({ logoUrl: "/uploads/sponsors/x.webp", bannerUrl: null });
+    jest.mocked(service.deleteSponsor).mockResolvedValue(undefined);
+    referenced = true;
+
+    await DELETE(jsonReq("DELETE", {}), params("4"));
+    expect(deleteStoredImage).not.toHaveBeenCalled();
   });
   afterEach(() => {
     jest.restoreAllMocks();
