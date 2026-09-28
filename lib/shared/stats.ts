@@ -489,7 +489,6 @@ export function computeDeepStats(
   return stats;
 }
 
-/** Formate un ratio 0..1 en pourcentage lisible (`"62 %"`), `"—"` si absent. */
 /** Bilan résumé : les trois nombres d'une carte d'annuaire. */
 export type RecordSummary = {
   wins: number;
@@ -527,6 +526,7 @@ export function computeRecordSummary(
   return { wins, losses, tournamentsPlayed };
 }
 
+/** Formate un ratio 0..1 en pourcentage lisible (`"62 %"`), `"—"` si absent. */
 export function formatRate(rate: number | null): string {
   if (rate === null) return "—";
   return `${Math.round(rate * 100)} %`;
