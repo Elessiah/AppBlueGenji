@@ -36,6 +36,6 @@ describe("boutons OAuth de la page de connexion", () => {
     // L'autre moitié du même mécanisme : la navigation complète ne sert à rien
     // si la page ne lit plus l'URL au montage.
     const page = source(join("app", "connexion", "_components", "LoginForm.tsx"));
-    expect(page).toMatch(/oauthErrorMessage\(params\.get\("error"\), params\.get\("provider"\)\)/);
+    expect(page).toMatch(/oauthErrorMessage\(params\.get\("error"\), params\.get\("provider"\), environment\)/);
   });
 });
