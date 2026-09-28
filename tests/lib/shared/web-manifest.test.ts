@@ -1,12 +1,14 @@
 import { describe, expect, it } from "@jest/globals";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
+import sharp from "sharp";
 import manifest from "@/app/manifest";
 import { config as middlewareConfig } from "@/middleware";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import {
   APP_BACKGROUND_COLOR,
   APP_ICONS,
+  APP_SCREENSHOTS,
   APP_SHORTCUTS,
   APP_SHORT_NAME,
   buildWebManifest,
@@ -71,6 +73,32 @@ describe("buildWebManifest", () => {
       expect(existsSync(file)).toBe(true);
       const { width, height } = pngSize(file);
       expect(`${width}x${height}`).toBe(sizes);
+    },
+  );
+
+  it("déclare une capture large et une étroite, sans quoi Chrome n'offre que l'invite minimale", () => {
+    const factors = (webManifest.screenshots ?? []).map((screenshot) => screenshot.form_factor);
+    expect(factors).toContain("wide");
+    expect(factors).toContain("narrow");
+    for (const screenshot of webManifest.screenshots ?? []) expect(screenshot.label).toBeTruthy();
+  });
+
+  it.each(APP_SCREENSHOTS.map((screenshot) => [screenshot.src, screenshot.sizes, screenshot.form_factor] as [string, string, string]))(
+    "%s existe, mesure bien %s et a la forme d'une capture %s",
+    async (src, sizes, formFactor) => {
+      const file = path.join(ROOT, "public", src);
+      expect(existsSync(file)).toBe(true);
+      const { width, height, format } = await sharp(file).metadata();
+      expect(format).toBe("webp");
+      expect(`${width}x${height}`).toBe(sizes);
+      // Bornes de Chrome : côtés entre 320 et 3840 px, rapport au plus 2,3.
+      const long = Math.max(width!, height!);
+      const short = Math.min(width!, height!);
+      expect(short).toBeGreaterThanOrEqual(320);
+      expect(long).toBeLessThanOrEqual(3840);
+      expect(long / short).toBeLessThanOrEqual(2.3);
+      // Une capture large est en paysage, une étroite en portrait.
+      expect(width! > height!).toBe(formFactor === "wide");
     },
   );
 
