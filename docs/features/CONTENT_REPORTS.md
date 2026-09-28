@@ -141,7 +141,9 @@ et au plus une fois par heure depuis la mise en page racine
   par heure (`reportAlertMode` : `ALERT`, puis `SATURATION_NOTICE` au premier
   signalement au-delà du plafond depuis la dernière annonce, puis `SILENT`). Pas
   « au 61ᵉ » : le compte de l'heure est lu sans verrou, deux envois simultanés
-  peuvent lire 59 et le suivant 61, et l'annonce ne partirait jamais.
+  peuvent lire 59 et le suivant 61, et l'annonce ne partirait jamais. Un
+  signalement de nouveau alerté (rythme retombé) réarme l'annonce : un second
+  pic dans l'heure est annoncé à son tour.
 - `REPORTS_HOURLY_HARD_CAP` : 600 par heure, au-delà desquels le dépôt est
   refusé (`REPORTS_SATURATED` → 429) — une borne sur la croissance de la table,
   qu'il faut une soixantaine d'IP pour tenir pleine.
