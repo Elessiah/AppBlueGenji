@@ -32,28 +32,53 @@ export function endpointHash(endpoint: string): string {
 }
 
 /**
- * Range l'abonnement d'un appareil pour le compte connecté. Un appareil déjà
- * abonné par un autre compte (navigateur partagé, changement de compte) passe
- * au nouveau : un navigateur n'a qu'un abonnement par site, il ne doit pas
- * recevoir les notifications d'un compte qui ne l'utilise plus.
+ * Range l'abonnement d'un appareil pour le compte connecté.
+ *
+ * Un appareil déjà abonné par un autre compte (navigateur partagé, changement
+ * de compte) passe au nouveau — mais **seulement sur preuve** : les clés
+ * `p256dh`/`auth` doivent être celles déjà rangées. Un navigateur n'a qu'un
+ * abonnement par site et le rend identique à quiconque s'y connecte, si bien
+ * que le cas légitime la fournit toujours ; l'adresse seule, elle, n'est pas un
+ * secret suffisant — c'est la règle de `deleteSubscription`, et l'écriture ne
+ * pouvait pas en suivre une plus lâche : qui connaissait l'adresse d'un autre
+ * appareil pouvait le rendre muet (clés remplacées, notifications
+ * indéchiffrables) ou y faire arriver les siennes.
+ *
+ * @returns `false` si l'appareil reste à un autre compte, faute de preuve.
  */
-export async function saveSubscription(userId: number, subscription: PushSubscriptionInput): Promise<void> {
+export async function saveSubscription(userId: number, subscription: PushSubscriptionInput): Promise<boolean> {
   const db = await getDatabase();
-  // Les dates ne repartent que si l'appareil **change de compte** : le panneau
-  // renvoie l'abonnement à chaque ouverture, et la date d'abonnement
-  // deviendrait sinon celle de la dernière visite. Elles sont écrites **avant**
-  // `user_id` : les affectations se lisent de gauche à droite, placées après
-  // elles compareraient la valeur neuve à elle-même.
+  const hash = endpointHash(subscription.endpoint);
+  // La condition est répétée sur chaque affectation, **jamais sur une valeur
+  // déjà réécrite** : les affectations se lisent de gauche à droite, d'où
+  // `user_id` en dernier. Elle reste vraie de bout en bout quand elle l'était
+  // au départ (même compte, ou clés identiques jusqu'au bout), et fausse de
+  // même — rien n'est alors touché. Les dates ne repartent que si l'appareil
+  // **change de compte** : le panneau renvoie l'abonnement à chaque ouverture,
+  // et la date d'abonnement deviendrait sinon celle de la dernière visite.
+  // Clés comparées **octet par octet** : la collation par défaut de la table
+  // ignore la casse, et une clé base64url qui ne diffère que par elle passerait
+  // pour la même preuve — puis remplacerait la vraie.
+  const allowed = `(user_id = VALUES(user_id) OR (BINARY p256dh = VALUES(p256dh) AND BINARY auth = VALUES(auth)))`;
   await db.execute(
     `INSERT INTO bg_push_subscriptions (user_id, endpoint_hash, endpoint, p256dh, auth)
      VALUES (?, ?, ?, ?, ?)
      ON DUPLICATE KEY UPDATE
-       created_at = IF(user_id = VALUES(user_id), created_at, CURRENT_TIMESTAMP),
-       last_success_at = IF(user_id = VALUES(user_id), last_success_at, NULL),
-       user_id = VALUES(user_id), endpoint = VALUES(endpoint),
-       p256dh = VALUES(p256dh), auth = VALUES(auth)`,
-    [userId, endpointHash(subscription.endpoint), subscription.endpoint, subscription.p256dh, subscription.auth],
+       created_at = IF(user_id = VALUES(user_id) OR NOT ${allowed}, created_at, CURRENT_TIMESTAMP),
+       last_success_at = IF(user_id = VALUES(user_id) OR NOT ${allowed}, last_success_at, NULL),
+       endpoint = IF(${allowed}, VALUES(endpoint), endpoint),
+       p256dh = IF(${allowed}, VALUES(p256dh), p256dh),
+       auth = IF(${allowed}, VALUES(auth), auth),
+       user_id = IF(${allowed}, VALUES(user_id), user_id)`,
+    [userId, hash, subscription.endpoint, subscription.p256dh, subscription.auth],
   );
+  // `affectedRows` ne distingue pas un refus d'une écriture à l'identique
+  // (mysql2 pose `FOUND_ROWS`) : on relit le titulaire.
+  const [rows] = await db.execute<(RowDataPacket & { user_id: number })[]>(
+    `SELECT user_id FROM bg_push_subscriptions WHERE endpoint_hash = ?`,
+    [hash],
+  );
+  return Number(rows[0]?.user_id) === userId;
 }
 
 /**

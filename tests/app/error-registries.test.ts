@@ -109,11 +109,13 @@ const TEAM_CODES = [
   "LOGO_DELETE_FAILED",
 ];
 
-/** Tout ce que `/api/profile/connections[/:provider]` et le rappel OAuth peuvent rendre. */
+/** Tout ce que `/api/profile/connections[/:provider]`, `/api/profile/sessions` et le rappel OAuth peuvent rendre. */
 const CONNECTION_CODES = [
   "PROVIDER_ALREADY_LINKED",
   "IDENTITY_ALREADY_LINKED",
   "LAST_CONNECTION",
+  "SESSIONS_READ_FAILED",
+  "SESSIONS_REVOKE_FAILED",
   "NOT_LINKED",
   "UNKNOWN_PROVIDER",
   "OAUTH_FAILED",

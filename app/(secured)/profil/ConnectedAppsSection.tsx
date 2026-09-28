@@ -37,7 +37,8 @@ import {
   oauthStartPath,
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
-import { connectionErrorMessage, connectionSuccessMessage } from "./connection-errors";
+import { connectionErrorMessage, connectionSuccessMessage, unlinkSuccessMessage } from "./connection-errors";
+import { OtherSessionsPanel } from "./OtherSessionsPanel";
 import s from "./profil.module.css";
 
 /** Ce que chaque porte apporte au compte, en plus d'une session. */
@@ -80,6 +81,8 @@ export function ConnectedAppsSection({
 }): React.ReactElement {
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
+  // Un retrait ferme les autres sessions : le compte d'à côté doit être relu.
+  const [sessionsVersion, setSessionsVersion] = useState(0);
 
   // Le retour d'un aller-retour de rattachement. L'URL est **nettoyée** dans la
   // foulée : sans cela, un rafraîchissement rejouerait le message, et un profil
@@ -118,9 +121,10 @@ export function ConnectedAppsSection({
       const res = await fetch(`/api/profile/connections/${OAUTH_PROVIDER_SLUGS[provider]}`, {
         method: "DELETE",
       });
-      const payload = (await res.json()) as { error?: string };
+      const payload = (await res.json()) as { error?: string; revokedSessions?: number | null };
       if (!res.ok) throw new Error(payload.error ?? "");
-      showSuccess(`${OAUTH_PROVIDER_LABELS[provider]} a été retiré de ton compte.`);
+      showSuccess(unlinkSuccessMessage(provider, payload.revokedSessions ?? null));
+      setSessionsVersion((version) => version + 1);
       await reload();
       onChanged?.();
     } catch (e) {
@@ -254,6 +258,8 @@ export function ConnectedAppsSection({
           })}
         </div>
       )}
+
+      <OtherSessionsPanel version={sessionsVersion} />
     </>
   );
 }

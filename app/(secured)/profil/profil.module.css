@@ -369,3 +369,29 @@
     flex-direction: column;
   }
 }
+
+/* ── Sessions ouvertes ────────────────────────────────────────────────────── */
+
+.sessionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.sessionsSummary {
+  margin: 0;
+  flex: 1 1 260px;
+}
+
+/* Même gabarit que « Retirer » dans la liste d'au-dessus, et jamais coupé :
+   sur mobile, la phrase passe au-dessus plutôt que d'écraser le bouton. */
+.sessionsButton {
+  padding: 4px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}

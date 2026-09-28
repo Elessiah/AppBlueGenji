@@ -113,6 +113,59 @@ export async function clearSession(): Promise<void> {
 }
 
 /**
+ * Empreinte de la session de cette requête, ou `""` sans cookie — une
+ * empreinte SHA-256 n'est jamais vide, si bien que `token_hash <> ""` désigne
+ * alors **toutes** les sessions du compte (le contournement de développement
+ * n'en porte aucune).
+ */
+async function currentTokenHash(): Promise<string> {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(SESSION_COOKIE)?.value;
+  return token ? hashToken(token) : "";
+}
+
+/** Sessions encore valides du compte, hors celle de cette requête. */
+export async function countOtherSessions(userId: number): Promise<number> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { c: number })[]>(
+    `SELECT COUNT(*) AS c FROM bg_user_sessions
+     WHERE user_id = ? AND token_hash <> ? AND expires_at > NOW()`,
+    [userId, await currentTokenHash()],
+  );
+  return Number(rows[0]?.c ?? 0);
+}
+
+/**
+ * Ferme toutes les sessions du compte **sauf celle de cette requête** — le
+ * « déconnecter mes autres appareils » de `/profil`, et le geste qui suit le
+ * détachement d'une porte d'entrée.
+ *
+ * Sans lui, une session volée restait valide trente jours sans recours : seules
+ * la déconnexion de l'appareil courant et la suppression du compte effaçaient
+ * des lignes de `bg_user_sessions`, et détacher le fournisseur compromis — le
+ * réflexe après la prise d'un compte Google ou Discord — ne fermait aucune des
+ * sessions qu'il avait ouvertes. Les sessions expirées partent avec, sans être
+ * comptées : les compter ferait annoncer des appareils fantômes.
+ *
+ * @returns le nombre de sessions encore valides qui ont été fermées.
+ */
+export async function revokeOtherSessions(userId: number): Promise<number> {
+  const db = await getDatabase();
+  const current = await currentTokenHash();
+  // Deux instructions pour que le compte rendu ne compte que des sessions qui
+  // ouvraient encore quelque chose.
+  await db.execute(
+    `DELETE FROM bg_user_sessions WHERE user_id = ? AND token_hash <> ? AND expires_at <= NOW()`,
+    [userId, current],
+  );
+  const [result] = await db.execute<ResultSetHeader>(
+    `DELETE FROM bg_user_sessions WHERE user_id = ? AND token_hash <> ?`,
+    [userId, current],
+  );
+  return Number(result.affectedRows ?? 0);
+}
+
+/**
  * Provisionne (ou réutilise) un utilisateur de test « vierge » déterministe :
  * non-admin, sans équipe, sans battletags ni majorité renseignés, stats à 0.
  * Utilisé pour les tests E2E du parcours « nouveau compte » via

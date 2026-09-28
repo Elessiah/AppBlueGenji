@@ -69,7 +69,7 @@ export const PROFILE_SECTIONS = [
   {
     id: "connexions",
     title: "Applications connectées",
-    lead: "Les portes par lesquelles tu entres sur le site.",
+    lead: "Les portes par lesquelles tu entres sur le site, et les sessions encore ouvertes.",
   },
   {
     id: "notifications",
