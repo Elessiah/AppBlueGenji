@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { usePathname } from "next/navigation";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
 import { useToast } from "@/components/ui/toast";
@@ -349,6 +350,15 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
 
           <CasterCard caster={current.caster} phase={current.phase} onCopy={copy} />
         </div>
+
+        {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici
+            que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
+            fois l'appareil abonné. */}
+        <PushNotificationsPanel
+          variant="compact"
+          topics={["MATCH_START"]}
+          lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
+        />
 
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
             (arbitrage, délai) la referme d'elle-même. */}

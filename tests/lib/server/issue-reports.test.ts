@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
+jest.mock("@/lib/server/push-subscriptions");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/repository");
 
 import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
+import { pushToUsers, subscribedStaffCandidates } from "@/lib/server/push-subscriptions";
 import { resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration";
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 import { fakePool, fakeConnection } from "../../helpers/sql-double";
@@ -46,6 +48,8 @@ async function mockDb(rows: unknown[][]) {
 
 beforeEach(async () => {
   jest.clearAllMocks();
+  jest.mocked(subscribedStaffCandidates).mockResolvedValue([]);
+  jest.mocked(pushToUsers).mockResolvedValue(0);
   jest.mocked(loadTournamentRow).mockResolvedValue(tournamentRow({ participant_type: "TEAM" }));
   jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(101);
   jest.mocked(pushRefereeAlert).mockResolvedValue({ sent: 3, unresolved: [], failed: [] });
@@ -186,6 +190,20 @@ describe("reportTournamentIssue", () => {
     await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).rejects.toThrow(
       "BOT_INTERNAL_UNREACHABLE",
     );
+  });
+
+  it("ne se dit pas injoignable quand un arbitre a reçu la notification push", async () => {
+    await mockDb([ENTRANT]);
+    jest.mocked(pushRefereeAlert).mockResolvedValue(null);
+    jest.mocked(subscribedStaffCandidates).mockResolvedValue([{ userId: 5, isAdmin: false, rolesJson: '["ARBITRE"]' }]);
+    jest.mocked(pushToUsers).mockResolvedValue(1);
+
+    await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, null)).resolves.toEqual({ notifiedReferees: 0 });
+    const [userIds, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
+    expect(userIds).toEqual([5]);
+    expect(topic).toBe("REFEREE_ALERT");
+    // Le texte du joueur reste sur Discord.
+    expect(content.body).not.toContain(VALID_MESSAGE);
   });
 
   it("accepte un signalement même si aucun arbitre n'a pu être joint", async () => {

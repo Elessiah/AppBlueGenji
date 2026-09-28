@@ -1,11 +1,11 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import {
-  isBotCircuitOpen,
-  pushDiscordDirectMessages,
-  type DiscordRecipient,
-} from "@/lib/server/bot-integration";
+import { isBotCircuitOpen } from "@/lib/server/bot-integration";
+import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
+import { privacyChangePush } from "@/lib/shared/push-messages";
 import { siteBaseUrl } from "@/lib/server/site-url";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { webPushConfig } from "@/lib/server/web-push";
 import {
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   announceablePrivacyChanges,
@@ -38,7 +38,8 @@ import {
  * entre-temps ne sont pas perdus : ils rejoignent le message suivant.
  *
  * Joignable veut dire : un **identifiant Discord** rattaché, ou un tag
- * **certifié**. Un tag non certifié n'est qu'une saisie, qui peut être celle
+ * **certifié** — ou un appareil abonné aux notifications push, qui reçoit le
+ * même lot en résumé (`privacyChangePush`). Un tag non certifié n'est qu'une saisie, qui peut être celle
  * d'un autre — on n'écrit pas à un inconnu pour lui parler du compte de
  * quelqu'un. Le bot n'écrit de toute façon qu'aux membres du serveur BlueGenji.
  *
@@ -73,12 +74,6 @@ type CandidateRow = RowDataPacket & {
 
 type DoneRow = RowDataPacket & { user_id: number; change_id: string };
 
-function toRecipient(row: CandidateRow): DiscordRecipient | null {
-  const handle = row.discord_verified_at ? row.discord_pseudo : null;
-  if (!row.discord_id && !handle) return null;
-  return { discordId: row.discord_id, handle, label: row.pseudo };
-}
-
 /**
  * Les comptes à qui un message est dû maintenant.
  *
@@ -93,6 +88,21 @@ function toRecipient(row: CandidateRow): DiscordRecipient | null {
  * clés primaires.
  */
 async function loadCandidates(settled: readonly PrivacyChange[]): Promise<CandidateRow[]> {
+  // Un compte sans Discord n'est candidat que si le push est **allumé** : sans
+  // clés, rien ne peut lui parvenir, et le réserver consommerait l'annonce pour
+  // de bon. Et si la table des abonnements manque (table tolérée), la lecture
+  // retombe sur Discord seul plutôt que d'éteindre toute l'annonce.
+  if (webPushConfig()) {
+    try {
+      return await queryCandidates(settled, true);
+    } catch (error) {
+      if (!isMissingTableError(error)) throw error;
+    }
+  }
+  return queryCandidates(settled, false);
+}
+
+async function queryCandidates(settled: readonly PrivacyChange[], withPush: boolean): Promise<CandidateRow[]> {
   const db = await getDatabase();
   const clause = settled
     .map(
@@ -105,7 +115,8 @@ async function loadCandidates(settled: readonly PrivacyChange[]): Promise<Candid
     `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.created_at
        FROM bg_users u
       WHERE u.is_deleted = 0
-        AND (u.discord_id IS NOT NULL OR (u.discord_verified_at IS NOT NULL AND u.discord_pseudo IS NOT NULL))
+        AND (u.discord_id IS NOT NULL OR (u.discord_verified_at IS NOT NULL AND u.discord_pseudo IS NOT NULL)
+             ${withPush ? "OR EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)" : ""})
         AND (${clause})
         AND NOT EXISTS (SELECT 1 FROM bg_privacy_change_notifications r
                          WHERE r.user_id = u.id AND r.sent_at > NOW() - INTERVAL ? DAY)
@@ -173,13 +184,12 @@ async function runSweep(now: Date): Promise<number> {
 
   // Un message par **ensemble** de changements : deux comptes qui ont les mêmes
   // à recevoir partagent un seul appel au bot.
-  const groups = new Map<string, { changes: PrivacyChange[]; recipients: DiscordRecipient[]; userIds: number[] }>();
+  const groups = new Map<string, { changes: PrivacyChange[]; recipients: NotificationRecipient[] }>();
   const siteUrl = siteBaseUrl();
   const batchByDue = new Map<string, PrivacyChange[]>();
   for (const row of candidates) {
-    const recipient = toRecipient(row);
-    if (!recipient) continue;
-    const userId = Number(row.id);
+    const recipient = toNotificationRecipient(row, "proven");
+    const userId = recipient.userId;
     // Tous les changements dus, récents compris — mais seulement si l'un d'eux a
     // passé le délai : la relecture peut avoir vu une acceptation depuis.
     const due = privacyDmBatch(
@@ -202,27 +212,34 @@ async function runSweep(now: Date): Promise<number> {
     const reserved = await reserve(userId, batch);
     if (reserved.length === 0) continue;
     const key = reserved.map((change) => change.id).join("|");
-    const group = groups.get(key) ?? { changes: reserved, recipients: [], userIds: [] };
+    const group = groups.get(key) ?? { changes: reserved, recipients: [] };
     group.recipients.push(recipient);
-    group.userIds.push(userId);
     groups.set(key, group);
   }
 
   let sent = 0;
   for (const group of groups.values()) {
-    const report = await pushDiscordDirectMessages(
-      buildPrivacyChangesMessage(group.changes, siteUrl),
-      group.recipients,
-      "privacy-changes",
-    );
-    if (report === null) {
-      await release(
-        group.userIds,
-        group.changes.map((change) => change.id),
-      );
+    const report = await notifyUsers(group.recipients, {
+      topic: "PRIVACY_CHANGE",
+      discord: { message: buildPrivacyChangesMessage(group.changes, siteUrl), context: "privacy-changes" },
+      push: privacyChangePush(group.changes.map((change) => change.title)),
+    });
+    sent += report.pushed;
+    if (report.discord === null) {
+      // Bot injoignable : seuls les comptes qu'il devait joindre sont rendus au
+      // balayage suivant — ceux qui n'avaient que le push l'ont reçu.
+      const viaDiscord = group.recipients
+        .filter((recipient) => recipient.discord !== null)
+        .map((recipient) => recipient.userId);
+      if (viaDiscord.length > 0) {
+        await release(
+          viaDiscord,
+          group.changes.map((change) => change.id),
+        );
+      }
       continue;
     }
-    sent += report.sent;
+    sent += report.discord.sent;
   }
   return sent;
 }

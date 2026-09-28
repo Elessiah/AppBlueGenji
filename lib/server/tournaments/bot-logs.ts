@@ -38,6 +38,9 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
+import { notifyStaff } from "@/lib/server/notify";
+import { refereeAlertPush } from "@/lib/shared/push-messages";
+import { notifyTournamentStart } from "./player-pushes";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
@@ -313,6 +316,12 @@ export function flushBotLogs(connection: PoolConnection): void {
     async function deliver({ entry, channel, message }: ResolvedBotLog): Promise<void> {
       if (channel !== "REFEREE") {
         await sendBotLog(message);
+        // Le coup d'envoi est une ligne de journal pour le staff, et une
+        // notification pour les joueurs engagés — la seule qui n'ait pas de
+        // message privé Discord : elle naît au même point de passage unique.
+        if (entry.kind === "tournament_started") {
+          void notifyTournamentStart(entry.tournamentId).catch(() => undefined);
+        }
         return;
       }
 
@@ -330,7 +339,12 @@ export function flushBotLogs(connection: PoolConnection): void {
       // rien n'est parti.
       let sent = false;
       try {
-        sent = (await pushRefereeAlert(message, "referee-alert", { honourCircuit: true })) !== null;
+        const report = await notifyStaff({
+          topic: "REFEREE_ALERT",
+          discord: () => pushRefereeAlert(message, "referee-alert", { honourCircuit: true }),
+          push: refereeAlertPush(message, refereePushKey(entry)),
+        });
+        sent = report.discord !== null;
       } catch {
         sent = false;
       }
@@ -403,6 +417,17 @@ function refereeAlertClaimId(entry: PendingBotLog): number | null {
  * Les deux natures concernées portent un `matchId` ; le `switch` est là pour
  * que TypeScript le sache, pas pour trancher quoi que ce soit.
  */
+/**
+ * Étiquette push d'une alerte d'arbitrage : sa nature et sa manche quand elle
+ * en a une. Stable d'un envoi à l'autre (la réservation, `claimId`, n'y entre
+ * pas) — une alerte renvoyée après un échec du bot remplace la précédente sans
+ * resonner — et **totale** : une nature d'alerte sans manche ajoutée demain ne
+ * doit pas faire échouer son propre envoi.
+ */
+function refereePushKey(entry: PendingBotLog): string {
+  return "matchId" in entry ? `${entry.kind}-${entry.matchId}` : entry.kind;
+}
+
 function refereeAlertMatchId(entry: PendingBotLog): number {
   switch (entry.kind) {
     case "score_conflict":

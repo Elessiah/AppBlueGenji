@@ -84,6 +84,20 @@ describe("deleteTournament", () => {
     }
   });
 
+  it("efface à la main les réservations qui pendent aux manches, avant elles", async () => {
+    const { execute } = mockExistingTournament();
+
+    await deleteTournament(7);
+
+    const sql = statements(execute);
+    const matches = sql.findIndex((s) => /^DELETE FROM bg_matches/.test(s));
+    for (const table of ["bg_match_reminders", "bg_referee_alerts", "bg_match_start_notices"]) {
+      const index = sql.findIndex((s) => s.includes(`FROM ${table}`) && s.startsWith("DELETE"));
+      expect(index).toBeGreaterThanOrEqual(0);
+      expect(index).toBeLessThan(matches);
+    }
+  });
+
   it("ne supprime jamais une équipe, un joueur ou une adhésion", async () => {
     const { execute } = mockExistingTournament();
 

@@ -338,6 +338,7 @@ describe("rollbackCurrentRound — écritures", () => {
 
     expect(statementWith(execute, "DELETE FROM bg_match_reminders")?.[1]).toEqual([2, 3]);
     expect(statementWith(execute, "DELETE FROM bg_referee_alerts")?.[1]).toEqual([2, 3]);
+    expect(statementWith(execute, "DELETE FROM bg_match_start_notices")?.[1]).toEqual([2, 3]);
     expect(statementWith(execute, "DELETE FROM bg_matches")?.[1]).toEqual([2, 3]);
     expect(statements(execute).some((sql) => sql.includes("SET team1_id = NULL"))).toBe(false);
   });
@@ -345,6 +346,7 @@ describe("rollbackCurrentRound — écritures", () => {
   it.each([
     ["bg_match_reminders"],
     ["bg_referee_alerts"],
+    ["bg_match_start_notices"],
   ])("supprime les manches suivantes même quand %s manque", async (table) => {
     // Création avalée par un `catch` dans `database.ts` : une base à qui la
     // table manque n'a rien à y effacer, et doit pouvoir reculer quand même.

@@ -17,6 +17,19 @@ import { invalidateTournamentPreview } from "./preview-cache";
 import { invalidateTournamentSnapshot } from "./snapshot";
 
 /**
+ * Toute écriture capable d'ouvrir le lancement d'un match publie l'un des
+ * évènements ci-dessous : c'est donc d'ici que part le balayage des départs de
+ * match (`./player-pushes`), étranglé et jamais attendu. Import dynamique : ce
+ * module est sur le chemin de chaque écriture, le push ne doit rien lui coûter
+ * tant qu'il n'a rien à faire.
+ */
+function scheduleMatchStartNotices(): void {
+  void import("./player-pushes")
+    .then(({ dispatchMatchStartNotices }) => dispatchMatchStartNotices())
+    .catch(() => undefined);
+}
+
+/**
  * Le tournoi lui-même a changé : plateau, inscrites, état.
  *
  * Seul cet événement vide la liste publique — c'est le seul dont le contenu s'y
@@ -24,6 +37,7 @@ import { invalidateTournamentSnapshot } from "./snapshot";
  * raison, les agrégats de la vitrine.
  */
 export function publishUpdatedEvent(tournamentId: number): void {
+  scheduleMatchStartNotices();
   invalidateTournamentSnapshot(tournamentId);
   // Une inscription change le tirage prévisible : l'aperçu suit.
   invalidateTournamentPreview(tournamentId);
@@ -66,6 +80,7 @@ export function publishMatchUpdatedEvent(
   tournamentId: number,
   options: { onAir?: boolean } = {},
 ): void {
+  scheduleMatchStartNotices();
   invalidateTournamentSnapshot(tournamentId);
   if (options.onAir) invalidateLandingLive();
   publishTournamentEvent({
@@ -94,6 +109,7 @@ export function publishMatchUpdatedEvent(
  * (`invalidateListsIfStateChanged`).
  */
 export function publishScoreReportedEvent(tournamentId: number, matchId: number): void {
+  scheduleMatchStartNotices();
   invalidateTournamentSnapshot(tournamentId);
   invalidateTeamRanking();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
@@ -108,6 +124,7 @@ export function publishScoreReportedEvent(tournamentId: number, matchId: number)
 
 /** Idem : l'arbitrage d'un score ne déplace pas un tournoi dans la liste. */
 export function publishScoreResolvedEvent(tournamentId: number, matchId: number): void {
+  scheduleMatchStartNotices();
   invalidateTournamentSnapshot(tournamentId);
   invalidateTeamRanking();
   // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.

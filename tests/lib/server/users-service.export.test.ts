@@ -9,6 +9,12 @@ jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/push-subscriptions", () => ({
+  exportPushData: jest.fn(async () => ({
+    devices: [{ endpoint: "https://fcm.googleapis.com/fcm/send/abc", p256dh: "k", auth: "a", createdAt: "2026-09-01T00:00:00.000Z", lastSuccessAt: null }],
+    disabledTopics: ["MATCH_REMINDER"],
+  })),
+}));
 
 async function mockDb(execute: SqlMock) {
   const { getDatabase } = await import("@/lib/server/database");
@@ -79,6 +85,11 @@ describe("exportOwnData", () => {
     await mockDb(execute);
 
     const data = await exportOwnData(42);
+
+    // Les appareils abonnés aux notifications push font partie de ce que le
+    // site détient : ils sont rendus, clés comprises, avec les sujets coupés.
+    expect(data.pushNotifications.devices).toHaveLength(1);
+    expect(data.pushNotifications.disabledTopics).toEqual(["MATCH_REMINDER"]);
 
     expect(data.account).toMatchObject({
       id: 42,

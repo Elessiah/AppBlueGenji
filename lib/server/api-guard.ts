@@ -210,6 +210,20 @@ export const REPORT_SUBMIT_RULE: RateLimitRule = {
 };
 
 /**
+ * Abonnements et réglages des notifications push, par compte.
+ *
+ * Chaque abonnement fait écrire le serveur vers un service de push au premier
+ * envoi ; un appareil s'abonne une fois, et le panneau renvoie son abonnement
+ * à chaque ouverture. Trente écritures en dix minutes ne gênent aucun usage et
+ * bornent un script qui remplirait la table d'abonnements.
+ */
+export const PUSH_WRITE_RULE: RateLimitRule = {
+  name: "push-subscription-write",
+  limit: 30,
+  windowMs: 10 * 60_000,
+};
+
+/**
  * Recherche de joueurs, d'équipes ou de tournois dans le formulaire de
  * signalement, par compte. Une frappe au clavier en déclenche une (après
  * temporisation) : soixante par minute ne gênent aucune saisie, et bornent un

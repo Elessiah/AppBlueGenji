@@ -19,6 +19,7 @@ import {
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
@@ -415,6 +416,42 @@ export default function RgpdPage() {
             <Link href="/conditions-utilisation#signalement">conditions d&apos;utilisation</Link>, que
             chacun accepte en créant un compte ou une équipe.
           </p>
+        </div>
+      </section>
+
+      <section id="notifications" className={styles.section}>
+        <header className={styles.head}>
+          <div>
+            <span className="eyebrow">SUR TON ACCORD</span>
+            <h2 className={styles.sectionTitle}>Notifications push</h2>
+          </div>
+        </header>
+        <div className={styles.prose}>
+          <p>
+            Tu peux être prévenu sur ton téléphone ou ton ordinateur du départ de tes matchs, d&apos;un
+            score à confirmer, du coup d&apos;envoi d&apos;un tournoi, des rappels de match et de ce
+            qui concerne ton compte ou ton équipe. <strong>Rien ne part sans ton geste</strong> :
+            les notifications s&apos;activent appareil par appareil, depuis{" "}
+            <Link href="/profil#notifications">Mon profil</Link>, où tu choisis aussi les sujets.
+          </p>
+          <ul>
+            <li>
+              <strong>Ce que le site garde</strong> : l&apos;adresse d&apos;abonnement que ton
+              navigateur lui donne, ses clés de chiffrement, la date d&apos;abonnement et de la
+              dernière notification remise, et les sujets que tu as coupés.
+            </li>
+            <li>
+              <strong>Par où passe le message</strong> : le service de push de ton navigateur
+              (Google, Mozilla, Apple ou Microsoft), qui le reçoit{" "}
+              <strong>chiffré pour ton seul appareil</strong> et ne peut pas le lire. Aucune
+              notification ne porte le pseudo d&apos;un joueur.
+            </li>
+            <li>
+              <strong>Combien de temps</strong> : jusqu&apos;à ce que tu les désactives, que ton
+              navigateur révoque l&apos;abonnement ou que tu supprimes ton compte — et au plus{" "}
+              {PUSH_SUBSCRIPTION_RETENTION_DAYS} jours sans notification remise.
+            </li>
+          </ul>
         </div>
       </section>
 

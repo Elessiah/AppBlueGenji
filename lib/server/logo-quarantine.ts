@@ -32,7 +32,8 @@ import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { pushDiscordDirectMessages, type DiscordRecipient } from "@/lib/server/bot-integration";
+import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
+import { moderationPush } from "@/lib/shared/push-messages";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { toIso } from "@/lib/server/serialization";
@@ -135,6 +136,7 @@ async function unlinkIfPresent(file: string): Promise<void> {
 }
 
 type MemberRecipientRow = RowDataPacket & {
+  id: number;
   pseudo: string;
   discord_id: string | null;
   discord_pseudo: string | null;
@@ -142,44 +144,31 @@ type MemberRecipientRow = RowDataPacket & {
 };
 
 /**
- * Un compte, converti en destinataire Discord s'il est joignable par un moyen
- * **prouvé** (identifiant, ou tag certifié) — `null` sinon. Partagée par les
- * deux lecteurs ci-dessous, qui ne diffèrent que par la requête qui amène la
- * ligne.
+ * Membres actuels d'une équipe, à prévenir d'une décision sur son logo. Le
+ * message privé ne part que par un moyen **prouvé** (identifiant, ou tag
+ * certifié) ; le push, aux appareils que chacun a abonnés.
  */
-function provenRecipient(row: MemberRecipientRow): DiscordRecipient | null {
-  const handle = row.discord_verified_at ? row.discord_pseudo : null;
-  if (!row.discord_id && !handle) return null;
-  return { discordId: row.discord_id, handle, label: row.pseudo };
-}
-
-/**
- * Membres actuels d'une équipe joignables sur Discord par un moyen **prouvé**
- * (identifiant, ou tag certifié).
- */
-async function teamMemberRecipients(teamId: number): Promise<DiscordRecipient[]> {
+async function teamMemberRecipients(teamId: number): Promise<NotificationRecipient[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<MemberRecipientRow[]>(
-    `SELECT u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
      FROM bg_team_members tm
      JOIN bg_users u ON u.id = tm.user_id
      WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0`,
     [teamId],
   );
-  return rows.map(provenRecipient).filter((recipient): recipient is DiscordRecipient => recipient !== null);
+  return rows.map((row) => toNotificationRecipient(row, "proven"));
 }
 
-/** Un joueur, joignable sur Discord par un moyen **prouvé** — au plus une entrée. */
-async function userRecipient(userId: number): Promise<DiscordRecipient[]> {
+/** Un joueur, à prévenir d'une décision sur son avatar — au plus une entrée. */
+async function userRecipient(userId: number): Promise<NotificationRecipient[]> {
   const db = await getDatabase();
   const [rows] = await db.execute<MemberRecipientRow[]>(
-    `SELECT pseudo, discord_id, discord_pseudo, discord_verified_at FROM bg_users
+    `SELECT id, pseudo, discord_id, discord_pseudo, discord_verified_at FROM bg_users
      WHERE id = ? AND is_deleted = 0`,
     [userId],
   );
-  if (rows.length === 0) return [];
-  const recipient = provenRecipient(rows[0]);
-  return recipient ? [recipient] : [];
+  return rows.slice(0, 1).map((row) => toNotificationRecipient(row, "proven"));
 }
 
 /**
@@ -222,9 +211,11 @@ export function notifyTeamLogoRemoved(teamId: number, teamName: string, reportId
   const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void teamMemberRecipients(teamId)
     .then((recipients) =>
-      recipients.length === 0
-        ? null
-        : pushDiscordDirectMessages(formatLogoRemovedNotice({ teamName, url }), recipients, "logo-removed"),
+      notifyUsers(recipients, {
+        topic: "MODERATION",
+        discord: { message: formatLogoRemovedNotice({ teamName, url }), context: "logo-removed" },
+        push: moderationPush({ kind: "REMOVED", teamName, teamId, reportId }),
+      }),
     )
     .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", error));
 }
@@ -238,7 +229,11 @@ export function notifyUserAvatarRemoved(userId: number, reportId: number | null)
   const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void userRecipient(userId)
     .then((recipients) =>
-      recipients.length === 0 ? null : pushDiscordDirectMessages(formatAvatarRemovedNotice({ url }), recipients, "avatar-removed"),
+      notifyUsers(recipients, {
+        topic: "MODERATION",
+        discord: { message: formatAvatarRemovedNotice({ url }), context: "avatar-removed" },
+        push: moderationPush({ kind: "REMOVED", reportId }),
+      }),
     )
     .catch((error) => console.error("[moderation] joueur non prévenu de la suppression", error));
 }
@@ -509,9 +504,11 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void teamMemberRecipients(teamId)
     .then((recipients) =>
-      recipients.length === 0
-        ? null
-        : pushDiscordDirectMessages(formatLogoHiddenNotice({ teamName, purgeAfter, url }), recipients, "logo-hidden"),
+      notifyUsers(recipients, {
+        topic: "MODERATION",
+        discord: { message: formatLogoHiddenNotice({ teamName, purgeAfter, url }), context: "logo-hidden" },
+        push: moderationPush({ kind: "HIDDEN", teamName, teamId, reportId }),
+      }),
     )
     .catch((error) => console.error("[moderation] équipe non prévenue du masquage", error));
 
@@ -601,9 +598,11 @@ export async function hideUserAvatarForReport(
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void userRecipient(userId)
     .then((recipients) =>
-      recipients.length === 0
-        ? null
-        : pushDiscordDirectMessages(formatAvatarHiddenNotice({ purgeAfter, url }), recipients, "avatar-hidden"),
+      notifyUsers(recipients, {
+        topic: "MODERATION",
+        discord: { message: formatAvatarHiddenNotice({ purgeAfter, url }), context: "avatar-hidden" },
+        push: moderationPush({ kind: "HIDDEN", reportId }),
+      }),
     )
     .catch((error) => console.error("[moderation] joueur non prévenu du masquage", error));
 
@@ -780,9 +779,11 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     });
     void teamMemberRecipients(Number(row.target_id))
       .then((recipients) =>
-        recipients.length === 0
-          ? null
-          : pushDiscordDirectMessages(formatLogoRestoredNotice({ teamName }), recipients, "logo-restored"),
+        notifyUsers(recipients, {
+          topic: "MODERATION",
+          discord: { message: formatLogoRestoredNotice({ teamName }), context: "logo-restored" },
+          push: moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }),
+        }),
       )
       .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
   } else {
@@ -792,9 +793,11 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     });
     void userRecipient(Number(row.target_id))
       .then((recipients) =>
-        recipients.length === 0
-          ? null
-          : pushDiscordDirectMessages(formatAvatarRestoredNotice(), recipients, "avatar-restored"),
+        notifyUsers(recipients, {
+          topic: "MODERATION",
+          discord: { message: formatAvatarRestoredNotice(), context: "avatar-restored" },
+          push: moderationPush({ kind: "RESTORED", reportId: null }),
+        }),
       )
       .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", error));
   }

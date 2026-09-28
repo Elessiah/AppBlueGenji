@@ -858,6 +858,69 @@ async function runMigrations(db: Pool): Promise<void> {
     // Table déjà présente, ou création refusée : les alertes se taisent.
   }
 
+  // Notifications push (`lib/shared/push-notifications.ts`). Même contrat que
+  // les rappels : un canal accessoire, créé sous un `catch` muet — une base où
+  // elles manquent sert le site sans push, jamais une erreur.
+  //
+  // L'adresse d'un abonnement dépasse souvent 255 caractères : l'unicité porte
+  // sur son empreinte SHA-256, pas sur la colonne elle-même.
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_push_subscriptions (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT NOT NULL,
+        endpoint_hash CHAR(64) NOT NULL,
+        endpoint VARCHAR(1024) NOT NULL,
+        p256dh VARCHAR(128) NOT NULL,
+        auth VARCHAR(64) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        last_success_at DATETIME NULL,
+        UNIQUE KEY uniq_bg_push_subscriptions_endpoint (endpoint_hash),
+        KEY idx_bg_push_subscriptions_user (user_id),
+        CONSTRAINT fk_bg_push_subscriptions_user FOREIGN KEY (user_id)
+          REFERENCES bg_users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : le push se tait.
+  }
+
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_push_topic_optouts (
+        user_id BIGINT NOT NULL,
+        topic VARCHAR(32) NOT NULL,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (user_id, topic),
+        CONSTRAINT fk_bg_push_topic_optouts_user FOREIGN KEY (user_id)
+          REFERENCES bg_users(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : tous les sujets restent actifs.
+  }
+
+  // Réservation d'une notification de départ de match : une par match, par
+  // appariement et par phase (`LOBBY`, `LAUNCHED`) — même mécanique que
+  // `bg_match_reminders`, la clé unique interdit le doublon entre deux
+  // balayages concurrents.
+  try {
+    await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_match_start_notices (
+        id BIGINT AUTO_INCREMENT PRIMARY KEY,
+        match_id BIGINT NOT NULL,
+        pairing VARCHAR(48) NOT NULL,
+        phase VARCHAR(16) NOT NULL,
+        sent_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE KEY uniq_bg_match_start_notices (match_id, pairing, phase),
+        CONSTRAINT fk_bg_match_start_notices_match FOREIGN KEY (match_id)
+          REFERENCES bg_matches(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    `);
+  } catch {
+    // Table déjà présente, ou création refusée : les départs se taisent.
+  }
+
   // ───────────────────────────────────────────────────────────────────────────
   // Vitrine et association
   // ───────────────────────────────────────────────────────────────────────────

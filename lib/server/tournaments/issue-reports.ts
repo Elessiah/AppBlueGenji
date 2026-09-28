@@ -26,6 +26,8 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { toParticipantType } from "@/lib/shared/participants";
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
+import { notifyStaff } from "@/lib/server/notify";
+import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   buildIssueReportMessage,
   matchRoundLabel,
@@ -133,21 +135,32 @@ export async function reportTournamentIssue(
     };
   }
 
-  const alert = await pushRefereeAlert(
-    buildIssueReportMessage({
-      tournamentName: String(context.tournament_name),
-      tournamentUrl: tournamentPageUrl(tournamentId),
-      entrant: { name: String(context.entrant_name), participantType },
-      match,
-      message,
-    }),
-    "issue-report",
-  );
+  const alertMessage = buildIssueReportMessage({
+    tournamentName: String(context.tournament_name),
+    tournamentUrl: tournamentPageUrl(tournamentId),
+    entrant: { name: String(context.entrant_name), participantType },
+    match,
+    message,
+  });
+  const { discord: alert, pushed } = await notifyStaff({
+    topic: "REFEREE_ALERT",
+    discord: () => pushRefereeAlert(alertMessage, "issue-report"),
+    // Le texte du joueur reste sur Discord : une notification s'affiche sur un
+    // écran verrouillé, elle ne dit que ce qui attend un arbitre, et où.
+    push: {
+      title: "Arbitrage requis",
+      body: `Problème signalé · ${String(context.tournament_name)}${match ? `, ${match.round}` : ""}.`,
+      url: tournamentMatchHref(tournamentId, match?.id ?? null),
+      tag: `issue-${tournamentId}-${match?.id ?? 0}`,
+    },
+  });
 
   // Le bot injoignable est remonté, pas avalé : répondre « signalement envoyé »
   // quand rien n'est parti laisserait le joueur attendre un arbitre qui n'a
-  // rien reçu. Il reste alors le canal Discord habituel.
-  if (alert === null) throw new Error("BOT_INTERNAL_UNREACHABLE");
+  // rien reçu. Il reste alors le canal Discord habituel. Mais si un appareil
+  // d'arbitre a reçu la notification push, quelque chose **est** parti : le
+  // dire injoignable ferait renvoyer le joueur, et sonner l'arbitre deux fois.
+  if (alert === null && pushed === 0) throw new Error("BOT_INTERNAL_UNREACHABLE");
 
-  return { notifiedReferees: alert.sent };
+  return { notifiedReferees: alert?.sent ?? 0 };
 }

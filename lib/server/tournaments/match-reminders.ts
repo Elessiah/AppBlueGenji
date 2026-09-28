@@ -29,9 +29,12 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import {
-  pushDiscordDirectMessages,
-  type DiscordRecipient,
-} from "@/lib/server/bot-integration";
+  loadEntrantPlayerIds,
+  loadNotificationRecipients,
+  notifyUsers,
+  type NotificationRecipient,
+} from "@/lib/server/notify";
+import { matchReminderPush } from "@/lib/shared/push-messages";
 import {
   MATCH_REMINDER_LOOKAHEAD_MS,
   MATCH_REMINDER_OFFSETS,
@@ -49,6 +52,7 @@ type ScheduledMatchRow = RowDataPacket & {
   id: number;
   tournament_id: number;
   tournament_name: string;
+  participant_type: string;
   bracket: string;
   round_number: number;
   start_at: string | Date;
@@ -56,13 +60,6 @@ type ScheduledMatchRow = RowDataPacket & {
   team2_id: number;
   team1_name: string;
   team2_name: string;
-};
-
-type RecipientRow = RowDataPacket & {
-  team_id: number;
-  pseudo: string;
-  discord_id: string | null;
-  discord_pseudo: string | null;
 };
 
 type SentReminderRow = RowDataPacket & {
@@ -84,60 +81,32 @@ let lastSweepAt = 0;
 let pendingSweep: Promise<number> | null = null;
 
 /**
- * Destinataire Discord d'un joueur.
+ * Destinataires d'un match, par engagée.
  *
- * Le tag suffit — le bot résout le membre sur le serveur BlueGenji. L'ID, quand
- * le compte a été lié par code Discord, évite ce balayage et reste donc
- * prioritaire.
- */
-function toRecipient(row: RecipientRow): DiscordRecipient | null {
-  if (!row.discord_id && !row.discord_pseudo) return null;
-  return {
-    discordId: row.discord_id,
-    handle: row.discord_pseudo,
-    label: row.pseudo,
-  };
-}
-
-/**
- * Joueurs des engagées d'un match, par engagée.
- *
- * Deux origines réunies : les membres actifs d'une équipe, et le joueur d'une
- * entrée solo (`bg_teams.solo_user_id`), qui n'a pas de ligne de membre — c'est
- * la même distinction qu'ailleurs dans le moteur, un engagé n'étant pas
- * forcément une équipe (`lib/shared/participants.ts`).
+ * Le tag déclaré suffit (`declared`) — le bot résout le membre sur le serveur
+ * BlueGenji, et le message ne dit rien de plus qu'un horaire public. L'ID,
+ * quand le compte a été lié par Discord, évite ce balayage et reste prioritaire.
+ * Un joueur sans Discord reste un destinataire : il peut avoir un appareil
+ * abonné aux notifications push.
  */
 async function loadRecipientsByTeam(
   teamIds: number[],
-): Promise<Map<number, DiscordRecipient[]>> {
-  const byTeam = new Map<number, DiscordRecipient[]>();
-  if (teamIds.length === 0) return byTeam;
-
-  const db = await getDatabase();
-  const placeholders = teamIds.map(() => "?").join(", ");
-  const [rows] = await db.query<RecipientRow[]>(
-    `SELECT tm.team_id AS team_id, u.pseudo, u.discord_id, u.discord_pseudo
-       FROM bg_team_members tm
-       JOIN bg_users u ON u.id = tm.user_id
-      WHERE tm.team_id IN (${placeholders})
-        AND tm.left_at IS NULL
-      UNION
-     SELECT t.id AS team_id, u.pseudo, u.discord_id, u.discord_pseudo
-       FROM bg_teams t
-       JOIN bg_users u ON u.id = t.solo_user_id
-      WHERE t.id IN (${placeholders})`,
-    [...teamIds, ...teamIds],
+): Promise<Map<number, NotificationRecipient[]>> {
+  const playersByTeam = await loadEntrantPlayerIds(teamIds);
+  const recipients = await loadNotificationRecipients(
+    [...playersByTeam.values()].flat(),
+    "declared",
   );
-
-  for (const row of rows) {
-    const recipient = toRecipient(row);
-    if (!recipient) continue;
-    const teamId = Number(row.team_id);
-    const list = byTeam.get(teamId);
-    if (list) list.push(recipient);
-    else byTeam.set(teamId, [recipient]);
+  const byUser = new Map(recipients.map((recipient) => [recipient.userId, recipient]));
+  const byTeam = new Map<number, NotificationRecipient[]>();
+  for (const [teamId, userIds] of playersByTeam) {
+    byTeam.set(
+      teamId,
+      userIds
+        .map((userId) => byUser.get(userId))
+        .filter((recipient): recipient is NotificationRecipient => recipient !== undefined),
+    );
   }
-
   return byTeam;
 }
 
@@ -260,7 +229,7 @@ async function runSweep(now: Date): Promise<number> {
   const [matches] = await db.query<ScheduledMatchRow[]>(
     `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
-            t.name AS tournament_name,
+            t.name AS tournament_name, t.participant_type,
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -330,11 +299,23 @@ async function runSweep(now: Date): Promise<number> {
         ? buildMatchReminderMessage(offset, context)
         : buildMatchScheduleAnnouncement(context, remaining);
 
-      await pushDiscordDirectMessages(
-        message,
-        recipients,
-        offset ? "match-reminder" : "match-scheduled",
-      );
+      await notifyUsers(recipients, {
+        topic: "MATCH_REMINDER",
+        discord: { message, context: offset ? "match-reminder" : "match-scheduled" },
+        push: matchReminderPush(
+          {
+            tournamentId: Number(match.tournament_id),
+            tournamentName: context.tournamentName,
+            matchId: Number(match.id),
+            teamName: side.teamName,
+            opponentName: side.opponentName,
+            roundLabel,
+            startAt: match.start_at,
+            solo: match.participant_type === "SOLO",
+          },
+          offset ? offset.label : null,
+        ),
+      });
       dispatched += 1;
     }
   }
