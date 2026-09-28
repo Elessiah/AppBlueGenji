@@ -135,7 +135,10 @@ describe("abonnements", () => {
     pool({ execute });
     await saveSubscription(7, SUB).catch(() => undefined);
     const sql = String(execute.mock.calls[0][0]);
-    const allowed = "(user_id = VALUES(user_id) OR (p256dh = VALUES(p256dh) AND auth = VALUES(auth)))";
+    // Comparaison binaire : la collation de la table ignore la casse, et une clé
+    // base64url n'est la même que si elle l'est octet par octet.
+    const allowed =
+      "(user_id = VALUES(user_id) OR (BINARY p256dh = VALUES(p256dh) AND BINARY auth = VALUES(auth)))";
     const assignments = sql
       .slice(sql.indexOf("ON DUPLICATE KEY UPDATE") + "ON DUPLICATE KEY UPDATE".length)
       .split(/,\n/)

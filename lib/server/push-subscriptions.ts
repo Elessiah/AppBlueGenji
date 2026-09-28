@@ -56,7 +56,10 @@ export async function saveSubscription(userId: number, subscription: PushSubscri
   // même — rien n'est alors touché. Les dates ne repartent que si l'appareil
   // **change de compte** : le panneau renvoie l'abonnement à chaque ouverture,
   // et la date d'abonnement deviendrait sinon celle de la dernière visite.
-  const allowed = `(user_id = VALUES(user_id) OR (p256dh = VALUES(p256dh) AND auth = VALUES(auth)))`;
+  // Clés comparées **octet par octet** : la collation par défaut de la table
+  // ignore la casse, et une clé base64url qui ne diffère que par elle passerait
+  // pour la même preuve — puis remplacerait la vraie.
+  const allowed = `(user_id = VALUES(user_id) OR (BINARY p256dh = VALUES(p256dh) AND BINARY auth = VALUES(auth)))`;
   await db.execute(
     `INSERT INTO bg_push_subscriptions (user_id, endpoint_hash, endpoint, p256dh, auth)
      VALUES (?, ?, ?, ?, ?)
