@@ -31,6 +31,7 @@ import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/access
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import { DEFAULT_SHARE_IMAGE, SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
 import { APP_BACKGROUND_COLOR } from "@/lib/shared/web-manifest";
+import { appleStartupImageLinks } from "@/lib/shared/apple-startup-images";
 
 /**
  * Socle des métadonnées de partage, hérité par toutes les pages.
@@ -72,8 +73,10 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
   // Nom sous l'icône d'iOS. Surtout pas `capable: true` : il forcerait le mode
-  // autonome, où la connexion OAuth ne revient pas — voir `APP_DISPLAY`.
-  appleWebApp: { title: SITE_NAME },
+  // autonome, où la connexion OAuth ne revient pas — voir `APP_DISPLAY`. Les
+  // écrans de lancement, eux, servent quand iOS l'impose quand même (défaut
+  // d'iOS 26) : sans eux, l'app s'ouvre sur un écran blanc.
+  appleWebApp: { title: SITE_NAME, startupImage: appleStartupImageLinks() },
 };
 
 /** Même couleur que le manifeste : la barre du navigateur se fond dans le fond du site. */

@@ -53,6 +53,33 @@ export const APP_ICONS = [
 ] as const satisfies MetadataRoute.Manifest["icons"];
 
 /**
+ * Captures de la fenêtre d'installation, fichiers de `public/screenshots/`.
+ *
+ * Sans elles, Chrome et Android n'offrent qu'une invite minimale (icône et
+ * nom) ; avec au moins une large et une étroite, l'invite présente le site.
+ * C'est l'accueil tel qu'un visiteur l'ouvre, sans la banderole ni la modale
+ * de recrutement : une annonce datée y resterait des mois après son retrait.
+ * **À refaire quand l'accueil change** — la marche à suivre est dans
+ * `docs/features/WEB_APP_MANIFEST.md`.
+ */
+export const APP_SCREENSHOTS = [
+  {
+    src: "/screenshots/home-wide.webp",
+    sizes: "1280x800",
+    type: "image/webp",
+    form_factor: "wide",
+    label: "Accueil de BlueGenji Esport sur ordinateur",
+  },
+  {
+    src: "/screenshots/home-narrow.webp",
+    sizes: "780x1688",
+    type: "image/webp",
+    form_factor: "narrow",
+    label: "Accueil de BlueGenji Esport sur mobile",
+  },
+] as const satisfies MetadataRoute.Manifest["screenshots"];
+
+/**
  * Raccourcis de l'icône installée (appui long, clic droit). Des pages que l'on
  * ouvre pour agir, pas la vitrine ; une page protégée affiche sa carte
  * « Connexion requise » à un lecteur sans session, rien n'y est donc exposé.
@@ -79,6 +106,7 @@ export function buildWebManifest(): MetadataRoute.Manifest {
     theme_color: APP_BACKGROUND_COLOR,
     categories: ["sports", "games", "entertainment"],
     icons: APP_ICONS.map((icon) => ({ ...icon })),
+    screenshots: APP_SCREENSHOTS.map((screenshot) => ({ ...screenshot })),
     shortcuts: APP_SHORTCUTS.map((shortcut) => ({
       ...shortcut,
       icons: [{ src: APP_ICONS[0].src, sizes: APP_ICONS[0].sizes, type: APP_ICONS[0].type }],
