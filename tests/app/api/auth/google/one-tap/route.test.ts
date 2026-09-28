@@ -101,3 +101,50 @@ describe("POST /api/auth/google/one-tap", () => {
     }
   });
 });
+
+describe("POST /api/auth/google/one-tap — CSRF de connexion", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetRateLimit(GOOGLE_ONE_TAP_RULE.name);
+    verifyMock.mockResolvedValue({ sub: "attaquant", name: "A" });
+    createUserMock.mockResolvedValue(42);
+    createSessionMock.mockResolvedValue(undefined);
+  });
+
+  const forged = (headers: Record<string, string>) =>
+    POST(
+      new Request("http://localhost:3000/api/auth/google/one-tap", {
+        method: "POST",
+        headers,
+        // `<form enctype=text/plain>` : `nom=valeur`, le nom reconstituant un JSON.
+        body: '{"credential":"jeton-de-l-attaquant","termsAccepted":true,"x":"="}',
+      }),
+    );
+
+  it("refuse le jeton de l'attaquant posé par un formulaire d'un autre site", async () => {
+    const res = await forged({
+      "content-type": "text/plain",
+      "sec-fetch-site": "cross-site",
+      origin: "https://attaquant.example",
+    });
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "CROSS_SITE_REQUEST" });
+    expect(verifyMock).not.toHaveBeenCalled();
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("refuse un corps `text/plain` même sans en-tête de provenance", async () => {
+    const res = await forged({ "content-type": "text/plain" });
+
+    expect(res.status).toBe(415);
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+
+  it("refuse une origine étrangère quand `Sec-Fetch-Site` manque", async () => {
+    const res = await forged({ "content-type": "application/json", origin: "https://attaquant.example" });
+
+    expect(res.status).toBe(403);
+    expect(createSessionMock).not.toHaveBeenCalled();
+  });
+});
