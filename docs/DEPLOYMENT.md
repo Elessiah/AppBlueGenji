@@ -124,6 +124,14 @@ limit_req_status 429;
 server {
     # … server_name, certificats, etc.
 
+    # En-têtes du proxy : **ici, au niveau du server, et nulle part dans une
+    # location**. nginx hérite de `proxy_set_header` en tout ou rien — une
+    # location qui en déclare un seul perd tous ceux du server, si bien qu'y
+    # ajouter X-Forwarded-For retirerait Host et le schéma à cette location-là.
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
     # Fichiers de build et images optimisées : une page en demande des
     # dizaines, les compter ferait refuser la page suivante à une salle entière.
     # L'optimiseur garde son résultat sur disque : il ne recalcule pas.
@@ -131,7 +139,9 @@ server {
         proxy_pass http://127.0.0.1:3000;
     }
 
-    # Fichiers de `public/` (pastilles, icônes) : même raison.
+    # Fichiers de `public/` (pastilles, icônes) et images téléversées : même
+    # raison. Une location regex l'emporte sur un préfixe : `/api/uploads/…`
+    # passe ici, pas par `/api/`.
     location ~* \.(?:png|jpe?g|gif|webp|avif|svg|ico|txt|xml|woff2?)$ {
         proxy_pass http://127.0.0.1:3000;
     }
@@ -140,7 +150,6 @@ server {
     # Le flux SSE ne doit ni être plafonné ni mis en tampon.
     location /api/ {
         proxy_pass http://127.0.0.1:3000;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_buffering off;
     }
 
@@ -149,7 +158,6 @@ server {
     location / {
         limit_req zone=bluegenji_pages burst=50 nodelay;
         proxy_pass http://127.0.0.1:3000;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 }
 ```
@@ -160,10 +168,12 @@ Trois points à ne pas perdre en l'adaptant :
   réseau local sort tout entier par la même adresse : 5 pages par seconde et une
   rafale de 50 laissent naviguer une salle de joueurs, et ne bornent qu'un
   script. Ne pas descendre en dessous sans l'avoir mesuré.
-- **`X-Forwarded-For` doit rester posé** sur `/api/` : c'est de lui que
+- **`X-Forwarded-For` doit rester posé**, et au niveau du `server` : c'est de lui que
   l'application tire l'IP de ses propres plafonds (`TRUSTED_PROXY_HOPS`, défaut
   1 = ce nginx). Sans lui, une identité absente n'est volontairement **pas**
-  plafonnée (`enforceRateLimit`), et tous les plafonds par IP tombent.
+  plafonnée (`enforceRateLimit`), et tous les plafonds par IP tombent. Si la
+  configuration en place pose déjà ses en-têtes dans chaque location, y
+  reporter les trois lignes plutôt que de n'en ajouter qu'une.
 - **Essayer d'abord à blanc** : `limit_req_dry_run on;` (nginx ≥ 1.17.1) dans
   `location /` journalise les refus sans les appliquer. Une soirée de tournoi
   sans ligne `limiting requests, dry run` dans `error.log`, puis on retire la
