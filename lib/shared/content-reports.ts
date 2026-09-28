@@ -87,6 +87,12 @@ export interface ReportCategoryDefinition {
   requiresContact: boolean;
   /** Qualité vis-à-vis du droit invoqué, et déclaration de bonne foi. */
   requiresRightsDeclaration: boolean;
+  /**
+   * Une réponse est due : sans compte, une adresse est exigée
+   * (`missingReplyChannel`). Une demande RGPD appelle une réponse sous un mois
+   * (art. 12) ; reçue sans compte ni adresse, personne ne pourrait la donner.
+   */
+  requiresReplyChannel: boolean;
   /** Aide du champ de description. */
   descriptionPlaceholder: string;
 }
@@ -99,6 +105,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: ["USER", "TEAM", "TOURNAMENT"],
     requiresContact: true,
     requiresRightsDeclaration: true,
+    requiresReplyChannel: false,
     descriptionPlaceholder:
       "Quelle œuvre est reproduite, où la voir sur le site, et à qui elle appartient…",
   },
@@ -109,6 +116,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: ["USER", "TEAM"],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder: "Quel contenu du site, sur quelle page, et ce qui ne va pas…",
   },
   BUG: {
@@ -118,6 +126,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder: "Ce que tu faisais, ce que tu attendais, ce qui s'est passé…",
   },
   // Les deux catégories suivantes reçoivent ce qu'une adresse électronique
@@ -134,6 +143,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: true,
     descriptionPlaceholder:
       "Le droit que tu exerces, le compte concerné (pseudo), et ce que tu demandes précisément…",
   },
@@ -144,6 +154,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: true,
     descriptionPlaceholder: "Qui tu es (particulier, organisme, autorité), l'objet de ta demande, et la page concernée…",
   },
   OTHER: {
@@ -153,6 +164,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: ["USER", "TEAM", "TOURNAMENT"],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder: "Explique-nous le problème…",
   },
   CONTEST: {
@@ -162,6 +174,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder:
       "Pourquoi le signalement est infondé : licence, autorisation du titulaire, création de l'équipe, contexte…",
   },
@@ -409,6 +422,19 @@ export function validateReportSubmission(input: unknown): ReportValidation {
 }
 
 /**
+ * Envoi sans compte d'une catégorie qui appelle une réponse
+ * (`requiresReplyChannel`), sans adresse pour la donner. La validation ne
+ * connaît pas la session : la route (`createReport`) et le formulaire posent
+ * cette question à part.
+ */
+export function missingReplyChannel(
+  submission: Pick<ReportSubmission, "category" | "contactEmail">,
+  authenticated: boolean,
+): boolean {
+  return REPORT_CATEGORY_DEFINITIONS[submission.category].requiresReplyChannel && !authenticated && !submission.contactEmail;
+}
+
+/**
  * Statut atteint par un geste, ou `null` s'il n'a pas de sens depuis l'état
  * courant (on ne prend pas en charge un signalement archivé, on ne rouvre pas
  * un signalement ouvert).
@@ -645,6 +671,8 @@ export function reportErrorMessage(code: string | null | undefined): string {
       return `Tu peux désigner ${REPORT_MAX_TARGETS} éléments au plus.`;
     case "REPORT_CONTACT_REQUIRED":
       return "Indique ton nom et une adresse électronique : un signalement de droit d'auteur doit pouvoir être suivi.";
+    case "REPORT_REPLY_CHANNEL_REQUIRED":
+      return "Indique une adresse pour qu'on puisse te répondre, ou connecte-toi.";
     case "REPORT_CONTACT_TOO_LONG":
       return "Le nom indiqué est trop long.";
     case "REPORT_INVALID_EMAIL":

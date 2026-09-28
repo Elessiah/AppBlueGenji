@@ -14,6 +14,7 @@ import {
   formatTargetNotice,
   isConcernedByReport,
   isPlausibleEmail,
+  missingReplyChannel,
   isReportAction,
   nextReportStatus,
   normalizeReportPagePath,
@@ -398,6 +399,16 @@ describe("registre des catégories", () => {
     expect(
       validateReportSubmission({ category, description: DESCRIPTION, targets: [{ type: "USER", id: 1 }], consent: true }),
     ).toEqual({ ok: false, error: "REPORT_TARGET_NOT_ALLOWED" });
+  });
+
+  it("exige un moyen de réponse pour RGPD et Hébergeur seulement", () => {
+    const flagged = REPORT_CATEGORIES.filter((category) => REPORT_CATEGORY_DEFINITIONS[category].requiresReplyChannel);
+    expect(flagged).toEqual(["RGPD", "HOSTING"]);
+    expect(missingReplyChannel({ category: "RGPD", contactEmail: null }, false)).toBe(true);
+    expect(missingReplyChannel({ category: "RGPD", contactEmail: null }, true)).toBe(false);
+    expect(missingReplyChannel({ category: "HOSTING", contactEmail: "a@b.fr" }, false)).toBe(false);
+    expect(missingReplyChannel({ category: "BUG", contactEmail: null }, false)).toBe(false);
+    expect(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED")).toMatch(/adresse.*connecte-toi/);
   });
 
   it("dit comment exercer ses droits sans renvoyer à une adresse", () => {

@@ -22,6 +22,7 @@ import {
   RIGHTS_RELATIONS,
   RIGHTS_RELATION_LABELS,
   reportErrorMessage,
+  missingReplyChannel,
   reportTargetFromPath,
   validateReportSubmission,
   REPORT_STATUS_LABELS,
@@ -196,6 +197,10 @@ export function ReportProblemDialog({
     if (busy) return;
     if (!validation.ok) {
       showError(reportErrorMessage(validation.error));
+      return;
+    }
+    if (missingReplyChannel(validation.value, authenticated)) {
+      showError(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED"));
       return;
     }
     setBusy(true);
@@ -453,7 +458,10 @@ export function ReportProblemDialog({
               ) : (
                 <div className="field">
                   <label htmlFor={`${titleId}-email`}>
-                    Adresse pour te répondre <span className={styles.optional}>(facultatif)</span>
+                    Adresse pour te répondre{" "}
+                    <span className={styles.optional}>
+                      {definition.requiresReplyChannel && !authenticated ? "(obligatoire sans compte)" : "(facultatif)"}
+                    </span>
                   </label>
                   <input
                     id={`${titleId}-email`}
@@ -466,8 +474,8 @@ export function ReportProblemDialog({
                   <p className={styles.hint}>
                     {authenticated
                       ? "Sans adresse, l'association te répondra par ton compte (Discord si tu l'as rattaché)."
-                      : category === "RGPD" || category === "HOSTING"
-                        ? "Sans adresse ni compte, l'association ne pourra pas te répondre : indique une adresse, ou connecte-toi."
+                      : definition.requiresReplyChannel
+                        ? "Sans compte, c'est la seule façon pour l'association de te répondre."
                         : "Sans adresse, l'association ne pourra pas te tenir au courant."}
                   </p>
                 </div>
