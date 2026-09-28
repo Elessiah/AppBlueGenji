@@ -12,8 +12,8 @@ concurrente** sur `bg_tournaments` — un simple `UPDATE` — attendait derrièr
 
 ## La cause
 
-`listTournamentBuckets` **attend** `syncVisibleTournaments()`, l'entretien de
-fond qui recale les états. Celui-ci :
+`listTournamentBuckets` **attendait** `syncVisibleTournaments()`, l'entretien de
+fond qui recale les états (il ne l'attend plus depuis : voir `REALTIME_REFRESH.md`). Celui-ci :
 
 1. ouvrait **une** transaction ;
 2. y repassait sur **tous** les tournois non terminés ;

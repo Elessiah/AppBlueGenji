@@ -39,6 +39,8 @@ export {
   // ici : aucun des deux ne consulte `start_visibility_at`, et la trame porte
   // l'instantané entier. Les routes passent par la variante gardée.
   getVisibleTournamentSnapshot,
+  // Sa lecture légère — la carte seule, même règle de visibilité.
+  getVisibleTournamentCard,
   getTournamentViewerContext,
   invalidateTournamentSnapshot,
   invalidateTournamentLists,

@@ -93,11 +93,8 @@ async function runSweep(options: {
       };
     });
 
-    const { listTournamentBuckets } = await import("@/lib/server/tournaments");
-    const { clearCache } = await import("@/lib/server/cache");
-    clearCache();
-    await listTournamentBuckets(null);
-    clearCache();
+    const { syncVisibleTournaments } = await import("@/lib/server/tournaments");
+    await syncVisibleTournaments();
   });
 
   return { connection, synced, published, matchPublished };
@@ -259,11 +256,8 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
         };
       });
 
-      const { listTournamentBuckets } = await import("@/lib/server/tournaments");
-      const { clearCache } = await import("@/lib/server/cache");
-      clearCache();
-      await listTournamentBuckets(null);
-      clearCache();
+      const { syncVisibleTournaments } = await import("@/lib/server/tournaments");
+      await syncVisibleTournaments();
     });
 
     expect(openWhenScoped).toBe(0);
@@ -300,5 +294,49 @@ describe("syncVisibleTournaments — une transaction par tournoi", () => {
         expect(buckets).toBeDefined();
       }),
     ).resolves.toBeUndefined();
+  });
+
+  // La passe tombait sur la requête de lecture toutes les 15 s : rendu de
+  // l'accueil et `GET /api/tournaments` attendaient la fin de l'entretien de
+  // tous les tournois à entretenir, alors que l'affichage n'en dépend plus.
+  it("sert la liste sans attendre la passe d'entretien", async () => {
+    let releaseSweep!: () => void;
+    const sweepStarted = jest.fn();
+
+    await jest.isolateModulesAsync(async () => {
+      jest.doMock("@/lib/server/tournaments/sync-scope", () => ({
+        findTournamentsNeedingSync: jest.fn(
+          () =>
+            new Promise<number[]>((resolve) => {
+              sweepStarted();
+              releaseSweep = () => resolve([]);
+            }),
+        ),
+      }));
+      jest.doMock("@/lib/server/database", () => ({
+        getDatabase: jest.fn(async () => ({
+          execute: jest.fn(async () => [[], undefined]),
+          getConnection: jest.fn(async () => ({
+            execute: jest.fn(async () => [[], undefined]),
+            beginTransaction: jest.fn(async () => undefined),
+            commit: jest.fn(async () => undefined),
+            rollback: jest.fn(async () => undefined),
+            release: jest.fn(() => undefined),
+          })),
+        })),
+        withConnection: jest.fn(),
+      }));
+
+      const { listTournamentBuckets } = await import("@/lib/server/tournaments");
+      const { clearCache } = await import("@/lib/server/cache");
+      clearCache();
+      const buckets = await listTournamentBuckets(null);
+      clearCache();
+
+      expect(buckets).toBeDefined();
+      // La passe est bien partie, et la liste a été servie avant qu'elle finisse.
+      expect(sweepStarted).toHaveBeenCalledTimes(1);
+      releaseSweep();
+    });
   });
 });

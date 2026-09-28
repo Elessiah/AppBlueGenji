@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 import { ShareCard, SHARE_CARD_SIZE, SHARE_CARD_CONTENT_TYPE } from "@/components/og/share-card";
-import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import { SITE_NAME, SITE_SHARE_CARD, tournamentShareCard } from "@/lib/shared/share-metadata";
 
 /**
@@ -37,14 +37,17 @@ export default async function Image({ params }: { params: Promise<{ id: string }
   const { id } = await params;
   const tournamentId = Number(id);
 
-  const snapshot =
+  // La carte seule, par la lecture légère : l'image ne dessine rien d'autre, et
+  // l'instantané entier (matchs, inscrites, classements) coûterait une passe en
+  // base à chaque robot d'aperçu.
+  const card =
     Number.isInteger(tournamentId) && tournamentId > 0
-      ? await getVisibleTournamentSnapshot(tournamentId).catch(() => null)
+      ? await getVisibleTournamentCard(tournamentId).catch(() => null)
       : null;
 
-  if (!snapshot) {
+  if (!card) {
     return new ImageResponse(<ShareCard {...SITE_SHARE_CARD} />, size);
   }
 
-  return new ImageResponse(<ShareCard {...tournamentShareCard(snapshot.card)} />, size);
+  return new ImageResponse(<ShareCard {...tournamentShareCard(card)} />, size);
 }

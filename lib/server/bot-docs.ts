@@ -1,14 +1,15 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import type { BotDocSection } from "@/lib/shared/bot-doc-sections";
+import { cached } from "@/lib/server/cache";
 
 /**
  * Documentation du bot Discord (projet `blueGenjiBot`).
  *
  * Les fichiers Markdown ne sont PAS copiés dans ce dépôt : ils sont lus à chaud
  * depuis le dossier du bot, qui vit à côté de celui de l'app (`~/apps/`). Toute
- * mise à jour de la doc du bot est donc visible sur `/bot/docs` sans rebuild —
- * la page est simplement revalidée (voir `revalidate` dans la page).
+ * mise à jour de la doc du bot est donc visible sur `/bot/docs` sans rebuild,
+ * dans la minute (`loadBotDocCached`).
  *
  * Le chemin est surchargeable via `BOT_DOCS_PATH` si les projets déménagent.
  */
@@ -29,7 +30,10 @@ export interface LoadedBotDoc {
   updatedAt: string | null;
 }
 
-/** Lit et rend un document du bot depuis le disque, à chaque requête. */
+/**
+ * Lit et rend un document du bot depuis le disque, à chaque appel — la page
+ * passe par {@link loadBotDocCached}.
+ */
 export async function loadBotDoc(section: BotDocSection): Promise<LoadedBotDoc> {
   const filePath = path.join(BOT_PROJECT_DIR, section.file);
   try {
@@ -45,6 +49,24 @@ export async function loadBotDoc(section: BotDocSection): Promise<LoadedBotDoc> 
   } catch {
     return { section, html: null, updatedAt: null };
   }
+}
+
+/** Durée pendant laquelle un document lu et rendu est resservi tel quel. */
+export const BOT_DOC_TTL_MS = 60_000;
+
+/**
+ * {@link loadBotDoc}, relu et reparsé au plus une fois par minute et par
+ * document.
+ *
+ * La page promettait ce délai par un `export const revalidate = 60` qui ne met
+ * plus rien en cache — tout le site est rendu à la demande depuis que la mise en
+ * page racine lit le nonce de la CSP —, si bien que chaque vue relisait le
+ * fichier sur disque et refaisait le rendu Markdown. La clé est le fichier du
+ * registre (`BOT_DOC_SECTIONS`), jamais une saisie : l'espace des clés est
+ * borné par construction.
+ */
+export function loadBotDocCached(section: BotDocSection): Promise<LoadedBotDoc> {
+  return cached(`bot-doc:${section.file}`, BOT_DOC_TTL_MS, () => loadBotDoc(section));
 }
 
 /* ------------------------------------------------------------------ */

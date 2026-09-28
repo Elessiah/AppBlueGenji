@@ -194,12 +194,15 @@ describe("liste des tournois — sans flux SSE", () => {
 });
 
 describe("lectures serveur — ce qui garde le cache utile", () => {
-  it("synchronise les états hors du cache, sans en faire une condition", () => {
+  it("synchronise les états hors du cache, sans en faire une condition ni l'attendre", () => {
     // Dedans, les événements publiés par la synchronisation invalideraient la
-    // liste qu'elle vient de rendre correcte ; et son échec ne doit pas vider
-    // `/tournois` alors que le cache tenait une liste servable.
-    expect(index).toContain("await syncVisibleTournaments().catch(() => undefined);");
-    expect(index.indexOf("await syncVisibleTournaments().catch(")).toBeLessThan(
+    // liste qu'elle vient de rendre correcte ; son échec ne doit pas vider
+    // `/tournois` alors que le cache tenait une liste servable ; et l'attendre
+    // faisait payer la passe entière, toutes les 15 s, à la lecture qui tombait
+    // dessus.
+    expect(index).toContain("void syncVisibleTournaments().catch(() => undefined);");
+    expect(index).not.toContain("await syncVisibleTournaments()");
+    expect(index.indexOf("void syncVisibleTournaments().catch(")).toBeLessThan(
       index.indexOf('cachedTournamentList("public"'),
     );
   });
