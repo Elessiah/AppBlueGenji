@@ -35,6 +35,14 @@ describe("sélection de texte sur les contrôles", () => {
     expect(zone).toMatch(/touch-action:\s*manipulation/);
   });
 
+  it("garde copiable à la main la valeur d'un bouton « copier »", () => {
+    // Le toast d'échec du presse-papiers demande de copier à la main.
+    const css = readFileSync(join(ROOT, "components/recruitment/ContactTags.module.css"), "utf8");
+    const value = blockFor(/\.contactTagVal\s*\{/, css);
+    expect(value).toMatch(/(^|[^-])user-select:\s*text/);
+    expect(value).toMatch(/-webkit-user-select:\s*text/);
+  });
+
   it.each([
     "app/(secured)/tournois/[id]/_components/ScoreStepper.tsx",
     "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx",
