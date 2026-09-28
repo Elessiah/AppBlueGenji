@@ -43,6 +43,11 @@
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  /* Le dégradé ne peint que la boîte de l'élément, haute d'une ligne à
+     `line-height: 1.02` : les jambages de « g » en sortaient et restaient
+     transparents. La boîte est allongée vers le bas sans rien déplacer. */
+  padding-bottom: 0.14em;
+  margin-bottom: -0.14em;
 }
 
 .lede {

@@ -55,6 +55,16 @@ describe("titre du hero", () => {
     // À 82 px, « gagner ensemble. » passait sur deux lignes sur un portable.
     expect(Number.parseFloat(max)).toBeLessThanOrEqual(68);
   });
+
+  it("peint les jambages de sa dernière ligne, sans décaler la suite", () => {
+    const accent = blockFor(/\.accent\s*\{/, hero);
+    const padding = /padding-bottom:\s*([\d.]+)em\s*;/.exec(accent);
+    const margin = /margin-bottom:\s*-([\d.]+)em\s*;/.exec(accent);
+    expect(padding).not.toBeNull();
+    expect(margin).not.toBeNull();
+    // Allongée d'un côté, rendue de l'autre : la ligne suivante ne bouge pas.
+    expect(padding?.[1]).toBe(margin?.[1]);
+  });
 });
 
 describe("espacements du hero", () => {
