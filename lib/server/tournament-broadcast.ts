@@ -47,6 +47,14 @@ import { nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
 export const ROOM_MAINTENANCE_MS = 30_000;
 
 /**
+ * Délai minimal avant de réessayer un abonné dont la file était pleine
+ * (`lib/server/stream-backpressure.ts`). Assez court pour qu'il retrouve vite
+ * le direct une fois la file dégagée, assez long pour qu'un client qui ne lit
+ * plus ne fasse pas tourner la salle à vide.
+ */
+export const BACKED_UP_RETRY_MS = 5_000;
+
+/**
  * Plafond de flux simultanés par utilisateur. Un onglet en ouvre un ; le
  * plafond n'existe que pour qu'un client en boucle de reconnexion, ou vingt
  * onglets oubliés, ne mobilisent pas la machine à eux seuls.
@@ -296,10 +304,11 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
         try {
           if (subscriber.send(frame.frame) === false) {
             // File du client pleine : rien n'est parti. Ni version ni horloge
-            // ne bougent, et un nouvel essai est programmé à la fenêtre du
-            // palier — le battement d'entretien seul ne suffirait pas à le
-            // resservir vite une fois la file dégagée.
-            nextDelay = Math.min(nextDelay, coalesceWindow);
+            // ne bougent, et un nouvel essai est programmé — espacé d'au moins
+            // `BACKED_UP_RETRY_MS` : à la fenêtre du palier (1 s), un client
+            // qui ne lit plus ferait repasser la salle, et reconstruire
+            // l'instantané, en continu jusqu'à sa fermeture.
+            nextDelay = Math.min(nextDelay, Math.max(coalesceWindow, BACKED_UP_RETRY_MS));
             continue;
           }
           state.version = frame.version;

@@ -192,12 +192,16 @@ describe("cache — bornes mémoire", () => {
   it("replace en fin d'ordre une clé recalculée après expiration", async () => {
     jest.useFakeTimers();
     await cached("rechargee", 1_000, async () => "v1");
+    await cached("autre", 60_000, async () => "a1");
     jest.advanceTimersByTime(1_001);
-    // Recalculée : elle est désormais la plus récente, et non plus en tête
-    // de l'éviction à sa place d'origine.
+    // Recalculée : elle passe derrière « autre », au lieu de garder sa place
+    // d'origine en tête de l'éviction.
     await cached("rechargee", 60_000, async () => "v2");
+    // 2 + 498 clés : la dernière insertion trouve le cache plein et évince une
+    // entrée, la moins récemment servie.
     for (let i = 0; i < 499; i += 1) await cached(`k${i}`, 60_000, async () => i);
 
     expect(await cached("rechargee", 60_000, async () => "v3")).toBe("v2");
+    expect(await cached("autre", 60_000, async () => "a2")).toBe("a2");
   });
 });

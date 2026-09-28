@@ -13,6 +13,7 @@ jest.mock("@/lib/server/tournaments/snapshot", () => ({
 }));
 
 import {
+  BACKED_UP_RETRY_MS,
   MAX_BUDGET_DELAY_MS,
   MAX_STREAMS_PER_USER,
   ROOM_BYTES_PER_SECOND,
@@ -363,10 +364,16 @@ describe("tournament-broadcast — cycle de vie", () => {
     expect(received).toEqual([]);
     expect(tournamentAudience(1)).toBe(1);
 
+    // Pas de nouvel essai à la cadence du palier : la salle ne tourne pas à
+    // vide pour un client qui ne lit plus.
+    const callsWhileBackedUp = getFrame.mock.calls.length;
+    await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs);
+    expect(getFrame.mock.calls.length).toBe(callsWhileBackedUp);
+
     // La file se dégage : le nouvel essai programmé sert la dernière version,
     // sans attendre le battement d'entretien.
     backedUp = false;
-    await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs);
+    await advance(BACKED_UP_RETRY_MS);
     expect(received).toEqual(["data: v2"]);
   });
 

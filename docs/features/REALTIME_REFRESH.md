@@ -173,7 +173,8 @@ sauter un envoi) et `decideStreamWrite` tranche avant chaque écriture :
 - **place disponible** → la trame part ;
 - **file pleine** → elle ne part pas, et `send` rend `false` : la salle garde
   l'abonné en retard (ni version ni horloge ne bougent) et reprogramme un essai
-  à la fenêtre du palier. Au dégagement, il reçoit **la dernière version**, pas
+  à la fenêtre du palier, jamais avant `BACKED_UP_RETRY_MS` (5 s) — sans quoi un
+  client qui ne lit plus ferait repasser la salle chaque seconde. Au dégagement, il reçoit **la dernière version**, pas
   toutes celles manquées ;
 - **file pleine depuis `STREAM_STALL_TIMEOUT_MS`** (60 s, constaté au plus tard
   par le battement de 25 s) → le flux est mis **en erreur** — et non fermé, ce
