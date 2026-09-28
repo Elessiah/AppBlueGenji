@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { TeamListItem } from "@/lib/shared/types";
 import {
   isRankedTeam,
@@ -6,6 +7,16 @@ import {
 } from "@/lib/shared/ranking";
 import s from "./HighlightStrip.module.css";
 
+/**
+ * Podium du classement (trois premières équipes), en tête de `/equipes` quand
+ * la liste est triée par classement.
+ *
+ * Chaque carte mène à la fiche de son équipe, comme les cartes d'annuaire : le
+ * lien est une plaque transparente (`.cardOverlay`) nommée « Voir la fiche de
+ * … » plutôt qu'un `<a>` enveloppant la carte, dont le nom accessible serait
+ * tout le texte de la carte mis bout à bout. Le bloc des points repasse
+ * au-dessus d'elle pour garder son `title`, seule explication visible de la cote.
+ */
 export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
   const top = teams.slice(0, 3);
   if (top.length < 3) return null;
@@ -14,6 +25,11 @@ export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
     <div className={s.strip}>
       {top.map((t) => (
         <div key={t.id} className={s.card} data-rank={t.rank}>
+          <Link
+            href={`/equipes/${t.id}`}
+            className={s.cardOverlay}
+            aria-label={`Voir la fiche de ${t.name}`}
+          />
           <div className={s.rank}>{String(t.rank).padStart(2, "0")}</div>
           <div>
             <div className={s.name}>{t.name}</div>
@@ -27,6 +43,7 @@ export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
               gagnée sur ce nombre-là, c'est expliquer deux fois le même chiffre
               de deux façons contradictoires sur la même page. */}
           <div
+            className={s.ptsBlock}
             title={`${RANKING_POINTS_LABEL} · ${rankingPointsHint(isRankedTeam(t), t.points)}`}
           >
             <div className={s.pts}>{t.points}</div>

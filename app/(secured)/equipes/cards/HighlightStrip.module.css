@@ -22,6 +22,32 @@
   grid-template-columns: auto 1fr auto;
   gap: 16px;
   align-items: center;
+  transition: border-color 0.15s ease;
+}
+
+.card:hover,
+.card:has(.cardOverlay:focus-visible) {
+  border-color: rgba(255, 157, 46, 0.5);
+}
+
+/* Lien de la carte : plaque transparente sur toute la carte (même mécanique
+   que `.cardOverlay` des cartes d'annuaire). */
+.cardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+}
+
+.cardOverlay:focus-visible {
+  outline: 1px solid var(--blue-300, #5ac8ff);
+  outline-offset: -3px;
+}
+
+/* Au-dessus de la plaque : son `title` explique la cote au survol. */
+.ptsBlock {
+  position: relative;
+  z-index: 2;
 }
 
 .card[data-rank="1"] {

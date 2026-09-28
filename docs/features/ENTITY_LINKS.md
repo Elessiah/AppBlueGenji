@@ -76,6 +76,13 @@ fiche de … »). Corollaire dans `TeamCard` : l'avatar du roster devient
 décoratif (`alt=""`), le lien qui l'entoure portant déjà le pseudo — sans quoi
 le lecteur d'écran l'annoncerait deux fois.
 
+**Le podium du classement** (`HighlightStrip`, les trois premières équipes en
+tête de `/equipes` quand la liste est triée par classement) suit la même
+mécanique, sans lien imbriqué : sa plaque mène à la fiche de l'équipe, et seul
+le bloc des points repasse au-dessus d'elle (`.ptsBlock`, `z-index: 2`) pour
+garder le `title` qui explique la cote — un clic sur les points n'ouvre donc
+pas la fiche, c'est le prix de l'infobulle.
+
 Deux pièges de mise en page, tous deux dus à l'élément de roster nouvellement
 intercalé :
 
@@ -153,6 +160,6 @@ qu'avec un lien mort.
 | Lien d'engagé (contexte tournoi) | `app/(secured)/tournois/[id]/_lib/entrant-link.tsx` |
 | Règle de chemin (pure) | `lib/shared/participants.ts` (`entrantHref`) |
 | Affordance | `app/globals.css` (`.entity-link`) |
-| Plaque des cartes | `app/(secured)/equipes/cards/TeamCard.module.css`, `app/(secured)/_shared/annuaire.module.css` |
+| Plaque des cartes | `app/(secured)/equipes/cards/TeamCard.module.css`, `app/(secured)/equipes/cards/HighlightStrip.module.css`, `app/(secured)/_shared/annuaire.module.css` |
 | Entrée solo → joueur | `lib/server/solo-entries-service.ts` (`findSoloEntryUser`), `app/api/teams/[id]/route.ts` |
-| Tests | `tests/app/entity-links.test.ts`, `tests/app/api/teams/solo-entry-detail.test.ts` |
+| Tests | `tests/app/entity-links.test.ts`, `tests/app/team-ranking-podium-links.test.tsx`, `tests/app/api/teams/solo-entry-detail.test.ts` |
