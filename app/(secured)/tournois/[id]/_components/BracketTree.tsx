@@ -145,7 +145,7 @@ export function BracketTree({
     if (fromEnd === 1) return "Demi-finales";
     if (fromEnd === 2) return "Quarts de finale";
     if (fromEnd === 3) return "8èmes de finale";
-    return `Round ${globalIdx + 1}`;
+    return `Manche ${globalIdx + 1}`;
   };
 
   const matchLabel = (matchNum: number, globalIdx: number) => {
