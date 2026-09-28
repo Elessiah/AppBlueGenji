@@ -11,6 +11,7 @@ const invalidatePreview = jest.fn();
 const invalidateLanding = jest.fn();
 const invalidateLandingLive = jest.fn();
 const invalidateRanking = jest.fn();
+const invalidateStats = jest.fn();
 const publishEvent = jest.fn();
 
 jest.mock("@/lib/server/tournaments/snapshot", () => ({
@@ -34,6 +35,10 @@ jest.mock("@/lib/server/ranking-cache", () => ({
   invalidateTeamRanking: () => invalidateRanking(),
 }));
 
+jest.mock("@/lib/server/stats-cache", () => ({
+  invalidateStats: () => invalidateStats(),
+}));
+
 jest.mock("@/lib/server/live", () => ({
   publishTournamentEvent: (event: unknown) => publishEvent(event),
 }));
@@ -52,6 +57,7 @@ beforeEach(() => {
   invalidateLanding.mockReset();
   invalidateLandingLive.mockReset();
   invalidateRanking.mockReset();
+  invalidateStats.mockReset();
   publishEvent.mockReset();
 });
 
@@ -74,6 +80,8 @@ describe("notifications — invalidation des caches", () => {
     // Un tournoi supprimé emporte ses rencontres, et avec elles toutes les
     // cotes qu'elles avaient déplacées : le classement se rejoue en entier.
     expect(invalidateRanking).toHaveBeenCalledTimes(1);
+    // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
+    expect(invalidateStats).toHaveBeenCalledTimes(1);
   });
 
   it("n'oublie que l'instantané et le classement à un score rapporté", () => {
@@ -94,6 +102,9 @@ describe("notifications — invalidation des caches", () => {
     // qu'un score doive vider. Une cote se rejoue en entier — un score corrigé
     // déplace aussi tout ce qui l'a suivi.
     expect(invalidateRanking).toHaveBeenCalledTimes(1);
+    // Même dépendance pour les bilans : un score change celui des deux engagées
+    // et de chacun de leurs joueurs.
+    expect(invalidateStats).toHaveBeenCalledTimes(1);
   });
 
   it("n'oublie que l'instantané et le classement à un score arbitré", () => {
@@ -103,6 +114,7 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidatePreview).not.toHaveBeenCalled();
     expect(invalidateLanding).not.toHaveBeenCalled();
     expect(invalidateRanking).toHaveBeenCalledTimes(1);
+    expect(invalidateStats).toHaveBeenCalledTimes(1);
   });
 
   // Lancement, hôte, caster, horaire, antenne, rediff : les écritures les plus
@@ -117,6 +129,8 @@ describe("notifications — invalidation des caches", () => {
     expect(invalidateLanding).not.toHaveBeenCalled();
     expect(invalidateLandingLive).not.toHaveBeenCalled();
     expect(invalidateRanking).not.toHaveBeenCalled();
+    // « Prêt », hôte, antenne, horaire : aucun ne change un bilan.
+    expect(invalidateStats).not.toHaveBeenCalled();
   });
 
   it("oublie aussi le direct de l'accueil quand l'antenne d'un match bouge", () => {

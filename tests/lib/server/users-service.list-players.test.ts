@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listPlayers } from "@/lib/server/users-service";
+import { clearCache } from "@/lib/server/cache";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
@@ -46,6 +47,8 @@ async function runList(rows: Record<string, unknown>[], viewerId: number) {
 describe("listPlayers visibility", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Les statistiques sont mutualisées (`stats-cache.ts`) : chaque cas relit la base.
+    clearCache();
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -146,5 +149,79 @@ describe("listPlayers — comptes anonymisés", () => {
       999,
     );
     expect(rows).toHaveLength(2);
+  });
+});
+
+/**
+ * Le bilan de l'annuaire recharge les matchs de toutes les équipes du site :
+ * c'était la lecture la plus lourde qu'un F5 pouvait relancer. Il est mutualisé
+ * — mais **pas** les lignes de compte, dont la visibilité dépend du lecteur et
+ * qu'un réglage de profil doit changer sur-le-champ.
+ */
+describe("listPlayers — bilan mutualisé", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearCache();
+  });
+
+  function directoryExecute(rows: Record<string, unknown>[]) {
+    return jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([rows]) // bg_users
+      .mockResolvedValueOnce([[]]) // équipe courante
+      .mockResolvedValueOnce([[{ user_id: 7, team_id: 5, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null }]])
+      .mockResolvedValueOnce([[]]) // matchs
+      .mockResolvedValueOnce([[]]) // inscriptions
+      .mockResolvedValueOnce([rows]) // bg_users, second appel
+      .mockResolvedValueOnce([[]]); // équipe courante, second appel
+  }
+
+  it("ne recalcule pas le bilan à un second chargement", async () => {
+    const execute = directoryExecute([userRow()]);
+    await mockDb(execute);
+
+    await listPlayers(999);
+    await listPlayers(999);
+
+    // 5 lectures au premier appel, 2 seulement au second : le bilan est resservi.
+    expect(execute).toHaveBeenCalledTimes(7);
+  });
+
+  it("relit les comptes à chaque appel : un avatar masqué l'est aussitôt", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[userRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[userRow({ visible_avatar: 0 })]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    const before = await listPlayers(999);
+    const after = await listPlayers(999);
+
+    expect(before[0].avatarUrl).toBe("/api/uploads/avatars/x.webp");
+    expect(after[0].avatarUrl).toBeNull();
+  });
+
+  it("donne un bilan vide à un compte né après le calcul mis en cache", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[userRow()]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[userRow(), userRow({ id: 8, pseudo: "Neuf" })]])
+      .mockResolvedValueOnce([[]]);
+    await mockDb(execute);
+
+    await listPlayers(999);
+    const players = await listPlayers(999);
+
+    const newcomer = players.find((player) => player.id === 8);
+    expect(newcomer).toMatchObject({ wins: 0, losses: 0, tournamentsCount: 0 });
   });
 });
