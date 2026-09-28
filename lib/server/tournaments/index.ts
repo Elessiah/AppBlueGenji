@@ -1,4 +1,4 @@
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
   TournamentBuckets,
   TournamentDetail,
@@ -1020,6 +1020,39 @@ export async function reportMatchScorePublic(
   myScoreRaw: number,
   opponentScoreRaw: number,
 ): Promise<void> {
+  await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
+    reportMatchScore(connection, tournamentId, matchId, userId, myScoreRaw, opponentScoreRaw),
+  );
+}
+
+/**
+ * Forfait d'un engagé sur **sa** manche, déclaré par lui-même
+ * (`./player-forfeit`). Même chaîne que le report d'un score : c'est un
+ * résultat de match comme un autre, qui doit faire avancer le plateau.
+ */
+export async function forfeitOwnMatchPublic(
+  tournamentId: number,
+  matchId: number,
+  userId: number,
+): Promise<void> {
+  const { forfeitOwnMatch } = await import("./player-forfeit");
+  await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
+    forfeitOwnMatch(connection, tournamentId, matchId, userId),
+  );
+}
+
+/**
+ * Transaction d'une écriture de résultat **par un engagé** (report de score,
+ * forfait sur sa manche), suivie de la chaîne qui en tire les conséquences :
+ * reports expirés, exemptions, réconciliation des modes à classement et des
+ * phases, clôture du tournoi. Écrite une fois : un chemin joueur qui oublierait
+ * une réconciliation laisserait la manche suivante non appariée.
+ */
+async function runPlayerMatchWrite(
+  tournamentId: number,
+  matchId: number,
+  write: (connection: PoolConnection) => Promise<unknown>,
+): Promise<void> {
   const stateBefore = await readTournamentState(tournamentId);
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1027,14 +1060,7 @@ export async function reportMatchScorePublic(
   try {
     await connection.beginTransaction();
 
-    await reportMatchScore(
-      connection,
-      tournamentId,
-      matchId,
-      userId,
-      myScoreRaw,
-      opponentScoreRaw,
-    );
+    await write(connection);
 
     await resolveExpiredScoreReports(connection, tournamentId);
     await tryAutoResolveByes(connection, tournamentId);

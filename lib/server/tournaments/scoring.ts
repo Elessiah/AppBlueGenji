@@ -224,9 +224,14 @@ export async function reportMatchScore(
      FROM bg_matches
      WHERE id = ?
        AND tournament_id = ?
-     LIMIT 1`,
+     LIMIT 1
+     FOR UPDATE`,
     [matchId, tournamentId],
   );
+  // Lecture **verrouillante** (table seule, sans jointure — MariaDB) : le
+  // statut lu ici garde toute l'écriture qui suit, et un forfait ou un
+  // arbitrage concurrent tranchant ce match entre les deux ne doit pas être
+  // réécrit par ce report (`./player-forfeit`, qui pose le même verrou).
 
   if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
   const match = matches[0];

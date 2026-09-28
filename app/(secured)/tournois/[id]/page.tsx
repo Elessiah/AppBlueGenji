@@ -1,7 +1,7 @@
 "use client";
 
 import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
-import { FormEvent, useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import type {
@@ -17,17 +17,10 @@ import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
-import { checkMatchScores, matchScoreViolationMessage } from "@/lib/shared/match-format";
 import { MatchFormatProvider } from "./_lib/match-format-context";
-import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
-import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
-import {
-  isMyTeamTeam1,
-  isViewerEntrant,
-  scoreSubmittedMessage,
-  teamLabel,
-} from "@/lib/shared/match-card-viewer";
+import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
+import { canOpenPlayerScoreDialog } from "@/lib/shared/player-score-report";
 import { isPreLaunchState } from "@/lib/shared/seeding";
 import {
   planRoundRollback,
@@ -36,6 +29,8 @@ import {
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import { AdminScoreDialog } from "./_components/AdminScoreDialog";
+import { PlayerScoreDialog } from "./_components/PlayerScoreDialog";
+import { PlayerScoreProvider } from "./_lib/player-score-context";
 import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
 import { MatchLiveDialog } from "./_components/MatchLiveDialog";
 import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
@@ -48,7 +43,6 @@ import { RegistrationsPanel } from "./_components/RegistrationsPanel";
 import { EntrantContactsPanel } from "./_components/EntrantContactsPanel";
 import { tournamentGrantsContactAccess } from "@/lib/shared/discord-identity";
 import { BracketPreview } from "./_components/BracketPreview";
-import { MatchScoreDraft } from "./_components/BracketTree";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
 import { PhaseTimeline } from "./_components/PhaseTimeline";
@@ -88,7 +82,6 @@ export default function TournamentDetailPage() {
   const { showError, showSuccess } = useToast();
 
   const { tournament: detail, refresh, isLive, tier, fatal } = useTournamentLive(tournamentId);
-  const [drafts, setDrafts] = useState<MatchScoreDraft>({});
   // Même raison que les deux dialogues ci-dessous : on retient l'identifiant, pas
   // l'objet. Un match capturé à l'ouverture ne bougeait plus, si bien que le
   // dialogue continuait d'afficher « 0 – 0 » sur un match que le flux venait de
@@ -113,6 +106,10 @@ export default function TournamentDetailPage() {
   // de diffusion à chaque instantané SSE, et redessineraient les 127 bandeaux
   // d'un plateau à 128 équipes pour un score qui n'en concerne qu'un.
   const openAdminScore = useCallback((match: BracketMatch) => setSelectedMatchForAdminId(match.id), []);
+  // Modale de score d'un engagé : identifiant, pas objet, comme l'arbitrage —
+  // la proposition adverse arrive par le flux pendant qu'elle est ouverte.
+  const [playerScoreMatchId, setPlayerScoreMatchId] = useState<number | null>(null);
+  const openPlayerScore = useCallback((match: BracketMatch) => setPlayerScoreMatchId(match.id), []);
   const openMatchLive = useCallback((match: BracketMatch) => setMatchForLiveId(match.id), []);
   const openMatchSchedule = useCallback(
     (match: BracketMatch) => setMatchForScheduleId(match.id),
@@ -161,6 +158,7 @@ export default function TournamentDetailPage() {
   // L'image enregistrée depuis ce dialogue irait sinon habiller un autre tournoi.
   useEffect(() => setImageDialogOpen(false), [tournamentId]);
   useEffect(() => setIssueTarget(undefined), [tournamentId]);
+  useEffect(() => setPlayerScoreMatchId(null), [tournamentId]);
   // Même précaution : une sanction ne doit pas se retrouver adressée à l'engagé
   // d'un autre tournoi parce que la page a changé de cible sous le dialogue.
   useEffect(() => setPenaltyTeamId(null), [tournamentId]);
@@ -313,92 +311,28 @@ export default function TournamentDetailPage() {
   // d'équipes (`lib/shared/participants.ts`).
   const wording = participantWording(detail.card.participantType);
 
-  const handleScoreChange = (matchId: number, field: "myScore" | "opponentScore", value: string) => {
-    setDrafts((prev) => ({
-      ...prev,
-      [matchId]: { ...prev[matchId], [field]: value },
-    }));
-  };
+  // Le match est lancé et le lecteur y est engagé : la modale offre la saisie
+  // du score (`lib/shared/match-launch.ts`, même règle que le serveur).
+  const canReportScore = (match: BracketMatch): boolean =>
+    !frozen &&
+    detail.myTeamId !== null &&
+    detail.canCreateReportsForTeamIds.includes(detail.myTeamId) &&
+    canPlayersReportScore(match, Date.now());
 
-  const canReport = (match: BracketMatch): boolean => {
-    if (frozen) return false;
-    if (!detail?.myTeamId) return false;
-    if (isMatchPlayed(match)) return false;
-    if (match.team1Id === null || match.team2Id === null) return false;
-    // Un match se joue une fois lancé (`lib/shared/match-launch.ts`) : le
-    // formulaire n'apparaît qu'alors, comme le serveur l'exige. Le lancement est
-    // toujours une écriture, que le flux apporte — l'horloge n'y joue aucun rôle.
-    if (!canPlayersReportScore(match, Date.now())) return false;
-    return (
-      detail.canCreateReportsForTeamIds.includes(detail.myTeamId) &&
-      (detail.myTeamId === match.team1Id || detail.myTeamId === match.team2Id)
-    );
-  };
+  const canOpenPlayerScore = (match: BracketMatch): boolean =>
+    canOpenPlayerScoreDialog({
+      match,
+      myTeamId: detail.myTeamId,
+      canReportScore: canReportScore(match),
+      canActForEntrant: detail.canRegisterEntrant,
+      frozen,
+    });
 
   const canAdminResolve = (match: BracketMatch): boolean => {
     if (frozen) return false;
     if (!detail?.isAdmin) return false;
     if (match.team1Id === null || match.team2Id === null) return false;
     return true;
-  };
-
-  const submitScore = async (match: BracketMatch, event: FormEvent) => {
-    event.preventDefault();
-    const draft = drafts[match.id] || { myScore: "", opponentScore: "" };
-
-    // Contrôle local contre le format **de la manche** : évite un aller-retour
-    // pour un score que le serveur refusera de toute façon, et permet un
-    // message chiffré (« le vainqueur doit atteindre 3 manches »). La manche
-    // compte : « BlueGenji Survie » joue deux formats, et sa qualification
-    // accepte un score que son arbre final refuse.
-    const format = tournamentMatchFormat(
-      detail.card.format,
-      detail.card.matchFormat,
-      detail.card.endurancePlayoffFormat,
-      match.roundNumber,
-    );
-    const violation = checkMatchScores(
-      format,
-      Number(draft.myScore),
-      Number(draft.opponentScore),
-      { decisive: true },
-    );
-    if (violation) {
-      showError(matchScoreViolationMessage(format, violation));
-      return;
-    }
-
-    try {
-      const response = await fetch(`/api/tournaments/${tournamentId}/matches/${match.id}/report`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          myScore: Number(draft.myScore),
-          opponentScore: Number(draft.opponentScore),
-        }),
-      });
-      const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
-      showSuccess(
-        scoreSubmittedMessage(
-          isMyTeamTeam1(detail.myTeamId, match.team1Id),
-          Number(draft.myScore),
-          Number(draft.opponentScore),
-          teamLabel(match.team1Name, match.team1Placeholder, "Équipe 1"),
-          teamLabel(match.team2Name, match.team2Placeholder, "Équipe 2"),
-        ),
-      );
-      // Retour immédiat pour qui agit : le flux, lui, sert tout le monde à la
-      // cadence de son palier.
-      void refresh();
-      setDrafts((prev) => {
-        const next = { ...prev };
-        delete next[match.id];
-        return next;
-      });
-    } catch (e) {
-      showError(mapError((e as Error).message));
-    }
   };
 
   // En multi-phases, l'abandon suit le format de la phase **en cours** — et non
@@ -528,6 +462,15 @@ export default function TournamentDetailPage() {
     selectedMatchForAdminId === null
       ? null
       : detail.matches.find((match) => match.id === selectedMatchForAdminId) ?? null;
+  // Relu comme l'arbitrage, et refermé de lui-même dès que le match n'appelle
+  // plus de geste du lecteur : l'adversaire vient de confirmer, l'arbitrage de
+  // trancher — la modale ne reste pas ouverte sur un résultat acquis.
+  const playerScoreCandidate =
+    playerScoreMatchId === null
+      ? null
+      : detail.matches.find((match) => match.id === playerScoreMatchId) ?? null;
+  const matchForPlayerScore =
+    playerScoreCandidate && canOpenPlayerScore(playerScoreCandidate) ? playerScoreCandidate : null;
   const matchForLive =
     matchForLiveId === null
       ? null
@@ -598,6 +541,11 @@ export default function TournamentDetailPage() {
         canReport={isViewerEntrant(detail.myTeamId, detail.registrations) && !frozen}
         openReport={openIssueReport}
       >
+      <PlayerScoreProvider
+        canOpen={canOpenPlayerScore}
+        canReportScore={canReportScore}
+        open={openPlayerScore}
+      >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} tournamentId={detail.card.id} />
       <section className="fade-in">
         <TournamentHeader
@@ -658,11 +606,7 @@ export default function TournamentDetailPage() {
                 allTournamentMatches={detail.matches}
                 myTeamId={detail.myTeamId}
                 isFinished={detail.card.state === "FINISHED"}
-                canReport={canReport}
                 adminResolvable={canAdminResolve}
-                drafts={drafts}
-                onScoreChange={handleScoreChange}
-                onSubmit={submitScore}
                 onOpenAdminModal={openAdminScore}
                 canForfeit={canForfeit}
                 onForfeit={forfeitTeam}
@@ -700,11 +644,7 @@ export default function TournamentDetailPage() {
               canPenalize={!frozen && detail.isAdmin}
               onPenalize={(teamId) => setPenaltyTeamId(teamId)}
               onLiftPenalty={liftPenalty}
-              canReport={canReport}
               adminResolvable={canAdminResolve}
-              drafts={drafts}
-              onScoreChange={handleScoreChange}
-              onSubmit={submitScore}
               onOpenAdminModal={openAdminScore}
               emptyLabel={noMatchesLabel}
               // Le format du tournoi, pas « SURVIVAL » en dur : les deux modes
@@ -725,11 +665,7 @@ export default function TournamentDetailPage() {
               allTournamentMatches={detail.matches}
               myTeamId={detail.myTeamId}
               isFinished={detail.card.state === "FINISHED"}
-              canReport={canReport}
               adminResolvable={canAdminResolve}
-              drafts={drafts}
-              onScoreChange={handleScoreChange}
-              onSubmit={submitScore}
               onOpenAdminModal={openAdminScore}
               canForfeit={canForfeit}
               onForfeit={forfeitTeam}
@@ -747,11 +683,7 @@ export default function TournamentDetailPage() {
                       matches={matches}
                       allTournamentMatches={detail.matches}
                       myTeamId={detail.myTeamId}
-                      canReport={canReport}
                       adminResolvable={canAdminResolve}
-                      drafts={drafts}
-                      onScoreChange={handleScoreChange}
-                      onSubmit={submitScore}
                       onOpenAdminModal={openAdminScore}
                       format={formatForBracket}
                     />
@@ -797,11 +729,7 @@ export default function TournamentDetailPage() {
                     matches={matches}
                     allTournamentMatches={detail.matches}
                     myTeamId={detail.myTeamId}
-                    canReport={canReport}
                     adminResolvable={canAdminResolve}
-                    drafts={drafts}
-                    onScoreChange={handleScoreChange}
-                    onSubmit={submitScore}
                     onOpenAdminModal={openAdminScore}
                     format={formatForBracket}
                   />
@@ -975,6 +903,19 @@ export default function TournamentDetailPage() {
         />
       )}
 
+      {matchForPlayerScore && detail.myTeamId !== null && (
+        <PlayerScoreDialog
+          key={matchForPlayerScore.id}
+          tournamentId={tournamentId}
+          match={matchForPlayerScore}
+          myTeamId={detail.myTeamId}
+          canReportScore={canReportScore(matchForPlayerScore)}
+          canForfeit={detail.canRegisterEntrant}
+          onClose={() => setPlayerScoreMatchId(null)}
+          onSubmitted={() => void refresh()}
+        />
+      )}
+
       {matchForLive && (
         <MatchLiveDialog
           key={matchForLive.id}
@@ -1091,6 +1032,7 @@ export default function TournamentDetailPage() {
           onRegistered={() => void refresh()}
         />
       )}
+      </PlayerScoreProvider>
       </IssueReportProvider>
       </LiveProvider>
       </MatchFormatProvider>

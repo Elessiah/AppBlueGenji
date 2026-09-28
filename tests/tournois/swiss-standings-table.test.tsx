@@ -58,11 +58,7 @@ function render(
           allTournamentMatches={[]}
           myTeamId={null}
           isFinished={isFinished}
-          canReport={() => false}
           adminResolvable={() => false}
-          drafts={{}}
-          onScoreChange={() => {}}
-          onSubmit={async () => {}}
           onOpenAdminModal={() => {}}
           canForfeit={canForfeit}
           onForfeit={() => {}}

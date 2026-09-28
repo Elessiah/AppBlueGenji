@@ -30,6 +30,8 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     nextLoserMatchId: null,
     nextLoserSlot: null,
     scoreDeadlineAt: null,
+    team1Report: null,
+    team2Report: null,
     updatedAt: "2026-01-01T00:00:00.000Z",
     phaseId: 0,
     phasePosition: null,
