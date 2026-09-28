@@ -643,9 +643,18 @@ function BgSurvieDiagram() {
           <text x={314} y={70 + index * 62} fill={INK} fontSize={11.5} fontFamily={MONO}>
             {`Seed ${bottom}`}
           </text>
-          <text x={436} y={60 + index * 62} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
-            {index === 0 ? "gauche / droite" : ""}
-          </text>
+          {/* Le côté se lit en face de chaque seed : une seule mention
+              « gauche / droite » entre les deux lignes chevauchait les noms. */}
+          {index === 0 && (
+            <>
+              <text x={436} y={50} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
+                gauche
+              </text>
+              <text x={436} y={70} fill={MUTE} fontSize={10} fontFamily={MONO} textAnchor="end">
+                droite
+              </text>
+            </>
+          )}
         </g>
       ))}
 

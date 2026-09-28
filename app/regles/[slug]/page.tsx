@@ -3,9 +3,9 @@ import { pageMetadata } from "@/lib/shared/page-metadata";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
-import { CyberCard, Pill } from "@/components/cyber";
 import { RuleDiagramFigure } from "@/components/rules/RuleDiagram";
 import { EmphasisText } from "@/components/rules/EmphasisText";
+import { RulesToc } from "@/components/rules/RulesToc";
 import {
   COMMON_RULES,
   TOURNAMENT_RULE_MODES,
@@ -23,6 +23,11 @@ import {
   tournamentSettingsGroups,
   type TournamentSettingsGroup,
 } from "@/lib/shared/tournament-settings";
+import {
+  RULES_PAGE_ANCHORS,
+  ruleSectionAnchors,
+  rulesPageOutline,
+} from "@/lib/shared/rules-page-outline";
 import styles from "./page.module.css";
 
 type PageProps = {
@@ -84,10 +89,9 @@ export async function generateMetadata({ params }: Pick<PageProps, "params">): P
   });
 }
 
-function RuleCard({ rule }: { rule: RuleSection }) {
+function RuleBody({ rule }: { rule: RuleSection }) {
   return (
-    <CyberCard className={styles.rule}>
-      <h3 className={styles.ruleTitle}>{rule.title}</h3>
+    <>
       {rule.body.map((paragraph) => (
         <p key={paragraph} className={styles.ruleBody}>
           <EmphasisText text={paragraph} />
@@ -102,10 +106,27 @@ function RuleCard({ rule }: { rule: RuleSection }) {
           ))}
         </ul>
       )}
-    </CyberCard>
+    </>
   );
 }
 
+function SectionHead({ id, eyebrow, title }: { id: string; eyebrow: string; title: string }) {
+  return (
+    <div className={styles.sectionHead}>
+      <span className="eyebrow">{eyebrow}</span>
+      <h2 id={id} className={styles.sectionTitle}>
+        {title}
+      </h2>
+    </div>
+  );
+}
+
+/**
+ * Une page de règles se lit dans un ordre : ce qui vaut pour **ce** tournoi
+ * (s'il est désigné), l'essentiel du mode, son détail, puis ce qui est commun à
+ * tous. Le sommaire (`RulesToc`) dit où l'on est ; les règles communes, les
+ * mêmes sur chaque page, sont repliées pour ne pas noyer celles du mode.
+ */
 export default async function RuleModePage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const mode = ruleModeBySlug(slug);
@@ -116,6 +137,8 @@ export default async function RuleModePage({ params, searchParams }: PageProps) 
   );
 
   const others = TOURNAMENT_RULE_MODES.filter((m) => m.slug !== mode.slug);
+  const outline = rulesPageOutline(mode, { hasTournamentSettings: tournamentSettings !== null });
+  const ruleAnchors = ruleSectionAnchors(mode.sections);
 
   return (
     <PublicPageShell>
@@ -138,19 +161,23 @@ export default async function RuleModePage({ params, searchParams }: PageProps) 
         ])}
       />
 
-      <section className={`${styles.section} ${styles.heroSection}`}>
+      <section className={`${styles.shell} ${styles.hero}`}>
         <div className="fabric" />
         <Link href="/regles" className={styles.back}>
           ← Règles des tournois
         </Link>
         <h1 className={`display ${styles.title}`}>{mode.label}</h1>
         <p className={styles.tagline}>{mode.tagline}</p>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 22 }}>
-          <Pill variant={mode.status === "SOON" ? "default" : "blue"}>
-            {mode.status === "SOON" ? "Bientôt disponible" : "Disponible à la création"}
-          </Pill>
-          <Pill variant="blue">{mode.shortLabel}</Pill>
-        </div>
+        {mode.status === "SOON" && (
+          <p className={styles.soonBanner}>
+            <span aria-hidden="true">⏳</span>
+            <span>
+              <strong>Bientôt disponible.</strong> Ce mode n&apos;est pas encore proposé à la
+              création d&apos;un tournoi. Ses règles sont publiées à l&apos;avance pour que les
+              équipes puissent s&apos;y préparer.
+            </span>
+          </p>
+        )}
         <dl className={styles.facts}>
           {mode.facts.map((fact) => (
             <div key={fact.label} className={styles.fact}>
@@ -159,113 +186,108 @@ export default async function RuleModePage({ params, searchParams }: PageProps) 
             </div>
           ))}
         </dl>
-        {mode.status === "SOON" && (
-          <p className={styles.soonBanner}>
-            <span aria-hidden="true">⏳</span>
-            <span>
-              Ce mode n&apos;est pas encore proposé à la création d&apos;un tournoi. Ses règles sont
-              publiées à l&apos;avance pour que les équipes puissent s&apos;y préparer.
-            </span>
-          </p>
-        )}
       </section>
 
-      {tournamentSettings && (
-        <section
-          className={styles.section}
-          style={{ paddingTop: 0 }}
-          aria-labelledby="reglages-du-tournoi"
-        >
-          <div className={styles.sectionHead}>
-            <span className="eyebrow">CE TOURNOI</span>
-            <h2 id="reglages-du-tournoi" className={styles.sectionTitle}>
-              Réglages de « {tournamentSettings.name} »
-            </h2>
-          </div>
-          <p className={styles.settingsIntro}>
-            Les valeurs retenues à la création de ce tournoi. Elles priment sur les valeurs par
-            défaut citées plus bas.{" "}
-            <Link href={`/tournois/${tournamentSettings.id}`} className="entity-link">
-              Retour au tournoi
-            </Link>
-          </p>
-          {tournamentSettings.groups.map((group) => (
-            <CyberCard key={group.title} className={styles.rule}>
-              <h3 className={styles.ruleTitle}>{group.title}</h3>
-              <dl className={styles.settings}>
-                {group.settings.map((setting) => (
-                  <div key={setting.label} className={styles.setting}>
-                    <dt className={styles.factLabel}>{setting.label}</dt>
-                    <dd className={styles.settingValue}>{setting.value}</dd>
+      <div className={`${styles.shell} ${styles.layout}`}>
+        <RulesToc entries={outline} />
+
+        <div className={styles.content}>
+          {tournamentSettings && (
+            <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.tournament}>
+              <div className={styles.tournamentPanel}>
+                <div className={styles.tournamentHead}>
+                  <span className="eyebrow">CE TOURNOI</span>
+                  <h2 id={RULES_PAGE_ANCHORS.tournament} className={styles.tournamentTitle}>
+                    Réglages de « {tournamentSettings.name} »
+                  </h2>
+                  <p className={styles.settingsIntro}>
+                    Les valeurs retenues à la création de ce tournoi. Elles priment sur les
+                    valeurs par défaut citées plus bas.
+                  </p>
+                  <Link
+                    href={`/tournois/${tournamentSettings.id}`}
+                    className={`entity-link ${styles.backToTournament}`}
+                  >
+                    ← Retour au tournoi
+                  </Link>
+                </div>
+                {tournamentSettings.groups.map((group) => (
+                  <div key={group.title} className={styles.settingsGroup}>
+                    <h3 className={styles.settingsGroupTitle}>{group.title}</h3>
+                    <dl className={styles.settings}>
+                      {group.settings.map((setting) => (
+                        <div key={setting.label} className={styles.setting}>
+                          <dt className={styles.factLabel}>{setting.label}</dt>
+                          <dd className={styles.settingValue}>{setting.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
                   </div>
                 ))}
-              </dl>
-            </CyberCard>
-          ))}
-        </section>
-      )}
+              </div>
+            </section>
+          )}
 
-      <section className={styles.section} style={{ paddingTop: 0 }}>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">EN BREF</span>
-          <h2 className={styles.sectionTitle}>Le principe</h2>
-        </div>
-        <ul className={styles.principles}>
-          {mode.principles.map((principle, i) => (
-            <li key={principle} className={styles.principle}>
-              <span className={styles.principleNum}>0{i + 1}</span>
-              <span>
-                <EmphasisText text={principle} />
-              </span>
-            </li>
-          ))}
-        </ul>
-      </section>
+          <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.essentials}>
+            <SectionHead id={RULES_PAGE_ANCHORS.essentials} eyebrow="EN BREF" title="L'essentiel" />
+            <ol className={styles.principles}>
+              {mode.principles.map((principle, i) => (
+                <li key={principle} className={styles.principle}>
+                  <span className={styles.principleNum} aria-hidden="true">
+                    {i + 1}
+                  </span>
+                  <span>
+                    <EmphasisText text={principle} />
+                  </span>
+                </li>
+              ))}
+            </ol>
+            <RuleDiagramFigure diagram={mode.diagram} caption={mode.diagramCaption} />
+          </section>
 
-      <section className={styles.section} style={{ paddingTop: 0 }}>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">SCHÉMA</span>
-          <h2 className={styles.sectionTitle}>Le mode en un coup d&apos;œil</h2>
-        </div>
-        <RuleDiagramFigure diagram={mode.diagram} caption={mode.diagramCaption} />
-      </section>
+          <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.details}>
+            <SectionHead id={RULES_PAGE_ANCHORS.details} eyebrow="EN DÉTAIL" title="Règles du mode" />
+            {mode.sections.map((rule, i) => (
+              <article key={rule.title} className={styles.rule} aria-labelledby={ruleAnchors[i]}>
+                <h3 id={ruleAnchors[i]} className={styles.ruleTitle}>
+                  {rule.title}
+                </h3>
+                <RuleBody rule={rule} />
+              </article>
+            ))}
+          </section>
 
-      <section className={styles.section} style={{ paddingTop: 0 }}>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">RÈGLES</span>
-          <h2 className={styles.sectionTitle}>Dans le détail</h2>
-        </div>
-        {mode.sections.map((rule) => (
-          <RuleCard key={rule.title} rule={rule} />
-        ))}
-      </section>
+          <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.common}>
+            <SectionHead id={RULES_PAGE_ANCHORS.common} eyebrow="TOUS MODES" title="Règles communes" />
+            <p className={styles.sectionIntro}>
+              Identiques dans tous les modes : lancement et format des matchs, report des scores,
+              forfaits. Ouvre une règle pour la lire.
+            </p>
+            <div className={styles.accordion}>
+              {COMMON_RULES.map((rule) => (
+                <details key={rule.title} className={styles.commonRule}>
+                  <summary className={styles.commonSummary}>{rule.title}</summary>
+                  <div className={styles.commonBody}>
+                    <RuleBody rule={rule} />
+                  </div>
+                </details>
+              ))}
+            </div>
+          </section>
 
-      <section className={styles.section} style={{ paddingTop: 0 }}>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">TOUS MODES</span>
-          <h2 className={styles.sectionTitle}>Règles communes</h2>
+          <section className={styles.section} aria-labelledby={RULES_PAGE_ANCHORS.others}>
+            <SectionHead id={RULES_PAGE_ANCHORS.others} eyebrow="COMPARER" title="Autres modes" />
+            <div className={styles.otherModes}>
+              {others.map((other) => (
+                <Link key={other.slug} href={`/regles/${other.slug}`} className={styles.otherMode}>
+                  {other.label}
+                  {other.status === "SOON" && <span className={styles.soonTag}>bientôt</span>}
+                </Link>
+              ))}
+            </div>
+          </section>
         </div>
-        {COMMON_RULES.map((rule) => (
-          <RuleCard key={rule.title} rule={rule} />
-        ))}
-      </section>
-
-      <section className={styles.section} style={{ paddingTop: 0, paddingBottom: 72 }}>
-        <div className={styles.sectionHead}>
-          <span className="eyebrow">AUTRES MODES</span>
-          <h2 className={styles.sectionTitle}>Comparer</h2>
-        </div>
-        <div className={styles.otherModes}>
-          {others.map((other) => (
-            <Link key={other.slug} href={`/regles/${other.slug}`} className={styles.otherMode}>
-              {other.label}
-              {other.status === "SOON" && (
-                <span style={{ color: "var(--amber)", fontSize: 11 }}>bientôt</span>
-              )}
-            </Link>
-          ))}
-        </div>
-      </section>
+      </div>
     </PublicPageShell>
   );
 }
