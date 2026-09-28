@@ -14,6 +14,7 @@ import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
+import { pendingScoreProposal } from "../_lib/score-form";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip } from "./MatchReplayStrip";
@@ -198,7 +199,11 @@ export function MatchRow({
             onClick={() => onOpenAdminModal(match)}
             className={`${styles.action} ${styles.actionAccent}`}
           >
-            <span aria-hidden="true">✎</span> Éditer le score
+            {/* Un score proposé attend une confirmation qui peut ne jamais
+                venir (adversaire fantôme) : le dialogue s'ouvre dessus, et le
+                bouton dit le geste qui reste à faire. */}
+            <span aria-hidden="true">✎</span>{" "}
+            {pendingScoreProposal(match) ? "Valider le score proposé" : "Éditer le score"}
           </CyberButton>
         </div>
       )}
