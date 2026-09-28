@@ -104,6 +104,16 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
     expect(await res.json()).toEqual({ error: "NOT_REGISTERED" });
   });
 
+  it("refuse avec 403 un engagé qui ne joue pas la manche signalée", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
+    jest.mocked(reportTournamentIssue).mockRejectedValue(new Error("NOT_MATCH_PARTICIPANT"));
+
+    const res = await POST(jsonReq({ ...VALID, matchId: 31 }), params("5"));
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "NOT_MATCH_PARTICIPANT" });
+  });
+
   it("refuse un message hors bornes avec 400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(player());
     jest.mocked(reportTournamentIssue).mockRejectedValue(

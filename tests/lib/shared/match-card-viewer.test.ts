@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   canReportOwnMatch,
+  isViewerEntrant,
   isMyTeamTeam1,
   scoreSubmittedMessage,
   teamLabel,
@@ -20,6 +21,25 @@ describe("isMyTeamTeam1", () => {
     // Un lecteur non engagé (`null`) sur une case encore vide (`team1Id`
     // aussi `null`) ne doit jamais se lire comme « je suis l'équipe 1 ».
     expect(isMyTeamTeam1(null, null)).toBe(false);
+  });
+});
+
+describe("isViewerEntrant", () => {
+  const registrations = [{ teamId: 10 }, { teamId: 20 }];
+
+  it("refuse un lecteur sans équipe", () => {
+    expect(isViewerEntrant(null, registrations)).toBe(false);
+  });
+
+  it("refuse un lecteur dont l'équipe active n'est pas inscrite", () => {
+    // `myTeamId` est l'équipe active, inscrite ou non : avoir une équipe ne
+    // fait pas de son joueur un engagé du tournoi.
+    expect(isViewerEntrant(30, registrations)).toBe(false);
+    expect(isViewerEntrant(10, [])).toBe(false);
+  });
+
+  it("accepte un lecteur dont l'équipe figure parmi les inscrites", () => {
+    expect(isViewerEntrant(20, registrations)).toBe(true);
   });
 });
 

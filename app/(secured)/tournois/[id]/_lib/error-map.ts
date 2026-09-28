@@ -191,6 +191,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   INVALID_ISSUE_MESSAGE:
     "Décris le problème en 10 à 1000 caractères pour que l'arbitre puisse agir.",
   NOT_REGISTERED: "Seuls les engagés du tournoi peuvent signaler un problème.",
+  NOT_MATCH_PARTICIPANT: "Seuls les joueurs de ce match peuvent le signaler.",
   BOT_INTERNAL_UNREACHABLE:
     "Le bot Discord est injoignable : le signalement n'est pas parti. Préviens le staff sur Discord.",
   // Générique à dessein : le plafond de débit est partagé par toutes les routes

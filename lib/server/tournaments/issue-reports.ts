@@ -10,7 +10,10 @@
  * **Réservé aux engagés.** Ce n'est pas un formulaire de contact : le bouton
  * n'existe que pour qui est inscrit au tournoi, et le serveur le revérifie —
  * sans quoi n'importe quel visiteur pourrait faire sonner le téléphone des
- * arbitres.
+ * arbitres. Un signalement **sur une manche** est plus étroit encore : seul un
+ * engagé qui la **joue** peut la désigner (`NOT_MATCH_PARTICIPANT`) — un
+ * inscrit qui suit le plateau d'à côté n'a rien à en dire à l'arbitrage, et
+ * le bouton de l'en-tête lui reste pour tout ce qui concerne le tournoi.
  *
  * **L'auteur n'est pas nommé** : le message part sur Discord, qui ne reçoit
  * aucun pseudo de joueur (`lib/shared/log-privacy.ts`). Il est désigné par son
@@ -40,6 +43,8 @@ type EntrantRow = RowDataPacket & {
 };
 
 type MatchRow = RowDataPacket & {
+  team1_id: number | null;
+  team2_id: number | null;
   bracket: string;
   round_number: number;
   team1_name: string | null;
@@ -61,7 +66,7 @@ export interface IssueReportResult {
  * @param matchId Manche visée, `null` pour un signalement portant sur le tournoi.
  * @returns Le nombre d'arbitres joints.
  * @throws `INVALID_ISSUE_MESSAGE` | `TOURNAMENT_NOT_FOUND` | `NOT_REGISTERED`
- *         | `MATCH_NOT_FOUND` | `BOT_INTERNAL_UNREACHABLE`
+ *         | `MATCH_NOT_FOUND` | `NOT_MATCH_PARTICIPANT` | `BOT_INTERNAL_UNREACHABLE`
  */
 export async function reportTournamentIssue(
   tournamentId: number,
@@ -102,7 +107,7 @@ export async function reportTournamentIssue(
     null;
   if (matchId !== null) {
     const [matchRows] = await db.execute<MatchRow[]>(
-      `SELECT m.bracket, m.round_number,
+      `SELECT m.team1_id, m.team2_id, m.bracket, m.round_number,
               t1.name AS team1_name, t2.name AS team2_name
          FROM bg_matches m
          LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -115,6 +120,11 @@ export async function reportTournamentIssue(
     // pris ailleurs ferait décrire à l'arbitre une manche d'un autre plateau.
     if (matchRows.length === 0) throw new Error("MATCH_NOT_FOUND");
     const row = matchRows[0];
+    // Seul un engagé qui **joue** la manche peut la signaler : l'interface
+    // n'affiche le bouton que sur sa carte, le serveur le revérifie.
+    if (Number(row.team1_id) !== entrantTeamId && Number(row.team2_id) !== entrantTeamId) {
+      throw new Error("NOT_MATCH_PARTICIPANT");
+    }
     match = {
       round: matchRoundLabel(String(row.bracket), Number(row.round_number)),
       team1: row.team1_name ? { name: row.team1_name, participantType } : null,

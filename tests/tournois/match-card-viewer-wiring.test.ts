@@ -22,6 +22,7 @@ const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
 const BRACKET_TREE = read(join(TOURNAMENT_DIR, "_components", "BracketTree.tsx"));
 const PAGE = read(join(TOURNAMENT_DIR, "page.tsx"));
 const ISSUE_REPORT_CONTEXT = read(join(TOURNAMENT_DIR, "_lib", "issue-report-context.tsx"));
+const HEADER = read(join(TOURNAMENT_DIR, "_components", "TournamentHeader.tsx"));
 
 describe("bouton « Signaler un problème » — réservé au match du lecteur", () => {
   it("MatchRow calcule la visibilité avec le module pur, pas une comparaison recopiée", () => {
@@ -37,6 +38,14 @@ describe("bouton « Signaler un problème » — réservé au match du lecteur",
     expect(MATCH_ROW).toContain("useLiveControls()");
     expect(ISSUE_REPORT_CONTEXT).not.toContain("myTeamId");
     expect(PAGE).not.toMatch(/<IssueReportProvider[\s\S]{0,120}myTeamId=/);
+  });
+
+  it("n'ouvre le signalement qu'aux engagés inscrits, pas à qui a seulement une équipe", () => {
+    // `myTeamId` est l'équipe active, inscrite ou non : le bouton de
+    // l'en-tête comme ceux des cartes passent par `isViewerEntrant`.
+    expect(PAGE).toContain("canReport={isViewerEntrant(detail.myTeamId, detail.registrations) && !frozen}");
+    expect(HEADER).toContain("isViewerEntrant(detail.myTeamId, detail.registrations) && (");
+    expect(HEADER).not.toContain("{detail.myTeamId !== null && (");
   });
 });
 

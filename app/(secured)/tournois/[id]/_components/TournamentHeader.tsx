@@ -5,6 +5,7 @@ import { CyberButton, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
+import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { participantWording } from "@/lib/shared/participants";
 import { advanceTarget } from "@/lib/shared/tournament-launch";
 import { TOURNAMENT_STAGE_META } from "@/lib/shared/tournament-progress";
@@ -211,10 +212,11 @@ export function TournamentHeader({
               <span aria-hidden="true">▶</span> Avancer le tournoi
             </CyberButton>
           )}
-          {/* Signalement : ouvert aux seuls engagés, à toute heure du tournoi —
+          {/* Signalement : ouvert aux seuls engagés (inscrits, pas seulement dotés
+              d'une équipe), à toute heure du tournoi —
               un problème d'inscription se signale avant le coup d'envoi comme
               un litige de score se signale après. */}
-          {detail.myTeamId !== null && (
+          {isViewerEntrant(detail.myTeamId, detail.registrations) && (
             <CyberButton
               variant="ghost"
               onClick={onReportIssue}
