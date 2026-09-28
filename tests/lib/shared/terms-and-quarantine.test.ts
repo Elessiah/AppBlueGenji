@@ -174,7 +174,7 @@ describe("quarantaine des avatars — jamais le pseudo du joueur sur Discord", (
     // message Discord ne porte jamais le pseudo d'un joueur, et la fonction ne
     // prend même pas de paramètre par lequel un appelant pourrait lui en glisser un.
     expect(formatAvatarHiddenLog({ reportId: 4, purgeAfter: new Date("2026-06-30T10:00:00Z") })).toBe(
-      "🙈 Avatar de un joueur masqué par le staff (signalement #4), suppression définitive le 30 juin 2026 sans contestation.",
+      "🙈 Avatar d'un joueur masqué par le staff (signalement #4), suppression définitive le 30 juin 2026 sans contestation.",
     );
   });
 });

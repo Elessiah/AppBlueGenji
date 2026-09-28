@@ -577,6 +577,40 @@ describe("getConcernedReport", () => {
     expect(report).not.toHaveProperty("contactEmail");
     expect(listQuarantinesForReports).toHaveBeenCalledWith([12]);
   });
+
+  it("ne montre que le logo de ses équipes et son propre avatar, jamais ceux des autres cibles", async () => {
+    install([
+      ...routes(
+        [
+          { report_id: 12, target_type: "TEAM", target_id: 4, label_snapshot: "Alpha" },
+          { report_id: 12, target_type: "TEAM", target_id: 6, label_snapshot: "Beta" },
+          { report_id: 12, target_type: "USER", target_id: 5, label_snapshot: "Nova" },
+          { report_id: 12, target_type: "USER", target_id: 77, label_snapshot: "UnAutreJoueur" },
+        ],
+        [{ team_id: 4 }],
+      ),
+      [
+        /FROM bg_users/,
+        () => [
+          [
+            { id: 5, pseudo: "Nova", avatar_url: null, visible_avatar: 1 },
+            { id: 77, pseudo: "UnAutreJoueur", avatar_url: null, visible_avatar: 1 },
+          ],
+        ],
+      ],
+    ]);
+    jest.mocked(listQuarantinesForReports).mockResolvedValue([
+      { id: 1, targetType: "TEAM", targetId: 4, targetName: "Alpha", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
+      // Équipe visée, mais dont le lecteur n'est pas membre : ne le concerne pas.
+      { id: 2, targetType: "TEAM", targetId: 6, targetName: "Beta", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
+      { id: 3, targetType: "USER", targetId: 5, targetName: "Nova", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
+      // Un autre joueur visé : son avatar masqué ne concerne pas ce lecteur.
+      { id: 4, targetType: "USER", targetId: 77, targetName: "UnAutreJoueur", reportId: 12, status: "HIDDEN", hiddenAt: "2026-09-20T10:00:00.000Z", purgeAfter: "2027-03-19T10:00:00.000Z", closedAt: null },
+    ]);
+
+    const report = await getConcernedReport(12, 5);
+    expect(report?.quarantines.map((quarantine) => quarantine.id)).toEqual([1, 3]);
+  });
 });
 
 describe("listContestableReports", () => {

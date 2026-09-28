@@ -489,6 +489,13 @@ describe("hideUserAvatarForReport", () => {
     await expect(hideUserAvatarForReport(12, 9, actor)).rejects.toThrow("AVATAR_NOT_MOVABLE");
     expect(rename).not.toHaveBeenCalled();
   });
+
+  it("refuse clairement un avatar dont le fichier n'existe plus, sans rien écrire", async () => {
+    jest.mocked(rename).mockRejectedValueOnce(Object.assign(new Error("absent"), { code: "ENOENT" }));
+    install([reportTargets, user], []);
+    await expect(hideUserAvatarForReport(12, 9, actor)).rejects.toThrow("AVATAR_FILE_MISSING");
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
 });
 
 const quarantineRow = (overrides: Record<string, unknown> = {}) => ({
@@ -562,6 +569,19 @@ describe("restoreReportedImage", () => {
     expect(connection.rollback).toHaveBeenCalled();
   });
 
+  it("n'écrase pas un avatar envoyé depuis", async () => {
+    install(
+      [],
+      [
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SELECT avatar_url AS image_url FROM bg_users/, () => [[{ image_url: "/api/uploads/avatars/9-new.webp" }]]],
+      ],
+    );
+    await expect(restoreReportedImage(30, actor)).rejects.toThrow("USER_HAS_NEW_AVATAR");
+    expect(rename).not.toHaveBeenCalled();
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+
   it("refuse une quarantaine déjà close ou inconnue", async () => {
     install([], [[/FROM bg_logo_quarantines q/, () => [[quarantineRow({ status: "PURGED" })]]]]);
     await expect(restoreReportedImage(30, actor)).rejects.toThrow("QUARANTINE_CLOSED");
@@ -586,6 +606,27 @@ describe("restoreReportedImage", () => {
     await expect(restoreReportedImage(30, actor)).rejects.toThrow("ER_LOCK_DEADLOCK");
     expect(rename).toHaveBeenNthCalledWith(1, HIDDEN, LIVE);
     expect(rename).toHaveBeenNthCalledWith(2, LIVE, HIDDEN);
+  });
+
+  it("renvoie le fichier en quarantaine si l'écriture d'un avatar échoue", async () => {
+    install(
+      [],
+      [
+        [/FROM bg_logo_quarantines q/, () => [[quarantineRow({ target_type: "USER", target_id: 9, target_name: "Nova", logo_url: AVATAR })]]],
+        [/SELECT avatar_url AS image_url FROM bg_users/, () => [[{ image_url: null }]]],
+        [
+          /UPDATE bg_users SET avatar_url = \?/,
+          () => {
+            throw new Error("ER_LOCK_DEADLOCK");
+          },
+        ],
+      ],
+    );
+    await expect(restoreReportedImage(30, actor)).rejects.toThrow("ER_LOCK_DEADLOCK");
+    expect(rename).toHaveBeenNthCalledWith(1, HIDDEN_AVATAR, LIVE_AVATAR);
+    expect(rename).toHaveBeenNthCalledWith(2, LIVE_AVATAR, HIDDEN_AVATAR);
+    // L'échec survient avant la resynchronisation de l'entrée solo.
+    expect(syncSoloEntryIdentityOn).not.toHaveBeenCalled();
   });
 });
 
