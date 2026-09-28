@@ -54,7 +54,10 @@ export type ParticipantWording = {
   guestCta: string;
   /** Sujet des phrases parlant de l'engagé : « L'équipe » / « Le joueur ». */
   subject: string;
-  /** Confirmation d'abandon, quand le joueur parle de son propre engagement. */
+  /**
+   * Conséquence de l'abandon, dans la modale de confirmation, quand le joueur
+   * parle de son propre engagement (le titre de la modale pose la question).
+   */
   forfeitSelfConfirm: string;
   /** Titre du dialogue d'inscription d'un engagé sans compte. */
   guestTitle: string;
@@ -98,7 +101,7 @@ export const PARTICIPANT_WORDING: Record<ParticipantType, ParticipantWording> = 
     registerCta: "Inscrire mon équipe",
     guestCta: "+ Équipe fantôme",
     subject: "L'équipe",
-    forfeitSelfConfirm: "Abandonner ? Votre équipe quittera définitivement le tournoi.",
+    forfeitSelfConfirm: "Votre équipe quittera définitivement le tournoi.",
     guestTitle: "Inscrire une équipe fantôme",
     guestHint:
       "Réservé aux équipes fantômes : une équipe de joueurs s'inscrit toujours elle-même.",
@@ -122,7 +125,7 @@ export const PARTICIPANT_WORDING: Record<ParticipantType, ParticipantWording> = 
     registerCta: "M'inscrire",
     guestCta: "+ Joueur invité",
     subject: "Le joueur",
-    forfeitSelfConfirm: "Abandonner ? Tu quitteras définitivement le tournoi.",
+    forfeitSelfConfirm: "Tu quitteras définitivement le tournoi.",
     guestTitle: "Inscrire un joueur invité",
     guestHint:
       "Réservé aux joueurs sans compte sur le site : un joueur inscrit s'engage toujours lui-même.",
