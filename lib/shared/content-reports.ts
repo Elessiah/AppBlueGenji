@@ -129,7 +129,8 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
   RGPD: {
     label: "RGPD",
     hint: "Exercer tes droits sur tes données : accès, rectification, effacement, opposition, portabilité.",
-    icon: "🛡",
+    // Glyphe texte, comme les autres : un émoji se peindrait en couleur.
+    icon: "⚿",
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,

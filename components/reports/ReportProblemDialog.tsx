@@ -466,7 +466,9 @@ export function ReportProblemDialog({
                   <p className={styles.hint}>
                     {authenticated
                       ? "Sans adresse, l'association te répondra par ton compte (Discord si tu l'as rattaché)."
-                      : "Sans adresse, l'association ne pourra pas te tenir au courant."}
+                      : category === "RGPD" || category === "HOSTING"
+                        ? "Sans adresse ni compte, l'association ne pourra pas te répondre : indique une adresse, ou connecte-toi."
+                        : "Sans adresse, l'association ne pourra pas te tenir au courant."}
                   </p>
                 </div>
               )}
