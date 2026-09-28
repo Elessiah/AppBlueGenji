@@ -67,6 +67,19 @@ le même fait — il n'y a pas d'image à cette adresse) :
   l'adresse des services de métadonnées cloud —, CGNAT, multicast, bouclage et
   adresses uniques locales IPv6, **formes développées comprises** :
   `0:0:0:0:0:0:0:1` ne s'écrit pas `::1` et passerait sinon).
+  Une adresse IPv6 est **analysée** en ses huit groupes, jamais reconnue à sa
+  forme écrite : le parseur d'URL réécrit `[::ffff:127.0.0.1]` en
+  `[::ffff:7f00:1]`, que l'ancienne regex laissait passer. Sont jugées aussi
+  l'IPv4 « compatible » (`::/96`), NAT64 (`64:ff9b::/96`, sur l'IPv4 traduite, et
+  `64:ff9b:1::/48`), 6to4 (`2002::/16`), site-local (`fec0::/10`), multicast
+  IPv6, et `localhost.` avec son point final ;
+- **adresses résolues refusées de même** : avant chaque saut, le nom est résolu
+  (`hostResolvesPublicly`) et **toutes** les adresses rendues passent par le même
+  prédicat — un domaine public qui pointe vers `127.0.0.1` passait le seul filtre
+  d'écriture. Une résolution qui échoue est un refus. Reste ouvert le
+  *rebinding* (le `fetch` intégré résout de nouveau en se connectant, et un DNS
+  hostile peut répondre autre chose) : le fermer demande de fixer l'adresse de
+  connexion dans l'agent HTTP, que Node n'expose pas sans dépendance.
   La requête part **depuis le serveur**, là où le
   navigateur la faisait depuis le poste du visiteur : une adresse interne devient
   joignable, ce qu'elle n'était pas. L'URL vient du staff, mais la confiance qu'on

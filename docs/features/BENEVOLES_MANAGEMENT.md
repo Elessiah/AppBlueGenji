@@ -47,8 +47,14 @@ Deux façons de renseigner la photo d'un bénévole :
    5 Mo max.
 2. **URL externe** — collée directement dans le champ (≤ 500 caractères).
 
-À la mise à jour ou la suppression d'un bénévole, l'ancien fichier local est
-supprimé en best-effort (`deleteStoredImage`) ; les URLs externes sont ignorées.
+Une adresse d'upload collée doit désigner le dossier des bénévoles
+(`INVALID_PHOTO_URL` sinon) : l'avatar d'un joueur ou le logo d'une équipe collé
+ici était effacé du disque au remplacement de la photo.
+
+À la mise à jour ou la suppression d'un bénévole, l'ancien fichier est supprimé
+en best-effort par `deleteUnreferencedUpload` (`lib/server/stored-upload-cleanup.ts`) —
+**seulement** s'il vit sous `uploads/benevoles/` et que plus aucune ligne ne le
+désigne ; les URLs externes sont ignorées.
 
 ## Réordonnancement des catégories
 

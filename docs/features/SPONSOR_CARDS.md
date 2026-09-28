@@ -50,7 +50,11 @@ La section gagne aussi une **introduction** éditable en place par la permission
   toute autre adresse (`INVALID_BANNER_URL`), y compris un autre dossier
   d'upload, que le nettoyage d'un bandeau remplacé effacerait sinon.
 - Un bandeau remplacé ou retiré, et celui d'un partenaire supprimé, est effacé
-  du disque (même nettoyage que le logo).
+  du disque (même nettoyage que le logo : `deleteUnreferencedUpload`, borné au
+  dossier `sponsors/` et à un fichier que plus aucune ligne ne désigne).
+- Le **logo**, lui, accepte une URL collée, mais une adresse d'upload doit être
+  celle d'un logo de partenaire (`INVALID_LOGO_URL`) : coller l'avatar d'un
+  joueur puis supprimer le partenaire effaçait cet avatar.
 
 ## Logo — plus de gabarit 3:1
 
