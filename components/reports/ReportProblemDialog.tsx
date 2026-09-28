@@ -8,6 +8,9 @@ import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
+  MODERATION_SUPPORT_PORTAL_URL,
+  OFF_SITE_CONDUCT_ENTRY,
+  OFF_SITE_CONDUCT_NOTICE,
   REPORT_CATEGORIES,
   REPORT_CATEGORY_DEFINITIONS,
   REPORT_CONTACT_EMAIL_MAX_LENGTH,
@@ -238,9 +241,9 @@ export function ReportProblemDialog({
               l&apos;association, qui le traitent au plus vite.
             </p>
             <div className={styles.categories}>
-              {REPORT_CATEGORIES.map((key) => {
+              {REPORT_CATEGORIES.flatMap((key) => {
                 const item = REPORT_CATEGORY_DEFINITIONS[key];
-                return (
+                const card = (
                   <button
                     key={key}
                     type="button"
@@ -256,6 +259,28 @@ export function ReportProblemDialog({
                     <span className={styles.categoryHint}>{item.hint}</span>
                   </button>
                 );
+                if (key !== "MODERATION") return [card];
+                // Juste après la modération du site : la modération qui ne
+                // l'est pas, et qui se traite ailleurs.
+                return [
+                  card,
+                  <a
+                    key="OFF_SITE_CONDUCT"
+                    href={MODERATION_SUPPORT_PORTAL_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={`${styles.categoryCard} ${styles.categoryExternal}`}
+                  >
+                    <span className={styles.categoryIcon} aria-hidden="true">
+                      {OFF_SITE_CONDUCT_ENTRY.icon}
+                    </span>
+                    <span className={styles.categoryLabel}>
+                      {OFF_SITE_CONDUCT_ENTRY.label}
+                      <span className="sr-only"> (portail de support, nouvel onglet)</span>
+                    </span>
+                    <span className={styles.categoryHint}>{OFF_SITE_CONDUCT_ENTRY.hint}</span>
+                  </a>,
+                ];
               })}
             </div>
           </ScrollArea>
@@ -272,6 +297,17 @@ export function ReportProblemDialog({
                   <span aria-hidden="true">{definition.icon}</span> {definition.label}
                 </span>
               </div>
+
+              {category === "MODERATION" && (
+                <p className={styles.anonNote}>
+                  {OFF_SITE_CONDUCT_NOTICE}{" "}
+                  <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
+                    portail de support BlueGenji
+                    <span className="sr-only"> (nouvel onglet)</span>
+                  </a>
+                  .
+                </p>
+              )}
 
               {definition.targets.length > 0 &&
                 (authenticated ? (
