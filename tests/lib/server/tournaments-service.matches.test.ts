@@ -12,7 +12,7 @@ import { queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 import { resolveUserEntrant } from "@/lib/server/tournaments/registration";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
-import { MIN_MINUTES_PER_REPORTED_MAP } from "@/lib/shared/score-report-deadline";
+import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { qualifyDestinationMatchId } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import { tournamentRow } from "../../helpers/tournament-rows";
@@ -234,12 +234,12 @@ describe("tournaments-service: match state machine", () => {
       const [report] = writes(calls);
       expect(report.sql).toMatch(/SET team1_report_score = \?/);
       expect(report.sql).toMatch(/status = 'AWAITING_CONFIRMATION'/);
-      // Un 3-1 affirme quatre maps jouées : la série plausible dure
-      // 4 × MIN_MINUTES_PER_REPORTED_MAP depuis le lancement, puis le délai.
+      // La série plausible est une série complète au format de la manche (ici
+      // score libre : le BO5 par défaut), depuis le lancement, puis le délai.
       expect(report.params).toEqual([
         3,
         1,
-        4 * MIN_MINUTES_PER_REPORTED_MAP,
+        plausibleSeriesMinutes(null),
         SCORE_REPORT_TIMEOUT_MINUTES,
         10,
       ]);
@@ -253,44 +253,32 @@ describe("tournaments-service: match state machine", () => {
       await reportMatchScore(connection, 1, 10, 42, 3, 0);
 
       const [report] = writes(calls);
-      // Calculée par la base : max(maintenant, lancement + série) puis le
-      // délai — et le lancement ne compte que s'il appartient à cet
-      // appariement.
-      expect(report.sql).toMatch(
-        /ELSE GREATEST\(COALESCE\(score_deadline_at, NOW\(\)\), DATE_ADD\( GREATEST\( NOW\(\),/,
-      );
+      // Calculée par la base et posée une fois (COALESCE) : max(maintenant,
+      // lancement + série) puis le délai — et le lancement ne compte que s'il
+      // appartient à cet appariement.
+      expect(report.sql).toMatch(/score_deadline_at = COALESCE\(score_deadline_at, DATE_ADD\( GREATEST\( NOW\(\),/);
       expect(report.sql).toMatch(
         /CASE WHEN launch_pairing = CONCAT\(team1_id, ':', team2_id\) THEN launched_at END/,
       );
       expect(report.params).toEqual([
         3,
         0,
-        3 * MIN_MINUTES_PER_REPORTED_MAP,
+        plausibleSeriesMinutes(null),
         SCORE_REPORT_TIMEOUT_MINUTES,
         10,
       ]);
     });
 
-    it("l'échéance suit le report en vigueur tant que l'adversaire n'a rien dit, puis se fige", async () => {
-      // Un « 1-0 » réécrit en « 3-0 » doit prendre l'échéance du second : elle
-      // ne fait que reculer (GREATEST) tant que l'adversaire n'a pas reporté,
-      // et se fige dès qu'il l'a fait — l'escalade d'un conflit se mesure sur
-      // elle, une resaisie en boucle ne doit pas la repousser.
-      const { connection, calls } = reportConnection();
+    it("l'échéance se lit sur le format, jamais sur le score déclaré", async () => {
+      // Un « 1-0 » ne l'abrège pas, un « 3-2 » ne la repousse pas : lue sur le
+      // score, elle était à la main du déclarant.
+      const short = reportConnection();
+      await reportMatchScore(short.connection, 1, 10, 42, 3, 0);
+      const long = reportConnection();
+      await reportMatchScore(long.connection, 1, 10, 42, 3, 2);
 
-      await reportMatchScore(connection, 1, 10, 42, 3, 0);
-
-      const [report] = writes(calls);
-      expect(report.sql).toMatch(
-        /score_deadline_at = CASE WHEN team2_report_score IS NOT NULL AND score_deadline_at IS NOT NULL THEN score_deadline_at ELSE GREATEST/,
-      );
-
-      reporterIs(200);
-      const second = reportConnection();
-      await reportMatchScore(second.connection, 1, 10, 42, 0, 3);
-      expect(writes(second.calls)[0].sql).toMatch(
-        /score_deadline_at = CASE WHEN team1_report_score IS NOT NULL AND score_deadline_at IS NOT NULL THEN score_deadline_at/,
-      );
+      expect(writes(short.calls)[0].params[2]).toBe(plausibleSeriesMinutes(null));
+      expect(writes(long.calls)[0].params[2]).toBe(plausibleSeriesMinutes(null));
     });
 
     it("refuse un membre du roster sans la charge de l'équipe, avant toute lecture du match", async () => {
@@ -314,7 +302,7 @@ describe("tournaments-service: match state machine", () => {
       expect(writes(calls)[0].params).toEqual([
         1,
         3,
-        4 * MIN_MINUTES_PER_REPORTED_MAP,
+        plausibleSeriesMinutes(null),
         SCORE_REPORT_TIMEOUT_MINUTES,
         10,
       ]);

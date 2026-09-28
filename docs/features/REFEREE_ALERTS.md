@@ -147,10 +147,8 @@ soir de tournoi avale la première ; la seconde arrive quand le match est
 vraiment en souffrance.
 
 L'escalade attend **un délai de plus** après `score_deadline_at`, et le jalon
-n'est pas choisi au hasard : cette colonne est **figée** dès que les deux
-engagées ont reporté — c'est-à-dire dès qu'un conflit existe. Avant, seul le camp
-qui attend sa confirmation la fait bouger, en la reculant (la fin de série
-plausible suit son report en vigueur, `docs/features/PLAYER_SCORE_ENTRY.md`). Les horodatages de
+n'est pas choisi au hasard : cette colonne est posée au premier report et jamais
+réécrite tant que la manche n'est pas tranchée (`COALESCE`). Les horodatages de
 report, eux, se repoussent à chaque saisie — une engagée qui resaisirait son
 score juste avant chaque échéance repousserait indéfiniment sa propre escalade,
 et le blocage qu'elle entretient ne serait jamais signalé.
@@ -158,8 +156,10 @@ et le blocage qu'elle entretient ne serait jamais signalé.
 Aucune durée n'est citée en dur ici, et l'exemple ci-dessus vaut pour la valeur
 du jour : la seule source est `SCORE_REPORT_TIMEOUT_MINUTES`
 (`lib/shared/constants.ts`), que le message reprend telle quelle. L'escalade part
-donc **deux délais** après le premier report — un pour l'expiration, un pour la
-souffrance constatée — quelle que soit la valeur réglée.
+donc **deux délais** après l'échéance du premier report — un pour l'expiration,
+un pour la souffrance constatée — quelle que soit la valeur réglée. Cette
+échéance ne court elle-même qu'après une fin de série plausible depuis le
+lancement (`lib/shared/score-report-deadline.ts`).
 
 La comparaison est faite en SQL (`score_deadline_at <= DATE_SUB(NOW(), INTERVAL
 … MINUTE)`), dans le même référentiel que celui qui a écrit la colonne :

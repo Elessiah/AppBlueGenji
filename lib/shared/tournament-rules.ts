@@ -82,7 +82,7 @@ export const COMMON_RULES: RuleSection[] = [
     ],
     bullets: [
       "Deux déclarations concordantes valident le match immédiatement.",
-      `Une seule déclaration ouvre un délai de confirmation de ${SCORE_REPORT_TIMEOUT_MINUTES} minutes, qui ne court qu'après une durée de série plausible depuis le lancement (${MIN_MINUTES_PER_REPORTED_MAP} minutes par map déclarée) : sans contestation de l'adversaire, le score est retenu.`,
+      `Une seule déclaration ouvre un délai de confirmation de ${SCORE_REPORT_TIMEOUT_MINUTES} minutes, qui ne court qu'après une durée de série plausible depuis le lancement (${MIN_MINUTES_PER_REPORTED_MAP} minutes par map que le format autorise) : sans contestation de l'adversaire, le score est retenu.`,
       "Deux déclarations contradictoires mettent le match en litige : un arbitre tranche et enregistre le score officiel.",
       "Un arbitre ou un administrateur peut corriger un score tant que la manche suivante n'a reçu aucune saisie ; au-delà, le score est verrouillé, y compris pour lui.",
     ],

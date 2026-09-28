@@ -523,8 +523,11 @@ toujours `UPCOMING`.
 Deux reports concordants closent la rencontre, deux reports contradictoires
 ouvrent un **conflit** qui part au canal arbitre. Un report **seul** fait foi à
 l'échéance de `score_deadline_at` — mais cette échéance ne court qu'après une
-**fin de série plausible** : `max(maintenant, lancement + 15 min par map
-déclarée, au plus le plafond de maps du format — BO5 en saisie libre)` plus `SCORE_REPORT_TIMEOUT_MINUTES` (`lib/shared/score-report-deadline.ts`).
+**fin de série plausible** : `max(maintenant, lancement + 15 min × plafond de
+maps du format — BO5 en saisie libre)` plus `SCORE_REPORT_TIMEOUT_MINUTES`
+(`lib/shared/score-report-deadline.ts`), posée une fois au premier report. Elle
+se lit sur le **format**, jamais sur le score déclaré : lue sur le score, un
+« 1-0 » l'abrégeait et un « 99-98 » la repoussait de deux jours.
 Sans ce plancher, un « 3-0 pour nous » déclaré à la seconde du lancement
 l'emportait dix minutes plus tard, pendant que l'adversaire jouait encore sa
 série. Un joueur ne peut donc en aucun cas :
