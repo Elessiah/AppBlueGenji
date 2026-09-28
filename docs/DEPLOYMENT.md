@@ -118,7 +118,27 @@ avec un autre site) : le bloc ci-dessous est à reporter à la main.
 
 ```nginx
 # Contexte http {} — noms préfixés : la configuration est partagée.
-limit_req_zone $binary_remote_addr zone=bluegenji_pages:10m rate=5r/s;
+#
+# Deux zones, parce que deux sortes de requêtes arrivent sur `location /`. En
+# production, Next **précharge** chaque lien qui entre à l'écran
+# (`next-router-prefetch: 1`) : une page de trente cartes en envoie trente d'un
+# coup, que le visiteur n'a pas demandées. Comptées avec les pages, elles
+# videraient la rafale d'une salle de joueurs en quelques secondes. Elles ont
+# donc leur seau, plus large — et non une exemption : l'en-tête est forgeable,
+# un script le poserait pour échapper à tout plafond.
+#
+# Une clé vide n'est comptée dans aucune zone : chaque requête ne tombe que
+# dans l'une des deux.
+map $http_next_router_prefetch $bluegenji_page_key {
+    ""      $binary_remote_addr;
+    default "";
+}
+map $http_next_router_prefetch $bluegenji_prefetch_key {
+    ""      "";
+    default $binary_remote_addr;
+}
+limit_req_zone $bluegenji_page_key     zone=bluegenji_pages:10m    rate=5r/s;
+limit_req_zone $bluegenji_prefetch_key zone=bluegenji_prefetch:10m rate=30r/s;
 limit_req_status 429;
 
 server {
@@ -153,10 +173,12 @@ server {
         proxy_buffering off;
     }
 
-    # Pages (documents HTML) : 5 par seconde et par IP, rafale de 50 servie
-    # sans attente.
+    # Pages (documents HTML et navigations du routeur) : 5 par seconde et par
+    # IP, rafale de 50 servie sans attente. Préchargements : 30 par seconde,
+    # rafale de 300.
     location / {
         limit_req zone=bluegenji_pages burst=50 nodelay;
+        limit_req zone=bluegenji_prefetch burst=300 nodelay;
         proxy_pass http://127.0.0.1:3000;
     }
 }
@@ -175,7 +197,7 @@ Trois points à ne pas perdre en l'adaptant :
   configuration en place pose déjà ses en-têtes dans chaque location, y
   reporter les trois lignes plutôt que de n'en ajouter qu'une.
 - **Essayer d'abord à blanc** : `limit_req_dry_run on;` (nginx ≥ 1.17.1) dans
-  `location /` journalise les refus sans les appliquer. Une soirée de tournoi
+  `location /` journalise les refus sans les appliquer (les deux zones). Une soirée de tournoi
   sans ligne `limiting requests, dry run` dans `error.log`, puis on retire la
   directive.
 
