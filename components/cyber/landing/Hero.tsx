@@ -45,7 +45,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
             <span className="eyebrow">{copy["home.hero.eyebrow"]}</span>
           </EditableCopy>
           <EditableCopy copyKey="home.hero.title" value={copy["home.hero.title"]} canEdit={canEditCopy}>
-            <h1 className="display" style={{ fontSize: "clamp(38px, 7vw, 82px)" }}>
+            <h1 className={`display ${styles.title}`}>
               {/* Dernière ligne du titre accentuée : c'est la chute du slogan. */}
               {copy["home.hero.title"].split("\n").map((line, index, lines) => (
                 <span key={line + index} className={index === lines.length - 1 ? styles.accent : undefined}>
