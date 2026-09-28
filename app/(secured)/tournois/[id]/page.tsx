@@ -584,7 +584,7 @@ export default function TournamentDetailPage() {
         canReport={detail.myTeamId !== null && !frozen}
         openReport={openIssueReport}
       >
-      <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} />
+      <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} tournamentId={detail.card.id} />
       <section className="fade-in">
         <TournamentHeader
           detail={detail}

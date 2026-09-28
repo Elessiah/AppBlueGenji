@@ -356,7 +356,7 @@ export function TournamentForm({
                 <option value="SINGLE">Simple élimination</option>
                 <option value="DOUBLE">Double élimination</option>
                 <option value="SWISS">Ronde suisse</option>
-                <option value="SURVIVAL">Survie</option>
+                <option value="SURVIVAL">Survie par coupes</option>
                 <option value="BG_SURVIE">BlueGenji Survie (endurance)</option>
                 <option value="MULTI">Multi-phases</option>
               </select>

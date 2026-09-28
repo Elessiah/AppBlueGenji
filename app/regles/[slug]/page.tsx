@@ -15,16 +15,61 @@ import {
 import { JsonLd } from "@/components/seo/JsonLd";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { breadcrumbJsonLd } from "@/lib/shared/structured-data";
+import { getCurrentUser } from "@/lib/server/auth";
+import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { can } from "@/lib/shared/permissions";
+import {
+  parseRulesTournamentParam,
+  tournamentSettingsGroups,
+  type TournamentSettingsGroup,
+} from "@/lib/shared/tournament-settings";
 import styles from "./page.module.css";
 
-type PageProps = { params: Promise<{ slug: string }> };
+type PageProps = {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
+
+type TournamentSettingsView = { id: number; name: string; groups: TournamentSettingsGroup[] };
+
+/**
+ * Réglages du tournoi désigné par `?tournoi=<id>` — le lien du bouton d'aide
+ * d'une fiche de tournoi le porte. Même règle de lecture que la fiche : il faut
+ * être connecté (l'espace des tournois l'est), et un tournoi non publié n'existe
+ * que pour la permission `tournaments`. Tout refus, toute panne de lecture, rend
+ * simplement la page générale du mode.
+ */
+async function loadTournamentSettings(tournamentId: number | null): Promise<TournamentSettingsView | null> {
+  if (tournamentId === null) return null;
+  try {
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const snapshot = await getVisibleTournamentSnapshot(tournamentId, {
+      canManage: can(user, "tournaments"),
+    });
+    if (!snapshot) return null;
+    return {
+      id: snapshot.card.id,
+      name: snapshot.card.name,
+      groups: tournamentSettingsGroups({
+        card: snapshot.card,
+        phases: snapshot.phases,
+        swiss: snapshot.swiss,
+        endurance: snapshot.endurance,
+        seedingSource: snapshot.seedingSource,
+      }),
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** Les modes sont un registre statique : toutes les pages sont pré-générées. */
 export function generateStaticParams(): { slug: string }[] {
   return TOURNAMENT_RULE_MODES.map((mode) => ({ slug: mode.slug }));
 }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata({ params }: Pick<PageProps, "params">): Promise<Metadata> {
   const { slug } = await params;
   const mode = ruleModeBySlug(slug);
   if (!mode) return pageMetadata({
@@ -61,10 +106,14 @@ function RuleCard({ rule }: { rule: RuleSection }) {
   );
 }
 
-export default async function RuleModePage({ params }: PageProps) {
+export default async function RuleModePage({ params, searchParams }: PageProps) {
   const { slug } = await params;
   const mode = ruleModeBySlug(slug);
   if (!mode) notFound();
+
+  const tournamentSettings = await loadTournamentSettings(
+    parseRulesTournamentParam((await searchParams).tournoi),
+  );
 
   const others = TOURNAMENT_RULE_MODES.filter((m) => m.slug !== mode.slug);
 
@@ -120,6 +169,41 @@ export default async function RuleModePage({ params }: PageProps) {
           </p>
         )}
       </section>
+
+      {tournamentSettings && (
+        <section
+          className={styles.section}
+          style={{ paddingTop: 0 }}
+          aria-labelledby="reglages-du-tournoi"
+        >
+          <div className={styles.sectionHead}>
+            <span className="eyebrow">CE TOURNOI</span>
+            <h2 id="reglages-du-tournoi" className={styles.sectionTitle}>
+              Réglages de « {tournamentSettings.name} »
+            </h2>
+          </div>
+          <p className={styles.settingsIntro}>
+            Les valeurs retenues à la création de ce tournoi. Elles priment sur les valeurs par
+            défaut citées plus bas.{" "}
+            <Link href={`/tournois/${tournamentSettings.id}`} className="entity-link">
+              Retour au tournoi
+            </Link>
+          </p>
+          {tournamentSettings.groups.map((group) => (
+            <CyberCard key={group.title} className={styles.rule}>
+              <h3 className={styles.ruleTitle}>{group.title}</h3>
+              <dl className={styles.settings}>
+                {group.settings.map((setting) => (
+                  <div key={setting.label} className={styles.setting}>
+                    <dt className={styles.factLabel}>{setting.label}</dt>
+                    <dd className={styles.settingValue}>{setting.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </CyberCard>
+          ))}
+        </section>
+      )}
 
       <section className={styles.section} style={{ paddingTop: 0 }}>
         <div className={styles.sectionHead}>

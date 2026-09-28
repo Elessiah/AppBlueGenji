@@ -65,7 +65,7 @@ export const A11Y_SETTINGS: readonly A11ySettingDefinition[] = [
   {
     key: "motion",
     label: "Réduire les animations",
-    description: "Arrête les animations décoratives et les transitions, même si ton système ne le demande pas.",
+    description: "Arrête les animations décoratives et les transitions, même si votre système ne le demande pas.",
   },
 ];
 
