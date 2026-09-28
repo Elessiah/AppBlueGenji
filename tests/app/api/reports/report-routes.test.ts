@@ -5,6 +5,7 @@ jest.mock("@/lib/server/content-reports");
 jest.mock("@/lib/server/logo-quarantine");
 jest.mock("@/lib/server/terms-acceptance");
 jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/users-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/staff-audit");
 
@@ -19,6 +20,7 @@ import { POST as deleteReportedLogo } from "@/app/api/admin/reports/[id]/logo-re
 import { POST as restoreLogo } from "@/app/api/admin/logo-quarantines/[id]/restore/route";
 import { DELETE as purgeLogo } from "@/app/api/admin/logo-quarantines/[id]/route";
 import { DELETE as removeTeamLogo } from "@/app/api/admin/teams/[id]/logo/route";
+import { DELETE as removeUserAvatar } from "@/app/api/admin/users/[id]/avatar/route";
 import { POST as acceptTerms } from "@/app/api/profile/terms/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import {
@@ -32,13 +34,17 @@ import {
 } from "@/lib/server/content-reports";
 import {
   deleteTeamLogoForReport,
+  deleteUserAvatarForReport,
   hideTeamLogo,
+  hideUserAvatarForReport,
   notifyTeamLogoRemoved,
+  notifyUserAvatarRemoved,
   purgeQuarantinedLogo,
-  restoreTeamLogo,
+  restoreReportedImage,
 } from "@/lib/server/logo-quarantine";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
+import { removeUserAvatarAsModerator } from "@/lib/server/users-service";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { resetRateLimit } from "@/lib/server/rate-limit";
@@ -194,11 +200,15 @@ describe("routes du panneau — permission `moderation`", () => {
   const calls: [string, () => Promise<Response>][] = [
     ["liste", () => adminList()],
     ["geste", () => adminAction(json("http://localhost", "PATCH", { action: "TAKE" }), params("3"))],
-    ["masquage", () => hideLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"))],
-    ["suppression depuis un signalement", () => deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"))],
+    ["masquage", () => hideLogo(json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }), params("3"))],
+    [
+      "suppression depuis un signalement",
+      () => deleteReportedLogo(json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }), params("3")),
+    ],
     ["rétablissement", () => restoreLogo(new Request("http://localhost"), params("3"))],
     ["suppression en quarantaine", () => purgeLogo(new Request("http://localhost"), params("3"))],
-    ["retrait immédiat", () => removeTeamLogo(new Request("http://localhost"), params("4"))],
+    ["retrait immédiat (équipe)", () => removeTeamLogo(new Request("http://localhost"), params("4"))],
+    ["retrait immédiat (joueur)", () => removeUserAvatar(new Request("http://localhost"), params("9"))],
   ];
 
   it.each(calls)("%s : refusé à un arbitre (403) et à un visiteur (401)", async (_label, call) => {
@@ -240,17 +250,36 @@ describe("routes du panneau — permission `moderation`", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(hideTeamLogo).mockResolvedValue({
       id: 30,
-      teamId: 4,
-      teamName: "Alpha",
+      targetType: "TEAM",
+      targetId: 4,
+      targetName: "Alpha",
       reportId: 3,
       status: "HIDDEN",
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: null,
     });
-    const res = await hideLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"));
+    const res = await hideLogo(json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }), params("3"));
     expect(res.status).toBe(201);
     expect(hideTeamLogo).toHaveBeenCalledWith(3, 4, { userId: 1, pseudo: "Admin" });
+  });
+
+  it("masque l'avatar d'un joueur visé", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(hideUserAvatarForReport).mockResolvedValue({
+      id: 50,
+      targetType: "USER",
+      targetId: 9,
+      targetName: "Nova",
+      reportId: 3,
+      status: "HIDDEN",
+      hiddenAt: "2026-09-24T10:00:00.000Z",
+      purgeAfter: "2027-03-23T10:00:00.000Z",
+      closedAt: null,
+    });
+    const res = await hideLogo(json("http://localhost", "POST", { targetType: "USER", targetId: 9 }), params("3"));
+    expect(res.status).toBe(201);
+    expect(hideUserAvatarForReport).toHaveBeenCalledWith(3, 9, { userId: 1, pseudo: "Admin" });
   });
 
   it.each<[string, number]>([
@@ -262,24 +291,62 @@ describe("routes du panneau — permission `moderation`", () => {
   ])("traduit le refus de masquage %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(hideTeamLogo).mockRejectedValue(new Error(code));
-    expect((await hideLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"))).status).toBe(status);
+    expect(
+      (await hideLogo(json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }), params("3"))).status,
+    ).toBe(status);
+  });
+
+  it("refuse une cible inconnue ou un identifiant invalide au masquage", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    expect((await hideLogo(json("http://localhost", "POST", {}), params("3"))).status).toBe(400);
+    expect(
+      (await hideLogo(json("http://localhost", "POST", { targetType: "TOURNAMENT", targetId: 4 }), params("3")))
+        .status,
+    ).toBe(400);
+    expect(hideTeamLogo).not.toHaveBeenCalled();
+    expect(hideUserAvatarForReport).not.toHaveBeenCalled();
   });
 
   it("supprime sans délai le logo d'une équipe visée, au titre du signalement", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(deleteTeamLogoForReport).mockResolvedValue({
       id: 31,
-      teamId: 4,
-      teamName: "Alpha",
+      targetType: "TEAM",
+      targetId: 4,
+      targetName: "Alpha",
       reportId: 3,
       status: "PURGED",
       hiddenAt: "2026-09-24T10:00:00.000Z",
       purgeAfter: "2027-03-23T10:00:00.000Z",
       closedAt: "2026-09-24T10:00:00.000Z",
     });
-    const res = await deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"));
+    const res = await deleteReportedLogo(
+      json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }),
+      params("3"),
+    );
     expect(res.status).toBe(201);
     expect(deleteTeamLogoForReport).toHaveBeenCalledWith(3, 4, { userId: 1, pseudo: "Admin" });
+  });
+
+  it("supprime sans délai l'avatar d'un joueur visé, au titre du signalement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(deleteUserAvatarForReport).mockResolvedValue({
+      id: 51,
+      targetType: "USER",
+      targetId: 9,
+      targetName: "Nova",
+      reportId: 3,
+      status: "PURGED",
+      hiddenAt: "2026-09-24T10:00:00.000Z",
+      purgeAfter: "2027-03-23T10:00:00.000Z",
+      closedAt: "2026-09-24T10:00:00.000Z",
+    });
+    const res = await deleteReportedLogo(
+      json("http://localhost", "POST", { targetType: "USER", targetId: 9 }),
+      params("3"),
+    );
+    expect(res.status).toBe(201);
+    expect(deleteUserAvatarForReport).toHaveBeenCalledWith(3, 9, { userId: 1, pseudo: "Admin" });
   });
 
   it.each<[string, number]>([
@@ -291,14 +358,20 @@ describe("routes du panneau — permission `moderation`", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(deleteTeamLogoForReport).mockRejectedValue(new Error(code));
     jest.spyOn(console, "error").mockImplementation(() => undefined);
-    const res = await deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("3"));
+    const res = await deleteReportedLogo(
+      json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }),
+      params("3"),
+    );
     expect(res.status).toBe(status);
   });
 
-  it("refuse une suppression sans équipe ou sur un identifiant invalide", async () => {
+  it("refuse une suppression sans cible ou sur un identifiant invalide", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     expect((await deleteReportedLogo(json("http://localhost", "POST", {}), params("3"))).status).toBe(400);
-    expect((await deleteReportedLogo(json("http://localhost", "POST", { teamId: 4 }), params("x"))).status).toBe(400);
+    expect(
+      (await deleteReportedLogo(json("http://localhost", "POST", { targetType: "TEAM", targetId: 4 }), params("x")))
+        .status,
+    ).toBe(400);
     expect(deleteTeamLogoForReport).not.toHaveBeenCalled();
   });
 
@@ -306,9 +379,11 @@ describe("routes du panneau — permission `moderation`", () => {
     ["QUARANTINE_NOT_FOUND", 404],
     ["QUARANTINE_CLOSED", 409],
     ["TEAM_HAS_NEW_LOGO", 409],
+    ["USER_HAS_NEW_AVATAR", 409],
+    ["AVATAR_NOT_MOVABLE", 409],
   ])("traduit le refus de rétablissement %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    jest.mocked(restoreTeamLogo).mockRejectedValue(new Error(code));
+    jest.mocked(restoreReportedImage).mockRejectedValue(new Error(code));
     expect((await restoreLogo(new Request("http://localhost"), params("30"))).status).toBe(status);
   });
 
@@ -357,6 +432,35 @@ describe("DELETE /api/admin/teams/[id]/logo", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(removeTeamLogoAsModerator).mockRejectedValue(new Error(code));
     expect((await removeTeamLogo(new Request("http://localhost"), params("4"))).status).toBe(status);
+  });
+});
+
+describe("DELETE /api/admin/users/[id]/avatar", () => {
+  it("retire l'avatar, efface le fichier après l'écriture et trace le geste", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(removeUserAvatarAsModerator).mockResolvedValue({
+      pseudo: "Nova",
+      removedAvatarUrl: "/api/uploads/avatars/9-a.webp",
+    });
+    jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
+
+    const res = await removeUserAvatar(new Request("http://localhost"), params("9"));
+    expect(res.status).toBe(200);
+    expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/9-a.webp");
+    // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), { id: 1, pseudo: "Admin" });
+    expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining("Nova"), expect.anything());
+    // Hors de tout signalement : le joueur est prévenu, sans lien de contestation.
+    expect(notifyUserAvatarRemoved).toHaveBeenCalledWith(9, null);
+  });
+
+  it.each<[string, number]>([
+    ["USER_NOT_FOUND", 404],
+    ["USER_HAS_NO_AVATAR", 409],
+  ])("traduit %s en %i", async (code, status) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    jest.mocked(removeUserAvatarAsModerator).mockRejectedValue(new Error(code));
+    expect((await removeUserAvatar(new Request("http://localhost"), params("9"))).status).toBe(status);
   });
 });
 

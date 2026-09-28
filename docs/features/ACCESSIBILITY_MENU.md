@@ -117,8 +117,16 @@ secondaires (`--ink-mute`, `--ink-dim`, jusqu'aux étiquettes 10 px du bloc
 Contact) prennent les valeurs du réglage « Contraste renforcé », toutes au-dessus
 de 4,5:1. On y cherche les mentions légales et l'accessibilité : il doit se lire
 sans réglage, quitte à être moins discret. Il pose aussi son **fond opaque**
-(`--cyber-bg`) pour que le contraste ne dépende pas du décor de la page, souligne
-ses liens et leur donne un anneau de focus explicite. C'est une **exception
+(`--cyber-bg`) pour que le contraste ne dépende pas du décor de la page, et
+donne à ses liens un anneau de focus explicite. Ses liens ne sont **pas**
+soulignés au repos : souligner chaque ligne de cinq colonnes rendait le bloc
+illisible, et une colonne de liens sous un intitulé se reconnaît par sa place
+(WCAG 1.4.1 ne vise que les liens pris dans un texte courant). Le soulignement
+revient au survol, au focus, et en permanence avec « Liens soulignés » — que le
+bouton « Réglages d'accessibilité » reprend dans sa feuille, la règle globale ne
+visant que `a[href]`. Ce bouton est aligné à gauche comme ses voisins (un
+bouton centre son texte, ce qui se voyait dès qu'il passait sur deux lignes).
+Le contraste renforcé permanent est une **exception
 voulue** à la règle « tout ce qui change l'apparence est désactivé par défaut » :
 le pied de page est justement l'endroit où l'on cherche le menu, il ne peut pas
 dépendre d'un réglage. Enfin son rembourrage du bas (92 px, 76 px sous 720 px,

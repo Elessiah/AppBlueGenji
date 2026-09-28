@@ -27,6 +27,7 @@
 
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -196,6 +197,18 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Si un signalement te vise, toi ou une équipe dont tu es membre, tu reçois un message privé Discord (si ton compte Discord est rattaché ou ton tag certifié). Tu lis ce qui est reproché — jamais qui l'a signalé — et tu peux le contester ; une contestation rouvre un signalement archivé.",
       `Un logo d'équipe signalé peut être masqué : il n'est plus en ligne, et il est supprimé définitivement au bout de ${LOGO_QUARANTINE_DAYS / 30} mois sans contestation, ou rétabli si la contestation aboutit. Tes coéquipiers et toi en êtes prévenus.`,
       "L'acceptation des conditions d'utilisation (à la création du compte, d'une équipe, ou en recevant la gestion d'une équipe) est enregistrée avec sa date et sa version ; elle figure dans l'export de tes données.",
+    ],
+  },
+  // Un usage nouveau de l'identifiant Discord (ou du tag certifié) : prévenir la
+  // gestion d'une équipe qu'un joueur demande à la rejoindre.
+  {
+    id: "2026-09-demande-adhesion-discord",
+    publishedAt: "2026-09-28",
+    title: "Demandes pour rejoindre ton équipe annoncées sur Discord",
+    summary: "Si tu gères une équipe, le bot te prévient en message privé quand un joueur demande à la rejoindre.",
+    details: [
+      "Le propriétaire et les managers d'une équipe reçoivent un message privé Discord à chaque demande d'adhésion, s'ils ont rattaché leur compte Discord ou certifié leur tag. Les autres membres ne reçoivent rien.",
+      `Le message ne nomme pas le joueur : il renvoie à la fiche de l'équipe, où la demande s'accepte ou se refuse. Une même personne ne fait écrire le bot à une même équipe qu'une fois toutes les ${TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS} heures.`,
     ],
   },
 ];

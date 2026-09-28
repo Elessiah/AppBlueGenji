@@ -73,22 +73,33 @@
   gap: 10px;
 }
 
-/* Liens soulignés : on les reconnaît sans compter sur la couleur, et le
-   bouton « Réglages d'accessibilité » se présente comme ses voisins.
-   Exception voulue à la règle « tout ce qui change l'apparence vit dans le
-   menu » (réglage `links`) : le pied de page doit se lire sans réglage,
-   c'est là qu'on cherche le menu. */
+/* Liens sans soulignement au repos : une colonne de liens sous un intitulé
+   se reconnaît par sa place, sans compter sur la couleur (WCAG 1.4.1 ne vise
+   que les liens pris dans un texte courant). Souligner chaque ligne rendait le
+   pied de page illisible. Le soulignement revient au survol et au focus, et
+   en permanence avec le réglage « Liens soulignés » du menu — la règle globale
+   `a[href]` n'atteignant pas le bouton, il la reprend ici.
+   Le bouton « Réglages d'accessibilité » se présente comme ses voisins :
+   aligné à gauche (un bouton centre son texte, visible dès qu'il passe sur
+   deux lignes dans une colonne étroite) et de même hauteur de ligne. */
 .columns a,
 .linkButton {
   color: var(--ink);
-  text-decoration: underline;
+  text-decoration: none;
   text-underline-offset: 3px;
   transition: color 0.18s ease;
 }
 
 .columns a:hover,
-.linkButton:hover {
+.columns a:focus-visible,
+.linkButton:hover,
+.linkButton:focus-visible {
   color: var(--blue-300);
+  text-decoration: underline;
+}
+
+:global(:root[data-a11y~="links"]) .linkButton {
+  text-decoration: underline;
 }
 
 /* Anneau explicite plutôt que celui du navigateur, qui varie d'un moteur à
@@ -101,10 +112,13 @@
 }
 
 .linkButton {
+  display: inline;
   padding: 0;
   border: 0;
   background: none;
   font: inherit;
+  line-height: inherit;
+  text-align: left;
   cursor: pointer;
 }
 

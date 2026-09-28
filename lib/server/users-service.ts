@@ -40,6 +40,7 @@ import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-iden
 import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
+import { cachedStats } from "@/lib/server/stats-cache";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { isLegacyDeletedPseudo, pickAnonymousPseudo, ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import type {
@@ -316,7 +317,14 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
   // comptés, défaites lues sur `loser_team_id` (que le moteur ne renseigne pas
   // toujours), fenêtres d'appartenance ignorées. Un seul chargeur, donc un seul
   // bilan par joueur, quelle que soit la page qui l'affiche.
-  const recordsByUserId = await loadPlayerRecords(userIds);
+  //
+  // Seul morceau lourd de la page — il recharge les matchs de toutes les
+  // équipes du site —, il est mutualisé (`stats-cache.ts`) : le bilan ne dépend
+  // pas du lecteur, contrairement aux lignes de compte ci-dessus, qui restent
+  // lues à chaque appel pour qu'un réglage de visibilité s'applique aussitôt.
+  // La clé ne porte pas la liste : un compte né pendant la fenêtre n'a encore
+  // aucun match, le repli à zéro ci-dessous dit déjà son bilan.
+  const recordsByUserId = await cachedStats("player-records", () => loadPlayerRecords(userIds));
 
   return baseUsers.map((user) => {
     const membership = membershipByUserId.get(user.id);
@@ -1846,6 +1854,51 @@ export async function updateUserAvatar(
 }
 
 /**
+ * Retrait de l'avatar d'un joueur par la modération (permission `moderation`),
+ * sans lien avec ce compte — même mécanique que
+ * `removeTeamLogoAsModerator` (`lib/server/teams-service.ts`) : le geste qui
+ * suit un signalement de droit d'auteur, ou une équipe (le logo d'une entrée
+ * solo n'est que l'avatar de son joueur).
+ *
+ * La ligne est relue **sous verrou** : un avatar téléversé à l'instant serait
+ * sinon retiré à la place de celui qu'on a vu. Le logo de l'entrée solo est
+ * resynchronisé **dans la même transaction** (`syncSoloEntryIdentityOn`) :
+ * sans elle, le fichier effacé par l'appelant resterait désigné par
+ * `bg_teams.logo_url`. Le fichier, lui, est effacé par l'appelant **après le
+ * commit** (un `unlink` ne se défait pas).
+ *
+ * @throws USER_NOT_FOUND
+ * @throws USER_HAS_NO_AVATAR
+ */
+export async function removeUserAvatarAsModerator(
+  userId: number,
+): Promise<{ pseudo: string; removedAvatarUrl: string }> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute<
+      (RowDataPacket & { pseudo: string; avatar_url: string | null; is_deleted: 0 | 1 })[]
+    >(`SELECT pseudo, avatar_url, is_deleted FROM bg_users WHERE id = ? FOR UPDATE`, [userId]);
+    // Un compte anonymisé n'a déjà plus d'avatar (`anonymizeAccount` le vide) ;
+    // le traiter comme introuvable évite de distinguer un cas qui ne se produit
+    // pas d'une ligne disparue.
+    if (rows.length === 0 || rows[0].is_deleted === 1) throw new Error("USER_NOT_FOUND");
+    const avatarUrl = rows[0].avatar_url;
+    if (!avatarUrl) throw new Error("USER_HAS_NO_AVATAR");
+    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
+    await syncSoloEntryIdentityOn(connection, userId);
+    await connection.commit();
+    return { pseudo: rows[0].pseudo, removedAvatarUrl: avatarUrl };
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/**
  * Un joueur est-il engagé dans un tournoi **encore vivant** ?
  *
  * C'est la condition qui ouvre son tag Discord à l'arbitrage
@@ -1951,6 +2004,7 @@ export async function getFullProfile(
 ): Promise<FullProfileResponse | null> {
   const viewerId = viewer.id;
   const viewerIsAdmin = Boolean(viewer.isAdmin);
+  const canModerate = can(viewer, "moderation");
   const db = await getDatabase();
 
   const [userRows] = await db.execute<UserRow[]>(
@@ -2087,6 +2141,11 @@ export async function getFullProfile(
     displayRoles: targetRoles,
     isSelf,
     viewerIsAdmin,
+    canModerate,
+    // Calculé sur la valeur **brute**, avant que `applyVisibility` ne la
+    // filtre selon `visible_avatar` — sans quoi un avatar masqué au lecteur
+    // masquerait aussi le bouton qui permet de le retirer.
+    moderationAvatarPresent: canModerate && Boolean(userRows[0].avatar_url),
   };
 }
 

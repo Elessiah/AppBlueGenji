@@ -55,8 +55,11 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
   const [saving, setSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const logoFileRef = useRef<HTMLInputElement | null>(null);
-  // Garantie des droits sur **ce** logo : cochée avant le choix du fichier, et
-  // décochée après chaque envoi — chaque image certifiée est la sienne.
+  // Le logo s'envoie en deux temps : choisir le fichier, puis certifier en
+  // détenir les droits et envoyer. La case n'existe qu'entre les deux — cochée
+  // avant le choix, elle restait affichée après l'envoi, où la décocher ne
+  // retirait rien : une garantie qui a l'air révocable et ne l'est pas.
+  const [pendingLogo, setPendingLogo] = useState<File | null>(null);
   const [logoRights, setLogoRights] = useState(false);
   const logoRightsRef = useRef<HTMLInputElement | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -109,7 +112,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
     }
   };
 
-  const onLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
+  const onLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -119,15 +122,32 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
       showError(teamErrorMessage(refusal));
       return;
     }
+    // Un nouveau fichier appelle une nouvelle garantie.
+    setPendingLogo(file);
+    setLogoRights(false);
+  };
+
+  const cancelPendingLogo = () => {
+    setPendingLogo(null);
+    setLogoRights(false);
+  };
+
+  const onLogoSend = async () => {
+    if (!pendingLogo) return;
+    if (!logoRights) {
+      showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
+      logoRightsRef.current?.focus();
+      return;
+    }
 
     setLogoBusy(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
-      formData.append(LOGO_RIGHTS_FIELD, logoRights ? "1" : "0");
+      formData.append("file", pendingLogo);
+      formData.append(LOGO_RIGHTS_FIELD, "1");
       await teamApi(`/api/teams/${team.team.id}/logo`, { method: "POST", body: formData }, "LOGO_UPLOAD_FAILED");
       showSuccess("Logo mis à jour.");
-      setLogoRights(false);
+      cancelPendingLogo();
       onChanged();
     } catch (e) {
       showError(teamErrorMessage((e as Error).message));
@@ -283,18 +303,11 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                 type="button"
                 className="btn"
                 disabled={logoBusy}
-                onClick={() => {
-                  if (!logoRights) {
-                    showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
-                    logoRightsRef.current?.focus();
-                    return;
-                  }
-                  logoFileRef.current?.click();
-                }}
+                onClick={() => logoFileRef.current?.click()}
               >
-                {logoBusy ? "Envoi…" : team.team.logoUrl ? "Changer le logo" : "Ajouter un logo"}
+                {pendingLogo ? "Choisir un autre fichier" : team.team.logoUrl ? "Changer le logo" : "Ajouter un logo"}
               </button>
-              {team.team.logoUrl ? (
+              {team.team.logoUrl && !pendingLogo ? (
                 <button type="button" className="btn ghost" disabled={logoBusy} onClick={onLogoDelete}>
                   Retirer le logo
                 </button>
@@ -302,20 +315,36 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
             </div>
           </div>
           <p className={styles.help}>PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo au maximum.</p>
-          <label className="consent-check">
-            <input
-              ref={logoRightsRef}
-              type="checkbox"
-              checked={logoRights}
-              onChange={(e) => setLogoRights(e.target.checked)}
-            />
-            <span>
-              {LOGO_RIGHTS_LABEL}{" "}
-              <Link href={LOGO_RIGHTS_TERMS_ANCHOR} target="_blank" rel="noreferrer">
-                En savoir plus
-              </Link>
-            </span>
-          </label>
+          {pendingLogo ? (
+            <>
+              <p className={styles.help}>
+                Fichier choisi : <strong>{pendingLogo.name}</strong>
+              </p>
+              <label className="consent-check">
+                <input
+                  ref={logoRightsRef}
+                  type="checkbox"
+                  checked={logoRights}
+                  disabled={logoBusy}
+                  onChange={(e) => setLogoRights(e.target.checked)}
+                />
+                <span>
+                  {LOGO_RIGHTS_LABEL}{" "}
+                  <Link href={LOGO_RIGHTS_TERMS_ANCHOR} target="_blank" rel="noreferrer">
+                    En savoir plus
+                  </Link>
+                </span>
+              </label>
+              <div className={styles.actionsRow}>
+                <button type="button" className="btn" disabled={logoBusy} onClick={onLogoSend}>
+                  {logoBusy ? "Envoi…" : "Envoyer le logo"}
+                </button>
+                <button type="button" className="btn ghost" disabled={logoBusy} onClick={cancelPendingLogo}>
+                  Annuler
+                </button>
+              </div>
+            </>
+          ) : null}
         </div>
 
         {ownsIdentity ? (

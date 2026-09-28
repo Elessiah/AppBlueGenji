@@ -69,3 +69,25 @@
   line-height: 1.6;
   color: var(--text-1);
 }
+
+/* Bandeau de modération (retrait d'avatar) : même gabarit que `.moderationBar`
+   de la fiche d'équipe (`app/(secured)/equipes/[id]/team.module.css`) — les
+   deux fiches partagent le même geste, elles partagent son habillage. */
+.moderationBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(245, 165, 36, 0.35);
+  border-radius: var(--r-cy-md, 10px);
+  background: rgba(245, 165, 36, 0.06);
+}
+
+.moderationLabel {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--amber, #f5a524);
+}

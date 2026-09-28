@@ -143,10 +143,23 @@ describe("PublicFooter — accessibilité", () => {
     expect(html).toMatch(/^<footer class="[^"]*\ba11y-always-contrast\b[^"]*">/);
   });
 
-  it("pose son propre fond opaque et souligne ses liens", () => {
+  it("pose son propre fond opaque", () => {
     const css = readSource("components/cyber/landing/PublicFooter.module.css");
     expect(css).toMatch(/\.root \{[^}]*background: var\(--cyber-bg\);/);
-    expect(css).toMatch(/\.columns a,\s*\.linkButton \{[^}]*text-decoration: underline;/);
+  });
+
+  it("ne souligne ses liens qu'au survol, au focus ou avec le réglage « Liens soulignés »", () => {
+    const css = readSource("components/cyber/landing/PublicFooter.module.css");
+    expect(css).toMatch(/\.columns a,\s*\.linkButton \{[^}]*text-decoration: none;/);
+    expect(css).toMatch(/\.linkButton:focus-visible \{[^}]*text-decoration: underline;/);
+    expect(css).toMatch(/:global\(:root\[data-a11y~="links"\]\) \.linkButton \{\s*text-decoration: underline;/);
+  });
+
+  it("aligne le bouton « Réglages d'accessibilité » sur les liens voisins", () => {
+    const css = readSource("components/cyber/landing/PublicFooter.module.css");
+    const button = css.match(/\.linkButton \{\s*display: inline;[^}]*\}/)?.[0] ?? "";
+    expect(button).toContain("text-align: left");
+    expect(button).toContain("line-height: inherit");
   });
 
   it("dégage sa dernière ligne du bouton flottant d'accessibilité", () => {

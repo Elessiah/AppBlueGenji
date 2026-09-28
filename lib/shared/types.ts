@@ -805,6 +805,21 @@ export type FullProfileResponse = {
   displayRoles: PlatformRole[];
   // Vrai lorsque le viewer est administrateur (débloque la gestion des rôles).
   viewerIsAdmin: boolean;
+  /**
+   * Le lecteur a la permission `moderation` : il peut retirer l'avatar sans
+   * lien avec ce compte — même geste que `TeamDetailResponse.canModerate`.
+   */
+  canModerate: boolean;
+  /**
+   * Le compte a un avatar **réel**, indépendamment du réglage de visibilité —
+   * `profile.avatarUrl` est filtré par `visible_avatar` et rend `null` pour un
+   * avatar masqué à ce lecteur, ce qui masquerait aussi le bouton de retrait à
+   * la modération sur l'avatar même qu'un signalement viserait. Toujours
+   * `false` hors modération (`canModerate`) : une case qui ne vaudrait jamais
+   * `true` pour un visiteur ordinaire ne lui apprend rien qu'il ne pourrait
+   * déjà déduire.
+   */
+  moderationAvatarPresent: boolean;
 };
 
 /**

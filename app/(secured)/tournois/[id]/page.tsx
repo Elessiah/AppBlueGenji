@@ -19,6 +19,7 @@ import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
 import { MatchFormatProvider } from "./_lib/match-format-context";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
+import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { canOpenPlayerScoreDialog } from "@/lib/shared/player-score-report";
 import { isPreLaunchState } from "@/lib/shared/seeding";
 import {
@@ -537,7 +538,7 @@ export default function TournamentDetailPage() {
           c'est justement quand le site décroche qu'il faut pouvoir joindre un
           arbitre. */}
       <IssueReportProvider
-        canReport={detail.myTeamId !== null && !frozen}
+        canReport={isViewerEntrant(detail.myTeamId, detail.registrations) && !frozen}
         openReport={openIssueReport}
       >
       <PlayerScoreProvider

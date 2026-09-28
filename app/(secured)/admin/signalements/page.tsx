@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import {
   REPORT_CATEGORY_DEFINITIONS,
   type ReportAction,
+  type ReportTargetRef,
   type ReportView,
 } from "@/lib/shared/content-reports";
 import {
@@ -138,46 +139,61 @@ function ReportsPanel() {
     );
   };
 
-  const onHideLogo = (teamId: number) => {
+  // « Logo » pour une équipe, « avatar » pour un joueur, et la personne
+  // prévenue avec « l'équipe » (un roster) ou « le joueur » (une personne).
+  const imageNoun = (type: ReportTargetRef["type"]) => (type === "USER" ? "Avatar" : "Logo");
+  const concernedNoun = (type: ReportTargetRef["type"]) => (type === "USER" ? "Le joueur est prévenu" : "L'équipe est prévenue");
+
+  const onHideLogo = (target: ReportTargetRef) => {
     if (!selected) return;
     void run(
       () =>
         adminFetch(
           `/api/admin/reports/${selected.id}/logo-quarantine`,
-          jsonBody("POST", { teamId }),
+          jsonBody("POST", { targetType: target.type, targetId: target.id }),
           "LOGO_HIDE_FAILED",
         ),
-      "Logo masqué. L'équipe est prévenue et peut contester.",
+      `${imageNoun(target.type)} masqué. ${concernedNoun(target.type)} et peut contester.`,
     );
   };
 
   // Depuis un dossier, la suppression passe par le signalement : elle y reste
-  // inscrite, et l'équipe est prévenue avec le lien pour contester.
-  const onDeleteLogo = (teamId: number) => {
+  // inscrite, et la personne concernée est prévenue avec le lien pour contester.
+  const onDeleteLogo = (target: ReportTargetRef) => {
     if (!selected) return;
     void run(
       () =>
         adminFetch(
           `/api/admin/reports/${selected.id}/logo-removal`,
-          jsonBody("POST", { teamId }),
+          jsonBody("POST", { targetType: target.type, targetId: target.id }),
           "TEAM_LOGO_REMOVE_FAILED",
         ),
-      "Logo supprimé définitivement. L'équipe est prévenue et peut contester.",
+      `${imageNoun(target.type)} supprimé définitivement. ${concernedNoun(target.type)} et peut contester.`,
     );
   };
 
-  const onRestore = (quarantineId: number) =>
+  // Le type de la cible ne voyage pas avec l'identifiant de quarantaine : on le
+  // relit sur le dossier ouvert pour choisir le bon mot dans le message.
+  const quarantineTargetType = (quarantineId: number): ReportTargetRef["type"] =>
+    reports?.flatMap((report) => report.quarantines).find((quarantine) => quarantine.id === quarantineId)
+      ?.targetType ?? "TEAM";
+
+  const onRestore = (quarantineId: number) => {
+    const type = quarantineTargetType(quarantineId);
     void run(
       () =>
         adminFetch(`/api/admin/logo-quarantines/${quarantineId}/restore`, { method: "POST" }, "LOGO_RESTORE_FAILED"),
-      "Logo rétabli. L'équipe est prévenue.",
+      `${imageNoun(type)} rétabli. ${concernedNoun(type)}.`,
     );
+  };
 
-  const onPurge = (quarantineId: number) =>
+  const onPurge = (quarantineId: number) => {
+    const type = quarantineTargetType(quarantineId);
     void run(
       () => adminFetch(`/api/admin/logo-quarantines/${quarantineId}`, { method: "DELETE" }, "LOGO_PURGE_FAILED"),
-      "Logo supprimé définitivement. L'équipe est prévenue.",
+      `${imageNoun(type)} supprimé définitivement. ${concernedNoun(type)}.`,
     );
+  };
 
   return (
     <section className={`container ${styles.page}`}>

@@ -22,6 +22,8 @@ const ENTRANT = [
 
 const MATCH = [
   {
+    team1_id: 101,
+    team2_id: 202,
     bracket: "UPPER",
     round_number: 2,
     team1_name: "Les Renards",
@@ -76,7 +78,16 @@ describe("reportTournamentIssue", () => {
   it("n'écrit que « un joueur » en tournoi individuel, auteur comme adversaires", async () => {
     await mockDb([
       [{ tournament_name: "Solo Cup", participant_type: "SOLO", entrant_name: "Kiro" }],
-      [{ bracket: "UPPER", round_number: 1, team1_name: "Kiro", team2_name: "Nova" }],
+      [
+        {
+          team1_id: 303,
+          team2_id: 101,
+          bracket: "UPPER",
+          round_number: 1,
+          team1_name: "Nova",
+          team2_name: "Kiro",
+        },
+      ],
     ]);
 
     await reportTournamentIssue(7, 42, VALID_MESSAGE, 31);
@@ -141,6 +152,31 @@ describe("reportTournamentIssue", () => {
       "MATCH_NOT_FOUND",
     );
     expect(pushRefereeAlert).not.toHaveBeenCalled();
+  });
+
+  it("refuse un engagé qui ne joue pas la manche visée", async () => {
+    await mockDb([ENTRANT, [{ ...MATCH[0], team1_id: 303, team2_id: 404 }]]);
+
+    await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, 31)).rejects.toThrow(
+      "NOT_MATCH_PARTICIPANT",
+    );
+    expect(pushRefereeAlert).not.toHaveBeenCalled();
+  });
+
+  it("refuse une manche dont un seul créneau est garni, par un autre engagé", async () => {
+    await mockDb([ENTRANT, [{ ...MATCH[0], team1_id: 303, team2_id: null }]]);
+
+    await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, 31)).rejects.toThrow(
+      "NOT_MATCH_PARTICIPANT",
+    );
+  });
+
+  it("accepte l'engagé placé en second sur la manche", async () => {
+    await mockDb([ENTRANT, [{ ...MATCH[0], team1_id: 202, team2_id: 101 }]]);
+
+    await expect(reportTournamentIssue(7, 42, VALID_MESSAGE, 31)).resolves.toEqual({
+      notifiedReferees: 3,
+    });
   });
 
   it("remonte l'injoignabilité du bot plutôt que de rassurer à tort", async () => {

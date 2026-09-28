@@ -221,6 +221,21 @@ Une fiche joueur en déclenche trois (appartenances, matchs, inscriptions), tout
 bornées à ses équipes. `getPlayerEntityStats` court-circuite tout dès qu'un
 joueur n'a aucune équipe.
 
+Ces lectures sont **mutualisées** (`lib/server/stats-cache.ts`, vol unique,
+30 s) : une fiche par équipe ou par joueur, et le bilan de l'annuaire entier.
+Rien ne les partageait, si bien que F5 maintenu sur `/joueurs` relançait à
+chaque chargement la lecture des matchs de toutes les équipes du site. Tout
+score les fait oublier (`tournaments/notifications.ts`, comme le classement) ;
+la durée de vie ne borne donc que ce qui bouge sans écriture de tournoi —
+l'arrivée ou le départ d'un joueur, qui déplace ses fenêtres d'appartenance.
+Seul ce qui est **dérivé des matchs** est mis en cache : les lignes de compte
+de l'annuaire, dont la visibilité dépend du lecteur, sont relues à chaque appel.
+L'objet rendu est partagé entre les lecteurs, aucun appelant ne le modifie.
+
+Les quatre routes qui les servent (`/api/players`, `/api/teams` et la fiche de
+chacun) partagent en outre un plafond par compte, `DIRECTORY_READ_RULE`
+(60 par minute, `lib/server/api-guard.ts`).
+
 ## Tests
 
 - `tests/lib/shared/stats.test.ts` — agrégation pure : séries, forme,

@@ -1,6 +1,6 @@
 # Messages Discord automatisés
 
-Le site écrit aux joueurs sur Discord, par le canal interne du bot. Deux usages,
+Le site écrit aux joueurs sur Discord, par le canal interne du bot. Trois usages,
 une seule mécanique : **le site rédige, le bot distribue**.
 
 - **Rappels de match** — une semaine, 24 h puis 1 h avant le coup d'envoi d'une
@@ -8,6 +8,9 @@ une seule mécanique : **le site rédige, le bot distribue**.
 - **Signalement d'un problème** — un inscrit alerte le staff depuis la page du
   tournoi ou depuis un match ; le bot le relaie au canal de logs et au rôle
   arbitre.
+- **Demande d'adhésion** — le propriétaire et les managers d'une équipe sont
+  prévenus en message privé qu'un joueur demande à la rejoindre ; voir
+  `docs/features/TEAM_JOIN_REQUEST_NOTIFICATION.md`.
 
 Le même canal « rôle arbitre » porte aussi les alertes que le **moteur** produit
 de lui-même — conflit de score, report expiré non tranché : le signalement en est
@@ -153,12 +156,22 @@ plateaux. Le joueur bloqué doit pouvoir alerter depuis la page où il est déj�
 - **Dans l'en-tête du tournoi** — portée « tournoi entier », à toute heure du
   tournoi : un problème d'inscription se signale avant le coup d'envoi comme un
   litige de score se signale après.
-- **Sur chaque match** dont les deux adversaires sont connus.
+- **Sur le match du lecteur**, et sur lui seul, une fois ses deux adversaires
+  connus.
 
 **Réservé aux engagés.** Ce n'est pas un formulaire de contact : le bouton n'est
-rendu que si `myTeamId` n'est pas `null`, et le serveur **revérifie**
-l'inscription — sans quoi n'importe quel visiteur pourrait faire sonner le
-téléphone des arbitres. La résolution de l'engagé est la même que partout
+rendu que si l'engagé du lecteur figure **parmi les inscrites**
+(`isViewerEntrant`, `lib/shared/match-card-viewer.ts`) — `myTeamId` seul ne
+suffit pas, c'est l'équipe active du lecteur, inscrite ou non —, et le serveur
+**revérifie** l'inscription (`NOT_REGISTERED` → 403) — sans quoi n'importe quel
+visiteur pourrait faire sonner le téléphone des arbitres.
+
+**Une manche n'est signalée que par qui la joue.** Un inscrit qui suit le
+plateau d'à côté n'a rien à en dire à l'arbitrage — il garde le bouton de
+l'en-tête pour tout ce qui concerne le tournoi. La carte ne porte le bouton
+que pour le lecteur engagé dans la rencontre (`canReportOwnMatch`), et le
+serveur refuse un `matchId` dont aucun des deux créneaux n'est l'engagé de
+l'auteur (`NOT_MATCH_PARTICIPANT` → 403). La résolution de l'engagé est la même que partout
 ailleurs (`resolveUserEntrantTeamId`) : équipe active en tournoi par équipes,
 entrée solo en tournoi individuel.
 

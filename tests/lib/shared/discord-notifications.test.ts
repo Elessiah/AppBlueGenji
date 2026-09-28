@@ -206,6 +206,13 @@ describe("matchRoundLabel", () => {
   it("retombe sur la manche pour un plateau inconnu", () => {
     expect(matchRoundLabel("AUTRE", 5)).toBe("Manche 5");
   });
+
+  it("numérote l'arbre final de BG Survie depuis 1, pas depuis 1000", () => {
+    expect(matchRoundLabel("UPPER", 999)).toBe("Manche 999");
+    expect(matchRoundLabel("UPPER", 1000)).toBe("Play-offs · tour 1");
+    expect(matchRoundLabel("UPPER", 1002)).toBe("Play-offs · tour 3");
+    expect(matchRoundLabel("THIRD_PLACE", 1002)).toBe("Petite finale");
+  });
 });
 
 describe("normalizeIssueReportMessage", () => {

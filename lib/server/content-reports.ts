@@ -24,7 +24,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
 import { toIso } from "@/lib/server/serialization";
 import { localUploadUrl } from "@/lib/shared/uploads";
-import { visibleAvatarUrl } from "@/lib/shared/avatar";
+import { localAvatarUrl, visibleAvatarUrl } from "@/lib/shared/avatar";
 import { canViewTournament, isTournamentPublished } from "@/lib/shared/tournament-visibility";
 import { displayTeamTag } from "@/lib/shared/team-tag";
 import type { PersonalDataExport } from "@/lib/shared/types";
@@ -64,6 +64,15 @@ export interface ReportViewer {
   userId: number | null;
   /** Permission `tournaments` : un tournoi non publié lui est désignable. */
   managesTournaments: boolean;
+  /**
+   * Permission `moderation` : l'aperçu d'un avatar visé lui est montré même
+   * masqué au public (`visible_avatar = 0`) — sans quoi un joueur qui masque
+   * son avatar masquait du même geste le bouton qui permet de le retirer sur
+   * signalement. `false` par défaut : ce n'est vrai que du panneau
+   * d'administration (`listReports`), jamais du sélecteur de cibles ouvert à
+   * tout membre qui rédige un signalement.
+   */
+  isModerator?: boolean;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -92,13 +101,13 @@ type TournamentTargetRow = RowDataPacket & {
   start_visibility_at: Date | string;
 };
 
-function userOption(row: UserTargetRow): ReportTargetOption {
+function userOption(row: UserTargetRow, isModerator: boolean): ReportTargetOption {
   return {
     type: "USER",
     id: Number(row.id),
     label: row.pseudo,
     detail: null,
-    imageUrl: visibleAvatarUrl(row.avatar_url, row.visible_avatar === 1),
+    imageUrl: isModerator ? localAvatarUrl(row.avatar_url) : visibleAvatarUrl(row.avatar_url, row.visible_avatar === 1),
   };
 }
 
@@ -176,7 +185,7 @@ export async function searchReportTargets(
          ORDER BY pseudo LIMIT ${limit}`,
         [pattern],
       );
-      return rows.map(userOption);
+      return rows.map((row) => userOption(row, false));
     }
     case "TEAM": {
       const [rows] = await db.execute<TeamTargetRow[]>(
@@ -224,7 +233,7 @@ export async function resolveReportTargets(
        WHERE ${TARGET_FILTERS.USER} AND id IN (${placeholders(userIds)})`,
       userIds,
     );
-    found.push(...rows.map(userOption));
+    found.push(...rows.map((row) => userOption(row, viewer.isModerator ?? false)));
   }
   const teamIds = idsOf("TEAM");
   if (teamIds.length > 0) {
@@ -655,10 +664,12 @@ export async function getConcernedReport(reportId: number, viewerUserId: number)
     description: row.description,
     createdAt: toIso(row.created_at) ?? new Date().toISOString(),
     targets: mine.map((target) => toTargetView(target, live)),
-    // Seulement les logos de **ses** équipes : ceux des autres équipes visées
-    // ne le regardent pas.
-    quarantines: (await listQuarantinesForReports([reportId])).filter((quarantine) =>
-      teamIds.includes(quarantine.teamId),
+    // Seulement ce qui le concerne directement : son propre avatar, ou le logo
+    // de **ses** équipes — jamais celui des autres équipes ou joueurs visés.
+    quarantines: (await listQuarantinesForReports([reportId])).filter(
+      (quarantine) =>
+        (quarantine.targetType === "TEAM" && teamIds.includes(quarantine.targetId)) ||
+        (quarantine.targetType === "USER" && quarantine.targetId === viewerUserId),
     ),
     myContests: contests.map((contest) => ({
       id: Number(contest.id),
@@ -784,10 +795,12 @@ export async function listReports(): Promise<ReportView[]> {
     ids,
   );
 
-  // Le panneau voit tout ce qui existe encore : un tournoi non publié compris.
+  // Le panneau voit tout ce qui existe encore : un tournoi non publié compris,
+  // un avatar masqué au public aussi — sans quoi le bouton qui le retire sur
+  // signalement disparaîtrait avec sa visibilité.
   const live = await resolveReportTargets(
     targetRows.map((row) => ({ type: row.target_type, id: Number(row.target_id) })),
-    { userId: null, managesTournaments: true },
+    { userId: null, managesTournaments: true, isModerator: true },
   );
   const liveByKey = new Map(live.map((option) => [`${option.type}:${option.id}`, option]));
 
