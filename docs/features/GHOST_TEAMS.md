@@ -58,8 +58,11 @@ création (staff)  →  inscription à un tournoi  →  reprise par un joueur (q
    (`USER_ALREADY_IN_TEAM`), si le compte est anonymisé
    (`bg_users.is_deleted = 1` → `USER_NOT_FOUND`), si l'équipe est réelle
    (`NOT_A_GHOST_TEAM`) ou dissoute (`TEAM_ALREADY_DELETED`), ou si une reprise
-   lui est déjà proposée (`ALREADY_INVITED`) ; à l'acceptation, si un autre
-   joueur a repris la fantôme entre-temps (`NOT_A_GHOST_TEAM`).
+   lui est déjà proposée (`ALREADY_INVITED` — contrôle et insertion sous le
+   verrou de la fantôme, pris en première instruction : aucun index n'interdit
+   deux invitations identiques, et deux propositions simultanées passaient
+   toutes deux) ; à l'acceptation, si un autre joueur a repris la fantôme
+   entre-temps (`NOT_A_GHOST_TEAM` → 409).
 
    **Pourquoi une invitation.** L'attribution était directe : un arbitre faisait
    d'un joueur sans équipe l'`OWNER` d'une fantôme sans qu'il ait rien demandé.

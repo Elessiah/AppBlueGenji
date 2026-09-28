@@ -86,8 +86,7 @@ describe("claimGhostTeam", () => {
 
   it("propose l'équipe par une invitation portant OWNER, sans rien attribuer", async () => {
     const execute = claimableReads();
-    const connectionExecute = jest.fn<SqlQuery>();
-    const connection = await mockDb(execute, connectionExecute);
+    const connection = await mockDb(execute);
 
     await expect(claimGhostTeam(3, 9, 1)).resolves.toBe("INVITED");
 
@@ -102,8 +101,29 @@ describe("claimGhostTeam", () => {
     const writes = execute.mock.calls.map(([sql]) => String(sql));
     expect(writes.some((sql) => /INSERT INTO bg_team_members/.test(sql))).toBe(false);
     expect(writes.some((sql) => /UPDATE bg_teams/.test(sql))).toBe(false);
-    expect(connectionExecute).not.toHaveBeenCalled();
-    expect(connection.beginTransaction).not.toHaveBeenCalled();
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(connection.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("verrouille la fantôme en toute première instruction : deux propositions simultanées se mettent en file", async () => {
+    const execute = claimableReads();
+    const connection = await mockDb(execute);
+
+    await claimGhostTeam(3, 9, 1);
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
+    const [first] = execute.mock.calls[0] as [string];
+    expect(first).toMatch(/FROM bg_teams WHERE id = \? FOR UPDATE/);
+  });
+
+  it("défait la transaction sur un refus", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
+    const connection = await mockDb(execute);
+
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("TEAM_NOT_FOUND");
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalledTimes(1);
   });
 
   it("refuse une équipe inconnue", async () => {

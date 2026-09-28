@@ -83,47 +83,65 @@ export async function claimGhostTeam(
   createdBy: number,
 ): Promise<"INVITED"> {
   const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
 
-  const [teams] = await db.execute<(RowDataPacket & { is_ghost: 0 | 1; deleted_at: Date | null })[]>(
-    `SELECT is_ghost, deleted_at FROM bg_teams WHERE id = ? LIMIT 1`,
-    [teamId],
-  );
-  if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
-  if (teams[0].deleted_at !== null) throw new Error("TEAM_ALREADY_DELETED");
-  if (teams[0].is_ghost !== 1) throw new Error("NOT_A_GHOST_TEAM");
+    // Verrou de la fantôme en **toute première instruction** : le contrôle
+    // « aucune proposition en attente » puis l'insertion sont séparés par un
+    // `await`, et aucun index n'interdit deux invitations identiques — deux
+    // propositions simultanées (deux arbitres, une requête rejouée) passeraient
+    // toutes deux. Le verrou les met en file ; c'est aussi celui que prend
+    // l'acceptation d'une reprise (`acceptIntoTeam`), si bien qu'une
+    // proposition ne peut pas naître sur une fantôme qu'on est en train de
+    // reprendre.
+    const [teams] = await connection.execute<
+      (RowDataPacket & { is_ghost: 0 | 1; deleted_at: Date | null })[]
+    >(`SELECT is_ghost, deleted_at FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
+    if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
+    if (teams[0].deleted_at !== null) throw new Error("TEAM_ALREADY_DELETED");
+    if (teams[0].is_ghost !== 1) throw new Error("NOT_A_GHOST_TEAM");
 
-  const [users] = await db.execute<(RowDataPacket & { id: number })[]>(
-    // `bg_users` marque l'anonymisation avec `is_deleted` (pas `deleted_at`,
-    // qui n'existe que sur `bg_teams`) : un compte anonymisé ne peut pas
-    // récupérer une équipe fantôme.
-    `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
-    [newOwnerUserId],
-  );
-  if (users.length === 0) throw new Error("USER_NOT_FOUND");
+    const [users] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      // `bg_users` marque l'anonymisation avec `is_deleted` (pas `deleted_at`,
+      // qui n'existe que sur `bg_teams`) : un compte anonymisé ne peut pas
+      // récupérer une équipe fantôme.
+      `SELECT id FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+      [newOwnerUserId],
+    );
+    if (users.length === 0) throw new Error("USER_NOT_FOUND");
 
-  // Contrôle d'agrément, pour un refus lisible dès la proposition : c'est
-  // l'acceptation (`acceptIntoTeam`) qui tient l'invariant « une seule équipe
-  // active », sous le verrou du joueur.
-  const [existingMembership] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_team_members WHERE user_id = ? AND left_at IS NULL LIMIT 1`,
-    [newOwnerUserId],
-  );
-  if (existingMembership.length > 0) throw new Error("USER_ALREADY_IN_TEAM");
+    // Contrôle d'agrément, pour un refus lisible dès la proposition : c'est
+    // l'acceptation (`acceptIntoTeam`) qui tient l'invariant « une seule équipe
+    // active », sous le verrou du joueur.
+    const [existingMembership] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_team_members WHERE user_id = ? AND left_at IS NULL LIMIT 1`,
+      [newOwnerUserId],
+    );
+    if (existingMembership.length > 0) throw new Error("USER_ALREADY_IN_TEAM");
 
-  const [pending] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_team_invitations
-     WHERE team_id = ? AND user_id = ? AND status = 'PENDING'
-     LIMIT 1`,
-    [teamId, newOwnerUserId],
-  );
-  if (pending.length > 0) throw new Error("ALREADY_INVITED");
+    const [pending] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_team_invitations
+       WHERE team_id = ? AND user_id = ? AND status = 'PENDING'
+       LIMIT 1`,
+      [teamId, newOwnerUserId],
+    );
+    if (pending.length > 0) throw new Error("ALREADY_INVITED");
 
-  await db.execute(
-    `INSERT INTO bg_team_invitations (team_id, user_id, created_by, kind, roles_json, status)
-     VALUES (?, ?, ?, 'INVITE', ?, 'PENDING')`,
-    [teamId, newOwnerUserId, createdBy, JSON.stringify(["OWNER"])],
-  );
-  return "INVITED";
+    await connection.execute(
+      `INSERT INTO bg_team_invitations (team_id, user_id, created_by, kind, roles_json, status)
+       VALUES (?, ?, ?, 'INVITE', ?, 'PENDING')`,
+      [teamId, newOwnerUserId, createdBy, JSON.stringify(["OWNER"])],
+    );
+
+    await connection.commit();
+    return "INVITED";
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
 }
 
 /**
