@@ -43,10 +43,17 @@ pouvoir sur la plateforme.
   (public sur n'importe quel serveur) pouvait énumérer le million de
   combinaisons jusqu'à ouvrir sa session.
 
-  Deux bornes tiennent désormais le secret, **toutes deux en base** :
+  Trois bornes tiennent désormais le secret, **toutes en base** :
   `MAX_DISCORD_CODE_ATTEMPTS` (5 essais par code, après quoi il est **brûlé**,
-  correct ou non) et `MAX_DISCORD_CODES_PER_WINDOW` (5 codes par compte et par
-  quart d'heure).
+  correct ou non), `MAX_DISCORD_CODES_PER_WINDOW` (5 codes par compte et par
+  quart d'heure) et `MAX_DISCORD_CODES_PER_DAY` (10 codes par compte et par
+  jour, refus `TOO_MANY_CODE_REQUESTS_TODAY`). Cette dernière tient la force
+  brute **lente** : à l'échelle du seul quart d'heure, vingt-cinq essais rejoués
+  sans relâche prenaient la session d'un joueur nommé avec ≈ 60 % de chances
+  sur un an ; cinquante essais par jour ramènent ce risque à ≈ 2 %, au prix de
+  dix messages privés quotidiens chez la victime. La rétention des codes
+  expirés n'est jamais plus courte que cette journée, sans quoi la purge
+  effacerait ce que le plafond doit compter.
 
   **Les deux se réservent, elles ne se relisent pas.** L'essai tient en une seule
   instruction — `UPDATE … SET attempts = attempts + 1 WHERE id = ? AND
@@ -81,10 +88,10 @@ pouvoir sur la plateforme.
   **L'axe d'un plafond dit qui il refuse.** Celui de la *demande* porte sur le
   compte visé, à dessein : ce qu'il protège est le téléphone de la victime, que
   chaque appel fait vibrer. Celui de la *vérification* a été posé sur le même
-  axe, et s'est retourné contre elle — la route est anonyme, l'identifiant
-  Discord d'un joueur se lit dans la réponse de la demande, et dix codes bidon
-  fermaient sa connexion pour un quart d'heure. Sa clé est donc le **couple
-  (compte visé, IP appelante)** : l'attaquant ne plafonne que lui-même, et le
+  axe, et s'est retourné contre elle — la route est anonyme, et dix codes
+  bidon fermaient la connexion d'un joueur nommé pour un quart d'heure. Sa clé
+  est donc le **couple (défi visé, IP appelante)** : l'attaquant ne plafonne que
+  lui-même, et le
   décompte des essais reste, lui, porté par le code en base — changer d'IP n'en
   donne pas un de plus.
 
@@ -96,6 +103,33 @@ pouvoir sur la plateforme.
   demande précédente, refusé comme invalide en lui brûlant ses cinq essais. Rien
   n'est invalidé *avant* l'envoi, pour la même raison inverse : l'ancien tué et
   le neuf jamais reçu laissaient le joueur sans rien du tout.
+
+  **La demande de code n'est pas un oracle.** Elle rendait, à tout appelant
+  anonyme et pour n'importe quel pseudo, l'identifiant Discord résolu et
+  `isNewAccount` — c'est-à-dire si la personne a un compte BlueGenji —, alors
+  que l'annuaire est derrière une connexion et que le flux public du bot masque
+  ces identifiants comme des coordonnées. Elle ne rend plus que le **numéro du
+  défi**, qui ne désigne personne, sous la même forme que le compte existe ou
+  non. La vérification désigne le défi par ce numéro et relit l'identifiant
+  **de la ligne** une fois le code juste (`consumeDiscordLoginChallenge`) ; un
+  défi que suit un défi plus récent pour le même compte est refusé, comme la
+  lecture par compte ne le verrait jamais.
+
+- **Les routes qui ouvrent ou ferment une session vérifient leur provenance.**
+  `SameSite=Lax` protège les routes authentifiées, pas celles qui *posent* la
+  session : elles n'ont besoin d'aucun cookie pour agir. Un formulaire
+  `enctype=text/plain` d'un site tiers, dont le nom de champ reconstitue un
+  JSON, connectait la victime au compte de l'attaquant (jeton One Tap ou code
+  Discord de l'attaquant), ou la déconnectait. `rejectCrossSiteRequest`
+  (`lib/server/request-origin.ts`) refuse en **403** une provenance étrangère
+  (`Sec-Fetch-Site`, sinon `Origin`) et en **415** un corps qui n'est pas
+  déclaré `application/json`, en première instruction des quatre `POST` de
+  `/api/auth/*`.
+
+- **Une réponse d'erreur ne porte qu'un code.** `fail` ne publie que ce qui a
+  la forme d'un code (`lib/shared/api-error-code.ts`) : un message d'exception
+  imprévu — mysql2, réseau, lecture du corps — devient `INTERNAL_ERROR` ou
+  `INVALID_REQUEST`, et n'est lisible que dans les journaux du serveur.
 
 - **Trois portes, et aucune ne se revendique par une adresse.** Le compte n'a
   pas de mot de passe : il s'ouvre par une identité OAuth rattachée — `google_sub`,
