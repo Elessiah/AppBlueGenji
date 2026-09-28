@@ -395,3 +395,8 @@
   font-size: 12px;
   white-space: nowrap;
 }
+
+.inviteOwnership {
+  color: var(--text-1);
+  font-size: 12px;
+}

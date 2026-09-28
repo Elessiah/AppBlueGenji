@@ -112,6 +112,16 @@ describe("GET /api/teams/[id]/invitations", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual(pending);
+    expect(listTeamPendingInvitations).toHaveBeenCalledWith(7, 2, false);
+  });
+
+  it("transmet au service la dérogation fantôme du staff `tournaments`", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] }));
+    jest.mocked(listTeamPendingInvitations).mockResolvedValue({ requests: [], invitations: [] });
+
+    await invitationsGet(req("GET"), params("9"));
+
+    expect(listTeamPendingInvitations).toHaveBeenCalledWith(9, 3, true);
   });
 
   it("refuse en 403 qui ne gère pas l'équipe", async () => {
@@ -141,7 +151,15 @@ describe("DELETE /api/invitations/[id]", () => {
     jest.mocked(cancelInvitation).mockResolvedValue(undefined);
     const res = await invitationDelete(req("DELETE"), params("5"));
     expect(res.status).toBe(200);
-    expect(cancelInvitation).toHaveBeenCalledWith(2, 5);
+    expect(cancelInvitation).toHaveBeenCalledWith(2, 5, false);
+  });
+
+  it("ouvre au staff `tournaments` le retrait d'une reprise de fantôme", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 3, isAdmin: false, roles: ["ARBITRE"] }));
+    jest.mocked(cancelInvitation).mockResolvedValue(undefined);
+    const res = await invitationDelete(req("DELETE"), params("5"));
+    expect(res.status).toBe(200);
+    expect(cancelInvitation).toHaveBeenCalledWith(3, 5, true);
   });
 
   it.each([

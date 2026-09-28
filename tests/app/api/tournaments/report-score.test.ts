@@ -42,3 +42,12 @@ describe("POST .../report — match pas encore lancé", () => {
     expect(reportMatchScore).toHaveBeenCalledWith(7, 42, 2, 3, 1);
   });
 });
+
+describe("POST .../report — qualité pour reporter", () => {
+  it("répond 403 à un membre sportif du roster", async () => {
+    jest.mocked(reportMatchScore).mockRejectedValue(new Error("NOT_TEAM_MATCH_LEADER"));
+    const res = await POST(req(), params);
+    expect(res.status).toBe(403);
+    await expect(res.json()).resolves.toMatchObject({ error: "NOT_TEAM_MATCH_LEADER" });
+  });
+});

@@ -19,6 +19,7 @@ import {
 import { checkEntrantEligibility } from "./registration-eligibility";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import { canViewTournament } from "@/lib/shared/tournament-visibility";
 import { computeTournamentState as sharedComputeTournamentState } from "@/lib/shared/tournament-state";
 import { parseTournamentDates } from "./validation";
@@ -935,7 +936,11 @@ export async function getTournamentViewerContext(
     canRegisterEntrant,
     registrationBlock,
     myTeamId,
-    canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
+    // Reporter un score revient à ceux qui mènent le match — capitaine, manager,
+    // propriétaire (`reportMatchScore` refuse `NOT_TEAM_MATCH_LEADER`) : un
+    // bouton qui mène à un 403 est un bouton qui ment.
+    canCreateReportsForTeamIds:
+      myTeamId && (isSolo || canDeclareTeamReady(activeTeam?.roles)) ? [myTeamId] : [],
     isAdmin: canManage,
     canDelete,
     canManageLive,

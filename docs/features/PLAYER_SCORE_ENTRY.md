@@ -25,7 +25,26 @@ porte côté joueur.
    contredisent, l'arbitrage est alerté (`REFEREE_ALERTS.md`), et chacun peut
    encore corriger la sienne (« Revoir le score »).
 4. **Sans réponse**, la proposition fait foi à l'échéance du délai
-   (`score_deadline_at`, rappelé dans la modale).
+   (`score_deadline_at`, rappelé dans la modale). Ce délai ne court qu'après une
+   fin de série plausible — une série **complète** au format de la manche,
+   15 min par map de son plafond (BO5 en saisie libre), depuis le lancement
+   (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
+   lancement ne fait pas foi avant que la série ait pu se jouer. L'échéance se
+   lit sur le format et non sur le score déclaré, qui la mettait à la main du
+   déclarant ; elle est posée une fois, au premier report, et seulement
+   rapprochée (à « maintenant + délai ») quand l'adversaire reporte à son tour —
+   un conflit est alors signalé à l'arbitrage depuis sa naissance.
+
+Proposer, confirmer et contester reviennent à **ceux qui mènent le match** :
+`CAPITAINE`, `MANAGER` ou `OWNER` — les rôles qui déclarent l'équipe prête
+(`canDeclareTeamReady`) —, ou le joueur en individuel. Un 0-3 déclaré contre
+soi est un forfait : une simple place au roster n'y suffit pas. Un membre
+sportif ne voit pas le bouton (`canCreateReportsForTeamIds` vide), et la route
+le refuse en `403 NOT_TEAM_MATCH_LEADER`. Pour la même raison, « score à
+confirmer » ne prévient que ceux qui peuvent y répondre : le push
+(`notifyScoreToConfirm`, par `loadEntrantMatchLeaderIds`) comme l'alerte de page
+(`viewerAlert`, sur `canCreateReportsForTeamIds`). Le forfait sur la manche,
+lui, reste au propriétaire et aux managers.
 
 La carte porte une ligne d'état **lisible de tous** (« 2 – 1 proposé par Alpha ·
 à confirmer », « Scores contradictoires · arbitrage alerté ») : sans elle, un

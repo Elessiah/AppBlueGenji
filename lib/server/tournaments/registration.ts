@@ -3,6 +3,7 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import {
   assertRegistrationEligibility,
@@ -139,6 +140,14 @@ export type UserEntrant = {
    * à représenter.
    */
   canActForEntrant: boolean;
+  /**
+   * Peut-il **mener un match** au nom de cet engagé — le déclarer prêt, en
+   * reporter le score ? `CAPITAINE`, `MANAGER` ou `OWNER`
+   * (`canDeclareTeamReady`), toujours vrai en individuel. Plus large que
+   * `canActForEntrant` d'un rôle : le capitaine, qui conduit l'équipe en jeu,
+   * lance la rencontre et doit pouvoir en dire le résultat.
+   */
+  canConductMatch: boolean;
 };
 
 export async function resolveUserEntrant(
@@ -147,7 +156,11 @@ export async function resolveUserEntrant(
   userId: number,
 ): Promise<UserEntrant> {
   if (isSoloTournament(tournament.participant_type)) {
-    return { teamId: await findSoloEntry(connection, userId), canActForEntrant: true };
+    return {
+      teamId: await findSoloEntry(connection, userId),
+      canActForEntrant: true,
+      canConductMatch: true,
+    };
   }
 
   // Sur la connexion de l'appelant : cette résolution est appelée depuis des
@@ -158,6 +171,7 @@ export async function resolveUserEntrant(
   return {
     teamId: activeTeam?.teamId ?? null,
     canActForEntrant: hasTeamManagementRole(activeTeam?.roles),
+    canConductMatch: canDeclareTeamReady(activeTeam?.roles),
   };
 }
 
@@ -257,7 +271,7 @@ function teamScopedError(code: string, teamId: number): TeamScopedRegistrationEr
  * Le caractère fantôme est relu **ici**, sur la connexion de la transaction, et
  * non par la route : entre l'affichage de la liste et la validation d'un lot il
  * s'écoule le temps de cocher des dizaines de lignes, pendant lequel une
- * fantôme peut être attribuée à un joueur (`claimGhostTeam`) ou dissoute. Une
+ * fantôme peut être reprise par un joueur (`acceptIntoTeam`) ou dissoute. Une
  * entrée solo est écartée par la même condition — elle naît avec
  * `is_ghost = 0` : le staff n'inscrit jamais un joueur du site à sa place, pas
  * plus qu'une équipe réelle.
@@ -280,7 +294,7 @@ export async function registerTeamsByIds(
   // Lecture **verrouillante**, et pas seulement par prudence : c'est la
   // première lecture de la transaction, donc celle qui fige l'instantané
   // `REPEATABLE READ`. Une lecture ordinaire verrait l'état du monde à cet
-  // instant et n'en démordrait plus — `claimGhostTeam` pourrait valider son
+  // instant et n'en démordrait plus — une reprise (`acceptIntoTeam`) pourrait valider son
   // `is_ghost = 0` juste après, et l'inscription passerait quand même : la
   // course que ce contrôle prétend fermer resterait ouverte. `FOR UPDATE` lit
   // la dernière version validée et retient la ligne jusqu'au commit.

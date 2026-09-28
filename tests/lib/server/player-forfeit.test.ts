@@ -39,7 +39,7 @@ function tournament(state: "RUNNING" | "FINISHED" = "RUNNING") {
 beforeEach(() => {
   jest.clearAllMocks();
   tournament();
-  jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: 20, canActForEntrant: true });
+  jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: 20, canActForEntrant: true, canConductMatch: true });
   jest.mocked(adminResolveMatch).mockResolvedValue(undefined);
 });
 
@@ -72,12 +72,12 @@ describe("forfeitOwnMatch", () => {
     ["TOURNAMENT_NOT_RUNNING", () => tournament("FINISHED"), readyMatch],
     [
       "NO_ACTIVE_TEAM",
-      () => jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: null, canActForEntrant: false }),
+      () => jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: null, canActForEntrant: false, canConductMatch: false }),
       readyMatch,
     ],
     [
       "NOT_TEAM_MANAGER",
-      () => jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: 20, canActForEntrant: false }),
+      () => jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: 20, canActForEntrant: false, canConductMatch: false }),
       readyMatch,
     ],
     ["MATCH_NOT_FOUND", () => undefined, null],
@@ -85,7 +85,7 @@ describe("forfeitOwnMatch", () => {
     ["MATCH_NOT_READY", () => undefined, { ...readyMatch, team1_id: null }],
     [
       "NOT_IN_MATCH",
-      () => jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: 99, canActForEntrant: true }),
+      () => jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId: 99, canActForEntrant: true, canConductMatch: true }),
       readyMatch,
     ],
   ])("refuse %s sans rien écrire", async (code, arrange, match) => {

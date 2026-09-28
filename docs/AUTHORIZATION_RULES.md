@@ -459,7 +459,7 @@ Règles structurelles qui tiennent quel que soit le rôle :
   (`TEAM_NOT_JOINABLE`, 409) : ni l'une ni l'autre n'a de membre, donc personne
   n'a qualité pour répondre — la demande restait en attente à jamais et son
   auteur se voyait refuser toute autre équipe par `ALREADY_REQUESTED`. Une
-  fantôme s'attribue par `POST /api/teams/[id]/claim` (§5).
+  fantôme se reprend sur proposition du staff, `POST /api/teams/[id]/claim` (§5).
 
 ### 3.2 Ce qu'un joueur ne peut pas faire
 
@@ -536,6 +536,14 @@ toujours `UPCOMING`.
 
 - ✅ le tournoi est `RUNNING` (`TOURNAMENT_NOT_RUNNING` sinon) ;
 - ✅ l'appelant a un engagé dans ce tournoi (`NO_ACTIVE_TEAM` sinon) ;
+- ✅ il **mène le match** au nom de cet engagé — `CAPITAINE`, `MANAGER` ou
+  `OWNER`, les rôles qui le déclarent prêt (`canDeclareTeamReady`), le joueur
+  lui-même en individuel (`NOT_TEAM_MATCH_LEADER` → 403). Reporter 0-3 contre
+  soi est un forfait, et un report seul finit par faire foi : le geste n'est
+  pas ouvert à une simple place au roster. Le capitaine en est, parce qu'il
+  lance la rencontre en jeu et doit pouvoir en dire le résultat ; il reste
+  exclu du forfait sur la manche et de l'abandon, qui engagent l'équipe hors
+  de tout match joué ;
 - ✅ **cet engagé est l'une des deux équipes du match** — sinon `NOT_IN_MATCH`.
   Le score est écrit dans la colonne de *son* camp (`team1_report_*` ou
   `team2_report_*`), déduite du match, jamais du corps de la requête ;
@@ -553,9 +561,17 @@ toujours `UPCOMING`.
 - ✅ le score constitue un **résultat final** au format de la manche
   (`checkMatchScores`).
 
-Un report d'équipe ne tranche rien seul : deux reports concordants closent la
-rencontre, deux reports contradictoires ouvrent un **conflit** qui part au canal
-arbitre. Un joueur ne peut donc en aucun cas :
+Deux reports concordants closent la rencontre, deux reports contradictoires
+ouvrent un **conflit** qui part au canal arbitre. Un report **seul** fait foi à
+l'échéance de `score_deadline_at` — mais cette échéance ne court qu'après une
+**fin de série plausible** : `max(maintenant, lancement + 15 min × plafond de
+maps du format — BO5 en saisie libre)` plus `SCORE_REPORT_TIMEOUT_MINUTES`
+(`lib/shared/score-report-deadline.ts`), posée une fois au premier report. Elle
+se lit sur le **format**, jamais sur le score déclaré : lue sur le score, un
+« 1-0 » l'abrégeait et un « 99-98 » la repoussait de deux jours.
+Sans ce plancher, un « 3-0 pour nous » déclaré à la seconde du lancement
+l'emportait dix minutes plus tard, pendant que l'adversaire jouait encore sa
+série. Un joueur ne peut donc en aucun cas :
 
 - ❌ saisir le score d'un match où son équipe ne joue pas ;
 - ❌ saisir un score pour l'équipe adverse ;
@@ -692,9 +708,13 @@ paramètre `viewerManagesGhostTeams` des fonctions de `teams-service` :
 
 - ✅ le staff `tournaments` crée, renomme, logote, inscrit en lot et dissout une
   équipe **fantôme** sans en être membre ;
-- ✅ il peut l'**attribuer** à un joueur réel (`POST /api/teams/[id]/claim`), qui
-  en devient `OWNER` — l'équipe cesse alors d'être fantôme, et la dérogation
-  s'éteint avec elle ;
+- ✅ il peut la **proposer** à un joueur réel (`POST /api/teams/[id]/claim`) :
+  une invitation portant `OWNER`, que le joueur **accepte** ou refuse. S'il
+  accepte, il en devient `OWNER` — l'équipe cesse alors d'être fantôme, et la
+  dérogation s'éteint avec elle ;
+- ❌ il ne peut **pas** faire d'un joueur le propriétaire d'une fantôme sans son
+  accord : engagé malgré lui dans un tournoi vivant, le joueur verrait son tag
+  Discord certifié et son BattleTag masqué ouverts à l'arbitrage (§2.3) ;
 - ❌ la dérogation ne s'applique **jamais** à une équipe réelle : le même staff
   n'a aucun droit sur une équipe qui a des membres.
 

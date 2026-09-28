@@ -3,6 +3,7 @@ import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { checkMatchScores, matchWinnerSide } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
+import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
 import { toIso } from "@/lib/server/serialization";
 import { MatchRow } from "./_internal";
 import {
@@ -11,7 +12,7 @@ import {
   queueBotLog,
   queueRefereeAlert,
 } from "./bot-logs";
-import { resolveUserEntrantTeamId } from "./registration";
+import { resolveUserEntrant } from "./registration";
 import { loadTournamentMatchFormat } from "./repository";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
@@ -166,6 +167,56 @@ export async function finalizeMatch(
   );
 }
 
+/**
+ * Échéance d'un **premier** report, en SQL : `max(maintenant, lancement +
+ * série plausible)` plus `SCORE_REPORT_TIMEOUT_MINUTES` — la règle de
+ * `scoreReportDeadline` (`lib/shared/score-report-deadline.ts`), calculée par la
+ * base pour rester dans le référentiel d'horloge qui a écrit `launched_at`.
+ *
+ * Le lancement ne compte que s'il appartient à **cet** appariement (même
+ * empreinte que `launchPairingKey`) ; sans lancement connu, la série court
+ * depuis maintenant. Deux paramètres, dans l'ordre : minutes de série, minutes
+ * de délai.
+ */
+const SCORE_DEADLINE_SQL = `DATE_ADD(
+             GREATEST(
+               NOW(),
+               DATE_ADD(
+                 COALESCE(
+                   CASE WHEN launch_pairing = CONCAT(team1_id, ':', team2_id) THEN launched_at END,
+                   NOW()
+                 ),
+                 INTERVAL ? MINUTE
+               )
+             ),
+             INTERVAL ? MINUTE
+           )`;
+
+/**
+ * Affectation de `score_deadline_at` par le report d'un camp, `otherSide`
+ * désignant l'adversaire. Paramètres, dans l'ordre : délai, délai, minutes de
+ * série, délai.
+ *
+ * · **Report seul** : l'échéance est posée une fois, au premier report
+ *   (`COALESCE`), après une fin de série plausible (`SCORE_DEADLINE_SQL`).
+ * · **L'adversaire a déjà reporté** : les deux ont parlé, la série est finie —
+ *   l'échéance est ramenée à `maintenant + délai` si elle était plus lointaine,
+ *   jamais repoussée (`LEAST`). C'est sur elle que se mesure l'escalade d'un
+ *   conflit à l'arbitrage (`resolveExpiredScoreReports`) : sans ce rappel, un
+ *   désaccord né dès la fin d'un BO5 attendait la fin de série plausible
+ *   (plus d'une heure) avant d'être signalé comme en souffrance, et une
+ *   resaisie en boucle ne peut pas la faire reculer.
+ */
+function scoreDeadlineAssignment(otherSide: "team1" | "team2"): string {
+  return `score_deadline_at = CASE
+             WHEN ${otherSide}_report_score IS NOT NULL THEN LEAST(
+               COALESCE(score_deadline_at, DATE_ADD(NOW(), INTERVAL ? MINUTE)),
+               DATE_ADD(NOW(), INTERVAL ? MINUTE)
+             )
+             ELSE COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL})
+           END`;
+}
+
 function validateScoreValue(value: number): number {
   if (!Number.isFinite(value)) {
     throw new Error("INVALID_SCORE");
@@ -193,9 +244,20 @@ export async function reportMatchScore(
 
   // L'engagé dépend du tournoi : l'équipe active du joueur, ou lui-même en
   // tournoi individuel.
-  const reporterTeamId = await resolveUserEntrantTeamId(connection, tournament, userId);
+  const entrant = await resolveUserEntrant(connection, tournament, userId);
+  const reporterTeamId = entrant.teamId;
   if (reporterTeamId === null) {
     throw new Error("NO_ACTIVE_TEAM");
+  }
+  // Reporter un score **engage l'équipe** : un 0-3 déclaré contre soi est un
+  // forfait, et un report seul finit par faire foi. Il est donc réservé à ceux
+  // qui mènent le match — les rôles qui le déclarent prêt (`CAPITAINE`,
+  // `MANAGER`, `OWNER`, `canDeclareTeamReady`), le joueur lui-même en
+  // individuel. Un membre sportif du roster (COACH, DPS recruté la veille…) n'a
+  // pas à trancher seul une rencontre au nom de toute l'équipe ; le capitaine,
+  // qui l'a lancée en jeu, doit pouvoir en dire le résultat.
+  if (!entrant.canConductMatch) {
+    throw new Error("NOT_TEAM_MATCH_LEADER");
   }
 
   const [matches] = await connection.execute<MatchRow[]>(
@@ -299,16 +361,31 @@ export async function reportMatchScore(
   });
   if (matchFormatViolation) throw new Error(matchFormatViolation);
 
+  // Durée d'une série complète au format de la manche : l'échéance d'un report
+  // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
+  // Elle se lit sur le format et non sur le score déclaré, si bien qu'elle est
+  // posée **une fois**, au premier report ; seul le report de l'adversaire la
+  // rapproche (`scoreDeadlineAssignment`).
+  const seriesMinutes = plausibleSeriesMinutes(matchFormat);
+
   if (isTeam1Reporter) {
     await connection.execute(
       `UPDATE bg_matches
        SET team1_report_score = ?,
            team1_report_opponent_score = ?,
            team1_reported_at = NOW(),
-           score_deadline_at = COALESCE(score_deadline_at, DATE_ADD(NOW(), INTERVAL ? MINUTE)),
+           ${scoreDeadlineAssignment("team2")},
            status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
-      [myScore, opponentScore, SCORE_REPORT_TIMEOUT_MINUTES, matchId],
+      [
+        myScore,
+        opponentScore,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        seriesMinutes,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        matchId,
+      ],
     );
   }
 
@@ -318,10 +395,18 @@ export async function reportMatchScore(
        SET team2_report_score = ?,
            team2_report_opponent_score = ?,
            team2_reported_at = NOW(),
-           score_deadline_at = COALESCE(score_deadline_at, DATE_ADD(NOW(), INTERVAL ? MINUTE)),
+           ${scoreDeadlineAssignment("team1")},
            status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
-      [myScore, opponentScore, SCORE_REPORT_TIMEOUT_MINUTES, matchId],
+      [
+        myScore,
+        opponentScore,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        seriesMinutes,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        matchId,
+      ],
     );
   }
 

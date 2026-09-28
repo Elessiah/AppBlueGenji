@@ -25,7 +25,7 @@ const params = { params: Promise.resolve({ id: "5" }) };
 
 /** Engagé du joueur tel que le rend `getUserEntrant`. */
 function entrant(teamId: number | null, canActForEntrant = true) {
-  return { teamId, canActForEntrant };
+  return { teamId, canActForEntrant, canConductMatch: canActForEntrant };
 }
 
 describe("POST /api/tournaments/[id]/forfeit", () => {

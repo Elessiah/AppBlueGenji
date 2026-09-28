@@ -5,8 +5,12 @@ import { getUserIdByPseudo } from "@/lib/server/users-service";
 import { can } from "@/lib/shared/permissions";
 
 /**
- * Attribue une équipe fantôme à un joueur réel : il en devient OWNER et
- * l'équipe cesse d'être fantôme. Réservé à la permission `tournaments`.
+ * **Propose** une équipe fantôme à un joueur réel. Réservé à la permission
+ * `tournaments`. Rien n'est attribué ici : le joueur reçoit une invitation, et
+ * ce n'est qu'en l'acceptant qu'il devient OWNER et que l'équipe cesse d'être
+ * fantôme (`claimGhostTeam`). Sans cela, un arbitre pouvait faire d'un free
+ * agent l'engagé d'un tournoi vivant — et lire ainsi ses contacts — sans qu'il
+ * ait rien demandé.
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -27,12 +31,18 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     const newOwnerId = await getUserIdByPseudo(pseudo);
     if (!newOwnerId) return fail("USER_NOT_FOUND", 404);
 
-    await claimGhostTeam(teamId, newOwnerId);
-    return ok({ success: true, ownerUserId: newOwnerId });
+    await claimGhostTeam(teamId, newOwnerId, user.id);
+    return ok({ success: true, invitedUserId: newOwnerId });
   } catch (error) {
     const message = (error as Error).message;
     if (message === "TEAM_NOT_FOUND" || message === "USER_NOT_FOUND") return fail(message, 404);
-    if (message === "NOT_A_GHOST_TEAM" || message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
+    if (
+      message === "NOT_A_GHOST_TEAM"
+      || message === "USER_ALREADY_IN_TEAM"
+      || message === "GHOST_CLAIM_ALREADY_PROPOSED"
+    ) {
+      return fail(message, 409);
+    }
     if (message === "TEAM_ALREADY_DELETED") return fail(message, 409);
     return fail(message || "TEAM_CLAIM_FAILED", 400);
   }

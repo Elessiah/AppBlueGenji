@@ -55,6 +55,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // l'inscrire à un tournoi » à qui venait de cliquer « Déclarer forfait ».
   NOT_TEAM_MANAGER:
     "Seuls le propriétaire et les managers de l'équipe peuvent l'engager dans un tournoi ou l'en retirer.",
+  // Report d'un score par un membre sportif du roster : le geste revient à ceux
+  // qui mènent le match, les mêmes rôles que « Prêt ».
+  NOT_TEAM_MATCH_LEADER:
+    "Seuls le capitaine, un manager ou le propriétaire peuvent saisir le score de l'équipe.",
   // Gérant qui n'a pas accepté les conditions d'utilisation (la modale
   // d'acceptation s'ouvre en même temps).
   TERMS_ACCEPTANCE_REQUIRED:

@@ -8,6 +8,7 @@ import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers, subscribedStaffCandidates } from "@/lib/server/push-subscriptions";
 import {
+  loadEntrantMatchLeaderIds,
   loadEntrantPlayerIds,
   loadNotificationRecipients,
   notifyStaff,
@@ -166,5 +167,29 @@ describe("destinataires", () => {
     expect(query.mock.calls[0][0]).toMatch(/solo_user_id IS NOT NULL/);
     expect(query.mock.calls[0][1]).toEqual([1, 2, 1, 2]);
     expect((await loadEntrantPlayerIds([])).size).toBe(0);
+  });
+});
+
+describe("loadEntrantMatchLeaderIds", () => {
+  it("ne garde que ceux qui mènent le match — capitaine, manager, propriétaire — et le joueur d'une entrée solo", async () => {
+    const query = jest.fn<SqlQuery>().mockResolvedValue([
+      [
+        { team_id: 1, user_id: 10, roles_json: JSON.stringify(["OWNER", "TANK"]), solo: 0 },
+        { team_id: 1, user_id: 11, roles_json: JSON.stringify(["COACH", "DPS"]), solo: 0 },
+        { team_id: 1, user_id: 13, roles_json: JSON.stringify(["CAPITAINE", "HEAL"]), solo: 0 },
+        { team_id: 1, user_id: 12, roles_json: JSON.stringify(["MANAGER"]), solo: 0 },
+        { team_id: 2, user_id: 20, roles_json: null, solo: 1 },
+      ],
+    ]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ query }));
+
+    const byTeam = await loadEntrantMatchLeaderIds([1, 2, 1]);
+
+    expect(byTeam.get(1)).toEqual([10, 13, 12]);
+    expect(byTeam.get(2)).toEqual([20]);
+    expect(query.mock.calls[0][0]).toMatch(/left_at IS NULL/);
+    expect(query.mock.calls[0][0]).toMatch(/solo_user_id IS NOT NULL/);
+    expect(query.mock.calls[0][1]).toEqual([1, 2, 1, 2]);
+    expect((await loadEntrantMatchLeaderIds([])).size).toBe(0);
   });
 });

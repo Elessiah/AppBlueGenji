@@ -5,9 +5,9 @@ import type { TeamJoinRequest, TeamSentInvitation } from "@/lib/shared/types";
  * Ce qui attend une réponse, vue gestion : demandes reçues et invitations
  * envoyées, lues d'un seul appel.
  *
- * `enabled` vaut faux pour qui ne gère pas l'équipe, pour une fantôme (aucun
- * membre, la route refuse) et pour une équipe dissoute : pas d'appel du tout
- * plutôt qu'un 403 attendu.
+ * `enabled` vaut faux pour qui ne gère pas l'équipe et pour une équipe
+ * dissoute : pas d'appel du tout plutôt qu'un 403 attendu. Sur une fantôme,
+ * seul le staff l'active — pour les reprises qu'il a proposées.
  */
 export function useTeamPendingInvitations(teamId: number, enabled: boolean) {
   const [requests, setRequests] = useState<TeamJoinRequest[]>([]);
