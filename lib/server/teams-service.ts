@@ -1070,8 +1070,18 @@ async function userHasActiveTeam(userId: number): Promise<boolean> {
  * conditionné à `PENDING`, relu sur `affectedRows` — une réponse arrivée entre
  * la lecture de l'appelant et ici l'emporte.
  *
+ * **Reprise d'une équipe fantôme** : une invitation portant `OWNER` n'est
+ * émise que par `claimGhostTeam` (staff `tournaments`) — une invitation de la
+ * gestion ne peut jamais le porter. Elle seule fait entrer un joueur dans une
+ * fantôme : il y arrive `OWNER`, l'équipe redevient ordinaire (`is_ghost = 0`)
+ * et les autres reprises encore en attente sur elle deviennent caduques. Une
+ * reprise dont la fantôme a déjà trouvé propriétaire est refusée
+ * (`NOT_A_GHOST_TEAM`) plutôt que de faire entrer le joueur dans une équipe
+ * réelle qui ne l'a pas invité.
+ *
  * @param roles rôles posés à l'arrivée ; vide (demande, invitation d'avant la
- *   colonne) → `DPS`, le défaut d'origine. `OWNER` n'est jamais posé ici.
+ *   colonne) → `DPS`, le défaut d'origine. `OWNER` n'est posé que par une
+ *   reprise de fantôme.
  */
 async function acceptIntoTeam(
   invitationId: number,
@@ -1079,8 +1089,9 @@ async function acceptIntoTeam(
   userId: number,
   roles: TeamRole[],
 ): Promise<void> {
+  const claim = isGhostClaimRoles(roles);
   const filtered = sanitizeRoles(roles).filter((r) => r !== "OWNER");
-  const payload = filtered.length === 0 ? ["DPS"] : filtered;
+  const payload = claim ? ["OWNER"] : filtered.length === 0 ? ["DPS"] : filtered;
 
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1097,15 +1108,25 @@ async function acceptIntoTeam(
     // dissolution (`softDeleteTeam`) écrit l'équipe puis annule ses
     // invitations ; prendre les deux dans le même ordre qu'elle interdit
     // l'interblocage, et une dissolution commitée pendant l'attente est vue.
+    // Une reprise **écrit** l'équipe (`is_ghost = 0`) : elle la verrouille donc
+    // d'emblée en exclusif — deux reprises concurrentes qui tiendraient chacune
+    // un verrou partagé s'interbloqueraient en voulant l'élever.
     const [teams] = await connection.execute<
       (RowDataPacket & { id: number; deleted_at: Date | null; is_ghost: 0 | 1; solo_user_id: number | null })[]
     >(
-      `SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams WHERE id = ? LOCK IN SHARE MODE`,
+      `SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams WHERE id = ? ${
+        claim ? "FOR UPDATE" : "LOCK IN SHARE MODE"
+      }`,
       [teamId],
     );
     if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
     if (teams[0].deleted_at !== null) throw new Error("TEAM_DELETED");
-    if (teams[0].is_ghost === 1 || teams[0].solo_user_id !== null) throw new Error("TEAM_NOT_JOINABLE");
+    if (teams[0].solo_user_id !== null) throw new Error("TEAM_NOT_JOINABLE");
+    if (claim) {
+      if (teams[0].is_ghost !== 1) throw new Error("NOT_A_GHOST_TEAM");
+    } else if (teams[0].is_ghost === 1) {
+      throw new Error("TEAM_NOT_JOINABLE");
+    }
 
     const [claimed] = await connection.execute<ResultSetHeader>(
       `UPDATE bg_team_invitations
@@ -1132,6 +1153,19 @@ async function acceptIntoTeam(
        WHERE user_id = ? AND status = 'PENDING'`,
       [userId],
     );
+    if (claim) {
+      // La fantôme a désormais un propriétaire : elle redevient une équipe
+      // ordinaire, et les reprises proposées à d'autres joueurs n'ont plus
+      // d'objet — les laisser en attente, elles finiraient refusées en
+      // `NOT_A_GHOST_TEAM` sous les yeux de qui les accepterait.
+      await connection.execute(`UPDATE bg_teams SET is_ghost = 0 WHERE id = ?`, [teamId]);
+      await connection.execute(
+        `UPDATE bg_team_invitations
+         SET status = 'CANCELLED', responded_at = NOW()
+         WHERE team_id = ? AND status = 'PENDING'`,
+        [teamId],
+      );
+    }
 
     await connection.commit();
   } catch (error) {
@@ -1168,6 +1202,14 @@ async function findPendingInvitation(
  */
 function invitationRoles(raw: unknown): TeamRole[] {
   return raw == null ? [] : parseRoles(raw);
+}
+
+/**
+ * L'invitation est-elle la **reprise d'une équipe fantôme** ? Seule
+ * `claimGhostTeam` pose `OWNER` sur une invitation : c'est sa marque.
+ */
+function isGhostClaimRoles(roles: readonly TeamRole[]): boolean {
+  return roles.includes("OWNER");
 }
 
 /**
@@ -1242,14 +1284,22 @@ export async function requestToJoinTeam(userId: number, teamId: number): Promise
   // Ni une fantôme ni une entrée solo ne se rejoignent. Ni l'une ni l'autre n'a
   // de membre, donc personne n'a qualité pour répondre : la demande restait
   // en attente à jamais, et son auteur se voyait ensuite refuser toute autre
-  // équipe par `ALREADY_REQUESTED`. Une fantôme s'attribue par
-  // `POST /api/teams/[id]/claim` (staff `tournaments`) ; une entrée solo n'est
-  // pas une équipe, c'est l'identité d'un joueur en tournoi individuel.
-  if (teams[0].is_ghost === 1 || teams[0].solo_user_id !== null) {
+  // équipe par `ALREADY_REQUESTED`. Une fantôme se **reprend** sur proposition
+  // du staff (`POST /api/teams/[id]/claim`, une invitation portant `OWNER`) :
+  // « Rejoindre » sur sa fiche accepte cette proposition, et rien d'autre. Une
+  // entrée solo n'est pas une équipe, c'est l'identité d'un joueur en tournoi
+  // individuel.
+  if (teams[0].solo_user_id !== null) throw new Error("TEAM_NOT_JOINABLE");
+
+  const existing = await findPendingInvitation(teamId, userId);
+  if (teams[0].is_ghost === 1) {
+    if (existing?.kind === "INVITE" && isGhostClaimRoles(existing.roles)) {
+      await acceptIntoTeam(existing.id, teamId, userId, existing.roles);
+      return "JOINED";
+    }
     throw new Error("TEAM_NOT_JOINABLE");
   }
 
-  const existing = await findPendingInvitation(teamId, userId);
   if (existing?.kind === "INVITE") {
     await acceptIntoTeam(existing.id, teamId, userId, existing.roles);
     return "JOINED";
@@ -1313,11 +1363,19 @@ export async function respondToInvitation(
 
 /** Invitations (INVITE) en attente adressées au joueur. */
 export async function listUserInvitations(userId: number): Promise<
-  { id: number; teamId: number; teamName: string; kind: "INVITE" | "REQUEST"; createdAt: string }[]
+  {
+    id: number;
+    teamId: number;
+    teamName: string;
+    kind: "INVITE" | "REQUEST";
+    createdAt: string;
+    /** Reprise d'une équipe fantôme : l'accepter en fait le propriétaire. */
+    ownership: boolean;
+  }[]
 > {
   const db = await getDatabase();
-  const [rows] = await db.execute<InvitationRow[]>(
-    `SELECT i.id, i.team_id, t.name AS team_name, i.user_id, u.pseudo, i.kind, i.created_at
+  const [rows] = await db.execute<(InvitationRow & { roles_json: unknown })[]>(
+    `SELECT i.id, i.team_id, t.name AS team_name, i.user_id, u.pseudo, i.kind, i.roles_json, i.created_at
      FROM bg_team_invitations i
      JOIN bg_teams t ON t.id = i.team_id
      JOIN bg_users u ON u.id = i.user_id
@@ -1331,6 +1389,7 @@ export async function listUserInvitations(userId: number): Promise<
     teamName: r.team_name,
     kind: r.kind,
     createdAt: toIso(r.created_at) ?? new Date().toISOString(),
+    ownership: isGhostClaimRoles(invitationRoles(r.roles_json)),
   }));
 }
 

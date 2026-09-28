@@ -11,6 +11,7 @@
  * Module `shared` : importable côté serveur comme côté client.
  */
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
+import { MIN_MINUTES_PER_REPORTED_MAP } from "./score-report-deadline";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "./match-launch";
 import { RANKING_SEEDING_RULE } from "./ranking";
 import type { TournamentFormat } from "./types";
@@ -77,11 +78,11 @@ export const COMMON_RULES: RuleSection[] = [
   {
     title: "Report des scores",
     body: [
-      "Le mécanisme est le même dans tous les modes : chaque équipe déclare le score de son match depuis la page du tournoi.",
+      "Le mécanisme est le même dans tous les modes : chaque équipe déclare le score de son match depuis la page du tournoi, par son propriétaire ou un de ses managers (le joueur lui-même en tournoi individuel).",
     ],
     bullets: [
       "Deux déclarations concordantes valident le match immédiatement.",
-      `Une seule déclaration ouvre un délai de confirmation de ${SCORE_REPORT_TIMEOUT_MINUTES} minutes : sans contestation de l'adversaire, le score est retenu.`,
+      `Une seule déclaration ouvre un délai de confirmation de ${SCORE_REPORT_TIMEOUT_MINUTES} minutes, qui ne court qu'après une durée de série plausible depuis le lancement (${MIN_MINUTES_PER_REPORTED_MAP} minutes par map déclarée) : sans contestation de l'adversaire, le score est retenu.`,
       "Deux déclarations contradictoires mettent le match en litige : un arbitre tranche et enregistre le score officiel.",
       "Un arbitre ou un administrateur peut corriger un score tant que la manche suivante n'a reçu aucune saisie ; au-delà, le score est verrouillé, y compris pour lui.",
     ],

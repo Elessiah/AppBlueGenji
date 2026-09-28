@@ -92,7 +92,7 @@ const TEAM_ERRORS: Record<string, string> = {
   GHOST_TEAM_CREATE_FAILED: "L'équipe fantôme n'a pas pu être créée.",
   TEAMS_LOAD_FAILED: "La liste des équipes n'a pas pu être chargée.",
   TEAM_DELETE_FAILED: "L'équipe n'a pas pu être dissoute.",
-  TEAM_CLAIM_FAILED: "L'équipe n'a pas pu être attribuée.",
+  TEAM_CLAIM_FAILED: "La proposition de reprise n'a pas pu être envoyée.",
   TEAM_OWNERSHIP_TRANSFER_FAILED: "La propriété n'a pas pu être transférée.",
   LOGO_UPLOAD_FAILED: "Le logo n'a pas pu être envoyé.",
   LOGO_DELETE_FAILED: "Le logo n'a pas pu être supprimé.",

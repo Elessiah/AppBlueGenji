@@ -10,8 +10,8 @@
  * `teams-service.ts`, paramètre `viewerManagesGhostTeams`).
  *
  * Cycle de vie : création par le staff → inscription à un tournoi →
- * éventuellement attribution à un joueur réel (`claimGhostTeam`), qui en fait
- * une équipe ordinaire dont il devient OWNER.
+ * éventuellement reprise par un joueur réel (`claimGhostTeam` propose, le
+ * joueur accepte), qui en fait une équipe ordinaire dont il devient OWNER.
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
@@ -53,14 +53,35 @@ export async function createGhostTeam(
 }
 
 /**
- * Attribue une équipe fantôme à un joueur réel : il en devient OWNER et
- * l'équipe redevient une équipe ordinaire (`is_ghost = 0`). L'historique
- * (inscriptions, matchs, classements) est conservé tel quel.
+ * **Propose** une équipe fantôme à un joueur réel : une invitation (`INVITE`)
+ * portant le rôle `OWNER`, que le joueur accepte ou refuse comme n'importe
+ * quelle invitation (`respondToInvitation`, ou « Rejoindre » sur la fiche).
+ * À l'acceptation, il en devient OWNER et l'équipe redevient une équipe
+ * ordinaire (`is_ghost = 0`) — c'est `acceptIntoTeam` qui l'écrit, dans sa
+ * transaction. L'historique (inscriptions, matchs, classements) est conservé.
  *
- * Refus : équipe inconnue, déjà réelle, dissoute, ou joueur déjà engagé dans
- * une autre équipe (invariant « un joueur = une seule équipe active »).
+ * **Pourquoi une invitation et plus une attribution directe** : faire d'un
+ * joueur l'OWNER d'une fantôme inscrite à un tournoi vivant le rend « engagé »,
+ * ce qui ouvre à la permission `tournaments` son tag Discord certifié et son
+ * BattleTag même masqué (`isInActiveTournament`, `canViewBattletag`). Sans son
+ * consentement, n'importe quel free agent pouvait ainsi être exposé par un
+ * arbitre. Engagé, il ne l'est désormais que s'il l'a accepté.
+ *
+ * Le rôle `OWNER` sert de **marque** à la reprise : une invitation ordinaire ne
+ * peut jamais le porter (`resolveInviteRoles` le retire), si bien que la marque
+ * ne se confond avec rien.
+ *
+ * Refus : équipe inconnue, déjà réelle, dissoute, joueur inconnu ou déjà engagé
+ * dans une autre équipe, ou reprise déjà proposée à ce joueur
+ * (`ALREADY_INVITED`).
+ *
+ * @param createdBy membre du staff qui propose la reprise (`created_by`).
  */
-export async function claimGhostTeam(teamId: number, newOwnerUserId: number): Promise<void> {
+export async function claimGhostTeam(
+  teamId: number,
+  newOwnerUserId: number,
+  createdBy: number,
+): Promise<"INVITED"> {
   const db = await getDatabase();
 
   const [teams] = await db.execute<(RowDataPacket & { is_ghost: 0 | 1; deleted_at: Date | null })[]>(
@@ -80,31 +101,29 @@ export async function claimGhostTeam(teamId: number, newOwnerUserId: number): Pr
   );
   if (users.length === 0) throw new Error("USER_NOT_FOUND");
 
+  // Contrôle d'agrément, pour un refus lisible dès la proposition : c'est
+  // l'acceptation (`acceptIntoTeam`) qui tient l'invariant « une seule équipe
+  // active », sous le verrou du joueur.
   const [existingMembership] = await db.execute<(RowDataPacket & { id: number })[]>(
     `SELECT id FROM bg_team_members WHERE user_id = ? AND left_at IS NULL LIMIT 1`,
     [newOwnerUserId],
   );
   if (existingMembership.length > 0) throw new Error("USER_ALREADY_IN_TEAM");
 
-  const connection = await db.getConnection();
-  try {
-    await connection.beginTransaction();
+  const [pending] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_team_invitations
+     WHERE team_id = ? AND user_id = ? AND status = 'PENDING'
+     LIMIT 1`,
+    [teamId, newOwnerUserId],
+  );
+  if (pending.length > 0) throw new Error("ALREADY_INVITED");
 
-    await connection.execute(
-      `INSERT INTO bg_team_members (team_id, user_id, roles_json)
-       VALUES (?, ?, ?)`,
-      [teamId, newOwnerUserId, JSON.stringify(["OWNER"])],
-    );
-
-    await connection.execute(`UPDATE bg_teams SET is_ghost = 0 WHERE id = ?`, [teamId]);
-
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
+  await db.execute(
+    `INSERT INTO bg_team_invitations (team_id, user_id, created_by, kind, roles_json, status)
+     VALUES (?, ?, ?, 'INVITE', ?, 'PENDING')`,
+    [teamId, newOwnerUserId, createdBy, JSON.stringify(["OWNER"])],
+  );
+  return "INVITED";
 }
 
 /**

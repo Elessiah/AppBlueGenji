@@ -935,7 +935,10 @@ export async function getTournamentViewerContext(
     canRegisterEntrant,
     registrationBlock,
     myTeamId,
-    canCreateReportsForTeamIds: myTeamId ? [myTeamId] : [],
+    // Reporter un score demande la même qualité que le forfait sur la manche
+    // (`reportMatchScore` refuse `NOT_TEAM_MANAGER`) : un bouton qui mène à un
+    // 403 est un bouton qui ment.
+    canCreateReportsForTeamIds: myTeamId && canRegisterEntrant ? [myTeamId] : [],
     isAdmin: canManage,
     canDelete,
     canManageLive,

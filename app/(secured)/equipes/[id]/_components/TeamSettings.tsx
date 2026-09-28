@@ -380,13 +380,13 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
             <h3 className={styles.dangerTitle}>Zone sensible</h3>
             <p className={styles.help}>
               {managedAsGhost
-                ? "Attribuer l'équipe à un joueur en fait une équipe ordinaire, dont il devient propriétaire."
+                ? "Proposer l'équipe à un joueur lui envoie une invitation : s'il l'accepte, elle devient une équipe ordinaire dont il est propriétaire."
                 : "Pour quitter l'équipe, transfère d'abord sa propriété à un autre membre."}
             </p>
             <div className={`${styles.actionsRow} ${styles.dangerActions}`}>
               {managedAsGhost ? (
                 <button type="button" className="btn ghost" onClick={() => setClaimOpen(true)}>
-                  Attribuer à un joueur
+                  Proposer à un joueur
                 </button>
               ) : (
                 <button type="button" className="btn ghost" onClick={() => setTransferOpen(true)}>
