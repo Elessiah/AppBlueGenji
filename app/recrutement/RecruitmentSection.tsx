@@ -367,7 +367,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
             )}
           </div>
           {isAdmin && (
-            <div className={styles.moveActions}>
+            <div className={styles.moveActions} data-tap-zone>
               <button
                 type="button"
                 className={styles.move}

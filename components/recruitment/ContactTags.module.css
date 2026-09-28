@@ -46,7 +46,14 @@
   color: var(--blue-300);
 }
 
+/*
+ * La valeur reste sélectionnable, bien qu'elle vive dans un bouton (que
+ * `globals.css` rend non sélectionnable) : quand le presse-papiers refuse, le
+ * toast demande de copier à la main, et c'est le seul endroit où le pseudo est écrit.
+ */
 .contactTagVal {
+  -webkit-user-select: text;
+  user-select: text;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

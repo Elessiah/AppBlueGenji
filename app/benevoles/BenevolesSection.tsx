@@ -278,7 +278,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
                   <span className={styles.categoryTitle}>{category}</span>
                   <span className={styles.categoryCount}>{members.length}</span>
                   {isAdmin && groups.length > 1 && (
-                    <div className={styles.categoryActions}>
+                    <div className={styles.categoryActions} data-tap-zone>
                       <button
                         type="button"
                         className={styles.categoryMove}

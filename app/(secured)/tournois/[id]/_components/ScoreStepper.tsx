@@ -29,7 +29,9 @@ export function ScoreStepper({ id, teamId, teamName, value, max, disabled, onCha
   const step = (delta: number) => onChange(String(Math.min(max, Math.max(0, (parsed ?? 0) + delta))));
 
   return (
-    <div>
+    // Zone d'appuis répétés : « + + + » ne doit rien sélectionner autour,
+    // ni le libellé ni le nom de l'équipe (voir `[data-tap-zone]`).
+    <div data-tap-zone>
       <label className={styles.sideLabel} htmlFor={id}>
         {/* L'emblème est décoratif : le nom accessible du champ reste le nom
             de l'équipe, écrit juste à côté. Pas de case réservée sur un côté

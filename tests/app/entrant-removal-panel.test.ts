@@ -128,7 +128,7 @@ describe("Cellule d'actions partagée", () => {
 
   it("s'ouvre dès que l'une des deux commandes est là", () => {
     expect(panel).toMatch(/const showActions = reorderable \|\| removable;/);
-    expect(panel).toMatch(/\{showActions && \(\s*<span className=\{styles\.actions\}>/);
+    expect(panel).toMatch(/\{showActions && \(\s*<span className=\{styles\.actions\}[^>]*>/);
   });
 
   it("choisit un gabarit de grille exclusif", () => {
