@@ -21,6 +21,8 @@ const TOURNAMENT_DIR = join("app", "(secured)", "tournois", "[id]");
 const MATCH_ROW = read(join(TOURNAMENT_DIR, "_components", "MatchRow.tsx"));
 const BRACKET_TREE = read(join(TOURNAMENT_DIR, "_components", "BracketTree.tsx"));
 const PAGE = read(join(TOURNAMENT_DIR, "page.tsx"));
+const PLAYER_DIALOG = read(join(TOURNAMENT_DIR, "_components", "PlayerScoreDialog.tsx"));
+const ADMIN_DIALOG = read(join(TOURNAMENT_DIR, "_components", "AdminScoreDialog.tsx"));
 const ISSUE_REPORT_CONTEXT = read(join(TOURNAMENT_DIR, "_lib", "issue-report-context.tsx"));
 
 describe("bouton « Signaler un problème » — réservé au match du lecteur", () => {
@@ -40,47 +42,48 @@ describe("bouton « Signaler un problème » — réservé au match du lecteur",
   });
 });
 
-describe("formulaire de score — champs ordonnés comme la carte", () => {
-  it("MatchRow ordonne ses deux champs avec le module pur", () => {
-    expect(MATCH_ROW).toContain("isMyTeamTeam1(myTeamId, match.team1Id)");
-    expect(MATCH_ROW).toContain("[topField, bottomField]");
+describe("saisie du score par un engagé — modale, plus de formulaire en ligne", () => {
+  it("MatchRow n'a plus de champ de score, mais un bouton qui ouvre la modale joueur", () => {
+    expect(MATCH_ROW).not.toContain('type="number"');
+    expect(MATCH_ROW).not.toContain("<form");
+    expect(MATCH_ROW).toContain("usePlayerScore()");
+    expect(MATCH_ROW).toContain("playerScore.open(match)");
+    // Le libellé annonce le geste attendu (saisir, confirmer, corriger), décidé
+    // par le module pur plutôt qu'écrit sur place.
+    expect(MATCH_ROW).toContain("playerScoreButtonLabel(playerReportView(match, myTeamId)");
   });
 
-  it("chaque champ porte le nom de son équipe, pas « Moi »/« Eux »", () => {
-    expect(MATCH_ROW).not.toContain('placeholder="Moi"');
-    expect(MATCH_ROW).not.toContain('placeholder="Eux"');
-    expect(MATCH_ROW).toContain("placeholder={field.label}");
+  it("la carte annonce la proposition en attente, lisible de tous", () => {
+    expect(MATCH_ROW).toContain("pendingReportNotice(match)");
   });
 
-  it("l'aria-label garde la distinction « mon score »/« score adverse », en plus du nom d'équipe", () => {
-    // Le nom de l'équipe seul ne dit pas lequel des deux champs est le mien —
-    // sans cette distinction, un lecteur d'écran entend deux champs nommés
-    // par équipe sans savoir dans lequel écrire son propre score.
-    expect(MATCH_ROW).toContain("`Votre score (${field.label})`");
-    expect(MATCH_ROW).toContain("`Score de l'adversaire (${field.label})`");
+  it("la modale ordonne ses deux champs comme la carte, nommés par équipe", () => {
+    expect(PLAYER_DIALOG).toMatch(/id="player-score-team1"[\s\S]{0,80}teamId=\{match\.team1Id\}[\s\S]{0,40}teamName=\{team1\}/);
+    expect(PLAYER_DIALOG).toMatch(/id="player-score-team2"[\s\S]{0,80}teamId=\{match\.team2Id\}[\s\S]{0,40}teamName=\{team2\}/);
+    // Le contrat de la route parle depuis l'engagé : la conversion passe par
+    // le module pur, jamais par une inversion recopiée.
+    expect(PLAYER_DIALOG).toContain("toReporterScores(myTeamIsTeam1,");
   });
 
-  it("le bouton d'envoi porte un nom accessible", () => {
-    // Avant : un « ✓ » nu, sans nom pour un lecteur d'écran.
-    expect(MATCH_ROW).not.toMatch(/<button className="btn" type="submit"[^>]*>\s*✓/);
-    expect(MATCH_ROW).toContain("Envoyer le score");
+  it("le stepper est celui de l'arbitrage : une seule implémentation", () => {
+    expect(PLAYER_DIALOG).toContain('from "./ScoreStepper"');
+    expect(ADMIN_DIALOG).toContain('from "./ScoreStepper"');
   });
 });
 
-describe("nom d'équipe — même repli sur la carte et dans le message d'envoi", () => {
-  it("MatchRow et page.tsx passent par le même repli à trois niveaux", () => {
+describe("nom d'équipe — même repli sur la carte et dans la modale", () => {
+  it("MatchRow et la modale passent par le même repli à trois niveaux", () => {
     expect(MATCH_ROW).toMatch(/teamLabel\(\s*match\.team1Name,\s*match\.team1Placeholder,/);
-    expect(PAGE).toMatch(/teamLabel\(match\.team1Name, match\.team1Placeholder,/);
+    expect(PLAYER_DIALOG).toMatch(/teamLabel\(match\.team1Name, match\.team1Placeholder,/);
   });
 });
 
 describe("notification d'envoi — nomme les équipes, pas l'identifiant du match", () => {
-  it("page.tsx construit le message avec le module pur", () => {
-    expect(PAGE).toContain('from "@/lib/shared/match-card-viewer"');
-    expect(PAGE).toContain("scoreSubmittedMessage(");
-    expect(PAGE).toContain("isMyTeamTeam1(detail.myTeamId, match.team1Id)");
-    // Le repli exact que dénonçait ERREUR.txt.
-    expect(PAGE).not.toMatch(/Score transmis pour le match #\$\{match\.id\}/);
+  it("la modale construit le message avec le module pur", () => {
+    expect(PLAYER_DIALOG).toContain('from "@/lib/shared/match-card-viewer"');
+    expect(PLAYER_DIALOG).toContain("scoreSubmittedMessage(");
+    expect(PLAYER_DIALOG).toContain("isMyTeamTeam1(myTeamId, match.team1Id)");
+    expect(PLAYER_DIALOG).not.toMatch(/Score transmis pour le match #\$\{match\.id\}/);
   });
 });
 

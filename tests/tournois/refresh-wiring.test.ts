@@ -141,7 +141,8 @@ describe("page de tournoi — ce que voit le lecteur", () => {
     // Une équipe qui saisit son score en fin de manche n'a aucun moyen de
     // deviner que son plateau date de plusieurs minutes — l'arbitrage non plus.
     expect(detailPage).toContain("const frozen = fatal !== null;");
-    expect(detailPage).toMatch(/const canReport = [\s\S]{0,80}if \(frozen\) return false;/);
+    expect(detailPage).toMatch(/const canReportScore = [\s\S]{0,80}!frozen/);
+    expect(detailPage).toMatch(/canOpenPlayerScoreDialog\(\{[\s\S]{0,200}frozen,/);
     expect(detailPage).toMatch(/const canAdminResolve = [\s\S]{0,80}if \(frozen\) return false;/);
     expect(detailPage).toMatch(/canForfeit = [\s\S]{0,40}!frozen/);
     // La plus destructrice des actions de la page suit la même règle : on ne
