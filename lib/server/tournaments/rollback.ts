@@ -362,7 +362,7 @@ async function deleteMatches(
   for (const ids of chunk(matchIds)) {
     const placeholders = ids.map(() => "?").join(", ");
     // Sous `ignoreMissingTable` comme dans `./deletion.ts` : la création de ces
-    // deux tables est avalée par un `catch` dans `database.ts`, et une base à
+    // trois tables est avalée par un `catch` dans `database.ts`, et une base à
     // qui l'une manque rendrait sinon tout retour en arrière impossible — pour
     // une table de notifications, où il n'y aurait de toute façon rien à effacer.
     await ignoreMissingTable(
@@ -374,6 +374,12 @@ async function deleteMatches(
     await ignoreMissingTable(
       connection.execute(
         `DELETE FROM bg_referee_alerts WHERE match_id IN (${placeholders})`,
+        ids,
+      ),
+    );
+    await ignoreMissingTable(
+      connection.execute(
+        `DELETE FROM bg_match_start_notices WHERE match_id IN (${placeholders})`,
         ids,
       ),
     );

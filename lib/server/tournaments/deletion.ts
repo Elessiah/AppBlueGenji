@@ -121,6 +121,16 @@ async function purgeTournamentRows(
       [tournamentId],
     ),
   );
+  // Même règle pour les réservations d'annonce de départ de match (notifications
+  // push) : elles pendent aux manches, table tolérée elle aussi.
+  await ignoreMissingTable(
+    connection.execute(
+      `DELETE n FROM bg_match_start_notices n
+       JOIN bg_matches m ON m.id = n.match_id
+       WHERE m.tournament_id = ?`,
+      [tournamentId],
+    ),
+  );
   await connection.execute(`DELETE FROM bg_matches WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(`DELETE FROM bg_tournament_phases WHERE tournament_id = ?`, [tournamentId]);
   await connection.execute(
