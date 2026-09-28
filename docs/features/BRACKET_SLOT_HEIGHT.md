@@ -7,7 +7,8 @@ parce que leurs créneaux couvrent la même hauteur totale (`maxMatchCount ×
 hauteur`). La hauteur tient les traits — pas l'inverse.
 
 - Décision pure : `app/(secured)/tournois/[id]/_lib/bracket-layout.ts`
-- Mesure : `app/(secured)/tournois/[id]/_hooks/useSlotHeight.ts`
+- Mesure : `app/(secured)/tournois/[id]/_hooks/useSlotHeight.ts`, registre des
+  créneaux `app/(secured)/tournois/[id]/_lib/slot-registry.ts`
 - Rendu : `app/(secured)/tournois/[id]/_components/BracketTree.tsx`
 
 ## Le symptôme
@@ -76,18 +77,30 @@ long et du format du match. Une table de correspondance « nombre d'actions →
 hauteur » serait un second modèle du rendu, à tenir à jour à chaque retouche de
 `MatchRow` — et sa dérive serait **muette**, exactement comme la panne d'origine.
 
-Deux chemins entretiennent la mesure, et le premier suffit dans le cas nominal :
+Deux chemins entretiennent la mesure, et chacun ne se déclenche que lorsqu'il
+y a lieu :
 
-1. un **effet de mise en page** rejoué à chaque rendu — le plateau arrive par le
-   flux SSE, et la rangée qui fait grandir une carte apparaît *dans* un rendu ;
+1. un **effet de mise en page**, qui ne relève la mesure que si un créneau a
+   été **posé ou retiré** depuis le rendu précédent (drapeau du registre) —
    mesurer avant la peinture évite le saut de mise en page ;
-2. un **`ResizeObserver`** pour ce qui échappe à React : chargement d'une police,
-   redimensionnement de la fenêtre qui fait replier un nom. Il appartient à un
+2. un **`ResizeObserver`** pour tout changement de taille d'un créneau déjà
+   posé : la rangée qui fait grandir une carte au fil du flux, le chargement
+   d'une police, le redimensionnement de la fenêtre qui fait replier un nom.
+   Ses observations sont délivrées après la mise en page et **avant** la
+   peinture, dans la même image : pas de saut non plus. Il appartient à un
    effet et non au `ref` — le mode strict de React démonte et remonte chaque
    composant en développement *sans* rejouer les `ref`, et un observateur créé
    là serait débranché pour de bon. Un onglet caché n'en délivre aucune
-   observation (le navigateur ne peint pas) : c'est sans conséquence, le retour
-   sur l'onglet provoque un rendu, donc une mesure.
+   observation (le navigateur ne peint pas) : c'est sans conséquence, les
+   tailles changées entre-temps sont signalées à la reprise du rendu.
+
+La mesure était auparavant rejouée à **chaque** rendu, et `measureSlot`
+rendait une `ref` neuve à chaque appel : React détachait puis rattachait chaque
+créneau, donc `unobserve` puis `observe` pour tous, et l'observateur rappelait
+aussitôt la mesure — deux relevés complets de l'arbre (une mise en page forcée
+chacun) par instantané du flux. Le registre rend désormais **la même `ref`**
+d'un rendu à l'autre tant que le match reste dans son round, et un instantané
+qui ne change la taille d'aucune carte ne force plus aucune mise en page.
 
 Aucune boucle à craindre : le contenu mesuré est de hauteur automatique et
 seulement *centré* dans son créneau, sa taille ne dépend donc pas de la hauteur

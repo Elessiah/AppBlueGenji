@@ -92,3 +92,15 @@ describe("ToastItem — comportement (source)", () => {
     expect(source).toMatch(/style=\{\{ animationDuration: `\$\{TOAST_DURATION_MS\}ms` \}\}/);
   });
 });
+
+describe("ToastProvider — valeur du contexte", () => {
+  const source = readSource("components/ui/toast.tsx");
+
+  it("passe une valeur mémoïsée : une notification ne re-rend pas tous les consommateurs", () => {
+    expect(source).toMatch(
+      /const value = useMemo\(\(\) => \(\{ showError, showSuccess \}\), \[showError, showSuccess\]\)/,
+    );
+    expect(source).toContain("<ToastContext.Provider value={value}>");
+    expect(source).not.toContain("value={{");
+  });
+});

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { MIN_SLOT_HEIGHT, type RoundMeasure, slotUnitHeight } from "../_lib/bracket-layout";
+import { createSlotRegistry, type SlotRegistry } from "../_lib/slot-registry";
 
 /**
  * Mesure la plus haute carte d'un tableau et en fait la hauteur de créneau.
@@ -11,6 +12,11 @@ import { MIN_SLOT_HEIGHT, type RoundMeasure, slotUnitHeight } from "../_lib/brac
  * du repli des noms d'équipe. On la **mesure** donc, et un `ResizeObserver`
  * refait le calcul quand une carte change de taille — le plateau arrive par le
  * flux SSE, une rangée peut apparaître longtemps après le premier rendu.
+ *
+ * La mesure n'est relevée que lorsqu'il y a lieu : un créneau posé ou retiré
+ * (avant la peinture, par l'effet de mise en page), une carte qui change de
+ * taille (par l'observateur). Un rendu qui ne change rien — le cas de presque
+ * tous les instantanés du flux — ne force aucune mise en page.
  *
  * Aucune boucle à craindre : le contenu mesuré est de hauteur automatique et
  * seulement *centré* dans son créneau, sa taille ne dépend donc pas de la
@@ -24,7 +30,8 @@ export interface SlotMeasure {
   /** Hauteur unitaire d'un créneau, jamais inférieure au plancher. */
   slotHeight: number;
   /**
-   * `ref` à poser sur le contenu d'un créneau (libellé + carte).
+   * `ref` à poser sur le contenu d'un créneau (libellé + carte) — la même d'un
+   * rendu à l'autre pour un même match.
    *
    * Le round est demandé parce que la hauteur se décide **par round** : c'est
    * lui qui porte l'effectif, et un round large n'a pas les mêmes besoins qu'une
@@ -35,14 +42,18 @@ export interface SlotMeasure {
 
 export function useSlotHeight(): SlotMeasure {
   const [slotHeight, setSlotHeight] = useState(MIN_SLOT_HEIGHT);
-  const nodes = useRef<Map<number, { roundNumber: number; element: HTMLElement }>>(new Map());
   const observer = useRef<ResizeObserver | null>(null);
+  const registry = useRef<SlotRegistry<HTMLElement> | null>(null);
+  if (registry.current === null) {
+    registry.current = createSlotRegistry<HTMLElement>(() => observer.current);
+  }
+  const slots: SlotRegistry<HTMLElement> = registry.current;
 
   const recompute = useCallback(() => {
     // L'effectif d'un round est le nombre de créneaux qu'il a rendus : c'est la
     // même liste que celle dont `BracketTree` tire sa géométrie.
     const rounds = new Map<number, RoundMeasure>();
-    for (const { roundNumber, element } of nodes.current.values()) {
+    for (const { roundNumber, element } of slots.nodes.values()) {
       const height = element.getBoundingClientRect().height;
       const round = rounds.get(roundNumber);
       if (!round) {
@@ -54,27 +65,13 @@ export function useSlotHeight(): SlotMeasure {
     }
     const next = slotUnitHeight(rounds.values());
     setSlotHeight((previous) => (previous === next ? previous : next));
-  }, []);
+  }, [slots]);
 
-  const measureSlot = useCallback(
-    (roundNumber: number, matchId: number) => (element: HTMLElement | null) => {
-      const previous = nodes.current.get(matchId);
-      if (previous) observer.current?.unobserve(previous.element);
-      if (!element) {
-        nodes.current.delete(matchId);
-        return;
-      }
-      nodes.current.set(matchId, { roundNumber, element });
-      // Pas encore d'observateur au tout premier rendu : l'effet ci-dessous
-      // rattrape les créneaux déjà posés.
-      observer.current?.observe(element);
-    },
-    [],
-  );
-
-  // À chaque rendu : les cartes viennent d'être posées ou remplacées, et la
-  // mesure doit précéder la peinture pour éviter un saut de mise en page.
-  useIsomorphicLayoutEffect(recompute);
+  // Créneaux posés ou retirés par ce rendu : la mesure doit précéder la
+  // peinture pour éviter un saut de mise en page.
+  useIsomorphicLayoutEffect(() => {
+    if (slots.takeDirty()) recompute();
+  });
 
   // L'observateur appartient à un effet, et non au `ref` : c'est ce qui le fait
   // renaître au remontage — le mode strict de React démonte et remonte chaque
@@ -84,12 +81,12 @@ export function useSlotHeight(): SlotMeasure {
     if (typeof ResizeObserver === "undefined") return;
     const resizeObserver = new ResizeObserver(recompute);
     observer.current = resizeObserver;
-    for (const { element } of nodes.current.values()) resizeObserver.observe(element);
+    for (const { element } of slots.nodes.values()) resizeObserver.observe(element);
     return () => {
       resizeObserver.disconnect();
       if (observer.current === resizeObserver) observer.current = null;
     };
-  }, [recompute]);
+  }, [recompute, slots]);
 
-  return { slotHeight, measureSlot };
+  return { slotHeight, measureSlot: slots.refFor };
 }

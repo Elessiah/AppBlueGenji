@@ -214,3 +214,83 @@ export function isScoreEditLocked(
   if (!match.decided) return false;
   return dependentMatches(match, allMatches, format, phaseFormat).some(hasScoreInput);
 }
+
+/**
+ * Identifiants de tous les matchs dont le score est verrouillé, calculés **en
+ * une passe** sur le plateau.
+ *
+ * Même règle que {@link isScoreEditLocked}, match par match — c'est elle qui
+ * fait foi, et un test confronte les deux sur des plateaux entiers. Elle
+ * existe parce que l'interface pose la question pour **chaque** carte : appelée
+ * cent fois, {@link isScoreEditLocked} refiltrait le plateau et reconstruisait
+ * une `Map` à chaque match tranché — un coût quadratique payé à chaque
+ * instantané du flux (5,5 ms par passe sur une double élimination à
+ * 128 équipes, sur un poste de bureau).
+ *
+ * Ce qui se refaisait par match se précalcule une fois : la dernière phase et,
+ * par phase, la dernière manche portant une saisie (formats à classement,
+ * phases ultérieures), et un index des matchs par identifiant (liens de
+ * bracket, parcourus à travers les rencontres résolues par le moteur).
+ */
+export function lockedScoreMatchIds(
+  allMatches: MatchScoreState[],
+  format: TournamentFormat,
+  phaseFormat?: PhaseFormat,
+): Set<number> {
+  const effective: TournamentFormat | PhaseFormat =
+    format === "MULTI" ? (phaseFormat ?? "SINGLE") : format;
+  const roundBased = effective === "SURVIVAL" || effective === "SWISS" || effective === "BG_SURVIE";
+
+  // Rang de phase le plus élevé portant une saisie, et, par rang, la manche la
+  // plus tardive qui en porte une.
+  let latestInputRank = Number.NEGATIVE_INFINITY;
+  const latestInputRound = new Map<number, number>();
+  const byId = new Map<number, MatchScoreState>();
+  for (const m of allMatches) {
+    byId.set(m.id, m);
+    if (!hasScoreInput(m)) continue;
+    const rank = phaseRank(m);
+    if (rank > latestInputRank) latestInputRank = rank;
+    const round = latestInputRound.get(rank);
+    if (round === undefined || m.roundNumber > round) latestInputRound.set(rank, m.roundNumber);
+  }
+
+  const locked = new Set<number>();
+  for (const m of allMatches) {
+    if (!m.decided) continue;
+    const rank = phaseRank(m);
+    const isLocked =
+      latestInputRank > rank ||
+      (roundBased
+        ? (latestInputRound.get(rank) ?? Number.NEGATIVE_INFINITY) > m.roundNumber
+        : bracketDependentHasInput(m, rank, byId));
+    if (isLocked) locked.add(m.id);
+  }
+  return locked;
+}
+
+/**
+ * {@link bracketDependents} suivi de `.some(hasScoreInput)`, sur un index
+ * partagé par tout le plateau : une cible d'une autre phase est ignorée, comme
+ * elle l'est là-bas faute de figurer dans la phase.
+ */
+function bracketDependentHasInput(
+  match: MatchScoreState,
+  rank: number,
+  byId: Map<number, MatchScoreState>,
+): boolean {
+  const seen = new Set<number>([match.id]);
+  const queue: MatchScoreState[] = [match];
+  while (queue.length > 0) {
+    const current = queue.shift() as MatchScoreState;
+    for (const id of [current.nextWinnerMatchId, current.nextLoserMatchId]) {
+      if (id === null || seen.has(id)) continue;
+      seen.add(id);
+      const target = byId.get(id);
+      if (!target || phaseRank(target) !== rank) continue;
+      if (hasScoreInput(target)) return true;
+      if (target.decided) queue.push(target);
+    }
+  }
+  return false;
+}
