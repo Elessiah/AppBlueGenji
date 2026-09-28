@@ -396,8 +396,9 @@ commun, et quatorze IP tenant chacune trois flux privaient tous les visiteurs de
 plus ancien des siens, pourvu qu'il en tienne strictement plus que le nouveau
 venu n'en aurait (`slotToEvict`) : un lecteur ordinaire déloge un client qui
 accumule, jamais un autre lecteur ordinaire, et le client délogé ne reprend pas
-sa place en se reconnectant. Les visiteurs sans IP connue forment un seul
-groupe. Le flux délogé voit sa connexion au bot coupée et se termine
+sa place en se reconnectant. Un visiteur sans IP connue compte pour un client à
+une place — rien ne dit que deux inconnus sont la même personne : il n'est
+jamais délogé, et n'en déloge qu'un client identifié qui accumule. Le flux délogé voit sa connexion au bot coupée et se termine
 proprement ; il faut désormais une IP par place pour fermer le direct à tous.
 
 L'IP retenue est celle **ajoutée par le proxy** (`X-Forwarded-For` lu depuis la

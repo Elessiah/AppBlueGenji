@@ -63,9 +63,11 @@ export function teamJoinNoticeRecipients(
 }
 
 /**
- * Équipes qu'une même personne peut faire prévenir de ses demandes, par
- * fenêtre de `TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS`, **toutes équipes
- * confondues**.
+ * Équipes **distinctes** qu'une même personne peut faire prévenir de ses
+ * demandes, par fenêtre de `TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS`. Des
+ * équipes, et non des demandes : retirer puis redéposer une demande à la même
+ * équipe ne fait rien partir (borne par équipe), et ne doit pas consommer ce
+ * plafond.
  *
  * La borne par équipe ne suffit pas : sans plafond sur le nombre d'équipes, un
  * compte — gratuit par OAuth — demandait à rejoindre chaque équipe du site et
@@ -80,12 +82,13 @@ export const TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP = 5;
 /**
  * Faut-il écrire ? Oui pour la **seule** demande de cette personne à cette
  * équipe dans la fenêtre — celle qui vient d'être déposée, d'où `<= 1` —, tant
- * que ses demandes de la fenêtre, toutes équipes confondues, n'excèdent pas
+ * que les équipes qu'elle a sollicitées dans la fenêtre n'excèdent pas
  * `TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP`.
  *
  * @param input.toThisTeam Demandes (tous statuts) de ce joueur à cette équipe
  *   créées depuis `TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS`, la nouvelle comprise.
- * @param input.toAnyTeam Même compte, toutes équipes confondues.
+ * @param input.toAnyTeam Équipes **distinctes** sollicitées dans la même fenêtre,
+ *   celle-ci comprise.
  */
 export function shouldNotifyTeamJoinRequest(input: { toThisTeam: number; toAnyTeam: number }): boolean {
   return input.toThisTeam <= 1 && input.toAnyTeam <= TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP;

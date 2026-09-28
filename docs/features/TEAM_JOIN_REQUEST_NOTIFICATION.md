@@ -44,11 +44,13 @@ compter.
 La borne par équipe ne borne pas le **nombre** d'équipes : un compte — gratuit
 par OAuth — demandait à rejoindre chaque équipe du site et faisait écrire le bot
 à toutes leurs gestions dans la journée. D'où un second plafond, toutes équipes
-confondues : au plus `TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP` (5) demandes du même
-joueur dans la fenêtre donnent un message ; au-delà, elles sont enregistrées et
-visibles sur les fiches, sans message. Les deux comptes se lisent en une seule
-requête (`SUM(team_id = ?)`, `COUNT(*)`), et `shouldNotifyTeamJoinRequest` les
-juge ensemble.
+confondues : un joueur fait prévenir au plus `TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP`
+(5) équipes **distinctes** dans la fenêtre ; au-delà, ses demandes sont
+enregistrées et visibles sur les fiches, sans message. Des équipes et non des
+demandes : redéposer à la même équipe ne fait rien partir, cela ne doit pas
+consommer le plafond. Les deux comptes se lisent en une seule requête
+(`SUM(team_id = ?)`, `COUNT(DISTINCT team_id)`), et `shouldNotifyTeamJoinRequest`
+les juge ensemble.
 
 ## Ce qui ne déclenche rien
 

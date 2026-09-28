@@ -39,17 +39,24 @@ export const MAX_BOT_FEED_STREAMS_PER_CLIENT = 3;
 export const MAX_BOT_FEED_STREAMS = 40;
 
 /**
- * Une place tenue : son client (`null` = IP inconnue, qui forment **un seul**
- * groupe pour le partage) et de quoi fermer le flux qui l'occupe.
+ * Une place tenue : son client (`null` = IP inconnue) et de quoi fermer le flux
+ * qui l'occupe.
  */
 type Slot = { clientKey: string | null; evict: () => void; released: boolean };
 
 /** Places tenues, de la plus ancienne à la plus récente. */
 const slots: Slot[] = [];
-const perClient = new Map<string | null, number>();
+/**
+ * Places par client **identifié**. Les visiteurs sans IP connue n'y figurent
+ * pas : rien ne dit que deux d'entre eux sont la même personne, les compter
+ * ensemble ferait déloger un lecteur à un seul onglet au motif que d'autres
+ * inconnus en tiennent. Chacun vaut donc un client à une place — jamais une
+ * cible du partage, et jamais un nouveau venu qui en tiendrait déjà.
+ */
+const perClient = new Map<string, number>();
 
 function heldBy(clientKey: string | null): number {
-  return perClient.get(clientKey) ?? 0;
+  return clientKey === null ? 0 : perClient.get(clientKey) ?? 0;
 }
 
 function releaseSlot(slot: Slot): void {
@@ -57,6 +64,7 @@ function releaseSlot(slot: Slot): void {
   slot.released = true;
   const index = slots.indexOf(slot);
   if (index >= 0) slots.splice(index, 1);
+  if (slot.clientKey === null) return;
   const current = heldBy(slot.clientKey);
   if (current <= 1) perClient.delete(slot.clientKey);
   else perClient.set(slot.clientKey, current - 1);
@@ -77,7 +85,7 @@ function releaseSlot(slot: Slot): void {
  * tous, il faut désormais une IP par place, et non plus une par trois.
  */
 function slotToEvict(held: number): Slot | null {
-  let victimKey: string | null | undefined;
+  let victimKey: string | undefined;
   let victimHeld = held + 1;
   for (const [key, count] of perClient) {
     if (count > victimHeld) {
@@ -122,7 +130,7 @@ export function acquireBotFeedSlot(
 
   const slot: Slot = { clientKey, evict, released: false };
   slots.push(slot);
-  perClient.set(clientKey, held + 1);
+  if (clientKey !== null) perClient.set(clientKey, held + 1);
   return () => releaseSlot(slot);
 }
 

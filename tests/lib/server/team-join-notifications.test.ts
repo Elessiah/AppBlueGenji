@@ -16,7 +16,7 @@ type Rows = { requests?: number; allTeams?: number; team?: { name: string } | nu
 
 function mockDb({ requests = 1, allTeams, team = { name: "Les Glaciers" }, members = [] }: Rows) {
   const execute = jest.fn<SqlQuery>(async (sql) => {
-    if (sql.includes("COUNT(*)")) return [[{ this_team: String(requests), any_team: allTeams ?? requests }], []];
+    if (sql.includes("AS any_team")) return [[{ this_team: String(requests), any_team: allTeams ?? requests }], []];
     if (sql.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     if (sql.includes("FROM bg_team_members")) return [members, []];
     throw new Error(`requête inattendue : ${sql}`);
@@ -118,9 +118,10 @@ describe("notifyTeamJoinRequest", () => {
 
     await notifyTeamJoinRequest(5, 42);
 
-    const count = execute.mock.calls.find(([sql]) => sql.includes("COUNT(*)"))!;
+    const count = execute.mock.calls.find(([sql]) => sql.includes("AS any_team"))!;
     expect(count[0]).toMatch(/kind = 'REQUEST'/);
-    expect(count[0]).toMatch(/SUM\(team_id = \?\) AS this_team, COUNT\(\*\) AS any_team/);
+    // Des équipes distinctes : redéposer une demande à la même équipe ne consomme pas le plafond.
+    expect(count[0]).toMatch(/SUM\(team_id = \?\) AS this_team, COUNT\(DISTINCT team_id\) AS any_team/);
     expect(count[0]).toMatch(/INTERVAL 24 HOUR/);
     expect(count[1]).toEqual([5, 42]);
     const members = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_team_members"))!;

@@ -139,10 +139,21 @@ describe("acquireBotFeedSlot", () => {
     expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
   });
 
-  it("fait céder les visiteurs sans IP connue, un seul groupe, à un visiteur identifié", () => {
+  it("ne compte pas les visiteurs sans IP connue comme un seul client", () => {
+    // Rien ne dit que deux inconnus sont la même personne : les regrouper
+    // ferait déloger un lecteur à un seul onglet au profit d'un visiteur identifié.
     const evict = jest.fn();
     for (let i = 0; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(null, evict);
-    expect(acquireBotFeedSlot("10.0.0.1")).not.toBeNull();
+    expect(acquireBotFeedSlot("10.0.0.1")).toBeNull();
+    expect(evict).not.toHaveBeenCalled();
+  });
+
+  it("fait céder un client identifié qui accumule à un visiteur sans IP connue", () => {
+    const evict = jest.fn();
+    acquireBotFeedSlot("10.0.0.1", evict);
+    acquireBotFeedSlot("10.0.0.1");
+    for (let i = 2; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(null);
+    expect(acquireBotFeedSlot(null)).not.toBeNull();
     expect(evict).toHaveBeenCalledTimes(1);
   });
 

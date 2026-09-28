@@ -38,7 +38,7 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   const db = await getDatabase();
 
   const [counts] = await db.execute<(RowDataPacket & { this_team: number | string | null; any_team: number })[]>(
-    `SELECT SUM(team_id = ?) AS this_team, COUNT(*) AS any_team FROM bg_team_invitations
+    `SELECT SUM(team_id = ?) AS this_team, COUNT(DISTINCT team_id) AS any_team FROM bg_team_invitations
      WHERE user_id = ? AND kind = 'REQUEST'
        AND created_at > NOW() - INTERVAL ${Number(TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS)} HOUR`,
     [teamId, requesterId],
