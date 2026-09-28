@@ -99,6 +99,85 @@ tapé à la main — ce qui le rendait d'autant plus dangereux.
 `tests/scripts/deploy-scripts.test.ts` garde ces deux fichiers à la source :
 rien n'y est exécuté, c'est leur **forme** qui est tenue.
 
+## Plafond de débit des pages (nginx)
+
+**Rien, dans l'application, ne plafonne le rechargement d'une page.** Les
+plafonds de `lib/server/api-guard.ts` ne couvrent que les routes `/api/*`, et
+depuis que la politique de sécurité du contenu pose un nonce par requête
+(`app/layout.tsx`, `await headers()`), aucune page n'est plus prérendue : chaque
+F5 refait un rendu serveur complet, et le serveur le termine même quand le
+navigateur l'a abandonné pour le suivant. Les lectures coûteuses sont en cache
+(vitrine, liste des tournois, instantanés, statistiques — `lib/server/stats-cache.ts`),
+si bien qu'un humain qui martèle F5 ne coûte presque que du processeur ; un
+script, lui, peut saturer le Raspberry Pi à coups de rendus.
+
+Le plafond des documents se pose donc **au proxy**, seul endroit qui voie toutes
+les requêtes avant qu'elles coûtent quoi que ce soit, et qui compte pour tous les
+processus. La configuration nginx n'est pas versionnée ici (elle est partagée
+avec un autre site) : le bloc ci-dessous est à reporter à la main.
+
+```nginx
+# Contexte http {} — noms préfixés : la configuration est partagée.
+limit_req_zone $binary_remote_addr zone=bluegenji_pages:10m rate=5r/s;
+limit_req_status 429;
+
+server {
+    # … server_name, certificats, etc.
+
+    # Fichiers de build et images optimisées : une page en demande des
+    # dizaines, les compter ferait refuser la page suivante à une salle entière.
+    # L'optimiseur garde son résultat sur disque : il ne recalcule pas.
+    location /_next/ {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    # Fichiers de `public/` (pastilles, icônes) : même raison.
+    location ~* \.(?:png|jpe?g|gif|webp|avif|svg|ico|txt|xml|woff2?)$ {
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    # API : l'application plafonne elle-même, route par route et par compte.
+    # Le flux SSE ne doit ni être plafonné ni mis en tampon.
+    location /api/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_buffering off;
+    }
+
+    # Pages (documents HTML) : 5 par seconde et par IP, rafale de 50 servie
+    # sans attente.
+    location / {
+        limit_req zone=bluegenji_pages burst=50 nodelay;
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+}
+```
+
+Trois points à ne pas perdre en l'adaptant :
+
+- **Le plafond est par IP, et une IP n'est pas une personne.** Un tournoi en
+  réseau local sort tout entier par la même adresse : 5 pages par seconde et une
+  rafale de 50 laissent naviguer une salle de joueurs, et ne bornent qu'un
+  script. Ne pas descendre en dessous sans l'avoir mesuré.
+- **`X-Forwarded-For` doit rester posé** sur `/api/` : c'est de lui que
+  l'application tire l'IP de ses propres plafonds (`TRUSTED_PROXY_HOPS`, défaut
+  1 = ce nginx). Sans lui, une identité absente n'est volontairement **pas**
+  plafonnée (`enforceRateLimit`), et tous les plafonds par IP tombent.
+- **Essayer d'abord à blanc** : `limit_req_dry_run on;` (nginx ≥ 1.17.1) dans
+  `location /` journalise les refus sans les appliquer. Une soirée de tournoi
+  sans ligne `limiting requests, dry run` dans `error.log`, puis on retire la
+  directive.
+
+Vérification, depuis une autre machine, une fois la configuration rechargée
+(`sudo nginx -t && sudo systemctl reload nginx`) :
+
+```bash
+for i in $(seq 1 80); do curl -s -o /dev/null -w "%{http_code}\n" https://<domaine>/; done | sort | uniq -c
+```
+
+Une cinquantaine de `200`, puis des `429`.
+
 ## Base de données
 
 Le seed ne se pose jamais sur la production : `npm run seed` refuse de tourner
