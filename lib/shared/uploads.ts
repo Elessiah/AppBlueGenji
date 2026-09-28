@@ -36,6 +36,22 @@ export function toDiskUploadPath(url: string | null | undefined): string | null 
   return null;
 }
 
+/** Dossiers d'upload, un par famille d'image (`lib/server/image-upload.ts`). */
+export type UploadFolder = "avatars" | "teams" | "sponsors" | "benevoles" | "tournaments";
+
+/**
+ * Vrai si l'adresse désigne un fichier téléversé **du dossier donné**.
+ *
+ * « À nous » ne suffit pas quand l'adresse vient d'une saisie et que son
+ * remplacement efface le fichier : coller le logo d'une équipe comme logo de
+ * partenaire puis supprimer le partenaire effaçait le logo de l'équipe. Chaque
+ * geste ne touche donc qu'au dossier qu'il remplit lui-même.
+ */
+export function isStoredUploadIn(url: string | null | undefined, folder: UploadFolder): boolean {
+  const disk = toDiskUploadPath(url);
+  return disk !== null && disk.startsWith(`${DISK_PREFIX}${folder}/`) && !disk.includes("..");
+}
+
 /**
  * L'URL, si c'est une image **à nous** ; `null` sinon.
  *

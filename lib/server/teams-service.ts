@@ -26,6 +26,7 @@ import { TEAM_NAME_ALREADY_USED, checkTeamName } from "@/lib/shared/team-name";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { assertTermsAccepted, recordTermsAcceptance } from "@/lib/server/terms-acceptance";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
+import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
 import type { TeamPageIdentity } from "@/lib/shared/entity-page-titles";
 
 /**
@@ -926,7 +927,8 @@ async function teamIsDeleted(teamId: number): Promise<boolean> {
 
 /**
  * Dissout (soft-delete) une équipe : réservé au propriétaire. Les données
- * saisies par les utilisateurs (nom, description, logo) sont effacées/anonymisées
+ * saisies par les utilisateurs (nom, description, logo — fichier compris, s'il
+ * n'est plus désigné ailleurs) sont effacées/anonymisées
  * et les membres détachés, mais la ligne et tout l'historique généré par la
  * plateforme (inscriptions, matchs, classements) sont conservés à jamais.
  */
@@ -944,9 +946,18 @@ export async function softDeleteTeam(
     throw new Error("FORBIDDEN");
   }
 
+  let previousLogoUrl: string | null = null;
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+
+    // Le logo est relu sous verrou, en toute première instruction : c'est le
+    // fichier que la dissolution retire, et il n'est effacé qu'après le commit.
+    const [locked] = await connection.execute<(RowDataPacket & { logo_url: string | null })[]>(
+      `SELECT logo_url FROM bg_teams WHERE id = ? FOR UPDATE`,
+      [teamId],
+    );
+    previousLogoUrl = locked[0]?.logo_url ?? null;
 
     // Anonymise les données saisies par l'utilisateur et libère les deux
     // identités uniques : le nom **et le sigle**. Le sigle vaut sur tout le
@@ -984,6 +995,12 @@ export async function softDeleteTeam(
   } finally {
     connection.release();
   }
+
+  // Vider la colonne ne retirait pas l'image : le fichier restait servi par
+  // `/api/uploads/teams/…`, en cache public d'un an. Après le commit (un
+  // `unlink` ne se défait pas), et seulement s'il vit dans `teams/` et que plus
+  // aucune ligne ne le désigne — un logo partagé reste à qui le porte encore.
+  await deleteUnreferencedUpload(previousLogoUrl, "teams");
 }
 
 // ───────────────────────────── Invitations & self-service ─────────────────────────────

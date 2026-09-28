@@ -154,3 +154,28 @@ describe("FALLBACK_SPONSORS", () => {
     expect(FALLBACK_SPONSORS.every((s) => s.bannerUrl === null)).toBe(true);
   });
 });
+
+/**
+ * Le logo accepte une adresse collée : une adresse d'upload d'un autre dossier
+ * (avatar, logo d'équipe) y était acceptée, puis effacée du disque au
+ * remplacement ou à la suppression du partenaire.
+ */
+describe("validateSponsorInput — logo", () => {
+  it("accepte un logo importé ou une adresse étrangère", () => {
+    for (const logoUrl of ["/api/uploads/sponsors/1-a.webp", "/uploads/sponsors/1-a.webp", "https://cdn.exemple.fr/logo.png"]) {
+      const result = validateSponsorInput({ name: "X", logoUrl });
+      expect(result.ok).toBe(true);
+      if (result.ok) expect(result.value.logoUrl).toBe(logoUrl);
+    }
+  });
+
+  it.each([
+    "/api/uploads/avatars/12-a.webp",
+    "/api/uploads/teams/3-a.webp",
+    "/uploads/benevoles/1-a.webp",
+    "/api/uploads/tournaments/4-a.webp",
+    "/api/uploads/sponsors/../avatars/12-a.webp",
+  ])("refuse l'adresse d'upload d'un autre dossier %s", (logoUrl) => {
+    expect(validateSponsorInput({ name: "X", logoUrl })).toEqual({ ok: false, error: "INVALID_LOGO_URL" });
+  });
+});

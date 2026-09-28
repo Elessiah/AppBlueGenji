@@ -5,6 +5,11 @@ jest.mock("@/lib/server/terms-acceptance", () =>
 );
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/database");
+// L'import de la photo résout le nom d'hôte avant d'y aller : une adresse
+// publique, sans dépendre du réseau de la machine qui lance les tests.
+jest.mock("node:dns/promises", () => ({
+  lookup: jest.fn(async () => [{ address: "142.250.75.225", family: 4 }]),
+}));
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");

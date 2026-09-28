@@ -1,3 +1,5 @@
+import { isStoredUploadIn, toDiskUploadPath } from "./uploads";
+
 export type Benevole = {
   id: number;
   firstName: string;
@@ -64,6 +66,13 @@ export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationR
   }
   if (pseudo && pseudo.length > BENEVOLE_PSEUDO_MAX) return { ok: false, error: "PSEUDO_TOO_LONG" };
   if (photoUrl && photoUrl.length > BENEVOLE_PHOTO_URL_MAX) return { ok: false, error: "PHOTO_URL_TOO_LONG" };
+  // Une photo téléversée vit dans `benevoles/` : une autre adresse d'upload
+  // (avatar d'un joueur, logo d'une équipe) serait effacée au remplacement de
+  // la photo. Une adresse étrangère reste acceptée ; `localUploadUrl` la
+  // tait à la sortie.
+  if (photoUrl && toDiskUploadPath(photoUrl) !== null && !isStoredUploadIn(photoUrl, "benevoles")) {
+    return { ok: false, error: "INVALID_PHOTO_URL" };
+  }
 
   return {
     ok: true,

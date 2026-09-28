@@ -152,7 +152,7 @@ describe("softDeleteTeam — dérogation staff", () => {
 
     await softDeleteTeam(99, 3, true);
 
-    expect(connectionExecute.mock.calls[0][0]).toMatch(/UPDATE bg_teams\s+SET deleted_at = NOW\(\)/);
+    expect(connectionExecute.mock.calls[1][0]).toMatch(/UPDATE bg_teams\s+SET deleted_at = NOW\(\)/);
     expect(connection.commit).toHaveBeenCalled();
   });
 

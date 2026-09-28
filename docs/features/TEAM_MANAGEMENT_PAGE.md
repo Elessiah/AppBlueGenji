@@ -53,7 +53,11 @@ transfert, attribution d'une fantôme, confirmations).
   vidait sur un pseudo mal tapé.
 - Les gestes destructeurs passent par `ConfirmDialog` : exclure un membre (qui
   partait sans question), quitter l'équipe, dissoudre (qui exige désormais de
-  **recopier le nom**, comme la suppression d'un tournoi).
+  **recopier le nom**, comme la suppression d'un tournoi). La dissolution
+  efface aussi le **fichier** du logo, après le commit (`softDeleteTeam` →
+  `deleteUnreferencedUpload`) : vider `logo_url` le laissait servi publiquement,
+  en cache d'un an. Un logo partagé avec une autre équipe, ou masqué par la
+  modération, reste en place.
 
 ## Rôles
 
