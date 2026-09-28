@@ -394,15 +394,17 @@
    tournoi, dans le coin où l'on s'attend à trouver ce qui suit la page.
    Ancrage : le « ? » (`.cta-float-help`, `app/globals.css`) occupe 78 → 126 px
    du bas, la pastille commence donc 12 px plus haut ; sous 720 px il descend
-   à 20 → 64 px, et elle le suit. Empilement : au-dessus des boutons flottants
-   (100), **sous** le témoin du régime de charge (110) — son panneau monte
-   dans cette zone quand on l'ouvre et doit passer devant ; la modale de
-   lancement (1250) reste au-dessus de tout. */
+   à 20 → 64 px, et elle le suit. Empilement (70) : au-dessus de la barre de
+   navigation (50), **sous** les modales de page (80 et plus — ouverte, la
+   modale de suppression d'un tournoi voyait la pastille recouvrir son bouton
+   « Supprimer ») et sous le témoin du régime de charge (110), dont le panneau
+   monte dans cette zone quand on l'ouvre ; la modale de lancement (1250)
+   reste au-dessus de tout. */
 .fab {
   position: fixed;
   right: 28px;
   bottom: 138px;
-  z-index: 105;
+  z-index: 70;
   display: inline-flex;
   align-items: center;
   gap: 8px;

@@ -763,12 +763,14 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 
 /* Bouton d'aide flottant des pages de tournoi : pastille ronde « ? » renvoyant
    vers les règles du mode joué. Même ancrage que .cta-float-home (les deux ne
-   coexistent jamais sur une même page). */
+   coexistent jamais sur une même page). Empilement (70) : sous les modales de
+   page (80 et plus), qu'il recouvrait sinon — un bouton flottant n'a rien à
+   faire devant une boîte de dialogue ouverte. */
 .cta-float-help {
   position: fixed;
   bottom: 78px;
   right: 28px;
-  z-index: 100;
+  z-index: 70;
   display: inline-flex;
   align-items: center;
   justify-content: center;
