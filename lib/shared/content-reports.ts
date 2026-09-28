@@ -96,12 +96,12 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
   },
   MODERATION: {
     label: "Modération",
-    hint: "Un pseudo, un nom d'équipe ou un comportement contraire aux règles.",
+    hint: "Un pseudo, un nom d'équipe ou un contenu du site contraire aux règles.",
     icon: "⚑",
     targets: ["USER", "TEAM"],
     requiresContact: false,
     requiresRightsDeclaration: false,
-    descriptionPlaceholder: "Ce qui s'est passé, où et quand…",
+    descriptionPlaceholder: "Quel contenu du site, sur quelle page, et ce qui ne va pas…",
   },
   BUG: {
     label: "Bug",
@@ -132,6 +132,34 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
       "Pourquoi le signalement est infondé : licence, autorisation du titulaire, création de l'équipe, contexte…",
   },
 };
+
+/**
+ * Portail de support de l'association (Spiceworks), où se signale la
+ * modération **qui n'est pas propre au site** : un comportement en match, une
+ * insulte d'un joueur, de la triche, un litige sur Discord.
+ *
+ * Le formulaire du site ne garde que ce qu'il héberge — un pseudo, un nom
+ * d'équipe, un logo — parce que c'est là que joue sa responsabilité
+ * d'hébergeur et que ses outils (masquage, contestation, prévenance des
+ * personnes visées) ont une prise. Un comportement en jeu n'a rien de tout
+ * cela : il se traite au cas par cas par l'équipe de modération, sur un outil
+ * de tickets qui garde l'échange avec le signalant.
+ *
+ * Le site n'y transmet **rien** : c'est un lien, que le visiteur suit s'il le
+ * souhaite.
+ */
+export const MODERATION_SUPPORT_PORTAL_URL = "https://bluegenjiesport.on.spiceworks.com/portal";
+
+/** Carte du choix de catégorie qui renvoie vers le portail de support. */
+export const OFF_SITE_CONDUCT_ENTRY = {
+  label: "Comportement d'un joueur",
+  hint: "En match, en vocal ou sur Discord : insulte, triche, anti-jeu… Se signale sur notre portail de support.",
+  icon: "↗",
+} as const;
+
+/** Rappel affiché dans l'étape « Modération » du formulaire. */
+export const OFF_SITE_CONDUCT_NOTICE =
+  "Ce formulaire concerne les contenus publiés sur le site (pseudo, nom d'équipe, logo…). Un mauvais comportement en match, une insulte d'un joueur, de la triche ou un problème sur Discord se signalent sur le";
 
 export const REPORT_TARGET_LABELS: Record<ReportTargetType, { one: string; many: string; picker: string }> = {
   USER: { one: "joueur", many: "joueurs", picker: "Joueurs concernés" },
