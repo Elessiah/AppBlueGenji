@@ -5,7 +5,7 @@ export function phaseFormatLabel(format: PhaseFormat): string {
     case "SWISS":
       return "Ronde suisse";
     case "SURVIVAL":
-      return "Survie";
+      return "Survie par coupes";
     case "DOUBLE":
       return "Double élimination";
     case "SINGLE":

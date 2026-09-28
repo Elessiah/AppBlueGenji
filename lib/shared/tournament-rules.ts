@@ -11,6 +11,7 @@
  * Module `shared` : importable côté serveur comme côté client.
  */
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "./constants";
+import { LAUNCH_AUTO_DELAY_MINUTES } from "./match-launch";
 import { RANKING_SEEDING_RULE } from "./ranking";
 import type { TournamentFormat } from "./types";
 
@@ -53,6 +54,27 @@ export type TournamentRuleMode = {
  */
 export const COMMON_RULES: RuleSection[] = [
   {
+    title: "Lancement d'un match",
+    body: [
+      "Un match jouable ne commence pas d'emblée : à son heure de début (ou dès qu'il est jouable s'il n'a pas d'horaire), il entre en **lancement**. Une fenêtre s'ouvre alors pour les joueurs des deux équipes, avec l'équipe hôte et les contacts utiles.",
+    ],
+    bullets: [
+      "Chaque équipe confirme qu'elle est prête — capitaine, manager ou propriétaire ; en tournoi individuel, le joueur lui-même. Le caster inscrit confirme aussi.",
+      `Le match est lancé quand toutes les parties sont prêtes, quand un arbitre le force, ou d'office au bout de ${LAUNCH_AUTO_DELAY_MINUTES} minutes.`,
+      "Aucun score ne peut être déclaré avant le lancement.",
+    ],
+  },
+  {
+    title: "Format des matchs",
+    body: [
+      "Le format des matchs (BO — nombre de maps au maximum — ou FT — nombre de maps à gagner) est fixé à la création et vaut pour tout le tournoi. Sans réglage, le score est libre.",
+    ],
+    bullets: [
+      "Un score qui dépasse le format, ou qui ne désigne pas de vainqueur quand le format en exige un, est refusé à la saisie.",
+      "Le match nul n'existe que si le tournoi l'autorise ; il ne s'applique jamais à un arbre à élimination directe.",
+    ],
+  },
+  {
     title: "Report des scores",
     body: [
       "Le mécanisme est le même dans tous les modes : chaque équipe déclare le score de son match depuis la page du tournoi.",
@@ -61,18 +83,28 @@ export const COMMON_RULES: RuleSection[] = [
       "Deux déclarations concordantes valident le match immédiatement.",
       `Une seule déclaration ouvre un délai de confirmation de ${SCORE_REPORT_TIMEOUT_MINUTES} minutes : sans contestation de l'adversaire, le score est retenu.`,
       "Deux déclarations contradictoires mettent le match en litige : un arbitre tranche et enregistre le score officiel.",
-      "Un arbitre ou un administrateur peut corriger un score à tout moment.",
+      "Un arbitre ou un administrateur peut corriger un score tant que la manche suivante n'a reçu aucune saisie ; au-delà, le score est verrouillé, y compris pour lui.",
     ],
   },
   {
     title: "Forfait",
     body: [
-      "Une équipe peut déclarer forfait à tout moment ; un arbitre peut aussi le faire à sa place.",
+      "Un arbitre peut prononcer le forfait d'une équipe sur un match : la rencontre est résolue en faveur de l'adversaire. Pour elle, c'est une défaite comme une autre : en élimination simple elle sort, en double élimination elle descend au bracket bas, en BlueGenji Survie elle perd le score plein du format et reste en lice avec le capital qui lui reste.",
     ],
     bullets: [
-      "Le match en cours est résolu en faveur de l'adversaire.",
-      "L'équipe quitte le tournoi et n'apparaît plus dans les rounds suivants.",
+      "En Survie par coupes, en Ronde suisse et en BlueGenji Survie, une équipe peut aussi se retirer du reste du tournoi pendant qu'il est en cours (ou l'arbitre l'en retirer) : elle n'est plus appariée.",
       "Son classement final tient compte du moment où elle est sortie.",
+    ],
+  },
+  {
+    title: "Double forfait",
+    body: [
+      "Quand aucune des deux équipes ne se présente, l'arbitre prononce un **double forfait** : le match est clos sans vainqueur ni score, et les deux équipes le perdent.",
+    ],
+    bullets: [
+      "En élimination, les deux équipes sortent et personne ne monte : le match suivant devient une victoire d'office pour l'autre qualifiée.",
+      "En Ronde suisse et en Survie par coupes, chacune encaisse une défaite ; en qualification BlueGenji Survie, chacune perd le score plein du format.",
+      "En finale, un double forfait ne désigne pas de championne : les deux finalistes sont classées 2ᵉ ex æquo.",
     ],
   },
 ];
@@ -195,16 +227,17 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
     label: "BlueGenji Survie",
     shortLabel: "BG Survie",
     status: "AVAILABLE",
-    tagline: "Un capital d'endurance qui fond à chaque défaite, puis un arbre à huit.",
+    tagline:
+      "Un capital d'endurance qui fond à chaque map perdue, puis un arbre à huit. Personne n'est coupé : on sort quand son capital est vide.",
     facts: [
-      { label: "Capital", value: "9 points" },
+      { label: "Capital", value: "9 points par défaut" },
       { label: "Barème", value: "+1 / −1 par map" },
       { label: "Élimination", value: "À 0 point" },
       { label: "Play-offs", value: "8 équipes" },
     ],
     principles: [
       "Chaque équipe démarre avec un capital d'endurance : une map gagnée le fait monter, une map perdue le fait descendre.",
-      "Tomber à zéro élimine immédiatement — personne n'est éliminé par une coupe, seulement par ses propres résultats.",
+      "Tomber à zéro élimine immédiatement — personne n'est éliminé par une coupe, seulement par ses propres résultats. C'est ce qui la distingue de la **Survie par coupes**, où les deux dernières sortent à intervalle régulier.",
       "Quand il ne reste que huit équipes — ou au bout du nombre de manches annoncé, si le tournoi en fixe un —, la phase qualificative s'arrête et laisse place à un arbre à élimination directe.",
     ],
     diagram: "BG_SURVIE",
@@ -248,7 +281,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Fin de la phase qualificative",
         body: [
-          "La phase s'arrête dès qu'il ne reste plus que huit équipes (ou moins). Sans autre réglage, aucune durée maximale n'est imposée : c'est l'endurance seule qui fait le tri.",
+          "La phase s'arrête à la fin de la manche où il ne reste plus que huit équipes (ou moins) : une manche entamée est toujours jouée jusqu'au bout. Sans autre réglage, aucune durée maximale n'est imposée : c'est l'endurance seule qui fait le tri.",
           "Le tournoi peut cependant annoncer un **nombre maximal de manches**. La phase s'arrête alors à la manche dite, et les huit premières du classement sont qualifiées — même si elles étaient encore trente en lice. Les autres sortent avec le capital qu'il leur restait : elles ne sont pas « éliminées », elles sont **hors course**.",
         ],
         bullets: [
@@ -270,6 +303,20 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
           "Match 4 : 3ᵉ contre 7ᵉ",
           "L'équipe affichée au-dessus prend le side gauche, celle du dessous le side droite.",
           "Une petite finale départage la 3ᵉ place, jouée en parallèle de la finale.",
+          "Le vainqueur du match 1 affronte celui du match 2 en demi-finale, le vainqueur du match 3 celui du match 4.",
+          "L'arbre ne connaît pas le match nul : il se joue au format propre aux play-offs s'il en a un, sinon au format du tournoi, égalité fermée.",
+        ],
+      },
+      {
+        title: "Pénalités d'endurance",
+        body: [
+          "L'arbitrage peut retirer des points de capital sans passer par un score de match : retard, joueur non éligible, conduite antisportive. Chaque sanction porte un motif, public, et figure au journal des sanctions sous le classement.",
+        ],
+        bullets: [
+          "La pénalité s'applique à la manche en cours, après ses matchs : si elle vide le capital, l'équipe est éliminée comme par une défaite.",
+          "Elle peut être levée tant qu'aucune manche suivante n'a reçu de score ; le classement est alors recalculé comme si elle n'avait jamais existé.",
+          "Aucune pénalité ne se pose ni ne se lève une fois l'arbre des play-offs lancé.",
+          "Au classement, « −N » à côté du capital indique ce que les pénalités ont réellement retiré.",
         ],
       },
       {
@@ -289,10 +336,11 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
   {
     slug: "survie",
     format: "SURVIVAL",
-    label: "Survie",
-    shortLabel: "Survie",
+    label: "Survie par coupes",
+    shortLabel: "Survie par coupes",
     status: "AVAILABLE",
-    tagline: "Un seul groupe, des coupes régulières, une seule survivante.",
+    tagline:
+      "Un seul groupe, des coupes à cadence fixe, une seule survivante. Ce sont les coupes qui éliminent, pas un capital de points.",
     facts: [
       { label: "Structure", value: "Groupe unique" },
       { label: "Coupe", value: "2 dernières" },
@@ -302,7 +350,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
     principles: [
       "Pas d'arbre : toutes les équipes restent dans un même groupe, classé et reclassé à chaque round.",
       "À chaque round, les équipes sont appariées par paires adjacentes au classement : 1 vs 2, 3 vs 4, 5 vs 6…",
-      "À intervalle régulier, les deux dernières du classement sont éliminées, jusqu'à la championne.",
+      "À intervalle régulier, les deux dernières du classement sont éliminées, jusqu'à la championne. À ne pas confondre avec **BlueGenji Survie**, où chaque équipe sort quand son capital d'endurance est vide, sans coupe.",
     ],
     diagram: "SURVIVAL",
     diagramCaption:
@@ -426,7 +474,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
       {
         title: "Abandon",
         body: [
-          "Comme en Survie, une équipe peut quitter le tournoi en cours de route. Elle conserve les points déjà acquis mais n'est plus appariée, et passe derrière toutes les équipes encore en lice au classement final.",
+          "Comme en Survie par coupes, une équipe peut quitter le tournoi en cours de route. Elle conserve les points déjà acquis mais n'est plus appariée, et passe derrière toutes les équipes encore en lice au classement final.",
         ],
       },
       {

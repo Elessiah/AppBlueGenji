@@ -24,6 +24,23 @@ export const metadata: Metadata = pageMetadata({
   path: "/accessibilite",
 });
 
+/** Les deux moyens de nous joindre, repris là où une demande est proposée. */
+function ContactList({ email }: { email: string }) {
+  return (
+    <ul>
+      <li>
+        Par courriel : <a href={`mailto:${email}`}>{email}</a>
+      </li>
+      <li>
+        Sur le{" "}
+        <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
+          serveur Discord de l&apos;association (nouvel onglet)
+        </a>
+      </li>
+    </ul>
+  );
+}
+
 /**
  * Déclaration d'accessibilité, au modèle RGAA 4.1. Le contenu vit dans
  * `lib/shared/accessibility-statement.ts` : la page ne décide de rien, elle met
@@ -98,10 +115,13 @@ export default function AccessibilityStatementPage() {
               <p className={styles.criterion}>{issue.criterion}</p>
               <p>{issue.detail}</p>
               {issue.workaround ? (
-                <p className={styles.workaround}>
-                  <strong>En attendant : </strong>
-                  {issue.workaround}
-                </p>
+                <div className={styles.workaround}>
+                  <p>
+                    <strong>En attendant : </strong>
+                    {issue.workaround}
+                  </p>
+                  {issue.requestByContact ? <ContactList email={contactEmail} /> : null}
+                </div>
               ) : null}
             </li>
           ))}
@@ -118,7 +138,7 @@ export default function AccessibilityStatementPage() {
         <div className={styles.prose}>
           <p>
             Le bouton en bas à gauche de chaque page ouvre le <strong>menu d&apos;accessibilité</strong>.
-            Ses réglages sont désactivés par défaut et gardés dans ton navigateur :
+            Ses réglages sont désactivés par défaut et gardés dans votre navigateur :
           </p>
           <ul>
             {accessibilityFeatures().map((feature) => (
@@ -163,21 +183,11 @@ export default function AccessibilityStatementPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            Si tu n&apos;arrives pas à accéder à un contenu ou à un service, écris-nous : nous
-            chercherons une alternative accessible, ou te transmettrons l&apos;information sous une
-            autre forme.
+            Si vous n&apos;arrivez pas à accéder à un contenu ou à un service, écrivez-nous : nous
+            chercherons une alternative accessible, ou vous transmettrons l&apos;information sous
+            une autre forme.
           </p>
-          <ul>
-            <li>
-              Par courriel : <a href={`mailto:${contactEmail}`}>{contactEmail}</a>
-            </li>
-            <li>
-              Sur le{" "}
-              <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
-                serveur Discord de l&apos;association (nouvel onglet)
-              </a>
-            </li>
-          </ul>
+          <ContactList email={contactEmail} />
         </div>
       </section>
 
@@ -190,9 +200,9 @@ export default function AccessibilityStatementPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            Si tu nous as signalé un défaut qui t&apos;empêche d&apos;accéder à un contenu ou à un
-            service et que tu n&apos;as pas obtenu de réponse satisfaisante, tu peux saisir le
-            Défenseur des droits :
+            Si vous nous avez signalé un défaut qui vous empêche d&apos;accéder à un contenu ou à
+            un service et que vous n&apos;avez pas obtenu de réponse satisfaisante, vous pouvez
+            saisir le Défenseur des droits :
           </p>
           <ul>
             <li>
@@ -205,7 +215,7 @@ export default function AccessibilityStatementPage() {
             <li>
               en contactant{" "}
               <a href="https://www.defenseurdesdroits.fr/carte-des-delegues" target="_blank" rel="noreferrer">
-                le délégué de ta région (nouvel onglet)
+                le délégué de votre région (nouvel onglet)
               </a>
               ;
             </li>

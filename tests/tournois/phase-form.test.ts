@@ -189,8 +189,8 @@ describe("phase-form — phaseFormatLabel", () => {
     expect(phaseFormatLabel("SWISS")).toBe("Ronde suisse");
   });
 
-  it('retourne "Survie" pour SURVIVAL', () => {
-    expect(phaseFormatLabel("SURVIVAL")).toBe("Survie");
+  it('retourne "Survie par coupes" pour SURVIVAL', () => {
+    expect(phaseFormatLabel("SURVIVAL")).toBe("Survie par coupes");
   });
 });
 

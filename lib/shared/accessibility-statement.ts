@@ -24,7 +24,7 @@
 import { A11Y_SETTINGS } from "@/lib/shared/accessibility-settings";
 
 /** Date d'établissement (ou de dernière mise à jour) de la déclaration. */
-export const ACCESSIBILITY_STATEMENT_DATE = "2026-09-24";
+export const ACCESSIBILITY_STATEMENT_DATE = "2026-09-28";
 
 /** Référentiel suivi. */
 export const ACCESSIBILITY_STANDARD = "RGAA 4.1 (critères WCAG 2.1 niveau AA)";
@@ -86,6 +86,12 @@ export type KnownIssue = {
   detail: string;
   /** Ce qui permet de le contourner aujourd'hui, s'il y a quelque chose. */
   workaround: string | null;
+  /**
+   * Le contournement passe par une demande : la page affiche alors les moyens
+   * de contact **à la suite** de la phrase, plutôt que de renvoyer le lecteur
+   * vers une section plus bas qu'il devrait aller chercher.
+   */
+  requestByContact?: boolean;
 };
 
 /** Contenus connus pour ne pas être accessibles, et leur contournement. */
@@ -114,7 +120,8 @@ export const KNOWN_ISSUES: readonly KnownIssue[] = [
     title: "Statuts de l'association",
     criterion: "RGAA 13.3",
     detail: "Les statuts sont publiés en PDF, sans contrôle d'accessibilité du document.",
-    workaround: "Une version accessible peut être demandée par le contact ci-dessous.",
+    workaround: "Une version accessible des statuts peut être demandée :",
+    requestByContact: true,
   },
 ];
 

@@ -231,7 +231,7 @@ export function AccessibilityPanel({
           <span aria-hidden="true">×</span>
         </button>
       </div>
-      <p className={styles.intro}>Tous désactivés par défaut. Ton choix est gardé dans ce navigateur.</p>
+      <p className={styles.intro}>Tous désactivés par défaut. Votre choix est gardé dans ce navigateur.</p>
       <ScrollArea orientation="y" className={styles.list} ariaLabel="Réglages d'accessibilité">
         <ul className={styles.options}>
           {A11Y_SETTINGS.map((setting) => {
@@ -265,7 +265,7 @@ export function AccessibilityPanel({
           })}
         </ul>
         <p className={styles.hint}>
-          Pour agrandir le texte, utilise le zoom de ton navigateur (Ctrl + ou ⌘ + sur Mac).
+          Pour agrandir le texte, utilisez le zoom de votre navigateur (Ctrl + ou ⌘ + sur Mac).
         </p>
       </ScrollArea>
       <div className={styles.foot}>

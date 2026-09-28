@@ -189,3 +189,35 @@
   font-size: 13.5px;
   line-height: 1.6;
 }
+
+/* Réglages d'un tournoi (`?tournoi=<id>`) : une grille d'étiquettes et de
+   valeurs par groupe, lisible à la largeur d'un téléphone. */
+.settingsIntro {
+  max-width: 70ch;
+  margin: 0 0 16px;
+  color: var(--ink-mute);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.settings {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+
+.setting {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settingValue {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}

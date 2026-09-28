@@ -389,7 +389,7 @@ export function PhaseCard({
                 <option value="SINGLE">Élimination simple</option>
                 <option value="DOUBLE">Double élimination</option>
                 <option value="SWISS">Ronde suisse</option>
-                <option value="SURVIVAL">Survie</option>
+                <option value="SURVIVAL">Survie par coupes</option>
               </select>
               {errorText("format")}
             </div>

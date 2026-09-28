@@ -49,7 +49,7 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
     slug: "guide",
     title: "Guide utilisateur",
     eyebrow: "PRISE EN MAIN · FR",
-    summary: "Services, format des messages et commandes slash.",
+    summary: "Jeux couverts, services, format des messages et commandes slash.",
     file: "helpfr.md",
   },
   {

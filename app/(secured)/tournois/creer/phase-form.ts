@@ -54,7 +54,7 @@ export function phaseFormatLabel(format: PhaseFormat): string {
     case "SWISS":
       return "Ronde suisse";
     case "SURVIVAL":
-      return "Survie";
+      return "Survie par coupes";
     default:
       const _: never = format;
       return _;

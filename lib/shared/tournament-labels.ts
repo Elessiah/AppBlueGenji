@@ -15,7 +15,7 @@ export const FORMAT_LABELS: Record<TournamentFormat, string> = {
   SINGLE: "Simple élimination",
   DOUBLE: "Double élimination",
   SWISS: "Ronde suisse",
-  SURVIVAL: "Survie",
+  SURVIVAL: "Survie par coupes",
   MULTI: "Multi-phases",
   BG_SURVIE: "BlueGenji Survie",
 };

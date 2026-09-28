@@ -446,7 +446,7 @@ export function describePhasePlan(plan: ResolvedPhase[]): string[] {
       case "SWISS":
         return "Ronde suisse";
       case "SURVIVAL":
-        return "Survie";
+        return "Survie par coupes";
     }
   };
 
