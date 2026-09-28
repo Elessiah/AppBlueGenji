@@ -224,6 +224,11 @@ export function MatchRow({
         >
           <span aria-hidden="true">🔒</span>
           Score verrouillé
+          {/* Le motif n'était qu'en infobulle, qu'un bloc non focalisable ne
+              montre ni au clavier ni aux lecteurs d'écran. */}
+          <span className="sr-only">
+            : la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.
+          </span>
         </div>
       )}
     </div>
