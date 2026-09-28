@@ -100,6 +100,40 @@ async function finalizeMatch(
   );
 }
 
+/**
+ * Un match n'a plus d'alimentation en attente sur une case quand aucun match
+ * non terminé du même plateau n'y envoie son vainqueur ou son perdant.
+ *
+ * Posée dans la requête des candidats plutôt qu'en un `COUNT(*)` par candidat :
+ * au lancement d'une double élimination à 128 équipes, ~200 matchs ont une
+ * case vide, et chaque comptage était un aller-retour de plus dans la
+ * transaction du score. `slotSql` désigne la case attendue (`null` = l'une ou
+ * l'autre, pour un match fantôme).
+ */
+function noPendingFeederSql(slotSql: string | null): string {
+  const winnerSlot = slotSql === null ? "" : ` AND f.next_winner_slot = ${slotSql}`;
+  const loserSlot = slotSql === null ? "" : ` AND f.next_loser_slot = ${slotSql}`;
+  return `NOT EXISTS (
+          SELECT 1
+          FROM bg_matches f
+          WHERE f.tournament_id = m.tournament_id
+            AND f.phase_id = m.phase_id
+            AND f.status <> 'COMPLETED'
+            AND (
+              (f.next_winner_match_id = m.id${winnerSlot})
+              OR
+              (f.next_loser_match_id = m.id${loserSlot})
+            )
+        )`;
+}
+
+/**
+ * Tranche d'office ce que le plateau ne peut plus disputer : exemptions (une
+ * seule équipe, case vide sans alimentation en attente) et matchs fantômes
+ * (aucune équipe). Chaque passe lit ses candidats **une fois**, alimentation
+ * comprise ; ce qu'une résolution débloque est repris à la passe suivante —
+ * jamais sur la ligne déjà lue, dont la case vide a pu être garnie entre-temps.
+ */
 export async function tryAutoResolveByes(
   connection: PoolConnection,
   tournamentId: number,
@@ -114,42 +148,24 @@ export async function tryAutoResolveByes(
     // Les byes ne doivent jamais s'échapper d'une phase vers une autre.
     const [candidates] = await connection.execute<MatchRow[]>(
       `SELECT
-        id,
-        team1_id,
-        team2_id,
-        next_winner_match_id,
-        next_winner_slot,
-        next_loser_match_id,
-        next_loser_slot
-      FROM bg_matches
-      WHERE tournament_id = ?
-        AND phase_id = ?
-        AND status <> 'COMPLETED'
-        AND winner_team_id IS NULL
-        AND ((team1_id IS NULL AND team2_id IS NOT NULL) OR (team1_id IS NOT NULL AND team2_id IS NULL))`,
+        m.id,
+        m.team1_id,
+        m.team2_id,
+        m.next_winner_match_id,
+        m.next_winner_slot,
+        m.next_loser_match_id,
+        m.next_loser_slot
+      FROM bg_matches m
+      WHERE m.tournament_id = ?
+        AND m.phase_id = ?
+        AND m.status <> 'COMPLETED'
+        AND m.winner_team_id IS NULL
+        AND ((m.team1_id IS NULL AND m.team2_id IS NOT NULL) OR (m.team1_id IS NOT NULL AND m.team2_id IS NULL))
+        AND ${noPendingFeederSql("CASE WHEN m.team1_id IS NULL THEN 1 ELSE 2 END")}`,
       [tournamentId, phaseId],
     );
 
     for (const candidate of candidates) {
-      const missingSlot = candidate.team1_id === null ? 1 : 2;
-      const [feeders] = await connection.execute<(RowDataPacket & { c: number })[]>(
-        `SELECT COUNT(*) AS c
-         FROM bg_matches
-         WHERE tournament_id = ?
-           AND phase_id = ?
-           AND status <> 'COMPLETED'
-           AND (
-             (next_winner_match_id = ? AND next_winner_slot = ?)
-             OR
-             (next_loser_match_id = ? AND next_loser_slot = ?)
-           )`,
-        [tournamentId, phaseId, candidate.id, missingSlot, candidate.id, missingSlot],
-      );
-
-      if (Number(feeders[0]?.c ?? 0) > 0) {
-        continue;
-      }
-
       const winnerTeamId =
         candidate.team1_id === null ? Number(candidate.team2_id) : Number(candidate.team1_id);
       const score =
@@ -167,39 +183,27 @@ export async function tryAutoResolveByes(
 
     // Cas 2 : les deux slots sont vides (match fantôme)
     const [ghosts] = await connection.execute<MatchRow[]>(
-      `SELECT id
-       FROM bg_matches
-       WHERE tournament_id = ?
-         AND phase_id = ?
-         AND status <> 'COMPLETED'
-         AND winner_team_id IS NULL
-         AND team1_id IS NULL
-         AND team2_id IS NULL`,
+      `SELECT m.id
+       FROM bg_matches m
+       WHERE m.tournament_id = ?
+         AND m.phase_id = ?
+         AND m.status <> 'COMPLETED'
+         AND m.winner_team_id IS NULL
+         AND m.team1_id IS NULL
+         AND m.team2_id IS NULL
+         AND ${noPendingFeederSql(null)}`,
       [tournamentId, phaseId],
     );
 
-    for (const ghost of ghosts) {
-      const [feeders] = await connection.execute<(RowDataPacket & { c: number })[]>(
-        `SELECT COUNT(*) AS c
-         FROM bg_matches
-         WHERE tournament_id = ?
-           AND phase_id = ?
-           AND status <> 'COMPLETED'
-           AND (next_winner_match_id = ? OR next_loser_match_id = ?)`,
-        [tournamentId, phaseId, ghost.id, ghost.id],
-      );
-
-      if (Number(feeders[0]?.c ?? 0) > 0) {
-        continue;
-      }
-
+    if (ghosts.length > 0) {
+      const ids = ghosts.map((ghost) => Number(ghost.id));
       await connection.execute(
         `UPDATE bg_matches
          SET status = 'COMPLETED',
              team1_score = 0,
              team2_score = 0
-         WHERE id = ?`,
-        [ghost.id],
+         WHERE id IN (${ids.map(() => "?").join(", ")})`,
+        ids,
       );
 
       hasProgress = true;

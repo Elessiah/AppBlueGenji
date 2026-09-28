@@ -174,32 +174,47 @@ export async function loadEnduranceStandings(
   }));
 }
 
+/**
+ * Lignes par instruction : 10 paramètres chacune, bien en deçà du plafond de
+ * 65 535 marqueurs d'une requête préparée, et un plateau entier tient en une.
+ */
+const STANDINGS_ROWS_PER_STATEMENT = 500;
+
+/**
+ * Écrit le classement en **une** instruction multi-lignes plutôt qu'un `INSERT`
+ * par équipe : la réconciliation tourne à chaque score, dans sa transaction,
+ * et 128 équipes y coûtaient 128 allers-retours verrous tenus. Un upsert et
+ * non le `CASE` de la Suisse, parce que le même chemin **sème** le classement
+ * (lignes absentes) et le réécrit.
+ */
 async function persistStandings(
   conn: PoolConnection,
   tournamentId: number,
   standings: EnduranceStanding[],
 ): Promise<void> {
-  for (const standing of standings) {
+  for (let start = 0; start < standings.length; start += STANDINGS_ROWS_PER_STATEMENT) {
+    const chunk = standings.slice(start, start + STANDINGS_ROWS_PER_STATEMENT);
+    const params = chunk.flatMap((standing) => [
+      tournamentId,
+      standing.teamId,
+      standing.seed,
+      standing.points,
+      standing.wins,
+      standing.losses,
+      standing.draws,
+      standing.status,
+      standing.eliminatedRound,
+      standing.rank,
+    ]);
     await conn.execute(
       `INSERT INTO bg_endurance_standings
         (tournament_id, team_id, seed, points, wins, losses, draws, status, eliminated_round, \`rank\`)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       VALUES ${chunk.map(() => "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").join(", ")}
        ON DUPLICATE KEY UPDATE
         seed = VALUES(seed), points = VALUES(points), wins = VALUES(wins),
         losses = VALUES(losses), draws = VALUES(draws), status = VALUES(status),
         eliminated_round = VALUES(eliminated_round), \`rank\` = VALUES(\`rank\`)`,
-      [
-        tournamentId,
-        standing.teamId,
-        standing.seed,
-        standing.points,
-        standing.wins,
-        standing.losses,
-        standing.draws,
-        standing.status,
-        standing.eliminatedRound,
-        standing.rank,
-      ],
+      params,
     );
   }
 }
