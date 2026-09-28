@@ -37,6 +37,17 @@ La config impose `DEV_AUTH_USER_ID` au serveur de test (et a priorité sur le
 Donc même si ton `.env` définit `DEV_AUTH_USER_ID` pour le dev local, les tests
 restent déterministes.
 
+### Fenêtres ouvertes d'elles-mêmes
+Tout spec importe `test` et `expect` de `e2e/helpers/test.ts`, **jamais** de
+`@playwright/test`. La fixture `page` y referme par « Plus tard », avant chaque
+action, les deux fenêtres que le site ouvre sans qu'on les demande : l'annonce
+de recrutement prioritaire (présente sur une base seedée) et les conditions
+d'utilisation d'un compte qui gère une équipe sans les avoir acceptées (le
+compte `E2E_AUTH_USER`, souvent). Leur voile interceptait le premier clic de
+chaque parcours — panne locale seulement, la CI n'ayant pas de base. Une page
+ouverte hors de la fixture (contexte créé à la main) appelle
+`dismissSiteOverlays(page)` elle-même.
+
 ## Niveaux de tests
 
 ### 1. `auth.spec.ts` — sans prérequis
