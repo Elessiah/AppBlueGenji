@@ -68,18 +68,14 @@ export async function deleteSubscription(userId: number, endpoint: string): Prom
   ]);
 }
 
-/** Ce compte est-il abonné sur cet appareil, et sur combien d'appareils en tout ? */
-export async function subscriptionStatus(
-  userId: number,
-  endpoint: string | null,
-): Promise<{ thisDevice: boolean; devices: number }> {
+/** Nombre d'appareils abonnés au compte. */
+export async function countDevices(userId: number): Promise<number> {
   const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { devices: number; mine: number | null })[]>(
-    `SELECT COUNT(*) AS devices, SUM(endpoint_hash = ?) AS mine
-     FROM bg_push_subscriptions WHERE user_id = ?`,
-    [endpoint ? endpointHash(endpoint) : "", userId],
+  const [rows] = await db.execute<(RowDataPacket & { devices: number })[]>(
+    `SELECT COUNT(*) AS devices FROM bg_push_subscriptions WHERE user_id = ?`,
+    [userId],
   );
-  return { thisDevice: Number(rows[0]?.mine ?? 0) > 0, devices: Number(rows[0]?.devices ?? 0) };
+  return Number(rows[0]?.devices ?? 0);
 }
 
 export async function loadDisabledTopics(userId: number): Promise<PushTopic[]> {

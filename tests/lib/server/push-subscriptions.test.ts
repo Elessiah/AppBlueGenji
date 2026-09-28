@@ -9,6 +9,7 @@ jest.mock("@/lib/server/web-push", () => ({
 
 import { getDatabase } from "@/lib/server/database";
 import {
+  countDevices,
   deleteSubscription,
   endpointHash,
   exportPushData,
@@ -18,7 +19,6 @@ import {
   saveDisabledTopics,
   saveSubscription,
   subscribedStaffCandidates,
-  subscriptionStatus,
 } from "@/lib/server/push-subscriptions";
 import { sendWebPush, type WebPushConfig } from "@/lib/server/web-push";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -139,10 +139,10 @@ describe("abonnements", () => {
   });
 
   it("compte les appareils du compte", async () => {
-    pool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[{ devices: 2, mine: 1 }]]) });
-    expect(await subscriptionStatus(7, SUB.endpoint)).toEqual({ thisDevice: true, devices: 2 });
-    pool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[{ devices: 0, mine: null }]]) });
-    expect(await subscriptionStatus(7, null)).toEqual({ thisDevice: false, devices: 0 });
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ devices: 2 }]]);
+    pool({ execute });
+    expect(await countDevices(7)).toBe(2);
+    expect(execute.mock.calls[0][1]).toEqual([7]);
   });
 });
 

@@ -56,6 +56,20 @@ export type PushNotificationsState = {
 
 class PushError extends Error {}
 
+/**
+ * Le motif d'un échec d'activation. Seul un refus du navigateur lui-même dit
+ * qu'il ne sait pas faire ; une coupure réseau pendant l'envoi de
+ * l'abonnement, par exemple, n'est qu'un échec à retenter — l'annoncer
+ * « navigateur non compatible » ferait renoncer à un navigateur qui marche.
+ */
+function enableErrorCode(error: unknown): string {
+  if (error instanceof PushError) return error.message;
+  const name = error instanceof Error ? error.name : "";
+  if (name === "NotSupportedError") return "PUSH_UNSUPPORTED";
+  if (name === "NotAllowedError") return "PUSH_PERMISSION_DENIED";
+  return "PUSH_FAILED";
+}
+
 async function readError(response: Response): Promise<string> {
   const body = (await response.json().catch(() => null)) as { error?: string } | null;
   return body?.error ?? "PUSH_FAILED";
@@ -215,7 +229,7 @@ export function usePushNotifications(
       await loadServer().catch(() => null);
       return true;
     } catch (error) {
-      onError(error instanceof PushError ? error.message : "PUSH_UNSUPPORTED");
+      onError(enableErrorCode(error));
       return false;
     } finally {
       setBusy(false);

@@ -9,11 +9,11 @@ import { DELETE, POST } from "@/app/api/push/subscriptions/route";
 import { PUT } from "@/app/api/push/topics/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import {
+  countDevices,
   deleteSubscription,
   loadDisabledTopics,
   saveDisabledTopics,
   saveSubscription,
-  subscriptionStatus,
 } from "@/lib/server/push-subscriptions";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { webPushConfig, type WebPushConfig } from "@/lib/server/web-push";
@@ -38,7 +38,7 @@ beforeEach(() => {
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
   jest.mocked(webPushConfig).mockReturnValue(CONFIG);
   jest.mocked(loadDisabledTopics).mockResolvedValue(["MATCH_REMINDER"]);
-  jest.mocked(subscriptionStatus).mockResolvedValue({ thisDevice: false, devices: 2 });
+  jest.mocked(countDevices).mockResolvedValue(2);
 });
 
 describe("GET /api/push", () => {
