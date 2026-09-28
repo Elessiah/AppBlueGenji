@@ -19,6 +19,7 @@ import {
   listReports,
   listReportsByAuthor,
   purgeExpiredReports,
+  resolveReportTargets,
   schedulePurgeExpiredReports,
   searchReportTargets,
 } from "@/lib/server/content-reports";
@@ -519,6 +520,26 @@ describe("searchReportTargets", () => {
     const [option] = await searchReportTargets("USER", "pseudo", { userId: 1, managesTournaments: false });
     expect(pool.execute.mock.calls[0][0]).toMatch(/is_deleted = 0/);
     expect(option.imageUrl).toBeNull();
+  });
+});
+
+describe("resolveReportTargets — avatar masqué et modération", () => {
+  const hiddenAvatarRow = { ...USER_ROW, avatar_url: "/api/uploads/avatars/8.webp", visible_avatar: 0 };
+
+  it("masque un avatar caché pour un lecteur ordinaire", async () => {
+    install([[/FROM bg_users/, () => [[hiddenAvatarRow]]]]);
+    const [option] = await resolveReportTargets([{ type: "USER", id: 8 }], { userId: 1, managesTournaments: false });
+    expect(option.imageUrl).toBeNull();
+  });
+
+  it("montre l'avatar caché à la modération, pour qu'elle puisse le retirer", async () => {
+    install([[/FROM bg_users/, () => [[hiddenAvatarRow]]]]);
+    const [option] = await resolveReportTargets([{ type: "USER", id: 8 }], {
+      userId: null,
+      managesTournaments: true,
+      isModerator: true,
+    });
+    expect(option.imageUrl).toBe("/api/uploads/avatars/8.webp");
   });
 });
 

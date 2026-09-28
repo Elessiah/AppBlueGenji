@@ -134,5 +134,38 @@ describe("users-service admin management", () => {
 
       expect(profile?.displayRoles).toContain("ADMIN");
     });
+
+    it("expose l'avatar réel à la modération, indépendamment de sa visibilité", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[userRow({ id: 7, avatar_url: "/api/uploads/avatars/7-a.webp", visible_avatar: 0 })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1, roles: ["ADMIN"], isAdmin: true }, 7);
+
+      expect(profile?.canModerate).toBe(true);
+      // L'avatar est masqué au lecteur ordinaire (visible_avatar = 0)...
+      expect(profile?.profile.avatarUrl).toBeNull();
+      // ... mais la modération sait qu'il existe, pour afficher le bouton de retrait.
+      expect(profile?.moderationAvatarPresent).toBe(true);
+    });
+
+    it("ne dit rien de l'avatar à qui n'a pas la permission `moderation`", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[userRow({ id: 7, avatar_url: "/api/uploads/avatars/7-a.webp", visible_avatar: 1 })]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([[]]);
+      await mockDb(execute);
+
+      const profile = await getFullProfile({ id: 1 }, 7);
+
+      expect(profile?.canModerate).toBe(false);
+      expect(profile?.moderationAvatarPresent).toBe(false);
+    });
   });
 });

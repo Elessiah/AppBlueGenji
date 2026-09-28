@@ -62,6 +62,8 @@ export function fullProfileResponse(
     roles: [],
     displayRoles: [],
     viewerIsAdmin: false,
+    canModerate: false,
+    moderationAvatarPresent: false,
     ...rest,
   };
 }
