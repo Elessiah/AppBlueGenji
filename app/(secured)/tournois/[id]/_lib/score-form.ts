@@ -4,6 +4,7 @@ import {
   matchScoreViolationMessage,
   type MatchFormat,
 } from "@/lib/shared/match-format";
+import { isMatchPlayed } from "@/lib/shared/match-outcome";
 
 export interface ScoreFormState {
   score1: string;
@@ -15,6 +16,51 @@ export interface ScoreFormState {
    * sélections mutuellement exclusives.
    */
   doubleForfeit?: boolean;
+}
+
+/**
+ * Proposition de score d'une engagée, restée **seule** en attente de l'autre.
+ *
+ * Le cas type est la rencontre contre une **équipe fantôme** : personne ne s'y
+ * connecte, la confirmation n'arrive donc jamais et c'est l'arbitrage qui doit
+ * trancher. Ouvrir le dialogue sur des champs vides l'obligeait à recopier un
+ * score déjà saisi par les joueurs ; il s'ouvre désormais sur la proposition,
+ * qu'un clic sur « Valider le résultat » confirme.
+ *
+ * `null` dès que la proposition ne peut pas servir de point de départ :
+ * · match déjà tranché, score déjà enregistré par l'arbitrage, forfait posé —
+ *   ce qui est en base prime sur ce qu'une équipe a proposé ;
+ * · **deux** propositions (un désaccord) — pré-remplir avec l'une donnerait
+ *   raison à une équipe sans que l'arbitre l'ait décidé ;
+ * · aucune proposition.
+ *
+ * Le pré-remplissage ne vaut pas validation : rien n'est écrit tant que
+ * l'arbitre n'a pas cliqué, et le dialogue dit d'où viennent les chiffres.
+ */
+export interface PendingScoreProposal {
+  team1Score: number;
+  team2Score: number;
+  /** Engagée qui a proposé le score, dans l'orientation du plateau. */
+  proposedBy: "team1" | "team2";
+}
+
+export function pendingScoreProposal(match: BracketMatch | null): PendingScoreProposal | null {
+  if (!match) return null;
+  if (isMatchPlayed(match)) return null;
+  if (match.team1Score !== null || match.team2Score !== null) return null;
+  if (match.forfeitTeamId !== null || match.doubleForfeit === true) return null;
+
+  const team1Report = match.team1Report ?? null;
+  const team2Report = match.team2Report ?? null;
+  if ((team1Report === null) === (team2Report === null)) return null;
+
+  const report = team1Report ?? team2Report;
+  if (!report) return null;
+  return {
+    team1Score: report.team1Score,
+    team2Score: report.team2Score,
+    proposedBy: team1Report ? "team1" : "team2",
+  };
 }
 
 /**
@@ -32,6 +78,15 @@ export interface ScoreFormState {
  * se chargeant de le rejouer à chaque changement de match.
  */
 export function scoreFormStateFor(match: BracketMatch | null): ScoreFormState {
+  const proposal = pendingScoreProposal(match);
+  if (proposal) {
+    return {
+      score1: String(proposal.team1Score),
+      score2: String(proposal.team2Score),
+      forfeitTeamId: undefined,
+      doubleForfeit: undefined,
+    };
+  }
   return {
     score1: match?.team1Score !== null && match?.team1Score !== undefined ? String(match.team1Score) : "",
     score2: match?.team2Score !== null && match?.team2Score !== undefined ? String(match.team2Score) : "",
@@ -75,6 +130,21 @@ export function storedResultSignature(match: BracketMatch | null): string {
     match.winnerTeamId ?? "∅",
     match.status,
   ].join("|");
+}
+
+/**
+ * Empreinte des **propositions d'équipe** en attente. Distincte du résultat
+ * enregistré : une proposition arrivée pendant que le dialogue est ouvert
+ * change ses valeurs d'ouverture, mais n'écrit rien — elle ne doit pas lever
+ * l'alerte « un autre arbitre a enregistré un résultat ».
+ */
+export function pendingProposalSignature(match: BracketMatch | null): string {
+  if (!match) return "";
+  return [reportSignature(match.team1Report), reportSignature(match.team2Report)].join("|");
+}
+
+function reportSignature(report: BracketMatch["team1Report"] | undefined): string {
+  return report ? `${report.team1Score}-${report.team2Score}` : "∅";
 }
 
 /** Le formulaire est-il resté sur les valeurs du match, sans une saisie ? */

@@ -4,6 +4,7 @@ import { mapError } from "../_lib/error-map";
 import {
   decideScoreForm,
   isUntouched,
+  pendingProposalSignature,
   scoreBlockerMessage,
   scoreFormStateFor,
   storedResultSignature,
@@ -36,6 +37,7 @@ export function useScoreForm(match: BracketMatch | null) {
   //   de l'effacer ou de la laisser écraser le travail de l'autre.
   const [synced, setSynced] = useState(() => ({
     signature: storedResultSignature(match),
+    proposals: pendingProposalSignature(match),
     // Valeurs adoptées au dernier alignement : c'est à elles que se compare la
     // saisie courante pour savoir si le lecteur a tapé quelque chose. Comparer
     // au match qui *arrive* ne le dirait pas — il a précisément changé.
@@ -44,15 +46,19 @@ export function useScoreForm(match: BracketMatch | null) {
   const [conflict, setConflict] = useState(false);
 
   const signature = storedResultSignature(match);
-  if (signature !== synced.signature) {
+  const proposals = pendingProposalSignature(match);
+  if (signature !== synced.signature || proposals !== synced.proposals) {
     const untouched = sameFormState(state, synced.baseline);
     const next = scoreFormStateFor(match);
-    setSynced({ signature, baseline: next });
+    setSynced({ signature, proposals, baseline: next });
 
     if (untouched) {
       setState(next);
       setConflict(false);
-    } else if (!submitting) {
+    } else if (signature !== synced.signature && !submitting) {
+      // Seul un résultat **enregistré** fait conflit : une proposition
+      // d'équipe arrivée pendant la saisie n'écrase rien, la saisie reste.
+      //
       // Pas pendant un envoi : le flux rapporte alors **notre propre** écriture,
       // qui arrive presque toujours avant la réponse HTTP. Sans cette réserve,
       // l'arbitre voyait « ce match a été modifié pendant ta saisie » accuser un
@@ -64,7 +70,7 @@ export function useScoreForm(match: BracketMatch | null) {
   /** Reprendre la valeur enregistrée, en abandonnant la saisie en cours. */
   const adoptStoredResult = () => {
     const next = scoreFormStateFor(match);
-    setSynced({ signature, baseline: next });
+    setSynced({ signature, proposals, baseline: next });
     setState(next);
     setConflict(false);
   };

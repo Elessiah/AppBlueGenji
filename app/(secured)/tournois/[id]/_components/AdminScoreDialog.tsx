@@ -14,7 +14,7 @@ import {
   matchWinsRequired,
 } from "@/lib/shared/match-format";
 import { useScoreForm } from "../_hooks/useScoreForm";
-import { scoreBlockerMessage } from "../_lib/score-form";
+import { pendingScoreProposal, scoreBlockerMessage } from "../_lib/score-form";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
@@ -111,6 +111,13 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
       ? storedResultLabel(match, team1, team2)
       : null;
   const blocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
+  // Score proposé par une engagée et jamais confirmé par l'autre — une équipe
+  // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
+  // vérifier puis à le valider, sans le recopier.
+  const proposal = pendingScoreProposal(match);
+  const proposalNotice = proposal
+    ? `Score proposé par ${proposal.proposedBy === "team1" ? team1 : team2} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${proposal.proposedBy === "team1" ? team2 : team1}. ${form.dirty ? "Ta saisie le remplace." : "Vérifie-le puis valide le résultat pour le confirmer."}`
+    : null;
 
   const run = async (action: "save" | "resolve") => {
     const ok = await form.submit(action);
@@ -173,6 +180,12 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
           {stored && (
             <p className={styles.stored} role="status">
               {stored}
+            </p>
+          )}
+
+          {proposalNotice && (
+            <p className={styles.stored} role="status">
+              {proposalNotice}
             </p>
           )}
 
