@@ -6,7 +6,8 @@ La section **« Partenaires et soutiens »** de la page d'accueil `/`
 est éditable par les **administrateurs** : ajout, modification et suppression de
 partenaires, avec la même mécanique que la [gestion du bureau](BUREAU_MANAGEMENT.md).
 
-- **Visiteurs / non-admins** : vitrine en lecture seule, limitée à **6 logos**.
+- **Visiteurs / non-admins** : vitrine en lecture seule, limitée à **6 cartes**
+  (bandeau, logo, nom, description — voir [SPONSOR_CARDS.md](SPONSOR_CARDS.md)).
 - **Admins** : voient et gèrent **l'ensemble** des partenaires (au-delà de 6),
   via un bouton « + Ajouter » et des actions Modifier / Supprimer sur chaque case.
 
@@ -29,8 +30,9 @@ Importable côté client et serveur :
 - `FALLBACK_SPONSORS` — vitrine de secours partagée.
 - `slugifySponsor(name)` — slug URL-safe (accents retirés, minuscules).
 - `validateSponsorInput(input)` — nom requis (≤ 120 car.), palier validé (défaut
-  `PARTNER`), logo/site/description optionnels (ramenés à `null` si vides),
-  `active` défaut `true`.
+  `PARTNER`), logo/bandeau/site/description optionnels (ramenés à `null` si vides),
+  bandeau limité aux fichiers téléversés (`INVALID_BANNER_URL`), description
+  ≤ 200 car. (`DESCRIPTION_TOO_LONG`), `active` défaut `true`.
 
 Le service `lib/server/sponsors-service.ts` réexporte ces symboles et ajoute le
 CRUD. À la création, le slug est dérivé du nom puis rendu **unique**
