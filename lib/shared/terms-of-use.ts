@@ -179,6 +179,6 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
 export const LOGO_RIGHTS_FIELD = "rightsCertified";
 export const LOGO_RIGHTS_NOT_CERTIFIED = "LOGO_RIGHTS_NOT_CERTIFIED";
 export const LOGO_RIGHTS_LABEL =
-  "Je certifie détenir les droits sur ce logo (création de l'équipe, licence libre ou autorisation du titulaire).";
+  "Je certifie détenir les droits sur ce logo : l'équipe l'a créé elle-même, il est sous licence libre, ou son auteur en a autorisé l'usage.";
 /** Ancre de la section des conditions que la case engage. */
 export const LOGO_RIGHTS_TERMS_ANCHOR = `${TERMS_PATH}#contenus`;
