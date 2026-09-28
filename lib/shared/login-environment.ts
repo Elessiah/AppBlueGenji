@@ -8,9 +8,9 @@
  *
  * - **l'app installée sur l'écran d'accueil d'iOS** — elle a ses propres
  *   cookies, et l'aller-retour s'ouvre dans une feuille Safari qui ne les
- *   partage pas. Le manifeste évite ce mode (`display: "minimal-ui"`), mais un
- *   joueur peut l'imposer (« Ouvrir en tant qu'app web », activé par défaut
- *   depuis iOS 26) ;
+ *   partage pas. Le manifeste ne le demande pas (`display: "minimal-ui"`),
+ *   mais iOS 26 coche par défaut « Ouvrir en tant qu'app web » à l'ajout, qui
+ *   l'impose quel que soit le manifeste ;
  * - **le navigateur intégré d'une application** (Instagram, TikTok, une
  *   WebView Android…) — cookies isolés, et Google refuse d'y ouvrir sa page.
  *

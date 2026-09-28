@@ -25,9 +25,13 @@ export const APP_BACKGROUND_COLOR = "#05060a";
  * l'app installée un stock de cookies à elle et ouvre l'aller-retour OAuth
  * dans une feuille Safari qui ne le partage pas — le cookie d'état posé au
  * départ manque au rappel, ou la session atterrit dans la feuille et l'app
- * reste déconnectée. iOS ne connaît pas `minimal-ui` et ouvre alors l'icône
- * dans Safari, où la connexion marche ; Chrome et Android installent quand
- * même l'app, dans une fenêtre qui garde retour et rechargement.
+ * reste déconnectée. Jusqu'à iOS 18, iOS ne connaît pas `minimal-ui` et ouvre
+ * l'icône dans Safari, où la connexion marche. **Ce n'est pas une garantie** :
+ * depuis iOS 26, l'ajout à l'écran d'accueil coche par défaut « Ouvrir en tant
+ * qu'app web », qui lance le mode autonome quel que soit le manifeste — d'où
+ * l'avertissement de `/connexion` (`lib/shared/login-environment.ts`). Chrome
+ * et Android installent l'app dans une fenêtre qui garde retour et
+ * rechargement.
  */
 export const APP_DISPLAY = "minimal-ui" as const;
 
