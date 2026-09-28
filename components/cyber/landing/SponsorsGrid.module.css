@@ -297,8 +297,16 @@
     align-items: flex-start;
   }
 
-  .grid {
-    grid-template-columns: 1fr;
+  /* Deux colonnes gardées jusqu'au plus petit écran : un logo 3:1 reste
+     lisible à demi-largeur (~170 px sur 375), et la colonne unique empilait
+     un bandeau par partenaire sur toute la hauteur de la section. */
+
+  /* À demi-largeur, les quatre boutons du staff ne tiennent plus posés sur le
+     logo (ils le recouvraient en entier) : ils passent dessous, à la ligne. */
+  .slotActions {
+    position: static;
+    flex-wrap: wrap;
+    margin-top: 8px;
   }
 }
 

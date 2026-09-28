@@ -65,5 +65,15 @@
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .grid {
+    gap: 32px;
+  }
+
+  /* 22 px sur une colonne de 350 px faisaient onze lignes d'introduction. */
+  .lede {
+    font-size: 18px;
+    line-height: 1.55;
+  }
 }
 
