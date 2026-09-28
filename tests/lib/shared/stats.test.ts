@@ -3,6 +3,7 @@ import {
   ACTIVITY_MONTHS,
   FORM_LENGTH,
   computeDeepStats,
+  computeRecordSummary,
   emptyDeepStats,
   formatDiff,
   formatRate,
@@ -407,6 +408,57 @@ describe("computeDeepStats", () => {
       );
 
       expect(stats.averageRank).toBe(1.67);
+    });
+  });
+});
+
+describe("computeRecordSummary", () => {
+  it("rend un bilan vide sans match ni tournoi", () => {
+    expect(computeRecordSummary([], [])).toEqual({ wins: 0, losses: 0, tournamentsPlayed: 0 });
+  });
+
+  it("ne compte un nul ni en victoire ni en défaite", () => {
+    const summary = computeRecordSummary(
+      [match({ matchId: 1 }), match({ matchId: 2, outcome: "DRAW" }), match({ matchId: 3, won: false })],
+      [],
+    );
+    expect(summary).toMatchObject({ wins: 1, losses: 1 });
+  });
+
+  it("ne compte que les tournois lancés ou terminés", () => {
+    const summary = computeRecordSummary(
+      [],
+      [
+        tournament({ tournamentId: 1, state: "FINISHED" }),
+        tournament({ tournamentId: 2, state: "RUNNING" }),
+        tournament({ tournamentId: 3, state: "REGISTRATION" }),
+        tournament({ tournamentId: 4, state: "UPCOMING" }),
+      ],
+    );
+    expect(summary.tournamentsPlayed).toBe(2);
+  });
+
+  // L'annuaire et la fiche ne doivent jamais annoncer deux bilans : le résumé
+  // est tenu aux trois nombres de l'agrégat complet, sur un jeu mêlant nuls,
+  // forfaits et inscriptions à venir.
+  it("rend exactement les nombres de l'agrégat complet", () => {
+    const matches = [
+      ...series([true, false, true, true, false]),
+      match({ matchId: 20, outcome: "DRAW" }),
+      match({ matchId: 21, forfeit: "RECEIVED" }),
+      match({ matchId: 22, won: false, forfeit: "GIVEN" }),
+    ];
+    const tournaments = [
+      tournament({ tournamentId: 1, finalRank: 1 }),
+      tournament({ tournamentId: 2, state: "RUNNING", finalRank: null }),
+      tournament({ tournamentId: 3, state: "REGISTRATION", finalRank: null }),
+    ];
+
+    const deep = computeDeepStats(matches, tournaments, NOW);
+    expect(computeRecordSummary(matches, tournaments)).toEqual({
+      wins: deep.matchesWon,
+      losses: deep.matchesLost,
+      tournamentsPlayed: deep.tournamentsPlayed,
     });
   });
 });

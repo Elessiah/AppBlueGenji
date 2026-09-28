@@ -11,6 +11,7 @@ import type {
 } from "@/lib/shared/types";
 import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
 import { getTeamEntityStats } from "@/lib/server/stats-service";
+import { cachedStats } from "@/lib/server/stats-cache";
 import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
@@ -157,6 +158,70 @@ async function assertCanActOnTeam(
   if (!(await ghostAdminOverride(teamId, viewerManagesGhostTeams))) throw new Error("FORBIDDEN");
 }
 
+type TeamListForm = ("w" | "l" | "d")[];
+
+/**
+ * Forme de chaque équipe pour l'annuaire : ses dix derniers résultats, le plus
+ * récent en tête.
+ *
+ * La requête parcourt **tous** les matchs de toutes les équipes, par une
+ * jointure en `OR` peu favorable aux index, et elle était rejouée à chaque
+ * chargement de `/equipes` alors qu'elle ne dépend pas du lecteur. Elle passe
+ * donc par `cachedStats`, comme le bilan des joueurs : vidé à chaque score
+ * (`tournaments/notifications.ts`), le cache ne retarde jamais une forme — un
+ * roster qui bouge ne la change pas, et une équipe créée n'en a aucune.
+ */
+async function loadTeamListForms(): Promise<Map<number, TeamListForm>> {
+  // Forme : les dix derniers résultats de chaque équipe, le plus récent en
+  // tête. Même assiette de matchs que le bilan (`playedMatchSql`) et même
+  // chronologie que les fiches (`updated_at`, à défaut les dates du tournoi) :
+  // la barre de forme de la carte est le début de celle de la fiche, pas une
+  // autre lecture des mêmes matchs. Le découpage par équipe se fait en SQL, ce
+  // qui évite aussi de ne servir que les 1000 derniers matchs du site — au-delà,
+  // les équipes les moins actives n'avaient plus de forme du tout.
+  //
+  // Le **nul** a sa lettre, et c'est cette assiette partagée qui l'y oblige :
+  // depuis qu'elle admet les matchs sans vainqueur, un `CASE … ELSE 'l'` les
+  // rangeait en défaites, si bien que la carte affichait une case rouge là où la
+  // fiche de la même équipe annonçait « N ».
+  const db = await getDatabase();
+  const [formRows] = await db.execute<
+    (RowDataPacket & { team_id: number; result: "w" | "l" | "d" })[]
+  >(
+    `SELECT team_id, result
+     FROM (
+       SELECT
+         t.id AS team_id,
+         CASE
+           WHEN m.winner_team_id IS NULL THEN 'd'
+           WHEN m.winner_team_id = t.id THEN 'w'
+           ELSE 'l'
+         END AS result,
+         ROW_NUMBER() OVER (
+           PARTITION BY t.id
+           ORDER BY COALESCE(m.updated_at, tr.finished_at, tr.start_at) DESC, m.id DESC
+         ) AS rn
+       FROM bg_teams t
+       JOIN bg_matches m
+         ON ${rankingMatchJoinSql("t.id")}
+       JOIN bg_tournaments tr ON tr.id = m.tournament_id
+       WHERE t.deleted_at IS NULL
+         AND t.solo_user_id IS NULL
+     ) ranked
+     WHERE rn <= ${LIST_FORM_LENGTH}
+     ORDER BY team_id ASC, rn ASC`,
+  );
+
+  const formByTeam = new Map<number, TeamListForm>();
+  for (const row of formRows) {
+    const teamId = Number(row.team_id);
+    const form = formByTeam.get(teamId) ?? [];
+    form.push(row.result);
+    formByTeam.set(teamId, form);
+  }
+  return formByTeam;
+}
+
 /**
  * Annuaire des équipes.
  *
@@ -199,52 +264,8 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
      GROUP BY t.id, t.name, t.tag, t.logo_url, t.created_at, t.is_ghost`,
   );
 
-  // Forme : les dix derniers résultats de chaque équipe, le plus récent en
-  // tête. Même assiette de matchs que le bilan (`playedMatchSql`) et même
-  // chronologie que les fiches (`updated_at`, à défaut les dates du tournoi) :
-  // la barre de forme de la carte est le début de celle de la fiche, pas une
-  // autre lecture des mêmes matchs. Le découpage par équipe se fait en SQL, ce
-  // qui évite aussi de ne servir que les 1000 derniers matchs du site — au-delà,
-  // les équipes les moins actives n'avaient plus de forme du tout.
-  //
-  // Le **nul** a sa lettre, et c'est cette assiette partagée qui l'y oblige :
-  // depuis qu'elle admet les matchs sans vainqueur, un `CASE … ELSE 'l'` les
-  // rangeait en défaites, si bien que la carte affichait une case rouge là où la
-  // fiche de la même équipe annonçait « N ».
-  const [formRows] = await db.execute<
-    (RowDataPacket & { team_id: number; result: "w" | "l" | "d" })[]
-  >(
-    `SELECT team_id, result
-     FROM (
-       SELECT
-         t.id AS team_id,
-         CASE
-           WHEN m.winner_team_id IS NULL THEN 'd'
-           WHEN m.winner_team_id = t.id THEN 'w'
-           ELSE 'l'
-         END AS result,
-         ROW_NUMBER() OVER (
-           PARTITION BY t.id
-           ORDER BY COALESCE(m.updated_at, tr.finished_at, tr.start_at) DESC, m.id DESC
-         ) AS rn
-       FROM bg_teams t
-       JOIN bg_matches m
-         ON ${rankingMatchJoinSql("t.id")}
-       JOIN bg_tournaments tr ON tr.id = m.tournament_id
-       WHERE t.deleted_at IS NULL
-         AND t.solo_user_id IS NULL
-     ) ranked
-     WHERE rn <= ${LIST_FORM_LENGTH}
-     ORDER BY team_id ASC, rn ASC`,
-  );
-
-  const formByTeam = new Map<number, ("w" | "l" | "d")[]>();
-  for (const row of formRows) {
-    const teamId = Number(row.team_id);
-    const form = formByTeam.get(teamId) ?? [];
-    form.push(row.result);
-    formByTeam.set(teamId, form);
-  }
+  // Forme : mutualisée (voir `loadTeamListForms`), elle ne dépend pas du lecteur.
+  const formByTeam = await cachedStats("team-list-forms", loadTeamListForms);
 
   // Bilan et points : une seule source pour l'annuaire, la fiche et le
   // leaderboard de la landing.
@@ -337,7 +358,8 @@ export async function listTeams(viewerId: number | null = null): Promise<TeamLis
       wins: ranked?.wins ?? 0,
       losses: ranked?.losses ?? 0,
       points: ranked?.points ?? 0,
-      form: formByTeam.get(id) || [],
+      // Copie : la table vient du cache, partagée entre tous les lecteurs.
+      form: [...(formByTeam.get(id) ?? [])],
       games: gamesByTeam.get(id) || [],
       rosterPreview: rosterByTeam.get(id) || [],
       region: null,

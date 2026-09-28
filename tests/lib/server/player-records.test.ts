@@ -187,6 +187,57 @@ describe("loadPlayerRecords", () => {
     expect(records.get(9)).toMatchObject({ wins: 0, losses: 1 });
   });
 
+  // Les lignes sont rangées par équipe : un match entre deux équipes du même
+  // joueur est rangé sous les deux, et ne doit compter qu'une fois.
+  it("compte une seule fois un match entre deux équipes du même joueur", async () => {
+    await mockDb(
+      fakeDb(
+        [membershipRow(7, 5), membershipRow(7, 6)],
+        [matchRow({ id: 1, team1_id: 5, team2_id: 6, winner_team_id: 5 })],
+        [registrationRow(), registrationRow({ team_id: 6 })],
+      ),
+    );
+
+    expect((await loadPlayerRecords([7])).get(7)).toEqual({
+      wins: 1,
+      losses: 0,
+      tournamentsPlayed: 1,
+    });
+  });
+
+  it("crédite chaque camp d'un match qui oppose deux joueurs listés", async () => {
+    await mockDb(
+      fakeDb(
+        [membershipRow(7, 5), membershipRow(9, 6)],
+        [matchRow({ id: 1, team1_id: 5, team2_id: 6, winner_team_id: 6 })],
+        [registrationRow(), registrationRow({ team_id: 6 })],
+      ),
+    );
+
+    const records = await loadPlayerRecords([7, 9]);
+    expect(records.get(7)).toEqual({ wins: 0, losses: 1, tournamentsPlayed: 1 });
+    expect(records.get(9)).toEqual({ wins: 1, losses: 0, tournamentsPlayed: 1 });
+  });
+
+  it("additionne les équipes successives d'un joueur", async () => {
+    await mockDb(
+      fakeDb(
+        [membershipRow(7, 5), membershipRow(7, 6)],
+        [
+          matchRow({ id: 1, team1_id: 5, team2_id: 9, winner_team_id: 5 }),
+          matchRow({ id: 2, tournament_id: 11, team1_id: 6, team2_id: 9, winner_team_id: 9 }),
+        ],
+        [registrationRow(), registrationRow({ team_id: 6, tournament_id: 11 })],
+      ),
+    );
+
+    expect((await loadPlayerRecords([7])).get(7)).toEqual({
+      wins: 1,
+      losses: 1,
+      tournamentsPlayed: 2,
+    });
+  });
+
   // Une inscription à un tournoi pas encore lancé n'est pas un tournoi joué.
   it("ne compte pas une inscription à un tournoi qui n'a pas commencé", async () => {
     await mockDb(

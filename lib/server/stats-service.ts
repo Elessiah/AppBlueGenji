@@ -20,9 +20,11 @@ import { parseMatchFormat } from "@/lib/shared/match-format";
 import { PLAYED_MATCH_SQL } from "@/lib/shared/ranking";
 import {
   computeDeepStats,
+  computeRecordSummary,
   emptyDeepStats,
   forfeitAwareMapScore,
   type DeepStats,
+  type RecordSummary,
   type StatsMatch,
   type StatsTournament,
 } from "@/lib/shared/stats";
@@ -470,12 +472,7 @@ export async function getPlayerStats(userId: number): Promise<DeepStats> {
  *
  * Les trois nombres sont **ceux de sa fiche**, pris sur le même agrégat.
  */
-export type PlayerRecord = {
-  wins: number;
-  losses: number;
-  /** Tournois disputés — une inscription à un tournoi pas encore lancé n'en est pas un. */
-  tournamentsPlayed: number;
-};
+export type PlayerRecord = RecordSummary;
 
 type UserMembershipRow = MembershipRow & { user_id: number };
 
@@ -549,23 +546,43 @@ export async function loadPlayerRecords(userIds: number[]): Promise<Map<number, 
     loadRegistrationRows(db, teamIds),
   ]);
 
+  // Les lignes sont rangées **une fois** par équipe : filtrer toutes les lignes
+  // du site pour chaque joueur coûtait joueurs × matchs, recalculé au premier
+  // chargement qui suit chaque score (le cache est vidé par les scores).
+  const matchesByTeam = groupByTeam(matchRows, (row) => [
+    Number(row.team1_id),
+    Number(row.team2_id),
+  ]);
+  const registrationsByTeam = groupByTeam(registrationRows, (row) => [Number(row.team_id)]);
+
   for (const [userId, memberships] of membershipsByUser) {
     const own = new Set(memberships.map((membership) => membership.teamId));
-    const { stats } = summarize(
-      collectForPlayer(
-        memberships,
-        matchRows.filter(
-          (row) => own.has(Number(row.team1_id)) || own.has(Number(row.team2_id)),
-        ),
-        registrationRows.filter((row) => own.has(Number(row.team_id))),
-      ),
-    );
-    records.set(userId, {
-      wins: stats.matchesWon,
-      losses: stats.matchesLost,
-      tournamentsPlayed: stats.tournamentsPlayed,
-    });
+    // Un match entre deux équipes du joueur figure dans les deux listes : le
+    // `Set` le ramène à une ligne, comme le faisait le filtre d'avant.
+    const ownMatches = new Set<MatchStatRow>();
+    const ownRegistrations: RegistrationStatRow[] = [];
+    for (const teamId of own) {
+      for (const row of matchesByTeam.get(teamId) ?? []) ownMatches.add(row);
+      ownRegistrations.push(...(registrationsByTeam.get(teamId) ?? []));
+    }
+    const collected = collectForPlayer(memberships, [...ownMatches], ownRegistrations);
+    // Même crédit que la fiche (`collectForPlayer`), mais seulement les trois
+    // nombres de la carte : un `DeepStats` complet par compte était jeté.
+    records.set(userId, computeRecordSummary(collected.matches, collected.tournaments));
   }
 
   return records;
+}
+
+/** Range des lignes sous chacune des équipes qu'elles concernent. */
+function groupByTeam<T>(rows: readonly T[], teamsOf: (row: T) => number[]): Map<number, T[]> {
+  const byTeam = new Map<number, T[]>();
+  for (const row of rows) {
+    for (const teamId of new Set(teamsOf(row))) {
+      const list = byTeam.get(teamId);
+      if (list) list.push(row);
+      else byTeam.set(teamId, [row]);
+    }
+  }
+  return byTeam;
 }

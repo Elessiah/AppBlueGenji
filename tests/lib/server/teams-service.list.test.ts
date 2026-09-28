@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { listTeams } from "@/lib/server/teams-service";
 import { clearCache } from "@/lib/server/cache";
+import { invalidateStats } from "@/lib/server/stats-cache";
 import { fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
@@ -19,6 +20,7 @@ const REPLAY_QUERY = /AS played_at/;
 // `limited_members` et non `ROW_NUMBER` : la requête de forme en emploie une
 // aussi, et la distinguer par sa fenêtre attraperait les deux.
 const ROSTER_QUERY = /limited_members/;
+const FORM_QUERY = /PARTITION BY t\.id/;
 
 /**
  * `listTeams` enchaîne plusieurs lectures : équipes, forme, classement (rejeu
@@ -37,6 +39,7 @@ const ROSTER_QUERY = /limited_members/;
 async function mockDb(
   teamRows: Record<string, unknown>[],
   rosterRows: Record<string, unknown>[] = [],
+  formRows: Record<string, unknown>[] = [],
 ) {
   let matchId = 0;
   let sparringId = 10_000;
@@ -62,6 +65,7 @@ async function mockDb(
       return [teamRows.map((row) => ({ id: row.id, name: row.name, logo_url: row.logo_url }))];
     }
     if (ROSTER_QUERY.test(text)) return [rosterRows];
+    if (FORM_QUERY.test(text)) return [formRows];
     return [[]];
   });
   const { getDatabase } = await import("@/lib/server/database");
@@ -222,5 +226,65 @@ describe("listTeams — avatar masqué dans l'aperçu du roster", () => {
 
     const sql = execute.mock.calls.map((call) => String(call[0])).find((s) => ROSTER_QUERY.test(s))!;
     expect(sql).toMatch(/u\.visible_avatar/);
+  });
+});
+
+describe("listTeams — forme des équipes", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearCache();
+  });
+
+  const formRows = [
+    { team_id: 12, result: "w" },
+    { team_id: 12, result: "d" },
+    { team_id: 12, result: "l" },
+  ];
+
+  function formQueries(execute: jest.Mock) {
+    return execute.mock.calls.filter((call) => FORM_QUERY.test(String(call[0]))).length;
+  }
+
+  it("rend la forme de chaque équipe, la plus récente en tête", async () => {
+    await mockDb([teamRow()], [], formRows);
+
+    const teams = await listTeams();
+
+    expect(teams[0].form).toEqual(["w", "d", "l"]);
+  });
+
+  // La requête parcourt tous les matchs du site : elle ne dépend pas du
+  // lecteur, et n'est donc lue qu'une fois par fenêtre du cache.
+  it("ne relit pas la forme d'un chargement à l'autre", async () => {
+    const execute = await mockDb([teamRow()], [], formRows);
+
+    await listTeams();
+    await listTeams(7);
+
+    expect(formQueries(execute)).toBe(1);
+  });
+
+  it("relit la forme une fois les statistiques oubliées (un score est tombé)", async () => {
+    const execute = await mockDb([teamRow()], [], formRows);
+
+    await listTeams();
+    invalidateStats();
+    await listTeams();
+
+    expect(formQueries(execute)).toBe(2);
+  });
+
+  it("ne livre jamais le tableau mis en cache au lecteur", async () => {
+    await mockDb([teamRow()], [], formRows);
+
+    const first = await listTeams();
+    first[0].form.push("w");
+    const second = await listTeams();
+
+    expect(second[0].form).toEqual(["w", "d", "l"]);
   });
 });
