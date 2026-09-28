@@ -22,6 +22,7 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
+import { isMyTeamTeam1, scoreSubmittedMessage, teamLabel } from "@/lib/shared/match-card-viewer";
 import { isPreLaunchState } from "@/lib/shared/seeding";
 import {
   planRoundRollback,
@@ -373,7 +374,15 @@ export default function TournamentDetailPage() {
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "SCORE_SUBMIT_FAILED");
-      showSuccess(`Score transmis pour le match #${match.id}.`);
+      showSuccess(
+        scoreSubmittedMessage(
+          isMyTeamTeam1(detail.myTeamId, match.team1Id),
+          Number(draft.myScore),
+          Number(draft.opponentScore),
+          teamLabel(match.team1Name, match.team1Placeholder, "Équipe 1"),
+          teamLabel(match.team2Name, match.team2Placeholder, "Équipe 2"),
+        ),
+      );
       // Retour immédiat pour qui agit : le flux, lui, sert tout le monde à la
       // cadence de son palier.
       void refresh();
