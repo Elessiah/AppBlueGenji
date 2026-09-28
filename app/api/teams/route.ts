@@ -1,4 +1,5 @@
 import { getCurrentUser } from "@/lib/server/auth";
+import { DIRECTORY_READ_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { createTeam, getUserActiveTeam, listTeams } from "@/lib/server/teams-service";
 import { createGhostTeam } from "@/lib/server/ghost-teams-service";
@@ -15,6 +16,9 @@ import {
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
+
+  const throttled = enforceRateLimit(DIRECTORY_READ_RULE, user.id);
+  if (throttled) return throttled;
 
   // Le lecteur voyage jusqu'à la liste pour le seul masquage d'avatar : il doit
   // voir le sien même s'il l'a masqué au reste du site.

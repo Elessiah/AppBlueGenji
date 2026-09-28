@@ -33,6 +33,7 @@ import type {
   TournamentGame,
   TournamentState,
 } from "@/lib/shared/types";
+import { cachedStats } from "@/lib/server/stats-cache";
 
 /**
  * Bloc statistique complet d'une entité : l'agrégat affiché en tête de fiche et
@@ -286,8 +287,18 @@ function toStatsTournament(row: RegistrationStatRow): StatsTournament {
   };
 }
 
-/** Statistiques approfondies d'une équipe, et son historique de tournois. */
-export async function getTeamEntityStats(teamId: number): Promise<EntityStats> {
+/**
+ * Statistiques approfondies d'une équipe, et son historique de tournois.
+ *
+ * Mutualisées (`stats-cache.ts`) : la fiche d'équipe les recalculait à chaque
+ * chargement, F5 compris. L'objet rendu est **partagé** entre les lecteurs —
+ * aucun appelant ne doit le modifier.
+ */
+export function getTeamEntityStats(teamId: number): Promise<EntityStats> {
+  return cachedStats(`team:${teamId}`, () => loadTeamEntityStats(teamId));
+}
+
+async function loadTeamEntityStats(teamId: number): Promise<EntityStats> {
   const db = await getDatabase();
   const [matchRows, registrationRows] = await Promise.all([
     loadMatchRows(db, [teamId]),
@@ -427,8 +438,15 @@ function collectForPlayer(
 /**
  * Statistiques approfondies d'un joueur et son historique de tournois, cumulés
  * sur ses équipes successives.
+ *
+ * Mutualisées comme celles d'une équipe ; l'objet rendu est partagé, aucun
+ * appelant ne doit le modifier.
  */
-export async function getPlayerEntityStats(userId: number): Promise<EntityStats> {
+export function getPlayerEntityStats(userId: number): Promise<EntityStats> {
+  return cachedStats(`player:${userId}`, () => loadPlayerEntityStats(userId));
+}
+
+async function loadPlayerEntityStats(userId: number): Promise<EntityStats> {
   const db = await getDatabase();
   const memberships = await loadMemberships(db, userId);
   const teamIds = [...new Set(memberships.map((membership) => membership.teamId))];

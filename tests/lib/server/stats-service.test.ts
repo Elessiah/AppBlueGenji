@@ -5,6 +5,7 @@ import {
   getTeamEntityStats,
   getTeamStats,
 } from "@/lib/server/stats-service";
+import { clearCache } from "@/lib/server/cache";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
@@ -70,6 +71,8 @@ function runningRegistrationRow(overrides: Record<string, unknown> = {}) {
 describe("getTeamStats", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Les statistiques sont mutualisées (`stats-cache.ts`) : chaque cas relit la base.
+    clearCache();
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -265,6 +268,8 @@ describe("getTeamStats", () => {
 describe("historique dérivé des mêmes matchs", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Les statistiques sont mutualisées (`stats-cache.ts`) : chaque cas relit la base.
+    clearCache();
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -378,6 +383,8 @@ describe("historique dérivé des mêmes matchs", () => {
 describe("getPlayerStats", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Les statistiques sont mutualisées (`stats-cache.ts`) : chaque cas relit la base.
+    clearCache();
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -695,5 +702,88 @@ describe("getPlayerStats", () => {
 
     expect(stats.tournamentsPlayed).toBe(2);
     expect(stats.matchesPlayed).toBe(2);
+  });
+});
+
+/**
+ * Les fiches recalculaient leurs statistiques à chaque chargement : F5 maintenu
+ * sur une fiche d'équipe relançait deux lectures complètes par rafraîchissement.
+ * Elles sont désormais mutualisées, et un score les fait oublier.
+ */
+describe("statistiques mutualisées", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    clearCache();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+    clearCache();
+  });
+
+  it("ne relit pas la base pour une seconde lecture de la même équipe", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getTeamStats(5);
+    await getTeamStats(5);
+
+    // Deux lectures (matchs, inscriptions) pour le premier appel, rien ensuite.
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("fait partager un seul calcul à des lecteurs simultanés", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await Promise.all(Array.from({ length: 10 }, () => getTeamEntityStats(5)));
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("garde une entrée par équipe", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getTeamStats(5);
+    await getTeamStats(6);
+
+    expect(execute).toHaveBeenCalledTimes(4);
+  });
+
+  it("relit la base après un score (invalidation)", async () => {
+    const { invalidateStats } = await import("@/lib/server/stats-cache");
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getTeamStats(5);
+    invalidateStats();
+    await getTeamStats(5);
+
+    expect(execute).toHaveBeenCalledTimes(4);
+  });
+
+  it("mutualise aussi la fiche d'un joueur", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ team_id: 5, joined_at: new Date("2026-01-01T00:00:00Z"), left_at: null }]])
+      .mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getPlayerEntityStats(42);
+    await getPlayerEntityStats(42);
+
+    // Appartenances, matchs, inscriptions : trois lectures, une seule fois.
+    expect(execute).toHaveBeenCalledTimes(3);
+  });
+
+  it("ne confond pas un joueur et une équipe de même identifiant", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    await mockDb(execute);
+
+    await getTeamStats(5);
+    await getPlayerStats(5);
+
+    // L'équipe : deux lectures. Le joueur : ses appartenances (vides, il s'arrête là).
+    expect(execute).toHaveBeenCalledTimes(3);
   });
 });

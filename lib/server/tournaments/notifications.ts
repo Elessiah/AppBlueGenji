@@ -11,6 +11,7 @@
 import { publishTournamentEvent } from "@/lib/server/live";
 import { invalidateLandingAggregates, invalidateLandingLive } from "@/lib/server/landing-cache";
 import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateStats } from "@/lib/server/stats-cache";
 import { invalidateTournamentLists } from "./list-cache";
 import { invalidateTournamentPreview } from "./preview-cache";
 import { invalidateTournamentSnapshot } from "./snapshot";
@@ -36,6 +37,8 @@ export function publishUpdatedEvent(tournamentId: number): void {
   // supprimé emporte ses rencontres, et toutes les cotes qu'elles avaient
   // déplacées. Rien ne se répare tout seul dans un cache.
   invalidateTeamRanking();
+  // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
+  invalidateStats();
   publishTournamentEvent({
     type: "updated",
     tournamentId,
@@ -93,6 +96,8 @@ export function publishMatchUpdatedEvent(
 export function publishScoreReportedEvent(tournamentId: number, matchId: number): void {
   invalidateTournamentSnapshot(tournamentId);
   invalidateTeamRanking();
+  // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
+  invalidateStats();
   publishTournamentEvent({
     type: "score_reported",
     tournamentId,
@@ -105,6 +110,8 @@ export function publishScoreReportedEvent(tournamentId: number, matchId: number)
 export function publishScoreResolvedEvent(tournamentId: number, matchId: number): void {
   invalidateTournamentSnapshot(tournamentId);
   invalidateTeamRanking();
+  // Les bilans des fiches et de l'annuaire se lisent sur les mêmes matchs.
+  invalidateStats();
   publishTournamentEvent({
     type: "score_resolved",
     tournamentId,
