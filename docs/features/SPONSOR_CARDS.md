@@ -62,7 +62,12 @@ transparente, illisible en pastille. Les fichiers déjà importés restent valid
 `SPONSOR_DESCRIPTION_MAX = 200`. Au-delà, l'enregistrement est refusé
 (`DESCRIPTION_TOO_LONG`) : la tronquer en silence ferait perdre du texte que le
 staff croit enregistré. Le champ de la modale est une zone multiligne bornée,
-avec compteur.
+avec compteur ; ses retours à la ligne sont gardés à l'affichage.
+
+La limite était de 1000 caractères (tronqués en silence). Un partenaire enregistré
+avant avec une description plus longue que 200 caractères ne se modifie plus
+qu'en la raccourcissant — le refus le dit. Aucun en production au moment du
+changement (la plus longue fait 20 caractères).
 
 ## Jeu de test
 

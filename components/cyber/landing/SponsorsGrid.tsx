@@ -305,7 +305,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
           return (
             <li key={sponsor.id} className={styles.slotWrap}>
               <article className={styles.card}>
-                <div className={`${styles.media} ${styles[`media${media.layout}`]}`}>
+                <div className={styles.media}>
                   {media.layout === "BANNER" && media.bannerSrc ? (
                     <Image
                       src={media.bannerSrc}
@@ -538,7 +538,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={toServedUploadUrl(form.logoUrl)} alt="Aperçu du logo" className={styles.logoPreview} />
               ) : (
-                <div className={`${styles.logoPreviewEmpty} ${styles.logoPreviewEmpty}`} aria-hidden="true">
+                <div className={styles.logoPreviewEmpty} aria-hidden="true">
                   LOGO
                 </div>
               )}

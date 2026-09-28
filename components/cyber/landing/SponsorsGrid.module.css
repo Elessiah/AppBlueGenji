@@ -201,6 +201,8 @@
 
 .description {
   margin: 0;
+  /* Saisie en zone multiligne : les retours à la ligne voulus sont gardés. */
+  white-space: pre-line;
   font-size: 14px;
   line-height: 1.5;
   color: var(--ink-mute);
