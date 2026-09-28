@@ -5,6 +5,11 @@ jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/logo-quarantine");
 jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://site.test" }));
+// Le verrou nommé est joué sur le pool simulé lui-même : ce qui compte ici est
+// ce qui se lit et s'écrit sous lui, pas `GET_LOCK`.
+jest.mock("@/lib/server/named-lock", () => ({
+  withNamedLock: (pool: unknown, _name: string, _timeout: number, run: (connection: unknown) => unknown) => run(pool),
+}));
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages, pushLeadershipAlert } from "@/lib/server/bot-integration";
@@ -98,6 +103,15 @@ describe("createReport", () => {
   ];
   /** Ancienneté du compte auteur et ses signalements à cibles du jour. */
   const markRoute: Route = [/UPDATE bg_report_targets SET notified_at = NOW\(\)/, () => [{ affectedRows: 1 }]];
+  const releaseRoute: Route = [/UPDATE bg_report_targets SET notified_at = NULL/, () => [{ affectedRows: 1 }]];
+  const usersRoute = (rows: Record<string, unknown>[] = []): Route => [
+    /FROM bg_users u\s+WHERE u.is_deleted = 0 AND u.id IN/,
+    () => [rows],
+  ];
+  const membersRoute = (rows: Record<string, unknown>[] = []): Route => [
+    /FROM bg_team_members tm\s+JOIN bg_users u/,
+    () => [rows],
+  ];
   const reporterRoute = (ageHours = 24 * 30, earlier = 0): Route => [
     /TIMESTAMPDIFF\(HOUR, u.created_at, NOW\(\)\) AS age_hours/,
     () => [[{ age_hours: ageHours, earlier }]],
@@ -109,7 +123,8 @@ describe("createReport", () => {
         cooldownRoute(),
         reporterRoute(),
         markRoute,
-        [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
+        usersRoute(),
+        membersRoute(),
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
       [
@@ -147,7 +162,8 @@ describe("createReport", () => {
         cooldownRoute(),
         reporterRoute(),
         markRoute,
-        [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
+        usersRoute(),
+        membersRoute(),
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
       [
@@ -168,24 +184,23 @@ describe("createReport", () => {
   });
 
   it("prévient les personnes visées joignables par un moyen prouvé, jamais l'auteur", async () => {
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 2, unresolved: [], failed: [] });
     install(
       [
         cooldownRoute(),
         reporterRoute(),
         markRoute,
-        [
-          /FROM bg_users u\s+WHERE u.is_deleted = 0/,
-          () => [
-            [
-              { id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null },
-              { id: 9, pseudo: "Membre", discord_id: null, discord_pseudo: "membre", discord_verified_at: new Date() },
-              // Tag saisi mais jamais certifié : il peut désigner n'importe qui.
-              { id: 10, pseudo: "NonCertifie", discord_id: null, discord_pseudo: "quelquun", discord_verified_at: null },
-              // L'auteur du signalement, membre de l'équipe qu'il signale.
-              { id: 3, pseudo: "Auteur", discord_id: "900000000000000003", discord_pseudo: null, discord_verified_at: null },
-            ],
-          ],
-        ],
+        releaseRoute,
+        usersRoute([
+          { id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null },
+        ]),
+        membersRoute([
+          { team_id: 4, id: 9, pseudo: "Membre", discord_id: null, discord_pseudo: "membre", discord_verified_at: new Date() },
+          // Tag saisi mais jamais certifié : il peut désigner n'importe qui.
+          { team_id: 4, id: 10, pseudo: "NonCertifie", discord_id: null, discord_pseudo: "quelquun", discord_verified_at: null },
+          // L'auteur du signalement, membre de l'équipe qu'il signale.
+          { team_id: 4, id: 3, pseudo: "Auteur", discord_id: "900000000000000003", discord_pseudo: null, discord_verified_at: null },
+        ]),
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
       [
@@ -199,10 +214,12 @@ describe("createReport", () => {
     await createReport(submission(), { userId: 3, managesTournaments: false });
     await flush();
 
-    const lookup = pool.execute.mock.calls.find(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0/.test(sql));
-    // Le joueur désigné, puis les membres actuels de l'équipe désignée.
-    expect(lookup?.[1]).toEqual([8, 4]);
-    expect(lookup?.[0]).toMatch(/tm.left_at IS NULL/);
+    const users = pool.execute.mock.calls.find(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0 AND u.id IN/.test(sql));
+    expect(users?.[1]).toEqual([8]);
+    // Les membres **actuels** de l'équipe désignée.
+    const members = pool.execute.mock.calls.find(([sql]) => /FROM bg_team_members tm/.test(sql));
+    expect(members?.[1]).toEqual([4]);
+    expect(members?.[0]).toMatch(/tm.left_at IS NULL/);
 
     const [message, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("content-report-target");
@@ -212,20 +229,55 @@ describe("createReport", () => {
       { discordId: null, handle: "membre", label: "Membre" },
     ]);
     // Les cibles prévenues sont marquées : c'est ce que relit la reprévenance.
-    const mark = pool.execute.mock.calls.find(([sql]) => /UPDATE bg_report_targets SET notified_at/.test(sql));
+    const mark = pool.execute.mock.calls.find(([sql]) => /UPDATE bg_report_targets SET notified_at = NOW/.test(sql));
     expect(mark?.[1]).toEqual([12, "USER", 8, "TEAM", 4]);
+    // Quelque chose est parti : la marque reste.
+    expect(pool.execute.mock.calls.some(([sql]) => /SET notified_at = NULL/.test(sql))).toBe(false);
   });
 
-  it("ne reprévient pas une cible déjà visée par un signalement récent", async () => {
+  it("ne marque que les cibles qui ont donné un destinataire, et rend la marque si rien n'est parti", async () => {
+    install(
+      [
+        cooldownRoute(),
+        reporterRoute(),
+        markRoute,
+        releaseRoute,
+        usersRoute([
+          { id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null },
+        ]),
+        // L'équipe n'a aucun membre joignable : elle n'est pas « prévenue ».
+        membersRoute([]),
+        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+      ],
+      [
+        countRoute(0),
+        ...targetRoutes,
+        [/INSERT INTO bg_reports/, () => [{ insertId: 12 }]],
+        [/INSERT INTO bg_report_targets/, () => [{}]],
+      ],
+    );
+
+    await createReport(submission(), { userId: 3, managesTournaments: false });
+    await flush();
+
+    const mark = pool.execute.mock.calls.find(([sql]) => /SET notified_at = NOW/.test(sql));
+    expect(mark?.[1]).toEqual([12, "USER", 8]);
+    // Bot injoignable, aucun appareil abonné : la réservation est rendue, sans
+    // quoi le joueur serait tenu pour prévenu et un signalement légitime tu.
+    const release = pool.execute.mock.calls.find(([sql]) => /SET notified_at = NULL/.test(sql));
+    expect(release?.[1]).toEqual([12, "USER", 8]);
+  });
+
+  it("ne reprévient pas une cible déjà prévenue par un signalement récent", async () => {
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
     install(
       [
         cooldownRoute([{ target_type: "TEAM", target_id: 4 }]),
         reporterRoute(),
         markRoute,
-        [
-          /FROM bg_users u\s+WHERE u.is_deleted = 0/,
-          () => [[{ id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null }]],
-        ],
+        usersRoute([
+          { id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null },
+        ]),
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
       [
@@ -244,12 +296,9 @@ describe("createReport", () => {
     expect(cooldown?.[0]).toMatch(/t.report_id <> \?/);
     // Seules comptent les cibles réellement prévenues, pas celles seulement désignées.
     expect(cooldown?.[0]).toMatch(/t.notified_at > NOW\(\) - INTERVAL 24 HOUR/);
-    expect(cooldown?.[0]).toMatch(/INTERVAL 24 HOUR/);
     expect(cooldown?.[1]).toEqual([12, "TEAM", 4, "USER", 8]);
     // L'équipe, déjà prévenue, n'est plus cherchée : seul le joueur l'est.
-    const lookup = pool.execute.mock.calls.find(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0/.test(sql));
-    expect(lookup?.[1]).toEqual([8]);
-    expect(lookup?.[0]).not.toMatch(/bg_team_members/);
+    expect(pool.execute.mock.calls.some(([sql]) => /FROM bg_team_members tm/.test(sql))).toBe(false);
     expect(jest.mocked(pushDiscordDirectMessages)).toHaveBeenCalledTimes(1);
   });
 
@@ -378,16 +427,16 @@ describe("createReport", () => {
     await flush();
 
     const reporter = pool.execute.mock.calls.find(([sql]) => /AS age_hours/.test(sql));
-    // Seuls les signalements **antérieurs** comptent : ceux déposés depuis ne
-    // retirent pas son message à celui-ci.
-    expect(reporter?.[0]).toMatch(/r.id < \?/);
+    // Les **autres** signalements de l'auteur : lus sous le verrou de la
+    // réservation, ceux qui ont prévenu quelqu'un sont exactement comptés.
+    expect(reporter?.[0]).toMatch(/r.id <> \?/);
     expect(reporter?.[1]).toEqual([12, 3]);
     expect(reporter?.[0]).toMatch(/INTERVAL 24 HOUR/);
     // Seuls comptent les signalements qui ont réellement prévenu quelqu'un.
     expect(reporter?.[0]).toMatch(/t.notified_at > NOW\(\) - INTERVAL 24 HOUR/);
     // Retenu, celui-ci ne marque aucune cible : il ne tiendra pas les autres au silence.
     expect(pool.execute.mock.calls.some(([sql]) => /UPDATE bg_report_targets/.test(sql))).toBe(false);
-    expect(pool.execute.mock.calls.some(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0/.test(sql))).toBe(false);
+    expect(pool.execute.mock.calls.some(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0 AND u.id IN/.test(sql))).toBe(false);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     // La direction, elle, est alertée.
     expect(pushLeadershipAlert).toHaveBeenCalled();

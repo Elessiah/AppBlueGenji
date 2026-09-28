@@ -15,7 +15,8 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { pushLeadershipAlert } from "@/lib/server/bot-integration";
-import { notifyStaff, notifyUsers, toNotificationRecipient } from "@/lib/server/notify";
+import { notifyStaff, notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
+import { withNamedLock } from "@/lib/server/named-lock";
 import { contentReportPush, staffReportPush } from "@/lib/shared/push-messages";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publishStaffAction } from "@/lib/server/staff-audit";
@@ -438,6 +439,17 @@ type RecipientRow = RowDataPacket & {
   discord_verified_at: Date | string | null;
 };
 
+type Executor = Pick<PoolConnection, "execute">;
+
+/** Verrou nommé qui sérialise la réservation des avis aux personnes visées. */
+const REPORT_TARGET_NOTICE_LOCK = "bg_report_target_notices";
+
+/** Ce qu'une réservation a posé : à qui écrire, et quelles cibles sont marquées. */
+type TargetNoticePlan = {
+  recipients: NotificationRecipient[];
+  marked: (readonly ["USER" | "TEAM", number])[];
+};
+
 /**
  * Prévient les personnes qu'un signalement vise — message privé Discord et
  * notification push : les joueurs désignés et les membres **actuels** des
@@ -448,14 +460,24 @@ type RecipientRow = RowDataPacket & {
  * saisi à la main peut désigner n'importe qui ; le push, lui, part aux
  * appareils que le compte a lui-même abonnés. L'auteur du signalement n'est pas prévenu de son
  * propre signalement. Un tournoi désigné ne prévient personne : il n'a pas de
- * membres, il est organisé par l'association. Une cible déjà visée dans les
- * `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` dernières heures n'est pas reprévenue :
- * le message part avant toute lecture par l'association, et sans cette borne
- * le formulaire servirait à faire écrire le bot en boucle à une équipe. Et
- * l'**auteur** est borné lui aussi (`reporterMayWarnTargets`) : un compte trop
- * récent, ou qui a déjà désigné des cibles `REPORT_TARGET_NOTICES_DAILY_CAP`
- * fois dans la journée, ne fait plus écrire à personne — le signalement est
- * enregistré, consultable par les personnes visées, seul le message est retenu.
+ * membres, il est organisé par l'association. Une cible déjà **prévenue** dans
+ * les `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` dernières heures ne l'est pas de
+ * nouveau : le message part avant toute lecture par l'association, et sans
+ * cette borne le formulaire servirait à faire écrire le bot en boucle à une
+ * équipe. Et l'**auteur** est borné lui aussi (`reporterMayWarnTargets`) : un
+ * compte trop récent, ou dont les signalements ont déjà prévenu quelqu'un
+ * `REPORT_TARGET_NOTICES_DAILY_CAP` fois dans la journée, ne fait plus écrire
+ * à personne — le signalement est enregistré, consultable par les personnes
+ * visées, seul le message est retenu.
+ *
+ * Les deux bornes se **réservent**, elles ne se relisent pas : la décision et
+ * la marque (`bg_report_targets.notified_at`) se prennent sous un verrou nommé
+ * (`reserveTargetNotices`), sans quoi cinq signalements simultanés sur une même
+ * équipe liraient tous « personne n'a été prévenu » et écriraient tous. La
+ * marque ne se pose que sur les cibles qui ont donné un destinataire, et elle
+ * est **rendue** si rien n'est parti (bot injoignable et aucun appareil
+ * abonné) : une cible marquée à tort rendrait muet pour 24 h le signalement
+ * légitime d'un autre.
  *
  * Meilleur effort : un bot injoignable laisse le signalement intact, les
  * personnes visées le découvriront quand l'association les contactera.
@@ -466,83 +488,109 @@ export async function notifyReportTargets(
   targets: readonly ReportTargetRef[],
   reporterUserId: number | null,
 ): Promise<void> {
-  const cooled = await recentlyNotifiedTargets(reportId, targets);
-  const notYetWarned = (target: ReportTargetRef) => !cooled.has(`${target.type}:${target.id}`);
-  const userIds = targets.filter((target) => target.type === "USER" && notYetWarned(target)).map((target) => target.id);
-  const teamIds = targets.filter((target) => target.type === "TEAM" && notYetWarned(target)).map((target) => target.id);
-  if (userIds.length === 0 && teamIds.length === 0) return;
-  if (reporterUserId !== null && !(await reporterMayWarn(reportId, reporterUserId))) {
-    console.info(`[reports] signalement #${reportId} : personnes visées non prévenues (compte récent ou plafond du jour)`);
-    return;
-  }
-
-  const clauses: string[] = [];
-  const params: number[] = [];
-  if (userIds.length > 0) {
-    clauses.push(`u.id IN (${userIds.map(() => "?").join(", ")})`);
-    params.push(...userIds);
-  }
-  if (teamIds.length > 0) {
-    clauses.push(
-      `u.id IN (SELECT tm.user_id FROM bg_team_members tm
-                WHERE tm.left_at IS NULL AND tm.team_id IN (${teamIds.map(() => "?").join(", ")}))`,
-    );
-    params.push(...teamIds);
-  }
-
+  if (!targets.some((target) => target.type === "USER" || target.type === "TEAM")) return;
   const db = await getDatabase();
-  const [rows] = await db.execute<RecipientRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
-     FROM bg_users u
-     WHERE u.is_deleted = 0 AND (${clauses.join(" OR ")})`,
-    params,
+  const plan = await withNamedLock(db, REPORT_TARGET_NOTICE_LOCK, 10, (connection) =>
+    reserveTargetNotices(connection, reportId, targets, reporterUserId),
   );
-
-  const recipients = rows
-    .filter((row) => reporterUserId === null || Number(row.id) !== reporterUserId)
-    .map((row) => toNotificationRecipient(row, "proven"));
-  if (recipients.length === 0) return;
-
-  // Les cibles réellement prévenues sont marquées : c'est ce que relisent le
-  // délai de reprévenance et le plafond de l'auteur. Compter toute cible
-  // **désignée** laissait un compte neuf, qui ne fait écrire à personne, rendre
-  // muet pour 24 h le signalement légitime d'un autre sur la même équipe.
-  const marked = [
-    ...userIds.map((id) => ["USER", id] as const),
-    ...teamIds.map((id) => ["TEAM", id] as const),
-  ];
-  await db.execute(
-    `UPDATE bg_report_targets SET notified_at = NOW()
-     WHERE report_id = ? AND (${marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
-    [reportId, ...marked.flat()],
-  );
+  if (!plan) return;
 
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-  await notifyUsers(recipients, {
+  const report = await notifyUsers(plan.recipients, {
     topic: "CONTENT_REPORT",
     discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
     push: contentReportPush({ reportId, category }),
   });
+  if ((report.discord?.sent ?? 0) + report.pushed === 0) {
+    await db.execute(
+      `UPDATE bg_report_targets SET notified_at = NULL
+       WHERE report_id = ? AND (${plan.marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
+      [reportId, ...plan.marked.flat()],
+    );
+  }
+}
+
+/**
+ * Sous le verrou : écarte les cibles déjà prévenues, applique le plafond de
+ * l'auteur, relève les destinataires et **marque** les cibles qui en ont donné
+ * un. `null` quand il n'y a personne à prévenir.
+ */
+async function reserveTargetNotices(
+  connection: Executor,
+  reportId: number,
+  targets: readonly ReportTargetRef[],
+  reporterUserId: number | null,
+): Promise<TargetNoticePlan | null> {
+  const cooled = await recentlyNotifiedTargets(connection, reportId, targets);
+  const notYetWarned = (target: ReportTargetRef) => !cooled.has(`${target.type}:${target.id}`);
+  const userIds = targets.filter((target) => target.type === "USER" && notYetWarned(target)).map((target) => target.id);
+  const teamIds = targets.filter((target) => target.type === "TEAM" && notYetWarned(target)).map((target) => target.id);
+  if (userIds.length === 0 && teamIds.length === 0) return null;
+  if (reporterUserId !== null && !(await reporterMayWarn(connection, reportId, reporterUserId))) {
+    console.info(`[reports] signalement #${reportId} : personnes visées non prévenues (compte récent ou plafond du jour)`);
+    return null;
+  }
+
+  const notReporter = (row: RecipientRow) => reporterUserId === null || Number(row.id) !== reporterUserId;
+  const byUser = new Map<number, RecipientRow>();
+  const marked: (readonly ["USER" | "TEAM", number])[] = [];
+
+  if (userIds.length > 0) {
+    const [rows] = await connection.execute<RecipientRow[]>(
+      `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+       FROM bg_users u
+       WHERE u.is_deleted = 0 AND u.id IN (${userIds.map(() => "?").join(", ")})`,
+      userIds,
+    );
+    for (const row of rows.filter(notReporter)) {
+      byUser.set(Number(row.id), row);
+      marked.push(["USER", Number(row.id)] as const);
+    }
+  }
+  if (teamIds.length > 0) {
+    const [rows] = await connection.execute<(RecipientRow & { team_id: number })[]>(
+      `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+       FROM bg_team_members tm
+       JOIN bg_users u ON u.id = tm.user_id
+       WHERE tm.left_at IS NULL AND u.is_deleted = 0 AND tm.team_id IN (${teamIds.map(() => "?").join(", ")})`,
+      teamIds,
+    );
+    const reachedTeams = new Set<number>();
+    for (const row of rows.filter(notReporter)) {
+      byUser.set(Number(row.id), row);
+      reachedTeams.add(Number(row.team_id));
+    }
+    for (const teamId of teamIds) if (reachedTeams.has(teamId)) marked.push(["TEAM", teamId] as const);
+  }
+  if (marked.length === 0) return null;
+
+  await connection.execute(
+    `UPDATE bg_report_targets SET notified_at = NOW()
+     WHERE report_id = ? AND (${marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
+    [reportId, ...marked.flat()],
+  );
+  return {
+    recipients: [...byUser.values()].map((row) => toNotificationRecipient(row, "proven")),
+    marked,
+  };
 }
 
 /**
  * L'auteur de ce signalement peut-il faire écrire aux personnes visées ?
- * Ancienneté de son compte et signalements qui ont **réellement prévenu**
- * quelqu'un (`bg_report_targets.notified_at`) dans les dernières 24 heures —
- * un tournoi désigné, une cible déjà prévenue ou un envoi retenu ne comptent
- * pas —, **antérieurs** à celui-ci (identifiant inférieur : la vérification ne part
- * qu'après le commit, et des envois rapprochés déposés depuis ne doivent pas
- * retirer son message à celui-ci), jugés par `reporterMayWarnTargets`. Un compte introuvable
- * ne fait écrire à personne.
+ * Ancienneté de son compte, et ses **autres** signalements qui ont réellement
+ * prévenu quelqu'un (`bg_report_targets.notified_at`) dans les dernières
+ * 24 heures — un tournoi désigné, une cible déjà prévenue ou un envoi retenu
+ * ne comptent pas —, jugés par `reporterMayWarnTargets`. Lu sous le verrou de
+ * la réservation, le compte est exact. Un compte introuvable ne fait écrire à
+ * personne.
  */
-async function reporterMayWarn(reportId: number, reporterUserId: number): Promise<boolean> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { age_hours: number; earlier: number })[]>(
+async function reporterMayWarn(connection: Executor, reportId: number, reporterUserId: number): Promise<boolean> {
+  const [rows] = await connection.execute<(RowDataPacket & { age_hours: number; earlier: number })[]>(
     `SELECT TIMESTAMPDIFF(HOUR, u.created_at, NOW()) AS age_hours,
             (SELECT COUNT(DISTINCT r.id)
              FROM bg_reports r
              JOIN bg_report_targets t ON t.report_id = r.id
-             WHERE r.reporter_user_id = u.id AND r.id < ?
+             WHERE r.reporter_user_id = u.id AND r.id <> ?
                AND t.notified_at > NOW() - INTERVAL 24 HOUR) AS earlier
      FROM bg_users u
      WHERE u.id = ?`,
@@ -562,13 +610,13 @@ async function reporterMayWarn(reportId: number, reporterUserId: number): Promis
  * compte retenu, par exemple — ne compte pas : elle n'a rien reçu.
  */
 async function recentlyNotifiedTargets(
+  connection: Executor,
   reportId: number,
   targets: readonly ReportTargetRef[],
 ): Promise<Set<string>> {
   const refs = targets.filter((target) => target.type === "USER" || target.type === "TEAM");
   if (refs.length === 0) return new Set();
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { target_type: ReportTargetType; target_id: number })[]>(
+  const [rows] = await connection.execute<(RowDataPacket & { target_type: ReportTargetType; target_id: number })[]>(
     `SELECT DISTINCT t.target_type, t.target_id
      FROM bg_report_targets t
      WHERE t.report_id <> ?
