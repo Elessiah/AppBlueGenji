@@ -245,6 +245,22 @@ export function shouldCommitFetched(
   return !payload.version || payload.version !== current.version;
 }
 
+/**
+ * Délai accordé au premier instantané une fois le flux **ouvert**.
+ *
+ * Un flux peut s'ouvrir (200, `onopen`) sans jamais rien livrer : un proxy ou un
+ * antivirus qui met la réponse en tampon la retient tant qu'elle n'est pas finie,
+ * et un flux ne finit pas. Aucune erreur ne se déclare, donc le repli REST — qui
+ * n'est armé que par `onerror` — ne partait jamais, et la page restait sur
+ * « Chargement du tournoi… » pour toujours. Passé ce délai sans instantané, on lit
+ * la donnée par REST et on sonde en secours, sans fermer le flux : s'il se met à
+ * livrer, il reprend la main.
+ *
+ * Le premier message est écrit dès la connexion côté serveur : quelques secondes
+ * couvrent largement une salle chargée, sans faire attendre un lecteur bloqué.
+ */
+export const FIRST_SNAPSHOT_TIMEOUT_MS = 5_000;
+
 /** Plafond exponentiel de départ, en millisecondes. */
 export const RECONNECT_BASE_MS = 1_000;
 /** Plafond de l'attente. Au-delà, on retente simplement toutes les minutes. */

@@ -58,12 +58,24 @@ import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { MatchAnchorProvider } from "./_lib/match-anchor-context";
 import { useMatchAnchor } from "./_hooks/useMatchAnchor";
 import { TournamentProgress } from "./_components/TournamentProgress";
+import { TournamentLoading } from "./_components/TournamentLoading";
 import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
 import { RollbackRoundDialog } from "./_components/RollbackRoundDialog";
 import { EndurancePenaltyDialog } from "./_components/EndurancePenaltyDialog";
 import { AdvanceTournamentDialog } from "./_components/AdvanceTournamentDialog";
 import { TournamentHeader } from "./_components/TournamentHeader";
 import { TournamentImageDialog } from "./_components/TournamentImageDialog";
+import { ConfirmActionDialog } from "./_components/ConfirmActionDialog";
+
+/** Confirmation en attente d'un geste irréversible (abandon, retrait de pénalité). */
+interface PendingConfirm {
+  title: string;
+  /** Un paragraphe par entrée. */
+  body: string[];
+  confirmLabel: string;
+  pendingLabel: string;
+  run: () => Promise<boolean>;
+}
 
 /** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
 const BOARD_TITLES: Record<TournamentFormat, string> = {
@@ -92,6 +104,7 @@ export default function TournamentDetailPage() {
   const [rollbackDialogOpen, setRollbackDialogOpen] = useState(false);
   const [advanceDialogOpen, setAdvanceDialogOpen] = useState(false);
   const [imageDialogOpen, setImageDialogOpen] = useState(false);
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   // On retient l'**identifiant** du match en cours de configuration, pas l'objet :
   // la page se recharge par SSE, et un objet capturé à l'ouverture deviendrait
   // périmé — le dialogue rejouerait alors une configuration dépassée par-dessus
@@ -251,18 +264,9 @@ export default function TournamentDetailPage() {
 
   if (!detail) {
     // Le premier affichage attend l'ouverture du flux, qui apporte le plateau
-    // et le contexte du lecteur d'un seul coup. `aria-busy` annonce l'attente
-    // aux lecteurs d'écran plutôt que de leur laisser une page muette.
-    return (
-      <section
-        className="ds-block"
-        style={{ color: "var(--text-2)" }}
-        role="status"
-        aria-busy="true"
-      >
-        Chargement du tournoi…
-      </section>
-    );
+    // et le contexte du lecteur d'un seul coup — ou, passé un délai sans rien,
+    // la lecture REST de secours (`FIRST_SNAPSHOT_TIMEOUT_MS`).
+    return <TournamentLoading />;
   }
 
   /**
@@ -357,12 +361,11 @@ export default function TournamentDetailPage() {
       teamId,
     );
 
-  const forfeitTeam = async (teamId: number, teamName: string) => {
-    const isMine = detail?.myTeamId === teamId;
-    const confirmation = isMine
-      ? wording.forfeitSelfConfirm
-      : `Déclarer ${teamName} forfait pour tout le reste du tournoi ? ${wording.subject} quittera définitivement le tournoi. Pour un forfait sur une seule manche, passez par le score du match.`;
-    if (!window.confirm(confirmation)) return;
+  // Abandon et retrait d'une pénalité : deux gestes qui ne se défont pas, donc
+  // une confirmation — une modale et non `window.confirm`, comme leurs voisins
+  // de la page (`ConfirmActionDialog`). Le geste lui-même ne part qu'au clic de
+  // confirmation, et rend `true` s'il a abouti pour que la modale se ferme.
+  const performForfeit = async (teamId: number, teamName: string, isMine: boolean) => {
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/forfeit`, {
         method: "POST",
@@ -373,16 +376,38 @@ export default function TournamentDetailPage() {
       if (!response.ok) throw new Error(payload.error || "FORFEIT_FAILED");
       showSuccess(isMine ? "Forfait enregistré." : `Forfait de ${teamName} enregistré.`);
       void refresh();
+      return true;
     } catch (e) {
       showError(mapError((e as Error).message));
+      return false;
     }
   };
 
-  const liftPenalty = async (penalty: EndurancePenaltyRow) => {
-    const confirmation =
-      `Retirer la pénalité de ${penalty.points} point(s) infligée à ${penalty.teamName} ?` +
-      ` Son capital d'endurance et tout ce que la sanction avait entraîné seront rétablis.`;
-    if (!window.confirm(confirmation)) return;
+  const forfeitTeam = (teamId: number, teamName: string) => {
+    const isMine = detail?.myTeamId === teamId;
+    setPendingConfirm(
+      isMine
+        ? {
+            title: "Abandonner le tournoi ?",
+            body: [wording.forfeitSelfConfirm],
+            confirmLabel: "Abandonner",
+            pendingLabel: "Abandon…",
+            run: () => performForfeit(teamId, teamName, true),
+          }
+        : {
+            title: `Déclarer ${teamName} forfait ?`,
+            body: [
+              `${wording.subject} quittera définitivement le tournoi : le forfait vaut pour tout ce qui reste à jouer.`,
+              "Pour un forfait sur une seule manche, passez par le score du match.",
+            ],
+            confirmLabel: "Déclarer forfait",
+            pendingLabel: "Enregistrement…",
+            run: () => performForfeit(teamId, teamName, false),
+          },
+    );
+  };
+
+  const performLiftPenalty = async (penalty: EndurancePenaltyRow) => {
     try {
       const response = await fetch(
         `/api/tournaments/${tournamentId}/penalties/${penalty.id}`,
@@ -392,9 +417,23 @@ export default function TournamentDetailPage() {
       if (!response.ok) throw new Error(payload.error || "PENALTY_LIFT_FAILED");
       showSuccess(`Pénalité retirée : ${penalty.teamName} récupère ${penalty.points} point(s).`);
       void refresh();
+      return true;
     } catch (e) {
       showError(mapError((e as Error).message));
+      return false;
     }
+  };
+
+  const liftPenalty = (penalty: EndurancePenaltyRow) => {
+    setPendingConfirm({
+      title: `Retirer la pénalité de ${penalty.teamName} ?`,
+      body: [
+        `${penalty.points} point(s) seront rendus au capital d'endurance, et tout ce que la sanction avait entraîné sera rétabli.`,
+      ],
+      confirmLabel: "Retirer la pénalité",
+      pendingLabel: "Retrait…",
+      run: () => performLiftPenalty(penalty),
+    });
   };
 
   // Ligne visée par le dialogue de pénalité, relue à chaque rendu depuis
@@ -554,7 +593,6 @@ export default function TournamentDetailPage() {
           tier={tier}
           fatal={fatal}
           frozen={frozen}
-          onBack={() => router.back()}
           onRegister={registerTeam}
           onReportIssue={() => openIssueReport(null)}
           onGuestRegister={() => setGhostRegistrationOpen(true)}
@@ -562,6 +600,11 @@ export default function TournamentDetailPage() {
           onLiveSaved={() => void refresh()}
           onEditImage={() => setImageDialogOpen(true)}
         />
+
+        {/* La frise complète l'en-tête : elle situe le tournoi sur son cycle de
+            vie, ce qu'on cherche en arrivant — pas sous les inscrites et les
+            contacts, où elle attendait en bas de page. */}
+        <TournamentProgress detail={detail} />
 
         <div className="ds-block" style={{ marginBottom: 20 }}>
           {isMulti && detail.phases && (
@@ -778,8 +821,6 @@ export default function TournamentDetailPage() {
           <EntrantContactsPanel tournamentId={detail.card.id} />
         )}
 
-        <TournamentProgress detail={detail} />
-
         {/* Zone de danger : les gestes qu'on ne défait pas, volontairement isolés
             en bas de page, loin des actions courantes. Retirés comme les autres
             quand le suivi est arrêté.
@@ -962,6 +1003,22 @@ export default function TournamentDetailPage() {
             void refresh();
           }}
         />
+      )}
+
+      {/* Le suivi arrêté retire les actions : une confirmation restée ouverte
+          partirait sur un état que la page ne montre plus. */}
+      {pendingConfirm !== null && !frozen && (
+        <ConfirmActionDialog
+          title={pendingConfirm.title}
+          confirmLabel={pendingConfirm.confirmLabel}
+          pendingLabel={pendingConfirm.pendingLabel}
+          onClose={() => setPendingConfirm(null)}
+          onConfirm={pendingConfirm.run}
+        >
+          {pendingConfirm.body.map((paragraph) => (
+            <p key={paragraph}>{paragraph}</p>
+          ))}
+        </ConfirmActionDialog>
       )}
 
       {rollbackDialogOpen && rollbackReady !== null && (

@@ -30,7 +30,7 @@ Quatre étages, séparés par du vide plutôt que par des traits :
 
 | Étage | Contenu | Pourquoi là |
 | --- | --- | --- |
-| Outils du lecteur | `← Retour`, témoin de flux, `⚙ Admin` | Ce qui parle de **qui regarde**, pas du tournoi. « À jour » décrit la page. |
+| Outils du lecteur | `← Retour` (lien vers `/tournois` qui ne revient dans l'historique que s'il reste sur le site — `TOURNAMENT_PAGE_PATH.md`), témoin de flux, `⚙ Admin` | Ce qui parle de **qui regarde**, pas du tournoi. « À jour » décrit la page. |
 | Identité | état, jeu (`· Individuel`), nom, description, `Modifier` | Ce qu'on lit en arrivant. |
 | Les faits | grille étiquetée | Chaque valeur porte son intitulé. |
 | Actions | chaîne officielle, inscription, invité, signalement | Hors du flux de lecture. |

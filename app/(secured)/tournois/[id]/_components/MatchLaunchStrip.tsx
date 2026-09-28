@@ -12,6 +12,7 @@ import {
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import styles from "./MatchLaunchStrip.module.css";
 
 async function send(url: string, method: string, body?: unknown): Promise<void> {
@@ -40,6 +41,7 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
   const { canManage, canSchedule, viewerUserId, myTeamId, castBlock } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
+  const [confirmForce, setConfirmForce] = useState(false);
   const phase = useMatchLaunchPhase(match);
 
   const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
@@ -76,14 +78,17 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
 
   if (!showHost && match.casterUserId === null && !showClaim) return null;
 
-  const run = async (action: () => Promise<void>, success: string) => {
+  /** Rend `true` si le geste a abouti (la confirmation se ferme alors). */
+  const run = async (action: () => Promise<void>, success: string): Promise<boolean> => {
     setBusy(true);
     try {
       await action();
       showSuccess(success);
       window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+      return true;
     } catch (error) {
       showError(launchErrorMessage((error as Error).message));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -209,16 +214,30 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
               type="button"
               className={`btn ${styles.small} ${styles.force}`}
               disabled={busy}
-              onClick={() => {
-                if (!window.confirm(`Lancer ${matchLabel} sans attendre les « Prêt » manquants ?`)) return;
-                void run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), "Match lancé.");
-              }}
+              onClick={() => setConfirmForce(true)}
               aria-label={`Forcer le lancement de ${matchLabel}`}
             >
               ▶ Forcer
             </button>
           )}
         </span>
+      )}
+      {/* Une modale et non `window.confirm`, comme les autres gestes sans retour
+          de la fiche (`ConfirmActionDialog`). Refermée d'elle-même si le
+          bouton disparaît (match lancé entre-temps par un autre arbitre). */}
+      {confirmForce && showForce && (
+        <ConfirmActionDialog
+          title={`Forcer le lancement de ${matchLabel} ?`}
+          confirmLabel="Lancer le match"
+          pendingLabel="Lancement…"
+          onClose={() => setConfirmForce(false)}
+          onConfirm={() => run(() => send(`/api/admin/matches/${match.id}/launch`, "POST"), "Match lancé.")}
+        >
+          <p>
+            Le match démarre sans attendre les « Prêt » manquants : les engagés peuvent
+            reporter leur score dès maintenant.
+          </p>
+        </ConfirmActionDialog>
       )}
     </div>
   );

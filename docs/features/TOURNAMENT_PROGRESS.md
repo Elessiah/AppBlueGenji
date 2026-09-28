@@ -1,6 +1,6 @@
 # Frise de progression d'un tournoi
 
-En bas de `/tournois/[id]`, une frise horizontale situe le tournoi sur son cycle
+Sous l'en-tête de `/tournois/[id]`, une frise horizontale situe le tournoi sur son cycle
 de vie, de **« masqué »** à **« terminé »** : barre remplie, jalons datés, étape
 courante mise en avant, et compte à rebours vers le jalon suivant.
 
