@@ -382,11 +382,13 @@ const FICTIONAL_BUREAU = [
   { name: "Jérôme Dubois", role: "Responsable arbitrage", initials: "JD", color: "rgb(167, 115, 255)" },
 ];
 
+// Les trois visages d'une carte partenaire (`lib/shared/sponsor-card.ts`) :
+// bandeau + logo, logo seul, bandeau seul — le quatrième, inactif, n'a rien.
 const FICTIONAL_SPONSORS = [
-  { name: "Test - HyperX", slug: "test-hyperx", tier: "GOLD" as const, website_url: "https://example.com/hyperx", description: "Périphériques gaming haute performance" },
-  { name: "Test - SteelSeries", slug: "test-steelseries", tier: "SILVER" as const, website_url: "https://example.com/steelseries", description: "Équipement esport de référence" },
-  { name: "Test - Red Bull", slug: "test-redbull", tier: "BRONZE" as const, website_url: "https://example.com/redbull", description: "Énergie pour les champions" },
-  { name: "Test - Discord", slug: "test-discord", tier: "PARTNER" as const, website_url: "https://example.com/discord", description: "La plateforme officielle de la communauté" },
+  { name: "Test - HyperX", slug: "test-hyperx", tier: "GOLD" as const, website_url: "https://example.com/hyperx", description: "Périphériques gaming haute performance", banner: true, logo: true },
+  { name: "Test - SteelSeries", slug: "test-steelseries", tier: "SILVER" as const, website_url: "https://example.com/steelseries", description: "Équipement esport de référence", banner: false, logo: true },
+  { name: "Test - Red Bull", slug: "test-redbull", tier: "BRONZE" as const, website_url: "https://example.com/redbull", description: "Énergie pour les champions", banner: true, logo: false },
+  { name: "Test - Discord", slug: "test-discord", tier: "PARTNER" as const, website_url: "https://example.com/discord", description: "La plateforme officielle de la communauté", banner: false, logo: false },
 ];
 
 // Annonces de recrutement : couvre l'aperçu tronqué des longues descriptions
@@ -844,16 +846,48 @@ async function createBulkTeams(db: Pool, count: number): Promise<number[]> {
   return teamIds;
 }
 
+/**
+ * Écrit une image de partenaire de test sous `public/uploads/sponsors` : un vrai
+ * fichier, pour que les cartes de la matrice se présentent comme en production
+ * (et non avec une URL étrangère, qu'elles refuseraient d'afficher). Un fichier
+ * **par partenaire** : supprimer ou remplacer l'image de l'un efface son fichier.
+ */
+async function ensureSeedSponsorImage(slug: string, kind: "banner" | "logo"): Promise<string> {
+  const dir = path.join(process.cwd(), "public", "uploads", "sponsors");
+  const filename = `seed-${slug}-${kind}.webp`;
+  await mkdir(dir, { recursive: true });
+  const [width, height] = kind === "banner" ? [1200, 400] : [256, 256];
+  const svg =
+    kind === "banner"
+      ? `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+        `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+        `<stop offset="0" stop-color="#0b1a2c"/><stop offset="1" stop-color="#1d5f8a"/></linearGradient></defs>` +
+        `<rect width="100%" height="100%" fill="url(#g)"/></svg>`
+      : `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+        `<text x="128" y="160" font-family="sans-serif" font-size="110" font-weight="700"` +
+        ` fill="#5ac8ff" text-anchor="middle">${slug.replace(/^test-/, "").slice(0, 2).toUpperCase()}</text></svg>`;
+  const image = await sharp({
+    create: { width, height, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } },
+  })
+    .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+    .webp({ quality: 82 })
+    .toBuffer();
+  await writeFile(path.join(dir, filename), image);
+  return toServedUploadUrl(`/uploads/sponsors/${filename}`);
+}
+
 async function createSponsors(db: Pool): Promise<void> {
   console.log("🤝 Création des sponsors...");
   for (let i = 0; i < FICTIONAL_SPONSORS.length; i++) {
     const s = FICTIONAL_SPONSORS[i];
     try {
+      const bannerUrl = s.banner ? await ensureSeedSponsorImage(s.slug, "banner") : null;
+      const logoUrl = s.logo ? await ensureSeedSponsorImage(s.slug, "logo") : null;
       await db.execute(
-        `INSERT INTO bg_sponsors (name, slug, tier, website_url, description, display_order, active)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        `INSERT INTO bg_sponsors (name, slug, tier, logo_url, banner_url, website_url, description, display_order, active)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         // Le dernier sponsor est inactif : couvre le filtrage de la page partenaires.
-        [s.name, s.slug, s.tier, s.website_url, s.description, (i + 1) * 10, i === FICTIONAL_SPONSORS.length - 1 ? 0 : 1]
+        [s.name, s.slug, s.tier, logoUrl, bannerUrl, s.website_url, s.description, (i + 1) * 10, i === FICTIONAL_SPONSORS.length - 1 ? 0 : 1]
       );
     } catch (error) {
       console.error(`  ✗ ${s.name}:`, (error as Error).message);

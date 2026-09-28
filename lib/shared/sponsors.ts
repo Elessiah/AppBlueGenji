@@ -1,3 +1,5 @@
+import { toDiskUploadPath } from "./uploads";
+
 export const SPONSOR_TIERS = ["GOLD", "SILVER", "BRONZE", "PARTNER"] as const;
 export type SponsorTier = (typeof SPONSOR_TIERS)[number];
 
@@ -7,6 +9,12 @@ export type Sponsor = {
   slug: string;
   tier: SponsorTier;
   logoUrl: string | null;
+  /**
+   * Bandeau de la carte (image large, recadrée au format 3:1 à l'import).
+   * Toujours un fichier téléversé chez nous — jamais une URL collée, contrairement
+   * au logo : la carte n'a pas de relais pour lui (voir `sponsor-card.ts`).
+   */
+  bannerUrl: string | null;
   websiteUrl: string | null;
   description: string | null;
 };
@@ -15,6 +23,7 @@ export type SponsorInput = {
   name: string;
   tier?: SponsorTier | string;
   logoUrl?: string | null;
+  bannerUrl?: string | null;
   websiteUrl?: string | null;
   description?: string | null;
   active?: boolean;
@@ -33,17 +42,25 @@ export const SPONSOR_TIER_LABELS: Record<SponsorTier, string> = {
  * non modifiables côté interface. Partagé client/serveur.
  */
 export const FALLBACK_SPONSORS: Sponsor[] = [
-  { id: -1, name: "LOGITECH G", slug: "logitech-g", tier: "PARTNER", logoUrl: null, websiteUrl: "https://www.logitechg.com", description: null },
-  { id: -2, name: "CORSAIR", slug: "corsair", tier: "PARTNER", logoUrl: null, websiteUrl: "https://www.corsair.com", description: null },
-  { id: -3, name: "HYPERX", slug: "hyperx", tier: "PARTNER", logoUrl: null, websiteUrl: "https://www.hyperxgaming.com", description: null },
-  { id: -4, name: "STEELSERIES", slug: "steelseries", tier: "PARTNER", logoUrl: null, websiteUrl: "https://www.steelseries.com", description: null },
-  { id: -5, name: "RAZER", slug: "razer", tier: "PARTNER", logoUrl: null, websiteUrl: "https://www.razer.com", description: null },
-  { id: -6, name: "ASUS ROG", slug: "asus-rog", tier: "PARTNER", logoUrl: null, websiteUrl: "https://rog.asus.com", description: null },
+  { id: -1, name: "LOGITECH G", slug: "logitech-g", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.logitechg.com", description: null },
+  { id: -2, name: "CORSAIR", slug: "corsair", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.corsair.com", description: null },
+  { id: -3, name: "HYPERX", slug: "hyperx", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.hyperxgaming.com", description: null },
+  { id: -4, name: "STEELSERIES", slug: "steelseries", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.steelseries.com", description: null },
+  { id: -5, name: "RAZER", slug: "razer", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://www.razer.com", description: null },
+  { id: -6, name: "ASUS ROG", slug: "asus-rog", tier: "PARTNER", logoUrl: null, bannerUrl: null, websiteUrl: "https://rog.asus.com", description: null },
 ];
 
 export const SPONSOR_NAME_MAX = 120;
 export const SPONSOR_SLUG_MAX = 140;
 export const SPONSOR_URL_MAX = 2048;
+/** Colonne `bg_sponsors.banner_url` : un chemin d'upload, jamais une URL longue. */
+export const SPONSOR_BANNER_URL_MAX = 255;
+/**
+ * Une **brève** description : elle s'affiche en entier sous le nom, sur une
+ * carte d'un tiers de largeur. Au-delà, elle serait coupée à l'écran — le champ
+ * refuse donc de la saisir plutôt que de la tronquer à l'affichage.
+ */
+export const SPONSOR_DESCRIPTION_MAX = 200;
 
 /** Génère un slug URL-safe à partir d'un nom (accents retirés, minuscules). */
 export function slugifySponsor(name: string): string {
@@ -54,6 +71,17 @@ export function slugifySponsor(name: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, SPONSOR_SLUG_MAX);
+}
+
+/**
+ * Vrai si l'adresse désigne un fichier du dossier des partenaires — le seul où
+ * la route de téléversement du bandeau écrit. Un autre dossier d'upload
+ * (avatar d'un joueur, logo d'une équipe) serait bien « à nous », mais le
+ * nettoyage d'un bandeau remplacé l'effacerait alors du disque.
+ */
+export function isStoredSponsorBanner(url: string): boolean {
+  const disk = toDiskUploadPath(url);
+  return disk !== null && disk.startsWith("/uploads/sponsors/") && !disk.includes("..");
 }
 
 function isTier(value: unknown): value is SponsorTier {
@@ -70,14 +98,24 @@ function normalizeOptional(value: unknown, max: number): string | null {
 export type SponsorValidationResult =
   | {
       ok: true;
-      value: { name: string; tier: SponsorTier; logoUrl: string | null; websiteUrl: string | null; description: string | null; active: boolean };
+      value: {
+        name: string;
+        tier: SponsorTier;
+        logoUrl: string | null;
+        bannerUrl: string | null;
+        websiteUrl: string | null;
+        description: string | null;
+        active: boolean;
+      };
     }
   | { ok: false; error: string };
 
 /**
  * Valide et normalise une entrée de sponsor. Le nom est requis ; le palier
- * (tier) défaut « PARTNER » ; logo/site/description sont optionnels et
- * ramenés à `null` si vides. `active` défaut `true`.
+ * (tier) défaut « PARTNER » ; logo/bandeau/site/description sont optionnels et
+ * ramenés à `null` si vides. Le bandeau doit être un fichier téléversé
+ * (`INVALID_BANNER_URL`), la description tenir en `SPONSOR_DESCRIPTION_MAX`
+ * caractères (`DESCRIPTION_TOO_LONG`). `active` défaut `true`.
  */
 export function validateSponsorInput(input: SponsorInput): SponsorValidationResult {
   const name = typeof input.name === "string" ? input.name.trim() : "";
@@ -92,8 +130,22 @@ export function validateSponsorInput(input: SponsorInput): SponsorValidationResu
 
   const logoUrl = normalizeOptional(input.logoUrl, SPONSOR_URL_MAX);
   const websiteUrl = normalizeOptional(input.websiteUrl, SPONSOR_URL_MAX);
-  const description = normalizeOptional(input.description, 1000);
+
+  const rawBanner = typeof input.bannerUrl === "string" ? input.bannerUrl.trim() : "";
+  let bannerUrl: string | null = null;
+  if (rawBanner) {
+    // Le bandeau ne se pose que par téléversement : une autre adresse est un
+    // refus, pas un repli silencieux sur « aucun bandeau ».
+    if (rawBanner.length > SPONSOR_BANNER_URL_MAX || !isStoredSponsorBanner(rawBanner)) {
+      return { ok: false, error: "INVALID_BANNER_URL" };
+    }
+    bannerUrl = rawBanner;
+  }
+
+  const rawDescription = typeof input.description === "string" ? input.description.trim() : "";
+  if (rawDescription.length > SPONSOR_DESCRIPTION_MAX) return { ok: false, error: "DESCRIPTION_TOO_LONG" };
+  const description = rawDescription || null;
   const active = input.active === undefined ? true : Boolean(input.active);
 
-  return { ok: true, value: { name, tier, logoUrl, websiteUrl, description, active } };
+  return { ok: true, value: { name, tier, logoUrl, bannerUrl, websiteUrl, description, active } };
 }

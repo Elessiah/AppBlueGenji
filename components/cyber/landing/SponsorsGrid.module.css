@@ -15,12 +15,27 @@
   padding: 24px 0 28px;
 }
 
+.headText {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  max-width: 720px;
+}
+
 .sectionTitle {
   margin: 6px 0 0;
   font-family: var(--font-sans);
   font-size: clamp(28px, 3vw, 44px);
   font-weight: 500;
   letter-spacing: -0.02em;
+}
+
+.lede {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink-mute);
 }
 
 .meta {
@@ -36,27 +51,171 @@
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
 .slotWrap {
   position: relative;
+  display: flex;
+  flex-direction: column;
 }
 
-.slot {
-  aspect-ratio: 3 / 1;
+/* Carte partenaire : image (bandeau et/ou logo) puis nom, description, domaine.
+   La carte entière est cliquable par le lien du nom, étiré (`.nameLink::after`). */
+.card {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   border: 1px solid var(--line-soft);
   border-radius: var(--r-cy-md);
-  position: relative;
   overflow: hidden;
+  background: rgba(5, 8, 12, 0.72);
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+
+.card:has(.nameLink):hover {
+  border-color: var(--blue-500);
+  transform: translateY(-2px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+}
+
+.card:has(.nameLink:focus-visible) {
+  border-color: var(--blue-300);
+  box-shadow: 0 0 0 3px rgba(var(--blue-500-rgb), 0.45);
+}
+
+.media {
+  position: relative;
+  aspect-ratio: 3 / 1;
+  overflow: hidden;
+  border-bottom: 1px solid var(--line-soft);
+  background:
+    radial-gradient(120% 140% at 20% 0%, rgba(90, 200, 255, 0.1), transparent 60%),
+    rgba(5, 8, 12, 0.9);
+}
+
+.banner {
+  object-fit: cover;
+}
+
+/* Sans bandeau, le logo s'affiche **entier** : jamais rogné, quelle que soit sa
+   forme (carré, horizontal, portrait). */
+.logoFrame {
+  position: absolute;
+  inset: 14px 18%;
+}
+
+.logo {
+  object-fit: contain;
+}
+
+/* Avec un bandeau, le logo se pose en pastille dans le coin bas-gauche. */
+.emblem {
+  position: absolute;
+  left: 12px;
+  bottom: 10px;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--r-cy-sm);
+  border: 1px solid var(--line-strong-cy);
+  background: rgba(5, 8, 12, 0.88);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.emblem .logo {
+  padding: 6px;
+}
+
+.initial {
+  position: absolute;
+  inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(5, 8, 12, 0.72);
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 700;
+  color: var(--blue-300);
+  text-shadow: 0 0 18px var(--blue-glow);
+}
+
+.tier {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: rgba(5, 8, 12, 0.82);
+  border: 1px solid var(--line-strong-cy);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 16px;
+  flex: 1;
+}
+
+.name {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.nameLink {
+  color: inherit;
+  text-decoration: none;
+  outline: none;
+}
+
+.nameLink::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.card:has(.nameLink):hover .name {
+  color: var(--blue-300);
+}
+
+.description {
+  margin: 0;
+  /* Saisie en zone multiligne : les retours à la ligne voulus sont gardés. */
+  white-space: pre-line;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-mute);
+  overflow-wrap: anywhere;
+}
+
+.domain {
+  margin-top: auto;
+  padding-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--blue-300);
 }
 
 .slotActions {
@@ -184,8 +343,8 @@
 
 .logoPreview,
 .logoPreviewEmpty {
-  width: 150px;
-  aspect-ratio: 3 / 1;
+  width: 72px;
+  aspect-ratio: 1;
   flex: none;
   border: 1px solid var(--line-soft);
   border-radius: var(--r-cy-sm, 8px);
@@ -255,30 +414,32 @@
   color: var(--ink-dim, var(--ink-mute));
 }
 
-.logo {
+.pattern {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  /* `cover` remplit toute la carte (presque un fond). Le logo importé est déjà
-     en 600×200, soit le même ratio 3:1 que l'emplacement, donc aucun rognage. */
-  object-fit: cover;
-}
-
-.pattern {
-  position: absolute;
-  inset: 0;
   opacity: 0.9;
 }
 
-.slot :global(.mono) {
-  position: relative;
-  z-index: 1;
-  color: var(--ink-mute);
-  letter-spacing: 0.2em;
-  font-size: 11px;
-  text-align: center;
-  padding: 0 12px;
+.bannerPreview,
+.bannerPreviewEmpty {
+  width: 150px;
+  aspect-ratio: 3 / 1;
+  flex: none;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-sm, 8px);
+  background: var(--cyber-bg, #06080b);
+}
+
+.bannerPreview {
+  object-fit: cover;
+}
+
+.modalTextarea {
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.5;
 }
 
 @media (max-width: 900px) {
@@ -297,10 +458,6 @@
     align-items: flex-start;
   }
 
-  /* Deux colonnes gardées jusqu'au plus petit écran : un logo 3:1 reste
-     lisible à demi-largeur (~170 px sur 375), et la colonne unique empilait
-     un bandeau par partenaire sur toute la hauteur de la section. */
-
   /* À demi-largeur, les quatre boutons du staff ne tiennent plus posés sur le
      logo (ils le recouvraient en entier) : ils passent dessous, à la ligne. */
   .slotActions {
@@ -310,3 +467,32 @@
   }
 }
 
+/* Une carte porte désormais un nom et une description : à demi-largeur d'un
+   téléphone (~170 px), le texte passait à la ligne tous les deux mots. */
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+
+/* Le soulèvement au survol est un mouvement : il se retire avec la préférence
+   système comme avec « Réduire les animations » du menu d'accessibilité. */
+@media (prefers-reduced-motion: reduce) {
+  .card:has(.nameLink):hover {
+    transform: none;
+  }
+}
+
+:global(:root[data-a11y~="motion"]) .card:has(.nameLink):hover {
+  transform: none;
+}
+
+/* En contrastes forcés, l'anneau (une ombre) disparaît : le focus du lien étiré
+   se redit par un contour sur la carte entière. */
+@media (forced-colors: active) {
+  .card:has(.nameLink:focus-visible) {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}

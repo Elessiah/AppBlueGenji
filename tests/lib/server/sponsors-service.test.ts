@@ -3,6 +3,7 @@ import {
   FALLBACK_SPONSORS,
   createSponsor,
   deleteSponsor,
+  getSponsorImageUrls,
   getSponsorLogoUrl,
   listSponsors,
   updateSponsor,
@@ -38,6 +39,20 @@ describe("sponsors-service", () => {
       const result = await listSponsors();
       expect(result).toHaveLength(1);
       expect(result[0].name).toBe("HyperX");
+      // Une ligne lue sans la colonne (base pas encore migrée) n'est pas `undefined`.
+      expect(result[0].bannerUrl).toBeNull();
+    });
+
+    it("reads the banner column", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[
+        { id: 1, name: "A", slug: "a", tier: "GOLD", logoUrl: null, bannerUrl: "/api/uploads/sponsors/b.webp", websiteUrl: null, description: "Musique" },
+      ]]);
+      await mockDb(execute);
+
+      const [sponsor] = await listSponsors();
+      expect(sponsor.bannerUrl).toBe("/api/uploads/sponsors/b.webp");
+      expect(sponsor.description).toBe("Musique");
+      expect(execute.mock.calls[0][0]).toContain("banner_url as bannerUrl");
     });
 
     it("returns the fallback when the table is empty", async () => {
@@ -68,6 +83,7 @@ describe("sponsors-service", () => {
         slug: "logitech-g",
         tier: "SILVER",
         logoUrl: null,
+        bannerUrl: null,
         websiteUrl: "https://l",
         description: null,
       });
@@ -83,6 +99,20 @@ describe("sponsors-service", () => {
 
       const sponsor = await createSponsor({ name: "Razer" });
       expect(sponsor.slug).toBe("razer-2");
+    });
+
+    it("writes the banner url in the INSERT", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[]])
+        .mockResolvedValueOnce([{ insertId: 9 }]);
+      await mockDb(execute);
+
+      const sponsor = await createSponsor({ name: "Akiu", bannerUrl: "/api/uploads/sponsors/b.webp" });
+      expect(sponsor.bannerUrl).toBe("/api/uploads/sponsors/b.webp");
+      const [sql, values] = execute.mock.calls[1];
+      expect(sql).toContain("banner_url");
+      expect(values).toContain("/api/uploads/sponsors/b.webp");
     });
 
     it("rejects invalid input before touching the database", async () => {
@@ -108,9 +138,23 @@ describe("sponsors-service", () => {
         slug: "hyperx",
         tier: "GOLD",
         logoUrl: null,
+        bannerUrl: null,
         websiteUrl: null,
         description: null,
       });
+    });
+
+    it("writes the banner url in the UPDATE", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([[{ slug: "akiu" }]])
+        .mockResolvedValueOnce([{ affectedRows: 1 }]);
+      await mockDb(execute);
+
+      await updateSponsor(3, { name: "Akiu", bannerUrl: "/uploads/sponsors/b.webp" });
+      const [sql, values] = execute.mock.calls[1];
+      expect(sql).toContain("banner_url = ?");
+      expect(values).toContain("/uploads/sponsors/b.webp");
     });
 
     it("throws NOT_FOUND when the sponsor does not exist", async () => {
@@ -137,6 +181,23 @@ describe("sponsors-service", () => {
     it("returns null when the sponsor does not exist", async () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await getSponsorLogoUrl(999)).toBeNull();
+    });
+  });
+
+  describe("getSponsorImageUrls", () => {
+    it("returns both stored image urls", async () => {
+      await mockDb(jest
+        .fn<SqlQuery>()
+        .mockResolvedValue([[{ logoUrl: "https://cdn/l.png", bannerUrl: "/uploads/sponsors/b.webp" }]]));
+      expect(await getSponsorImageUrls(1)).toEqual({
+        logoUrl: "https://cdn/l.png",
+        bannerUrl: "/uploads/sponsors/b.webp",
+      });
+    });
+
+    it("returns nulls when the sponsor does not exist", async () => {
+      await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
+      expect(await getSponsorImageUrls(999)).toEqual({ logoUrl: null, bannerUrl: null });
     });
   });
 
