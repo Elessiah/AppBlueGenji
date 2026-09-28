@@ -18,9 +18,9 @@ import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip } from "./MatchReplayStrip";
 import { EntrantName } from "./EntrantName";
+import { CyberButton } from "@/components/cyber";
+import styles from "./MatchRow.module.css";
 
-const CARD_W = 210;
-const BORDER = "var(--border, #444)";
 
 interface MatchRowProps {
   match: BracketMatch;
@@ -91,15 +91,10 @@ export function MatchRow({
     format,
   );
 
-  const rowStyle = (win: boolean): React.CSSProperties => ({
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: "5px 8px",
-    background: win ? "rgba(79,224,162,0.15)" : hasWinner ? "rgba(255,255,255,0.03)" : undefined,
-    color: win ? "var(--text-0)" : hasWinner ? "var(--text-2)" : "var(--text-1)",
-    fontWeight: win ? 600 : 400,
-  });
+  const rowClass = (win: boolean): string =>
+    [styles.row, win ? styles.winner : hasWinner ? styles.decided : ""].filter(Boolean).join(" ");
+  const scoreClass = (forfeits: boolean): string =>
+    forfeits ? `${styles.score} ${styles.forfeitScore}` : styles.score;
 
   const team1Display = teamLabel(
     match.team1Name,
@@ -129,27 +124,21 @@ export function MatchRow({
       // suisse, endurance) : une carte de match a donc toujours son identifiant,
       // sans qu'aucune vue ait à y penser.
       id={matchAnchorId(match.id)}
-      className={isAnchorTarget ? "match-anchor-target" : undefined}
+      className={[
+        styles.card,
+        adminResolvable ? styles.resolvable : "",
+        isAnchorTarget ? "match-anchor-target" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
       // Hors de l'ordre de tabulation, mais focalisable par programme : à
       // l'arrivée d'une ancre, `useMatchAnchor` y pose le focus pour qu'un
       // lecteur d'écran annonce la carte. Sans cela, le défilement et le halo
       // ne disent rien à qui ne voit pas la page — le navigateur en fait autant
       // sur une ancre native, que le flux SSE nous empêche d'utiliser.
       tabIndex={-1}
-      style={{
-        width: CARD_W,
-        background: "var(--surface-1)",
-        border: `1px solid ${adminResolvable ? "rgba(89,212,255,0.4)" : BORDER}`,
-        borderRadius: 6,
-        overflow: "hidden",
-        fontSize: 13,
-        // Marge de sécurité pour le saut natif du navigateur sur `#match-…`
-        // (rechargement d'une URL ancrée) : le défilement piloté par
-        // `useMatchAnchor` centre la carte, celui du navigateur la colle en haut.
-        scrollMargin: 96,
-      }}
     >
-      <div style={{ ...rowStyle(team1Win), borderBottom: `1px solid ${BORDER}` }}>
+      <div className={rowClass(team1Win)}>
         {/* Emblème compris : il garde sa case même sur une ligne vide (TBD,
             BYE), pour que les deux noms de la carte commencent au même endroit. */}
         <EntrantName
@@ -157,42 +146,23 @@ export function MatchRow({
           name={team1Display}
           title={team1Display}
           truncate
-          style={{ flex: 1 }}
+          className={styles.name}
         />
-        <strong style={{ marginLeft: 8, color: team1Win ? "var(--green)" : team1Forfeits ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
-          {team1Score}
-        </strong>
+        <strong className={scoreClass(team1Forfeits)}>{team1Score}</strong>
       </div>
-      <div style={rowStyle(team2Win)}>
+      <div className={rowClass(team2Win)}>
         <EntrantName
           teamId={match.team2Id}
           name={team2Display}
           title={team2Display}
           truncate
-          style={{ flex: 1 }}
+          className={styles.name}
         />
-        <strong style={{ marginLeft: 8, color: team2Win ? "var(--green)" : team2Forfeits ? "rgba(255,157,46,0.9)" : "var(--text-2)" }}>
-          {team2Score}
-        </strong>
+        <strong className={scoreClass(team2Forfeits)}>{team2Score}</strong>
       </div>
 
       {(isDraw || isDoubleForfeit) && (
-        <p
-          style={{
-            margin: 0,
-            padding: "3px 8px",
-            fontSize: 10,
-            letterSpacing: "0.06em",
-            textTransform: "uppercase",
-            textAlign: "center",
-            // L'ambre des « FF » pour un double forfait : la mention dit la même
-            // chose que les deux scores, elle en prend la couleur. Le gris reste
-            // au nul, qui n'est ni une faute ni une absence.
-            color: isDoubleForfeit ? "rgba(255,157,46,0.9)" : "var(--text-2)",
-            background: isDoubleForfeit ? "rgba(255,157,46,0.06)" : "rgba(255,255,255,0.03)",
-            borderTop: `1px solid ${BORDER}`,
-          }}
-        >
+        <p className={isDoubleForfeit ? `${styles.outcome} ${styles.outcomeForfeit}` : styles.outcome}>
           {isDoubleForfeit ? "Double forfait" : "Match nul"}
         </p>
       )}
@@ -205,102 +175,60 @@ export function MatchRow({
       {/* Pas de région live : un plateau de cent vingt-sept cartes en
           annoncerait autant à chaque instantané du flux. L'annonce qui compte,
           celle du lecteur engagé, vit dans sa modale. */}
-      {reportNotice && (
-        <p
-          style={{
-            margin: 0,
-            padding: "4px 8px",
-            fontSize: 10.5,
-            lineHeight: 1.4,
-            textAlign: "center",
-            color: "var(--blue-300, #8ad9ff)",
-            background: "rgba(89,212,255,0.06)",
-            borderTop: `1px solid ${BORDER}`,
-          }}
-        >
-          {reportNotice}
-        </p>
-      )}
+      {reportNotice && <p className={styles.reportNotice}>{reportNotice}</p>}
 
       {playerScoreLabel && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            padding: "5px 6px",
-            background: "rgba(79,224,162,0.06)",
-            borderTop: `1px solid ${BORDER}`,
-          }}
-        >
-          <button
+        <div className={`${styles.bar} ${styles.playerBar}`}>
+          <CyberButton
             type="button"
+            variant="ghost"
             onClick={() => playerScore.open(match)}
-            className="btn"
-            style={{ padding: "4px 12px", fontSize: 12 }}
+            className={styles.action}
           >
             <span aria-hidden="true">✎</span> {playerScoreLabel}
-          </button>
+          </CyberButton>
         </div>
       )}
 
       {adminResolvable && !scoreLocked && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            padding: "5px 6px",
-            background: "rgba(89,212,255,0.08)",
-            borderTop: `1px solid rgba(89,212,255,0.25)`,
-          }}
-        >
-          <button
+        <div className={`${styles.bar} ${styles.adminBar}`}>
+          <CyberButton
             type="button"
+            variant="ghost"
             onClick={() => onOpenAdminModal(match)}
-            className="btn"
-            style={{ padding: "4px 12px", fontSize: 12, background: "rgba(89,212,255,0.15)", borderColor: "rgba(89,212,255,0.4)" }}
+            className={`${styles.action} ${styles.actionAccent}`}
           >
-            ✎ Éditer le score
-          </button>
+            <span aria-hidden="true">✎</span> Éditer le score
+          </CyberButton>
         </div>
       )}
 
       {canReportMatch && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "center",
-            padding: "4px 6px",
-            borderTop: `1px solid ${BORDER}`,
-          }}
-        >
-          <button
+        <div className={styles.bar}>
+          <CyberButton
             type="button"
+            variant="ghost"
             onClick={() => openReport(match)}
-            className="btn ghost"
             title="Prévenir le staff d'un problème sur ce match"
-            style={{ padding: "3px 10px", fontSize: 11 }}
+            className={`${styles.action} ${styles.actionMinor}`}
           >
-            ⚠ Signaler un problème
-          </button>
+            <span aria-hidden="true">⚠</span> Signaler un problème
+          </CyberButton>
         </div>
       )}
 
       {adminResolvable && scoreLocked && (
         <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 6,
-            padding: "5px 6px",
-            borderTop: `1px solid ${BORDER}`,
-            fontSize: 11,
-            color: "var(--text-2)",
-          }}
+          className={`${styles.bar} ${styles.locked}`}
           title="La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié."
         >
           <span aria-hidden="true">🔒</span>
           Score verrouillé
+          {/* Le motif n'était qu'en infobulle, qu'un bloc non focalisable ne
+              montre ni au clavier ni aux lecteurs d'écran. */}
+          <span className="sr-only">
+            : la manche suivante a déjà des scores, le résultat de ce match ne peut plus être modifié.
+          </span>
         </div>
       )}
     </div>
