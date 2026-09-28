@@ -49,12 +49,16 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Le joueur a bien une équipe : ce qui lui manque est la charge de l'engager.
   // La phrase nomme donc les rôles, et dit à qui s'adresser.
   //
-  // Formulation neutre quant à l'acte : le même code refuse l'inscription, le
-  // report d'un score **et** l'abandon, qui exigent la même qualité pour la même raison (§4.2 et §4.7 de
+  // Formulation neutre quant à l'acte : le même code refuse l'inscription **et**
+  // l'abandon, qui exigent la même qualité pour la même raison (§4.2 et §4.7 de
   // `docs/AUTHORIZATION_RULES.md`). Nommer l'inscription faisait lire « peuvent
   // l'inscrire à un tournoi » à qui venait de cliquer « Déclarer forfait ».
   NOT_TEAM_MANAGER:
-    "Seuls le propriétaire et les managers de l'équipe peuvent l'engager dans un tournoi, en reporter les scores ou l'en retirer.",
+    "Seuls le propriétaire et les managers de l'équipe peuvent l'engager dans un tournoi ou l'en retirer.",
+  // Report d'un score par un membre sportif du roster : le geste revient à ceux
+  // qui mènent le match, les mêmes rôles que « Prêt ».
+  NOT_TEAM_MATCH_LEADER:
+    "Seuls le capitaine, un manager ou le propriétaire peuvent saisir le score de l'équipe.",
   // Gérant qui n'a pas accepté les conditions d'utilisation (la modale
   // d'acceptation s'ouvre en même temps).
   TERMS_ACCEPTANCE_REQUIRED:

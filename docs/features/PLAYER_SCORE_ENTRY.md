@@ -33,14 +33,16 @@ porte côté joueur.
    lit sur le format et non sur le score déclaré, qui la mettait à la main du
    déclarant ; elle est posée une fois, au premier report.
 
-Proposer, confirmer et contester demandent **qualité pour agir au nom de
-l'engagé** (`OWNER` / `MANAGER`, ou le joueur en individuel) — la même que le
-forfait ci-dessous : un 0-3 déclaré contre soi est un forfait. Un membre
-sportif du roster ne voit pas le bouton (`canCreateReportsForTeamIds` vide), et
-la route le refuse en `403 NOT_TEAM_MANAGER`. Pour la même raison, « score à
+Proposer, confirmer et contester reviennent à **ceux qui mènent le match** :
+`CAPITAINE`, `MANAGER` ou `OWNER` — les rôles qui déclarent l'équipe prête
+(`canDeclareTeamReady`) —, ou le joueur en individuel. Un 0-3 déclaré contre
+soi est un forfait : une simple place au roster n'y suffit pas. Un membre
+sportif ne voit pas le bouton (`canCreateReportsForTeamIds` vide), et la route
+le refuse en `403 NOT_TEAM_MATCH_LEADER`. Pour la même raison, « score à
 confirmer » ne prévient que ceux qui peuvent y répondre : le push
-(`notifyScoreToConfirm`, par `loadEntrantManagerIds`) comme l'alerte de page
-(`viewerAlert`, sur `canCreateReportsForTeamIds`).
+(`notifyScoreToConfirm`, par `loadEntrantMatchLeaderIds`) comme l'alerte de page
+(`viewerAlert`, sur `canCreateReportsForTeamIds`). Le forfait sur la manche,
+lui, reste au propriétaire et aux managers.
 
 La carte porte une ligne d'état **lisible de tous** (« 2 – 1 proposé par Alpha ·
 à confirmer », « Scores contradictoires · arbitrage alerté ») : sans elle, un

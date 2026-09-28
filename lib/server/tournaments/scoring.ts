@@ -225,13 +225,14 @@ export async function reportMatchScore(
     throw new Error("NO_ACTIVE_TEAM");
   }
   // Reporter un score **engage l'équipe** : un 0-3 déclaré contre soi est un
-  // forfait, et un report seul finit par faire foi. Il demande donc la même
-  // qualité que le forfait sur la manche et l'abandon — `OWNER` ou `MANAGER`,
-  // le joueur lui-même en individuel (`./player-forfeit`). Un membre sportif du
-  // roster (COACH, DPS recruté la veille…) n'a pas à trancher seul une
-  // rencontre au nom de toute l'équipe.
-  if (!entrant.canActForEntrant) {
-    throw new Error("NOT_TEAM_MANAGER");
+  // forfait, et un report seul finit par faire foi. Il est donc réservé à ceux
+  // qui mènent le match — les rôles qui le déclarent prêt (`CAPITAINE`,
+  // `MANAGER`, `OWNER`, `canDeclareTeamReady`), le joueur lui-même en
+  // individuel. Un membre sportif du roster (COACH, DPS recruté la veille…) n'a
+  // pas à trancher seul une rencontre au nom de toute l'équipe ; le capitaine,
+  // qui l'a lancée en jeu, doit pouvoir en dire le résultat.
+  if (!entrant.canConductMatch) {
+    throw new Error("NOT_TEAM_MATCH_LEADER");
   }
 
   const [matches] = await connection.execute<MatchRow[]>(

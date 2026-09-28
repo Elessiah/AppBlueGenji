@@ -3,6 +3,7 @@ import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { canDeclareTeamReady } from "@/lib/shared/match-launch";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import {
   assertRegistrationEligibility,
@@ -139,6 +140,14 @@ export type UserEntrant = {
    * à représenter.
    */
   canActForEntrant: boolean;
+  /**
+   * Peut-il **mener un match** au nom de cet engagé — le déclarer prêt, en
+   * reporter le score ? `CAPITAINE`, `MANAGER` ou `OWNER`
+   * (`canDeclareTeamReady`), toujours vrai en individuel. Plus large que
+   * `canActForEntrant` d'un rôle : le capitaine, qui conduit l'équipe en jeu,
+   * lance la rencontre et doit pouvoir en dire le résultat.
+   */
+  canConductMatch: boolean;
 };
 
 export async function resolveUserEntrant(
@@ -147,7 +156,11 @@ export async function resolveUserEntrant(
   userId: number,
 ): Promise<UserEntrant> {
   if (isSoloTournament(tournament.participant_type)) {
-    return { teamId: await findSoloEntry(connection, userId), canActForEntrant: true };
+    return {
+      teamId: await findSoloEntry(connection, userId),
+      canActForEntrant: true,
+      canConductMatch: true,
+    };
   }
 
   // Sur la connexion de l'appelant : cette résolution est appelée depuis des
@@ -158,6 +171,7 @@ export async function resolveUserEntrant(
   return {
     teamId: activeTeam?.teamId ?? null,
     canActForEntrant: hasTeamManagementRole(activeTeam?.roles),
+    canConductMatch: canDeclareTeamReady(activeTeam?.roles),
   };
 }
 

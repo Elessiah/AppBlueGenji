@@ -22,7 +22,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import { loadEntrantManagerIds, loadEntrantPlayerIds, notifyUsers } from "@/lib/server/notify";
+import { loadEntrantMatchLeaderIds, loadEntrantPlayerIds, notifyUsers } from "@/lib/server/notify";
 import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { webPushConfig } from "@/lib/server/web-push";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
@@ -282,8 +282,8 @@ type ReportedMatchRow = RowDataPacket & {
 
 /**
  * Prévient l'engagée qui n'a pas encore saisi son score que l'autre l'a fait —
- * **ceux qui peuvent y répondre** seulement (`loadEntrantManagerIds`) : confirmer
- * ou contester demande la qualité du forfait, `OWNER` ou `MANAGER`.
+ * **ceux qui peuvent y répondre** seulement (`loadEntrantMatchLeaderIds`) : confirmer
+ * ou contester revient au capitaine, aux managers et au propriétaire.
  * Appelé après le commit d'un report ; ne fait rien si la manche est déjà
  * tranchée (les deux reports concordaient) ou si les deux ont saisi (conflit —
  * c'est l'arbitrage qui est alors prévenu).
@@ -311,7 +311,7 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
     if (team1Reported === team2Reported) return 0;
 
     const waitingTeamId = Number(team1Reported ? row.team2_id : row.team1_id);
-    const players = await loadEntrantManagerIds([waitingTeamId]);
+    const players = await loadEntrantMatchLeaderIds([waitingTeamId]);
     return pushTo(
       players.get(waitingTeamId) ?? [],
       "SCORE_TO_CONFIRM",

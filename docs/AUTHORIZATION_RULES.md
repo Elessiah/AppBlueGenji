@@ -498,11 +498,14 @@ toujours `UPCOMING`.
 
 - ✅ le tournoi est `RUNNING` (`TOURNAMENT_NOT_RUNNING` sinon) ;
 - ✅ l'appelant a un engagé dans ce tournoi (`NO_ACTIVE_TEAM` sinon) ;
-- ✅ il a **qualité pour agir en son nom** — `OWNER` ou `MANAGER`, le joueur
-  lui-même en individuel (`NOT_TEAM_MANAGER` → 403). Reporter 0-3 contre soi
-  est un forfait, et un report seul finit par faire foi : le geste demande donc
-  la qualité du forfait sur la manche et de l'abandon, pas une simple place au
-  roster ;
+- ✅ il **mène le match** au nom de cet engagé — `CAPITAINE`, `MANAGER` ou
+  `OWNER`, les rôles qui le déclarent prêt (`canDeclareTeamReady`), le joueur
+  lui-même en individuel (`NOT_TEAM_MATCH_LEADER` → 403). Reporter 0-3 contre
+  soi est un forfait, et un report seul finit par faire foi : le geste n'est
+  pas ouvert à une simple place au roster. Le capitaine en est, parce qu'il
+  lance la rencontre en jeu et doit pouvoir en dire le résultat ; il reste
+  exclu du forfait sur la manche et de l'abandon, qui engagent l'équipe hors
+  de tout match joué ;
 - ✅ **cet engagé est l'une des deux équipes du match** — sinon `NOT_IN_MATCH`.
   Le score est écrit dans la colonne de *son* camp (`team1_report_*` ou
   `team2_report_*`), déduite du match, jamais du corps de la requête ;

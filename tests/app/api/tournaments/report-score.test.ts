@@ -44,10 +44,10 @@ describe("POST .../report — match pas encore lancé", () => {
 });
 
 describe("POST .../report — qualité pour reporter", () => {
-  it("répond 403 à un membre du roster sans la charge de l'équipe", async () => {
-    jest.mocked(reportMatchScore).mockRejectedValue(new Error("NOT_TEAM_MANAGER"));
+  it("répond 403 à un membre sportif du roster", async () => {
+    jest.mocked(reportMatchScore).mockRejectedValue(new Error("NOT_TEAM_MATCH_LEADER"));
     const res = await POST(req(), params);
     expect(res.status).toBe(403);
-    await expect(res.json()).resolves.toMatchObject({ error: "NOT_TEAM_MANAGER" });
+    await expect(res.json()).resolves.toMatchObject({ error: "NOT_TEAM_MATCH_LEADER" });
   });
 });

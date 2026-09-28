@@ -49,9 +49,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       return fail(message, 400);
     }
 
-    // Membre du roster sans la charge de l'équipe : reporter un score l'engage
-    // entière, comme le forfait sur la manche (`OWNER` / `MANAGER`).
-    if (message === "NOT_TEAM_MANAGER") return fail(message, 403);
+    // Membre sportif du roster : reporter un score engage l'équipe entière, et
+    // revient à ceux qui mènent le match (capitaine, manager, propriétaire).
+    if (message === "NOT_TEAM_MATCH_LEADER") return fail(message, 403);
 
     // Le match existe et le score est bien formé : c'est son état qui refuse,
     // le temps que les parties se déclarent prêtes (`lib/shared/match-launch.ts`).

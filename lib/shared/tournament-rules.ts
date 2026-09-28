@@ -78,7 +78,7 @@ export const COMMON_RULES: RuleSection[] = [
   {
     title: "Report des scores",
     body: [
-      "Le mécanisme est le même dans tous les modes : chaque équipe déclare le score de son match depuis la page du tournoi, par son propriétaire ou un de ses managers (le joueur lui-même en tournoi individuel).",
+      "Le mécanisme est le même dans tous les modes : chaque équipe déclare le score de son match depuis la page du tournoi, par son capitaine, un de ses managers ou son propriétaire (le joueur lui-même en tournoi individuel).",
     ],
     bullets: [
       "Deux déclarations concordantes valident le match immédiatement.",

@@ -209,7 +209,7 @@ describe("tournaments-service: match state machine", () => {
     function reporterIs(
       teamId: number | null,
       state: TournamentRow["state"] = "RUNNING",
-      canActForEntrant = true,
+      canConductMatch = true,
     ) {
       jest.mocked(syncTournamentState).mockResolvedValue({
         row: tournamentRow({ id: 1, state, participant_type: "TEAM" }),
@@ -217,7 +217,11 @@ describe("tournaments-service: match state machine", () => {
         contentChanged: false,
         launchesChanged: false,
       });
-      jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId, canActForEntrant });
+      jest.mocked(resolveUserEntrant).mockResolvedValue({
+        teamId,
+        canActForEntrant: canConductMatch,
+        canConductMatch,
+      });
     }
 
     beforeEach(() => {
@@ -281,13 +285,13 @@ describe("tournaments-service: match state machine", () => {
       expect(writes(long.calls)[0].params[2]).toBe(plausibleSeriesMinutes(null));
     });
 
-    it("refuse un membre du roster sans la charge de l'équipe, avant toute lecture du match", async () => {
-      // Un 0-3 déclaré contre soi est un forfait : il demande la même qualité
-      // (`OWNER` / `MANAGER`) que le forfait sur la manche.
+    it("refuse un membre sportif du roster, avant toute lecture du match", async () => {
+      // Un 0-3 déclaré contre soi est un forfait : le report revient à ceux qui
+      // mènent le match (capitaine, manager, propriétaire).
       reporterIs(100, "RUNNING", false);
       const { connection, calls } = reportConnection();
 
-      await expect(reportMatchScore(connection, 1, 10, 42, 0, 3)).rejects.toThrow("NOT_TEAM_MANAGER");
+      await expect(reportMatchScore(connection, 1, 10, 42, 0, 3)).rejects.toThrow("NOT_TEAM_MATCH_LEADER");
       expect(calls.some((c) => c.sql.includes("FROM bg_matches"))).toBe(false);
       expect(writes(calls)).toHaveLength(0);
     });
