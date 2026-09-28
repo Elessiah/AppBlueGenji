@@ -111,6 +111,38 @@ describe("TeamCard — légende du total de points", () => {
   });
 });
 
+describe("TeamCard — sens de lecture de la barre de forme", () => {
+  it("l'écrit au-dessus de la barre plutôt qu'en `title`", () => {
+    const markup = renderToStaticMarkup(<TeamCard team={team()} />);
+    expect(markup).not.toMatch(/title="[^"]*derniers matchs/);
+    expect(markup).toContain("récent → ancien");
+  });
+
+  it("le donne aussi aux lecteurs d'écran, avant les résultats", () => {
+    const markup = renderToStaticMarkup(<TeamCard team={team()} />);
+    expect(markup).toContain(
+      'aria-label="3 derniers matchs, du plus récent au plus ancien : victoire, défaite, victoire"',
+    );
+  });
+
+  it("ne rend rien pour une équipe sans match", () => {
+    const markup = renderToStaticMarkup(<TeamCard team={team({ form: [] })} />);
+    expect(markup).not.toContain("récent → ancien");
+    expect(markup).not.toContain('role="img"');
+  });
+});
+
+describe("/tournois — section « Terminés »", () => {
+  it("rend ses cartes comme items de la grille, sans enveloppe", () => {
+    const source = stripComments(read("app/(secured)/tournois/page.tsx"));
+    // Une enveloppe empilait toutes les cartes dans une seule cellule, et
+    // `.card { height: 100% }` étirait chacune à la hauteur de la pile.
+    expect(source).not.toMatch(/<div>\s*\{filteredBuckets\.finished/);
+    // `stripComments` laisse `{}` à la place du commentaire JSX qui précède.
+    expect(source).toMatch(/title="TERMINÉS"[\s\S]*?>\s*(?:\{\}\s*)?\{filteredBuckets\.finished/);
+  });
+});
+
 describe("RollbackRoundDialog — repli du nom d'équipe", () => {
   it("passe par `teamLabel` plutôt qu'un repli recopié à la main", () => {
     const source = stripComments(
