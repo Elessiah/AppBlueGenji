@@ -26,7 +26,7 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-25";
+export const REGISTER_UPDATED_AT = "2026-09-28";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -168,6 +168,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Organiser des tournois amateurs et en conserver les résultats",
     subPurposes: [
       "Constituer des équipes (membres, rôles, invitations)",
+      "Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)",
       "Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores",
       "Publier résultats, classements, statistiques et palmarès",
     ],
@@ -182,8 +183,12 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Résultats et palmarès : sans limite de durée (mémoire sportive) ; un compte supprimé y apparaît sous un pseudo d'emprunt",
       "Droit d'opposition ouvert sur demande",
     ],
-    recipients: ["Public du site", "Staff d'arbitrage et d'administration"],
-    transfers: ["Aucun"],
+    recipients: [
+      "Public du site",
+      "Staff d'arbitrage et d'administration",
+      "Discord, qui achemine le message privé d'une demande d'adhésion",
+    ],
+    transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
     security: [
       ...COMMON_SECURITY,
       "Modification d'un score verrouillée dès que la manche suivante est entamée",
