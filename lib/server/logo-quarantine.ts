@@ -1,20 +1,32 @@
 /**
- * Quarantaine des logos d'équipe signalés — service.
+ * Quarantaine des images signalées (logos d'équipe, avatars de joueur) — service.
  *
  * Les règles (durée, suppression d'office, messages) vivent dans le module pur
  * `lib/shared/logo-quarantine.ts` ; ici, les fichiers, la base et les envois.
  *
- * **Où va le fichier.** Masqué, il quitte `public/uploads/teams` — que la route
- * `/api/uploads/...` sert à quiconque connaît son adresse — pour
- * `data/quarantine/teams`, qu'aucune route ne sert. Retirer la seule colonne
- * `logo_url` ne suffirait pas : l'adresse du fichier a pu être copiée, partagée,
- * mise en cache, et resterait valide. Rétabli, il revient à la même adresse ;
- * supprimé, il est effacé.
+ * **Où va le fichier.** Masqué, il quitte `public/uploads/teams` (ou
+ * `public/uploads/avatars`) — que la route `/api/uploads/...` sert à quiconque
+ * connaît son adresse — pour `data/quarantine/teams` (ou `.../players`), qu'aucune
+ * route ne sert. Retirer la seule colonne ne suffirait pas : l'adresse du
+ * fichier a pu être copiée, partagée, mise en cache, et resterait valide.
+ * Rétabli, il revient à la même adresse ; supprimé, il est effacé.
  *
  * **Ordre des gestes.** Un déplacement de fichier ne se défait pas avec une
  * transaction : le fichier est déplacé **avant** l'écriture, et remis en place
  * si l'écriture échoue. L'inverse laisserait, sur une panne de disque, une base
- * qui annonce un logo masqué pendant que le site le sert encore.
+ * qui annonce une image masquée pendant que le site la sert encore.
+ *
+ * **Équipe et joueur ne partagent que le cycle et la table** (`team_id` xor
+ * `user_id`, comme `bg_teams.solo_user_id` distingue déjà une entrée solo sans
+ * colonne « type » à tenir à jour). Leurs gestes d'écriture restent séparés,
+ * parce qu'ils ne se ressemblent pas : un logo peut être partagé par plusieurs
+ * équipes (le jeu de test en partage un), jamais un avatar ; retirer un avatar
+ * doit resynchroniser l'entrée solo du joueur (son logo n'est que son avatar
+ * recopié, `lib/server/solo-entries-service.ts`), ce qu'un logo d'équipe n'a
+ * jamais à faire. Une seule fonction qui aurait tenté de couvrir les deux
+ * aurait fini par oublier l'une des deux règles au premier appel sur l'autre
+ * domaine ; les fonctions génériques ci-dessous (lecture, rétablissement,
+ * purge) ne connaissent, elles, que ce qui est réellement commun aux deux.
  */
 import { copyFile, mkdir, rename, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -24,10 +36,15 @@ import { pushDiscordDirectMessages, type DiscordRecipient } from "@/lib/server/b
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { toIso } from "@/lib/server/serialization";
+import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { reportConcernedHref, type ReportPerson } from "@/lib/shared/content-reports";
 import {
   canAutoPurgeLogo,
+  formatAvatarHiddenLog,
+  formatAvatarHiddenNotice,
+  formatAvatarRemovedNotice,
+  formatAvatarRestoredNotice,
   formatLogoHiddenLog,
   formatLogoHiddenNotice,
   formatLogoRemovedNotice,
@@ -35,15 +52,22 @@ import {
   logoQuarantinePurgeDate,
   type LogoQuarantineStatus,
   type LogoQuarantineView,
+  type QuarantineTargetType,
 } from "@/lib/shared/logo-quarantine";
 
 const TEAM_UPLOAD_PREFIX = "/uploads/teams/";
-/** Nom d'un fichier de logo tel que `storeImageBuffer` les écrit. */
+const USER_UPLOAD_PREFIX = "/uploads/avatars/";
+/** Nom d'un fichier téléversé tel que `storeImageBuffer` les écrit (logo ou avatar). */
 const LOGO_FILENAME = /^[A-Za-z0-9_-]+\.webp$/;
 
-/** Dossier de la quarantaine, hors de tout ce que le site sert. */
+/** Dossier de la quarantaine des logos d'équipe, hors de tout ce que le site sert. */
 export function quarantineDirectory(): string {
   return path.join(process.cwd(), "data", "quarantine", "teams");
+}
+
+/** Dossier de la quarantaine des avatars, hors de tout ce que le site sert. */
+export function avatarQuarantineDirectory(): string {
+  return path.join(process.cwd(), "data", "quarantine", "players");
 }
 
 /**
@@ -66,6 +90,26 @@ export function logoFileLocations(
   return {
     live: path.join(process.cwd(), "public", "uploads", "teams", filename),
     quarantined: path.join(quarantineDirectory(), `team-${teamId}-${filename}`),
+  };
+}
+
+/**
+ * Les deux emplacements d'un avatar — en ligne et en quarantaine —, ou `null`
+ * si l'adresse n'est pas celle d'un avatar téléversé. Même garde-fou que
+ * `logoFileLocations` ; un avatar n'est jamais partagé entre deux comptes, donc
+ * le nom en quarantaine n'a besoin de porter que le joueur.
+ */
+export function avatarFileLocations(
+  avatarUrl: string,
+  userId: number,
+): { live: string; quarantined: string } | null {
+  const relative = toDiskUploadPath(avatarUrl);
+  if (!relative || !relative.startsWith(USER_UPLOAD_PREFIX)) return null;
+  const filename = relative.slice(USER_UPLOAD_PREFIX.length);
+  if (!LOGO_FILENAME.test(filename) || !Number.isSafeInteger(userId) || userId <= 0) return null;
+  return {
+    live: path.join(process.cwd(), "public", "uploads", "avatars", filename),
+    quarantined: path.join(avatarQuarantineDirectory(), `user-${userId}-${filename}`),
   };
 }
 
@@ -118,6 +162,21 @@ async function teamMemberRecipients(teamId: number): Promise<DiscordRecipient[]>
   return recipients;
 }
 
+/** Un joueur, joignable sur Discord par un moyen **prouvé** — au plus une entrée. */
+async function userRecipient(userId: number): Promise<DiscordRecipient[]> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<MemberRecipientRow[]>(
+    `SELECT pseudo, discord_id, discord_pseudo, discord_verified_at FROM bg_users
+     WHERE id = ? AND is_deleted = 0`,
+    [userId],
+  );
+  if (rows.length === 0) return [];
+  const row = rows[0];
+  const handle = row.discord_verified_at ? row.discord_pseudo : null;
+  if (!row.discord_id && !handle) return [];
+  return [{ discordId: row.discord_id, handle, label: row.pseudo }];
+}
+
 /**
  * Le signalement existe et désigne cette équipe — c'est ce lien qui permettra à
  * l'équipe de contester la décision prise sur son logo.
@@ -142,6 +201,28 @@ async function assertTeamTargeted(reportId: number, teamId: number): Promise<voi
 }
 
 /**
+ * Le signalement existe et désigne ce joueur — même rôle qu'`assertTeamTargeted`.
+ *
+ * @throws REPORT_NOT_FOUND
+ * @throws USER_NOT_TARGETED
+ */
+async function assertUserTargeted(reportId: number, userId: number): Promise<void> {
+  const db = await getDatabase();
+  const [reports] = await db.execute<RowDataPacket[]>(
+    `SELECT r.id FROM bg_reports r
+     JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'USER' AND t.target_id = ?
+     WHERE r.id = ? AND r.parent_report_id IS NULL LIMIT 1`,
+    [userId, reportId],
+  );
+  if (reports.length > 0) return;
+  const [exists] = await db.execute<RowDataPacket[]>(
+    `SELECT id FROM bg_reports WHERE id = ? AND parent_report_id IS NULL LIMIT 1`,
+    [reportId],
+  );
+  throw new Error(exists.length === 0 ? "REPORT_NOT_FOUND" : "USER_NOT_TARGETED");
+}
+
+/**
  * Prévient les membres actuels d'une équipe que son logo a été supprimé sans
  * délai — depuis un signalement (`reportId`, le message porte le lien de
  * contestation) ou depuis la fiche de l'équipe (`null`). Jamais attendu.
@@ -155,6 +236,20 @@ export function notifyTeamLogoRemoved(teamId: number, teamName: string, reportId
         : pushDiscordDirectMessages(formatLogoRemovedNotice({ teamName, url }), recipients, "logo-removed"),
     )
     .catch((error) => console.error("[moderation] équipe non prévenue de la suppression", error));
+}
+
+/**
+ * Prévient un joueur que son avatar a été supprimé sans délai — depuis un
+ * signalement (`reportId`, le message porte le lien de contestation) ou depuis
+ * sa fiche (`null`). Même rôle que `notifyTeamLogoRemoved`. Jamais attendu.
+ */
+export function notifyUserAvatarRemoved(userId: number, reportId: number | null): void {
+  const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
+  void userRecipient(userId)
+    .then((recipients) =>
+      recipients.length === 0 ? null : pushDiscordDirectMessages(formatAvatarRemovedNotice({ url }), recipients, "avatar-removed"),
+    )
+    .catch((error) => console.error("[moderation] joueur non prévenu de la suppression", error));
 }
 
 /**
@@ -239,8 +334,87 @@ export async function deleteTeamLogoForReport(
   const at = removedAt.toISOString();
   return {
     id: quarantineId,
-    teamId,
-    teamName,
+    targetType: "TEAM",
+    targetId: teamId,
+    targetName: teamName,
+    reportId,
+    status: "PURGED",
+    hiddenAt: at,
+    purgeAfter: contestUntil.toISOString(),
+    closedAt: at,
+  };
+}
+
+/**
+ * Supprime **sans délai** l'avatar d'un joueur visé par un signalement — même
+ * rôle que `deleteTeamLogoForReport`, sans la question du partage (un avatar
+ * n'est jamais désigné par deux comptes) mais avec la resynchronisation de
+ * l'entrée solo, dont le logo n'est que l'avatar recopié
+ * (`lib/server/solo-entries-service.ts`) : sans elle, le fichier effacé plus
+ * bas resterait désigné par `bg_teams.logo_url`.
+ *
+ * @throws REPORT_NOT_FOUND
+ * @throws USER_NOT_TARGETED
+ * @throws USER_HAS_NO_AVATAR
+ */
+export async function deleteUserAvatarForReport(
+  reportId: number,
+  userId: number,
+  actor: ReportPerson,
+): Promise<LogoQuarantineView> {
+  await assertUserTargeted(reportId, userId);
+  const db = await getDatabase();
+  const removedAt = new Date();
+  const contestUntil = logoQuarantinePurgeDate(removedAt);
+  let pseudo: string;
+  let avatarUrl: string;
+  let quarantineId: number;
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [users] = await connection.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
+      `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
+      [userId],
+    );
+    if (users.length === 0 || !users[0].avatar_url) throw new Error("USER_HAS_NO_AVATAR");
+    pseudo = users[0].pseudo;
+    avatarUrl = users[0].avatar_url;
+    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ?`, [userId]);
+    await syncSoloEntryIdentityOn(connection, userId);
+    const [inserted] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO bg_logo_quarantines
+         (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after, status, closed_at)
+       VALUES (?, ?, ?, ?, ?, ?, 'PURGED', ?)`,
+      [userId, reportId, avatarUrl, actor.userId, removedAt, contestUntil, removedAt],
+    );
+    quarantineId = Number(inserted.insertId);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  const files = avatarFileLocations(avatarUrl, userId);
+  if (files) {
+    await unlinkIfPresent(files.live).catch((error) => {
+      console.error("[moderation] fichier de l'avatar non effacé", error);
+    });
+  }
+
+  publishStaffAction(`🗑️ Avatar de ${pseudo} supprimé sans délai par le staff (signalement #${reportId}).`, {
+    id: actor.userId,
+    pseudo: actor.pseudo,
+  });
+  notifyUserAvatarRemoved(userId, reportId);
+
+  const at = removedAt.toISOString();
+  return {
+    id: quarantineId,
+    targetType: "USER",
+    targetId: userId,
+    targetName: pseudo,
     reportId,
     status: "PURGED",
     hiddenAt: at,
@@ -352,8 +526,101 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
 
   return {
     id: quarantineId,
-    teamId,
-    teamName,
+    targetType: "TEAM",
+    targetId: teamId,
+    targetName: teamName,
+    reportId,
+    status: "HIDDEN",
+    hiddenAt: hiddenAt.toISOString(),
+    purgeAfter: purgeAfter.toISOString(),
+    closedAt: null,
+  };
+}
+
+/**
+ * Masque l'avatar d'un joueur visé par un signalement — même rôle que
+ * `hideTeamLogo`, sans la question du partage (voir `deleteUserAvatarForReport`)
+ * mais avec la même resynchronisation de l'entrée solo.
+ *
+ * @throws REPORT_NOT_FOUND
+ * @throws USER_NOT_TARGETED
+ * @throws USER_HAS_NO_AVATAR
+ * @throws AVATAR_NOT_MOVABLE L'avatar n'est pas un fichier du site.
+ * @throws AVATAR_FILE_MISSING Le fichier désigné n'existe plus sur le disque.
+ * @throws AVATAR_CHANGED
+ */
+export async function hideUserAvatarForReport(
+  reportId: number,
+  userId: number,
+  actor: ReportPerson,
+): Promise<LogoQuarantineView> {
+  const db = await getDatabase();
+  await assertUserTargeted(reportId, userId);
+
+  const [users] = await db.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
+    `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
+    [userId],
+  );
+  if (users.length === 0 || !users[0].avatar_url) throw new Error("USER_HAS_NO_AVATAR");
+  const avatarUrl = users[0].avatar_url;
+  const pseudo = users[0].pseudo;
+  const files = avatarFileLocations(avatarUrl, userId);
+  if (!files) throw new Error("AVATAR_NOT_MOVABLE");
+
+  try {
+    await moveFile(files.live, files.quarantined);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") throw new Error("AVATAR_FILE_MISSING");
+    throw error;
+  }
+
+  const hiddenAt = new Date();
+  const purgeAfter = logoQuarantinePurgeDate(hiddenAt);
+  let quarantineId: number;
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    const [locked] = await connection.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+      `SELECT avatar_url FROM bg_users WHERE id = ? FOR UPDATE`,
+      [userId],
+    );
+    if (locked.length === 0 || locked[0].avatar_url !== avatarUrl) throw new Error("AVATAR_CHANGED");
+    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ?`, [userId]);
+    await syncSoloEntryIdentityOn(connection, userId);
+    const [inserted] = await connection.execute<ResultSetHeader>(
+      `INSERT INTO bg_logo_quarantines (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [userId, reportId, avatarUrl, actor.userId, hiddenAt, purgeAfter],
+    );
+    quarantineId = Number(inserted.insertId);
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback();
+    const abandoned = (error as Error).message === "AVATAR_CHANGED";
+    const undo = abandoned ? unlinkIfPresent(files.quarantined) : moveFile(files.quarantined, files.live);
+    await undo.catch((moveError) => {
+      console.error("[moderation] avatar non remis en place après échec", moveError);
+    });
+    throw error;
+  } finally {
+    connection.release();
+  }
+
+  publishStaffAction(formatAvatarHiddenLog({ pseudo, reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo });
+  const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
+  void userRecipient(userId)
+    .then((recipients) =>
+      recipients.length === 0
+        ? null
+        : pushDiscordDirectMessages(formatAvatarHiddenNotice({ purgeAfter, url }), recipients, "avatar-hidden"),
+    )
+    .catch((error) => console.error("[moderation] joueur non prévenu du masquage", error));
+
+  return {
+    id: quarantineId,
+    targetType: "USER",
+    targetId: userId,
+    targetName: pseudo,
     reportId,
     status: "HIDDEN",
     hiddenAt: hiddenAt.toISOString(),
@@ -364,8 +631,9 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
 
 type QuarantineRow = RowDataPacket & {
   id: number;
-  team_id: number;
-  team_name: string;
+  target_type: QuarantineTargetType;
+  target_id: number;
+  target_name: string;
   report_id: number | null;
   logo_url: string;
   status: LogoQuarantineStatus;
@@ -374,16 +642,24 @@ type QuarantineRow = RowDataPacket & {
   closed_at: Date | string | null;
 };
 
-const QUARANTINE_SELECT = `SELECT q.id, q.team_id, t.name AS team_name, q.report_id, q.logo_url, q.status,
-       q.hidden_at, q.purge_after, q.closed_at
+// `COALESCE` porte le générique : une ligne d'équipe n'a pas de `u.pseudo` à
+// joindre, une ligne de joueur pas de `t.name`, et le seul des deux qui n'est
+// pas nul est déjà celui qu'il faut lire.
+const QUARANTINE_SELECT = `SELECT q.id,
+       CASE WHEN q.team_id IS NOT NULL THEN 'TEAM' ELSE 'USER' END AS target_type,
+       COALESCE(q.team_id, q.user_id) AS target_id,
+       COALESCE(t.name, u.pseudo) AS target_name,
+       q.report_id, q.logo_url, q.status, q.hidden_at, q.purge_after, q.closed_at
 FROM bg_logo_quarantines q
-JOIN bg_teams t ON t.id = q.team_id`;
+LEFT JOIN bg_teams t ON t.id = q.team_id
+LEFT JOIN bg_users u ON u.id = q.user_id`;
 
 function toView(row: QuarantineRow): LogoQuarantineView {
   return {
     id: Number(row.id),
-    teamId: Number(row.team_id),
-    teamName: row.team_name,
+    targetType: row.target_type,
+    targetId: Number(row.target_id),
+    targetName: row.target_name,
     reportId: row.report_id === null ? null : Number(row.report_id),
     status: row.status,
     hiddenAt: toIso(row.hidden_at) ?? new Date().toISOString(),
@@ -416,18 +692,23 @@ async function lockQuarantine(connection: PoolConnection, quarantineId: number):
 }
 
 /**
- * Rétablit un logo masqué — la contestation a abouti.
+ * Rétablit une image masquée — la contestation a abouti.
  *
- * Refusé si l'équipe a envoyé un **autre** logo entre-temps : remettre l'ancien
- * par-dessus effacerait un choix qu'elle a fait depuis. Le logo masqué reste
- * alors en quarantaine, jusqu'à son échéance ou à sa suppression.
+ * Refusé si la personne concernée a envoyé une **autre** image entre-temps :
+ * remettre l'ancienne par-dessus effacerait un choix fait depuis. L'image
+ * masquée reste alors en quarantaine, jusqu'à son échéance ou à sa suppression.
+ *
+ * Les deux domaines partagent la mécanique (verrou, déplacement de fichier
+ * avant le commit, remise en place si l'écriture échoue) mais pas l'écriture :
+ * une équipe n'a rien d'autre à recopier, un joueur doit resynchroniser son
+ * entrée solo (`deleteUserAvatarForReport`).
  *
  * @throws QUARANTINE_NOT_FOUND
  * @throws QUARANTINE_CLOSED
- * @throws TEAM_HAS_NEW_LOGO
- * @throws LOGO_NOT_MOVABLE
+ * @throws TEAM_HAS_NEW_LOGO | USER_HAS_NEW_AVATAR
+ * @throws LOGO_NOT_MOVABLE | AVATAR_NOT_MOVABLE
  */
-export async function restoreTeamLogo(quarantineId: number, actor: ReportPerson): Promise<void> {
+export async function restoreReportedImage(quarantineId: number, actor: ReportPerson): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   let row: QuarantineRow;
@@ -435,21 +716,33 @@ export async function restoreTeamLogo(quarantineId: number, actor: ReportPerson)
   try {
     await connection.beginTransaction();
     row = await lockQuarantine(connection, quarantineId);
-    const [teams] = await connection.execute<(RowDataPacket & { logo_url: string | null })[]>(
-      `SELECT logo_url FROM bg_teams WHERE id = ? FOR UPDATE`,
-      [row.team_id],
+    const isTeam = row.target_type === "TEAM";
+    const targetId = Number(row.target_id);
+    const table = isTeam ? "bg_teams" : "bg_users";
+    const column = isTeam ? "logo_url" : "avatar_url";
+    // Un compte anonymisé n'a plus d'avatar à retrouver, et ne doit surtout pas
+    // en recevoir un par ce chemin : la condition l'exclut de la même façon
+    // qu'une ligne disparue (`QUARANTINE_NOT_FOUND`), sans quoi le rétablissement
+    // republierait une identité sur une ligne que la suppression a vidée.
+    const liveGuard = isTeam ? "" : " AND is_deleted = 0";
+    const [owners] = await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
+      `SELECT ${column} AS image_url FROM ${table} WHERE id = ?${liveGuard} FOR UPDATE`,
+      [targetId],
     );
-    if (teams.length === 0) throw new Error("QUARANTINE_NOT_FOUND");
-    if (teams[0].logo_url) throw new Error("TEAM_HAS_NEW_LOGO");
-    const located = logoFileLocations(row.logo_url, Number(row.team_id));
-    if (!located) throw new Error("LOGO_NOT_MOVABLE");
+    if (owners.length === 0) throw new Error("QUARANTINE_NOT_FOUND");
+    if (owners[0].image_url) throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
+    const located = isTeam
+      ? logoFileLocations(row.logo_url, targetId)
+      : avatarFileLocations(row.logo_url, targetId);
+    if (!located) throw new Error(isTeam ? "LOGO_NOT_MOVABLE" : "AVATAR_NOT_MOVABLE");
     files = located;
 
     // Déplacé **avant** le commit, sous les verrous : un échec de disque laisse
-    // la quarantaine intacte, sans une base qui annoncerait un logo absent.
+    // la quarantaine intacte, sans une base qui annoncerait une image absente.
     await moveFile(files.quarantined, files.live);
     try {
-      await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [row.logo_url, row.team_id]);
+      await connection.execute(`UPDATE ${table} SET ${column} = ? WHERE id = ?${liveGuard}`, [row.logo_url, targetId]);
+      if (!isTeam) await syncSoloEntryIdentityOn(connection, targetId);
       await connection.execute(
         `UPDATE bg_logo_quarantines SET status = 'RESTORED', closed_at = NOW() WHERE id = ?`,
         [quarantineId],
@@ -472,22 +765,36 @@ export async function restoreTeamLogo(quarantineId: number, actor: ReportPerson)
     connection.release();
   }
 
-  const teamName = row.team_name;
-  publishStaffAction(`✅ Logo de l'équipe « ${teamName} » rétabli par le staff (contestation acceptée).`, {
-    id: actor.userId,
-    pseudo: actor.pseudo,
-  });
-  void teamMemberRecipients(Number(row.team_id))
-    .then((recipients) =>
-      recipients.length === 0
-        ? null
-        : pushDiscordDirectMessages(formatLogoRestoredNotice({ teamName }), recipients, "logo-restored"),
-    )
-    .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
+  if (row.target_type === "TEAM") {
+    const teamName = row.target_name;
+    publishStaffAction(`✅ Logo de l'équipe « ${teamName} » rétabli par le staff (contestation acceptée).`, {
+      id: actor.userId,
+      pseudo: actor.pseudo,
+    });
+    void teamMemberRecipients(Number(row.target_id))
+      .then((recipients) =>
+        recipients.length === 0
+          ? null
+          : pushDiscordDirectMessages(formatLogoRestoredNotice({ teamName }), recipients, "logo-restored"),
+      )
+      .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
+  } else {
+    publishStaffAction(`✅ Avatar de ${row.target_name} rétabli par le staff (contestation acceptée).`, {
+      id: actor.userId,
+      pseudo: actor.pseudo,
+    });
+    void userRecipient(Number(row.target_id))
+      .then((recipients) =>
+        recipients.length === 0
+          ? null
+          : pushDiscordDirectMessages(formatAvatarRestoredNotice(), recipients, "avatar-restored"),
+      )
+      .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", error));
+  }
 }
 
 /**
- * Supprime définitivement un logo en quarantaine — par l'association (avant
+ * Supprime définitivement une image en quarantaine — par l'association (avant
  * l'échéance, contestation rejetée) ou d'office (échéance passée).
  *
  * @throws QUARANTINE_NOT_FOUND
@@ -512,22 +819,29 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
     connection.release();
   }
 
+  const isTeam = row.target_type === "TEAM";
+  const targetId = Number(row.target_id);
+  const reportId = row.report_id === null ? null : Number(row.report_id);
+
   // Après le commit : un `unlink` ne se défait pas. Un échec laisse un résidu
   // dans un dossier que rien ne sert.
-  const files = logoFileLocations(row.logo_url, Number(row.team_id));
+  const files = isTeam ? logoFileLocations(row.logo_url, targetId) : avatarFileLocations(row.logo_url, targetId);
   if (files) {
     await unlinkIfPresent(files.quarantined).catch((error) => {
       console.error("[moderation] fichier en quarantaine non effacé", error);
     });
   }
 
-  const line = `🗑️ Logo de l'équipe « ${row.team_name} » supprimé définitivement`;
+  const line = isTeam
+    ? `🗑️ Logo de l'équipe « ${row.target_name} » supprimé définitivement`
+    : `🗑️ Avatar de ${row.target_name} supprimé définitivement`;
   if (actor) {
     publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo });
-    // Avant l'échéance annoncée : l'équipe attend une date qui ne vaut plus,
-    // elle apprend la décision (DSA art. 17) comme elle apprendrait un
-    // rétablissement. À l'échéance, le message du masquage l'a déjà dite.
-    notifyTeamLogoRemoved(Number(row.team_id), row.team_name, row.report_id === null ? null : Number(row.report_id));
+    // Avant l'échéance annoncée : la personne concernée attend une date qui ne
+    // vaut plus, elle apprend la décision (DSA art. 17) comme elle apprendrait
+    // un rétablissement. À l'échéance, le message du masquage l'a déjà dite.
+    if (isTeam) notifyTeamLogoRemoved(targetId, row.target_name, reportId);
+    else notifyUserAvatarRemoved(targetId, reportId);
   } else {
     console.info(`[moderation] ${line} à l'échéance de sa quarantaine.`);
   }
@@ -576,12 +890,22 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
   return purged;
 }
 
-/** Chemin du fichier d'un logo en quarantaine, pour l'aperçu du panneau. */
+/** Chemin du fichier d'une image en quarantaine, pour l'aperçu du panneau. */
 export async function quarantinedLogoFile(quarantineId: number): Promise<string | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<
-    (RowDataPacket & { logo_url: string; team_id: number; status: LogoQuarantineStatus })[]
-  >(`SELECT logo_url, team_id, status FROM bg_logo_quarantines WHERE id = ? LIMIT 1`, [quarantineId]);
+    (RowDataPacket & {
+      logo_url: string;
+      team_id: number | null;
+      user_id: number | null;
+      status: LogoQuarantineStatus;
+    })[]
+  >(`SELECT logo_url, team_id, user_id, status FROM bg_logo_quarantines WHERE id = ? LIMIT 1`, [quarantineId]);
   if (rows.length === 0 || rows[0].status !== "HIDDEN") return null;
-  return logoFileLocations(rows[0].logo_url, Number(rows[0].team_id))?.quarantined ?? null;
+  const row = rows[0];
+  const located =
+    row.team_id !== null
+      ? logoFileLocations(row.logo_url, Number(row.team_id))
+      : avatarFileLocations(row.logo_url, Number(row.user_id));
+  return located?.quarantined ?? null;
 }
