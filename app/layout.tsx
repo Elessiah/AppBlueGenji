@@ -5,6 +5,7 @@ import { FONT_VARIABLES } from "./site-fonts";
 import { ToastProvider } from "@/components/ui/toast";
 import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
+import { SiteNavigationTracker } from "@/components/site-navigation-tracker";
 import { ClientPowerRoot } from "@/components/client-power-root";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
@@ -198,6 +199,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               traverser la bannière de recrutement ni la navigation. */}
           <SkipLink />
           <VisitTracker />
+          <SiteNavigationTracker />
           <ClientPowerRoot />
           {/* Deux modales ne se superposent pas : tant qu'un choix de
               confidentialité est dû, la mise en avant du recrutement se tait

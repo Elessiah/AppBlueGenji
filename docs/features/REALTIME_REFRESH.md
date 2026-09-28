@@ -190,6 +190,11 @@ côté.
    saisir un score en croyant son plateau à jour. Si l'échec précède la première
    donnée, la page affiche un écran dédié avec un lien vers `/connexion` plutôt
    qu'un « Chargement… » sans fin. 429 et 5xx restent retentés.
+
+   Un flux qui **s'ouvre sans rien livrer** (réponse mise en tampon par un
+   proxy) ne déclare aucune erreur : passé `FIRST_SNAPSHOT_TIMEOUT_MS` (5 s)
+   sans premier instantané, la page lit par REST et sonde en secours, flux
+   laissé ouvert (`docs/features/TOURNAMENT_PAGE_PATH.md`).
 5. **La salle se réveille à l'heure exacte** de la prochaine bascule d'état,
    pour toute la salle d'un coup — plutôt que de laisser cent clients se
    réveiller chacun de leur côté à la même seconde.

@@ -1,0 +1,105 @@
+/* Squelette de la fiche tournoi, le temps du premier instantané. */
+
+.root {
+  padding: 8px 0 24px;
+}
+
+.shapes {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.bar,
+.fact,
+.card {
+  border-radius: var(--r-cy-sm);
+  background: linear-gradient(
+    90deg,
+    var(--cyber-bg-2) 0%,
+    var(--cyber-bg-3) 50%,
+    var(--cyber-bg-2) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.6s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+.bar {
+  height: 14px;
+}
+
+.back {
+  width: 90px;
+}
+
+.title {
+  width: min(420px, 80%);
+  height: 30px;
+}
+
+.line {
+  width: min(560px, 95%);
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.fact {
+  height: 52px;
+}
+
+.progress {
+  height: 10px;
+  margin-top: 10px;
+}
+
+.board {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.card {
+  width: 220px;
+  max-width: 100%;
+  height: 86px;
+}
+
+.caption {
+  margin: 18px 0 0;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .fact,
+  .card {
+    animation: none;
+  }
+}
+
+/* Contrastes forcés : les fonds sont remplacés par la couleur du système, et
+   les formes disparaissaient dans la page. Un contour les redessine. */
+@media (forced-colors: active) {
+  .bar,
+  .fact,
+  .card {
+    border: 1px solid CanvasText;
+  }
+}

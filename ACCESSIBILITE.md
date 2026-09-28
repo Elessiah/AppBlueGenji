@@ -38,7 +38,7 @@ pipeline de `CLAUDE.md`.
 2. **Ajouter une tâche** : même chemin, à la suite, même format (critère,
    constat, à faire), avec le numéro qui suit le dernier attribué — relu sur
    `main` au moment du push et avancé dans le même commit. Les numéros ne
-   sont **pas** réattribués : **dernier numéro attribué — 19**.
+   sont **pas** réattribués : **dernier numéro attribué — 20**.
 3. **Abandonner une tâche** (ou ne la régler qu'en partie) : la remettre ici
    par un commit direct sur `main`, sous son numéro d'origine. La PR qui règle
    une tâche n'a rien à retirer de ce fichier.

@@ -676,6 +676,17 @@
   white-space: nowrap;
 }
 
+/* …et se déplie en entier quand on survole la carte ou qu'on en focalise le
+   lien : la plaque `.cardOverlay` recouvre le nom, si bien qu'aucun `title` ni
+   `:hover` posé sur lui ne se déclencherait. Le pied étant poussé en bas
+   (`margin-top: auto`), la ligne gagnée prend d'abord l'espace libre de la
+   carte. */
+.card:hover .cardChampion,
+.card:focus-within .cardChampion {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 /* progress bar */
 .progress {
   height: 2px;

@@ -13,6 +13,9 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/state");
 jest.mock("@/lib/server/tournaments/list-cache");
+jest.mock("@/lib/server/landing-cache");
+jest.mock("@/lib/server/ranking-cache");
+jest.mock("@/lib/server/stats-cache");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/database");
 // Les formats à classement chargent leurs métadonnées : hors sujet ici, et elles
@@ -37,6 +40,9 @@ import {
 } from "@/lib/server/tournaments/repository";
 import { hasPendingStateTransition, syncTournamentState } from "@/lib/server/tournaments/state";
 import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
+import { invalidateLandingAggregates } from "@/lib/server/landing-cache";
+import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
+import { invalidateStats } from "@/lib/server/stats-cache";
 import { getDatabase } from "@/lib/server/database";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
@@ -274,6 +280,41 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     expect(invalidateTournamentLists).toHaveBeenCalled();
   });
 
+  it("vide aussi classement, bilans et vitrine quand une manche est tranchée à la lecture", async () => {
+    // Même mesure que `publishUpdatedEvent`, qu'emprunte la même bascule passée
+    // par la passe de fond : sans quoi le classement du site et la vitrine
+    // garderaient l'ancien résultat selon le chemin qui a entretenu le tournoi.
+    jest.mocked(hasPendingStateTransition).mockResolvedValue(true);
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: runningRow(),
+      stateChanged: false,
+      contentChanged: true,
+      launchesChanged: false,
+    });
+
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+    expect(invalidateTeamRanking).toHaveBeenCalled();
+    expect(invalidateStats).toHaveBeenCalled();
+    expect(invalidateLandingAggregates).toHaveBeenCalled();
+  });
+
+  it("vide classement, bilans et vitrine sur une bascule d'état (clôture comprise)", async () => {
+    jest.mocked(hasPendingStateTransition).mockResolvedValue(true);
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: runningRow(),
+      stateChanged: true,
+      contentChanged: false,
+      launchesChanged: false,
+    });
+
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+    expect(invalidateTeamRanking).toHaveBeenCalled();
+    expect(invalidateStats).toHaveBeenCalled();
+    expect(invalidateLandingAggregates).toHaveBeenCalled();
+  });
+
   it("ne touche pas aux listes pour un simple lancement de match", async () => {
     // Un lancement ne change que ce plateau, qui est justement en train d'être
     // reconstruit : aucune carte de la liste ne le montre.
@@ -288,6 +329,9 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
     expect(invalidateTournamentLists).not.toHaveBeenCalled();
+    expect(invalidateTeamRanking).not.toHaveBeenCalled();
+    expect(invalidateStats).not.toHaveBeenCalled();
+    expect(invalidateLandingAggregates).not.toHaveBeenCalled();
   });
 
   it("ne touche pas aux listes quand rien n'a basculé", async () => {
