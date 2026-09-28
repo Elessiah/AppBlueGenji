@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { dismissSiteOverlays, test, expect, type Page } from "./helpers/test";
 import {
   apiAs,
   browserAs,
@@ -47,30 +47,26 @@ test.describe("Parcours joueur dans un tournoi", () => {
   const toasts = (page: Page) => page.getByRole("region", { name: "Notifications" });
 
   /**
-   * Fenêtres qui s'ouvrent d'elles-mêmes sur toute page — annonce de
-   * recrutement, centre de lancement du match : on les referme avant d'agir
-   * sur la fiche, qu'elles couvriraient.
+   * Centre de lancement du match, qui s'ouvre de lui-même sur la fiche : on le
+   * referme par Échap avant d'agir. Les pages de ce parcours naissent de
+   * contextes propres à chaque joueur, hors de la fixture `page` : le garde
+   * commun (annonce de recrutement, conditions d'utilisation) est donc posé à
+   * l'ouverture de la fiche, par `dismissSiteOverlays`.
    */
-  async function dismissOverlays(page: Page) {
+  async function dismissLaunchCenter(page: Page) {
     for (let attempt = 0; attempt < 4; attempt++) {
       const overlay = page.getByRole("dialog").filter({ hasNotText: "Score de mon match" }).first();
       if (!(await overlay.isVisible().catch(() => false))) return;
-      // Échap d'abord : il ferme la fenêtre du dessus (le centre de lancement
-      // se pose sur l'annonce), puis « Plus tard » pour l'annonce, qui
-      // n'écoute pas Échap.
       await page.keyboard.press("Escape");
       await page.waitForTimeout(200);
-      const later = page.getByRole("button", { name: "Plus tard" });
-      if (await later.isVisible().catch(() => false)) {
-        await later.click({ timeout: 2_000 }).catch(() => undefined);
-      }
     }
   }
 
   async function openTournament(page: Page, tournamentId: number, matchId: number) {
+    await dismissSiteOverlays(page);
     await page.goto(`/tournois/${tournamentId}`);
     await expect(matchCard(page, matchId)).toBeVisible({ timeout: 30_000 });
-    await dismissOverlays(page);
+    await dismissLaunchCenter(page);
   }
 
   test("le joueur propose un score, l'adversaire le confirme d'un clic", async ({ browser }) => {

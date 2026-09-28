@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 
 /**
  * Gating admin de la création de tournoi. L'utilisateur `fresh` n'est PAS admin :

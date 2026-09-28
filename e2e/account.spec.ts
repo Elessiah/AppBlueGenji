@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 
 /**
  * Parcours « compte vierge » — nécessite le bypass DEV_AUTH provisionnant un

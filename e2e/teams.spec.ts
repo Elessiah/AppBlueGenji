@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 
 /**
  * Gestion d'équipe : description à la création + self-service (bouton Rejoindre).

@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 import { TERMS_VERSION } from "../lib/shared/terms-of-use";
 
 /**

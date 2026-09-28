@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "./helpers/test";
 
 /**
  * Header public dynamique sur la page d'accueil (scopé à l'élément <header>,
