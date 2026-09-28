@@ -29,7 +29,7 @@ réelle, un arbitre n'a pas plus de droits qu'un visiteur.
 ## Cycle de vie
 
 ```
-création (staff)  →  inscription à un tournoi  →  attribution à un joueur
+création (staff)  →  inscription à un tournoi  →  reprise par un joueur (qui accepte)
                                               ↘  ou dissolution (soft-delete)
 ```
 
@@ -47,14 +47,33 @@ création (staff)  →  inscription à un tournoi  →  attribution à un joueur
    sa place. Les contrôles d'état, de doublon et de capacité sont ceux de
    l'inscription normale (`registerTeam` dans
    `lib/server/tournaments/registration.ts`).
-4. **Attribution** — `POST /api/teams/[id]/claim` avec `{ pseudo }`. Le joueur
-   devient `OWNER`, `is_ghost` repasse à 0 et l'équipe redevient ordinaire.
-   Refus si le joueur appartient déjà à une équipe (`USER_ALREADY_IN_TEAM`),
-   si le compte est anonymisé (`bg_users.is_deleted = 1` → `USER_NOT_FOUND`),
-   si l'équipe est réelle (`NOT_A_GHOST_TEAM`) ou dissoute
-   (`TEAM_ALREADY_DELETED`).
+4. **Reprise** — `POST /api/teams/[id]/claim` avec `{ pseudo }` **propose**
+   l'équipe au joueur : une invitation (`INVITE`) portant le rôle `OWNER`, qu'il
+   accepte depuis `/profil` (section invitations, où elle est annoncée « tu en
+   deviendras propriétaire ») ou par « Rejoindre » sur la fiche de la fantôme.
+   **Rien ne change avant sa réponse.** À l'acceptation (`acceptIntoTeam`, une
+   transaction), il devient `OWNER`, `is_ghost` repasse à 0, l'équipe redevient
+   ordinaire et les autres reprises encore en attente sur elle sont annulées.
+   Refus à la proposition si le joueur appartient déjà à une équipe
+   (`USER_ALREADY_IN_TEAM`), si le compte est anonymisé
+   (`bg_users.is_deleted = 1` → `USER_NOT_FOUND`), si l'équipe est réelle
+   (`NOT_A_GHOST_TEAM`) ou dissoute (`TEAM_ALREADY_DELETED`), ou si une reprise
+   lui est déjà proposée (`ALREADY_INVITED`) ; à l'acceptation, si un autre
+   joueur a repris la fantôme entre-temps (`NOT_A_GHOST_TEAM`).
 
-   L'attribution est le **seul** chemin de passation sur une fantôme : faute de
+   **Pourquoi une invitation.** L'attribution était directe : un arbitre faisait
+   d'un joueur sans équipe l'`OWNER` d'une fantôme sans qu'il ait rien demandé.
+   Inscrite à un tournoi vivant, la fantôme faisait de lui un **engagé**, ce qui
+   ouvre à la permission `tournaments` son tag Discord certifié et son BattleTag
+   même masqué (`isInActiveTournament`, `canViewBattletag`) — un moyen de lire
+   le contact de n'importe quel free agent, que la règle réserve aux joueurs
+   réellement engagés. Il ne l'est désormais que s'il l'a accepté.
+
+   Le rôle `OWNER` sert de **marque** à la reprise : une invitation de la
+   gestion ne peut jamais le porter (`resolveInviteRoles` le retire), et une
+   fantôme ne se rejoint par aucune autre invitation (`TEAM_NOT_JOINABLE`).
+
+   La reprise est le **seul** chemin de passation sur une fantôme : faute de
    ligne `bg_team_members`, `POST /api/teams/[id]/transfer-ownership` y répond
    toujours `FORBIDDEN` (personne n'y est `OWNER`). Une fois attribuée,
    l'équipe est ordinaire et son propriétaire transfère la propriété comme
@@ -68,9 +87,9 @@ création (staff)  →  inscription à un tournoi  →  attribution à un joueur
   `GhostTeamDialog`; badge `FANTÔME` sur les cartes concernées.
 - **`/equipes/[id]`** — badge dans le titre, formulaire de gestion habituel
   (`canManage` est vrai pour le staff sur une fantôme), et deux actions
-  spécifiques : « Attribuer à un joueur » et « Supprimer l'équipe fantôme ».
+  spécifiques : « Proposer à un joueur » et « Supprimer l'équipe fantôme ».
   Le bloc d'adhésion est remplacé par un message : une fantôme ne se rejoint
-  pas, elle s'attribue. Le bloc « Inviter un membre » et la relève des demandes
+  pas, elle se reprend sur proposition du staff. Le bloc « Inviter un membre » et la relève des demandes
   d'adhésion sont masqués (`canManage && !isGhost`) : les routes de roster
   refusent la dérogation fantôme, ces contrôles ne pourraient que renvoyer 403.
 - **`/tournois/[id]`** — bouton « + Équipe fantôme » pendant les inscriptions,
@@ -214,7 +233,7 @@ l'inscription ordinaire.
 Il est relu dans la transaction, et par un `SELECT … ORDER BY id FOR UPDATE` —
 pas par prudence : c'est la **première lecture** de la transaction, donc celle
 qui fige l'instantané `REPEATABLE READ`. Une lecture ordinaire verrait l'état du
-monde à cet instant et n'en démordrait plus ; `claimGhostTeam` pourrait valider
+monde à cet instant et n'en démordrait plus ; une reprise (`acceptIntoTeam`) pourrait valider
 son `is_ghost = 0` juste après, et l'inscription passerait quand même — la
 course que le contrôle prétend fermer resterait ouverte. `ORDER BY id` fixe
 l'ordre de verrouillage : deux lots qui se recoupent s'attendent au lieu de

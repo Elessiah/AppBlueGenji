@@ -25,7 +25,16 @@ porte côté joueur.
    contredisent, l'arbitrage est alerté (`REFEREE_ALERTS.md`), et chacun peut
    encore corriger la sienne (« Revoir le score »).
 4. **Sans réponse**, la proposition fait foi à l'échéance du délai
-   (`score_deadline_at`, rappelé dans la modale).
+   (`score_deadline_at`, rappelé dans la modale). Ce délai ne court qu'après une
+   fin de série plausible — 15 min par map déclarée depuis le lancement
+   (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
+   lancement ne fait pas foi avant que la série ait pu se jouer.
+
+Proposer, confirmer et contester demandent **qualité pour agir au nom de
+l'engagé** (`OWNER` / `MANAGER`, ou le joueur en individuel) — la même que le
+forfait ci-dessous : un 0-3 déclaré contre soi est un forfait. Un membre
+sportif du roster ne voit pas le bouton (`canCreateReportsForTeamIds` vide), et
+la route le refuse en `403 NOT_TEAM_MANAGER`.
 
 La carte porte une ligne d'état **lisible de tous** (« 2 – 1 proposé par Alpha ·
 à confirmer », « Scores contradictoires · arbitrage alerté ») : sans elle, un

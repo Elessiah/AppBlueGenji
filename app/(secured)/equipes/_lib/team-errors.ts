@@ -35,7 +35,7 @@ const TEAM_ERRORS: Record<string, string> = {
   INVALID_TEAM_ID: "Cette équipe n'existe pas.",
   INVALID_INVITATION_ID: "Cette invitation n'existe pas.",
   // La ligne existe dans `bg_teams`, mais elle ne représente pas une équipe
-  // qu'on rejoint : une fantôme n'a aucun membre — elle s'attribue par
+  // qu'on rejoint : une fantôme n'a aucun membre — elle se reprend par
   // l'arbitrage —, et une entrée solo est l'identité d'un joueur en tournoi
   // individuel. Dans les deux cas la demande n'aurait jamais trouvé personne
   // pour y répondre.
