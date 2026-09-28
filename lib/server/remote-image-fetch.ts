@@ -26,6 +26,8 @@ import { pinnedHttpsGet } from "@/lib/server/pinned-https";
 /** Même plafond de taille qu'à l'import (`lib/server/image-upload.ts`). */
 export const MAX_REMOTE_IMAGE_BYTES = 5 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 5_000;
+/** Agent annoncé aux hébergeurs d'images. */
+export const REMOTE_IMAGE_USER_AGENT = "BlueGenji-ImageRelay/1.0";
 /**
  * Redirections suivies **à la main**, pour revalider l'hôte à chaque saut :
  * `fetch` les suit sinon jusqu'à n'importe quelle destination, ce qui rendrait
@@ -118,7 +120,11 @@ export async function fetchRemoteImage(
         // jugement vient d'accepter, et ne suit aucune redirection.
         res = await pinnedHttpsGet(target, {
           signal: controller.signal,
-          headers: { Accept: "image/*" },
+          // `node:https` n'envoie aucun `User-Agent`, là où `fetch` envoyait
+          // `node` : certains hébergeurs (Wikimedia, des règles Cloudflare)
+          // refusent une requête qui n'en porte pas, et le logo disparaîtrait
+          // sans bruit.
+          headers: { Accept: "image/*", "User-Agent": REMOTE_IMAGE_USER_AGENT },
           resolve: resolveHost,
           isAllowedAddress: (address) => !isPrivateImageHostname(address),
         });
