@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { TournamentBuckets, TournamentCard } from "@/lib/shared/types";
 import { can, type PlatformRole } from "@/lib/shared/permissions";
 import { sameBuckets, sameTournaments } from "@/lib/shared/tournament-schedule";
@@ -30,7 +30,13 @@ import {
   type GameFilter,
 } from "./_lib/buckets";
 import { buildTickerItems } from "./_lib/ticker";
-import { tournamentsPageMetrics } from "./_lib/metrics";
+import {
+  DEFAULT_OPEN_SECTIONS,
+  pageSectionAnchor,
+  pageSections,
+  splitMyTournaments,
+  type PageSectionKey,
+} from "./_lib/page-sections";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
 import s from "./tournois.module.css";
 
@@ -43,7 +49,7 @@ const emptyBuckets: TournamentBuckets = {
 
 /** Sections dont la liste est bornée par défaut (`_lib/buckets.ts` ne connaît
  * pas cette limite : c'est un choix d'affichage, pas un fait sur les données). */
-type LimitedSectionKey = "running" | "registration" | "upcoming" | "finished";
+type LimitedSectionKey = "mine" | "running" | "registration" | "upcoming" | "finished";
 const SECTION_DISPLAY_LIMIT = 12;
 
 /**
@@ -90,6 +96,20 @@ function ShowMoreRow({
   );
 }
 
+/**
+ * Tournois (en cours ou à venir) où le lecteur est engagé. Complément
+ * décoratif de la liste : en cas d'échec la page retombe sur ses sections
+ * habituelles, sans « Mes tournois » — rien à signaler au lecteur.
+ */
+async function fetchMyTournamentIds(signal?: AbortSignal): Promise<number[]> {
+  const response = await fetch("/api/me/tournaments", { cache: "no-store", signal });
+  const payload = (await response.json()) as { tournamentIds?: unknown };
+  if (!response.ok || !Array.isArray(payload.tournamentIds)) {
+    throw new Error("MY_TOURNAMENTS_READ_FAILED");
+  }
+  return payload.tournamentIds.filter((id): id is number => Number.isInteger(id));
+}
+
 async function fetchBuckets(url: string, signal?: AbortSignal): Promise<TournamentBuckets> {
   const response = await fetch(url, { cache: "no-store", signal });
   const payload = (await response.json()) as {
@@ -109,7 +129,11 @@ export default function TournamentsPage() {
   const [gameFilter, setGameFilter] = useState<GameFilter>("all");
   const [buckets, setBuckets] = useState<TournamentBuckets>(emptyBuckets);
   const [hiddenTournaments, setHiddenTournaments] = useState<TournamentCard[]>([]);
+  const [myTournamentIds, setMyTournamentIds] = useState<ReadonlySet<number>>(new Set());
   const [expandedSections, setExpandedSections] = useState<ReadonlySet<LimitedSectionKey>>(new Set());
+  const [openSections, setOpenSections] = useState<ReadonlySet<PageSectionKey>>(
+    () => new Set(DEFAULT_OPEN_SECTIONS),
+  );
   const [isAdmin, setIsAdmin] = useState(false);
   // « Ctrl+K » par défaut (sûr pour le rendu serveur) : la vraie plateforme
   // ne se lit que côté client, une fois montée.
@@ -141,6 +165,26 @@ export default function TournamentsPage() {
     void load(false, controller.signal);
     return () => controller.abort();
   }, [load]);
+
+  // Les tournois du lecteur arrivent par une lecture à part : la liste publique
+  // est la même pour tous (et mutualisée côté serveur), elle ne peut pas savoir
+  // qui la lit. Un échec ne dit rien — la page garde ses sections habituelles.
+  const loadMine = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const ids = await fetchMyTournamentIds(signal);
+      setMyTournamentIds((previous) =>
+        previous.size === ids.length && ids.every((id) => previous.has(id)) ? previous : new Set(ids),
+      );
+    } catch {
+      // Silencieux, premier chargement compris : voir `fetchMyTournamentIds`.
+    }
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void loadMine(controller.signal);
+    return () => controller.abort();
+  }, [loadMine]);
 
   // Les tournois pas encore visibles ne sont servis qu'au staff `tournaments` :
   // inutile d'aller les demander pour se faire répondre 403. Leur échec ne doit
@@ -179,9 +223,14 @@ export default function TournamentsPage() {
   // retour sur l'onglet — ce qui remplace le F5 — doublé d'une relecture de
   // fond, rare pour les spectateurs, plus fréquente pour le staff. Côté
   // serveur, la liste publique est mutualisée : ces relectures ne coûtent
-  // presque rien (`lib/server/tournaments/list-cache.ts`).
+  // presque rien (`lib/server/tournaments/list-cache.ts`). « Mes tournois »
+  // suit la même cadence : s'inscrire depuis une fiche puis revenir sur
+  // l'onglet suffit à voir le tournoi remonter en tête.
   useAutoRefresh(
-    (signal) => Promise.all([load(true, signal), loadHidden(true, signal)]).then(() => undefined),
+    (signal) =>
+      Promise.all([load(true, signal), loadHidden(true, signal), loadMine(signal)]).then(
+        () => undefined,
+      ),
     { intervalMs: refreshCadenceFor({ isStaff: isAdmin }).listIntervalMs },
   );
 
@@ -193,7 +242,6 @@ export default function TournamentsPage() {
       .then((p) => setIsAdmin(can(p?.user, "tournaments")))
       .catch(() => setIsAdmin(false));
   }, []);
-
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -222,6 +270,15 @@ export default function TournamentsPage() {
       return next;
     });
 
+  const setSectionOpen = (key: PageSectionKey, open: boolean) =>
+    setOpenSections((prev) => {
+      if (prev.has(key) === open) return prev;
+      const next = new Set(prev);
+      if (open) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+
   // Les cartes portent leur horaire : le client fait basculer « Prochainement »
   // → « Inscriptions » → « En cours » à la seconde dite, sans rien demander au
   // serveur (`lib/shared/tournament-schedule.ts`).
@@ -230,12 +287,12 @@ export default function TournamentsPage() {
   // La recherche (le passage coûteux : nom, description, format sur chaque
   // tournoi) n'est faite qu'une fois — le filtre de jeu, lui, ne fait que
   // comparer une chaîne déjà connue, appliqué séparément pour le panier
-  // affiché (`filteredBuckets`) et pour les pastilles, qui veulent le compte
+  // affiché (`gameFilteredBuckets`) et pour les pastilles, qui veulent le compte
   // de CHAQUE jeu sans se soucier de celui déjà choisi (`queryFilteredBuckets`).
   const queryFilteredBuckets = filterBuckets(scheduledBuckets, query, "all");
   const queryFilteredHidden = filterTournamentsByQuery(hiddenTournaments, query);
 
-  const filteredBuckets: TournamentBuckets =
+  const gameFilteredBuckets: TournamentBuckets =
     gameFilter === "all"
       ? queryFilteredBuckets
       : {
@@ -246,21 +303,52 @@ export default function TournamentsPage() {
         };
   const filteredHidden = filterTournamentsByGame(queryFilteredHidden, gameFilter);
 
+  // Les tournois du lecteur quittent leur section d'origine pour passer en
+  // tête : chacun n'apparaît qu'une fois. Le découpage suit les paniers déjà
+  // reclassés par l'horloge, pour qu'un tournoi qui démarre reste en tête.
+  const { mine: myTournaments, others: filteredBuckets } = splitMyTournaments(
+    gameFilteredBuckets,
+    myTournamentIds,
+  );
+  // Jugé avant filtre : une recherche qui vide « Mes tournois » laisse son
+  // entrée au sommaire (à zéro) au lieu de la faire disparaître.
+  const hasMyTournaments = splitMyTournaments(scheduledBuckets, myTournamentIds).mine.length > 0;
+
   const totalHidden = filteredHidden.length;
+  const totalMine = myTournaments.length;
   const totalRunning = filteredBuckets.running.length;
   const totalRegistration = filteredBuckets.registration.length;
   const totalUpcoming = filteredBuckets.upcoming.length;
   const totalFinished = filteredBuckets.finished.length;
 
-  // La section des invisibles prend la première place quand elle est affichée :
-  // les suivantes se décalent pour garder une numérotation continue.
   const showHidden = isAdmin && hiddenTournaments.length > 0;
-  const ix = (position: number) => String(position + (showHidden ? 1 : 0)).padStart(2, "0");
+
+  // Toutes les sections que ce lecteur peut avoir, zéros compris : le
+  // sommaire les montre toutes (un zéro répond à « y a-t-il un tournoi en
+  // cours ? »), la page ne rend que celles qui contiennent quelque chose.
+  const sections = pageSections(
+    {
+      hidden: totalHidden,
+      mine: totalMine,
+      running: totalRunning,
+      registration: totalRegistration,
+      upcoming: totalUpcoming,
+      finished: totalFinished,
+    },
+    { hidden: showHidden, mine: hasMyTournaments },
+  );
+  const shownSections = sections.filter((entry) => entry.count > 0);
+  // Numérotation continue des seules sections affichées : un « 03 » qui suit
+  // un « 01 » ferait chercher la section manquante.
+  const ix = (key: PageSectionKey) =>
+    String(shownSections.findIndex((entry) => entry.key === key) + 1).padStart(2, "0");
+  const isOpen = (key: PageSectionKey) => openSections.has(key);
 
   // Bandeaux d'illustration chargés en priorité : les premiers dans l'ordre
   // d'affichage des sections ouvertes d'office (les terminés sont repliés).
   const priorityBanners = priorityBannerIds([
     ...(showHidden ? filteredHidden : []),
+    ...myTournaments,
     ...filteredBuckets.running,
     ...filteredBuckets.registration,
     ...filteredBuckets.upcoming,
@@ -274,17 +362,9 @@ export default function TournamentsPage() {
     countByGame(queryFilteredBuckets, key) +
     (showHidden ? filterTournamentsByGame(queryFilteredHidden, key).length : 0);
 
-  const emptyMsg = (whenUnfiltered: string) => sectionEmptyMessage(whenUnfiltered, query, gameFilter);
-
-  const metrics = tournamentsPageMetrics(
-    {
-      running: totalRunning,
-      registration: totalRegistration,
-      upcoming: totalUpcoming,
-      hidden: totalHidden,
-    },
-    isAdmin,
-  );
+  // Une section dépliée montre le total réel, jamais un compte figé au clic.
+  const visibleSlice = (key: LimitedSectionKey, list: TournamentCard[]) =>
+    list.slice(0, expandedSections.has(key) ? list.length : SECTION_DISPLAY_LIMIT);
 
   return (
     <div className={s.page}>
@@ -294,195 +374,247 @@ export default function TournamentsPage() {
       <div className={s.pageInner}>
         <div className="container">
           <header className={s.pageHead}>
-          <div>
-            <span className="eyebrow">PLATEFORME · TOURNOIS</span>
-            <h1 className={s.title}>
-              Tournois <em className={s.titleEm}>BlueGenji</em>
-            </h1>
-            <div className={s.subtitle}>SUIVI TEMPS RÉEL · PHASES MULTIPLES · BRACKETS ARBITRÉS</div>
-          </div>
-          {isAdmin && (
-            <CyberButton asChild variant="primary">
-              <Link href="/tournois/creer">
-                <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                  <path
-                    d="M8 3v10M3 8h10"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                Créer un tournoi
-              </Link>
-            </CyberButton>
-          )}
-        </header>
-
-        <div
-          className={s.metrics}
-          style={{ "--metric-cols": metrics.length } as CSSProperties}
-        >
-          {metrics.map((m) => (
-            <div className={s.metric} key={m.label}>
-              <div className={s.metricNum}>
-                {m.highlighted ? <em>{m.value}</em> : m.value}
-              </div>
-              <div className={s.metricLbl}>{m.label}</div>
+            <div>
+              <span className="eyebrow">PLATEFORME · TOURNOIS</span>
+              <h1 className={s.title}>
+                Tournois <em className={s.titleEm}>BlueGenji</em>
+              </h1>
+              <div className={s.subtitle}>SUIVI TEMPS RÉEL · PHASES MULTIPLES · BRACKETS ARBITRÉS</div>
             </div>
-          ))}
-        </div>
+            {isAdmin && (
+              <CyberButton asChild variant="primary">
+                <Link href="/tournois/creer">
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path
+                      d="M8 3v10M3 8h10"
+                      stroke="currentColor"
+                      strokeWidth="1.6"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  Créer un tournoi
+                </Link>
+              </CyberButton>
+            )}
+          </header>
 
-        <div className={s.toolbar}>
-          <div className={s.search}>
-            <span className={s.searchIcon}>
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-                <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4" />
-                <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              </svg>
-            </span>
-            <input
-              ref={searchInputRef}
-              aria-label="Rechercher un tournoi"
-              placeholder="Rechercher un tournoi, un format…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            <span className={s.searchKbd}>{shortcutLabel}</span>
+          <div className={s.toolbar}>
+            <div className={s.search}>
+              <span className={s.searchIcon}>
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="7" cy="7" r="5" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+              </span>
+              <input
+                ref={searchInputRef}
+                aria-label="Rechercher un tournoi"
+                placeholder="Rechercher un tournoi, un format…"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+              />
+              <span className={s.searchKbd}>{shortcutLabel}</span>
+            </div>
+            <div className={s.filterRow}>
+              {[
+                ["all", "Tous"],
+                ["ow", "Overwatch"],
+                ["mr", "Marvel Rivals"],
+              ].map(([key, label]) => {
+                const count = countGame(key as GameFilter);
+                return (
+                  <button
+                    key={key}
+                    className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
+                    aria-pressed={gameFilter === key}
+                    aria-label={`${label} (${count})`}
+                    onClick={() => setGameFilter(key as GameFilter)}
+                  >
+                    {label}
+                    <span className={s.num} aria-hidden="true">
+                      {count}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          <div className={s.filterRow}>
-            {[
-              ["all", "Tous"],
-              ["ow", "Overwatch"],
-              ["mr", "Marvel Rivals"],
-            ].map(([key, label]) => {
-              const count = countGame(key as GameFilter);
-              return (
-                <button
-                  key={key}
-                  className={`${s.chip} ${gameFilter === key ? s.chipOn : ""}`}
-                  aria-pressed={gameFilter === key}
-                  aria-label={`${label} (${count})`}
-                  onClick={() => setGameFilter(key as GameFilter)}
+
+          {/* Sommaire : remplace le bandeau de chiffres, qui répétait les
+              comptes des sections sans mener nulle part. Une section vide y
+              reste, grisée, au lieu d'occuper un grand cadre « Vide » plus bas. */}
+          <nav className={s.sectionNav} aria-label="Sections de la page">
+            {sections.map((entry) =>
+              entry.count > 0 ? (
+                <a
+                  key={entry.key}
+                  href={`#${pageSectionAnchor(entry.key)}`}
+                  className={s.sectionNavLink}
+                  data-tone={entry.key === "mine" ? "mine" : undefined}
+                  // Mène parfois à une section repliée (« Terminés ») : on la
+                  // déplie, sans quoi le lien aboutirait sur un en-tête vide.
+                  onClick={() => setSectionOpen(entry.key, true)}
                 >
-                  {label}
-                  <span className={s.num} aria-hidden="true">
-                    {count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  {entry.navLabel}
+                  <span className={s.num}>{entry.count}</span>
+                </a>
+              ) : (
+                <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
+                  {entry.navLabel}
+                  <span className={s.num}>0</span>
+                </span>
+              ),
+            )}
+          </nav>
 
-        {/* Les paniers reclassés, comme les sections : sinon le bandeau
-            annoncerait « À VENIR » un tournoi affiché juste dessous en
-            « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
-        <Ticker items={buildTickerItems(scheduledBuckets)} />
+          {/* Les paniers reclassés, comme les sections : sinon le bandeau
+              annoncerait « À VENIR » un tournoi affiché juste dessous en
+              « INSCRIPTIONS » — le genre de doute qui fait recharger la page. */}
+          <Ticker items={buildTickerItems(scheduledBuckets)} />
 
-        <div className={s.sections}>
-          {showHidden && (
-            <Section
-              ix="01"
-              title="TOURNOIS INVISIBLES"
-              accent="· STAFF"
-              count={totalHidden}
-              defaultOpen={true}
-              emptyMsg="Aucun tournoi invisible ne correspond à cette recherche."
-            >
-              {filteredHidden.map((t) => (
-                <div key={t.id} className={s.hiddenCard}>
-                  <StateCard t={t} priority={priorityBanners.has(t.id)} />
+          <div className={s.sections}>
+            {shownSections.length === 0 && (
+              <div className={s.emptyAll}>
+                <div className={s.emptyTitle}>Aucun tournoi</div>
+                <div className={s.emptyMsg}>
+                  {sectionEmptyMessage("Aucun tournoi publié pour le moment.", query, gameFilter)}
                 </div>
-              ))}
-            </Section>
-          )}
+              </div>
+            )}
 
-          <Section
-            ix={ix(1)}
-            title="EN COURS"
-            count={totalRunning}
-            defaultOpen={true}
-            emptyMsg={emptyMsg("Aucun tournoi en cours actuellement.")}
-            dataCols="2"
-          >
-            {filteredBuckets.running
-              .slice(0, expandedSections.has("running") ? totalRunning : SECTION_DISPLAY_LIMIT)
-              .map((t) => (
-                <RunningCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
-              ))}
-            <ShowMoreRow
-              sectionTitle="EN COURS"
-              total={totalRunning}
-              expanded={expandedSections.has("running")}
-              onToggle={() => toggleSection("running")}
-            />
-          </Section>
+            {showHidden && totalHidden > 0 && (
+              <Section
+                id={pageSectionAnchor("hidden")}
+                ix={ix("hidden")}
+                title="TOURNOIS INVISIBLES"
+                accent="· STAFF"
+                count={totalHidden}
+                open={isOpen("hidden")}
+                onOpenChange={(open) => setSectionOpen("hidden", open)}
+              >
+                {filteredHidden.map((t) => (
+                  <div key={t.id} className={s.hiddenCard}>
+                    <StateCard t={t} priority={priorityBanners.has(t.id)} />
+                  </div>
+                ))}
+              </Section>
+            )}
 
-          <Section
-            ix={ix(2)}
-            title="INSCRIPTIONS OUVERTES"
-            count={totalRegistration}
-            defaultOpen={true}
-            emptyMsg={emptyMsg("Aucun tournoi en phase d'inscription pour le moment.")}
-          >
-            {filteredBuckets.registration
-              .slice(0, expandedSections.has("registration") ? totalRegistration : SECTION_DISPLAY_LIMIT)
-              .map((t) => (
-                <RegistrationCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
-              ))}
-            <ShowMoreRow
-              sectionTitle="INSCRIPTIONS OUVERTES"
-              total={totalRegistration}
-              expanded={expandedSections.has("registration")}
-              onToggle={() => toggleSection("registration")}
-            />
-          </Section>
+            {totalMine > 0 && (
+              <Section
+                id={pageSectionAnchor("mine")}
+                ix={ix("mine")}
+                title="MES TOURNOIS"
+                count={totalMine}
+                tone="mine"
+                open={isOpen("mine")}
+                onOpenChange={(open) => setSectionOpen("mine", open)}
+              >
+                {visibleSlice("mine", myTournaments).map((t) => (
+                  <div key={t.id} className={s.mineCard}>
+                    <StateCard t={t} priority={priorityBanners.has(t.id)} />
+                  </div>
+                ))}
+                <ShowMoreRow
+                  sectionTitle="MES TOURNOIS"
+                  total={totalMine}
+                  expanded={expandedSections.has("mine")}
+                  onToggle={() => toggleSection("mine")}
+                />
+              </Section>
+            )}
 
-          <Section
-            ix={ix(3)}
-            title="PROCHAINEMENT"
-            count={totalUpcoming}
-            defaultOpen={true}
-            emptyMsg={emptyMsg("Aucun tournoi à venir pour le moment.")}
-          >
-            {filteredBuckets.upcoming
-              .slice(0, expandedSections.has("upcoming") ? totalUpcoming : SECTION_DISPLAY_LIMIT)
-              .map((t) => (
-                <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
-              ))}
-            <ShowMoreRow
-              sectionTitle="PROCHAINEMENT"
-              total={totalUpcoming}
-              expanded={expandedSections.has("upcoming")}
-              onToggle={() => toggleSection("upcoming")}
-            />
-          </Section>
+            {totalRunning > 0 && (
+              <Section
+                id={pageSectionAnchor("running")}
+                ix={ix("running")}
+                title="EN COURS"
+                count={totalRunning}
+                open={isOpen("running")}
+                onOpenChange={(open) => setSectionOpen("running", open)}
+                dataCols="2"
+              >
+                {visibleSlice("running", filteredBuckets.running).map((t) => (
+                  <RunningCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
+                ))}
+                <ShowMoreRow
+                  sectionTitle="EN COURS"
+                  total={totalRunning}
+                  expanded={expandedSections.has("running")}
+                  onToggle={() => toggleSection("running")}
+                />
+              </Section>
+            )}
 
-          <Section
-            ix={ix(4)}
-            title="TERMINÉS"
-            count={totalFinished}
-            defaultOpen={false}
-            emptyMsg={emptyMsg("Aucun tournoi terminé pour le moment.")}
-          >
-            {/* Les cartes sont les items de la grille, comme dans les autres
-                sections : une enveloppe les empilait dans une seule cellule, et
-                `.card { height: 100% }` étirait chacune à la hauteur de la pile. */}
-            {filteredBuckets.finished
-              .slice(0, expandedSections.has("finished") ? totalFinished : SECTION_DISPLAY_LIMIT)
-              .map((t) => (
-                <FinishedCard key={t.id} t={t} />
-              ))}
-            <ShowMoreRow
-              sectionTitle="TERMINÉS"
-              total={totalFinished}
-              expanded={expandedSections.has("finished")}
-              onToggle={() => toggleSection("finished")}
-            />
-          </Section>
-        </div>
+            {totalRegistration > 0 && (
+              <Section
+                id={pageSectionAnchor("registration")}
+                ix={ix("registration")}
+                title="INSCRIPTIONS OUVERTES"
+                count={totalRegistration}
+                open={isOpen("registration")}
+                onOpenChange={(open) => setSectionOpen("registration", open)}
+              >
+                {visibleSlice("registration", filteredBuckets.registration).map((t) => (
+                  <RegistrationCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
+                ))}
+                <ShowMoreRow
+                  sectionTitle="INSCRIPTIONS OUVERTES"
+                  total={totalRegistration}
+                  expanded={expandedSections.has("registration")}
+                  onToggle={() => toggleSection("registration")}
+                />
+              </Section>
+            )}
+
+            {totalUpcoming > 0 && (
+              <Section
+                id={pageSectionAnchor("upcoming")}
+                ix={ix("upcoming")}
+                title="PROCHAINEMENT"
+                count={totalUpcoming}
+                open={isOpen("upcoming")}
+                onOpenChange={(open) => setSectionOpen("upcoming", open)}
+              >
+                {visibleSlice("upcoming", filteredBuckets.upcoming).map((t) => (
+                  <UpcomingCard key={t.id} t={t} priority={priorityBanners.has(t.id)} />
+                ))}
+                <ShowMoreRow
+                  sectionTitle="PROCHAINEMENT"
+                  total={totalUpcoming}
+                  expanded={expandedSections.has("upcoming")}
+                  onToggle={() => toggleSection("upcoming")}
+                />
+              </Section>
+            )}
+
+            {totalFinished > 0 && (
+              <Section
+                id={pageSectionAnchor("finished")}
+                ix={ix("finished")}
+                title="TERMINÉS"
+                count={totalFinished}
+                open={isOpen("finished")}
+                onOpenChange={(open) => setSectionOpen("finished", open)}
+              >
+                {/* Les cartes sont les items de la grille, comme dans les autres
+                    sections : une enveloppe les empilait dans une seule cellule, et
+                    `.card { height: 100% }` étirait chacune à la hauteur de la pile. */}
+                {visibleSlice("finished", filteredBuckets.finished).map((t) => (
+                  <FinishedCard key={t.id} t={t} />
+                ))}
+                <ShowMoreRow
+                  sectionTitle="TERMINÉS"
+                  total={totalFinished}
+                  expanded={expandedSections.has("finished")}
+                  onToggle={() => toggleSection("finished")}
+                />
+              </Section>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
