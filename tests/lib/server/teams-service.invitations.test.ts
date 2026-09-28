@@ -154,6 +154,23 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
     }
     return [{ affectedRows: n }];
   }
+  if (/UPDATE bg_team_invitations SET status = 'CANCELLED'.* WHERE team_id = \? AND status = 'PENDING'/.test(text)) {
+    const [teamId] = params as number[];
+    let n = 0;
+    for (const inv of state.invitations) {
+      if (inv.team_id === teamId && inv.status === "PENDING") {
+        inv.status = "CANCELLED";
+        n++;
+      }
+    }
+    return [{ affectedRows: n }];
+  }
+  if (/UPDATE bg_teams SET is_ghost = 0 WHERE id = \?/.test(text)) {
+    const [teamId] = params as number[];
+    const team = state.teams[teamId];
+    if (team) team.is_ghost = 0;
+    return [{ affectedRows: team ? 1 : 0 }];
+  }
   if (/UPDATE bg_team_invitations SET status = 'DECLINED'.* WHERE id = \?/.test(text)) {
     const [id] = params as number[];
     const inv = state.invitations.find((i) => i.id === id);
@@ -264,10 +281,15 @@ describe("arrivée du joueur — les rôles de l'invitation sont posés", () => 
     expect(rolesOf(42)).toEqual(["CAPITAINE", "HEAL"]);
   });
 
-  it("ne pose jamais OWNER, même s'il était écrit dans l'invitation", async () => {
+  it("ne fait jamais d'un invité l'OWNER d'une équipe réelle, même si l'invitation le porte", async () => {
+    // `OWNER` sur une invitation est la marque d'une reprise de fantôme : sur
+    // une équipe réelle, elle ne peut venir que d'une ligne altérée, et le refus
+    // vaut mieux qu'une arrivée silencieuse sous un autre rôle.
     const inv = invite({ roles_json: ["OWNER", "DPS"] });
-    await respondToInvitation(42, inv.id, true);
-    expect(rolesOf(42)).toEqual(["DPS"]);
+    await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("NOT_A_GHOST_TEAM");
+    expect(rolesOf(42)).toBeUndefined();
+    expect(inv.status).toBe("PENDING");
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
   });
 
   it("rend caduques les autres invitations du joueur", async () => {
@@ -284,6 +306,84 @@ describe("arrivée du joueur — les rôles de l'invitation sont posés", () => 
     await respondToInvitation(42, inv.id, false);
     expect(inv.status).toBe("DECLINED");
     expect(rolesOf(42)).toBeUndefined();
+  });
+});
+
+describe("reprise d'une équipe fantôme — le joueur accepte", () => {
+  beforeEach(() => {
+    state.teams[9] = { deleted_at: null, is_ghost: 1, solo_user_id: null };
+  });
+
+  const claimInvite = (overrides: Partial<Invitation> = {}) =>
+    invite({ team_id: 9, roles_json: ["OWNER"], ...overrides });
+
+  it("accepter la proposition fait du joueur l'OWNER et rend l'équipe ordinaire", async () => {
+    const inv = claimInvite();
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(rolesOf(42)).toEqual(["OWNER"]);
+    expect(state.teams[9].is_ghost).toBe(0);
+    expect(inv.status).toBe("ACCEPTED");
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("verrouille la fantôme en exclusif, puisqu'elle va l'écrire", async () => {
+    const inv = claimInvite();
+    await respondToInvitation(42, inv.id, true);
+
+    const teamRead = connection.execute.mock.calls
+      .map(([sql]) => String(sql).replace(/\s+/g, " "))
+      .find((sql) => /FROM bg_teams WHERE id = \?/.test(sql));
+    expect(teamRead).toMatch(/FOR UPDATE/);
+  });
+
+  it("annule les reprises proposées à d'autres joueurs sur la même fantôme", async () => {
+    const other = claimInvite({ user_id: 43 });
+    const inv = claimInvite();
+
+    await respondToInvitation(42, inv.id, true);
+
+    expect(other.status).toBe("CANCELLED");
+  });
+
+  it("décliner laisse la fantôme telle quelle, sans membre", async () => {
+    const inv = claimInvite();
+
+    await respondToInvitation(42, inv.id, false);
+
+    expect(inv.status).toBe("DECLINED");
+    expect(state.teams[9].is_ghost).toBe(1);
+    expect(rolesOf(42)).toBeUndefined();
+  });
+
+  it("refuse une reprise dont la fantôme a déjà trouvé propriétaire", async () => {
+    const inv = claimInvite();
+    state.teams[9].is_ghost = 0;
+
+    await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("NOT_A_GHOST_TEAM");
+    expect(rolesOf(42)).toBeUndefined();
+    expect(inv.status).toBe("PENDING");
+  });
+
+  it("une invitation sans OWNER ne fait entrer personne dans une fantôme", async () => {
+    const inv = invite({ team_id: 9, roles_json: ["DPS"] });
+
+    await expect(respondToInvitation(42, inv.id, true)).rejects.toThrow("TEAM_NOT_JOINABLE");
+    expect(state.teams[9].is_ghost).toBe(1);
+  });
+
+  it("« Rejoindre » sur la fiche de la fantôme accepte la proposition", async () => {
+    claimInvite();
+
+    await expect(requestToJoinTeam(42, 9)).resolves.toBe("JOINED");
+    expect(rolesOf(42)).toEqual(["OWNER"]);
+    expect(state.teams[9].is_ghost).toBe(0);
+  });
+
+  it("sans proposition, une fantôme reste impossible à rejoindre", async () => {
+    await expect(requestToJoinTeam(42, 9)).rejects.toThrow("TEAM_NOT_JOINABLE");
+    expect(state.invitations).toHaveLength(0);
   });
 });
 

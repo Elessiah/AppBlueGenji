@@ -73,35 +73,44 @@ describe("claimGhostTeam", () => {
     jest.restoreAllMocks();
   });
 
-  it("nomme le joueur OWNER et lève le drapeau fantôme", async () => {
-    const execute = jest
+  /** Lectures d'une proposition recevable : fantôme, joueur, sans équipe, rien en attente. */
+  function claimableReads() {
+    return jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]) // équipe
       .mockResolvedValueOnce([[{ id: 9 }]]) // utilisateur
-      .mockResolvedValueOnce([[]]); // aucune équipe active
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+      .mockResolvedValueOnce([[]]) // aucune équipe active
+      .mockResolvedValueOnce([[]]) // aucune invitation en attente
+      .mockResolvedValueOnce([{ affectedRows: 1 }]); // insertion de l'invitation
+  }
+
+  it("propose l'équipe par une invitation portant OWNER, sans rien attribuer", async () => {
+    const execute = claimableReads();
+    const connectionExecute = jest.fn<SqlQuery>();
     const connection = await mockDb(execute, connectionExecute);
 
-    await claimGhostTeam(3, 9);
+    await expect(claimGhostTeam(3, 9, 1)).resolves.toBe("INVITED");
 
-    const [memberSql, memberParams] = connectionExecute.mock.calls[0] as [string, unknown[]];
-    expect(memberSql).toMatch(/INSERT INTO bg_team_members/);
-    expect(memberParams).toEqual([3, 9, JSON.stringify(["OWNER"])]);
+    const [inviteSql, inviteParams] = execute.mock.calls[4] as [string, unknown[]];
+    expect(inviteSql).toMatch(/INSERT INTO bg_team_invitations/);
+    expect(inviteSql).toMatch(/'INVITE'/);
+    expect(inviteSql).toMatch(/'PENDING'/);
+    expect(inviteParams).toEqual([3, 9, 1, JSON.stringify(["OWNER"])]);
 
-    const [teamSql, teamParams] = connectionExecute.mock.calls[1] as [string, unknown[]];
-    expect(teamSql).toMatch(/UPDATE bg_teams SET is_ghost = 0/);
-    expect(teamParams).toEqual([3]);
-
-    expect(connection.commit).toHaveBeenCalled();
-    expect(connection.rollback).not.toHaveBeenCalled();
-    expect(connection.release).toHaveBeenCalled();
+    // Le cœur de la règle : ni appartenance, ni levée du drapeau fantôme tant
+    // que le joueur n'a pas accepté.
+    const writes = execute.mock.calls.map(([sql]) => String(sql));
+    expect(writes.some((sql) => /INSERT INTO bg_team_members/.test(sql))).toBe(false);
+    expect(writes.some((sql) => /UPDATE bg_teams/.test(sql))).toBe(false);
+    expect(connectionExecute).not.toHaveBeenCalled();
+    expect(connection.beginTransaction).not.toHaveBeenCalled();
   });
 
   it("refuse une équipe inconnue", async () => {
     const execute = jest.fn<SqlQuery>().mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
-    await expect(claimGhostTeam(3, 9)).rejects.toThrow("TEAM_NOT_FOUND");
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("TEAM_NOT_FOUND");
   });
 
   it("refuse une équipe réelle", async () => {
@@ -110,7 +119,7 @@ describe("claimGhostTeam", () => {
       .mockResolvedValueOnce([[{ is_ghost: 0, deleted_at: null }]]);
     await mockDb(execute);
 
-    await expect(claimGhostTeam(3, 9)).rejects.toThrow("NOT_A_GHOST_TEAM");
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("NOT_A_GHOST_TEAM");
   });
 
   it("refuse une équipe dissoute", async () => {
@@ -119,7 +128,7 @@ describe("claimGhostTeam", () => {
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: new Date() }]]);
     await mockDb(execute);
 
-    await expect(claimGhostTeam(3, 9)).rejects.toThrow("TEAM_ALREADY_DELETED");
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("TEAM_ALREADY_DELETED");
   });
 
   it("refuse un joueur inconnu ou anonymisé", async () => {
@@ -129,7 +138,7 @@ describe("claimGhostTeam", () => {
       .mockResolvedValueOnce([[]]);
     await mockDb(execute);
 
-    await expect(claimGhostTeam(3, 9)).rejects.toThrow("USER_NOT_FOUND");
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("USER_NOT_FOUND");
   });
 
   // Régression : la recherche du futur propriétaire filtrait sur `deleted_at`,
@@ -139,15 +148,10 @@ describe("claimGhostTeam", () => {
   // Le mock de la base ne peut pas détecter une colonne absente : on vérifie
   // donc la forme de la requête.
   it("cherche le futur propriétaire sur is_deleted, jamais sur deleted_at", async () => {
-    const execute = jest
-      .fn<SqlQuery>()
-      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
-      .mockResolvedValueOnce([[{ id: 9 }]])
-      .mockResolvedValueOnce([[]]);
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
-    await mockDb(execute, connectionExecute);
+    const execute = claimableReads();
+    await mockDb(execute);
 
-    await claimGhostTeam(3, 9);
+    await claimGhostTeam(3, 9, 1);
 
     const [userSql] = execute.mock.calls[1] as [string];
     expect(userSql).toMatch(/FROM bg_users/);
@@ -163,22 +167,20 @@ describe("claimGhostTeam", () => {
       .mockResolvedValueOnce([[{ id: 55 }]]);
     await mockDb(execute);
 
-    await expect(claimGhostTeam(3, 9)).rejects.toThrow("USER_ALREADY_IN_TEAM");
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("USER_ALREADY_IN_TEAM");
   });
 
-  it("annule la transaction si l'insertion du membre échoue", async () => {
+  it("refuse une seconde proposition au même joueur tant que la première attend", async () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]])
       .mockResolvedValueOnce([[{ id: 9 }]])
-      .mockResolvedValueOnce([[]]);
-    const connectionExecute = jest.fn<SqlQuery>().mockRejectedValue(new Error("DB_DOWN"));
-    const connection = await mockDb(execute, connectionExecute);
+      .mockResolvedValueOnce([[]])
+      .mockResolvedValueOnce([[{ id: 77 }]]);
+    await mockDb(execute);
 
-    await expect(claimGhostTeam(3, 9)).rejects.toThrow("DB_DOWN");
-    expect(connection.rollback).toHaveBeenCalled();
-    expect(connection.commit).not.toHaveBeenCalled();
-    expect(connection.release).toHaveBeenCalled();
+    await expect(claimGhostTeam(3, 9, 1)).rejects.toThrow("ALREADY_INVITED");
+    expect(execute).toHaveBeenCalledTimes(4);
   });
 });
 

@@ -9,9 +9,10 @@ jest.mock("@/lib/server/tournaments/state");
 
 import { finalizeMatch, reportMatchScore } from "@/lib/server/tournaments/scoring";
 import { queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
-import { resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration";
+import { resolveUserEntrant } from "@/lib/server/tournaments/registration";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { MIN_MINUTES_PER_REPORTED_MAP } from "@/lib/shared/score-report-deadline";
 import { qualifyDestinationMatchId } from "@/app/(secured)/tournois/[id]/_lib/bracket-sections";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import { tournamentRow } from "../../helpers/tournament-rows";
@@ -205,14 +206,18 @@ describe("tournaments-service: match state machine", () => {
     const completion = (calls: Call[]) =>
       calls.find((c) => c.sql.includes("status = 'COMPLETED'"));
 
-    function reporterIs(teamId: number | null, state: TournamentRow["state"] = "RUNNING") {
+    function reporterIs(
+      teamId: number | null,
+      state: TournamentRow["state"] = "RUNNING",
+      canActForEntrant = true,
+    ) {
       jest.mocked(syncTournamentState).mockResolvedValue({
         row: tournamentRow({ id: 1, state, participant_type: "TEAM" }),
         stateChanged: false,
         contentChanged: false,
         launchesChanged: false,
       });
-      jest.mocked(resolveUserEntrantTeamId).mockResolvedValue(teamId);
+      jest.mocked(resolveUserEntrant).mockResolvedValue({ teamId, canActForEntrant });
     }
 
     beforeEach(() => {
@@ -229,9 +234,50 @@ describe("tournaments-service: match state machine", () => {
       const [report] = writes(calls);
       expect(report.sql).toMatch(/SET team1_report_score = \?/);
       expect(report.sql).toMatch(/status = 'AWAITING_CONFIRMATION'/);
-      expect(report.params).toEqual([3, 1, SCORE_REPORT_TIMEOUT_MINUTES, 10]);
+      // Un 3-1 affirme quatre maps jouées : la série plausible dure
+      // 4 × MIN_MINUTES_PER_REPORTED_MAP depuis le lancement, puis le délai.
+      expect(report.params).toEqual([
+        3,
+        1,
+        4 * MIN_MINUTES_PER_REPORTED_MAP,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        10,
+      ]);
       expect(completion(calls)).toBeUndefined();
       expect(queueRefereeAlert).not.toHaveBeenCalled();
+    });
+
+    it("l'échéance d'un premier report ne court qu'après une fin de série plausible", async () => {
+      const { connection, calls } = reportConnection();
+
+      await reportMatchScore(connection, 1, 10, 42, 3, 0);
+
+      const [report] = writes(calls);
+      // Posée une fois (COALESCE), par la base : max(maintenant, lancement +
+      // série) puis le délai — et le lancement ne compte que s'il appartient à
+      // cet appariement.
+      expect(report.sql).toMatch(/score_deadline_at = COALESCE\(score_deadline_at, DATE_ADD\( GREATEST\( NOW\(\),/);
+      expect(report.sql).toMatch(
+        /CASE WHEN launch_pairing = CONCAT\(team1_id, ':', team2_id\) THEN launched_at END/,
+      );
+      expect(report.params).toEqual([
+        3,
+        0,
+        3 * MIN_MINUTES_PER_REPORTED_MAP,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        10,
+      ]);
+    });
+
+    it("refuse un membre du roster sans la charge de l'équipe, avant toute lecture du match", async () => {
+      // Un 0-3 déclaré contre soi est un forfait : il demande la même qualité
+      // (`OWNER` / `MANAGER`) que le forfait sur la manche.
+      reporterIs(100, "RUNNING", false);
+      const { connection, calls } = reportConnection();
+
+      await expect(reportMatchScore(connection, 1, 10, 42, 0, 3)).rejects.toThrow("NOT_TEAM_MANAGER");
+      expect(calls.some((c) => c.sql.includes("FROM bg_matches"))).toBe(false);
+      expect(writes(calls)).toHaveLength(0);
     });
 
     it("l'engagée 2 écrit dans ses propres colonnes", async () => {
@@ -241,7 +287,13 @@ describe("tournaments-service: match state machine", () => {
       await reportMatchScore(connection, 1, 10, 42, 1, 3);
 
       expect(writes(calls)[0].sql).toMatch(/SET team2_report_score = \?/);
-      expect(writes(calls)[0].params).toEqual([1, 3, SCORE_REPORT_TIMEOUT_MINUTES, 10]);
+      expect(writes(calls)[0].params).toEqual([
+        1,
+        3,
+        4 * MIN_MINUTES_PER_REPORTED_MAP,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        10,
+      ]);
     });
 
     it("deux reports concordants clôturent la rencontre au profit du vainqueur", async () => {
