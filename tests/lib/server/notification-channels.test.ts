@@ -62,9 +62,9 @@ describe("un seul point d'entrée pour les notifications", () => {
       }
     }
     expect(offenders).toEqual([]);
-    // Le balayage a bien vu les quatre envois d'aujourd'hui : une règle qui ne
+    // Le balayage a bien vu les trois envois d'aujourd'hui : une règle qui ne
     // trouve rien à vérifier passerait sans rien garantir.
-    expect(seen).toBeGreaterThanOrEqual(4);
+    expect(seen).toBeGreaterThanOrEqual(3);
   });
 
   it("saurait repérer un appel direct", () => {

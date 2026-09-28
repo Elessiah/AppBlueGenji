@@ -23,7 +23,11 @@ import {
   schedulePurgeExpiredReports,
   searchReportTargets,
 } from "@/lib/server/content-reports";
-import type { ReportSubmission } from "@/lib/shared/content-reports";
+import {
+  REPORTS_HOURLY_CAP,
+  REPORTS_HOURLY_HARD_CAP,
+  type ReportSubmission,
+} from "@/lib/shared/content-reports";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 type Route = [RegExp, (params: unknown) => unknown];
@@ -92,11 +96,17 @@ describe("createReport", () => {
     /SELECT DISTINCT t.target_type, t.target_id\s+FROM bg_report_targets t/,
     () => [rows],
   ];
+  /** Ancienneté du compte auteur et ses signalements à cibles du jour. */
+  const reporterRoute = (ageHours = 24 * 30, earlier = 0): Route => [
+    /TIMESTAMPDIFF\(HOUR, u.created_at, NOW\(\)\) AS age_hours/,
+    () => [[{ age_hours: ageHours, earlier }]],
+  ];
 
   it("enregistre le signalement et ses cibles, libellé relevé, dans une transaction", async () => {
     install(
       [
         cooldownRoute(),
+        reporterRoute(),
         [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
@@ -133,6 +143,7 @@ describe("createReport", () => {
     install(
       [
         cooldownRoute(),
+        reporterRoute(),
         [/FROM bg_users u\s+WHERE u.is_deleted = 0/, () => [[]]],
         [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
       ],
@@ -157,6 +168,7 @@ describe("createReport", () => {
     install(
       [
         cooldownRoute(),
+        reporterRoute(),
         [
           /FROM bg_users u\s+WHERE u.is_deleted = 0/,
           () => [
@@ -201,6 +213,7 @@ describe("createReport", () => {
     install(
       [
         cooldownRoute([{ target_type: "TEAM", target_id: 4 }]),
+        reporterRoute(),
         [
           /FROM bg_users u\s+WHERE u.is_deleted = 0/,
           () => [[{ id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null }]],
@@ -296,14 +309,72 @@ describe("createReport", () => {
     ).resolves.toBe(15);
   });
 
-  it("refuse au-delà du plafond horaire, sans rien écrire", async () => {
-    install([], [countRoute(60)]);
+  it("refuse au-delà du plafond dur de l'heure, sans rien écrire", async () => {
+    install([], [countRoute(REPORTS_HOURLY_HARD_CAP)]);
     await expect(createReport(submission(), { userId: 3, managesTournaments: false })).rejects.toThrow(
       "REPORTS_SATURATED",
     );
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.execute.mock.calls.some(([sql]) => /INSERT/.test(sql))).toBe(false);
     expect(pushLeadershipAlert).not.toHaveBeenCalled();
+  });
+
+  /**
+   * Le plafond d'alerte refusait le dépôt : six IP suffisaient à fermer le seul
+   * canal de signalement que le site publie. Au-delà, le signalement est
+   * enregistré ; seule l'alerte est retenue.
+   */
+  it("enregistre au-delà du plafond d'alerte, et n'annonce la saturation qu'une fois", async () => {
+    const routes = (total: number): Route[] => [
+      countRoute(total),
+      [/INSERT INTO bg_reports/, () => [{ insertId: 70 }]],
+    ];
+    const bug = submission({ category: "BUG", targets: [] });
+
+    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(REPORTS_HOURLY_CAP));
+    await expect(createReport(bug, { userId: 3, managesTournaments: false })).resolves.toBe(70);
+    expect(connection.commit).toHaveBeenCalled();
+    expect(pushLeadershipAlert).toHaveBeenCalledTimes(1);
+    const [notice] = jest.mocked(pushLeadershipAlert).mock.calls[0];
+    expect(notice).toContain(`Plus de ${REPORTS_HOURLY_CAP} signalements`);
+    expect(notice).toContain("https://site.test/admin/signalements");
+    expect(notice).not.toContain("#70");
+
+    jest.mocked(pushLeadershipAlert).mockClear();
+    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(REPORTS_HOURLY_CAP + 1));
+    await expect(createReport(bug, { userId: 3, managesTournaments: false })).resolves.toBe(70);
+    expect(connection.commit).toHaveBeenCalled();
+    expect(pushLeadershipAlert).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["un compte trop récent", 1, 0],
+    ["un compte qui a déjà désigné des cibles trois fois dans la journée", 24 * 30, 3],
+  ])("ne fait écrire à personne depuis %s — le signalement est enregistré", async (_label, ageHours, earlier) => {
+    install(
+      [
+        cooldownRoute(),
+        reporterRoute(ageHours, earlier),
+        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+      ],
+      [
+        countRoute(0),
+        ...targetRoutes,
+        [/INSERT INTO bg_reports/, () => [{ insertId: 12 }]],
+        [/INSERT INTO bg_report_targets/, () => [{}]],
+      ],
+    );
+    await expect(createReport(submission(), { userId: 3, managesTournaments: false })).resolves.toBe(12);
+    await flush();
+
+    const reporter = pool.execute.mock.calls.find(([sql]) => /AS age_hours/.test(sql));
+    // Celui-ci exclu du compte, sur le compte de l'auteur.
+    expect(reporter?.[1]).toEqual([12, 3]);
+    expect(reporter?.[0]).toMatch(/INTERVAL 24 HOUR/);
+    expect(pool.execute.mock.calls.some(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0/.test(sql))).toBe(false);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    // La direction, elle, est alertée.
+    expect(pushLeadershipAlert).toHaveBeenCalled();
   });
 
   it("refuse une cible disparue ou invisible", async () => {
