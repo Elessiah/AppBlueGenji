@@ -26,11 +26,19 @@ import {
  */
 const unavailable = journeyUnavailableReason();
 
+/** Délai d'un test de ce parcours (voir `describe.configure`). */
+const PLAYER_JOURNEY_TEST_TIMEOUT_MS = 90_000;
+
 let fixture: JourneyFixture | null = null;
 
 test.describe("Parcours joueur dans un tournoi", () => {
   test.skip(unavailable !== null, unavailable ?? "");
-  test.describe.configure({ mode: "serial" });
+  // Délai par test porté à 90 s : le défaut de 30 s ne couvrait pas un parcours
+  // à deux navigateurs sur un serveur de développement qui compile la fiche de
+  // tournoi à froid (22 à 24 s sur un bon passage, au-delà par moments) — et
+  // `openTournament` accorde à lui seul 30 s à la carte du match, deux fois par
+  // test. Le délai ne vaut que pour cette suite, qui est la seule à ce régime.
+  test.describe.configure({ mode: "serial", timeout: PLAYER_JOURNEY_TEST_TIMEOUT_MS });
 
   test.beforeAll(async ({ baseURL }) => {
     fixture = await setUpJourney(baseURL!);
