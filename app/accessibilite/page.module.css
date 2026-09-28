@@ -66,7 +66,8 @@
 
 .prose p,
 .prose li,
-.issue p {
+.issue p,
+.issue li {
   margin: 0;
   font-size: 15px;
   line-height: 1.75;
@@ -93,13 +94,15 @@
   font-weight: 500;
 }
 
-.prose a {
+.prose a,
+.issue a {
   color: var(--blue-300);
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 
-.prose a:focus-visible {
+.prose a:focus-visible,
+.issue a:focus-visible {
   outline: 2px solid var(--blue-300);
   outline-offset: 2px;
   border-radius: 2px;
@@ -140,6 +143,17 @@
 }
 
 .issue .workaround {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   padding-left: 12px;
   border-left: 2px solid var(--blue-500);
+}
+
+.issue .workaround ul {
+  margin: 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
