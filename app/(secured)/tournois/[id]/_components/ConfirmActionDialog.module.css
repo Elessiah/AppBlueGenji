@@ -49,3 +49,11 @@
   gap: 10px;
   margin-top: 20px;
 }
+
+/* Sur un écran étroit, les deux actions s'empilent pleine largeur plutôt que de
+   se tasser à droite : « Déclarer forfait » tient alors sur une ligne. */
+@media (max-width: 420px) {
+  .actions > :global(.btn) {
+    flex: 1 1 100%;
+  }
+}

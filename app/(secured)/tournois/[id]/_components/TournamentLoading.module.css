@@ -93,3 +93,13 @@
     animation: none;
   }
 }
+
+/* Contrastes forcés : les fonds sont remplacés par la couleur du système, et
+   les formes disparaissaient dans la page. Un contour les redessine. */
+@media (forced-colors: active) {
+  .bar,
+  .fact,
+  .card {
+    border: 1px solid CanvasText;
+  }
+}
