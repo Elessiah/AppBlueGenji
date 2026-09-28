@@ -211,7 +211,11 @@ export function usePushNotifications(
         if (syncExisting) {
           await postSubscription(subscription);
           if (cancelled) return;
-          await loadServer();
+          setSubscribed(true);
+          // Rafraîchir le compte d'appareils n'est qu'un plus : son échec ne
+          // doit pas faire passer pour inactif un appareil bel et bien abonné.
+          await loadServer().catch(() => null);
+          return;
         }
         if (!cancelled) setSubscribed(true);
       } catch {
