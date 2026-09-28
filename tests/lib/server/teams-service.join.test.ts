@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/team-join-notifications");
 
 import { requestToJoinTeam } from "@/lib/server/teams-service";
 import { getDatabase } from "@/lib/server/database";
+import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /**
@@ -45,6 +47,7 @@ const wrote = (execute: SqlMock, fragment: string) =>
 describe("requestToJoinTeam — ni une fantôme ni une entrée solo", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(notifyTeamJoinRequest).mockResolvedValue();
   });
 
   it("refuse une demande d'adhésion à une équipe fantôme", async () => {
@@ -78,6 +81,25 @@ describe("requestToJoinTeam — ni une fantôme ni une entrée solo", () => {
 
     await expect(requestToJoinTeam(42, 5)).resolves.toBe("REQUESTED");
     expect(wrote(execute, "INSERT INTO bg_team_invitations")).toBe(true);
+    // La gestion de l'équipe est prévenue sur Discord.
+    expect(notifyTeamJoinRequest).toHaveBeenCalledWith(5, 42);
+  });
+
+  it("ne prévient personne quand la demande est refusée", async () => {
+    await mockJoinDb(joinableTeam({ is_ghost: 1 }));
+    await expect(requestToJoinTeam(42, 5)).rejects.toThrow("TEAM_NOT_JOINABLE");
+    expect(notifyTeamJoinRequest).not.toHaveBeenCalled();
+  });
+
+  it("enregistre la demande même quand la gestion n'a pas pu être prévenue", async () => {
+    await mockJoinDb(joinableTeam());
+    jest.mocked(notifyTeamJoinRequest).mockRejectedValueOnce(new Error("bot"));
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(requestToJoinTeam(42, 5)).resolves.toBe("REQUESTED");
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 
   it("lit bien le caractère fantôme et l'entrée solo dans sa requête", async () => {

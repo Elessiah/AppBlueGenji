@@ -25,6 +25,7 @@ import {
 import { TEAM_NAME_ALREADY_USED, checkTeamName } from "@/lib/shared/team-name";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { assertTermsAccepted, recordTermsAcceptance } from "@/lib/server/terms-acceptance";
+import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import type { TeamPageIdentity } from "@/lib/shared/entity-page-titles";
 
 /**
@@ -1220,6 +1221,12 @@ export async function requestToJoinTeam(userId: number, teamId: number): Promise
     `INSERT INTO bg_team_invitations (team_id, user_id, created_by, kind, status)
      VALUES (?, ?, ?, 'REQUEST', 'PENDING')`,
     [teamId, userId, userId],
+  );
+  // Le propriétaire et les managers sont prévenus en message privé : sans cela,
+  // la demande n'existait que pour qui pensait à ouvrir la fiche. Jamais
+  // attendu — la demande est enregistrée, le message n'est qu'un avertissement.
+  void notifyTeamJoinRequest(teamId, userId).catch((error) =>
+    console.error("[teams] gestion non prévenue d'une demande d'adhésion", error),
   );
   return "REQUESTED";
 }

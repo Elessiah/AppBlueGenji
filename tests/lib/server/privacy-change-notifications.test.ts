@@ -205,7 +205,10 @@ describe("dispatchPrivacyChangeNotifications", () => {
     await dispatchPrivacyChangeNotifications(NOW);
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
     expect(message).not.toContain(first.title);
-    for (const change of rest) expect(message).toContain(change.title);
+    // Le message nomme ce qu'il peut porter ; le reste attend le suivant.
+    const named = privacyChangesForOneMessage(rest, siteBaseUrl());
+    expect(named.length).toBeGreaterThan(0);
+    for (const change of named) expect(message).toContain(change.title);
   });
 
   it("n'envoie rien pour une réservation déjà prise ailleurs", async () => {
