@@ -71,6 +71,31 @@ describe("CalendarCard — accessibilité", () => {
     const markup = renderToStaticMarkup(<CalendarCard events={[] as LandingCalendarEvent[]} />);
     expect(markup).toMatch(/<h3[^>]*>\s*PROCHAINS ÉVÉNEMENTS/);
   });
+
+  const event: LandingCalendarEvent = {
+    tournamentId: 42,
+    name: "Coupe d'automne",
+    game: "OW",
+    startAt: "2026-10-12T18:00:00.000Z",
+    registrationOpenAt: "2026-10-01T18:00:00.000Z",
+    registrationCloseAt: "2026-10-11T18:00:00.000Z",
+    state: "REGISTRATION",
+    maxTeams: 16,
+    registeredTeams: 4,
+  };
+
+  it("mène chaque événement à la fiche de son tournoi", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[event, { ...event, tournamentId: 7, name: "Ligue" }]} />);
+    expect(markup).toMatch(/<a[^>]*href="\/tournois\/42"[^>]*>Coupe d&#x27;automne<\/a>/);
+    expect(markup).toMatch(/<a[^>]*href="\/tournois\/7"[^>]*>Ligue<\/a>/);
+  });
+
+  it("donne au lien le seul nom du tournoi, sans date, jeu ni état", () => {
+    const markup = renderToStaticMarkup(<CalendarCard events={[event]} />);
+    const link = markup.match(/<a[^>]*href="\/tournois\/42"[^>]*>([\s\S]*?)<\/a>/);
+    expect(link?.[1]).toBe("Coupe d&#x27;automne");
+    expect(link?.[0]).not.toContain("aria-label");
+  });
 });
 
 describe("JoinCTA — accessibilité", () => {
