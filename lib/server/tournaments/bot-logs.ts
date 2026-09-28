@@ -38,6 +38,9 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { isBotCircuitOpen, pushRefereeAlert, sendBotLog } from "@/lib/server/bot-integration";
+import { notifyStaff } from "@/lib/server/notify";
+import { refereeAlertPush } from "@/lib/shared/push-messages";
+import { notifyTournamentStart } from "./player-pushes";
 import { getDatabase } from "@/lib/server/database";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import {
@@ -313,6 +316,12 @@ export function flushBotLogs(connection: PoolConnection): void {
     async function deliver({ entry, channel, message }: ResolvedBotLog): Promise<void> {
       if (channel !== "REFEREE") {
         await sendBotLog(message);
+        // Le coup d'envoi est une ligne de journal pour le staff, et une
+        // notification pour les joueurs engagés — la seule qui n'ait pas de
+        // message privé Discord : elle naît au même point de passage unique.
+        if (entry.kind === "tournament_started") {
+          void notifyTournamentStart(entry.tournamentId).catch(() => undefined);
+        }
         return;
       }
 
@@ -330,7 +339,12 @@ export function flushBotLogs(connection: PoolConnection): void {
       // rien n'est parti.
       let sent = false;
       try {
-        sent = (await pushRefereeAlert(message, "referee-alert", { honourCircuit: true })) !== null;
+        const report = await notifyStaff({
+          topic: "REFEREE_ALERT",
+          discord: () => pushRefereeAlert(message, "referee-alert", { honourCircuit: true }),
+          push: refereeAlertPush(message),
+        });
+        sent = report.discord !== null;
       } catch {
         sent = false;
       }

@@ -24,6 +24,7 @@ import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-09-28";
@@ -417,6 +418,42 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
       "Plafonds d'envoi par personne et par heure",
       "Logo masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
+    ],
+  },
+  {
+    ref: "T12",
+    name: "Notifications push",
+    purpose: "Prévenir un joueur sur ses appareils, à sa demande, de ce qui le concerne sur le site",
+    subPurposes: [
+      "Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, rappels de match",
+      "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
+      "Alertes d'arbitrage et de modération pour le staff qui détient ces rôles",
+    ],
+    legalBasis: "Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)",
+    dataSubjects: ["Joueurs inscrits qui activent les notifications sur un appareil"],
+    dataCategories: [
+      "Adresse d'abonnement de l'appareil, fournie par le navigateur, et ses clés de chiffrement",
+      "Date d'abonnement et de la dernière notification remise",
+      "Sujets de notification coupés par le compte",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      "Abonnement : jusqu'à sa désactivation, sa révocation par le navigateur, ou la suppression du compte",
+      `Abonnement resté sans notification remise : ${PUSH_SUBSCRIPTION_RETENTION_DAYS} jours au plus`,
+      "Sujets coupés : durée du compte",
+    ],
+    recipients: [
+      "Le joueur lui-même",
+      "Le service de push de son navigateur (Google, Mozilla, Apple ou Microsoft), qui achemine un message chiffré qu'il ne peut pas lire",
+    ],
+    transfers: [
+      "États-Unis : service de push du navigateur choisi par le joueur, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291), dans le cadre des garanties propres à chaque fournisseur",
+    ],
+    security: [
+      ...COMMON_SECURITY,
+      "Contenu chiffré pour le seul appareil abonné ; envois signés par la clé du site (VAPID)",
+      "Aucun pseudo de joueur dans une notification",
+      "Services de push acceptés limités à ceux des navigateurs du marché",
     ],
   },
 ];

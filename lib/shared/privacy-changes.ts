@@ -28,6 +28,7 @@
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
+import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -209,6 +210,19 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Le propriétaire et les managers d'une équipe reçoivent un message privé Discord à chaque demande d'adhésion, s'ils ont rattaché leur compte Discord ou certifié leur tag. Les autres membres ne reçoivent rien.",
       `Le message ne nomme pas le joueur : il renvoie à la fiche de l'équipe, où la demande s'accepte ou se refuse. Une même personne ne fait écrire le bot à une même équipe qu'une fois toutes les ${TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS} heures.`,
+    ],
+  },  // Un traitement nouveau : l'abonnement d'un appareil aux notifications push,
+  // et les sujets qu'un compte coupe. Durée lue sur la constante du code.
+  {
+    id: "2026-09-notifications-push",
+    publishedAt: "2026-09-29",
+    title: "Notifications push, si tu les actives",
+    summary:
+      "Tu peux être prévenu sur ton téléphone ou ton ordinateur du départ de tes matchs et de ce qui te concerne sur le site. Rien ne part sans ton accord.",
+    details: [
+      "Les notifications ne s'activent que sur ton geste, appareil par appareil, depuis « Mon profil » ; tu choisis les sujets, et tu les désactives quand tu veux.",
+      "Le site garde l'adresse d'abonnement que ton navigateur lui donne et ses clés de chiffrement. Le message passe par le service de push de ton navigateur (Google, Mozilla, Apple ou Microsoft), chiffré pour ton seul appareil : ce service ne peut pas le lire.",
+      `Un abonnement est effacé à sa désactivation, quand ton navigateur le révoque, avec ton compte, ou au bout de ${PUSH_SUBSCRIPTION_RETENTION_DAYS} jours sans notification remise. Aucune notification ne porte le pseudo d'un joueur.`,
     ],
   },
 ];

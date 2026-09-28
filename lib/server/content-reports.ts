@@ -14,11 +14,9 @@
  */
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import {
-  pushDiscordDirectMessages,
-  pushLeadershipAlert,
-  type DiscordRecipient,
-} from "@/lib/server/bot-integration";
+import { pushLeadershipAlert } from "@/lib/server/bot-integration";
+import { notifyStaff, notifyUsers, toNotificationRecipient } from "@/lib/server/notify";
+import { contentReportPush, staffReportPush } from "@/lib/shared/push-messages";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { listQuarantinesForReports, purgeDueQuarantines } from "@/lib/server/logo-quarantine";
@@ -340,7 +338,11 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
     fromMember: viewer.userId !== null,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(reportId)}`,
   });
-  void pushLeadershipAlert(message, "content-report").catch(() => undefined);
+  void notifyStaff({
+    topic: "STAFF_REPORT",
+    discord: () => pushLeadershipAlert(message, "content-report"),
+    push: staffReportPush({ reportId, contest: false }),
+  }).catch(() => undefined);
   void notifyReportTargets(reportId, submission.category, targets, viewer.userId).catch((error) => {
     console.error("[reports] personnes visées non prévenues", error);
   });
@@ -385,13 +387,14 @@ type RecipientRow = RowDataPacket & {
 };
 
 /**
- * Prévient en message privé les personnes qu'un signalement vise : les joueurs
- * désignés et les membres **actuels** des équipes désignées, pour qu'elles
- * puissent le contester.
+ * Prévient les personnes qu'un signalement vise — message privé Discord et
+ * notification push : les joueurs désignés et les membres **actuels** des
+ * équipes désignées, pour qu'elles puissent le contester.
  *
- * Ne sont joints que les comptes dont le site connaît un moyen **prouvé** de les
- * joindre (identifiant Discord, ou tag certifié) — un tag saisi à la main peut
- * désigner n'importe qui. L'auteur du signalement n'est pas prévenu de son
+ * Le message privé ne part qu'aux comptes dont le site connaît un moyen
+ * **prouvé** de les joindre (identifiant Discord, ou tag certifié) — un tag
+ * saisi à la main peut désigner n'importe qui ; le push, lui, part aux
+ * appareils que le compte a lui-même abonnés. L'auteur du signalement n'est pas prévenu de son
  * propre signalement. Un tournoi désigné ne prévient personne : il n'a pas de
  * membres, il est organisé par l'association. Une cible déjà visée dans les
  * `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` dernières heures n'est pas reprévenue :
@@ -435,17 +438,17 @@ export async function notifyReportTargets(
     params,
   );
 
-  const recipients: DiscordRecipient[] = [];
-  for (const row of rows) {
-    if (reporterUserId !== null && Number(row.id) === reporterUserId) continue;
-    const handle = row.discord_verified_at ? row.discord_pseudo : null;
-    if (!row.discord_id && !handle) continue;
-    recipients.push({ discordId: row.discord_id, handle, label: row.pseudo });
-  }
+  const recipients = rows
+    .filter((row) => reporterUserId === null || Number(row.id) !== reporterUserId)
+    .map((row) => toNotificationRecipient(row, "proven"));
   if (recipients.length === 0) return;
 
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-  await pushDiscordDirectMessages(formatTargetNotice({ category, url }), recipients, "content-report-target");
+  await notifyUsers(recipients, {
+    topic: "CONTENT_REPORT",
+    discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
+    push: contentReportPush({ reportId, category }),
+  });
 }
 
 /**
@@ -554,7 +557,11 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     reopened,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(parentId)}`,
   });
-  void pushLeadershipAlert(message, "content-report-contest").catch(() => undefined);
+  void notifyStaff({
+    topic: "STAFF_REPORT",
+    discord: () => pushLeadershipAlert(message, "content-report-contest"),
+    push: staffReportPush({ reportId: contestId, contest: true }),
+  }).catch(() => undefined);
   return contestId;
 }
 

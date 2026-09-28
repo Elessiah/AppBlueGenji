@@ -72,6 +72,11 @@ export const PROFILE_SECTIONS = [
     lead: "Les portes par lesquelles tu entres sur le site.",
   },
   {
+    id: "notifications",
+    title: "Notifications",
+    lead: "Être prévenu sur ton téléphone ou ton ordinateur, même le site fermé.",
+  },
+  {
     id: "invitations",
     title: "Invitations d'équipe",
     lead: "Les équipes qui t'ont proposé de les rejoindre.",

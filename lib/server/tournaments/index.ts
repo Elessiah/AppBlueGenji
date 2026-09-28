@@ -176,6 +176,7 @@ import { getTournamentSnapshot } from "./snapshot";
 import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
+import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { findTournamentsNeedingSync } from "./sync-scope";
 import { loadViewerCastBlock } from "./match-launch";
 
@@ -578,6 +579,9 @@ export async function listTournamentBuckets(
   // sans attente ici — un bot lent ou injoignable ne doit pas retarder la
   // liste, et le prochain passage rattrapera ce qui reste dû.
   void dispatchDueMatchReminders().catch(() => undefined);
+  // Même raison pour les départs de match : un lancement ouvert par l'horloge
+  // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
+  void dispatchMatchStartNotices().catch(() => undefined);
 
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.
@@ -1088,6 +1092,8 @@ async function runPlayerMatchWrite(
     flushBotLogs(connection);
 
     publishScoreReportedEvent(tournamentId, matchId);
+    // L'adversaire a un score à confirmer : il le sait sans avoir la page ouverte.
+    void notifyScoreToConfirm(matchId);
     await invalidateListsIfStateChanged(tournamentId, stateBefore);
   } catch (error) {
     await connection.rollback();

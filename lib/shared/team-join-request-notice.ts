@@ -26,6 +26,7 @@ export const TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS = 24;
 
 /** Un membre actuel de l'équipe, tel que le service le lit. */
 export type TeamJoinNoticeMember = {
+  userId: number;
   pseudo: string;
   roles: readonly TeamRole[];
   discordId: string | null;
@@ -41,17 +42,21 @@ export type TeamJoinNoticeRecipient = {
 };
 
 /**
- * Les membres à prévenir : gestion de l'équipe, joignable par un moyen
- * **prouvé** (identifiant Discord, ou tag certifié). Un tag saisi à la main
- * peut désigner n'importe qui — le bot écrirait alors à un inconnu.
+ * Les membres à prévenir : la gestion de l'équipe. Chacun reçoit la
+ * notification push de ses appareils abonnés ; le message privé Discord ne part
+ * qu'à qui est joignable par un moyen **prouvé** (identifiant Discord, ou tag
+ * certifié) — un tag saisi à la main peut désigner n'importe qui, le bot
+ * écrirait alors à un inconnu (`discord: null`).
  */
-export function teamJoinNoticeRecipients(members: readonly TeamJoinNoticeMember[]): TeamJoinNoticeRecipient[] {
-  const recipients: TeamJoinNoticeRecipient[] = [];
+export function teamJoinNoticeRecipients(
+  members: readonly TeamJoinNoticeMember[],
+): { userId: number; discord: TeamJoinNoticeRecipient | null }[] {
+  const recipients: { userId: number; discord: TeamJoinNoticeRecipient | null }[] = [];
   for (const member of members) {
     if (!hasTeamManagementRole(member.roles)) continue;
     const handle = member.discordVerified ? member.discordPseudo : null;
-    if (!member.discordId && !handle) continue;
-    recipients.push({ discordId: member.discordId, handle, label: member.pseudo });
+    const discord = member.discordId || handle ? { discordId: member.discordId, handle, label: member.pseudo } : null;
+    recipients.push({ userId: member.userId, discord });
   }
   return recipients;
 }

@@ -1,0 +1,123 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.compact {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--r-cy-md);
+  background: var(--cyber-bg-1);
+}
+
+.lead {
+  margin: 0;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.deviceRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue-300);
+  box-shadow: 0 0 8px var(--blue-glow);
+}
+
+.notice,
+.muted {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-1);
+  max-width: 68ch;
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text-1);
+  max-width: 68ch;
+}
+
+.topics {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-1);
+}
+
+.topicList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .topicList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.topic {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.topic input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.topicText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+}
+
+.topicLabel {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.topicDesc {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-1);
+}

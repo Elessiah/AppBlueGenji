@@ -48,6 +48,7 @@ import {
 import { ProfileSection } from "./_components/ProfileSection";
 import { DiscordVerificationDialog } from "./DiscordVerificationDialog";
 import { ConnectedAppsSection } from "./ConnectedAppsSection";
+import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { BattletagVisibilityNotice } from "./BattletagVisibilityNotice";
 import { useAccountConnections } from "./useAccountConnections";
 import s from "./profil.module.css";
@@ -962,6 +963,10 @@ export default function ProfilePage() {
           reload={reloadConnections}
           onChanged={loadDiscordState}
         />
+      </ProfileSection>
+
+      <ProfileSection section={sectionById.notifications}>
+        <PushNotificationsPanel />
       </ProfileSection>
 
       {invitations.length > 0 && (

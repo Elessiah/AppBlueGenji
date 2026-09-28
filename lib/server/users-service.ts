@@ -8,7 +8,7 @@ import {
   type AccountDeletionPlan,
   type AccountTrace,
 } from "@/lib/shared/account-deletion";
-import { isDuplicateEntryError, isReferencedRowError } from "@/lib/server/mysql-errors";
+import { ignoreMissingTable, isDuplicateEntryError, isReferencedRowError } from "@/lib/server/mysql-errors";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import type { PlayerPageIdentity } from "@/lib/shared/entity-page-titles";
 import { BATTLETAG_LOCKED, isBattletagLocked } from "@/lib/shared/battletag-lock";
@@ -35,6 +35,7 @@ import {
   recordTermsAcceptanceIfBehind,
 } from "@/lib/server/terms-acceptance";
 import { listReportsByAuthor } from "@/lib/server/content-reports";
+import { exportPushData } from "@/lib/server/push-subscriptions";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
@@ -1782,6 +1783,13 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
   // jamais sollicité (`is_deleted = 0` borne les deux lectures).
   await connection.execute(`DELETE FROM bg_privacy_acknowledgments WHERE user_id = ?`, [userId]);
   await connection.execute(`DELETE FROM bg_privacy_change_notifications WHERE user_id = ?`, [userId]);
+  // Les appareils abonnés aux notifications push, et les sujets coupés : un
+  // compte anonymisé ne reçoit plus rien, et garder l'adresse d'abonnement
+  // d'un appareil qui n'est plus à personne serait garder une donnée sans
+  // objet. Tables tolérées (`isMissingTableError`) : une base qui en manque
+  // n'a rien à effacer.
+  await ignoreMissingTable(connection.execute(`DELETE FROM bg_push_subscriptions WHERE user_id = ?`, [userId]));
+  await ignoreMissingTable(connection.execute(`DELETE FROM bg_push_topic_optouts WHERE user_id = ?`, [userId]));
   // Même raison pour les acceptations des conditions d'utilisation. Les
   // signalements qu'il a envoyés restent à traiter — l'association en a
   // besoin —, mais ne pointent plus vers lui.
@@ -2241,6 +2249,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     privacyAcknowledgments: await listPrivacyAcknowledgments(userId),
     termsAcceptances: await listTermsAcceptances(userId),
     reports: await listReportsByAuthor(userId),
+    pushNotifications: await exportPushData(userId),
   };
 }
 

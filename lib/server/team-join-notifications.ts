@@ -6,7 +6,8 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
+import { notifyUsers } from "@/lib/server/notify";
+import { teamJoinRequestPush } from "@/lib/shared/push-messages";
 import { parseRoles } from "@/lib/server/serialization";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@/lib/shared/team-join-request-notice";
 
 type ManagerRow = RowDataPacket & {
+  id: number;
   pseudo: string;
   roles_json: unknown;
   discord_id: string | null;
@@ -25,8 +27,8 @@ type ManagerRow = RowDataPacket & {
 };
 
 /**
- * Écrit en message privé au propriétaire et aux managers de l'équipe qu'un
- * joueur vient de demander à la rejoindre.
+ * Prévient le propriétaire et les managers de l'équipe — message privé Discord
+ * et notification push — qu'un joueur vient de demander à la rejoindre.
  *
  * Meilleur effort, comme tout message du bot : la demande est déjà enregistrée,
  * un bot injoignable la laisse intacte — la gestion la verra sur la fiche.
@@ -50,7 +52,7 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   if (teams.length === 0) return;
 
   const [rows] = await db.execute<ManagerRow[]>(
-    `SELECT u.pseudo, tm.roles_json, u.discord_id, u.discord_pseudo, u.discord_verified_at
+    `SELECT u.id, u.pseudo, tm.roles_json, u.discord_id, u.discord_pseudo, u.discord_verified_at
      FROM bg_team_members tm
      JOIN bg_users u ON u.id = tm.user_id
      WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0 AND u.id <> ?`,
@@ -58,6 +60,7 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   );
   const recipients = teamJoinNoticeRecipients(
     rows.map((row) => ({
+      userId: Number(row.id),
       pseudo: row.pseudo,
       roles: parseRoles(row.roles_json),
       discordId: row.discord_id,
@@ -68,9 +71,9 @@ export async function notifyTeamJoinRequest(teamId: number, requesterId: number)
   if (recipients.length === 0) return;
 
   const url = `${siteCanonicalBase()}/equipes/${teamId}`;
-  await pushDiscordDirectMessages(
-    formatTeamJoinRequestNotice({ teamName: teams[0].name, url }),
-    recipients,
-    "team-join-request",
-  );
+  await notifyUsers(recipients, {
+    topic: "TEAM_JOIN_REQUEST",
+    discord: { message: formatTeamJoinRequestNotice({ teamName: teams[0].name, url }), context: "team-join-request" },
+    push: teamJoinRequestPush({ teamId, teamName: teams[0].name }),
+  });
 }

@@ -26,6 +26,8 @@ import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
 import { toParticipantType } from "@/lib/shared/participants";
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
+import { notifyStaff } from "@/lib/server/notify";
+import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import {
   buildIssueReportMessage,
   matchRoundLabel,
@@ -133,16 +135,25 @@ export async function reportTournamentIssue(
     };
   }
 
-  const alert = await pushRefereeAlert(
-    buildIssueReportMessage({
-      tournamentName: String(context.tournament_name),
-      tournamentUrl: tournamentPageUrl(tournamentId),
-      entrant: { name: String(context.entrant_name), participantType },
-      match,
-      message,
-    }),
-    "issue-report",
-  );
+  const alertMessage = buildIssueReportMessage({
+    tournamentName: String(context.tournament_name),
+    tournamentUrl: tournamentPageUrl(tournamentId),
+    entrant: { name: String(context.entrant_name), participantType },
+    match,
+    message,
+  });
+  const { discord: alert } = await notifyStaff({
+    topic: "REFEREE_ALERT",
+    discord: () => pushRefereeAlert(alertMessage, "issue-report"),
+    // Le texte du joueur reste sur Discord : une notification s'affiche sur un
+    // écran verrouillé, elle ne dit que ce qui attend un arbitre, et où.
+    push: {
+      title: "Arbitrage requis",
+      body: `Problème signalé · ${String(context.tournament_name)}${match ? `, ${match.round}` : ""}.`,
+      url: tournamentMatchHref(tournamentId, match?.id ?? null),
+      tag: `issue-${tournamentId}-${match?.id ?? 0}`,
+    },
+  });
 
   // Le bot injoignable est remonté, pas avalé : répondre « signalement envoyé »
   // quand rien n'est parti laisserait le joueur attendre un arbitre qui n'a

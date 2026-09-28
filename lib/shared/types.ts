@@ -887,6 +887,21 @@ export type PersonalDataExport = {
     parentReportId: number | null;
     createdAt: string;
   }[];
+  /**
+   * Notifications push (`lib/shared/push-notifications.ts`) : les appareils
+   * abonnés — **tout** ce que la ligne garde, clés comprises — et les sujets
+   * coupés par le compte.
+   */
+  pushNotifications: {
+    devices: {
+      endpoint: string;
+      p256dh: string;
+      auth: string;
+      createdAt: string;
+      lastSuccessAt: string | null;
+    }[];
+    disabledTopics: string[];
+  };
 };
 
 export type TeamDetailResponse = {
