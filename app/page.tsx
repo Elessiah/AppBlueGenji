@@ -100,7 +100,7 @@ export default async function HomePage() {
       <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
       <LeaderCal leaderboard={leaderboard} events={events} />
       <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} />
-      <SponsorsGrid sponsors={sponsors} isAdmin={isAdmin} />
+      <SponsorsGrid sponsors={sponsors} copy={copy} isAdmin={isAdmin} />
       <JoinCTA isAuthenticated={!!user} copy={copy} canEditCopy={isAdmin} />
     </PublicPageShell>
   );

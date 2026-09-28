@@ -30,6 +30,7 @@ export async function POST(req: Request) {
       name: typeof body.name === "string" ? body.name : "",
       tier: typeof body.tier === "string" ? body.tier : undefined,
       logoUrl: typeof body.logoUrl === "string" ? body.logoUrl : null,
+      bannerUrl: typeof body.bannerUrl === "string" ? body.bannerUrl : null,
       websiteUrl: typeof body.websiteUrl === "string" ? body.websiteUrl : null,
       description: typeof body.description === "string" ? body.description : null,
       active: typeof body.active === "boolean" ? body.active : undefined,
