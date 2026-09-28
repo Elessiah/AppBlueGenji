@@ -1401,12 +1401,22 @@ export async function listUserInvitations(userId: number): Promise<
  * Les invitations envoyées ne se voyaient nulle part : ni pour savoir qui
  * attendre, ni pour en retirer une après une erreur de pseudo — réinviter le
  * même joueur ne rendant que `ALREADY_INVITED`.
+ *
+ * Sur une **fantôme**, le staff `tournaments` y lit les reprises qu'il a
+ * proposées (`claimGhostTeam`) : personne d'autre n'a qualité pour le faire,
+ * une fantôme n'ayant aucun membre.
  */
 export async function listTeamPendingInvitations(
   teamId: number,
   requesterId: number,
+  viewerManagesGhostTeams = false,
 ): Promise<{ requests: TeamJoinRequest[]; invitations: TeamSentInvitation[] }> {
-  if (!(await userCanManageTeam(teamId, requesterId))) throw new Error("FORBIDDEN");
+  if (
+    !(await userCanManageTeam(teamId, requesterId)) &&
+    !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
+  ) {
+    throw new Error("FORBIDDEN");
+  }
   const db = await getDatabase();
   const [rows] = await db.execute<
     (RowDataPacket & {
@@ -1458,8 +1468,18 @@ export async function listTeamPendingInvitations(
  * L'écriture est conditionnée à `status = 'PENDING'` : une réponse arrivée entre
  * la lecture et l'écriture l'emporte, et l'annulation est refusée plutôt que de
  * réécrire une invitation déjà acceptée.
+ *
+ * Une **reprise de fantôme** est l'acte du staff `tournaments`, qui doit pouvoir
+ * la retirer — un pseudo mal choisi, une proposition devenue sans objet : sans
+ * cela, elle attendrait indéfiniment et resterait acceptable des semaines plus
+ * tard. D'où la dérogation fantôme, la même que pour le reste de
+ * l'administration d'une fantôme (`viewerManagesGhostTeams`).
  */
-export async function cancelInvitation(actingUserId: number, invitationId: number): Promise<void> {
+export async function cancelInvitation(
+  actingUserId: number,
+  invitationId: number,
+  viewerManagesGhostTeams = false,
+): Promise<void> {
   const db = await getDatabase();
   const [rows] = await db.execute<
     (RowDataPacket & { team_id: number; user_id: number; kind: "INVITE" | "REQUEST"; status: string })[]
@@ -1472,7 +1492,13 @@ export async function cancelInvitation(actingUserId: number, invitationId: numbe
   if (inv.status !== "PENDING") throw new Error("INVITATION_NOT_PENDING");
 
   if (inv.kind === "INVITE") {
-    if (!(await userCanManageTeam(Number(inv.team_id), actingUserId))) throw new Error("FORBIDDEN");
+    const teamId = Number(inv.team_id);
+    if (
+      !(await userCanManageTeam(teamId, actingUserId)) &&
+      !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
+    ) {
+      throw new Error("FORBIDDEN");
+    }
   } else if (Number(inv.user_id) !== actingUserId) {
     throw new Error("FORBIDDEN");
   }

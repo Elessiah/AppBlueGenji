@@ -26,6 +26,8 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { parseRoles } from "@/lib/server/serialization";
+import { hasTeamManagementRole } from "@/lib/shared/team-roles";
 import {
   pushDiscordDirectMessages,
   type DiscordDeliveryReport,
@@ -186,6 +188,40 @@ export async function loadEntrantPlayerIds(teamIds: readonly number[]): Promise<
   for (const row of rows) {
     const teamId = Number(row.team_id);
     byTeam.set(teamId, [...(byTeam.get(teamId) ?? []), Number(row.user_id)]);
+  }
+  return byTeam;
+}
+
+/**
+ * Ceux qui ont **qualité pour agir au nom** des engagées données, par engagée :
+ * `OWNER` et `MANAGER` d'une équipe (`hasTeamManagementRole`), le joueur d'une
+ * entrée solo. Pour les notifications qui appellent un geste que seuls eux
+ * peuvent faire — confirmer ou contester un score (`reportMatchScore` refuse
+ * `NOT_TEAM_MANAGER`) : prévenir tout le roster enverrait un membre sportif
+ * vers un bouton qu'il n'a pas.
+ */
+export async function loadEntrantManagerIds(teamIds: readonly number[]): Promise<Map<number, number[]>> {
+  const byTeam = new Map<number, number[]>();
+  const ids = [...new Set(teamIds)];
+  if (ids.length === 0) return byTeam;
+  const db = await getDatabase();
+  const placeholders = ids.map(() => "?").join(", ");
+  const [rows] = await db.query<
+    (RowDataPacket & { team_id: number; user_id: number; roles_json: unknown; solo: number })[]
+  >(
+    `SELECT tm.team_id, tm.user_id, tm.roles_json, 0 AS solo FROM bg_team_members tm
+      WHERE tm.team_id IN (${placeholders}) AND tm.left_at IS NULL
+     UNION ALL
+     SELECT t.id AS team_id, t.solo_user_id AS user_id, NULL AS roles_json, 1 AS solo FROM bg_teams t
+      WHERE t.id IN (${placeholders}) AND t.solo_user_id IS NOT NULL`,
+    [...ids, ...ids],
+  );
+  for (const row of rows) {
+    if (Number(row.solo) !== 1 && !hasTeamManagementRole(parseRoles(row.roles_json))) continue;
+    const teamId = Number(row.team_id);
+    const users = byTeam.get(teamId) ?? [];
+    if (!users.includes(Number(row.user_id))) users.push(Number(row.user_id));
+    byTeam.set(teamId, users);
   }
   return byTeam;
 }

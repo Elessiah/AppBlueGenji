@@ -111,6 +111,11 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
         .map((i) => ({ ...i, pseudo: `joueur${i.user_id}` })),
     ];
   }
+  if (/SELECT is_ghost, deleted_at FROM bg_teams WHERE id = \?/.test(text)) {
+    const [teamId] = params as number[];
+    const team = state.teams[teamId];
+    return [team ? [{ is_ghost: team.is_ghost, deleted_at: team.deleted_at }] : []];
+  }
   if (/SELECT id, deleted_at, is_ghost, solo_user_id FROM bg_teams/.test(text)) {
     const [teamId] = params as number[];
     const team = state.teams[teamId];
@@ -379,6 +384,34 @@ describe("reprise d'une équipe fantôme — le joueur accepte", () => {
     await expect(requestToJoinTeam(42, 9)).resolves.toBe("JOINED");
     expect(rolesOf(42)).toEqual(["OWNER"]);
     expect(state.teams[9].is_ghost).toBe(0);
+  });
+
+  it("le staff `tournaments` retire une reprise proposée sur une fantôme", async () => {
+    const inv = claimInvite();
+
+    await cancelInvitation(3, inv.id, true);
+
+    expect(inv.status).toBe("CANCELLED");
+  });
+
+  it("sans la dérogation, personne ne retire une reprise : une fantôme n'a aucun gérant", async () => {
+    const inv = claimInvite();
+
+    await expect(cancelInvitation(3, inv.id, false)).rejects.toThrow("FORBIDDEN");
+    expect(inv.status).toBe("PENDING");
+  });
+
+  it("le staff lit les reprises en attente d'une fantôme", async () => {
+    claimInvite();
+
+    const pending = await listTeamPendingInvitations(9, 3, true);
+
+    expect(pending.invitations).toHaveLength(1);
+    expect(pending.invitations[0]).toMatchObject({ userId: 42, roles: ["OWNER"] });
+  });
+
+  it("la dérogation fantôme ne vaut rien sur une équipe réelle", async () => {
+    await expect(listTeamPendingInvitations(7, 3, true)).rejects.toThrow("FORBIDDEN");
   });
 
   it("sans proposition, une fantôme reste impossible à rejoindre", async () => {

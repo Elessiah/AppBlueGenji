@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { cancelInvitation, respondToInvitation } from "@/lib/server/teams-service";
 import { JOIN_CONFLICTS } from "@/lib/server/team-invite-roles";
+import { can } from "@/lib/shared/permissions";
 
 /** Accepte ou refuse une invitation/demande en attente. Body: { accept: boolean }. */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -31,7 +32,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
 /**
  * Retire une invitation (gestion de l'équipe) ou une demande d'adhésion (son
- * auteur) encore en attente. Voir `cancelInvitation`.
+ * auteur) encore en attente — et, pour le staff `tournaments`, une reprise de
+ * fantôme qu'il a proposée. Voir `cancelInvitation`.
  */
 export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -42,7 +44,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(invitationId) || invitationId <= 0) return fail("INVALID_INVITATION_ID", 400);
 
   try {
-    await cancelInvitation(user.id, invitationId);
+    await cancelInvitation(user.id, invitationId, can(user, "tournaments"));
     return ok({ ok: true });
   } catch (error) {
     const message = (error as Error).message;

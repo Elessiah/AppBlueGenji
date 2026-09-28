@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { getTeamDetail, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams-service";
 import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
+import { can } from "@/lib/shared/permissions";
 
 /**
  * Ce qui attend une réponse, vue gestion : les demandes (REQUEST) reçues et
@@ -17,7 +18,7 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    return ok(await listTeamPendingInvitations(teamId, user.id));
+    return ok(await listTeamPendingInvitations(teamId, user.id, can(user, "tournaments")));
   } catch (error) {
     const message = (error as Error).message;
     if (message === "FORBIDDEN") return fail(message, 403);

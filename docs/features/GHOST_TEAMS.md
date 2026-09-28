@@ -69,6 +69,12 @@ création (staff)  →  inscription à un tournoi  →  reprise par un joueur (q
    le contact de n'importe quel free agent, que la règle réserve aux joueurs
    réellement engagés. Il ne l'est désormais que s'il l'a accepté.
 
+   Une proposition **se retire** : le staff la voit sous « Zone sensible » de la
+   fiche et la retire (`DELETE /api/invitations/[id]`), par la même dérogation
+   fantôme que le reste de l'administration (`cancelInvitation` et
+   `listTeamPendingInvitations` prennent `viewerManagesGhostTeams`) — sans
+   cela, un pseudo mal choisi resterait acceptable indéfiniment.
+
    Le rôle `OWNER` sert de **marque** à la reprise : une invitation de la
    gestion ne peut jamais le porter (`resolveInviteRoles` le retire), et une
    fantôme ne se rejoint par aucune autre invitation (`TEAM_NOT_JOINABLE`).

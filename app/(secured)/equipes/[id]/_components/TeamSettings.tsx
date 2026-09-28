@@ -21,6 +21,7 @@ import Link from "next/link";
 import { jsonRequest, teamApi } from "../_lib/team-api";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
+import { useTeamPendingInvitations } from "../_hooks/useTeamPendingInvitations";
 import { ConfirmDialog } from "./ConfirmDialog";
 import styles from "../team.module.css";
 import { TEAM_IDENTITY_FIELD_ERRORS } from "@/lib/shared/field-errors";
@@ -49,6 +50,24 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
   const router = useRouter();
   const managedAsGhost = team.managedAsGhost;
   const ownsIdentity = team.viewerMembership === "OWNER" || managedAsGhost;
+  // Reprises proposées par le staff et encore sans réponse : elles se voient et
+  // se retirent ici, faute de quoi un pseudo mal choisi resterait acceptable
+  // indéfiniment.
+  const ghostClaims = useTeamPendingInvitations(team.team.id, managedAsGhost && !team.team.deletedAt);
+  const [withdrawingClaimId, setWithdrawingClaimId] = useState<number | null>(null);
+  const withdrawClaim = async (invitationId: number, pseudo: string) => {
+    if (withdrawingClaimId !== null) return;
+    setWithdrawingClaimId(invitationId);
+    try {
+      await teamApi(`/api/invitations/${invitationId}`, { method: "DELETE" }, "INVITATION_CANCEL_FAILED");
+      showSuccess(`Proposition à ${pseudo} retirée.`);
+    } catch (e) {
+      showError(teamErrorMessage((e as Error).message));
+    } finally {
+      setWithdrawingClaimId(null);
+      void ghostClaims.reload();
+    }
+  };
 
   const saved = {
     name: team.team.name,
@@ -383,6 +402,25 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                 ? "Proposer l'équipe à un joueur lui envoie une invitation : s'il l'accepte, elle devient une équipe ordinaire dont il est propriétaire."
                 : "Pour quitter l'équipe, transfère d'abord sa propriété à un autre membre."}
             </p>
+            {managedAsGhost && ghostClaims.invitations.length > 0 ? (
+              <ul className={styles.claimList} aria-label="Propositions de reprise en attente">
+                {ghostClaims.invitations.map((claim) => (
+                  <li key={claim.id} className={styles.actionsRow}>
+                    <span className={styles.help}>
+                      Proposée à <strong>{claim.pseudo}</strong> — en attente de sa réponse.
+                    </span>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={withdrawingClaimId !== null}
+                      onClick={() => void withdrawClaim(claim.id, claim.pseudo)}
+                    >
+                      Retirer
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
             <div className={`${styles.actionsRow} ${styles.dangerActions}`}>
               {managedAsGhost ? (
                 <button type="button" className="btn ghost" onClick={() => setClaimOpen(true)}>
@@ -415,7 +453,10 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
           teamId={team.team.id}
           teamName={team.team.name}
           onClose={() => setClaimOpen(false)}
-          onChanged={onChanged}
+          onChanged={() => {
+            onChanged();
+            void ghostClaims.reload();
+          }}
         />
       )}
 

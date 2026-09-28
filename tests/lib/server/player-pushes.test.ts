@@ -6,7 +6,7 @@ jest.mock("@/lib/server/push-subscriptions");
 jest.mock("@/lib/server/web-push", () => ({ webPushConfig: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
-import { loadEntrantPlayerIds, notifyUsers } from "@/lib/server/notify";
+import { loadEntrantManagerIds, loadEntrantPlayerIds, notifyUsers } from "@/lib/server/notify";
 import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { webPushConfig, type WebPushConfig } from "@/lib/server/web-push";
 import {
@@ -210,13 +210,13 @@ describe("notifyScoreToConfirm", () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   }
 
-  it("prévient l'engagée qui n'a pas encore saisi", async () => {
+  it("prévient l'engagée qui n'a pas encore saisi — ceux qui peuvent y répondre", async () => {
     reported({});
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[2, [20]]]));
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[2, [20]]]));
 
     expect(await notifyScoreToConfirm(40)).toBe(1);
 
-    expect(loadEntrantPlayerIds).toHaveBeenCalledWith([2]);
+    expect(loadEntrantManagerIds).toHaveBeenCalledWith([2]);
     const [push] = pushes();
     expect(push.notification.topic).toBe("SCORE_TO_CONFIRM");
     expect(push.notification.push.body).toContain("Renards a saisi");
@@ -225,7 +225,7 @@ describe("notifyScoreToConfirm", () => {
 
   it("ne nomme pas l'adversaire en tournoi individuel", async () => {
     reported({ participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
-    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[2, [20]]]));
+    jest.mocked(loadEntrantManagerIds).mockResolvedValue(new Map([[2, [20]]]));
     await notifyScoreToConfirm(40);
     expect(pushes()[0].notification.push.body).toContain("Ton adversaire a saisi");
   });
