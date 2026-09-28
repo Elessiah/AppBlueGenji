@@ -340,6 +340,36 @@ describe("tournament-broadcast — cycle de vie", () => {
     expect(alive.received).toEqual(["data: v1"]);
   });
 
+  it("garde en retard un abonné dont la file est pleine, puis lui renvoie la dernière version", async () => {
+    // La route rend `false` quand le client ne lit plus : rien n'est parti.
+    // La salle ne doit ni le croire servi, ni lui empiler les versions manquées.
+    const received: string[] = [];
+    let backedUp = true;
+    const slow = {
+      tier: "PRIORITY" as const,
+      send: (frame: Uint8Array) => {
+        if (backedUp) return false;
+        received.push(new TextDecoder().decode(frame).trim());
+        return true;
+      },
+    };
+    joinTournamentRoom(1, slow);
+
+    publish();
+    await advance(0);
+    getFrame.mockResolvedValue(frameOf("v2"));
+    publish();
+    await advance(0);
+    expect(received).toEqual([]);
+    expect(tournamentAudience(1)).toBe(1);
+
+    // La file se dégage : le nouvel essai programmé sert la dernière version,
+    // sans attendre le battement d'entretien.
+    backedUp = false;
+    await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs);
+    expect(received).toEqual(["data: v2"]);
+  });
+
   it("ne retire pas du registre une salle plus récente", async () => {
     // Une salle peut se vider pendant qu'un envoi est en attente. Le temps que
     // celui-ci reprenne, une salle NEUVE a pu prendre sa place : la retirer la
