@@ -370,7 +370,7 @@ export async function deleteUserAvatarForReport(
     if (users.length === 0 || !users[0].avatar_url) throw new Error("USER_HAS_NO_AVATAR");
     pseudo = users[0].pseudo;
     avatarUrl = users[0].avatar_url;
-    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ?`, [userId]);
+    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
     await syncSoloEntryIdentityOn(connection, userId);
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_logo_quarantines
@@ -394,7 +394,7 @@ export async function deleteUserAvatarForReport(
     });
   }
 
-  publishStaffAction(`🗑️ Avatar de ${ANONYMOUS_PLAYER_LABEL} supprimé sans délai par le staff (signalement #${reportId}).`, {
+  publishStaffAction(`🗑️ Avatar d'${ANONYMOUS_PLAYER_LABEL} supprimé sans délai par le staff (signalement #${reportId}).`, {
     id: actor.userId,
     pseudo: actor.pseudo,
   });
@@ -786,7 +786,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
       )
       .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
   } else {
-    publishStaffAction(`✅ Avatar de ${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
+    publishStaffAction(`✅ Avatar d'${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
       id: actor.userId,
       pseudo: actor.pseudo,
     });
@@ -844,7 +844,7 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
   // dans pm2 — sans quoi il faudrait deux variables à tenir cohérentes.
   const line = isTeam
     ? `🗑️ Logo de l'équipe « ${row.target_name} » supprimé définitivement`
-    : `🗑️ Avatar de ${ANONYMOUS_PLAYER_LABEL} supprimé définitivement`;
+    : `🗑️ Avatar d'${ANONYMOUS_PLAYER_LABEL} supprimé définitivement`;
   if (actor) {
     publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo });
     // Avant l'échéance annoncée : la personne concernée attend une date qui ne

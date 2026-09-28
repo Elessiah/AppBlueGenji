@@ -201,7 +201,7 @@ export function formatAvatarRestoredNotice(): string {
  */
 export function formatAvatarHiddenLog(input: { reportId: number; purgeAfter: Date }): string {
   return (
-    `🙈 Avatar de ${ANONYMOUS_PLAYER_LABEL} masqué par le staff (signalement #${input.reportId}), ` +
+    `🙈 Avatar d'${ANONYMOUS_PLAYER_LABEL} masqué par le staff (signalement #${input.reportId}), ` +
     `suppression définitive le ${formatQuarantineDate(input.purgeAfter)} sans contestation.`
   );
 }

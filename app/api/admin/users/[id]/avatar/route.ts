@@ -41,7 +41,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     });
     // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts) : ce
     // canal est un tiers hébergé hors de l'Union européenne, sans purge.
-    publishStaffAction(`🧹 Avatar de ${ANONYMOUS_PLAYER_LABEL} retiré par le staff (modération).`, {
+    publishStaffAction(`🧹 Avatar d'${ANONYMOUS_PLAYER_LABEL} retiré par le staff (modération).`, {
       id: user.id,
       pseudo: user.pseudo,
     });
