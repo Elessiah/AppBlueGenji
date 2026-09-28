@@ -767,6 +767,30 @@ a.sectionNavLink:focus-visible {
   filter: grayscale(0.8) brightness(0.75);
 }
 
+/* « Mes tournois » : la section du lecteur se distingue des sections
+   publiques par un liseré à gauche de l'en-tête et un index plein. */
+.section[data-tone="mine"] .sectionHead {
+  border-left: 2px solid var(--blue-500);
+  padding-left: 14px;
+  background: linear-gradient(90deg, rgba(90, 200, 255, 0.07), transparent 60%);
+}
+
+.section[data-tone="mine"] .sectionIx {
+  color: var(--cyber-bg);
+  background: var(--blue-500);
+  border-color: var(--blue-500);
+}
+
+/* Cartes de « Mes tournois » : cadre bleu, pour que la carte seule dise
+   encore « tu y es engagé » une fois la section quittée des yeux. */
+.mineCard .card {
+  border-color: rgba(90, 200, 255, 0.4);
+}
+
+.mineCard .card:hover {
+  border-color: rgba(90, 200, 255, 0.6);
+}
+
 /* Cartes de la section « tournois invisibles » : cadre pointillé, pour que la
    carte elle-même rappelle que rien de tout cela n'est encore publié. Placé
    après les variantes `data-state`, de même spécificité, pour l'emporter. */
