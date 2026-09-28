@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { POST } from "@/app/api/auth/discord/request/route";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
-import {
-  createDiscordLoginChallenge,
-  discardDiscordChallenge,
-  discordAccountExists,
-} from "@/lib/server/users-service";
+import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users-service";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { DISCORD_CODE_REQUEST_IP_RULE, DISCORD_CODE_REQUEST_RULE } from "@/lib/server/api-guard";
 
@@ -17,14 +13,12 @@ jest.mock("@/lib/server/bot-integration", () => ({
 jest.mock("@/lib/server/users-service", () => ({
   createDiscordLoginChallenge: jest.fn(),
   discardDiscordChallenge: jest.fn(),
-  discordAccountExists: jest.fn(),
 }));
 
 const resolveDiscordUserMock = resolveDiscordUser as jest.MockedFunction<typeof resolveDiscordUser>;
 const sendDiscordLoginCodeMock = sendDiscordLoginCode as jest.MockedFunction<typeof sendDiscordLoginCode>;
 const createDiscordLoginChallengeMock =
   createDiscordLoginChallenge as jest.MockedFunction<typeof createDiscordLoginChallenge>;
-const discordAccountExistsMock = discordAccountExists as jest.MockedFunction<typeof discordAccountExists>;
 const discardChallengeMock =
   discardDiscordChallenge as jest.MockedFunction<typeof discardDiscordChallenge>;
 
@@ -41,8 +35,6 @@ describe("POST /api/auth/discord/request", () => {
     resolveDiscordUserMock.mockReset();
     sendDiscordLoginCodeMock.mockReset();
     createDiscordLoginChallengeMock.mockReset();
-    discordAccountExistsMock.mockReset();
-    discordAccountExistsMock.mockResolvedValue(false);
     discardChallengeMock.mockReset();
     discardChallengeMock.mockResolvedValue();
     // Le plafond est par compte Discord visé et vit en mémoire du processus :
@@ -64,27 +56,24 @@ describe("POST /api/auth/discord/request", () => {
     expect(sendDiscordLoginCodeMock).not.toHaveBeenCalled();
   });
 
-  it("returns 200 with the resolved id when the code is generated and sent", async () => {
+  it("returns 200 with the challenge token when the code is generated and sent", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
     sendDiscordLoginCodeMock.mockResolvedValue();
 
     const response = await POST(buildRequest({ discordId: "123456789012345678" }));
-    const payload = (await response.json()) as {
-      success: boolean;
-      expiresAt: string;
-      discordId: string;
-      isNewAccount: boolean;
-    };
+    const payload = (await response.json()) as Record<string, unknown>;
 
     expect(response.status).toBe(200);
-    expect(payload.success).toBe(true);
-    expect(payload.discordId).toBe("123456789012345678");
-    expect(payload.expiresAt).toBe("2030-01-01T10:00:00.000Z");
-    expect(payload.isNewAccount).toBe(true);
+    expect(payload).toEqual({
+      success: true,
+      challenge: "t1",
+      expiresAt: "2030-01-01T10:00:00.000Z",
+    });
     expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456");
   });
 
@@ -94,6 +83,7 @@ describe("POST /api/auth/discord/request", () => {
     // boucle rendait le décompte des essais purement décoratif.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -116,6 +106,7 @@ describe("POST /api/auth/discord/request", () => {
   it("ne plafonne pas un second compte au passage", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -137,6 +128,7 @@ describe("POST /api/auth/discord/request", () => {
     // essais sur la mauvaise ligne.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 42,
+      challengeToken: "t42",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -152,6 +144,7 @@ describe("POST /api/auth/discord/request", () => {
     // Le joueur doit lire pourquoi il n'a rien reçu, pas une erreur de base.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 42,
+      challengeToken: "t42",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -168,6 +161,7 @@ describe("POST /api/auth/discord/request", () => {
   it("laisse vivre le code dont le message privé est bien parti", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 42,
+      challengeToken: "t42",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -195,6 +189,7 @@ describe("POST /api/auth/discord/request", () => {
     // sans celui-ci, la route anonyme faisait sortir une requête par appel.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -224,39 +219,79 @@ describe("POST /api/auth/discord/request", () => {
     expect(resolveDiscordUserMock).not.toHaveBeenCalled();
   });
 
-  it("signale isNewAccount=false quand un compte est déjà rattaché au Discord", async () => {
-    discordAccountExistsMock.mockResolvedValue(true);
+  it("ne dit ni l'identifiant Discord ni l'existence d'un compte : pas d'oracle", async () => {
+    // La réponse rendait l'identifiant résolu et `isNewAccount` pour n'importe
+    // quel pseudo, à un appelant anonyme. Elle ne porte plus que le jeton du
+    // défi : deux pseudos, dont l'un seul est membre, donnent la même forme.
+    resolveDiscordUserMock.mockResolvedValue("123456789012345678");
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 3,
+      challengeToken: "t3",
       code: "111222",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
     sendDiscordLoginCodeMock.mockResolvedValue();
 
-    const response = await POST(buildRequest({ discordId: "123456789012345678" }));
-    const payload = (await response.json()) as { isNewAccount: boolean };
+    const response = await POST(buildRequest({ handle: "keryan" }));
+    const text = await response.text();
 
     expect(response.status).toBe(200);
-    expect(payload.isNewAccount).toBe(false);
-    expect(discordAccountExistsMock).toHaveBeenCalledWith("123456789012345678");
-    // Le code est envoyé dans les deux cas : la connexion suit le même chemin.
-    expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "111222");
+    expect(Object.keys(JSON.parse(text)).sort()).toEqual(["challenge", "expiresAt", "success"]);
+    expect(text).not.toContain("123456789012345678");
+    expect(text).not.toContain("isNewAccount");
+  });
+
+  it("refuse un formulaire venu d'un autre site, avant d'écrire à qui que ce soit", async () => {
+    const response = await POST(
+      new Request("http://localhost:3000/api/auth/discord/request", {
+        method: "POST",
+        headers: { "content-type": "text/plain", "sec-fetch-site": "cross-site" },
+        body: '{"handle":"victime","x":"="}',
+      }),
+    );
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "CROSS_SITE_REQUEST" });
+    expect(resolveDiscordUserMock).not.toHaveBeenCalled();
+    expect(sendDiscordLoginCodeMock).not.toHaveBeenCalled();
+  });
+
+  it("refuse un corps qui n'est pas déclaré en JSON", async () => {
+    const response = await POST(
+      new Request("http://localhost:3000/api/auth/discord/request", {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: JSON.stringify({ handle: "keryan" }),
+      }),
+    );
+
+    expect(response.status).toBe(415);
+    expect(resolveDiscordUserMock).not.toHaveBeenCalled();
+  });
+
+  it("remonte le plafond journalier en 429, sous son propre code", async () => {
+    createDiscordLoginChallengeMock.mockRejectedValue(new Error("TOO_MANY_CODE_REQUESTS_TODAY"));
+
+    const response = await POST(buildRequest({ handle: "keryan" }));
+
+    expect(response.status).toBe(429);
+    expect(await response.json()).toEqual({ error: "TOO_MANY_CODE_REQUESTS_TODAY" });
+    expect(sendDiscordLoginCodeMock).not.toHaveBeenCalled();
   });
 
   it("resolves a discord tag to an id before sending the code", async () => {
     resolveDiscordUserMock.mockResolvedValue("999888777666555444");
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 2,
+      challengeToken: "t2",
       code: "654321",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
     sendDiscordLoginCodeMock.mockResolvedValue();
 
     const response = await POST(buildRequest({ handle: "keryan" }));
-    const payload = (await response.json()) as { success: boolean; discordId: string };
 
     expect(response.status).toBe(200);
-    expect(payload.discordId).toBe("999888777666555444");
     expect(resolveDiscordUserMock).toHaveBeenCalledWith("keryan");
     // Le tag part **avec** le défi : c'est lui que la certification écrira si le
     // code revient juste (`consumeDiscordChallenge`), et il doit être celui qui a
@@ -280,6 +315,7 @@ describe("POST /api/auth/discord/request", () => {
   it("maps BOT_INTERNAL_UNREACHABLE to 503", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -306,6 +342,7 @@ describe("POST /api/auth/discord/request", () => {
   it("maps DISCORD_DM_FAILED to 502", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });

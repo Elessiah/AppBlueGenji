@@ -6,11 +6,8 @@ import {
 } from "@/lib/server/api-guard";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { fail, ok } from "@/lib/server/http";
-import {
-  createDiscordLoginChallenge,
-  discardDiscordChallenge,
-  discordAccountExists,
-} from "@/lib/server/users-service";
+import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
+import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users-service";
 
 function mapRequestError(message: string): { code: string; status: number } {
   if (message === "BOT_INTERNAL_UNREACHABLE") {
@@ -36,14 +33,19 @@ function mapRequestError(message: string): { code: string; status: number } {
   }
 
   // Trop de codes demandés pour ce compte : c'est un plafond, pas une panne.
-  if (message === "TOO_MANY_CODE_REQUESTS") {
-    return { code: "TOO_MANY_CODE_REQUESTS", status: 429 };
+  if (message === "TOO_MANY_CODE_REQUESTS" || message === "TOO_MANY_CODE_REQUESTS_TODAY") {
+    return { code: message, status: 429 };
   }
 
   return { code: message || "FAILED_TO_SEND_CODE", status: 500 };
 }
 
 export async function POST(req: Request) {
+  // Chaque appel fait écrire le bot à quelqu'un : un formulaire d'un autre site
+  // ne doit pas pouvoir le déclencher depuis le navigateur d'un visiteur.
+  const crossSite = rejectCrossSiteRequest(req, { requireJson: true });
+  if (crossSite) return crossSite;
+
   // **Avant tout le reste**, y compris la lecture du corps : la suite ouvre une
   // requête vers le bot (qui interroge Discord) pour résoudre le pseudo, et le
   // plafond par compte visé ne peut être posé qu'après cette résolution. Sans
@@ -70,10 +72,6 @@ export async function POST(req: Request) {
     const throttled = enforceRateLimit(DISCORD_CODE_REQUEST_RULE, discordId);
     if (throttled) return throttled;
 
-    // Un compte déjà rattaché à ce Discord a forcément un pseudo : le client
-    // masque alors le champ « pseudo site », réservé à la première connexion.
-    const isNewAccount = !(await discordAccountExists(discordId));
-
     // Le tag part avec le défi : c'est lui qui sera certifié si le code
     // revient juste (`consumeDiscordChallenge`). Un identifiant numérique n'en
     // est pas un, `normalizeDiscordHandle` le laisse tomber.
@@ -98,10 +96,17 @@ export async function POST(req: Request) {
       throw error;
     }
 
+    // **Ni l'identifiant Discord, ni l'existence d'un compte du site.** La
+    // réponse les rendait pour n'importe quel pseudo, à un appelant anonyme :
+    // un oracle, alors que l'annuaire est derrière une connexion et que le flux
+    // public du bot masque ces identifiants comme des coordonnées. Elle est
+    // désormais la même que le pseudo désigne un membre ou non ; le jeton du
+    // défi ne désigne personne — et, imprévisible, il ne se devine pas pour
+    // brûler le code d'autrui —, l'identifiant n'étant relu qu'une fois le code
+    // juste (`consumeDiscordLoginChallenge`).
     return ok({
       success: true,
-      discordId,
-      isNewAccount,
+      challenge: challenge.challengeToken,
       expiresAt: challenge.expiresAt.toISOString(),
     });
   } catch (error) {
