@@ -125,7 +125,8 @@ une fois en production : la clé publique est gravée dans chaque abonnement.
 - Au montage du panneau, un abonnement déjà présent dans le navigateur est
   renvoyé (upsert) : c'est ce qui rattache un navigateur partagé au compte qui
   s'y connecte — **sur preuve** : un appareil rangé sous un autre compte ne
-  change de titulaire que si les clés `p256dh`/`auth` envoyées sont celles déjà
+  change de titulaire que si les clés `p256dh`/`auth` envoyées sont, octet par
+  octet (`BINARY`, la collation de la table ignorant la casse), celles déjà
   rangées (un navigateur rend le même abonnement à quiconque s'y connecte).
   L'adresse seule n'est pas un secret suffisant, comme pour le désabonnement ;
   sans preuve, rien n'est touché et la route répond 409
