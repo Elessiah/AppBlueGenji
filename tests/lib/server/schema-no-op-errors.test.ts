@@ -84,3 +84,41 @@ describe("isSchemaNoOpError — sans instruction, le défaut est prudent", () =>
     expect(isSchemaNoOpError(err("ER_MULTIPLE_PRI_KEY"))).toBe(false);
   });
 });
+
+describe("isSchemaNoOpError — clé étrangère déjà posée", () => {
+  const ADD_FK = `ALTER TABLE bg_logo_quarantines
+       ADD CONSTRAINT fk_bg_logo_quarantines_quarantined_user FOREIGN KEY (user_id)
+         REFERENCES bg_users(id) ON DELETE CASCADE`;
+  const ADD_FK_UNNAMED = "ALTER TABLE t ADD FOREIGN KEY (user_id) REFERENCES bg_users(id)";
+  const withMessage = (code: string, message: string) =>
+    Object.assign(new Error(message), { code });
+
+  it("tolère le doublon de nom sous MySQL (ER_FK_DUP_NAME) et MariaDB (ER_DUP_CONSTRAINT_NAME)", () => {
+    for (const statement of [ADD_FK, ADD_FK_UNNAMED]) {
+      expect(isSchemaNoOpError(err("ER_FK_DUP_NAME"), statement)).toBe(true);
+      expect(isSchemaNoOpError(err("ER_DUP_CONSTRAINT_NAME"), statement)).toBe(true);
+    }
+  });
+
+  it("tolère le 1005 d'InnoDB portant errno 121", () => {
+    const error = withMessage(
+      "ER_CANT_CREATE_TABLE",
+      "Can't create table `bg`.`bg_logo_quarantines` (errno: 121 \"Duplicate key on write or update\")",
+    );
+    expect(isSchemaNoOpError(error, ADD_FK)).toBe(true);
+  });
+
+  it("signale un 1005 d'une autre cause — type incompatible, table absente", () => {
+    const error = withMessage(
+      "ER_CANT_CREATE_TABLE",
+      "Can't create table `bg`.`bg_logo_quarantines` (errno: 150 \"Foreign key constraint is incorrectly formed\")",
+    );
+    expect(isSchemaNoOpError(error, ADD_FK)).toBe(false);
+  });
+
+  it("ne tolère le doublon de clé étrangère que sur une instruction qui en pose une", () => {
+    expect(isSchemaNoOpError(err("ER_FK_DUP_NAME"), ADD_INDEX)).toBe(false);
+    expect(isSchemaNoOpError(err("ER_FK_DUP_NAME"), ADD_COLUMN)).toBe(false);
+    expect(isSchemaNoOpError(err("ER_FK_DUP_NAME"))).toBe(false);
+  });
+});
