@@ -16,6 +16,7 @@
  * jamais recopiées : une phrase qui annonce « 5 Mo » doit suivre la limite.
  */
 
+import { IMAGE_CROP_INVALID } from "./image-crop";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "./uploads";
 
 const ACCEPTED_TYPES: ReadonlySet<string> = new Set(IMAGE_UPLOAD_MIME_TYPES);
@@ -26,6 +27,7 @@ const IMAGE_UPLOAD_ERRORS: Record<string, string> = {
   IMAGE_FORMAT_INVALID: "Format non reconnu : PNG, JPEG ou WebP seulement.",
   IMAGE_DIMENSIONS_INVALID: "Dimensions d'image non prises en charge.",
   IMAGE_ANIMATED_NOT_SUPPORTED: "Les images animées ne sont pas acceptées.",
+  [IMAGE_CROP_INVALID]: "Recadrage illisible. Choisis de nouveau l'image et recadre-la.",
 };
 
 /**

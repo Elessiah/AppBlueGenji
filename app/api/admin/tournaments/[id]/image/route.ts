@@ -7,11 +7,13 @@ import {
 } from "@/lib/server/tournaments/image";
 import { can } from "@/lib/shared/permissions";
 import { checkTournamentImageSettings } from "@/lib/shared/tournament-image";
+import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 
 /**
  * Illustration ou logo d'un tournoi (`lib/shared/tournament-image.ts`).
  *
- * - `POST` (multipart) : `file`, et facultativement `fit`, `focusX`, `focusY` —
+ * - `POST` (multipart) : `file`, et facultativement `fit`, `focusX`, `focusY` et
+ *   `crop` (zone gardée, `lib/shared/image-crop.ts`) —
  *   pose ou remplace l'image ;
  * - `PATCH` (JSON) : `{ fit, focusX, focusY }` — change le cadrage seul ;
  * - `DELETE` : retire l'image.
@@ -70,6 +72,10 @@ export async function POST(req: Request, context: RouteContext) {
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);
 
+  // La zone choisie dans la modale de recadrage ; absente, le gabarit seul.
+  const crop = parseImageCropField(form.get(IMAGE_CROP_FIELD));
+  if (!crop.ok) return fail(IMAGE_CROP_INVALID, 400);
+
   const settings = checkTournamentImageSettings({
     fit: form.get("fit") ?? undefined,
     focusX: form.get("focusX") ?? undefined,
@@ -78,7 +84,7 @@ export async function POST(req: Request, context: RouteContext) {
   if (!settings.ok) return fail(settings.error, 400);
 
   try {
-    const image = await setTournamentImage(auth.tournamentId, file, settings.value);
+    const image = await setTournamentImage(auth.tournamentId, file, settings.value, crop.crop);
     return ok({ image });
   } catch (error) {
     return mapFailure(error, "TOURNAMENT_IMAGE_UPLOAD_FAILED");

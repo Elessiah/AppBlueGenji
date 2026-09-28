@@ -439,6 +439,14 @@
   position: relative;
 }
 
+/* Aperçu du logo recadré avant envoi : affiché entier, comme le gabarit
+   « contain » du serveur le rendra. */
+.logoPendingImage {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
 .visuallyHidden {
   position: absolute;
   width: 1px;

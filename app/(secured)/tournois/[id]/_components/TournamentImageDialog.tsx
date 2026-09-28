@@ -71,7 +71,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
     }
     setBusy(true);
     try {
-      await applyImageChange(tournamentId, change, value.file);
+      await applyImageChange(tournamentId, change, value.file, value.crop);
       const message = imageChangeSuccessMessage(change);
       if (message) showSuccess(message);
       onSaved();

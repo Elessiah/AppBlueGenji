@@ -1,0 +1,243 @@
+/* Modale de recadrage — ouverte par-dessus d'autres modales (fiche partenaire,
+   image de tournoi) : son voile passe au-dessus de `LandingDialog` (1000), sous
+   les modales d'obligation de la mise en page racine (1200 et plus). */
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1150;
+  background: rgba(6, 8, 12, 0.78);
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.dialog {
+  width: 100%;
+  max-width: 760px;
+  margin: auto;
+  background: var(--cyber-bg-2, #14181f);
+  border: 1px solid var(--line-strong-cy, rgba(90, 200, 255, 0.35));
+  border-radius: var(--r-cy-md, 12px);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.6);
+  padding: 22px;
+  outline: none;
+  color: var(--ink, #e6e9ef);
+}
+
+.title {
+  margin: 0 0 14px;
+  font-size: 18px;
+  letter-spacing: 0.02em;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 180px;
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 640px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.stageWrap {
+  min-width: 0;
+}
+
+/* Le cadre est positionné en pourcentages de ce conteneur, qui épouse l'image
+   affichée : aucune mesure à refaire quand la fenêtre change de taille. */
+.stage {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: var(--r-cy-sm, 6px);
+  background: repeating-conic-gradient(#1c2129 0% 25%, #151920 0% 50%) 0 0 / 16px 16px;
+  touch-action: none;
+  user-select: none;
+}
+
+.image {
+  display: block;
+  max-width: 100%;
+  max-height: min(60vh, 520px);
+  pointer-events: none;
+}
+
+.frame {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--blue-300, #8fdcff);
+  /* Tout ce qui n'est pas gardé s'assombrit : l'ombre déborde du cadre et le
+     conteneur la rogne à ses bords. */
+  box-shadow: 0 0 0 9999px rgba(4, 6, 10, 0.62);
+  cursor: move;
+  touch-action: none;
+  outline: none;
+}
+
+.frame:focus-visible {
+  border-color: #fff;
+  box-shadow:
+    0 0 0 9999px rgba(4, 6, 10, 0.62),
+    0 0 0 3px var(--blue-glow, rgba(90, 200, 255, 0.6));
+}
+
+/* Repère des gabarits affichés en cercle (avatar, bénévole) : ce qui sort du
+   rond ne se verra pas. */
+.frameRound::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px dashed rgba(255, 255, 255, 0.75);
+  pointer-events: none;
+}
+
+.grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(to right, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.25) 33.33%, transparent calc(33.33% + 0.5px)),
+    linear-gradient(to right, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.25) 66.66%, transparent calc(66.66% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(33.33% - 0.5px), rgba(255, 255, 255, 0.25) 33.33%, transparent calc(33.33% + 0.5px)),
+    linear-gradient(to bottom, transparent calc(66.66% - 0.5px), rgba(255, 255, 255, 0.25) 66.66%, transparent calc(66.66% + 0.5px));
+}
+
+/* Poignées : 24 px de cible pour un point de 12 px visible (WCAG 2.5.8),
+   posées **dans** les coins — le conteneur rogne ce qui dépasse, et un cadre
+   calé sur l'image entière (le cas par défaut d'un logo) aurait perdu la
+   moitié de ses poignées. */
+.handle {
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  touch-action: none;
+}
+
+.handle::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  background: var(--blue-300, #8fdcff);
+  border: 2px solid var(--cyber-bg, #07090d);
+  border-radius: 3px;
+}
+
+.handle_nw {
+  left: -2px;
+  top: -2px;
+  cursor: nwse-resize;
+}
+
+.handle_ne {
+  right: -2px;
+  top: -2px;
+  cursor: nesw-resize;
+}
+
+.handle_sw {
+  left: -2px;
+  bottom: -2px;
+  cursor: nesw-resize;
+}
+
+.handle_se {
+  right: -2px;
+  bottom: -2px;
+  cursor: nwse-resize;
+}
+
+.hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-1, #c4cad4);
+}
+
+.side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.caption {
+  margin: 0;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-1, #c4cad4);
+}
+
+.preview {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--r-cy-sm, 6px);
+  border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+  background: repeating-conic-gradient(#1c2129 0% 25%, #151920 0% 50%) 0 0 / 12px 12px;
+}
+
+.previewRound {
+  border-radius: 50%;
+}
+
+.previewImage {
+  position: absolute;
+  max-width: none;
+  pointer-events: none;
+}
+
+.tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tools :global(.btn) {
+  padding: 6px 12px;
+  font-size: 13px;
+  min-width: 36px;
+}
+
+.error {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-1, #c4cad4);
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 14px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
+
+.cancel {
+  background: none;
+  border: none;
+  padding: 6px 4px;
+  color: var(--text-1, #c4cad4);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.cancel:hover {
+  color: var(--ink, #e6e9ef);
+}
+
+.cancel:focus-visible {
+  outline: 2px solid var(--blue-300, #8fdcff);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
