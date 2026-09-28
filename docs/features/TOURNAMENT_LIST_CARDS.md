@@ -60,7 +60,16 @@ au survol de la carte et au focus de son lien (`.card:hover .cardChampion`,
 `.card:focus-within .cardChampion` — clavier compris), le pied poussé en bas
 absorbant la ligne gagnée dans l'espace libre de la carte. Le texte complet est
 dans le DOM, les lecteurs d'écran le lisent sans rien faire. Même règle sur la
-carte d'annuaire d'équipe (`TeamCard.tsx`), voir `ELO_RANKING.md`.
+carte d'annuaire d'équipe (`TeamCard.tsx`) : la légende des points (voir
+`ELO_RANKING.md`) et le sens de lecture de la barre de forme, désormais écrit
+au-dessus d'elle (« Forme · récent → ancien ») et repris dans son `aria-label`.
+
+**Les cartes sont les items de la grille.** La section « Terminés » les
+enveloppait dans un `<div>` nu : les douze cartes s'empilaient dans une seule
+cellule de `.sectionBody`, et `.card { height: 100% }` — posé pour aligner les
+cartes d'une même rangée — étirait chacune à la hauteur de toute la pile
+(4 581 px mesurés pour ~230 px de contenu). Elles sont désormais rendues
+directement, comme dans les trois autres sections.
 
 ## Trois champs de `TournamentCard`
 
