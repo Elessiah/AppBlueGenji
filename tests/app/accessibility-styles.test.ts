@@ -171,8 +171,27 @@ describe("éléments flottants — pas de chevauchement", () => {
     const launch = stripComments(readSource("components/match-launch/MatchLaunchCenter.module.css"));
     // La pastille : son bas, plus sa hauteur (rembourrage 2 × 10 px, une ligne
     // de 13 px, bordures) — 40 px au moins.
-    const pillTop = px(launch, ".fab", "bottom") + 40;
+    const pillTop = px(launch, ".fab", "bottom", mobile(launch)) + 40;
     expect(px(toast, ".stack", "bottom", mobile(toast))).toBeGreaterThan(pillTop);
+  });
+
+  it("la pastille de lancement de match s'empile au-dessus du « ? », sur ordinateur comme sous 720 px", () => {
+    const launch = stripComments(readSource("components/match-launch/MatchLaunchCenter.module.css"));
+    const globals = stripComments(readSource("app/globals.css"));
+    const helpMobile = globals.lastIndexOf(".cta-float-help {");
+    const helpTop = px(globals, ".cta-float-help", "bottom") + px(globals, ".cta-float-help", "height");
+    const helpTopMobile =
+      px(globals, ".cta-float-help", "bottom", helpMobile) + px(globals, ".cta-float-help", "height", helpMobile);
+    expect(px(launch, ".fab", "bottom")).toBeGreaterThan(helpTop);
+    expect(px(launch, ".fab", "bottom", mobile(launch))).toBeGreaterThan(helpTopMobile);
+  });
+
+  it("la pastille de lancement de match passe sous le panneau du témoin de régime", () => {
+    const launch = stripComments(readSource("components/match-launch/MatchLaunchCenter.module.css"));
+    const zIndex = (css: string, selector: string) =>
+      Number(css.slice(css.indexOf(`${selector} {`)).match(/^[^}]*z-index: (\d+)/)?.[1]);
+    expect(zIndex(launch, ".fab")).toBeLessThan(zIndex(badge, ".root"));
+    expect(zIndex(launch, ".fab")).toBeLessThan(zIndex(launch, ".overlay"));
   });
 
   it("sur ordinateur, la pile s'arrête à la moitié de l'écran, loin de la pastille de droite", () => {
