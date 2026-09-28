@@ -70,6 +70,22 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
           membershipErrorMessage,
         );
 
+  // Reprise d'une fantôme : acceptée **par l'identifiant de l'invitation**, et
+  // non par « Rejoindre » (`/join`). Sur une page restée ouverte pendant qu'un
+  // autre joueur reprenait l'équipe, `/join` verrait une équipe ordinaire sans
+  // invitation et y déposerait une demande d'adhésion ; l'invitation, elle, a
+  // été annulée par cette reprise et répond `INVITATION_NOT_PENDING`.
+  const acceptGhostClaim = () =>
+    team.viewerInvitationId === null
+      ? Promise.resolve(false)
+      : act(
+          async () => {
+            await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: true }), "INVITATION_RESPOND_FAILED");
+            return "Tu es désormais propriétaire de l'équipe.";
+          },
+          membershipErrorMessage,
+        );
+
   const withdrawRequest = () =>
     team.viewerInvitationId === null
       ? Promise.resolve(false)
@@ -125,7 +141,12 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
               👻 Le staff te propose de reprendre cette équipe fantôme&nbsp;: en acceptant, tu en
               deviens propriétaire, historique de tournois compris.
             </p>
-            <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
+            <button
+              type="button"
+              className={`btn ${styles.primaryButton}`}
+              onClick={() => void acceptGhostClaim()}
+              disabled={busy || team.viewerInvitationId === null}
+            >
               Reprendre l&apos;équipe
             </button>
             <button
