@@ -1,4 +1,4 @@
-﻿import type { Metadata } from "next";
+﻿import type { Metadata, Viewport } from "next";
 import { cookies, headers } from "next/headers";
 import "./globals.css";
 import { FONT_VARIABLES } from "./site-fonts";
@@ -30,6 +30,7 @@ import {
 import { A11Y_COOKIE, a11yAttribute, parseA11yCookie } from "@/lib/shared/accessibility-settings";
 import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/shared/share-metadata";
 import { DEFAULT_SHARE_IMAGE, SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
+import { APP_BACKGROUND_COLOR } from "@/lib/shared/web-manifest";
 
 /**
  * Socle des métadonnées de partage, hérité par toutes les pages.
@@ -70,6 +71,13 @@ export const metadata: Metadata = {
     icon: "/favicon.png",
     apple: "/apple-touch-icon.png",
   },
+  // Lancé depuis l'écran d'accueil d'iOS, qui ne lit pas le manifeste pour cela.
+  appleWebApp: { capable: true, title: SITE_NAME, statusBarStyle: "black" },
+};
+
+/** Même couleur que le manifeste : la barre du navigateur se fond dans le fond du site. */
+export const viewport: Viewport = {
+  themeColor: APP_BACKGROUND_COLOR,
 };
 
 /** Page où la mise en avant se tait : le visiteur y lit déjà les annonces. */
