@@ -115,8 +115,15 @@ export type TournamentSubscriber = {
    * bougeait — avec un témoin de flux au vert.
    */
   version?: string | null;
-  /** Écrit une trame déjà encodée. Doit lever si la connexion est fermée. */
-  send: (frame: Uint8Array) => void;
+  /**
+   * Écrit une trame déjà encodée. Doit lever si la connexion est fermée.
+   *
+   * Rend `false` quand la trame n'a **pas** été écrite parce que le client ne
+   * lit plus assez vite (`lib/server/stream-backpressure.ts`) : l'abonné reste
+   * alors « en retard », et la salle lui renverra la dernière version plus tard
+   * — une seule trame, et non toutes celles qu'il a manquées.
+   */
+  send: (frame: Uint8Array) => boolean | void;
   /**
    * Termine la connexion. Appelé quand le tournoi a disparu : sans cela le flux
    * resterait ouvert et sain, et le spectateur garderait une pastille
@@ -287,7 +294,14 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
         }
 
         try {
-          subscriber.send(frame.frame);
+          if (subscriber.send(frame.frame) === false) {
+            // File du client pleine : rien n'est parti. Ni version ni horloge
+            // ne bougent, et un nouvel essai est programmé à la fenêtre du
+            // palier — le battement d'entretien seul ne suffirait pas à le
+            // resservir vite une fois la file dégagée.
+            nextDelay = Math.min(nextDelay, coalesceWindow);
+            continue;
+          }
           state.version = frame.version;
           state.lastSentAt = now;
         } catch {
