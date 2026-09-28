@@ -14,11 +14,11 @@ import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
 import {
+  MODERATION_SUPPORT_PORTAL_URL,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
-import { MODERATION_SUPPORT_PORTAL_URL } from "@/lib/shared/content-reports";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
