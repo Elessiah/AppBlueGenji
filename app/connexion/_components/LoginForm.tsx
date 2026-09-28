@@ -373,7 +373,11 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                   value={pseudo}
                   onChange={(e) => setPseudo(e.target.value)}
                   placeholder="Ton pseudo"
+                  aria-describedby="login-site-pseudo-help"
                 />
+                <span id="login-site-pseudo-help" className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
+                  Seulement à la création de ton compte : si tu en as déjà un, il garde son pseudo.
+                </span>
               </div>
               <CyberButton
                 variant="ghost"
