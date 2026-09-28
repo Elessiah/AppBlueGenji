@@ -57,6 +57,18 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 });
 
+describe("page tournois — sommaire des sections", () => {
+  it("le nom accessible d'un lien ne colle pas le libellé et le compte", () => {
+    expect(page).toContain("aria-label={`${entry.navLabel} (${entry.count})`}");
+    expect(page).toMatch(/<span className=\{s\.num\} aria-hidden="true">\s*\{entry\.count\}/);
+  });
+
+  it("une ancre restée dans l'URL déplie et rejoint sa section une fois rendue", () => {
+    expect(page).toContain("parsePageSectionAnchor(window.location.hash)");
+    expect(page).toMatch(/setSectionOpen\(key, true\);[\s\S]{0,200}scrollIntoView/);
+  });
+});
+
 describe("page tournois — volume des sections", () => {
   it("chaque section bornée peut se déplier puis se replier", () => {
     for (const key of ["mine", "running", "registration", "upcoming", "finished"]) {

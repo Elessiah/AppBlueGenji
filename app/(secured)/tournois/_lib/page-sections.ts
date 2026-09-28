@@ -59,6 +59,17 @@ export function pageSectionAnchor(key: PageSectionKey): string {
 }
 
 /**
+ * Section désignée par un fragment d'URL (`#tournois-finished`), ou `null`.
+ * Les liens du sommaire laissent leur ancre dans l'URL : recharger ou partager
+ * la page doit ramener à la même section, dépliée. Le fragment revient du
+ * navigateur, il n'est accepté que s'il nomme une section connue.
+ */
+export function parsePageSectionAnchor(hash: string): PageSectionKey | null {
+  const fragment = hash.startsWith("#") ? hash.slice(1) : hash;
+  return PAGE_SECTION_ORDER.find((key) => pageSectionAnchor(key) === fragment) ?? null;
+}
+
+/**
  * Sort des paniers les tournois où le lecteur est engagé, pour les regrouper
  * en tête — en cours d'abord, puis inscriptions, puis à venir, chaque panier
  * gardant son ordre. Un tournoi n'apparaît jamais deux fois : il quitte son

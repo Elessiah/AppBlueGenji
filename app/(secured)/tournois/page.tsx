@@ -34,6 +34,7 @@ import {
   DEFAULT_OPEN_SECTIONS,
   pageSectionAnchor,
   pageSections,
+  parsePageSectionAnchor,
   splitMyTournaments,
   type PageSectionKey,
 } from "./_lib/page-sections";
@@ -344,6 +345,29 @@ export default function TournamentsPage() {
     String(shownSections.findIndex((entry) => entry.key === key) + 1).padStart(2, "0");
   const isOpen = (key: PageSectionKey) => openSections.has(key);
 
+  // Une ancre du sommaire reste dans l'URL : au rechargement (ou sur un lien
+  // partagé), la section visée n'existe pas encore — elle naît avec la liste —
+  // et « Terminés » est repliée d'office. On attend donc qu'elle soit rendue,
+  // on la déplie puis on y mène, une seule fois par chargement.
+  const pendingAnchorRef = useRef<PageSectionKey | null | undefined>(undefined);
+  const anchorTargetShown = shownSections.some((entry) => entry.key === pendingAnchorRef.current);
+  useEffect(() => {
+    if (pendingAnchorRef.current === undefined) {
+      pendingAnchorRef.current = parsePageSectionAnchor(window.location.hash);
+    }
+    const key = pendingAnchorRef.current;
+    if (!key || !shownSections.some((entry) => entry.key === key)) return;
+    pendingAnchorRef.current = null;
+    setSectionOpen(key, true);
+    // Après le rendu de la section dépliée, pas avant.
+    window.setTimeout(() => {
+      document.getElementById(pageSectionAnchor(key))?.scrollIntoView({ block: "start" });
+    }, 0);
+    // `shownSections` est recalculée à chaque rendu : seul compte le moment où
+    // la section visée apparaît.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchorTargetShown]);
+
   // Bandeaux d'illustration chargés en priorité : les premiers dans l'ordre
   // d'affichage des sections ouvertes d'office (les terminés sont repliés).
   const priorityBanners = priorityBannerIds([
@@ -454,14 +478,23 @@ export default function TournamentsPage() {
                   // Mène parfois à une section repliée (« Terminés ») : on la
                   // déplie, sans quoi le lien aboutirait sur un en-tête vide.
                   onClick={() => setSectionOpen(entry.key, true)}
+                  // Libellé et compte sont deux éléments sans séparateur : le
+                  // nom accessible les collerait (« Mes tournois34 »). Il
+                  // commence par le texte visible (WCAG 2.5.3).
+                  aria-label={`${entry.navLabel} (${entry.count})`}
                 >
                   {entry.navLabel}
-                  <span className={s.num}>{entry.count}</span>
+                  <span className={s.num} aria-hidden="true">
+                    {entry.count}
+                  </span>
                 </a>
               ) : (
                 <span key={entry.key} className={`${s.sectionNavLink} ${s.sectionNavEmpty}`}>
                   {entry.navLabel}
-                  <span className={s.num}>0</span>
+                  <span className={s.num} aria-hidden="true">
+                    0
+                  </span>
+                  <span className="sr-only"> (aucun)</span>
                 </span>
               ),
             )}

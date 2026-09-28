@@ -4,6 +4,7 @@ import {
   PAGE_SECTION_ORDER,
   pageSectionAnchor,
   pageSections,
+  parsePageSectionAnchor,
   splitMyTournaments,
   type PageSectionKey,
 } from "@/app/(secured)/tournois/_lib/page-sections";
@@ -105,5 +106,25 @@ describe("repères de la page", () => {
     expect(PAGE_SECTION_ORDER.filter((key) => !DEFAULT_OPEN_SECTIONS.includes(key))).toEqual([
       "finished",
     ]);
+  });
+});
+
+describe("parsePageSectionAnchor", () => {
+  it("retrouve la section d'une ancre du sommaire, avec ou sans « # »", () => {
+    expect(parsePageSectionAnchor("#tournois-finished")).toBe("finished");
+    expect(parsePageSectionAnchor("tournois-mine")).toBe("mine");
+  });
+
+  it("refuse tout fragment qui ne nomme pas une section connue", () => {
+    expect(parsePageSectionAnchor("")).toBeNull();
+    expect(parsePageSectionAnchor("#match-42")).toBeNull();
+    expect(parsePageSectionAnchor("#tournois-")).toBeNull();
+    expect(parsePageSectionAnchor("#tournois-finished-x")).toBeNull();
+  });
+
+  it("chaque ancre produite se relit en sa propre section", () => {
+    for (const key of PAGE_SECTION_ORDER) {
+      expect(parsePageSectionAnchor(`#${pageSectionAnchor(key)}`)).toBe(key);
+    }
   });
 });
