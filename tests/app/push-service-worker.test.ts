@@ -50,6 +50,15 @@ describe("service worker des notifications", () => {
     expect(options).toMatchObject({ body: "Déclare-toi prêt.", tag: "t", data: { url: "/tournois/4#match-9" } });
   });
 
+  it("porte l'icône de l'app déclarée au manifeste", async () => {
+    const { APP_ICONS } = await import("@/lib/shared/web-manifest");
+    const worker = loadWorker();
+    worker.fire("push", { data: { json: () => ({ title: "x" }) } });
+    await Promise.all(worker.waited);
+    const [, options] = worker.showNotification.mock.calls[0] as unknown as [string, { icon: string }];
+    expect(APP_ICONS.map((icon) => icon.src)).toContain(options.icon);
+  });
+
   it("ramène un lien étranger ou un message illisible à l'accueil du site", async () => {
     const worker = loadWorker();
     worker.fire("push", { data: { json: () => ({ title: "x", url: "//evil.test" }) } });

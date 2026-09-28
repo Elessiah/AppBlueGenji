@@ -36,7 +36,9 @@ self.addEventListener("push", (event) => {
   const title = typeof data.title === "string" && data.title ? data.title : "BlueGenji Esport";
   const options = {
     body: typeof data.body === "string" ? data.body : "",
-    icon: "/apple-touch-icon.png",
+    // L'icône de l'app installée (`APP_ICONS`, `lib/shared/web-manifest.ts`) :
+    // la notification porte le même visage que l'icône du site.
+    icon: "/icons/icon-192.png",
     badge: "/favicon.png",
     lang: "fr",
     data: { url: sitePath(data.url) },
