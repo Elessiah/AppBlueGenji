@@ -21,6 +21,7 @@ import {
 import {
   applyLiveMessage,
   fatalFailure,
+  FIRST_SNAPSHOT_TIMEOUT_MS,
   INITIAL_LIVE_STATE,
   parseLiveMessage,
   reconnectDelayMs,
@@ -56,7 +57,9 @@ const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: f
  * 3. **retour sur l'onglet** — reprendre la main relit la donnée si elle a
  *    vieilli, ce qui remplace le réflexe de recharger ;
  * 4. **sondage de secours** — uniquement tant que le flux est coupé, à la
- *    cadence du palier accordé par le serveur.
+ *    cadence du palier accordé par le serveur — ou tant qu'un flux **ouvert**
+ *    n'a livré aucun instantané (`FIRST_SNAPSHOT_TIMEOUT_MS` : réponse mise en
+ *    tampon par un proxy, qui ne déclare aucune erreur).
  *
  * Et une règle de sobriété, le **régime de charge** (`lib/shared/client-power.ts`) :
  * ce qui est *reçu* et ce qui est *rendu* sont deux choses. Tout instantané est
@@ -350,6 +353,8 @@ export function useTournamentLive(tournamentId: number) {
     let source: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    /** Guette le premier instantané d'un flux ouvert (`FIRST_SNAPSHOT_TIMEOUT_MS`). */
+    let firstSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
     let attempts = 0;
     let stopped = false;
 
@@ -362,6 +367,7 @@ export function useTournamentLive(tournamentId: number) {
       if (stopped) return;
       stopped = true;
       stopFallback();
+      stopFirstSnapshotWatch();
       if (reconnectTimer !== null) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
@@ -378,6 +384,33 @@ export function useTournamentLive(tournamentId: number) {
         clearInterval(fallbackTimer);
         fallbackTimer = null;
       }
+    };
+
+    const stopFirstSnapshotWatch = () => {
+      if (firstSnapshotTimer !== null) {
+        clearTimeout(firstSnapshotTimer);
+        firstSnapshotTimer = null;
+      }
+    };
+
+    /**
+     * Flux ouvert, page encore vide : si rien n'arrive dans le délai, la donnée
+     * est lue par REST et le sondage de secours prend le relais. Le flux reste
+     * ouvert — un premier message tardif coupe le sondage et reprend la main.
+     */
+    const watchFirstSnapshot = () => {
+      stopFirstSnapshotWatch();
+      if (stateRef.current.detail) return;
+      firstSnapshotTimer = setTimeout(() => {
+        firstSnapshotTimer = null;
+        if (cancelled || stopped || stateRef.current.detail) return;
+        // Le témoin dit ce qui est : ce flux ne livre rien.
+        setIsLive(false);
+        void load(true).then((failure) => {
+          if (failure && !cancelled) giveUp(failure);
+        });
+        startFallback();
+      }, FIRST_SNAPSHOT_TIMEOUT_MS);
     };
 
     /** Sondage de secours, tant que le flux est coupé. */
@@ -418,6 +451,7 @@ export function useTournamentLive(tournamentId: number) {
         attempts = 0;
         setIsLive(true);
         stopFallback();
+        watchFirstSnapshot();
       };
 
       source.onmessage = (event) => {
@@ -425,7 +459,10 @@ export function useTournamentLive(tournamentId: number) {
         const message = parseLiveMessage(event.data);
         if (!message) return;
         // Le premier message porte déjà tout : la connexion vaut chargement.
+        // Il lève aussi le guet et le sondage qu'un flux muet avait armés.
         setIsLive(true);
+        stopFirstSnapshotWatch();
+        stopFallback();
 
         // Le contexte du lecteur n'arrive qu'à la connexion — sauf l'aperçu du
         // plateau, qui se périme à chaque inscription. On ne le redemande que
@@ -444,6 +481,7 @@ export function useTournamentLive(tournamentId: number) {
 
       source.onerror = () => {
         if (cancelled) return;
+        stopFirstSnapshotWatch();
         source?.close();
         source = null;
         setIsLive(false);
@@ -490,6 +528,7 @@ export function useTournamentLive(tournamentId: number) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
+      stopFirstSnapshotWatch();
       source?.close();
       source = null;
       attempts = 0;
@@ -507,6 +546,7 @@ export function useTournamentLive(tournamentId: number) {
       window.removeEventListener("online", onVisible);
       if (reconnectTimer !== null) clearTimeout(reconnectTimer);
       stopFallback();
+      stopFirstSnapshotWatch();
       source?.close();
       setIsLive(false);
     };

@@ -1,12 +1,15 @@
 "use client";
 
+import { useState, type MouseEvent } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CyberButton, Pill } from "@/components/cyber";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { participantWording } from "@/lib/shared/participants";
+import { canReturnInSite, isPlainLeftClick, previousSitePathname } from "@/lib/shared/site-back";
 import { advanceTarget } from "@/lib/shared/tournament-launch";
 import { TOURNAMENT_STAGE_META } from "@/lib/shared/tournament-progress";
 import type { LiveFailure } from "../_lib/live-state";
@@ -23,6 +26,17 @@ import { LiveIndicator } from "./LiveIndicator";
 import { TournamentLiveLink } from "./TournamentLiveLink";
 import s from "./TournamentHeader.module.css";
 
+/** Ce que `canReturnInSite` a besoin de lire du navigateur, à l'instant. */
+function readSiteBackInput() {
+  return {
+    previousPath: previousSitePathname(),
+    referrer: document.referrer,
+    origin: window.location.origin,
+    currentPath: window.location.pathname,
+    historyLength: window.history.length,
+  };
+}
+
 const TONE_CLASS: Record<HeaderTone, string> = {
   neutral: s.stateNeutral,
   green: s.stateGreen,
@@ -38,7 +52,6 @@ interface TournamentHeaderProps {
   fatal: LiveFailure | null;
   /** Suivi arrêté : les actions sont retirées plutôt que laissées à échouer. */
   frozen: boolean;
-  onBack: () => void;
   onRegister: () => void;
   onReportIssue: () => void;
   onGuestRegister: () => void;
@@ -75,7 +88,6 @@ export function TournamentHeader({
   tier,
   fatal,
   frozen,
-  onBack,
   onRegister,
   onReportIssue,
   onGuestRegister,
@@ -95,14 +107,28 @@ export function TournamentHeader({
   // L'image se règle dans tous les états, contrairement au formulaire : elle
   // est décorative et n'engage aucune règle du moteur.
   const showImageEdit = detail.isAdmin && !frozen;
+  const router = useRouter();
+  // Figé au premier rendu : l'en-tête n'est rendu que côté client (la page
+  // attend le flux), et la page précédente ne change pas tant qu'on reste ici.
+  const [backInSite] = useState(() => canReturnInSite(readSiteBackInput()));
+
+  // Un vrai lien vers la liste — atteignable, ouvrable dans un onglet —, qui ne
+  // cède au retour dans l'historique que lorsque celui-ci reste sur le site
+  // (`lib/shared/site-back.ts`) : on y retrouve alors la page quittée, défilement
+  // compris. Relu au clic, la navigation ayant pu changer depuis le rendu.
+  const onBackClick = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (!isPlainLeftClick(event) || !canReturnInSite(readSiteBackInput())) return;
+    event.preventDefault();
+    router.back();
+  };
 
   return (
     <div className="ds-header green">
       <div className={`ds-header-body ${s.shell}`}>
         <div className={s.utility}>
-          <button type="button" onClick={onBack} className={s.back}>
-            <span aria-hidden="true">←</span> Retour
-          </button>
+          <Link href="/tournois" onClick={onBackClick} className={s.back}>
+            <span aria-hidden="true">←</span> {backInSite ? "Retour" : "Tous les tournois"}
+          </Link>
           <div className={s.viewer}>
             {/* Dit que la page se tient à jour seule : sans ce repère, on
                 recharge par précaution même quand tout arrive tout seul. */}

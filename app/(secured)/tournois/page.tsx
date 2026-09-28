@@ -465,13 +465,14 @@ export default function TournamentsPage() {
             defaultOpen={false}
             emptyMsg={emptyMsg("Aucun tournoi terminé pour le moment.")}
           >
-            <div>
-              {filteredBuckets.finished
-                .slice(0, expandedSections.has("finished") ? totalFinished : SECTION_DISPLAY_LIMIT)
-                .map((t) => (
-                  <FinishedCard key={t.id} t={t} />
-                ))}
-            </div>
+            {/* Les cartes sont les items de la grille, comme dans les autres
+                sections : une enveloppe les empilait dans une seule cellule, et
+                `.card { height: 100% }` étirait chacune à la hauteur de la pile. */}
+            {filteredBuckets.finished
+              .slice(0, expandedSections.has("finished") ? totalFinished : SECTION_DISPLAY_LIMIT)
+              .map((t) => (
+                <FinishedCard key={t.id} t={t} />
+              ))}
             <ShowMoreRow
               sectionTitle="TERMINÉS"
               total={totalFinished}
