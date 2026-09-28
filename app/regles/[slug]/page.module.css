@@ -382,6 +382,18 @@
   color: var(--ink);
 }
 
+.back:focus-visible,
+.otherMode:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .otherMode {
+    transition: none;
+  }
+}
+
 .soonTag {
   color: var(--amber);
   font-size: 11px;
