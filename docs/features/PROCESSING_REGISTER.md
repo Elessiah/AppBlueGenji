@@ -14,7 +14,7 @@ joueur, le staff — sans demande à faire :
 ## Source unique
 
 `lib/shared/processing-register.ts` (pur) porte tout : le responsable
-(`registerController`, contact passé en argument depuis `RGPD_CONTACT_EMAIL`),
+(`registerController`, contact tiré de `lib/shared/legal-contact.ts` — tag Discord et formulaire, **aucune adresse électronique**),
 la liste `PROCESSING_ACTIVITIES` et l'export `registerToCsv`. La page et le
 tableur en descendent tous deux : ils ne peuvent pas se contredire.
 
