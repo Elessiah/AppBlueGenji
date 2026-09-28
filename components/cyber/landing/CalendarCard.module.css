@@ -40,6 +40,8 @@
   grid-template-columns: 56px 1px 1fr auto;
   gap: 12px;
   align-items: center;
+  border-radius: var(--r-cy-sm);
+  transition: background-color 0.15s ease;
 }
 
 /* Le lien du nom couvre toute la ligne : la date, l'heure et les pastilles
@@ -51,6 +53,23 @@
   position: absolute;
   inset: -6px;
   border-radius: inherit;
+}
+
+.row:hover {
+  background-color: rgba(90, 200, 255, 0.05);
+}
+
+.row:hover .link {
+  color: var(--blue-100);
+}
+
+.link:focus-visible {
+  outline: none;
+}
+
+.link:focus-visible::after {
+  outline: 1px solid var(--blue-300);
+  outline-offset: 0;
 }
 
 .date {
