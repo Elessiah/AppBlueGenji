@@ -226,6 +226,22 @@ for i in $(seq 1 80); do curl -s -o /dev/null -w "%{http_code}\n" https://<domai
 
 Une cinquantaine de `200`, puis des `429`.
 
+## Taille des corps de requête (nginx)
+
+L'application borne elle-même ce qu'elle lit (`lib/server/request-body.ts`) :
+256 Kio pour un corps JSON, 32 Kio sur les routes anonymes (connexion, visites,
+rapports CSP, signalements), 5 Mio + 256 Kio pour un téléversement d'image — la
+lecture s'arrête en flux au-delà, et un `Content-Length` excessif est refusé
+sans rien lire. nginx doit donc laisser passer **au moins** la borne des images :
+
+```nginx
+client_max_body_size 6m;
+```
+
+Plus bas, un logo ou un avatar de 5 Mo serait refusé par nginx (413) avant
+d'atteindre l'application, qui l'annonce pourtant accepté. Plus haut ne coûte
+rien de plus au Raspberry Pi : c'est l'application qui ne lit pas au-delà.
+
 ## Base de données
 
 Le seed ne se pose jamais sur la production : `npm run seed` refuse de tourner

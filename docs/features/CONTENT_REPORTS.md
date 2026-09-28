@@ -133,7 +133,25 @@ et au plus une fois par heure depuis la mise en page racine
 - `REPORT_SUBMIT_RULE` : 5 envois par 30 min, par compte ou par IP.
 - `REPORTS_HOURLY_CAP` : 60 signalements par heure **tous auteurs confondus**,
   en base — la seule borne qui tienne sans identité, et chaque envoi écrit en
-  privé à deux personnes.
+  privé à deux personnes. Elle borne l'**alerte**, jamais le dépôt : elle a
+  d'abord refusé l'envoi (429), et six IP suffisaient alors à fermer le seul
+  canal que le site publie — notification d'un contenu illicite, demande RGPD,
+  question d'hébergeur. Au-delà, le signalement est enregistré et visible au
+  panneau ; la direction reçoit **une** alerte qui annonce l'afflux
+  (`reportAlertMode` : `ALERT`, puis `SATURATION_NOTICE` au 61ᵉ, puis `SILENT`),
+  et plus rien jusqu'à ce que le rythme retombe.
+- `REPORTS_HOURLY_HARD_CAP` : 600 par heure, au-delà desquels le dépôt est
+  refusé (`REPORTS_SATURATED` → 429) — une borne sur la croissance de la table,
+  qu'il faut une soixantaine d'IP pour tenir pleine.
+- `REPORT_TARGET_NOTICES_DAILY_CAP` et `REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS` :
+  un compte fait prévenir les personnes visées par au plus **3** signalements à
+  cibles par 24 h, et seulement s'il a au moins **48 h**. Désigner une équipe
+  fait écrire le bot à chacun de ses membres : sans borne par auteur, quelques
+  comptes gratuits écrivaient chaque jour à tout le site, et Discord pouvait
+  classer le bot comme spammeur — ce qui couperait aussi la connexion par code.
+  Au-delà, le signalement est enregistré et reste consultable par les personnes
+  visées (`/signalements/[id]`, formulaire de contestation) ; seul le message est
+  retenu (`reporterMayWarnTargets`).
 - `REPORT_TARGET_SEARCH_RULE` : la recherche de cibles est réservée aux comptes
   connectés (l'annuaire l'est) et plafonnée.
 

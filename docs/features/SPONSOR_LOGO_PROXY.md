@@ -76,10 +76,15 @@ le même fait — il n'y a pas d'image à cette adresse) :
 - **adresses résolues refusées de même** : avant chaque saut, le nom est résolu
   (`hostResolvesPublicly`) et **toutes** les adresses rendues passent par le même
   prédicat — un domaine public qui pointe vers `127.0.0.1` passait le seul filtre
-  d'écriture. Une résolution qui échoue est un refus. Reste ouvert le
-  *rebinding* (le `fetch` intégré résout de nouveau en se connectant, et un DNS
-  hostile peut répondre autre chose) : le fermer demande de fixer l'adresse de
-  connexion dans l'agent HTTP, que Node n'expose pas sans dépendance.
+  d'écriture. Une résolution qui échoue est un refus ;
+- **adresse de connexion fixée** (`lib/server/pinned-https.ts`) : le `fetch`
+  intégré résolvait le nom **une seconde fois** en se connectant, et un DNS
+  hostile à durée de vie nulle pouvait rendre une adresse publique au contrôle
+  puis `127.0.0.1` à la connexion (*rebinding*). La requête passe désormais par
+  `node:https`, dont l'option `lookup` résout, juge chaque adresse et rend au
+  socket celle qu'elle vient d'accepter — il n'y a plus de seconde résolution,
+  et aucune dépendance (`undici`) n'a été ajoutée. Le certificat reste vérifié
+  contre le nom.
   La requête part **depuis le serveur**, là où le
   navigateur la faisait depuis le poste du visiteur : une adresse interne devient
   joignable, ce qu'elle n'était pas. L'URL vient du staff, mais la confiance qu'on
