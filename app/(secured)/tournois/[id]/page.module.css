@@ -1,0 +1,120 @@
+/*
+ * Fiche d'un tournoi — ce que la page pose elle-même autour de ses panneaux.
+ *
+ * Le cadre des panneaux (`.ds-block`, `.ds-section-title`) reste la classe
+ * globale : c'est celui de tous les panneaux de l'espace connecté, voisins de
+ * cette page compris (inscrites, contacts, progression). Le reste passe par les
+ * jetons, que « Contraste renforcé » atteint.
+ */
+
+/* Échec définitif ou chargement : un texte seul dans son panneau. */
+.status {
+  color: var(--ink-mute);
+}
+
+/* Titre de l'échec définitif. Un aplat plutôt que le dégradé découpé dans le
+   texte de `.ds-title` : un texte transparent peint par son fond n'a pas de
+   couleur que le réglage de contraste puisse éclaircir. */
+.fatalTitle {
+  margin: 0 0 12px;
+  font-family: var(--font-title), sans-serif;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+}
+
+.fatalText {
+  margin: 0 0 20px;
+  line-height: 1.6;
+}
+
+.board {
+  margin-bottom: 20px;
+}
+
+/* Phrase à la place d'un plateau (avant-course, aucun match). */
+.empty {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ink-mute);
+}
+
+.preview {
+  margin-top: 18px;
+}
+
+/* Un tableau par type (principal, perdants, grande finale…), espacés entre eux. */
+.bracket + .bracket {
+  margin-top: 32px;
+}
+
+/* ---------- Zone de danger ---------- */
+
+.danger {
+  margin-top: 24px;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--red-live) 45%, transparent);
+  border-radius: var(--r-cy-md);
+}
+
+.dangerTitle {
+  color: var(--red-live);
+}
+
+.dangerRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Le trait sépare les deux blocs : il n'a pas lieu d'être quand il n'y a rien
+   dessous. Un arbitre ne voit pas la suppression, et il y gagnait une ligne de
+   séparation qui ne séparait rien. */
+.dangerRow + .dangerRow {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.dangerText {
+  margin: 0;
+  max-width: 560px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--ink-mute);
+}
+
+/* Deux classes : l'emporte sur le gabarit de `CyberButton`. */
+.dangerRow .dangerAction {
+  padding: 8px 18px;
+  font-size: 13px;
+}
+
+.dangerRow .rollbackAction {
+  border-color: var(--amber);
+}
+
+.dangerRow .rollbackAction:not([aria-disabled="true"]) {
+  color: var(--amber);
+}
+
+.dangerRow .deleteAction {
+  border-color: var(--red-live);
+  color: var(--red-live);
+}
+
+/* Le survol du bouton fantôme vire au bleu : ici, la couleur dit la nature du
+   geste, elle ne change pas sous le pointeur. Sélecteur alourdi pour dépasser
+   celui de `CyberButton` (`.ghost:hover:not(…):not(…)`). */
+.danger .dangerRow .rollbackAction:hover:not([aria-disabled="true"]) {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.danger .dangerRow .deleteAction:hover:not(:disabled) {
+  border-color: var(--red-live);
+  color: var(--red-live);
+}

@@ -46,7 +46,7 @@ import { BracketPreview } from "./_components/BracketPreview";
 import { BracketSections } from "./_components/BracketSections";
 import { SurvivalView } from "./_components/SurvivalView";
 import { PhaseTimeline } from "./_components/PhaseTimeline";
-import { PhaseStandingsTable } from "./_components/PhaseStandingsTable";
+import { PhaseStandingsBlock } from "./_components/PhaseStandingsBlock";
 import {
   defaultSelectedPhaseId,
   visibleRulesFormat,
@@ -64,6 +64,7 @@ import { EndurancePenaltyDialog } from "./_components/EndurancePenaltyDialog";
 import { AdvanceTournamentDialog } from "./_components/AdvanceTournamentDialog";
 import { TournamentHeader } from "./_components/TournamentHeader";
 import { TournamentImageDialog } from "./_components/TournamentImageDialog";
+import styles from "./page.module.css";
 
 /** « Arbre » ne veut rien dire dans les formats à classement, qui n'en ont pas. */
 const BOARD_TITLES: Record<TournamentFormat, string> = {
@@ -228,11 +229,11 @@ export default function TournamentDetailPage() {
   // reste que le F5, et où il ne sert à rien.
   if (fatal && !detail) {
     return (
-      <section className="ds-block" style={{ color: "var(--text-2)" }} role="alert">
-        <h1 className="ds-title green" style={{ fontSize: 24, marginBottom: 12 }}>
+      <section className={`ds-block ${styles.status}`} role="alert">
+        <h1 className={styles.fatalTitle}>
           {fatal === "UNAUTHORIZED" ? "Session expirée" : "Tournoi introuvable"}
         </h1>
-        <p style={{ margin: "0 0 20px", lineHeight: 1.6 }}>
+        <p className={styles.fatalText}>
           {fatal === "UNAUTHORIZED"
             ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
             : // Volontairement neutre : ce 404 recouvre le tournoi supprimé et
@@ -255,8 +256,7 @@ export default function TournamentDetailPage() {
     // aux lecteurs d'écran plutôt que de leur laisser une page muette.
     return (
       <section
-        className="ds-block"
-        style={{ color: "var(--text-2)" }}
+        className={`ds-block ${styles.status}`}
         role="status"
         aria-busy="true"
       >
@@ -502,9 +502,19 @@ export default function TournamentDetailPage() {
   // d'avance, et pour un tournoi déjà lancé. Il s'affiche sur tout l'avant-course
   // (`isPreLaunchState`), inscriptions closes comprises.
   const previewBlock = detail.preview ? (
-    <div style={{ marginTop: 18 }}>
+    <div className={styles.preview}>
       <BracketPreview preview={detail.preview} canReorder={detail.isAdmin} />
     </div>
+  ) : null;
+
+  // Classement d'une phase terminée, affiché sous son plateau quand on la
+  // consulte — le même bloc pour les trois vues qui en ont un.
+  const selectedPhaseStandings =
+    isMulti && selectedPhase?.state === "FINISHED"
+      ? detail.phaseStandings?.[selectedPhase.id] ?? null
+      : null;
+  const finishedPhaseStandings = selectedPhaseStandings ? (
+    <PhaseStandingsBlock standings={selectedPhaseStandings} />
   ) : null;
 
   return (
@@ -563,7 +573,7 @@ export default function TournamentDetailPage() {
           onEditImage={() => setImageDialogOpen(true)}
         />
 
-        <div className="ds-block" style={{ marginBottom: 20 }}>
+        <div className={`ds-block ${styles.board}`}>
           {isMulti && detail.phases && (
             <PhaseTimeline
               phases={detail.phases}
@@ -585,7 +595,7 @@ export default function TournamentDetailPage() {
               tomber la clôture dans leur vue — sans match ni aperçu. */}
           {isPreLaunchState(detail.card.state) ? (
             <>
-              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+              <p className={styles.empty}>
                 {formatForBracket === "SURVIVAL"
                   ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
                   : detail.card.format === "BG_SURVIE"
@@ -612,23 +622,7 @@ export default function TournamentDetailPage() {
                 onForfeit={forfeitTeam}
                 emptyLabel={noMatchesLabel}
               />
-              {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
-                <div style={{ marginTop: 24 }}>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "var(--text-2)",
-                      fontWeight: 600,
-                      marginBottom: 10,
-                    }}
-                  >
-                    Qualifiées
-                  </div>
-                  <PhaseStandingsTable standings={detail.phaseStandings[selectedPhase.id]} />
-                </div>
-              )}
+              {finishedPhaseStandings}
             </>
           ) : detail.card.format === "BG_SURVIE" && detail.endurance ? (
             <EnduranceView
@@ -675,7 +669,7 @@ export default function TournamentDetailPage() {
             <>
               {brackets.length > 0 ? (
                 brackets.map(({ type, matches }) => (
-                  <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0, minHeight: 0, overflow: "visible" }}>
+                  <div key={type} className={styles.bracket}>
                     <BracketSections
                       bracketType={type}
                       bracketLabel={bracketLabels[type]}
@@ -690,38 +684,22 @@ export default function TournamentDetailPage() {
                   </div>
                 ))
               ) : (
-                <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+                <p className={styles.empty}>
                   {noMatchesLabel}
                 </p>
               )}
-              {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
-                <div style={{ marginTop: 24 }}>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "var(--text-2)",
-                      fontWeight: 600,
-                      marginBottom: 10,
-                    }}
-                  >
-                    Classement
-                  </div>
-                  <PhaseStandingsTable standings={detail.phaseStandings[selectedPhase.id]} />
-                </div>
-              )}
+              {finishedPhaseStandings}
             </>
           ) : !filteredMatches.length ? (
             <>
-              <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>
+              <p className={styles.empty}>
                 {noMatchesLabel}
               </p>
             </>
           ) : (
             <>
               {brackets.map(({ type, matches }) => (
-                <div key={type} style={{ marginBottom: type !== brackets[brackets.length - 1].type ? 32 : 0, minHeight: 0, overflow: "visible" }}>
+                <div key={type} className={styles.bracket}>
                   <BracketSections
                     bracketType={type}
                     bracketLabel={bracketLabels[type]}
@@ -735,23 +713,7 @@ export default function TournamentDetailPage() {
                   />
                 </div>
               ))}
-              {isMulti && selectedPhase?.state === "FINISHED" && detail.phaseStandings && detail.phaseStandings[selectedPhase.id] && (
-                <div style={{ marginTop: 24 }}>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "var(--text-2)",
-                      fontWeight: 600,
-                      marginBottom: 10,
-                    }}
-                  >
-                    Qualifiées
-                  </div>
-                  <PhaseStandingsTable standings={detail.phaseStandings[selectedPhase.id]} />
-                </div>
-              )}
+              {finishedPhaseStandings}
             </>
           )}
         </div>
@@ -789,46 +751,17 @@ export default function TournamentDetailPage() {
             réservée aux administrateurs stricts (`canDelete`). La section
             s'ouvre donc au premier, chaque bloc gardant sa propre garde. */}
         {(detail.isAdmin || detail.canDelete) && !frozen && (
-          <div
-            className="ds-block"
-            style={{
-              marginTop: 24,
-              border: "1px solid color-mix(in srgb, var(--red-live, #ff4d4d) 45%, transparent)",
-              borderRadius: "var(--r-cy-md, 12px)",
-              padding: 18,
-            }}
-          >
+          <div className={`ds-block ${styles.danger}`}>
             <div className="ds-section-title">
-              <h2 style={{ color: "var(--red-live, #ff4d4d)" }}>Zone de danger</h2>
+              <h2 className={styles.dangerTitle}>Zone de danger</h2>
             </div>
             {/* Retour en arrière — au-dessus de la suppression : c'est le geste
                 qu'un arbitre vient chercher ici, et le seul des deux qui se
                 rejoue. Rendu même quand il est refusé, avec son motif : un
                 bouton qui disparaît laisse chercher, une phrase explique. */}
             {detail.isAdmin && rollbackPlan !== null && (
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 16,
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  // Le trait sépare les deux blocs : il n'a pas lieu d'être quand
-                  // il n'y a rien dessous. Un arbitre ne voit pas la suppression,
-                  // et il y gagnait une ligne de séparation qui ne séparait rien.
-                  ...(detail.canDelete
-                    ? {
-                        paddingBottom: 16,
-                        marginBottom: 16,
-                        borderBottom: "1px solid var(--line-soft, rgba(255,255,255,0.08))",
-                      }
-                    : null),
-                }}
-              >
-                <p
-                  id="rollback-hint"
-                  style={{ margin: 0, fontSize: 13, color: "var(--text-2, #9aa4b2)", maxWidth: 560, lineHeight: 1.55 }}
-                >
+              <div className={styles.dangerRow}>
+                <p id="rollback-hint" className={styles.dangerText}>
                   {rollbackReady
                     ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${detail.card.state === "FINISHED" ? " Le tournoi étant terminé, il sera rouvert et son classement final effacé." : ""} Pense à noter les scores avant : rien n'est archivé.`
                     : mapError(rollbackRefusal ?? "")}
@@ -847,12 +780,7 @@ export default function TournamentDetailPage() {
                   // La phrase à gauche dit ce que le geste efface, ou pourquoi il
                   // est refusé : elle fait partie du bouton, pas de son décor.
                   aria-describedby="rollback-hint"
-                  style={{
-                    fontSize: 13,
-                    padding: "8px 18px",
-                    borderColor: "var(--amber, #ffb020)",
-                    color: rollbackReady === null ? undefined : "var(--amber, #ffb020)",
-                  }}
+                  className={`${styles.dangerAction} ${styles.rollbackAction}`}
                 >
                   Revenir en arrière d&apos;une manche
                 </CyberButton>
@@ -860,32 +788,19 @@ export default function TournamentDetailPage() {
             )}
 
             {detail.canDelete && (
-            <div
-              style={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 16,
-                alignItems: "center",
-                justifyContent: "space-between",
-              }}
-            >
-              <p style={{ margin: 0, fontSize: 13, color: "var(--text-2, #9aa4b2)", maxWidth: 560, lineHeight: 1.55 }}>
-                Supprimer ce tournoi l&apos;efface du site pour de bon, avec ses matchs, ses
-                inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.
-              </p>
-              <CyberButton
-                variant="ghost"
-                onClick={() => setDeleteDialogOpen(true)}
-                style={{
-                  fontSize: 13,
-                  padding: "8px 18px",
-                  borderColor: "var(--red-live, #ff4d4d)",
-                  color: "var(--red-live, #ff4d4d)",
-                }}
-              >
-                Supprimer le tournoi
-              </CyberButton>
-            </div>
+              <div className={styles.dangerRow}>
+                <p className={styles.dangerText}>
+                  Supprimer ce tournoi l&apos;efface du site pour de bon, avec ses matchs, ses
+                  inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.
+                </p>
+                <CyberButton
+                  variant="ghost"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  className={`${styles.dangerAction} ${styles.deleteAction}`}
+                >
+                  Supprimer le tournoi
+                </CyberButton>
+              </div>
             )}
           </div>
         )}

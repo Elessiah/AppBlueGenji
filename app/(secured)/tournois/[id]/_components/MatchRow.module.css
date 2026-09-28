@@ -1,0 +1,148 @@
+/*
+ * Carte de match — passage unique des vues du plateau (arbre, survie, suisse,
+ * endurance). Voir `MatchRow.tsx`.
+ *
+ * Tout passe par les jetons : les couleurs littérales qu'elle portait en ligne
+ * (ambre du forfait, voile des lignes, bordures) restaient pâles quand le
+ * lecteur cochait « Contraste renforcé », qui ne redéfinit que des jetons. Deux
+ * d'entre elles ne rendaient même rien — `--surface-1` et `--green` ne sont
+ * définis nulle part : le fond de la carte était transparent et le score du
+ * vainqueur prenait la couleur de sa ligne.
+ */
+
+.card {
+  /* Même largeur que la colonne de `BracketTree` (`CARD_W`), qui trace ses
+     connecteurs sur elle. */
+  width: 210px;
+  background: var(--cyber-bg-2);
+  border: 1px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-md);
+  overflow: hidden;
+  font-size: 13px;
+  /* Marge de sécurité pour le saut natif du navigateur sur `#match-…`
+     (rechargement d'une URL ancrée) : le défilement piloté par
+     `useMatchAnchor` centre la carte, celui du navigateur la colle en haut. */
+  scroll-margin: 96px;
+}
+
+/* Carte que le lecteur peut arbitrer : un liseré bleu la distingue des autres. */
+.resolvable {
+  border-color: rgba(var(--blue-500-rgb), 0.4);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  color: var(--ink);
+}
+
+.row + .row {
+  border-top: 1px solid var(--line-strong-cy);
+}
+
+/* Rencontre tranchée : la ligne perdante passe en retrait, la gagnante porte
+   le vert et la graisse. */
+.decided {
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+  color: var(--ink-mute);
+}
+
+.winner {
+  background: color-mix(in srgb, var(--accent-green) 15%, transparent);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.name {
+  flex: 1;
+}
+
+.score {
+  margin-left: 8px;
+  color: var(--ink-mute);
+}
+
+.winner .score {
+  color: var(--accent-green);
+}
+
+/* « FF » : l'ambre du forfait, qu'il soit tranché ou seulement noté. */
+.forfeitScore {
+  color: var(--amber);
+}
+
+/* Mention de la rencontre close sans vainqueur : nul, ou double forfait. */
+.outcome {
+  margin: 0;
+  padding: 3px 8px;
+  border-top: 1px solid var(--line-strong-cy);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: center;
+  color: var(--ink-mute);
+  background: color-mix(in srgb, var(--ink) 3%, transparent);
+}
+
+/* L'ambre des « FF » pour un double forfait : la mention dit la même chose que
+   les deux scores, elle en prend la couleur. Le gris reste au nul, qui n'est ni
+   une faute ni une absence. */
+.outcomeForfeit {
+  color: var(--amber);
+  background: color-mix(in srgb, var(--amber) 6%, transparent);
+}
+
+.reportNotice {
+  margin: 0;
+  padding: 4px 8px;
+  border-top: 1px solid var(--line-strong-cy);
+  font-size: 10.5px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--blue-300);
+  background: rgba(var(--blue-500-rgb), 0.06);
+}
+
+/* Rangées d'action, sous les lignes des engagés. */
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-top: 1px solid var(--line-strong-cy);
+}
+
+.playerBar {
+  background: color-mix(in srgb, var(--accent-green) 6%, transparent);
+}
+
+.adminBar {
+  background: rgba(var(--blue-500-rgb), 0.08);
+  border-top-color: rgba(var(--blue-500-rgb), 0.25);
+}
+
+/* Deux classes : l'emporte sur le gabarit de `CyberButton`, quel que soit
+   l'ordre de chargement des deux feuilles. */
+.bar .action {
+  padding: 4px 12px;
+  font-size: 12px;
+  gap: 5px;
+}
+
+.bar .actionAccent {
+  border-color: rgba(var(--blue-500-rgb), 0.45);
+  background: rgba(var(--blue-500-rgb), 0.15);
+}
+
+.bar .actionMinor {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+.locked {
+  font-size: 11px;
+  color: var(--ink-mute);
+}

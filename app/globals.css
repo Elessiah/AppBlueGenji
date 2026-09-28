@@ -96,8 +96,8 @@ a {
 /* Carte de match visee par une ancre `#match-[id]` (lien profond depuis
    l'accueil). La page s'ouvre deja defilee au bon endroit : ce halo dit
    **laquelle** des cartes visibles on venait voir, puis s'efface.
-   La classe est globale parce que `MatchRow` n'a pas de module CSS — ses styles
-   sont en ligne, et une animation ne s'ecrit pas en style en ligne. */
+   La classe reste globale, hors de `MatchRow.module.css` : le reglage
+   « Reduire les animations » la vise plus bas par son nom. */
 .match-anchor-target {
   animation: match-anchor-pulse 3s ease-out 1;
 }
