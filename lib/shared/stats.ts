@@ -490,6 +490,43 @@ export function computeDeepStats(
 }
 
 /** Formate un ratio 0..1 en pourcentage lisible (`"62 %"`), `"—"` si absent. */
+/** Bilan résumé : les trois nombres d'une carte d'annuaire. */
+export type RecordSummary = {
+  wins: number;
+  losses: number;
+  /** Tournois disputés — une inscription à un tournoi pas encore lancé n'en est pas un. */
+  tournamentsPlayed: number;
+};
+
+/**
+ * Les trois nombres de `computeDeepStats` que porte une carte d'annuaire
+ * (`matchesWon`, `matchesLost`, `tournamentsPlayed`), sans le reste de
+ * l'agrégat — tri, séries, répartitions, adversaires, fenêtre d'activité.
+ *
+ * L'annuaire calcule ce bilan pour **chaque** compte du site, et le cache est
+ * vidé à chaque score : recalculer un `DeepStats` complet par joueur pour en
+ * jeter presque tout coûtait l'essentiel du chargement de `/joueurs` pendant un
+ * tournoi. Les règles sont celles de l'agrégat complet (un nul n'est ni une
+ * victoire ni une défaite, `PLAYED_STATES` décide d'un tournoi disputé), ce
+ * qu'un test tient en comparant les deux fonctions.
+ */
+export function computeRecordSummary(
+  matches: readonly StatsMatch[],
+  tournaments: readonly StatsTournament[],
+): RecordSummary {
+  let wins = 0;
+  let losses = 0;
+  for (const match of matches) {
+    if (match.outcome === "WIN") wins += 1;
+    else if (match.outcome === "LOSS") losses += 1;
+  }
+  let tournamentsPlayed = 0;
+  for (const tournament of tournaments) {
+    if (PLAYED_STATES.has(tournament.state)) tournamentsPlayed += 1;
+  }
+  return { wins, losses, tournamentsPlayed };
+}
+
 export function formatRate(rate: number | null): string {
   if (rate === null) return "—";
   return `${Math.round(rate * 100)} %`;
