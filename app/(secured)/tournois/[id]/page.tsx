@@ -22,7 +22,12 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
-import { isMyTeamTeam1, scoreSubmittedMessage, teamLabel } from "@/lib/shared/match-card-viewer";
+import {
+  isMyTeamTeam1,
+  isViewerEntrant,
+  scoreSubmittedMessage,
+  teamLabel,
+} from "@/lib/shared/match-card-viewer";
 import { isPreLaunchState } from "@/lib/shared/seeding";
 import {
   planRoundRollback,
@@ -590,7 +595,7 @@ export default function TournamentDetailPage() {
           c'est justement quand le site décroche qu'il faut pouvoir joindre un
           arbitre. */}
       <IssueReportProvider
-        canReport={detail.myTeamId !== null && !frozen}
+        canReport={isViewerEntrant(detail.myTeamId, detail.registrations) && !frozen}
         openReport={openIssueReport}
       >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} tournamentId={detail.card.id} />

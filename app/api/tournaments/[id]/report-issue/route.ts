@@ -9,8 +9,9 @@ import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
  * Corps : `{ message: string, matchId?: number | null }` — `matchId` absent ou
  * `null` désigne le tournoi entier.
  *
- * Réservé aux **engagés** du tournoi : le service revérifie l'inscription, le
- * bouton de l'interface ne suffit pas à en faire un droit. Plafonné, parce que
+ * Réservé aux **engagés** du tournoi, et une manche aux seuls engagés qui la
+ * jouent : le service revérifie les deux, le bouton de l'interface ne suffit
+ * pas à en faire un droit. Plafonné, parce que
  * la route fait vibrer le téléphone des arbitres à chaque appel.
  */
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -44,7 +45,9 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "INVALID_ISSUE_MESSAGE") return fail(message, 400);
-    if (message === "NOT_REGISTERED") return fail(message, 403);
+    if (message === "NOT_REGISTERED" || message === "NOT_MATCH_PARTICIPANT") {
+      return fail(message, 403);
+    }
     if (message === "TOURNAMENT_NOT_FOUND" || message === "MATCH_NOT_FOUND") {
       return fail(message, 404);
     }

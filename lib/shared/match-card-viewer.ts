@@ -15,6 +15,20 @@ export function isMyTeamTeam1(myTeamId: number | null, team1Id: number | null): 
 }
 
 /**
+ * Le lecteur est-il **engagé** dans ce tournoi ? `myTeamId` ne suffit pas à le
+ * dire : en tournoi par équipes, c'est l'équipe active du lecteur, **inscrite
+ * ou non** — elle sert aussi à proposer l'inscription. Seule sa présence parmi
+ * les inscrites en fait un engagé, et donc quelqu'un qui peut signaler un
+ * problème (le serveur rejoue la même règle).
+ */
+export function isViewerEntrant(
+  myTeamId: number | null,
+  registrations: ReadonlyArray<{ teamId: number }>,
+): boolean {
+  return myTeamId !== null && registrations.some((row) => row.teamId === myTeamId);
+}
+
+/**
  * Le bouton « Signaler un problème » d'une carte ne doit s'afficher que sur
  * le match du **lecteur** : le bouton de l'en-tête couvre déjà tout le reste
  * du plateau, et répéter le bouton sur chaque carte alourdit celles qui ne
