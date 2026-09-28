@@ -68,13 +68,12 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   const [environment, setEnvironment] = useState<LoginEnvironment>("BROWSER");
 
   const [handle, setHandle] = useState("");
-  const [resolvedId, setResolvedId] = useState("");
+  // Numéro du défi émis : la demande de code ne rend plus l'identifiant
+  // Discord résolu, ni si un compte existe déjà (c'était un oracle anonyme).
+  const [challengeId, setChallengeId] = useState<number | null>(null);
   const [pseudo, setPseudo] = useState("");
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
-  // Le champ « pseudo site » ne sert qu'à la création du compte : on ne
-  // l'affiche que si le compte Discord n'est pas encore rattaché au site.
-  const [isNewAccount, setIsNewAccount] = useState(true);
   const [loading, setLoading] = useState(false);
   // Consentement RGPD requis avant toute création de compte. Tant qu'il n'est
   // pas accordé, la carte de connexion est masquée derrière la popup et aucune
@@ -151,16 +150,13 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
       const payload = (await response.json()) as {
         error?: string;
         expiresAt?: string;
-        discordId?: string;
-        isNewAccount?: boolean;
+        challengeId?: number;
       };
       if (!response.ok) {
         const code = payload.error || "FAILED";
         throw new CodedError(code, loginErrorMessage(code));
       }
-      setResolvedId(payload.discordId || "");
-      setIsNewAccount(payload.isNewAccount !== false);
-      if (payload.isNewAccount === false) setPseudo("");
+      setChallengeId(typeof payload.challengeId === "number" ? payload.challengeId : null);
       setRequested(true);
       showSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
     } catch (e) {
@@ -180,9 +176,9 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          discordId: resolvedId,
+          challengeId,
           code,
-          pseudo: isNewAccount ? pseudo : undefined,
+          pseudo: pseudo.trim() ? pseudo : undefined,
           termsAccepted,
         }),
       });
@@ -361,19 +357,24 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                 />
                 <FieldErrorText fieldId={LOGIN_FIELD_IDS.code} message={fieldErrors.message("code")} />
               </div>
-              {isNewAccount && (
-                <div className="field">
-                  <label htmlFor="login-site-pseudo">Pseudo site <span style={{ color: "var(--ink-mute)", fontWeight: 400 }}>(première connexion)</span></label>
-                  <input
-                    id="login-site-pseudo"
-                    type="text"
-                    name="pseudo"
-                    value={pseudo}
-                    onChange={(e) => setPseudo(e.target.value)}
-                    placeholder="Ton pseudo"
-                  />
-                </div>
-              )}
+              {/*
+                Proposé à tous : le serveur ne dit plus si le compte existe
+                (la réponse de la demande de code en faisait un oracle), et ne
+                lit ce pseudo qu'à la création — un compte existant garde le sien.
+              */}
+              <div className="field">
+                <label htmlFor="login-site-pseudo">
+                  Pseudo site <span style={{ color: "var(--ink-mute)", fontWeight: 400 }}>(facultatif, première connexion)</span>
+                </label>
+                <input
+                  id="login-site-pseudo"
+                  type="text"
+                  name="pseudo"
+                  value={pseudo}
+                  onChange={(e) => setPseudo(e.target.value)}
+                  placeholder="Ton pseudo"
+                />
+              </div>
               <CyberButton
                 variant="ghost"
                 type="submit"
@@ -391,7 +392,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                   fieldErrors.clear();
                   setRequested(false);
                   setCode("");
-                  setIsNewAccount(true);
+                  setChallengeId(null);
                 }}
                 className="mono"
                 style={{

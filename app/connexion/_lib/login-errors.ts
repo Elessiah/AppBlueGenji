@@ -51,6 +51,18 @@ const LOGIN_ERRORS: Record<string, string> = {
   // un téléphone, elles sont comptées.
   TOO_MANY_CODE_REQUESTS:
     "Trop de codes demandés pour ce compte Discord. Attends une quinzaine de minutes, ou connecte-toi avec Google.",
+  // Plafond **journalier** : la borne qui tient la force brute lente du code.
+  // Le bouton Discord (OAuth) n'y est pas soumis — c'est la sortie à nommer.
+  TOO_MANY_CODE_REQUESTS_TODAY:
+    "Trop de codes demandés pour ce compte Discord aujourd'hui. Connecte-toi avec le bouton Discord ou Google, ou réessaie demain.",
+  // Défi absent ou illisible : l'onglet est antérieur à la demande de code, ou
+  // la page a été rechargée entre les deux étapes.
+  INVALID_CHALLENGE: "Demande de code introuvable. Redemande un code.",
+  // La requête ne vient pas de cette page (formulaire d'un autre site, ou
+  // extension qui la réécrit) : rien que le joueur puisse corriger, sauf
+  // recommencer depuis le site.
+  CROSS_SITE_REQUEST: "Requête refusée. Recharge la page de connexion, puis réessaie.",
+  UNSUPPORTED_CONTENT_TYPE: "Requête refusée. Recharge la page de connexion, puis réessaie.",
   // Plafond de débit générique (`enforceRateLimit`), sur la demande comme sur la
   // vérification.
   TOO_MANY_REQUESTS:

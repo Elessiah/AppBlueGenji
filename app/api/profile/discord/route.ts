@@ -50,6 +50,7 @@ function statusFor(message: string): number {
     case "PROFILE_NOT_FOUND":
       return 404;
     case "TOO_MANY_CODE_REQUESTS":
+    case "TOO_MANY_CODE_REQUESTS_TODAY":
       return 429;
     case "DISCORD_DM_FAILED":
       return 502;
