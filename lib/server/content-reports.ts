@@ -515,7 +515,9 @@ export async function notifyReportTargets(
  * L'auteur de ce signalement peut-il faire écrire aux personnes visées ?
  * Ancienneté de son compte et signalements désignant des **personnes** (joueur
  * ou équipe — un tournoi désigné ne prévient personne) des dernières 24 heures,
- * celui-ci exclu, jugés par `reporterMayWarnTargets`. Un compte introuvable
+ * **antérieurs** à celui-ci (identifiant inférieur : la vérification ne part
+ * qu'après le commit, et des envois rapprochés déposés depuis ne doivent pas
+ * retirer son message à celui-ci), jugés par `reporterMayWarnTargets`. Un compte introuvable
  * ne fait écrire à personne.
  */
 async function reporterMayWarn(reportId: number, reporterUserId: number): Promise<boolean> {
@@ -525,7 +527,7 @@ async function reporterMayWarn(reportId: number, reporterUserId: number): Promis
             (SELECT COUNT(DISTINCT r.id)
              FROM bg_reports r
              JOIN bg_report_targets t ON t.report_id = r.id
-             WHERE r.reporter_user_id = u.id AND r.id <> ?
+             WHERE r.reporter_user_id = u.id AND r.id < ?
                AND t.target_type IN ('USER', 'TEAM')
                AND r.created_at > NOW() - INTERVAL 24 HOUR) AS earlier
      FROM bg_users u

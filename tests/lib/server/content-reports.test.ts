@@ -368,7 +368,9 @@ describe("createReport", () => {
     await flush();
 
     const reporter = pool.execute.mock.calls.find(([sql]) => /AS age_hours/.test(sql));
-    // Celui-ci exclu du compte, sur le compte de l'auteur.
+    // Seuls les signalements **antérieurs** comptent : ceux déposés depuis ne
+    // retirent pas son message à celui-ci.
+    expect(reporter?.[0]).toMatch(/r.id < \?/);
     expect(reporter?.[1]).toEqual([12, 3]);
     expect(reporter?.[0]).toMatch(/INTERVAL 24 HOUR/);
     // Un signalement qui ne désigne qu'un tournoi n'a prévenu personne : il ne compte pas.
