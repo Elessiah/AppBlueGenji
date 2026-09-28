@@ -163,6 +163,11 @@ export function isUnknownColumnError(error: unknown): boolean {
  *   permanente cesse d'être lue : ce serait éroder le signal même qu'on a posé
  *   pour protéger le retrait des adresses.
  *
+ * Même règle pour une **clé étrangère** : le doublon de son nom n'est un no-op
+ * que sur un `ADD … FOREIGN KEY` (voir `isDuplicateForeignKeyName`). La
+ * migration de `fk_bg_logo_quarantines_quarantined_user` journalisait sinon un
+ * faux « le schéma reste en arrière du code » à chaque redémarrage.
+ *
  * Sans `statement`, seuls les deux codes inconditionnels sont tolérés — le
  * défaut prudent.
  */
