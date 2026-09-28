@@ -1,7 +1,6 @@
 "use client";
 
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
-import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import { canReportOwnMatch, teamLabel } from "@/lib/shared/match-card-viewer";
@@ -15,6 +14,7 @@ import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { pendingScoreProposal } from "../_lib/score-form";
+import { isMatchScoreLocked } from "../_lib/score-lock";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip } from "./MatchReplayStrip";
@@ -85,12 +85,10 @@ export function MatchRow({
   const isDoubleForfeit = isMatchDoubleForfeit(match);
 
   // Même règle que le garde-fou serveur (`lib/shared/match-lock.ts`) : le score
-  // n'est plus éditable dès que la manche suivante porte une saisie.
-  const scoreLocked = isScoreEditLocked(
-    fromBracketMatch(match),
-    allMatches.map(fromBracketMatch),
-    format,
-  );
+  // n'est plus éditable dès que la manche suivante porte une saisie. Calculé
+  // une fois pour tout le plateau (`_lib/score-lock.ts`) : posée carte par
+  // carte, la question coûtait un parcours du plateau à chacune.
+  const scoreLocked = isMatchScoreLocked(match.id, allMatches, format);
 
   const rowClass = (win: boolean): string =>
     [styles.row, win ? styles.winner : hasWinner ? styles.decided : ""].filter(Boolean).join(" ");

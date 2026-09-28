@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   countdownRemaining,
   isCountdownHeld,
@@ -57,9 +57,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const showError = useCallback((message: string) => add(message, "error"), [add]);
   const showSuccess = useCallback((message: string) => add(message, "success"), [add]);
+  // Valeur stable : un objet neuf à chaque rendu du fournisseur — donc à chaque
+  // notification ajoutée *et* retirée — re-rendait tous les consommateurs de
+  // `useToast`, fiche d'un tournoi et tout son plateau compris.
+  const value = useMemo(() => ({ showError, showSuccess }), [showError, showSuccess]);
 
   return (
-    <ToastContext.Provider value={{ showError, showSuccess }}>
+    <ToastContext.Provider value={value}>
       {children}
       <div className="sr-only" role="status" aria-live="polite">
         {toasts
