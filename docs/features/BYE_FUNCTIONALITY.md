@@ -202,6 +202,20 @@ Round 2:
    - Is spacing maintained?
    - Are BYE teams readable?
 
+### Résolution automatique (`tryAutoResolveByes`)
+
+`lib/server/tournaments/byes.ts` tranche d'office, par passes successives, les
+exemptions (une seule équipe, case vide qu'aucun match non terminé n'alimente
+plus) et les matchs fantômes (aucune équipe, aucune alimentation en attente).
+L'absence d'alimentation est posée **dans la requête des candidats**
+(`NOT EXISTS` sur les matchs non terminés qui y envoient vainqueur ou perdant),
+et les fantômes d'une passe sont clos en un seul `UPDATE` : la fonction tourne
+dans la transaction de chaque score, où un `COUNT(*)` par match à case vide
+coûtait ~200 allers-retours au lancement d'une double élimination à 128
+équipes. Une passe ne résout que ce qui était libre **au moment de sa lecture** ;
+ce qu'elle débloque est repris à la passe suivante, sur une ligne relue — jamais
+sur la ligne déjà chargée, dont la case vide a pu être garnie entre-temps.
+
 ### Common BYE Display Patterns
 
 ```

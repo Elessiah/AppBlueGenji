@@ -289,7 +289,10 @@ ce qu'elle avait entraîné, exactement comme une correction de score.
 
 `reconcileEndurance` est idempotent et appelé après chaque saisie de score
 (report joueur, sauvegarde admin, résolution admin) : il persiste le classement,
-puis enchaîne la manche suivante ou bascule en play-offs.
+puis enchaîne la manche suivante ou bascule en play-offs. Le classement part en
+**une** instruction (`INSERT` multi-lignes à `ON DUPLICATE KEY UPDATE`, par lots
+de 500 équipes) et non une par équipe : la réconciliation tourne dans la
+transaction du score, et 128 allers-retours y tenaient les verrous d'autant.
 
 Si une correction de score change le classement alors que la manche courante est
 posée mais **pas encore entamée**, ses appariements sont périmés : ils sont

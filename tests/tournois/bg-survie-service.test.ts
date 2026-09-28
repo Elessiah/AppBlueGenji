@@ -91,6 +91,26 @@ const ROUND_PLAYED: [string, unknown][] = [
   ["SELECT COUNT(*) AS total", [[{ total: 2, done: 2 }]]],
 ];
 
+/**
+ * Lignes du classement écrites par `persistStandings`, une par équipe : le
+ * classement part en une instruction multi-lignes, dix paramètres par ligne.
+ */
+const STANDING_COLUMNS = 10;
+const STANDINGS_INSERT = "INSERT INTO bg_endurance_standings";
+
+function standingRows(conn: { execute: SqlMock }): unknown[][] {
+  return conn.execute.mock.calls
+    .filter(([sql]) => String(sql).includes(STANDINGS_INSERT))
+    .flatMap(([, params]) => {
+      const values = params as unknown[];
+      const rows: unknown[][] = [];
+      for (let i = 0; i < values.length; i += STANDING_COLUMNS) {
+        rows.push(values.slice(i, i + STANDING_COLUMNS));
+      }
+      return rows;
+    });
+}
+
 describe("initializeEnduranceTournament", () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -101,9 +121,7 @@ describe("initializeEnduranceTournament", () => {
 
   /** Seeds posés par les `INSERT` du classement, sous la forme [équipe, seed]. */
   function insertedSeeds(conn: ReturnType<typeof makeConn>): [unknown, unknown][] {
-    return conn.execute.mock.calls
-      .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
-      .map(([, params]) => [(params as unknown[])[1], (params as unknown[])[2]]);
+    return standingRows(conn).map((values) => [values[1], values[2]]);
   }
 
   it("sème le classement depuis le classement du site et fige le barème", async () => {
@@ -136,6 +154,54 @@ describe("initializeEnduranceTournament", () => {
     );
     // Barème par défaut rendu explicite : 9 / +1 / −1 / 8.
     expect((settings?.[1] as unknown[]).slice(0, 4)).toEqual([9, 1, 1, 8]);
+  });
+
+  it("écrit le classement en une instruction multi-lignes, pas une par équipe", async () => {
+    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue(
+      Array.from({ length: 128 }, (_, index) => ({ teamId: index + 1, teamName: `É${index}` })),
+    );
+    const conn = makeConn([[[tournamentRow()]]]);
+
+    await initializeEnduranceTournament(5, conn);
+
+    const inserts = conn.execute.mock.calls.filter(([sql]) =>
+      String(sql).includes(STANDINGS_INSERT),
+    );
+    expect(inserts).toHaveLength(1);
+    const [sql, params] = inserts[0];
+    expect(String(sql).match(/\(\?, \?, \?, \?, \?, \?, \?, \?, \?, \?\)/g)).toHaveLength(128);
+    expect(String(sql)).toContain("ON DUPLICATE KEY UPDATE");
+    expect(params as unknown[]).toHaveLength(128 * STANDING_COLUMNS);
+    expect(standingRows(conn)[127].slice(0, 3)).toEqual([5, 128, 128]);
+  });
+
+  it("découpe un très grand classement en lots de 500 lignes", async () => {
+    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue(
+      Array.from({ length: 1001 }, (_, index) => ({ teamId: index + 1, teamName: `É${index}` })),
+    );
+    const conn = makeConn([[[tournamentRow()]]]);
+
+    await initializeEnduranceTournament(5, conn);
+
+    const sizes = conn.execute.mock.calls
+      .filter(([sql]) => String(sql).includes(STANDINGS_INSERT))
+      .map(([, params]) => (params as unknown[]).length / STANDING_COLUMNS);
+    expect(sizes).toEqual([500, 500, 1]);
+    expect(standingRows(conn).map((row) => row[1])).toEqual(
+      Array.from({ length: 1001 }, (_, index) => index + 1),
+    );
+  });
+
+  it("n'écrit rien quand le classement est vide", async () => {
+    jest.mocked(loadEntrantsBySiteRanking).mockResolvedValue([]);
+    const conn = makeConn([[[tournamentRow()]]]);
+
+    await initializeEnduranceTournament(5, conn);
+
+    expect(standingRows(conn)).toEqual([]);
+    expect(
+      conn.execute.mock.calls.some(([sql]) => String(sql).includes(STANDINGS_INSERT)),
+    ).toBe(false);
   });
 
   it("fait primer l'ordre fixé à la main sur le classement du site", async () => {
@@ -473,14 +539,8 @@ describe("reconcileEndurance", () => {
 
     await reconcileEndurance(5, conn);
 
-    const inserts = conn.execute.mock.calls.filter(([sql]) =>
-      String(sql).includes("INSERT INTO bg_endurance_standings"),
-    );
     const byTeam = new Map(
-      inserts.map(([, params]) => {
-        const values = params as unknown[];
-        return [values[1], { points: values[3], wins: values[4], losses: values[5] }];
-      }),
+      standingRows(conn).map((values) => [values[1], { points: values[3], wins: values[4], losses: values[5] }]),
     );
 
     expect(byTeam.get(1)).toEqual({ points: 10, wins: 1, losses: 0 });
@@ -492,12 +552,7 @@ describe("reconcileEndurance", () => {
   /** Classement persisté par une réconciliation, indexé par équipe. */
   function persistedPoints(conn: { execute: SqlMock }): Map<unknown, number> {
     return new Map(
-      conn.execute.mock.calls
-        .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
-        .map(([, params]) => {
-          const values = params as unknown[];
-          return [values[1], values[3] as number];
-        }),
+      standingRows(conn).map((values) => [values[1], values[3] as number]),
     );
   }
 
@@ -616,10 +671,7 @@ describe("reconcileEndurance — plafond de manches", () => {
       [[standingRow(1), standingRow(2), standingRow(3), standingRow(4)]],
       [[played(1, 1, 2, 1), played(1, 3, 4, 3), played(2, 1, 3, 1), played(2, 2, 4, 2)]],
       [[]], // forfaits
-      [{ affectedRows: 1 }],
-      [{ affectedRows: 1 }],
-      [{ affectedRows: 1 }],
-      [{ affectedRows: 1 }],
+      [{ affectedRows: 4 }], // persistStandings : une instruction pour tout le classement
       // startEndurancePlayoffs : tournoi relu, puis classement relu.
       [
         [
@@ -637,12 +689,7 @@ describe("reconcileEndurance — plafond de manches", () => {
   /** Statut persisté par la réconciliation, indexé par équipe. */
   function persistedStatuses(conn: { execute: SqlMock }): Map<unknown, unknown> {
     return new Map(
-      conn.execute.mock.calls
-        .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
-        .map(([, params]) => {
-          const values = params as unknown[];
-          return [values[1], values[7]];
-        }),
+      standingRows(conn).map((values) => [values[1], values[7]]),
     );
   }
 
@@ -660,12 +707,7 @@ describe("reconcileEndurance — plafond de manches", () => {
     expect(statuses.get(4)).toBe("OUT_OF_CONTENTION");
 
     const points = new Map(
-      conn.execute.mock.calls
-        .filter(([sql]) => String(sql).includes("INSERT INTO bg_endurance_standings"))
-        .map(([, params]) => {
-          const values = params as unknown[];
-          return [values[1], values[3]];
-        }),
+      standingRows(conn).map((values) => [values[1], values[3]]),
     );
     expect(points.get(2)).toBe(9);
   });
@@ -721,10 +763,7 @@ describe("reconcileEndurance — réappariement après correction", () => {
         ],
       ],
       [[]], // forfaits
-      [{ affectedRows: 1 }], // persistStandings ×4 (absorbés par le fallback)
-      [{ affectedRows: 1 }],
-      [{ affectedRows: 1 }],
-      [{ affectedRows: 1 }],
+      [{ affectedRows: 4 }], // persistStandings : une instruction pour tout le classement
       [[{ c: 0 }]], // la manche 2 ne porte aucune saisie
       [pairings], // appariements actuellement en base
     ];
