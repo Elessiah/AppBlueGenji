@@ -20,6 +20,7 @@
  */
 import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie";
 import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
+import { discordInline, discordQuote } from "./discord-text";
 
 /** Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`). */
 export type MatchReminderOffsetKey = "P7D" | "P1D" | "PT1H";
@@ -203,8 +204,8 @@ export function buildMatchReminderMessage(
 ): string {
   const lines = [
     `**Rappel de match — dans ${offset.label}**`,
-    `${context.tournamentName} · ${context.roundLabel}`,
-    `**${context.teamName}** contre **${context.opponentName}**`,
+    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
+    `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`,
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
   if (context.tournamentUrl) lines.push(context.tournamentUrl);
@@ -230,8 +231,8 @@ export function buildMatchScheduleAnnouncement(
 ): string {
   const lines = [
     "**Match programmé**",
-    `${context.tournamentName} · ${context.roundLabel}`,
-    `**${context.teamName}** contre **${context.opponentName}**`,
+    `${discordInline(context.tournamentName)} · ${context.roundLabel}`,
+    `**${discordInline(context.teamName)}** contre **${discordInline(context.opponentName)}**`,
     `Coup d'envoi : ${formatMatchStart(context.startAt)} (heure de Paris)`,
   ];
   if (remaining.length > 0) {
@@ -322,7 +323,7 @@ export interface IssueReportContext {
 function reporterLabel(entrant: LogEntrant): string {
   return entrant.participantType === "SOLO"
     ? ANONYMOUS_PLAYER_LABEL
-    : `${ANONYMOUS_PLAYER_LABEL} de l'équipe ${entrant.name}`;
+    : `${ANONYMOUS_PLAYER_LABEL} de l'équipe ${discordInline(entrant.name)}`;
 }
 
 /**
@@ -334,13 +335,15 @@ function reporterLabel(entrant: LogEntrant): string {
 export function buildIssueReportMessage(context: IssueReportContext): string {
   const lines = [
     "**Signalement de problème**",
-    `Tournoi : ${context.tournamentName}`,
+    `Tournoi : ${discordInline(context.tournamentName)}`,
     context.match
       ? `Match : ${context.match.round} — ${context.match.team1 ? entrantLabel(context.match.team1) : "TBD"} vs ${context.match.team2 ? entrantLabel(context.match.team2) : "TBD"} (#${context.match.id})`
       : "Portée : tournoi entier",
     `Auteur : ${reporterLabel(context.entrant)}`,
     "",
-    context.message,
+    // Texte libre de l'auteur : cité ligne à ligne, balisage et mentions
+    // désamorcés — aucune de ses lignes ne passe pour une ligne du site.
+    discordQuote(context.message),
   ];
   if (context.tournamentUrl) lines.push("", context.tournamentUrl);
   return lines.join("\n");

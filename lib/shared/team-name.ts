@@ -16,6 +16,8 @@
  * Module pur : importable côté serveur comme côté client.
  */
 
+import { visibleText } from "./visible-text";
+
 export const TEAM_NAME_MIN_LENGTH = 3;
 export const TEAM_NAME_MAX_LENGTH = 60;
 
@@ -52,14 +54,18 @@ export function teamNameLength(name: string): number {
 }
 
 /**
- * Valide une saisie de nom et rend sa forme canonique (sans espaces de bordure).
+ * Valide une saisie de nom et rend sa forme canonique (`visibleText` : caractères
+ * visibles seulement, espaces réduits).
  *
  * Prend `unknown` : le corps d'une requête n'est qu'annoté, et un nom qui n'est
  * pas du texte (`{ "name": 123 }`) faisait lever `.trim()` — le message du
  * moteur JavaScript partait alors au client à la place d'un refus nommé.
  */
 export function checkTeamName(raw: unknown): TeamNameCheck {
-  const name = typeof raw === "string" ? raw.trim() : "";
+  // Forme visible : sans caractère invisible ni commande de direction (un sosie
+  // d'une autre équipe passerait sinon l'unicité), sans saut de ligne (qui
+  // forgerait une ligne de journal), espaces réduits.
+  const name = typeof raw === "string" ? visibleText(raw) : "";
   const length = teamNameLength(name);
   if (length < TEAM_NAME_MIN_LENGTH || length > TEAM_NAME_MAX_LENGTH) {
     return { ok: false, reason: INVALID_TEAM_NAME };

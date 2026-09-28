@@ -6,6 +6,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
 import { can } from "@/lib/shared/permissions";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
+import { discordInline } from "@/lib/shared/discord-text";
 
 /**
  * Retire le logo d'une équipe, pour la modération (permission `moderation`) :
@@ -39,7 +40,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
       // un retrait déjà effectif.
       console.error("[moderation] fichier du logo non effacé", error);
     });
-    publishStaffAction(`🧹 Logo de l'équipe « ${teamName} » retiré par le staff (modération).`, {
+    publishStaffAction(`🧹 Logo de l'équipe « ${discordInline(teamName)} » retiré par le staff (modération).`, {
       id: user.id,
       pseudo: user.pseudo,
     });

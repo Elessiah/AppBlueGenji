@@ -23,6 +23,7 @@
  */
 
 import { LOGO_QUARANTINE_DAYS, type LogoQuarantineView } from "./logo-quarantine";
+import { discordInline } from "./discord-text";
 
 /**
  * Catégories d'un signalement.
@@ -543,7 +544,10 @@ export function formatReportAlert(input: {
       parts.push(plural(ofType.length, type));
       continue;
     }
-    const names = ofType.map((target) => target.label).filter((label): label is string => Boolean(label));
+    const names = ofType
+      .map((target) => target.label)
+      .filter((label): label is string => Boolean(label))
+      .map(discordInline);
     parts.push(names.length > 0 ? `${plural(ofType.length, type)} (${names.join(", ")})` : plural(ofType.length, type));
   }
   const scope = parts.length > 0 ? ` — ${parts.join(", ")}` : "";

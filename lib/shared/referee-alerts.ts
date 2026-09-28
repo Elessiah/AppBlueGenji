@@ -79,6 +79,7 @@
 import type { BotEventKind, BotLogTournament } from "./bot-logs";
 import { matchRoundLabel } from "./discord-notifications";
 import { entrantLabel, type LogEntrant } from "./log-privacy";
+import { discordInline } from "./discord-text";
 
 /**
  * Canal de destination d'un évènement.
@@ -154,7 +155,7 @@ export interface RefereeAlertContext {
 function alertLine(emoji: string, reason: string, context: RefereeAlertContext): string {
   const round = matchRoundLabel(context.bracket, context.roundNumber);
   const line =
-    `${emoji} Arbitrage requis — « ${context.tournament.name} » (#${context.tournament.id})` +
+    `${emoji} Arbitrage requis — « ${discordInline(context.tournament.name)} » (#${context.tournament.id})` +
     ` · ${round} : ${entrantLabel(context.team1)} vs ${entrantLabel(context.team2)} (match #${context.matchId})` +
     ` — ${reason}.`;
   return context.tournamentUrl ? `${line} ${context.tournamentUrl}` : line;

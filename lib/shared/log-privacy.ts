@@ -17,6 +17,7 @@
  * de cycle entre eux.
  */
 import type { ParticipantType } from "./participants";
+import { discordInline } from "./discord-text";
 
 /**
  * Un engagé tel qu'un message Discord le reçoit : son nom **et** ce qu'il est.
@@ -37,9 +38,13 @@ export const ANONYMOUS_PLAYER_LABEL = "un joueur";
 /** Ce qu'un message Discord écrit à la place d'un membre du staff. */
 export const ANONYMOUS_STAFF_LABEL = "le staff";
 
-/** Nom d'un engagé sur Discord : l'équipe par son nom, le joueur jamais. */
+/**
+ * Nom d'un engagé sur Discord : l'équipe par son nom, le joueur jamais. Le nom
+ * est neutralisé (`discordInline`) : une équipe nommée `@everyone` ne notifie
+ * personne, un nom balisé ne devient pas un lien masqué.
+ */
 export function entrantLabel(entrant: LogEntrant): string {
-  return entrant.participantType === "SOLO" ? ANONYMOUS_PLAYER_LABEL : entrant.name;
+  return entrant.participantType === "SOLO" ? ANONYMOUS_PLAYER_LABEL : discordInline(entrant.name);
 }
 
 /** Auteur d'un geste du staff : nommé dans les journaux du serveur, jamais sur Discord. */

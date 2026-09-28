@@ -56,6 +56,7 @@ import {
   type LogoQuarantineView,
   type QuarantineTargetType,
 } from "@/lib/shared/logo-quarantine";
+import { discordInline } from "@/lib/shared/discord-text";
 
 const TEAM_UPLOAD_PREFIX = "/uploads/teams/";
 const USER_UPLOAD_PREFIX = "/uploads/avatars/";
@@ -311,7 +312,7 @@ export async function deleteTeamLogoForReport(
     });
   }
 
-  publishStaffAction(`🗑️ Logo de l'équipe « ${teamName} » supprimé sans délai par le staff (signalement #${reportId}).`, {
+  publishStaffAction(`🗑️ Logo de l'équipe « ${discordInline(teamName)} » supprimé sans délai par le staff (signalement #${reportId}).`, {
     id: actor.userId,
     pseudo: actor.pseudo,
   });
@@ -773,7 +774,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
 
   if (row.target_type === "TEAM") {
     const teamName = row.target_name;
-    publishStaffAction(`✅ Logo de l'équipe « ${teamName} » rétabli par le staff (contestation acceptée).`, {
+    publishStaffAction(`✅ Logo de l'équipe « ${discordInline(teamName)} » rétabli par le staff (contestation acceptée).`, {
       id: actor.userId,
       pseudo: actor.pseudo,
     });
@@ -846,7 +847,7 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
   // une seule chaîne, jamais de pseudo, même dans sa moitié qui ne part que
   // dans pm2 — sans quoi il faudrait deux variables à tenir cohérentes.
   const line = isTeam
-    ? `🗑️ Logo de l'équipe « ${row.target_name} » supprimé définitivement`
+    ? `🗑️ Logo de l'équipe « ${discordInline(row.target_name)} » supprimé définitivement`
     : `🗑️ Avatar d'${ANONYMOUS_PLAYER_LABEL} supprimé définitivement`;
   if (actor) {
     publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo });
