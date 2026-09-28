@@ -50,17 +50,3 @@ pipeline de `CLAUDE.md`.
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
-
-## 20. Sens de lecture de la barre de forme inatteignable sous la plaque de la carte d'équipe
-
-- **Critère** : RGAA 10.7 / WCAG 1.3.1 — une information de lecture (l'ordre
-  des cases) n'est donnée qu'en infobulle native, que rien n'atteint.
-- **Constat** : `app/(secured)/equipes/cards/TeamCard.tsx`, `.formBar` — la
-  barre des derniers matchs porte `title="N derniers matchs, du plus récent au
-  plus ancien"`, mais la plaque `.cardOverlay` (`z-index: 1`) recouvre toute la
-  carte : la souris n'atteint jamais la barre, l'infobulle ne se déclenche pas.
-  Les lecteurs d'écran ont l'`aria-label` (résultats énumérés), mais un voyant
-  ne sait pas dans quel sens lire les cases.
-- **À faire** : dire le sens visiblement (petite légende « récent → ancien »
-  sous la barre, ou flèche) et retirer le `title`, comme la légende des points
-  (`RANKING_UNRANKED_SHORT`) et le nom du vainqueur de `FinishedCard`.
