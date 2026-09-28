@@ -447,7 +447,9 @@ describe("DELETE /api/admin/users/[id]/avatar", () => {
     const res = await removeUserAvatar(new Request("http://localhost"), params("9"));
     expect(res.status).toBe(200);
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/9-a.webp");
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("Nova"), { id: 1, pseudo: "Admin" });
+    // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
+    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), { id: 1, pseudo: "Admin" });
+    expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining("Nova"), expect.anything());
     // Hors de tout signalement : le joueur est prévenu, sans lien de contestation.
     expect(notifyUserAvatarRemoved).toHaveBeenCalledWith(9, null);
   });

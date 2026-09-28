@@ -13,6 +13,10 @@ import {
 import {
   LOGO_QUARANTINE_DAYS,
   canAutoPurgeLogo,
+  formatAvatarHiddenLog,
+  formatAvatarHiddenNotice,
+  formatAvatarRemovedNotice,
+  formatAvatarRestoredNotice,
   formatLogoHiddenLog,
   formatLogoHiddenNotice,
   formatLogoRemovedNotice,
@@ -141,5 +145,36 @@ describe("suppression sans délai d'un logo", () => {
     expect(standalone).not.toContain("signalement.");
     expect(standalone).toContain("Signaler un problème");
     expect(standalone).not.toContain("https://");
+  });
+});
+
+describe("quarantaine des avatars — jamais le pseudo du joueur sur Discord", () => {
+  it("dit au joueur ce qui arrive, au singulier, sans nommer l'auteur du signalement", () => {
+    const hidden = formatAvatarHiddenNotice({ purgeAfter: new Date("2026-06-30T10:00:00Z"), url: "https://site.test/signalements/4" });
+    expect(hidden).toContain("Ton avatar");
+    expect(hidden).toContain("30 juin 2026");
+    expect(hidden).toContain("https://site.test/signalements/4");
+    expect(formatAvatarRestoredNotice()).toContain("rétabli");
+  });
+
+  it("prévient le joueur avec le lien du signalement, ou le renvoie vers l'association", () => {
+    const linked = formatAvatarRemovedNotice({ url: "https://site.test/signalements/12" });
+    expect(linked).toContain("Ton avatar");
+    expect(linked).toContain("à la suite d'un signalement");
+    expect(linked).toContain("https://site.test/signalements/12");
+
+    const standalone = formatAvatarRemovedNotice({ url: null });
+    expect(standalone).not.toContain("signalement.");
+    expect(standalone).toContain("Signaler un problème");
+    expect(standalone).not.toContain("https://");
+  });
+
+  it("journalise le masquage sans jamais nommer le joueur (lib/shared/log-privacy.ts)", () => {
+    // Contrairement à `formatLogoHiddenLog`, qui peut nommer une équipe : un
+    // message Discord ne porte jamais le pseudo d'un joueur, et la fonction ne
+    // prend même pas de paramètre par lequel un appelant pourrait lui en glisser un.
+    expect(formatAvatarHiddenLog({ reportId: 4, purgeAfter: new Date("2026-06-30T10:00:00Z") })).toBe(
+      "🙈 Avatar de un joueur masqué par le staff (signalement #4), suppression définitive le 30 juin 2026 sans contestation.",
+    );
   });
 });

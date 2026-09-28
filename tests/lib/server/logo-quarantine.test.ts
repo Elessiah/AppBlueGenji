@@ -108,7 +108,7 @@ describe("avatarFileLocations", () => {
 });
 
 describe("deleteTeamLogoForReport", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'TEAM'/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
   const members: Route = [
     /FROM bg_team_members tm\s+JOIN bg_users u/,
     () => [[{ pseudo: "Capitaine", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]],
@@ -188,7 +188,7 @@ describe("deleteTeamLogoForReport", () => {
 });
 
 describe("deleteUserAvatarForReport", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'USER'/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
   const locked = (avatarUrl: string | null): Route => [
     /SELECT pseudo, avatar_url FROM bg_users WHERE id = \? AND is_deleted = 0 FOR UPDATE/,
     () => [[{ pseudo: "Nova", avatar_url: avatarUrl }]],
@@ -221,7 +221,11 @@ describe("deleteUserAvatarForReport", () => {
     const [message, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-removed");
     expect(message).toContain("Ton avatar");
-    expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("sans délai"), { id: 1, pseudo: "Admin" });
+    // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
+    const [staffLine] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(staffLine).toContain("un joueur");
+    expect(staffLine).toContain("sans délai");
+    expect(staffLine).not.toContain("Nova");
   });
 
   it("refuse un joueur sans avatar, sans rien écrire", async () => {
@@ -274,7 +278,7 @@ describe("notifyUserAvatarRemoved", () => {
 });
 
 describe("hideTeamLogo", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'TEAM'/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
   const team: Route = [/SELECT name, logo_url FROM bg_teams/, () => [[{ name: "Alpha", logo_url: LOGO }]]];
   const notShared: Route = [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \? AND id <> \?/, () => [[{ total: 0 }]]];
   const shared: Route = [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \? AND id <> \?/, () => [[{ total: 2 }]]];
@@ -423,7 +427,7 @@ describe("hideTeamLogo", () => {
 });
 
 describe("hideUserAvatarForReport", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'USER'/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
   const user: Route = [/SELECT pseudo, avatar_url FROM bg_users WHERE id = \? AND is_deleted = 0 LIMIT 1/, () => [[{ pseudo: "Nova", avatar_url: AVATAR }]]];
   const recipient: Route = [
     /FROM bg_users\s+WHERE id = \? AND is_deleted = 0/,
@@ -434,7 +438,7 @@ describe("hideUserAvatarForReport", () => {
     install(
       [reportTargets, user, recipient],
       [
-        [/SELECT avatar_url FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ avatar_url: AVATAR }]]],
+        [/SELECT avatar_url FROM bg_users WHERE id = \? AND is_deleted = 0 FOR UPDATE/, () => [[{ avatar_url: AVATAR }]]],
         [/UPDATE bg_users SET avatar_url = NULL/, () => [{}]],
         [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 50 }]],
       ],
@@ -452,12 +456,16 @@ describe("hideUserAvatarForReport", () => {
     const [message, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-hidden");
     expect(message).toContain("Ton avatar");
+    // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
+    const [staffLine] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(staffLine).toContain("un joueur");
+    expect(staffLine).not.toContain("Nova");
   });
 
   it("efface le fichier, sans le republier, si le joueur a changé d'avatar pendant le geste", async () => {
     install(
       [reportTargets, user],
-      [[/SELECT avatar_url FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ avatar_url: "/api/uploads/avatars/9-new.webp" }]]]],
+      [[/SELECT avatar_url FROM bg_users WHERE id = \? AND is_deleted = 0 FOR UPDATE/, () => [[{ avatar_url: "/api/uploads/avatars/9-new.webp" }]]]],
     );
     await expect(hideUserAvatarForReport(12, 9, actor)).rejects.toThrow("AVATAR_CHANGED");
     expect(connection.rollback).toHaveBeenCalled();
@@ -535,6 +543,10 @@ describe("restoreReportedImage", () => {
     const [, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-restored");
     expect(recipients).toHaveLength(1);
+    // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
+    const [staffLine] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(staffLine).toContain("un joueur");
+    expect(staffLine).not.toContain("Nova");
   });
 
   it("n'écrase pas une image envoyée depuis", async () => {
@@ -624,6 +636,10 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     const [message, , context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-removed");
     expect(message).toContain("Ton avatar");
+    // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
+    const [staffLine] = jest.mocked(publishStaffAction).mock.calls[0];
+    expect(staffLine).toContain("un joueur");
+    expect(staffLine).not.toContain("Nova");
   });
 
   it("supprime d'office ce qui est échu et non contesté, et garde ce qui attend une décision", async () => {
