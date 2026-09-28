@@ -445,8 +445,14 @@ type RecipientRow = RowDataPacket & {
 
 type Executor = Pick<PoolConnection, "execute">;
 
-/** Verrou nommé qui sérialise la réservation des avis aux personnes visées. */
+/** Verrou nommé qui sérialise les avis aux personnes visées, envoi compris. */
 const REPORT_TARGET_NOTICE_LOCK = "bg_report_target_notices";
+/**
+ * Attente du verrou : il est tenu le temps d'un envoi, que le bot peut faire
+ * durer jusqu'à son délai de notification (15 s) — quelques envois en file
+ * doivent passer.
+ */
+const REPORT_TARGET_NOTICE_LOCK_WAIT_SECONDS = 60;
 
 /** Ce qu'une réservation a posé : à qui écrire, et quelles cibles sont marquées. */
 type TargetNoticePlan = {
@@ -474,10 +480,10 @@ type TargetNoticePlan = {
  * à personne — le signalement est enregistré, consultable par les personnes
  * visées, seul le message est retenu.
  *
- * Les deux bornes se **réservent**, elles ne se relisent pas : la décision et
- * la marque (`bg_report_targets.notified_at`) se prennent sous un verrou nommé
- * (`reserveTargetNotices`), sans quoi cinq signalements simultanés sur une même
- * équipe liraient tous « personne n'a été prévenu » et écriraient tous. La
+ * Les deux bornes se **réservent**, elles ne se relisent pas : la décision, la
+ * marque (`bg_report_targets.notified_at`) et l'envoi se font sous un verrou
+ * nommé (`reserveTargetNotices`), sans quoi cinq signalements simultanés sur
+ * une même équipe liraient tous « personne n'a été prévenu » et écriraient tous. La
  * marque ne se pose que sur les cibles qui ont donné un destinataire, et elle
  * est **rendue** si rien n'est parti (bot injoignable et aucun appareil
  * abonné) : une cible marquée à tort rendrait muet pour 24 h le signalement
@@ -494,24 +500,29 @@ export async function notifyReportTargets(
 ): Promise<void> {
   if (!targets.some((target) => target.type === "USER" || target.type === "TEAM")) return;
   const db = await getDatabase();
-  const plan = await withNamedLock(db, REPORT_TARGET_NOTICE_LOCK, 10, (connection) =>
-    reserveTargetNotices(connection, reportId, targets, reporterUserId),
-  );
-  if (!plan) return;
+  // L'envoi se fait **sous** le verrou, marque rendue comprise : relâché avant,
+  // un second signalement sur la même équipe lirait la marque d'un envoi encore
+  // en cours, se tairait, puis le premier rendrait sa marque faute d'avoir rien
+  // remis — et l'équipe ne serait prévenue par aucun des deux. Les signalements
+  // à cibles sont rares et plafonnés ; les attendre en file ne coûte rien.
+  await withNamedLock(db, REPORT_TARGET_NOTICE_LOCK, REPORT_TARGET_NOTICE_LOCK_WAIT_SECONDS, async (connection) => {
+    const plan = await reserveTargetNotices(connection, reportId, targets, reporterUserId);
+    if (!plan) return;
 
-  const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-  const report = await notifyUsers(plan.recipients, {
-    topic: "CONTENT_REPORT",
-    discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
-    push: contentReportPush({ reportId, category }),
+    const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
+    const report = await notifyUsers(plan.recipients, {
+      topic: "CONTENT_REPORT",
+      discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
+      push: contentReportPush({ reportId, category }),
+    });
+    if ((report.discord?.sent ?? 0) + report.pushed === 0) {
+      await connection.execute(
+        `UPDATE bg_report_targets SET notified_at = NULL
+         WHERE report_id = ? AND (${plan.marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
+        [reportId, ...plan.marked.flat()],
+      );
+    }
   });
-  if ((report.discord?.sent ?? 0) + report.pushed === 0) {
-    await db.execute(
-      `UPDATE bg_report_targets SET notified_at = NULL
-       WHERE report_id = ? AND (${plan.marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
-      [reportId, ...plan.marked.flat()],
-    );
-  }
 }
 
 /**
