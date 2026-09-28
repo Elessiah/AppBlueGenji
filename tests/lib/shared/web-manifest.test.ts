@@ -38,8 +38,8 @@ describe("buildWebManifest", () => {
     expect(webManifest.lang).toBe("fr");
   });
 
-  it("s'installe en application autonome couvrant tout le site", () => {
-    expect(webManifest.display).toBe("standalone");
+  it("s'installe sans mode autonome, où iOS perdrait la session OAuth", () => {
+    expect(webManifest.display).toBe("minimal-ui");
     expect(webManifest.start_url).toBe("/");
     expect(webManifest.scope).toBe("/");
     expect(webManifest.id).toBe("/");

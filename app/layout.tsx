@@ -71,8 +71,9 @@ export const metadata: Metadata = {
     icon: "/favicon.png",
     apple: "/apple-touch-icon.png",
   },
-  // Lancé depuis l'écran d'accueil d'iOS, qui ne lit pas le manifeste pour cela.
-  appleWebApp: { capable: true, title: SITE_NAME, statusBarStyle: "black" },
+  // Nom sous l'icône d'iOS. Surtout pas `capable: true` : il forcerait le mode
+  // autonome, où la connexion OAuth ne revient pas — voir `APP_DISPLAY`.
+  appleWebApp: { title: SITE_NAME },
 };
 
 /** Même couleur que le manifeste : la barre du navigateur se fond dans le fond du site. */

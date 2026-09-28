@@ -10,10 +10,11 @@
 | `app/manifest.ts` | Route Next — `<link rel="manifest">` est posé seul dans le `<head>` |
 | `public/icons/icon-192.png`, `icon-512.png` | Icônes `any`, logo transparent |
 | `public/icons/icon-maskable-512.png` | Icône `maskable` : logo à 72 % du côté sur `--cyber-bg`, dans la zone sûre de 80 % d'Android |
-| `app/layout.tsx` | `viewport.themeColor` (même couleur) et `appleWebApp` (iOS ne lit pas le manifeste pour cela) |
+| `app/layout.tsx` | `viewport.themeColor` (même couleur) et `appleWebApp.title` (nom sous l'icône iOS) |
 
 ## Choix
 
+- **`display: "minimal-ui"`, jamais `standalone`** : en mode autonome, iOS donne à l'app installée ses propres cookies et ouvre l'aller-retour OAuth (Google, Discord, Blizzard) dans une feuille Safari qui ne les partage pas — `bg_oauth` manque au rappel, ou la session reste dans la feuille. iOS ne connaît pas `minimal-ui` et ouvre l'icône dans Safari ; Chrome et Android installent l'app dans une fenêtre avec retour et rechargement. Pour la même raison, pas de `appleWebApp.capable`.
 - **Couleurs = `--cyber-bg` (`#05060a`)** : écran de lancement et barre d'état se fondent dans la première page peinte.
 - **Aucun service worker** : l'installation n'en exige plus, et un cache hors ligne servirait un plateau de tournoi périmé à qui croit le lire en direct.
 - **Raccourcis** : Tournois, Équipes, Mon profil. Pages protégées : sans session, elles affichent la carte « Connexion requise », rien n'est exposé.

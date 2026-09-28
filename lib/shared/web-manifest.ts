@@ -19,6 +19,18 @@ import { SITE_DESCRIPTION, SITE_NAME } from "./share-metadata";
 /** `--cyber-bg` — fond du site, écran de lancement et barre d'état. */
 export const APP_BACKGROUND_COLOR = "#05060a";
 
+/**
+ * `minimal-ui`, et pas `standalone` : les connexions Google, Discord et
+ * Blizzard sortent du site puis y reviennent. En `standalone`, iOS donne à
+ * l'app installée un stock de cookies à elle et ouvre l'aller-retour OAuth
+ * dans une feuille Safari qui ne le partage pas — le cookie d'état posé au
+ * départ manque au rappel, ou la session atterrit dans la feuille et l'app
+ * reste déconnectée. iOS ne connaît pas `minimal-ui` et ouvre alors l'icône
+ * dans Safari, où la connexion marche ; Chrome et Android installent quand
+ * même l'app, dans une fenêtre qui garde retour et rechargement.
+ */
+export const APP_DISPLAY = "minimal-ui" as const;
+
 /** Nom affiché sous l'icône, là où « BlueGenji Esport » serait tronqué. */
 export const APP_SHORT_NAME = "BlueGenji";
 
@@ -57,7 +69,7 @@ export function buildWebManifest(): MetadataRoute.Manifest {
     dir: "ltr",
     start_url: "/",
     scope: "/",
-    display: "standalone",
+    display: APP_DISPLAY,
     orientation: "any",
     background_color: APP_BACKGROUND_COLOR,
     theme_color: APP_BACKGROUND_COLOR,
