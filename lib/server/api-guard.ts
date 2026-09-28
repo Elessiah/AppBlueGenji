@@ -300,7 +300,7 @@ export const DISCORD_CODE_REQUEST_IP_RULE: RateLimitRule = {
  * **victime** : la route est anonyme, et dix codes bidon suffisaient alors à
  * fermer la connexion Discord d'un joueur nommé pendant un quart d'heure. (La
  * demande de code ne publie plus l'identifiant Discord : la vérification
- * désigne désormais le **défi** par son numéro.) Le compte visé est bien le seul axe qu'un attaquant ne peut pas
+ * désigne désormais le **défi** par un jeton imprévisible.) Le compte visé est bien le seul axe qu'un attaquant ne peut pas
  * faire tourner — mais c'est précisément ce qui fait de lui un mauvais axe
  * *ici* : le refus retombe sur la personne visée, pas sur l'appelant. Le
  * décompte des essais, lui, reste porté par le code en base, où changer d'IP

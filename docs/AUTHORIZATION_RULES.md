@@ -108,12 +108,16 @@ pouvoir sur la plateforme.
   anonyme et pour n'importe quel pseudo, l'identifiant Discord résolu et
   `isNewAccount` — c'est-à-dire si la personne a un compte BlueGenji —, alors
   que l'annuaire est derrière une connexion et que le flux public du bot masque
-  ces identifiants comme des coordonnées. Elle ne rend plus que le **numéro du
+  ces identifiants comme des coordonnées. Elle ne rend plus que le **jeton du
   défi**, qui ne désigne personne, sous la même forme que le compte existe ou
-  non. La vérification désigne le défi par ce numéro et relit l'identifiant
+  non. La vérification désigne le défi par ce jeton et relit l'identifiant
   **de la ligne** une fois le code juste (`consumeDiscordLoginChallenge`) ; un
   défi que suit un défi plus récent pour le même compte est refusé, comme la
-  lecture par compte ne le verrait jamais.
+  lecture par compte ne le verrait jamais. Le jeton est **imprévisible**
+  (24 octets aléatoires, seule son empreinte en base,
+  `bg_discord_login_challenges.lookup_hash`) : le numéro de ligne, séquentiel,
+  se devinait, et cinq codes faux sur chacun des derniers numéros auraient
+  brûlé tous les codes en vol du site sans connaître personne.
 
 - **Les routes qui ouvrent ou ferment une session vérifient leur provenance.**
   `SameSite=Lax` protège les routes authentifiées, pas celles qui *posent* la

@@ -77,6 +77,13 @@ export type GoogleProfilePayload = {
 
 export type DiscordChallenge = {
   challengeId: number;
+  /**
+   * Jeton **imprévisible** qui désigne le défi auprès de la connexion
+   * (`consumeDiscordLoginChallenge`). Seule son empreinte est rangée en base.
+   * Le numéro de ligne, séquentiel, ne peut pas jouer ce rôle : qui le devine
+   * brûle les codes d'autrui.
+   */
+  challengeToken: string;
   code: string;
   expiresAt: Date;
 };
@@ -197,6 +204,19 @@ function timingSafeEquals(left: string, right: string): boolean {
   const b = Buffer.from(right, "utf8");
   if (a.length !== b.length) return false;
   return crypto.timingSafeEqual(a, b);
+}
+
+/**
+ * Jeton d'un défi : 24 octets aléatoires, soit 32 caractères base64url. Forme
+ * vérifiée par {@link isDiscordChallengeToken} avant toute lecture en base.
+ */
+function randomChallengeToken(): string {
+  return crypto.randomBytes(24).toString("base64url");
+}
+
+/** `true` si `value` a la forme d'un jeton de défi. */
+export function isDiscordChallengeToken(value: unknown): value is string {
+  return typeof value === "string" && /^[A-Za-z0-9_-]{32}$/.test(value);
 }
 
 function randomCode(): string {
@@ -857,6 +877,7 @@ export async function createDiscordLoginChallenge(
 ): Promise<DiscordChallenge> {
   const db = await getDatabase();
   const code = randomCode();
+  const challengeToken = randomChallengeToken();
   // Le tag n'est retenu que s'il en est un : une demande faite par identifiant
   // numérique n'a pas de tag à certifier, et écrire l'identifiant dans cette
   // colonne ferait passer un nombre pour un pseudo.
@@ -904,9 +925,9 @@ export async function createDiscordLoginChallenge(
         }
 
         const [insert] = await connection.execute<ResultSetHeader>(
-          `INSERT INTO bg_discord_login_challenges (discord_id, code_hash, handle, expires_at)
-           VALUES (?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
-          [discordId, hashCode(code), storedHandle],
+          `INSERT INTO bg_discord_login_challenges (discord_id, lookup_hash, code_hash, handle, expires_at)
+           VALUES (?, ?, ?, ?, DATE_ADD(NOW(), INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE))`,
+          [discordId, hashCode(challengeToken), hashCode(code), storedHandle],
         );
 
         const [rows] = await connection.execute<(RowDataPacket & { expires_at: Date | string })[]>(
@@ -917,6 +938,7 @@ export async function createDiscordLoginChallenge(
         const rawExpiresAt = rows[0]?.expires_at;
         return {
           challengeId: Number(insert.insertId),
+          challengeToken,
           code,
           // mysql2 peut renvoyer expires_at en string selon la config du pool : on normalise en Date.
           expiresAt: rawExpiresAt ? new Date(rawExpiresAt) : new Date(Date.now() + DISCORD_CODE_VALIDITY_MINUTES * 60 * 1000),
@@ -984,35 +1006,43 @@ export async function consumeDiscordChallenge(
 }
 
 /**
- * Consomme un code **désigné par son défi** — chemin de la connexion.
+ * Consomme un code **désigné par le jeton de son défi** — chemin de la
+ * connexion.
  *
  * La demande de code rendait l'identifiant Discord résolu (et si un compte du
  * site y était rattaché) à qui envoyait n'importe quel pseudo : un oracle
  * anonyme, alors que l'annuaire est derrière une connexion et que le flux
  * public du bot masque ces identifiants comme des coordonnées. Elle ne rend
- * plus que le numéro du défi, qui ne désigne personne ; l'identifiant n'est
+ * plus que le jeton du défi, qui ne désigne personne ; l'identifiant n'est
  * relu qu'**ici**, une fois le code juste.
+ *
+ * **Un jeton imprévisible, pas le numéro de ligne.** Séquentiel, le numéro se
+ * devine — et la demande en rend un récent à chaque appel : cinq codes faux
+ * sur chacun des derniers numéros brûlaient tous les codes en vol du site,
+ * connexions et certifications de tag confondues, sans connaître personne.
+ * Seule l'empreinte du jeton est en base.
  *
  * La règle « seul le dernier code émis vaut » est gardée : un défi que suit un
  * défi plus récent pour le même compte est refusé, exactement comme
  * {@link consumeDiscordChallenge} ne le lirait jamais.
  */
 export async function consumeDiscordLoginChallenge(
-  challengeId: number,
+  challengeToken: string,
   code: string,
 ): Promise<DiscordLoginProof | null> {
+  if (!isDiscordChallengeToken(challengeToken)) return null;
   const db = await getDatabase();
 
   const [rows] = await db.execute<ChallengeRow[]>(
     `SELECT c.id, c.discord_id, c.code_hash, c.handle, c.expires_at, c.consumed_at, c.attempts
      FROM bg_discord_login_challenges c
-     WHERE c.id = ?
+     WHERE c.lookup_hash = ?
        AND NOT EXISTS (
          SELECT 1 FROM bg_discord_login_challenges newer
          WHERE newer.discord_id = c.discord_id AND newer.id > c.id
        )
      LIMIT 1`,
-    [challengeId],
+    [hashCode(challengeToken)],
   );
 
   if (rows.length === 0) return null;

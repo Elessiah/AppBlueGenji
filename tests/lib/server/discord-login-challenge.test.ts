@@ -7,6 +7,7 @@ jest.mock("@/lib/server/solo-entries-service");
 import {
   consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
+  isDiscordChallengeToken,
   discardDiscordChallenge,
   DISCORD_CODE_DAY_HOURS,
   DISCORD_CODE_WINDOW_MINUTES,
@@ -32,11 +33,15 @@ import { fakePool } from "../../helpers/sql-double";
 type Challenge = {
   id: number;
   discord_id: string;
+  lookup_hash: string | null;
   code_hash: string;
   expires_at: Date;
   consumed_at: Date | null;
   attempts: number;
 };
+
+const TOKEN = "A".repeat(32);
+const OTHER_TOKEN = "B".repeat(32);
 
 const hash = (code: string) => crypto.createHash("sha256").update(code).digest("hex");
 
@@ -73,10 +78,10 @@ function fakeDb(
         return [state === null ? [] : [{ ...state }], []];
       }
 
-      // Lecture par numéro de défi : la clause `NOT EXISTS` écarte un défi
+      // Lecture par jeton de défi : la clause `NOT EXISTS` écarte un défi
       // qu'un plus récent a remplacé.
       if (q.startsWith("SELECT c.id, c.discord_id, c.code_hash")) {
-        const matches = state !== null && state.id === Number(params[0]) && !newerChallengeExists;
+        const matches = state !== null && state.lookup_hash === params[0] && !newerChallengeExists;
         return [matches ? [{ ...state }] : [], []];
       }
 
@@ -151,6 +156,7 @@ function pendingChallenge(overrides: Partial<Challenge> = {}): Challenge {
   return {
     id: 1,
     discord_id: "123",
+    lookup_hash: hash(TOKEN),
     code_hash: hash("424242"),
     expires_at: new Date(Date.now() + 600_000),
     consumed_at: null,
@@ -433,7 +439,7 @@ describe("discardDiscordChallenge", () => {
   });
 });
 
-describe("consumeDiscordLoginChallenge — le défi désigné par son numéro", () => {
+describe("consumeDiscordLoginChallenge — le défi désigné par son jeton", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
@@ -443,7 +449,7 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son numéro", 
     // ici, qu'il réapparaît — une fois la preuve faite.
     fakeDb(pendingChallenge({ id: 9, discord_id: "555" }));
 
-    await expect(consumeDiscordLoginChallenge(9, "424242")).resolves.toEqual({
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toEqual({
       discordId: "555",
       handle: null,
     });
@@ -452,7 +458,7 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son numéro", 
   it("refuse un code faux sans rien rendre, et décompte l'essai", async () => {
     const { state } = fakeDb(pendingChallenge({ id: 9 }));
 
-    await expect(consumeDiscordLoginChallenge(9, "000000")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "000000")).resolves.toBeNull();
     expect(state!.attempts).toBe(1);
   });
 
@@ -460,34 +466,79 @@ describe("consumeDiscordLoginChallenge — le défi désigné par son numéro", 
     const { state } = fakeDb(pendingChallenge({ id: 9 }));
 
     for (let i = 0; i < MAX_DISCORD_CODE_ATTEMPTS; i += 1) {
-      await consumeDiscordLoginChallenge(9, "000000");
+      await consumeDiscordLoginChallenge(TOKEN, "000000");
     }
 
     expect(state!.consumed_at).not.toBeNull();
-    await expect(consumeDiscordLoginChallenge(9, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
   });
 
   it("refuse un défi inconnu", async () => {
     fakeDb(pendingChallenge({ id: 9 }));
-    await expect(consumeDiscordLoginChallenge(10, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(OTHER_TOKEN, "424242")).resolves.toBeNull();
   });
 
   it("refuse un défi remplacé par un plus récent : seul le dernier code émis vaut", async () => {
     fakeDb(pendingChallenge({ id: 9 }), 0, true, 0, true);
-    await expect(consumeDiscordLoginChallenge(9, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
   });
 
   it("écarte le défi remplacé **dans la requête**", async () => {
     const { execute } = fakeDb(pendingChallenge({ id: 9 }));
-    await consumeDiscordLoginChallenge(9, "424242");
+    await consumeDiscordLoginChallenge(TOKEN, "424242");
 
-    const read = statementsOf(execute).find((q) => q.startsWith("SELECT c.id"))!;
+    const [sql, params] = execute.mock.calls.find(([q]) =>
+      String(q).replace(/\s+/g, " ").trim().startsWith("SELECT c.id"),
+    ) as [string, unknown[]];
+    const read = sql.replace(/\s+/g, " ");
+    // Le jeton n'est jamais écrit ni cherché en clair : seule son empreinte l'est.
+    expect(params).toEqual([hash(TOKEN)]);
     expect(read).toContain("NOT EXISTS");
     expect(read).toContain("newer.id > c.id");
   });
 
   it("refuse un défi expiré", async () => {
     fakeDb(pendingChallenge({ id: 9, expires_at: new Date(Date.now() - 1000) }));
-    await expect(consumeDiscordLoginChallenge(9, "424242")).resolves.toBeNull();
+    await expect(consumeDiscordLoginChallenge(TOKEN, "424242")).resolves.toBeNull();
+  });
+
+  it("refuse sans rien lire un jeton mal formé (l'ancien numéro de ligne compris)", async () => {
+    const { execute } = fakeDb(pendingChallenge({ id: 9 }));
+
+    await expect(consumeDiscordLoginChallenge("9", "424242")).resolves.toBeNull();
+    expect(execute).not.toHaveBeenCalled();
+  });
+});
+
+describe("jeton de défi", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it("est imprévisible, bien formé, et seule son empreinte est rangée", async () => {
+    // Le numéro de ligne, séquentiel, se devinait : cinq codes faux sur chacun
+    // des derniers numéros brûlaient tous les codes en vol du site.
+    const first = fakeDb(null, 0);
+    const a = await createDiscordLoginChallenge("123");
+    fakeDb(null, 0);
+    const b = await createDiscordLoginChallenge("123");
+
+    expect(isDiscordChallengeToken(a.challengeToken)).toBe(true);
+    expect(a.challengeToken).not.toBe(b.challengeToken);
+
+    const [, params] = first.connection.execute.mock.calls.find(([q]) =>
+      String(q).replace(/\s+/g, " ").trim().startsWith("INSERT"),
+    ) as unknown as [string, unknown[]];
+    expect(params[1]).toBe(hash(a.challengeToken));
+    expect(params).not.toContain(a.challengeToken);
+  });
+
+  it.each<[string, unknown]>([
+    ["un nombre", 7],
+    ["une chaîne courte", "abc"],
+    ["un caractère hors base64url", "=".repeat(32)],
+    ["rien", undefined],
+  ])("refuse %s", (_label, value) => {
+    expect(isDiscordChallengeToken(value)).toBe(false);
   });
 });

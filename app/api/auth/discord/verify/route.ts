@@ -2,14 +2,12 @@ import { createSession } from "@/lib/server/auth";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
-import { consumeDiscordLoginChallenge, createOrGetDiscordUser } from "@/lib/server/users-service";
+import {
+  consumeDiscordLoginChallenge,
+  createOrGetDiscordUser,
+  isDiscordChallengeToken,
+} from "@/lib/server/users-service";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
-
-/** Numéro de défi rendu par `/api/auth/discord/request` : un entier positif. */
-function parseChallengeId(raw: unknown): number | null {
-  const value = typeof raw === "string" ? Number(raw) : raw;
-  return typeof value === "number" && Number.isSafeInteger(value) && value > 0 ? value : null;
-}
 
 export async function POST(req: Request) {
   // Avant tout : un formulaire d'un autre site posant le code **de
@@ -19,15 +17,15 @@ export async function POST(req: Request) {
 
   try {
     const body = (await req.json()) as {
-      challengeId?: unknown;
+      challenge?: unknown;
       code?: string;
       pseudo?: string;
       termsAccepted?: boolean;
     };
-    const challengeId = parseChallengeId(body.challengeId);
+    const challenge = body.challenge;
     const code = typeof body.code === "string" ? body.code.trim() : "";
 
-    if (challengeId === null) {
+    if (!isDiscordChallengeToken(challenge)) {
       return fail("INVALID_CHALLENGE", 400);
     }
 
@@ -48,7 +46,7 @@ export async function POST(req: Request) {
     const callerIp = requestClientIp(req);
     const throttled = enforceRateLimit(
       DISCORD_CODE_VERIFY_RULE,
-      callerIp === null ? null : `${challengeId}:${callerIp}`,
+      callerIp === null ? null : `${challenge}:${callerIp}`,
     );
     if (throttled) return throttled;
 
@@ -61,7 +59,7 @@ export async function POST(req: Request) {
     // L'identifiant Discord vient **du défi**, jamais du client : la demande de
     // code ne le publie plus (c'était un oracle), et il n'est relu qu'une fois
     // le code juste.
-    const proof = await consumeDiscordLoginChallenge(challengeId, code);
+    const proof = await consumeDiscordLoginChallenge(challenge, code);
     if (!proof) {
       return fail("CODE_INVALID_OR_EXPIRED", 401);
     }

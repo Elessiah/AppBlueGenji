@@ -100,12 +100,13 @@ export async function POST(req: Request) {
     // réponse les rendait pour n'importe quel pseudo, à un appelant anonyme :
     // un oracle, alors que l'annuaire est derrière une connexion et que le flux
     // public du bot masque ces identifiants comme des coordonnées. Elle est
-    // désormais la même que le pseudo désigne un membre ou non ; le numéro du
-    // défi ne désigne personne, et l'identifiant n'est relu qu'une fois le code
+    // désormais la même que le pseudo désigne un membre ou non ; le jeton du
+    // défi ne désigne personne — et, imprévisible, il ne se devine pas pour
+    // brûler le code d'autrui —, l'identifiant n'étant relu qu'une fois le code
     // juste (`consumeDiscordLoginChallenge`).
     return ok({
       success: true,
-      challengeId: challenge.challengeId,
+      challenge: challenge.challengeToken,
       expiresAt: challenge.expiresAt.toISOString(),
     });
   } catch (error) {

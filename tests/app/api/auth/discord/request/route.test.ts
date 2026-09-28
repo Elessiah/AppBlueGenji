@@ -56,9 +56,10 @@ describe("POST /api/auth/discord/request", () => {
     expect(sendDiscordLoginCodeMock).not.toHaveBeenCalled();
   });
 
-  it("returns 200 with the challenge number when the code is generated and sent", async () => {
+  it("returns 200 with the challenge token when the code is generated and sent", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -70,7 +71,7 @@ describe("POST /api/auth/discord/request", () => {
     expect(response.status).toBe(200);
     expect(payload).toEqual({
       success: true,
-      challengeId: 1,
+      challenge: "t1",
       expiresAt: "2030-01-01T10:00:00.000Z",
     });
     expect(sendDiscordLoginCodeMock).toHaveBeenCalledWith("123456789012345678", "123456");
@@ -82,6 +83,7 @@ describe("POST /api/auth/discord/request", () => {
     // boucle rendait le décompte des essais purement décoratif.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -104,6 +106,7 @@ describe("POST /api/auth/discord/request", () => {
   it("ne plafonne pas un second compte au passage", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -125,6 +128,7 @@ describe("POST /api/auth/discord/request", () => {
     // essais sur la mauvaise ligne.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 42,
+      challengeToken: "t42",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -140,6 +144,7 @@ describe("POST /api/auth/discord/request", () => {
     // Le joueur doit lire pourquoi il n'a rien reçu, pas une erreur de base.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 42,
+      challengeToken: "t42",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -156,6 +161,7 @@ describe("POST /api/auth/discord/request", () => {
   it("laisse vivre le code dont le message privé est bien parti", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 42,
+      challengeToken: "t42",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -183,6 +189,7 @@ describe("POST /api/auth/discord/request", () => {
     // sans celui-ci, la route anonyme faisait sortir une requête par appel.
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -214,11 +221,12 @@ describe("POST /api/auth/discord/request", () => {
 
   it("ne dit ni l'identifiant Discord ni l'existence d'un compte : pas d'oracle", async () => {
     // La réponse rendait l'identifiant résolu et `isNewAccount` pour n'importe
-    // quel pseudo, à un appelant anonyme. Elle ne porte plus que le numéro du
+    // quel pseudo, à un appelant anonyme. Elle ne porte plus que le jeton du
     // défi : deux pseudos, dont l'un seul est membre, donnent la même forme.
     resolveDiscordUserMock.mockResolvedValue("123456789012345678");
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 3,
+      challengeToken: "t3",
       code: "111222",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -228,7 +236,7 @@ describe("POST /api/auth/discord/request", () => {
     const text = await response.text();
 
     expect(response.status).toBe(200);
-    expect(Object.keys(JSON.parse(text)).sort()).toEqual(["challengeId", "expiresAt", "success"]);
+    expect(Object.keys(JSON.parse(text)).sort()).toEqual(["challenge", "expiresAt", "success"]);
     expect(text).not.toContain("123456789012345678");
     expect(text).not.toContain("isNewAccount");
   });
@@ -275,6 +283,7 @@ describe("POST /api/auth/discord/request", () => {
     resolveDiscordUserMock.mockResolvedValue("999888777666555444");
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 2,
+      challengeToken: "t2",
       code: "654321",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -306,6 +315,7 @@ describe("POST /api/auth/discord/request", () => {
   it("maps BOT_INTERNAL_UNREACHABLE to 503", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });
@@ -332,6 +342,7 @@ describe("POST /api/auth/discord/request", () => {
   it("maps DISCORD_DM_FAILED to 502", async () => {
     createDiscordLoginChallengeMock.mockResolvedValue({
       challengeId: 1,
+      challengeToken: "t1",
       code: "123456",
       expiresAt: new Date("2030-01-01T10:00:00.000Z"),
     });

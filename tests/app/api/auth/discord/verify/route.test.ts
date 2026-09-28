@@ -1,7 +1,17 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users-service", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/users-service")>(
+    "@/lib/server/users-service",
+  );
+  return {
+    consumeDiscordLoginChallenge: jest.fn(),
+    createOrGetDiscordUser: jest.fn(),
+    // La forme du jeton est la vraie règle : la simuler la rendrait décorative.
+    isDiscordChallengeToken: actual.isDiscordChallengeToken,
+  };
+});
 
 import { POST } from "@/app/api/auth/discord/verify/route";
 import { createSession } from "@/lib/server/auth";
@@ -18,17 +28,18 @@ import { resetRateLimit } from "@/lib/server/rate-limit";
  * appelante) — l'attaquant ne ferme la porte qu'à lui-même. Voir
  * `docs/AUTHORIZATION_RULES.md` §1.1.
  *
- * Le défi est désigné par **son numéro** : la demande de code ne publie plus
- * l'identifiant Discord (c'était un oracle), que la route relit du défi une
- * fois le code juste.
+ * Le défi est désigné par **un jeton imprévisible** : la demande de code ne
+ * publie plus l'identifiant Discord (c'était un oracle), que la route relit du
+ * défi une fois le code juste — et un numéro de ligne, séquentiel, se serait
+ * deviné pour brûler les codes d'autrui.
  */
 
 const verifyMock = jest.mocked(consumeDiscordLoginChallenge);
 const createUserMock = jest.mocked(createOrGetDiscordUser);
 const createSessionMock = jest.mocked(createSession);
 
-const VICTIM_CHALLENGE = 7;
-const OTHER_CHALLENGE = 8;
+const VICTIM_CHALLENGE = "v".repeat(32);
+const OTHER_CHALLENGE = "o".repeat(32);
 const VICTIM_DISCORD = "999888777666555444";
 const ATTACKER_IP = "203.0.113.7";
 const VICTIM_IP = "198.51.100.42";
@@ -43,13 +54,13 @@ function request(body: unknown, headers: Record<string, string> = {}) {
   );
 }
 
-function attempt(challengeId: unknown, code: string, ip: string | null = ATTACKER_IP) {
-  return request({ challengeId, code }, ip === null ? {} : { "x-forwarded-for": ip });
+function attempt(challenge: unknown, code: string, ip: string | null = ATTACKER_IP) {
+  return request({ challenge, code }, ip === null ? {} : { "x-forwarded-for": ip });
 }
 
-const exhaust = async (challengeId: number, ip: string) => {
+const exhaust = async (challenge: string, ip: string) => {
   for (let i = 0; i < DISCORD_CODE_VERIFY_RULE.limit; i += 1) {
-    await attempt(challengeId, "000000", ip);
+    await attempt(challenge, "000000", ip);
   }
 };
 
@@ -124,7 +135,7 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
     verifyMock.mockResolvedValue({ discordId: VICTIM_DISCORD, handle: "keryan" });
 
     await request(
-      { challengeId: VICTIM_CHALLENGE, code: "424242", discordId: "111111111111111111" },
+      { challenge: VICTIM_CHALLENGE, code: "424242", discordId: "111111111111111111" },
       { "x-forwarded-for": ATTACKER_IP },
     );
 
@@ -150,24 +161,18 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
 
   it.each<[string, unknown]>([
     ["absent", undefined],
-    ["nul", 0],
-    ["négatif", -3],
-    ["décimal", 1.5],
-    ["texte", "abc"],
-  ])("refuse un numéro de défi %s en 400, sans rien consulter", async (_label, challengeId) => {
-    const res = await attempt(challengeId, "424242");
+    ["numérique (l'ancien numéro de ligne)", 7],
+    ["trop court", "abc"],
+    ["trop long", "a".repeat(33)],
+    ["hors alphabet base64url", "+".repeat(32)],
+  ])("refuse un jeton de défi %s en 400, sans rien consulter", async (_label, challenge) => {
+    const res = await attempt(challenge, "424242");
 
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "INVALID_CHALLENGE" });
     expect(verifyMock).not.toHaveBeenCalled();
   });
 
-  it("accepte un numéro de défi transmis en chaîne", async () => {
-    verifyMock.mockResolvedValue({ discordId: VICTIM_DISCORD, handle: null });
-
-    expect((await attempt("7", "424242")).status).toBe(200);
-    expect(verifyMock).toHaveBeenCalledWith(7, "424242");
-  });
 });
 
 describe("POST /api/auth/discord/verify — CSRF de connexion", () => {
@@ -182,7 +187,7 @@ describe("POST /api/auth/discord/verify — CSRF de connexion", () => {
   it("refuse le formulaire `text/plain` d'un autre site, sans ouvrir de session", async () => {
     // Le nom de champ reconstitue un JSON valide : `req.json()` l'acceptait, et
     // la victime se retrouvait connectée au compte de l'attaquant.
-    const res = await request('{"challengeId":7,"code":"424242","x":"="}', {
+    const res = await request(`{"challenge":"${VICTIM_CHALLENGE}","code":"424242","x":"="}`, {
       "content-type": "text/plain",
       "sec-fetch-site": "cross-site",
       origin: "https://attaquant.example",
@@ -194,7 +199,7 @@ describe("POST /api/auth/discord/verify — CSRF de connexion", () => {
   });
 
   it("refuse le même formulaire sur un navigateur qui ne pose aucun en-tête de provenance", async () => {
-    const res = await request('{"challengeId":7,"code":"424242","x":"="}', {
+    const res = await request(`{"challenge":"${VICTIM_CHALLENGE}","code":"424242","x":"="}`, {
       "content-type": "text/plain",
     });
 
@@ -204,7 +209,7 @@ describe("POST /api/auth/discord/verify — CSRF de connexion", () => {
 
   it("laisse passer la page de connexion du site", async () => {
     const res = await request(
-      { challengeId: VICTIM_CHALLENGE, code: "424242" },
+      { challenge: VICTIM_CHALLENGE, code: "424242" },
       { "sec-fetch-site": "same-origin", origin: "http://localhost:3000" },
     );
 

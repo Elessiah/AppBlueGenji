@@ -68,9 +68,9 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   const [environment, setEnvironment] = useState<LoginEnvironment>("BROWSER");
 
   const [handle, setHandle] = useState("");
-  // Numéro du défi émis : la demande de code ne rend plus l'identifiant
+  // Jeton du défi émis : la demande de code ne rend plus l'identifiant
   // Discord résolu, ni si un compte existe déjà (c'était un oracle anonyme).
-  const [challengeId, setChallengeId] = useState<number | null>(null);
+  const [challenge, setChallenge] = useState<string | null>(null);
   const [pseudo, setPseudo] = useState("");
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
@@ -150,13 +150,13 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
       const payload = (await response.json()) as {
         error?: string;
         expiresAt?: string;
-        challengeId?: number;
+        challenge?: string;
       };
       if (!response.ok) {
         const code = payload.error || "FAILED";
         throw new CodedError(code, loginErrorMessage(code));
       }
-      setChallengeId(typeof payload.challengeId === "number" ? payload.challengeId : null);
+      setChallenge(typeof payload.challenge === "string" ? payload.challenge : null);
       setRequested(true);
       showSuccess(`Code envoyé en DM Discord (expiration : ${new Date(payload.expiresAt || "").toLocaleTimeString()}).`);
     } catch (e) {
@@ -176,7 +176,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          challengeId,
+          challenge,
           code,
           pseudo: pseudo.trim() ? pseudo : undefined,
           termsAccepted,
@@ -396,7 +396,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                   fieldErrors.clear();
                   setRequested(false);
                   setCode("");
-                  setChallengeId(null);
+                  setChallenge(null);
                 }}
                 className="mono"
                 style={{
