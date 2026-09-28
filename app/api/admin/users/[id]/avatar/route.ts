@@ -4,6 +4,7 @@ import { deleteStoredImage } from "@/lib/server/image-upload";
 import { notifyUserAvatarRemoved } from "@/lib/server/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeUserAvatarAsModerator } from "@/lib/server/users-service";
+import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 
@@ -31,14 +32,16 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (!Number.isSafeInteger(userId) || userId <= 0) return fail("INVALID_USER_ID", 400);
 
   try {
-    const { pseudo, removedAvatarUrl } = await removeUserAvatarAsModerator(userId);
+    const { removedAvatarUrl } = await removeUserAvatarAsModerator(userId);
     await deleteStoredImage(toDiskUploadPath(removedAvatarUrl)).catch((error) => {
       // La ligne ne désigne plus le fichier : il n'est plus servi par le site.
       // Un disque récalcitrant laisse un résidu, que l'on signale sans défaire
       // un retrait déjà effectif.
       console.error("[moderation] fichier de l'avatar non effacé", error);
     });
-    publishStaffAction(`🧹 Avatar de ${pseudo} retiré par le staff (modération).`, {
+    // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts) : ce
+    // canal est un tiers hébergé hors de l'Union européenne, sans purge.
+    publishStaffAction(`🧹 Avatar de ${ANONYMOUS_PLAYER_LABEL} retiré par le staff (modération).`, {
       id: user.id,
       pseudo: user.pseudo,
     });

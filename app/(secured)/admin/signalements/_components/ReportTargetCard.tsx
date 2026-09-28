@@ -25,8 +25,16 @@ interface ReportTargetCardProps {
   onPurge: (quarantineId: number) => void;
 }
 
-/** « Logo » pour une équipe, « avatar » pour un joueur : les deux seules cibles qui portent une image. */
-const IMAGE_NOUN: Partial<Record<ReportTargetView["type"], string>> = { TEAM: "logo", USER: "avatar" };
+/**
+ * « Logo » pour une équipe, « avatar » pour un joueur : les deux seules cibles
+ * qui portent une image. `withArticle` porte l'élision (« l'avatar », jamais
+ * « le avatar ») une fois pour toutes les phrases qui le répètent ci-dessous.
+ */
+const IMAGE_NOUN: Partial<Record<ReportTargetView["type"], { nounCap: string; withArticle: string }>> = {
+  TEAM: { nounCap: "Logo", withArticle: "le logo" },
+  USER: { nounCap: "Avatar", withArticle: "l'avatar" },
+};
+const DEFAULT_IMAGE_NOUN = IMAGE_NOUN.TEAM as { nounCap: string; withArticle: string };
 
 /**
  * Une cible d'un signalement, avec ce qu'on peut faire d'elle **sans quitter le
@@ -47,9 +55,9 @@ export function ReportTargetCard({
 }: ReportTargetCardProps) {
   const hidden = quarantines.find((quarantine) => quarantine.status === "HIDDEN") ?? null;
   const closed = quarantines.filter((quarantine) => quarantine.status !== "HIDDEN");
-  const noun = IMAGE_NOUN[target.type] ?? "logo";
-  const nounCap = noun === "avatar" ? "Avatar" : "Logo";
-  const canActOnLogo = IMAGE_NOUN[target.type] !== undefined && target.exists && category !== "BUG";
+  const image = IMAGE_NOUN[target.type];
+  const { nounCap, withArticle } = image ?? DEFAULT_IMAGE_NOUN;
+  const canActOnLogo = image !== undefined && target.exists && category !== "BUG";
 
   return (
     <li className={styles.target}>
@@ -102,7 +110,7 @@ export function ReportTargetCard({
               disabled={busy}
               onClick={() => onRestore(hidden.id)}
             >
-              Rétablir {noun === "avatar" ? "l'avatar" : "le logo"}
+              Rétablir {withArticle}
             </button>
             <ArmedButton
               label="Supprimer maintenant"
@@ -137,10 +145,10 @@ export function ReportTargetCard({
             disabled={busy}
             onClick={() => onHideLogo({ type: target.type, id: target.id })}
           >
-            Masquer {noun === "avatar" ? "l'avatar" : "le logo"}
+            Masquer {withArticle}
           </button>
           <ArmedButton
-            label={`Supprimer ${noun === "avatar" ? "l'avatar" : "le logo"}`}
+            label={`Supprimer ${withArticle}`}
             confirmLabel="Supprimer sans délai ?"
             className={styles.actionDanger}
             disabled={busy}

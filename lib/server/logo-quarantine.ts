@@ -39,6 +39,7 @@ import { toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { reportConcernedHref, type ReportPerson } from "@/lib/shared/content-reports";
+import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
 import {
   canAutoPurgeLogo,
   formatAvatarHiddenLog,
@@ -141,6 +142,18 @@ type MemberRecipientRow = RowDataPacket & {
 };
 
 /**
+ * Un compte, converti en destinataire Discord s'il est joignable par un moyen
+ * **prouvé** (identifiant, ou tag certifié) — `null` sinon. Partagée par les
+ * deux lecteurs ci-dessous, qui ne diffèrent que par la requête qui amène la
+ * ligne.
+ */
+function provenRecipient(row: MemberRecipientRow): DiscordRecipient | null {
+  const handle = row.discord_verified_at ? row.discord_pseudo : null;
+  if (!row.discord_id && !handle) return null;
+  return { discordId: row.discord_id, handle, label: row.pseudo };
+}
+
+/**
  * Membres actuels d'une équipe joignables sur Discord par un moyen **prouvé**
  * (identifiant, ou tag certifié).
  */
@@ -153,13 +166,7 @@ async function teamMemberRecipients(teamId: number): Promise<DiscordRecipient[]>
      WHERE tm.team_id = ? AND tm.left_at IS NULL AND u.is_deleted = 0`,
     [teamId],
   );
-  const recipients: DiscordRecipient[] = [];
-  for (const row of rows) {
-    const handle = row.discord_verified_at ? row.discord_pseudo : null;
-    if (!row.discord_id && !handle) continue;
-    recipients.push({ discordId: row.discord_id, handle, label: row.pseudo });
-  }
-  return recipients;
+  return rows.map(provenRecipient).filter((recipient): recipient is DiscordRecipient => recipient !== null);
 }
 
 /** Un joueur, joignable sur Discord par un moyen **prouvé** — au plus une entrée. */
@@ -171,55 +178,39 @@ async function userRecipient(userId: number): Promise<DiscordRecipient[]> {
     [userId],
   );
   if (rows.length === 0) return [];
-  const row = rows[0];
-  const handle = row.discord_verified_at ? row.discord_pseudo : null;
-  if (!row.discord_id && !handle) return [];
-  return [{ discordId: row.discord_id, handle, label: row.pseudo }];
+  const recipient = provenRecipient(rows[0]);
+  return recipient ? [recipient] : [];
 }
 
 /**
- * Le signalement existe et désigne cette équipe — c'est ce lien qui permettra à
- * l'équipe de contester la décision prise sur son logo.
+ * Le signalement existe et désigne cette cible (équipe ou joueur) — c'est ce
+ * lien qui permet à la personne concernée de contester la décision prise sur
+ * son image. Les deux domaines posent exactement la même question, seul le
+ * refus qui nomme la cible change : une seconde fonction n'aurait fait que
+ * recopier celle-ci en changeant un littéral.
  *
  * @throws REPORT_NOT_FOUND
- * @throws TEAM_NOT_TARGETED
+ * @throws TEAM_NOT_TARGETED | USER_NOT_TARGETED
  */
-async function assertTeamTargeted(reportId: number, teamId: number): Promise<void> {
+async function assertTargeted(
+  reportId: number,
+  targetType: "TEAM" | "USER",
+  targetId: number,
+): Promise<void> {
   const db = await getDatabase();
   const [reports] = await db.execute<RowDataPacket[]>(
     `SELECT r.id FROM bg_reports r
-     JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'TEAM' AND t.target_id = ?
+     JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = ? AND t.target_id = ?
      WHERE r.id = ? AND r.parent_report_id IS NULL LIMIT 1`,
-    [teamId, reportId],
+    [targetType, targetId, reportId],
   );
   if (reports.length > 0) return;
   const [exists] = await db.execute<RowDataPacket[]>(
     `SELECT id FROM bg_reports WHERE id = ? AND parent_report_id IS NULL LIMIT 1`,
     [reportId],
   );
-  throw new Error(exists.length === 0 ? "REPORT_NOT_FOUND" : "TEAM_NOT_TARGETED");
-}
-
-/**
- * Le signalement existe et désigne ce joueur — même rôle qu'`assertTeamTargeted`.
- *
- * @throws REPORT_NOT_FOUND
- * @throws USER_NOT_TARGETED
- */
-async function assertUserTargeted(reportId: number, userId: number): Promise<void> {
-  const db = await getDatabase();
-  const [reports] = await db.execute<RowDataPacket[]>(
-    `SELECT r.id FROM bg_reports r
-     JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = 'USER' AND t.target_id = ?
-     WHERE r.id = ? AND r.parent_report_id IS NULL LIMIT 1`,
-    [userId, reportId],
-  );
-  if (reports.length > 0) return;
-  const [exists] = await db.execute<RowDataPacket[]>(
-    `SELECT id FROM bg_reports WHERE id = ? AND parent_report_id IS NULL LIMIT 1`,
-    [reportId],
-  );
-  throw new Error(exists.length === 0 ? "REPORT_NOT_FOUND" : "USER_NOT_TARGETED");
+  if (exists.length === 0) throw new Error("REPORT_NOT_FOUND");
+  throw new Error(targetType === "TEAM" ? "TEAM_NOT_TARGETED" : "USER_NOT_TARGETED");
 }
 
 /**
@@ -275,7 +266,7 @@ export async function deleteTeamLogoForReport(
   teamId: number,
   actor: ReportPerson,
 ): Promise<LogoQuarantineView> {
-  await assertTeamTargeted(reportId, teamId);
+  await assertTargeted(reportId, "TEAM", teamId);
   const db = await getDatabase();
   const removedAt = new Date();
   // Rien n'attend plus d'être effacé ; l'échéance dit ici jusqu'à quand la
@@ -362,7 +353,7 @@ export async function deleteUserAvatarForReport(
   userId: number,
   actor: ReportPerson,
 ): Promise<LogoQuarantineView> {
-  await assertUserTargeted(reportId, userId);
+  await assertTargeted(reportId, "USER", userId);
   const db = await getDatabase();
   const removedAt = new Date();
   const contestUntil = logoQuarantinePurgeDate(removedAt);
@@ -403,7 +394,7 @@ export async function deleteUserAvatarForReport(
     });
   }
 
-  publishStaffAction(`🗑️ Avatar de ${pseudo} supprimé sans délai par le staff (signalement #${reportId}).`, {
+  publishStaffAction(`🗑️ Avatar de ${ANONYMOUS_PLAYER_LABEL} supprimé sans délai par le staff (signalement #${reportId}).`, {
     id: actor.userId,
     pseudo: actor.pseudo,
   });
@@ -439,7 +430,7 @@ export async function deleteUserAvatarForReport(
  */
 export async function hideTeamLogo(reportId: number, teamId: number, actor: ReportPerson): Promise<LogoQuarantineView> {
   const db = await getDatabase();
-  await assertTeamTargeted(reportId, teamId);
+  await assertTargeted(reportId, "TEAM", teamId);
 
   const [teams] = await db.execute<(RowDataPacket & { name: string; logo_url: string | null })[]>(
     `SELECT name, logo_url FROM bg_teams WHERE id = ? AND solo_user_id IS NULL LIMIT 1`,
@@ -555,7 +546,7 @@ export async function hideUserAvatarForReport(
   actor: ReportPerson,
 ): Promise<LogoQuarantineView> {
   const db = await getDatabase();
-  await assertUserTargeted(reportId, userId);
+  await assertTargeted(reportId, "USER", userId);
 
   const [users] = await db.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
     `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
@@ -581,11 +572,11 @@ export async function hideUserAvatarForReport(
   try {
     await connection.beginTransaction();
     const [locked] = await connection.execute<(RowDataPacket & { avatar_url: string | null })[]>(
-      `SELECT avatar_url FROM bg_users WHERE id = ? FOR UPDATE`,
+      `SELECT avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
       [userId],
     );
     if (locked.length === 0 || locked[0].avatar_url !== avatarUrl) throw new Error("AVATAR_CHANGED");
-    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ?`, [userId]);
+    await connection.execute(`UPDATE bg_users SET avatar_url = NULL WHERE id = ? AND is_deleted = 0`, [userId]);
     await syncSoloEntryIdentityOn(connection, userId);
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_logo_quarantines (user_id, report_id, logo_url, hidden_by_user_id, hidden_at, purge_after)
@@ -606,7 +597,7 @@ export async function hideUserAvatarForReport(
     connection.release();
   }
 
-  publishStaffAction(formatAvatarHiddenLog({ pseudo, reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo });
+  publishStaffAction(formatAvatarHiddenLog({ reportId, purgeAfter }), { id: actor.userId, pseudo: actor.pseudo });
   const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void userRecipient(userId)
     .then((recipients) =>
@@ -718,17 +709,26 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     row = await lockQuarantine(connection, quarantineId);
     const isTeam = row.target_type === "TEAM";
     const targetId = Number(row.target_id);
-    const table = isTeam ? "bg_teams" : "bg_users";
-    const column = isTeam ? "logo_url" : "avatar_url";
-    // Un compte anonymisé n'a plus d'avatar à retrouver, et ne doit surtout pas
-    // en recevoir un par ce chemin : la condition l'exclut de la même façon
-    // qu'une ligne disparue (`QUARANTINE_NOT_FOUND`), sans quoi le rétablissement
-    // republierait une identité sur une ligne que la suppression a vidée.
-    const liveGuard = isTeam ? "" : " AND is_deleted = 0";
-    const [owners] = await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
-      `SELECT ${column} AS image_url FROM ${table} WHERE id = ?${liveGuard} FOR UPDATE`,
-      [targetId],
-    );
+
+    // Deux instructions **statiques**, une par domaine — une SQL bâtie par
+    // interpolation de nom de table/colonne se dérobe au `grep`, et ce fichier
+    // tient par ailleurs à ce que chaque écriture reste une chaîne qu'on
+    // retrouve telle quelle dans le code (voir `hideTeamLogo`/
+    // `hideUserAvatarForReport`, qui ne partagent pas non plus leurs requêtes).
+    const [owners] = isTeam
+      ? await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
+          `SELECT logo_url AS image_url FROM bg_teams WHERE id = ? FOR UPDATE`,
+          [targetId],
+        )
+      : // Un compte anonymisé n'a plus d'avatar à retrouver, et ne doit surtout
+        // pas en recevoir un par ce chemin : la condition l'exclut de la même
+        // façon qu'une ligne disparue (`QUARANTINE_NOT_FOUND`), sans quoi le
+        // rétablissement republierait une identité sur une ligne que la
+        // suppression a vidée.
+        await connection.execute<(RowDataPacket & { image_url: string | null })[]>(
+          `SELECT avatar_url AS image_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
+          [targetId],
+        );
     if (owners.length === 0) throw new Error("QUARANTINE_NOT_FOUND");
     if (owners[0].image_url) throw new Error(isTeam ? "TEAM_HAS_NEW_LOGO" : "USER_HAS_NEW_AVATAR");
     const located = isTeam
@@ -741,8 +741,15 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     // la quarantaine intacte, sans une base qui annoncerait une image absente.
     await moveFile(files.quarantined, files.live);
     try {
-      await connection.execute(`UPDATE ${table} SET ${column} = ? WHERE id = ?${liveGuard}`, [row.logo_url, targetId]);
-      if (!isTeam) await syncSoloEntryIdentityOn(connection, targetId);
+      if (isTeam) {
+        await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [row.logo_url, targetId]);
+      } else {
+        await connection.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`, [
+          row.logo_url,
+          targetId,
+        ]);
+        await syncSoloEntryIdentityOn(connection, targetId);
+      }
       await connection.execute(
         `UPDATE bg_logo_quarantines SET status = 'RESTORED', closed_at = NOW() WHERE id = ?`,
         [quarantineId],
@@ -779,7 +786,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
       )
       .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
   } else {
-    publishStaffAction(`✅ Avatar de ${row.target_name} rétabli par le staff (contestation acceptée).`, {
+    publishStaffAction(`✅ Avatar de ${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
       id: actor.userId,
       pseudo: actor.pseudo,
     });
@@ -832,9 +839,12 @@ export async function purgeQuarantinedLogo(quarantineId: number, actor: ReportPe
     });
   }
 
+  // `line` sert la ligne Discord *et* le journal serveur d'une purge d'office :
+  // une seule chaîne, jamais de pseudo, même dans sa moitié qui ne part que
+  // dans pm2 — sans quoi il faudrait deux variables à tenir cohérentes.
   const line = isTeam
     ? `🗑️ Logo de l'équipe « ${row.target_name} » supprimé définitivement`
-    : `🗑️ Avatar de ${row.target_name} supprimé définitivement`;
+    : `🗑️ Avatar de ${ANONYMOUS_PLAYER_LABEL} supprimé définitivement`;
   if (actor) {
     publishStaffAction(`${line} par le staff.`, { id: actor.userId, pseudo: actor.pseudo });
     // Avant l'échéance annoncée : la personne concernée attend une date qui ne

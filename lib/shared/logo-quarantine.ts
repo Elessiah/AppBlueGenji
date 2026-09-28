@@ -26,6 +26,7 @@
  * table, mais leurs gestes serveur (fichier partagé, entrée solo à
  * resynchroniser…) restent des implémentations séparées.
  */
+import { ANONYMOUS_PLAYER_LABEL } from "./log-privacy";
 
 /** Durée de la quarantaine avant suppression définitive, en jours. */
 export const LOGO_QUARANTINE_DAYS = 180;
@@ -192,10 +193,15 @@ export function formatAvatarRestoredNotice(): string {
   return `✅ BlueGenji — Ton avatar a été rétabli : la contestation a été acceptée.`;
 }
 
-/** Ligne du journal (canal de logs) d'un avatar masqué — pseudo seul. */
-export function formatAvatarHiddenLog(input: { pseudo: string; reportId: number; purgeAfter: Date }): string {
+/**
+ * Ligne du journal (canal de logs) d'un avatar masqué — **jamais** le pseudo du
+ * joueur : ce canal est un tiers hébergé hors de l'Union européenne, sans purge
+ * automatique (`lib/shared/log-privacy.ts`). Un nom d'équipe peut y partir, un
+ * joueur jamais.
+ */
+export function formatAvatarHiddenLog(input: { reportId: number; purgeAfter: Date }): string {
   return (
-    `🙈 Avatar de ${input.pseudo} masqué par le staff (signalement #${input.reportId}), ` +
+    `🙈 Avatar de ${ANONYMOUS_PLAYER_LABEL} masqué par le staff (signalement #${input.reportId}), ` +
     `suppression définitive le ${formatQuarantineDate(input.purgeAfter)} sans contestation.`
   );
 }

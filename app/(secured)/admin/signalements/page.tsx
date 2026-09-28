@@ -178,18 +178,22 @@ function ReportsPanel() {
     reports?.flatMap((report) => report.quarantines).find((quarantine) => quarantine.id === quarantineId)
       ?.targetType ?? "TEAM";
 
-  const onRestore = (quarantineId: number) =>
+  const onRestore = (quarantineId: number) => {
+    const type = quarantineTargetType(quarantineId);
     void run(
       () =>
         adminFetch(`/api/admin/logo-quarantines/${quarantineId}/restore`, { method: "POST" }, "LOGO_RESTORE_FAILED"),
-      `${imageNoun(quarantineTargetType(quarantineId))} rétabli. ${concernedNoun(quarantineTargetType(quarantineId))}.`,
+      `${imageNoun(type)} rétabli. ${concernedNoun(type)}.`,
     );
+  };
 
-  const onPurge = (quarantineId: number) =>
+  const onPurge = (quarantineId: number) => {
+    const type = quarantineTargetType(quarantineId);
     void run(
       () => adminFetch(`/api/admin/logo-quarantines/${quarantineId}`, { method: "DELETE" }, "LOGO_PURGE_FAILED"),
-      `${imageNoun(quarantineTargetType(quarantineId))} supprimé définitivement. ${concernedNoun(quarantineTargetType(quarantineId))}.`,
+      `${imageNoun(type)} supprimé définitivement. ${concernedNoun(type)}.`,
     );
+  };
 
   return (
     <section className={`container ${styles.page}`}>
