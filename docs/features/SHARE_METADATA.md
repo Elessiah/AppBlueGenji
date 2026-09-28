@@ -142,10 +142,20 @@ il vit sous `[id]/`, donc il héritait de l'encart **du tournoi** — même titr
 La route d'un tournoi est **servie sans passer par les mises en page**, donc sans
 la garde de l'espace sécurisé : elle porte sa propre application de la règle de
 visibilité, par la même porte que la fiche
-(`getVisibleTournamentSnapshot`, voir `TOURNAMENT_VISIBILITY_ACCESS.md`). Un
+(`getVisibleTournamentCard`, voir `TOURNAMENT_VISIBILITY_ACCESS.md`). Un
 tournoi illisible retombe sur la carte du site — une image d'erreur ferait un
 encart cassé, et une 404 laisserait Discord afficher un encart sans image.
 `revalidate = 300` : l'effectif engagé figure sur la carte, elle vieillit.
+
+Fiche et image ne lisent que la **carte** du tournoi (`getVisibleTournamentCard`),
+une requête indexée, et non l'instantané entier : celui-ci charge tous les
+matchs, les inscrites et les classements — voire une transaction d'entretien —,
+et l'ouverture d'une fiche le construisait une fois pour ses seules métadonnées
+avant que le flux SSE ne le redemande, le cache ne durant que 3 s. Aucun
+entretien n'étant joué sur ce chemin, l'état de la carte est **recalculé depuis
+les dates** (`computeTournamentState`, la règle que le client applique aussi) :
+l'encart n'annonce pas « prochainement » un tournoi dont les inscriptions viennent
+d'ouvrir sans que personne ait encore ouvert sa page.
 
 ## Le socle d'une page (`lib/shared/page-metadata.ts`)
 

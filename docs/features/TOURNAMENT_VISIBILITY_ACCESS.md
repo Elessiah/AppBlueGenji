@@ -58,6 +58,11 @@ Les deux portes de lecture y passent :
 - `GET /api/tournaments/[id]` — la lecture REST de **secours**, à travers
   `getTournamentDetail`, qui délègue à la même fonction.
 
+Ce qui ne veut que **décrire** le tournoi — titre et description d'un lien
+partagé, image d'aperçu (`SHARE_METADATA.md`) — passe par sa lecture légère,
+`getVisibleTournamentCard` : la carte seule, une requête, jugée par le même
+`canViewTournament`, avec le même `null` pour les deux refus.
+
 Câbler les deux est une obligation, pas une précaution : le flux étant le chemin
 normal, une garde posée sur la seule lecture REST n'entrerait en jeu qu'après une
 coupure du direct (`REALTIME_REFRESH.md`).
