@@ -26,9 +26,9 @@ export type PlatformRole = "ADMIN" | "ARBITRE" | "CASTER" | "COMMUNITY_MANAGER" 
  * - `recruitment` — page recrutement.
  * - `roles` — attribution des rôles de permission aux utilisateurs (réservé ADMIN).
  * - `moderation` — traitement des signalements et retrait d'un contenu publié
- *   par un membre (logo d'équipe). Réservé ADMIN : retirer le contenu d'un
- *   tiers engage la responsabilité de l'association, ce n'est pas un geste
- *   d'arbitrage ni de vitrine.
+ *   par un membre (logo d'équipe, avatar de joueur). Réservé ADMIN : retirer
+ *   le contenu d'un tiers engage la responsabilité de l'association, ce n'est
+ *   pas un geste d'arbitrage ni de vitrine.
  */
 export type Permission =
   | "tournaments"

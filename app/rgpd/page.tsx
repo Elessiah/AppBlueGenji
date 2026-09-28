@@ -374,12 +374,12 @@ export default function RgpdPage() {
             le signalement qu&apos;elle vise.
           </p>
 
-          <h3>4. Un logo signalé : masqué, puis rétabli ou supprimé</h3>
+          <h3>4. Un logo ou un avatar signalé : masqué, puis rétabli ou supprimé</h3>
           <p>
-            Plutôt que de supprimer tout de suite un logo d&apos;équipe signalé, l&apos;association peut
-            le <strong>masquer</strong> : il cesse aussitôt d&apos;être en ligne (le fichier quitte le
-            dossier servi par le site), et il est gardé à part, hors ligne. Les membres de
-            l&apos;équipe reçoivent un message privé qui annonce la{" "}
+            Plutôt que de supprimer tout de suite un logo d&apos;équipe ou un avatar de joueur signalé,
+            l&apos;association peut le <strong>masquer</strong> : il cesse aussitôt d&apos;être en ligne
+            (le fichier quitte le dossier servi par le site), et il est gardé à part, hors ligne. Les
+            membres de l&apos;équipe, ou le joueur, reçoivent un message privé qui annonce la{" "}
             <strong>date de suppression définitive</strong>.
           </p>
           <ul>
@@ -389,13 +389,13 @@ export default function RgpdPage() {
               de modération (art. 20).
             </li>
             <li>
-              <strong>Sans contestation</strong>, le logo est supprimé définitivement à l&apos;échéance,
-              du site comme de ses sauvegardes.
+              <strong>Sans contestation</strong>, l&apos;image est supprimée définitivement à
+              l&apos;échéance, du site comme de ses sauvegardes.
             </li>
             <li>
-              <strong>Contesté</strong>, il n&apos;est jamais supprimé d&apos;office : il attend la
-              décision de l&apos;association. Si la contestation aboutit, il est{" "}
-              <strong>rétabli</strong> tel quel et l&apos;équipe en est prévenue.
+              <strong>Contestée</strong>, elle n&apos;est jamais supprimée d&apos;office : elle attend la
+              décision de l&apos;association. Si la contestation aboutit, elle est{" "}
+              <strong>rétablie</strong> telle quelle et la personne concernée en est prévenue.
             </li>
             <li>
               Un contenu <strong>manifestement illicite</strong> peut être supprimé sans délai de

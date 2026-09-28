@@ -65,9 +65,10 @@ nomme personne non plus : la page qu'il ouvre, elle, ne se lit qu'en étant vis�
 
 `GET /api/reports/[id]` (`getConcernedReport`) : motif, date, état,
 description, **seulement les cibles qui la concernent**, ses propres
-contestations et les logos masqués de **ses** équipes. **Jamais** l'identité du
-signalant. Un signalement qui n'existe pas et un signalement qui ne la vise pas
-rendent le même 404 : les identifiants sont consécutifs.
+contestations, les logos masqués de **ses** équipes et **son propre** avatar
+masqué. **Jamais** l'identité du signalant. Un signalement qui n'existe pas et
+un signalement qui ne la vise pas rendent le même 404 : les identifiants sont
+consécutifs.
 
 ## Le panneau
 
@@ -80,11 +81,12 @@ rendent le même 404 : les identifiants sont consécutifs.
   caché par eux.
 - Les contestations sont **rangées sous leur signalement d'origine**, jamais
   listées à part ; elles n'ont pas de cycle de vie propre.
-- Gestes sur une équipe visée : **masquer le logo** (voir
-  `LOGO_QUARANTINE.md`), **supprimer le logo** tout de suite (contenu
-  manifestement illicite — la décision est inscrite au signalement et l'équipe
-  prévenue, comme au masquage), puis rétablir ou supprimer un logo masqué. Les gestes
-  sans retour demandent un second clic (`ArmedButton`).
+- Gestes sur une équipe ou un joueur visé : **masquer** son image (logo ou
+  avatar, voir `LOGO_QUARANTINE.md`), la **supprimer** tout de suite (contenu
+  manifestement illicite — la décision est inscrite au signalement et la
+  personne concernée prévenue, comme au masquage), puis rétablir ou supprimer
+  une image masquée. Les gestes sans retour demandent un second clic
+  (`ArmedButton`).
 - La navigation de l'espace connecté porte un lien « Signalements » avec le
   nombre à traiter, pour la seule permission `moderation`.
 
@@ -92,9 +94,10 @@ rendent le même 404 : les identifiants sont consécutifs.
 
 Un signalement ouvert est gardé le temps de son traitement ; archivé, il est
 effacé `REPORT_RETENTION_DAYS_AFTER_RESOLUTION` (30) jours plus tard, cibles et
-contestations comprises (cascade) — **sauf** s'il tient encore un logo masqué,
-ou un logo supprimé dont le délai de contestation court : il est gardé jusqu'à
-cette échéance (l'équipe doit pouvoir contester). La suppression d'un compte
+contestations comprises (cascade) — **sauf** s'il tient encore une image
+masquée (logo ou avatar), ou une image supprimée dont le délai de contestation
+court : il est gardé jusqu'à cette échéance (la personne concernée doit
+pouvoir contester). La suppression d'un compte
 visé efface le pseudo relevé sur ses cibles (`label_snapshot`) : le panneau
 retombe sinon sur ce relevé dès que le compte n'est plus vivant. La purge est **datée**, donc une base restaurée d'une sauvegarde se
 repurge d'elle-même. Elle tourne à chaque envoi, à chaque ouverture du panneau,
