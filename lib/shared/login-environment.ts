@@ -34,10 +34,12 @@ export interface LoginEnvironmentSignals {
 /**
  * Jetons que les navigateurs intégrés ajoutent à leur agent utilisateur. `; wv)`
  * est la marque d'une WebView Android. Discord n'en pose aucun : son navigateur
- * intégré n'est pas reconnaissable, et le conseil ne s'affichera pas.
+ * intégré n'est pas reconnaissable, et le conseil ne s'affichera pas. Aucune
+ * borne de mot en fin de jeton : TikTok écrit `musical_ly_2023…`, que `\b`
+ * refuserait.
  */
 const IN_APP_BROWSER_PATTERN =
-  /\b(FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|TikTok|musical_ly|BytedanceWebview|Twitter|LinkedInApp|MicroMessenger)\b|; wv\)/i;
+  /\b(?:FBAN|FBAV|FB_IAB|Instagram|Line\/|Snapchat|TikTok|musical_ly|BytedanceWebview|Twitter|LinkedInApp|MicroMessenger)|; wv\)/i;
 
 function isIos({ userAgent, maxTouchPoints = 0 }: LoginEnvironmentSignals): boolean {
   if (/\b(iPhone|iPad|iPod)\b/.test(userAgent)) return true;
