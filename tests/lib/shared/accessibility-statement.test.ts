@@ -66,6 +66,16 @@ describe("contenus non accessibles", () => {
     expect(new Set(KNOWN_ISSUES.map((issue) => issue.title)).size).toBe(KNOWN_ISSUES.length);
   });
 
+  it("une limite contournée par une demande ne renvoie pas à une section plus bas", () => {
+    // La page affiche les moyens de contact à la suite de la phrase : un
+    // « ci-dessous » y serait faux, et obligerait à aller chercher le contact.
+    for (const issue of KNOWN_ISSUES) {
+      expect(issue.workaround ?? "").not.toMatch(/ci-dessous/);
+    }
+    const statutes = KNOWN_ISSUES.find((issue) => issue.criterion.includes("13.3"));
+    expect(statutes?.requestByContact).toBe(true);
+  });
+
   it("le contraste par défaut est déclaré, avec le réglage qui le contourne", () => {
     // Choix d'apparence assumé (le contraste renforcé reste désactivé par
     // défaut) : il doit donc figurer ici, et renvoyer au réglage par son nom.

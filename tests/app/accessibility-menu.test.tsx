@@ -121,7 +121,7 @@ describe("AccessibilityPanel", () => {
   it("nomme le bouton de fermeture et renvoie au zoom pour la taille du texte", () => {
     const html = panel([]);
     expect(html).toContain('aria-label="Fermer le menu d&#x27;accessibilité"');
-    expect(html).toContain("zoom de ton navigateur");
+    expect(html).toContain("zoom de votre navigateur");
   });
 
   it("fait défiler la liste dans une ScrollArea nommée", () => {

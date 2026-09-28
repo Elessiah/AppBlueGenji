@@ -11,6 +11,8 @@ import {
   upcomingRuleModes,
 } from "@/lib/shared/tournament-rules";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
+import { FORMAT_LABELS } from "@/lib/shared/tournament-labels";
 import type { TournamentFormat } from "@/lib/shared/types";
 
 const ROOT = join(__dirname, "..", "..", "..");
@@ -87,11 +89,47 @@ describe("tournament-rules — résolution", () => {
   });
 });
 
+describe("tournament-rules — Survie par coupes et BlueGenji Survie", () => {
+  it("nomme la Survie par coupes comme le reste du site, sans ambiguïté avec BlueGenji Survie", () => {
+    const survival = ruleModeForFormat("SURVIVAL");
+    expect(survival?.label).toBe(FORMAT_LABELS.SURVIVAL);
+    expect(survival?.label).toBe("Survie par coupes");
+    expect(ruleModeForFormat("BG_SURVIE")?.label).toBe(FORMAT_LABELS.BG_SURVIE);
+    // Chacune renvoie explicitement à l'autre pour marquer la différence.
+    expect(survival?.principles.join(" ")).toContain("BlueGenji Survie");
+    expect(ruleModeForFormat("BG_SURVIE")?.principles.join(" ")).toContain("Survie par coupes");
+  });
+
+  it("documente les pénalités d'endurance de BlueGenji Survie", () => {
+    const titles = ruleModeForFormat("BG_SURVIE")?.sections.map((s) => s.title);
+    expect(titles).toContain("Pénalités d'endurance");
+  });
+});
+
 describe("tournament-rules — règles communes", () => {
   it("décrit le report des scores et le forfait", () => {
     const titles = COMMON_RULES.map((r) => r.title);
     expect(titles).toContain("Report des scores");
     expect(titles).toContain("Forfait");
+  });
+
+  it("décrit aussi le lancement, le format des matchs et le double forfait", () => {
+    const titles = COMMON_RULES.map((r) => r.title);
+    expect(titles).toEqual(
+      expect.arrayContaining(["Lancement d'un match", "Format des matchs", "Double forfait"]),
+    );
+  });
+
+  it("annonce le délai de lancement d'office réellement appliqué", () => {
+    const launch = COMMON_RULES.find((r) => r.title === "Lancement d'un match");
+    expect(launch?.bullets?.join(" ")).toContain(`${LAUNCH_AUTO_DELAY_MINUTES} minutes`);
+  });
+
+  it("n'annonce plus qu'un forfait fait toujours quitter le tournoi (faux en BlueGenji Survie)", () => {
+    const forfeit = COMMON_RULES.find((r) => r.title === "Forfait");
+    const text = [...(forfeit?.body ?? []), ...(forfeit?.bullets ?? [])].join(" ");
+    expect(text).not.toContain("L'équipe quitte le tournoi");
+    expect(text).toContain("BlueGenji Survie");
   });
 
   it("annonce le délai de confirmation réellement appliqué par le moteur", () => {
@@ -120,6 +158,8 @@ describe("tournament-rules — câblage des pages", () => {
     // Le bouton cible le mode **affiché à l'écran** : sur un tournoi multi-phases,
     // sélectionner une autre phase change la page de règles visée.
     expect(detailPage).toContain("<RulesHelpFab format={visibleFormat}");
+    // Et porte le tournoi, pour que les règles affichent ses réglages.
+    expect(detailPage).toContain("tournamentId={detail.card.id}");
     expect(detailPage).toContain("visibleRulesFormat(detail.card, selectedPhase)");
     expect(read("app/(secured)/tournois/page.tsx")).toContain("<RulesHelpFab />");
     expect(read("components/rules/RulesHelpFab.tsx")).toContain("cta-float-help");
