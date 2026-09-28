@@ -217,7 +217,7 @@ describe("/bot — l'état d'un serveur se lit en français", () => {
     // « BUILD 4f8a » retiré par ailleurs.
     expect(servers).not.toContain("ACTIFS · TRIÉS PAR ACTIVITÉ 30J");
     expect(servers).toContain("SERVEURS AFFICHÉS");
-    expect(page).toContain("fetchBotServers(8)");
+    expect(page).toContain("cachedBotServers(8)");
   });
 
   it("a une couleur pour l'état qu'elle ne connaît pas", () => {
@@ -265,5 +265,30 @@ describe("/bot — les pictogrammes restants servent", () => {
       expect(read(caller)).not.toContain('name="discord"');
       expect(read(caller)).toContain("<DiscordIcon />");
     }
+  });
+});
+
+describe("/bot — aucune lecture pour rien, aucun cache promis en vain", () => {
+  const docsPage = read("app/bot/docs/[[...slug]]/page.tsx");
+
+  it("n'appelle plus `fetchBotStats`, dont le résultat était jeté", () => {
+    expect(page).not.toContain("fetchBotStats");
+    // Une case vide en tête de déstructuration est la trace d'une lecture jetée.
+    expect(page).not.toMatch(/const \[\s*,/);
+  });
+
+  it("passe par les lectures mutualisées plutôt que par des appels directs au bot", () => {
+    expect(page).not.toContain("@/lib/server/bot-integration");
+    expect(page).toContain("@/lib/server/bot-showcase-cache");
+    expect(read("app/api/bot/activity/route.ts")).toContain("cachedBotActivity(range)");
+    expect(docsPage).toContain("loadBotDocCached(section)");
+    expect(docsPage).not.toMatch(/\bloadBotDoc\(/);
+  });
+
+  // Toutes les pages sont rendues à la demande (la mise en page racine lit le
+  // nonce de la CSP) : un `revalidate` n'y met rien en cache et le laisse croire.
+  it("ne déclare plus de `revalidate` trompeur", () => {
+    expect(page).not.toMatch(/^export const revalidate/m);
+    expect(docsPage).not.toMatch(/^export const revalidate/m);
   });
 });

@@ -7,12 +7,11 @@ jest.mock("@/lib/server/tournaments-service");
 
 import { generateMetadata } from "@/app/(secured)/tournois/[id]/layout";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getVisibleTournamentSnapshot } from "@/lib/server/tournaments-service";
+import { getVisibleTournamentCard } from "@/lib/server/tournaments-service";
 import type { AuthUser } from "@/lib/server/auth";
 import type { TournamentCard } from "@/lib/shared/types";
 import { tournamentCard } from "../helpers/tournament-card";
 import { authUser } from "../helpers/auth-user";
-import { tournamentSnapshot } from "../helpers/tournament-detail";
 
 /**
  * L'aperçu d'un lien de tournoi, du côté du câblage.
@@ -24,7 +23,8 @@ import { tournamentSnapshot } from "../helpers/tournament-detail";
  *
  * 1. la garde de l'espace sécurisé ne redirige plus (sans quoi aucun `<head>`
  *    n'est jamais servi à un robot d'aperçu) ;
- * 2. la fiche passe par la porte de visibilité, et par elle seule ;
+ * 2. la fiche passe par la porte de visibilité — sa lecture légère, la carte
+ *    seule, et non l'instantané entier ;
  * 3. la route d'image, servie **hors** des mises en page, refait ce contrôle
  *    pour son compte.
  */
@@ -39,7 +39,7 @@ const OG_ROUTE = read(...TOURNAMENT_DIR, "opengraph-image.tsx");
 const AUTH = read("lib", "server", "auth.ts");
 
 const mockedUser = jest.mocked(getCurrentUser);
-const mockedSnapshot = jest.mocked(getVisibleTournamentSnapshot);
+const mockedCard = jest.mocked(getVisibleTournamentCard);
 
 function card(overrides: Partial<TournamentCard> = {}): TournamentCard {
   return tournamentCard({
@@ -108,9 +108,9 @@ describe("garde de l'espace sécurisé", () => {
 });
 
 describe("generateMetadata de la fiche", () => {
-  it("rédige l'encart depuis l'instantané visible", async () => {
+  it("rédige l'encart depuis la carte visible", async () => {
     mockedUser.mockResolvedValue(null);
-    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: card() }));
+    mockedCard.mockResolvedValue(card());
 
     const meta = await generateMetadata(params("42") as never);
 
@@ -124,25 +124,25 @@ describe("generateMetadata de la fiche", () => {
 
   it("passe la permission `tournaments` du lecteur à la porte de visibilité", async () => {
     mockedUser.mockResolvedValue(user({ isAdmin: true }));
-    mockedSnapshot.mockResolvedValue(tournamentSnapshot({ card: card() }));
+    mockedCard.mockResolvedValue(card());
 
     await generateMetadata(params("42") as never);
 
-    expect(mockedSnapshot).toHaveBeenCalledWith(42, { canManage: true });
+    expect(mockedCard).toHaveBeenCalledWith(42, { canManage: true });
   });
 
   it("traite un visiteur sans session comme un lecteur sans droits", async () => {
     mockedUser.mockResolvedValue(null);
-    mockedSnapshot.mockResolvedValue(null);
+    mockedCard.mockResolvedValue(null);
 
     await generateMetadata(params("42") as never);
 
-    expect(mockedSnapshot).toHaveBeenCalledWith(42, { canManage: false });
+    expect(mockedCard).toHaveBeenCalledWith(42, { canManage: false });
   });
 
   it("retombe sur l'encart du site quand le tournoi n'est pas lisible", async () => {
     mockedUser.mockResolvedValue(null);
-    mockedSnapshot.mockResolvedValue(null);
+    mockedCard.mockResolvedValue(null);
 
     const meta = await generateMetadata(params("42") as never);
 
@@ -154,7 +154,7 @@ describe("generateMetadata de la fiche", () => {
   it("n'interroge même pas la base sur un identifiant qui n'en est pas un", async () => {
     const meta = await generateMetadata(params("../secrets") as never);
 
-    expect(mockedSnapshot).not.toHaveBeenCalled();
+    expect(mockedCard).not.toHaveBeenCalled();
     expect(meta.title).toBe("Tournoi");
   });
 
@@ -169,14 +169,14 @@ describe("generateMetadata de la fiche", () => {
 
 describe("route d'image d'un tournoi", () => {
   it("refait le contrôle de visibilité, n'ayant aucune mise en page au-dessus", () => {
-    expect(OG_ROUTE).toContain("getVisibleTournamentSnapshot(tournamentId)");
+    expect(OG_ROUTE).toContain("getVisibleTournamentCard(tournamentId)");
   });
 
   it("retombe sur la carte du site plutôt que de rendre une erreur", () => {
     // Une image d'erreur ferait un encart cassé ; une 404 laisserait Discord
     // afficher un encart sans image.
     expect(OG_ROUTE).toContain("catch(() => null)");
-    expect(OG_ROUTE).toContain("if (!snapshot)");
+    expect(OG_ROUTE).toContain("if (!card)");
     expect(OG_ROUTE).toContain("<ShareCard {...SITE_SHARE_CARD} />");
   });
 

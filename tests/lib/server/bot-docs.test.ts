@@ -204,4 +204,37 @@ describe("loadBotDoc", () => {
     expect(doc.html).toBeNull();
     expect(doc.updatedAt).toBeNull();
   });
+
+  // La page promettait ce délai par un `revalidate` qui ne met plus rien en
+  // cache (tout le site est rendu à la demande) : chaque vue relisait le disque.
+  it("resert un document déjà rendu au lieu de relire le disque", async () => {
+    const { clearCache } = await import("@/lib/server/cache");
+    clearCache();
+    const section = { ...BOT_DOC_SECTIONS[0], file: "cache.md" };
+    await fs.writeFile(path.join(dir, "cache.md"), "# Avant\n", "utf8");
+
+    const first = await mod.loadBotDocCached(section);
+    await fs.writeFile(path.join(dir, "cache.md"), "# Après\n", "utf8");
+    const second = await mod.loadBotDocCached(section);
+
+    expect(first.html).toContain("Avant");
+    expect(second).toBe(first);
+    // La lecture brute, elle, voit la nouvelle version : seul le cache retient.
+    expect((await mod.loadBotDoc(section)).html).toContain("Après");
+    expect(mod.BOT_DOC_TTL_MS).toBe(60_000);
+    clearCache();
+  });
+
+  it("ne mélange pas deux documents du registre", async () => {
+    const { clearCache } = await import("@/lib/server/cache");
+    clearCache();
+    await fs.writeFile(path.join(dir, "other.md"), "# Autre\n", "utf8");
+
+    const help = await mod.loadBotDocCached({ ...BOT_DOC_SECTIONS[0], file: "helpfr.md" });
+    const other = await mod.loadBotDocCached({ ...BOT_DOC_SECTIONS[0], file: "other.md" });
+
+    expect(help.html).toContain("Aide");
+    expect(other.html).toContain("Autre");
+    clearCache();
+  });
 });
