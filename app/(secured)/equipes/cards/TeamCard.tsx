@@ -85,18 +85,25 @@ export function TeamCard({ team }: { team: TeamListItem }) {
         </div>
       </div>
 
+      {/* Le sens de lecture est écrit au-dessus de la barre, jamais en
+          `title` : la plaque `.cardOverlay` recouvre la carte, la souris
+          n'atteindrait pas la barre et l'infobulle ne s'ouvrirait jamais. */}
       {team.form.length > 0 && (
-        <div
-          className={s.formBar}
-          role="img"
-          title={`${team.form.length} derniers matchs, du plus récent au plus ancien`}
-          aria-label={`${team.form.length} derniers matchs : ${team.form
-            .map((r) => (r === "w" ? "victoire" : r === "l" ? "défaite" : "nul"))
-            .join(", ")}`}
-        >
-          {team.form.map((r, i) => (
-            <div key={i} className={`${s.formCell} ${s[r]}`} />
-          ))}
+        <div className={s.form}>
+          <div className={s.formLbl} aria-hidden="true">
+            Forme <span className={s.formOrder}>· récent → ancien</span>
+          </div>
+          <div
+            className={s.formBar}
+            role="img"
+            aria-label={`${team.form.length} derniers matchs, du plus récent au plus ancien : ${team.form
+              .map((r) => (r === "w" ? "victoire" : r === "l" ? "défaite" : "nul"))
+              .join(", ")}`}
+          >
+            {team.form.map((r, i) => (
+              <div key={i} className={`${s.formCell} ${s[r]}`} />
+            ))}
+          </div>
         </div>
       )}
 

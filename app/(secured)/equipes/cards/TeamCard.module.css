@@ -349,10 +349,28 @@
   border-color: rgba(255, 157, 46, 0.45);
 }
 
+.form {
+  margin-bottom: 14px;
+}
+
+/* Étiquette de la barre de forme : même gabarit que celles des statistiques,
+   le sens de lecture en retrait. */
+.formLbl {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.formOrder {
+  letter-spacing: 0.12em;
+}
+
 .formBar {
   display: flex;
   gap: 3px;
-  margin-bottom: 14px;
 }
 
 .formCell {
