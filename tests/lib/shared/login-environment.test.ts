@@ -3,6 +3,7 @@ import { oauthErrorMessage } from "@/app/connexion/_lib/login-errors";
 import {
   detectLoginEnvironment,
   loginEnvironmentAdvice,
+  loginEnvironmentNotice,
   readLoginEnvironmentSignals,
 } from "@/lib/shared/login-environment";
 
@@ -86,6 +87,25 @@ describe("loginEnvironmentAdvice", () => {
       expect(advice).toContain("code Discord");
     },
   );
+});
+
+describe("loginEnvironmentNotice", () => {
+  it("ne prévient de rien dans un navigateur ordinaire", () => {
+    expect(loginEnvironmentNotice("BROWSER")).toBeNull();
+  });
+
+  it.each(["IOS_INSTALLED_APP", "IN_APP_BROWSER"] as const)(
+    "prévient avant le clic pour %s, et nomme le code Discord comme repli",
+    (environment) => {
+      const notice = loginEnvironmentNotice(environment) ?? "";
+      expect(notice).toContain("Si elle échoue");
+      expect(notice).toContain("code Discord");
+    },
+  );
+
+  it("dit Safari à l'app iOS installée, seul navigateur qui partage ses cookies avec l'icône", () => {
+    expect(loginEnvironmentNotice("IOS_INSTALLED_APP")).toContain("Safari");
+  });
 });
 
 describe("oauthErrorMessage avec le contexte du navigateur", () => {
