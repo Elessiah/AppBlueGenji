@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { publicSitemapRoutes } from "@/lib/shared/sitemap";
+import { LOGO_RIGHTS_LABEL } from "@/lib/shared/terms-of-use";
 
 /**
  * Les écrans du signalement et des conditions d'utilisation. Le harnais tourne
@@ -67,6 +68,21 @@ describe("conditions d'utilisation à la création du compte", () => {
     expect(create).toContain("acceptTerms");
     expect(create).toContain("LOGO_RIGHTS_FIELD");
     expect(read("app/(secured)/equipes/[id]/_components/TeamSettings.tsx")).toContain("LOGO_RIGHTS_FIELD");
+  });
+
+  it("la case des droits sur un logo n'existe qu'avec un fichier choisi et se fige pendant l'envoi", () => {
+    const settings = read("app/(secured)/equipes/[id]/_components/TeamSettings.tsx");
+    // Rendue sous le fichier en attente, jamais après l'envoi.
+    expect(settings).toMatch(/\{pendingLogo \? \([\s\S]*?checked=\{logoRights\}\s*disabled=\{logoBusy\}/);
+    // L'envoi lui-même attend la case : choisir un fichier n'envoie rien.
+    expect(settings).not.toMatch(/onLogoChange[\s\S]{0,400}teamApi\(/);
+    const create = read("app/(secured)/equipes/creer/page.tsx");
+    expect(create).toMatch(/checked=\{logoRights\}\s*disabled=\{loading\}/);
+  });
+
+  it("le libellé de la case nomme les trois origines d'un logo sans ambiguïté", () => {
+    expect(LOGO_RIGHTS_LABEL).not.toContain("création de l'équipe");
+    expect(LOGO_RIGHTS_LABEL).toContain("l'équipe l'a créé");
   });
 
   it("la page des conditions est au plan du site", () => {
