@@ -1,13 +1,16 @@
 "use client";
 
-import { FormEvent } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { fromBracketMatch, isScoreEditLocked } from "@/lib/shared/match-lock";
-import { matchFormatLabel, matchWinsRequired } from "@/lib/shared/match-format";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
-import { canReportOwnMatch, isMyTeamTeam1, teamLabel } from "@/lib/shared/match-card-viewer";
-import { useMatchFormat } from "../_lib/match-format-context";
+import { canReportOwnMatch, teamLabel } from "@/lib/shared/match-card-viewer";
+import {
+  pendingReportNotice,
+  playerReportView,
+  playerScoreButtonLabel,
+} from "@/lib/shared/player-score-report";
+import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
@@ -21,12 +24,7 @@ const BORDER = "var(--border, #444)";
 
 interface MatchRowProps {
   match: BracketMatch;
-  reportable: boolean;
   adminResolvable: boolean;
-  onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
-  myScore: string;
-  opponentScore: string;
-  onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   allMatches: BracketMatch[];
   roundNumber: number;
@@ -35,20 +33,12 @@ interface MatchRowProps {
 
 export function MatchRow({
   match,
-  reportable,
   adminResolvable,
-  onScoreChange,
-  myScore,
-  opponentScore,
-  onSubmit,
   onOpenAdminModal,
   allMatches,
   roundNumber,
   format,
 }: MatchRowProps) {
-  // Format du tournoi (BO5, FT3…) : rappelé au-dessus des champs et appliqué
-  // comme borne haute, pour que la saisie ne parte pas hors format.
-  const matchFormat = useMatchFormat(match);
   // Signalement : réservé aux engagés du tournoi, et seulement sur une manche
   // dont les deux adversaires sont connus — il n'y a rien à arbitrer sur une
   // case encore vide. Réservé de plus au **match du lecteur** : le bouton
@@ -61,16 +51,22 @@ export function MatchRow({
   // signalement, qui décrirait la même donnée depuis deux sources.
   const { myTeamId } = useLiveControls();
   const canReportMatch = canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id);
-  // Le formulaire de score liste ses deux champs dans l'ordre de la carte
-  // (équipe 1 en haut, équipe 2 en bas), quelle que soit la place du lecteur —
-  // sans cela, « Moi » apparaissait toujours en premier et l'ordre des champs
-  // pouvait être l'inverse de celui des noms juste au-dessus.
-  const myTeamIsTeam1 = isMyTeamTeam1(myTeamId, match.team1Id);
+  // Saisie du score par un engagé : un bouton qui ouvre la modale joueur, et
+  // non plus un formulaire en ligne — deux champs de 52 px sans libellé visible
+  // ni retour une fois envoyé. Le libellé annonce le geste attendu (saisir,
+  // confirmer la proposition adverse, corriger la sienne).
+  const playerScore = usePlayerScore();
+  const canOpenPlayerScore = playerScore.canOpen(match);
+  const playerScoreLabel = canOpenPlayerScore
+    ? playerScoreButtonLabel(playerReportView(match, myTeamId), playerScore.canReportScore(match))
+    : null;
+  // Proposition en attente, lisible de tous : sans elle, un match joué et
+  // reporté se lisait exactement comme un match pas encore joué.
+  const reportNotice = pendingReportNotice(match);
   // Cible d'une ancre `#match-[id]` : la carte est surlignée quelques secondes
   // à l'arrivée. Sans ce repère, la page s'ouvre défilée au bon endroit mais le
   // lecteur ne sait pas laquelle des cartes visibles il venait voir.
   const isAnchorTarget = useHighlightedMatch() === match.id;
-  const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
 
   const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
   const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
@@ -115,17 +111,6 @@ export function MatchRow({
     match.team2Placeholder,
     roundNumber === 1 && match.team2Id === null && match.team1Id !== null ? "BYE" : "TBD",
   );
-
-  // Les deux champs du formulaire, dans l'ordre de la carte (équipe 1 puis
-  // équipe 2) et nommés par l'équipe : l'aria-label garde tout de même la
-  // distinction « mon score »/« score adverse », que le seul nom d'équipe ne
-  // porte pas pour qui n'a pas vu la carte au-dessus. La paire clé/valeur/mine
-  // n'est écrite qu'une fois chacune, pour qu'un futur champ (`disabled`, un
-  // autre `aria-label`) n'ait pas quatre branches à tenir à jour ensemble.
-  const myField = { key: "myScore" as const, value: myScore, mine: true };
-  const opponentField = { key: "opponentScore" as const, value: opponentScore, mine: false };
-  const topField = { ...(myTeamIsTeam1 ? myField : opponentField), label: team1Display };
-  const bottomField = { ...(myTeamIsTeam1 ? opponentField : myField), label: team2Display };
 
   const isBye = match.team1Id === null || match.team2Id === null;
   // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :
@@ -217,53 +202,43 @@ export function MatchRow({
 
       <MatchReplayStrip match={match} />
 
-      {reportable && (
-        <form
-          onSubmit={(e) => onSubmit(match, e)}
+      {reportNotice && (
+        <p
+          role="status"
+          style={{
+            margin: 0,
+            padding: "4px 8px",
+            fontSize: 10.5,
+            lineHeight: 1.4,
+            textAlign: "center",
+            color: "var(--blue-300, #8ad9ff)",
+            background: "rgba(89,212,255,0.06)",
+            borderTop: `1px solid ${BORDER}`,
+          }}
+        >
+          {reportNotice}
+        </p>
+      )}
+
+      {playerScoreLabel && (
+        <div
           style={{
             display: "flex",
-            flexWrap: "wrap",
-            gap: 4,
+            justifyContent: "center",
             padding: "5px 6px",
             background: "rgba(79,224,162,0.06)",
             borderTop: `1px solid ${BORDER}`,
           }}
         >
-          {matchFormat && (
-            <p
-              style={{
-                width: "100%",
-                margin: 0,
-                fontSize: 10,
-                letterSpacing: "0.06em",
-                textTransform: "uppercase",
-                color: "var(--text-2)",
-              }}
-            >
-              {matchFormatLabel(matchFormat)} · premier à {maxScore}
-            </p>
-          )}
-          {[topField, bottomField].map((field) => (
-            <input
-              key={field.key}
-              type="number"
-              min={0}
-              max={maxScore}
-              placeholder={field.label}
-              aria-label={field.mine ? `Votre score (${field.label})` : `Score de l'adversaire (${field.label})`}
-              // Un nom d'équipe long se coupe dans les 52 px du champ : le
-              // `title` le rend lisible en entier au survol, comme les deux
-              // lignes de noms au-dessus (`EntrantName`, `title={teamDisplay}`).
-              title={field.label}
-              value={field.value}
-              onChange={(e) => onScoreChange(match.id, field.key, e.target.value)}
-              style={{ width: 52, fontSize: 12 }}
-            />
-          ))}
-          <button className="btn" type="submit" style={{ padding: "3px 10px", fontSize: 12 }}>
-            Envoyer le score
+          <button
+            type="button"
+            onClick={() => playerScore.open(match)}
+            className="btn"
+            style={{ padding: "4px 12px", fontSize: 12 }}
+          >
+            <span aria-hidden="true">✎</span> {playerScoreLabel}
           </button>
-        </form>
+        </div>
       )}
 
       {adminResolvable && !scoreLocked && (

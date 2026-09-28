@@ -464,6 +464,19 @@ export type TournamentBuckets = {
   finished: TournamentCard[];
 };
 
+/**
+ * Score **proposé** par une engagée, en attente de l'autre (cycle de report,
+ * `lib/shared/player-score-report.ts`). Toujours dans l'orientation du plateau
+ * — équipe 1, équipe 2 —, quelle que soit l'engagée qui l'a proposé : c'est
+ * ainsi que la carte les affiche, et la conversion depuis le « mon score /
+ * score adverse » stocké n'est écrite qu'une fois, à la sérialisation.
+ */
+export type MatchScoreReport = {
+  team1Score: number;
+  team2Score: number;
+  reportedAt: string;
+};
+
 export type BracketMatch = {
   id: number;
   tournamentId: number;
@@ -494,6 +507,10 @@ export type BracketMatch = {
   nextLoserMatchId: number | null;
   nextLoserSlot: number | null;
   scoreDeadlineAt: string | null;
+  /** Proposition de score de l'équipe 1 en attente ; `null` = aucune. */
+  team1Report: MatchScoreReport | null;
+  /** Proposition de score de l'équipe 2 en attente ; `null` = aucune. */
+  team2Report: MatchScoreReport | null;
   updatedAt: string;
   /** ID de la phase du tournoi (0 pour un tournoi sans phases). */
   phaseId: number;

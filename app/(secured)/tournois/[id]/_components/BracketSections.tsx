@@ -1,8 +1,8 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
-import { BracketTree, MatchScoreDraft, ScrollRequest } from "./BracketTree";
+import { BracketTree, ScrollRequest } from "./BracketTree";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { ACCENT, buildSections, defaultOpenKey, findMyNextMatch, qualifyDestinationMatchId } from "../_lib/bracket-sections";
 import { useMatchAnchorTarget } from "../_lib/match-anchor-context";
@@ -14,11 +14,7 @@ interface BracketSectionsProps {
   matches: BracketMatch[];
   allTournamentMatches: BracketMatch[];
   myTeamId: number | null;
-  canReport: (m: BracketMatch) => boolean;
   adminResolvable: (m: BracketMatch) => boolean;
-  drafts: MatchScoreDraft;
-  onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
-  onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   format: TournamentFormat;
   /**
@@ -45,11 +41,7 @@ export function BracketSections({
   matches,
   allTournamentMatches,
   myTeamId,
-  canReport,
   adminResolvable,
-  drafts,
-  onScoreChange,
-  onSubmit,
   onOpenAdminModal,
   format,
   resolveNextMatchId,
@@ -181,12 +173,8 @@ export function BracketSections({
                 scrollTargetMatchId={myNextMatchId}
                 scrollRequest={scrollRequest}
                 onQualifyClick={handleQualifyClick}
-                canReport={canReport}
                 adminResolvable={adminResolvable}
                 format={format}
-                drafts={drafts}
-                onScoreChange={onScoreChange}
-                onSubmit={onSubmit}
                 onOpenAdminModal={onOpenAdminModal}
                 resolveNextMatchId={resolveNextMatchId}
               />

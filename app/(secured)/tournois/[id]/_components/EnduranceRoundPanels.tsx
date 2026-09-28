@@ -1,10 +1,9 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { MatchRow } from "./MatchRow";
-import type { MatchScoreDraft } from "./BracketTree";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import {
   defaultOpenEnduranceRound,
@@ -25,11 +24,7 @@ interface EnduranceRoundPanelsProps {
   /** L'arbre final est-il lancé ? Décide du volet ouvert par défaut. */
   playoffsStarted: boolean;
   allTournamentMatches: BracketMatch[];
-  canReport: (match: BracketMatch) => boolean;
   adminResolvable: (match: BracketMatch) => boolean;
-  drafts: MatchScoreDraft;
-  onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
-  onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   format: TournamentFormat;
 }
@@ -58,11 +53,7 @@ export function EnduranceRoundPanels({
   myTeamId,
   playoffsStarted,
   allTournamentMatches,
-  canReport,
   adminResolvable,
-  drafts,
-  onScoreChange,
-  onSubmit,
   onOpenAdminModal,
   format,
 }: EnduranceRoundPanelsProps) {
@@ -135,12 +126,7 @@ export function EnduranceRoundPanels({
                 <MatchRow
                   key={match.id}
                   match={match}
-                  reportable={canReport(match)}
                   adminResolvable={adminResolvable(match)}
-                  onScoreChange={onScoreChange}
-                  myScore={drafts[match.id]?.myScore || ""}
-                  opponentScore={drafts[match.id]?.opponentScore || ""}
-                  onSubmit={onSubmit}
                   onOpenAdminModal={onOpenAdminModal}
                   allMatches={allTournamentMatches}
                   roundNumber={match.roundNumber}

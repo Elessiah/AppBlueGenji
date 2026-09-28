@@ -1,9 +1,8 @@
 "use client";
 
-import { type CSSProperties, FormEvent } from "react";
+import { type CSSProperties } from "react";
 import type { BracketMatch, SwissMeta, SwissStandingRow } from "@/lib/shared/types";
 import { formatPoints } from "@/lib/shared/swiss";
-import { MatchScoreDraft } from "./BracketTree";
 import { MatchRow } from "./MatchRow";
 import { ScrollArea } from "@/components/cyber";
 import { EntrantName } from "./EntrantName";
@@ -19,11 +18,7 @@ interface SwissViewProps {
   allTournamentMatches: BracketMatch[];
   myTeamId: number | null;
   isFinished: boolean;
-  canReport: (m: BracketMatch) => boolean;
   adminResolvable: (m: BracketMatch) => boolean;
-  drafts: MatchScoreDraft;
-  onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
-  onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   /** Le forfait de cette équipe peut-il être déclaré depuis le classement ? */
   canForfeit: (teamId: number) => boolean;
@@ -86,11 +81,7 @@ export function SwissView({
   allTournamentMatches,
   myTeamId,
   isFinished,
-  canReport,
   adminResolvable,
-  drafts,
-  onScoreChange,
-  onSubmit,
   onOpenAdminModal,
   canForfeit,
   onForfeit,
@@ -456,12 +447,7 @@ export function SwissView({
                           <MatchRow
                             key={match.id}
                             match={match}
-                            reportable={canReport(match)}
                             adminResolvable={adminResolvable(match)}
-                            onScoreChange={onScoreChange}
-                            myScore={drafts[match.id]?.myScore || ""}
-                            opponentScore={drafts[match.id]?.opponentScore || ""}
-                            onSubmit={onSubmit}
                             onOpenAdminModal={onOpenAdminModal}
                             allMatches={allTournamentMatches}
                             roundNumber={match.roundNumber}
