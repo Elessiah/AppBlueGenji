@@ -4,6 +4,7 @@ import { ChangeEvent, FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useToast } from "@/components/ui/toast";
+import { appendCroppedImage, useImageCropper, type CroppedImage } from "@/components/ui/image-crop-dialog";
 import { CyberCard, CyberButton } from "@/components/cyber";
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, normalizeTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
@@ -29,7 +30,8 @@ export default function CreateTeamPage() {
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");
   const [description, setDescription] = useState("");
-  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logo, setLogo] = useState<CroppedImage | null>(null);
+  const { cropImage, cropDialog } = useImageCropper();
   // Créer une équipe, c'est accepter les conditions d'utilisation ; envoyer son
   // logo, c'est garantir en détenir les droits. Deux cases, deux engagements.
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -38,7 +40,7 @@ export default function CreateTeamPage() {
   const logoInputRef = useRef<HTMLInputElement | null>(null);
   const fieldErrors = useFieldErrors(TEAM_IDENTITY_FIELD_ERRORS, FIELD_IDS);
 
-  const onLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const onLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -47,8 +49,18 @@ export default function CreateTeamPage() {
       showError(teamErrorMessage(refusal));
       return;
     }
-    setLogoFile(file);
+    const cropped = await cropImage(file, "team-logo", "Recadrer le logo");
+    if (!cropped) return;
+    setLogo(cropped);
     setLogoRights(false);
+  };
+
+  // Recadrer de nouveau le fichier déjà choisi : la garantie des droits porte
+  // sur le fichier, pas sur la zone gardée — elle n'est pas redemandée.
+  const onLogoRecrop = async () => {
+    if (!logo) return;
+    const cropped = await cropImage(logo.file, "team-logo", "Recadrer le logo");
+    if (cropped) setLogo(cropped);
   };
 
   const onSubmit = async (event: FormEvent) => {
@@ -62,7 +74,7 @@ export default function CreateTeamPage() {
     }
     // Le nom est bon : son signalement d'erreur tombe, même si une case manque.
     fieldErrors.clear();
-    if (logoFile && !logoRights) {
+    if (logo && !logoRights) {
       showError(teamErrorMessage("LOGO_RIGHTS_NOT_CERTIFIED"));
       return;
     }
@@ -88,9 +100,9 @@ export default function CreateTeamPage() {
         throw new CodedError(code, code);
       }
 
-      if (logoFile) {
+      if (logo) {
         const formData = new FormData();
-        formData.append("file", logoFile);
+        appendCroppedImage(formData, logo);
         formData.append(LOGO_RIGHTS_FIELD, logoRights ? "1" : "0");
         const logoResponse = await fetch(`/api/teams/${payload.teamId}/logo`, {
           method: "POST",
@@ -118,6 +130,7 @@ export default function CreateTeamPage() {
 
   return (
     <section className="fade-in container">
+      {cropDialog}
       <Link href="/equipes" style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--ink-mute)", marginBottom: 16 }}>
         ← Équipes
       </Link>
@@ -192,7 +205,7 @@ export default function CreateTeamPage() {
                 ref={logoInputRef}
                 type="file"
                 accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
-                onChange={onLogoChange}
+                onChange={(event) => void onLogoChange(event)}
                 style={{ display: "none" }}
               />
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
@@ -205,15 +218,24 @@ export default function CreateTeamPage() {
                 >
                   Choisir un logo
                 </button>
-                {logoFile ? (
+                {logo ? (
                   <>
-                    <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>{logoFile.name}</span>
+                    <span style={{ fontSize: 12, color: "var(--ink-mute)" }}>{logo.file.name}</span>
+                    <button
+                      type="button"
+                      className="btn ghost"
+                      disabled={loading}
+                      onClick={() => void onLogoRecrop()}
+                      style={{ padding: "6px 12px", fontSize: 12 }}
+                    >
+                      Recadrer
+                    </button>
                     <button
                       type="button"
                       className="btn ghost"
                       disabled={loading}
                       onClick={() => {
-                        setLogoFile(null);
+                        setLogo(null);
                         setLogoRights(false);
                       }}
                       style={{ padding: "6px 12px", fontSize: 12 }}
@@ -226,7 +248,7 @@ export default function CreateTeamPage() {
               <p style={{ fontSize: 11, color: "var(--ink-mute)", margin: "6px 0 0" }}>
                 PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo max
               </p>
-              {logoFile ? (
+              {logo ? (
                 <label className="consent-check">
                   <input
                     type="checkbox"

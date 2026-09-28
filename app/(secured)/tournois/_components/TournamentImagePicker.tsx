@@ -6,7 +6,8 @@
    exception que l'aperçu de la modale des partenaires. */
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useCroppedPreviewUrl, useImageCropper } from "@/components/ui/image-crop-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   TOURNAMENT_IMAGE_ACCEPT,
@@ -34,28 +35,6 @@ interface TournamentImagePickerProps {
   disabled?: boolean;
 }
 
-/**
- * URL `blob:` d'un fichier local, révoquée dès qu'elle ne sert plus.
- *
- * L'URL est rendue **avec le fichier qu'elle désigne** et n'est lue que si ce
- * fichier est toujours le courant : l'effet ne s'exécutant qu'après le rendu,
- * le rendu qui suit un changement de fichier verrait sinon l'URL — déjà
- * révoquée — du fichier précédent.
- */
-function useObjectUrl(file: File | null): string | null {
-  const [entry, setEntry] = useState<{ file: File; url: string } | null>(null);
-  useEffect(() => {
-    if (!file) {
-      setEntry(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setEntry({ file, url });
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
-  return entry !== null && entry.file === file ? entry.url : null;
-}
-
 /** Dimensions d'un fichier image ; `null` si le navigateur ne sait pas les lire. */
 async function readImageSize(file: File): Promise<{ width: number; height: number } | null> {
   if (typeof createImageBitmap !== "function") return null;
@@ -74,9 +53,10 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
  *
  * Trois gestes, dans l'ordre où ils se posent :
  *
- * 1. **Choisir un fichier**, de n'importe quelles dimensions : rien n'est
- *    recadré à l'envoi (`lib/server/image-upload.ts`, gabarit
- *    `tournament-image`). Un mode est proposé d'après les proportions.
+ * 1. **Choisir un fichier**, de n'importe quelles dimensions, puis la zone
+ *    gardée dans la modale de recadrage — libre : le gabarit
+ *    `tournament-image` ne fait ensuite que réduire, sans rogner. Un mode est
+ *    proposé d'après les proportions de cette zone.
  * 2. **Dire ce que c'est** : une illustration remplit un bandeau, un logo est
  *    toujours montré en entier.
  * 3. Pour une illustration, **désigner le point qui doit rester visible** —
@@ -93,7 +73,14 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
   // Un fichier survole la zone vide : on le dit avant qu'il soit lâché.
   const [dropping, setDropping] = useState(false);
   const baseId = useId();
-  const objectUrl = useObjectUrl(value.file);
+  const { cropImage, cropDialog } = useImageCropper();
+  // L'aperçu montre la **zone gardée** : c'est dans elle que se choisit le
+  // point focal, et c'est elle que le serveur enregistrera.
+  const pending = useMemo(
+    () => (value.file ? { file: value.file, crop: value.crop } : null),
+    [value.file, value.crop],
+  );
+  const objectUrl = useCroppedPreviewUrl(pending);
 
   // Un fichier choisi ne se montre que **lui-même** : tant que son URL locale
   // n'existe pas, on n'affiche rien plutôt que l'image enregistrée (retirée
@@ -122,9 +109,25 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
       return;
     }
     const seq = ++pickSeqRef.current;
+    const cropped = await cropImage(file, "tournament-image", "Recadrer l'image du tournoi");
+    if (!cropped || seq !== pickSeqRef.current) return;
     const size = await readImageSize(file);
     if (seq !== pickSeqRef.current) return;
-    onChange(withNewFile(file, size ? suggestImageFit(size.width, size.height) : settings.fit));
+    // Le mode proposé suit les proportions de la zone gardée, pas du fichier.
+    const fit = size
+      ? suggestImageFit(size.width * (cropped.crop?.width ?? 1), size.height * (cropped.crop?.height ?? 1))
+      : settings.fit;
+    onChange(withNewFile(file, fit, cropped.crop));
+  };
+
+  // Recadrer de nouveau le fichier choisi : la zone change, le point focal —
+  // relatif à elle — revient au centre, le mode choisi reste.
+  const onRecrop = async () => {
+    if (!value.file) return;
+    const seq = ++pickSeqRef.current;
+    const cropped = await cropImage(value.file, "tournament-image", "Recadrer l'image du tournoi");
+    if (!cropped || seq !== pickSeqRef.current) return;
+    onChange(withNewFile(value.file, settings.fit, cropped.crop));
   };
 
   const moveFocus = (event: PointerEvent<HTMLDivElement>) => {
@@ -143,6 +146,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
 
   return (
     <div className={s.root}>
+      {cropDialog}
       <input
         ref={fileInputRef}
         type="file"
@@ -185,8 +189,8 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
             {dropping ? "Dépose l'image ici" : "Ajouter une illustration ou un logo"}
           </span>
           <span id={hintId} className={s.emptyHint}>
-            Facultatif · PNG, JPEG ou WebP, 5 Mo max · toutes dimensions acceptées, rien n&apos;est
-            rogné à l&apos;envoi
+            Facultatif · PNG, JPEG ou WebP, 5 Mo max · toutes dimensions acceptées, tu choisis la
+            zone gardée
           </span>
         </button>
       ) : (
@@ -310,6 +314,17 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
             >
               Remplacer l&apos;image
             </button>
+            {value.file !== null && (
+              <button
+                type="button"
+                className="btn ghost"
+                disabled={disabled}
+                onClick={() => void onRecrop()}
+                style={{ padding: "8px 16px", fontSize: 13 }}
+              >
+                Recadrer
+              </button>
+            )}
             <button
               type="button"
               className="btn ghost"
@@ -318,7 +333,7 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
                 // Un fichier dont les dimensions se lisent encore ne revient pas
                 // après un retrait.
                 pickSeqRef.current += 1;
-                onChange({ ...value, file: null, removed: true });
+                onChange({ ...value, file: null, crop: null, removed: true });
               }}
               style={{ padding: "8px 16px", fontSize: 13 }}
             >

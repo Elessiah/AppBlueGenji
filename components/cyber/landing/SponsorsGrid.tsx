@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
 import {
   type Sponsor,
   type SponsorTier,
@@ -80,6 +81,7 @@ function sortByTier(list: Sponsor[]): Sponsor[] {
 
 export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridProps) {
   const { showError, showSuccess } = useToast();
+  const { cropImage, cropDialog } = useImageCropper();
   const [items, setItems] = useState<Sponsor[]>(sponsors);
   const [editing, setEditing] = useState<Sponsor | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
@@ -252,12 +254,19 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
       return;
     }
 
+    const image = await cropImage(
+      file,
+      kind === "logo" ? "sponsor-logo" : "sponsor-banner",
+      kind === "logo" ? "Recadrer le logo" : "Recadrer le bandeau",
+    );
+    if (!image) return;
+
     const setUploading = kind === "logo" ? setLogoBusy : setBannerBusy;
     const label = kind === "logo" ? "du logo" : "du bandeau";
     setUploading(true);
     try {
       const data = new FormData();
-      data.append("file", file);
+      appendCroppedImage(data, image);
       const res = await fetch(`/api/landing/sponsors/${kind}`, { method: "POST", body: data });
       const payload = (await res.json()) as { logoUrl?: string; bannerUrl?: string; error?: string };
       const url = kind === "logo" ? payload.logoUrl : payload.bannerUrl;
@@ -276,6 +285,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
 
   return (
     <section id="sponsors" className={styles.root}>
+      {cropDialog}
       <div className={styles.head}>
         <div className={styles.headText}>
           <h2 className={styles.sectionTitle}>Partenaires et soutiens</h2>
@@ -527,7 +537,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
               </div>
             </div>
             <span className={styles.logoHint}>
-              Image large en fond de carte, recadrée au centre en 1200 × 400 px (ratio 3:1). PNG, JPEG ou WebP, 5 Mo max.
+              Image large en fond de carte, recadrée en 1200 × 400 px (ratio 3:1) — tu choisis la zone gardée à l&apos;import. PNG, JPEG ou WebP, 5 Mo max.
             </span>
           </div>
 

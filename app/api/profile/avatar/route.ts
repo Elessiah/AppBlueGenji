@@ -5,6 +5,7 @@ import { getUserById, updateUserAvatar } from "@/lib/server/users-service";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isImageUploadError } from "@/lib/shared/image-upload-errors";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
+import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 
 /**
  * Le ménage du fichier orphelin : un **résidu**, jamais un échec.
@@ -41,9 +42,13 @@ export async function POST(req: Request) {
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);
 
+  // La zone choisie dans la modale de recadrage ; absente, le gabarit seul.
+  const crop = parseImageCropField(form.get(IMAGE_CROP_FIELD));
+  if (!crop.ok) return fail(IMAGE_CROP_INVALID, 400);
+
   try {
     const current = await getUserById(user.id);
-    const diskPath = await processAndStoreImage(file, "avatar", user.id);
+    const diskPath = await processAndStoreImage(file, "avatar", user.id, crop.crop);
     const servedUrl = toServedUploadUrl(diskPath);
     // Un téléversement parti avant une suppression de compte reprend **après**
     // son commit, bloqué jusque-là sur le verrou de la ligne : l'écriture est

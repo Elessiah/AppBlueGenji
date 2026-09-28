@@ -3,6 +3,7 @@ import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { processAndStoreImage } from "@/lib/server/image-upload";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
+import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 
 /**
  * Reçoit un fichier image (multipart) et le stocke comme bandeau de carte
@@ -28,8 +29,12 @@ export async function POST(req: Request) {
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);
 
+  // La zone choisie dans la modale de recadrage ; absente, le gabarit seul.
+  const crop = parseImageCropField(form.get(IMAGE_CROP_FIELD));
+  if (!crop.ok) return fail(IMAGE_CROP_INVALID, 400);
+
   try {
-    const diskPath = await processAndStoreImage(file, "sponsor-banner", user.id);
+    const diskPath = await processAndStoreImage(file, "sponsor-banner", user.id, crop.crop);
     return ok({ bannerUrl: toServedUploadUrl(diskPath) });
   } catch (error) {
     return fail((error as Error).message || "BANNER_UPLOAD_FAILED", 400);

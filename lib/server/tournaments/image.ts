@@ -22,6 +22,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
+import type { CropRect } from "@/lib/shared/image-crop";
 import {
   DEFAULT_IMAGE_SETTINGS,
   type TournamentImage,
@@ -85,8 +86,9 @@ export async function setTournamentImage(
   tournamentId: number,
   file: File,
   settings: TournamentImageSettings,
+  crop: CropRect | null = null,
 ): Promise<TournamentImage> {
-  const url = toServedUploadUrl(await processAndStoreImage(file, "tournament-image", tournamentId));
+  const url = toServedUploadUrl(await processAndStoreImage(file, "tournament-image", tournamentId, crop));
 
   let previousUrl: string | null;
   try {

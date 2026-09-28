@@ -12,9 +12,10 @@ import { authUser, publicUserProfile } from "../../../helpers/auth-user";
 
 const user = authUser({ id: 42 });
 
-function fileReq(file?: File) {
+function fileReq(file?: File, crop?: string) {
   const form = new FormData();
   if (file) form.append("file", file);
+  if (crop !== undefined) form.append("crop", crop);
   return new Request("http://localhost/api/profile/avatar", { method: "POST", body: form });
 }
 
@@ -56,7 +57,26 @@ describe("POST /api/profile/avatar", () => {
     // après démarrage → 404). C'est cette URL servie qui est persistée/rendue.
     expect(await res.json()).toEqual({ avatarUrl: "/api/uploads/avatars/42-abc.webp" });
     expect(updateUserAvatar).toHaveBeenCalledWith(42, "/api/uploads/avatars/42-abc.webp");
-    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "avatar", 42);
+    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "avatar", 42, null);
+  });
+
+  it("transmet la zone choisie dans la modale de recadrage", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/42-abc.webp");
+    const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.5 };
+
+    const res = await POST(fileReq(pngFile(), JSON.stringify(crop)));
+    expect(res.status).toBe(200);
+    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "avatar", 42, crop);
+  });
+
+  it("refuse un recadrage hors de l'image avant tout traitement", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(user);
+    const res = await POST(fileReq(pngFile(), JSON.stringify({ x: 0.8, y: 0, width: 0.5, height: 0.5 })));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "IMAGE_CROP_INVALID" });
+    expect(processAndStoreImage).not.toHaveBeenCalled();
   });
 
   it("deletes the previous avatar file (served url → disk path)", async () => {

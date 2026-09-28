@@ -4,6 +4,7 @@ import { UserAvatar } from "@/components/user-avatar";
 import { ChangeEvent, FormEvent, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogoutButton } from "@/components/logout-button";
+import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
@@ -75,6 +76,7 @@ const VISIBILITY_LABELS: Record<string, string> = {
 export default function ProfilePage() {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
+  const { cropImage, cropDialog } = useImageCropper();
   const fieldErrors = useFieldErrors(PROFILE_FIELD_ERRORS, PROFILE_FIELD_IDS);
   const [data, setData] = useState<FullProfileResponse | null>(null);
 
@@ -494,10 +496,13 @@ export default function ProfilePage() {
       return;
     }
 
+    const image = await cropImage(file, "avatar", "Recadrer ton avatar");
+    if (!image) return;
+
     setAvatarBusy(true);
     try {
       const formData = new FormData();
-      formData.append("file", file);
+      appendCroppedImage(formData, image);
       const response = await fetch("/api/profile/avatar", {
         method: "POST",
         body: formData,
@@ -583,6 +588,7 @@ export default function ProfilePage() {
 
   return (
     <section className={`fade-in ${s.page}`}>
+      {cropDialog}
       {battletagNoticeOpen && (
         <BattletagVisibilityNotice onClose={() => setBattletagNoticeOpen(false)} />
       )}

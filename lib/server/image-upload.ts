@@ -2,15 +2,11 @@ import crypto from "node:crypto";
 import path from "node:path";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
 import sharp from "sharp";
+import { cropRectToRegion, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 
-export type UploadKind =
-  | "avatar"
-  | "team-logo"
-  | "sponsor-logo"
-  | "sponsor-banner"
-  | "benevole-photo"
-  | "tournament-image";
+/** Gabarits de sortie ; la liste vit dans le module pur, que lit aussi la modale de recadrage. */
+export type UploadKind = ImageUploadKind;
 
 const MAX_BYTES = IMAGE_UPLOAD_MAX_BYTES;
 const MAX_DIMENSION = 8000;
@@ -117,6 +113,7 @@ export async function processAndStoreImage(
   file: File,
   kind: UploadKind,
   ownerId: number,
+  crop: CropRect | null = null,
 ): Promise<string> {
   if (!file || typeof file.size !== "number") {
     throw new Error("FILE_MISSING");
@@ -126,7 +123,7 @@ export async function processAndStoreImage(
   }
 
   const arrayBuffer = await file.arrayBuffer();
-  return storeImageBuffer(Buffer.from(arrayBuffer), file.type, kind, ownerId);
+  return storeImageBuffer(Buffer.from(arrayBuffer), file.type, kind, ownerId, crop);
 }
 
 /**
@@ -146,6 +143,9 @@ export async function processAndStoreImage(
  * @param declaredMime Type annoncé par la source ; confronté aux octets réels.
  * @param kind Gabarit de sortie (dimensions, cadrage, qualité).
  * @param ownerId Identifiant repris dans le nom du fichier.
+ * @param crop Zone gardée, choisie dans la modale de recadrage — fractions de
+ *   l'image **orientée** (`lib/shared/image-crop.ts`) ; `null` = le gabarit
+ *   seul, comme avant l'outil.
  * @returns Le chemin disque relatif (`/uploads/...`) du fichier écrit.
  */
 export async function storeImageBuffer(
@@ -153,6 +153,7 @@ export async function storeImageBuffer(
   declaredMime: string,
   kind: UploadKind,
   ownerId: number,
+  crop: CropRect | null = null,
 ): Promise<string> {
   if (buffer.byteLength > MAX_BYTES) {
     throw new Error("IMAGE_TOO_LARGE");
@@ -171,7 +172,11 @@ export async function storeImageBuffer(
     throw new Error("IMAGE_FORMAT_INVALID");
   }
 
-  const pipeline = sharp(buffer, { failOn: "error" });
+  // `autoOrient` : une photo de téléphone porte son sens dans l'EXIF, que la
+  // sortie WebP ne garde pas — elle ressortait couchée. C'est aussi dans ce
+  // repère redressé que le navigateur l'a montrée, donc que le rectangle de
+  // recadrage a été choisi.
+  const pipeline = sharp(buffer, { failOn: "error", autoOrient: true });
   const meta = await pipeline.metadata();
 
   if (!meta.width || !meta.height) {
@@ -185,6 +190,14 @@ export async function storeImageBuffer(
   }
 
   const config = KIND_CONFIG[kind];
+
+  // Le découpage passe **avant** le gabarit (`extract` puis `resize`) : le
+  // gabarit s'applique alors à la zone choisie, et un cadre aux bonnes
+  // proportions n'y est plus rogné.
+  if (crop) {
+    const oriented = meta.autoOrient ?? { width: meta.width, height: meta.height };
+    pipeline.extract(cropRectToRegion(crop, oriented));
+  }
 
   const resized =
     config.fit === "cover"

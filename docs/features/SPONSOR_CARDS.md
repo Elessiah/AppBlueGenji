@@ -42,8 +42,10 @@ La section gagne aussi une **introduction** éditable en place par la permission
 - Colonne `bg_sponsors.banner_url VARCHAR(255) NULL` (dans le `CREATE TABLE` et
   dans `RECENT_SCHEMA_CHANGES`).
 - `POST /api/landing/sponsors/banner` (multipart, permission `showcase`) stocke
-  l'image avec le gabarit `sponsor-banner` : WebP **1200 × 400**, recadré au
-  centre — l'aperçu de la modale montre donc ce que la vitrine affichera.
+  l'image avec le gabarit `sponsor-banner` : WebP **1200 × 400**, recadré sur la
+  zone 3:1 choisie dans la modale de recadrage ([IMAGE_CROP.md](IMAGE_CROP.md) —
+  au centre sans geste) ; l'aperçu de la modale montre donc ce que la vitrine
+  affichera.
 - Contrairement au logo, **aucune URL collée** : `validateSponsorInput` refuse
   toute autre adresse (`INVALID_BANNER_URL`), y compris un autre dossier
   d'upload, que le nettoyage d'un bandeau remplacé effacerait sinon.

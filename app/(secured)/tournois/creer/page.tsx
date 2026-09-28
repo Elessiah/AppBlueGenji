@@ -92,7 +92,7 @@ export default function CreateTournamentPage() {
             // son identifiant. Son échec ne défait pas la création — le tournoi
             // existe, on le dit, et l'image s'ajoute ensuite depuis sa fiche.
             try {
-              await applyImageChange(payload.id, imagePickerChange(null, image), image.file);
+              await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop);
               showSuccess("Tournoi créé.");
             } catch (error) {
               showError(

@@ -5,6 +5,12 @@ import { useRouter } from "next/navigation";
 import { LogoWithGlow } from "@/components/logo-with-glow";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
+import {
+  appendCroppedImage,
+  useCroppedPreviewUrl,
+  useImageCropper,
+  type CroppedImage,
+} from "@/components/ui/image-crop-dialog";
 import { TEAM_TAG_MAX_LENGTH, TEAM_TAG_MIN_LENGTH, checkTeamTag, normalizeTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH, checkTeamName } from "@/lib/shared/team-name";
 import { teamErrorMessage } from "../../_lib/team-errors";
@@ -59,7 +65,9 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
   // détenir les droits et envoyer. La case n'existe qu'entre les deux — cochée
   // avant le choix, elle restait affichée après l'envoi, où la décocher ne
   // retirait rien : une garantie qui a l'air révocable et ne l'est pas.
-  const [pendingLogo, setPendingLogo] = useState<File | null>(null);
+  const [pendingLogo, setPendingLogo] = useState<CroppedImage | null>(null);
+  const { cropImage, cropDialog } = useImageCropper();
+  const pendingPreviewUrl = useCroppedPreviewUrl(pendingLogo);
   const [logoRights, setLogoRights] = useState(false);
   const logoRightsRef = useRef<HTMLInputElement | null>(null);
   const [transferOpen, setTransferOpen] = useState(false);
@@ -112,7 +120,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
     }
   };
 
-  const onLogoChange = (event: ChangeEvent<HTMLInputElement>) => {
+  const onLogoChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
@@ -122,9 +130,19 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
       showError(teamErrorMessage(refusal));
       return;
     }
+    const cropped = await cropImage(file, "team-logo", "Recadrer le logo");
+    if (!cropped) return;
     // Un nouveau fichier appelle une nouvelle garantie.
-    setPendingLogo(file);
+    setPendingLogo(cropped);
     setLogoRights(false);
+  };
+
+  // Recadrer de nouveau le même fichier : la garantie porte sur le fichier,
+  // pas sur la zone gardée, elle reste acquise.
+  const onLogoRecrop = async () => {
+    if (!pendingLogo) return;
+    const cropped = await cropImage(pendingLogo.file, "team-logo", "Recadrer le logo");
+    if (cropped) setPendingLogo(cropped);
   };
 
   const cancelPendingLogo = () => {
@@ -143,7 +161,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
     setLogoBusy(true);
     try {
       const formData = new FormData();
-      formData.append("file", pendingLogo);
+      appendCroppedImage(formData, pendingLogo);
       formData.append(LOGO_RIGHTS_FIELD, "1");
       await teamApi(`/api/teams/${team.team.id}/logo`, { method: "POST", body: formData }, "LOGO_UPLOAD_FAILED");
       showSuccess("Logo mis à jour.");
@@ -185,6 +203,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
 
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby="team-settings-title">
+      {cropDialog}
       <div className="ds-section-title orange">
         <h2 id="team-settings-title">Paramètres de l&apos;équipe</h2>
       </div>
@@ -283,7 +302,12 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
           </span>
           <div className={styles.logoRow}>
             <div className={styles.logoPreview} aria-hidden>
-              {team.team.logoUrl ? (
+              {pendingPreviewUrl ? (
+                // Le logo recadré, pas encore envoyé : un fichier local, que
+                // `next/image` ne sait pas servir.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={pendingPreviewUrl} alt="" className={styles.logoPendingImage} />
+              ) : team.team.logoUrl ? (
                 <LogoWithGlow src={team.team.logoUrl} alt="" width={64} height={64} size="sm" borderRadius={12} />
               ) : (
                 "🛡"
@@ -293,7 +317,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
               ref={logoFileRef}
               type="file"
               accept={IMAGE_UPLOAD_MIME_TYPES.join(",")}
-              onChange={onLogoChange}
+              onChange={(event) => void onLogoChange(event)}
               className={styles.visuallyHidden}
               tabIndex={-1}
               aria-hidden
@@ -318,7 +342,8 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
           {pendingLogo ? (
             <>
               <p className={styles.help}>
-                Fichier choisi : <strong>{pendingLogo.name}</strong>
+                Fichier choisi : <strong>{pendingLogo.file.name}</strong> — l&apos;aperçu montre la zone
+                gardée.
               </p>
               <label className="consent-check">
                 <input
@@ -338,6 +363,9 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
               <div className={styles.actionsRow}>
                 <button type="button" className="btn" disabled={logoBusy} onClick={onLogoSend}>
                   {logoBusy ? "Envoi…" : "Envoyer le logo"}
+                </button>
+                <button type="button" className="btn ghost" disabled={logoBusy} onClick={() => void onLogoRecrop()}>
+                  Recadrer
                 </button>
                 <button type="button" className="btn ghost" disabled={logoBusy} onClick={cancelPendingLogo}>
                   Annuler

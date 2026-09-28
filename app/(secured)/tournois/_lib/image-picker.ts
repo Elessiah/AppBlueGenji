@@ -10,6 +10,7 @@ import {
   type TournamentImageFit,
   type TournamentImageSettings,
 } from "@/lib/shared/tournament-image";
+import { IMAGE_CROP_FIELD, serializeCropRect, type CropRect } from "@/lib/shared/image-crop";
 
 /**
  * État du sélecteur d'image (`_components/TournamentImagePicker`), partagé par
@@ -22,6 +23,12 @@ import {
 export type ImagePickerValue = {
   /** Nouveau fichier choisi, pas encore envoyé. */
   file: File | null;
+  /**
+   * Zone gardée du nouveau fichier, choisie dans la modale de recadrage
+   * (`lib/shared/image-crop.ts`) ; `null` = l'image entière. Le point focal se
+   * choisit **dans** cette zone, l'aperçu la montrant seule.
+   */
+  crop: CropRect | null;
   /** L'image enregistrée a été retirée (sans en choisir une autre). */
   removed: boolean;
   settings: TournamentImageSettings;
@@ -30,6 +37,7 @@ export type ImagePickerValue = {
 export function initialImagePickerValue(existing: TournamentImage | null): ImagePickerValue {
   return {
     file: null,
+    crop: null,
     removed: false,
     settings: existing
       ? { fit: existing.fit, focusX: existing.focusX, focusY: existing.focusY }
@@ -88,9 +96,10 @@ export function suggestImageFit(width: number, height: number): TournamentImageF
 }
 
 /** Brouillon après le choix d'un fichier : cadrage recentré, mode proposé. */
-export function withNewFile(file: File, fit: TournamentImageFit): ImagePickerValue {
+export function withNewFile(file: File, fit: TournamentImageFit, crop: CropRect | null = null): ImagePickerValue {
   return {
     file,
+    crop,
     removed: false,
     settings: { fit, focusX: DEFAULT_IMAGE_FOCUS, focusY: DEFAULT_IMAGE_FOCUS },
   };
@@ -119,6 +128,7 @@ export async function applyImageChange(
   tournamentId: number,
   change: TournamentImageChange,
   file: File | null,
+  crop: CropRect | null = null,
 ): Promise<TournamentImage | null | undefined> {
   if (change.kind === "NONE") return undefined;
 
@@ -128,6 +138,7 @@ export async function applyImageChange(
     if (file === null) throw new Error(tournamentImageErrorMessage("FILE_MISSING"));
     const form = new FormData();
     form.append("file", file);
+    if (crop) form.append(IMAGE_CROP_FIELD, serializeCropRect(crop));
     form.append("fit", change.settings.fit);
     form.append("focusX", String(change.settings.focusX));
     form.append("focusY", String(change.settings.focusY));

@@ -4,6 +4,7 @@ import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-uplo
 import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { can } from "@/lib/shared/permissions";
+import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
 import {
   LOGO_RIGHTS_FIELD,
   LOGO_RIGHTS_NOT_CERTIFIED,
@@ -35,6 +36,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);
 
+  // La zone choisie dans la modale de recadrage ; absente, le gabarit seul.
+  const crop = parseImageCropField(form.get(IMAGE_CROP_FIELD));
+  if (!crop.ok) return fail(IMAGE_CROP_INVALID, 400);
+
   // La garantie des droits passe **avant** le traitement du fichier : c'est une
   // saisie du formulaire, rien à convertir pour la refuser. Les conditions
   // d'utilisation, elles, sont jugées par `updateTeamLogo` (règle unique des
@@ -43,7 +48,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
 
   try {
     const currentLogo = await getTeamLogoUrl(teamId);
-    const diskPath = await processAndStoreImage(file, "team-logo", teamId);
+    const diskPath = await processAndStoreImage(file, "team-logo", teamId, crop.crop);
     const servedUrl = toServedUploadUrl(diskPath);
     try {
       await updateTeamLogo(user.id, teamId, servedUrl, managesGhostTeams);

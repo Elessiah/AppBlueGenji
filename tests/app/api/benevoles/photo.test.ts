@@ -55,7 +55,7 @@ describe("POST /api/benevoles/photo", () => {
     const res = await POST(fileReq(pngFile()));
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ photoUrl: "/api/uploads/benevoles/1-abc.webp" });
-    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "benevole-photo", 1);
+    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "benevole-photo", 1, null);
   });
 
   it("surfaces processing errors as 400", async () => {

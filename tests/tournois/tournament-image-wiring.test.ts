@@ -106,7 +106,7 @@ describe("écrans", () => {
     const form = read("app/(secured)/tournois/_components/TournamentForm.tsx");
     expect(form).toMatch(/\{mode === "create" && \([\s\S]{0,300}<TournamentImagePicker existing=\{null\}/);
     const create = read("app/(secured)/tournois/creer/page.tsx");
-    expect(create).toContain("await applyImageChange(payload.id, imagePickerChange(null, image), image.file);");
+    expect(create).toContain("await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop);");
     const upload = create.indexOf("applyImageChange(payload.id");
     expect(create.indexOf("router.push(`/tournois/${payload.id}`)")).toBeGreaterThan(upload);
     expect(create.slice(create.lastIndexOf("try {", upload), upload)).toContain("try {");

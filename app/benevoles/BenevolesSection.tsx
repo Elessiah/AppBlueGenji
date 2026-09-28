@@ -5,6 +5,7 @@ import { useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
 import { useToast } from "@/components/ui/toast";
+import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
 import {
   type Benevole,
   benevoleInitials,
@@ -58,6 +59,7 @@ const VALIDATION_ERROR_MESSAGES: Record<string, string> = {
 
 export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionProps) {
   const { showError, showSuccess } = useToast();
+  const { cropImage, cropDialog } = useImageCropper();
   const [benevoles, setBenevoles] = useState<Benevole[]>(initialBenevoles);
   const groups = useMemo(() => groupByCategory(benevoles), [benevoles]);
   const [editing, setEditing] = useState<Benevole | null>(null);
@@ -183,10 +185,13 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
       return;
     }
 
+    const image = await cropImage(file, "benevole-photo", "Recadrer la photo");
+    if (!image) return;
+
     setPhotoBusy(true);
     try {
       const data = new FormData();
-      data.append("file", file);
+      appendCroppedImage(data, image);
       const res = await fetch("/api/benevoles/photo", { method: "POST", body: data });
       const payload = (await res.json()) as { photoUrl?: string; error?: string };
       if (!res.ok || !payload.photoUrl) {
@@ -243,6 +248,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
 
   return (
     <>
+      {cropDialog}
       <section className={styles.section}>
         <header className={styles.head}>
           <div>

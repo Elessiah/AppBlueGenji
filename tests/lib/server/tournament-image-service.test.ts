@@ -73,7 +73,7 @@ describe("setTournamentImage", () => {
 
     await expect(setTournamentImage(7, pngFile(), cover)).resolves.toEqual({ url: NEW_URL, ...cover });
 
-    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "tournament-image", 7);
+    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "tournament-image", 7, null);
     const statements = sql(execute);
     expect(statements[0]).toBe("SELECT image_url FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE");
     expect(statements[1]).toMatch(/^UPDATE bg_tournaments SET image_url = \?, image_fit = \?/);
