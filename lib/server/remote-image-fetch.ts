@@ -5,6 +5,7 @@ import {
   isPrivateImageHostname,
   parseRemoteImageUrl,
 } from "@/lib/shared/remote-image";
+import { pinnedHttpsGet } from "@/lib/server/pinned-https";
 
 /**
  * Aller chercher une image sur une origine étrangère, sans lui laisser le
@@ -49,10 +50,11 @@ const resolveWithSystem: HostResolver = async (hostname) =>
  * une seule adresse interne suffit à refuser, le client HTTP pouvant choisir
  * n'importe laquelle. Une résolution qui échoue est un refus.
  *
- * Reste hors de portée le **rebinding** : `fetch` résout à nouveau le nom en se
- * connectant, et un serveur DNS hostile peut répondre autre chose la seconde
- * fois. Le fermer demande de fixer l'adresse de connexion dans l'agent HTTP,
- * que le `fetch` intégré à Node n'expose pas sans dépendance.
+ * Ce contrôle préalable refuse tôt, sans ouvrir de socket ; il ne suffirait
+ * pas seul — un client HTTP qui résout **de nouveau** le nom en se connectant
+ * laisserait un serveur DNS hostile répondre autre chose la seconde fois
+ * (*rebinding*). D'où la connexion par `pinnedHttpsGet`, dont le socket
+ * n'utilise que les adresses que ce même jugement vient d'accepter.
  */
 export async function hostResolvesPublicly(
   hostname: string,
@@ -111,11 +113,14 @@ export async function fetchRemoteImage(
     try {
       let res: Response;
       try {
-        res = await fetch(target, {
-          redirect: "manual",
+        // Pas le `fetch` intégré : il résoudrait le nom une seconde fois en se
+        // connectant. `pinnedHttpsGet` connecte le socket à l'adresse que le
+        // jugement vient d'accepter, et ne suit aucune redirection.
+        res = await pinnedHttpsGet(target, {
           signal: controller.signal,
           headers: { Accept: "image/*" },
-          cache: "no-store",
+          resolve: resolveHost,
+          isAllowedAddress: (address) => !isPrivateImageHostname(address),
         });
       } catch {
         return null;

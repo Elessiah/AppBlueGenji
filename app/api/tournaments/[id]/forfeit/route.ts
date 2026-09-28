@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { forfeitTournamentTeam, getUserEntrant } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Déclare le forfait d'un engagé dans un tournoi « Survie » ou « Ronde suisse »
@@ -25,7 +26,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const body = (await req.json().catch(() => ({}))) as { teamId?: number };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { teamId?: number };
   const isReferee = can(user, "tournaments");
 
   let teamId: number | null = null;

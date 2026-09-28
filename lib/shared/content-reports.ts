@@ -696,7 +696,7 @@ export function reportErrorMessage(code: string | null | undefined): string {
     case "REPORT_NOT_CONCERNED":
       return "Tu ne peux contester qu'un signalement qui te vise, toi ou une équipe dont tu es membre.";
     case "REPORTS_SATURATED":
-      return "Trop de signalements reçus en peu de temps. Réessaie dans une heure, ou écris-nous sur Discord.";
+      return "Trop de signalements reçus en peu de temps. Réessaie plus tard, ou écris-nous sur Discord.";
     case "TOO_MANY_REQUESTS":
       return "Tu as envoyé plusieurs signalements d'affilée. Patiente un peu avant de recommencer.";
     default:
@@ -705,15 +705,89 @@ export function reportErrorMessage(code: string | null | undefined): string {
 }
 
 /**
- * Plafond de signalements reçus par heure, **tous auteurs confondus**.
+ * Signalements par heure, **tous auteurs confondus**, au-delà desquels la
+ * direction n'est plus alertée **un par un**.
  *
- * Le plafond par auteur (`REPORT_SUBMIT_RULE`) ne borne rien quand l'appelant
- * n'a ni compte ni adresse identifiable, et chaque signalement écrit en privé
- * au propriétaire et au président de l'association : sans borne globale, un
- * script ferait vibrer leur téléphone sans fin. Soixante par heure, c'est bien
- * au-delà de ce qu'une communauté amateur produit en une soirée agitée.
+ * Chaque signalement écrit en privé au propriétaire et au président de
+ * l'association : sans borne globale, un script ferait vibrer leur téléphone
+ * sans fin. Mais ce plafond a d'abord **refusé le dépôt** (429), et c'était un
+ * seau commun que n'importe qui pouvait vider — cinq envois par demi-heure et
+ * par IP, donc six IP pour le tenir plein en continu, et avec lui **tous** les
+ * signalements : notification d'un contenu illicite (LCEN, DSA), demande RGPD,
+ * question d'hébergeur, c'est-à-dire le seul canal que le site publie. Ce qui
+ * doit être borné est l'**alerte**, pas le dépôt : au-delà, le signalement est
+ * enregistré et visible au panneau, et une seule alerte dit que les suivants
+ * n'en feront plus (`reportAlertMode`). Soixante par heure, c'est bien au-delà
+ * de ce qu'une communauté amateur produit en une soirée agitée.
  */
 export const REPORTS_HOURLY_CAP = 60;
+
+/**
+ * Signalements par heure au-delà desquels le dépôt **est** refusé
+ * (`REPORTS_SATURATED`) — une borne sur la croissance de la table, pas sur le
+ * bruit. Dix fois le plafond d'alerte : la tenir pleine demande une soixantaine
+ * d'IP qui envoient sans relâche, là où six suffisaient à fermer le canal.
+ */
+export const REPORTS_HOURLY_HARD_CAP = 600;
+
+/**
+ * Ce que la direction reçoit pour un signalement de plus : une alerte (`ALERT`),
+ * l'alerte unique qui annonce la saturation (`SATURATION_NOTICE`), ou rien
+ * (`SILENT`) — le signalement est alors au panneau, sans message.
+ */
+export type ReportAlertMode = "ALERT" | "SATURATION_NOTICE" | "SILENT";
+
+/** @param receivedInLastHour Signalements reçus dans l'heure **avant** celui-ci. */
+export function reportAlertMode(receivedInLastHour: number): ReportAlertMode {
+  if (receivedInLastHour < REPORTS_HOURLY_CAP) return "ALERT";
+  if (receivedInLastHour === REPORTS_HOURLY_CAP) return "SATURATION_NOTICE";
+  return "SILENT";
+}
+
+/**
+ * L'alerte unique qui remplace les suivantes, une fois le plafond horaire
+ * franchi. Ni pseudo ni description, comme toute alerte de signalement.
+ */
+export function formatReportsSaturatedAlert(input: { adminUrl: string }): string {
+  return (
+    `🚩 Plus de ${REPORTS_HOURLY_CAP} signalements reçus en une heure : les suivants sont enregistrés ` +
+    `sans alerte jusqu'à ce que le rythme retombe. Afflux inhabituel — à vérifier : ${input.adminUrl}`
+  );
+}
+
+/**
+ * Signalements **désignant des cibles** qu'un même compte peut faire suivre,
+ * par 24 heures, d'un message aux personnes visées.
+ *
+ * Désigner une équipe fait écrire le bot à chacun de ses membres : sans borne
+ * par auteur, quelques comptes — gratuits par OAuth — suffisaient à écrire
+ * chaque jour à tous les joueurs du site, dix cibles par envoi, et le bot
+ * risquait d'être classé comme spammeur par Discord (ce qui couperait aussi la
+ * connexion par code). Au-delà, le signalement est enregistré et reste
+ * consultable par les personnes visées ; seul le message de plus est retenu.
+ */
+export const REPORT_TARGET_NOTICES_DAILY_CAP = 3;
+
+/**
+ * Ancienneté minimale, en heures, du compte dont un signalement fait prévenir
+ * les personnes visées — un compte ouvert pour l'occasion ne fait écrire le bot
+ * à personne. Le signalement, lui, est enregistré et traité normalement.
+ */
+export const REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS = 48;
+
+/**
+ * Le signalement de ce compte peut-il faire écrire aux personnes visées ?
+ *
+ * @param input.accountAgeHours Ancienneté du compte auteur.
+ * @param input.earlierReportsWithTargets Signalements à cibles du même compte
+ *   dans les 24 dernières heures, **celui-ci exclu**.
+ */
+export function reporterMayWarnTargets(input: { accountAgeHours: number; earlierReportsWithTargets: number }): boolean {
+  return (
+    input.accountAgeHours >= REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS &&
+    input.earlierReportsWithTargets < REPORT_TARGET_NOTICES_DAILY_CAP
+  );
+}
 
 /**
  * Délai pendant lequel une cible déjà visée par un signalement n'est **pas**

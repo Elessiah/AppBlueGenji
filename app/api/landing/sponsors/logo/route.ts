@@ -4,6 +4,7 @@ import { fail, ok } from "@/lib/server/http";
 import { processAndStoreImage } from "@/lib/server/image-upload";
 import { toServedUploadUrl } from "@/lib/shared/uploads";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
+import { readImageUploadForm } from "@/lib/server/request-body";
 
 /**
  * Reçoit un fichier image (multipart) et le stocke sous forme de logo
@@ -16,12 +17,8 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
 
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return fail("FILE_MISSING", 400);
-  }
+  const form = await readImageUploadForm(req, user.id);
+  if (form instanceof Response) return form;
 
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);

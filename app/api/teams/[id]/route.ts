@@ -12,6 +12,7 @@ import {
   TEAM_NAME_ALREADY_USED,
   teamFieldsAreText,
 } from "@/lib/shared/team-name";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -53,7 +54,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   try {
-    const body = (await req.json()) as { name?: string; description?: string | null; tag?: string | null };
+    const body = (await readJsonBody(req)) as { name?: string; description?: string | null; tag?: string | null };
     if (!teamFieldsAreText(body, ["name", "description", "tag"])) return fail(INVALID_TEAM_FIELDS, 400);
     const managesGhostTeams = can(user, "tournaments");
     await updateTeamMeta(

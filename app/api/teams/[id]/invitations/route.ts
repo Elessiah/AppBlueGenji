@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { getTeamDetail, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams-service";
 import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Ce qui attend une réponse, vue gestion : les demandes (REQUEST) reçues et
@@ -35,7 +36,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
 
   try {
-    const body = (await req.json()) as { pseudo?: string; roles?: unknown };
+    const body = (await readJsonBody(req)) as { pseudo?: string; roles?: unknown };
     if (!body.pseudo?.trim()) return fail("MISSING_PSEUDO", 400);
 
     const result = await inviteToTeam(user.id, teamId, body.pseudo.trim(), inviteRolesFromBody(body.roles));

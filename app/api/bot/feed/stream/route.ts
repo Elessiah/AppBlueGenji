@@ -7,7 +7,8 @@
  * D'où les deux gardes posées ici avant toute chose : un plafond de **rythme**
  * d'ouverture (`BOT_FEED_OPEN_RULE`) et un plafond de flux **simultanés**
  * (`lib/server/bot-feed-guard.ts`), le second couvrant le cas — courant sur une
- * page publique — où l'IP du visiteur n'est pas connue.
+ * page publique — où l'IP du visiteur n'est pas connue. Plein, ce dernier se
+ * partage : le client qui accumule les flux cède le plus ancien des siens.
  *
  * La place réservée doit être rendue par **toutes** les portes de sortie : fin
  * du flux amont, erreur de lecture, annulation du corps par le runtime, abandon
@@ -32,7 +33,12 @@ export async function GET(req: Request): Promise<Response> {
   const throttled = enforceRateLimit(BOT_FEED_OPEN_RULE, clientIp);
   if (throttled) return throttled;
 
-  const release = acquireBotFeedSlot(clientIp);
+  // Plein, le plafond global se partage : un flux peut être délogé au profit
+  // d'un visiteur qui en tient moins (`bot-feed-guard.ts`). Couper la
+  // connexion vers le bot suffit à le fermer — la lecture en cours échoue,
+  // `pull` rend l'erreur au client, qui se reconnectera plus tard.
+  const evicted = new AbortController();
+  const release = acquireBotFeedSlot(clientIp, () => evicted.abort());
   if (!release) {
     return new Response('event: error\ndata: TOO_MANY_STREAMS\n\n', {
       status: 429,
@@ -49,7 +55,11 @@ export async function GET(req: Request): Promise<Response> {
 
   let upstream: Response;
   try {
-    upstream = await fetch(`${baseUrl}/internal/feed/stream`, { headers, signal: req.signal, cache: 'no-store' });
+    upstream = await fetch(`${baseUrl}/internal/feed/stream`, {
+      headers,
+      signal: AbortSignal.any([req.signal, evicted.signal]),
+      cache: 'no-store',
+    });
   } catch {
     release();
     return new Response('event: error\ndata: BOT_UNREACHABLE\n\n', { status: 503, headers: { 'Content-Type': 'text/event-stream' } });
@@ -64,6 +74,10 @@ export async function GET(req: Request): Promise<Response> {
   // laisse aucun endroit où apprendre que la connexion s'est terminée.
   const reader = upstream.body.getReader();
   req.signal.addEventListener('abort', release);
+  // Délogé après l'ouverture : on ne compte pas sur la seule annulation du
+  // `fetch` pour tarir le corps — le lecteur est fermé, et le flux se termine
+  // proprement côté client, qui se reconnectera.
+  evicted.signal.addEventListener('abort', () => void reader.cancel().catch(() => undefined));
 
   // Course résiduelle : le client a pu partir pendant que le `fetch` se
   // résolvait. Un signal **déjà** avorté ne déclenche jamais son écouteur, et

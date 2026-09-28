@@ -6,6 +6,7 @@ import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isImageUploadError } from "@/lib/shared/image-upload-errors";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
+import { readImageUploadForm } from "@/lib/server/request-body";
 
 /**
  * Le ménage du fichier orphelin : un **résidu**, jamais un échec.
@@ -32,12 +33,8 @@ export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return fail("FILE_MISSING", 400);
-  }
+  const form = await readImageUploadForm(req, user.id);
+  if (form instanceof Response) return form;
 
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);

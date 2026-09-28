@@ -37,13 +37,20 @@ type ManagerRow = RowDataPacket & {
 export async function notifyTeamJoinRequest(teamId: number, requesterId: number): Promise<void> {
   const db = await getDatabase();
 
-  const [counts] = await db.execute<(RowDataPacket & { n: number })[]>(
-    `SELECT COUNT(*) AS n FROM bg_team_invitations
-     WHERE team_id = ? AND user_id = ? AND kind = 'REQUEST'
+  const [counts] = await db.execute<(RowDataPacket & { this_team: number | string | null; any_team: number })[]>(
+    `SELECT SUM(team_id = ?) AS this_team, COUNT(*) AS any_team FROM bg_team_invitations
+     WHERE user_id = ? AND kind = 'REQUEST'
        AND created_at > NOW() - INTERVAL ${Number(TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS)} HOUR`,
     [teamId, requesterId],
   );
-  if (!shouldNotifyTeamJoinRequest(Number(counts[0]?.n ?? 0))) return;
+  if (
+    !shouldNotifyTeamJoinRequest({
+      toThisTeam: Number(counts[0]?.this_team ?? 0),
+      toAnyTeam: Number(counts[0]?.any_team ?? 0),
+    })
+  ) {
+    return;
+  }
 
   const [teams] = await db.execute<(RowDataPacket & { name: string })[]>(
     `SELECT name FROM bg_teams WHERE id = ? AND deleted_at IS NULL LIMIT 1`,

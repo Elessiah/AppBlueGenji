@@ -8,6 +8,7 @@ import {
   validateTournamentInput,
   type TournamentInputBody,
 } from "@/lib/server/tournaments/validation";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -36,7 +37,7 @@ export async function POST(req: Request) {
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    const body = (await req.json()) as TournamentInputBody & {
+    const body = (await readJsonBody(req)) as TournamentInputBody & {
       startVisibilityAt?: string;
       registrationOpenAt?: string;
       registrationCloseAt?: string;

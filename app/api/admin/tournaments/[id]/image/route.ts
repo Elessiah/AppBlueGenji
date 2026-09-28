@@ -8,6 +8,7 @@ import {
 import { can } from "@/lib/shared/permissions";
 import { checkTournamentImageSettings } from "@/lib/shared/tournament-image";
 import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib/shared/image-crop";
+import { readImageUploadForm, readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Illustration ou logo d'un tournoi (`lib/shared/tournament-image.ts`).
@@ -34,7 +35,7 @@ const IMAGE_INPUT_ERRORS = new Set([
   "IMAGE_ANIMATED_NOT_SUPPORTED",
 ]);
 
-async function authorize(context: RouteContext): Promise<{ tournamentId: number } | Response> {
+async function authorize(context: RouteContext): Promise<{ tournamentId: number; userId: number } | Response> {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
@@ -44,7 +45,7 @@ async function authorize(context: RouteContext): Promise<{ tournamentId: number 
   if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
-  return { tournamentId };
+  return { tournamentId, userId: user.id };
 }
 
 function mapFailure(error: unknown, fallback: string): Response {
@@ -62,12 +63,8 @@ export async function POST(req: Request, context: RouteContext) {
   const auth = await authorize(context);
   if (auth instanceof Response) return auth;
 
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return fail("FILE_MISSING", 400);
-  }
+  const form = await readImageUploadForm(req, auth.userId);
+  if (form instanceof Response) return form;
 
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);
@@ -95,7 +92,7 @@ export async function PATCH(req: Request, context: RouteContext) {
   const auth = await authorize(context);
   if (auth instanceof Response) return auth;
 
-  const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
+  const body = (await readJsonBody(req).catch(() => null)) as Record<string, unknown> | null;
   if (body === null || typeof body !== "object") return fail("INVALID_IMAGE_FIT", 400);
 
   // Au PATCH, les trois champs sont **exigés**, et typés : `checkTournamentImageSettings`

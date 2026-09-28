@@ -1,7 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { enforceRateLimit, ISSUE_REPORT_RULE } from "@/lib/server/api-guard";
+import { enforceRateLimit, ISSUE_REPORT_DAILY_RULE, ISSUE_REPORT_RULE } from "@/lib/server/api-guard";
 import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Signale un problème au staff depuis la page d'un tournoi.
@@ -18,7 +19,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const limited = enforceRateLimit(ISSUE_REPORT_RULE, user.id);
+  const limited = enforceRateLimit(ISSUE_REPORT_RULE, user.id) ?? enforceRateLimit(ISSUE_REPORT_DAILY_RULE, user.id);
   if (limited) return limited;
 
   const { id } = await context.params;
@@ -27,7 +28,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const body = (await req.json().catch(() => ({}))) as {
+  const body = (await readJsonBody(req).catch(() => ({}))) as {
     message?: unknown;
     matchId?: unknown;
   };

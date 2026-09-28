@@ -3,6 +3,7 @@ import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { deleteSponsor, getSponsorImageUrls, updateSponsor } from "@/lib/server/sponsors-service";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Supprime l'ancien fichier (logo ou bandeau) s'il a changé, qu'il vit dans le
@@ -32,7 +33,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
   let body: Record<string, unknown>;
   try {
-    body = (await req.json()) as Record<string, unknown>;
+    body = (await readJsonBody(req)) as Record<string, unknown>;
   } catch {
     return fail("INVALID_BODY", 400);
   }

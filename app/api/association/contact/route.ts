@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { getContactInfo, setContactInfo } from "@/lib/server/contact-service";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
   const contact = await getContactInfo();
@@ -15,7 +16,7 @@ export async function PUT(req: Request) {
 
   let body: { email?: unknown; discordTag?: unknown; discordUrl?: unknown };
   try {
-    body = (await req.json()) as typeof body;
+    body = (await readJsonBody(req)) as typeof body;
   } catch {
     return fail("INVALID_BODY", 400);
   }

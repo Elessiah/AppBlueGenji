@@ -9,6 +9,7 @@ import {
   updateTeamMemberRoles,
 } from "@/lib/server/teams-service";
 import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -21,7 +22,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   try {
-    const body = (await req.json()) as { pseudo?: string; roles?: unknown };
+    const body = (await readJsonBody(req)) as { pseudo?: string; roles?: unknown };
     if (!body.pseudo?.trim()) {
       return fail("MISSING_PSEUDO", 400);
     }
@@ -57,7 +58,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   }
 
   try {
-    const body = (await req.json()) as { userId?: number; roles?: TeamRole[] };
+    const body = (await readJsonBody(req)) as { userId?: number; roles?: TeamRole[] };
     if (!body.userId || !Number.isInteger(body.userId)) {
       return fail("MISSING_USER_ID", 400);
     }
@@ -86,7 +87,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
   }
 
   try {
-    const body = (await req.json()) as { userId?: number };
+    const body = (await readJsonBody(req)) as { userId?: number };
     if (!body.userId || !Number.isInteger(body.userId)) {
       return fail("MISSING_USER_ID", 400);
     }

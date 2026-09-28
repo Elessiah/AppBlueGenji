@@ -10,6 +10,7 @@ import {
   LOGO_RIGHTS_NOT_CERTIFIED,
   TERMS_ACCEPTANCE_REQUIRED,
 } from "@/lib/shared/terms-of-use";
+import { readImageUploadForm } from "@/lib/server/request-body";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -26,12 +27,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return fail("FORBIDDEN", 403);
   }
 
-  let form: FormData;
-  try {
-    form = await req.formData();
-  } catch {
-    return fail("FILE_MISSING", 400);
-  }
+  const form = await readImageUploadForm(req, user.id);
+  if (form instanceof Response) return form;
 
   const file = form.get("file");
   if (!(file instanceof File)) return fail("FILE_MISSING", 400);

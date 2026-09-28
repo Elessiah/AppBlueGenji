@@ -1,6 +1,7 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string; matchId: string }> }) {
   const user = await getCurrentUser();
@@ -21,7 +22,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   try {
-    const body = (await req.json()) as { myScore?: number; opponentScore?: number };
+    const body = (await readJsonBody(req)) as { myScore?: number; opponentScore?: number };
 
     await reportMatchScore(
       tournamentId,
