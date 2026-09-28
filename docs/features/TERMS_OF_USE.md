@@ -49,7 +49,12 @@ est gardée 30 s par compte, vidée à l'acceptation.
 
 Case « Je certifie détenir les droits sur ce logo » (`LOGO_RIGHTS_FIELD`),
 exigée par la route (`LOGO_RIGHTS_NOT_CERTIFIED`, 400) **avant** tout traitement
-du fichier. Décochée après chaque envoi : chaque image certifiée est la sienne.
+du fichier. La case n'apparaît **qu'une fois un fichier choisi** et disparaît
+avec lui : sur la fiche d'équipe, le logo s'envoie en deux temps (choisir, puis
+certifier et « Envoyer le logo »), et la case est figée pendant l'envoi. Elle
+était auparavant cochée *avant* le choix et restait affichée après : la décocher
+une fois le logo en ligne ne retirait rien, une garantie qui avait l'air
+révocable sans l'être. Chaque nouveau fichier redemande la garantie.
 
 ## Données
 

@@ -199,6 +199,7 @@ export default function CreateTeamPage() {
                 <button
                   type="button"
                   className="btn"
+                  disabled={loading}
                   onClick={() => logoInputRef.current?.click()}
                   style={{ padding: "9px 18px", fontSize: 13 }}
                 >
@@ -210,7 +211,11 @@ export default function CreateTeamPage() {
                     <button
                       type="button"
                       className="btn ghost"
-                      onClick={() => setLogoFile(null)}
+                      disabled={loading}
+                      onClick={() => {
+                        setLogoFile(null);
+                        setLogoRights(false);
+                      }}
                       style={{ padding: "6px 12px", fontSize: 12 }}
                     >
                       Retirer
@@ -223,7 +228,12 @@ export default function CreateTeamPage() {
               </p>
               {logoFile ? (
                 <label className="consent-check">
-                  <input type="checkbox" checked={logoRights} onChange={(e) => setLogoRights(e.target.checked)} />
+                  <input
+                    type="checkbox"
+                    checked={logoRights}
+                    disabled={loading}
+                    onChange={(e) => setLogoRights(e.target.checked)}
+                  />
                   <span>
                     {LOGO_RIGHTS_LABEL}{" "}
                     <Link href={LOGO_RIGHTS_TERMS_ANCHOR} target="_blank" rel="noreferrer">
