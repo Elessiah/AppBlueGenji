@@ -40,7 +40,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
     expect(page).toMatch(
       /const showHidden = isAdmin && hiddenTournaments\.length > 0/,
     );
-    expect(page).toMatch(/\{showHidden && \(\s*<Section[\s\S]*?TOURNOIS INVISIBLES/);
+    expect(page).toMatch(/\{showHidden && totalHidden > 0 && \(\s*<Section[\s\S]*?TOURNOIS INVISIBLES/);
   });
 
   it("aplatit les paniers reçus pour la section", () => {
@@ -63,10 +63,13 @@ describe("page tournois — section « Tournois invisibles »", () => {
     );
   });
 
-  it("renumérote les sections quand celle des invisibles s'ajoute", () => {
-    expect(page).toMatch(/String\(position \+ \(showHidden \? 1 : 0\)\)\.padStart\(2, "0"\)/);
-    expect(page).toMatch(/ix=\{ix\(1\)\}/);
-    expect(page).toMatch(/ix=\{ix\(4\)\}/);
+  it("numérote les seules sections affichées, invisibles comprises", () => {
+    // La numérotation suit la liste des sections rendues : celle des
+    // invisibles, en tête, décale les suivantes sans laisser de trou.
+    expect(page).toContain("const shownSections = sections.filter((entry) => entry.count > 0);");
+    expect(page).toMatch(/shownSections\.findIndex\(\(entry\) => entry\.key === key\) \+ 1\)\.padStart\(2, "0"\)/);
+    expect(page).toContain('ix={ix("hidden")}');
+    expect(page).toContain('ix={ix("finished")}');
   });
 
   it("ne laisse plus d'onglet sur la page", () => {

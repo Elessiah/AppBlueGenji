@@ -38,8 +38,8 @@ describe("page tournois — barre de recherche et filtres", () => {
     expect(page).toContain("countByGame(queryFilteredBuckets, key)");
   });
 
-  it("une section vidée par un filtre le dit, distinctement d'une section réellement vide", () => {
-    expect(page).toContain("sectionEmptyMessage(whenUnfiltered, query, gameFilter)");
+  it("une page vidée par un filtre le dit, distinctement d'une page réellement vide", () => {
+    expect(page).toContain('sectionEmptyMessage("Aucun tournoi publié pour le moment.", query, gameFilter)');
   });
 
   it("« Créer un tournoi » est un seul contrôle interactif, pas un bouton dans un lien", () => {
@@ -59,7 +59,7 @@ describe("page tournois — barre de recherche et filtres", () => {
 
 describe("page tournois — volume des sections", () => {
   it("chaque section bornée peut se déplier puis se replier", () => {
-    for (const key of ["running", "registration", "upcoming", "finished"]) {
+    for (const key of ["mine", "running", "registration", "upcoming", "finished"]) {
       expect(page).toContain(`expanded={expandedSections.has("${key}")}`);
       expect(page).toContain(`onToggle={() => toggleSection("${key}")}`);
     }
@@ -74,7 +74,7 @@ describe("page tournois — volume des sections", () => {
     // qui fait grossir la section le laissait périmé, cachant les arrivées
     // récentes derrière un « Voir plus » qui semblait pourtant déplié.
     expect(page).not.toContain("displayLimits");
-    expect(page).toMatch(/expandedSections\.has\("running"\) \? totalRunning : SECTION_DISPLAY_LIMIT/);
+    expect(page).toContain("list.slice(0, expandedSections.has(key) ? list.length : SECTION_DISPLAY_LIMIT)");
   });
 
   it("chaque bouton « Voir plus »/« Voir moins » nomme sa section", () => {
@@ -82,6 +82,7 @@ describe("page tournois — volume des sections", () => {
     // page : sans le nom de la section, une navigation par liste de contrôles
     // (lecteur d'écran) ne peut pas les distinguer.
     const titles: Record<string, string> = {
+      mine: "MES TOURNOIS",
       running: "EN COURS",
       registration: "INSCRIPTIONS OUVERTES",
       upcoming: "PROCHAINEMENT",

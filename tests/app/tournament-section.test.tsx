@@ -11,7 +11,7 @@ import { Section } from "@/app/(secured)/tournois/Section";
 describe("Section — en-tête accessible", () => {
   it("pose le bouton dans un <h2>, jamais l'inverse", () => {
     const markup = renderToStaticMarkup(
-      <Section ix="01" title="EN COURS" count={2} emptyMsg="Vide">
+      <Section ix="01" title="EN COURS" count={2}>
         <div>contenu</div>
       </Section>,
     );
@@ -22,7 +22,7 @@ describe("Section — en-tête accessible", () => {
 
   it("le nom accessible du titre se limite au titre, sans l'index ni le compte", () => {
     const markup = renderToStaticMarkup(
-      <Section ix="01" title="EN COURS" count={46} emptyMsg="Vide">
+      <Section ix="01" title="EN COURS" count={46}>
         <div>contenu</div>
       </Section>,
     );
@@ -34,7 +34,7 @@ describe("Section — en-tête accessible", () => {
 
   it("l'accent (« · STAFF ») reste dans le nom accessible, pas seulement le titre", () => {
     const markup = renderToStaticMarkup(
-      <Section ix="01" title="TOURNOIS INVISIBLES" accent="· STAFF" count={4} emptyMsg="Vide">
+      <Section ix="01" title="TOURNOIS INVISIBLES" accent="· STAFF" count={4}>
         <div>contenu</div>
       </Section>,
     );
@@ -47,7 +47,7 @@ describe("Section — en-tête accessible", () => {
 
   it("le bouton porte aria-expanded et aria-controls, qui désigne le corps affiché", () => {
     const markup = renderToStaticMarkup(
-      <Section ix="01" title="EN COURS" count={2} defaultOpen={true} emptyMsg="Vide">
+      <Section ix="01" title="EN COURS" count={2} defaultOpen={true}>
         <div>contenu</div>
       </Section>,
     );
@@ -59,7 +59,7 @@ describe("Section — en-tête accessible", () => {
 
   it("replié par défaut : aria-expanded le dit, le corps ne rend rien", () => {
     const markup = renderToStaticMarkup(
-      <Section ix="04" title="TERMINÉS" count={3} defaultOpen={false} emptyMsg="Vide">
+      <Section ix="04" title="TERMINÉS" count={3} defaultOpen={false}>
         <div>contenu qui ne doit pas apparaître replié</div>
       </Section>,
     );
@@ -69,7 +69,7 @@ describe("Section — en-tête accessible", () => {
 
   it("replié : aria-controls ne désigne plus un id absent du DOM", () => {
     const markup = renderToStaticMarkup(
-      <Section ix="04" title="TERMINÉS" count={3} defaultOpen={false} emptyMsg="Vide">
+      <Section ix="04" title="TERMINÉS" count={3} defaultOpen={false}>
         <div>contenu</div>
       </Section>,
     );
@@ -78,15 +78,57 @@ describe("Section — en-tête accessible", () => {
     expect(markup).not.toContain("aria-controls");
   });
 
-  it("section vide : titre « Vide » et message dédié, sous le même id référencé", () => {
+  it("porte l'ancre visée par le sommaire de la page", () => {
     const markup = renderToStaticMarkup(
-      <Section ix="02" title="INSCRIPTIONS" count={0} defaultOpen={true} emptyMsg="Rien à inscrire ici.">
-        <div>jamais rendu à zéro</div>
+      <Section id="tournois-running" ix="01" title="EN COURS" count={2}>
+        <div>contenu</div>
       </Section>,
     );
-    const controlsId = markup.match(/aria-controls="([^"]+)"/)?.[1];
-    expect(markup).toContain(`id="${controlsId}"`);
-    expect(markup).toContain("Rien à inscrire ici.");
-    expect(markup).not.toContain("jamais rendu à zéro");
+    expect(markup).toMatch(/<section id="tournois-running"/);
+  });
+
+  it("ouverture pilotée : `open` l'emporte sur `defaultOpen`", () => {
+    const closed = renderToStaticMarkup(
+      <Section ix="04" title="TERMINÉS" count={3} defaultOpen={true} open={false}>
+        <div>contenu piloté</div>
+      </Section>,
+    );
+    expect(closed).toContain('aria-expanded="false"');
+    expect(closed).not.toContain("contenu piloté");
+
+    const opened = renderToStaticMarkup(
+      <Section ix="04" title="TERMINÉS" count={3} defaultOpen={false} open={true}>
+        <div>contenu piloté</div>
+      </Section>,
+    );
+    expect(opened).toContain('aria-expanded="true"');
+    expect(opened).toContain("contenu piloté");
+  });
+
+  it("n'a plus de cadre « Vide » : la page ne rend pas une section sans tournoi", () => {
+    const markup = renderToStaticMarkup(
+      <Section ix="02" title="INSCRIPTIONS" count={0}>
+        {null}
+      </Section>,
+    );
+    expect(markup).not.toContain(">Vide<");
+  });
+
+  it("la variante « mine » est posée sur la section, pour son en-tête distinct", () => {
+    const markup = renderToStaticMarkup(
+      <Section ix="01" title="MES TOURNOIS" count={1} tone="mine">
+        <div>contenu</div>
+      </Section>,
+    );
+    expect(markup).toContain('data-tone="mine"');
+  });
+
+  it("le chevron est décoratif", () => {
+    const markup = renderToStaticMarkup(
+      <Section ix="01" title="EN COURS" count={1}>
+        <div>contenu</div>
+      </Section>,
+    );
+    expect(markup).toMatch(/<svg[^>]*aria-hidden="true"/);
   });
 });
