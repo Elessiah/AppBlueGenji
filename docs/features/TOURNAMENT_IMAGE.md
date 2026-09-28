@@ -18,6 +18,13 @@ d'un logo survit (WebP avec couche alpha). Les refus sont ceux de tout
 téléversement du site : PNG, JPEG ou WebP, 5 Mo, 8000 px par côté, pas
 d'animation.
 
+Seule exception, voulue par l'organisateur : la **zone gardée** qu'il choisit
+dans la modale de recadrage commune à tous les imports
+([IMAGE_CROP.md](IMAGE_CROP.md)), cadre **libre** pour ce gabarit. Elle part
+avec le fichier (champ `crop`) et le point focal se choisit ensuite **dans**
+cette zone — l'aperçu du sélecteur ne montre qu'elle. Sans geste, le cadre
+couvre l'image entière et rien n'est découpé.
+
 Le cadrage se décide **au rendu**, selon deux modes (`bg_tournaments.image_fit`) :
 
 | Mode | Libellé | Rendu | Cadrage |
