@@ -6,6 +6,7 @@ import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { teamLabel } from "@/lib/shared/match-card-viewer";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
@@ -238,8 +239,8 @@ export function RollbackRoundDialog({
                 }}
               >
                 <span style={{ color: "var(--text-2, #9aa4b2)" }}>
-                  {match.team1Name ?? match.team1Placeholder ?? "À venir"} vs{" "}
-                  {match.team2Name ?? match.team2Placeholder ?? "À venir"}
+                  {teamLabel(match.team1Name, match.team1Placeholder, "À venir")} vs{" "}
+                  {teamLabel(match.team2Name, match.team2Placeholder, "À venir")}
                 </span>
                 <span
                   className="mono"

@@ -505,6 +505,15 @@ export const RANKING_PLACEMENT_HINT = "compris dans la cote · rang final des to
 export const RANKING_UNRANKED_HINT = "Aucun match joué : cote de départ";
 
 /**
+ * La même nuance en deux mots, **affichée** sous le total d'une carte
+ * d'annuaire d'équipe non classée : la légende complète n'y tient pas, et un
+ * `title` y serait inatteignable (la plaque `.cardOverlay` recouvre la carte).
+ * Sans elle, une équipe qui n'a jamais joué afficherait le même nombre qu'une
+ * équipe qui l'a gagné, sans rien pour les distinguer.
+ */
+export const RANKING_UNRANKED_SHORT = "Aucun match";
+
+/**
  * Le cas que les points de parcours ont ouvert : aucun match compté, et
  * pourtant une cote qui n'est plus celle du départ.
  *

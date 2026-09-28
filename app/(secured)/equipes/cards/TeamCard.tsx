@@ -9,6 +9,7 @@ import { displayTeamTag } from "@/lib/shared/team-tag";
 import {
   isRankedTeam,
   RANKING_POINTS_LABEL,
+  RANKING_UNRANKED_SHORT,
   rankingPointsHint,
 } from "@/lib/shared/ranking";
 import s from "./TeamCard.module.css";
@@ -33,6 +34,7 @@ import s from "./TeamCard.module.css";
 export function TeamCard({ team }: { team: TeamListItem }) {
   const color = getPaletteColor(team.id);
   const isTop3 = team.rank <= 3;
+  const ranked = isRankedTeam(team);
 
   return (
     <article className={s.card} style={{ "--c": color } as React.CSSProperties}>
@@ -105,15 +107,22 @@ export function TeamCard({ team }: { team: TeamListItem }) {
       <div className={s.stats}>
         {/* Tout le monde part de la même cote : sans cette nuance, une équipe
             qui n'a jamais joué afficherait le même nombre qu'une équipe qui l'a
-            gagné, et rien ne dirait la différence. */}
-        <div
-          title={`${RANKING_POINTS_LABEL} · ${rankingPointsHint(isRankedTeam(team), team.points)}`}
-        >
+            gagné, et rien ne dirait la différence. La nuance est donc écrite
+            dans la carte — jamais en `title`, que la plaque `.cardOverlay`
+            rendrait inatteignable : visible en deux mots pour une équipe non
+            classée, entière pour les lecteurs d'écran. */}
+        <div>
           <div className={s.statLbl}>
             <span aria-hidden="true">Pts</span>
             <span className="sr-only">{RANKING_POINTS_LABEL}</span>
           </div>
           <div className={s.statVal}>{team.points}</div>
+          {!ranked && (
+            <div className={s.statHint} aria-hidden="true">
+              {RANKING_UNRANKED_SHORT}
+            </div>
+          )}
+          <span className="sr-only">{rankingPointsHint(ranked, team.points)}</span>
         </div>
         <div>
           <div className={s.statLbl}>

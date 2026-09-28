@@ -200,6 +200,17 @@
   line-height: 1;
 }
 
+/* Nuance sous le total d'une équipe non classée (« Aucun match ») : même
+   gabarit que l'étiquette du dessus, pour se lire comme une légende. */
+.statHint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  color: var(--ink-mute);
+  text-transform: uppercase;
+  margin-top: 4px;
+}
+
 .statVal.win {
   color: #4fe0a2;
 }
