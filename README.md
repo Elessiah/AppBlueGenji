@@ -71,6 +71,14 @@ npm run seed:view      # inspecte le jeu de test
 
 Scripts prévus pour la production (`NODE_ENV=production`) : `npm run backfill:avatars` (rapatrie les photos restées chez leur hébergeur) et `npm run replay:deletions` (rejoue les suppressions de compte après restauration d'une sauvegarde — lancer d'abord avec `--dry-run`).
 
+## Application installée — limite connue
+
+Le site est installable (manifeste `/manifest.webmanifest`, voir [`docs/features/WEB_APP_MANIFEST.md`](docs/features/WEB_APP_MANIFEST.md)), en mode `minimal-ui` et **jamais `standalone`**.
+
+**Le risque** : lancée en mode autonome depuis l'écran d'accueil d'iOS, l'app a ses propres cookies, et l'aller-retour de la connexion Google, Discord ou Blizzard s'ouvre dans une feuille Safari qui ne les partage pas. La connexion échoue alors (`?error=state` le plus souvent), ou réussit dans la feuille en laissant l'app déconnectée. Le manifeste évite ce mode, mais un joueur peut l'imposer (« Ouvrir en tant qu'app web », activé par défaut depuis iOS 26). Les navigateurs intégrés des applications (Instagram, TikTok, WebView Android…) posent le même problème. Le code Discord par message privé, qui ne quitte pas la page, fonctionne partout.
+
+**Ce que fait le site** : `/connexion` reconnaît ces deux contextes (`lib/shared/login-environment.ts`) et, sur un échec OAuth qu'ils peuvent expliquer, ajoute au message d'erreur le conseil d'ouvrir le site dans un autre navigateur ou de passer par le code Discord. Le cas silencieux — connexion réussie dans la feuille, app restée déconnectée — ne produit aucune erreur et ne peut pas être signalé.
+
 ## Déploiement
 
 `./update.sh` — voir [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md).
