@@ -34,9 +34,11 @@ export function isTransactionAborted(error: unknown): boolean {
 /**
  * `true` si la table n'existe pas.
  *
- * Trois tables de `lib/server/database.ts` — et elles seules — sont créées dans
+ * Six tables de `lib/server/database.ts` — et elles seules — sont créées dans
  * un `try` dont le `catch` est muet : `bg_match_reminders`,
- * `bg_referee_alerts` et `bg_endurance_penalties`. Une base où leur création a
+ * `bg_referee_alerts`, `bg_endurance_penalties` et les trois tables des
+ * notifications push (`bg_push_subscriptions`, `bg_push_topic_optouts`,
+ * `bg_match_start_notices`). Une base où leur création a
  * échoué reste debout, et c'est à leurs lecteurs de s'en accommoder plutôt que
  * d'emporter la fonctionnalité qui les appelle : un rappel perdu vaut mieux
  * qu'un report de score en erreur. Les purges — suppression d'un tournoi,
@@ -56,7 +58,7 @@ export function isMissingTableError(error: unknown): boolean {
 }
 
 /**
- * Attend une écriture sur l'une des trois tables tolérées, en tenant son
+ * Attend une écriture sur l'une des tables tolérées, en tenant son
  * absence pour « rien à faire ».
  *
  * Toute autre erreur remonte — un interblocage, en particulier, a déjà défait
@@ -71,7 +73,7 @@ export async function ignoreMissingTable(write: Promise<unknown>): Promise<void>
 }
 
 /**
- * Lit les lignes d'un `SELECT` sur l'une des trois tables tolérées, en tenant
+ * Lit les lignes d'un `SELECT` sur l'une des tables tolérées, en tenant
  * son absence pour « aucune ligne ».
  *
  * Aucune ligne n'a pu être écrite dans une table qui n'existe pas : la lire

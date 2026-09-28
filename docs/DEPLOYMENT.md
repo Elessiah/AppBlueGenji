@@ -86,6 +86,22 @@ pm2 save                 # sans ça, un reboot restaure l'ancienne entrée cass�
 Le `pm2 save` n'est pas optionnel : il fige l'entrée réparée dans
 `~/.pm2/dump.pm2`, que `pm2 resurrect` relit au démarrage de la machine.
 
+## Notifications push : les clés VAPID
+
+Le push est éteint tant que `VAPID_PUBLIC_KEY` et `VAPID_PRIVATE_KEY` manquent
+(`docs/features/PUSH_NOTIFICATIONS.md`). Pour l'allumer :
+
+```bash
+npm run push:keys
+```
+
+puis recopier les deux lignes (et un `VAPID_SUBJECT` en `mailto:`) dans
+`.env.production`, et redémarrer. **Une seule fois** : la clé publique est
+gravée dans chaque abonnement d'appareil, et changer la paire rend tous les
+abonnements existants muets — chaque joueur devrait réactiver les
+notifications sur chacun de ses appareils. La clé privée se sauvegarde avec le
+reste de la configuration, hors du dépôt.
+
 ## Ce que `start.sh` ne fait pas
 
 `start.sh` démarre le serveur, et rien d'autre. Il a longtemps enchaîné
