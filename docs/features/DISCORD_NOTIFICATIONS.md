@@ -1,6 +1,6 @@
 # Messages Discord automatisés
 
-Le site écrit aux joueurs sur Discord, par le canal interne du bot. Deux usages,
+Le site écrit aux joueurs sur Discord, par le canal interne du bot. Trois usages,
 une seule mécanique : **le site rédige, le bot distribue**.
 
 - **Rappels de match** — une semaine, 24 h puis 1 h avant le coup d'envoi d'une
@@ -8,6 +8,9 @@ une seule mécanique : **le site rédige, le bot distribue**.
 - **Signalement d'un problème** — un inscrit alerte le staff depuis la page du
   tournoi ou depuis un match ; le bot le relaie au canal de logs et au rôle
   arbitre.
+- **Demande d'adhésion** — le propriétaire et les managers d'une équipe sont
+  prévenus en message privé qu'un joueur demande à la rejoindre ; voir
+  `docs/features/TEAM_JOIN_REQUEST_NOTIFICATION.md`.
 
 Le même canal « rôle arbitre » porte aussi les alertes que le **moteur** produit
 de lui-même — conflit de score, report expiré non tranché : le signalement en est
