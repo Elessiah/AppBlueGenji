@@ -1,4 +1,5 @@
-/* Dialogue d'édition d'un score, pour la permission `tournaments`.
+/* Dialogues de score : arbitrage (`AdminScoreDialog`, permission `tournaments`)
+   et engagés (`PlayerScoreDialog`).
    Même ossature que les autres modales de la fiche tournoi (voile sombre,
    carte centrée, jetons « cyber ») — voir `MatchScheduleDialog`.
 

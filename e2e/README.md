@@ -65,6 +65,24 @@ Ignoré tant que `E2E_AUTH_USER` n'est pas défini. Prérequis :
 Le bypass (`lib/server/auth.ts → getDevBypassUser`) authentifie alors toutes les
 routes `(secured)` sans OAuth ni code Discord (inopérant si `NODE_ENV=production`).
 
+### 3. `player-journey.spec.ts` — parcours joueur (base requise)
+Deux joueurs **réels** s'affrontent dans un tournoi créé pour l'occasion :
+inscription de leurs équipes, lancement du match, score proposé dans la modale
+puis confirmé par l'adversaire, désaccord, forfait sur la manche.
+
+Le bypass `DEV_AUTH_USER_ID` n'offrant qu'une identité par serveur, la fixture
+(`e2e/helpers/player-journey-fixture.ts`) crée ses comptes en base et leur ouvre
+de vraies sessions (ligne `bg_user_sessions` + cookie `bg_session`) ; tout le
+reste passe par l'API, comme un utilisateur. Comptes, équipes et tournois sont
+effacés à la fin.
+
+Prérequis : une base MySQL configurée dans `.env`, et **pas** d'`E2E_AUTH_USER`
+(le bypass masquerait les sessions). Ignoré sinon — donc en CI sans base.
+
+```bash
+npx playwright test e2e/player-journey.spec.ts
+```
+
 ## CI
 
 En CI, seul `auth.spec.ts` s'exécute par défaut (pas de DB requise). Pour activer

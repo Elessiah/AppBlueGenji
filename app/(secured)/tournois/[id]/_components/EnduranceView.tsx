@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useMemo } from "react";
+import { useMemo } from "react";
 import { ScrollArea } from "@/components/cyber";
 import type {
   BracketMatch,
@@ -31,7 +31,6 @@ import type { MatchFormat } from "@/lib/shared/match-format";
 import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";
 import { BracketSections } from "./BracketSections";
-import type { MatchScoreDraft } from "./BracketTree";
 import { EnduranceRoundPanels } from "./EnduranceRoundPanels";
 import styles from "./EnduranceView.module.css";
 
@@ -58,11 +57,7 @@ interface EnduranceViewProps {
    */
   onPenalize?: (teamId: number) => void;
   onLiftPenalty?: (penalty: EndurancePenaltyRow) => void;
-  canReport: (match: BracketMatch) => boolean;
   adminResolvable: (match: BracketMatch) => boolean;
-  drafts: MatchScoreDraft;
-  onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
-  onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   format: TournamentFormat;
   /** Phrase affichée quand le plateau ne porte encore aucune rencontre. */
@@ -353,11 +348,7 @@ export function EnduranceView({
   canPenalize = false,
   onPenalize,
   onLiftPenalty,
-  canReport,
   adminResolvable,
-  drafts,
-  onScoreChange,
-  onSubmit,
   onOpenAdminModal,
   format,
   emptyLabel = "Aucun match pour l'instant.",
@@ -642,11 +633,7 @@ export function EnduranceView({
             matches={decisive}
             allTournamentMatches={matches}
             myTeamId={myTeamId}
-            canReport={canReport}
             adminResolvable={adminResolvable}
-            drafts={drafts}
-            onScoreChange={onScoreChange}
-            onSubmit={onSubmit}
             onOpenAdminModal={onOpenAdminModal}
             format={format}
             resolveNextMatchId={resolvePlayoffNext}
@@ -661,11 +648,7 @@ export function EnduranceView({
                 matches={thirdPlace}
                 allTournamentMatches={matches}
                 myTeamId={myTeamId}
-                canReport={canReport}
                 adminResolvable={adminResolvable}
-                drafts={drafts}
-                onScoreChange={onScoreChange}
-                onSubmit={onSubmit}
                 onOpenAdminModal={onOpenAdminModal}
                 format={format}
               />
@@ -683,11 +666,7 @@ export function EnduranceView({
             myTeamId={myTeamId}
             playoffsStarted={endurance.playoffsStarted}
             allTournamentMatches={matches}
-            canReport={canReport}
             adminResolvable={adminResolvable}
-            drafts={drafts}
-            onScoreChange={onScoreChange}
-            onSubmit={onSubmit}
             onOpenAdminModal={onOpenAdminModal}
             format={format}
           />

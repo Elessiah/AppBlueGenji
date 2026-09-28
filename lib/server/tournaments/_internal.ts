@@ -1,7 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { toIso } from "@/lib/server/serialization";
 import { toParticipantType } from "@/lib/shared/participants";
-import type { BracketMatch, TournamentCard, TournamentPhase } from "@/lib/shared/types";
+import type { BracketMatch, MatchScoreReport, TournamentCard, TournamentPhase } from "@/lib/shared/types";
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import {
   parseRegistrationFilters,
@@ -269,6 +269,18 @@ export function mapMatch(row: MatchRow): BracketMatch {
     nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
     nextLoserSlot: row.next_loser_slot === null ? null : Number(row.next_loser_slot),
     scoreDeadlineAt: toIso(row.score_deadline_at),
+    team1Report: mapScoreReport(
+      row.team1_report_score,
+      row.team1_report_opponent_score,
+      row.team1_reported_at,
+      1,
+    ),
+    team2Report: mapScoreReport(
+      row.team2_report_score,
+      row.team2_report_opponent_score,
+      row.team2_reported_at,
+      2,
+    ),
     updatedAt: toIso(row.updated_at)!,
     phaseId: Number(row.phase_id ?? 0),
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
@@ -278,6 +290,29 @@ export function mapMatch(row: MatchRow): BracketMatch {
     liveStartedAt: toIso(row.live_started_at),
     ...mapMatchLaunch(row),
     replayUrl: normalizeReplayUrl(row.replay_url ?? null),
+  };
+}
+
+/**
+ * Proposition de score d'une engagée, retournée dans l'orientation du plateau.
+ * Le stockage parle depuis l'engagée (« mon score », « score adverse ») : pour
+ * l'équipe 2, son propre score est donc celui de la **seconde** colonne.
+ */
+function mapScoreReport(
+  score: number | null | undefined,
+  opponentScore: number | null | undefined,
+  reportedAt: Date | string | null | undefined,
+  side: 1 | 2,
+): MatchScoreReport | null {
+  if (score === null || score === undefined || opponentScore === null || opponentScore === undefined) {
+    return null;
+  }
+  const own = Number(score);
+  const other = Number(opponentScore);
+  return {
+    team1Score: side === 1 ? own : other,
+    team2Score: side === 1 ? other : own,
+    reportedAt: toIso(reportedAt ?? null) ?? "",
   };
 }
 

@@ -16,6 +16,10 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // bouton qu'il n'a pas — c'est `decideScoreForm` qui la donne, côté arbitrage,
   // avant même l'aller-retour.
   MATCH_ALREADY_COMPLETED: "Ce match est déjà tranché : son résultat ne peut plus être saisi.",
+  // Saisie d'un score ou d'un forfait par un engagé (modale joueur).
+  NOT_IN_MATCH: "Ton équipe ne joue pas ce match.",
+  SCORE_SUBMIT_FAILED: "Le score n'a pas pu être envoyé. Réessaie.",
+  MATCH_FORFEIT_FAILED: "Le forfait n'a pas pu être enregistré. Réessaie.",
   DRAW_NOT_ALLOWED: "Match nul impossible : ce tournoi exige un vainqueur.",
   // Formulations de repli : l'interface connaît le format du tournoi et
   // remplace ces messages par une version chiffrée (`matchScoreViolationMessage`).

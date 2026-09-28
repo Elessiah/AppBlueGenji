@@ -112,6 +112,29 @@ describe("reportMatchScore — respect du format de match", () => {
     jest.mocked(tryAutoResolveByes).mockResolvedValue(undefined);
   });
 
+  it("verrouille la ligne du match à sa lecture, avant toute écriture", async () => {
+    // Un forfait ou un arbitrage concurrent peut trancher le match entre la
+    // lecture et l'écriture : sans verrou, ce report le rouvrirait.
+    mockTournament({ type: "BO", value: 5 });
+    const { conn } = fakeConnection({ type: "BO", value: 5 });
+    const seen: string[] = [];
+    const execute = conn.execute.bind(conn);
+    (conn as unknown as { execute: (sql: string, p?: unknown) => unknown }).execute = (
+      sql: string,
+      params?: unknown,
+    ) => {
+      seen.push(sql.replace(/\s+/g, " ").trim());
+      return (execute as (sql: string, p?: unknown) => unknown)(sql, params);
+    };
+
+    await reportMatchScore(conn, 1, 10, 42, 3, 1);
+    const firstMatchRead = seen.findIndex((q) => q.includes("FROM bg_matches"));
+    const firstWrite = seen.findIndex((q) => q.startsWith("UPDATE"));
+    expect(seen[firstMatchRead]).toMatch(/AND tournament_id = \? LIMIT 1 FOR UPDATE$/);
+    expect(seen[firstMatchRead]).not.toMatch(/JOIN/);
+    expect(firstMatchRead).toBeLessThan(firstWrite);
+  });
+
   it("accepte un 3-1 en BO5", async () => {
     mockTournament({ type: "BO", value: 5 });
     const { conn, writes } = fakeConnection({ type: "BO", value: 5 });

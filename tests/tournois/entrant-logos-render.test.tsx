@@ -165,6 +165,8 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     nextLoserMatchId: null,
     nextLoserSlot: null,
     scoreDeadlineAt: null,
+    team1Report: null,
+    team2Report: null,
     updatedAt: "2026-09-01T18:00:00.000Z",
     phaseId: 0,
     phasePosition: null,
@@ -191,12 +193,7 @@ function renderMatch(value: BracketMatch) {
     <ToastProvider>
       <MatchRow
         match={value}
-        reportable={false}
         adminResolvable={false}
-        onScoreChange={() => {}}
-        myScore=""
-        opponentScore=""
-        onSubmit={async () => {}}
         onOpenAdminModal={() => {}}
         allMatches={[value]}
         roundNumber={value.roundNumber}
@@ -276,7 +273,7 @@ describe("emblème — alignement et cas limites", () => {
   });
 
   it("ne réserve pas de case blanche devant le libellé d'un côté vide du dialogue de score", () => {
-    expect(stripComments(read("AdminScoreDialog.tsx"))).toContain(
+    expect(stripComments(read("ScoreStepper.tsx"))).toContain(
       "{teamId !== null && <EntrantLogo teamId={teamId}",
     );
   });

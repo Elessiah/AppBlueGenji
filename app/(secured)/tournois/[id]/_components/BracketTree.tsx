@@ -1,12 +1,11 @@
 "use client";
 
-import { CSSProperties, FormEvent, Fragment, useEffect, useRef } from "react";
+import { CSSProperties, Fragment, useEffect, useRef } from "react";
 import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/types";
 import { ScrollArea } from "@/components/cyber";
 import { useSlotHeight } from "../_hooks/useSlotHeight";
 import { MatchRow } from "./MatchRow";
 
-export type MatchScoreDraft = Record<number, { myScore: string; opponentScore: string }>;
 
 const CARD_W = 210;
 const CONN_W = 40;
@@ -39,11 +38,7 @@ interface BracketTreeProps {
   scrollRequest: ScrollRequest | null;
   /** Clic sur le badge « Qualifié en X » : ouvre/défile vers le match de destination. */
   onQualifyClick?: (sourceMatch: BracketMatch) => void;
-  canReport: (m: BracketMatch) => boolean;
   adminResolvable: (m: BracketMatch) => boolean;
-  drafts: MatchScoreDraft;
-  onScoreChange: (matchId: number, field: "myScore" | "opponentScore", value: string) => void;
-  onSubmit: (match: BracketMatch, e: FormEvent) => Promise<void>;
   onOpenAdminModal: (match: BracketMatch) => void;
   format: TournamentFormat;
   /**
@@ -70,11 +65,7 @@ export function BracketTree({
   scrollTargetMatchId,
   scrollRequest,
   onQualifyClick,
-  canReport,
   adminResolvable,
-  drafts,
-  onScoreChange,
-  onSubmit,
   onOpenAdminModal,
   format,
   resolveNextMatchId,
@@ -234,12 +225,7 @@ export function BracketTree({
                         >
                           <MatchRow
                             match={match}
-                            reportable={canReport(match)}
                             adminResolvable={adminResolvable(match)}
-                            onScoreChange={onScoreChange}
-                            myScore={drafts[match.id]?.myScore || ""}
-                            opponentScore={drafts[match.id]?.opponentScore || ""}
-                            onSubmit={onSubmit}
                             onOpenAdminModal={onOpenAdminModal}
                             allMatches={allTournamentMatches}
                             roundNumber={roundNum}

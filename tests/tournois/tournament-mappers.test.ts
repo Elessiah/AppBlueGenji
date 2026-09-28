@@ -120,3 +120,60 @@ describe("mapMatch — dates", () => {
     expect(match.scoreDeadlineAt).toMatch(ISO);
   });
 });
+
+describe("mapMatch — propositions de score en attente", () => {
+  it("rend null tant qu'aucune engagée n'a proposé de score", () => {
+    const match = mapMatch(matchRow());
+    expect(match.team1Report).toBeNull();
+    expect(match.team2Report).toBeNull();
+  });
+
+  it("oriente la proposition de l'équipe 1 telle quelle", () => {
+    const match = mapMatch(
+      matchRow({
+        team1_report_score: 2,
+        team1_report_opponent_score: 1,
+        team1_reported_at: new Date("2026-05-20T10:05:00.000Z"),
+      }),
+    );
+    expect(match.team1Report).toEqual({
+      team1Score: 2,
+      team2Score: 1,
+      reportedAt: "2026-05-20T10:05:00.000Z",
+    });
+    expect(match.team2Report).toBeNull();
+  });
+
+  it("retourne la proposition de l'équipe 2 dans l'orientation du plateau", () => {
+    // L'équipe 2 dit « j'ai gagné 2 à 0 » : sur le plateau, c'est 0 – 2.
+    const match = mapMatch(
+      matchRow({
+        team2_report_score: 2,
+        team2_report_opponent_score: 0,
+        team2_reported_at: new Date("2026-05-20T10:06:00.000Z"),
+      }),
+    );
+    expect(match.team2Report).toEqual({
+      team1Score: 0,
+      team2Score: 2,
+      reportedAt: "2026-05-20T10:06:00.000Z",
+    });
+  });
+
+  it("ignore une proposition à moitié écrite", () => {
+    const match = mapMatch(matchRow({ team1_report_score: 2, team1_report_opponent_score: null }));
+    expect(match.team1Report).toBeNull();
+  });
+
+  it("lit des scores rendus en chaîne par le pilote", () => {
+    const match = mapMatch(
+      matchRow({
+        team1_report_score: "3" as unknown as number,
+        team1_report_opponent_score: "0" as unknown as number,
+        team1_reported_at: "2026-05-20 10:05:00" as unknown as Date,
+      }),
+    );
+    expect(match.team1Report).toMatchObject({ team1Score: 3, team2Score: 0 });
+    expect(match.team1Report?.reportedAt).toMatch(ISO);
+  });
+});
