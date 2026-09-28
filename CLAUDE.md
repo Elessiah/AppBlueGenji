@@ -38,7 +38,7 @@ npx jest tests/path/to/file.test.ts
 ### Route Layout
 - `/` — Landing page
 - `/connexion` — Passwordless login (Google OAuth + Discord 6-digit code via DM)
-- `/regles` + `/regles/[slug]` — Règles publiques de chaque mode de tournoi (schémas SVG inline). Contenu et mapping format → page dans `lib/shared/tournament-rules.ts` ; ajouter un mode = ajouter une entrée au registre (les pages sont pré-générées via `generateStaticParams`). Le bouton flottant « ? » des pages de tournoi (`components/rules/RulesHelpFab.tsx`) résout sa cible depuis le format du tournoi.
+- `/regles` + `/regles/[slug]` — Règles publiques de chaque mode de tournoi (schémas SVG inline). Contenu et mapping format → page dans `lib/shared/tournament-rules.ts` ; ajouter un mode = ajouter une entrée au registre (les pages sont pré-générées via `generateStaticParams`). Le bouton flottant « ? » des pages de tournoi (`components/rules/RulesHelpFab.tsx`) résout sa cible depuis le format du tournoi. Depuis une fiche, il porte `?tournoi=<id>` : la page affiche alors en tête les réglages de ce tournoi (`lib/shared/tournament-settings.ts`, lus par la même porte que la fiche — `docs/features/TOURNAMENT_RULES_SETTINGS.md`). Le mode `SURVIVAL` s'affiche « Survie par coupes », pour ne pas se confondre avec BlueGenji Survie.
 - `/(secured)/*` — Auth-protected routes: `tournois`, `equipes`, `joueurs`, `profil`
 - `/api/*` — REST API routes (no tRPC, no server actions)
 
