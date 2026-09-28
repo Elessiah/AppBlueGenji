@@ -120,6 +120,12 @@
   background: rgba(90, 200, 255, 0.06);
 }
 
+/* Carte qui quitte le site (portail de support) : un lien, pas une catégorie. */
+.categoryExternal {
+  text-decoration: none;
+  border-style: dashed;
+}
+
 .categoryIcon {
   grid-row: span 2;
   display: grid;
