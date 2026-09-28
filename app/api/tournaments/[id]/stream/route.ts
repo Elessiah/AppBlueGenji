@@ -22,6 +22,10 @@ import {
 } from "@/lib/server/tournaments-service";
 import { can, canAny } from "@/lib/shared/permissions";
 import { resolveRefreshTier } from "@/lib/shared/refresh-tiers";
+import {
+  decideStreamWrite,
+  STREAM_QUEUE_HIGH_WATER_BYTES,
+} from "@/lib/server/stream-backpressure";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -171,9 +175,31 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         }
       };
 
-      const write = (frame: Uint8Array): void => {
+      // Contre-pression (`lib/server/stream-backpressure.ts`) : une connexion
+      // bloquée sans être fermée ne fait jamais échouer `enqueue`, et chaque
+      // trame s'ajoutait à une file en mémoire sans borne. File pleine, la trame
+      // n'est pas écrite (`false` : la salle garde l'abonné en retard et lui
+      // renverra la dernière version au dégagement) ; pleine trop longtemps, la
+      // connexion est fermée.
+      let backedUpSince: number | null = null;
+      const write = (frame: Uint8Array): boolean => {
         if (closed) throw new Error("STREAM_CLOSED");
+        const decision = decideStreamWrite(controller.desiredSize, backedUpSince, Date.now());
+        backedUpSince = decision.backedUpSince;
+        if (decision.action === "CLOSE") {
+          // `error` et non `close` : fermer laisserait la file attendre d'être
+          // lue par un client qui ne lit plus ; l'erreur la libère sur-le-champ.
+          try {
+            controller.error(new Error("STREAM_STALLED"));
+          } catch {
+            // Flux déjà terminé.
+          }
+          cleanup();
+          throw new Error("STREAM_CLOSED");
+        }
+        if (decision.action === "SKIP") return false;
         controller.enqueue(frame);
+        return true;
       };
 
       try {
@@ -243,6 +269,13 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     cancel() {
       cleanup();
     },
+  },
+  // File mesurée en octets, pas en trames : c'est la mémoire qu'on borne, et la
+  // stratégie par défaut (une trame) déclarerait la file pleine dès la trame
+  // d'ouverture encore non lue.
+  {
+    highWaterMark: STREAM_QUEUE_HIGH_WATER_BYTES,
+    size: (chunk: Uint8Array) => chunk.byteLength,
   });
 
   return new Response(stream, {

@@ -22,10 +22,16 @@
 type CacheEntry = { value: unknown; expiresAt: number };
 
 /**
- * Plafond d'entrées conservées. Les clés sont peu nombreuses et stables
- * (quelques agrégats de la vitrine, un instantané par tournoi consulté) ; le
- * plafond n'est qu'un garde-fou contre une clé construite à partir d'une entrée
- * utilisateur qui aurait échappé à la vigilance.
+ * Plafond d'entrées conservées. Deux familles de clés s'y côtoient : quelques
+ * agrégats **partagés** et chers (liste publique, rejeu du classement, vitrine,
+ * un instantané par tournoi consulté) et des clés **par compte** (`terms-need:`
+ * à chaque page vue, fiches `player:` et `team:`), bien plus nombreuses lors
+ * d'un gros évènement.
+ *
+ * L'éviction est donc **LRU** et non par ordre d'insertion : une entrée
+ * partagée, relue à chaque page, reste en tête et ne se fait pas chasser par
+ * une rafale de clés par compte lues une seule fois — ce qui la ferait
+ * recalculer pour rien avant son échéance.
  */
 const MAX_ENTRIES = 500;
 
@@ -66,7 +72,7 @@ function releasePending(key: string): void {
   else pending.set(key, current - 1);
 }
 
-/** Évince les entrées expirées, puis les plus anciennes si le plafond tient encore. */
+/** Évince les entrées expirées, puis les moins récemment lues si le plafond tient encore. */
 function evictIfNeeded(now: number): void {
   if (store.size < MAX_ENTRIES) return;
 
@@ -74,8 +80,8 @@ function evictIfNeeded(now: number): void {
     if (entry.expiresAt <= now) store.delete(key);
   }
 
-  // `Map` itère dans l'ordre d'insertion : les premières clés sont les plus
-  // anciennes écritures.
+  // `Map` itère dans l'ordre d'insertion, et une lecture réinsère sa clé
+  // (`cached`) : les premières clés sont les moins récemment servies.
   while (store.size >= MAX_ENTRIES) {
     const oldest = store.keys().next();
     if (oldest.done) break;
@@ -107,6 +113,9 @@ export async function cached<T>(key: string, ttlMs: number, loader: () => Promis
 
   const entry = store.get(key);
   if (entry && entry.expiresAt > now) {
+    // Relue : repasse en fin d'ordre, loin de l'éviction.
+    store.delete(key);
+    store.set(key, entry);
     return entry.value as T;
   }
 
@@ -118,6 +127,9 @@ export async function cached<T>(key: string, ttlMs: number, loader: () => Promis
   const promise = (async () => {
     const value = await loader();
     if (ttlMs > 0 && generationOf(key) === generationAtStart) {
+      // Retirée d'abord : `Map.set` sur une clé présente (valeur expirée) la
+      // laisserait à sa place d'origine, en tête de l'éviction.
+      store.delete(key);
       evictIfNeeded(Date.now());
       store.set(key, { value, expiresAt: Date.now() + ttlMs });
     }

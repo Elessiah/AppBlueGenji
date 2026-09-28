@@ -22,8 +22,13 @@ import {
   resetTournamentBroadcast,
   tournamentAudience,
 } from "@/lib/server/tournament-broadcast";
+import {
+  STREAM_QUEUE_HIGH_WATER_BYTES,
+  STREAM_STALL_TIMEOUT_MS,
+} from "@/lib/server/stream-backpressure";
 import type { PlatformRole } from "@/lib/shared/permissions";
 import { authUser } from "../../../helpers/auth-user";
+import * as snapshotModule from "@/lib/server/tournaments/snapshot";
 
 const params = (id: string) => ({ params: Promise.resolve({ id }) });
 
@@ -322,6 +327,66 @@ describe("GET /api/tournaments/[id]/stream — plafonds", () => {
     // flux mort.
     expect(response.headers.get("X-Accel-Buffering")).toBe("no");
     await response.body!.cancel();
+  });
+});
+
+describe("GET /api/tournaments/[id]/stream — contre-pression", () => {
+  beforeEach(() => {
+    // Le temps avancé réveille le battement d'entretien de la salle, qui relit
+    // l'instantané : sans ce double, il ouvrirait une vraie connexion MySQL.
+    jest
+      .spyOn(snapshotModule, "getTournamentSnapshotFrame")
+      .mockRejectedValue(new Error("hors ligne"));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  /** Instantané dont la trame d'ouverture remplit à elle seule la file. */
+  function oversizedSnapshot(): TournamentSnapshot {
+    return {
+      ...snapshotWith([]),
+      filler: "x".repeat(STREAM_QUEUE_HIGH_WATER_BYTES + 1),
+    } as unknown as TournamentSnapshot;
+  }
+
+  it("ferme un flux dont le client ne lit plus, au lieu d'empiler les trames", async () => {
+    jest.useFakeTimers();
+    jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(oversizedSnapshot());
+
+    // Personne ne lit : la trame d'ouverture reste en file, pleine.
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(200);
+    expect(tournamentAudience(5)).toBe(1);
+
+    // Premier battement : file pleine, le ping est sauté, la connexion tient.
+    jest.advanceTimersByTime(25_000);
+    expect(tournamentAudience(5)).toBe(1);
+
+    // File toujours pleine au-delà du délai : la connexion est fermée, et sa
+    // place de flux rendue.
+    jest.advanceTimersByTime(STREAM_STALL_TIMEOUT_MS + 25_000);
+    expect(tournamentAudience(5)).toBe(0);
+    await expect(response.body!.getReader().read()).rejects.toThrow("STREAM_STALLED");
+
+    jest.useRealTimers();
+    for (let i = 0; i < MAX_STREAMS_PER_USER; i += 1) {
+      const next = await GET(new Request("http://t/"), params("5"));
+      expect(next.status).toBe(200);
+      await next.body!.cancel();
+    }
+  });
+
+  it("laisse ouvert un flux que le client lit", async () => {
+    jest.useFakeTimers();
+    const response = await GET(new Request("http://t/"), params("5"));
+    const reader = response.body!.getReader();
+    await reader.read();
+
+    jest.advanceTimersByTime(STREAM_STALL_TIMEOUT_MS * 3);
+    expect(tournamentAudience(5)).toBe(1);
+    await reader.cancel();
   });
 });
 

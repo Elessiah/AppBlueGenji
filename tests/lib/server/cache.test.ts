@@ -174,4 +174,34 @@ describe("cache — bornes mémoire", () => {
     expect(await cached("k0", 60_000, async () => -1)).toBe(-1);
     expect(await cached("k699", 60_000, async () => -1)).toBe(699);
   });
+
+  it("évince la clé la moins récemment lue, pas la plus anciennement écrite", async () => {
+    // Une entrée partagée relue à chaque page (liste publique, classement) ne
+    // doit pas céder sa place à une rafale de clés par compte lues une fois.
+    await cached("partagee", 60_000, async () => "chère");
+    for (let i = 0; i < 700; i += 1) {
+      await cached(`compte:${i}`, 60_000, async () => i);
+      // Relue entre deux écritures, comme à chaque page vue.
+      await cached("partagee", 60_000, async () => "recalculée");
+    }
+
+    expect(await cached("partagee", 60_000, async () => "recalculée")).toBe("chère");
+    expect(await cached("compte:0", 60_000, async () => -1)).toBe(-1);
+  });
+
+  it("replace en fin d'ordre une clé recalculée après expiration", async () => {
+    jest.useFakeTimers();
+    await cached("rechargee", 1_000, async () => "v1");
+    await cached("autre", 60_000, async () => "a1");
+    jest.advanceTimersByTime(1_001);
+    // Recalculée : elle passe derrière « autre », au lieu de garder sa place
+    // d'origine en tête de l'éviction.
+    await cached("rechargee", 60_000, async () => "v2");
+    // 2 + 498 clés : la dernière insertion trouve le cache plein et évince une
+    // entrée, la moins récemment servie.
+    for (let i = 0; i < 499; i += 1) await cached(`k${i}`, 60_000, async () => i);
+
+    expect(await cached("rechargee", 60_000, async () => "v3")).toBe("v2");
+    expect(await cached("autre", 60_000, async () => "a2")).toBe("a2");
+  });
 });
