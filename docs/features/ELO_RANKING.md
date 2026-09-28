@@ -291,10 +291,15 @@ toute valeur absente ou inconnue plutôt que de refuser la requête.
   par la PR #88 sans que le texte suive. La phrase est désormais unique
   (`RANKING_SEEDING_RULE`) et dérivée des constantes : deux phrases copiées
   dérivent, une constante partagée non.
-- L'infobulle annonce la nouvelle règle, **dérivée des constantes** : « Base 500
+- La légende annonce la nouvelle règle, **dérivée des constantes** : « Base 500
   · une victoire prend à l'adversaire d'autant plus de points qu'elle était
   improbable (plancher 100) ». Une équipe non classée lit « Aucun match joué :
-  cote de départ ».
+  cote de départ ». Sur la carte d'annuaire, ce n'est **plus une infobulle** :
+  la plaque `.cardOverlay` recouvre la carte et rendait le `title`
+  inatteignable. La légende complète y est donnée aux lecteurs d'écran
+  (`sr-only`), et une équipe non classée affiche en plus « Aucun match »
+  (`RANKING_UNRANKED_SHORT`) sous son total — la nuance que l'infobulle portait
+  est la seule qui distingue son 500 de celui d'une équipe qui a joué.
 
 ## Tests
 

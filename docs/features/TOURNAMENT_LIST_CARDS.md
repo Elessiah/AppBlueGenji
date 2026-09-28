@@ -52,6 +52,25 @@ quatre cartes (`RunningCard`, `RegistrationCard`, `UpcomingCard`,
 qui n'est plus lui-même un lien, une seule `<Link className={s.cardOverlay}>`
 posée en premier enfant.
 
+**Corollaire : aucun `title` sous la plaque.** Elle recouvre toute la carte, la
+souris n'atteint donc plus aucun de ses enfants et une infobulle native ne s'y
+déclenche jamais. Le nom du vainqueur, coupé en ellipse au-delà d'une ligne, se
+lisait entier par un `title` devenu inatteignable : il se **déplie** désormais
+au survol de la carte et au focus de son lien (`.card:hover .cardChampion`,
+`.card:focus-within .cardChampion` — clavier compris), le pied poussé en bas
+absorbant la ligne gagnée dans l'espace libre de la carte. Le texte complet est
+dans le DOM, les lecteurs d'écran le lisent sans rien faire. Même règle sur la
+carte d'annuaire d'équipe (`TeamCard.tsx`) : la légende des points (voir
+`ELO_RANKING.md`) et le sens de lecture de la barre de forme, désormais écrit
+au-dessus d'elle (« Forme · récent → ancien ») et repris dans son `aria-label`.
+
+**Les cartes sont les items de la grille.** La section « Terminés » les
+enveloppait dans un `<div>` nu : les douze cartes s'empilaient dans une seule
+cellule de `.sectionBody`, et `.card { height: 100% }` — posé pour aligner les
+cartes d'une même rangée — étirait chacune à la hauteur de toute la pile
+(4 581 px mesurés pour ~230 px de contenu). Elles sont désormais rendues
+directement, comme dans les trois autres sections.
+
 ## Trois champs de `TournamentCard`
 
 - `finishedAt` — `bg_tournaments.finished_at`, rendu par `mapCard`. Une carte

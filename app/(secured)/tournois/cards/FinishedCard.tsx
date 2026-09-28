@@ -75,8 +75,11 @@ export function FinishedCard({ t, priority }: FinishedCardProps) {
       <div className={s.cardFoot}>
         <div className={s.cardFootMain}>
           <div className={s.cardFootLbl}>Vainqueur</div>
-          {/* Le nom peut être coupé (ellipse) : il reste entier au survol. */}
-          <div className={`${s.cardFootVal} ${s.cardChampion}`} title={t.champion?.name}>
+          {/* Le nom peut être coupé (ellipse) : il se déplie au survol de la
+              carte et au focus de son lien (`.card:hover`/`:focus-within`). Un
+              `title` natif ne servirait à rien — la plaque `.cardOverlay` le
+              recouvre, la souris ne l'atteint jamais. */}
+          <div className={`${s.cardFootVal} ${s.cardChampion}`}>
             {t.champion ? (
               <>
                 <span aria-hidden="true">🏆 </span>
