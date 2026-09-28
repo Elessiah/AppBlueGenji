@@ -137,9 +137,9 @@ describe("/tournois — section « Terminés »", () => {
     const source = stripComments(read("app/(secured)/tournois/page.tsx"));
     // Une enveloppe empilait toutes les cartes dans une seule cellule, et
     // `.card { height: 100% }` étirait chacune à la hauteur de la pile.
-    expect(source).not.toMatch(/<div>\s*\{filteredBuckets\.finished/);
+    expect(source).not.toMatch(/<div>\s*\{visibleSlice\("finished"/);
     // `stripComments` laisse `{}` à la place du commentaire JSX qui précède.
-    expect(source).toMatch(/title="TERMINÉS"[\s\S]*?>\s*(?:\{\}\s*)?\{filteredBuckets\.finished/);
+    expect(source).toMatch(/title="TERMINÉS"[\s\S]*?>\s*(?:\{\}\s*)?\{visibleSlice\("finished", filteredBuckets\.finished\)/);
   });
 });
 

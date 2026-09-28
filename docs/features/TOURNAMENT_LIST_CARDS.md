@@ -115,6 +115,10 @@ en cours », sans rien affirmer sur une diffusion, et la case « Invisibles ·
 staff » n'apparaît que pour le staff — trois cases pour tout le monde, quatre
 pour le staff, jamais un repli inventé.
 
+> Ce bandeau a depuis été remplacé par le **sommaire** des sections, qui porte
+> les mêmes comptes mais mène à chaque section — voir
+> `docs/features/MY_TOURNAMENTS_SECTION.md`.
+
 Le ticker (`_lib/ticker.ts`) faisait le même genre d'annonce fausse : chaque
 tournoi en cours donnait « RÉSULTAT · <nom> · N équipes engagées », alors
 qu'aucun résultat n'y est porté — c'est `lib/server/landing-service.ts` qui
