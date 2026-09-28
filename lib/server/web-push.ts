@@ -72,9 +72,26 @@ export function vapidKeyPair(publicKey: string, privateKey: string): crypto.KeyO
 }
 
 let warned = false;
+/** Dernière configuration calculée, et les trois chaînes dont elle vient. */
+let memo: { key: string; config: WebPushConfig | null } | null = null;
 
-/** Configuration du push, ou `null` s'il est éteint. */
+/**
+ * Configuration du push, ou `null` s'il est éteint.
+ *
+ * Mémorisée sur les trois variables : elle est lue à chaque évènement de
+ * tournoi publié (balayage des départs de match), et la construire coûte une
+ * multiplication scalaire sur la courbe — pour une valeur qui ne change pas de
+ * la vie du processus.
+ */
 export function webPushConfig(env: Readonly<Record<string, string | undefined>> = process.env): WebPushConfig | null {
+  const key = [env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT, env.APP_URL].join("|");
+  if (memo && memo.key === key) return memo.config;
+  const config = buildWebPushConfig(env);
+  memo = { key, config };
+  return config;
+}
+
+function buildWebPushConfig(env: Readonly<Record<string, string | undefined>>): WebPushConfig | null {
   const publicKey = env.VAPID_PUBLIC_KEY?.trim();
   const privateKeyRaw = env.VAPID_PRIVATE_KEY?.trim();
   if (!publicKey || !privateKeyRaw) return null;

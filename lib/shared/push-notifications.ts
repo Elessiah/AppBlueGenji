@@ -242,6 +242,21 @@ export function decodeBase64Url(value: string): Uint8Array | null {
   }
 }
 
+/**
+ * La clé avec laquelle le navigateur a pris un abonnement
+ * (`PushSubscription.options.applicationServerKey`) est-elle la clé publique
+ * **actuelle** du site ? Un abonnement pris sous une ancienne paire reste dans
+ * le navigateur, mais chaque envoi y est refusé : il faut le refaire. Clé
+ * inconnue d'un côté ou de l'autre → on ne conclut rien (`true`) : mieux vaut
+ * garder un abonnement qu'en détruire un sain.
+ */
+export function isSameServerKey(current: ArrayBuffer | null, publicKey: string): boolean {
+  const expected = decodeBase64Url(publicKey);
+  if (!current || !expected) return true;
+  const bytes = new Uint8Array(current);
+  return bytes.length === expected.length && bytes.every((byte, index) => byte === expected[index]);
+}
+
 export type PushSubscriptionInput = {
   endpoint: string;
   p256dh: string;

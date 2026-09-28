@@ -9,7 +9,7 @@ import { readSource } from "../helpers/read-source";
 
 type Listener = (event: Record<string, unknown>) => void;
 
-function loadWorker(windows: { url: string; focus: jest.Mock }[] = []) {
+function loadWorker(windows: { url: string; focus: unknown; navigate?: unknown }[] = []) {
   const listeners = new Map<string, Listener>();
   const showNotification = jest.fn(async () => undefined);
   const openWindow = jest.fn(async (_url: string) => null);
@@ -74,6 +74,17 @@ describe("service worker des notifications", () => {
     await Promise.all(worker.waited);
     expect(close).toHaveBeenCalled();
     expect(focus).toHaveBeenCalled();
+    expect(worker.openWindow).not.toHaveBeenCalled();
+  });
+
+  it("mène l'onglet ouvert jusqu'au match visé quand l'ancre diffère", async () => {
+    const focused = jest.fn(async () => undefined);
+    const navigate = jest.fn(async (_url: string) => ({ focus: focused }));
+    const worker = loadWorker([{ url: "https://site.test/tournois/4", focus: jest.fn(), navigate }]);
+    worker.fire("notificationclick", { notification: { close: jest.fn(), data: { url: "/tournois/4#match-9" } } });
+    await Promise.all(worker.waited);
+    expect(navigate).toHaveBeenCalledWith("https://site.test/tournois/4#match-9");
+    expect(focused).toHaveBeenCalled();
     expect(worker.openWindow).not.toHaveBeenCalled();
   });
 

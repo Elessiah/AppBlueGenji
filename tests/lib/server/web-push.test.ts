@@ -151,6 +151,14 @@ describe("webPushConfig", () => {
     expect(cfg?.subject).toBe("https://site.test");
   });
 
+  it("ne recalcule pas la configuration tant que l'environnement ne change pas", () => {
+    const keys = generateVapidKeys();
+    const env = { VAPID_PUBLIC_KEY: keys.publicKey, VAPID_PRIVATE_KEY: keys.privateKey, VAPID_SUBJECT: "mailto:a@b.test" };
+    const first = webPushConfig(env);
+    expect(webPushConfig({ ...env })).toBe(first);
+    expect(webPushConfig({ ...env, VAPID_SUBJECT: "mailto:c@d.test" })?.subject).toBe("mailto:c@d.test");
+  });
+
   it("s'éteint (en le disant une fois) sur une paire invalide ou sans contact", () => {
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const keys = generateVapidKeys();

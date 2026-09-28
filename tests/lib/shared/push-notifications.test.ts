@@ -12,6 +12,7 @@ import {
   isAllowedPushEndpoint,
   isIosUserAgent,
   isPushTopic,
+  isSameServerKey,
   parsePushSubscription,
   pushErrorMessage,
   pushSupport,
@@ -253,5 +254,21 @@ describe("déclaration du traitement", () => {
   it("déclare un manifeste en mode autonome, condition du push sur iPhone", async () => {
     const { default: manifest } = await import("@/app/manifest");
     expect(manifest().display).toBe("standalone");
+  });
+});
+
+describe("isSameServerKey", () => {
+  const key = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 9)]);
+  const buffer = (bytes: Buffer) => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+
+  it("reconnaît la clé actuelle, et refuse une ancienne paire", () => {
+    expect(isSameServerKey(buffer(key), key.toString("base64url"))).toBe(true);
+    const other = Buffer.concat([Buffer.from([4]), Buffer.alloc(64, 8)]);
+    expect(isSameServerKey(buffer(other), key.toString("base64url"))).toBe(false);
+  });
+
+  it("ne conclut rien sans clé lisible", () => {
+    expect(isSameServerKey(null, key.toString("base64url"))).toBe(true);
+    expect(isSameServerKey(buffer(key), "!!")).toBe(true);
   });
 });

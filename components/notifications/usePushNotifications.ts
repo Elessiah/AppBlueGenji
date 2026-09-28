@@ -20,6 +20,7 @@ import {
   PUSH_SERVICE_WORKER_PATH,
   decodeBase64Url,
   isIosUserAgent,
+  isSameServerKey,
   pushSupport,
   type PushSupport,
   type PushTopic,
@@ -72,6 +73,15 @@ function detectSupport(): PushSupport {
       nav.standalone === true ||
       (typeof window.matchMedia === "function" && window.matchMedia("(display-mode: standalone)").matches),
   });
+}
+
+/**
+ * L'abonnement a-t-il été pris avec la clé publique **actuelle** du site ? Un
+ * abonnement pris sous une ancienne clé (paire renouvelée) reste présent dans
+ * le navigateur, mais chaque envoi y est refusé : il faut le refaire.
+ */
+function matchesServerKey(subscription: PushSubscription, publicKey: string): boolean {
+  return isSameServerKey(subscription.options?.applicationServerKey ?? null, publicKey);
 }
 
 async function currentSubscription(): Promise<PushSubscription | null> {
@@ -151,6 +161,9 @@ export function usePushNotifications(
         if (cancelled || detected !== "AVAILABLE" || !state?.publicKey) return;
         const subscription = await currentSubscription();
         if (!subscription || cancelled) return;
+        // Pris sous une ancienne clé : muet pour de bon. Il n'est ni renvoyé ni
+        // annoncé actif — « Activer » le refera.
+        if (!matchesServerKey(subscription, state.publicKey)) return;
         if (syncExisting) {
           await postSubscription(subscription);
           if (cancelled) return;
@@ -186,7 +199,11 @@ export function usePushNotifications(
       await navigator.serviceWorker.ready;
       const key = decodeBase64Url(server.publicKey);
       if (!key) throw new PushError("PUSH_NOT_CONFIGURED");
-      const existing = await registration.pushManager.getSubscription();
+      let existing = await registration.pushManager.getSubscription();
+      if (existing && !matchesServerKey(existing, server.publicKey)) {
+        await existing.unsubscribe().catch(() => false);
+        existing = null;
+      }
       const subscription =
         existing ??
         (await registration.pushManager.subscribe({

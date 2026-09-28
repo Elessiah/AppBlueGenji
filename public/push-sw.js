@@ -56,6 +56,12 @@ self.addEventListener("notificationclick", (event) => {
       for (const client of windows) {
         const url = new URL(client.url);
         if (url.origin === target.origin && url.pathname === target.pathname && "focus" in client) {
+          // Même page, autre ancre (le match visé) : on y mène l'onglet, sans
+          // quoi il reprendrait le focus là où il était, loin du match.
+          if (url.href !== target.href && "navigate" in client) {
+            const navigated = await client.navigate(target.href).catch(() => null);
+            return (navigated || client).focus();
+          }
           return client.focus();
         }
       }
