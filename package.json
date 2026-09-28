@@ -8,7 +8,8 @@
     "build": "next build",
     "start": "sh start.sh",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck": "node node_modules/typescript-native/bin/tsc --noEmit -p tsconfig.typecheck.json",
+    "typecheck:ts5": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.typecheck.json",
     "test": "jest",
     "test:coverage": "jest --coverage",
     "e2e:install": "playwright install chromium",
@@ -44,7 +45,8 @@
     "jest": "^30.5.2",
     "ts-jest": "^29.4.13",
     "tsx": "^4.19.4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-native": "npm:typescript@^7.0.2"
   },
   "overrides": {
     "postcss": "^8.5.28",

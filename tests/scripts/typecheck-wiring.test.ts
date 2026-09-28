@@ -41,7 +41,37 @@ describe("type-vérification des tests", () => {
 
   it("est lancée par `npm run typecheck`", () => {
     const pkg = json("package.json") as { scripts: Record<string, string> };
-    expect(pkg.scripts.typecheck).toBe("tsc --noEmit -p tsconfig.typecheck.json");
+    expect(pkg.scripts.typecheck).toMatch(/--noEmit -p tsconfig\.typecheck\.json$/);
+  });
+
+  it("désigne son compilateur par chemin, jamais par le binaire `tsc`", () => {
+    // TypeScript 5 (`typescript`, lu par Next, ts-jest et ESLint) et 7
+    // (`typescript-native`) fournissent tous deux un binaire `tsc` : celui que
+    // `node_modules/.bin` retient dépend de l'ordre d'installation.
+    const pkg = json("package.json") as { scripts: Record<string, string> };
+    expect(pkg.scripts.typecheck).toMatch(/^node node_modules\/typescript-native\/bin\/tsc /);
+    expect(pkg.scripts["typecheck:ts5"]).toMatch(/^node node_modules\/typescript\/bin\/tsc /);
+  });
+
+  it("installe TypeScript 7 à côté de TypeScript 5, sans le remplacer", () => {
+    // Next, ts-jest et typescript-eslint chargent `typescript` et refusent la
+    // version 7 : seul le contrôle des types passe par l'alias.
+    const pkg = json("package.json") as { devDependencies: Record<string, string> };
+    expect(pkg.devDependencies.typescript).toMatch(/^\^5/);
+    expect(pkg.devDependencies["typescript-native"]).toMatch(/^npm:typescript@\^7/);
+  });
+
+  it("lit les imports de feuilles globales pareil en TypeScript 5 et 7", () => {
+    // Défaut de TypeScript 6+ : `import "./globals.css"` serait refusé, Next
+    // ne déclarant que les `*.module.css`. Posé explicitement, le réglage ne
+    // dépend plus de la version qui lit le fichier.
+    const options = json("tsconfig.json").compilerOptions as Record<string, unknown>;
+    expect(options.noUncheckedSideEffectImports).toBe(false);
+  });
+
+  it("ne pose dans `tsconfig.jest.json` aucune résolution retirée de TypeScript 7", () => {
+    const options = json("tsconfig.jest.json").compilerOptions as Record<string, unknown>;
+    expect(options.moduleResolution).toBeUndefined();
   });
 
   it("est jouée par le CI", () => {
