@@ -12,32 +12,67 @@ import { test as base, expect, type Page } from "@playwright/test";
  *   seedée, jamais de la CI, qui n'a pas de base ;
  * - les **conditions d'utilisation** (`components/legal/TermsAcceptanceModal.tsx`),
  *   pour un compte qui gère une équipe sans les avoir acceptées — le compte
- *   `E2E_AUTH_USER` d'un parcours authentifié, typiquement.
+ *   `E2E_AUTH_USER` d'un parcours authentifié, typiquement ;
+ * - les **changements du traitement des données**
+ *   (`components/privacy/PrivacyChangesModal.tsx`), pour un compte créé avant
+ *   la dernière entrée de `PRIVACY_CHANGES` — un compte de développement
+ *   ancien, pris comme `E2E_AUTH_USER`.
  *
- * Aucune des deux n'est l'objet d'un test : elles les faisaient échouer au
- * premier clic, sur un `intercepts pointer events` qui ne nomme pas la cause.
- * Chaque page les referme donc par « Plus tard » — le seul geste qu'elles
- * partagent, et qui n'enregistre rien : ni acceptation, ni annonce lue au-delà
- * du cookie du navigateur de test.
+ * Aucune n'est l'objet d'un test : elles les faisaient échouer au premier
+ * clic, sur un `intercepts pointer events` qui ne nomme pas la cause. Les deux
+ * premières se referment par « Plus tard », qui n'enregistre rien (ni
+ * acceptation, ni annonce lue au-delà du cookie du navigateur de test). La
+ * troisième n'a pas de « plus tard » — elle ne se ferme qu'en acceptant ou en
+ * supprimant le compte — : on l'**accepte**, seule écriture de ce garde, faite
+ * au nom du compte de test (`bg_privacy_acknowledgments`, une fois par
+ * compte et par changement).
  *
  * Tout spec importe `test` et `expect` d'ici, jamais de `@playwright/test` :
  * un parcours qui l'oublierait retrouverait la panne sur une base seedée
  * seulement, donc invisible en CI.
  */
 export async function dismissSiteOverlays(page: Page): Promise<void> {
-  const overlay = page
+  const later = page
     .getByRole("dialog")
     .filter({ has: page.getByRole("button", { name: "Plus tard", exact: true }) });
 
+  // Playwright éprouve le déclencheur en mode strict : il est donc posé sur la
+  // première fenêtre, et le traitement referme toutes les autres.
   await page.addLocatorHandler(
-    overlay,
-    async (dialog) => {
-      // La fenêtre est dans le HTML initial : un clic reçu avant l'hydratation
-      // ne fait rien. On reclique donc jusqu'à ce qu'elle soit fermée.
+    later.first(),
+    async () => {
+      // Les deux fenêtres peuvent être ouvertes ensemble (l'annonce ne se tait
+      // pas devant les conditions) : on les referme toutes, sans présumer
+      // laquelle est au-dessus — un clic sur celle du dessous est intercepté,
+      // il échoue court et le tour suivant le rejoue. La fenêtre est aussi
+      // dans le HTML initial : un clic reçu avant l'hydratation ne fait rien,
+      // d'où la répétition jusqu'à fermeture.
       await expect(async () => {
-        await dialog.getByRole("button", { name: "Plus tard", exact: true }).click({ timeout: 2_000 });
-        await expect(dialog).toBeHidden({ timeout: 1_000 });
-      }).toPass({ timeout: 15_000 });
+        const buttons = await later.getByRole("button", { name: "Plus tard", exact: true }).all();
+        for (const button of buttons) {
+          await button.click({ timeout: 1_000 }).catch(() => undefined);
+        }
+        await expect(later).toHaveCount(0, { timeout: 1_000 });
+      }).toPass({ timeout: 20_000 });
+    },
+    { noWaitAfter: true },
+  );
+
+  const privacyChanges = page
+    .getByRole("dialog")
+    .filter({ has: page.getByRole("button", { name: "Je refuse, je supprime mon compte" }) });
+
+  await page.addLocatorHandler(
+    privacyChanges.first(),
+    async () => {
+      await expect(async () => {
+        // Un clic reçu pose « Enregistrement… » à la place du libellé, le
+        // temps de la requête (longue en développement, la route se compile) :
+        // on ne reclique que si le bouton dit encore « J'accepte ».
+        const accept = privacyChanges.getByRole("button", { name: "J'accepte", exact: true });
+        if (await accept.isVisible()) await accept.click({ timeout: 2_000 });
+        await expect(privacyChanges).toHaveCount(0, { timeout: 5_000 });
+      }).toPass({ timeout: 20_000 });
     },
     { noWaitAfter: true },
   );
