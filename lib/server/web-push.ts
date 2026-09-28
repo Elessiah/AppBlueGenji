@@ -45,7 +45,14 @@ export function vapidKeyPair(publicKey: string, privateKey: string): crypto.KeyO
   const priv = decodeBase64Url(privateKey);
   if (!pub || pub.length !== 65 || pub[0] !== 0x04 || !priv || priv.length !== 32) return null;
   try {
-    const key = crypto.createPrivateKey({
+    // `createPrivateKey` ne vérifie pas que `d` correspond à (x, y) — et la clé
+    // publique qu'on en tirerait ne ferait que relire le (x, y) fourni. On la
+    // **recalcule** donc depuis `d`, et on compare : une paire dépareillée
+    // signerait des jetons que tous les services refuseraient.
+    const ecdh = crypto.createECDH("prime256v1");
+    ecdh.setPrivateKey(Buffer.from(priv));
+    if (!ecdh.getPublicKey().equals(Buffer.from(pub))) return null;
+    return crypto.createPrivateKey({
       key: {
         kty: "EC",
         crv: "P-256",
@@ -55,14 +62,6 @@ export function vapidKeyPair(publicKey: string, privateKey: string): crypto.KeyO
       },
       format: "jwk",
     });
-    // `createPrivateKey` ne vérifie pas que `d` correspond à (x, y) : on
-    // recalcule la clé publique et on compare, sans quoi une paire dépareillée
-    // signerait des jetons que tous les services refuseraient.
-    const derived = crypto.createPublicKey(key).export({ format: "jwk" });
-    if (derived.x !== toBase64Url(pub.subarray(1, 33)) || derived.y !== toBase64Url(pub.subarray(33, 65))) {
-      return null;
-    }
-    return key;
   } catch {
     return null;
   }
@@ -71,7 +70,7 @@ export function vapidKeyPair(publicKey: string, privateKey: string): crypto.KeyO
 let warned = false;
 
 /** Configuration du push, ou `null` s'il est éteint. */
-export function webPushConfig(env: NodeJS.ProcessEnv = process.env): WebPushConfig | null {
+export function webPushConfig(env: Readonly<Record<string, string | undefined>> = process.env): WebPushConfig | null {
   const publicKey = env.VAPID_PUBLIC_KEY?.trim();
   const privateKeyRaw = env.VAPID_PRIVATE_KEY?.trim();
   if (!publicKey || !privateKeyRaw) return null;
@@ -87,7 +86,7 @@ export function webPushConfig(env: NodeJS.ProcessEnv = process.env): WebPushConf
   return { publicKey, privateKey, subject };
 }
 
-function defaultSubject(env: NodeJS.ProcessEnv): string | null {
+function defaultSubject(env: Readonly<Record<string, string | undefined>>): string | null {
   const appUrl = env.APP_URL?.trim();
   return appUrl && appUrl.startsWith("https://") ? appUrl.replace(/\/+$/, "") : null;
 }

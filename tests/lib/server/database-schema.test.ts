@@ -429,7 +429,7 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     expect(sql).toMatch(/ALTER TABLE bg_recruitment_ads ADD COLUMN priority\s+ENUM\('PRIORITY', 'IMPORTANT', 'OPTIONAL'\)/);
   });
 
-  it("garde les trois tables tolérantes, dont des chemins accessoires dépendent", () => {
+  it("garde les tables tolérantes, dont des chemins accessoires dépendent", () => {
     // `isMissingTableError` décrit ce contrat, et `deletion.ts` / `rollback.ts` /
     // les chemins de notification s'y appuient : un rappel, une alerte ou une
     // sanction perdus valent mieux qu'un démarrage qui tombe.
@@ -437,6 +437,9 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
       "bg_match_reminders",
       "bg_referee_alerts",
       "bg_endurance_penalties",
+      "bg_push_subscriptions",
+      "bg_push_topic_optouts",
+      "bg_match_start_notices",
     ]) {
       const before = sql.slice(0, sql.indexOf(`CREATE TABLE IF NOT EXISTS ${tableName}`));
       expect(before.slice(-60)).toContain("try {");

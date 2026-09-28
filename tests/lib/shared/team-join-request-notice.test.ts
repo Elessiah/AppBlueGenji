@@ -9,6 +9,7 @@ import {
 
 function member(overrides: Partial<TeamJoinNoticeMember> = {}): TeamJoinNoticeMember {
   return {
+    userId: 1,
     pseudo: "Nova",
     roles: ["OWNER"],
     discordId: "100000000000000001",
@@ -21,10 +22,11 @@ function member(overrides: Partial<TeamJoinNoticeMember> = {}): TeamJoinNoticeMe
 describe("teamJoinNoticeRecipients", () => {
   it("prévient le propriétaire et les managers", () => {
     const recipients = teamJoinNoticeRecipients([
-      member({ pseudo: "Owner", roles: ["OWNER", "DPS"] }),
-      member({ pseudo: "Manager", roles: ["MANAGER"] }),
+      member({ userId: 1, pseudo: "Owner", roles: ["OWNER", "DPS"] }),
+      member({ userId: 2, pseudo: "Manager", roles: ["MANAGER"] }),
     ]);
-    expect(recipients.map((r) => r.label)).toEqual(["Owner", "Manager"]);
+    expect(recipients.map((r) => r.discord?.label)).toEqual(["Owner", "Manager"]);
+    expect(recipients.map((r) => r.userId)).toEqual([1, 2]);
   });
 
   it("ne prévient ni les rôles sportifs ni le capitaine", () => {
@@ -36,16 +38,18 @@ describe("teamJoinNoticeRecipients", () => {
     expect(recipients).toEqual([]);
   });
 
-  it("n'écrit qu'à un moyen prouvé : identifiant, ou tag certifié", () => {
+  it("n'écrit sur Discord qu'à un moyen prouvé, mais garde chacun pour le push", () => {
     const recipients = teamJoinNoticeRecipients([
-      member({ pseudo: "Id", discordId: "1", discordPseudo: null, discordVerified: false }),
-      member({ pseudo: "Tag", discordId: null, discordPseudo: "tag", discordVerified: true }),
-      member({ pseudo: "Saisi", discordId: null, discordPseudo: "quelquun", discordVerified: false }),
-      member({ pseudo: "Rien", discordId: null, discordPseudo: null, discordVerified: false }),
+      member({ userId: 1, pseudo: "Id", discordId: "1", discordPseudo: null, discordVerified: false }),
+      member({ userId: 2, pseudo: "Tag", discordId: null, discordPseudo: "tag", discordVerified: true }),
+      member({ userId: 3, pseudo: "Saisi", discordId: null, discordPseudo: "quelquun", discordVerified: false }),
+      member({ userId: 4, pseudo: "Rien", discordId: null, discordPseudo: null, discordVerified: false }),
     ]);
     expect(recipients).toEqual([
-      { discordId: "1", handle: null, label: "Id" },
-      { discordId: null, handle: "tag", label: "Tag" },
+      { userId: 1, discord: { discordId: "1", handle: null, label: "Id" } },
+      { userId: 2, discord: { discordId: null, handle: "tag", label: "Tag" } },
+      { userId: 3, discord: null },
+      { userId: 4, discord: null },
     ]);
   });
 
@@ -53,7 +57,7 @@ describe("teamJoinNoticeRecipients", () => {
     const [recipient] = teamJoinNoticeRecipients([
       member({ discordId: "7", discordPseudo: "invérifié", discordVerified: false }),
     ]);
-    expect(recipient).toEqual({ discordId: "7", handle: null, label: "Nova" });
+    expect(recipient).toEqual({ userId: 1, discord: { discordId: "7", handle: null, label: "Nova" } });
   });
 });
 

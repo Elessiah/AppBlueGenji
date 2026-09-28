@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
+jest.mock("@/lib/server/push-subscriptions");
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://site.test" }));
 
 import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
+import { pushToUsers } from "@/lib/server/push-subscriptions";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
@@ -24,6 +26,7 @@ function mockDb({ requests = 1, team = { name: "Les Glaciers" }, members = [] }:
 
 function row(overrides: Record<string, unknown> = {}) {
   return {
+    id: 1,
     pseudo: "Owner",
     roles_json: JSON.stringify(["OWNER"]),
     discord_id: "100000000000000001",
@@ -37,6 +40,7 @@ describe("notifyTeamJoinRequest", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    jest.mocked(pushToUsers).mockResolvedValue(0);
   });
 
   it("écrit au propriétaire et aux managers, avec le lien de la fiche", async () => {
@@ -68,10 +72,23 @@ describe("notifyTeamJoinRequest", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
-  it("ne fait rien sans gestion joignable", async () => {
-    mockDb({ members: [row({ discord_id: null, discord_verified_at: null })] });
+  it("n'écrit pas sur Discord à une gestion sans moyen prouvé, mais la prévient en push", async () => {
+    mockDb({ members: [row({ id: 9, discord_id: null, discord_verified_at: null })] });
     await notifyTeamJoinRequest(5, 42);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    const [userIds, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
+    expect(userIds).toEqual([9]);
+    expect(topic).toBe("TEAM_JOIN_REQUEST");
+    expect(content.url).toBe("/equipes/5");
+    // Aucun pseudo de joueur dans la notification.
+    expect(content.body).not.toContain("Owner");
+  });
+
+  it("ne prévient personne quand l'équipe n'a aucune gestion", async () => {
+    mockDb({ members: [row({ roles_json: ["DPS"] })] });
+    await notifyTeamJoinRequest(5, 42);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
   });
 
   it("ne fait rien pour une équipe dissoute entre-temps", async () => {

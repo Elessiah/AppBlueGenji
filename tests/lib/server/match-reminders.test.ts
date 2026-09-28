@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
+jest.mock("@/lib/server/push-subscriptions");
 
 import {
   dispatchDueMatchReminders,
   resetMatchReminderThrottle,
 } from "@/lib/server/tournaments/match-reminders";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
+import { pushToUsers } from "@/lib/server/push-subscriptions";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 const START = new Date("2026-09-10T18:00:00Z");
@@ -28,30 +30,40 @@ const MATCH = {
   team2_name: "Team Nova",
 };
 
-const RECIPIENTS = [
-  { team_id: 101, pseudo: "Kiro", discord_id: "555000111", discord_pseudo: "kiro" },
-  { team_id: 101, pseudo: "Ayla", discord_id: null, discord_pseudo: "ayla_bg" },
-  { team_id: 102, pseudo: "Nova", discord_id: null, discord_pseudo: "nova" },
+type Recipient = {
+  team_id: number;
+  id: number;
+  pseudo: string;
+  discord_id: string | null;
+  discord_pseudo: string | null;
+};
+
+const RECIPIENTS: Recipient[] = [
+  { team_id: 101, id: 1, pseudo: "Kiro", discord_id: "555000111", discord_pseudo: "kiro" },
+  { team_id: 101, id: 2, pseudo: "Ayla", discord_id: null, discord_pseudo: "ayla_bg" },
+  { team_id: 102, id: 3, pseudo: "Nova", discord_id: null, discord_pseudo: "nova" },
 ];
 
 /** La manche a déjà été observée : le cycle normal des paliers s'applique. */
 const SEEN = [{ match_id: 31, offset_key: "SEEN" }];
 
 /**
- * Câble la base : `query` sert les trois lectures (matchs, clés déjà posées,
- * destinataires), `execute` les réservations.
+ * Câble la base : `query` sert les quatre lectures (matchs, clés déjà posées,
+ * joueurs des engagées, comptes), `execute` les réservations.
  */
 async function mockDb(options: {
   matches?: unknown[];
   sent?: unknown[];
-  recipients?: unknown[];
+  recipients?: Recipient[];
   claimed?: boolean;
 }) {
+  const recipients = options.recipients ?? RECIPIENTS;
   const query = jest
     .fn<() => Promise<unknown>>()
     .mockResolvedValueOnce([options.matches ?? [MATCH]])
     .mockResolvedValueOnce([options.sent ?? SEEN])
-    .mockResolvedValueOnce([options.recipients ?? RECIPIENTS]);
+    .mockResolvedValueOnce([recipients.map((r) => ({ team_id: r.team_id, user_id: r.id }))])
+    .mockResolvedValueOnce([recipients.map((r) => ({ ...r, discord_verified_at: null }))]);
   const execute = jest
     .fn<() => Promise<unknown>>()
     .mockResolvedValue([{ affectedRows: options.claimed === false ? 0 : 1 }]);
@@ -75,6 +87,7 @@ function sentMessages(): string[] {
 beforeEach(() => {
   jest.clearAllMocks();
   resetMatchReminderThrottle();
+  jest.mocked(pushToUsers).mockResolvedValue(0);
   jest.mocked(pushDiscordDirectMessages).mockResolvedValue({
     sent: 0,
     unresolved: [],
@@ -138,18 +151,34 @@ describe("dispatchDueMatchReminders — cycle normal", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
-  it("écarte un joueur sans identité Discord", async () => {
+  it("écarte de Discord un joueur sans identité, mais le garde pour le push", async () => {
     await mockDb({
       recipients: [
-        { team_id: 101, pseudo: "Kiro", discord_id: null, discord_pseudo: null },
-        { team_id: 102, pseudo: "Nova", discord_id: null, discord_pseudo: "nova" },
+        { team_id: 101, id: 1, pseudo: "Kiro", discord_id: null, discord_pseudo: null },
+        { team_id: 102, id: 3, pseudo: "Nova", discord_id: null, discord_pseudo: "nova" },
       ],
     });
 
-    // Une seule engagée reste joignable : un seul envoi.
-    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(1);
+    expect(await dispatchDueMatchReminders(ONE_HOUR_BEFORE)).toBe(2);
+    // Une seule engagée joignable sur Discord : un seul appel au bot.
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
     const [, recipients] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(recipients.map((r) => r.label)).toEqual(["Nova"]);
+    // Le push, lui, part aux deux engagées — Kiro compris.
+    expect(jest.mocked(pushToUsers).mock.calls.map((call) => call[0])).toEqual([[1], [3]]);
+  });
+
+  it("pousse le rappel sous le sujet des rappels, vers le match", async () => {
+    await mockDb({});
+
+    await dispatchDueMatchReminders(ONE_HOUR_BEFORE);
+
+    const [userIds, topic, content] = jest.mocked(pushToUsers).mock.calls[0];
+    expect(userIds).toEqual([1, 2]);
+    expect(topic).toBe("MATCH_REMINDER");
+    expect(content.title).toBe("Match dans 1 heure");
+    expect(content.body).toContain("Les Renards contre Team Nova");
+    expect(content.url).toBe("/tournois/7#match-31");
   });
 
   it("ne borne le calendrier qu'aux manches programmées et non jouées", async () => {
