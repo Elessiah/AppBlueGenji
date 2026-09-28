@@ -24,6 +24,7 @@
 
 .statActions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
   padding-top: 12px;
@@ -188,7 +189,11 @@
   margin-top: 4px;
 }
 
-@media (max-width: 720px) {
+/* Deux colonnes jusqu'au plus petit écran : un chiffre et son intitulé
+   tiennent dans une demi-largeur de téléphone, et une colonne unique doublait
+   la hauteur du bloc pour rien. Seuls les écrans les plus étroits repassent à
+   une colonne, où l'intitulé en capitales espacées ne tiendrait plus. */
+@media (max-width: 340px) {
   .stats {
     grid-template-columns: 1fr;
   }
