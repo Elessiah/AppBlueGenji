@@ -30,6 +30,12 @@ jamais le site en retour.
 | Clôture sans adversaires | `🚫 Tournoi clos faute d'adversaires — « … » (#12) : aucun engagement.` | `finalizeUnderfilledTournament` |
 | Suppression définitive | `🗑️ Tournoi supprimé définitivement — « … » (#12), par … (#3).` | `DELETE /api/admin/tournaments/[id]` |
 
+Le libellé de manche vient de `matchRoundLabel`, partagé avec les rappels, les
+signalements et les alertes arbitre. L'arbre final de BlueGenji Survie numérote
+ses tours à partir de `PLAYOFF_ROUND_OFFSET` (1000) : ils s'annoncent donc
+« Play-offs · tour N », compté depuis 1, et non « Manche 1000 » juste après la
+« Manche 5 » de la qualification.
+
 Le **retrait d'un engagé** et l'**abandon** sont deux lignes et non une, parce
 que ce sont deux faits : l'abandon laisse l'engagé au classement avec un forfait
 à son nom, le retrait efface son inscription avant le coup d'envoi — après quoi
