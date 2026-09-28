@@ -3,7 +3,8 @@
  *
  * `POST` range l'abonnement que le navigateur vient de créer (ou renvoie celui
  * qu'il a déjà : l'écriture est un « upsert », et c'est ce qui rattache un
- * navigateur partagé au compte qui s'y connecte) ; `DELETE` le retire. Le corps
+ * navigateur partagé au compte qui s'y connecte — sur preuve des clés, 409
+ * sinon) ; `DELETE` le retire. Le corps
  * est celui de `PushSubscription.toJSON()`.
  */
 import { enforceRateLimit, PUSH_WRITE_RULE } from "@/lib/server/api-guard";
@@ -33,7 +34,9 @@ export async function POST(req: Request) {
   const parsed = parsePushSubscription(body?.subscription);
   if (!parsed.ok) return fail(parsed.error, 400);
 
-  await saveSubscription(user.id, parsed.value);
+  // Refusé : l'appareil est rangé sous un autre compte avec d'autres clés, et
+  // l'adresse seule ne prouve pas qu'on le détient (`saveSubscription`).
+  if (!(await saveSubscription(user.id, parsed.value))) return fail("PUSH_SUBSCRIPTION_CLAIMED", 409);
   return ok({ subscribed: true });
 }
 

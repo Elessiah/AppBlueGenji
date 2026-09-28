@@ -297,6 +297,8 @@ export const PUSH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   INVALID_PUSH_SUBSCRIPTION: "Cet appareil a rendu un abonnement illisible. Réessaie, ou change de navigateur.",
   PUSH_SERVICE_NOT_ALLOWED: "Le service de notifications de ce navigateur n'est pas pris en charge.",
   PUSH_NOT_CONFIGURED: "Les notifications push ne sont pas encore activées sur le site.",
+  PUSH_SUBSCRIPTION_CLAIMED:
+    "Cet appareil reçoit déjà les notifications d'un autre compte. Désactive-les depuis ce compte, puis réessaie.",
   PUSH_PERMISSION_DENIED:
     "Ton navigateur bloque les notifications de ce site. Autorise-les dans ses réglages, puis réessaie.",
   PUSH_UNSUPPORTED: "Ce navigateur ne sait pas recevoir de notifications push.",

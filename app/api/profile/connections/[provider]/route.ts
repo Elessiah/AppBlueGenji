@@ -10,7 +10,7 @@
  * l'appelant est bien chez lui, c'est l'état du compte qui s'y oppose — et il
  * nomme le geste qui le lève (rattacher un autre fournisseur d'abord).
  */
-import { getCurrentUser } from "@/lib/server/auth";
+import { getCurrentUser, revokeOtherSessions } from "@/lib/server/auth";
 import { unlinkOAuthIdentity } from "@/lib/server/account-identities";
 import { fail, ok } from "@/lib/server/http";
 import { oauthProviderFromSlug } from "@/lib/shared/oauth-providers";
@@ -41,9 +41,16 @@ export async function DELETE(
 
   try {
     await unlinkOAuthIdentity(user.id, provider);
-    return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message || "CONNECTION_UNLINK_FAILED";
     return fail(message, statusFor(message));
   }
+
+  let revokedSessions: number | null = null;
+  try {
+    revokedSessions = await revokeOtherSessions(user.id);
+  } catch (error) {
+    console.error("[connections] fermeture des autres sessions impossible", error);
+  }
+  return ok({ success: true, revokedSessions });
 }

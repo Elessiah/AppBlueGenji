@@ -369,3 +369,21 @@
     flex-direction: column;
   }
 }
+
+/* ── Sessions ouvertes ────────────────────────────────────────────────────── */
+
+.sessionsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.sessionsSummary {
+  margin: 0;
+  flex: 1 1 260px;
+}

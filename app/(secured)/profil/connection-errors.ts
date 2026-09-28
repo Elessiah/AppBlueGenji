@@ -45,6 +45,8 @@ const CONNECTION_ERRORS: Record<string, string> = {
     "Ce moyen de connexion n'est pas configuré sur le site. Signale-le à l'organisation.",
   PROFILE_NOT_FOUND: "Ton compte est introuvable. Reconnecte-toi.",
   UNAUTHORIZED: "Reconnecte-toi pour gérer tes applications.",
+  SESSIONS_READ_FAILED: "Tes autres sessions n'ont pas pu être comptées. Réessaie dans un instant.",
+  SESSIONS_REVOKE_FAILED: "Tes autres sessions n'ont pas pu être fermées. Réessaie dans un instant.",
 };
 
 export function connectionErrorMessage(code: string | null | undefined): string {
@@ -68,4 +70,43 @@ export function connectionSuccessMessage(provider: OAuthProvider | null, refresh
   return provider === "DISCORD"
     ? "Discord reconfirmé : ton pseudo a été relu auprès de Discord."
     : `${label} reconfirmé : les informations de ton compte ont été relues.`;
+}
+
+/** « 1 autre session », « 3 autres sessions » — l'accord suit le nombre. */
+function otherSessions(count: number): string {
+  return count === 1 ? "1 autre session" : `${count} autres sessions`;
+}
+
+/**
+ * Ce que dit la ligne « Sessions ouvertes » : combien d'autres navigateurs ou
+ * appareils ouvrent encore le compte. `null` = pas encore lu (ou illisible), et
+ * la phrase ne l'invente pas.
+ */
+export function otherSessionsSummary(count: number | null): string {
+  if (count === null) return "Les sessions ouvertes sur tes autres appareils n'ont pas encore été comptées.";
+  if (count === 0) return "Aucune autre session n'est ouverte : seul cet appareil est connecté à ton compte.";
+  return `${otherSessions(count)} ${count === 1 ? "est ouverte" : "sont ouvertes"} sur d'autres navigateurs ou appareils.`;
+}
+
+/** Le compte rendu de « Déconnecter mes autres sessions ». */
+export function sessionsRevokedMessage(count: number): string {
+  if (count === 0) return "Aucune autre session n'était ouverte.";
+  return `${otherSessions(count)} ${count === 1 ? "a été fermée" : "ont été fermées"}.`;
+}
+
+/**
+ * Le compte rendu d'un retrait réussi.
+ *
+ * Le retrait ferme les autres sessions du compte (réflexe de qui croit la
+ * porte compromise) : la phrase le dit, et **ne tait pas un échec** —
+ * `revoked` à `null` renvoie au bouton qui refait le geste, puisque le
+ * retrait lui-même est acquis.
+ */
+export function unlinkSuccessMessage(provider: OAuthProvider, revoked: number | null): string {
+  const removed = `${OAUTH_PROVIDER_LABELS[provider]} a été retiré de ton compte.`;
+  if (revoked === null) {
+    return `${removed} Tes autres sessions n'ont pas pu être fermées : utilise « Déconnecter mes autres sessions ».`;
+  }
+  if (revoked === 0) return removed;
+  return `${removed} ${sessionsRevokedMessage(revoked)}`;
 }
