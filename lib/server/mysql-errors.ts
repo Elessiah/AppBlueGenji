@@ -187,7 +187,34 @@ export function isSchemaNoOpError(error: unknown, statement?: string): boolean {
     if (code === "ER_DUP_KEYNAME" && /\bADD\s+(UNIQUE\s+)?(INDEX|KEY)\b/.test(sql)) return true;
     // La table a déjà une clé primaire : la recomposition est faite.
     if (code === "ER_MULTIPLE_PRI_KEY" && /\bADD\s+PRIMARY\s+KEY\b/.test(sql)) return true;
+    // La clé étrangère nommée existe déjà.
+    if (addsForeignKey(sql) && isDuplicateForeignKeyName(code, error)) return true;
   }
 
   return false;
 }
+
+/** `ADD [CONSTRAINT nom] FOREIGN KEY` — l'instruction pose une clé étrangère. */
+function addsForeignKey(sql: string): boolean {
+  return /\bADD\s+(CONSTRAINT\s+`?[A-Z0-9_]+`?\s+)?FOREIGN\s+KEY\b/.test(sql);
+}
+
+/**
+ * Le refus d'une clé étrangère dont le **nom** est déjà pris, sous ses deux
+ * formes.
+ *
+ * MySQL rend `ER_FK_DUP_NAME` (1826 — que MariaDB appelle
+ * `ER_DUP_CONSTRAINT_NAME` sous le même numéro, mysql2 le nommant d'après la
+ * table de MySQL). InnoDB sous MariaDB peut aussi le rendre en
+ * `ER_CANT_CREATE_TABLE` (1005) portant `errno: 121` — « Duplicate key on write
+ * or update », la collision dans le dictionnaire des clés étrangères. Ce 1005
+ * n'est reconnu **que** portant ce 121 : il couvre aussi une colonne de type
+ * incompatible ou une table référencée absente, qui sont de vraies anomalies.
+ */
+function isDuplicateForeignKeyName(code: string, error: unknown): boolean {
+  if (code === "ER_FK_DUP_NAME" || code === "ER_DUP_CONSTRAINT_NAME") return true;
+  if (code !== "ER_CANT_CREATE_TABLE") return false;
+  const message = error instanceof Error ? error.message : "";
+  return /errno:?\s*121\b/i.test(message);
+}
+
