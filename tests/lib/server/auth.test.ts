@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import crypto from "node:crypto";
-import { createSession, getCurrentUser, clearSession, ensureUniquePseudo } from "@/lib/server/auth";
+import {
+  createSession,
+  getCurrentUser,
+  clearSession,
+  countOtherSessions,
+  ensureUniquePseudo,
+  revokeOtherSessions,
+} from "@/lib/server/auth";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { fakeCookieStore } from "../../helpers/cookie-store";
 
@@ -217,6 +224,54 @@ describe("auth", () => {
       jest.mocked(cookies).mockResolvedValue(fakeCookieStore(mockNoCookie()));
 
       expect(await getCurrentUser()).toBeNull();
+    });
+  });
+
+  describe("autres sessions", () => {
+    const hashOf = (token: string) => crypto.createHash("sha256").update(token).digest("hex");
+
+    async function withCookie(token: string | undefined, execute: jest.Mock<SqlQuery>) {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      jest.mocked(cookies).mockResolvedValue(
+        fakeCookieStore({
+          get: jest.fn().mockReturnValue(token === undefined ? undefined : { value: token }),
+          set: jest.fn(),
+        }),
+      );
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    }
+
+    it("compte les sessions valides du compte, hors celle de la requête", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 3 }]]);
+      await withCookie("courant", execute);
+
+      expect(await countOtherSessions(7)).toBe(3);
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toMatch(/user_id = \? AND token_hash <> \? AND expires_at > NOW\(\)/);
+      expect(params).toEqual([7, hashOf("courant")]);
+    });
+
+    it("ferme toutes les sessions du compte sauf la courante, et ne compte que les valides", async () => {
+      const execute = jest
+        .fn<SqlQuery>()
+        .mockResolvedValueOnce([{ affectedRows: 4 }])
+        .mockResolvedValueOnce([{ affectedRows: 2 }]);
+      await withCookie("courant", execute);
+
+      expect(await revokeOtherSessions(7)).toBe(2);
+      // Les expirées d'abord, hors du compte rendu.
+      expect(execute.mock.calls[0][0]).toMatch(/expires_at <= NOW\(\)/);
+      expect(execute.mock.calls[1][0]).toMatch(/DELETE FROM bg_user_sessions WHERE user_id = \? AND token_hash <> \?$/);
+      for (const call of execute.mock.calls) expect(call[1]).toEqual([7, hashOf("courant")]);
+    });
+
+    it("sans cookie, ne garde aucune session (le contournement de développement n'en a pas)", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+      await withCookie(undefined, execute);
+
+      await revokeOtherSessions(7);
+      expect(execute.mock.calls[1][1]).toEqual([7, ""]);
     });
   });
 

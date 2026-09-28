@@ -72,6 +72,7 @@ describe("GET /api/push", () => {
 
 describe("POST /api/push/subscriptions", () => {
   it("range l'abonnement de l'appareil pour le compte connecté", async () => {
+    jest.mocked(saveSubscription).mockResolvedValueOnce(true);
     const response = await POST(request("POST", { subscription: SUBSCRIPTION }));
     expect(response.status).toBe(200);
     expect(saveSubscription).toHaveBeenCalledWith(7, {
@@ -79,6 +80,13 @@ describe("POST /api/push/subscriptions", () => {
       p256dh: P256DH,
       auth: AUTH,
     });
+  });
+
+  it("refuse en 409 un appareil détenu par un autre compte sans preuve des clés", async () => {
+    jest.mocked(saveSubscription).mockResolvedValueOnce(false);
+    const response = await POST(request("POST", { subscription: SUBSCRIPTION }));
+    expect(response.status).toBe(409);
+    expect((await response.json()).error).toBe("PUSH_SUBSCRIPTION_CLAIMED");
   });
 
   it("refuse sans session, sans clés, et un service de push inconnu", async () => {

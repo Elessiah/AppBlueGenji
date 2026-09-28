@@ -112,20 +112,58 @@ describe("pushToUsers", () => {
 
 describe("abonnements", () => {
   it("range un abonnement par son empreinte, en le rattachant au compte courant", async () => {
-    const execute = jest.fn<SqlQuery>().mockResolvedValue([{}]);
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([{}])
+      .mockResolvedValueOnce([[{ user_id: 7 }]]);
     pool({ execute });
 
-    await saveSubscription(7, SUB);
+    expect(await saveSubscription(7, SUB)).toBe(true);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toMatch(/user_id = VALUES\(user_id\)/);
-    // Les dates ne repartent qu'au changement de compte, et sont comparées
-    // **avant** la réécriture de `user_id` (affectations de gauche à droite).
-    expect(sql.indexOf("created_at = IF(user_id = VALUES(user_id), created_at, CURRENT_TIMESTAMP)")).toBeGreaterThan(-1);
-    expect(sql.indexOf("last_success_at = IF(user_id = VALUES(user_id), last_success_at, NULL)")).toBeGreaterThan(-1);
-    expect(sql.indexOf("last_success_at = IF(")).toBeLessThan(sql.indexOf("user_id = VALUES(user_id), endpoint"));
     expect(params).toEqual([7, endpointHash(SUB.endpoint), SUB.endpoint, "k", "s"]);
     expect(endpointHash(SUB.endpoint)).toMatch(/^[0-9a-f]{64}$/);
+    // Le titulaire est relu : `affectedRows` ne distingue pas un refus d'une
+    // écriture à l'identique.
+    expect(execute.mock.calls[1][0]).toMatch(/SELECT user_id FROM bg_push_subscriptions WHERE endpoint_hash = \?/);
+    expect(execute.mock.calls[1][1]).toEqual([endpointHash(SUB.endpoint)]);
+    expect(sql).toMatch(/ON DUPLICATE KEY UPDATE/);
+  });
+
+  it("ne déplace un appareil vers un autre compte que sur preuve des clés", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{}]);
+    pool({ execute });
+    await saveSubscription(7, SUB).catch(() => undefined);
+    const sql = String(execute.mock.calls[0][0]);
+    const allowed = "(user_id = VALUES(user_id) OR (p256dh = VALUES(p256dh) AND auth = VALUES(auth)))";
+    const assignments = sql
+      .slice(sql.indexOf("ON DUPLICATE KEY UPDATE") + "ON DUPLICATE KEY UPDATE".length)
+      .split(/,\n/)
+      .map((line) => line.trim());
+    // Chaque réécriture est gardée par la preuve — l'adresse seule ne suffit
+    // plus, comme pour le désabonnement.
+    for (const column of ["endpoint", "p256dh", "auth", "user_id"]) {
+      expect(assignments).toContain(`${column} = IF(${allowed}, VALUES(${column}), ${column})`);
+    }
+    // Les dates ne repartent qu'au changement **accepté** de compte.
+    expect(assignments).toContain(
+      `created_at = IF(user_id = VALUES(user_id) OR NOT ${allowed}, created_at, CURRENT_TIMESTAMP)`,
+    );
+    expect(assignments).toContain(
+      `last_success_at = IF(user_id = VALUES(user_id) OR NOT ${allowed}, last_success_at, NULL)`,
+    );
+    // `user_id` en dernier : les affectations se lisent de gauche à droite, et
+    // la condition des autres doit lire le titulaire d'avant.
+    expect(assignments[assignments.length - 1]).toMatch(/^user_id = /);
+  });
+
+  it("rend false quand l'appareil reste à un autre compte", async () => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([{}])
+      .mockResolvedValueOnce([[{ user_id: 99 }]]);
+    pool({ execute });
+    expect(await saveSubscription(7, SUB)).toBe(false);
   });
 
   it("ne désabonne que l'appareil du compte connecté", async () => {

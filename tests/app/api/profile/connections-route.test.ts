@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/account-identities");
 
-import { getCurrentUser } from "@/lib/server/auth";
+import { getCurrentUser, revokeOtherSessions } from "@/lib/server/auth";
 import { listAccountConnections, unlinkOAuthIdentity } from "@/lib/server/account-identities";
 import { GET } from "@/app/api/profile/connections/route";
 import { DELETE } from "@/app/api/profile/connections/[provider]/route";
@@ -27,6 +27,7 @@ beforeEach(() => {
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 7 }));
   jest.mocked(listAccountConnections).mockResolvedValue([]);
   jest.mocked(unlinkOAuthIdentity).mockResolvedValue(undefined);
+  jest.mocked(revokeOtherSessions).mockResolvedValue(2);
 });
 
 describe("GET /api/profile/connections", () => {
@@ -85,6 +86,36 @@ describe("DELETE /api/profile/connections/[provider]", () => {
 
     expect(response.status).toBe(200);
     expect(unlinkOAuthIdentity).toHaveBeenCalledWith(7, "BLIZZARD");
+  });
+
+  it("ferme les autres sessions du compte une fois la porte détachée", async () => {
+    const response = await DELETE(new Request("http://x"), params("google"));
+
+    expect(response.status).toBe(200);
+    expect(revokeOtherSessions).toHaveBeenCalledWith(7);
+    expect(jest.mocked(revokeOtherSessions).mock.invocationCallOrder[0]).toBeGreaterThan(
+      jest.mocked(unlinkOAuthIdentity).mock.invocationCallOrder[0],
+    );
+    await expect(response.json()).resolves.toEqual({ success: true, revokedSessions: 2 });
+  });
+
+  it("ne ferme aucune session quand le retrait est refusé", async () => {
+    jest.mocked(unlinkOAuthIdentity).mockRejectedValue(new Error("LAST_CONNECTION"));
+
+    await DELETE(new Request("http://x"), params("discord"));
+
+    expect(revokeOtherSessions).not.toHaveBeenCalled();
+  });
+
+  it("n'annonce pas raté un retrait acquis quand la fermeture des sessions échoue", async () => {
+    jest.mocked(revokeOtherSessions).mockRejectedValue(new Error("ECONNRESET"));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+
+    const response = await DELETE(new Request("http://x"), params("google"));
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ success: true, revokedSessions: null });
+    spy.mockRestore();
   });
 
   it("rend **409** sur le dernier moyen de connexion", async () => {
