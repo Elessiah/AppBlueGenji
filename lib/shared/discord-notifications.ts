@@ -18,6 +18,7 @@
  * base ni réseau, pour que la règle soit testable et que serveur et interface ne
  * puissent pas en avoir deux lectures.
  */
+import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie";
 import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 
 /** Clé d'un palier de rappel. Persistée (`bg_match_reminders.offset_key`). */
@@ -254,6 +255,12 @@ export function buildMatchScheduleAnnouncement(
  * @returns Le libellé en français.
  */
 export function matchRoundLabel(bracket: string, roundNumber: number): string {
+  // L'arbre final de BlueGenji Survie numérote ses tours à partir de
+  // `PLAYOFF_ROUND_OFFSET` : affiché tel quel, le journal passait de
+  // « Manche 5 » à « Manche 1000 ». Même libellé que le retour en arrière.
+  if (isEndurancePlayoffRound(roundNumber) && bracket !== "THIRD_PLACE") {
+    return `Play-offs · tour ${roundNumber - PLAYOFF_ROUND_OFFSET + 1}`;
+  }
   const round = `manche ${roundNumber}`;
   switch (bracket) {
     case "LOWER":
