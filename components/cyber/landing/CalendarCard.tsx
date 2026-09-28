@@ -1,5 +1,6 @@
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import type { LandingCalendarEvent } from "@/lib/shared/landing";
+import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import styles from "./CalendarCard.module.css";
 
 type CalendarCardProps = {
@@ -54,8 +55,14 @@ export function CalendarCard({ events }: CalendarCardProps) {
                   <span className={styles.pill}>{event.game}</span>
                   <span className={styles.tag}>{tagLabel(event.state)}</span>
                 </div>
+                {/* Le nom porte le lien, étiré sur toute la ligne par un
+                    `::after` : la ligne entière mène à la fiche, et le nom
+                    accessible du lien reste celui du tournoi — pas la date,
+                    le jeu et l'état concaténés. */}
                 <div className={styles.title} title={formatLocalDateTime(date)}>
-                  {event.name}
+                  <a className={styles.link} href={tournamentMatchHref(event.tournamentId)}>
+                    {event.name}
+                  </a>
                 </div>
               </div>
               <div className={`num mono ${styles.time}`}>{date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}</div>
