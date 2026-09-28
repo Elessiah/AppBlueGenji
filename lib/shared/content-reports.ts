@@ -716,8 +716,8 @@ export function reportErrorMessage(code: string | null | undefined): string {
  * signalements : notification d'un contenu illicite (LCEN, DSA), demande RGPD,
  * question d'hébergeur, c'est-à-dire le seul canal que le site publie. Ce qui
  * doit être borné est l'**alerte**, pas le dépôt : au-delà, le signalement est
- * enregistré et visible au panneau, et une seule alerte dit que les suivants
- * n'en feront plus (`reportAlertMode`). Soixante par heure, c'est bien au-delà
+ * enregistré et visible au panneau, et une seule alerte par heure dit que les
+ * suivants n'en feront plus (`reportAlertMode`). Soixante par heure, c'est bien au-delà
  * de ce qu'une communauté amateur produit en une soirée agitée.
  */
 export const REPORTS_HOURLY_CAP = 60;
@@ -737,10 +737,30 @@ export const REPORTS_HOURLY_HARD_CAP = 600;
  */
 export type ReportAlertMode = "ALERT" | "SATURATION_NOTICE" | "SILENT";
 
-/** @param receivedInLastHour Signalements reçus dans l'heure **avant** celui-ci. */
-export function reportAlertMode(receivedInLastHour: number): ReportAlertMode {
+/** Intervalle minimal entre deux alertes de saturation. */
+export const REPORTS_SATURATION_NOTICE_INTERVAL_MS = 60 * 60_000;
+
+/**
+ * L'annonce de saturation ne tient pas au franchissement **exact** du plafond :
+ * le compte de l'heure est lu sans verrou, et deux envois simultanés peuvent
+ * lire 59 puis le suivant 61 — l'annonce ne partirait jamais, et la direction
+ * cesserait d'être alertée sans savoir pourquoi. Elle part donc au premier
+ * signalement au-delà du plafond depuis la dernière annonce, au plus une fois
+ * par `REPORTS_SATURATION_NOTICE_INTERVAL_MS`.
+ *
+ * @param receivedInLastHour Signalements reçus dans l'heure **avant** celui-ci.
+ * @param lastNoticeAt Instant de la dernière annonce (ms), `null` s'il n'y en a pas eu.
+ * @param now Instant présent (ms).
+ */
+export function reportAlertMode(
+  receivedInLastHour: number,
+  lastNoticeAt: number | null,
+  now: number,
+): ReportAlertMode {
   if (receivedInLastHour < REPORTS_HOURLY_CAP) return "ALERT";
-  if (receivedInLastHour === REPORTS_HOURLY_CAP) return "SATURATION_NOTICE";
+  if (lastNoticeAt === null || now - lastNoticeAt >= REPORTS_SATURATION_NOTICE_INTERVAL_MS) {
+    return "SATURATION_NOTICE";
+  }
   return "SILENT";
 }
 
@@ -779,7 +799,7 @@ export const REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS = 48;
  * Le signalement de ce compte peut-il faire écrire aux personnes visées ?
  *
  * @param input.accountAgeHours Ancienneté du compte auteur.
- * @param input.earlierReportsWithTargets Signalements à cibles du même compte
+ * @param input.earlierReportsWithTargets Signalements du même compte désignant un joueur ou une équipe
  *   dans les 24 dernières heures, **celui-ci exclu**.
  */
 export function reporterMayWarnTargets(input: { accountAgeHours: number; earlierReportsWithTargets: number }): boolean {

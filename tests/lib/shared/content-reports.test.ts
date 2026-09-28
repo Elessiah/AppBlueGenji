@@ -13,6 +13,7 @@ import {
   REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS,
   REPORTS_HOURLY_CAP,
   REPORTS_HOURLY_HARD_CAP,
+  REPORTS_SATURATION_NOTICE_INTERVAL_MS,
   formatContestAlert,
   formatReportsSaturatedAlert,
   formatReportAlert,
@@ -468,12 +469,25 @@ describe("reportErrorMessage", () => {
 });
 
 describe("reportAlertMode", () => {
-  it("alerte sous le plafond, annonce la saturation une fois, puis se tait", () => {
-    expect(reportAlertMode(0)).toBe("ALERT");
-    expect(reportAlertMode(REPORTS_HOURLY_CAP - 1)).toBe("ALERT");
-    expect(reportAlertMode(REPORTS_HOURLY_CAP)).toBe("SATURATION_NOTICE");
-    expect(reportAlertMode(REPORTS_HOURLY_CAP + 1)).toBe("SILENT");
-    expect(reportAlertMode(REPORTS_HOURLY_HARD_CAP - 1)).toBe("SILENT");
+  const now = 10 * REPORTS_SATURATION_NOTICE_INTERVAL_MS;
+
+  it("alerte sous le plafond, annonce la saturation, puis se tait", () => {
+    expect(reportAlertMode(0, null, now)).toBe("ALERT");
+    expect(reportAlertMode(REPORTS_HOURLY_CAP - 1, null, now)).toBe("ALERT");
+    expect(reportAlertMode(REPORTS_HOURLY_CAP, null, now)).toBe("SATURATION_NOTICE");
+    expect(reportAlertMode(REPORTS_HOURLY_CAP + 1, now - 1000, now)).toBe("SILENT");
+    expect(reportAlertMode(REPORTS_HOURLY_HARD_CAP - 1, now - 1000, now)).toBe("SILENT");
+  });
+
+  it("annonce la saturation même si le plafond exact n'a jamais été lu", () => {
+    // Deux envois simultanés lisent 59, le suivant 61 : l'annonce doit partir.
+    expect(reportAlertMode(REPORTS_HOURLY_CAP + 1, null, now)).toBe("SATURATION_NOTICE");
+  });
+
+  it("réannonce une saturation qui dure au-delà de l'intervalle", () => {
+    expect(
+      reportAlertMode(REPORTS_HOURLY_CAP + 5, now - REPORTS_SATURATION_NOTICE_INTERVAL_MS, now),
+    ).toBe("SATURATION_NOTICE");
   });
 
   it("garde le refus du dépôt bien au-delà du plafond d'alerte", () => {

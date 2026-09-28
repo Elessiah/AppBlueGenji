@@ -371,6 +371,8 @@ describe("createReport", () => {
     // Celui-ci exclu du compte, sur le compte de l'auteur.
     expect(reporter?.[1]).toEqual([12, 3]);
     expect(reporter?.[0]).toMatch(/INTERVAL 24 HOUR/);
+    // Un signalement qui ne désigne qu'un tournoi n'a prévenu personne : il ne compte pas.
+    expect(reporter?.[0]).toMatch(/t.target_type IN \('USER', 'TEAM'\)/);
     expect(pool.execute.mock.calls.some(([sql]) => /FROM bg_users u\s+WHERE u.is_deleted = 0/.test(sql))).toBe(false);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
     // La direction, elle, est alertée.

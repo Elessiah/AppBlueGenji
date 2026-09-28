@@ -299,11 +299,11 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
   const connection = await db.getConnection();
   let reportId: number;
   let targets: ReportTargetOption[];
-  let alertMode: ReportAlertMode;
+  let receivedInLastHour: number;
   try {
     await connection.beginTransaction();
 
-    alertMode = await reportAlertModeFor(connection);
+    receivedInLastHour = await countRecentReports(connection);
 
     targets = await resolveReportTargets(submission.targets, viewer, connection);
     if (targets.length !== submission.targets.length) throw new Error("REPORT_TARGET_NOT_FOUND");
@@ -350,7 +350,7 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
     fromMember: viewer.userId !== null,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(reportId)}`,
   });
-  alertLeadership(alertMode, message, reportId, false);
+  alertLeadership(receivedInLastHour, message, reportId, false);
   void notifyReportTargets(reportId, submission.category, targets, viewer.userId).catch((error) => {
     console.error("[reports] personnes visées non prévenues", error);
   });
@@ -360,24 +360,38 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
 }
 
 /**
- * L'alerte que mérite un signalement de plus, d'après ceux reçus dans l'heure.
+ * Signalements reçus dans l'heure, avant celui qu'on s'apprête à écrire.
  *
  * @throws REPORTS_SATURATED Au-delà du plafond **dur** : le dépôt est refusé.
  */
-async function reportAlertModeFor(connection: Pick<PoolConnection, "execute">): Promise<ReportAlertMode> {
+async function countRecentReports(connection: Pick<PoolConnection, "execute">): Promise<number> {
   const [recent] = await connection.execute<(RowDataPacket & { total: number })[]>(
     `SELECT COUNT(*) AS total FROM bg_reports WHERE created_at > NOW() - INTERVAL 1 HOUR`,
   );
   const total = Number(recent[0]?.total ?? 0);
   if (total >= REPORTS_HOURLY_HARD_CAP) throw new Error("REPORTS_SATURATED");
-  return reportAlertMode(total);
+  return total;
 }
 
 /**
- * Prévient la direction (Discord et push) selon le régime de l'heure : l'alerte
- * du signalement, l'alerte unique de saturation, ou rien. Jamais attendu.
+ * Dernière annonce de saturation partie de ce processus. En mémoire : au pire,
+ * un processus de plus annonce une fois de plus — jamais une de moins.
  */
-function alertLeadership(mode: ReportAlertMode, message: string, reportId: number, contest: boolean): void {
+let lastSaturationNoticeAt: number | null = null;
+
+/**
+ * Prévient la direction (Discord et push) selon le régime de l'heure : l'alerte
+ * du signalement, l'annonce de saturation, ou rien. Appelé **après** le commit :
+ * un dépôt refusé n'annonce rien. Jamais attendu.
+ *
+ * @param receivedInLastHour Compte relu avant l'écriture (`countRecentReports`).
+ */
+function alertLeadership(receivedInLastHour: number, message: string, reportId: number, contest: boolean): void {
+  const now = Date.now();
+  // Décidé et marqué sans `await` entre les deux : deux envois simultanés ne
+  // peuvent pas annoncer la saturation tous les deux.
+  const mode: ReportAlertMode = reportAlertMode(receivedInLastHour, lastSaturationNoticeAt, now);
+  if (mode === "SATURATION_NOTICE") lastSaturationNoticeAt = now;
   if (mode === "SILENT") return;
   const saturated = mode === "SATURATION_NOTICE";
   const text = saturated
@@ -499,8 +513,9 @@ export async function notifyReportTargets(
 
 /**
  * L'auteur de ce signalement peut-il faire écrire aux personnes visées ?
- * Ancienneté de son compte et signalements à cibles des dernières 24 heures
- * (celui-ci exclu), jugés par `reporterMayWarnTargets`. Un compte introuvable
+ * Ancienneté de son compte et signalements désignant des **personnes** (joueur
+ * ou équipe — un tournoi désigné ne prévient personne) des dernières 24 heures,
+ * celui-ci exclu, jugés par `reporterMayWarnTargets`. Un compte introuvable
  * ne fait écrire à personne.
  */
 async function reporterMayWarn(reportId: number, reporterUserId: number): Promise<boolean> {
@@ -511,6 +526,7 @@ async function reporterMayWarn(reportId: number, reporterUserId: number): Promis
              FROM bg_reports r
              JOIN bg_report_targets t ON t.report_id = r.id
              WHERE r.reporter_user_id = u.id AND r.id <> ?
+               AND t.target_type IN ('USER', 'TEAM')
                AND r.created_at > NOW() - INTERVAL 24 HOUR) AS earlier
      FROM bg_users u
      WHERE u.id = ?`,
@@ -575,7 +591,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
   let contestId: number;
   let parentCategory: ReportCategory;
   let reopened = false;
-  let alertMode: ReportAlertMode;
+  let receivedInLastHour: number;
   try {
     await connection.beginTransaction();
     const [parents] = await connection.execute<
@@ -598,7 +614,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     );
     if (!concerned) throw new Error("REPORT_NOT_CONCERNED");
 
-    alertMode = await reportAlertModeFor(connection);
+    receivedInLastHour = await countRecentReports(connection);
 
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_reports
@@ -630,7 +646,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     reopened,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(parentId)}`,
   });
-  alertLeadership(alertMode, message, contestId, true);
+  alertLeadership(receivedInLastHour, message, contestId, true);
   return contestId;
 }
 
