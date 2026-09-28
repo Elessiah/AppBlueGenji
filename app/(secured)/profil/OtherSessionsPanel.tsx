@@ -64,16 +64,17 @@ export function OtherSessionsPanel({ version }: { version: number }): React.Reac
 
   return (
     <div className={s.sessionsRow}>
-      <p id="other-sessions-summary" className={`${s.hint} ${s.sessionsSummary}`} aria-live="polite">
+      {/* Pas de zone d'annonce : la notification dit déjà le résultat du geste,
+          et la ligne répétée juste après le doublerait au lecteur d'écran. */}
+      <p id="other-sessions-summary" className={`${s.hint} ${s.sessionsSummary}`}>
         {otherSessionsSummary(count)}
       </p>
       <button
         type="button"
-        className="btn ghost"
+        className={`btn ghost ${s.sessionsButton}`}
         onClick={revoke}
         disabled={busy || count === 0}
         aria-describedby="other-sessions-summary"
-        style={{ padding: "4px 12px", fontSize: 12 }}
       >
         {busy ? "Fermeture…" : "Déconnecter mes autres sessions"}
       </button>

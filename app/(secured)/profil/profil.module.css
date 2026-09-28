@@ -387,3 +387,11 @@
   margin: 0;
   flex: 1 1 260px;
 }
+
+/* Même gabarit que « Retirer » dans la liste d'au-dessus, et jamais coupé :
+   sur mobile, la phrase passe au-dessus plutôt que d'écraser le bouton. */
+.sessionsButton {
+  padding: 4px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
