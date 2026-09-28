@@ -371,21 +371,14 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
               <img src={url} alt="" className={s.previewImage} style={previewImageStyle} draggable={false} />
             </div>
             <div className={s.tools} data-tap-zone>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => scale(1 / CROP_SCALE_STEP)}
-                aria-label="Réduire le cadre"
-              >
-                −
+              {/* Le libellé est le texte visible, pas un `aria-label` : un
+                  symbole seul nommé autrement ne répondrait plus à la commande
+                  vocale de ce qu'on lit dessus (WCAG 2.5.3). */}
+              <button type="button" className="btn ghost" onClick={() => scale(1 / CROP_SCALE_STEP)}>
+                <span aria-hidden="true">− </span>Réduire
               </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => scale(CROP_SCALE_STEP)}
-                aria-label="Agrandir le cadre"
-              >
-                +
+              <button type="button" className="btn ghost" onClick={() => scale(CROP_SCALE_STEP)}>
+                <span aria-hidden="true">+ </span>Agrandir
               </button>
               <button type="button" className="btn ghost" onClick={() => setBox(defaultCropBox(size, aspect))}>
                 Réinitialiser
