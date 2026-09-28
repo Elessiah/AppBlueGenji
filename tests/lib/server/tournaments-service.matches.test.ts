@@ -203,6 +203,20 @@ describe("tournaments-service: match state machine", () => {
     }
 
     const writes = (calls: Call[]) => calls.filter((c) => c.sql.startsWith("UPDATE"));
+    /**
+     * Paramètres de l'écriture d'un report : scores, puis ceux de l'échéance —
+     * délai, délai (branche « l'adversaire a déjà reporté »), minutes de série,
+     * délai (branche « report seul ») —, puis le match.
+     */
+    const reportParams = (my: number, opp: number) => [
+      my,
+      opp,
+      SCORE_REPORT_TIMEOUT_MINUTES,
+      SCORE_REPORT_TIMEOUT_MINUTES,
+      plausibleSeriesMinutes(null),
+      SCORE_REPORT_TIMEOUT_MINUTES,
+      10,
+    ];
     const completion = (calls: Call[]) =>
       calls.find((c) => c.sql.includes("status = 'COMPLETED'"));
 
@@ -240,13 +254,7 @@ describe("tournaments-service: match state machine", () => {
       expect(report.sql).toMatch(/status = 'AWAITING_CONFIRMATION'/);
       // La série plausible est une série complète au format de la manche (ici
       // score libre : le BO5 par défaut), depuis le lancement, puis le délai.
-      expect(report.params).toEqual([
-        3,
-        1,
-        plausibleSeriesMinutes(null),
-        SCORE_REPORT_TIMEOUT_MINUTES,
-        10,
-      ]);
+      expect(report.params).toEqual(reportParams(3, 1));
       expect(completion(calls)).toBeUndefined();
       expect(queueRefereeAlert).not.toHaveBeenCalled();
     });
@@ -260,17 +268,11 @@ describe("tournaments-service: match state machine", () => {
       // Calculée par la base et posée une fois (COALESCE) : max(maintenant,
       // lancement + série) puis le délai — et le lancement ne compte que s'il
       // appartient à cet appariement.
-      expect(report.sql).toMatch(/score_deadline_at = COALESCE\(score_deadline_at, DATE_ADD\( GREATEST\( NOW\(\),/);
+      expect(report.sql).toMatch(/ELSE COALESCE\(score_deadline_at, DATE_ADD\( GREATEST\( NOW\(\),/);
       expect(report.sql).toMatch(
         /CASE WHEN launch_pairing = CONCAT\(team1_id, ':', team2_id\) THEN launched_at END/,
       );
-      expect(report.params).toEqual([
-        3,
-        0,
-        plausibleSeriesMinutes(null),
-        SCORE_REPORT_TIMEOUT_MINUTES,
-        10,
-      ]);
+      expect(report.params).toEqual(reportParams(3, 0));
     });
 
     it("l'échéance se lit sur le format, jamais sur le score déclaré", async () => {
@@ -281,8 +283,22 @@ describe("tournaments-service: match state machine", () => {
       const long = reportConnection();
       await reportMatchScore(long.connection, 1, 10, 42, 3, 2);
 
-      expect(writes(short.calls)[0].params[2]).toBe(plausibleSeriesMinutes(null));
-      expect(writes(long.calls)[0].params[2]).toBe(plausibleSeriesMinutes(null));
+      expect(writes(short.calls)[0].params[4]).toBe(plausibleSeriesMinutes(null));
+      expect(writes(long.calls)[0].params[4]).toBe(plausibleSeriesMinutes(null));
+    });
+
+    it("le report de l'adversaire rapproche l'échéance, sans jamais la repousser", async () => {
+      // Les deux ont parlé : la série est finie, un conflit doit être signalé à
+      // l'arbitrage depuis sa naissance et non depuis la fin de série
+      // plausible du premier report.
+      reporterIs(200);
+      const { connection, calls } = reportConnection();
+
+      await reportMatchScore(connection, 1, 10, 42, 1, 3);
+
+      expect(writes(calls)[0].sql).toMatch(
+        /score_deadline_at = CASE WHEN team1_report_score IS NOT NULL THEN LEAST\( COALESCE\(score_deadline_at, DATE_ADD\(NOW\(\), INTERVAL \? MINUTE\)\), DATE_ADD\(NOW\(\), INTERVAL \? MINUTE\) \)/,
+      );
     });
 
     it("refuse un membre sportif du roster, avant toute lecture du match", async () => {
@@ -303,13 +319,7 @@ describe("tournaments-service: match state machine", () => {
       await reportMatchScore(connection, 1, 10, 42, 1, 3);
 
       expect(writes(calls)[0].sql).toMatch(/SET team2_report_score = \?/);
-      expect(writes(calls)[0].params).toEqual([
-        1,
-        3,
-        plausibleSeriesMinutes(null),
-        SCORE_REPORT_TIMEOUT_MINUTES,
-        10,
-      ]);
+      expect(writes(calls)[0].params).toEqual(reportParams(1, 3));
     });
 
     it("deux reports concordants clôturent la rencontre au profit du vainqueur", async () => {

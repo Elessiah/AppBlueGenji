@@ -192,6 +192,31 @@ const SCORE_DEADLINE_SQL = `DATE_ADD(
              INTERVAL ? MINUTE
            )`;
 
+/**
+ * Affectation de `score_deadline_at` par le report d'un camp, `otherSide`
+ * désignant l'adversaire. Paramètres, dans l'ordre : délai, délai, minutes de
+ * série, délai.
+ *
+ * · **Report seul** : l'échéance est posée une fois, au premier report
+ *   (`COALESCE`), après une fin de série plausible (`SCORE_DEADLINE_SQL`).
+ * · **L'adversaire a déjà reporté** : les deux ont parlé, la série est finie —
+ *   l'échéance est ramenée à `maintenant + délai` si elle était plus lointaine,
+ *   jamais repoussée (`LEAST`). C'est sur elle que se mesure l'escalade d'un
+ *   conflit à l'arbitrage (`resolveExpiredScoreReports`) : sans ce rappel, un
+ *   désaccord né dès la fin d'un BO5 attendait la fin de série plausible
+ *   (plus d'une heure) avant d'être signalé comme en souffrance, et une
+ *   resaisie en boucle ne peut pas la faire reculer.
+ */
+function scoreDeadlineAssignment(otherSide: "team1" | "team2"): string {
+  return `score_deadline_at = CASE
+             WHEN ${otherSide}_report_score IS NOT NULL THEN LEAST(
+               COALESCE(score_deadline_at, DATE_ADD(NOW(), INTERVAL ? MINUTE)),
+               DATE_ADD(NOW(), INTERVAL ? MINUTE)
+             )
+             ELSE COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL})
+           END`;
+}
+
 function validateScoreValue(value: number): number {
   if (!Number.isFinite(value)) {
     throw new Error("INVALID_SCORE");
@@ -339,9 +364,8 @@ export async function reportMatchScore(
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
   // Elle se lit sur le format et non sur le score déclaré, si bien qu'elle est
-  // posée **une fois**, au premier report (`COALESCE`) : ni une resaisie ni
-  // l'adversaire ne la déplacent — c'est sur elle que se mesure l'escalade d'un
-  // conflit à l'arbitrage.
+  // posée **une fois**, au premier report ; seul le report de l'adversaire la
+  // rapproche (`scoreDeadlineAssignment`).
   const seriesMinutes = plausibleSeriesMinutes(matchFormat);
 
   if (isTeam1Reporter) {
@@ -350,10 +374,18 @@ export async function reportMatchScore(
        SET team1_report_score = ?,
            team1_report_opponent_score = ?,
            team1_reported_at = NOW(),
-           score_deadline_at = COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL}),
+           ${scoreDeadlineAssignment("team2")},
            status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
-      [myScore, opponentScore, seriesMinutes, SCORE_REPORT_TIMEOUT_MINUTES, matchId],
+      [
+        myScore,
+        opponentScore,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        seriesMinutes,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        matchId,
+      ],
     );
   }
 
@@ -363,10 +395,18 @@ export async function reportMatchScore(
        SET team2_report_score = ?,
            team2_report_opponent_score = ?,
            team2_reported_at = NOW(),
-           score_deadline_at = COALESCE(score_deadline_at, ${SCORE_DEADLINE_SQL}),
+           ${scoreDeadlineAssignment("team1")},
            status = 'AWAITING_CONFIRMATION'
        WHERE id = ?`,
-      [myScore, opponentScore, seriesMinutes, SCORE_REPORT_TIMEOUT_MINUTES, matchId],
+      [
+        myScore,
+        opponentScore,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        seriesMinutes,
+        SCORE_REPORT_TIMEOUT_MINUTES,
+        matchId,
+      ],
     );
   }
 

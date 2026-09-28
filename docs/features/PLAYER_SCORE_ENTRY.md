@@ -31,7 +31,9 @@ porte côté joueur.
    (`lib/shared/score-report-deadline.ts`) : un « 3-0 » envoyé à la seconde du
    lancement ne fait pas foi avant que la série ait pu se jouer. L'échéance se
    lit sur le format et non sur le score déclaré, qui la mettait à la main du
-   déclarant ; elle est posée une fois, au premier report.
+   déclarant ; elle est posée une fois, au premier report, et seulement
+   rapprochée (à « maintenant + délai ») quand l'adversaire reporte à son tour —
+   un conflit est alors signalé à l'arbitrage depuis sa naissance.
 
 Proposer, confirmer et contester reviennent à **ceux qui mènent le match** :
 `CAPITAINE`, `MANAGER` ou `OWNER` — les rôles qui déclarent l'équipe prête
