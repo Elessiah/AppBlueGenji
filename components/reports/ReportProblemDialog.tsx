@@ -47,6 +47,12 @@ interface ReportProblemDialogProps {
    * déjà choisis.
    */
   contestOf?: number;
+  /**
+   * Ouvre directement le détail d'une catégorie (bouton « Faire une demande
+   * RGPD » de `/rgpd`). Contrairement à une contestation, on peut encore en
+   * changer.
+   */
+  initialCategory?: Exclude<ReportCategory, "CONTEST">;
   /** Appelé après un envoi réussi (la page d'un signalement relit ses contestations). */
   onSubmitted?: () => void;
 }
@@ -74,11 +80,14 @@ export function ReportProblemDialog({
   authenticated,
   onClose,
   contestOf,
+  initialCategory,
   onSubmitted,
 }: ReportProblemDialogProps) {
   const { showError, showSuccess } = useToast();
   const titleId = useId();
-  const [category, setCategory] = useState<ReportCategory | null>(contestOf ? "CONTEST" : null);
+  const [category, setCategory] = useState<ReportCategory | null>(
+    contestOf ? "CONTEST" : (initialCategory ?? null),
+  );
   const [parentReportId, setParentReportId] = useState<number | null>(contestOf ?? null);
   const [contestable, setContestable] = useState<ContestableReportOption[] | null>(null);
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
@@ -378,7 +387,7 @@ export function ReportProblemDialog({
                   placeholder={definition.descriptionPlaceholder}
                   aria-invalid={descriptionTooShort}
                   aria-describedby={`${titleId}-description-hint`}
-                  data-autofocus={contestOf !== undefined ? "" : undefined}
+                  data-autofocus={contestOf !== undefined || initialCategory !== undefined ? "" : undefined}
                 />
                 <p
                   id={`${titleId}-description-hint`}

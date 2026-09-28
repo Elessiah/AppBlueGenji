@@ -152,5 +152,3 @@ export const DROITS: DroitEntry[] = [
     text: "Vous pouvez retirer votre consentement à tout moment sans que cela affecte la licéité du traitement antérieur.",
   },
 ];
-
-export const RGPD_CONTACT_EMAIL_FALLBACK = "keryan.h@outlook.fr";

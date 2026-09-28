@@ -8,8 +8,10 @@ import {
   DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
-  RGPD_CONTACT_EMAIL_FALLBACK,
 } from "@/lib/shared/rgpd-policy";
+import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
+import { getCurrentUser } from "@/lib/server/auth";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
 import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
@@ -29,8 +31,10 @@ export const metadata: Metadata = pageMetadata({
   path: "/rgpd",
 });
 
-export default function RgpdPage() {
-  const contactEmail = process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK;
+export default async function RgpdPage() {
+  // Le formulaire laisse un membre connecté désigner son compte ; un visiteur
+  // l'ouvre aussi, sans cela.
+  const user = await getCurrentUser().catch(() => null);
   // La date suit le dernier changement présenté aux joueurs
   // (`lib/shared/privacy-changes.ts`) : écrite à la main, elle restait en juin
   // pendant que la politique changeait.
@@ -66,7 +70,7 @@ export default function RgpdPage() {
           </p>
           <p>
             Pour toute question relative à vos données personnelles, contactez-nous
-            à l'adresse indiquée en section&nbsp;06.
+            par les moyens indiqués en section&nbsp;06.
           </p>
         </div>
       </section>
@@ -321,7 +325,7 @@ export default function RgpdPage() {
           <p>
             Le bouton <strong>« Signaler un problème »</strong>, en bas de chaque page, est ouvert à{" "}
             <strong>tous</strong>, avec ou sans compte. On y choisit une catégorie — droit
-            d&apos;auteur, modération, bug, autre —, on décrit le problème et, connecté, on désigne les
+            d&apos;auteur, modération, bug, RGPD, hébergeur, autre —, on décrit le problème et, connecté, on désigne les
             joueurs, équipes ou tournois concernés. Un signalement de <strong>droit d&apos;auteur</strong>{" "}
             exige en plus le nom et l&apos;adresse électronique de son auteur, sa qualité (titulaire des
             droits, représentant, tiers) et une déclaration de bonne foi : c&apos;est ce que le règlement
@@ -496,14 +500,24 @@ export default function RgpdPage() {
         <div className={styles.prose}>
           <p>
             Pour exercer l'un de vos droits ou poser une question relative au
-            traitement de vos données, contactez le responsable de traitement.
-            Nous répondons dans un délai maximum d'<strong>un mois</strong> (art. 12 RGPD).
+            traitement de vos données, contactez le responsable de traitement par
+            le formulaire « {REPORT_FORM_NAME} », présent en bas de chaque page,
+            catégorie <strong>RGPD</strong> — ou sur Discord. Nous répondons dans un
+            délai maximum d'<strong>un mois</strong> (art. 12 RGPD).
           </p>
         </div>
         <div className={styles.contactBlock} style={{ marginTop: 24 }}>
           <span className={styles.contactLabel}>Contact RGPD</span>
-          <span className={styles.contactValue}>{contactEmail}</span>
-          <span className={styles.contactSub}>Objet recommandé : « Demande RGPD — [droit concerné] »</span>
+          <span className={styles.contactValue}>Formulaire « {REPORT_FORM_NAME} », catégorie RGPD</span>
+          <span className={styles.contactSub}>Ou sur Discord : {LEGAL_CONTACT_DISCORD}</span>
+          <div style={{ marginTop: 12 }}>
+            <ReportProblemButton
+              authenticated={Boolean(user)}
+              initialCategory="RGPD"
+              label="Faire une demande RGPD"
+              cyber
+            />
+          </div>
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>

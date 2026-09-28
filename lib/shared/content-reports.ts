@@ -32,7 +32,7 @@ import { LOGO_QUARANTINE_DAYS, type LogoQuarantineView } from "./logo-quarantine
  * concerne. Elle ne désigne rien, elle se rattache à son signalement d'origine
  * (`parentReportId`) et se range sous lui dans le panneau.
  */
-export type ReportCategory = "COPYRIGHT" | "MODERATION" | "BUG" | "OTHER" | "CONTEST";
+export type ReportCategory = "COPYRIGHT" | "MODERATION" | "BUG" | "RGPD" | "HOSTING" | "OTHER" | "CONTEST";
 
 /** Ce qu'un signalement peut viser. */
 export type ReportTargetType = "USER" | "TEAM" | "TOURNAMENT";
@@ -46,7 +46,15 @@ export type ReportAction = "TAKE" | "RELEASE" | "RESOLVE" | "REOPEN";
 /** Qualité du signalant vis-à-vis d'un droit d'auteur invoqué. */
 export type RightsRelation = "HOLDER" | "AGENT" | "THIRD_PARTY";
 
-export const REPORT_CATEGORIES: readonly ReportCategory[] = ["COPYRIGHT", "MODERATION", "BUG", "OTHER", "CONTEST"];
+export const REPORT_CATEGORIES: readonly ReportCategory[] = [
+  "COPYRIGHT",
+  "MODERATION",
+  "BUG",
+  "RGPD",
+  "HOSTING",
+  "OTHER",
+  "CONTEST",
+];
 
 /** Catégories d'un signalement « d'origine », c'est-à-dire qui n'est pas une contestation. */
 export const PRIMARY_REPORT_CATEGORIES: readonly ReportCategory[] = REPORT_CATEGORIES.filter(
@@ -111,6 +119,31 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     descriptionPlaceholder: "Ce que tu faisais, ce que tu attendais, ce qui s'est passé…",
+  },
+  // Les deux catégories suivantes reçoivent ce qu'une adresse électronique
+  // publiée recevait (`lib/shared/legal-contact.ts`) : le site n'en publie plus
+  // aucune. Ni l'une ni l'autre ne désigne de cible — une demande sur ses
+  // propres données n'a personne à prévenir, et un contenu illicite d'un joueur
+  // ou d'une équipe se signale par « Droit d'auteur » ou « Modération », qui
+  // savent le masquer et le faire contester.
+  RGPD: {
+    label: "RGPD",
+    hint: "Exercer tes droits sur tes données : accès, rectification, effacement, opposition, portabilité.",
+    icon: "🛡",
+    targets: [],
+    requiresContact: false,
+    requiresRightsDeclaration: false,
+    descriptionPlaceholder:
+      "Le droit que tu exerces, le compte concerné (pseudo), et ce que tu demandes précisément…",
+  },
+  HOSTING: {
+    label: "Hébergeur",
+    hint: "Écrire à l'éditeur ou à l'hébergeur du site : mentions légales, demande d'une autorité, question juridique.",
+    icon: "§",
+    targets: [],
+    requiresContact: false,
+    requiresRightsDeclaration: false,
+    descriptionPlaceholder: "Qui tu es (particulier, organisme, autorité), l'objet de ta demande, et la page concernée…",
   },
   OTHER: {
     label: "Autre",
@@ -590,7 +623,7 @@ export const REPORT_PRIVACY_NOTICE = {
   legalBasis:
     "Base légale : ton consentement, et pour un contenu illicite l'obligation faite à l'hébergeur de traiter les notifications (règlement européen sur les services numériques, art. 16).",
   rights:
-    "Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, en écrivant à l'association (voir la politique de confidentialité).",
+    "Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, par ce formulaire (catégorie « RGPD ») ou sur Discord (voir la politique de confidentialité).",
 } as const;
 
 /** Phrase française d'un refus de la route, jamais le jeton lui-même. */

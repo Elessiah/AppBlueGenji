@@ -3,7 +3,6 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberButton } from "@/components/cyber";
-import { RGPD_CONTACT_EMAIL_FALLBACK } from "@/lib/shared/rgpd-policy";
 import {
   PROCESSING_ACTIVITIES,
   REGISTER_UPDATED_AT,
@@ -72,7 +71,7 @@ function ActivityCard({ activity }: { activity: ProcessingActivity }) {
 }
 
 export default function RegistrePage() {
-  const controller = registerController(process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK);
+  const controller = registerController();
   return (
     <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
@@ -109,7 +108,7 @@ export default function RegistrePage() {
         <table className={styles.registerTable}>
           <tbody>
             <Field label="Responsable du traitement" items={`${controller.name} — ${controller.legalForm}, ${controller.seat}`} />
-            <Field label="Contact" items={controller.contactEmail} />
+            <Field label="Contact" items={controller.contact} />
             <Field label="Délégué à la protection des données" items={controller.dpo} />
             <Field label="Hébergeur (sous-traitant)" items={controller.host} />
           </tbody>
