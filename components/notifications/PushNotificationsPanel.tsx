@@ -49,6 +49,17 @@ export function PushNotificationsPanel({
   const push = usePushNotifications(onError, { syncExisting: variant === "full" });
   const listId = useId();
 
+  if (push.loadFailed && push.server === null) {
+    // Le refus est déjà parti en notification ; ici, seulement le geste.
+    return variant === "compact" ? null : (
+      <div className={s.deviceRow}>
+        <CyberButton type="button" variant="ghost" onClick={push.retry}>
+          Réessayer
+        </CyberButton>
+      </div>
+    );
+  }
+
   if (push.support === null || push.server === null) {
     return variant === "compact" ? null : (
       <p className={s.muted} role="status">

@@ -234,6 +234,7 @@ describe("isIosUserAgent", () => {
 describe("pushErrorMessage", () => {
   it("traduit un code connu et retombe sur une phrase sinon", () => {
     expect(pushErrorMessage("PUSH_SERVICE_NOT_ALLOWED")).toMatch(/navigateur/);
+    expect(pushErrorMessage("PUSH_LOAD_FAILED")).toMatch(/pas pu être lus/);
     expect(pushErrorMessage("INCONNU")).toMatch(/Réessaie/);
     expect(pushErrorMessage(null)).toMatch(/Réessaie/);
   });

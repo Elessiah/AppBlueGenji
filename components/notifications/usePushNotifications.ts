@@ -46,6 +46,10 @@ export type PushNotificationsState = {
    * l'est déjà.
    */
   checked: boolean;
+  /** La lecture des réglages a échoué : l'écran propose de réessayer. */
+  loadFailed: boolean;
+  /** Relit les réglages (et l'abonnement de l'appareil) après un échec. */
+  retry: () => void;
   busy: boolean;
   /** `true` si l'appareil est désormais abonné. */
   enable: () => Promise<boolean>;
@@ -133,6 +137,8 @@ export function usePushNotifications(
   const [server, setServer] = useState<ServerState | null>(null);
   const [subscribed, setSubscribed] = useState(false);
   const [checked, setChecked] = useState(false);
+  const [loadFailed, setLoadFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
   // Sujets coupés : la liste **voulue** (dernier geste, tant qu'elle n'est pas
   // écrite) et la dernière **confirmée** par le serveur. Deux cases cochées coup
@@ -155,6 +161,13 @@ export function usePushNotifications(
     }),
   );
 
+  // Le dernier `onError` reçu, sans en faire une dépendance de l'effet de
+  // chargement — un appelant qui ne le mémorise pas relancerait la lecture à
+  // chaque rendu.
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
+  const retry = useCallback(() => setAttempt((count) => count + 1), []);
+
   const loadServer = useCallback(async (): Promise<ServerState | null> => {
     const response = await fetch("/api/push", { credentials: "same-origin", cache: "no-store" });
     if (!response.ok) return null;
@@ -171,6 +184,15 @@ export function usePushNotifications(
     setSupport(detected);
     void (async () => {
       const state = await loadServer().catch(() => null);
+      if (cancelled) return;
+      if (!state) {
+        // Sans réglages, le panneau n'a rien à montrer : il le dit et propose
+        // de relire, au lieu d'attendre une réponse qui ne viendra pas.
+        setLoadFailed(true);
+        onErrorRef.current("PUSH_LOAD_FAILED");
+        return;
+      }
+      setLoadFailed(false);
       try {
         if (cancelled || detected !== "AVAILABLE" || !state?.publicKey) return;
         const subscription = await currentSubscription();
@@ -193,7 +215,7 @@ export function usePushNotifications(
     return () => {
       cancelled = true;
     };
-  }, [loadServer, syncExisting]);
+  }, [loadServer, syncExisting, attempt]);
 
   const enable = useCallback(async () => {
     if (!server?.publicKey) {
@@ -289,5 +311,5 @@ export function usePushNotifications(
     [onError, server],
   );
 
-  return { support, server, subscribed, checked, busy, enable, disable, setTopicEnabled };
+  return { support, server, subscribed, checked, loadFailed, retry, busy, enable, disable, setTopicEnabled };
 }

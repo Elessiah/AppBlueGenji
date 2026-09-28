@@ -301,6 +301,7 @@ export const PUSH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
     "Ton navigateur bloque les notifications de ce site. Autorise-les dans ses réglages, puis réessaie.",
   PUSH_UNSUPPORTED: "Ce navigateur ne sait pas recevoir de notifications push.",
   INVALID_PUSH_TOPICS: "Réglages de notifications illisibles.",
+  PUSH_LOAD_FAILED: "Les réglages de notifications n'ont pas pu être lus.",
 };
 
 export function pushErrorMessage(code: string | null | undefined): string {
