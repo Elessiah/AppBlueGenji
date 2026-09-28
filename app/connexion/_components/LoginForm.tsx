@@ -10,6 +10,7 @@ import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
 import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { loginErrorMessage, oauthErrorMessage } from "../_lib/login-errors";
+import { detectLoginEnvironment, readLoginEnvironmentSignals } from "@/lib/shared/login-environment";
 import { OAuthButtons } from "./OAuthButtons";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
@@ -120,7 +121,12 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
     // Le refus vient du module partagé, qui compose la phrase depuis le motif
     // (`?error=`) et le fournisseur (`?provider=`). Les cinq codes écrits ici en
     // dur ne parlaient que de Google : la troisième porte en aurait fait quinze.
-    const message = oauthErrorMessage(params.get("error"), params.get("provider"));
+    // Sur l'icône d'écran d'accueil d'iOS ou dans le navigateur intégré d'une
+    // application, l'aller-retour perd ses cookies : le refus le dit, et
+    // nomme les sorties (autre navigateur, code Discord).
+    const signals = readLoginEnvironmentSignals();
+    const environment = signals ? detectLoginEnvironment(signals) : "BROWSER";
+    const message = oauthErrorMessage(params.get("error"), params.get("provider"), environment);
     if (message) showError(message);
   }, [showError]);
 

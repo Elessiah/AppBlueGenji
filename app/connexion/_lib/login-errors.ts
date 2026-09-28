@@ -11,6 +11,8 @@
  * pur, testable, et un repli qui ne laisse **jamais** sortir un jeton.
  */
 
+import { loginEnvironmentAdvice, type LoginEnvironment } from "@/lib/shared/login-environment";
+
 const LOGIN_ERRORS: Record<string, string> = {
   // Bot injoignable ou mal configuré : la panne est de notre côté, le joueur n'a
   // rien à corriger — mais la connexion Google, elle, reste ouverte.
@@ -106,6 +108,16 @@ const OAUTH_ERRORS: Record<string, (provider: string) => string> = {
   terms: () => "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion.",
 };
 
+/**
+ * Les refus qu'un contexte à cookies isolés (app installée sur iOS, navigateur
+ * intégré) produit réellement : le cookie d'état manque au retour (`state`),
+ * l'échange échoue (`oauth`), le rappel arrive vide (`params`) ou la session
+ * de départ n'est pas relue (`session`). Une configuration manquante, une
+ * panne du fournisseur ou des conditions refusées n'ont rien à voir avec le
+ * navigateur : y joindre le conseil enverrait changer de navigateur pour rien.
+ */
+const ENVIRONMENT_SENSITIVE_OAUTH_ERRORS = new Set(["params", "state", "oauth", "session"]);
+
 /** Nom du fournisseur tel qu'il s'affiche dans une phrase de refus. */
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
@@ -119,13 +131,19 @@ const PROVIDER_LABELS: Record<string, string> = {
  * Un fournisseur inconnu — ou absent, sur un vieux lien — retombe sur « OAuth »
  * plutôt que sur une phrase amputée : le message reste lisible même quand le
  * paramètre manque.
+ *
+ * `environment` ajoute, pour un refus que le navigateur peut expliquer, le
+ * conseil d'en changer (voir `lib/shared/login-environment.ts`).
  */
 export function oauthErrorMessage(
   kind: string | null | undefined,
   providerSlug: string | null | undefined,
+  environment: LoginEnvironment = "BROWSER",
 ): string | null {
   if (!kind) return null;
   const render = OAUTH_ERRORS[kind];
   if (!render) return null;
-  return render(PROVIDER_LABELS[(providerSlug ?? "").toLowerCase()] ?? "OAuth");
+  const message = render(PROVIDER_LABELS[(providerSlug ?? "").toLowerCase()] ?? "OAuth");
+  const advice = ENVIRONMENT_SENSITIVE_OAUTH_ERRORS.has(kind) ? loginEnvironmentAdvice(environment) : null;
+  return advice ? `${message} ${advice}` : message;
 }
