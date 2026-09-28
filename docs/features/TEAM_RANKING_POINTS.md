@@ -105,6 +105,10 @@ site, byes compris — au-delà, les équipes les moins actives n'avaient plus d
 forme du tout. Elle sort maintenant de la même assiette et de la même
 chronologie que la forme des fiches, découpée par équipe en SQL : la barre de la
 carte est le début de celle de la fiche, pas une autre lecture des mêmes matchs.
+Parce qu'elle parcourt tous les matchs du site et ne dépend pas du lecteur, elle
+est **mutualisée** (`loadTeamListForms`, par `cachedStats`) : elle était rejouée à
+chaque chargement de `/equipes`. Le cache est vidé à chaque score, comme le
+bilan des joueurs, si bien qu'il ne retarde jamais une forme.
 
 ## Ce qui reste volontairement différent
 

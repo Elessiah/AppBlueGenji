@@ -176,14 +176,21 @@ fiche du même joueur :
 Un barème partagé n'aurait pas suffi — c'est la leçon déjà tirée pour les points
 d'équipe (`TEAM_RANKING_POINTS.md`) : posé sur deux assiettes différentes, il
 rend encore deux nombres. `loadPlayerRecords` est donc **le** chargeur de bilan
-joueur : mêmes lignes, même crédit, même agrégat (`computeDeepStats`) que la
-fiche. La carte ne peut plus contredire la fiche parce qu'elle n'a plus de
-calcul à elle.
+joueur : mêmes lignes, même crédit que la fiche, et les trois nombres de son
+agrégat — `computeRecordSummary` (`lib/shared/stats.ts`) rend `matchesWon`,
+`matchesLost` et `tournamentsPlayed` sous les règles de `computeDeepStats`, sans
+le reste (tri, séries, répartitions, activité), qu'on calculait pour chaque
+compte avant de le jeter. Un test tient l'égalité des deux fonctions. La carte ne
+peut plus contredire la fiche parce qu'elle n'a plus de calcul à elle.
 
 Le coût reste borné : **trois requêtes pour toute la page**, quel que soit le
 nombre de joueurs listés — les appartenances de tous, puis les matchs et les
 inscriptions de leurs équipes. Le découpage par joueur se fait ensuite en
-mémoire, sur des listes déjà chargées. C'est `collectForPlayer`, extrait de
+mémoire : matchs et inscriptions sont **rangés une fois par équipe**, et chaque
+joueur ne relit que les lignes de ses équipes — filtrer toutes les lignes du site
+pour chaque joueur coûtait joueurs × matchs, recalculé au premier chargement qui
+suit chaque score. Un match entre deux équipes du même joueur, rangé sous les
+deux, n'est compté qu'une fois. C'est `collectForPlayer`, extrait de
 `getPlayerEntityStats`, qui garantit l'identité du crédit.
 
 ## Classement du site
