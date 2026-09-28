@@ -20,8 +20,9 @@ import {
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import { LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
-const controller = registerController("rgpd@exemple.invalid");
+const controller = registerController();
 const byRef = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref) as ProcessingActivity;
 
 /** Découpe un CSV `;` en respectant les guillemets — de quoi relire l'export. */
@@ -138,8 +139,11 @@ describe("durées : le registre cite les constantes que le code applique", () =>
 });
 
 describe("registerController", () => {
-  it("porte le contact reçu, sans lire l'environnement", () => {
-    expect(controller.contactEmail).toBe("rgpd@exemple.invalid");
+  it("donne le contact Discord et le formulaire, sans aucune adresse électronique", () => {
+    expect(controller.contact).toBe(RGPD_CONTACT_LINE);
+    expect(controller.contact).toContain(LEGAL_CONTACT_DISCORD);
+    expect(controller.contact).toContain("RGPD");
+    expect(controller.contact).not.toContain("@");
     expect(controller.legalForm).toMatch(/loi 1901/);
   });
 
@@ -195,7 +199,7 @@ describe("registerToCsv", () => {
     expect(col("Nom du traitement")).toBe("Sauvegardes");
     expect(col("Date de mise à jour")).toBe(REGISTER_UPDATED_AT);
     expect(col("Durées de conservation").split("\n")).toEqual(byRef("T09").retention);
-    expect(col("Responsable du traitement")).toContain("rgpd@exemple.invalid");
+    expect(col("Responsable du traitement")).toContain(RGPD_CONTACT_LINE);
     expect(col("Hébergeur (sous-traitant)")).toContain(SITE_HOST.address);
   });
 

@@ -1,4 +1,3 @@
-import { RGPD_CONTACT_EMAIL_FALLBACK } from "@/lib/shared/rgpd-policy";
 import {
   registerController,
   registerExportFilename,
@@ -10,15 +9,13 @@ import {
  *
  * Public et sans compte : le registre ne contient aucune donnée personnelle, et
  * c'est tout son intérêt d'être récupérable sans rien demander (CNIL, joueur,
- * staff). Rendu à la demande pour que l'adresse de contact suive
- * `RGPD_CONTACT_EMAIL` du serveur, comme la page `/rgpd`, et non celle de la
- * machine qui a compilé.
+ * staff). Rien n'y dépend plus de l'environnement du serveur : le contact
+ * est une constante du code (`lib/shared/legal-contact.ts`), si bien que la
+ * route peut être rendue à la compilation.
  */
-export const dynamic = "force-dynamic";
 
 export function GET(): Response {
-  const contactEmail = process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK;
-  return new Response(registerToCsv(registerController(contactEmail)), {
+  return new Response(registerToCsv(registerController()), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="${registerExportFilename()}"`,

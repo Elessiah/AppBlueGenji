@@ -3,7 +3,7 @@ import Link from "next/link";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
-import { RGPD_CONTACT_EMAIL_FALLBACK } from "@/lib/shared/rgpd-policy";
+import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import {
   ACCESSIBILITY_STANDARD,
   AUDIT_CONFORMITY_RATE,
@@ -24,12 +24,18 @@ export const metadata: Metadata = pageMetadata({
   path: "/accessibilite",
 });
 
-/** Les deux moyens de nous joindre, repris là où une demande est proposée. */
-function ContactList({ email }: { email: string }) {
+/**
+ * Les moyens de nous joindre, repris là où une demande est proposée. Aucune
+ * adresse électronique : le site n'en publie pas (`lib/shared/legal-contact.ts`).
+ */
+function ContactList() {
   return (
     <ul>
       <li>
-        Par courriel : <a href={`mailto:${email}`}>{email}</a>
+        Par le formulaire « {REPORT_FORM_NAME} », en bas de chaque page (catégorie « Autre »)
+      </li>
+      <li>
+        Sur Discord, en message privé : <strong>{LEGAL_CONTACT_DISCORD}</strong>
       </li>
       <li>
         Sur le{" "}
@@ -48,7 +54,6 @@ function ContactList({ email }: { email: string }) {
  * tient là-bas.
  */
 export default function AccessibilityStatementPage() {
-  const contactEmail = process.env.RGPD_CONTACT_EMAIL ?? RGPD_CONTACT_EMAIL_FALLBACK;
   const dateLabel = accessibilityStatementDateLabel();
   const statusLabel = CONFORMITY_LABELS[CONFORMITY_STATUS];
 
@@ -120,7 +125,7 @@ export default function AccessibilityStatementPage() {
                     <strong>En attendant : </strong>
                     {issue.workaround}
                   </p>
-                  {issue.requestByContact ? <ContactList email={contactEmail} /> : null}
+                  {issue.requestByContact ? <ContactList /> : null}
                 </div>
               ) : null}
             </li>
@@ -187,7 +192,7 @@ export default function AccessibilityStatementPage() {
             chercherons une alternative accessible, ou vous transmettrons l&apos;information sous
             une autre forme.
           </p>
-          <ContactList email={contactEmail} />
+          <ContactList />
         </div>
       </section>
 

@@ -17,7 +17,7 @@ describe("renvoi de la modération hors site vers le portail de support", () => 
   });
 
   it("ne crée pas de catégorie : rien n'est enregistré pour un comportement en jeu", () => {
-    expect(REPORT_CATEGORIES).toEqual(["COPYRIGHT", "MODERATION", "BUG", "OTHER", "CONTEST"]);
+    expect(REPORT_CATEGORIES).toEqual(["COPYRIGHT", "MODERATION", "BUG", "RGPD", "HOSTING", "OTHER", "CONTEST"]);
   });
 
   it("restreint la catégorie Modération aux contenus du site", () => {

@@ -12,6 +12,7 @@
  * section Hébergement des mentions légales du site (`/mentions-legales#hebergement`).
  */
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 
 
 export type Lang = "fr" | "en";
@@ -58,10 +59,12 @@ export interface BilingualDoc {
 /** Même serveur que le reste du site : voir `lib/shared/discord.ts`. */
 const DISCORD_INVITE = DISCORD_INVITE_URL;
 const DISCORD_TERMS = "https://discord.com/terms";
+const FORM_FR = `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site`;
+const FORM_EN = `The **“${REPORT_FORM_NAME}”** form at the bottom of every page of the site`;
 const DISCORD_GUIDELINES = "https://discord.com/guidelines";
 const PRIVACY_HREF = "/privacy-policy-bot";
-const CONTACT_EMAIL = "keryan.h@outlook.fr";
-const CONTACT_DISCORD = "elessiah";
+// Aucune adresse électronique : le site n'en publie pas (`lib/shared/legal-contact.ts`).
+const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
 /* -------------------------------------------------------------------------- */
 /*  Terms of Service / Conditions d'Utilisation                               */
@@ -201,7 +204,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "bullets",
-            items: [`Discord : **${CONTACT_DISCORD}**`, `Email : **${CONTACT_EMAIL}**`],
+            items: [`Discord : **${CONTACT_DISCORD}**`, FORM_FR],
           },
         ],
       },
@@ -216,7 +219,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "bullets",
-            items: [`**Email** : ${CONTACT_EMAIL}`, `**Discord** : ${CONTACT_DISCORD}`],
+            items: [`**Discord** : ${CONTACT_DISCORD}`, FORM_FR],
           },
         ],
       },
@@ -361,7 +364,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "bullets",
-            items: [`Discord: **${CONTACT_DISCORD}**`, `Email: **${CONTACT_EMAIL}**`],
+            items: [`Discord: **${CONTACT_DISCORD}**`, FORM_EN],
           },
         ],
       },
@@ -376,7 +379,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "bullets",
-            items: [`**Email**: ${CONTACT_EMAIL}`, `**Discord**: ${CONTACT_DISCORD}`],
+            items: [`**Discord**: ${CONTACT_DISCORD}`, FORM_EN],
           },
         ],
       },
@@ -538,7 +541,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           },
           {
             kind: "bullets",
-            items: [`**Email** : ${CONTACT_EMAIL}`, `**Discord** : ${CONTACT_DISCORD}`],
+            items: [`**Discord** : ${CONTACT_DISCORD}`, FORM_FR],
           },
           {
             kind: "p",
@@ -697,7 +700,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           },
           {
             kind: "bullets",
-            items: [`**Email**: ${CONTACT_EMAIL}`, `**Discord**: ${CONTACT_DISCORD}`],
+            items: [`**Discord**: ${CONTACT_DISCORD}`, FORM_EN],
           },
           {
             kind: "p",

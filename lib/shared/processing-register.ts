@@ -17,7 +17,8 @@
  * `REGISTER_UPDATED_AT` avance. Les durées citées viennent des constantes du
  * code chaque fois qu'il y en a une : c'est ce qui les empêche de mentir.
  *
- * Module pur : aucune lecture d'environnement, le contact est passé en argument.
+ * Module pur : aucune lecture d'environnement. Le contact ne comporte aucune
+ * adresse électronique (`lib/shared/legal-contact.ts`).
  */
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
@@ -25,6 +26,7 @@ import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
+import { RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-09-28";
@@ -41,7 +43,8 @@ export interface RegisterController {
   name: string;
   legalForm: string;
   seat: string;
-  contactEmail: string;
+  /** Moyens de joindre le responsable — aucune adresse électronique (`lib/shared/legal-contact.ts`). */
+  contact: string;
   dpo: string;
   /** Hébergeur du site, sous-traitant : il héberge les données de tous les traitements. */
   host: string;
@@ -67,13 +70,13 @@ export interface ProcessingActivity {
   security: string[];
 }
 
-export function registerController(contactEmail: string): RegisterController {
+export function registerController(): RegisterController {
   return {
     name: "BlueGenji",
     legalForm: "Association loi 1901",
     seat: "Janvilliers (France)",
-    contactEmail,
-    dpo: "Aucun délégué à la protection des données désigné (désignation non obligatoire) — contact RGPD à l'adresse ci-dessus",
+    contact: RGPD_CONTACT_LINE,
+    dpo: "Aucun délégué à la protection des données désigné (désignation non obligatoire) — contact RGPD ci-dessus",
     host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}, SIREN ${SITE_HOST.siren}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country}`,
   };
 }
@@ -385,7 +388,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Signalements, contestations et modération des contenus",
     purpose: "Recevoir et traiter les signalements adressés à l'association, dont les notifications de contenu illicite",
     subPurposes: [
-      "Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, autre)",
+      "Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, RGPD, hébergeur, autre)",
       "Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester",
       "Masquer un logo d'équipe signalé, puis le rétablir ou le supprimer définitivement",
       "Alerter les administrateurs sur Discord, sans donnée nominative",
@@ -509,7 +512,7 @@ export function registerToCsv(
   controller: RegisterController,
   activities: readonly ProcessingActivity[] = PROCESSING_ACTIVITIES,
 ): string {
-  const controllerText = `${controller.name} — ${controller.legalForm}, ${controller.seat} — ${controller.contactEmail}`;
+  const controllerText = `${controller.name} — ${controller.legalForm}, ${controller.seat} — ${controller.contact}`;
   const rows = activities.map((a) => [
     a.ref,
     a.name,

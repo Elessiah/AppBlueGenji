@@ -272,6 +272,20 @@ describe("createReport", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
+  it.each(["RGPD", "HOSTING"] as const)(
+    "refuse une demande %s sans compte ni adresse : personne ne pourrait y répondre",
+    async (category) => {
+      install([], []);
+      await expect(
+        createReport(submission({ category, targets: [], contactName: null, contactEmail: null, rightsRelation: null }), {
+          userId: null,
+          managesTournaments: false,
+        }),
+      ).rejects.toThrow("REPORT_REPLY_CHANNEL_REQUIRED");
+      expect(pool.execute).not.toHaveBeenCalled();
+    },
+  );
+
   it("accepte le signalement sans cible d'un visiteur sans compte", async () => {
     install(
       [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],

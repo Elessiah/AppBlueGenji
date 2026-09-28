@@ -37,6 +37,7 @@ import {
   formatReportAlert,
   formatTargetNotice,
   isConcernedByReport,
+  missingReplyChannel,
   nextReportStatus,
   reportAdminHref,
   reportConcernedHref,
@@ -278,12 +279,15 @@ export async function resolveReportTargets(
  * formulaire ne lui propose d'ailleurs aucun sélecteur.
  *
  * @throws REPORT_TARGETS_REQUIRE_LOGIN Des cibles désignées sans compte.
+ * @throws REPORT_REPLY_CHANNEL_REQUIRED Une demande qui appelle une réponse
+ *   (RGPD, hébergeur), envoyée sans compte ni adresse.
  * @throws REPORTS_SATURATED Trop de signalements reçus dans l'heure.
  * @throws REPORT_TARGET_NOT_FOUND Une cible n'existe pas ou n'est pas visible.
  */
 export async function createReport(submission: ReportSubmission, viewer: ReportViewer): Promise<number> {
   if (submission.category === "CONTEST") return createContest(submission, viewer);
   if (viewer.userId === null && submission.targets.length > 0) throw new Error("REPORT_TARGETS_REQUIRE_LOGIN");
+  if (missingReplyChannel(submission, viewer.userId !== null)) throw new Error("REPORT_REPLY_CHANNEL_REQUIRED");
   const db = await getDatabase();
   const connection = await db.getConnection();
   let reportId: number;

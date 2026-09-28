@@ -1103,7 +1103,7 @@ async function runMigrations(db: Pool): Promise<void> {
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_reports (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
-      category ENUM('COPYRIGHT', 'MODERATION', 'BUG', 'OTHER', 'CONTEST') NOT NULL,
+      category ENUM('COPYRIGHT', 'MODERATION', 'BUG', 'RGPD', 'HOSTING', 'OTHER', 'CONTEST') NOT NULL,
       status ENUM('OPEN', 'IN_PROGRESS', 'RESOLVED') NOT NULL DEFAULT 'OPEN',
       parent_report_id BIGINT NULL,
       description TEXT NOT NULL,
@@ -1309,7 +1309,12 @@ async function runMigrations(db: Pool): Promise<void> {
     `ALTER TABLE bg_logo_quarantines ADD INDEX idx_bg_logo_quarantines_user (user_id)`,
     `ALTER TABLE bg_logo_quarantines
        ADD CONSTRAINT fk_bg_logo_quarantines_quarantined_user FOREIGN KEY (user_id)
-         REFERENCES bg_users(id) ON DELETE CASCADE`,
+         REFERENCES bg_users(id) ON DELETE CASCADE`,    // Catégories « RGPD » et « Hébergeur » du formulaire de signalement, qui
+    // remplacent l'adresse électronique de contact que le site ne publie plus
+    // (`lib/shared/legal-contact.ts`). Un `MODIFY` qui ne fait qu'élargir
+    // l'ENUM : rejoué sur une base qui le porte déjà, il ne change rien.
+    `ALTER TABLE bg_reports MODIFY category
+       ENUM('COPYRIGHT', 'MODERATION', 'BUG', 'RGPD', 'HOSTING', 'OTHER', 'CONTEST') NOT NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

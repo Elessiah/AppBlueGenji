@@ -1,15 +1,9 @@
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GET } from "@/app/rgpd/registre.csv/route";
-import { RGPD_CONTACT_EMAIL_FALLBACK } from "@/lib/shared/rgpd-policy";
+import { LEGAL_CONTACT_DISCORD } from "@/lib/shared/legal-contact";
 import { registerExportFilename } from "@/lib/shared/processing-register";
-
-const saved = process.env.RGPD_CONTACT_EMAIL;
-afterEach(() => {
-  if (saved === undefined) delete process.env.RGPD_CONTACT_EMAIL;
-  else process.env.RGPD_CONTACT_EMAIL = saved;
-});
 
 describe("GET /rgpd/registre.csv", () => {
   it("rend un CSV téléchargeable, nommé et daté", async () => {
@@ -24,19 +18,15 @@ describe("GET /rgpd/registre.csv", () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
-  it("porte le contact RGPD configuré sur le serveur", async () => {
-    process.env.RGPD_CONTACT_EMAIL = "contact@exemple.invalid";
-    expect(await GET().text()).toContain("contact@exemple.invalid");
+  it("porte le contact Discord du responsable, et aucune adresse électronique", async () => {
+    const text = await GET().text();
+    expect(text).toContain(LEGAL_CONTACT_DISCORD);
+    expect(text).not.toMatch(/[^\s@;"]+@[^\s@;"]+\.[a-z]{2,}/i);
   });
 
-  it("retombe sur le contact par défaut", async () => {
-    delete process.env.RGPD_CONTACT_EMAIL;
-    expect(await GET().text()).toContain(RGPD_CONTACT_EMAIL_FALLBACK);
-  });
-
-  it("est rendu à la demande, pas figé à la compilation", () => {
+  it("ne lit plus l'environnement : aucune variable ne peut y remettre une adresse", () => {
     const source = readFileSync(join(__dirname, "..", "..", "app", "rgpd", "registre.csv", "route.ts"), "utf8");
-    expect(source).toContain('export const dynamic = "force-dynamic"');
+    expect(source).not.toContain("process.env");
   });
 });
 

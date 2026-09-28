@@ -22,6 +22,7 @@ import {
   RIGHTS_RELATIONS,
   RIGHTS_RELATION_LABELS,
   reportErrorMessage,
+  missingReplyChannel,
   reportTargetFromPath,
   validateReportSubmission,
   REPORT_STATUS_LABELS,
@@ -47,6 +48,12 @@ interface ReportProblemDialogProps {
    * déjà choisis.
    */
   contestOf?: number;
+  /**
+   * Ouvre directement le détail d'une catégorie (bouton « Faire une demande
+   * RGPD » de `/rgpd`). Contrairement à une contestation, on peut encore en
+   * changer.
+   */
+  initialCategory?: Exclude<ReportCategory, "CONTEST">;
   /** Appelé après un envoi réussi (la page d'un signalement relit ses contestations). */
   onSubmitted?: () => void;
 }
@@ -74,11 +81,14 @@ export function ReportProblemDialog({
   authenticated,
   onClose,
   contestOf,
+  initialCategory,
   onSubmitted,
 }: ReportProblemDialogProps) {
   const { showError, showSuccess } = useToast();
   const titleId = useId();
-  const [category, setCategory] = useState<ReportCategory | null>(contestOf ? "CONTEST" : null);
+  const [category, setCategory] = useState<ReportCategory | null>(
+    contestOf ? "CONTEST" : (initialCategory ?? null),
+  );
   const [parentReportId, setParentReportId] = useState<number | null>(contestOf ?? null);
   const [contestable, setContestable] = useState<ContestableReportOption[] | null>(null);
   const [selection, setSelection] = useState<Selection>(EMPTY_SELECTION);
@@ -187,6 +197,10 @@ export function ReportProblemDialog({
     if (busy) return;
     if (!validation.ok) {
       showError(reportErrorMessage(validation.error));
+      return;
+    }
+    if (missingReplyChannel(validation.value, authenticated)) {
+      showError(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED"));
       return;
     }
     setBusy(true);
@@ -378,7 +392,7 @@ export function ReportProblemDialog({
                   placeholder={definition.descriptionPlaceholder}
                   aria-invalid={descriptionTooShort}
                   aria-describedby={`${titleId}-description-hint`}
-                  data-autofocus={contestOf !== undefined ? "" : undefined}
+                  data-autofocus={contestOf !== undefined || initialCategory !== undefined ? "" : undefined}
                 />
                 <p
                   id={`${titleId}-description-hint`}
@@ -444,7 +458,10 @@ export function ReportProblemDialog({
               ) : (
                 <div className="field">
                   <label htmlFor={`${titleId}-email`}>
-                    Adresse pour te répondre <span className={styles.optional}>(facultatif)</span>
+                    Adresse pour te répondre{" "}
+                    <span className={styles.optional}>
+                      {definition.requiresReplyChannel && !authenticated ? "(obligatoire sans compte)" : "(facultatif)"}
+                    </span>
                   </label>
                   <input
                     id={`${titleId}-email`}
@@ -457,7 +474,9 @@ export function ReportProblemDialog({
                   <p className={styles.hint}>
                     {authenticated
                       ? "Sans adresse, l'association te répondra par ton compte (Discord si tu l'as rattaché)."
-                      : "Sans adresse, l'association ne pourra pas te tenir au courant."}
+                      : definition.requiresReplyChannel
+                        ? "Sans compte, c'est la seule façon pour l'association de te répondre."
+                        : "Sans adresse, l'association ne pourra pas te tenir au courant."}
                   </p>
                 </div>
               )}

@@ -5,7 +5,6 @@ import {
   DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
-  RGPD_CONTACT_EMAIL_FALLBACK,
 } from "@/lib/shared/rgpd-policy";
 
 describe("DONNEES_PROFIL", () => {
@@ -176,12 +175,6 @@ describe("DROITS", () => {
       expect(droit.title.trim().length).toBeGreaterThan(0);
       expect(droit.text.trim().length).toBeGreaterThan(0);
     }
-  });
-});
-
-describe("RGPD_CONTACT_EMAIL_FALLBACK", () => {
-  it("is a valid email address", () => {
-    expect(RGPD_CONTACT_EMAIL_FALLBACK).toMatch(/^[^\s@]+@[^\s@]+\.[^\s@]+$/);
   });
 });
 

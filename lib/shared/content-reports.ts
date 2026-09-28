@@ -32,7 +32,7 @@ import { LOGO_QUARANTINE_DAYS, type LogoQuarantineView } from "./logo-quarantine
  * concerne. Elle ne désigne rien, elle se rattache à son signalement d'origine
  * (`parentReportId`) et se range sous lui dans le panneau.
  */
-export type ReportCategory = "COPYRIGHT" | "MODERATION" | "BUG" | "OTHER" | "CONTEST";
+export type ReportCategory = "COPYRIGHT" | "MODERATION" | "BUG" | "RGPD" | "HOSTING" | "OTHER" | "CONTEST";
 
 /** Ce qu'un signalement peut viser. */
 export type ReportTargetType = "USER" | "TEAM" | "TOURNAMENT";
@@ -46,7 +46,15 @@ export type ReportAction = "TAKE" | "RELEASE" | "RESOLVE" | "REOPEN";
 /** Qualité du signalant vis-à-vis d'un droit d'auteur invoqué. */
 export type RightsRelation = "HOLDER" | "AGENT" | "THIRD_PARTY";
 
-export const REPORT_CATEGORIES: readonly ReportCategory[] = ["COPYRIGHT", "MODERATION", "BUG", "OTHER", "CONTEST"];
+export const REPORT_CATEGORIES: readonly ReportCategory[] = [
+  "COPYRIGHT",
+  "MODERATION",
+  "BUG",
+  "RGPD",
+  "HOSTING",
+  "OTHER",
+  "CONTEST",
+];
 
 /** Catégories d'un signalement « d'origine », c'est-à-dire qui n'est pas une contestation. */
 export const PRIMARY_REPORT_CATEGORIES: readonly ReportCategory[] = REPORT_CATEGORIES.filter(
@@ -79,6 +87,12 @@ export interface ReportCategoryDefinition {
   requiresContact: boolean;
   /** Qualité vis-à-vis du droit invoqué, et déclaration de bonne foi. */
   requiresRightsDeclaration: boolean;
+  /**
+   * Une réponse est due : sans compte, une adresse est exigée
+   * (`missingReplyChannel`). Une demande RGPD appelle une réponse sous un mois
+   * (art. 12) ; reçue sans compte ni adresse, personne ne pourrait la donner.
+   */
+  requiresReplyChannel: boolean;
   /** Aide du champ de description. */
   descriptionPlaceholder: string;
 }
@@ -91,6 +105,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: ["USER", "TEAM", "TOURNAMENT"],
     requiresContact: true,
     requiresRightsDeclaration: true,
+    requiresReplyChannel: false,
     descriptionPlaceholder:
       "Quelle œuvre est reproduite, où la voir sur le site, et à qui elle appartient…",
   },
@@ -101,6 +116,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: ["USER", "TEAM"],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder: "Quel contenu du site, sur quelle page, et ce qui ne va pas…",
   },
   BUG: {
@@ -110,7 +126,36 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder: "Ce que tu faisais, ce que tu attendais, ce qui s'est passé…",
+  },
+  // Les deux catégories suivantes reçoivent ce qu'une adresse électronique
+  // publiée recevait (`lib/shared/legal-contact.ts`) : le site n'en publie plus
+  // aucune. Ni l'une ni l'autre ne désigne de cible — une demande sur ses
+  // propres données n'a personne à prévenir, et un contenu illicite d'un joueur
+  // ou d'une équipe se signale par « Droit d'auteur » ou « Modération », qui
+  // savent le masquer et le faire contester.
+  RGPD: {
+    label: "RGPD",
+    hint: "Exercer tes droits sur tes données : accès, rectification, effacement, opposition, portabilité.",
+    // Glyphe texte, comme les autres : un émoji se peindrait en couleur.
+    icon: "⚿",
+    targets: [],
+    requiresContact: false,
+    requiresRightsDeclaration: false,
+    requiresReplyChannel: true,
+    descriptionPlaceholder:
+      "Le droit que tu exerces, le compte concerné (pseudo), et ce que tu demandes précisément…",
+  },
+  HOSTING: {
+    label: "Hébergeur",
+    hint: "Écrire à l'éditeur ou à l'hébergeur du site : mentions légales, demande d'une autorité, question juridique.",
+    icon: "§",
+    targets: [],
+    requiresContact: false,
+    requiresRightsDeclaration: false,
+    requiresReplyChannel: true,
+    descriptionPlaceholder: "Qui tu es (particulier, organisme, autorité), l'objet de ta demande, et la page concernée…",
   },
   OTHER: {
     label: "Autre",
@@ -119,6 +164,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: ["USER", "TEAM", "TOURNAMENT"],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder: "Explique-nous le problème…",
   },
   CONTEST: {
@@ -128,6 +174,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
+    requiresReplyChannel: false,
     descriptionPlaceholder:
       "Pourquoi le signalement est infondé : licence, autorisation du titulaire, création de l'équipe, contexte…",
   },
@@ -375,6 +422,19 @@ export function validateReportSubmission(input: unknown): ReportValidation {
 }
 
 /**
+ * Envoi sans compte d'une catégorie qui appelle une réponse
+ * (`requiresReplyChannel`), sans adresse pour la donner. La validation ne
+ * connaît pas la session : la route (`createReport`) et le formulaire posent
+ * cette question à part.
+ */
+export function missingReplyChannel(
+  submission: Pick<ReportSubmission, "category" | "contactEmail">,
+  authenticated: boolean,
+): boolean {
+  return REPORT_CATEGORY_DEFINITIONS[submission.category].requiresReplyChannel && !authenticated && !submission.contactEmail;
+}
+
+/**
  * Statut atteint par un geste, ou `null` s'il n'a pas de sens depuis l'état
  * courant (on ne prend pas en charge un signalement archivé, on ne rouvre pas
  * un signalement ouvert).
@@ -590,7 +650,7 @@ export const REPORT_PRIVACY_NOTICE = {
   legalBasis:
     "Base légale : ton consentement, et pour un contenu illicite l'obligation faite à l'hébergeur de traiter les notifications (règlement européen sur les services numériques, art. 16).",
   rights:
-    "Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, en écrivant à l'association (voir la politique de confidentialité).",
+    "Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, par ce formulaire (catégorie « RGPD ») ou sur Discord (voir la politique de confidentialité).",
 } as const;
 
 /** Phrase française d'un refus de la route, jamais le jeton lui-même. */
@@ -611,6 +671,8 @@ export function reportErrorMessage(code: string | null | undefined): string {
       return `Tu peux désigner ${REPORT_MAX_TARGETS} éléments au plus.`;
     case "REPORT_CONTACT_REQUIRED":
       return "Indique ton nom et une adresse électronique : un signalement de droit d'auteur doit pouvoir être suivi.";
+    case "REPORT_REPLY_CHANNEL_REQUIRED":
+      return "Indique une adresse pour qu'on puisse te répondre, ou connecte-toi.";
     case "REPORT_CONTACT_TOO_LONG":
       return "Le nom indiqué est trop long.";
     case "REPORT_INVALID_EMAIL":

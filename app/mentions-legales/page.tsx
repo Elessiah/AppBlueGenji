@@ -6,6 +6,7 @@ import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { SITE_HOST } from "@/lib/shared/site-host";
+import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 
@@ -193,6 +194,10 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           <br />
           SIREN : {SITE_HOST.siren}
         </p>
+        <p>
+          Pour écrire à l&apos;hébergeur ou à l&apos;éditeur : bouton <strong>« {REPORT_FORM_NAME} »</strong>{" "}
+          en bas de chaque page, catégorie « Hébergeur ».
+        </p>
       </>
     ),
   },
@@ -265,8 +270,8 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           Conformément au Règlement Général sur la Protection des Données (RGPD — Règlement UE
           2016/679), vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement
           et de portabilité des données vous concernant, ainsi que d&apos;un droit d&apos;opposition
-          au traitement. Ces droits peuvent être exercés en contactant l&apos;association via son
-          serveur Discord. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
+          au traitement. Ces droits peuvent être exercés par le bouton « {REPORT_FORM_NAME} » en bas de
+          chaque page, catégorie « RGPD », ou sur Discord auprès de <strong>{LEGAL_CONTACT_DISCORD}</strong>. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
           <Link href="/rgpd">politique de confidentialité</Link>.
         </p>
       </>

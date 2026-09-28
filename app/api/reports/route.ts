@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     return ok({ id }, 201);
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "REPORT_TARGET_NOT_FOUND") return fail(message, 400);
+    if (message === "REPORT_TARGET_NOT_FOUND" || message === "REPORT_REPLY_CHANNEL_REQUIRED") return fail(message, 400);
     if (message === "REPORT_CONTEST_LOGIN_REQUIRED" || message === "REPORT_TARGETS_REQUIRE_LOGIN") {
       return fail(message, 401);
     }
