@@ -39,12 +39,19 @@ export function endpointHash(endpoint: string): string {
  */
 export async function saveSubscription(userId: number, subscription: PushSubscriptionInput): Promise<void> {
   const db = await getDatabase();
+  // Les dates ne repartent que si l'appareil **change de compte** : le panneau
+  // renvoie l'abonnement à chaque ouverture, et la date d'abonnement
+  // deviendrait sinon celle de la dernière visite. Elles sont écrites **avant**
+  // `user_id` : les affectations se lisent de gauche à droite, placées après
+  // elles compareraient la valeur neuve à elle-même.
   await db.execute(
     `INSERT INTO bg_push_subscriptions (user_id, endpoint_hash, endpoint, p256dh, auth)
      VALUES (?, ?, ?, ?, ?)
-     ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), endpoint = VALUES(endpoint),
-       p256dh = VALUES(p256dh), auth = VALUES(auth), created_at = CURRENT_TIMESTAMP,
-       last_success_at = NULL`,
+     ON DUPLICATE KEY UPDATE
+       created_at = IF(user_id = VALUES(user_id), created_at, CURRENT_TIMESTAMP),
+       last_success_at = IF(user_id = VALUES(user_id), last_success_at, NULL),
+       user_id = VALUES(user_id), endpoint = VALUES(endpoint),
+       p256dh = VALUES(p256dh), auth = VALUES(auth)`,
     [userId, endpointHash(subscription.endpoint), subscription.endpoint, subscription.p256dh, subscription.auth],
   );
 }

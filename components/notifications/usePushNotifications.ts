@@ -14,7 +14,8 @@
  * s'y connecter, et ce qui répare un abonnement que le serveur aurait oublié
  * (purgé, base restaurée). L'écriture est un « upsert », sans effet sinon.
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { createLatestValueWriter } from "@/lib/shared/latest-value-writer";
 import {
   PUSH_SERVICE_WORKER_PATH,
   decodeBase64Url,
@@ -37,6 +38,13 @@ export type PushNotificationsState = {
   server: ServerState | null;
   /** Ce navigateur est-il abonné (et rattaché à ce compte) ? */
   subscribed: boolean;
+  /**
+   * L'abonnement du navigateur a-t-il été relu ? Tant que non, `subscribed`
+   * vaut `false` par défaut et ne dit rien : un écran qui propose d'activer
+   * attend ce drapeau, sans quoi il proposerait un instant d'activer ce qui
+   * l'est déjà.
+   */
+  checked: boolean;
   busy: boolean;
   /** `true` si l'appareil est désormais abonné. */
   enable: () => Promise<boolean>;
@@ -85,17 +93,51 @@ async function postSubscription(subscription: PushSubscription): Promise<void> {
  * @param onError reçoit le **code** d'un refus ; l'appelant le traduit
  *   (`pushErrorMessage`) et l'affiche en notification — jamais dans la page.
  */
-export function usePushNotifications(onError: (code: string) => void): PushNotificationsState {
+export function usePushNotifications(
+  onError: (code: string) => void,
+  options: {
+    /**
+     * Renvoyer au serveur l'abonnement déjà présent dans le navigateur (défaut).
+     * La forme compacte s'en passe : elle ne fait que proposer, et une écriture
+     * à chaque ouverture de la modale de lancement coûterait sans rien apporter.
+     */
+    syncExisting?: boolean;
+  } = {},
+): PushNotificationsState {
+  const syncExisting = options.syncExisting ?? true;
   const [support, setSupport] = useState<PushSupport | null>(null);
   const [server, setServer] = useState<ServerState | null>(null);
   const [subscribed, setSubscribed] = useState(false);
+  const [checked, setChecked] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Sujets coupés : la liste **voulue** (dernier geste, tant qu'elle n'est pas
+  // écrite) et la dernière **confirmée** par le serveur. Deux cases cochées coup
+  // sur coup envoient deux listes entières : elles partent en série
+  // (`createLatestValueWriter`), sans quoi la plus ancienne pouvait être écrite
+  // en dernier et contredire l'écran.
+  const desiredTopics = useRef<PushTopic[] | null>(null);
+  const confirmedTopics = useRef<PushTopic[] | null>(null);
+  const topicWriter = useRef(
+    createLatestValueWriter<PushTopic[]>(async (wanted) => {
+      const response = await fetch("/api/push/topics", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ disabledTopics: wanted }),
+      });
+      if (!response.ok) throw new PushError(await readError(response));
+      confirmedTopics.current = wanted;
+      if (desiredTopics.current === wanted) desiredTopics.current = null;
+    }),
+  );
 
   const loadServer = useCallback(async (): Promise<ServerState | null> => {
     const response = await fetch("/api/push", { credentials: "same-origin", cache: "no-store" });
     if (!response.ok) return null;
     const state = (await response.json()) as ServerState;
-    setServer(state);
+    confirmedTopics.current = state.disabledTopics;
+    // Une écriture de sujets en cours garde la main sur l'affichage.
+    setServer(desiredTopics.current ? { ...state, disabledTopics: desiredTopics.current } : state);
     return state;
   }, []);
 
@@ -105,23 +147,26 @@ export function usePushNotifications(onError: (code: string) => void): PushNotif
     setSupport(detected);
     void (async () => {
       const state = await loadServer().catch(() => null);
-      if (cancelled || detected !== "AVAILABLE" || !state?.publicKey) return;
       try {
+        if (cancelled || detected !== "AVAILABLE" || !state?.publicKey) return;
         const subscription = await currentSubscription();
         if (!subscription || cancelled) return;
-        await postSubscription(subscription);
-        if (!cancelled) {
-          setSubscribed(true);
+        if (syncExisting) {
+          await postSubscription(subscription);
+          if (cancelled) return;
           await loadServer();
         }
+        if (!cancelled) setSubscribed(true);
       } catch {
         // Silencieux : le panneau propose simplement d'activer.
+      } finally {
+        if (!cancelled) setChecked(true);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [loadServer]);
+  }, [loadServer, syncExisting]);
 
   const enable = useCallback(async () => {
     if (!server?.publicKey) {
@@ -192,25 +237,26 @@ export function usePushNotifications(onError: (code: string) => void): PushNotif
   const setTopicEnabled = useCallback(
     async (topic: PushTopic, enabled: boolean) => {
       if (!server) return;
-      const previous = server.disabledTopics;
-      const next = enabled ? previous.filter((t) => t !== topic) : [...previous.filter((t) => t !== topic), topic];
+      const current = desiredTopics.current ?? server.disabledTopics;
+      const next = enabled ? current.filter((t) => t !== topic) : [...current.filter((t) => t !== topic), topic];
+      desiredTopics.current = next;
       // Le geste se voit tout de suite ; le serveur le confirme ou le défait.
-      setServer({ ...server, disabledTopics: next });
+      setServer((state) => (state ? { ...state, disabledTopics: next } : state));
+
       try {
-        const response = await fetch("/api/push/topics", {
-          method: "PUT",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ disabledTopics: next }),
-        });
-        if (!response.ok) throw new PushError(await readError(response));
+        await topicWriter.current.submit(next);
       } catch (error) {
-        setServer((current) => (current ? { ...current, disabledTopics: previous } : current));
+        // Échec : l'écran revient à ce que le serveur a confirmé, et le geste
+        // perdu est dit. Un geste plus récent encore en file garde la main.
+        if (desiredTopics.current !== next) return;
+        desiredTopics.current = null;
+        const confirmed = confirmedTopics.current ?? [];
+        setServer((state) => (state ? { ...state, disabledTopics: confirmed } : state));
         onError(error instanceof PushError ? error.message : "PUSH_FAILED");
       }
     },
     [onError, server],
   );
 
-  return { support, server, subscribed, busy, enable, disable, setTopicEnabled };
+  return { support, server, subscribed, checked, busy, enable, disable, setTopicEnabled };
 }

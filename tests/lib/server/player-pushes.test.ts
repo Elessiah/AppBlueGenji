@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/notify");
@@ -6,7 +6,7 @@ jest.mock("@/lib/server/push-subscriptions");
 jest.mock("@/lib/server/web-push", () => ({ webPushConfig: jest.fn() }));
 
 import { getDatabase } from "@/lib/server/database";
-import { loadEntrantPlayerIds, loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
+import { loadEntrantPlayerIds, notifyUsers } from "@/lib/server/notify";
 import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { webPushConfig, type WebPushConfig } from "@/lib/server/web-push";
 import {
@@ -23,6 +23,7 @@ const LOBBY_MATCH = {
   id: 40,
   tournament_id: 4,
   tournament_name: "Coupe",
+  participant_type: "TEAM",
   team1_id: 1,
   team2_id: 2,
   team1_name: "Renards",
@@ -60,14 +61,14 @@ beforeEach(() => {
       [2, [20]],
     ]),
   );
-  jest.mocked(loadNotificationRecipients).mockImplementation(async (ids) =>
-    ids.map((userId) => ({ userId, discord: { discordId: String(userId), handle: null, label: "x" } })),
-  );
   jest.mocked(notifyUsers).mockImplementation(async (recipients) => ({
     discord: { sent: 0, unresolved: [], failed: [] },
     pushed: recipients.length,
   }));
 });
+
+// La relève d'un balayage étranglé pose un minuteur : il ne survit pas au test.
+afterEach(() => resetMatchStartNoticeThrottle());
 
 function pushes() {
   return jest.mocked(notifyUsers).mock.calls.map(([recipients, notification]) => ({
@@ -139,12 +140,40 @@ describe("dispatchMatchStartNotices", () => {
     expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20], [99]]);
   });
 
+  it("ne nomme aucun joueur en tournoi individuel", async () => {
+    mockDb([{ ...LOBBY_MATCH, participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" }]);
+    await dispatchMatchStartNotices();
+    for (const push of pushes()) {
+      expect(push.notification.push.body).not.toMatch(/Kiro|Nova/);
+    }
+  });
+
+  it("rejoue un balayage étranglé une fois le délai écoulé, au lieu de le perdre", async () => {
+    jest.useFakeTimers();
+    try {
+      const { query } = mockDb([]);
+      await dispatchMatchStartNotices();
+      expect(query).toHaveBeenCalledTimes(1);
+
+      // Un lancement s'ouvre juste après : l'appel est étranglé…
+      expect(await dispatchMatchStartNotices()).toBe(0);
+      expect(query).toHaveBeenCalledTimes(1);
+
+      // … mais la relève repasse d'elle-même, une seule fois.
+      await dispatchMatchStartNotices();
+      await jest.advanceTimersByTimeAsync(10_000);
+      expect(query).toHaveBeenCalledTimes(2);
+    } finally {
+      resetMatchStartNoticeThrottle();
+      jest.useRealTimers();
+    }
+  });
+
   it("s'étrangle, et ne lève jamais", async () => {
     mockDb([]);
     await dispatchMatchStartNotices();
     expect(await dispatchMatchStartNotices()).toBe(0);
     expect(jest.mocked(getDatabase)).toHaveBeenCalledTimes(1);
-
     resetMatchStartNoticeThrottle();
     const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getDatabase).mockRejectedValue(new Error("panne"));
@@ -166,6 +195,7 @@ describe("notifyScoreToConfirm", () => {
         {
           tournament_id: 4,
           tournament_name: "Coupe",
+          participant_type: "TEAM",
           status: "AWAITING_CONFIRMATION",
           team1_id: 1,
           team2_id: 2,
@@ -191,6 +221,13 @@ describe("notifyScoreToConfirm", () => {
     expect(push.notification.topic).toBe("SCORE_TO_CONFIRM");
     expect(push.notification.push.body).toContain("Renards a saisi");
     expect(push.notification.push.url).toBe("/tournois/4#match-40");
+  });
+
+  it("ne nomme pas l'adversaire en tournoi individuel", async () => {
+    reported({ participant_type: "SOLO", team1_name: "Kiro", team2_name: "Nova" });
+    jest.mocked(loadEntrantPlayerIds).mockResolvedValue(new Map([[2, [20]]]));
+    await notifyScoreToConfirm(40);
+    expect(pushes()[0].notification.push.body).toContain("Ton adversaire a saisi");
   });
 
   it.each([

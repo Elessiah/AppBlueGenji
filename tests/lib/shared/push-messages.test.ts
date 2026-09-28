@@ -57,6 +57,25 @@ describe("matchReminderPush", () => {
   });
 });
 
+describe("tournoi individuel", () => {
+  const solo = { ...SIDE, teamName: "Kiro", opponentName: "Nova", solo: true };
+
+  it("ne nomme aucun joueur : un engagé y est un pseudo", () => {
+    for (const content of [
+      matchStartPush(solo, "LOBBY"),
+      matchStartPush(solo, "LAUNCHED"),
+      scoreToConfirmPush(solo),
+      matchReminderPush({ ...solo, roundLabel: "Tour 1", startAt: "2026-09-10T18:00:00Z" }, "1 heure"),
+    ]) {
+      expect(content.body).not.toContain("Kiro");
+      expect(content.body).not.toContain("Nova");
+      expect(content.title).not.toContain("Nova");
+    }
+    expect(scoreToConfirmPush(solo).body).toContain("Ton adversaire a saisi");
+    expect(matchStartPush(solo, "LOBBY").body).toContain("Ton match · Coupe BlueGenji");
+  });
+});
+
 describe("rédacteurs", () => {
   it("score à confirmer : nomme l'adversaire qui a saisi", () => {
     const content = scoreToConfirmPush(SIDE);
@@ -102,10 +121,16 @@ describe("rédacteurs", () => {
   });
 
   it("arbitrage : reprend la ligne sans Markdown, et mène à son lien", () => {
-    const content = refereeAlertPush("⚠️ **Conflit de score** — Coupe · https://site.test/tournois/4");
+    const content = refereeAlertPush("⚠️ **Conflit de score** — Coupe · https://site.test/tournois/4", "score_conflict-40");
     expect(content.body).toBe("⚠️ Conflit de score — Coupe ·");
     expect(content.url).toBe("https://site.test/tournois/4");
-    expect(refereeAlertPush("sans lien").url).toBe("/tournois");
+    expect(refereeAlertPush("sans lien", "k").url).toBe("/tournois");
+  });
+
+  it("arbitrage : une étiquette par alerte, pour que deux conflits d'un même tournoi ne se remplacent pas", () => {
+    const line = "⚠️ **Conflit de score** — Coupe BlueGenji · https://site.test/tournois/4";
+    expect(refereeAlertPush(line, "score_conflict-40").tag).not.toBe(refereeAlertPush(line, "score_conflict-41").tag);
+    expect(refereeAlertPush(line, "score_conflict-40").tag).toBe(refereeAlertPush(line, "score_conflict-40").tag);
   });
 
   it("modération reçue : distingue signalement et contestation", () => {

@@ -342,7 +342,7 @@ export function flushBotLogs(connection: PoolConnection): void {
         const report = await notifyStaff({
           topic: "REFEREE_ALERT",
           discord: () => pushRefereeAlert(message, "referee-alert", { honourCircuit: true }),
-          push: refereeAlertPush(message),
+          push: refereeAlertPush(message, `${entry.kind}-${refereeAlertMatchId(entry)}`),
         });
         sent = report.discord !== null;
       } catch {

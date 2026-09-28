@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
+jest.mock("@/lib/server/push-subscriptions");
+jest.mock("@/lib/server/web-push", () => ({ webPushConfig: jest.fn(() => null) }));
 
 import { getDatabase } from "@/lib/server/database";
 import { isBotCircuitOpen, pushDiscordDirectMessages } from "@/lib/server/bot-integration";
@@ -17,6 +19,8 @@ import {
 } from "@/lib/shared/privacy-changes";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { fakePool } from "../../helpers/sql-double";
+import { pushToUsers } from "@/lib/server/push-subscriptions";
+import { webPushConfig, type WebPushConfig } from "@/lib/server/web-push";
 
 const DAY_MS = 86_400_000;
 const at = (iso: string, plusDays = 0) => new Date(Date.parse(`${iso}T12:00:00Z`) + plusDays * DAY_MS);
@@ -69,6 +73,7 @@ describe("dispatchPrivacyChangeNotifications", () => {
     jest.clearAllMocks();
     resetPrivacyNotificationThrottle();
     jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+    jest.mocked(pushToUsers).mockResolvedValue(0);
     jest.mocked(pushDiscordDirectMessages).mockResolvedValue({
       sent: 1,
       unresolved: [],
@@ -266,5 +271,71 @@ describe("dispatchPrivacyChangeNotifications", () => {
     const count = calls.length;
     expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
     expect(calls).toHaveLength(count);
+  });
+});
+
+describe("dispatchPrivacyChangeNotifications — notifications push", () => {
+  const CONFIG = { publicKey: "pk", privateKey: {} as WebPushConfig["privateKey"], subject: "mailto:a@b.test" };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetPrivacyNotificationThrottle();
+    jest.mocked(isBotCircuitOpen).mockReturnValue(false);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue({ sent: 1, unresolved: [], failed: [] });
+    jest.mocked(pushToUsers).mockResolvedValue(1);
+  });
+  afterEach(() => {
+    resetPrivacyNotificationThrottle();
+    jest.mocked(webPushConfig).mockReturnValue(null);
+  });
+
+  it("ne retient un compte sans Discord que si le push est allumé", async () => {
+    jest.mocked(webPushConfig).mockReturnValue(null);
+    const off = fakeDb({ candidates: [] });
+    await dispatchPrivacyChangeNotifications(NOW);
+    expect(off.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!.sql).not.toContain("bg_push_subscriptions");
+
+    resetPrivacyNotificationThrottle();
+    jest.mocked(webPushConfig).mockReturnValue(CONFIG);
+    const on = fakeDb({ candidates: [] });
+    await dispatchPrivacyChangeNotifications(NOW);
+    expect(on.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!.sql).toContain(
+      "OR EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)",
+    );
+  });
+
+  it("retombe sur Discord seul si la table des abonnements manque", async () => {
+    jest.mocked(webPushConfig).mockReturnValue(CONFIG);
+    const calls: string[] = [];
+    const handler = async (sql: string) => {
+      const q = flat(sql);
+      calls.push(q);
+      if (q.startsWith("SELECT u.id, u.pseudo")) {
+        if (q.includes("bg_push_subscriptions")) throw Object.assign(new Error("absente"), { code: "ER_NO_SUCH_TABLE" });
+        return [[candidate()]];
+      }
+      if (q.startsWith("SELECT user_id, change_id")) return [[]];
+      return [{ affectedRows: 1 }];
+    };
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn(handler), query: jest.fn(handler) }));
+
+    expect(await dispatchPrivacyChangeNotifications(NOW)).toBeGreaterThan(0);
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
+  it("prévient en push un compte sans Discord, et ne rend au balayage que ceux que le bot devait joindre", async () => {
+    jest.mocked(webPushConfig).mockReturnValue(CONFIG);
+    jest.mocked(pushDiscordDirectMessages).mockResolvedValue(null);
+    const calls = fakeDb({
+      candidates: [candidate({ id: 1 }), candidate({ id: 2, discord_id: null, pseudo: "Kiro" })],
+    });
+
+    await dispatchPrivacyChangeNotifications(NOW);
+
+    expect(jest.mocked(pushToUsers).mock.calls[0][0]).toEqual([1, 2]);
+    expect(jest.mocked(pushToUsers).mock.calls[0][1]).toBe("PRIVACY_CHANGE");
+    const release = calls.find((c) => c.sql.startsWith("DELETE FROM bg_privacy_change_notifications"))!;
+    expect(release.params[0]).toBe(1);
+    expect(release.params).not.toContain(2);
   });
 });

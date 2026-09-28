@@ -118,7 +118,12 @@ describe("abonnements", () => {
     await saveSubscription(7, SUB);
 
     const [sql, params] = execute.mock.calls[0];
-    expect(sql).toMatch(/ON DUPLICATE KEY UPDATE user_id = VALUES\(user_id\)/);
+    expect(sql).toMatch(/user_id = VALUES\(user_id\)/);
+    // Les dates ne repartent qu'au changement de compte, et sont comparées
+    // **avant** la réécriture de `user_id` (affectations de gauche à droite).
+    expect(sql.indexOf("created_at = IF(user_id = VALUES(user_id), created_at, CURRENT_TIMESTAMP)")).toBeGreaterThan(-1);
+    expect(sql.indexOf("last_success_at = IF(user_id = VALUES(user_id), last_success_at, NULL)")).toBeGreaterThan(-1);
+    expect(sql.indexOf("last_success_at = IF(")).toBeLessThan(sql.indexOf("user_id = VALUES(user_id), endpoint"));
     expect(params).toEqual([7, endpointHash(SUB.endpoint), SUB.endpoint, "k", "s"]);
     expect(endpointHash(SUB.endpoint)).toMatch(/^[0-9a-f]{64}$/);
   });

@@ -22,11 +22,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
-import {
-  loadEntrantPlayerIds,
-  loadNotificationRecipients,
-  notifyUsers,
-} from "@/lib/server/notify";
+import { loadEntrantPlayerIds, notifyUsers } from "@/lib/server/notify";
 import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { webPushConfig } from "@/lib/server/web-push";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
@@ -37,15 +33,12 @@ import {
 } from "@/lib/shared/push-messages";
 import type { PushContent } from "@/lib/shared/push-notifications";
 
-/** Comptes à prévenir, sans canal Discord : ces notifications n'en ont pas. */
-async function pushOnlyRecipients(userIds: readonly number[]) {
-  const recipients = await loadNotificationRecipients(userIds, "proven");
-  return recipients.map((recipient) => ({ userId: recipient.userId, discord: null }));
-}
-
 async function pushTo(userIds: readonly number[], topic: "MATCH_START" | "SCORE_TO_CONFIRM" | "TOURNAMENT_START", push: PushContent, urgent: boolean) {
   if (userIds.length === 0) return 0;
-  const { pushed } = await notifyUsers(await pushOnlyRecipients(userIds), {
+  // Sans canal Discord : ces notifications n'en ont pas. Les comptes supprimés
+  // sont écartés par la distribution elle-même (`pushToUsers`).
+  const recipients = userIds.map((userId) => ({ userId, discord: null }));
+  const { pushed } = await notifyUsers(recipients, {
     topic,
     push,
     pushOptions: urgent
@@ -63,6 +56,7 @@ type StartingMatchRow = RowDataPacket & {
   id: number;
   tournament_id: number;
   tournament_name: string;
+  participant_type: string;
   team1_id: number;
   team2_id: number;
   team1_name: string;
@@ -126,7 +120,7 @@ async function runMatchStartSweep(): Promise<number> {
   // L'appariement courant seulement : un état de lancement posé pour une paire
   // que le moteur a depuis remplacée ne compte pas (`currentLaunchState`).
   const [rows] = await db.query<StartingMatchRow[]>(
-    `SELECT m.id, m.tournament_id, t.name AS tournament_name,
+    `SELECT m.id, m.tournament_id, t.name AS tournament_name, t.participant_type,
             m.team1_id, m.team2_id, t1.name AS team1_name, t2.name AS team2_name,
             m.caster_user_id, m.launch_pairing, m.launched_at
        FROM bg_matches m
@@ -164,6 +158,7 @@ async function runMatchStartSweep(): Promise<number> {
       tournamentId: Number(row.tournament_id),
       tournamentName: String(row.tournament_name),
       matchId: Number(row.id),
+      solo: row.participant_type === "SOLO",
     };
     const sides = [
       { teamId: Number(row.team1_id), teamName: String(row.team1_name), opponentName: String(row.team2_name) },
@@ -203,6 +198,24 @@ const PURGE_INTERVAL_MS = 60 * 60_000;
 let lastSweepAt = 0;
 let lastPurgeAt = 0;
 let pendingSweep: Promise<number> | null = null;
+let trailingTimer: ReturnType<typeof setTimeout> | null = null;
+
+/**
+ * Rejoue le balayage une fois l'étranglement écoulé. Un appel étranglé — ou
+ * arrivé pendant un balayage déjà parti, dont la lecture a pu précéder le
+ * lancement qu'on vient d'ouvrir — ne doit pas être **perdu** : sans cette
+ * relève, l'annonce attendrait la prochaine écriture ou la prochaine lecture
+ * de la liste, qui peuvent ne venir qu'après le lancement d'office. Un seul
+ * minuteur à la fois, détaché du processus (`unref`).
+ */
+function scheduleTrailingSweep(delayMs: number): void {
+  if (trailingTimer) return;
+  trailingTimer = setTimeout(() => {
+    trailingTimer = null;
+    void dispatchMatchStartNotices();
+  }, Math.max(0, delayMs));
+  trailingTimer.unref?.();
+}
 
 /**
  * Annonce les départs de match dus. Jamais bloquant, jamais une exception :
@@ -212,8 +225,15 @@ export async function dispatchMatchStartNotices(): Promise<number> {
   // Push éteint (clés absentes) : rien à annoncer, et surtout rien à
   // **réserver** — une annonce réservée sans canal serait perdue pour de bon.
   if (!webPushConfig()) return 0;
-  if (pendingSweep) return pendingSweep;
-  if (Date.now() - lastSweepAt < MATCH_START_SWEEP_THROTTLE_MS) return 0;
+  if (pendingSweep) {
+    scheduleTrailingSweep(MATCH_START_SWEEP_THROTTLE_MS);
+    return pendingSweep;
+  }
+  const sinceLast = Date.now() - lastSweepAt;
+  if (sinceLast < MATCH_START_SWEEP_THROTTLE_MS) {
+    scheduleTrailingSweep(MATCH_START_SWEEP_THROTTLE_MS - sinceLast);
+    return 0;
+  }
   pendingSweep = (async () => {
     try {
       if (Date.now() - lastPurgeAt >= PURGE_INTERVAL_MS) {
@@ -239,6 +259,8 @@ export function resetMatchStartNoticeThrottle(): void {
   lastSweepAt = 0;
   lastPurgeAt = 0;
   pendingSweep = null;
+  if (trailingTimer) clearTimeout(trailingTimer);
+  trailingTimer = null;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -248,6 +270,7 @@ export function resetMatchStartNoticeThrottle(): void {
 type ReportedMatchRow = RowDataPacket & {
   tournament_id: number;
   tournament_name: string;
+  participant_type: string;
   status: string;
   team1_id: number | null;
   team2_id: number | null;
@@ -268,7 +291,7 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
   try {
     const db = await getDatabase();
     const [rows] = await db.execute<ReportedMatchRow[]>(
-      `SELECT m.tournament_id, t.name AS tournament_name, m.status, m.team1_id, m.team2_id,
+      `SELECT m.tournament_id, t.name AS tournament_name, t.participant_type, m.status, m.team1_id, m.team2_id,
               t1.name AS team1_name, t2.name AS team2_name, m.team1_reported_at, m.team2_reported_at
          FROM bg_matches m
          JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -296,6 +319,7 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
         matchId,
         teamName: String(team1Reported ? row.team2_name : row.team1_name),
         opponentName: String(team1Reported ? row.team1_name : row.team2_name),
+        solo: row.participant_type === "SOLO",
       }),
       false,
     );

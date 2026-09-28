@@ -52,6 +52,7 @@ type ScheduledMatchRow = RowDataPacket & {
   id: number;
   tournament_id: number;
   tournament_name: string;
+  participant_type: string;
   bracket: string;
   round_number: number;
   start_at: string | Date;
@@ -228,7 +229,7 @@ async function runSweep(now: Date): Promise<number> {
   const [matches] = await db.query<ScheduledMatchRow[]>(
     `SELECT m.id, m.tournament_id, m.bracket, m.round_number, m.start_at,
             m.team1_id, m.team2_id,
-            t.name AS tournament_name,
+            t.name AS tournament_name, t.participant_type,
             t1.name AS team1_name, t2.name AS team2_name
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -310,6 +311,7 @@ async function runSweep(now: Date): Promise<number> {
             opponentName: side.opponentName,
             roundLabel,
             startAt: match.start_at,
+            solo: match.participant_type === "SOLO",
           },
           offset ? offset.label : null,
         ),

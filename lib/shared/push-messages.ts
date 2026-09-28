@@ -24,7 +24,18 @@ type MatchSide = {
   matchId: number;
   teamName: string;
   opponentName: string;
+  /**
+   * Tournoi individuel : le nom d'un engagé y **est** le pseudo d'un joueur.
+   * La notification dit alors « ton match », sans nommer personne — elle
+   * s'affiche sur un écran verrouillé, et la règle ne connaît pas d'exception.
+   */
+  solo?: boolean;
 };
+
+/** « Renards contre Nova », ou « Ton match » quand les engagés sont des joueurs. */
+function pairing(side: MatchSide): string {
+  return side.solo ? "Ton match" : `${side.teamName} contre ${side.opponentName}`;
+}
 
 /** Étiquette d'un match : les notifications d'un même match se remplacent. */
 function matchTag(matchId: number): string {
@@ -41,7 +52,7 @@ export function matchStartPush(side: MatchSide, phase: "LOBBY" | "LAUNCHED"): Pu
   return {
     title: phase === "LOBBY" ? "Ton match commence" : "Ton match est lancé",
     body:
-      `${side.teamName} contre ${side.opponentName} · ${side.tournamentName}. ` +
+      `${pairing(side)} · ${side.tournamentName}. ` +
       (phase === "LOBBY" ? "Déclare-toi prêt." : "Bonne partie !"),
     url: tournamentMatchHref(side.tournamentId, side.matchId),
     tag: matchTag(side.matchId),
@@ -55,7 +66,7 @@ export function matchReminderPush(
 ): PushContent {
   return {
     title: offsetLabel ? `Match dans ${offsetLabel}` : "Match programmé",
-    body: `${side.teamName} contre ${side.opponentName} · ${side.tournamentName}, ${side.roundLabel}. Coup d'envoi ${formatMatchStart(side.startAt)} (heure de Paris).`,
+    body: `${pairing(side)} · ${side.tournamentName}, ${side.roundLabel}. Coup d'envoi ${formatMatchStart(side.startAt)} (heure de Paris).`,
     url: tournamentMatchHref(side.tournamentId, side.matchId),
     tag: `${matchTag(side.matchId)}-reminder`,
   };
@@ -65,7 +76,7 @@ export function matchReminderPush(
 export function scoreToConfirmPush(side: MatchSide): PushContent {
   return {
     title: "Score à confirmer",
-    body: `${side.opponentName} a saisi le score de votre match (${side.tournamentName}). Confirme-le, ou conteste-le.`,
+    body: `${side.solo ? "Ton adversaire" : side.opponentName} a saisi le score de votre match (${side.tournamentName}). Confirme-le, ou conteste-le.`,
     url: tournamentMatchHref(side.tournamentId, side.matchId),
     tag: `${matchTag(side.matchId)}-score`,
   };
@@ -148,7 +159,7 @@ export function privacyChangePush(titles: readonly string[]): PushContent {
  * push en reprend la phrase, sans la mise en forme Markdown qu'une
  * notification afficherait telle quelle.
  */
-export function refereeAlertPush(message: string): PushContent {
+export function refereeAlertPush(message: string, key: string): PushContent {
   // Le lien du tournoi est dans la ligne (URL absolue) : c'est là qu'on
   // arbitre. `buildPushPayload` le ramène à un chemin du site.
   const url = message.match(/https?:\/\/\S+/)?.[0] ?? "/tournois";
@@ -156,7 +167,10 @@ export function refereeAlertPush(message: string): PushContent {
     title: "Arbitrage requis",
     body: stripMarkdown(message),
     url,
-    tag: `referee-${stripMarkdown(message).slice(0, 40)}`,
+    // Une étiquette **par alerte** (nature et manche) : deux conflits d'un même
+    // tournoi ne se remplacent pas, et une même alerte renvoyée après un échec
+    // du bot remplace la précédente sans resonner.
+    tag: `referee-${key}`,
   };
 }
 

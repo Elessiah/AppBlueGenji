@@ -142,7 +142,7 @@ export async function reportTournamentIssue(
     match,
     message,
   });
-  const { discord: alert } = await notifyStaff({
+  const { discord: alert, pushed } = await notifyStaff({
     topic: "REFEREE_ALERT",
     discord: () => pushRefereeAlert(alertMessage, "issue-report"),
     // Le texte du joueur reste sur Discord : une notification s'affiche sur un
@@ -157,8 +157,10 @@ export async function reportTournamentIssue(
 
   // Le bot injoignable est remonté, pas avalé : répondre « signalement envoyé »
   // quand rien n'est parti laisserait le joueur attendre un arbitre qui n'a
-  // rien reçu. Il reste alors le canal Discord habituel.
-  if (alert === null) throw new Error("BOT_INTERNAL_UNREACHABLE");
+  // rien reçu. Il reste alors le canal Discord habituel. Mais si un appareil
+  // d'arbitre a reçu la notification push, quelque chose **est** parti : le
+  // dire injoignable ferait renvoyer le joueur, et sonner l'arbitre deux fois.
+  if (alert === null && pushed === 0) throw new Error("BOT_INTERNAL_UNREACHABLE");
 
-  return { notifiedReferees: alert.sent };
+  return { notifiedReferees: alert?.sent ?? 0 };
 }

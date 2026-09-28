@@ -4,6 +4,8 @@ import { isBotCircuitOpen } from "@/lib/server/bot-integration";
 import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
 import { privacyChangePush } from "@/lib/shared/push-messages";
 import { siteBaseUrl } from "@/lib/server/site-url";
+import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { webPushConfig } from "@/lib/server/web-push";
 import {
   PRIVACY_DM_MIN_INTERVAL_DAYS,
   announceablePrivacyChanges,
@@ -86,6 +88,21 @@ type DoneRow = RowDataPacket & { user_id: number; change_id: string };
  * clés primaires.
  */
 async function loadCandidates(settled: readonly PrivacyChange[]): Promise<CandidateRow[]> {
+  // Un compte sans Discord n'est candidat que si le push est **allumé** : sans
+  // clés, rien ne peut lui parvenir, et le réserver consommerait l'annonce pour
+  // de bon. Et si la table des abonnements manque (table tolérée), la lecture
+  // retombe sur Discord seul plutôt que d'éteindre toute l'annonce.
+  if (webPushConfig()) {
+    try {
+      return await queryCandidates(settled, true);
+    } catch (error) {
+      if (!isMissingTableError(error)) throw error;
+    }
+  }
+  return queryCandidates(settled, false);
+}
+
+async function queryCandidates(settled: readonly PrivacyChange[], withPush: boolean): Promise<CandidateRow[]> {
   const db = await getDatabase();
   const clause = settled
     .map(
@@ -99,7 +116,7 @@ async function loadCandidates(settled: readonly PrivacyChange[]): Promise<Candid
        FROM bg_users u
       WHERE u.is_deleted = 0
         AND (u.discord_id IS NOT NULL OR (u.discord_verified_at IS NOT NULL AND u.discord_pseudo IS NOT NULL)
-             OR EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id))
+             ${withPush ? "OR EXISTS (SELECT 1 FROM bg_push_subscriptions s WHERE s.user_id = u.id)" : ""})
         AND (${clause})
         AND NOT EXISTS (SELECT 1 FROM bg_privacy_change_notifications r
                          WHERE r.user_id = u.id AND r.sent_at > NOW() - INTERVAL ? DAY)

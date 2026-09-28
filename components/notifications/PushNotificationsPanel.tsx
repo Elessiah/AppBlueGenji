@@ -46,7 +46,7 @@ export function PushNotificationsPanel({
 }: PushNotificationsPanelProps): React.ReactElement | null {
   const { showError, showSuccess } = useToast();
   const onError = useCallback((code: string) => showError(pushErrorMessage(code)), [showError]);
-  const push = usePushNotifications(onError);
+  const push = usePushNotifications(onError, { syncExisting: variant === "full" });
   const listId = useId();
 
   if (push.support === null || push.server === null) {
@@ -63,7 +63,7 @@ export function PushNotificationsPanel({
 
   // La forme compacte ne sert qu'à proposer : abonné, ou sans rien à proposer,
   // elle se tait plutôt que d'occuper la place d'un écran qui a autre chose à dire.
-  if (variant === "compact" && (push.subscribed || !configured || blocked)) return null;
+  if (variant === "compact" && (!push.checked || push.subscribed || !configured || blocked)) return null;
 
   const deviceControl = !configured ? (
     <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>
