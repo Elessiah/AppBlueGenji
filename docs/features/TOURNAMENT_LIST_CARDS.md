@@ -52,6 +52,16 @@ quatre cartes (`RunningCard`, `RegistrationCard`, `UpcomingCard`,
 qui n'est plus lui-même un lien, une seule `<Link className={s.cardOverlay}>`
 posée en premier enfant.
 
+**Corollaire : aucun `title` sous la plaque.** Elle recouvre toute la carte, la
+souris n'atteint donc plus aucun de ses enfants et une infobulle native ne s'y
+déclenche jamais. Le nom du vainqueur, coupé en ellipse au-delà d'une ligne, se
+lisait entier par un `title` devenu inatteignable : il se **déplie** désormais
+au survol de la carte et au focus de son lien (`.card:hover .cardChampion`,
+`.card:focus-within .cardChampion` — clavier compris), le pied poussé en bas
+absorbant la ligne gagnée dans l'espace libre de la carte. Le texte complet est
+dans le DOM, les lecteurs d'écran le lisent sans rien faire. Même règle sur la
+carte d'annuaire d'équipe (`TeamCard.tsx`), voir `ELO_RANKING.md`.
+
 ## Trois champs de `TournamentCard`
 
 - `finishedAt` — `bg_tournaments.finished_at`, rendu par `mapCard`. Une carte
