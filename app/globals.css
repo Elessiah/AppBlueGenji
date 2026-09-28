@@ -302,6 +302,60 @@ select {
   font: inherit;
 }
 
+/*
+ * Un contrôle qu'on touche ne se sélectionne pas.
+ *
+ * Sur mobile, deux appuis rapprochés sont lus comme un double appui : le
+ * navigateur sélectionne le mot sous le doigt, puis étend la sélection à chaque
+ * appui suivant — taper trois fois « + » dans la modale de score surlignait le
+ * libellé, les chiffres et le nom des équipes, et faisait surgir la loupe et le
+ * menu « Copier ». Posée sur l'élément (comme les cases à cocher), la règle
+ * couvre le bouton ajouté demain sans que personne ait à s'en souvenir.
+ *
+ * `touch-action: manipulation` retire en plus le zoom au double appui, donc le
+ * délai qu'il impose au second appui : un « + + + » compte bien trois fois.
+ * La bulle d'appui long (`-webkit-touch-callout`) ne vaut que pour les boutons —
+ * un libellé peut contenir un lien, dont l'appui long reste utile.
+ *
+ * Les champs de saisie sont rétablis explicitement : sous iOS, un ancêtre en
+ * `user-select: none` peut empêcher d'éditer un champ qu'il contient.
+ */
+button,
+[role="button"],
+[role="tab"],
+[role="switch"],
+[role="option"],
+[role="menuitem"],
+label,
+summary {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
+button,
+[role="button"] {
+  -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/*
+ * Une zone de réglage par appuis répétés (`data-tap-zone`) ne sélectionne rien,
+ * y compris ce qui entoure ses boutons : sur iOS, un double appui sur un
+ * bouton non sélectionnable reporte la sélection sur le texte le plus proche.
+ */
+[data-tap-zone] {
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

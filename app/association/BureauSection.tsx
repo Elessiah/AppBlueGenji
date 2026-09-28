@@ -194,7 +194,7 @@ export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
               <p className={styles.bureauRole}>{b.role}</p>
             </div>
             {canManage(b) && (
-              <div className={styles.bureauCardActions}>
+              <div className={styles.bureauCardActions} data-tap-zone>
                 <button
                   type="button"
                   className={`${styles.bureauAction} ${styles.moveAction}`}

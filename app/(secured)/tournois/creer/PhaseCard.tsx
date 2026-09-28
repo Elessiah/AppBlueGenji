@@ -207,6 +207,7 @@ export function PhaseCard({
 
         {/* Controls */}
         <div
+          data-tap-zone
           style={{
             display: "flex",
             gap: 6,

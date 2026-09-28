@@ -378,7 +378,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
                 </div>
               </article>
               {canManage(sponsor) && (
-                <div className={styles.slotActions}>
+                <div className={styles.slotActions} data-tap-zone>
                   <button
                     type="button"
                     className={`${styles.slotAction} ${styles.moveAction}`}

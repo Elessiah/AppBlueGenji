@@ -255,7 +255,7 @@ function RecruitmentBanner({
         </Link>
       )}
       {multiple && (
-        <span className={styles.bannerControls}>
+        <span className={styles.bannerControls} data-tap-zone>
           <button
             type="button"
             className={styles.bannerButton}

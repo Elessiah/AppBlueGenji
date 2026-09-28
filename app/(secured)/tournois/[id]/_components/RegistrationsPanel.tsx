@@ -299,7 +299,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
               <span className={styles.muted}>{formatLocalDateTime(reg.registeredAt)}</span>
               <span className={styles.muted}>{reg.finalRank ?? "-"}</span>
               {showActions && (
-                <span className={styles.actions}>
+                <span className={styles.actions} data-tap-zone>
                   {reorderable && (
                     <>
                       <button
