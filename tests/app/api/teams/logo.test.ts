@@ -71,7 +71,7 @@ describe("POST /api/teams/[id]/logo", () => {
     // Le dernier argument = « le viewer administre les équipes fantômes »
     // (permission `tournaments`) ; faux pour un simple membre.
     expect(updateTeamLogo).toHaveBeenCalledWith(7, 3, "/api/uploads/teams/3-abc.webp", false);
-    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "team-logo", 3);
+    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "team-logo", 3, null);
   });
 
   it("deletes the previous logo file (served url → disk path)", async () => {

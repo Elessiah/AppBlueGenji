@@ -55,7 +55,7 @@ describe("POST /api/landing/sponsors/logo", () => {
     // Le fichier reste sur disque sous `/uploads/...`, mais l'URL exposée passe
     // par `/api/uploads/...` (servie par un route handler, cf. bug Turbopack).
     expect(await res.json()).toEqual({ logoUrl: "/api/uploads/sponsors/1-abc.webp" });
-    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "sponsor-logo", 1);
+    expect(processAndStoreImage).toHaveBeenCalledWith(expect.any(File), "sponsor-logo", 1, null);
   });
 
   it("surfaces processing errors as 400", async () => {

@@ -119,7 +119,7 @@ describe("POST — pose ou remplace l'image", () => {
       fit: "CONTAIN",
       focusX: 10,
       focusY: 90,
-    });
+    }, null);
   });
 
   it("un fichier seul suffit : le cadrage prend ses défauts", async () => {
@@ -128,7 +128,20 @@ describe("POST — pose ou remplace l'image", () => {
       fit: "COVER",
       focusX: 50,
       focusY: 50,
-    });
+    }, null);
+  });
+
+  it("transmet la zone gardée choisie dans la modale de recadrage", async () => {
+    const crop = { x: 0.25, y: 0, width: 0.5, height: 1 };
+    await POST(uploadReq({ file: pngFile(), crop: JSON.stringify(crop) }), params());
+    expect(setTournamentImage).toHaveBeenCalledWith(5, expect.any(File), expect.any(Object), crop);
+  });
+
+  it("refuse un recadrage illisible, sans rien écrire", async () => {
+    const res = await POST(uploadReq({ file: pngFile(), crop: "{\"x\":2}" }), params());
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual(expect.objectContaining({ error: "IMAGE_CROP_INVALID" }));
+    expect(setTournamentImage).not.toHaveBeenCalled();
   });
 
   it("refuse une requête sans fichier", async () => {

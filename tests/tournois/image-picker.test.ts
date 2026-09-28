@@ -32,6 +32,7 @@ describe("initialImagePickerValue", () => {
   it("part des réglages de l'image enregistrée", () => {
     expect(initialImagePickerValue(saved)).toEqual({
       file: null,
+      crop: null,
       removed: false,
       settings: { fit: "CONTAIN", focusX: 30, focusY: 70 },
     });
@@ -40,6 +41,7 @@ describe("initialImagePickerValue", () => {
   it("part des défauts sans image (création)", () => {
     expect(initialImagePickerValue(null)).toEqual({
       file: null,
+      crop: null,
       removed: false,
       settings: { fit: "COVER", focusX: 50, focusY: 50 },
     });
@@ -99,9 +101,15 @@ describe("withNewFile", () => {
     const file = pngFile();
     expect(withNewFile(file, "CONTAIN")).toEqual({
       file,
+      crop: null,
       removed: false,
       settings: { fit: "CONTAIN", focusX: 50, focusY: 50 },
     });
+  });
+
+  it("garde la zone choisie dans la modale de recadrage", () => {
+    const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.4 };
+    expect(withNewFile(pngFile(), "COVER", crop).crop).toEqual(crop);
   });
 });
 
@@ -159,6 +167,16 @@ describe("applyImageChange", () => {
     expect(body.get("fit")).toBe("COVER");
     expect(body.get("focusX")).toBe("12");
     expect(body.get("focusY")).toBe("88");
+    // Sans recadrage, aucun champ : le serveur suit son chemin d'origine.
+    expect(body.get("crop")).toBeNull();
+  });
+
+  it("joint la zone gardée quand l'image a été recadrée", async () => {
+    respond(200, { image: saved });
+    const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.4 };
+    await applyImageChange(7, { kind: "UPLOAD", settings: { fit: "COVER", focusX: 50, focusY: 50 } }, pngFile(), crop);
+    const body = fetchMock.mock.calls[0][1]?.body as FormData;
+    expect(JSON.parse(String(body.get("crop")))).toEqual(crop);
   });
 
   it("refuse un envoi sans fichier sans rien appeler", async () => {
