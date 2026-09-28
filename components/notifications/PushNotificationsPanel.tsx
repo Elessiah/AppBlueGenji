@@ -46,7 +46,10 @@ export function PushNotificationsPanel({
 }: PushNotificationsPanelProps): React.ReactElement | null {
   const { showError, showSuccess } = useToast();
   const onError = useCallback((code: string) => showError(pushErrorMessage(code)), [showError]);
-  const push = usePushNotifications(onError, { syncExisting: variant === "full" });
+  const push = usePushNotifications(onError, {
+    syncExisting: variant === "full",
+    announceLoadFailure: variant === "full",
+  });
   const listId = useId();
 
   if (push.loadFailed && push.server === null) {

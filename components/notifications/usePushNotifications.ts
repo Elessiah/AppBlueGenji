@@ -130,9 +130,17 @@ export function usePushNotifications(
      * à chaque ouverture de la modale de lancement coûterait sans rien apporter.
      */
     syncExisting?: boolean;
+    /**
+     * Dire en notification que les réglages n'ont pas pu être lus (défaut). La
+     * forme compacte se tait : posée dans la modale de lancement, elle
+     * afficherait une erreur sur un écran que le joueur n'a pas ouvert, à côté
+     * du « Prêt » qu'il doit cliquer.
+     */
+    announceLoadFailure?: boolean;
   } = {},
 ): PushNotificationsState {
   const syncExisting = options.syncExisting ?? true;
+  const announceLoadFailure = options.announceLoadFailure ?? true;
   const [support, setSupport] = useState<PushSupport | null>(null);
   const [server, setServer] = useState<ServerState | null>(null);
   const [subscribed, setSubscribed] = useState(false);
@@ -189,7 +197,7 @@ export function usePushNotifications(
         // Sans réglages, le panneau n'a rien à montrer : il le dit et propose
         // de relire, au lieu d'attendre une réponse qui ne viendra pas.
         setLoadFailed(true);
-        onErrorRef.current("PUSH_LOAD_FAILED");
+        if (announceLoadFailure) onErrorRef.current("PUSH_LOAD_FAILED");
         return;
       }
       setLoadFailed(false);
@@ -215,7 +223,7 @@ export function usePushNotifications(
     return () => {
       cancelled = true;
     };
-  }, [loadServer, syncExisting, attempt]);
+  }, [loadServer, syncExisting, announceLoadFailure, attempt]);
 
   const enable = useCallback(async () => {
     if (!server?.publicKey) {
