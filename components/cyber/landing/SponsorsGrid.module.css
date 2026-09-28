@@ -473,3 +473,24 @@
   }
 }
 
+
+/* Le soulèvement au survol est un mouvement : il se retire avec la préférence
+   système comme avec « Réduire les animations » du menu d'accessibilité. */
+@media (prefers-reduced-motion: reduce) {
+  .card:has(.nameLink):hover {
+    transform: none;
+  }
+}
+
+:global(:root[data-a11y~="motion"]) .card:has(.nameLink):hover {
+  transform: none;
+}
+
+/* En contrastes forcés, l'anneau (une ombre) disparaît : le focus du lien étiré
+   se redit par un contour sur la carte entière. */
+@media (forced-colors: active) {
+  .card:has(.nameLink:focus-visible) {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
