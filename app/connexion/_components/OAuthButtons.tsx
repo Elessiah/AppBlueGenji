@@ -33,19 +33,49 @@ const PROVIDER_NOTES: Partial<Record<OAuthProvider, string>> = {
   BLIZZARD: "Renseigne ton BattleTag automatiquement.",
 };
 
+/** Identifiant de l'avertissement de contexte, relié à chaque bouton. */
+const ENVIRONMENT_NOTICE_ID = "oauth-environment-notice";
+
 export function OAuthButtons({
   redirect,
   termsAccepted,
+  environmentNotice = null,
 }: {
   redirect: string;
   /** Conditions d'utilisation acceptées dans la modale d'entrée de la page. */
   termsAccepted: boolean;
+  /**
+   * Avertissement quand le navigateur risque de perdre l'aller-retour OAuth
+   * (app installée sur iOS, navigateur intégré) — `loginEnvironmentNotice`.
+   * Ce n'est pas une erreur, rien n'a échoué : une note, pas un toast.
+   */
+  environmentNotice?: string | null;
 }): React.ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      {environmentNotice ? (
+        <p
+          role="note"
+          id={ENVIRONMENT_NOTICE_ID}
+          style={{
+            fontSize: 12,
+            color: "var(--ink)",
+            lineHeight: 1.5,
+            margin: 0,
+            padding: "8px 10px",
+            borderLeft: "2px solid var(--amber)",
+            background: "var(--cyber-bg-2)",
+          }}
+        >
+          {environmentNotice}
+        </p>
+      ) : null}
       {LOGIN_ORDER.map((provider, index) => {
         const note = PROVIDER_NOTES[provider];
         const noteId = `oauth-note-${OAUTH_PROVIDER_SLUGS[provider]}`;
+        const describedBy = [environmentNotice ? ENVIRONMENT_NOTICE_ID : null, note ? noteId : null]
+          .filter(Boolean)
+          .join(" ");
         return (
           <div key={provider}>
             <CyberButton variant={index === 0 ? "primary" : "ghost"} asChild style={{ width: "100%" }}>
@@ -68,7 +98,7 @@ export function OAuthButtons({
               */}
               <a
                 href={oauthStartPath(provider, { redirect, termsAccepted })}
-                aria-describedby={note ? noteId : undefined}
+                aria-describedby={describedBy || undefined}
               >
                 Continuer avec {OAUTH_PROVIDER_LABELS[provider]}
               </a>

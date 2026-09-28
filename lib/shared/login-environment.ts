@@ -71,6 +71,27 @@ export function loginEnvironmentAdvice(environment: LoginEnvironment): string | 
   }
 }
 
+/**
+ * L'avertissement affiché **avant** le clic, au-dessus des boutons OAuth.
+ *
+ * Il ne double pas le conseil joint à l'erreur, il le rend possible pour
+ * iOS : dans l'app installée, l'aller-retour s'ouvre dans une feuille Safari,
+ * et c'est **elle** qui reçoit la redirection `/connexion?error=…` — une page
+ * qui ne se sait plus installée (`navigator.standalone` y vaut `false`), donc
+ * incapable de nommer la cause. Le seul moment où l'app sait qu'elle l'est,
+ * c'est avant de partir.
+ */
+export function loginEnvironmentNotice(environment: LoginEnvironment): string | null {
+  switch (environment) {
+    case "IOS_INSTALLED_APP":
+      return "Tu utilises le site depuis l'icône de l'écran d'accueil : iOS y bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans Safari, ou utilise le code Discord par message privé ci-dessous.";
+    case "IN_APP_BROWSER":
+      return "Tu navigues dans le navigateur intégré d'une application, qui bloque souvent la connexion par Google, Discord ou Blizzard. Si elle échoue, ouvre le site dans ton navigateur habituel, ou utilise le code Discord par message privé ci-dessous.";
+    default:
+      return null;
+  }
+}
+
 /** Lecture des signaux dans le navigateur. `null` côté serveur. */
 export function readLoginEnvironmentSignals(): LoginEnvironmentSignals | null {
   if (typeof window === "undefined" || typeof navigator === "undefined") return null;
