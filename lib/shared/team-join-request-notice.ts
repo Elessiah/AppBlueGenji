@@ -14,6 +14,7 @@
 
 import { hasTeamManagementRole } from "./team-roles";
 import type { TeamRole } from "./types";
+import { discordInline } from "./discord-text";
 
 /**
  * Une même personne ne fait écrire le bot à une même équipe qu'une fois par
@@ -79,7 +80,7 @@ export function shouldNotifyTeamJoinRequest(requestsInWindow: number): boolean {
  */
 export function formatTeamJoinRequestNotice(input: { teamName: string; url: string }): string {
   return (
-    `📨 BlueGenji — Un joueur demande à rejoindre ton équipe « ${input.teamName} ». ` +
+    `📨 BlueGenji — Un joueur demande à rejoindre ton équipe « ${discordInline(input.teamName)} ». ` +
     `Accepte ou refuse sa demande depuis la fiche de l'équipe : ${input.url}`
   );
 }

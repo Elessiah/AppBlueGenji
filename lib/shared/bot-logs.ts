@@ -40,6 +40,7 @@ import { participantWording, type ParticipantType } from "./participants";
 import { ANONYMOUS_STAFF_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { formatLabel, gameLabel } from "./tournament-labels";
 import type { TournamentFormat, TournamentGame } from "./types";
+import { discordInline } from "./discord-text";
 
 /** Tournoi désigné dans une ligne de journal. */
 export interface BotLogTournament {
@@ -77,7 +78,7 @@ export type BotEventKind =
  * d'une page (`/tournois/<id>`) sans deviner de laquelle il s'agit.
  */
 function tournamentLabel(tournament: BotLogTournament): string {
-  return `« ${tournament.name} » (#${tournament.id})`;
+  return `« ${discordInline(tournament.name)} » (#${tournament.id})`;
 }
 
 /**
@@ -338,7 +339,7 @@ export function formatEndurancePenaltyLog(context: {
   reason: string;
 }): string {
   const points = `${context.points} point${context.points > 1 ? "s" : ""} d'endurance`;
-  return `${lead("⛔", "Pénalité", context.tournament)} : ${entrantLabel(context.entrant)} perd ${points} — ${context.reason}.`;
+  return `${lead("⛔", "Pénalité", context.tournament)} : ${entrantLabel(context.entrant)} perd ${points} — ${discordInline(context.reason)}.`;
 }
 
 /**

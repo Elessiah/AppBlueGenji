@@ -27,6 +27,7 @@
  * resynchroniser…) restent des implémentations séparées.
  */
 import { ANONYMOUS_PLAYER_LABEL } from "./log-privacy";
+import { discordInline } from "./discord-text";
 
 /** Durée de la quarantaine avant suppression définitive, en jours. */
 export const LOGO_QUARANTINE_DAYS = 180;
@@ -104,7 +105,7 @@ export function formatQuarantineDate(date: Date): string {
  */
 export function formatLogoHiddenNotice(input: { teamName: string; purgeAfter: Date; url: string }): string {
   return (
-    `🙈 BlueGenji — Le logo de ton équipe « ${input.teamName} » a été masqué à la suite d'un signalement. ` +
+    `🙈 BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été masqué à la suite d'un signalement. ` +
     `Sans contestation de votre part, il sera supprimé définitivement le ${formatQuarantineDate(input.purgeAfter)}. ` +
     `Si vous en détenez les droits, contestez ici : ${input.url}`
   );
@@ -136,20 +137,20 @@ export function formatLogoRemovedNotice(input: { teamName: string; url: string |
     ? `Si vous en détenez les droits, contestez ici : ${input.url}`
     : "Si vous en détenez les droits, écrivez à l'association (« Signaler un problème », en bas de chaque page).";
   return (
-    `🗑️ BlueGenji — Le logo de ton équipe « ${input.teamName} » a été supprimé par la modération du site` +
+    `🗑️ BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été supprimé par la modération du site` +
     `${input.url ? " à la suite d'un signalement" : ""}. ${answer}`
   );
 }
 
 /** Message privé aux membres d'une équipe dont le logo est rétabli. */
 export function formatLogoRestoredNotice(input: { teamName: string }): string {
-  return `✅ BlueGenji — Le logo de ton équipe « ${input.teamName} » a été rétabli : la contestation a été acceptée.`;
+  return `✅ BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été rétabli : la contestation a été acceptée.`;
 }
 
 /** Ligne du journal (canal de logs) d'un logo masqué — nom d'équipe seul. */
 export function formatLogoHiddenLog(input: { teamName: string; reportId: number; purgeAfter: Date }): string {
   return (
-    `🙈 Logo de l'équipe « ${input.teamName} » masqué par le staff (signalement #${input.reportId}), ` +
+    `🙈 Logo de l'équipe « ${discordInline(input.teamName)} » masqué par le staff (signalement #${input.reportId}), ` +
     `suppression définitive le ${formatQuarantineDate(input.purgeAfter)} sans contestation.`
   );
 }

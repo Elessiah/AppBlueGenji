@@ -1,5 +1,6 @@
 ﻿import { TEAM_ROLES } from "@/lib/shared/constants";
 import type { TeamRole } from "@/lib/shared/types";
+import { visibleText } from "@/lib/shared/visible-text";
 
 export function toIso(value: Date | string | null): string | null {
   if (!value) return null;
@@ -35,8 +36,14 @@ export function parseRoles(value: unknown): TeamRole[] {
   return [];
 }
 
+/**
+ * Forme canonique d'un pseudo : caractères visibles seulement (voir
+ * `visibleText` — invisibles, commandes de direction et contrôles retirés,
+ * NFKC), espaces réduits. Appliquée à l'écriture **et** aux recherches par
+ * pseudo : `Adm` + U+200B + `in` désigne donc `Admin`, jamais un sosie.
+ */
 export function normalizePseudo(raw: string): string {
-  return raw.replace(/\s+/g, " ").trim();
+  return visibleText(raw);
 }
 
 export function slugifyPseudo(raw: string): string {
