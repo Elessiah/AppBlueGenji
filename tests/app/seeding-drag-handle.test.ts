@@ -56,11 +56,11 @@ describe("Poignée de glissement du seeding", () => {
     // héberge aussi le retrait d'un engagé (`showActions`) : ce qui doit rester
     // accroché à `reorderable` est le couple poignée / flèches, pas le conteneur.
     expect(panel).toMatch(/\{reorderable && \(\s*<span[\s\S]*?className=\{styles\.grip\}/);
-    expect(panel).toMatch(/\{showActions && \(\s*<span className=\{styles\.actions\}>/);
+    expect(panel).toMatch(/\{showActions && \(\s*<span className=\{styles\.actions\}[^>]*>/);
     expect(panel).toMatch(/const showActions = reorderable \|\| removable;/);
     // Les flèches sont bien sous `reorderable`, à l'intérieur de la cellule.
     expect(panel).toMatch(
-      /<span className=\{styles\.actions\}>\s*\{reorderable && \(\s*<>[\s\S]*?styles\.arrow/,
+      /<span className=\{styles\.actions\}[^>]*>\s*\{reorderable && \(\s*<>[\s\S]*?styles\.arrow/,
     );
   });
 
