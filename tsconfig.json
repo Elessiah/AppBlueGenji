@@ -12,6 +12,12 @@
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "isolatedModules": true,
+    // Défaut de TypeScript 6+ : un import pour effet de bord doit résoudre un
+    // module typé. Next ne déclare que les `*.module.css`, si bien que les
+    // feuilles globales (`import "./globals.css"`) seraient refusées. Posé
+    // explicitement pour que TS 5 (build, Jest, ESLint) et TS 7 (typecheck)
+    // lisent la même règle.
+    "noUncheckedSideEffectImports": false,
     "jsx": "preserve",
     "incremental": true,
     "types": ["jest", "node"],

@@ -41,7 +41,16 @@ describe("type-vérification des tests", () => {
 
   it("est lancée par `npm run typecheck`", () => {
     const pkg = json("package.json") as { scripts: Record<string, string> };
-    expect(pkg.scripts.typecheck).toBe("tsc --noEmit -p tsconfig.typecheck.json");
+    expect(pkg.scripts.typecheck).toMatch(/--noEmit -p tsconfig\.typecheck\.json$/);
+  });
+
+  it("désigne son compilateur par chemin, jamais par le binaire `tsc`", () => {
+    // TypeScript 5 (`typescript`, lu par Next, ts-jest et ESLint) et 7
+    // (`typescript-native`) fournissent tous deux un binaire `tsc` : celui que
+    // `node_modules/.bin` retient dépend de l'ordre d'installation.
+    const pkg = json("package.json") as { scripts: Record<string, string> };
+    expect(pkg.scripts.typecheck).toMatch(/^node node_modules\/typescript-native\/bin\/tsc /);
+    expect(pkg.scripts["typecheck:ts5"]).toMatch(/^node node_modules\/typescript\/bin\/tsc /);
   });
 
   it("est jouée par le CI", () => {
