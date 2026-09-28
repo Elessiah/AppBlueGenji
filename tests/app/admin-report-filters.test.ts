@@ -84,7 +84,7 @@ describe("compteurs", () => {
       report({ category: "BUG", status: "RESOLVED" }),
       report({ category: "MODERATION" }),
     ]);
-    expect(counts).toEqual({ ALL: 3, COPYRIGHT: 2, MODERATION: 1, BUG: 0, OTHER: 0 });
+    expect(counts).toEqual({ ALL: 3, COPYRIGHT: 2, MODERATION: 1, BUG: 0, RGPD: 0, HOSTING: 0, OTHER: 0 });
   });
 
   it("résume les états, contestés actifs compris", () => {
@@ -98,7 +98,7 @@ describe("compteurs", () => {
   });
 
   it("n'offre pas d'onglet aux contestations, rangées sous leur signalement", () => {
-    expect(CATEGORY_TABS).toEqual(["ALL", "COPYRIGHT", "MODERATION", "BUG", "OTHER"]);
+    expect(CATEGORY_TABS).toEqual(["ALL", "COPYRIGHT", "MODERATION", "BUG", "RGPD", "HOSTING", "OTHER"]);
     expect(categoryTabLabel("ALL")).toBe("Tous");
     expect(categoryTabLabel("COPYRIGHT")).toBe("Droit d'auteur");
   });

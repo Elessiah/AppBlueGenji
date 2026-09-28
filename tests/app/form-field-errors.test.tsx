@@ -287,7 +287,9 @@ describe("déclaration d'accessibilité", () => {
   });
 
   it("donne un contact et les voies de recours", () => {
-    expect(html).toMatch(/href="mailto:[^"]+"/);
+    expect(html).not.toContain("mailto:");
+    expect(html).toContain("Signaler un problème");
+    expect(html).toContain("elessiah");
     expect(html).toContain("Défenseur des droits");
   });
 

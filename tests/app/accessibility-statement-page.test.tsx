@@ -27,6 +27,6 @@ describe("page /accessibilite — vouvoiement", () => {
 
   it("met les moyens de contact directement sous une limite contournée par une demande", () => {
     const page = read("app/accessibilite/page.tsx");
-    expect(page).toContain("issue.requestByContact ? <ContactList email={contactEmail} />");
+    expect(page).toContain("issue.requestByContact ? <ContactList />");
   });
 });

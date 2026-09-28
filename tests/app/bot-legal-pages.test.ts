@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -57,11 +58,12 @@ describe("bot legal content is fully bilingual", () => {
 });
 
 describe("bot legal content carries the contact details", () => {
-  it.each(DOCS)("%s mentions the support email and Discord in both languages", (_name, doc) => {
+  it.each(DOCS)("%s gives Discord and the report form, never an email, in both languages", (_name, doc) => {
     for (const lang of [doc.fr, doc.en]) {
       const flat = JSON.stringify(lang);
-      expect(flat).toContain("keryan.h@outlook.fr");
-      expect(flat).toContain("elessiah");
+      expect(flat).toContain(LEGAL_CONTACT_DISCORD);
+      expect(flat).toContain(REPORT_FORM_NAME);
+      expect(flat).not.toMatch(/[^\s@"*]+@[^\s@"*]+\.[a-z]{2,}/i);
     }
   });
 });
