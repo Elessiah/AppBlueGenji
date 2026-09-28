@@ -779,12 +779,12 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     });
     void teamMemberRecipients(Number(row.target_id))
       .then((recipients) =>
-      notifyUsers(recipients, {
-        topic: "MODERATION",
-        discord: { message: formatLogoRestoredNotice({ teamName }), context: "logo-restored" },
-        push: moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }),
-      }),
-    )
+        notifyUsers(recipients, {
+          topic: "MODERATION",
+          discord: { message: formatLogoRestoredNotice({ teamName }), context: "logo-restored" },
+          push: moderationPush({ kind: "RESTORED", teamName, teamId: Number(row.target_id), reportId: null }),
+        }),
+      )
       .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
   } else {
     publishStaffAction(`✅ Avatar d'${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
@@ -793,12 +793,12 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     });
     void userRecipient(Number(row.target_id))
       .then((recipients) =>
-      notifyUsers(recipients, {
-        topic: "MODERATION",
-        discord: { message: formatAvatarRestoredNotice(), context: "avatar-restored" },
-        push: moderationPush({ kind: "RESTORED", reportId: null }),
-      }),
-    )
+        notifyUsers(recipients, {
+          topic: "MODERATION",
+          discord: { message: formatAvatarRestoredNotice(), context: "avatar-restored" },
+          push: moderationPush({ kind: "RESTORED", reportId: null }),
+        }),
+      )
       .catch((error) => console.error("[moderation] joueur non prévenu du rétablissement", error));
   }
 }
