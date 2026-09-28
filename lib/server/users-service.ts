@@ -40,6 +40,7 @@ import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-iden
 import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
+import { cachedStats } from "@/lib/server/stats-cache";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { isLegacyDeletedPseudo, pickAnonymousPseudo, ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import type {
@@ -316,7 +317,14 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
   // comptés, défaites lues sur `loser_team_id` (que le moteur ne renseigne pas
   // toujours), fenêtres d'appartenance ignorées. Un seul chargeur, donc un seul
   // bilan par joueur, quelle que soit la page qui l'affiche.
-  const recordsByUserId = await loadPlayerRecords(userIds);
+  //
+  // Seul morceau lourd de la page — il recharge les matchs de toutes les
+  // équipes du site —, il est mutualisé (`stats-cache.ts`) : le bilan ne dépend
+  // pas du lecteur, contrairement aux lignes de compte ci-dessus, qui restent
+  // lues à chaque appel pour qu'un réglage de visibilité s'applique aussitôt.
+  // La clé ne porte pas la liste : un compte né pendant la fenêtre n'a encore
+  // aucun match, le repli à zéro ci-dessous dit déjà son bilan.
+  const recordsByUserId = await cachedStats("player-records", () => loadPlayerRecords(userIds));
 
   return baseUsers.map((user) => {
     const membership = membershipByUserId.get(user.id);

@@ -93,6 +93,22 @@ export const LANDING_READ_RULE: RateLimitRule = {
 };
 
 /**
+ * Lectures de l'annuaire et des fiches, par utilisateur : `/api/players`,
+ * `/api/teams` et la fiche de chacun.
+ *
+ * Un seul seau pour les quatre routes : ce qu'il borne est le rythme auquel un
+ * compte fait recalculer des statistiques, quelle que soit la fiche visée. Ce
+ * sont les seules lectures de l'espace connecté qu'un F5 maintenu rendait
+ * coûteuses — l'annuaire des joueurs recharge les matchs de tout le site. Large :
+ * soixante pages d'annuaire ou de fiche par minute, personne ne lit à ce rythme.
+ */
+export const DIRECTORY_READ_RULE: RateLimitRule = {
+  name: "directory-read",
+  limit: 60,
+  windowMs: 60_000,
+};
+
+/**
  * Ouvertures du flux temps réel, par utilisateur.
  *
  * Distinct du plafond de flux *simultanés* (`MAX_STREAMS_PER_USER`) : celui-ci
