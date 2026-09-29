@@ -47,13 +47,28 @@ natures :
   | Tâche | Précondition |
   | --- | --- |
   | `createBracketIfMissing` | élimination sans `bracket_size`, ou sans aucun match |
-  | `resolveExpiredScoreReports` | une manche `AWAITING_CONFIRMATION` dont le délai est passé |
+  | `resolveExpiredScoreReports` | une manche `AWAITING_CONFIRMATION` dont le délai est passé, **et** qui porte un report unique (que la résolution clôt) ou un conflit dont l'escalade est due sans être réservée |
   | `tryAutoResolveByes` | un bye ou un match fantôme **résolvable** (`RESOLVABLE_BYE_SQL` / `RESOLVABLE_GHOST_SQL`, partagés avec la résolution) |
   | `finalizeTournamentIfDone` | élimination dont toutes les rencontres sont jouées |
   | `finalizeUnderfilledTournament` | moins de `MIN_ENTRANTS_FOR_MATCHES` engagés |
 
 Un plateau en cours, sans bye ni report expiré, ne coûte donc plus rien à la
 passe.
+
+**Un conflit déjà escaladé n'est plus un entretien dû.** La précondition des
+reports disait d'abord « délai passé, pas de vainqueur » : un conflit de score
+(deux reports contradictoires) y restait à chaque balayage jusqu'à ce qu'un
+arbitre le tranche — 3 tournois sur une base seedée après une passe complète —,
+alors que `resolveExpiredScoreReports` ne clôt qu'un report **unique** et que
+l'escalade (`score_report_stalled`) est réservée une fois dans
+`bg_referee_alerts`. Elle retient désormais un report unique
+(`SINGLE_REPORT_SQL`), ou un double report (`BOTH_REPORTED_SQL`) dont le délai
+d'escalade (`SCORE_REPORT_TIMEOUT_MINUTES` après l'échéance, même calcul que la
+résolution) est écoulé **et** sans ligne `SCORE_REPORT_STALLED`. C'est le
+pendant, côté balayage, du réveil de salle de `nextRoomWakeAt`, qui ne relit un
+conflit expiré qu'à l'instant de son escalade. Coupe-circuit du bot ouvert, rien
+n'est réservé et le tournoi reste retenu : l'escalade doit partir une fois le bot
+revenu.
 
 **La précondition des byes est celle de la résolution, mot pour mot.** Elle
 disait d'abord « une case est vide sur un match ouvert », ce qui attrape toute
