@@ -33,6 +33,21 @@ describe("stickyHeaderHeightValue", () => {
     expect(stickyHeaderHeightValue(Number.NaN)).toBe("0px");
     expect(stickyHeaderHeightValue(Number.POSITIVE_INFINITY)).toBe("0px");
   });
+
+  it("rend 0px quand l'en-tête n'est plus collant (écran bas)", () => {
+    expect(stickyHeaderHeightValue(124, "relative")).toBe("0px");
+    expect(stickyHeaderHeightValue(124, "static")).toBe("0px");
+    expect(stickyHeaderHeightValue(124, null)).toBe("0px");
+    expect(stickyHeaderHeightValue(124, "sticky")).toBe("124px");
+    expect(stickyHeaderHeightValue(124, "fixed")).toBe("124px");
+  });
+
+  it("les en-têtes repassent bien en position relative sur écran bas", () => {
+    // Le jour où ce repli disparaît, la règle `position` ci-dessus n'a plus d'objet.
+    const shortScreen = /@media \(max-height: 500px\) \{[^}]*\{\s*position:\s*relative/;
+    expect(readSource("components/cyber/landing/PublicHeader.module.css")).toMatch(shortScreen);
+    expect(readSource("components/arena-nav.module.css")).toMatch(shortScreen);
+  });
 });
 
 describe("marge d'ancre sous l'en-tête collant", () => {

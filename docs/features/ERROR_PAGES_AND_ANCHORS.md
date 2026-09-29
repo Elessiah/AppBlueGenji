@@ -37,9 +37,12 @@ La hauteur est désormais **mesurée** :
 - les deux en-têtes collants (`PublicHeader`, `ArenaNav`) portent
   `data-sticky-header` ;
 - `components/sticky-header-offset.tsx`, monté dans la mise en page racine, le
-  cherche à chaque chemin et pose sa hauteur (`ResizeObserver`) sur `<html>` en
+  recherche dès qu'il a quitté le document (`MutationObserver` — l'en-tête
+  change sans que le chemin change, page d'erreur puis « Réessayer »), suit sa
+  taille (`ResizeObserver`, `resize`) et la pose sur `<html>` en
   `--sticky-header-h` (`lib/shared/sticky-header.ts` : arrondi au pixel
-  supérieur, `0px` sans en-tête) ;
+  supérieur, `0px` sans en-tête ou quand il n'est plus collant — sous 500 px
+  de haut, les deux en-têtes repassent en `position: relative`) ;
 - une seule règle, `html { scroll-padding-top: calc(var(--sticky-header-h,
   134px) + 16px) }`, vaut pour toute ancre, tout `scrollIntoView` et tout
   défilement de focus — lien d'évitement compris.

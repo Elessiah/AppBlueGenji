@@ -20,9 +20,16 @@ export const STICKY_HEADER_HEIGHT_VAR = "--sticky-header-h";
 /**
  * Valeur de la propriété pour une hauteur mesurée : arrondie au pixel
  * supérieur (une fraction de pixel suffit à rogner le haut d'un titre), `0px`
- * sans en-tête ou pour une mesure illisible.
+ * sans en-tête, pour une mesure illisible, ou quand l'en-tête **n'est plus
+ * collant** — sur un écran bas (≤ 500 px), les deux en-têtes repassent en
+ * `position: relative` pour rendre la place à la page : il défile avec elle et
+ * ne recouvre plus rien, une marge à sa hauteur ne ferait que la reprendre.
  */
-export function stickyHeaderHeightValue(height: number | null | undefined): string {
+export function stickyHeaderHeightValue(
+  height: number | null | undefined,
+  position: string | null | undefined = "sticky",
+): string {
+  if (position !== "sticky" && position !== "fixed") return "0px";
   if (typeof height !== "number" || !Number.isFinite(height) || height <= 0) return "0px";
   return `${Math.ceil(height)}px`;
 }

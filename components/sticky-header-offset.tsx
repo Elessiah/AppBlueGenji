@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
 import {
   STICKY_HEADER_ATTR,
   STICKY_HEADER_HEIGHT_VAR,
@@ -14,28 +13,52 @@ import {
  * une ancre ou un focus ramené en haut de la vue s'arrête **sous** l'en-tête,
  * quelle que soit sa hauteur du moment (`lib/shared/sticky-header.ts`).
  *
- * Monté dans la mise en page racine ; l'en-tête change d'une page à l'autre
- * (vitrine ↔ espace connecté), d'où une nouvelle recherche à chaque chemin.
- * Sans en-tête, la propriété vaut `0px`. Ne rend rien.
+ * L'en-tête est remplacé sans que le chemin change — vitrine ↔ espace
+ * connecté, mais aussi la page d'erreur qui le retire puis « Réessayer » qui le
+ * remonte sur la même URL : on le recherche donc dès qu'il a quitté le
+ * document (`MutationObserver`, vérification regroupée par image). La hauteur
+ * suit ses redimensionnements (`ResizeObserver`) et la fenêtre (un écran bas
+ * le fait repasser en `position: relative`, marge nulle). Ne rend rien.
  */
 export function StickyHeaderOffset() {
-  const pathname = usePathname();
-
   useEffect(() => {
     const root = document.documentElement;
-    const header = document.querySelector<HTMLElement>(`[${STICKY_HEADER_ATTR}]`);
-    const apply = () => {
-      root.style.setProperty(
-        STICKY_HEADER_HEIGHT_VAR,
-        stickyHeaderHeightValue(header ? header.getBoundingClientRect().height : null),
-      );
+    let header: HTMLElement | null = null;
+    let frame = 0;
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? null : new ResizeObserver(() => apply());
+
+    function apply() {
+      const value = header
+        ? stickyHeaderHeightValue(header.getBoundingClientRect().height, getComputedStyle(header).position)
+        : stickyHeaderHeightValue(null);
+      root.style.setProperty(STICKY_HEADER_HEIGHT_VAR, value);
+    }
+
+    function track() {
+      frame = 0;
+      if (header?.isConnected) return;
+      resizeObserver?.disconnect();
+      header = document.querySelector<HTMLElement>(`[${STICKY_HEADER_ATTR}]`);
+      if (header) resizeObserver?.observe(header);
+      apply();
+    }
+
+    const scheduleTrack = () => {
+      if (!frame) frame = window.requestAnimationFrame(track);
     };
-    apply();
-    if (!header || typeof ResizeObserver === "undefined") return;
-    const observer = new ResizeObserver(apply);
-    observer.observe(header);
-    return () => observer.disconnect();
-  }, [pathname]);
+    const mutationObserver = new MutationObserver(scheduleTrack);
+    mutationObserver.observe(document.body, { childList: true, subtree: true });
+    window.addEventListener("resize", apply);
+    track();
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      mutationObserver.disconnect();
+      resizeObserver?.disconnect();
+      window.removeEventListener("resize", apply);
+    };
+  }, []);
 
   return null;
 }
