@@ -3,8 +3,10 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { readSource } from "../helpers/read-source";
 import {
+  READING_LINE_SLACK_PX,
   STICKY_HEADER_ATTR,
   STICKY_HEADER_HEIGHT_VAR,
+  readingLinePx,
   stickyHeaderHeightValue,
 } from "@/lib/shared/sticky-header";
 
@@ -47,6 +49,26 @@ describe("stickyHeaderHeightValue", () => {
     const shortScreen = /@media \(max-height: 500px\) \{[^}]*\{\s*position:\s*relative/;
     expect(readSource("components/cyber/landing/PublicHeader.module.css")).toMatch(shortScreen);
     expect(readSource("components/arena-nav.module.css")).toMatch(shortScreen);
+  });
+});
+
+describe("readingLinePx", () => {
+  it("dépasse la marge d'arrivée résolue, quelle que soit la hauteur de l'en-tête", () => {
+    expect(readingLinePx("150px")).toBe(150 + READING_LINE_SLACK_PX);
+    expect(readingLinePx("140.5px")).toBeGreaterThan(140.5);
+    expect(readingLinePx("16px")).toBe(16 + READING_LINE_SLACK_PX);
+  });
+
+  it("retombe sur la seule tolérance pour une valeur illisible", () => {
+    expect(readingLinePx("auto")).toBe(READING_LINE_SLACK_PX);
+    expect(readingLinePx("")).toBe(READING_LINE_SLACK_PX);
+    expect(readingLinePx(null)).toBe(READING_LINE_SLACK_PX);
+  });
+
+  it("sert au sommaire des règles, plus aucune ligne en dur", () => {
+    const toc = readSource("components/rules/RulesToc.tsx");
+    expect(toc).toContain("readingLinePx(getComputedStyle(document.documentElement).scrollPaddingTop)");
+    expect(toc).not.toContain("ACTIVE_LINE_PX");
   });
 });
 

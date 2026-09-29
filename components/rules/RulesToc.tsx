@@ -7,19 +7,19 @@ import {
 } from "@/lib/shared/rules-page-outline";
 import styles from "./RulesToc.module.css";
 
-/** Au-dessus de cette ligne (en-tête collant compris), une section est « en cours ». */
-const ACTIVE_LINE_PX = 140;
+import { readingLinePx } from "@/lib/shared/sticky-header";
 
 /**
  * Section en cours : la dernière dont le titre a franchi la ligne de lecture.
  * Rendu `null` tant que rien ne l'a franchie (haut de page).
  */
 function currentAnchor(ids: string[]): string | null {
+  const line = readingLinePx(getComputedStyle(document.documentElement).scrollPaddingTop);
   let current: string | null = null;
   for (const id of ids) {
     const element = document.getElementById(id);
     if (!element) continue;
-    if (element.getBoundingClientRect().top - ACTIVE_LINE_PX <= 0) current = id;
+    if (element.getBoundingClientRect().top - line <= 0) current = id;
     else break;
   }
   return current;

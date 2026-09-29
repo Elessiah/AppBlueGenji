@@ -33,3 +33,17 @@ export function stickyHeaderHeightValue(
   if (typeof height !== "number" || !Number.isFinite(height) || height <= 0) return "0px";
   return `${Math.ceil(height)}px`;
 }
+
+/** Tolérance sous la marge d'arrivée : arrondis et défilement inachevé. */
+export const READING_LINE_SLACK_PX = 24;
+
+/**
+ * Ligne de lecture d'un sommaire (section « en cours » au-dessus d'elle), tirée
+ * de la marge d'arrivée **résolue** (`getComputedStyle(html).scrollPaddingTop`) :
+ * une cible atteinte par le sommaire s'arrête à cette marge, la ligne doit
+ * donc la dépasser — une constante décrochait dès que l'en-tête grandissait.
+ */
+export function readingLinePx(scrollPaddingTop: string | null | undefined): number {
+  const padding = Number.parseFloat(scrollPaddingTop ?? "");
+  return (Number.isFinite(padding) && padding > 0 ? padding : 0) + READING_LINE_SLACK_PX;
+}
