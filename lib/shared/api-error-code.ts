@@ -19,6 +19,18 @@ export const INTERNAL_ERROR = "INTERNAL_ERROR";
 /** Code rendu à la place d'un message non public, sur un refus client (4xx). */
 export const INVALID_REQUEST = "INVALID_REQUEST";
 
+/**
+ * Code rendu quand l'écriture a été **annulée par un interblocage** : une
+ * autre écriture concurrente (typiquement un réordonnancement du seeding contre
+ * une saisie de score) tenait les mêmes lignes, et la base a défait l'une des
+ * deux. Rien n'a été écrit ; recommencer suffit. Rendu en **409** par `fail()`.
+ */
+export const CONCURRENT_UPDATE_RETRY = "CONCURRENT_UPDATE_RETRY";
+
+/** Phrase d'interface de `CONCURRENT_UPDATE_RETRY`. */
+export const CONCURRENT_UPDATE_RETRY_MESSAGE =
+  "Une autre modification du tournoi est passée au même moment : rien n'a été enregistré. Réessaie.";
+
 /** `true` si `message` a la forme d'un code d'erreur publiable. */
 export function isPublicErrorCode(message: unknown): message is string {
   return typeof message === "string" && PUBLIC_ERROR_CODE.test(message);
