@@ -48,7 +48,7 @@ function Field({ label, items }: { label: string; items: readonly string[] | str
 
 function ActivityCard({ activity }: { activity: ProcessingActivity }) {
   return (
-    <article id={activity.ref.toLowerCase()} aria-labelledby={`${activity.ref}-title`}>
+    <article className={styles.registerCard} id={activity.ref.toLowerCase()} aria-labelledby={`${activity.ref}-title`}>
       <h3 className={styles.registerTitle} id={`${activity.ref}-title`}>
         <span className={styles.rightNum}>{activity.ref}</span> {activity.name}
       </h3>
