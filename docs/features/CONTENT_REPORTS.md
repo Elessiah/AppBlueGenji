@@ -158,9 +158,10 @@ et au plus une fois par heure depuis la mise en page racine
   visées (`/signalements/[id]`, formulaire de contestation) ; seul le message est
   retenu (`reporterMayWarnTargets`). Les deux bornes — reprévenance d'une cible
   et plafond de l'auteur — se **réservent** sous un verrou nommé
-  (`reserveTargetNotices`), **envoi compris** : cinq signalements simultanés sur
-  une équipe liraient sinon tous « personne n'a été prévenu », et une marque
-  rendue après un envoi raté aurait déjà fait taire le suivant. Seules les cibles qui ont
+  (`reserveTargetNotices`) : cinq signalements simultanés sur une équipe
+  liraient sinon tous « personne n'a été prévenu ». L'envoi se fait **hors** du
+  verrou — tenu pendant l'appel au bot, il gardait une connexion du pool par
+  signalement en attente. Seules les cibles qui ont
   donné un destinataire sont marquées (`notified_at`), et la marque est rendue,
   **cible par cible** (un envoi par cible), si rien ne lui est parvenu (bot
   injoignable, aucun appareil abonné).
