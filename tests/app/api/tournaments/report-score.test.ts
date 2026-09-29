@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
+jest.mock("@/lib/server/tournaments/write-visibility");
 
 import { POST } from "@/app/api/tournaments/[id]/matches/[matchId]/report/route";
+import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { getCurrentUser } from "@/lib/server/auth";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
@@ -20,6 +22,7 @@ function req() {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(canActOnTournament).mockResolvedValue(true);
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 2 }));
 });
 
@@ -49,5 +52,16 @@ describe("POST .../report — qualité pour reporter", () => {
     const res = await POST(req(), params);
     expect(res.status).toBe(403);
     await expect(res.json()).resolves.toMatchObject({ error: "NOT_TEAM_MATCH_LEADER" });
+  });
+});
+
+describe("tournoi non publié", () => {
+  it("répond le même 404 qu'un identifiant inexistant, sans atteindre le service", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 2 }));
+    jest.mocked(canActOnTournament).mockResolvedValue(false);
+    const res = await POST(req(), params);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "TOURNAMENT_NOT_FOUND" });
+    expect(reportMatchScore).not.toHaveBeenCalled();
   });
 });

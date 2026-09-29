@@ -91,3 +91,25 @@ describe("compteurs de l'accueil", () => {
     expect(discordStarted).toBe(true);
   });
 });
+
+describe("compteur de tournois de l'accueil", () => {
+  beforeEach(() => {
+    clearCache();
+    jest.clearAllMocks();
+  });
+
+  afterEach(() => {
+    clearCache();
+  });
+
+  it("ne compte que les tournois publiés : un tournoi caché ne se trahit pas par le total", async () => {
+    const execute = jest.fn<SqlQuery>(async () => [[{ players: 1, teams: 1, tournaments: 1 }], []]);
+    mockedDb.mockResolvedValue(fakePool({ execute }));
+    mockedDiscord.mockResolvedValue(null);
+
+    await getLandingStats();
+
+    const sql = String(execute.mock.calls[0]?.[0]);
+    expect(sql).toMatch(/COUNT\(\*\) FROM bg_tournaments WHERE start_visibility_at <= NOW\(\)/);
+  });
+});

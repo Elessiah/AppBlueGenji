@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
+jest.mock("@/lib/server/tournaments/write-visibility");
 
 import { POST } from "@/app/api/tournaments/[id]/register/route";
+import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
 import { REGISTRATION_FILTER_ERRORS } from "@/lib/shared/registration-filters";
@@ -42,6 +44,7 @@ function rejectsWith(code: string) {
 describe("POST /api/tournaments/[id]/register", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(canActOnTournament).mockResolvedValue(true);
     jest.mocked(getCurrentUser).mockResolvedValue(player);
     jest.mocked(service.registerCurrentUserTeam).mockResolvedValue(undefined);
   });
@@ -100,5 +103,17 @@ describe("POST /api/tournaments/[id]/register", () => {
     rejectsWith("ER_LOCK_DEADLOCK");
     const res = await POST(req(), params);
     expect(res.status).toBe(500);
+  });
+});
+
+describe("tournoi non publié", () => {
+  it("répond le même 404 qu'un identifiant inexistant, sans atteindre le service", async () => {
+    jest.clearAllMocks();
+    jest.mocked(getCurrentUser).mockResolvedValue(player);
+    jest.mocked(canActOnTournament).mockResolvedValue(false);
+    const res = await POST(req(), params);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "TOURNAMENT_NOT_FOUND" });
+    expect(service.registerCurrentUserTeam).not.toHaveBeenCalled();
   });
 });

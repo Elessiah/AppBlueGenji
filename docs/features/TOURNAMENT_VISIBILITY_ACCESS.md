@@ -78,22 +78,29 @@ l'existence est justement ce qu'on protège, l'identifiant étant devinable.
 `getVisibleTournamentSnapshot` rend `null` pour « n'existe pas » comme pour
 « pas pour vous », et les deux appelants traduisent ce `null` en un même 404.
 
-## Ce que la garde n'a pas besoin de couvrir
+## Les routes d'écriture : pas d'action possible, mais pas d'oracle non plus
 
-Les routes d'écriture d'un tournoi (`register`, `forfeit`, `matches/.../report`,
-`report-issue`) ne sont pas concernées, et pas par oubli : `validateDateOrder`
-impose `startVisibilityAt <= registrationOpenAt <= registrationCloseAt <= startAt`
-à la création **comme à l'édition**. Un tournoi non publié est donc toujours
-`UPCOMING`, et chacune de ces routes exige déjà un état plus avancé ou un
-engagement qu'il est impossible d'avoir. `edit` est de son côté gardé par
-`can(user, "tournaments")`.
+Les routes d'écriture d'un joueur (`register`, `report-issue`, `forfeit`,
+`matches/.../report`, `matches/.../forfeit`) ne pouvaient rien **faire** sur un
+tournoi caché : `validateDateOrder` impose
+`startVisibilityAt <= registrationOpenAt <= registrationCloseAt <= startAt` à la
+création **comme à l'édition**, donc un tournoi non publié est toujours
+`UPCOMING`. Mais elles **répondaient** différemment : `TOURNAMENT_NOT_FOUND` (404)
+pour un identifiant inexistant, un autre code (`REGISTRATION_CLOSED`,
+`NOT_REGISTERED`, `TOURNAMENT_NOT_RUNNING`…) pour un tournoi en préparation — un
+compte sans rôle énumérait les identifiants et confirmait l'existence que le 404
+des lectures veut taire.
 
-L'invariant porte sur ce que l'**application** écrit : les deux seuls chemins qui
-posent ces quatre dates passent par `validateDateOrder`. Une ligne fabriquée à la
-main en base — ou par `npm run seed`, qui insère en SQL direct — pourrait le
-violer et rendre `register` atteignable sur un tournoi caché. Si un jour une
-écriture contourne cette validation, c'est la garde de visibilité qu'il faudra
-porter aussi sur ces routes, pas seulement les dates qu'il faudra recontrôler.
+Chacune appelle donc `canActOnTournament` (`lib/server/tournaments/write-visibility.ts`)
+**avant** le service : une lecture de `start_visibility_at`, jugée par la même
+règle pure `canViewTournament`, et le même 404 `TOURNAMENT_NOT_FOUND` qu'un
+identifiant inexistant. La permission `tournaments` passe sans lecture en base.
+Le contrôle porte aussi, au passage, sur une ligne qui violerait l'invariant des
+dates (seed, SQL écrit à la main). `edit` reste gardé par `can(user, "tournaments")`.
+
+Le compteur de tournois de la vitrine (`GET /api/landing/stats`, public) ne compte
+que les tournois publiés (`start_visibility_at <= NOW()`) : son évolution
+trahissait sinon la création d'un tournoi caché.
 
 La vitrine publique est logée à la même enseigne : le calendrier et le ticker de
 `/` passent par `listTournamentBuckets`, déjà filtré.

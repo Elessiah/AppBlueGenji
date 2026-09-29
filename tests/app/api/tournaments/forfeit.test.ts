@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
+jest.mock("@/lib/server/tournaments/write-visibility");
 
 import { POST } from "@/app/api/tournaments/[id]/forfeit/route";
+import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
 import { authUser } from "../../../helpers/auth-user";
@@ -31,6 +33,7 @@ function entrant(teamId: number | null, canActForEntrant = true) {
 describe("POST /api/tournaments/[id]/forfeit", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.mocked(canActOnTournament).mockResolvedValue(true);
     jest.mocked(service.forfeitTournamentTeam).mockResolvedValue(undefined);
     jest.mocked(service.getUserEntrant).mockResolvedValue(entrant(null));
   });
@@ -140,5 +143,17 @@ describe("POST /api/tournaments/[id]/forfeit", () => {
     const res = await POST(req({ teamId: 88 }), params);
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "TEAM_ALREADY_OUT" });
+  });
+});
+
+describe("tournoi non publié", () => {
+  it("répond le même 404 qu'un identifiant inexistant, sans atteindre le service", async () => {
+    jest.clearAllMocks();
+    jest.mocked(getCurrentUser).mockResolvedValue(member);
+    jest.mocked(canActOnTournament).mockResolvedValue(false);
+    const res = await POST(req(), params);
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "TOURNAMENT_NOT_FOUND" });
+    expect(service.forfeitTournamentTeam).not.toHaveBeenCalled();
   });
 });

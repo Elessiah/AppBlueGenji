@@ -493,9 +493,16 @@ s'applique aux **deux** portes de lecture — le flux SSE (chemin nominal) et la
 lecture REST de secours — ainsi qu'à la route d'image d'aperçu, servie hors des
 mises en page.
 
-Aucune route d'écriture n'a à contrôler la visibilité : `validateDateOrder`
-garantit `startVisibilityAt <= registrationOpenAt`, donc un tournoi caché est
-toujours `UPCOMING`.
+Les routes d'écriture des joueurs (`register`, `report-issue`, `forfeit`,
+`matches/.../report`, `matches/.../forfeit`) n'ont pas à contrôler l'**action** —
+`validateDateOrder` garantit `startVisibilityAt <= registrationOpenAt`, donc un
+tournoi caché est toujours `UPCOMING` et rien n'y est faisable —, mais elles
+contrôlent la **visibilité** avant tout autre refus (`canActOnTournament`,
+`lib/server/tournaments/write-visibility.ts`) : sans quoi leurs codes d'erreur
+(`TOURNAMENT_NOT_FOUND` pour un identifiant inexistant, `REGISTRATION_CLOSED`,
+`NOT_REGISTERED`… pour un tournoi en préparation) servaient d'oracle
+d'existence. Même règle, même 404. Le compteur public de la vitrine
+(`GET /api/landing/stats`) ne compte, lui aussi, que les tournois publiés.
 
 ### 4.2 S'engager
 

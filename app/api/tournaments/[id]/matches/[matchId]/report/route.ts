@@ -1,5 +1,6 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
 import { readJsonBody } from "@/lib/server/request-body";
 
@@ -20,6 +21,10 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(matchId) || matchId <= 0) {
     return fail("INVALID_MATCH_ID", 400);
   }
+
+  // Tournoi non publié : même 404 qu'un identifiant inexistant, avant tout
+  // autre refus (`write-visibility.ts`).
+  if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   try {
     const body = (await readJsonBody(req)) as { myScore?: number; opponentScore?: number };

@@ -2,8 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments/issue-reports");
+jest.mock("@/lib/server/tournaments/write-visibility");
 
 import { POST } from "@/app/api/tournaments/[id]/report-issue/route";
+import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { getCurrentUser } from "@/lib/server/auth";
 import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
 import { ISSUE_REPORT_DAILY_RULE, ISSUE_REPORT_RULE } from "@/lib/server/api-guard";
@@ -36,6 +38,7 @@ const VALID = { message: "adversaire absent depuis 20 minutes" };
 
 beforeEach(() => {
   jest.clearAllMocks();
+  jest.mocked(canActOnTournament).mockResolvedValue(true);
   jest.mocked(reportTournamentIssue).mockResolvedValue({ notifiedReferees: 2 });
 });
 afterEach(() => {
@@ -175,5 +178,16 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
     resetRateLimit(ISSUE_REPORT_RULE.name);
     expect((await POST(jsonReq(VALID), params("5"))).status).toBe(429);
     expect(ISSUE_REPORT_DAILY_RULE.windowMs).toBe(24 * 60 * 60_000);
+  });
+});
+
+describe("tournoi non publié", () => {
+  it("répond le même 404 qu'un identifiant inexistant, sans atteindre le service", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
+    jest.mocked(canActOnTournament).mockResolvedValue(false);
+    const res = await POST(jsonReq(VALID), params("5"));
+    expect(res.status).toBe(404);
+    expect(await res.json()).toMatchObject({ error: "TOURNAMENT_NOT_FOUND" });
+    expect(reportTournamentIssue).not.toHaveBeenCalled();
   });
 });
