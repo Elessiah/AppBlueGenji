@@ -88,7 +88,8 @@ const OAUTH_CLIENTS: Record<OAuthProvider, OAuthClient> = {
         // **Le pseudo, pas le nom d'affichage.** `username` est le tag stable
         // par lequel on retrouve quelqu'un sur Discord ; `global_name` est un
         // libellé décoratif, que deux comptes peuvent partager. C'est le
-        // premier que la certification publie à l'arbitrage.
+        // premier que le site enregistre, et que le joueur peut ensuite
+        // certifier pour l'ouvrir à l'arbitrage.
         handle: user.username,
         avatarUrl: discordAvatarUrl(user),
       };

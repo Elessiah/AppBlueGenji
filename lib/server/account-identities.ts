@@ -42,6 +42,7 @@ import {
   createOrGetBlizzardUser,
   createOrGetDiscordUser,
   createOrGetGoogleUser,
+  DISCORD_NAMED_PSEUDO_SQL,
   normalizeBattletag,
   normalizeDiscordHandle,
   type TermsConsent,
@@ -134,8 +135,8 @@ export async function listAccountConnections(userId: number): Promise<AccountCon
  * Ouvre (ou retrouve) le compte que désigne cette identité.
  *
  * Simple aiguillage : chaque fournisseur a déjà sa fonction dans
- * `users-service`, avec ses effets propres — la certification du tag pour
- * Discord, le BattleTag pour Blizzard, la photo pour Google. Les regrouper ici
+ * `users-service`, avec ses effets propres — le tag (enregistré, non certifié)
+ * pour Discord, le BattleTag pour Blizzard, la photo pour Google. Les regrouper ici
  * évite qu'une route ait à savoir lequel appeler, ce qui est exactement le genre
  * d'aiguillage qu'on oublie de compléter en ajoutant un fournisseur.
  */
@@ -188,10 +189,9 @@ async function subjectTakenByAnother(
  * `REFRESHED` n'est pas un cas limite mais un geste à part entière : c'est
  * **la même** identité, rapportée une seconde fois par le fournisseur. Rien ne
  * change de porte ; seul ce que le fournisseur atteste est réécrit — pour
- * Discord, le pseudo, certifié. C'est ainsi qu'un compte déjà relié certifie son
- * tag sans passer par le bot : la résolution d'un tag par le bot balaie les
- * serveurs qu'il partage avec le joueur, et un compte venu par OAuth n'en
- * partage souvent aucun.
+ * Discord, le pseudo, **non certifié** s'il a changé. C'est ainsi qu'un compte
+ * relié dont le tag manque (retiré, ou tapé à la main avant le rattachement)
+ * obtient un pseudo nommé par Discord, qu'il certifie ensuite d'un clic.
  */
 export type OAuthLinkOutcome = "LINKED" | "REFRESHED";
 
@@ -234,13 +234,13 @@ export async function linkOAuthIdentity(
   try {
     let result: ResultSetHeader;
     if (identity.provider === "DISCORD") {
-      // Le rattachement **certifie** le tag, exactement comme la connexion par
-      // Discord : l'aller-retour OAuth est la preuve que demande
-      // `lib/shared/discord-identity.ts`, et c'est Discord lui-même qui nomme le
-      // pseudo. Un pseudo entièrement numérique est écarté par
-      // `normalizeDiscordHandle` — on ne publie pas une suite de chiffres là où
-      // un arbitre attend un nom — et le compte se rattache alors sans que son
-      // tag soit certifié.
+      // Le rattachement **enregistre** le pseudo que Discord nomme, sans le
+      // certifier — exactement comme la connexion par Discord
+      // (`DISCORD_NAMED_PSEUDO_SQL`) : rattacher une porte n'est pas consentir à
+      // l'exposition. La certification se donne ensuite d'un clic sur `/profil`.
+      // Un pseudo entièrement numérique est écarté par `normalizeDiscordHandle`
+      // et le tag stocké reste alors tel quel, avec son origine : un tag tapé à
+      // la main avant le rattachement ne devient pas certifiable d'un clic.
       //
       // `discord_link_method` est posé dans la **même** instruction, et à
       // `OAUTH` sans condition : c'est ce que ce rattachement-ci est, et il
@@ -251,13 +251,13 @@ export async function linkOAuthIdentity(
       [result] = await db.execute<ResultSetHeader>(
         handle
           ? `UPDATE bg_users
-             SET discord_id = ?, discord_pseudo = ?, discord_verified_at = NOW(),
+             SET discord_id = ?, ${DISCORD_NAMED_PSEUDO_SQL},
                  discord_link_method = 'OAUTH'
              WHERE id = ? AND is_deleted = 0`
           : `UPDATE bg_users
              SET discord_id = ?, discord_link_method = 'OAUTH'
              WHERE id = ? AND is_deleted = 0`,
-        handle ? [identity.subject, handle, userId] : [identity.subject, userId],
+        handle ? [identity.subject, handle, handle, userId] : [identity.subject, userId],
       );
     } else if (identity.provider === "BLIZZARD") {
       // Même règle qu'à la connexion : Blizzard fait foi sur le BattleTag, et
@@ -343,9 +343,14 @@ export async function unlinkOAuthIdentity(userId: number, provider: OAuthProvide
   // rattachement, et un compte détaché n'en a plus. La laisser ferait annoncer
   // « rattaché par le bouton Discord » au prochain rattachement par code, tant
   // que celui-ci n'aurait pas réécrit la colonne.
+  //
+  // L'**origine** du tag aussi : le pseudo reste, mais il a été nommé par un
+  // compte Discord que plus rien ne relie à celui-ci. Un autre Discord rattaché
+  // ensuite, sans pseudo affichable, pourrait sinon certifier d'un clic le
+  // pseudo de l'ancien (`certifyLinkedDiscordTag`).
   const clearedColumns =
     provider === "DISCORD"
-      ? "discord_id = NULL, discord_verified_at = NULL, discord_link_method = NULL"
+      ? "discord_id = NULL, discord_verified_at = NULL, discord_link_method = NULL, discord_pseudo_from_discord = 0"
       : `${column} = NULL`;
 
   const db = await getDatabase();

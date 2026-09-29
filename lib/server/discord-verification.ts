@@ -14,23 +14,18 @@
  * secret est le même objet, il n'y a aucune raison d'en avoir un second, moins
  * éprouvé.
  *
- * **Deux chemins, une seule règle.** Un compte qui porte déjà un `discord_id` a
- * *déjà* fait cette preuve — c'est ainsi qu'il s'est connecté. Lui redemander un
- * code serait rejouer ce qu'on détient : le site vérifie alors que le tag saisi
- * **résout vers cet identifiant-là**, et certifie sur place, sans message privé.
- * Un compte Google, lui, n'a rien prouvé : il passe par le code. `startVerification`
- * dit lequel des deux vient de se produire, et c'est la seule différence entre
- * les deux parcours.
+ * **La connexion prouve, elle ne certifie pas.** Se connecter par Discord (bouton
+ * ou code) enregistre le pseudo que Discord a donné, **non certifié** : c'est un
+ * acte d'authentification, pas le consentement à l'exposition que la
+ * certification ouvre. Celle-ci reste un geste distinct, fait sur `/profil`.
  *
- * **L'écran n'emprunte plus le premier chemin.** Il suppose que le bot sache
- * résoudre le tag, donc qu'il partage un serveur avec le joueur — ce qu'un
- * compte venu par OAuth Discord n'a jamais eu à faire : la recherche balayait
- * alors tous les serveurs du bot sans trouver personne, dépassait le délai de
- * l'appel, et le profil annonçait « bot non joignable ». Un compte rattaché
- * certifie donc par un aller-retour OAuth (`linkOAuthIdentity`, qui réécrit le
- * pseudo nommé par Discord). Le chemin reste ici parce qu'il demeure une preuve
- * juste, et qu'un compte rattaché entre l'ouverture du profil et le clic y
- * aboutit encore.
+ * **Deux chemins, selon ce que le compte a déjà prouvé.** Un compte qui porte un
+ * `discord_id` a *déjà* fait la preuve — c'est ainsi qu'il s'est connecté, et
+ * c'est Discord qui a nommé son pseudo (`discord_pseudo_from_discord`). Il
+ * certifie donc **d'un clic** (`certifyLinkedDiscordTag`) : ni aller-retour
+ * OAuth, ni code, ni bot — et jamais une valeur envoyée par le client, qui ne
+ * sert qu'à vérifier que le tag montré est bien celui qu'on certifie. Un compte
+ * Google, lui, n'a rien prouvé : il passe par le code en message privé.
  *
  * **Ce module ne relie jamais deux comptes Discord.** Un compte du site dont le
  * `discord_id` est posé le garde : un tag qui résout ailleurs est refusé
@@ -61,6 +56,13 @@ export type DiscordAccountState = {
    * certification se fait **sans code** (voir `discordVerificationNeedsCode`).
    */
   linked: boolean;
+  /**
+   * Le tag enregistré a-t-il été **nommé par Discord** ? C'est la condition de
+   * la certification en un clic d'un compte rattaché : sans elle (tag tapé à la
+   * main avant le rattachement, ou aucun tag), le joueur repasse par Discord
+   * pour qu'il nomme son pseudo.
+   */
+  attested: boolean;
 };
 
 /** Résultat d'une demande de certification. */
@@ -74,6 +76,7 @@ type UserDiscordRow = RowDataPacket & {
   discord_id: string | null;
   discord_pseudo: string | null;
   discord_verified_at: Date | null;
+  discord_pseudo_from_discord: number | boolean | null;
 };
 
 /**
@@ -88,7 +91,7 @@ type UserDiscordRow = RowDataPacket & {
 async function loadDiscordRow(userId: number): Promise<UserDiscordRow | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<UserDiscordRow[]>(
-    `SELECT discord_id, discord_pseudo, discord_verified_at
+    `SELECT discord_id, discord_pseudo, discord_verified_at, discord_pseudo_from_discord
      FROM bg_users
      WHERE id = ? AND is_deleted = 0
      LIMIT 1`,
@@ -103,7 +106,13 @@ export async function getDiscordAccountState(userId: number): Promise<DiscordAcc
     tag: row?.discord_pseudo ?? null,
     verified: row?.discord_verified_at != null,
     linked: Boolean(row?.discord_id),
+    attested: isAttestedTag(row),
   };
+}
+
+/** Le tag stocké a-t-il été nommé par Discord (et existe-t-il) ? */
+function isAttestedTag(row: UserDiscordRow | null): boolean {
+  return Boolean(row?.discord_pseudo) && Number(row?.discord_pseudo_from_discord ?? 0) === 1;
 }
 
 /**
@@ -129,20 +138,12 @@ export async function getDiscordAccountState(userId: number): Promise<DiscordAcc
  * lecture préalable ne suffit pas : c'est l'écriture qui doit porter la
  * condition, un `await` la sépare de son contrôle.
  *
- * `method` suit `discord_id` : `DM_CODE` quand c'est **ce geste** qui vient de
- * poser l'identifiant, et `null` — ne touche à rien — quand le compte le
- * portait déjà. La distinction n'est pas cosmétique : la certification
- * immédiate d'un compte **déjà rattaché** ne franchit aucune porte, et lui
- * attribuer `DM_CODE` réécrirait en « code en message privé » un rattachement
- * noué par le bouton. Le `COALESCE` de `discord_id` et celui de la méthode
- * disent donc la même chose, chacun de son côté.
+ * La méthode suit `discord_id` par le même `COALESCE` : le code reçu en message
+ * privé est la porte qu'un compte sans Discord vient de franchir, mais il ne
+ * réécrit pas celle d'un rattachement déjà noué.
  */
-async function writeVerifiedTag(
-  userId: number,
-  discordId: string,
-  tag: string,
-  method: ConnectionMethod | null,
-): Promise<void> {
+async function writeVerifiedTag(userId: number, discordId: string, tag: string): Promise<void> {
+  const method: ConnectionMethod = "DM_CODE";
   const db = await getDatabase();
   try {
     const [result] = await db.execute<ResultSetHeader>(
@@ -150,9 +151,10 @@ async function writeVerifiedTag(
        SET discord_id = COALESCE(discord_id, ?),
            discord_pseudo = ?,
            discord_verified_at = NOW(),
-           discord_link_method = ${method === null ? "discord_link_method" : "COALESCE(discord_link_method, ?)"}
+           discord_pseudo_from_discord = 1,
+           discord_link_method = COALESCE(discord_link_method, ?)
        WHERE id = ? AND is_deleted = 0`,
-      method === null ? [discordId, tag, userId] : [discordId, tag, method, userId],
+      [discordId, tag, method, userId],
     );
     if (Number(result.affectedRows) === 0) throw new Error("PROFILE_NOT_FOUND");
   } catch (error) {
@@ -188,19 +190,70 @@ async function discordIdTakenByAnother(discordId: string, userId: number): Promi
  * plafond de débit ; qu'il lève est ce qui le rend effectif — appelé après
  * l'envoi, il n'aurait plus rien à empêcher.
  *
- * Il n'est **pas** appelé sur le chemin sans code : une certification immédiate
+ * Il n'est **pas** appelé sur le chemin sans code : une certification en un clic
  * ne fait sonner aucun téléphone, il n'y a rien à protéger.
  */
 export type ResolvedDiscordIdGuard = (discordId: string) => void;
 
 /**
+ * Certifie **d'un clic** le tag d'un compte Discord rattaché.
+ *
+ * La preuve est faite — le compte s'est connecté par ce Discord, qui a nommé le
+ * pseudo — et ce clic n'apporte que ce qui manquait : le **consentement** à
+ * l'exposition. Rien n'est donc demandé au bot ni à Discord, et rien de ce que
+ * le client envoie n'est écrit : `expectedTag` (le tag que l'écran montrait)
+ * sert seulement de garde, pour ne pas certifier un pseudo que la connexion d'un
+ * autre appareil viendrait de remplacer sous les yeux du joueur.
+ *
+ * Une seule instruction, conditions comprises : un `await` entre la lecture et
+ * l'écriture laisserait un détachement ou une suppression de compte s'y glisser.
+ * Déjà certifié, le geste réussit sans rien changer (`COALESCE`).
+ *
+ * @throws DISCORD_NOT_LINKED Le compte n'a plus de Discord rattaché.
+ * @throws DISCORD_TAG_MISSING Aucun tag enregistré.
+ * @throws DISCORD_TAG_NOT_ATTESTED Le tag n'a pas été nommé par Discord (saisi
+ *   avant le rattachement) : le joueur repasse par Discord pour qu'il le nomme.
+ * @throws DISCORD_TAG_CHANGED Le tag enregistré n'est plus celui montré.
+ * @throws PROFILE_NOT_FOUND Compte supprimé.
+ */
+export async function certifyLinkedDiscordTag(
+  userId: number,
+  expectedTag: string,
+): Promise<{ status: "VERIFIED"; tag: string }> {
+  const expected = normalizeDiscordHandle(expectedTag);
+  if (expected) {
+    const db = await getDatabase();
+    const [result] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_users
+       SET discord_verified_at = COALESCE(discord_verified_at, NOW())
+       WHERE id = ? AND is_deleted = 0
+         AND discord_id IS NOT NULL
+         AND discord_pseudo_from_discord = 1
+         AND discord_pseudo = ?`,
+      [userId, expected],
+    );
+    if (Number(result.affectedRows) > 0) return { status: "VERIFIED", tag: expected };
+  }
+
+  // Rien n'a été apparié : la relecture ne décide plus, elle **nomme** le refus.
+  const row = await loadDiscordRow(userId);
+  if (!row) throw new Error("PROFILE_NOT_FOUND");
+  if (!row.discord_id) throw new Error("DISCORD_NOT_LINKED");
+  if (!row.discord_pseudo) throw new Error("DISCORD_TAG_MISSING");
+  if (!isAttestedTag(row)) throw new Error("DISCORD_TAG_NOT_ATTESTED");
+  throw new Error("DISCORD_TAG_CHANGED");
+}
+
+/**
  * Ouvre une certification pour `handle`.
+ *
+ * Un compte **rattaché** certifie d'un clic ({@link certifyLinkedDiscordTag}) :
+ * `handle` n'y est que le tag montré à l'écran. Un compte sans Discord reçoit un
+ * code en message privé.
  *
  * @throws INVALID_DISCORD_HANDLE Un identifiant numérique, une chaîne vide : il
  *   n'y a pas de **tag** à certifier. La connexion accepte un identifiant en
  *   repli, la certification non — c'est un pseudo qu'elle publie à l'arbitrage.
- * @throws DISCORD_ID_MISMATCH Le tag désigne un autre compte Discord que celui
- *   déjà rattaché.
  * @throws DISCORD_ALREADY_LINKED Un autre compte du site a déjà prouvé ce
  *   Discord.
  * @throws DISCORD_USER_NOT_FOUND / BOT_INTERNAL_UNREACHABLE / DISCORD_DM_FAILED
@@ -211,28 +264,20 @@ export async function startDiscordVerification(
   handle: string,
   guardBeforeSend?: ResolvedDiscordIdGuard,
 ): Promise<VerificationStart> {
-  const tag = normalizeDiscordHandle(handle);
-  if (!tag) throw new Error("INVALID_DISCORD_HANDLE");
-
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
 
+  // **La preuve existe déjà** : ce compte s'est connecté par son Discord. Il ne
+  // manque que le consentement, que ce clic donne.
+  if (row.discord_id) return certifyLinkedDiscordTag(userId, handle);
+
+  const tag = normalizeDiscordHandle(handle);
+  if (!tag) throw new Error("INVALID_DISCORD_HANDLE");
+
   const discordId = await resolveDiscordUser(tag);
 
-  if (row.discord_id && row.discord_id !== discordId) {
-    throw new Error("DISCORD_ID_MISMATCH");
-  }
   if (await discordIdTakenByAnother(discordId, userId)) {
     throw new Error("DISCORD_ALREADY_LINKED");
-  }
-
-  // **La preuve existe déjà** : ce compte s'est connecté par ce Discord. Le tag
-  // vient d'être résolu vers ce même identifiant, il n'y a plus rien à prouver.
-  if (row.discord_id === discordId) {
-    // Aucune porte franchie : le rattachement existait avant ce geste, et ce
-    // n'est pas à lui de dire par où il est passé.
-    await writeVerifiedTag(userId, discordId, tag, null);
-    return { status: "VERIFIED", tag };
   }
 
   // **Avant le défi et avant l'envoi** : ce qui suit fait vibrer le téléphone de
@@ -287,6 +332,6 @@ export async function confirmDiscordVerification(
   // Le code reçu en message privé **est** la porte, ici : sur un compte qui ne
   // portait pas encore de `discord_id`, cette écriture le pose, et c'est donc
   // ce geste-là qui a noué le rattachement.
-  await writeVerifiedTag(userId, discordId, proof.handle, "DM_CODE");
+  await writeVerifiedTag(userId, discordId, proof.handle);
   return { tag: proof.handle };
 }

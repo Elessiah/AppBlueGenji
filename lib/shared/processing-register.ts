@@ -100,7 +100,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)",
       "Exporter ses données et supprimer son compte depuis « Mon profil »",
     ],
-    legalBasis: "Consentement (création du compte, choix des données affichées)",
+    legalBasis:
+      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles",
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
       "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)",
@@ -134,18 +135,18 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Connecter un joueur à son compte sans mot de passe",
     subPurposes: [
       "Connexion par Google, Discord ou Blizzard (OAuth)",
-      "Invite de connexion Google One Tap, sur la seule page de connexion et après acceptation de la politique de confidentialité",
+      "Invite de connexion Google One Tap, sur la seule page de connexion et seulement si le visiteur l'a demandée (case à part, décochée par défaut — consentement)",
       "Connexion par code à six chiffres envoyé en message privé Discord par le bot",
       "Rattachement de plusieurs moyens de connexion à un même compte",
     ],
     legalBasis: "Exécution du service demandé par le joueur (contrat)",
     dataSubjects: [
       "Joueurs inscrits sur le site",
-      "Visiteurs de la page de connexion ayant accepté la politique (invite Google One Tap)",
+      "Visiteurs de la page de connexion ayant coché l'invite Google One Tap",
     ],
     dataCategories: [
       "Identifiants techniques opaques Google, Discord et Blizzard",
-      "Identifiant Discord et pseudo Discord (connexion par code)",
+      "Identifiant Discord et pseudo Discord (connexion par code ou par bouton), enregistré sans être certifié — la certification, qui l'expose, est un geste distinct (T04)",
       "Porte de rattachement du compte Discord (bouton OAuth ou code en message privé)",
       "Code de connexion (conservé uniquement sous forme d'empreinte), nombre d'essais",
       "Adresse IP (en mémoire uniquement, pour limiter les essais — jamais écrite)",
@@ -212,7 +213,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Envoyer des rappels de match en message privé Discord (une semaine, 24 h et 1 h avant)",
       "Alerter le rôle arbitre (conflit de score, report expiré, signalement d'un joueur)",
     ],
-    legalBasis: "Consentement (certification du pseudo Discord par le joueur) et intérêt légitime (bon déroulement des tournois)",
+    legalBasis:
+      "Consentement (certification du pseudo Discord, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) et intérêt légitime (bon déroulement des tournois)",
     dataSubjects: ["Joueurs engagés dans un tournoi", "Arbitres", "Casters inscrits sur un match"],
     dataCategories: [
       "Pseudo et identifiant Discord",

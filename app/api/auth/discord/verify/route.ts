@@ -52,10 +52,10 @@ export async function POST(req: Request) {
     if (throttled) return throttled;
 
     // On consomme plutôt qu'on ne vérifie : le défi porte le **tag** qui a servi
-    // à résoudre l'identifiant, et se connecter par Discord *est* la preuve que
-    // la certification demande. Le compte ressort donc avec son tag certifié,
-    // sans que personne n'ait à refaire le geste depuis son profil — ce qui
-    // règle d'un coup le cas de tous les comptes nés par cette porte.
+    // à résoudre l'identifiant, et c'est lui — jamais une valeur renvoyée par le
+    // client — que le compte enregistre. **Sans le certifier** : se connecter
+    // n'est pas consentir à exposer son tag, et la certification reste un clic
+    // distinct sur le profil.
     //
     // L'identifiant Discord vient **du défi**, jamais du client : la demande de
     // code ne le publie plus (c'était un oracle), et il n'est relu qu'une fois

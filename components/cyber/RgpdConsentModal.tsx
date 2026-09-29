@@ -7,16 +7,27 @@ import { TERMS_CHECKBOX_LABEL, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 
 interface RgpdConsentModalProps {
-  onAccept: () => void;
+  /** `oneTap` : le visiteur a coché l'invite Google One Tap (décochée par défaut). */
+  onAccept: (choices: { oneTap: boolean }) => void;
   onRefuse: () => void;
 }
 
 /**
- * Popup de consentement RGPD affiché avant toute création de compte.
- * Présente l'usage des données et exige un consentement explicite. Un refus
- * (`onRefuse`) doit ramener l'utilisateur en arrière sans qu'aucune donnée ne
- * soit enregistrée : aucune requête d'authentification n'est déclenchée tant
- * que l'utilisateur n'a pas accepté.
+ * Popup d'entrée de `/connexion`, affichée avant toute création de compte.
+ *
+ * **Une information, pas un consentement** — sauf pour ce qui est réellement
+ * facultatif. Les données sans lesquelles un compte n'existe pas (pseudo,
+ * identifiant du fournisseur de connexion) reposent sur l'exécution du service
+ * demandé (art. 6.1.b RGPD) : les faire « accepter » serait demander un
+ * consentement qui n'est pas libre, puisque le refuser interdit le service. La
+ * modale **informe** (art. 13) et renvoie à la politique ; ce qui s'accepte vraiment
+ * a sa propre case : les conditions d'utilisation (preuve serveur,
+ * `bg_terms_acceptances`), et l'invite **Google One Tap**, décochée par défaut,
+ * seul traitement de cette page qui fasse appel à un tiers sans que le visiteur
+ * l'ait demandé (IP et cookie `g_state` chez Google).
+ *
+ * Revenir en arrière (`onRefuse`) ne déclenche aucune requête
+ * d'authentification : rien n'est enregistré.
  */
 export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
@@ -25,6 +36,8 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
   // présenter avant qu'il existe. Une case à part, et non un « en continuant,
   // tu acceptes » : c'est une acceptation qu'on doit pouvoir prouver.
   const [termsChecked, setTermsChecked] = useState(false);
+  // Décochée par défaut : un consentement se donne, il ne se présume pas.
+  const [oneTapChecked, setOneTapChecked] = useState(false);
   // Focus initial dans la modale, tabulation piégée et défilement figé : sans
   // eux, le clavier atteignait le formulaire de connexion derrière le voile
   // avant tout consentement. `locked` : Échap ne tranche pas un consentement,
@@ -73,8 +86,8 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
         </h2>
 
         <p style={{ color: "var(--ink-mute)", fontSize: 14, lineHeight: 1.7, margin: "0 0 16px" }}>
-          En créant ton compte, tu acceptes que BlueGenji traite les données
-          strictement nécessaires au fonctionnement de la plateforme :
+          Pour faire fonctionner ton compte, BlueGenji traite les données strictement
+          nécessaires au service que tu demandes :
         </p>
 
         <ul
@@ -107,10 +120,9 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
             publicité ciblée.
           </li>
           <li>
-            Une fois accepté, Google peut te proposer, sur cette page seulement, de continuer
-            avec ton compte Google ouvert dans le navigateur (invite <strong>Google One
-            Tap</strong>) : Google reçoit alors ton adresse IP et peut déposer un cookie{" "}
-            <strong>g_state</strong>.
+            Te connecter par Discord enregistre ton pseudo Discord <strong>sans le
+            certifier</strong> : personne ne le voit tant que tu ne le certifies pas toi-même
+            dans ton profil.
           </li>
           <li>
             Tu peux à tout moment exporter ou supprimer tes données depuis ton profil.
@@ -127,8 +139,33 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
           >
             politique de confidentialité
           </Link>
-          . Si tu refuses, aucune donnée ne sera enregistrée.
+          . Si tu reviens en arrière, aucune donnée ne sera enregistrée.
         </p>
+
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 10,
+            margin: "0 0 14px",
+            fontSize: 13.5,
+            lineHeight: 1.5,
+            color: "var(--ink)",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={oneTapChecked}
+            onChange={(event) => setOneTapChecked(event.target.checked)}
+            style={{ marginTop: 3 }}
+          />
+          <span>
+            Facultatif : me proposer, sur cette page seulement, de continuer avec mon compte
+            Google ouvert dans le navigateur (invite <strong>Google One Tap</strong>). Google
+            reçoit alors mon adresse IP et peut déposer un cookie <strong>g_state</strong>.
+          </span>
+        </label>
 
         <label
           style={{
@@ -166,11 +203,11 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
           <CyberButton
             variant="primary"
             type="button"
-            onClick={onAccept}
+            onClick={() => onAccept({ oneTap: oneTapChecked })}
             disabled={!termsChecked}
             style={{ flex: 1, minWidth: 160 }}
           >
-            J&apos;accepte et je continue
+            Continuer
           </CyberButton>
           <CyberButton
             variant="ghost"
@@ -178,7 +215,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
             onClick={onRefuse}
             style={{ flex: 1, minWidth: 120 }}
           >
-            Refuser
+            Revenir en arrière
           </CyberButton>
         </div>
       </div>

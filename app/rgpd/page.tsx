@@ -292,10 +292,18 @@ export default async function RgpdPage() {
             </li>
             <li>
               <strong>bg_rgpd_consent</strong> et <strong>bg_terms_consent</strong> — deux valeurs
-              du stockage local, posées sur la page de connexion <strong>quand vous acceptez</strong>{" "}
-              cette politique et les conditions d&apos;utilisation, pour ne pas vous les redemander.
-              La seconde ne contient que le numéro de version des conditions acceptées : une
-              nouvelle version vous les présente de nouveau.
+              du stockage local, posées sur la page de connexion <strong>quand vous continuez</strong>{" "}
+              après avoir lu l&apos;information sur vos données et accepté les conditions
+              d&apos;utilisation, pour ne pas vous les représenter. Elles ne contiennent qu&apos;un
+              numéro de version : une nouvelle version vous les présente de nouveau.
+              L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
+              numéro de version, dès que votre compte existe.
+            </li>
+            <li>
+              <strong>bg_one_tap_consent</strong> — une valeur du stockage local, posée
+              <strong> seulement si vous cochez</strong> la case « Google One Tap » de la page de
+              connexion (décochée par défaut) ; la décocher la retire. Elle retient ce choix, qui
+              est fait avant toute création de compte et n&apos;est donc rattaché à personne.
             </li>
           </ul>
           <p>
@@ -305,7 +313,8 @@ export default async function RgpdPage() {
           </p>
           <p>
             <strong>Une seule exception, et sur une seule page.</strong> Sur la page de connexion,
-            et seulement <strong>après</strong> que vous avez accepté cette politique, le site
+            et seulement <strong>si vous l&apos;avez demandé</strong> en cochant la case
+            « Google One Tap » (décochée par défaut, base légale : votre consentement), le site
             charge l&apos;invite de connexion de Google (Google One Tap,{" "}
             <code>accounts.google.com</code>). Google reçoit alors votre adresse IP, lit sa propre
             session pour vous proposer de continuer avec votre compte Google, et peut déposer sur

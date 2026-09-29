@@ -238,6 +238,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Pour compter les visiteurs uniques depuis la mise en service, le site garde une seule empreinte par visiteur, sans page ni date. Elle ne permet pas de remonter à toi, et ni ton adresse IP ni ton compte ne sont enregistrés.",
     ],
   },
+  // La connexion par Discord ne certifie plus le tag : l'exposition à
+  // l'organisation ne naît plus que d'un geste distinct. Les certifications
+  // déjà acquises à la connexion sont **gardées** — les défaire en silence
+  // fermerait des inscriptions et couperait l'arbitrage en plein tournoi —,
+  // et cette entrée est ce qui les signale à leur titulaire, avec le geste qui
+  // les retire.
+  {
+    id: "2026-09-certification-discord-volontaire",
+    publishedAt: "2026-09-30",
+    title: "Tag Discord : la certification n'est plus automatique",
+    summary:
+      "Se connecter par Discord n'ouvre plus ton tag à l'organisation : tu le certifies toi-même, d'un clic, depuis ton profil.",
+    details: [
+      "Jusqu'ici, te connecter par Discord (bouton ou code en message privé) certifiait ton tag Discord, donc le rendait lisible des administrateurs, des arbitres pendant tes tournois, et des joueurs et du caster de tes matchs. Désormais, la connexion enregistre seulement ton pseudo Discord, invisible de tous ; c'est le bouton « Certifier mon tag » de « Mon profil » qui l'ouvre à l'organisation.",
+      "Si ton tag a été certifié automatiquement, il le reste : l'organisation peut toujours te joindre pendant un tournoi. Pour retirer cette exposition, retire ton tag dans « Mon profil » : ta prochaine connexion par Discord le réenregistrera sans le certifier.",
+      "Le pseudo, les identifiants de connexion et le compte reposent sur l'exécution du service que tu demandes, et non plus sur un consentement : la politique de confidentialité le précise. L'invite Google One Tap de la page de connexion ne s'affiche plus que si tu la demandes, par une case décochée par défaut.",
+    ],
+  },
 ];
 
 /**

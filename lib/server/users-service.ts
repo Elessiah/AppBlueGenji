@@ -556,19 +556,41 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
 }
 
 /**
+ * Affectations SQL qui enregistrent un pseudo **nommé par Discord** — à la
+ * connexion ou au rattachement —, **sans le certifier**.
+ *
+ * Se connecter est un acte d'authentification, pas un consentement à
+ * l'exposition que porte la certification (`lib/shared/discord-identity.ts`) :
+ * la connexion enregistre donc le dernier pseudo que Discord a donné et marque
+ * son origine (`discord_pseudo_from_discord = 1`), ce qui permet ensuite de le
+ * certifier d'un clic depuis `/profil` (`certifyLinkedDiscordTag`).
+ *
+ * Une certification déjà donnée **survit** tant que le pseudo ne change pas —
+ * elle porte sur ce tag-là — et **tombe** s'il change, comme toute modification
+ * du tag (`updateOwnProfile`) : le joueur a consenti à exposer un pseudo précis,
+ * pas celui qu'il prendra demain. Le `CASE` précède l'affectation du pseudo,
+ * MySQL évaluant de gauche à droite ; `<=>` parce que l'ancien peut être `NULL`.
+ *
+ * Deux paramètres, tous deux le pseudo normalisé.
+ */
+export const DISCORD_NAMED_PSEUDO_SQL = `discord_verified_at = CASE
+             WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END,
+           discord_pseudo = ?,
+           discord_pseudo_from_discord = 1`;
+
+/**
  * Retrouve (ou crée) le compte rattaché à cet identifiant Discord.
  *
- * `verifiedHandle` est le **tag prouvé** par le code qui vient d'être consommé
- * (`null` quand la demande portait un identifiant numérique). Il est écrit tel
- * quel, et **certifié** : se connecter par Discord *est* la preuve que la
- * certification demande, si bien qu'un joueur qui entre par cette porte n'a
- * jamais à la refaire depuis son profil.
+ * `verifiedHandle` est le **tag prouvé** par le code qui vient d'être consommé,
+ * ou nommé par Discord au retour de l'OAuth (`null` quand la demande portait un
+ * identifiant numérique). Il est **enregistré, jamais certifié** : voir
+ * {@link DISCORD_NAMED_PSEUDO_SQL}. La certification reste un geste distinct,
+ * fait depuis le profil.
  *
- * Il **écrase** le tag stocké, y compris un tag déjà certifié, et ce n'est pas
- * une négligence : on n'arrive ici que par un identifiant qui a résolu ce
- * handle-là. Les deux valeurs désignent donc le même compte Discord, et la plus
- * récente est la bonne — un pseudo Discord se change, et c'est précisément le cas
- * où le tag stocké est périmé.
+ * Il **écrase** le tag stocké, et ce n'est pas une négligence : on n'arrive ici
+ * que par un identifiant qui a résolu ce handle-là. Les deux valeurs désignent
+ * donc le même compte Discord, et la plus récente est la bonne — un pseudo
+ * Discord se change, et c'est précisément le cas où le tag stocké est périmé.
  *
  * `door.method` dit **par quelle des deux portes Discord** on arrive : les deux
  * chemins — l'aller-retour OAuth et le code reçu en message privé — passent par
@@ -627,27 +649,28 @@ export async function createOrGetDiscordUser(
     // partie avant la suppression a résolu son compte sur le `discord_id`
     // d'alors ; elle reprend **après** le commit de `deleteOwnAccount`, qui
     // vient de vider tag et certification. Sans la condition, elle réécrivait
-    // le vrai pseudo Discord sur la ligne anonymisée **et le recertifiait** :
-    // `canViewDiscordTag` rouvre alors cette coordonnée à l'arbitrage de tout
-    // tournoi encore vivant où l'engagé figure — précisément ce que
-    // l'anonymisation venait d'effacer.
+    // le vrai pseudo Discord sur la ligne anonymisée — une donnée personnelle
+    // que l'anonymisation venait d'effacer.
     //
     // La session, elle, n'est pas le sujet : `getCurrentUser` et la lecture
     // par jeton portent déjà `is_deleted = 0`, donc celle que la connexion
     // s'apprête à ouvrir ne résoudra personne.
     //
-    // Le tag reste **conditionnel** — un identifiant numérique n'a rien à
-    // certifier —, la méthode non : elle décrit la porte qu'on vient de
-    // franchir, que Discord ait nommé un pseudo affichable ou pas. Les deux
-    // dans la même instruction, plutôt qu'une seconde écriture qui laisserait
-    // un `await` entre elles.
+    // Le tag reste **conditionnel** — un identifiant numérique n'est pas un
+    // pseudo —, la méthode non : elle décrit la porte qu'on vient de franchir,
+    // que Discord ait nommé un pseudo affichable ou pas. Les deux dans la même
+    // instruction, plutôt qu'une seconde écriture qui laisserait un `await`
+    // entre elles.
     await db.execute(
-      `UPDATE bg_users
-       SET discord_pseudo = CASE WHEN ? THEN ? ELSE discord_pseudo END,
-           discord_verified_at = CASE WHEN ? THEN NOW() ELSE discord_verified_at END,
-           discord_link_method = ${methodSql}
-       WHERE id = ? AND is_deleted = 0`,
-      [Boolean(handle), handle, Boolean(handle), userId],
+      handle
+        ? `UPDATE bg_users
+           SET ${DISCORD_NAMED_PSEUDO_SQL},
+               discord_link_method = ${methodSql}
+           WHERE id = ? AND is_deleted = 0`
+        : `UPDATE bg_users
+           SET discord_link_method = ${methodSql}
+           WHERE id = ? AND is_deleted = 0`,
+      handle ? [handle, handle, userId] : [userId],
     );
     await adoptRemoteAvatar(userId, avatarUrl ?? undefined);
     await settleTermsAfterLogin(userId, false, door);
@@ -660,10 +683,12 @@ export async function createOrGetDiscordUser(
   const pseudo = await ensureUniquePseudo(rawPseudo);
 
   const [created] = await db.execute<ResultSetHeader>(
-    `INSERT INTO bg_users (pseudo, discord_id, discord_pseudo, discord_verified_at,
+    // Tag enregistré, **jamais certifié** : un compte neuf n'a rien consenti
+    // d'autre que de se connecter.
+    `INSERT INTO bg_users (pseudo, discord_id, discord_pseudo, discord_pseudo_from_discord,
                            discord_link_method)
-     VALUES (?, ?, ?, ${handle ? "NOW()" : "NULL"}, ?)`,
-    [pseudo, discordId, handle, door.method],
+     VALUES (?, ?, ?, ?, ?)`,
+    [pseudo, discordId, handle, handle ? 1 : 0, door.method],
   );
 
   const userId = Number(created.insertId);
@@ -1353,6 +1378,12 @@ export async function updateOwnProfile(
              ELSE ?
            END,
            marvel_rivals_tag = CASE WHEN ? THEN ? ELSE marvel_rivals_tag END,
+           discord_pseudo_from_discord = CASE
+             WHEN NOT ? THEN discord_pseudo_from_discord
+             WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_pseudo_from_discord
+             WHEN discord_pseudo <=> ? THEN discord_pseudo_from_discord
+             ELSE 0
+           END,
            discord_verified_at = CASE
              WHEN NOT ? THEN discord_verified_at
              WHEN discord_id IS NOT NULL AND ? IS NOT NULL THEN discord_verified_at
@@ -1378,6 +1409,10 @@ export async function updateOwnProfile(
         nextBattletag,
         patch.marvelRivalsTag !== undefined,
         patch.marvelRivalsTag ?? null,
+        // Origine du tag : une saisie qui le change le fait passer pour tapé.
+        touchesDiscordTag,
+        nextDiscordPseudo,
+        nextDiscordPseudo,
         touchesDiscordTag,
         nextDiscordPseudo,
         nextDiscordPseudo,
@@ -1870,6 +1905,7 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
              -- que lui, et une date restée seule ferait d'un compte anonymisé un
              -- compte « vérifié » sans tag.
              discord_verified_at = NULL,
+             discord_pseudo_from_discord = 0,
              is_adult = NULL,
              discord_id = NULL,
              -- La méthode décrit un rattachement, pas un compte : les trois portes
