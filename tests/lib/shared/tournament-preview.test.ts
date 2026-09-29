@@ -190,7 +190,7 @@ describe("buildTournamentPreview — survie", () => {
   it("apparie les couples adjacents du classement", () => {
     const preview = build({ format: "SURVIVAL", entrants: entrants(6), seedingSource: "RANKING" });
 
-    expect(preview.roundLabel).toBe("Round 1");
+    expect(preview.roundLabel).toBe("Manche 1");
     expect(pairIds(preview)).toEqual([
       [1, 2],
       [3, 4],
@@ -201,7 +201,7 @@ describe("buildTournamentPreview — survie", () => {
   it("ouvre par un barrage entre les deux dernières sur effectif impair", () => {
     const preview = build({ format: "SURVIVAL", entrants: entrants(7) });
 
-    expect(preview.roundLabel).toBe("Barrage (round 1)");
+    expect(preview.roundLabel).toBe("Barrage (manche 1)");
     expect(pairIds(preview)).toEqual([[6, 7]]);
     expect(preview.pairings[0].kind).toBe("BARRAGE");
     expect(preview.notes.join(" ")).toContain("barrage");

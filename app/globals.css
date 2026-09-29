@@ -1209,6 +1209,39 @@ html {
   }
 }
 
+/* Au doigt, la barre des navigateurs mobiles se superpose et s'efface : rien
+   ne dit qu'une zone horizontale continue. `ScrollArea` pose `data-scroll-hint`
+   (`start`, `end`) sur les bords où il reste du contenu, que l'on estompe
+   (`lib/shared/scroll-hint.ts`). */
+@media (pointer: coarse) {
+  .scroll-area[data-scroll-hint] {
+    --scroll-hint-start: 0px;
+    --scroll-hint-end: 0px;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--scroll-hint-start),
+      #000 calc(100% - var(--scroll-hint-end)),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 var(--scroll-hint-start),
+      #000 calc(100% - var(--scroll-hint-end)),
+      transparent 100%
+    );
+  }
+
+  .scroll-area[data-scroll-hint~="start"] {
+    --scroll-hint-start: 28px;
+  }
+
+  .scroll-area[data-scroll-hint~="end"] {
+    --scroll-hint-end: 28px;
+  }
+}
+
 /* ===========================================================
    CADRE BORNÉ D'UNE MODALE
    -----------------------------------------------------------

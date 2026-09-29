@@ -11,6 +11,7 @@ import { normalizeStreamUrl, type MatchLiveTrigger } from "@/lib/shared/live-str
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
 import { currentLaunchState, launchReadiness, resolveHostTeamId } from "@/lib/shared/match-launch";
+import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -256,8 +257,8 @@ export function mapMatch(row: MatchRow): BracketMatch {
     team2Id: row.team2_id === null ? null : Number(row.team2_id),
     team1Name: row.team1_name,
     team2Name: row.team2_name,
-    team1Placeholder: row.team1_placeholder ?? null,
-    team2Placeholder: row.team2_placeholder ?? null,
+    team1Placeholder: localizeBracketPlaceholder(row.team1_placeholder ?? null),
+    team2Placeholder: localizeBracketPlaceholder(row.team2_placeholder ?? null),
     team1Score: row.team1_score === null ? null : Number(row.team1_score),
     team2Score: row.team2_score === null ? null : Number(row.team2_score),
     winnerTeamId: row.winner_team_id === null ? null : Number(row.winner_team_id),

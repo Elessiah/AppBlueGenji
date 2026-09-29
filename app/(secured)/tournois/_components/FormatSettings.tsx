@@ -247,7 +247,7 @@ export function FormatSettings({
       {format === "SURVIVAL" && (
         <>
           <div className="field">
-            <label htmlFor="survival-first-cut">Rounds avant la première coupe</label>
+            <label htmlFor="survival-first-cut">Manches avant la première coupe</label>
             <NumberInput
               id="survival-first-cut"
               min={1}
@@ -265,7 +265,7 @@ export function FormatSettings({
           </div>
 
           <div className="field">
-            <label htmlFor="survival-rounds">Rounds entre les coupes suivantes</label>
+            <label htmlFor="survival-rounds">Manches entre les coupes suivantes</label>
             <NumberInput
               id="survival-rounds"
               min={1}

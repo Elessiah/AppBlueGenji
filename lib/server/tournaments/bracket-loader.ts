@@ -1,6 +1,7 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { cached } from "@/lib/server/cache";
+import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
 
 /**
  * Durée de vie du mini-arbre de l'accueil. Il n'accompagne qu'une vignette :
@@ -57,8 +58,8 @@ async function loadMiniBracketRows(
   );
 
   return rows.map((row) => ({
-    a: row.team1_name ?? row.team1_placeholder ?? "À venir",
-    b: row.team2_name ?? row.team2_placeholder ?? "À venir",
+    a: row.team1_name ?? localizeBracketPlaceholder(row.team1_placeholder) ?? "À venir",
+    b: row.team2_name ?? localizeBracketPlaceholder(row.team2_placeholder) ?? "À venir",
     sa: row.team1_score ?? "—",
     sb: row.team2_score ?? "—",
   }));

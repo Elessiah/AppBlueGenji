@@ -24,6 +24,11 @@ import { mapError } from "../_lib/error-map";
 import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { useSeedingDrag } from "../_hooks/useSeedingDrag";
 import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
+import {
+  hiddenRegistrationCount,
+  mustExpandToShow,
+  visibleRegistrationCount,
+} from "../_lib/registrations-list";
 import styles from "./RegistrationsPanel.module.css";
 
 interface RegistrationsPanelProps {
@@ -127,6 +132,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   // que son seul identifiant : le dialogue reste monté pendant que le flux
   // redessine la page, et c'est le nom vu au moment du clic qu'il doit annoncer.
   const [removing, setRemoving] = useState<{ teamId: number; teamName: string } | null>(null);
+  // Liste repliée aux premières lignes (`_lib/registrations-list.ts`).
+  const [expanded, setExpanded] = useState(false);
 
   /** Écrit un ordre complet, avec aperçu optimiste et annonce vocale. */
   const applyOrder = useCallback(
@@ -191,7 +198,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   }, [refocus]);
 
   const move = async (teamId: number, direction: "up" | "down") => {
-    await applyOrder(moveInOrder(order, teamId, direction), teamId);
+    const next = moveInOrder(order, teamId, direction);
+    if (mustExpandToShow(next.indexOf(teamId), expanded)) setExpanded(true);
+    await applyOrder(next, teamId);
     setRefocus({ teamId, direction });
   };
 
@@ -211,6 +220,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   // toujours les deux : « Ordre » seul sur un tournoi lancé sans score,
   // « Retrait » seul sur un plateau d'un unique engagé.
   const actionsLabel = reorderable && removable ? "Actions" : reorderable ? "Ordre" : "Retrait";
+
+  const hiddenCount = hiddenRegistrationCount(rows.length);
+  const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
 
   return (
     <div className="ds-block">
@@ -265,7 +277,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
             <span>Classement final</span>
             {showActions && <span className={styles.actionsHead}>{actionsLabel}</span>}
           </div>
-          {rows.map((reg, index) => (
+          {visibleRows.map((reg, index) => (
             <div
               key={reg.teamId}
               ref={drag.setRowRef(reg.teamId)}
@@ -353,6 +365,21 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {hiddenCount > 0 && (
+        /* Un seul bouton dont le libellé change : deux boutons alternés
+           perdraient le focus clavier à chaque bascule. */
+        <div className={styles.showMoreRow}>
+          <button
+            type="button"
+            className={styles.showMore}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {expanded ? "Réduire la liste" : `Voir toute la liste (${hiddenCount} de plus)`}
+          </button>
         </div>
       )}
 

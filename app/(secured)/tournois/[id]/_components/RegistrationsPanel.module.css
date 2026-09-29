@@ -337,3 +337,30 @@
     transition: none;
   }
 }
+
+/* Repli de la liste au-delà de seize lignes (`_lib/registrations-list.ts`). */
+.showMoreRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.showMore {
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--line-strong-cy, var(--line));
+  border-radius: var(--r-cy-sm, 6px);
+  background: transparent;
+  color: var(--ink, var(--text-0));
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.showMore:hover {
+  border-color: var(--blue-500, #5ac8ff);
+}
+
+.showMore:focus-visible {
+  outline: 2px solid var(--blue-500, #5ac8ff);
+  outline-offset: 2px;
+}
