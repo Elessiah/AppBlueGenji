@@ -165,10 +165,21 @@
   color: var(--text-1, #c4cad4);
 }
 
-/* L'aide clavier ne décrit aucun geste possible sur un écran tactile. */
+/* Sur un écran tactile, l'aide clavier quitte l'écran mais pas la description
+   du cadre : `pointer: coarse` ne dit pas qu'il n'y a aucun clavier (tablette
+   à clavier, lecteur d'écran piloté au clavier), et `display: none` la
+   retirerait aussi de ce que lit l'`aria-describedby`. */
 @media (pointer: coarse) {
   .hintKeys {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }
 

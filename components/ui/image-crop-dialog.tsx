@@ -347,9 +347,8 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
           <p id={hintId} className={s.hint}>
             Fais glisser le cadre pour choisir la zone gardée, tire un coin pour le redimensionner
             {aspect !== null ? " (proportions imposées)" : ""}.
-            {/* L'aide clavier se tait sur un écran tactile, où elle ne
-                décrivait aucun geste possible : les boutons de l'aperçu y
-                tiennent le même rôle. */}
+            {/* L'aide clavier quitte l'écran tactile, où les boutons de
+                l'aperçu tiennent le même rôle, mais reste lue avec le cadre. */}
             <span className={s.hintKeys}>
               {" "}
               Au clavier : flèches pour le déplacer (Maj pour aller plus vite), + et − pour

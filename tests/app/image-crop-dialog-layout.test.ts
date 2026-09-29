@@ -53,8 +53,12 @@ describe("modale de recadrage — petits écrans", () => {
     expect(css).toMatch(/\.backdrop\s*\{[^}]*overscroll-behavior:\s*contain;/);
   });
 
-  it("l'aide clavier se tait sur un écran tactile, l'aide au doigt reste", () => {
-    expect(mediaBody("(pointer: coarse)")).toMatch(/\.hintKeys\s*\{[^}]*display:\s*none;/);
+  it("l'aide clavier quitte l'écran tactile sans quitter la description, l'aide au doigt reste", () => {
+    const coarse = mediaBody("(pointer: coarse)");
+    // Masquée visuellement seulement : `display: none` la retirerait aussi de
+    // l'`aria-describedby` du cadre, qu'un clavier externe pilote encore.
+    expect(coarse).toMatch(/\.hintKeys\s*\{[^}]*clip:\s*rect\(0, 0, 0, 0\);/);
+    expect(coarse).not.toMatch(/display:\s*none|visibility:\s*hidden/);
     const keys = tsx.slice(tsx.indexOf("className={s.hintKeys}"));
     expect(keys.length).toBeLessThan(tsx.length);
     // La phrase du geste au doigt n'est pas dans la partie masquée.
