@@ -134,7 +134,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
           >
             politique de confidentialité
           </Link>
-          . Si tu reviens en arrière, aucun compte n&apos;est créé ; seule la mesure d&apos;audience du site a compté ta visite de cette page.
+          . Si tu reviens en arrière, aucun compte n&apos;est créé ; seule la mesure d&apos;audience du site a pu compter ta visite.
         </p>
 
         <label

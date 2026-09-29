@@ -82,8 +82,8 @@ export default async function RgpdPage() {
           Politique de<br />confidentialité
         </h1>
         <p style={{ marginTop: 20, fontSize: 15, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 560 }}>
-          BlueGenji ne collecte que les données strictement nécessaires au fonctionnement
-          de la plateforme. Aucune revente de données, aucun traceur publicitaire, aucun
+          BlueGenji ne collecte que les données nécessaires au fonctionnement de la
+          plateforme et à la mesure de sa fréquentation. Aucune revente de données, aucun traceur publicitaire, aucun
           outil d&apos;analyse tiers, aucune publicité ciblée. La fréquentation du site est
           mesurée par le site lui-même : voir{" "}
           <Link href="#audience">Mesure d&apos;audience</Link>.
@@ -420,11 +420,13 @@ export default async function RgpdPage() {
             service. Aucun outil tiers n&apos;est employé, et rien n&apos;en sert à la publicité.
           </p>
           <p>
-            <strong>Ce qui est transmis.</strong> À chaque chargement d&apos;une page du site,
-            quelle qu&apos;elle soit (y compris la page de connexion, avant toute création de
-            compte), votre navigateur signale au serveur le chemin de la page, sans ses
-            paramètres. Plusieurs chargements en {SITE_VISIT_WINDOW_MINUTES} minutes ne
-            comptent qu&apos;une visite.
+            <strong>Ce qui est transmis.</strong> Quand vous arrivez sur le site, par
+            n&apos;importe quelle page (y compris la page de connexion, avant toute création de
+            compte), votre navigateur signale au serveur le chemin de cette page, sans ses
+            paramètres. La navigation d&apos;une page à l&apos;autre ne le fait pas, et un même
+            onglet ne le refait normalement pas avant {SITE_VISIT_WINDOW_MINUTES} minutes ; côté serveur,
+            plusieurs arrivées en {SITE_VISIT_WINDOW_MINUTES} minutes ne comptent qu&apos;une
+            visite.
           </p>
           <p>
             <strong>Ce qui est enregistré.</strong> Le serveur calcule une empreinte
