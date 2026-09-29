@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 
-import SecuredLoading from "@/app/(secured)/loading";
+import { SecuredLoading } from "@/app/(secured)/_shared/SecuredLoading";
 
 const read = (path: string) => readFileSync(join(process.cwd(), path), "utf8");
 
@@ -44,19 +44,28 @@ describe("barre de navigation — rafraîchie après les gestes qui la changent"
 });
 
 describe("frontière de chargement de l'espace connecté", () => {
-  it("existe au niveau du segment", () => {
-    expect(existsSync(join(process.cwd(), "app/(secured)/loading.tsx"))).toBe(true);
+  it.each(["tournois", "equipes", "joueurs", "profil", "signalements"])(
+    "le segment %s a sa frontière, qui rend le squelette partagé",
+    (segment) => {
+      expect(read(`app/(secured)/${segment}/loading.tsx`)).toContain("export default SecuredLoading");
+    },
+  );
+
+  it("n'enveloppe pas la racine : le 404 de l'administration garderait sinon un statut 200", () => {
+    expect(existsSync(join(process.cwd(), "app/(secured)/loading.tsx"))).toBe(false);
+    expect(existsSync(join(process.cwd(), "app/(secured)/admin/loading.tsx"))).toBe(false);
   });
 
-  it("annonce le chargement aux technologies d'assistance et masque le décor", () => {
+  it("annonce le chargement et masque le décor, sans aria-busy qui ne retomberait jamais", () => {
     const html = renderToStaticMarkup(<SecuredLoading />);
     expect(html).toContain('role="status"');
     expect(html).toContain("Chargement…");
+    expect(html).not.toContain("aria-busy");
     expect(html.match(/aria-hidden="true"/g)?.length).toBeGreaterThanOrEqual(3);
   });
 
   it("son animation suit le régime de charge et le mouvement réduit", () => {
-    const css = read("app/(secured)/loading.module.css");
+    const css = read("app/(secured)/_shared/SecuredLoading.module.css");
     expect(css).toContain("animation-play-state: var(--deco-anim-state)");
     expect(css).toContain("prefers-reduced-motion: reduce");
   });

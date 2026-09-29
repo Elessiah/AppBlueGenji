@@ -1,4 +1,4 @@
-import styles from "./loading.module.css";
+import styles from "./SecuredLoading.module.css";
 
 /**
  * Frontière de chargement de l'espace connecté.
@@ -10,10 +10,20 @@ import styles from "./loading.module.css";
  *
  * Volontairement neutre : un squelette qui imiterait une page précise
  * mentirait sur toutes les autres.
+ *
+ * Posée **segment par segment** (`tournois`, `equipes`, `joueurs`, `profil`,
+ * `signalements`) et jamais à la racine de `(secured)` : une frontière rend la
+ * réponse en flux, donc fige son statut à `200` avant que les mises en page
+ * qu'elle enveloppe aient parlé — `admin/signalements/layout.tsx`, qui refuse
+ * en `notFound()` (404, jamais 403), ne pourrait plus poser son statut.
+ *
+ * Pas d'`aria-busy` : la frontière est remplacée d'un bloc par la page, la
+ * zone ne cesserait donc jamais d'être « occupée » et le lecteur d'écran
+ * attendrait indéfiniment pour l'annoncer.
  */
-export default function SecuredLoading() {
+export function SecuredLoading() {
   return (
-    <div className={styles.shell} role="status" aria-live="polite" aria-busy="true">
+    <div className={styles.shell} role="status" aria-live="polite">
       <span className="sr-only">Chargement…</span>
       <div className={`${styles.bar} ${styles.title}`} aria-hidden="true" />
       <div className={`${styles.bar} ${styles.line}`} aria-hidden="true" />
