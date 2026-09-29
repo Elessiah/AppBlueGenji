@@ -97,11 +97,23 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   identifiants de connexion, résultats de tournois, avatars et logos).
 - **Destinataires** : le responsable technique de l'association, seul détenteur
   des clés de déchiffrement.
-- **Hébergement** : Microsoft (OneDrive, compte personnel de l'association). Les
-  données sont **chiffrées avant envoi** (`age` pour les archives, `rclone crypt`
-  pour les images et le journal) : Microsoft stocke sans pouvoir lire, ce qui
-  couvre à la fois l'absence de contrat de sous-traitance d'un compte personnel
-  et un éventuel stockage hors de l'Union européenne.
+- **Hébergement** : Microsoft (OneDrive, compte **personnel**). Le cadre est
+  celui d'un particulier : Contrat de services Microsoft et déclaration de
+  confidentialité de Microsoft, **aucun contrat de sous-traitance** (le DPA de
+  Microsoft ne vaut que pour ses offres professionnelles). Microsoft n'y
+  garantit **aucun lieu de stockage** : on n'en affirme donc aucun (ni UE, ni
+  Irlande, ni Pays-Bas), et un transfert éventuel vers les États-Unis repose sur
+  la certification EU-U.S. Data Privacy Framework de Microsoft Corporation
+  (décision d'adéquation (UE) 2023/1795).
+- **Garantie** : les données sont **chiffrées sur le Raspberry Pi avant tout
+  envoi** — `age` pour les archives (clé publique sur le serveur, clé privée
+  hors du serveur), `rclone crypt` pour les images, les logos masqués et le
+  journal (mot de passe dans la configuration rclone du serveur, copie de
+  secours hors du serveur). Aucune clé ne part chez Microsoft, qui stocke sans
+  pouvoir lire. Le script des images **refuse** un remote qui n'est pas de type
+  `crypt` (seul `UPLOADS_ALLOW_PLAINTEXT=true` passe outre, à ne jamais poser).
+  Le chiffrement au repos de Microsoft et le transport HTTPS/TLS de l'API
+  OneDrive ne sont que des **mesures complémentaires**.
 - **Durée** : archives 30 jours ; images le temps de leur présence sur le site ;
   journal des suppressions 60 jours par entrée.
 - **Mesures** : chiffrement, suppression définitive (sans corbeille), clé privée
