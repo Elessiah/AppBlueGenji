@@ -100,6 +100,28 @@ describe("ScrollArea — contrat du composant", () => {
   });
 });
 
+describe("ScrollArea — indice de défilement tactile", () => {
+  it("estompe au doigt les bords où il reste du contenu", () => {
+    const coarse = GLOBALS.slice(GLOBALS.indexOf("@media (pointer: coarse)"));
+    expect(coarse).toContain(".scroll-area[data-scroll-hint]");
+    expect(coarse).toContain('.scroll-area[data-scroll-hint~="start"]');
+    expect(coarse).toContain('.scroll-area[data-scroll-hint~="end"]');
+    expect(coarse).toMatch(/mask-image:\s*linear-gradient/);
+  });
+
+  it("n'annonce rien avant toute mesure (rendu serveur)", () => {
+    expect(renderToStaticMarkup(<ScrollArea ariaLabel="Zone">contenu</ScrollArea>)).not.toContain(
+      "data-scroll-hint",
+    );
+  });
+
+  it("relit l'indice au défilement, et laisse `fade` et l'axe vertical à part", () => {
+    expect(COMPONENT).toContain("horizontalScrollHint");
+    expect(COMPONENT).toContain("onScroll={hinted ? updateHint : undefined}");
+    expect(COMPONENT).toContain('const hinted = orientation !== "y" && !fade;');
+  });
+});
+
 describe("ScrollArea — adoption", () => {
   const consumers = [
     "app/(secured)/tournois/[id]/_components/BracketTree.tsx",
