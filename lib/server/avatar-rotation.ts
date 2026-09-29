@@ -86,7 +86,15 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
   }
   // Un fichier partagé reste servi à l'ancienne adresse : ses variantes
   // optimisées n'en disent pas plus que lui.
-  if (written && original) await purgeOptimizedCopies(original);
+  if (written && original) {
+    // Une adresse de forme ancienne (`/uploads/…`) est servie par le serveur
+    // statique, qui pose un `ETag` : Next range alors ses variantes sous cet
+    // en-tête et non sous l'empreinte des octets, que la purge ne reconnaît
+    // plus. Cas hérité et rare (toute écriture actuelle pose `/api/uploads/…`) :
+    // on vide tout le cache de l'optimiseur, qui se reconstruit à la demande.
+    if (row.avatar_url.startsWith("/uploads/")) await purgeAllOptimizedCopies();
+    else await purgeOptimizedCopies(original);
+  }
   return written ? target.url : null;
 }
 
@@ -167,6 +175,15 @@ export async function purgeOptimizedCopies(source: Buffer): Promise<number> {
     }
   }
   return purged;
+}
+
+/** Vide tout le cache de l'optimiseur d'images (au mieux). */
+export async function purgeAllOptimizedCopies(): Promise<void> {
+  try {
+    await rm(optimizedImageCacheDirectory(), { recursive: true, force: true });
+  } catch (error) {
+    console.error("[avatar-rotation] cache de l'optimiseur non vidé", error);
+  }
 }
 
 /** Nom d'un avatar tel que `storeImageBuffer` l'écrit. */

@@ -117,6 +117,15 @@ describe("rotateHiddenAvatarFile", () => {
     expect(rmMock).toHaveBeenCalledWith(path.join(optimizedImageCacheDirectory(), "k1"), { recursive: true, force: true });
   });
 
+  it("vide tout le cache de l'optimiseur pour une adresse de forme ancienne (`/uploads/…`)", async () => {
+    // Servie par le serveur statique, elle porte un `ETag` : Next range ses
+    // variantes sous cet en-tête, que l'empreinte des octets ne retrouve pas.
+    mockDb({ avatar_url: "/uploads/avatars/42-aaaa.webp", visible_avatar: 0 });
+    await rotateHiddenAvatarFile(42);
+    expect(rmMock).toHaveBeenCalledWith(optimizedImageCacheDirectory(), { recursive: true, force: true });
+    expect(readdirMock).not.toHaveBeenCalled();
+  });
+
   it("ne touche à rien si l'avatar est visible", async () => {
     mockDb({ avatar_url: OLD_URL, visible_avatar: 1 });
     expect(await rotateHiddenAvatarFile(42)).toBeNull();
