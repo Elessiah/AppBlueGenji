@@ -17,7 +17,7 @@ règle de fond = avancer `TERMS_VERSION`**, ce qui redemande l'acceptation.
 Le site n'a pas de formulaire d'inscription : un compte naît à la première
 connexion. L'acceptation voyage donc avec la connexion — `terms=1` scellé dans le
 cookie d'état OAuth (comme l'intention, jamais relu dans l'URL du rappel),
-`termsAccepted` dans le corps du code Discord et de Google One Tap. **Un compte
+`termsAccepted` dans le corps du code Discord. **Un compte
 neuf sans acceptation est refusé** (`TERMS_REQUIRED`) ; un compte existant se
 connecte toujours.
 

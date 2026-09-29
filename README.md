@@ -5,7 +5,7 @@ Site de l'association **BlueGenji Esport** : tournois amateurs francophones sur 
 ## Fonctionnalités
 
 - **Vitrine publique** : accueil (tournoi en direct, classement, calendrier, partenaires), association, page du bot et sa documentation, règles de chaque mode de tournoi (`/regles`), recrutement, pages légales (RGPD et registre des traitements, conditions d'utilisation, déclaration d'accessibilité).
-- **Connexion sans mot de passe** : OAuth Google (et Google One Tap), OAuth Discord, OAuth Blizzard, ou code à six chiffres envoyé en message privé par le bot. Les identités se rattachent depuis « Applications connectées » sur `/profil`.
+- **Connexion sans mot de passe** : OAuth Google, OAuth Discord, OAuth Blizzard, ou code à six chiffres envoyé en message privé par le bot. Les identités se rattachent depuis « Applications connectées » sur `/profil`.
 - **Tournois** : simple et double élimination, Ronde suisse, Survie par coupes, BlueGenji Survie (capital d'endurance puis arbre à huit) et tournois multi-phases ; tournois par équipes ou individuels, format des matchs (BO / FT, match nul optionnel), conditions d'inscription, ordre de départ réordonnable, lancement des matchs avec « Prêt », report et arbitrage des scores, forfaits et doubles forfaits, retour en arrière d'une manche, diffusions et rediffs.
 - **Temps réel** : flux SSE par tournoi (`/api/tournaments/[id]/stream`), un instantané calculé une fois pour tous les spectateurs.
 - **Équipes et joueurs** : rôles cumulables, invitations, sigle, logo, équipes fantômes, statistiques approfondies et classement Elo avec points de parcours.

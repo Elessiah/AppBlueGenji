@@ -123,11 +123,11 @@ pouvoir sur la plateforme.
   `SameSite=Lax` protège les routes authentifiées, pas celles qui *posent* la
   session : elles n'ont besoin d'aucun cookie pour agir. Un formulaire
   `enctype=text/plain` d'un site tiers, dont le nom de champ reconstitue un
-  JSON, connectait la victime au compte de l'attaquant (jeton One Tap ou code
-  Discord de l'attaquant), ou la déconnectait. `rejectCrossSiteRequest`
+  JSON, connectait la victime au compte de l'attaquant (code Discord de
+  l'attaquant), ou la déconnectait. `rejectCrossSiteRequest`
   (`lib/server/request-origin.ts`) refuse en **403** une provenance étrangère
   (`Sec-Fetch-Site`, sinon `Origin`) et en **415** un corps qui n'est pas
-  déclaré `application/json`, en première instruction des quatre `POST` de
+  déclaré `application/json`, en première instruction des trois `POST` de
   `/api/auth/*`.
 
 - **Une réponse d'erreur ne porte qu'un code.** `fail` ne publie que ce qui a
