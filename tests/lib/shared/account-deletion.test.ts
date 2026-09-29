@@ -167,6 +167,15 @@ describe("accountDeletionConfirmation", () => {
     expect(erase).toContain("journaux du serveur");
   });
 
+  it("nomme ces mêmes restes pour une anonymisation et pour l'inconnu", () => {
+    for (const reason of ["TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS", RETENTION_UNKNOWN] as const) {
+      const text = accountDeletionConfirmation(reason);
+      expect(text).toContain(`sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours)`);
+      expect(text).toContain("mesure d'audience");
+      expect(text).toMatch(/irréversible\.$/);
+    }
+  });
+
   it("annonce le pseudo d'emprunt dès qu'une ligne reste, et jamais sinon", () => {
     for (const reason of ["TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS"] as const) {
       expect(accountDeletionConfirmation(reason)).toContain("pseudo d'emprunt");
