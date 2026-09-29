@@ -374,7 +374,7 @@ export default function PlayerDetailPage() {
             <span>Tournoi</span>
             <span>Statut</span>
             <span>Bilan</span>
-            <span>Rank</span>
+            <span>Classement</span>
           </div>
           {data.tournaments.map((entry) => (
             <div className="table-row" key={`${entry.tournamentId}-${entry.playedAt}`}>
@@ -383,7 +383,7 @@ export default function PlayerDetailPage() {
               <span data-label="Bilan">
                 {entry.wins}W / {entry.losses}L
               </span>
-              <span data-label="Rank">{entry.finalRank ?? "-"}</span>
+              <span data-label="Classement">{entry.finalRank ?? "-"}</span>
             </div>
           ))}
         </div>
