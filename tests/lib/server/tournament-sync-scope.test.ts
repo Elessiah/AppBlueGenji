@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 import { findTournamentsNeedingSync } from "@/lib/server/tournaments/sync-scope";
+import { RESOLVABLE_BYE_SQL, RESOLVABLE_GHOST_SQL } from "@/lib/server/tournaments/byes";
 
 /**
  * L'entretien de fond ne visite plus que les tournois qui ont **quelque chose à
@@ -153,9 +154,29 @@ describe("findTournamentsNeedingSync — entretien dû", () => {
     expect(sql).toContain("m.score_deadline_at <= NOW()");
   });
 
-  it("couvre les byes et matchs fantômes encore ouverts", async () => {
+  // La question est celle même de `tryAutoResolveByes`, pas « une case est
+  // vide » : une case qui attend le vainqueur d'un match non joué est l'état
+  // normal de tout arbre en cours, et la retenir faisait entretenir à chaque
+  // balayage 17 des 22 éliminations en cours d'une base seedée, pour rien.
+  it("couvre les byes et matchs fantômes résolvables, par la condition de la résolution", async () => {
     const sql = await maintenanceSql();
-    expect(sql).toContain("m.team1_id IS NULL OR m.team2_id IS NULL");
+    expect(sql).toContain(RESOLVABLE_BYE_SQL);
+    expect(sql).toContain(RESOLVABLE_GHOST_SQL);
+    expect(sql).not.toContain("AND (m.team1_id IS NULL OR m.team2_id IS NULL))");
+  });
+
+  it("n'y retient une case vide que si plus aucun match non terminé ne l'alimente", () => {
+    for (const predicate of [RESOLVABLE_BYE_SQL, RESOLVABLE_GHOST_SQL]) {
+      expect(predicate).toContain("NOT EXISTS");
+      expect(predicate).toContain("f.status <> 'COMPLETED'");
+      expect(predicate).toContain("f.next_winner_match_id = m.id");
+      expect(predicate).toContain("f.next_loser_match_id = m.id");
+    }
+    // Le bye vise la case vide, le match fantôme les deux.
+    expect(RESOLVABLE_BYE_SQL).toContain("CASE WHEN m.team1_id IS NULL THEN 1 ELSE 2 END");
+    expect(RESOLVABLE_GHOST_SQL.replace(/\s+/g, " ")).toContain(
+      "m.team1_id IS NULL AND m.team2_id IS NULL",
+    );
   });
 
   it("couvre la clôture d'une élimination entièrement jouée", async () => {
