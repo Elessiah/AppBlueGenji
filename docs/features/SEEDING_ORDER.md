@@ -131,11 +131,13 @@ lecture ordinaire — sous `REPEATABLE READ`, c'est la première lecture ordinai
 qui fige l'instantané. Jugée sur des lectures ordinaires, la borne ne tenait que
 hors concurrence : un premier report validé entre le contrôle et
 `deleteAllMatches` échappait à l'instantané, et le plateau régénéré l'effaçait
-alors que le joueur avait reçu un succès. Désormais un report (ou un forfait) en
-cours fait attendre le réordonnancement, qui le voit et refuse en
-`SEEDING_LOCKED` ; un report arrivé après attend la fin du réordonnancement et
-trouve son match supprimé (`MATCH_NOT_FOUND`) — un refus visible, jamais une
-saisie perdue en silence.
+alors que le joueur avait reçu un succès. Toute écriture de score lit son match
+sous `FOR UPDATE` — report et forfait d'un joueur, enregistrement et validation
+de l'arbitrage (`adminSaveMatchScores`, `adminResolveMatch`, qui le lisaient
+sans verrou) : une saisie en cours fait attendre le réordonnancement, qui la
+voit et refuse en `SEEDING_LOCKED` ; une saisie arrivée après attend la fin du
+réordonnancement et trouve son match supprimé (`MATCH_NOT_FOUND`) — un refus
+visible, jamais une saisie perdue en silence.
 
 Deux raisons de verrouillage, exposées à l'interface :
 
