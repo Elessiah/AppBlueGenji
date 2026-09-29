@@ -95,6 +95,7 @@ export function MatchScheduleDialog({ match, onClose, onSaved }: MatchScheduleDi
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="match-schedule-title"
         tabIndex={-1}
         style={{

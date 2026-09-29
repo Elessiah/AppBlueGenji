@@ -135,13 +135,12 @@ export function RollbackRoundDialog({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="rollback-round-title"
         tabIndex={-1}
         style={{
           width: "100%",
           maxWidth: 520,
-          maxHeight: "90vh",
-          overflow: "auto",
           background: "var(--cyber-bg-2, #14181f)",
           border: "1px solid var(--red-live, #ff4d4d)",
           borderRadius: "var(--r-cy-md, 12px)",

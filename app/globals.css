@@ -1210,6 +1210,27 @@ html {
 }
 
 /* ===========================================================
+   CADRE BORNÉ D'UNE MODALE
+   -----------------------------------------------------------
+   Toute modale dont le contenu peut dépasser l'écran (paysage
+   mobile, clavier virtuel ouvert) porte `.dialog-bounded` : elle
+   tient dans la hauteur **visible** et défile d'elle-même, sans
+   quoi le titre et les boutons sortent de l'écran alors que le
+   défilement de la page est verrouillé. `100dvh` suit la barre
+   d'adresse et le clavier d'iOS, là où `100vh` vaut la grande
+   hauteur ; `100vh` reste en repli pour les navigateurs sans `dvh`.
+   Un style en ligne `overflow` l'emporte (modale qui délègue son
+   défilement à une <ScrollArea> interne).
+   =========================================================== */
+
+.dialog-bounded {
+  max-height: calc(100vh - 32px);
+  max-height: calc(100dvh - 32px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ===========================================================
    CYBER-MINIMAL TOKENS (refonte additive — voir CLAUDE.md)
    =========================================================== */
 

@@ -91,17 +91,12 @@ export function DeleteTournamentDialog({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="delete-tournament-title"
         tabIndex={-1}
         style={{
           width: "100%",
           maxWidth: 480,
-          // Le défilement de la page est verrouillé tant que la modale est
-          // ouverte : sans ces deux lignes, un écran court (mobile en paysage,
-          // fenêtre réduite) pousserait les boutons hors de vue sans aucun
-          // moyen de les atteindre.
-          maxHeight: "90vh",
-          overflow: "auto",
           background: "var(--cyber-bg-2, #14181f)",
           border: "1px solid var(--red-live, #ff4d4d)",
           borderRadius: "var(--r-cy-md, 12px)",

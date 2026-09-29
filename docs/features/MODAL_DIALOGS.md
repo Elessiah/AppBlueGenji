@@ -73,3 +73,15 @@ contact du pied de page, bureau, bénévoles, annonces de recrutement) passent
 par `components/cyber/landing/LandingDialog.tsx`, qui applique les trois
 règles et porte le voile ; chaque section ne fournit que l'habillage de son
 panneau.
+
+## Hauteur bornée
+
+Une modale dont le contenu peut dépasser l'écran (paysage mobile, clavier
+virtuel ouvert) porte la classe globale `.dialog-bounded` (`app/globals.css`) :
+`max-height: calc(100dvh - 32px)` (repli `100vh`), `overflow-y: auto`. Le
+`dvh` suit la barre d'adresse et le clavier d'iOS, là où `100vh` vaut la grande
+hauteur et laissait les boutons hors écran, défilement de la page verrouillé.
+Les dialogues de la fiche tournoi (diffusion, horaire, rediff, signalement,
+pénalité, avancée, suppression, retrait, retour en arrière, image) la
+portent ; les feuilles de module (`ScoreDialog.module.css`,
+`ConfirmActionDialog.module.css`) posent la même borne.

@@ -110,6 +110,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="match-live-title"
         tabIndex={-1}
         style={{
