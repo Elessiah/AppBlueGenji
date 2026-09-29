@@ -107,17 +107,30 @@ describe("POST /api/teams/[id]/claim", () => {
     expect(claimGhostTeam).not.toHaveBeenCalled();
   });
 
-  it("attribue l'équipe au joueur résolu par son pseudo", async () => {
+  it("propose l'équipe au joueur résolu par son pseudo, au nom du staff qui agit", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(getUserIdByPseudo).mockResolvedValue(9);
-    jest.mocked(claimGhostTeam).mockResolvedValue(undefined);
+    jest.mocked(claimGhostTeam).mockResolvedValue("INVITED");
 
     const res = await claimRoute(jsonReq({ pseudo: "  Kery  " }), params("3"));
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ success: true, ownerUserId: 9 });
+    // Une invitation, pas une attribution : la réponse ne nomme pas de
+    // propriétaire, le joueur n'en est un qu'une fois qu'il a accepté.
+    expect(await res.json()).toEqual({ success: true, invitedUserId: 9 });
     expect(getUserIdByPseudo).toHaveBeenCalledWith("Kery");
-    expect(claimGhostTeam).toHaveBeenCalledWith(3, 9);
+    expect(claimGhostTeam).toHaveBeenCalledWith(3, 9, admin.id);
+  });
+
+  it("renvoie 409 si une reprise attend déjà la réponse de ce joueur", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(getUserIdByPseudo).mockResolvedValue(9);
+    jest.mocked(claimGhostTeam).mockRejectedValue(new Error("GHOST_CLAIM_ALREADY_PROPOSED"));
+
+    const res = await claimRoute(jsonReq({ pseudo: "Kery" }), params("3"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "GHOST_CLAIM_ALREADY_PROPOSED" });
   });
 
   it("renvoie 404 pour un pseudo inconnu", async () => {

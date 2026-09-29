@@ -35,7 +35,7 @@ const TEAM_ERRORS: Record<string, string> = {
   INVALID_TEAM_ID: "Cette équipe n'existe pas.",
   INVALID_INVITATION_ID: "Cette invitation n'existe pas.",
   // La ligne existe dans `bg_teams`, mais elle ne représente pas une équipe
-  // qu'on rejoint : une fantôme n'a aucun membre — elle s'attribue par
+  // qu'on rejoint : une fantôme n'a aucun membre — elle se reprend par
   // l'arbitrage —, et une entrée solo est l'identité d'un joueur en tournoi
   // individuel. Dans les deux cas la demande n'aurait jamais trouvé personne
   // pour y répondre.
@@ -75,6 +75,9 @@ const TEAM_ERRORS: Record<string, string> = {
   PLAYER_ACCOUNT_DELETED: "Ce joueur a supprimé son compte : il ne peut plus rejoindre d'équipe.",
   MEMBER_ACCOUNT_DELETED: "Ce compte a été supprimé : il ne peut pas recevoir la propriété de l'équipe.",
   NOT_A_GHOST_TEAM: "Cette équipe n'est plus une équipe fantôme : elle a déjà un propriétaire.",
+  // Reprise d'une fantôme déjà proposée au même joueur (staff) : distinct
+  // d'`ALREADY_INVITED`, qui parle à la gestion de « son » équipe.
+  GHOST_CLAIM_ALREADY_PROPOSED: "Cette équipe est déjà proposée à ce joueur : sa réponse est attendue.",
 
   // ── Replis des routes : chacun nomme le geste qui a échoué. ──
   TEAM_JOIN_FAILED: "La demande n'a pas pu être envoyée.",
@@ -92,7 +95,7 @@ const TEAM_ERRORS: Record<string, string> = {
   GHOST_TEAM_CREATE_FAILED: "L'équipe fantôme n'a pas pu être créée.",
   TEAMS_LOAD_FAILED: "La liste des équipes n'a pas pu être chargée.",
   TEAM_DELETE_FAILED: "L'équipe n'a pas pu être dissoute.",
-  TEAM_CLAIM_FAILED: "L'équipe n'a pas pu être attribuée.",
+  TEAM_CLAIM_FAILED: "La proposition de reprise n'a pas pu être envoyée.",
   TEAM_OWNERSHIP_TRANSFER_FAILED: "La propriété n'a pas pu être transférée.",
   LOGO_UPLOAD_FAILED: "Le logo n'a pas pu être envoyé.",
   LOGO_DELETE_FAILED: "Le logo n'a pas pu être supprimé.",

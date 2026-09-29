@@ -70,6 +70,22 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
           membershipErrorMessage,
         );
 
+  // Reprise d'une fantôme : acceptée **par l'identifiant de l'invitation**, et
+  // non par « Rejoindre » (`/join`). Sur une page restée ouverte pendant qu'un
+  // autre joueur reprenait l'équipe, `/join` verrait une équipe ordinaire sans
+  // invitation et y déposerait une demande d'adhésion ; l'invitation, elle, a
+  // été annulée par cette reprise et répond `INVITATION_NOT_PENDING`.
+  const acceptGhostClaim = () =>
+    team.viewerInvitationId === null
+      ? Promise.resolve(false)
+      : act(
+          async () => {
+            await teamApi(`/api/invitations/${team.viewerInvitationId}`, jsonRequest("POST", { accept: true }), "INVITATION_RESPOND_FAILED");
+            return "Tu es désormais propriétaire de l'équipe.";
+          },
+          membershipErrorMessage,
+        );
+
   const withdrawRequest = () =>
     team.viewerInvitationId === null
       ? Promise.resolve(false)
@@ -112,14 +128,42 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
   }
 
   // Équipe fantôme : aucun joueur à qui adresser une demande d'adhésion. Le
-  // seul chemin vers un roster réel est l'attribution par le staff.
+  // seul chemin vers un roster réel est la **reprise** que le staff propose à
+  // un joueur — et que ce joueur accepte ici ou depuis son profil. Elle ne se
+  // fait jamais sans lui : engagé d'office, il verrait ses contacts ouverts à
+  // l'arbitrage d'un tournoi qu'il n'a pas choisi.
   if (team.team.isGhost) {
     return (
       <div className={`ds-block ${styles.block}`}>
-        <p className={styles.notice}>
-          👻 Équipe fantôme — créée par le staff pour les tournois, sans joueur rattaché. Elle ne
-          peut pas être rejointe&nbsp;: seul le staff peut l&apos;attribuer à un joueur.
-        </p>
+        {team.viewerInvitation === "INVITED" ? (
+          <div className={styles.actionsRow}>
+            <p className={styles.notice}>
+              👻 Le staff te propose de reprendre cette équipe fantôme&nbsp;: en acceptant, tu en
+              deviens propriétaire, historique de tournois compris.
+            </p>
+            <button
+              type="button"
+              className={`btn ${styles.primaryButton}`}
+              onClick={() => void acceptGhostClaim()}
+              disabled={busy || team.viewerInvitationId === null}
+            >
+              Reprendre l&apos;équipe
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={() => void declineInvitation()}
+              disabled={busy || team.viewerInvitationId === null}
+            >
+              Décliner
+            </button>
+          </div>
+        ) : (
+          <p className={styles.notice}>
+            👻 Équipe fantôme — créée par le staff pour les tournois, sans joueur rattaché. Elle ne
+            peut pas être rejointe&nbsp;: seul le staff peut la proposer à un joueur.
+          </p>
+        )}
       </div>
     );
   }

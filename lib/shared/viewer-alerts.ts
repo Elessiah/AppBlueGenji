@@ -48,6 +48,12 @@ type AlertMatch = {
 export type ViewerAlertDetail = {
   card: { state: string };
   myTeamId: number | null;
+  /**
+   * Engagées au nom desquelles le lecteur peut reporter un score
+   * (`TournamentViewerContext`) : « score à confirmer » ne sonne que pour
+   * elles — un membre sportif n'a aucun geste à faire.
+   */
+  canCreateReportsForTeamIds: ReadonlyArray<number>;
   matches: ReadonlyArray<AlertMatch>;
 };
 
@@ -99,7 +105,10 @@ export function viewerAlert(
   if (me !== null) {
     const awaiting = (match: AlertMatch) =>
       match.status === "AWAITING_CONFIRMATION" && involves(match, me);
-    if (gained(idsWhere(previous, awaiting), idsWhere(next, awaiting))) {
+    if (
+      next.canCreateReportsForTeamIds.includes(me) &&
+      gained(idsWhere(previous, awaiting), idsWhere(next, awaiting))
+    ) {
       found.add("SCORE_TO_CONFIRM");
     }
 

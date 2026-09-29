@@ -44,11 +44,12 @@ describe("resolveUserEntrant — tournoi par équipes", () => {
       await expect(resolveUserEntrant(conn, TEAM_TOURNAMENT, 42)).resolves.toEqual({
         teamId: 77,
         canActForEntrant: true,
+        canConductMatch: true,
       });
     },
   );
 
-  it.each([["DPS"], ["TANK"], ["HEAL"], ["COACH"], ["CAPITAINE"]] as TeamRole[][])(
+  it.each([["DPS"], ["TANK"], ["HEAL"], ["COACH"]] as TeamRole[][])(
     "la refuse à un %s, rôle sportif",
     async (role) => {
       // Jouer pour une équipe ne donne pas le droit de l'engager — ni de la
@@ -58,9 +59,22 @@ describe("resolveUserEntrant — tournoi par équipes", () => {
       await expect(resolveUserEntrant(conn, TEAM_TOURNAMENT, 42)).resolves.toEqual({
         teamId: 77,
         canActForEntrant: false,
+        canConductMatch: false,
       });
     },
   );
+
+  it("le capitaine mène le match sans pouvoir engager l'équipe", async () => {
+    // Il la lance en jeu (« Prêt ») et en reporte le score, mais l'inscrire ou
+    // l'abandonner reste l'affaire du propriétaire et des managers.
+    activeTeamMock.mockResolvedValue(activeTeam(["CAPITAINE"]));
+
+    await expect(resolveUserEntrant(conn, TEAM_TOURNAMENT, 42)).resolves.toEqual({
+      teamId: 77,
+      canActForEntrant: false,
+      canConductMatch: true,
+    });
+  });
 
   it("accorde la qualité dès qu'un rôle de gestion figure dans le cumul", async () => {
     // Les rôles sont cumulables : un capitaine qui est aussi manager décide.
@@ -69,6 +83,7 @@ describe("resolveUserEntrant — tournoi par équipes", () => {
     await expect(resolveUserEntrant(conn, TEAM_TOURNAMENT, 42)).resolves.toEqual({
       teamId: 77,
       canActForEntrant: true,
+      canConductMatch: true,
     });
   });
 
@@ -78,6 +93,7 @@ describe("resolveUserEntrant — tournoi par équipes", () => {
     await expect(resolveUserEntrant(conn, TEAM_TOURNAMENT, 42)).resolves.toEqual({
       teamId: null,
       canActForEntrant: false,
+      canConductMatch: false,
     });
   });
 
@@ -105,6 +121,7 @@ describe("resolveUserEntrant — tournoi individuel", () => {
     await expect(resolveUserEntrant(conn, SOLO_TOURNAMENT, 42)).resolves.toEqual({
       teamId: 910,
       canActForEntrant: true,
+      canConductMatch: true,
     });
     expect(activeTeamMock).not.toHaveBeenCalled();
   });
@@ -116,6 +133,7 @@ describe("resolveUserEntrant — tournoi individuel", () => {
     await expect(resolveUserEntrant(conn, SOLO_TOURNAMENT, 42)).resolves.toEqual({
       teamId: null,
       canActForEntrant: true,
+      canConductMatch: true,
     });
   });
 
@@ -126,6 +144,7 @@ describe("resolveUserEntrant — tournoi individuel", () => {
     await expect(resolveUserEntrant(conn, SOLO_TOURNAMENT, 42)).resolves.toEqual({
       teamId: 910,
       canActForEntrant: true,
+      canConductMatch: true,
     });
   });
 });

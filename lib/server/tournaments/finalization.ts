@@ -329,10 +329,10 @@ export async function finalizeTournamentIfDone(
  * parte qu'une fois : la fonction, elle, est appelée à chaque entretien.
  *
  * L'escalade attend **un délai de plus** après `score_deadline_at`. Cette
- * colonne est posée au premier report et jamais réécrite tant que la manche
- * n'est pas tranchée (`COALESCE`) : elle ne peut donc pas être repoussée par
- * une engagée qui resaisirait son score en boucle, contrairement aux
- * horodatages de report.
+ * colonne est posée au premier report, puis seulement **rapprochée** quand
+ * l'adversaire reporte à son tour (`scoreDeadlineAssignment`, `./scoring`) :
+ * elle ne peut donc pas être repoussée par une engagée qui resaisirait son
+ * score en boucle, contrairement aux horodatages de report.
  *
  * Le doublon avec l'alerte de conflit — les deux évènements peuvent naître dans
  * la même transaction — n'est pas écarté ici : cette fonction est appelée

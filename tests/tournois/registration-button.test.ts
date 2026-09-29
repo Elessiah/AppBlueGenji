@@ -150,3 +150,49 @@ describe("la lecture de roster n'a lieu que si elle peut changer la réponse", (
     expect(eligibilityMock).not.toHaveBeenCalled();
   });
 });
+
+describe("canCreateReportsForTeamIds — qui voit le bouton de report", () => {
+  it("l'ouvre au propriétaire ou au manager de l'équipe engagée", async () => {
+    const context = await getTournamentViewerContext(
+      snapshot({ card: { state: "RUNNING" }, registrations: [{ teamId: 42 }] }),
+      7,
+    );
+
+    expect(context.canCreateReportsForTeamIds).toEqual([42]);
+  });
+
+  it("l'ouvre au capitaine, qui lance le match en jeu", async () => {
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 42,
+      teamName: "Équipe",
+      roles: ["CAPITAINE", "DPS"],
+    });
+
+    const context = await getTournamentViewerContext(
+      snapshot({ card: { state: "RUNNING" }, registrations: [{ teamId: 42 }] }),
+      7,
+    );
+
+    expect(context.canCreateReportsForTeamIds).toEqual([42]);
+    // Le capitaine mène le match, il n'engage pas l'équipe pour autant.
+    expect(context.canRegisterEntrant).toBe(false);
+  });
+
+  it("le ferme à un membre sportif : reporter un score engage toute l'équipe", async () => {
+    // Un 0-3 déclaré contre soi est un forfait. Le serveur refuse en 403
+    // `NOT_TEAM_MATCH_LEADER` ; un bouton qui y mène serait un bouton qui ment.
+    jest.mocked(getUserActiveTeam).mockResolvedValue({
+      teamId: 42,
+      teamName: "Équipe",
+      roles: ["COACH", "DPS"],
+    });
+
+    const context = await getTournamentViewerContext(
+      snapshot({ card: { state: "RUNNING" }, registrations: [{ teamId: 42 }] }),
+      7,
+    );
+
+    expect(context.myTeamId).toBe(42);
+    expect(context.canCreateReportsForTeamIds).toEqual([]);
+  });
+});

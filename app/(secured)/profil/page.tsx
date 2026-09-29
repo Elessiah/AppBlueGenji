@@ -127,13 +127,13 @@ export default function ProfilePage() {
   });
   const [avatarBusy, setAvatarBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [invitations, setInvitations] = useState<{ id: number; teamId: number; teamName: string }[]>([]);
+  const [invitations, setInvitations] = useState<{ id: number; teamId: number; teamName: string; ownership?: boolean }[]>([]);
 
   const loadInvitations = async () => {
     try {
       const res = await fetch("/api/me/invitations", { cache: "no-store" });
       if (!res.ok) return;
-      const payload = (await res.json()) as { invitations?: { id: number; teamId: number; teamName: string }[] };
+      const payload = (await res.json()) as { invitations?: { id: number; teamId: number; teamName: string; ownership?: boolean }[] };
       setInvitations(payload.invitations ?? []);
     } catch {
       // silencieux
@@ -980,7 +980,15 @@ export default function ProfilePage() {
           <div className="table-like">
             {invitations.map((inv) => (
               <div className="table-row" key={inv.id} style={{ alignItems: "center" }}>
-                <TeamLink teamId={inv.teamId}>{inv.teamName}</TeamLink>
+                <span>
+                  <TeamLink teamId={inv.teamId}>{inv.teamName}</TeamLink>
+                  {/* Reprise d'une équipe fantôme proposée par le staff : l'accepter
+                      en fait le propriétaire, ce qu'une invitation ordinaire ne fait
+                      jamais — le joueur doit le lire avant de cliquer. */}
+                  {inv.ownership && (
+                    <span className={s.inviteOwnership}> · tu en deviendras propriétaire</span>
+                  )}
+                </span>
                 <span className={s.inviteActions}>
                   <button
                     type="button"

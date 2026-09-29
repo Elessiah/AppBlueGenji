@@ -26,6 +26,7 @@ const match = (overrides: Partial<M> = {}): M => ({
 const detail = (matches: M[], overrides: Partial<ViewerAlertDetail> = {}): ViewerAlertDetail => ({
   card: { state: "RUNNING" },
   myTeamId: 1,
+  canCreateReportsForTeamIds: [1],
   matches,
   ...overrides,
 });
@@ -62,6 +63,18 @@ describe("viewerAlert", () => {
       match({ id: 2, roundNumber: 2, status: "READY", team1Id: 1, team2Id: 3 }),
     ]);
     expect(viewerAlert(before, after)).toBe("SCORE_TO_CONFIRM");
+  });
+
+  it("ne fait pas sonner « score à confirmer » chez un membre sans qualité pour reporter", () => {
+    // Confirmer demande `OWNER` / `MANAGER` : un membre sportif n'a aucun geste
+    // à faire, il n'entend donc que ce qui le concerne ensuite (son match suivant).
+    const before = detail([match({ status: "READY", team1Id: 1, team2Id: 2 })], {
+      canCreateReportsForTeamIds: [],
+    });
+    const after = detail([match({ status: "AWAITING_CONFIRMATION", team1Id: 1, team2Id: 2 })], {
+      canCreateReportsForTeamIds: [],
+    });
+    expect(viewerAlert(before, after)).toBeNull();
   });
 
   it("annonce une nouvelle manche à un spectateur", () => {

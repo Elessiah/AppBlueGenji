@@ -21,8 +21,9 @@ interface ClaimGhostTeamDialogProps {
 }
 
 /**
- * Attribution d'une équipe fantôme à un joueur réel (staff `tournaments`).
- * Le joueur devient OWNER et l'équipe cesse d'être fantôme : elle retrouve le
+ * Proposition de reprise d'une équipe fantôme à un joueur réel (staff
+ * `tournaments`). Le joueur reçoit une invitation : c'est en l'acceptant qu'il
+ * devient OWNER et que l'équipe cesse d'être fantôme — elle retrouve alors le
  * fonctionnement normal (invitations, gestion du roster par son propriétaire).
  */
 export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: ClaimGhostTeamDialogProps) {
@@ -38,7 +39,7 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: C
     fieldErrors.clear();
     try {
       await teamApi(`/api/teams/${teamId}/claim`, jsonRequest("POST", { pseudo: trimmed }), "TEAM_CLAIM_FAILED");
-      showSuccess(`${trimmed} est désormais propriétaire de ${teamName}.`);
+      showSuccess(`${trimmed} est invité à reprendre ${teamName}.`);
       onClose();
       onChanged();
     } catch (e) {
@@ -54,7 +55,7 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: C
 
   return (
     <TeamDialog
-      title="Attribuer l'équipe à un joueur"
+      title="Proposer l'équipe à un joueur"
       onClose={onClose}
       busy={busy}
       onSubmit={submit}
@@ -64,14 +65,15 @@ export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: C
             Annuler
           </button>
           <button type="submit" className={`btn ${styles.primaryButton}`} disabled={busy || !trimmed}>
-            {busy ? "Attribution…" : "Attribuer l'équipe"}
+            {busy ? "Envoi…" : "Envoyer la proposition"}
           </button>
         </>
       }
     >
       <p>
-        {teamName} cessera d&apos;être une équipe fantôme : le joueur en devient propriétaire et
-        gère lui-même son roster. L&apos;historique de tournois est conservé.
+        Le joueur reçoit une invitation. S&apos;il l&apos;accepte, {teamName} cesse d&apos;être une
+        équipe fantôme : il en devient propriétaire et gère lui-même son roster, historique de
+        tournois compris. Rien ne change tant qu&apos;il n&apos;a pas répondu.
       </p>
       <div className="field">
         <label htmlFor="claim-pseudo">Pseudo du joueur</label>
