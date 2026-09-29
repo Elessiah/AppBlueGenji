@@ -37,7 +37,7 @@ affichées dans le tableau « Données collectées ») :
   job différé. Les copies de sauvegarde chiffrées gardent le compte **30 jours au
   plus**, et une restauration rejoue les suppressions intervenues depuis. Voir
   `docs/features/ACCOUNT_DELETION.md` et `docs/features/BACKUP_DATA_PROTECTION.md`.
-- **Aucune mention de SIRET / RNA** (données non publiées) sur le site.
+- **Aucune mention de SIRET / SIREN / RNA** sur le site : l'association n'en publie pas, et l'hébergeur, particulier bénévole, n'en a pas.
 
 ## 2. Consentement à l'inscription
 
