@@ -216,16 +216,23 @@ function moderationTermsUrl(): string {
 /**
  * Le fondement d'une décision rattachée à ce signalement — relu en base,
  * l'appelant ne connaissant que son identifiant. Hors signalement, ou
- * signalement déjà effacé : les règles du site.
+ * signalement déjà effacé : les règles du site. **Ne lève jamais** : une
+ * lecture manquée rend les règles du site plutôt que de faire perdre l'avis
+ * entier, qui porte la décision et les voies de recours.
  */
 async function reportGrounds(reportId: number | null): Promise<ModerationGrounds> {
   if (reportId === null) return moderationGroundsFor(null);
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { category: ReportCategory })[]>(
-    `SELECT category FROM bg_reports WHERE id = ? LIMIT 1`,
-    [reportId],
-  );
-  return moderationGroundsFor(rows[0]?.category ?? null);
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.execute<(RowDataPacket & { category: ReportCategory })[]>(
+      `SELECT category FROM bg_reports WHERE id = ? LIMIT 1`,
+      [reportId],
+    );
+    return moderationGroundsFor(rows[0]?.category ?? null);
+  } catch (error) {
+    console.error("[moderation] fondement de la décision non relu", error);
+    return moderationGroundsFor(null);
+  }
 }
 
 /**
@@ -930,6 +937,13 @@ type DueRow = RowDataPacket & {
  * défendu son logo ferait supprimer l'image que sa contestation retenait.
  * `NULL` — contestation d'avant la colonne — vaut personne visée : seules
  * celles-là pouvaient alors contester.
+ *
+ * La contestation de l'auteur **rouvre** le dossier (la direction doit y
+ * répondre), ce qui le fait passer pour non tranché. Elle n'est pourtant
+ * possible que sur un dossier archivé : toute contestation antérieure avait
+ * donc reçu sa décision. Seule compte une contestation de personne visée
+ * **postérieure** à la dernière de l'auteur — sans quoi celle-ci retiendrait
+ * l'image au-delà de l'échéance, par la réouverture.
  */
 export async function purgeDueQuarantines(now: Date = new Date()): Promise<number> {
   const db = await getDatabase();
@@ -937,7 +951,13 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
     `SELECT q.id, q.purge_after, q.report_id, r.status AS report_status,
             EXISTS (SELECT 1 FROM bg_reports c
                     WHERE c.parent_report_id = q.report_id
-                      AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')) AS contested
+                      AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')
+                      -- L'auteur ne conteste qu'un dossier archivé : ce qui
+                      -- précède sa contestation était tranché, et la
+                      -- réouverture qu'elle provoque ne remet rien en attente.
+                      AND c.id > COALESCE((SELECT MAX(n.id) FROM bg_reports n
+                                           WHERE n.parent_report_id = q.report_id
+                                             AND n.contest_role = 'NOTIFIER'), 0)) AS contested
      FROM bg_logo_quarantines q
      LEFT JOIN bg_reports r ON r.id = q.report_id
      WHERE q.status = 'HIDDEN' AND q.purge_after <= ?`,

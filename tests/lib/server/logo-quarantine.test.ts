@@ -283,6 +283,23 @@ describe("notifyUserAvatarRemoved", () => {
     expect(message).toContain("Faits retenus : constat de la modération");
     expect(message).toContain("https://site.test/conditions-utilisation#contenus");
   });
+
+  it("prévient quand même si le fondement ne se relit pas : les règles du site, jamais le silence", async () => {
+    install([
+      [/SELECT category FROM bg_reports WHERE id = \? LIMIT 1/, () => Promise.reject(new Error("ECONNRESET"))],
+      [
+        /FROM bg_users\s+WHERE id = \? AND is_deleted = 0/,
+        () => [[{ pseudo: "Nova", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]],
+      ],
+    ]);
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    notifyUserAvatarRemoved(9, 12);
+    await flush();
+    const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    expect(message).toContain("https://site.test/signalements/12");
+    expect(message).toContain("Motif : image jugée contraire aux conditions d'utilisation");
+    error.mockRestore();
+  });
 });
 
 describe("hideTeamLogo", () => {
@@ -727,6 +744,9 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     // l'appartenance du jour ; une contestation d'avant la colonne compte.
     expect(sql).toMatch(/c\.contest_role IS NULL OR c\.contest_role = 'TARGET'/);
     expect(sql).not.toMatch(/bg_team_members/);
+    // La réouverture par l'auteur ne remet pas en attente ce qui était tranché :
+    // seule une contestation de personne visée postérieure à la sienne compte.
+    expect(sql).toMatch(/c\.id > COALESCE\(\(SELECT MAX\(n\.id\)[\s\S]*n\.contest_role = 'NOTIFIER'\), 0\)/);
   });
 });
 

@@ -61,7 +61,11 @@ image contestée n'est jamais supprimée d'office** (`canAutoPurgeLogo`) :
 l'échéance passée, elle attend que l'association archive le signalement ou la
 rétablisse. Seule la contestation d'une **personne visée** compte : celle de
 l'auteur du signalement (qui voudrait l'image partie, pas gardée) ne retient
-rien, sans quoi elle prolongerait la garde au-delà de l'échéance annoncée.
+rien, sans quoi elle prolongerait la garde au-delà de l'échéance annoncée. Qui
+conteste est écrit avec la contestation (`bg_reports.contest_role`), jamais
+redéduit de l'appartenance du jour. Et comme l'auteur ne conteste qu'un dossier
+archivé, la réouverture qu'il provoque ne remet rien en attente : seule compte
+une contestation de personne visée **postérieure** à la sienne.
 
 ## Exposé des motifs
 
