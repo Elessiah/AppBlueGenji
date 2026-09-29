@@ -911,7 +911,8 @@ de vitrine — d'où une permission propre, que seul `ADMIN` porte. Elle ouvre :
 
 Ces gestes **retirent**, ils ne remplacent jamais : la modération ne pose ni logo
 ni avatar, ne touche ni au roster, ni au nom, ni aux inscriptions. L'équipe ou
-le joueur est prévenu en message privé, avec le lien pour contester. Voir
+le joueur est prévenu en message privé — avec le lien pour contester quand le
+geste part d'un signalement, sans lien quand c'est un retrait direct. Voir
 `docs/features/CONTENT_REPORTS.md` et `docs/features/LOGO_QUARANTINE.md`.
 
 Côté membres, **signaler** n'exige aucun rôle (§8), **désigner des cibles** exige
@@ -960,7 +961,9 @@ Volontairement ouvert, à connaître pour ne pas le confondre avec un trou :
 - `GET /api/landing/sponsors/[id]/logo` — relais du logo d'un partenaire
   **publié**, qui relit l'URL en base et ne prend qu'un identifiant (§6).
 - `POST /api/reports` — signaler un problème, **sans compte** : plafonné par
-  compte ou, à défaut, par IP (5 par demi-heure). Désigner des cibles ou
+  compte ou, à défaut, par IP (5 par demi-heure) — sans IP lisible (proxy qui
+  ne pose pas `X-Forwarded-For`), pas de plafond, règle de `enforceRateLimit`.
+  Désigner des cibles ou
   contester exige une session (401 sinon) — chaque cible reçoit un message
   privé, et un formulaire anonyme ferait écrire le bot à qui l'on veut.
 - `POST /api/csp-report` — le collecteur des violations de la politique de
