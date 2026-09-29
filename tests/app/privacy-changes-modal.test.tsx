@@ -91,17 +91,23 @@ describe("PrivacyChangesModal — contrats du geste", () => {
 
   it("envoie les identifiants montrés, pas « tout ce qui est dû »", () => {
     expect(source).toContain('fetch("/api/profile/privacy-changes"');
-    expect(source).toContain("changeIds: changes.map((change) => change.id)");
+    expect(source).toContain("await record(changes.map((change) => change.id));");
   });
 
   it("suivre un lien d'action vaut prise de connaissance et ferme la modale sans attendre", () => {
-    expect(source).toContain("onClick={followLink}");
-    const body = source.slice(source.indexOf("const followLink = () => {"));
+    expect(source).toContain("onClick={() => followLink(change.id)}");
+    const body = source.slice(source.indexOf("const followLink = (changeId: string) => {"));
     // Fermée avant l'envoi : elle ne doit pas rester sur l'écran où elle envoie.
     expect(body.indexOf("close();")).toBeGreaterThan(-1);
-    expect(body.indexOf("close();")).toBeLessThan(body.indexOf("record()"));
-    // Pas de second enregistrement si le bouton en a déjà lancé un.
-    expect(body.indexOf("if (busy) return;")).toBeLessThan(body.indexOf("record()"));
+    expect(body.indexOf("close();")).toBeLessThan(body.indexOf("record("));
+    // Seul le changement du lien est acquitté, pas ses voisins.
+    expect(body).toContain("record([changeId])");
+    // Pas de second enregistrement si le bouton en a déjà lancé un, et sa
+    // réponse ne parle plus d'une modale refermée.
+    expect(body.indexOf("if (busy) {")).toBeLessThan(body.indexOf("record("));
+    expect(body).toContain("leftByLink.current = true;");
+    expect(source).toContain("if (!leftByLink.current) showSuccess(");
+    expect(source).toContain("showError(leftByLink.current ? REPLAY_NOTICE");
   });
 
   it("ne touche jamais au compte : ni aperçu ni route de suppression", () => {

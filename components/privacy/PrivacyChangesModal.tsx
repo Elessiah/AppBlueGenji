@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { CyberButton, ScrollArea } from "@/components/cyber";
@@ -21,6 +21,9 @@ import styles from "./PrivacyChangesModal.module.css";
  * décidé côté serveur sur `/rgpd` aurait suivi le joueur sur tout le site.
  */
 export const PRIVACY_POLICY_PATH = "/rgpd";
+
+/** Échec d'un enregistrement parti d'une modale déjà refermée : rien à réessayer ici. */
+const REPLAY_NOTICE = "Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.";
 
 /**
  * Présente à un compte connecté les changements publiés du traitement de ses
@@ -48,6 +51,9 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);
+  // Fermée par un lien d'action pendant un enregistrement : sa réponse ne doit
+  // plus parler d'une modale que le joueur a quittée.
+  const leftByLink = useRef(false);
 
   const pathname = usePathname();
   const open = changes.length > 0 && !answered && pathname !== PRIVACY_POLICY_PATH;
@@ -60,11 +66,11 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
 
   if (!open) return null;
 
-  const record = async () => {
+  const record = async (changeIds: string[]) => {
     const response = await fetch("/api/profile/privacy-changes", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ changeIds: changes.map((change) => change.id) }),
+      body: JSON.stringify({ changeIds }),
     });
     if (!response.ok) throw new Error();
   };
@@ -78,30 +84,33 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
     if (busy) return;
     setBusy(true);
     try {
-      await record();
+      await record(changes.map((change) => change.id));
       close();
-      showSuccess("C'est noté, merci.");
+      if (!leftByLink.current) showSuccess("C'est noté, merci.");
     } catch {
-      showError("Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.");
+      showError(leftByLink.current ? REPLAY_NOTICE : "Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.");
     } finally {
       setBusy(false);
     }
   };
 
   /**
-   * Suivre un lien d'action vaut prise de connaissance, et la modale se ferme
-   * **aussitôt** : elle ne se tait que sur `/rgpd`, et attendre la réponse la
-   * laisserait couvrir l'écran même où elle envoie agir — pour de bon si
-   * l'enregistrement échoue. Un échec la fait simplement revenir au chargement
-   * suivant, ce que le message annonce. Un enregistrement déjà en cours (clic
-   * sur le bouton juste avant) n'est pas doublé.
+   * Suivre un lien d'action vaut prise de connaissance **de ce changement-là**,
+   * pas des autres présentés avec lui : un clic dans une entrée ne prouve pas
+   * qu'on a lu ses voisines, qui reviendront au chargement suivant. La modale
+   * se ferme **aussitôt** : elle ne se tait que sur `/rgpd`, et attendre la
+   * réponse la laisserait couvrir l'écran même où elle envoie agir — pour de
+   * bon si l'enregistrement échoue. Un échec la fait simplement revenir au
+   * chargement suivant, ce que le message annonce. Un enregistrement déjà en
+   * cours (clic sur le bouton juste avant) couvre tout et n'est pas doublé.
    */
-  const followLink = () => {
+  const followLink = (changeId: string) => {
     close();
-    if (busy) return;
-    record().catch(() => {
-      showError("Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.");
-    });
+    if (busy) {
+      leftByLink.current = true;
+      return;
+    }
+    record([changeId]).catch(() => showError(REPLAY_NOTICE));
   };
 
   return (
@@ -148,7 +157,7 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
                   <ul className={styles.changeLinks}>
                     {change.links.map((link) => (
                       <li key={link.href}>
-                        <Link href={link.href} onClick={followLink}>
+                        <Link href={link.href} onClick={() => followLink(change.id)}>
                           {link.label}
                         </Link>
                       </li>

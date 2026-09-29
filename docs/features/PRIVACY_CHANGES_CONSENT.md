@@ -105,7 +105,9 @@ partie des comptes :
   Discord, sans quoi des comptes non concernés occuperaient le lot). Un fait
   inconnu vaut **faux** : dans le doute, une entrée ciblée se tait.
 - `links` : liens vers les écrans où agir, rendus par la modale sous le détail.
-  Suivre l'un d'eux vaut prise de connaissance — la modale ne se tait que sur
+  Suivre l'un d'eux vaut prise de connaissance **de cette entrée seule** (ses
+  voisines reviennent au chargement suivant) et ferme la modale sans attendre
+  la réponse — elle ne se tait que sur
   `/rgpd`, elle couvrirait sinon l'écran même où elle envoie. Le message Discord
   ne les porte pas.
 
