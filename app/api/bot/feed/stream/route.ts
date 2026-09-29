@@ -21,7 +21,7 @@
  * passe par la même porte.
  */
 import { BOT_FEED_OPEN_RULE, enforceRateLimit, requestClientIp } from '@/lib/server/api-guard';
-import { acquireBotFeedSlot } from '@/lib/server/bot-feed-guard';
+import { acquireBotFeedSlot, canAcquireBotFeedSlot } from '@/lib/server/bot-feed-guard';
 import { redactSseChunk } from '@/lib/shared/bot-feed-redaction';
 
 export const runtime = 'nodejs';
@@ -38,13 +38,17 @@ export async function GET(req: Request): Promise<Response> {
   // connexion vers le bot suffit à le fermer — la lecture en cours échoue,
   // `pull` rend l'erreur au client, qui se reconnectera plus tard.
   const evicted = new AbortController();
-  const release = acquireBotFeedSlot(clientIp, () => evicted.abort());
-  if (!release) {
-    return new Response('event: error\ndata: TOO_MANY_STREAMS\n\n', {
+  const evict = () => evicted.abort();
+  const tooMany = () =>
+    new Response('event: error\ndata: TOO_MANY_STREAMS\n\n', {
       status: 429,
       headers: { 'Content-Type': 'text/event-stream', 'Retry-After': '30' },
     });
-  }
+  // Une place libre se prend tout de suite. S'il faut en déloger une, on ne le
+  // fait qu'une fois le bot joint : couper un lecteur pour un nouveau venu que
+  // le bot injoignable laisserait sans rien ne servirait personne.
+  let release = acquireBotFeedSlot(clientIp, evict, { allowEviction: false });
+  if (!release && !canAcquireBotFeedSlot(clientIp)) return tooMany();
 
   const baseUrl = (process.env.BOT_INTERNAL_URL || 'http://127.0.0.1:4400').replace(/\/+$/, '');
   const headers: Record<string, string> = { accept: 'text/event-stream' };
@@ -61,19 +65,28 @@ export async function GET(req: Request): Promise<Response> {
       cache: 'no-store',
     });
   } catch {
-    release();
+    release?.();
     return new Response('event: error\ndata: BOT_UNREACHABLE\n\n', { status: 503, headers: { 'Content-Type': 'text/event-stream' } });
   }
   if (!upstream.ok || !upstream.body) {
-    release();
+    release?.();
     return new Response(`event: error\ndata: BOT_${upstream.status}\n\n`, { status: 502, headers: { 'Content-Type': 'text/event-stream' } });
   }
+  if (!release) {
+    // Le bot répond : c'est maintenant qu'on fait place, s'il y a toujours lieu.
+    release = acquireBotFeedSlot(clientIp, evict);
+    if (!release) {
+      void upstream.body.cancel().catch(() => undefined);
+      return tooMany();
+    }
+  }
+  const releaseSlot = release;
 
   // Le corps de l'amont est relayé au travers d'un flux à nous, dont la seule
   // raison d'être est de rendre la place : passer `upstream.body` tel quel ne
   // laisse aucun endroit où apprendre que la connexion s'est terminée.
   const reader = upstream.body.getReader();
-  req.signal.addEventListener('abort', release);
+  req.signal.addEventListener('abort', releaseSlot);
   // Délogé après l'ouverture : on ne compte pas sur la seule annulation du
   // `fetch` pour tarir le corps — le lecteur est fermé, et le flux se termine
   // proprement côté client, qui se reconnectera.
@@ -86,7 +99,7 @@ export async function GET(req: Request): Promise<Response> {
   // fuites referment le plafond pour tout le monde jusqu'au redémarrage. Même
   // garde que la route du flux de tournoi.
   if (req.signal.aborted) {
-    release();
+    releaseSlot();
     void reader.cancel().catch(() => undefined);
     // 204 plutôt que le 499 d'nginx : ce dernier est un code de journal, pas un
     // statut HTTP.
@@ -112,7 +125,7 @@ export async function GET(req: Request): Promise<Response> {
           // sortie.
           if (pending) controller.enqueue(encoder.encode(redactSseChunk(pending)));
           controller.close();
-          release();
+          releaseSlot();
           return;
         }
         pending += decoder.decode(value, { stream: true });
@@ -123,12 +136,12 @@ export async function GET(req: Request): Promise<Response> {
         pending = pending.slice(cut + 1);
         controller.enqueue(encoder.encode(redactSseChunk(complete)));
       } catch (error) {
-        release();
+        releaseSlot();
         controller.error(error);
       }
     },
     cancel(reason) {
-      release();
+      releaseSlot();
       return reader.cancel(reason);
     },
   });

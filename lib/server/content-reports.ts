@@ -455,10 +455,15 @@ const REPORT_TARGET_NOTICE_LOCK = "bg_report_target_notices";
 const REPORT_TARGET_NOTICE_LOCK_WAIT_SECONDS = 60;
 
 /** Ce qu'une réservation a posé : à qui écrire, et quelles cibles sont marquées. */
-type TargetNoticePlan = {
-  recipients: NotificationRecipient[];
-  marked: (readonly ["USER" | "TEAM", number])[];
-};
+type NoticeTarget = readonly ["USER" | "TEAM", number];
+
+/**
+ * Ce qu'une réservation a posé : une cible marquée par groupe, et les personnes
+ * qu'elle prévient. Chaque personne n'est rangée que dans **un** groupe (le
+ * joueur désigné d'abord, puis sa première équipe désignée) : elle ne reçoit
+ * qu'un message, et la remise se juge cible par cible.
+ */
+type TargetNoticePlan = { target: NoticeTarget; recipients: NotificationRecipient[] }[];
 
 /**
  * Prévient les personnes qu'un signalement vise — message privé Discord et
@@ -510,16 +515,23 @@ export async function notifyReportTargets(
     if (!plan) return;
 
     const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-    const report = await notifyUsers(plan.recipients, {
-      topic: "CONTENT_REPORT",
-      discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
-      push: contentReportPush({ reportId, category }),
-    });
-    if ((report.discord?.sent ?? 0) + report.pushed === 0) {
+    const undelivered: NoticeTarget[] = [];
+    // Un envoi par cible : la marque se rend **cible par cible**. Jugée sur le
+    // total, une équipe joignable seulement sur Discord restait marquée quand le
+    // bot était injoignable, dès qu'un joueur désigné à côté recevait un push.
+    for (const group of plan) {
+      const report = await notifyUsers(group.recipients, {
+        topic: "CONTENT_REPORT",
+        discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
+        push: contentReportPush({ reportId, category }),
+      });
+      if ((report.discord?.sent ?? 0) + report.pushed === 0) undelivered.push(group.target);
+    }
+    if (undelivered.length > 0) {
       await connection.execute(
         `UPDATE bg_report_targets SET notified_at = NULL
-         WHERE report_id = ? AND (${plan.marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
-        [reportId, ...plan.marked.flat()],
+         WHERE report_id = ? AND (${undelivered.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
+        [reportId, ...undelivered.flat()],
       );
     }
   });
@@ -547,8 +559,8 @@ async function reserveTargetNotices(
   }
 
   const notReporter = (row: RecipientRow) => reporterUserId === null || Number(row.id) !== reporterUserId;
-  const byUser = new Map<number, RecipientRow>();
-  const marked: (readonly ["USER" | "TEAM", number])[] = [];
+  const assigned = new Set<number>();
+  const plan: TargetNoticePlan = [];
 
   if (userIds.length > 0) {
     const [rows] = await connection.execute<RecipientRow[]>(
@@ -558,8 +570,8 @@ async function reserveTargetNotices(
       userIds,
     );
     for (const row of rows.filter(notReporter)) {
-      byUser.set(Number(row.id), row);
-      marked.push(["USER", Number(row.id)] as const);
+      assigned.add(Number(row.id));
+      plan.push({ target: ["USER", Number(row.id)] as const, recipients: [toNotificationRecipient(row, "proven")] });
     }
   }
   if (teamIds.length > 0) {
@@ -570,24 +582,27 @@ async function reserveTargetNotices(
        WHERE tm.left_at IS NULL AND u.is_deleted = 0 AND tm.team_id IN (${teamIds.map(() => "?").join(", ")})`,
       teamIds,
     );
-    const reachedTeams = new Set<number>();
-    for (const row of rows.filter(notReporter)) {
-      byUser.set(Number(row.id), row);
-      reachedTeams.add(Number(row.team_id));
+    for (const teamId of teamIds) {
+      const recipients: NotificationRecipient[] = [];
+      for (const row of rows) {
+        if (Number(row.team_id) !== teamId || !notReporter(row) || assigned.has(Number(row.id))) continue;
+        assigned.add(Number(row.id));
+        recipients.push(toNotificationRecipient(row, "proven"));
+      }
+      // Une équipe sans membre à prévenir (ou dont chacun l'est déjà par un
+      // autre groupe) n'est pas marquée : rien ne lui a été envoyé en son nom.
+      if (recipients.length > 0) plan.push({ target: ["TEAM", teamId] as const, recipients });
     }
-    for (const teamId of teamIds) if (reachedTeams.has(teamId)) marked.push(["TEAM", teamId] as const);
   }
-  if (marked.length === 0) return null;
+  if (plan.length === 0) return null;
+  const marked = plan.map((group) => group.target);
 
   await connection.execute(
     `UPDATE bg_report_targets SET notified_at = NOW()
      WHERE report_id = ? AND (${marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
     [reportId, ...marked.flat()],
   );
-  return {
-    recipients: [...byUser.values()].map((row) => toNotificationRecipient(row, "proven")),
-    marked,
-  };
+  return plan;
 }
 
 /**

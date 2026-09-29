@@ -161,8 +161,9 @@ et au plus une fois par heure depuis la mise en page racine
   (`reserveTargetNotices`), **envoi compris** : cinq signalements simultanés sur
   une équipe liraient sinon tous « personne n'a été prévenu », et une marque
   rendue après un envoi raté aurait déjà fait taire le suivant. Seules les cibles qui ont
-  donné un destinataire sont marquées (`notified_at`), et la marque est rendue
-  si rien n'est parti (bot injoignable, aucun appareil abonné).
+  donné un destinataire sont marquées (`notified_at`), et la marque est rendue,
+  **cible par cible** (un envoi par cible), si rien ne lui est parvenu (bot
+  injoignable, aucun appareil abonné).
 - `REPORT_TARGET_SEARCH_RULE` : la recherche de cibles est réservée aux comptes
   connectés (l'annuaire l'est) et plafonnée.
 

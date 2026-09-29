@@ -113,12 +113,13 @@ function slotToEvict(held: number): Slot | null {
 export function acquireBotFeedSlot(
   clientKey: string | null,
   evict: () => void = () => undefined,
+  options: { allowEviction?: boolean } = {},
 ): (() => void) | null {
   const held = heldBy(clientKey);
   if (clientKey !== null && held >= MAX_BOT_FEED_STREAMS_PER_CLIENT) return null;
 
   if (slots.length >= MAX_BOT_FEED_STREAMS) {
-    const victim = slotToEvict(held);
+    const victim = options.allowEviction === false ? null : slotToEvict(held);
     if (!victim) return null;
     releaseSlot(victim);
     try {
@@ -132,6 +133,21 @@ export function acquireBotFeedSlot(
   slots.push(slot);
   if (clientKey !== null) perClient.set(clientKey, held + 1);
   return () => releaseSlot(slot);
+}
+
+/**
+ * Vrai si `acquireBotFeedSlot` accorderait une place à ce client maintenant,
+ * au besoin en délogeant un flux — sans rien réserver ni déloger.
+ *
+ * Sert à la route à refuser **avant** d'appeler le bot, et à ne déloger qu'une
+ * fois le bot joint : délogé pour un nouveau venu que le bot injoignable
+ * laisse sans rien, un lecteur aurait été coupé pour rien, et chaque
+ * reconnexion automatique en couperait un autre.
+ */
+export function canAcquireBotFeedSlot(clientKey: string | null): boolean {
+  const held = heldBy(clientKey);
+  if (clientKey !== null && held >= MAX_BOT_FEED_STREAMS_PER_CLIENT) return false;
+  return slots.length < MAX_BOT_FEED_STREAMS || slotToEvict(held) !== null;
 }
 
 /** Nombre de flux ouverts (diagnostic, tests). */

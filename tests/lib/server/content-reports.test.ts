@@ -221,12 +221,15 @@ describe("createReport", () => {
     expect(members?.[1]).toEqual([4]);
     expect(members?.[0]).toMatch(/tm.left_at IS NULL/);
 
-    const [message, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
+    // Un envoi par cible — le joueur désigné, puis l'équipe —, chacun une seule fois.
+    const calls = jest.mocked(pushDiscordDirectMessages).mock.calls;
+    expect(calls).toHaveLength(2);
+    const [message, , context] = calls[0];
     expect(context).toBe("content-report-target");
     expect(message).toContain("https://site.test/signalements/12");
-    expect(recipients).toEqual([
-      { discordId: "900000000000000008", handle: null, label: "PseudoSecret" },
-      { discordId: null, handle: "membre", label: "Membre" },
+    expect(calls.map(([, recipients]) => recipients)).toEqual([
+      [{ discordId: "900000000000000008", handle: null, label: "PseudoSecret" }],
+      [{ discordId: null, handle: "membre", label: "Membre" }],
     ]);
     // Les cibles prévenues sont marquées : c'est ce que relit la reprévenance.
     const mark = pool.execute.mock.calls.find(([sql]) => /UPDATE bg_report_targets SET notified_at = NOW/.test(sql));
@@ -266,6 +269,41 @@ describe("createReport", () => {
     // quoi le joueur serait tenu pour prévenu et un signalement légitime tu.
     const release = pool.execute.mock.calls.find(([sql]) => /SET notified_at = NULL/.test(sql));
     expect(release?.[1]).toEqual([12, "USER", 8]);
+  });
+
+  it("rend la marque de la seule cible à qui rien n'est parvenu", async () => {
+    // Le joueur reçoit son message, l'équipe non (bot tombé entre les deux).
+    jest
+      .mocked(pushDiscordDirectMessages)
+      .mockResolvedValueOnce({ sent: 1, unresolved: [], failed: [] })
+      .mockResolvedValueOnce(null);
+    install(
+      [
+        cooldownRoute(),
+        reporterRoute(),
+        markRoute,
+        releaseRoute,
+        usersRoute([
+          { id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null },
+        ]),
+        membersRoute([
+          { team_id: 4, id: 9, pseudo: "Membre", discord_id: "900000000000000009", discord_pseudo: null, discord_verified_at: null },
+        ]),
+        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+      ],
+      [
+        countRoute(0),
+        ...targetRoutes,
+        [/INSERT INTO bg_reports/, () => [{ insertId: 12 }]],
+        [/INSERT INTO bg_report_targets/, () => [{}]],
+      ],
+    );
+
+    await createReport(submission(), { userId: 3, managesTournaments: false });
+    await flush();
+
+    const release = pool.execute.mock.calls.find(([sql]) => /SET notified_at = NULL/.test(sql));
+    expect(release?.[1]).toEqual([12, "TEAM", 4]);
   });
 
   it("ne reprévient pas une cible déjà prévenue par un signalement récent", async () => {

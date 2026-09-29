@@ -113,6 +113,35 @@ describe("GET /api/bot/feed/stream — garde-fous", () => {
     await held[1].body!.cancel();
   });
 
+  it("ne déloge personne pour un nouveau venu que le bot injoignable laisserait sans rien", async () => {
+    const evict = jest.fn();
+    acquireBotFeedSlot("10.0.0.1", evict);
+    acquireBotFeedSlot("10.0.0.1", evict);
+    for (let i = botFeedStreamCount(); i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+    globalThis.fetch = jest.fn(async () => {
+      throw new Error("ECONNREFUSED");
+    }) as never;
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(503);
+    expect(evict).not.toHaveBeenCalled();
+    expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
+  });
+
+  it("déloge seulement une fois le bot joint", async () => {
+    const evict = jest.fn();
+    acquireBotFeedSlot("10.0.0.1", evict);
+    acquireBotFeedSlot("10.0.0.1", evict);
+    for (let i = botFeedStreamCount(); i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(evict).toHaveBeenCalledTimes(1);
+    await drain(response);
+  });
+
   it("rend la place quand le flux amont se termine", async () => {
     const response = await GET(request());
     expect(botFeedStreamCount()).toBe(1);
