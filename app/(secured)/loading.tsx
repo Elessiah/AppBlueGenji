@@ -13,7 +13,7 @@ import styles from "./loading.module.css";
  */
 export default function SecuredLoading() {
   return (
-    <div className={styles.shell} role="status" aria-live="polite">
+    <div className={styles.shell} role="status" aria-live="polite" aria-busy="true">
       <span className="sr-only">Chargement…</span>
       <div className={`${styles.bar} ${styles.title}`} aria-hidden="true" />
       <div className={`${styles.bar} ${styles.line}`} aria-hidden="true" />
