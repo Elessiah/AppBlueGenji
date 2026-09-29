@@ -121,7 +121,18 @@ bien la suppression passe la première et l'inscription ne trouve plus personne
 La confirmation **décrit ce qui va se passer**. Une phrase unique servait aux deux
 cas et promettait la conservation des statistiques à des comptes qui n'en ont
 aucune ; le joueur qui n'a jamais joué a droit à la vraie réponse — il ne restera
-rien.
+rien de son compte ni de son profil.
+
+« Rien » s'arrête là, et la phrase le dit. Elle affirmait « sans laisser de trace
+sur le site » (et « il ne reste aucune trace de ton passage » après coup), ce qui
+était faux : restent les sauvegardes chiffrées (`BACKUP_RETENTION_DAYS`), la
+ligne du journal des suppressions (`ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS`),
+l'empreinte de mesure d'audience `u:<id>` (détail des visites
+`SITE_VISIT_DETAIL_RETENTION_DAYS` jours, empreinte seule sans limite dans
+`bg_site_visitors`, recalculable par l'association qui détient le sel) et, pour
+un membre du staff, les lignes `[staff-audit]` des journaux pm2. Les durées sont
+citées depuis leurs constantes ; le message de succès, plus court, renvoie à la
+politique de confidentialité et à son registre.
 
 Le **mode ne suffit pas** à la rédiger. « Tes statistiques de tournoi resteront
 conservées — elles appartiennent aussi aux équipes que tu as affrontées » est
