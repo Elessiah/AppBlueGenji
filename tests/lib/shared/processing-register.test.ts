@@ -215,3 +215,25 @@ describe("registerExportFilename", () => {
     expect(REGISTER_UPDATED_AT).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
+
+describe("bases légales : le registre et la politique disent la même chose", () => {
+  const byRef = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref)!;
+
+  it("fonde le compte (T01) et l'authentification (T02) sur le contrat", () => {
+    // Un consentement demandé pour des données sans lesquelles le compte
+    // n'existe pas ne serait pas libre (RGPD art. 7.4).
+    expect(byRef("T01").legalBasis).toMatch(/^Exécution du service demandé par le joueur \(contrat\)/);
+    expect(byRef("T02").legalBasis).toMatch(/contrat/);
+  });
+
+  it("fonde l'exposition du tag (T04) sur une certification distincte de la connexion", () => {
+    expect(byRef("T04").legalBasis).toMatch(/Consentement \(certification du pseudo Discord/);
+    expect(byRef("T04").legalBasis).toMatch(/jamais acquise par la seule connexion/);
+  });
+
+  it("ne dit plus que One Tap suit l'acceptation de la politique : il suit une case", () => {
+    const t02 = byRef("T02");
+    expect(t02.subPurposes.join(" ")).toMatch(/décochée par défaut/);
+    expect(t02.subPurposes.join(" ")).not.toMatch(/après acceptation de la politique/);
+  });
+});

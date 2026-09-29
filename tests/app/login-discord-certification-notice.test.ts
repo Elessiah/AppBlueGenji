@@ -3,19 +3,19 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   DISCORD_CERTIFICATION_UNDO,
+  DISCORD_LOGIN_TAG_NOTICE,
   DISCORD_TAG_AUDIENCE,
 } from "@/lib/shared/identity-sharing";
 
 /**
- * L'exposition doit être annoncée sur **les deux** chemins de certification.
+ * Ce que la connexion Discord fait du tag, dit avant le clic.
  *
- * Celui de `/profil` passe par un dialogue qui l'énonce public par public
- * (`DISCORD_VERIFICATION_EXPOSURE`). L'autre est la connexion Discord, qui
- * certifie le tag sans qu'on le demande : entrer par cette porte *est* la preuve
- * que la certification réclame. C'était donc le seul endroit où un tag
- * s'ouvrait à l'organisation sans un mot — un membre qui n'avait jamais rempli
- * le champ « Pseudo Discord » voyait son handle devenir lisible par les
- * administrateurs et les arbitres, sans rien en savoir.
+ * La connexion certifiait le tag sans qu'on le demande : c'était le seul
+ * endroit où un tag s'ouvrait à l'organisation sans geste de son titulaire, et
+ * la base « Consentement » annoncée ne tenait pas. Elle l'**enregistre**
+ * désormais, non certifié ; la certification est un clic distinct sur
+ * `/profil`. La page de connexion doit donc le dire, et dire qui lirait le tag
+ * une fois certifié.
  *
  * Assertion sur la **source** faute de pouvoir monter la page : elle tient à ce
  * qu'aucun test ne peut deviner, la présence de la phrase.
@@ -28,9 +28,25 @@ import {
  */
 const SOURCE = readFileSync(join(process.cwd(), "app/connexion/_components/LoginForm.tsx"), "utf8");
 
-describe("connexion Discord — annonce de la certification", () => {
-  it("dit que se connecter certifie le tag", () => {
-    expect(SOURCE).toMatch(/certifie ce tag/i);
+describe("connexion Discord — annonce de l'enregistrement du tag", () => {
+  it("dit que se connecter enregistre le tag **sans le certifier**", () => {
+    // Se connecter n'est pas consentir à l'exposition : la phrase ne doit plus
+    // promettre une certification que la connexion ne fait plus.
+    expect(SOURCE).toMatch(/enregistre ce tag<\/strong>, sans le certifier/);
+    expect(SOURCE).not.toMatch(/certifie ce tag/i);
+  });
+
+  it("dit que la certification se fait ensuite, dans le profil", () => {
+    expect(SOURCE).toMatch(/Si tu le certifies ensuite\s+dans « Mon profil »/);
+  });
+
+  it("la note sous le bouton Discord dit la même chose, et qui lirait le tag", () => {
+    expect(DISCORD_LOGIN_TAG_NOTICE).toMatch(/sans le certifier/);
+    expect(DISCORD_LOGIN_TAG_NOTICE).toMatch(/invisible de tous, administrateurs compris/);
+    expect(DISCORD_LOGIN_TAG_NOTICE).toContain(DISCORD_TAG_AUDIENCE);
+    expect(
+      readFileSync(join(process.cwd(), "app/connexion/_components/OAuthButtons.tsx"), "utf8"),
+    ).toContain("DISCORD: DISCORD_LOGIN_TAG_NOTICE");
   });
 
   it("nomme les deux publics, et eux seuls", () => {
@@ -43,13 +59,9 @@ describe("connexion Discord — annonce de la certification", () => {
     expect(SOURCE).toContain("DISCORD_TAG_AUDIENCE");
   });
 
-  it("nomme le geste d'annulation, et celui qui existe à l'écran", () => {
-    // Il n'y a pas de route de décertification, et le taire laisserait le
-    // lecteur sans aucune issue. Mais se connecter par Discord **rattache** le
-    // compte, ce qui met le champ de `/profil` en lecture seule : « modifie ton
-    // tag » désignait alors le seul geste que ce lecteur ne peut plus faire.
+  it("garde un geste d'annulation nommé, celui qui existe à l'écran", () => {
+    // Il n'y a pas de route de décertification : le retrait du tag l'est.
     expect(DISCORD_CERTIFICATION_UNDO).toMatch(/retire ton tag/i);
-    expect(SOURCE).toContain("DISCORD_CERTIFICATION_UNDO");
   });
 
   it("ne recopie plus la phrase dans la page", () => {

@@ -96,7 +96,7 @@ describe("champ Discord — un retrait ne laisse pas la pastille mentir", () => 
     // pastille et « ce pseudo est certifié » à côté d'un champ qu'on vient de
     // vider. La réponse du `PATCH` porte déjà la vérité.
     const removal = page.slice(page.indexOf("const onDiscordTagRemove"));
-    const posted = removal.indexOf("setDiscordState((prev) => ({ ...prev, tag: null, verified: false }))");
+    const posted = removal.indexOf("setDiscordState((prev) => ({ ...prev, tag: null, verified: false, attested: false }))");
     const reload = removal.indexOf("await loadDiscordState()");
     expect(posted).toBeGreaterThanOrEqual(0);
     expect(posted).toBeLessThan(reload);

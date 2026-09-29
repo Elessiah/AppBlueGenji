@@ -24,9 +24,11 @@ test.describe("Consentement RGPD", () => {
 
     // L'acceptation exige les conditions d'utilisation, case à part : sans
     // elle le bouton reste fermé (un compte naît à la première connexion).
-    const accept = page.getByRole("button", { name: /accepte et je continue/i });
+    const accept = page.getByRole("button", { name: /^Continuer$/ });
     await expect(accept).toBeDisabled();
-    await dialog.getByRole("checkbox").check();
+    await dialog.getByRole("checkbox", { name: /conditions d.utilisation/ }).check();
+    // L'invite Google One Tap est une case à part, décochée par défaut.
+    await expect(dialog.getByRole("checkbox", { name: /Google One Tap/ })).not.toBeChecked();
 
     // Tant que la popup est ouverte, la voie Discord est masquée derrière.
     await accept.click();
@@ -37,12 +39,12 @@ test.describe("Consentement RGPD", () => {
       window.localStorage.getItem("bg_rgpd_consent"),
       window.localStorage.getItem("bg_terms_consent"),
     ]);
-    expect(stored).toEqual(["1", String(TERMS_VERSION)]);
+    expect(stored).toEqual(["2", String(TERMS_VERSION)]);
   });
 
   test("le refus ramène à l'accueil sans enregistrer de consentement", async ({ page }) => {
     await page.goto("/connexion");
-    await page.getByRole("button", { name: /^Refuser$/ }).click();
+    await page.getByRole("button", { name: /^Revenir en arrière$/ }).click();
 
     // Retour en arrière total : on quitte /connexion (délai : voir `expect` dans
     // `playwright.config.ts`)…
@@ -60,7 +62,7 @@ test.describe("Connexion", () => {
   // ci-dessus.
   test.beforeEach(async ({ page }) => {
     await page.addInitScript((termsVersion) => {
-      window.localStorage.setItem("bg_rgpd_consent", "1");
+      window.localStorage.setItem("bg_rgpd_consent", "2");
       window.localStorage.setItem("bg_terms_consent", termsVersion);
     }, String(TERMS_VERSION));
   });

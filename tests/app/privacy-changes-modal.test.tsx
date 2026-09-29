@@ -48,7 +48,7 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(markup).toMatch(/aria-modal="true"/);
     expect(markup).toContain(`${PRIVACY_CHANGES.length} changements de nos règles de confidentialité`);
     for (const change of PRIVACY_CHANGES) {
-      expect(markup).toContain(change.title);
+      expect(markup).toContain(change.title.replace(/'/g, "&#x27;"));
       expect(markup).toContain(`dateTime="${change.publishedAt}"`);
     }
     expect(markup).toContain(PRIVACY_CHANGES[0].details[0].slice(0, 40).replace(/'/g, "&#x27;"));

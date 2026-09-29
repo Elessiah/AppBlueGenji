@@ -190,8 +190,10 @@ describe("deleteOwnAccount — anonymisation", () => {
   });
 });
 
-describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => {
-  it("certifie le compte existant avec le tag prouvé", async () => {
+describe("createOrGetDiscordUser — entrer par Discord enregistre le tag, sans le certifier", () => {
+  it("enregistre le tag prouvé sur le compte existant, sans le certifier", async () => {
+    // Se connecter n'est pas consentir à l'exposition : la certification reste
+    // un geste distinct, fait sur `/profil`.
     const { queries } = fakeDb((q) =>
       q.startsWith("SELECT id FROM bg_users WHERE discord_id") ? [[{ id: 7 }]] : undefined,
     );
@@ -202,16 +204,31 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
 
     const update = find(queries, "UPDATE bg_users");
     expect(update).toBeDefined();
-    expect(update!.sql).toContain("discord_verified_at = CASE WHEN ? THEN NOW()");
-    // Le drapeau du `CASE` est vrai : il y a bien un tag à écrire et à certifier.
-    expect(update!.params).toEqual([true, "keryan", true, 7]);
+    expect(update!.sql).not.toContain("NOW()");
+    // Une certification déjà donnée survit au même pseudo, tombe s'il change.
+    expect(update!.sql).toContain("WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END");
+    expect(update!.sql).toContain("discord_pseudo_from_discord = 1");
+    expect(update!.params).toEqual(["keryan", "keryan", 7]);
     // La porte est notée au passage, et le code en message privé ne dégrade
     // jamais un rattachement déjà noué par le bouton.
     expect(update!.sql).toContain("discord_link_method = COALESCE(discord_link_method, 'DM_CODE')");
   });
 
-  it("ne touche à rien quand la demande portait un identifiant numérique", async () => {
-    // Il n'y a alors aucun tag à certifier : le joueur s'est connecté par son ID.
+  it("place la décertification avant l'écriture du pseudo : MySQL lit de gauche à droite", async () => {
+    const { queries } = fakeDb((q) =>
+      q.startsWith("SELECT id FROM bg_users WHERE discord_id") ? [[{ id: 7 }]] : undefined,
+    );
+
+    await createOrGetDiscordUser("900000000000000001", undefined, "keryan", {
+      method: "OAUTH", termsAccepted: true,
+    });
+
+    const sql = find(queries, "UPDATE bg_users")!.sql;
+    expect(sql.indexOf("discord_verified_at = CASE")).toBeLessThan(sql.indexOf("discord_pseudo = ?"));
+  });
+
+  it("ne touche qu'à la porte quand la demande portait un identifiant numérique", async () => {
+    // Il n'y a alors aucun pseudo à enregistrer : le joueur s'est connecté par son ID.
     const { queries } = fakeDb((q) =>
       q.startsWith("SELECT id FROM bg_users WHERE discord_id") ? [[{ id: 7 }]] : undefined,
     );
@@ -220,15 +237,14 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
       method: "OAUTH", termsAccepted: true,
     });
 
-    // L'écriture part tout de même — elle note la **porte** franchie, qui ne
-    // dépend pas de ce que Discord a nommé — mais ses deux `CASE` sont fermés :
-    // ni le tag stocké ni sa certification ne bougent.
     const update = find(queries, "UPDATE bg_users")!;
-    expect(update.params).toEqual([false, null, false, 7]);
+    expect(update.params).toEqual([7]);
     expect(update.sql).toContain("discord_link_method = 'OAUTH'");
+    expect(update.sql).not.toContain("discord_pseudo");
+    expect(update.sql).not.toContain("discord_verified_at");
   });
 
-  it("crée un compte neuf avec son tag certifié", async () => {
+  it("crée un compte neuf avec son tag enregistré, jamais certifié", async () => {
     const { queries } = fakeDb((q) => {
       if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) return [[]];
       if (q.startsWith("SELECT COUNT(*) AS c FROM bg_users WHERE pseudo")) return [[{ c: 0 }]];
@@ -242,15 +258,13 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
 
     expect(userId).toBe(42);
     const insert = find(queries, "INSERT INTO bg_users")!;
-    expect(insert.sql).toContain("discord_verified_at");
-    expect(insert.sql).toContain("NOW()");
-    expect(insert.params).toContain("keryan");
-    // Un compte né par une porte porte le nom de cette porte dès sa ligne.
-    expect(insert.sql).toContain("discord_link_method");
-    expect(insert.params).toContain("OAUTH");
+    expect(insert.sql).not.toContain("discord_verified_at");
+    expect(insert.sql).not.toContain("NOW()");
+    // Tag, origine Discord, et porte franchie.
+    expect(insert.params).toEqual(["Nova", "900000000000000002", "keryan", 1, "OAUTH"]);
   });
 
-  it("crée un compte sans certification quand aucun tag n'a été prouvé", async () => {
+  it("crée un compte sans tag ni origine quand Discord n'a nommé aucun pseudo", async () => {
     const { queries } = fakeDb((q) => {
       if (q.startsWith("SELECT id FROM bg_users WHERE discord_id")) return [[]];
       if (q.startsWith("SELECT COUNT(*) AS c FROM bg_users WHERE pseudo")) return [[{ c: 0 }]];
@@ -263,10 +277,9 @@ describe("createOrGetDiscordUser — entrer par Discord certifie le tag", () => 
     });
 
     const insert = find(queries, "INSERT INTO bg_users")!;
-    expect(insert.sql).toContain("NULL");
-    // Pas de tag certifié, mais une porte franchie : les deux faits sont
-    // distincts, et le second s'écrit quand même.
-    expect(insert.params).toContain("DM_CODE");
+    // Pas de tag, mais une porte franchie : les deux faits sont distincts, et
+    // le second s'écrit quand même.
+    expect(insert.params).toEqual(["Nova", "900000000000000002", null, 0, "DM_CODE"]);
   });
 });
 
@@ -683,15 +696,26 @@ describe("updateOwnProfile — un patch partiel ne vide pas les champs voisins",
   it("garde le BattleTag, le tag Marvel et la majorité quand le patch n'en parle pas", async () => {
     const update = await partial({ discordPseudo: null });
 
-    // Positions 1, 3 et 11 : « le patch parle-t-il de ce champ ? »
-    expect([update.params[1], update.params[3], update.params[11]]).toEqual([false, false, false]);
+    // Positions 1, 3 et 14 : « le patch parle-t-il de ce champ ? »
+    expect([update.params[1], update.params[3], update.params[14]]).toEqual([false, false, false]);
   });
 
   it("les écrit dès que le patch les mentionne, valeur vide comprise", async () => {
     const update = await partial({ overwatchBattletag: null, isAdult: false });
 
     expect([update.params[1], update.params[2]]).toEqual([true, null]);
-    expect([update.params[11], update.params[12]]).toEqual([true, false]);
+    expect([update.params[14], update.params[15]]).toEqual([true, false]);
+  });
+
+  it("un tag saisi perd son origine Discord : il ne se certifie plus d'un clic", async () => {
+    const update = await partial({ discordPseudo: "tape_a_la_main" });
+
+    const flag = update.sql.indexOf("discord_pseudo_from_discord = CASE");
+    expect(flag).toBeGreaterThan(-1);
+    // Lu **avant** l'affectation du pseudo, sinon il comparerait la valeur neuve.
+    expect(flag).toBeLessThan(update.sql.indexOf("discord_pseudo = CASE"));
+    expect(update.sql).toMatch(/WHEN discord_pseudo <=> \? THEN discord_pseudo_from_discord\s+ELSE 0/);
+    expect(update.params.slice(5, 8)).toEqual([true, "tape_a_la_main", "tape_a_la_main"]);
   });
 
   it("passe les quatre colonnes par le même `CASE`", async () => {
