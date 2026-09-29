@@ -447,11 +447,21 @@ describe("Schéma — ce qui reste à côté des CREATE", () => {
     }
   });
 
-  it("garde les deux rattrapages permanents, dont la cause peut se reproduire", () => {
-    // L'invitation Discord périmée en pied de page, et le logo d'une entrée solo
-    // qui republierait un avatar masqué.
+  it("garde les trois rattrapages permanents, dont la cause peut se reproduire", () => {
+    // L'invitation Discord périmée en pied de page, le faux courriel du pied de
+    // page, et le logo d'une entrée solo qui republierait un avatar masqué.
     expect(sql).toContain("SUPERSEDED_DISCORD_INVITE_URLS");
+    expect(sql).toContain("SUPERSEDED_CONTACT_EMAILS");
     expect(sql).toContain("SET t.logo_url = NULL");
+  });
+
+  it("vide le faux courriel du pied de page, et lui seul", () => {
+    const start = sql.indexOf("SUPERSEDED_CONTACT_EMAILS.map");
+    const block = sql.slice(start, sql.indexOf("} catch", start));
+    expect(block).toContain("SET setting_value = ''");
+    expect(block).toContain("WHERE setting_key = ?");
+    expect(block).toContain("AND setting_value IN (${placeholders})");
+    expect(block).toContain("[CONTACT_EMAIL_KEY, ...SUPERSEDED_CONTACT_EMAILS]");
   });
 
   it("ne rejoue plus les rattrapages d'une conversion déjà faite", () => {

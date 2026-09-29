@@ -7,13 +7,16 @@ import {
   validateEmail,
   EMAIL_MAX,
   DISCORD_TAG_MAX,
+  SUPERSEDED_CONTACT_EMAILS,
+  toPublicContact,
 } from "@/lib/shared/contact";
+import { ASSOCIATION_EMAIL_ENCODED, decodeContact, encodeContact } from "@/lib/shared/obfuscated-contact";
 
 describe("validateEmail", () => {
   it("accepts and normalises a valid address", () => {
-    expect(validateEmail("  Presse@BlueGenji-Esport.FR  ")).toEqual({
+    expect(validateEmail("  Contact@Exemple.INVALID  ")).toEqual({
       ok: true,
-      value: "presse@bluegenji-esport.fr",
+      value: "contact@exemple.invalid",
     });
   });
 
@@ -107,5 +110,34 @@ describe("validateContactInfo", () => {
 
   it("ships sensible defaults", () => {
     expect(validateContactInfo(DEFAULT_CONTACT).ok).toBe(true);
+  });
+
+  it("le courriel par défaut est celui de l'association, décodé", () => {
+    expect(DEFAULT_CONTACT.email).toBe(decodeContact(ASSOCIATION_EMAIL_ENCODED));
+    expect(DEFAULT_CONTACT.email.endsWith(["gmail", "com"].join("."))).toBe(true);
+  });
+});
+
+describe("faux courriel retiré", () => {
+  // Composée plutôt qu'écrite : ce fichier ne doit pas être celui qui la publie.
+  const FAKE = ["presse", "bluegenji-esport.fr"].join("@");
+
+  it("n'est plus le défaut, et le rattrapage de démarrage le connaît", () => {
+    expect(DEFAULT_CONTACT.email).not.toBe(FAKE);
+    expect(SUPERSEDED_CONTACT_EMAILS).toEqual([FAKE]);
+  });
+});
+
+describe("toPublicContact", () => {
+  it("encode le courriel et laisse les canaux Discord tels quels", () => {
+    const contact = { email: "a@b.invalid", discordTag: "tag", discordUrl: "https://discord.gg/x" };
+    const pub = toPublicContact(contact);
+    expect(pub).toEqual({ emailEncoded: encodeContact("a@b.invalid"), discordTag: "tag", discordUrl: "https://discord.gg/x" });
+    expect(JSON.stringify(pub)).not.toContain("a@b.invalid");
+    expect(decodeContact(pub.emailEncoded)).toBe("a@b.invalid");
+  });
+
+  it("un courriel vide reste vide", () => {
+    expect(toPublicContact({ email: "", discordTag: "", discordUrl: "" }).emailEncoded).toBe("");
   });
 });
