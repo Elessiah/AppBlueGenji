@@ -272,6 +272,25 @@ export async function resolveReportTargets(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Le signalant peut-il recevoir une réponse **sans** adresse ? Seulement par un
+ * compte Discord prouvé (identifiant rattaché ou tag certifié) : le site
+ * n'envoie aucun courriel, et une session seule ne porte aucun message.
+ * Interrogé seulement quand la catégorie appelle une réponse et qu'aucune
+ * adresse n'est donnée — ailleurs la réponse ne change rien.
+ */
+async function isReplyReachable(userId: number | null): Promise<boolean> {
+  if (userId === null) return false;
+  const db = await getDatabase();
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_users
+      WHERE id = ? AND is_deleted = 0 AND (discord_id IS NOT NULL OR discord_verified_at IS NOT NULL)
+      LIMIT 1`,
+    [userId],
+  );
+  return rows.length > 0;
+}
+
+/**
  * Enregistre un signalement, puis prévient le propriétaire et le président de
  * l'association sur Discord.
  *
@@ -293,25 +312,6 @@ export async function resolveReportTargets(
  *   au-delà du plafond d'alerte, seule l'alerte est retenue (`reportAlertMode`).
  * @throws REPORT_TARGET_NOT_FOUND Une cible n'existe pas ou n'est pas visible.
  */
-/**
- * Le signalant peut-il recevoir une réponse **sans** adresse ? Seulement par un
- * compte Discord prouvé (identifiant rattaché ou tag certifié) : le site
- * n'envoie aucun courriel, et une session seule ne porte aucun message.
- * Interrogé seulement quand la catégorie appelle une réponse et qu'aucune
- * adresse n'est donnée — ailleurs la réponse ne change rien.
- */
-async function isReplyReachable(userId: number | null): Promise<boolean> {
-  if (userId === null) return false;
-  const db = await getDatabase();
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_users
-      WHERE id = ? AND is_deleted = 0 AND (discord_id IS NOT NULL OR discord_verified_at IS NOT NULL)
-      LIMIT 1`,
-    [userId],
-  );
-  return rows.length > 0;
-}
-
 export async function createReport(submission: ReportSubmission, viewer: ReportViewer): Promise<number> {
   if (submission.category === "CONTEST") return createContest(submission, viewer);
   if (viewer.userId === null && submission.targets.length > 0) throw new Error("REPORT_TARGETS_REQUIRE_LOGIN");
