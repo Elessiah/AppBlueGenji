@@ -29,15 +29,26 @@ const OFFLINE_CACHE_PREFIX = "bg-offline-";
 const OFFLINE_CACHE = OFFLINE_CACHE_PREFIX + "v1";
 const OFFLINE_URL = "/offline.html";
 
+/**
+ * Met la page hors ligne en cache si elle n'y est pas. Ne lève jamais : un
+ * échec (réseau instable, déploiement qui répond 502) ne doit pas faire
+ * échouer l'installation — le même service worker porte les notifications,
+ * dont l'activation attend `serviceWorker.ready`. On retente à la prochaine
+ * navigation réussie.
+ */
+async function ensureOfflinePage() {
+  try {
+    if (await caches.match(OFFLINE_URL, { cacheName: OFFLINE_CACHE })) return;
+    const cache = await caches.open(OFFLINE_CACHE);
+    // `reload` : jamais une copie du cache HTTP, qui pourrait dater.
+    await cache.add(new Request(OFFLINE_URL, { cache: "reload" }));
+  } catch (error) {
+    // Sans page en cache, une navigation hors ligne garde l'erreur du navigateur.
+  }
+}
+
 self.addEventListener("install", (event) => {
-  event.waitUntil(
-    (async () => {
-      const cache = await caches.open(OFFLINE_CACHE);
-      // `reload` : jamais une copie du cache HTTP, qui pourrait dater.
-      await cache.add(new Request(OFFLINE_URL, { cache: "reload" }));
-      await self.skipWaiting();
-    })(),
-  );
+  event.waitUntil(ensureOfflinePage().then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (event) => {
@@ -67,8 +78,11 @@ self.addEventListener("fetch", (event) => {
     (async () => {
       try {
         const preloaded = await event.preloadResponse;
-        if (preloaded) return preloaded;
-        return await fetch(event.request);
+        const response = preloaded || (await fetch(event.request));
+        // Le réseau répond : c'est le moment de rattraper une page hors ligne
+        // que l'installation n'aurait pas pu mettre en cache.
+        event.waitUntil(ensureOfflinePage());
+        return response;
       } catch (error) {
         const offline = await caches.match(OFFLINE_URL, { cacheName: OFFLINE_CACHE });
         if (offline) return offline;

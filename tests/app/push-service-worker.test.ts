@@ -13,17 +13,28 @@ const OFFLINE_PAGE = { offline: true };
 
 function loadWorker(
   windows: { url: string; focus: unknown; navigate?: unknown }[] = [],
-  options: { fetch?: (request: unknown) => Promise<unknown>; cacheNames?: string[] } = {},
+  options: {
+    fetch?: (request: unknown) => Promise<unknown>;
+    cacheNames?: string[];
+    /** La page hors ligne est-elle déjà en cache ? (défaut : oui) */
+    cached?: boolean;
+    /** La mise en cache échoue-t-elle (réseau instable, 502) ? */
+    addFails?: boolean;
+  } = {},
 ) {
   const listeners = new Map<string, Listener>();
   const showNotification = jest.fn(async () => undefined);
   const openWindow = jest.fn(async (_url: string) => null);
-  const cacheAdd = jest.fn(async (_request: unknown) => undefined);
+  let stored: unknown = options.cached === false ? undefined : OFFLINE_PAGE;
+  const cacheAdd = jest.fn(async (_request: unknown) => {
+    if (options.addFails) throw new TypeError("Failed to fetch");
+    stored = OFFLINE_PAGE;
+  });
   const caches = {
     open: jest.fn(async (_name: string) => ({ add: cacheAdd })),
     keys: jest.fn(async () => options.cacheNames ?? []),
     delete: jest.fn(async (_name: string) => true),
-    match: jest.fn(async (_url: string, _options: unknown): Promise<unknown> => OFFLINE_PAGE),
+    match: jest.fn(async (_url: string, _options: unknown): Promise<unknown> => stored),
   };
   const enablePreload = jest.fn(async () => undefined);
   const fetch = jest.fn(options.fetch ?? (async () => ({ network: true })));
@@ -69,7 +80,7 @@ describe("service worker du site", () => {
   });
 
   it("ne met en cache que la page hors ligne, et rien du site", async () => {
-    const worker = loadWorker();
+    const worker = loadWorker([], { cached: false });
     worker.fire("install", {});
     await Promise.all(worker.waited);
     expect(worker.cacheAdd).toHaveBeenCalledTimes(1);
@@ -78,6 +89,30 @@ describe("service worker du site", () => {
     expect(worker.self.skipWaiting).toHaveBeenCalled();
     // Aucune autre écriture de cache n'existe dans le fichier.
     expect(readSource("public/push-sw.js")).not.toMatch(/\.put\(|addAll\(/);
+  });
+
+  it("une page hors ligne injoignable ne fait pas échouer l'installation", async () => {
+    const worker = loadWorker([], { cached: false, addFails: true });
+    worker.fire("install", {});
+    await expect(Promise.all(worker.waited)).resolves.toBeDefined();
+    expect(worker.self.skipWaiting).toHaveBeenCalled();
+  });
+
+  it("rattrape la page hors ligne à la navigation réussie suivante", async () => {
+    const worker = loadWorker([], { cached: false });
+    worker.fire("fetch", { request: { mode: "navigate" } });
+    await worker.responded[0];
+    await Promise.all(worker.waited);
+    expect(worker.cacheAdd).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne recharge pas une page hors ligne déjà en cache", async () => {
+    const worker = loadWorker();
+    worker.fire("install", {});
+    worker.fire("fetch", { request: { mode: "navigate" } });
+    await worker.responded[0];
+    await Promise.all(worker.waited);
+    expect(worker.cacheAdd).not.toHaveBeenCalled();
   });
 
   it("à l'activation, efface ses anciennes versions et elles seules", async () => {
@@ -104,7 +139,7 @@ describe("service worker du site", () => {
     const [first, second] = await Promise.all(worker.responded);
     expect(first).toBe(preloaded);
     expect(second).toEqual({ network: true });
-    expect(worker.caches.match).not.toHaveBeenCalled();
+    expect(worker.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("une erreur HTTP reste la réponse du serveur", async () => {
@@ -112,7 +147,6 @@ describe("service worker du site", () => {
     const worker = loadWorker([], { fetch: async () => notFound });
     worker.fire("fetch", { request: { mode: "navigate" } });
     expect(await worker.responded[0]).toBe(notFound);
-    expect(worker.caches.match).not.toHaveBeenCalled();
   });
 
   it("sans réseau, rend la page hors ligne", async () => {
@@ -129,11 +163,11 @@ describe("service worker du site", () => {
   it("sans réseau ni page en cache, rend l'échec d'origine", async () => {
     const failure = new TypeError("Failed to fetch");
     const worker = loadWorker([], {
+      cached: false,
       fetch: async () => {
         throw failure;
       },
     });
-    worker.caches.match.mockResolvedValueOnce(undefined);
     worker.fire("fetch", { request: { mode: "navigate" } });
     await expect(worker.responded[0]).rejects.toBe(failure);
   });
