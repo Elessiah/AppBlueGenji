@@ -435,7 +435,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Microsoft (OneDrive de l'hébergeur du site — ${ONEDRIVE_BACKUP_FRAMEWORK}), qui stocke les copies chiffrées sans pouvoir les lire`,
     ],
     transfers: [
-      `Possibles hors de l'Union européenne, notamment vers les États-Unis, le lieu de stockage n'étant pas garanti : Microsoft, qui ne reçoit que des données chiffrées avant envoi avec une clé que seule l'association détient — ${transferBasis(["MICROSOFT"])}`,
+      `Possibles vers les États-Unis (lieu de stockage non garanti par Microsoft) : Microsoft, qui ne reçoit que des données chiffrées avant envoi avec une clé que seule l'association détient — ${transferBasis(["MICROSOFT"])}`,
     ],
     security: [
       "Chiffrement sur le serveur de l'association avant tout envoi (age pour les archives, rclone crypt pour les images, les logos masqués et le journal) : aucune clé n'est transmise à Microsoft",

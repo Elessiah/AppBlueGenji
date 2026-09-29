@@ -552,14 +552,14 @@ export default async function RgpdPage() {
           </ul>
           <p>
             <strong>Encadrement des transferts.</strong> Ces services peuvent traiter ou héberger
-            des données hors de l&apos;Espace économique européen, notamment aux États-Unis. Chaque
-            transfert repose sur un mécanisme nommé : {transferBasis(ALL_TRANSFER_RECIPIENTS)}.
+            des données aux États-Unis. Le transfert y repose, pour chacun, sur :{" "}
+            {transferBasis(ALL_TRANSFER_RECIPIENTS)}.
           </p>
           <p>
             <strong>Sauvegardes.</strong> Elles sont déposées sur le OneDrive d&apos;un{" "}
-            {ONEDRIVE_BACKUP_FRAMEWORK} : elles peuvent donc être stockées hors de l&apos;Union
-            européenne, et un transfert vers les États-Unis repose alors sur la certification EU-U.S.
-            Data Privacy Framework de Microsoft Corporation. La garantie que tient
+            {ONEDRIVE_BACKUP_FRAMEWORK} : le site n&apos;affirme donc aucun lieu de stockage, et un
+            transfert vers les États-Unis repose sur la certification EU-U.S. Data Privacy Framework
+            de Microsoft Corporation. La garantie que tient
             l&apos;association est ailleurs : archives de la base, images, logos masqués et journal
             des suppressions sont <strong>chiffrés sur le Raspberry Pi avant tout envoi</strong>,
             avec une clé que seule l&apos;association détient et qui n&apos;est jamais transmise à
