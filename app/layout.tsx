@@ -23,6 +23,12 @@ import type { PrivacyChange } from "@/lib/shared/privacy-changes";
 import { siteMetadataBase } from "@/lib/server/site-url";
 import { PATHNAME_HEADER } from "@/lib/shared/csp";
 import {
+  TERMS_POSTPONED_COOKIE,
+  isTermsPostponed,
+  recruitmentModalSilenced,
+  termsModalDueOnLoad,
+} from "@/lib/shared/global-modals";
+import {
   RECRUITMENT_BANNER_COOKIE,
   RECRUITMENT_MODAL_COOKIE,
   recruitmentDismissed,
@@ -166,7 +172,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // neuve pour ce visiteur.
   const cookieStore = await cookies();
   const spotlight = await getRecruitmentSpotlight();
-  const onRecruitmentPage = requestHeaders.get(PATHNAME_HEADER) === RECRUITMENT_PAGE;
+  const requestedPath = requestHeaders.get(PATHNAME_HEADER);
+  const onRecruitmentPage = requestedPath === RECRUITMENT_PAGE;
   const modalSeen = recruitmentSeenAmong(
     cookieStore.get(RECRUITMENT_MODAL_COOKIE)?.value,
     spotlight.modal.map((ad) => ad.id),
@@ -196,6 +203,14 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // signalant doit tenir même quand personne n'ouvre le panneau.
   schedulePurgeExpiredReports();
   const termsRequired = await termsRequiredFor(user?.id);
+  // « Plus tard » tient pour la session (cookie) : sans quoi la modale revenait
+  // à chaque chargement complet. Un geste de gestion refusé la rouvre malgré lui.
+  const termsPostponed = isTermsPostponed(cookieStore.get(TERMS_POSTPONED_COOKIE)?.value);
+  const termsDueOnLoad = termsModalDueOnLoad({
+    termsRequired,
+    postponed: termsPostponed,
+    pathname: requestedPath,
+  });
   // Réglages d'accessibilité du lecteur : posés **dans le HTML initial**, sans
   // quoi un contraste renforcé ferait d'abord clignoter la page dans ses
   // couleurs d'origine. Voir `lib/shared/accessibility-settings.ts`.
@@ -216,11 +231,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <SiteNavigationTracker />
           <ClientPowerRoot />
           {/* Deux modales ne se superposent pas : tant qu'un choix de
-              confidentialité est dû, la mise en avant du recrutement se tait
-              (la banderole, elle, reste). */}
+              confidentialité ou les conditions attendent une réponse, et sur
+              la connexion (sa modale de consentement passe d'abord), la mise
+              en avant du recrutement se tait (la banderole, elle, reste).
+              Voir `lib/shared/global-modals.ts`. */}
           <RecruitmentHighlight
             modalAds={spotlight.modal}
-            modalSilenced={privacyChanges.length > 0}
+            modalSilenced={recruitmentModalSilenced({
+              privacyPending: privacyChanges.length > 0,
+              termsModalDue: termsDueOnLoad,
+              pathname: requestedPath,
+            })}
             modalSeen={modalSeen}
             bannerAds={spotlight.banner}
             bannerDismissed={bannerDismissed}
@@ -228,7 +249,10 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           />
           <PrivacyChangesModal changes={privacyChanges} />
           {user && (
-            <TermsAcceptanceModal initiallyRequired={termsRequired} privacyPending={privacyChanges.length > 0} />
+            <TermsAcceptanceModal
+              initiallyRequired={termsRequired && !termsPostponed}
+              privacyPending={privacyChanges.length > 0}
+            />
           )}
           {/* Lancement des matchs du joueur, sur toutes les pages : la modale
               s'ouvre à l'heure du match, où qu'il se trouve sur le site. */}

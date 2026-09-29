@@ -15,6 +15,11 @@
 .modal {
   width: min(640px, 100%);
   max-height: calc(100dvh - 32px);
+  /* Modale bloquante (ni Échap ni clic à côté) : sur un écran bas (téléphone en
+     paysage), ses boutons doivent rester atteignables — la modale défile plutôt
+     que de pousser « J'accepte » / « Je refuse » sous le bord de l'écran. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -72,7 +77,8 @@
    que soit le nombre de changements cumulés. */
 .changes {
   flex: 1 1 auto;
-  min-height: 120px;
+  /* 120 px sur un écran ordinaire, moins sur un écran bas où chaque ligne compte. */
+  min-height: min(120px, 22dvh);
   border: 1px solid var(--line-soft);
   border-radius: var(--r-cy-md, 10px);
   background: var(--cyber-bg-2, #10141b);
