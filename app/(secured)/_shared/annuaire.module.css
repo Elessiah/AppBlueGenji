@@ -370,6 +370,19 @@
   outline: 2px solid rgba(90, 200, 255, 0.6);
   outline-offset: 2px;
 }
+@media (prefers-reduced-motion: reduce) {
+  .showMoreBtn {
+    transition: none;
+  }
+}
+/* Sur téléphone, une cible pleine largeur : le bouton suit une longue grille
+   qu'on fait défiler au pouce. */
+@media (max-width: 640px) {
+  .showMoreBtn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
 
 /* ---------- TEAM CARD (Equipes) ---------- */
 .tmGrid {
