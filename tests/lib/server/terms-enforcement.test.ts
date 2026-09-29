@@ -60,6 +60,12 @@ const rolesOf = (roles: Record<number, string[]>): Route => [
   },
 ];
 
+/** Verrous pris en tête des transactions du roster (`withTeamRosterLock`). */
+const locks: Route[] = [
+  [/SELECT id FROM bg_teams WHERE id = \? FOR UPDATE/, () => [[{ id: 7 }]]],
+  [/SELECT is_deleted FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ is_deleted: 0 }]]],
+];
+
 const refused = new Error("TERMS_ACCEPTANCE_REQUIRED");
 
 beforeEach(() => {
@@ -72,22 +78,28 @@ beforeEach(() => {
 
 describe("gestion d'une équipe — les conditions après le rôle", () => {
   it("refuse un gérant qui ne les a pas acceptées, avant toute écriture", async () => {
-    install([rolesOf({ 1: ["MANAGER"], 2: ["DPS"] }), [/UPDATE bg_team_members/, () => [{ affectedRows: 1 }]]]);
+    install([], [
+      ...locks,
+      rolesOf({ 1: ["MANAGER"], 2: ["DPS"] }),
+      [/UPDATE bg_team_members/, () => [{ affectedRows: 1 }]],
+    ]);
     jest.mocked(assertTermsAccepted).mockRejectedValueOnce(refused);
 
     await expect(updateTeamMemberRoles(1, 7, 2, ["TANK"])).rejects.toThrow("TERMS_ACCEPTANCE_REQUIRED");
-    expect(assertTermsAccepted).toHaveBeenCalledWith(1);
-    expect(pool.execute.mock.calls.some(([sql]) => /UPDATE/.test(sql))).toBe(false);
+    // Relues sur la connexion de la transaction, sous le verrou de l'équipe.
+    expect(assertTermsAccepted).toHaveBeenCalledWith(1, fakeConnection(connection));
+    expect(connection.execute.mock.calls.some(([sql]) => /^\s*UPDATE/.test(sql))).toBe(false);
+    expect(connection.rollback).toHaveBeenCalled();
   });
 
   it("répond « interdit » à qui n'a aucun rôle, sans parler des conditions", async () => {
-    install([rolesOf({ 1: ["DPS"] })]);
+    install([], [...locks, rolesOf({ 1: ["DPS"] })]);
     await expect(updateTeamMemberRoles(1, 7, 2, ["TANK"])).rejects.toThrow("FORBIDDEN");
     expect(assertTermsAccepted).not.toHaveBeenCalled();
   });
 
   it("exige les conditions pour exclure un membre et transférer la propriété", async () => {
-    install([rolesOf({ 1: ["OWNER"], 2: ["DPS"] })]);
+    install([], [...locks, rolesOf({ 1: ["OWNER"], 2: ["DPS"] })]);
     jest.mocked(assertTermsAccepted).mockRejectedValue(refused);
     await expect(removeTeamMember(1, 7, 2)).rejects.toThrow("TERMS_ACCEPTANCE_REQUIRED");
     await expect(transferTeamOwnership(1, 7, 2)).rejects.toThrow("TERMS_ACCEPTANCE_REQUIRED");
@@ -129,13 +141,15 @@ describe("gestion d'une équipe — les conditions après le rôle", () => {
 
 describe("createTeam — l'acceptation écrite dans la transaction qui crée l'équipe", () => {
   const routes: Route[] = [
+    [/SELECT id FROM bg_users WHERE id = \? FOR UPDATE/, () => [[{ id: 3 }]]],
+    [/FROM bg_team_members\s+WHERE user_id = \?/, () => [[]]],
     [/SELECT id FROM bg_teams WHERE tag/, () => [[]]],
     [/INSERT INTO bg_teams/, () => [{ insertId: 50 }]],
     [/INSERT INTO bg_team_members/, () => [{}]],
   ];
 
   it("enregistre l'acceptation sur la connexion de la transaction", async () => {
-    install([[/FROM bg_team_members\s+WHERE user_id = \?/, () => [[]]]], routes);
+    install([], routes);
     await expect(createTeam(3, "Nouvelle équipe")).resolves.toBe(50);
     expect(recordTermsAcceptance).toHaveBeenCalledWith(3, "TEAM_CREATION", expect.anything());
     expect(jest.mocked(recordTermsAcceptance).mock.calls[0][2]).toBe(fakeConnection(connection));
@@ -143,7 +157,7 @@ describe("createTeam — l'acceptation écrite dans la transaction qui crée l'�
   });
 
   it("défait la création si le compte a disparu entre-temps", async () => {
-    install([[/FROM bg_team_members\s+WHERE user_id = \?/, () => [[]]]], routes);
+    install([], routes);
     jest.mocked(recordTermsAcceptance).mockResolvedValueOnce(false);
     await expect(createTeam(3, "Nouvelle équipe")).rejects.toThrow("PROFILE_NOT_FOUND");
     expect(connection.rollback).toHaveBeenCalled();

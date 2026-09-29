@@ -147,7 +147,10 @@ describe("softDeleteTeam — dérogation staff", () => {
       .mockResolvedValueOnce([[{ deleted_at: null }]]) // teamIsDeleted
       .mockResolvedValueOnce(NOT_A_MEMBER) // userOwnsTeam
       .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]); // isGhostTeam
-    const connectionExecute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+    const connectionExecute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 1 }]]) // relue sous verrou
+      .mockResolvedValue([{ affectedRows: 1 }]);
     const connection = await mockDb(execute, connectionExecute);
 
     await softDeleteTeam(99, 3, true);
@@ -165,6 +168,25 @@ describe("softDeleteTeam — dérogation staff", () => {
     await mockDb(execute);
 
     await expect(softDeleteTeam(99, 3, true)).rejects.toThrow("FORBIDDEN");
+  });
+
+  it("refuse une fantôme reprise pendant que le staff confirmait la suppression", async () => {
+    // Vue fantôme sur le pool, puis reprise (`is_ghost = 0`) avant le verrou :
+    // la dérogation est rejugée sous le verrou de l'équipe.
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ deleted_at: null }]])
+      .mockResolvedValueOnce(NOT_A_MEMBER)
+      .mockResolvedValueOnce([[{ is_ghost: 1, deleted_at: null }]]);
+    const connectionExecute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 0 }]])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    const connection = await mockDb(execute, connectionExecute);
+
+    await expect(softDeleteTeam(99, 3, true)).rejects.toThrow("FORBIDDEN");
+    expect(connectionExecute).toHaveBeenCalledTimes(1);
+    expect(connection.rollback).toHaveBeenCalled();
   });
 
   it("refuse une équipe déjà dissoute avant tout contrôle de droits", async () => {

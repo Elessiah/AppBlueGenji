@@ -101,6 +101,90 @@ async function getMemberRoles(teamId: number, userId: number): Promise<TeamRole[
   return parseRoles(rows[0].roles_json);
 }
 
+/**
+ * Transaction d'une écriture sur le roster d'une équipe existante (rôles,
+ * propriété, départ, exclusion).
+ *
+ * Ces gestes lisaient les rôles sur le pool puis écrivaient sans rien relire :
+ * un destinataire parti entre les deux ne recevait pas la propriété que
+ * l'ancien propriétaire venait de perdre, et l'équipe restait sans `OWNER`. Ils
+ * se sérialisent désormais sur **la ligne de l'équipe**, verrouillée en
+ * exclusif — la même que prennent la dissolution (`softDeleteTeam`) et, en
+ * partagé, l'acceptation (`acceptIntoTeam`), toujours **après** une éventuelle
+ * ligne de joueur : c'est l'ordre établi, qui interdit l'interblocage.
+ *
+ * @param lockUserId compte à verrouiller **avant** l'équipe — en toute première
+ *   instruction, comme le fait `acceptIntoTeam` ; sans lui, le verrou de
+ *   l'équipe est la première instruction. Sous REPEATABLE READ, c'est la
+ *   première lecture ordinaire qui fige l'instantané : toute relecture des
+ *   rôles vient donc après le verrou, par {@link lockMemberRoles}.
+ */
+async function withTeamRosterLock<T>(
+  teamId: number,
+  work: (connection: PoolConnection) => Promise<T>,
+  lockUserId?: (connection: PoolConnection) => Promise<void>,
+): Promise<T> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+    if (lockUserId) await lockUserId(connection);
+    await connection.execute(`SELECT id FROM bg_teams WHERE id = ? FOR UPDATE`, [teamId]);
+    const result = await work(connection);
+    await connection.commit();
+    return result;
+  } catch (error) {
+    await connection.rollback();
+    throw error;
+  } finally {
+    connection.release();
+  }
+}
+
+/** Rôles en cours d'un membre, relus **sous verrou** dans la transaction. */
+async function lockMemberRoles(
+  connection: Pick<PoolConnection, "execute">,
+  teamId: number,
+  userId: number,
+): Promise<TeamRole[] | null> {
+  const [rows] = await connection.execute<(RowDataPacket & { roles_json: string })[]>(
+    `SELECT roles_json
+     FROM bg_team_members
+     WHERE team_id = ?
+       AND user_id = ?
+       AND left_at IS NULL
+     LIMIT 1
+     FOR UPDATE`,
+    [teamId, userId],
+  );
+  if (rows.length === 0) return null;
+  return parseRoles(rows[0].roles_json);
+}
+
+/**
+ * Écrit sur **une** ligne d'appartenance en cours, et refuse si l'écriture n'en
+ * apparie pas exactement une : sous les verrous de {@link withTeamRosterLock},
+ * c'est impossible — le contrôle garde la règle si ce verrou venait à manquer,
+ * au lieu d'un `UPDATE` muet qui laisserait le roster à moitié écrit.
+ */
+async function writeActiveMembership(
+  connection: Pick<PoolConnection, "execute">,
+  setSql: string,
+  params: SqlParams,
+  teamId: number,
+  userId: number,
+): Promise<void> {
+  const [res] = await connection.execute<ResultSetHeader>(
+    `UPDATE bg_team_members
+     SET ${setSql}
+     WHERE team_id = ?
+       AND user_id = ?
+       AND left_at IS NULL`,
+    [...params, teamId, userId],
+  );
+  if (Number(res.affectedRows) !== 1) throw new Error("MEMBER_NOT_FOUND");
+}
+
 async function userCanManageTeam(teamId: number, userId: number): Promise<boolean> {
   return hasTeamManagementRole(await getMemberRoles(teamId, userId));
 }
@@ -400,22 +484,34 @@ export async function createTeam(
   const db = await getDatabase();
   const normalizedTag = resolveTeamTag(tag);
 
-  const [existingMembership] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id
-     FROM bg_team_members
-     WHERE user_id = ?
-       AND left_at IS NULL
-     LIMIT 1`,
-    [ownerUserId],
-  );
-
-  if (existingMembership.length > 0) {
-    throw new Error("USER_ALREADY_IN_TEAM");
-  }
-
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
+
+    // « Une seule équipe active à la fois » n'est tenu par aucun index : le
+    // contrôle se fait sous le verrou de la ligne du joueur, **celui que prend
+    // `acceptIntoTeam`**, en toute première instruction (sous REPEATABLE READ,
+    // une lecture ordinaire placée avant figerait l'instantané, et l'appartenance
+    // relue ensuite serait périmée). Lu sur le pool, hors transaction, il
+    // laissait passer deux créations simultanées — ou une création et une
+    // acceptation — et le joueur finissait dans deux équipes actives.
+    const [account] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id FROM bg_users WHERE id = ? FOR UPDATE`,
+      [ownerUserId],
+    );
+    if (account.length === 0) throw new Error("PROFILE_NOT_FOUND");
+
+    const [existingMembership] = await connection.execute<(RowDataPacket & { id: number })[]>(
+      `SELECT id
+       FROM bg_team_members
+       WHERE user_id = ?
+         AND left_at IS NULL
+       LIMIT 1`,
+      [ownerUserId],
+    );
+    if (existingMembership.length > 0) {
+      throw new Error("USER_ALREADY_IN_TEAM");
+    }
 
     await assertTeamTagAvailable(connection, normalizedTag);
 
@@ -717,109 +813,103 @@ export async function canManageTeam(teamId: number, userId: number): Promise<boo
   return userCanManageTeam(teamId, userId);
 }
 
+/**
+ * Change les rôles d'un membre. Autorisé aux rôles de gestion (OWNER ou
+ * MANAGER) ; un MANAGER ne touche pas aux rôles de l'OWNER.
+ *
+ * Rôles du demandeur **et** de la cible relus sous le verrou de l'équipe
+ * (`withTeamRosterLock`) : lu avant, un `targetIsOwner` périmé réécrivait sans
+ * `OWNER` les rôles d'un membre qui venait de recevoir la propriété, et
+ * l'équipe restait sans propriétaire.
+ */
 export async function updateTeamMemberRoles(
   requesterId: number,
   teamId: number,
   memberUserId: number,
   roles: TeamRole[],
 ): Promise<void> {
-  const db = await getDatabase();
+  await withTeamRosterLock(teamId, async (connection) => {
+    const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
+    if (!requesterRoles) throw new Error("FORBIDDEN");
+    const requesterIsOwner = requesterRoles.includes("OWNER");
+    const requesterIsManager = requesterRoles.includes("MANAGER");
+    if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
+    await assertTermsAccepted(requesterId, connection);
 
-  const requesterRoles = await getMemberRoles(teamId, requesterId);
-  if (!requesterRoles) throw new Error("FORBIDDEN");
-  const requesterIsOwner = requesterRoles.includes("OWNER");
-  const requesterIsManager = requesterRoles.includes("MANAGER");
-  if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
-  await assertTermsAccepted(requesterId);
+    const targetRoles = await lockMemberRoles(connection, teamId, memberUserId);
+    if (!targetRoles) throw new Error("MEMBER_NOT_FOUND");
+    const targetIsOwner = targetRoles.includes("OWNER");
 
-  const targetRoles = await getMemberRoles(teamId, memberUserId);
-  if (!targetRoles) throw new Error("MEMBER_NOT_FOUND");
-  const targetIsOwner = targetRoles.includes("OWNER");
+    if (targetIsOwner && !requesterIsOwner) {
+      throw new Error("FORBIDDEN");
+    }
 
-  if (targetIsOwner && !requesterIsOwner) {
-    throw new Error("FORBIDDEN");
-  }
+    const filteredRoles = sanitizeRoles(roles).filter((role) => role !== "OWNER");
+    if (filteredRoles.length === 0) {
+      throw new Error("MISSING_ROLE");
+    }
 
-  const filteredRoles = sanitizeRoles(roles).filter((role) => role !== "OWNER");
-  if (filteredRoles.length === 0) {
-    throw new Error("MISSING_ROLE");
-  }
+    const finalRoles = targetIsOwner
+      ? (["OWNER", ...filteredRoles] as TeamRole[])
+      : filteredRoles;
 
-  const finalRoles = targetIsOwner
-    ? (["OWNER", ...filteredRoles] as TeamRole[])
-    : filteredRoles;
-
-  const [res] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_team_members
-     SET roles_json = ?
-     WHERE team_id = ?
-       AND user_id = ?
-       AND left_at IS NULL`,
-    [JSON.stringify(finalRoles), teamId, memberUserId],
-  );
-
-  if (Number(res.affectedRows) === 0) {
-    throw new Error("MEMBER_NOT_FOUND");
-  }
+    await writeActiveMembership(
+      connection,
+      "roles_json = ?",
+      [JSON.stringify(finalRoles)],
+      teamId,
+      memberUserId,
+    );
+  });
 }
 
 /**
  * Exclut (kick) un membre. Autorisé aux rôles de gestion (OWNER ou MANAGER).
  * Le propriétaire ne peut pas être exclu, et nul ne peut s'exclure soi-même
  * via ce chemin (utiliser `leaveTeam`).
+ *
+ * Sous le verrou de l'équipe, comme le transfert : lu avant, un membre qui
+ * recevait la propriété entre la lecture et l'écriture était exclu malgré
+ * `CANNOT_KICK_OWNER`, emportant le seul `OWNER` de l'équipe.
  */
 export async function removeTeamMember(requesterId: number, teamId: number, memberUserId: number): Promise<void> {
-  const db = await getDatabase();
+  await withTeamRosterLock(teamId, async (connection) => {
+    const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
+    if (!requesterRoles) throw new Error("FORBIDDEN");
+    const requesterIsOwner = requesterRoles.includes("OWNER");
+    const requesterIsManager = requesterRoles.includes("MANAGER");
+    if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
+    await assertTermsAccepted(requesterId, connection);
 
-  const requesterRoles = await getMemberRoles(teamId, requesterId);
-  if (!requesterRoles) throw new Error("FORBIDDEN");
-  const requesterIsOwner = requesterRoles.includes("OWNER");
-  const requesterIsManager = requesterRoles.includes("MANAGER");
-  if (!requesterIsOwner && !requesterIsManager) throw new Error("FORBIDDEN");
-  await assertTermsAccepted(requesterId);
+    if (memberUserId === requesterId) {
+      throw new Error("OWNER_CANNOT_LEAVE");
+    }
 
-  if (memberUserId === requesterId) {
-    throw new Error("OWNER_CANNOT_LEAVE");
-  }
+    const targetRoles = await lockMemberRoles(connection, teamId, memberUserId);
+    if (!targetRoles) throw new Error("MEMBER_NOT_FOUND");
+    if (targetRoles.includes("OWNER")) {
+      throw new Error("CANNOT_KICK_OWNER");
+    }
 
-  const targetRoles = await getMemberRoles(teamId, memberUserId);
-  if (!targetRoles) throw new Error("MEMBER_NOT_FOUND");
-  if (targetRoles.includes("OWNER")) {
-    throw new Error("CANNOT_KICK_OWNER");
-  }
-
-  const [res] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_team_members
-     SET left_at = NOW()
-     WHERE team_id = ?
-       AND user_id = ?
-       AND left_at IS NULL`,
-    [teamId, memberUserId],
-  );
-
-  if (Number(res.affectedRows) === 0) {
-    throw new Error("MEMBER_NOT_FOUND");
-  }
+    await writeActiveMembership(connection, "left_at = NOW()", [], teamId, memberUserId);
+  });
 }
 
 /**
  * Un membre quitte volontairement son équipe. Le propriétaire doit d'abord
  * transférer la propriété (`transferTeamOwnership`).
+ *
+ * Sous le verrou de l'équipe : lu avant, un membre qui recevait la propriété
+ * pendant son départ partait avec, et l'équipe restait sans propriétaire.
  */
 export async function leaveTeam(userId: number, teamId: number): Promise<void> {
-  const db = await getDatabase();
-  const roles = await getMemberRoles(teamId, userId);
-  if (!roles) throw new Error("NOT_A_MEMBER");
-  if (roles.includes("OWNER")) throw new Error("OWNER_MUST_TRANSFER");
+  await withTeamRosterLock(teamId, async (connection) => {
+    const roles = await lockMemberRoles(connection, teamId, userId);
+    if (!roles) throw new Error("NOT_A_MEMBER");
+    if (roles.includes("OWNER")) throw new Error("OWNER_MUST_TRANSFER");
 
-  await db.execute(
-    `UPDATE bg_team_members
-     SET left_at = NOW()
-     WHERE team_id = ?
-       AND user_id = ?
-       AND left_at IS NULL`,
-    [teamId, userId],
-  );
+    await writeActiveMembership(connection, "left_at = NOW()", [], teamId, userId);
+  });
 }
 
 /**
@@ -865,6 +955,20 @@ export async function getUserActiveTeam(
   };
 }
 
+/**
+ * Transfère la propriété (`OWNER`) à un autre membre en cours de l'équipe.
+ *
+ * Tout se joue dans une transaction : compte du destinataire verrouillé en
+ * toute première instruction (le verrou que prend la suppression de compte),
+ * puis la ligne de l'équipe (`withTeamRosterLock`), puis les rôles des deux
+ * membres **relus** sous ces verrous. Lus sur le pool, ils laissaient deux
+ * issues : un destinataire parti entre la lecture et l'écriture ne recevait
+ * rien pendant que l'ancien propriétaire perdait le rôle (équipe sans
+ * `OWNER`, que le staff ne peut pas réparer sur une équipe réelle), et deux
+ * transferts simultanés vers deux membres laissaient deux `OWNER`. Chaque
+ * écriture doit en outre apparier exactement une ligne, sans quoi tout est
+ * défait.
+ */
 export async function transferTeamOwnership(
   requesterId: number,
   teamId: number,
@@ -874,68 +978,53 @@ export async function transferTeamOwnership(
     throw new Error("TRANSFER_TO_SELF");
   }
 
-  const db = await getDatabase();
+  let targetDeleted = false;
+  await withTeamRosterLock(
+    teamId,
+    async (connection) => {
+      const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
+      if (!requesterRoles || !requesterRoles.includes("OWNER")) {
+        throw new Error("FORBIDDEN");
+      }
+      await assertTermsAccepted(requesterId, connection);
 
-  const requesterRoles = await getMemberRoles(teamId, requesterId);
-  if (!requesterRoles || !requesterRoles.includes("OWNER")) {
-    throw new Error("FORBIDDEN");
-  }
-  await assertTermsAccepted(requesterId);
+      const targetRoles = await lockMemberRoles(connection, teamId, newOwnerUserId);
+      if (!targetRoles) {
+        throw new Error("MEMBER_NOT_FOUND");
+      }
+      // Un compte anonymisé garde sa ligne d'appartenance : lui confier
+      // l'équipe la laisserait sans personne capable d'ouvrir une session pour
+      // la conduire, et l'état serait définitif — seul le propriétaire
+      // transfère ou dissout, et il ne peut être ni exclu ni partir.
+      if (targetDeleted) throw new Error("MEMBER_ACCOUNT_DELETED");
 
-  const targetRoles = await getMemberRoles(teamId, newOwnerUserId);
-  if (!targetRoles) {
-    throw new Error("MEMBER_NOT_FOUND");
-  }
+      const newOwnerRoles: TeamRole[] = ["OWNER", ...targetRoles.filter((r) => r !== "OWNER")];
+      const oldOwnerRemaining = requesterRoles.filter((r) => r !== "OWNER");
+      const oldOwnerRoles: TeamRole[] = oldOwnerRemaining.length === 0 ? ["DPS"] : oldOwnerRemaining;
 
-  const newOwnerRoles: TeamRole[] = ["OWNER", ...targetRoles.filter((r) => r !== "OWNER")];
-
-  const oldOwnerRemaining = requesterRoles.filter((r) => r !== "OWNER");
-  const oldOwnerRoles: TeamRole[] = oldOwnerRemaining.length === 0 ? ["DPS"] : oldOwnerRemaining;
-
-  const connection = await db.getConnection();
-  try {
-    await connection.beginTransaction();
-
-    // Un compte anonymisé garde sa ligne d'appartenance : lui confier l'équipe
-    // la laisserait sans personne capable d'ouvrir une session pour la
-    // conduire, et l'état serait définitif — seul le propriétaire transfère ou
-    // dissout, et il ne peut être ni exclu ni partir. Lu **dans** la
-    // transaction et sous le verrou que prend la suppression de compte, en
-    // toute première instruction : lu avant, une anonymisation commitée entre
-    // la lecture et les écritures recevait quand même la propriété.
-    const [targetAccount] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
-      `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
-      [newOwnerUserId],
-    );
-    if (targetAccount.length === 0 || targetAccount[0].is_deleted === 1) {
-      throw new Error("MEMBER_ACCOUNT_DELETED");
-    }
-
-    await connection.execute(
-      `UPDATE bg_team_members
-       SET roles_json = ?
-       WHERE team_id = ?
-         AND user_id = ?
-         AND left_at IS NULL`,
-      [JSON.stringify(oldOwnerRoles), teamId, requesterId],
-    );
-
-    await connection.execute(
-      `UPDATE bg_team_members
-       SET roles_json = ?
-       WHERE team_id = ?
-         AND user_id = ?
-         AND left_at IS NULL`,
-      [JSON.stringify(newOwnerRoles), teamId, newOwnerUserId],
-    );
-
-    await connection.commit();
-  } catch (error) {
-    await connection.rollback();
-    throw error;
-  } finally {
-    connection.release();
-  }
+      await writeActiveMembership(
+        connection,
+        "roles_json = ?",
+        [JSON.stringify(oldOwnerRoles)],
+        teamId,
+        requesterId,
+      );
+      await writeActiveMembership(
+        connection,
+        "roles_json = ?",
+        [JSON.stringify(newOwnerRoles)],
+        teamId,
+        newOwnerUserId,
+      );
+    },
+    async (connection) => {
+      const [targetAccount] = await connection.execute<(RowDataPacket & { is_deleted: 0 | 1 })[]>(
+        `SELECT is_deleted FROM bg_users WHERE id = ? FOR UPDATE`,
+        [newOwnerUserId],
+      );
+      targetDeleted = targetAccount.length === 0 || targetAccount[0].is_deleted === 1;
+    },
+  );
 }
 
 async function teamIsDeleted(teamId: number): Promise<boolean> {
@@ -961,10 +1050,8 @@ export async function softDeleteTeam(
 ): Promise<void> {
   const db = await getDatabase();
   if (await teamIsDeleted(teamId)) throw new Error("TEAM_ALREADY_DELETED");
-  if (
-    !(await userOwnsTeam(teamId, requesterId))
-    && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
-  ) {
+  const viaOwnership = await userOwnsTeam(teamId, requesterId);
+  if (!viaOwnership && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))) {
     throw new Error("FORBIDDEN");
   }
 
@@ -975,11 +1062,25 @@ export async function softDeleteTeam(
 
     // Le logo est relu sous verrou, en toute première instruction : c'est le
     // fichier que la dissolution retire, et il n'est effacé qu'après le commit.
-    const [locked] = await connection.execute<(RowDataPacket & { logo_url: string | null })[]>(
-      `SELECT logo_url FROM bg_teams WHERE id = ? FOR UPDATE`,
+    // Ce verrou est celui des gestes du roster (`withTeamRosterLock`) : le droit
+    // de dissoudre est donc **rejugé** dessous — lu seulement avant, un vieil
+    // onglet de l'ancien propriétaire dissolvait l'équipe qu'il venait de
+    // transférer, et le staff une fantôme reprise entre-temps.
+    const [locked] = await connection.execute<
+      (RowDataPacket & { logo_url: string | null; deleted_at: Date | null; is_ghost: 0 | 1 })[]
+    >(
+      `SELECT logo_url, deleted_at, is_ghost FROM bg_teams WHERE id = ? FOR UPDATE`,
       [teamId],
     );
-    previousLogoUrl = locked[0]?.logo_url ?? null;
+    if (locked.length === 0) throw new Error("FORBIDDEN");
+    if (locked[0].deleted_at) throw new Error("TEAM_ALREADY_DELETED");
+    if (viaOwnership) {
+      const roles = await lockMemberRoles(connection, teamId, requesterId);
+      if (!roles || !roles.includes("OWNER")) throw new Error("FORBIDDEN");
+    } else if (locked[0].is_ghost !== 1) {
+      throw new Error("FORBIDDEN");
+    }
+    previousLogoUrl = locked[0].logo_url ?? null;
 
     // Anonymise les données saisies par l'utilisateur et libère les deux
     // identités uniques : le nom **et le sigle**. Le sigle vaut sur tout le
