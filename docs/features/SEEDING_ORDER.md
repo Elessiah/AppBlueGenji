@@ -190,9 +190,10 @@ suivies d'un bouton réversible « Voir toute la liste (N de plus) » /
 devenaient introuvables. L'état déplié est un drapeau, pas un compte figé : une
 liste dépliée le reste quand le flux y ajoute une ligne. Une flèche « ↓ » qui
 ferait passer une ligne sous la dernière visible déplie la liste d'elle-même,
-pour que la ligne déplacée et son bouton restent à l'écran ; pendant un
-glissement la liste s'affiche en entier, et une ligne lâchée sous la dernière
-visible la déplie de même.
+pour que la ligne déplacée et son bouton restent à l'écran. Un appui sur la
+poignée `⠿` la déplie aussi, de façon synchrone (`flushSync`), **avant** que le
+geste ne relève les emplacements : ils ne sont mesurés qu'une fois, au premier
+appui, et une ligne masquée à cet instant ne serait jamais une cible.
 
 ## Surfaces
 

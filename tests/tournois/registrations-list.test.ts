@@ -37,12 +37,17 @@ describe("repli de la liste des inscrites", () => {
     expect(panel).toContain("mustExpandToShow(");
   });
 
-  it("affiche toute la liste pendant un glissement et la déplie au lâcher", () => {
+  it("déplie la liste avant que le glissement ne mesure les lignes, et au lâcher", () => {
     const panel = readFileSync(
       join(__dirname, "..", "..", "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx"),
       "utf8",
     );
-    expect(panel).toMatch(/visibleRegistrationCount\(rows\.length, expanded \|\| drag\.draggingTeamId !== null\)/);
+    const grip = panel.slice(panel.indexOf("const gripProps"));
+    // Dépliée de façon synchrone **avant** l'appel du geste, qui relève les emplacements.
+    expect(grip.indexOf("flushSync(() => setExpanded(true))")).toBeGreaterThan(-1);
+    expect(grip.indexOf("flushSync(")).toBeLessThan(grip.indexOf("onPointerDown(event)"));
+    expect(panel).toContain("{...gripProps(reg.teamId)}");
+    expect(panel).not.toContain("{...drag.handleProps(reg.teamId)}");
     const onDrop = panel.slice(panel.indexOf("const onDrop"), panel.indexOf("const drag ="));
     expect(onDrop).toContain("mustExpandToShow(");
   });

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
+import { flushSync } from "react-dom";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { useToast } from "@/components/ui/toast";
 import { Pill } from "@/components/cyber";
@@ -224,12 +225,22 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   const actionsLabel = reorderable && removable ? "Actions" : reorderable ? "Ordre" : "Retrait";
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
-  // Pendant un glissement, la liste s'affiche en entier : la cible peut tomber
-  // juste sous la dernière ligne visible, et la ligne tirée n'y disparaît pas.
-  const visibleRows = rows.slice(
-    0,
-    visibleRegistrationCount(rows.length, expanded || drag.draggingTeamId !== null),
-  );
+  const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
+
+  // `useSeedingDrag` relève les emplacements de **toutes** les lignes au premier
+  // appui, une seule fois : une ligne masquée à cet instant ne serait jamais une
+  // cible. La liste se déplie donc, de façon synchrone, avant la mesure.
+  const gripProps = (teamId: number) => {
+    const { onPointerDown } = drag.handleProps(teamId);
+    return {
+      onPointerDown: (event: PointerEvent<HTMLElement>) => {
+        if (!expanded && hiddenCount > 0 && !busy && event.button === 0) {
+          flushSync(() => setExpanded(true));
+        }
+        onPointerDown(event);
+      },
+    };
+  };
 
   return (
     <div className="ds-block">
@@ -304,7 +315,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
                   aria-hidden="true"
                   className={styles.grip}
                   title="Glisser pour réordonner"
-                  {...drag.handleProps(reg.teamId)}
+                  {...gripProps(reg.teamId)}
                 >
                   ⠿
                 </span>
