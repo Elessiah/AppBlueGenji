@@ -35,7 +35,7 @@ describe("BotStatusStrip — ne publie aucune mesure inventée", () => {
 });
 
 describe("BotHero — ne se donne ni identifiant ni statut inventés", () => {
-  const html = renderToStaticMarkup(<BotHero />);
+  const html = renderToStaticMarkup(<BotHero status={null} />);
 
   it("n'affiche plus de discriminant ni de « vérifié »", () => {
     expect(html).not.toContain("#8242");
@@ -54,7 +54,7 @@ describe("BotHero — ne se donne ni identifiant ni statut inventés", () => {
 describe("Scopes — affichés depuis la liste que l'URL envoie", () => {
   it("dit dans le héros et la carte les scopes de l'invitation", () => {
     const label = BOT_INVITE_SCOPES.map((s) => s.toUpperCase()).join(" + ");
-    expect(renderToStaticMarkup(<BotHero />)).toContain(`OAUTH2 · ${label} · GRATUIT`);
+    expect(renderToStaticMarkup(<BotHero status={null} />)).toContain(`OAUTH2 · ${label} · GRATUIT`);
     expect(renderToStaticMarkup(<BotInviteCard />)).toContain(`SCOPES · ${label}`);
   });
 });

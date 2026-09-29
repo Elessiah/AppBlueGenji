@@ -77,8 +77,8 @@ describe("botStatusDisplay", () => {
     expect(botStatusDisplay(undefined)).toBe("—");
   });
 
-  it("montre l'état reçu tel quel, même inconnu — c'est une information", () => {
-    expect(botStatusDisplay("OPERATIONAL")).toBe("OPERATIONAL");
+  it("traduit un état connu et montre un état inconnu tel quel", () => {
+    expect(botStatusDisplay("OPERATIONAL")).toBe("Opérationnel");
     expect(botStatusDisplay("MAINTENANCE")).toBe("MAINTENANCE");
   });
 });
