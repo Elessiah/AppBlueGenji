@@ -542,7 +542,7 @@ export function EnduranceView({
                     <button
                       type="button"
                       onClick={() => onForfeit(standing.teamId, standing.teamName)}
-                      className="btn tap-target tap-target-lg"
+                      className="btn tap-target"
                       title={
                         isMine
                           ? `Abandonner : ${wording.subject} quittera définitivement le tournoi`

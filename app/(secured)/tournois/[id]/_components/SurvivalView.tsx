@@ -207,7 +207,7 @@ export function SurvivalView({
                     <button
                       type="button"
                       onClick={() => onForfeit(team.teamId, team.teamName)}
-                      className="btn tap-target tap-target-lg"
+                      className="btn tap-target"
                       title={
                         isMine
                           ? "Abandonner : votre équipe quitte définitivement le tournoi"

@@ -13,13 +13,9 @@ describe("zones de tap étendues", () => {
   it("étend la zone par un pseudo-élément centré, au plancher de 24 px", () => {
     const after = blockFor(/\.tap-target::after\s*\{/);
     expect(after).toMatch(/position:\s*absolute/);
-    expect(after).toMatch(/width:\s*max\(100%,\s*var\(--tap-min,\s*24px\)\)/);
-    expect(after).toMatch(/height:\s*max\(100%,\s*var\(--tap-min,\s*24px\)\)/);
+    expect(after).toMatch(/width:\s*max\(100%,\s*24px\)/);
+    expect(after).toMatch(/height:\s*max\(100%,\s*24px\)/);
     expect(after).toMatch(/translate\(-50%,\s*-50%\)/);
-  });
-
-  it("vise 44 px pour un geste sans retour", () => {
-    expect(blockFor(/\.tap-target-lg\s*\{/)).toMatch(/--tap-min:\s*44px/);
   });
 
   it("ne repositionne pas un contrôle déjà positionné", () => {
@@ -36,9 +32,9 @@ describe("zones de tap étendues", () => {
     ["components/cyber/landing/PublicFooter.tsx", /<Link className="tap-target" href="\/rgpd">/],
     ["components/legal/SiteFooterBar.tsx", /<Link className="tap-target" href="\/rgpd">/],
     ["app/(secured)/tournois/[id]/_components/TournamentHeader.tsx", /\$\{s\.back\} tap-target/],
-    ["app/(secured)/tournois/[id]/_components/SurvivalView.tsx", /btn tap-target tap-target-lg/],
-    ["app/(secured)/tournois/[id]/_components/SwissView.tsx", /btn tap-target tap-target-lg/],
-    ["app/(secured)/tournois/[id]/_components/EnduranceView.tsx", /btn tap-target tap-target-lg/],
+    ["app/(secured)/tournois/[id]/_components/SurvivalView.tsx", /btn tap-target"/],
+    ["app/(secured)/tournois/[id]/_components/SwissView.tsx", /btn tap-target"/],
+    ["app/(secured)/tournois/[id]/_components/EnduranceView.tsx", /btn tap-target"/],
     ["app/(secured)/tournois/[id]/_components/MatchLiveStrip.tsx", /btn ghost tap-target/],
     ["app/(secured)/tournois/[id]/_components/MatchLaunchStrip.tsx", /btn tap-target ghost/],
     ["app/(secured)/tournois/[id]/_components/MatchReplayStrip.tsx", /btn ghost tap-target/],
