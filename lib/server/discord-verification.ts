@@ -284,22 +284,7 @@ export async function startDiscordVerification(
   // quelqu'un, et un plafond posé après n'aurait plus rien à refuser.
   guardBeforeSend?.(discordId);
 
-  const challenge = await createDiscordLoginChallenge(discordId, tag);
-  try {
-    await sendDiscordLoginCode(discordId, challenge.code);
-  } catch (error) {
-    // Même geste symétrique qu'à la connexion : un code qui n'est pas parti ne
-    // doit pas survivre à son échec, sinon il masque comme « dernier émis »
-    // celui que le joueur détient vraiment.
-    await discardDiscordChallenge(challenge.challengeId).catch(() => {});
-    throw error;
-  }
-
-  return {
-    status: "CODE_SENT",
-    discordId,
-    expiresAt: challenge.expiresAt.toISOString(),
-  };
+  return sendHandleChallenge(discordId, tag);
 }
 
 /**
@@ -334,4 +319,141 @@ export async function confirmDiscordVerification(
   // ce geste-là qui a noué le rattachement.
   await writeVerifiedTag(userId, discordId, proof.handle);
   return { tag: proof.handle };
+}
+
+/**
+ * Émet un défi pour `tag` et l'envoie en message privé.
+ *
+ * La mécanique est celle de la connexion par code, sans rien de plus : même
+ * table, mêmes deux bornes en base (`createDiscordLoginChallenge`), et un envoi
+ * raté **supprime** sa ligne — un code qui n'est pas parti ne doit pas survivre
+ * à son échec, sinon il masque comme « dernier émis » celui que le joueur
+ * détient vraiment.
+ */
+async function sendHandleChallenge(
+  discordId: string,
+  tag: string,
+): Promise<{ status: "CODE_SENT"; discordId: string; expiresAt: string }> {
+  const challenge = await createDiscordLoginChallenge(discordId, tag);
+  try {
+    await sendDiscordLoginCode(discordId, challenge.code);
+  } catch (error) {
+    await discardDiscordChallenge(challenge.challengeId).catch(() => {});
+    throw error;
+  }
+
+  return {
+    status: "CODE_SENT",
+    discordId,
+    expiresAt: challenge.expiresAt.toISOString(),
+  };
+}
+
+/**
+ * « Mettre à jour mon pseudo » — la ligne « Bot Discord » d'« Applications
+ * connectées ».
+ *
+ * Le bot ne **renvoie** jamais le tag d'un compte : il ne sait que résoudre un
+ * pseudo qu'on lui donne. Le joueur saisit donc son pseudo, le bot le retrouve et
+ * lui envoie un code à six chiffres en message privé, et c'est le code qui
+ * prouve que le pseudo est le sien. Le pseudo enregistré est alors « donné par
+ * Discord » au même titre que celui d'une connexion
+ * (`discord_pseudo_from_discord`), donc certifiable d'un clic ensuite.
+ *
+ * **On ne déplace jamais une porte** : un compte qui porte un `discord_id` ne
+ * peut mettre à jour que le pseudo de *ce* compte Discord — un pseudo qui résout
+ * ailleurs est refusé (`DISCORD_ID_MISMATCH`). Un compte sans Discord rattache
+ * par le même geste (`discord_link_method = 'DM_CODE'`), sauf si un autre compte
+ * du site détient déjà ce Discord.
+ *
+ * @throws INVALID_DISCORD_HANDLE Chaîne vide ou identifiant numérique.
+ * @throws DISCORD_ID_MISMATCH Le pseudo désigne un autre compte Discord.
+ * @throws DISCORD_ALREADY_LINKED Ce Discord est rattaché à un autre compte.
+ */
+export async function startDiscordHandleUpdate(
+  userId: number,
+  handle: string,
+  guardBeforeSend?: ResolvedDiscordIdGuard,
+): Promise<{ status: "CODE_SENT"; discordId: string; expiresAt: string }> {
+  const row = await loadDiscordRow(userId);
+  if (!row) throw new Error("PROFILE_NOT_FOUND");
+
+  const tag = normalizeDiscordHandle(handle);
+  if (!tag) throw new Error("INVALID_DISCORD_HANDLE");
+
+  const discordId = await resolveDiscordUser(tag);
+  if (row.discord_id && row.discord_id !== discordId) throw new Error("DISCORD_ID_MISMATCH");
+  if (!row.discord_id && (await discordIdTakenByAnother(discordId, userId))) {
+    throw new Error("DISCORD_ALREADY_LINKED");
+  }
+
+  // Avant le défi et avant l'envoi, comme pour la certification.
+  guardBeforeSend?.(discordId);
+  return sendHandleChallenge(discordId, tag);
+}
+
+/**
+ * Confirme « Mettre à jour mon pseudo » avec le code reçu.
+ *
+ * Le pseudo écrit est celui **retenu sur la ligne du défi** — celui que le bot a
+ * résolu vers ce compte Discord —, jamais une valeur renvoyée par le client.
+ *
+ * Une seule instruction, dont l'ordre des affectations compte (MySQL les évalue
+ * de gauche à droite) :
+ *
+ * - la **certification** tombe si le pseudo change (`<=>`, le tag pouvant être
+ *   `NULL`) : elle portait sur l'ancien, et certifier reste un geste distinct ;
+ *   un pseudo inchangé la garde ;
+ * - la **méthode** n'est posée que sur un rattachement neuf, lue **avant**
+ *   l'affectation de `discord_id` : réauthentifier un rattachement existant
+ *   n'est pas franchir une porte, et `OAUTH` ne redescend jamais ;
+ * - `discord_id IS NULL OR discord_id = ?` porte dans l'écriture la règle que le
+ *   `SELECT` n'a fait que nommer — un rattachement a pu changer pendant
+ *   l'`await` —, et `is_deleted = 0` ferme la course avec une suppression.
+ *
+ * @throws CODE_INVALID_OR_EXPIRED Code faux, périmé, consommé ou brûlé.
+ * @throws DISCORD_ID_MISMATCH Le compte a un autre Discord rattaché.
+ * @throws DISCORD_ALREADY_LINKED Un autre compte a rattaché ce Discord entre-temps.
+ */
+export async function confirmDiscordHandleUpdate(
+  userId: number,
+  discordId: string,
+  code: string,
+): Promise<{ tag: string }> {
+  const row = await loadDiscordRow(userId);
+  if (!row) throw new Error("PROFILE_NOT_FOUND");
+  if (row.discord_id && row.discord_id !== discordId) throw new Error("DISCORD_ID_MISMATCH");
+
+  const proof = await consumeDiscordChallenge(discordId, code);
+  if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
+  // Un défi né d'un identifiant numérique (connexion en repli) n'a aucun pseudo.
+  const tag = normalizeDiscordHandle(proof.handle ?? "");
+  if (!tag) throw new Error("INVALID_DISCORD_HANDLE");
+
+  const method: ConnectionMethod = "DM_CODE";
+  const db = await getDatabase();
+  let affected: number;
+  try {
+    const [result] = await db.execute<ResultSetHeader>(
+      `UPDATE bg_users
+       SET discord_verified_at = CASE WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END,
+           discord_link_method = CASE WHEN discord_id IS NULL THEN ? ELSE discord_link_method END,
+           discord_id = COALESCE(discord_id, ?),
+           discord_pseudo = ?,
+           discord_pseudo_from_discord = 1
+       WHERE id = ? AND is_deleted = 0 AND (discord_id IS NULL OR discord_id = ?)`,
+      [tag, method, discordId, tag, userId, discordId],
+    );
+    affected = Number(result.affectedRows);
+  } catch (error) {
+    if (isDuplicateEntryError(error)) throw new Error("DISCORD_ALREADY_LINKED");
+    throw error;
+  }
+
+  if (affected === 0) {
+    const current = await loadDiscordRow(userId);
+    if (!current) throw new Error("PROFILE_NOT_FOUND");
+    throw new Error("DISCORD_ID_MISMATCH");
+  }
+  return { tag };
 }

@@ -21,11 +21,14 @@
  * (`lib/shared/account-connections.ts`), si bien qu'un bouton actif mène
  * toujours quelque part.
  */
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   checkConnectionUnlink,
   connectionMethodLabel,
+  DISCORD_BOT_CONNECTION_LABEL,
+  discordBotRowState,
+  discordButtonLinked,
   connectionUnlinkRefusalMessage,
   type AccountConnection,
 } from "@/lib/shared/account-connections";
@@ -37,6 +40,7 @@ import {
   oauthStartPath,
   type OAuthProvider,
 } from "@/lib/shared/oauth-providers";
+import { DiscordBotHandleDialog } from "./DiscordBotHandleDialog";
 import { connectionErrorMessage, connectionSuccessMessage, unlinkSuccessMessage } from "./connection-errors";
 import { OtherSessionsPanel } from "./OtherSessionsPanel";
 import s from "./profil.module.css";
@@ -81,6 +85,8 @@ export function ConnectedAppsSection({
 }): React.ReactElement {
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
+  // Le dialogue « Mettre à jour mon pseudo » de la ligne du bot, s'il est ouvert.
+  const [botDialog, setBotDialog] = useState<"UPDATE" | "LINK" | null>(null);
   // Un retrait ferme les autres sessions : le compte d'à côté doit être relu.
   const [sessionsVersion, setSessionsVersion] = useState(0);
 
@@ -157,7 +163,17 @@ export function ConnectedAppsSection({
         <p style={{ fontSize: 13, color: "var(--text-2)", margin: 0 }}>Chargement…</p>
       ) : (
         <div className="table-like">
-          {connections.map((connection) => {
+          {connections.map((rawConnection) => {
+            // Discord a deux lignes pour une seule identité : la ligne du bouton
+            // ne se dit rattachée que si ce n'est pas le code qui porte le
+            // rattachement (`discordButtonLinked`) — sinon, c'est la ligne du bot
+            // qui le porte, et celle-ci propose d'ajouter le bouton.
+            const connection =
+              rawConnection.provider === "DISCORD"
+                ? { ...rawConnection, linked: discordButtonLinked(rawConnection) }
+                : rawConnection;
+            const discordByCode =
+              rawConnection.provider === "DISCORD" && rawConnection.linked && !connection.linked;
             const refusal = checkConnectionUnlink(connections, connection.provider);
             const label = OAUTH_PROVIDER_LABELS[connection.provider];
             const handleLabel = OAUTH_PROVIDER_HANDLE_LABELS[connection.provider];
@@ -169,9 +185,9 @@ export function ConnectedAppsSection({
             // chose à dire ? ».
             const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
             return (
+              <Fragment key={connection.provider}>
               <div
                 className="table-row"
-                key={connection.provider}
                 style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
               >
                 <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
@@ -181,7 +197,9 @@ export function ConnectedAppsSection({
                       ? connection.handle && handleLabel
                         ? `${handleLabel} : ${connection.handle}`
                         : "Rattaché"
-                      : PROVIDER_NOTES[connection.provider]}
+                      : discordByCode
+                        ? "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord."
+                        : PROVIDER_NOTES[connection.provider]}
                   </span>
                   {/*
                     **Ce que « Rattaché » ne disait pas.** Discord a deux portes
@@ -254,12 +272,100 @@ export function ConnectedAppsSection({
                   )}
                 </span>
               </div>
+              {connection.provider === "DISCORD" ? (
+                <DiscordBotRow
+                  connections={connections}
+                  busy={busy !== null}
+                  disconnecting={busy === "DISCORD"}
+                  onUpdate={setBotDialog}
+                  onDisconnect={() => unlink("DISCORD")}
+                />
+              ) : null}
+              </Fragment>
             );
           })}
         </div>
       )}
 
+      {botDialog ? (
+        <DiscordBotHandleDialog
+          mode={botDialog}
+          onClose={() => setBotDialog(null)}
+          onUpdated={() => {
+            setBotDialog(null);
+            void reload();
+            onChanged?.();
+          }}
+        />
+      ) : null}
+
       <OtherSessionsPanel version={sessionsVersion} />
     </>
+  );
+}
+
+/**
+ * La ligne « Bot Discord (code par message privé) ».
+ *
+ * Elle décrit la **même** identité Discord que la ligne du bouton — le compte
+ * n'en a qu'une —, mais la porte du code : ce que la ligne affiche et permet
+ * vient du module pur (`discordBotRowState`), partagé avec les tests.
+ */
+function DiscordBotRow({
+  connections,
+  busy,
+  disconnecting,
+  onUpdate,
+  onDisconnect,
+}: {
+  connections: AccountConnection[];
+  busy: boolean;
+  disconnecting: boolean;
+  onUpdate: (mode: "UPDATE" | "LINK") => void;
+  onDisconnect: () => void;
+}): React.ReactElement {
+  const row = discordBotRowState(connections);
+  const detailsId = "connection-details-discord-bot";
+  return (
+    <div className="table-row" style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+      <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+        <strong style={{ fontSize: 14 }}>{DISCORD_BOT_CONNECTION_LABEL}</strong>
+        <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
+          {row.note}
+        </span>
+        {row.refusal ? (
+          <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
+            {row.refusal}
+          </span>
+        ) : null}
+      </span>
+      <span
+        style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center", flexWrap: "wrap" }}
+      >
+        <button
+          type="button"
+          className={row.handleAction === "LINK" ? "btn" : "btn ghost"}
+          disabled={busy}
+          onClick={() => onUpdate(row.handleAction)}
+          aria-describedby={detailsId}
+          style={{ padding: "4px 12px", fontSize: 12 }}
+        >
+          {row.handleAction === "LINK" ? "Rattacher par code" : "Mettre à jour mon pseudo"}
+        </button>
+        {row.canDisconnect ? (
+          <button
+            type="button"
+            className="btn ghost"
+            disabled={busy}
+            onClick={onDisconnect}
+            aria-label="Se déconnecter du bot Discord"
+            aria-describedby={detailsId}
+            style={{ padding: "4px 12px", fontSize: 12 }}
+          >
+            {disconnecting ? "Déconnexion…" : "Se déconnecter"}
+          </button>
+        ) : null}
+      </span>
+    </div>
   );
 }

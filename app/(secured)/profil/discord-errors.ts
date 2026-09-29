@@ -67,3 +67,33 @@ export function discordVerificationErrorMessage(code: string | null | undefined)
   if (!code) return "La certification a échoué. Réessaie dans un instant.";
   return VERIFICATION_ERRORS[code] ?? "La certification a échoué. Réessaie dans un instant.";
 }
+
+/**
+ * Les refus de « Mettre à jour mon pseudo » (ligne « Bot Discord »).
+ *
+ * Même bot, mêmes bornes, donc les mêmes refus — mais pas les mêmes phrases
+ * partout : celles qui nomment la **certification** mentiraient ici, le geste
+ * ne certifie rien. Seules celles-là sont réécrites ; les autres (tag
+ * introuvable, DM fermés, plafonds) disent la même chose dans les deux gestes et
+ * viennent du registre ci-dessus, pour n'en tenir qu'une copie.
+ */
+const HANDLE_UPDATE_ERRORS: Record<string, string> = {
+  INVALID_DISCORD_HANDLE:
+    "Renseigne ton pseudo Discord (un pseudo, pas un identifiant numérique).",
+  CODE_INVALID_OR_EXPIRED: "Code invalide ou expiré. Demande un nouveau code.",
+  DISCORD_ID_MISMATCH:
+    "Ce pseudo appartient à un autre compte Discord que celui rattaché à ton compte BlueGenji. Vérifie le pseudo : on ne remplace pas un compte Discord par un autre.",
+  DISCORD_ALREADY_LINKED:
+    "Ce compte Discord est déjà rattaché à un autre compte du site. Contacte l'organisation si c'est bien le tien.",
+  BOT_INTERNAL_UNREACHABLE:
+    "Mise à jour indisponible pour le moment (bot non joignable). Réessaie plus tard.",
+  BOT_INTERNAL_UNAUTHORIZED:
+    "Mise à jour indisponible (configuration interne). Signale-le à l'organisation.",
+  UNAUTHORIZED: "Reconnecte-toi pour mettre ton pseudo à jour.",
+};
+
+export function discordHandleUpdateErrorMessage(code: string | null | undefined): string {
+  const fallback = "La mise à jour de ton pseudo a échoué. Réessaie dans un instant.";
+  if (!code) return fallback;
+  return HANDLE_UPDATE_ERRORS[code] ?? VERIFICATION_ERRORS[code] ?? fallback;
+}
