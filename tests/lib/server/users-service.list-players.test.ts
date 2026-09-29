@@ -31,7 +31,7 @@ function userRow(overrides: Record<string, unknown> = {}) {
 
 /**
  * `listPlayers` enchaîne : les comptes, leur équipe courante, puis le bilan par
- * `loadPlayerRecords` (appartenances, matchs, inscriptions). Sans appartenance,
+ * `loadAllPlayerRecords` (appartenances, matchs, inscriptions). Sans appartenance,
  * le chargeur s'arrête là — d'où trois réponses seulement.
  */
 async function runList(rows: Record<string, unknown>[], viewerId: number) {
@@ -39,7 +39,7 @@ async function runList(rows: Record<string, unknown>[], viewerId: number) {
     .fn<SqlQuery>()
     .mockResolvedValueOnce([rows]) // bg_users
     .mockResolvedValueOnce([[]]) // team memberships (équipe courante)
-    .mockResolvedValueOnce([[]]); // appartenances (loadPlayerRecords)
+    .mockResolvedValueOnce([[]]); // appartenances (loadAllPlayerRecords)
   await mockDb(execute);
   return listPlayers(viewerId);
 }
@@ -83,10 +83,10 @@ describe("listPlayers visibility", () => {
     expect(closed[0].openToRecruitment).toBe(false);
   });
 
-  // Les engagements du joueur (équipes + entrée solo des tournois individuels)
-  // sont une union : le filtre doit vivre DANS chaque branche, sinon la table
-  // dérivée perd l'index `user_id` et fait scanner toutes les adhésions.
-  it("filtre les engagements dans les deux branches de l'union", async () => {
+  // L'annuaire lit tous les comptes : une liste `IN (?, …)` de tous leurs
+  // identifiants ne filtrait rien et portait un paramètre par compte (deux fois
+  // dans l'union des engagements). Les deux lectures portent sur tout le site.
+  it("lit appartenances et engagements sans liste d'identifiants", async () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[userRow({ id: 7 }), userRow({ id: 9, pseudo: "Other" })]])
@@ -96,11 +96,15 @@ describe("listPlayers visibility", () => {
 
     await listPlayers(999);
 
-    const [sql, params] = execute.mock.calls[2] as [string, unknown[]];
-    expect(sql).toMatch(/FROM bg_team_members\s+WHERE user_id IN \(\?, \?\)/);
-    expect(sql).toMatch(/FROM bg_teams\s+WHERE solo_user_id IN \(\?, \?\)/);
-    // Une liste d'identifiants par branche.
-    expect(params).toEqual([7, 9, 7, 9]);
+    const [current, currentParams] = execute.mock.calls[1] as [string, unknown[] | undefined];
+    expect(current).not.toMatch(/\bIN \(/);
+    expect(current).toMatch(/WHERE tm\.left_at IS NULL/);
+    expect(currentParams ?? []).toEqual([]);
+
+    const [union, unionParams] = execute.mock.calls[2] as [string, unknown[]];
+    expect(union).not.toMatch(/\bIN \(/);
+    expect(union).toMatch(/FROM bg_teams\s+WHERE solo_user_id IS NOT NULL/);
+    expect(unionParams).toEqual([]);
   });
 
   // Le bilan de la carte ne se calcule plus ici : il descend du même chargeur
