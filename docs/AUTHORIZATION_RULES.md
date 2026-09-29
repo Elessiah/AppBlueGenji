@@ -156,7 +156,9 @@ pouvoir sur la plateforme.
   par le navigateur lui-même) et `/api/visits`.
 
   **Le type du corps, là où il est lu.** `readJsonBody` refuse
-  (`UNSUPPORTED_CONTENT_TYPE`) un corps qui n'est pas **déclaré** JSON
+  (`UNSUPPORTED_CONTENT_TYPE`, rendu en **415** par `fail` quel que soit le
+  statut que la route demande) un corps qui n'est pas **déclaré** JSON
+
   (`application/json`, un type `+json`, `application/csp-report`), sans rien
   lire : un formulaire HTML ne sait envoyer que `text/plain`,
   `application/x-www-form-urlencoded` ou `multipart/form-data`. C'est une
