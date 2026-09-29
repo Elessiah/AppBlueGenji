@@ -37,7 +37,11 @@ export function DirectoryShowMore({
     onShowMore();
     // Après le rendu des nouvelles cartes.
     window.setTimeout(() => {
-      const card = gridRef.current?.children.item(shown);
+      // Une recherche différée arrivée entre-temps peut avoir ramené la liste à
+      // sa première page : la carte visée n'existe plus, on rejoint alors la
+      // première, jamais `<body>`.
+      const grid = gridRef.current;
+      const card = grid?.children.item(shown) ?? grid?.children.item(0);
       card
         ?.querySelector<HTMLElement>("a[href], button:not([disabled])")
         ?.focus();

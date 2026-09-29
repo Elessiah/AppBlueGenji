@@ -157,7 +157,7 @@ describe("DirectoryShowMore (focus)", () => {
   // retomber sur <body>, il rejoint la première carte ajoutée.
   it("déplace le focus vers la première carte ajoutée", () => {
     const source = readSource("app/(secured)/_shared/DirectoryShowMore.tsx");
-    expect(source).toContain("gridRef.current?.children.item(shown)");
+    expect(source).toContain("grid?.children.item(shown) ?? grid?.children.item(0)");
     expect(source).toMatch(/\?\.focus\(\)/);
   });
 });

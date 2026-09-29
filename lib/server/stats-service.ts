@@ -561,8 +561,8 @@ async function loadRecords(userIds: number[] | null): Promise<Map<number, Player
   if (teamIds.length === 0) return records;
 
   // Tout le site : matchs et inscriptions sont lus sans liste d'équipes (elle
-  // porterait un paramètre par équipe, trois fois) ; `groupByTeam` ne garde
-  // ensuite que les équipes des joueurs.
+  // porterait un paramètre par équipe, trois fois) ; seules les lignes des
+  // équipes des joueurs sont ensuite relues, par `groupByTeam`.
   const scope = userIds === null ? null : teamIds;
   const [matchRows, registrationRows] = await Promise.all([
     loadMatchRows(db, scope),
