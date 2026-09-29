@@ -341,8 +341,21 @@ la fiche (`getFullProfile`), dans cet ordre :
 | ----------------------------------------------------------------- | :----------------------: |
 | Le propriétaire du compte                                         | ✅                        |
 | Un joueur engagé dans un **même match** d'un tournoi vivant       | ✅ (coéquipiers compris)  |
+| Le **caster inscrit** sur ce match, en lancement ou lancé         | ✅ (contacts de la modale seulement) |
 | Permission `tournaments`, titulaire engagé dans un tournoi vivant | ✅                        |
 | Administrateur hors de ce cas, `casting`, joueur, visiteur        | ❌                        |
+
+**Le caster d'un match est une partie du match, pas un titulaire de
+`casting`.** La modale de lancement (`GET /api/me/match-launches`,
+`lib/server/tournaments/match-launch-info.ts`) présente à **chaque partie** —
+les deux équipes et le caster inscrit — les contacts des autres, BattleTag
+masqué compris, et le BattleTag du caster aux deux équipes : c'est par lui
+qu'on s'ajoute en jeu. L'exposition est voulue et déclarée
+(`PRIVACY_CHANGES`, `2026-09-lancement-des-matchs` : « un nouveau public (le
+caster) pour le BattleTag » ; registre T04) ; elle se limite à un ou deux
+contacts par équipe, du lancement à la fin du match. Le ❌ de `casting`
+ci-dessus vaut pour la fiche d'un joueur, pas pour cette modale. Voir
+`docs/features/MATCH_LAUNCH.md`.
 
 « Vivant » = tout état sauf `FINISHED`, la borne de
 `tournamentGrantsContactAccess` : le besoin naît du tournoi et s'éteint avec

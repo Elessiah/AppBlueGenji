@@ -137,6 +137,11 @@ seul ce module établit. Rien n'entre dans `TournamentSnapshot`, diffusé à tou
 les abonnés du flux : l'instantané ne porte que les « Prêt », l'hôte et le
 **pseudo** du caster, publics comme tout pseudo du site.
 
+Le caster compte parmi les parties : il reçoit le BattleTag **masqué** des
+contacts, et les équipes le sien. `docs/AUTHORIZATION_RULES.md` §2.3 l'écrit
+comme une ligne à part, distincte de la permission `casting`, qui n'ouvre
+rien sur la fiche d'un joueur.
+
 Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
 `/rgpd` et le registre des traitements (T04).
 
