@@ -20,6 +20,7 @@ import { loadTournamentRow, getMatchRows, deleteAllMatches, resetRegistrationRan
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { lockTournamentRow } from "./registration";
 import { publishUpdatedEvent } from "./notifications";
+import { isTransactionAborted } from "@/lib/server/mysql-errors";
 
 export type SeedingBoard = {
   entries: SeedingEntry[];
@@ -136,11 +137,37 @@ export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoa
 }
 
 /**
+ * Nombre de tentatives d'un réordonnancement défait par un interblocage.
+ *
+ * Aucun ordre de verrous ne l'exclut : les gestes du staff (avancée, retour en
+ * arrière, inscription) tiennent le tournoi puis écrivent des matchs, les
+ * saisies de score tiennent leur match — voire d'autres, par l'entretien — puis
+ * le tournoi dans la réconciliation. Le réordonnancement prend l'ordre des
+ * premiers (tournoi, puis matchs) et, quand une saisie le croise, **rejoue** la
+ * transaction : InnoDB choisit d'ordinaire pour victime la transaction qui a le
+ * moins écrit, et le réordonnancement n'a encore rien écrit quand il pose ses
+ * verrous. Rejouée, elle relit les matchs, voit la saisie et refuse en
+ * `SEEDING_LOCKED`.
+ */
+const REORDER_DEADLOCK_ATTEMPTS = 3;
+
+/**
  * Applique un nouvel ordre de seeding.
  *
  * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | INVALID_SEED_ORDER
  */
 export async function reorderSeeding(tournamentId: number, orderedTeamIds: number[]): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await reorderSeedingOnce(tournamentId, orderedTeamIds);
+      return;
+    } catch (error) {
+      if (!isTransactionAborted(error) || attempt >= REORDER_DEADLOCK_ATTEMPTS) throw error;
+    }
+  }
+}
+
+async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -154,16 +181,13 @@ export async function reorderSeeding(tournamentId: number, orderedTeamIds: numbe
     // l'attente. Sans cela, un premier report validé entre ce contrôle et
     // `deleteAllMatches` échappait à l'instantané : le plateau régénéré
     // l'effaçait, et le joueur, qui avait reçu un succès, n'en savait rien.
-    // Le verrou des matchs sérialise les saisies de score (reports, forfaits,
-    // arbitrage), qui verrouillent leur match ; celui du tournoi, les gestes du
-    // staff (inscription, retrait, autre réordonnancement).
-    //
-    // Les matchs **d'abord** : c'est l'ordre des chemins de score, qui tiennent
-    // leur match puis verrouillent la ligne du tournoi dans la réconciliation
-    // (`reconcilePhases`). Pris dans l'ordre inverse, une saisie concurrente
-    // finissait en interblocage (`ER_LOCK_DEADLOCK`, un 500) au lieu d'attendre.
-    await lockTournamentMatches(connection, tournamentId);
+    // Le verrou du tournoi sérialise les gestes du staff (avancée, retour en
+    // arrière, inscription, retrait, autre réordonnancement), celui des matchs
+    // les saisies de score (reports, forfaits, arbitrage), qui verrouillent
+    // leur match. Tournoi d'abord, comme ces gestes du staff ; l'interblocage
+    // possible avec une saisie est rejoué (`REORDER_DEADLOCK_ATTEMPTS`).
     await lockTournamentRow(connection, tournamentId);
+    await lockTournamentMatches(connection, tournamentId);
 
     const tournament = await loadTournamentRow(connection, tournamentId);
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");

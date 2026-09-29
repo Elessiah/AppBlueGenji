@@ -218,7 +218,7 @@ describe("reorderSeeding", () => {
     expect(sqls.some((sql) => /current_phase_id = NULL/.test(sql))).toBe(true);
   });
 
-  it("verrouille les matchs puis le tournoi avant toute lecture ordinaire", async () => {
+  it("verrouille le tournoi puis ses matchs avant toute lecture ordinaire", async () => {
     // Sous REPEATABLE READ, la première lecture ordinaire fige l'instantané :
     // posés après, les verrous laisseraient juger la fenêtre sur un état
     // d'avant l'attente, et un report concurrent serait effacé par le plateau
@@ -245,11 +245,59 @@ describe("reorderSeeding", () => {
 
     await reorderSeeding(5, [2, 1]);
 
-    // Matchs d'abord : l'ordre des chemins de score (match, puis tournoi dans
-    // la réconciliation) — l'inverse finirait en interblocage.
-    expect(order.slice(0, 4)).toEqual(["lock-matches", "lock-tournament", "tournament", "entries"]);
+    // Tournoi d'abord, comme les gestes du staff qui écrivent des matchs sous
+    // ce verrou (avancée, retour en arrière, inscription).
+    expect(order.slice(0, 4)).toEqual(["lock-tournament", "lock-matches", "tournament", "entries"]);
     expect(order).toContain("matches");
     expect(order.indexOf("lock-matches")).toBeLessThan(order.indexOf("matches"));
+  });
+
+  it("rejoue la transaction défaite par un interblocage, puis refuse sur la saisie vue", async () => {
+    // Une saisie de score croise le réordonnancement (match puis tournoi contre
+    // tournoi puis matchs) : InnoDB défait l'un des deux. Rejoué, le
+    // réordonnancement relit les matchs et voit le score désormais commité.
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+    let matchLocks = 0;
+    connection.execute.mockImplementation(async (sql: unknown) => {
+      const text = String(sql);
+      if (/FROM bg_matches WHERE tournament_id = \? FOR UPDATE/.test(text)) {
+        matchLocks += 1;
+        if (matchLocks === 1) throw deadlock;
+      }
+      if (text.includes("FROM bg_tournament_registrations")) return registrationRows();
+      return [[]];
+    });
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "RUNNING" }));
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow({ team1_score: 1, team2_score: 0 })]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow("SEEDING_LOCKED");
+
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(2);
+    expect(connection.release).toHaveBeenCalledTimes(2);
+    expect(deleteAllMatches).not.toHaveBeenCalled();
+  });
+
+  it("abandonne après trois interblocages et remonte l'erreur", async () => {
+    const deadlock = Object.assign(new Error("Deadlock found"), { code: "ER_LOCK_DEADLOCK" });
+    connection.execute.mockImplementation(async (sql: unknown) => {
+      if (/FOR UPDATE/.test(String(sql))) throw deadlock;
+      return [[]];
+    });
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toBe(deadlock);
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(3);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("ne rejoue pas une autre erreur", async () => {
+    connection.execute.mockImplementation(async (sql: unknown) => {
+      if (/FOR UPDATE/.test(String(sql))) throw new Error("ER_LOCK_WAIT_TIMEOUT");
+      return [[]];
+    });
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+    expect(connection.beginTransaction).toHaveBeenCalledTimes(1);
   });
 
   it("refuse un report enregistré pendant l'attente du verrou", async () => {
