@@ -4,8 +4,13 @@ import {
   connectionMethodLabel,
   checkConnectionUnlink,
   connectionUnlinkRefusalMessage,
+  discordBotLinked,
+  discordBotRowState,
+  discordButtonLinked,
+  isLinkRefusal,
   linkedConnectionCount,
   type AccountConnection,
+  type ConnectionMethod,
 } from "@/lib/shared/account-connections";
 import { OAUTH_PROVIDERS, type OAuthProvider } from "@/lib/shared/oauth-providers";
 
@@ -176,5 +181,82 @@ describe("connectionMethodLabel — par quelle porte ce Discord est arrivé", ()
     for (const method of ["OAUTH", "DM_CODE"] as const) {
       expect(connectionMethodLabel(discord(method))).not.toContain(method);
     }
+  });
+});
+
+describe("Discord : deux lignes, une seule identité", () => {
+  const withDiscord = (
+    method: ConnectionMethod | null,
+    others: Partial<Record<OAuthProvider, boolean>> = {},
+    handle: string | null = "keryan",
+  ): AccountConnection[] =>
+    connections({ DISCORD: true, ...others }).map((c) =>
+      c.provider === "DISCORD" ? { ...c, method, handle } : c,
+    );
+  const discordOf = (list: AccountConnection[]) => list.find((c) => c.provider === "DISCORD");
+
+  it("donne le rattachement à une seule des deux lignes", () => {
+    for (const method of ["OAUTH", "DM_CODE", null] as const) {
+      const d = discordOf(withDiscord(method));
+      expect(Number(discordButtonLinked(d)) + Number(discordBotLinked(d))).toBe(1);
+    }
+    expect(discordBotLinked(discordOf(withDiscord("DM_CODE")))).toBe(true);
+    // Un rattachement antérieur à la colonne reste sur la ligne du bouton, qui le
+    // montrait déjà ainsi : lui attribuer le code serait affirmer ce qu'on ignore.
+    expect(discordButtonLinked(discordOf(withDiscord(null)))).toBe(true);
+  });
+
+  it("ne dit aucune ligne rattachée sans identité Discord", () => {
+    const d = discordOf(connections({ GOOGLE: true }));
+    expect(discordButtonLinked(d)).toBe(false);
+    expect(discordBotLinked(d)).toBe(false);
+    expect(discordButtonLinked(undefined)).toBe(false);
+  });
+
+  it("offre « Se déconnecter » sur la ligne du bot quand une autre porte reste", () => {
+    const row = discordBotRowState(withDiscord("DM_CODE", { GOOGLE: true }));
+    expect(row).toMatchObject({ linked: true, handle: "keryan", handleAction: "UPDATE", canDisconnect: true });
+    expect(row.refusal).toBeNull();
+    expect(row.note).toContain("keryan");
+  });
+
+  it("ne mure jamais la dernière porte : le bot seul ne se déconnecte pas", () => {
+    const row = discordBotRowState(withDiscord("DM_CODE"));
+    expect(row.canDisconnect).toBe(false);
+    expect(row.refusal).toContain("dernier moyen de connexion");
+    // La mise à jour du pseudo, elle, reste offerte : elle ne retire rien.
+    expect(row.handleAction).toBe("UPDATE");
+  });
+
+  it("sur un compte rattaché par le bouton, renvoie la déconnexion à la ligne Discord", () => {
+    const row = discordBotRowState(withDiscord("OAUTH", { GOOGLE: true }));
+    expect(row).toMatchObject({ linked: false, handle: null, handleAction: "UPDATE", canDisconnect: false });
+    expect(row.refusal).toBeNull();
+    expect(row.note).toContain("bouton Discord");
+  });
+
+  it("n'affirme pas la porte d'un rattachement antérieur à la colonne", () => {
+    // `null` = on ne sait pas : certains de ces comptes sont entrés par code.
+    const row = discordBotRowState(withDiscord(null, { GOOGLE: true }));
+    expect(row.linked).toBe(false);
+    expect(row.note).not.toContain("bouton");
+    expect(row.note).toContain("ligne Discord");
+  });
+
+  it("propose de rattacher par code un compte sans Discord", () => {
+    const row = discordBotRowState(connections({ GOOGLE: true }));
+    expect(row).toMatchObject({ linked: false, handleAction: "LINK", canDisconnect: false, refusal: null });
+  });
+
+  it("nomme le rattachement sans pseudo plutôt qu'une ligne vide", () => {
+    const row = discordBotRowState(withDiscord("DM_CODE", { GOOGLE: true }, null));
+    expect(row.note).toBe("Rattaché par code en message privé");
+  });
+});
+
+describe("LINK_REFUSALS — l'annulation d'un rattachement", () => {
+  it("laisse voyager l'annulation et l'état périmé jusqu'au profil", () => {
+    expect(isLinkRefusal("LINK_CANCELLED")).toBe(true);
+    expect(isLinkRefusal("LINK_STATE_MISMATCH")).toBe(true);
   });
 });

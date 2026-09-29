@@ -156,6 +156,91 @@ export function connectionMethodLabel(connection: AccountConnection): string | n
     : "Rattaché par code en message privé";
 }
 
+/** Libellé de la ligne du bot dans « Applications connectées ». */
+export const DISCORD_BOT_CONNECTION_LABEL = "Bot Discord (code par message privé)";
+
+/**
+ * Discord a deux portes, et l'écran leur donne **deux lignes** : « Discord »
+ * (le bouton, aller-retour OAuth) et « Bot Discord » (le code à six chiffres en
+ * message privé). Mais le compte n'a qu'**une** identité Discord
+ * (`bg_users.discord_id`) : les deux lignes décrivent le même rattachement, et
+ * la méthode qui l'a établi (`discord_link_method`) décide laquelle le porte.
+ *
+ * La règle choisie est la plus sûre, et elle tient en deux points :
+ *
+ * - **une seule ligne est rattachée à la fois.** `DM_CODE` → la ligne du bot ;
+ *   `OAUTH` → la ligne Discord ; `null` (rattachement antérieur à la colonne)
+ *   → la ligne Discord aussi, qui le montrait déjà ainsi. Le compteur de la
+ *   règle « on ne mure jamais la dernière porte » compte donc Discord **une**
+ *   fois, ce qu'il est ;
+ * - **se déconnecter du bot détache l'identité Discord entière** — il n'y en a
+ *   qu'une, et `OAUTH` ne redescend jamais en `DM_CODE`. Le geste n'est donc
+ *   offert que sur la ligne qui porte le rattachement ; sur un compte rattaché
+ *   par le bouton, c'est la ligne Discord qui l'offre, et la ligne du bot le dit.
+ *
+ * « Mettre à jour mon pseudo » vaut, lui, pour **tout** compte Discord rattaché,
+ * quelle que soit la porte : le code ne fait que prouver un pseudo pour le
+ * compte Discord déjà rattaché (refus `DISCORD_ID_MISMATCH` sinon). Sur un
+ * compte sans Discord, le même geste le rattache par code.
+ */
+export function discordButtonLinked(connection: AccountConnection | undefined): boolean {
+  return Boolean(
+    connection && connection.provider === "DISCORD" && connection.linked && connection.method !== "DM_CODE",
+  );
+}
+
+/** La ligne du bot porte-t-elle le rattachement ? (Voir {@link discordButtonLinked}.) */
+export function discordBotLinked(connection: AccountConnection | undefined): boolean {
+  return Boolean(
+    connection && connection.provider === "DISCORD" && connection.linked && connection.method === "DM_CODE",
+  );
+}
+
+/** Ce que la ligne « Bot Discord » affiche et permet. */
+export type DiscordBotRowState = {
+  /** La ligne porte-t-elle le rattachement Discord du compte ? */
+  linked: boolean;
+  /** Le pseudo Discord enregistré par ce rattachement, s'il y en a un. */
+  handle: string | null;
+  /** `UPDATE` : réauthentifier le pseudo ; `LINK` : rattacher Discord par code. */
+  handleAction: "UPDATE" | "LINK";
+  /** « Se déconnecter » est-il offert ? */
+  canDisconnect: boolean;
+  /** La phrase de la ligne, sous le libellé. */
+  note: string;
+  /** Un refus à dire en ambre (dernier moyen de connexion), sinon `null`. */
+  refusal: string | null;
+};
+
+export function discordBotRowState(connections: readonly AccountConnection[]): DiscordBotRowState {
+  const discord = connections.find((connection) => connection.provider === "DISCORD");
+  const anyLinked = Boolean(discord?.linked);
+  const linked = discordBotLinked(discord);
+  const unlinkRefusal = linked ? checkConnectionUnlink(connections, "DISCORD") : null;
+  const note = linked
+    ? discord?.handle
+      ? `Pseudo Discord : ${discord.handle}`
+      : "Rattaché par code en message privé"
+    : anyLinked
+      ? // `null` = rattachement antérieur à la colonne : la porte est inconnue,
+        // la phrase ne l'affirme donc pas — elle ne dit que où se retirer.
+        discord?.method === "OAUTH"
+        ? "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour."
+        : "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour."
+      : "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.";
+  return {
+    linked,
+    handle: linked ? (discord?.handle ?? null) : null,
+    handleAction: anyLinked ? "UPDATE" : "LINK",
+    canDisconnect: linked && unlinkRefusal === null,
+    note,
+    refusal:
+      unlinkRefusal === "LAST_CONNECTION"
+        ? "Impossible de te déconnecter du bot : c'est ton dernier moyen de connexion. Ajoutes-en un autre d'abord."
+        : null,
+  };
+}
+
 /**
  * Les refus du **rattachement** — ceux qu'une URL a le droit de porter.
  *
@@ -180,6 +265,10 @@ export const LINK_REFUSALS: readonly string[] = [
   "NOT_CONFIGURED",
   "OAUTH_FAILED",
   "LINK_FAILED",
+  // Rattachement annulé chez le fournisseur, ou revenu sur un état qui n'est
+  // pas celui émis : le joueur revient sur `/profil`, pas sur `/connexion`.
+  "LINK_CANCELLED",
+  "LINK_STATE_MISMATCH",
 ];
 
 /** Ce motif peut-il être écrit dans l'URL de retour ? */

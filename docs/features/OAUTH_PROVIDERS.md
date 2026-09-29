@@ -205,6 +205,39 @@ lecteur depuis le verrou du BattleTag, et deux `fetch` pour la même donnée en
 feraient deux vérités — le temps d'un retrait, la section dirait « Rattacher »
 pendant que le champ d'en haut resterait fermé.
 
+#### Deux lignes pour Discord : le bouton et le bot
+
+Le compte n'a qu'**une** identité Discord (`discord_id`), mais l'écran donne une
+ligne à chaque porte : « Discord » (le bouton OAuth) et **« Bot Discord (code
+par message privé) »**. La méthode décide laquelle porte le rattachement
+(`discordButtonLinked` / `discordBotLinked` dans `lib/shared/account-connections.ts`) :
+`DM_CODE` → la ligne du bot, `OAUTH` **et `NULL`** → la ligne du bouton. Une
+seule ligne est donc rattachée à la fois, et la règle du dernier moyen de
+connexion compte Discord une fois — ce qu'il est.
+
+- **« Mettre à jour mon pseudo »** (tout compte rattaché, quelle que soit la
+  porte) : le bot ne renvoie jamais un tag, le joueur **saisit** son pseudo, le
+  bot lui envoie un code en message privé, et le code prouve le pseudo
+  (`POST/PUT /api/profile/discord/handle`). Même table, mêmes bornes, mêmes
+  plafonds que la connexion par code ; pseudo écrit **relu sur le défi** ; refus
+  `DISCORD_ID_MISMATCH` s'il résout vers un autre compte Discord. Le pseudo est
+  « donné par Discord » (`discord_pseudo_from_discord = 1`), la certification
+  tombe s'il change, la méthode reste intacte (réauthentifier n'est pas
+  franchir une porte). Sans Discord rattaché, le même geste **rattache par
+  code** (« Rattacher par code »).
+- **« Se déconnecter »** n'est offert que sur la ligne qui porte le
+  rattachement : il détache l'identité Discord entière (il n'y en a qu'une), le
+  tag redevient saisissable, et `LAST_CONNECTION` le refuse comme partout. Sur un
+  compte rattaché par le bouton, la ligne du bot renvoie à la ligne Discord.
+- La ligne du bouton, sur un compte rattaché par code, propose « Rattacher » :
+  même compte Discord → la méthode passe à `OAUTH` (et la ligne du bot se tait).
+
+**Un rattachement annulé revient sur `/profil`.** Un rappel sans `code`
+(annulation chez le fournisseur) ou dont l'état ne correspond pas revient avec
+`?connection_error=LINK_CANCELLED` / `LINK_STATE_MISMATCH` quand le cookie d'état,
+émis pour cette porte, dit `LINK`. Cookie expiré (plus de dix minutes) : rien ne
+dit plus qu'il s'agissait d'un rattachement, et le repli reste `/connexion`.
+
 ## Pièges
 
 **L'intention est scellée à l'aller.** `LOGIN` ouvre une session, `LINK` rattache

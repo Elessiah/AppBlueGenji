@@ -39,3 +39,37 @@ describe("boutons OAuth de la page de connexion", () => {
     expect(page).toMatch(/oauthErrorMessage\(params\.get\("error"\), params\.get\("provider"\), environment\)/);
   });
 });
+
+/**
+ * Les aides de la page de connexion sont des phrases : elles étaient en mono
+ * 10 px `--ink-dim`, illisibles sur mobile. Toutes passent par le même style de
+ * texte courant, et la sortie vers l'accueil est une cible de 44 px en tête de
+ * carte plutôt qu'un sur-titre de 11 px sous le pli.
+ */
+describe("lisibilité de la page de connexion", () => {
+  const form = source(join("app", "connexion", "_components", "LoginForm.tsx"));
+  const buttons = source(join("app", "connexion", "_components", "OAuthButtons.tsx"));
+  const styles = source(join("app", "connexion", "_lib", "login-styles.ts"));
+
+  it("n'écrit plus aucune aide en 10 px", () => {
+    expect(form).not.toMatch(/fontSize: 10, color/);
+    expect(buttons).not.toMatch(/fontSize: 10/);
+  });
+
+  it("rend les aides en Inter 13 px, hors de la teinte la plus pâle", () => {
+    expect(styles).toMatch(/fontFamily: "var\(--font-sans\)"/);
+    expect(styles).toMatch(/fontSize: 13/);
+    expect(styles).not.toMatch(/color: "var\(--ink-dim\)"/);
+    // L'import, puis les trois aides du formulaire par code.
+    expect(form.match(/LOGIN_HELP_TEXT_STYLE/g)).toHaveLength(4);
+    expect(buttons).toMatch(/style=\{\{ \.\.\.LOGIN_HELP_TEXT_STYLE/);
+  });
+
+  it("offre un retour à l'accueil lisible, en tête de carte", () => {
+    expect(form).not.toMatch(/RETOUR ACCUEIL/);
+    const back = form.indexOf("← Retour à l&apos;accueil");
+    expect(back).toBeGreaterThan(-1);
+    expect(back).toBeLessThan(form.indexOf("BLUEGENJI · ACCÈS MEMBRE"));
+    expect(form).toMatch(/minHeight: 44,\s*fontSize: 14/);
+  });
+});

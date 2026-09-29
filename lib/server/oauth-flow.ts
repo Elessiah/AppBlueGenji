@@ -198,9 +198,18 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
   // minutes durant.
   const saved = await consumeOAuthState();
 
-  if (!code || !state) return loginFailure(base, provider, "params");
+  // Un rattachement lancé depuis `/profil` revient sur `/profil`, même quand il
+  // échoue avant la lecture de l'identité — annulé chez le fournisseur (rappel
+  // sans `code`), ou revenu avec un état qui ne correspond pas. L'intention est
+  // lue **dans le cookie**, jamais dans l'URL, et seulement s'il a été émis pour
+  // cette porte-ci : sinon rien ne dit qu'il s'agissait d'un rattachement, et la
+  // page de connexion reste la seule destination honnête.
+  const linking = saved?.intent === "LINK" && saved.provider === provider;
+  if (!code || !state) {
+    return linking ? linkFailure(base, provider, "LINK_CANCELLED") : loginFailure(base, provider, "params");
+  }
   if (!saved || saved.state !== state || saved.provider !== provider) {
-    return loginFailure(base, provider, "state");
+    return linking ? linkFailure(base, provider, "LINK_STATE_MISMATCH") : loginFailure(base, provider, "state");
   }
 
   let identity: OAuthIdentity;

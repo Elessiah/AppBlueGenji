@@ -69,3 +69,18 @@ chose.
 `AuthGate`, lui, n'a rien à filtrer : sa destination vient de `usePathname()`,
 pas d'un paramètre — elle ne peut désigner qu'un chemin du site. Le filtre la
 laisse passer telle quelle.
+
+## Visiteur déjà connecté
+
+Un compte connecté qui ouvrait `/connexion` voyait le formulaire et la modale
+d'entrée d'un nouveau compte, sans que rien ne lui dise qu'il avait une
+session. `app/connexion/page.tsx` le redirige désormais, côté serveur et avant
+tout rendu, par `signedInLoginRedirect` : la destination demandée
+(`?redirect=`, filtrée par `safeRedirectPath` comme aux trois portes), ou
+`/tournois`. Une destination qui ramène à `/connexion` elle-même est écartée —
+la page se redirigerait vers elle-même à l'infini.
+
+Exception : un compte connecté qui arrive avec `?error=` reste sur la page, qui
+annonce le refus. Un rattachement OAuth raté avant la lecture de son intention
+(`params`, `state`) retombe encore ici plutôt que sur `/profil` (consigné dans
+`ERREUR.txt`), et le rediriger ferait disparaître le message.

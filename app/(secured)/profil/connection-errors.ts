@@ -40,6 +40,11 @@ const CONNECTION_ERRORS: Record<string, string> = {
   // serveur ne voyage pas jusqu'ici (`LINK_REFUSALS`), et il n'apprendrait rien
   // au joueur.
   LINK_FAILED: "Le rattachement n'a pas abouti. Réessaie dans un instant.",
+  LINK_CANCELLED: "Rattachement annulé : rien n'a été modifié.",
+  // L'état revenu n'est pas celui émis : le plus souvent une seconde tentative
+  // ouverte dans un autre onglet, qui a remplacé la première.
+  LINK_STATE_MISMATCH:
+    "Le rattachement n'a pas pu être vérifié (une autre tentative l'a peut-être remplacé). Recommence depuis ce bouton.",
   // Rien à réessayer : la variable d'environnement manque, et le bouton ne
   // marchera pas tant que personne ne l'aura remplie.
   NOT_CONFIGURED:

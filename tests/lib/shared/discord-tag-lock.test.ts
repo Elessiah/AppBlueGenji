@@ -109,7 +109,9 @@ describe("discordTagLockNotice", () => {
       discordTagLockNotice({ tag: null, verified: false, linked: true }),
     ];
     for (const notice of notices) {
-      expect(notice.toLowerCase()).toContain("reconnecte-toi");
+      // « Mettre à jour mon pseudo » est offert à tout compte rattaché, quelle
+      // que soit la porte (ligne « Bot Discord »).
+      expect(notice).toContain("« Mettre à jour mon pseudo »");
       expect(notice).not.toContain("Applications connectées");
     }
   });
