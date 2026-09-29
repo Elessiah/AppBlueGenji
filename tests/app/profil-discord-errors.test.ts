@@ -1,5 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
-import { discordVerificationErrorMessage } from "@/app/(secured)/profil/discord-errors";
+import {
+  discordHandleUpdateErrorMessage,
+  discordVerificationErrorMessage,
+} from "@/app/(secured)/profil/discord-errors";
 
 /**
  * Les refus de la certification, dits en français.
@@ -49,5 +52,30 @@ describe("discordVerificationErrorMessage", () => {
     // Le joueur ne les lève pas en réessayant : il faut lui dire quoi faire.
     expect(discordVerificationErrorMessage("DISCORD_ID_MISMATCH")).toMatch(/corrige|contacte/i);
     expect(discordVerificationErrorMessage("DISCORD_ALREADY_LINKED")).toMatch(/contacte/i);
+  });
+});
+
+describe("discordHandleUpdateErrorMessage — « Mettre à jour mon pseudo »", () => {
+  it("traduit tous les refus, sans jamais laisser sortir le code", () => {
+    for (const code of CODES) {
+      const message = discordHandleUpdateErrorMessage(code);
+      expect(message).not.toContain(code);
+      expect(message.length).toBeGreaterThan(10);
+    }
+    expect(discordHandleUpdateErrorMessage("QUELQUE_CHOSE_DE_NEUF")).toMatch(/pseudo/i);
+    expect(discordHandleUpdateErrorMessage(undefined)).toMatch(/pseudo/i);
+  });
+
+  it("ne parle jamais de certification : le geste ne certifie rien", () => {
+    const codes = ["CODE_INVALID_OR_EXPIRED", "INVALID_DISCORD_HANDLE", "BOT_INTERNAL_UNREACHABLE", "DISCORD_ID_MISMATCH"];
+    for (const code of codes) {
+      expect(discordHandleUpdateErrorMessage(code)).not.toMatch(/certifi/i);
+    }
+  });
+
+  it("reprend les phrases communes aux deux gestes", () => {
+    expect(discordHandleUpdateErrorMessage("DISCORD_DM_FAILED")).toBe(
+      discordVerificationErrorMessage("DISCORD_DM_FAILED"),
+    );
   });
 });

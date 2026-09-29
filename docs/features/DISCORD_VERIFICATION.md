@@ -300,6 +300,17 @@ D'où la règle, écrite **une fois** dans un module pur et tenue aux deux bouts
   rattachement peut tomber entre les deux. Un `CASE` jumeau couvre
   `discord_verified_at`, qui n'a aucune raison de tomber quand rien ne change.
 
+### Changer de pseudo : « Mettre à jour mon pseudo »
+
+Le verrou vaut pour **toute** connexion Discord — le bouton comme le code en
+message privé : il suit `discord_id`, pas la méthode. Le geste qui rouvre la
+donnée sans la rendre saisissable est la ligne « Bot Discord » d'« Applications
+connectées » : pseudo saisi, code reçu du bot, pseudo relu sur le défi et écrit
+« donné par Discord ». Il ne certifie pas — un pseudo changé perd sa
+certification, redonnée ensuite d'un clic. « Se déconnecter » sur cette même
+ligne détache l'identité et rouvre le champ. Voir
+`docs/features/OAUTH_PROVIDERS.md`, « Deux lignes pour Discord ».
+
 ### Retirer son tag reste possible
 
 Un compte rattaché ne peut pas **inventer** un autre tag ; il peut en revanche

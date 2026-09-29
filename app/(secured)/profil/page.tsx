@@ -984,6 +984,13 @@ export default function ProfilePage() {
           connections={connections}
           reload={reloadConnections}
           onChanged={loadDiscordState}
+          onDiscordTagChanged={(tag) => {
+            // Le pseudo vient d'être écrit en base par le code du bot : le champ
+            // (verrouillé sous un Discord rattaché) **et** sa référence suivent,
+            // sans quoi l'écran montrerait l'ancien pseudo jusqu'au rechargement.
+            setDiscordPseudo(tag);
+            setSavedDiscordPseudo(tag);
+          }}
         />
       </ProfileSection>
 

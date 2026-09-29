@@ -131,7 +131,8 @@ export function discordTagLockNotice(state: {
   // un pour un compte né par Discord : le bouton y est remplacé par le refus
   // `LAST_CONNECTION`, faute d'une autre porte. Reste celui qui vaut toujours :
   // se renommer chez Discord, puis se reconnecter.
-  const rename = "Pour en changer, renomme-toi sur Discord puis reconnecte-toi.";
+  const rename =
+    "Pour en changer, renomme-toi sur Discord puis utilise « Mettre à jour mon pseudo » (ligne « Bot Discord » des applications connectées).";
   if (!state.tag) {
     // Deux causes mènent ici — un tag retiré, ou un pseudo Discord entièrement
     // numérique que `normalizeDiscordHandle` écarte — et l'écran ne peut pas les
@@ -141,7 +142,7 @@ export function discordTagLockNotice(state: {
     // Le bouton est **nommé**, jamais situé : « ci-dessous » était faux (il est
     // rendu au-dessus du paragraphe) et n'aurait de toute façon rien à faire
     // dans un module pur, qui ne connaît pas la mise en page de ses lecteurs.
-    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Utilise « Enregistrer mon tag », ou reconnecte-toi par Discord.`;
+    return `Ton compte Discord est rattaché, mais aucun pseudo n'est enregistré : l'organisation ne peut pas te joindre pendant un tournoi. Utilise « Enregistrer mon tag » ou « Mettre à jour mon pseudo », ou reconnecte-toi par Discord.`;
   }
   // On n'affirme pas l'**origine** du tag : `linkOAuthIdentity` n'écrit
   // `discord_pseudo` que si Discord a donné un pseudo affichable, si bien qu'un
