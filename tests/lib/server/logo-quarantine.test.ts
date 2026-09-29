@@ -36,6 +36,7 @@ import {
   quarantinedLogoFile,
   restoreReportedImage,
 } from "@/lib/server/logo-quarantine";
+import { logoQuarantinePurgeDate } from "@/lib/shared/logo-quarantine";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 type Route = [RegExp, (params: unknown) => unknown];
@@ -60,10 +61,13 @@ const HIDDEN_AVATAR = path.join(avatarQuarantineDirectory(), "user-9-9-abc.webp"
 let pool: { execute: jest.Mock<SqlQuery>; getConnection: () => Promise<unknown> };
 let connection: ReturnType<typeof connectionMock>;
 
+const reportCategory: Route = [/SELECT category FROM bg_reports WHERE id = \? LIMIT 1/, () => [[{ category: "COPYRIGHT" }]]];
+
 function install(poolRoutes: Route[], connectionRoutes: Route[] = []) {
   connection = connectionMock();
   connection.execute = routed(connectionRoutes);
-  pool = { execute: routed(poolRoutes), getConnection: async () => fakeConnection(connection) };
+  // Le fondement d'une décision se relit sur la catégorie du signalement.
+  pool = { execute: routed([...poolRoutes, reportCategory]), getConnection: async () => fakeConnection(connection) };
   jest.mocked(getDatabase).mockResolvedValue(fakePool(pool));
 }
 
@@ -110,7 +114,7 @@ describe("avatarFileLocations", () => {
 });
 
 describe("deleteTeamLogoForReport", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ category: "COPYRIGHT" }]]];
   const members: Route = [
     /FROM bg_team_members tm\s+JOIN bg_users u/,
     () => [[{ pseudo: "Capitaine", discord_id: "900000000000000005", discord_pseudo: null, discord_verified_at: null }]],
@@ -132,7 +136,6 @@ describe("deleteTeamLogoForReport", () => {
       ],
     );
 
-    const before = Date.now();
     const view = await deleteTeamLogoForReport(12, 4, actor);
     await flush();
 
@@ -143,7 +146,7 @@ describe("deleteTeamLogoForReport", () => {
     expect([teamId, reportId, logoUrl, hiddenBy]).toEqual([4, 12, LOGO, 1]);
     // Ouverte et close au même instant ; l'échéance est celle de la contestation.
     expect(closedAt).toBe(hiddenAt);
-    expect(Math.round(((purgeAfter as Date).getTime() - before) / 86_400_000)).toBe(180);
+    expect((purgeAfter as Date).getTime()).toBe(logoQuarantinePurgeDate(hiddenAt as Date).getTime());
 
     expect(unlink).toHaveBeenCalledWith(LIVE);
     expect(rename).not.toHaveBeenCalled();
@@ -190,7 +193,7 @@ describe("deleteTeamLogoForReport", () => {
 });
 
 describe("deleteUserAvatarForReport", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ category: "COPYRIGHT" }]]];
   const locked = (avatarUrl: string | null): Route => [
     /SELECT pseudo, avatar_url FROM bg_users WHERE id = \? AND is_deleted = 0 FOR UPDATE/,
     () => [[{ pseudo: "Nova", avatar_url: avatarUrl }]],
@@ -205,16 +208,15 @@ describe("deleteUserAvatarForReport", () => {
       [locked(AVATAR), [/UPDATE bg_users SET avatar_url = NULL/, () => [{}]], [/INSERT INTO bg_logo_quarantines/, () => [{ insertId: 40 }]]],
     );
 
-    const before = Date.now();
     const view = await deleteUserAvatarForReport(12, 9, actor);
     await flush();
 
     expect(connection.commit).toHaveBeenCalled();
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 9);
     const insert = connection.execute.mock.calls.find(([sql]) => /INSERT INTO bg_logo_quarantines/.test(sql));
-    const [userId, reportId, avatarUrl, hiddenBy, , purgeAfter] = insert?.[1] as unknown[];
+    const [userId, reportId, avatarUrl, hiddenBy, hiddenAt, purgeAfter] = insert?.[1] as unknown[];
     expect([userId, reportId, avatarUrl, hiddenBy]).toEqual([9, 12, AVATAR, 1]);
-    expect(Math.round(((purgeAfter as Date).getTime() - before) / 86_400_000)).toBe(180);
+    expect((purgeAfter as Date).getTime()).toBe(logoQuarantinePurgeDate(hiddenAt as Date).getTime());
 
     expect(unlink).toHaveBeenCalledWith(LIVE_AVATAR);
     expect(view).toEqual(
@@ -259,7 +261,9 @@ describe("notifyTeamLogoRemoved", () => {
     await flush();
     const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(message).toContain("« Alpha »");
-    expect(message).not.toContain("https://");
+    expect(message).not.toContain("/signalements/");
+    expect(message).toContain("Faits retenus : constat de la modération");
+    expect(message).toContain("https://site.test/conditions-utilisation#contenus");
   });
 });
 
@@ -275,12 +279,14 @@ describe("notifyUserAvatarRemoved", () => {
     await flush();
     const [message] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(message).toContain("Ton avatar");
-    expect(message).not.toContain("https://");
+    expect(message).not.toContain("/signalements/");
+    expect(message).toContain("Faits retenus : constat de la modération");
+    expect(message).toContain("https://site.test/conditions-utilisation#contenus");
   });
 });
 
 describe("hideTeamLogo", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ category: "COPYRIGHT" }]]];
   const team: Route = [/SELECT name, logo_url FROM bg_teams/, () => [[{ name: "Alpha", logo_url: LOGO }]]];
   const notShared: Route = [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \? AND id <> \?/, () => [[{ total: 0 }]]];
   const shared: Route = [/COUNT\(\*\) AS total FROM bg_teams WHERE logo_url = \? AND id <> \?/, () => [[{ total: 2 }]]];
@@ -304,7 +310,6 @@ describe("hideTeamLogo", () => {
       ],
     );
 
-    const before = Date.now();
     const view = await hideTeamLogo(12, 4, actor);
     await flush();
 
@@ -313,13 +318,15 @@ describe("hideTeamLogo", () => {
     expect(view).toEqual(
       expect.objectContaining({ id: 30, targetType: "TEAM", targetId: 4, targetName: "Alpha", reportId: 12, status: "HIDDEN" }),
     );
-    const days = (new Date(view.purgeAfter).getTime() - before) / 86_400_000;
-    expect(Math.round(days)).toBe(180);
+    expect(view.purgeAfter).toBe(logoQuarantinePurgeDate(new Date(view.hiddenAt)).toISOString());
 
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha » masqué"), { id: 1, pseudo: "Admin" });
     const [message, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("logo-hidden");
     expect(message).toContain("https://site.test/signalements/12");
+    // Le motif suit la catégorie du signalement lue en vérifiant la cible.
+    expect(message).toContain("Motif : atteinte présumée au droit d'auteur");
+    expect(message).toContain("https://site.test/conditions-utilisation#contenus");
     // Seul le membre joignable par un moyen prouvé est prévenu.
     expect(recipients).toEqual([{ discordId: "900000000000000005", handle: null, label: "Capitaine" }]);
   });
@@ -429,7 +436,7 @@ describe("hideTeamLogo", () => {
 });
 
 describe("hideUserAvatarForReport", () => {
-  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ id: 12 }]]];
+  const reportTargets: Route = [/JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = \?/, () => [[{ category: "COPYRIGHT" }]]];
   const user: Route = [/SELECT pseudo, avatar_url FROM bg_users WHERE id = \? AND is_deleted = 0 LIMIT 1/, () => [[{ pseudo: "Nova", avatar_url: AVATAR }]]];
   const recipient: Route = [
     /FROM bg_users\s+WHERE id = \? AND is_deleted = 0/,

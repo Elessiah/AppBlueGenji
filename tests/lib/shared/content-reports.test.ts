@@ -21,6 +21,7 @@ import {
   formatReportsSaturatedAlert,
   formatReportAlert,
   formatTargetNotice,
+  canContestReport,
   isConcernedByReport,
   isPlausibleEmail,
   missingReplyChannel,
@@ -362,13 +363,53 @@ describe("messages Discord — aucun joueur nommé", () => {
       parentId: 8,
       parentCategory: "MODERATION",
       reopened: true,
+      by: "TARGET",
       adminUrl: "https://site.test/admin/signalements?id=8",
     });
     expect(reopened).toContain("Contestation #20 du signalement #8 (Modération)");
+    expect(reopened).toContain("envoyée par une personne visée");
     expect(reopened).toContain("réactivé");
+    const byNotifier = formatContestAlert({
+      contestId: 1,
+      parentId: 2,
+      parentCategory: "BUG",
+      reopened: false,
+      by: "NOTIFIER",
+      adminUrl: "u",
+    });
+    expect(byNotifier).not.toContain("réactivé");
+    expect(byNotifier).toContain("envoyée par l'auteur du signalement");
+  });
+});
+
+describe("canContestReport", () => {
+  const viewer = { userId: 5, teamIds: [3] };
+  const base = { category: "COPYRIGHT" as const, reporterUserId: null, targets: [] };
+
+  it("laisse une personne visée contester à tout moment", () => {
+    for (const status of ["OPEN", "IN_PROGRESS", "RESOLVED"] as const) {
+      expect(canContestReport(viewer, { ...base, status, targets: [{ type: "TEAM", id: 3 }] })).toBe(true);
+    }
+  });
+
+  it("laisse l'auteur du signalement contester la décision, une fois le dossier archivé (DSA art. 20.1)", () => {
+    expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "RESOLVED" })).toBe(true);
+    // Pas encore de décision à contester.
+    expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "OPEN" })).toBe(false);
+    expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "IN_PROGRESS" })).toBe(false);
+  });
+
+  it("refuse tout autre lecteur, et une contestation ne se conteste pas", () => {
+    expect(canContestReport(viewer, { ...base, reporterUserId: 6, status: "RESOLVED" })).toBe(false);
+    expect(canContestReport(viewer, { ...base, status: "RESOLVED" })).toBe(false);
     expect(
-      formatContestAlert({ contestId: 1, parentId: 2, parentCategory: "BUG", reopened: false, adminUrl: "u" }),
-    ).not.toContain("réactivé");
+      canContestReport(viewer, {
+        category: "CONTEST",
+        reporterUserId: 5,
+        status: "RESOLVED",
+        targets: [{ type: "USER", id: 5 }],
+      }),
+    ).toBe(false);
   });
 });
 

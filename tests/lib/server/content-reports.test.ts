@@ -590,8 +590,11 @@ describe("createReport — contestation", () => {
     parentReportId: 12,
     description: "Nous détenons les droits sur ce logo.",
   });
-  const parentRoutes = (status: string, targets: unknown[]): Route[] => [
-    [/SELECT category, status FROM bg_reports WHERE id = \? FOR UPDATE/, () => [[{ category: "COPYRIGHT", status }]]],
+  const parentRoutes = (status: string, targets: unknown[], reporter: number | null = null): Route[] => [
+    [
+      /SELECT category, status, reporter_user_id FROM bg_reports WHERE id = \? FOR UPDATE/,
+      () => [[{ category: "COPYRIGHT", status, reporter_user_id: reporter }]],
+    ],
     [/FROM bg_report_targets WHERE report_id = \?/, () => [targets]],
     [/FROM bg_team_members tm/, () => [[{ team_id: 4 }]]],
     [/COUNT\(\*\) AS total FROM bg_reports/, () => [[{ total: 0 }]]],
@@ -622,7 +625,7 @@ describe("createReport — contestation", () => {
     await expect(createReport(contest, { userId: 5, managesTournaments: false })).rejects.toThrow("REPORT_NOT_CONCERNED");
     expect(connection.rollback).toHaveBeenCalled();
 
-    install([], [[/SELECT category, status FROM bg_reports/, () => [[]]]]);
+    install([], [[/SELECT category, status, reporter_user_id FROM bg_reports/, () => [[]]]]);
     await expect(createReport(contest, { userId: 5, managesTournaments: false })).rejects.toThrow("REPORT_NOT_CONCERNED");
   });
 
@@ -652,11 +655,32 @@ describe("createReport — contestation", () => {
     expect(jest.mocked(pushLeadershipAlert).mock.calls[0][0]).toContain("réactivé");
   });
 
+  it("laisse l'auteur du signalement contester la décision prise, une fois le dossier archivé", async () => {
+    const other = [{ report_id: 12, target_type: "TEAM", target_id: 99, label_snapshot: "Autre" }];
+    install([], parentRoutes("RESOLVED", other, 5));
+    await expect(createReport(contest, { userId: 5, managesTournaments: false })).resolves.toBe(20);
+    const message = jest.mocked(pushLeadershipAlert).mock.calls[0][0];
+    expect(message).toContain("envoyée par l'auteur du signalement");
+    expect(message).toContain("réactivé");
+
+    // Avant la décision, il n'a rien à contester ; un autre compte non plus.
+    install([], parentRoutes("IN_PROGRESS", other, 5));
+    await expect(createReport(contest, { userId: 5, managesTournaments: false })).rejects.toThrow("REPORT_NOT_CONCERNED");
+    install([], parentRoutes("RESOLVED", other, 6));
+    await expect(createReport(contest, { userId: 5, managesTournaments: false })).rejects.toThrow("REPORT_NOT_CONCERNED");
+  });
+
+  it("dit « personne visée » quand l'auteur est aussi visé", async () => {
+    install([], parentRoutes("RESOLVED", [{ report_id: 12, target_type: "USER", target_id: 5, label_snapshot: "Moi" }], 5));
+    await createReport(contest, { userId: 5, managesTournaments: false });
+    expect(jest.mocked(pushLeadershipAlert).mock.calls[0][0]).toContain("envoyée par une personne visée");
+  });
+
   it("ne laisse pas contester une contestation", async () => {
     install(
       [],
       [
-        [/SELECT category, status FROM bg_reports/, () => [[{ category: "CONTEST", status: "OPEN" }]]],
+        [/SELECT category, status, reporter_user_id FROM bg_reports/, () => [[{ category: "CONTEST", status: "OPEN", reporter_user_id: 5 }]]],
         [/FROM bg_report_targets/, () => [[]]],
         [/FROM bg_team_members tm/, () => [[]]],
       ],
@@ -884,17 +908,18 @@ describe("getConcernedReport", () => {
 });
 
 describe("listContestableReports", () => {
-  it("cherche les signalements qui visent le joueur ou ses équipes, jamais les contestations", async () => {
+  it("cherche les signalements qui visent le joueur ou ses équipes, et ceux qu'il a envoyés une fois archivés — jamais les contestations", async () => {
     install([
       [/FROM bg_team_members tm/, () => [[{ team_id: 4 }, { team_id: 6 }]]],
-      [/SELECT DISTINCT r.id/, () => [[{ id: 12, category: "COPYRIGHT", status: "RESOLVED", created_at: new Date("2026-09-20T10:00:00Z") }]]],
+      [/SELECT r.id, r.category/, () => [[{ id: 12, category: "COPYRIGHT", status: "RESOLVED", created_at: new Date("2026-09-20T10:00:00Z") }]]],
     ]);
     await expect(listContestableReports(5)).resolves.toEqual([
       { id: 12, category: "COPYRIGHT", status: "RESOLVED", createdAt: "2026-09-20T10:00:00.000Z" },
     ]);
     const [sql, params] = pool.execute.mock.calls[1];
     expect(sql).toMatch(/r.category <> 'CONTEST'/);
-    expect(params).toEqual([5, 4, 6]);
+    expect(sql).toMatch(/r\.reporter_user_id = \? AND r\.status = 'RESOLVED'/);
+    expect(params).toEqual([5, 4, 6, 5]);
   });
 });
 
