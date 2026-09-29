@@ -308,11 +308,11 @@
   text-align: center;
 }
 
-/* Sous 1100 px, la barre ne tient plus « Accueil » sur une ligne avec ce lien
-   en toutes lettres : le libellé passe en lecture seule pour les technologies
+/* Sous 1150 px — même seuil que les pictogrammes d'« Accueil » —, la barre ne
+   tient plus ce lien en toutes lettres : le libellé passe en lecture seule pour les technologies
    d'assistance (le nom accessible reste « Signalements »), le drapeau et le
    compteur restent visibles. */
-@media (max-width: 1100px) {
+@media (max-width: 1150px) {
   .navReportsLabel {
     position: absolute;
     width: 1px;

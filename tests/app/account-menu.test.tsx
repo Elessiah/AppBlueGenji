@@ -105,4 +105,11 @@ describe("mise en page de la navigation", () => {
     const block = arenaCss.slice(arenaCss.indexOf("@media (max-width: 1150px)"));
     expect(block).toMatch(/\.navHomeLabel\s*\{[^}]*clip: rect\(0, 0, 0, 0\)/);
   });
+
+  it("masque le libellé « Signalements » au même seuil que les autres raccourcis", () => {
+    // Le lien partage la classe `.navHome` : à un seuil plus bas, il s'affichait
+    // en toutes lettres, agrandi, dans la plage même que l'on compacte.
+    const labelRule = arenaCss.slice(0, arenaCss.indexOf(".navReportsLabel {"));
+    expect(labelRule.slice(labelRule.lastIndexOf("@media"))).toContain("(max-width: 1150px)");
+  });
 });
