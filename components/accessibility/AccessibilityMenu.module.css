@@ -398,3 +398,12 @@
   bottom: auto;
   transform-origin: top left;
 }
+
+/* Exception : le recadrage d'image (`components/ui/image-crop-dialog.tsx`,
+   reconnu à ses poignées `[data-handle]`) occupe tout l'écran d'un téléphone —
+   8 px de voile, son titre et les poignées du cadre passent sous le coin haut
+   gauche. C'est un outil qu'on referme d'un geste, pas un texte à lire : le
+   bouton s'y retire. */
+:global(html:has([aria-modal="true"]:not([hidden]) [data-handle])) .root {
+  visibility: hidden;
+}

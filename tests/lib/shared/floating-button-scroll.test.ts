@@ -101,8 +101,13 @@ describe("le menu d'accessibilité reste offert pendant une modale", () => {
   const block = (selector: string) =>
     css.match(new RegExp(String.raw`${modalOpen} ${selector}\s*\{([^}]*)\}`))?.[1] ?? "";
 
-  it("n'est jamais masqué : une modale qu'on ne peut pas écarter doit rester lisible", () => {
-    expect(css).not.toMatch(/visibility:\s*hidden/);
+  it("n'est masqué que sous le recadrage d'image, jamais sous une modale à lire", () => {
+    const hidden = [...css.matchAll(/([^{}]+)\{[^}]*visibility:\s*hidden;/g)].map((m) => m[1].trim());
+    expect(hidden).toEqual([
+      ':global(html:has([aria-modal="true"]:not([hidden]) [data-handle])) .root',
+    ]);
+    // Le repère est bien porté par les poignées du recadrage.
+    expect(readSource("components/ui/image-crop-dialog.tsx")).toContain("data-handle={handle}");
   });
 
   it("passe au-dessus de tous les voiles, remonté dans le coin haut gauche", () => {
