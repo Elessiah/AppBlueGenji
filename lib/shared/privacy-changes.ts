@@ -245,7 +245,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // gardé jusqu'ici sans limite, est effacé après report en compteurs.
   {
     id: "2026-09-mesure-audience-duree",
-    publishedAt: "2026-09-29",
+    publishedAt: "2026-09-30",
     title: `Fréquentation du site : le détail des visites gardé ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours`,
     summary: `Le détail des visites du site (page vue, date) est désormais effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours.`,
     details: [
@@ -261,7 +261,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // les retire.
   {
     id: "2026-09-certification-discord-volontaire",
-    publishedAt: "2026-09-29",
+    publishedAt: "2026-09-30",
     title: "Tag Discord : la certification n'est plus automatique",
     summary:
       "Se connecter par Discord n'ouvre plus ton tag à l'organisation : tu le certifies toi-même, d'un clic, depuis ton profil.",
@@ -276,12 +276,15 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // les destinataires et les transferts hors UE qui existaient déjà.
   {
     id: "2026-10-retrait-google-one-tap",
-    // Mis en production le 2026-09-29 (#278), comme les deux entrées
-    // précédentes (#272, mesure d'audience) — un audit les a vues en ligne ce
-    // jour-là. Datées du 30 ou d'octobre, elles se seraient tues un ou deux
-    // jours, puis montrées à des comptes inscrits sous la politique déjà à
-    // jour. L'identifiant, déjà publié, garde son « 2026-10 ».
-    publishedAt: "2026-09-29",
+    // Mergé le 2026-09-29 après-midi (#278), comme les deux entrées
+    // précédentes (#272, mesure d'audience), et mis en ligne ensuite : daté,
+    // comme elles, du **lendemain**. Un compte né le 29 avant le déploiement
+    // s'est inscrit sous l'ancienne politique — dater du 29 le priverait pour
+    // toujours de ces changements (dont la certification automatique de son
+    // tag) ; dater du 30 ne montre au pire qu'un changement déjà en vigueur.
+    // Octobre n'avait pas de raison d'être. L'identifiant, déjà publié, garde
+    // son « 2026-10 ».
+    publishedAt: "2026-09-30",
     title: "Plus d'invite Google, destinataires nommés",
     summary:
       "L'invite « Continuer avec Google » de la page de connexion est retirée : aucune page du site ne fait plus appel à Google dans ton navigateur. La politique de confidentialité nomme désormais chaque destinataire de tes données et les transferts hors de l'Union.",

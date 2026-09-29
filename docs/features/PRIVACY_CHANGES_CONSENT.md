@@ -200,14 +200,19 @@ champ `acceptedAt` inchangé pour ne pas casser le format). Registre : T10, base
 
 ## Dates corrigées
 
-`2026-10-retrait-google-one-tap` portait `publishedAt: "2026-10-01"`, et les
-deux entrées qui le précèdent (`2026-09-mesure-audience-duree`,
-`2026-09-certification-discord-volontaire`) `"2026-09-30"`, alors que les trois
-ont été mergées et mises en ligne le **29 septembre 2026** (#278, #272) — un
-audit les a vues en ligne ce jour-là. Les trois sont ramenées au 29 : datées plus
-tard, elles se seraient tues un ou deux jours avec le filtre de publication, puis
-montrées à des comptes inscrits sous la politique déjà à jour. L'ordre du
-registre est tenu ; les identifiants, déjà publiés, ne changent pas.
+`2026-10-retrait-google-one-tap` portait `publishedAt: "2026-10-01"` alors que
+le retrait a été mergé le 29 septembre 2026 dans l'après-midi (#278), puis mis
+en ligne : sa date est ramenée au **30 septembre**, comme les deux entrées
+livrées avec lui (#272, mesure d'audience). Le lendemain de la mise en ligne et
+non son jour : un compte né le 29 **avant** le déploiement s'est inscrit sous
+l'ancienne politique, et `createdDay < publishedAt` le priverait pour toujours
+de ces changements — dont celui qui lui apprend que son tag a été certifié
+automatiquement. L'erreur inverse (un compte né le 29 après le déploiement lit
+un changement déjà en vigueur) est sans dommage. Octobre, lui, n'avait pas de
+raison d'être. L'identifiant, déjà publié, garde son « 2026-10 ».
+
+Règle qui en découle : quand l'heure du déploiement n'est pas connue, dater
+une entrée du **lendemain** de sa mise en ligne.
 
 ## Mise en production initiale
 

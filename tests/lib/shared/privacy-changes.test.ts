@@ -205,9 +205,9 @@ describe("PRIVACY_CHANGES — aucune entrée ne fait accepter", () => {
     }
   });
 
-  it("date le retrait de Google One Tap au jour de sa mise en production, pas en octobre", () => {
+  it("date le retrait de Google One Tap du lendemain de sa mise en ligne, pas d'octobre", () => {
     const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-10-retrait-google-one-tap");
-    expect(entry?.publishedAt).toBe("2026-09-29");
+    expect(entry?.publishedAt).toBe("2026-09-30");
   });
 });
 
