@@ -354,10 +354,20 @@
   color: var(--ink, var(--text-0));
   font-size: 13px;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .showMore:hover {
   border-color: var(--blue-500, #5ac8ff);
+  background: rgba(var(--blue-rgb), 0.08);
+}
+
+/* Sur téléphone, le bouton prend la largeur : une cible étroite au bas d'une
+   longue liste se manque facilement du pouce. */
+@media (max-width: 640px) {
+  .showMore {
+    width: 100%;
+  }
 }
 
 .showMore:focus-visible {
