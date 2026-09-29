@@ -5,6 +5,7 @@ import {
   touchesViewerMatches,
   viewerAlert,
   viewerAlertTitle,
+  viewerLaunchChanged,
   VIEWER_ALERT_PRIORITY,
   type ViewerAlertDetail,
 } from "@/lib/shared/viewer-alerts";
@@ -172,5 +173,75 @@ describe("touchesViewerMatches — ce qui ne se regroupe pas", () => {
     expect(
       touchesViewerMatches(detail([other], spectator), detail([{ ...other, status: "COMPLETED" }], spectator)),
     ).toBe(false);
+  });
+
+  it("vrai quand le match que le lecteur caste bouge", () => {
+    // Le caster n'a pas d'engagée : son match lui échappait, et se redessinait
+    // au rythme regroupé du reste du plateau.
+    const caster = { myTeamId: null, viewerUserId: 42 };
+    const casted = { ...other, casterUserId: 42 };
+    expect(
+      touchesViewerMatches(
+        detail([casted], caster),
+        detail([{ ...casted, casterReady: true }], caster),
+      ),
+    ).toBe(true);
+  });
+});
+
+/**
+ * La modale de lancement vivait de sa seule interrogation (8 à 60 s) pendant
+ * que la fiche recevait le même changement dans la seconde : « 1/2 prêts » sur
+ * la carte, 0/2 dans la modale au-dessus.
+ */
+describe("viewerLaunchChanged — relecture de la modale de lancement", () => {
+  const mine = match({ status: "READY", team1Id: 1, team2Id: 2 });
+  const other = match({ id: 2, status: "READY", team1Id: 3, team2Id: 4 });
+
+  it("ne demande rien au premier instantané : la modale lit d'elle-même au montage", () => {
+    expect(viewerLaunchChanged(null, detail([mine]))).toBe(false);
+  });
+
+  it("ne demande rien quand rien ne bouge", () => {
+    expect(viewerLaunchChanged(detail([mine, other]), detail([mine, other]))).toBe(false);
+  });
+
+  it.each<[string, Partial<M>]>([
+    ["le « Prêt » de l'adversaire", { team2Ready: true }],
+    ["le « Prêt » du caster", { casterReady: true }],
+    ["l'ouverture du lancement", { lobbyOpenedAt: "2026-09-23T20:01:00Z" }],
+    ["le lancement", { launchedAt: "2026-09-23T20:02:00Z" }],
+    ["un caster qui s'inscrit", { casterUserId: 9 }],
+    ["un changement de statut", { status: "AWAITING_CONFIRMATION" }],
+  ])("demande une relecture sur %s, même sans écriture datée", (_label, change) => {
+    // `updatedAt` inchangé : ce qui compte est le contenu, pas l'horodatage.
+    expect(viewerLaunchChanged(detail([mine]), detail([{ ...mine, ...change }]))).toBe(true);
+  });
+
+  it("ne demande rien pour le match d'une autre équipe", () => {
+    expect(
+      viewerLaunchChanged(detail([mine, other]), detail([mine, { ...other, team1Ready: true }])),
+    ).toBe(false);
+  });
+
+  it("couvre les matchs que le lecteur caste", () => {
+    const caster = { myTeamId: null, viewerUserId: 42 };
+    const casted = { ...other, casterUserId: 42 };
+    expect(
+      viewerLaunchChanged(detail([casted], caster), detail([{ ...casted, team1Ready: true }], caster)),
+    ).toBe(true);
+    // Et rien pour un spectateur sans match à lui.
+    const spectator = { myTeamId: null, viewerUserId: 7 };
+    expect(
+      viewerLaunchChanged(
+        detail([casted], spectator),
+        detail([{ ...casted, team1Ready: true }], spectator),
+      ),
+    ).toBe(false);
+  });
+
+  it("demande une relecture quand un match du lecteur apparaît", () => {
+    const next = match({ id: 3, roundNumber: 2, status: "READY", team1Id: 1, team2Id: 5 });
+    expect(viewerLaunchChanged(detail([mine]), detail([mine, next]))).toBe(true);
   });
 });

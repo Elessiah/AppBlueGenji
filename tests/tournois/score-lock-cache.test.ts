@@ -63,12 +63,31 @@ describe("isMatchScoreLocked", () => {
   });
 });
 
-describe("câblage dans MatchRow", () => {
-  const source = readSource("app/(secured)/tournois/[id]/_components/MatchRow.tsx");
+describe("câblage dans les vues du plateau", () => {
+  const row = readSource("app/(secured)/tournois/[id]/_components/MatchRow.tsx");
+  const views = [
+    ["BracketTree.tsx", "format"],
+    ["EnduranceRoundPanels.tsx", "format"],
+    ["SurvivalView.tsx", '"SURVIVAL"'],
+    ["SwissView.tsx", '"SWISS"'],
+  ] as const;
 
   it("lit le verrou mutualisé au lieu de convertir tout le plateau par carte", () => {
-    expect(source).toContain("isMatchScoreLocked(match.id, allMatches, format)");
-    expect(source).not.toMatch(/allMatches\.map\(fromBracketMatch\)/);
-    expect(source).not.toMatch(/isScoreEditLocked\(/);
+    for (const [file, format] of views) {
+      const source = readSource(`app/(secured)/tournois/[id]/_components/${file}`);
+      expect(source).toContain(
+        `scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, ${format})}`,
+      );
+      expect(source).not.toMatch(/allMatches=/);
+    }
+    expect(row).not.toMatch(/allMatches/);
+    expect(row).not.toMatch(/isScoreEditLocked\(/);
+  });
+
+  it("ne passe à la carte qu'un booléen, pour qu'elle reste mémorisable", () => {
+    // Le plateau entier en prop change à chaque instantané : toutes les cartes
+    // se redessinaient pour un score qui n'en concernait qu'une.
+    expect(row).toContain("scoreLocked: boolean;");
+    expect(row).toMatch(/export const MatchRow = memo\(function MatchRow/);
   });
 });

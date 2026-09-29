@@ -28,7 +28,12 @@ import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
 
 const FAR_FUTURE = "2099-01-01T00:00:00.000Z";
 
-function frameOf(version: string, bytes = 32): TournamentSnapshotFrame {
+function frameOf(
+  version: string,
+  bytes = 32,
+  card: Partial<TournamentSnapshot["card"]> = {},
+  matches: unknown[] = [],
+): TournamentSnapshotFrame {
   const snapshot = {
     card: {
       id: 1,
@@ -36,16 +41,21 @@ function frameOf(version: string, bytes = 32): TournamentSnapshotFrame {
       registrationOpenAt: FAR_FUTURE,
       registrationCloseAt: FAR_FUTURE,
       startAt: FAR_FUTURE,
+      ...card,
     },
+    matches,
     version,
   } as unknown as TournamentSnapshot;
 
   // Le poids compte : c'est lui qui déclenche le budget de sortie de la salle.
   const body = `data: ${version}`.padEnd(Math.max(bytes - 2, 1), " ");
+  const frame = new TextEncoder().encode(`${body}\n\n`);
   return {
     snapshot,
     version,
-    frame: new TextEncoder().encode(`${body}\n\n`),
+    frame,
+    // Vue sur la trame, comme en production : ce qui suit « data: ».
+    snapshotJson: frame.subarray("data: ".length, frame.byteLength - 2),
   };
 }
 

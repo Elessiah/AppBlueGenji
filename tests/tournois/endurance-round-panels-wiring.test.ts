@@ -35,7 +35,7 @@ describe("volets de manche — câblage de la vue", () => {
     // Le verrou de score se lit sur le format : une constante en dur mentirait
     // le jour où BG Survie et Survie divergeraient.
     expect(PAGE).toContain("format={detail.card.format}");
-    expect(PANELS).toContain("format={format}");
+    expect(PANELS).toContain("isMatchScoreLocked(match.id, allTournamentMatches, format)");
   });
 
   it("déplie le volet où dort la cible d'une ancre", () => {
