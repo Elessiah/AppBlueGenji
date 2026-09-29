@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
 import { pageMetadata } from "@/lib/shared/page-metadata";
@@ -30,6 +31,25 @@ export const metadata: Metadata = pageMetadata({
     "Politique de confidentialité de BlueGenji : données collectées, droits des utilisateurs, durées de conservation et contact RGPD.",
   path: "/rgpd",
 });
+
+/** Intitulés des colonnes du tableau des données, repris par chaque fiche mobile. */
+const DATA_COLUMNS = ["Donnée", "Finalité", "Base légale", "Conservation"] as const;
+
+/**
+ * Cellule du tableau des données. Son intitulé n'est affiché qu'en fiche
+ * (sous 640 px) et reste masqué des technologies d'assistance, qui lisent
+ * déjà l'en-tête de colonne.
+ */
+function DataCell({ column, children }: { column: 0 | 1 | 2 | 3; children: ReactNode }) {
+  return (
+    <td role="cell">
+      <span className={styles.cellLabel} aria-hidden="true">
+        {DATA_COLUMNS[column]}
+      </span>
+      {children}
+    </td>
+  );
+}
 
 export default async function RgpdPage() {
   // Le formulaire laisse un membre connecté désigner son compte ; un visiteur
@@ -96,41 +116,46 @@ export default async function RgpdPage() {
             pour pseudo : si c&apos;est le tien, change-le dans Mon profil.
           </p>
         </div>
-        <table className={styles.dataTable} style={{ marginTop: 24 }}>
-          <thead>
-            <tr>
-              <th>Donnée</th>
-              <th>Finalité</th>
-              <th>Base légale</th>
-              <th>Conservation</th>
+        {/* Sous 640 px, chaque ligne devient une fiche : les cellules s'empilent
+            et portent leur intitulé (`DataCell`), rien n'est masqué et la page
+            ne défile plus en largeur. Les rôles explicites gardent la sémantique
+            de tableau que `display: block` retire dans certains navigateurs. */}
+        <table role="table" className={styles.dataTable} style={{ marginTop: 24 }}>
+          <thead role="rowgroup">
+            <tr role="row">
+              {DATA_COLUMNS.map((column) => (
+                <th key={column} role="columnheader" scope="col">
+                  {column}
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {DONNEES_PROFIL.map((d, i) => (
-              <tr key={i}>
-                <td>{d.donnee}</td>
-                <td>{d.finalite}</td>
-                <td>
+              <tr key={i} role="row">
+                <DataCell column={0}>{d.donnee}</DataCell>
+                <DataCell column={1}>{d.finalite}</DataCell>
+                <DataCell column={2}>
                   <span className={styles.badge}>{d.base}</span>
-                </td>
-                <td>{d.duree}</td>
+                </DataCell>
+                <DataCell column={3}>{d.duree}</DataCell>
               </tr>
             ))}
-            <tr>
-              <td>{DONNEE_TOURNOIS.donnee}</td>
-              <td>{DONNEE_TOURNOIS.finalite}</td>
-              <td>
+            <tr role="row">
+              <DataCell column={0}>{DONNEE_TOURNOIS.donnee}</DataCell>
+              <DataCell column={1}>{DONNEE_TOURNOIS.finalite}</DataCell>
+              <DataCell column={2}>
                 <span className={styles.badgeAmber}>{DONNEE_TOURNOIS.base}</span>
-              </td>
-              <td>{DONNEE_TOURNOIS.duree}</td>
+              </DataCell>
+              <DataCell column={3}>{DONNEE_TOURNOIS.duree}</DataCell>
             </tr>
-            <tr>
-              <td>{DONNEE_SAUVEGARDES.donnee}</td>
-              <td>{DONNEE_SAUVEGARDES.finalite}</td>
-              <td>
+            <tr role="row">
+              <DataCell column={0}>{DONNEE_SAUVEGARDES.donnee}</DataCell>
+              <DataCell column={1}>{DONNEE_SAUVEGARDES.finalite}</DataCell>
+              <DataCell column={2}>
                 <span className={styles.badgeAmber}>{DONNEE_SAUVEGARDES.base}</span>
-              </td>
-              <td>{DONNEE_SAUVEGARDES.duree} **</td>
+              </DataCell>
+              <DataCell column={3}>{DONNEE_SAUVEGARDES.duree} **</DataCell>
             </tr>
           </tbody>
         </table>
