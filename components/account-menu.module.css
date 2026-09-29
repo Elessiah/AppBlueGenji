@@ -1,0 +1,135 @@
+/* Menu du compte : avatar + pseudo, panneau « Mon profil / Mon équipe /
+   Déconnexion ». Partagé par la barre connectée et l'en-tête public. */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  min-width: 0;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 6px 12px 6px 6px;
+  border: 1px solid var(--line-strong-cy);
+  border-radius: 999px;
+  background: var(--cyber-bg-1);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.trigger:hover,
+.triggerOpen {
+  border-color: rgba(90, 200, 255, 0.45);
+}
+
+.trigger:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: 2px;
+}
+
+.name {
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.caret {
+  font-size: 10px;
+  color: var(--ink-mute);
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 60;
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  background: var(--cyber-bg-1, #0c0f14);
+  border: 1px solid var(--line-strong-cy, var(--line-soft));
+  border-radius: var(--r-cy-md, 10px);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.7),
+    0 0 26px rgba(90, 200, 255, calc(0.1 * var(--glow, 1)));
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  min-height: 44px;
+  justify-content: center;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: var(--r-cy-sm, 8px);
+  background: transparent;
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+
+.item:hover,
+.item:focus-visible {
+  color: var(--ink);
+  background: rgba(90, 200, 255, 0.08);
+}
+
+.item:focus-visible {
+  outline: 2px solid var(--blue-500);
+  outline-offset: -2px;
+}
+
+.itemHint {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-mute);
+}
+
+.logout {
+  margin-top: 4px;
+  border-top: 1px solid var(--line-soft);
+  border-radius: 0 0 var(--r-cy-sm, 8px) var(--r-cy-sm, 8px);
+}
+
+.logout:disabled {
+  cursor: progress;
+  color: var(--ink-dim);
+}
+
+/* Sous 720 px, l'avatar seul : la barre n'a plus la place du pseudo, que le
+   nom accessible du bouton garde. */
+@media (max-width: 720px) {
+  .name {
+    display: none;
+  }
+
+  .trigger {
+    padding-right: 10px;
+    gap: 6px;
+  }
+}
