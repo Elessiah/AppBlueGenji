@@ -171,7 +171,7 @@
 
 .metaLabel {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-mute, #9aa4b2);

@@ -92,7 +92,7 @@ export default async function BotDocsPage({ params }: PageProps) {
               </div>
               <span
                 className="mono"
-                style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--ink-dim)" }}
+                style={{ fontSize: 11, letterSpacing: "0.18em", color: "var(--ink-dim)" }}
               >
                 SOURCE · BLUEGENJIBOT/{section.file.toUpperCase()}
               </span>

@@ -92,7 +92,7 @@ export function PhaseTimeline({
                   (CLAUDE.md, « trois sens de live »). */}
               <Pill
                 variant={isCurrent ? "blue" : "default"}
-                style={{ fontSize: 10, padding: "2px 8px" }}
+                style={{ fontSize: 11, padding: "2px 8px" }}
               >
                 {state}
               </Pill>

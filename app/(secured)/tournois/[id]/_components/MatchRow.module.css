@@ -80,7 +80,7 @@
   margin: 0;
   padding: 3px 8px;
   border-top: 1px solid var(--line-strong-cy);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   text-align: center;
@@ -100,7 +100,7 @@
   margin: 0;
   padding: 4px 8px;
   border-top: 1px solid var(--line-strong-cy);
-  font-size: 10.5px;
+  font-size: 11px;
   line-height: 1.4;
   text-align: center;
   color: var(--blue-300);

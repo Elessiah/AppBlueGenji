@@ -90,7 +90,7 @@
   background: rgba(5, 6, 10, 0.92);
   color: var(--ink-mute);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1;
   cursor: pointer;
   transition:

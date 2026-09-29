@@ -154,7 +154,7 @@
   top: 8px;
   left: 8px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink);
@@ -229,7 +229,7 @@
 
 .slotAction {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -304,7 +304,7 @@
 
 .modalLabel {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -377,7 +377,7 @@
 
 .logoUploadBtn {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--ink);
@@ -408,7 +408,7 @@
 
 .logoHint {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   line-height: 1.5;
   letter-spacing: 0.04em;
   color: var(--ink-dim, var(--ink-mute));

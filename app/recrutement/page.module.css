@@ -263,7 +263,7 @@
 
 .action {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -333,7 +333,7 @@
 
 .modalLabel {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -372,7 +372,7 @@ select.modalInput {
 
 .modalHint {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--ink-dim);
 }
@@ -410,7 +410,7 @@ select.modalInput {
   align-items: center;
   gap: 7px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -439,7 +439,7 @@ select.modalInput {
 }
 
 .filterCount {
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.04em;
   color: var(--ink-dim);
 }
@@ -453,7 +453,7 @@ select.modalInput {
   display: inline-flex;
   align-items: center;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -516,7 +516,7 @@ select.modalInput {
 .counter {
   align-self: flex-end;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.08em;
   color: var(--ink-dim);
 }

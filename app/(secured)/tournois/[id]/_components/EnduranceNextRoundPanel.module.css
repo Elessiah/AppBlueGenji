@@ -66,7 +66,7 @@
   border: 1px solid var(--line-strong-cy, rgba(255, 255, 255, 0.18));
   border-radius: 999px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--text-1);

@@ -38,7 +38,7 @@
 .ghostBadge {
   margin-left: 12px;
   vertical-align: middle;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--ink-mute);
   border: 1px solid var(--line-soft);

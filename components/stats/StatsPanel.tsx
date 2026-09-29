@@ -167,7 +167,7 @@ function ActivityChart({ stats }: { stats: DeepStats }) {
                 x={x + barWidth / 2}
                 y={height - 6}
                 textAnchor="middle"
-                fontSize={10}
+                fontSize={11}
                 style={{ fill: "var(--text-2)" }}
               >
                 {monthLabel(point.month)}

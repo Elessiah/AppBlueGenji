@@ -47,7 +47,7 @@
   top: 14px;
   right: 14px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--ink-mute);
   background: var(--cyber-bg-1);
@@ -155,7 +155,7 @@
 
 .tag {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   color: #ff9d2e;
   text-transform: uppercase;
@@ -168,7 +168,7 @@
   margin-left: 8px;
   vertical-align: middle;
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.18em;
   color: var(--ink-mute);
@@ -190,7 +190,7 @@
 
 .statLbl {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--ink-mute);
   text-transform: uppercase;
@@ -209,7 +209,7 @@
    gabarit que l'étiquette du dessus, pour se lire comme une légende. */
 .statHint {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.12em;
   color: var(--ink-mute);
   text-transform: uppercase;
@@ -233,7 +233,7 @@
 
 .rosterLbl {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--ink-mute);
   text-transform: uppercase;
@@ -249,7 +249,7 @@
   display: grid;
   place-items: center;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-mute);
 }
 
@@ -295,7 +295,7 @@
 
 .gamePill {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--blue-300);
@@ -328,7 +328,7 @@
 
 .footMeta {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-mute);
   letter-spacing: 0.12em;
 }
@@ -362,7 +362,7 @@
    le sens de lecture en retrait. */
 .formLbl {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--ink-mute);
   text-transform: uppercase;
