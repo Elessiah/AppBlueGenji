@@ -234,7 +234,6 @@ describe("completeOAuth — connexion", () => {
   it("ouvre la session Google et suit la destination", async () => {
     jest.mocked(fetchGoogleUser).mockResolvedValue({
       sub: "sub-1",
-      name: "Nova",
       picture: "https://exemple.test/a.png",
     });
 

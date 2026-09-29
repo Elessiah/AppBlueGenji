@@ -158,7 +158,7 @@ describe("création d'un compte — les conditions, condition de naissance", () 
   const consent = { termsAccepted: true };
 
   it.each<[string, () => Promise<number>]>([
-    ["Google", () => createOrGetGoogleUser({ sub: "g-1", name: "Nova" }, refusedConsent)],
+    ["Google", () => createOrGetGoogleUser({ sub: "g-1" }, refusedConsent)],
     ["Blizzard", () => createOrGetBlizzardUser("bz-1", "Nova#2143", refusedConsent)],
     ["Discord", () => createOrGetDiscordUser("900000000000000001", "Nova", null, { method: "OAUTH", termsAccepted: false })],
   ])("%s : refuse de créer un compte sans acceptation, avant l'insertion", async (_label, create) => {
@@ -168,7 +168,7 @@ describe("création d'un compte — les conditions, condition de naissance", () 
   });
 
   it.each<[string, () => Promise<number>]>([
-    ["Google", () => createOrGetGoogleUser({ sub: "g-1", name: "Nova" }, consent)],
+    ["Google", () => createOrGetGoogleUser({ sub: "g-1" }, consent)],
     ["Blizzard", () => createOrGetBlizzardUser("bz-1", "Nova#2143", consent)],
     ["Discord", () => createOrGetDiscordUser("900000000000000001", "Nova", null, { method: "DM_CODE", termsAccepted: true })],
   ])("%s : écrit l'acceptation du compte qui naît", async (_label, create) => {
