@@ -264,3 +264,49 @@ describe("verrou de manche — depuis l'arbitrage, pas depuis l'helper", () => {
     expect(writes.length).toBeGreaterThan(0);
   });
 });
+
+describe("lecture verrouillante du match — course avec le réordonnancement du seeding", () => {
+  /**
+   * Un réordonnancement verrouille les matchs du tournoi puis détruit le
+   * plateau. Lu sans verrou, le match paraissait encore là, l'`UPDATE` ne
+   * touchait plus rien après l'attente, et l'arbitrage annonçait un succès.
+   */
+  function recordingConnection(matchRows: Record<string, unknown>[]) {
+    const reads: string[] = [];
+    const writes: string[] = [];
+    const conn = {
+      execute: async (sql: string) => {
+        const q = sql.replace(/\s+/g, " ").trim();
+        if (q.startsWith("UPDATE")) {
+          writes.push(q);
+          return [{ affectedRows: 1 }, []];
+        }
+        reads.push(q);
+        return [matchRows, []];
+      },
+    } as unknown as PoolConnection;
+    return { conn, reads, writes };
+  }
+
+  it.each<[string, (conn: PoolConnection) => Promise<void>]>([
+    ["l'enregistrement", (conn) => adminSaveMatchScores(conn, 10, 1, 0)],
+    ["la validation", (conn) => adminResolveMatch(conn, 10, 1, 0)],
+  ])("%s lit le match sous `FOR UPDATE`, sans jointure", async (_label, run) => {
+    const { conn, reads } = recordingConnection([]);
+
+    await expect(run(conn)).rejects.toThrow("MATCH_NOT_FOUND");
+
+    expect(reads[0]).toMatch(/FROM bg_matches WHERE id = \? LIMIT 1 FOR UPDATE$/);
+    expect(reads[0]).not.toMatch(/JOIN/);
+  });
+
+  it.each<[string, (conn: PoolConnection) => Promise<void>]>([
+    ["l'enregistrement", (conn) => adminSaveMatchScores(conn, 10, 1, 0)],
+    ["la validation", (conn) => adminResolveMatch(conn, 10, 1, 0)],
+  ])("%s refuse un match supprimé pendant l'attente, sans rien écrire", async (_label, run) => {
+    const { conn, writes } = recordingConnection([]);
+
+    await expect(run(conn)).rejects.toThrow("MATCH_NOT_FOUND");
+    expect(writes).toHaveLength(0);
+  });
+});
