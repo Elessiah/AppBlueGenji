@@ -141,7 +141,10 @@ score perdu en silence. Ce refus est lisible : `fail()` (`lib/server/http.ts`)
 reconnaît le message d'interblocage (`isDeadlockMessage`,
 `lib/server/mysql-errors.ts`) et le rend en **409 `CONCURRENT_UPDATE_RETRY`**,
 que l'interface traduit en « rien n'a été enregistré, réessaie » — sur toute
-route d'écriture, report d'un joueur, arbitrage et forfait de manche compris.
+route qui transmet le message de l'erreur à `fail()` : report d'un joueur,
+arbitrage (enregistrer, valider), forfait de manche et gestes du lancement
+(`launchFailure`). Une route qui le remplace par un code fixe garde son refus
+générique.
 La saisie n'est pas rejouée d'office : c'est au joueur de la renvoyer, sur le
 plateau tel qu'il est devenu. Jugée sur des lectures ordinaires, la borne ne tenait que
 hors concurrence : un premier report validé entre le contrôle et

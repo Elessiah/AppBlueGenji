@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { fail } from "@/lib/server/http";
 import { isDeadlockMessage } from "@/lib/server/mysql-errors";
+import { launchFailure } from "@/lib/server/tournaments/match-launch-routes";
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { ERROR_MESSAGES, mapError } from "@/app/(secured)/tournois/[id]/_lib/error-map";
 
@@ -58,6 +59,30 @@ describe("fail — interblocage", () => {
     const response = fail("Lock wait timeout exceeded; try restarting transaction", 500);
     expect(response.status).toBe(500);
     expect((await response.json()).error).toBe("INTERNAL_ERROR");
+  });
+});
+
+describe("launchFailure — interblocage", () => {
+  it("laisse passer l'interblocage au lieu du code de repli", async () => {
+    const warn = jest.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const response = launchFailure(new Error(DEADLOCK), {}, "MATCH_READY_FAILED");
+      expect(response.status).toBe(409);
+      expect((await response.json()).error).toBe(CONCURRENT_UPDATE_RETRY);
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("garde le code de repli pour une erreur imprévue", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = launchFailure(new Error("boom"), {}, "MATCH_READY_FAILED");
+      expect(response.status).toBe(500);
+      expect((await response.json()).error).toBe("MATCH_READY_FAILED");
+    } finally {
+      error.mockRestore();
+    }
   });
 });
 

@@ -1,4 +1,5 @@
 import { fail } from "@/lib/server/http";
+import { isDeadlockMessage } from "@/lib/server/mysql-errors";
 
 /** Identifiant de match lu dans un segment d'URL : entier strictement positif. */
 export function parseMatchIdParam(raw: string): number | null {
@@ -18,6 +19,8 @@ export function launchFailure(
   const message = (error as Error).message;
   const status = statuses[message];
   if (status) return fail(message, status);
+  // Interblocage : le message brut passe, `fail()` le rend en « réessaie ».
+  if (isDeadlockMessage(message)) return fail(message, 500);
   console.error("[match-launch] échec", error);
   return fail(fallback, 500);
 }
