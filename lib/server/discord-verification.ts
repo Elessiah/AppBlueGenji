@@ -39,7 +39,7 @@ import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integ
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import type { ConnectionMethod } from "@/lib/shared/account-connections";
 import {
-  consumeDiscordChallenge,
+  consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
   discardDiscordChallenge,
   normalizeDiscordHandle,
@@ -70,7 +70,16 @@ export type VerificationStart =
   /** Certifié sur place : l'identifiant était déjà prouvé. */
   | { status: "VERIFIED"; tag: string }
   /** Un code part en message privé ; la confirmation suivra. */
-  | { status: "CODE_SENT"; discordId: string; expiresAt: string };
+  | CodeSent;
+
+/**
+ * Un code est parti en message privé. La confirmation désigne le défi par
+ * `challenge`, un jeton imprévisible qui **ne désigne personne** — jamais par
+ * l'identifiant Discord résolu, que le site traite partout comme une
+ * coordonnée : le rendre ici faisait de la demande un oracle (« ce pseudo est
+ * ce compte Discord »), celui que la connexion par code a cessé d'être.
+ */
+export type CodeSent = { status: "CODE_SENT"; challenge: string; expiresAt: string };
 
 type UserDiscordRow = RowDataPacket & {
   discord_id: string | null;
@@ -163,23 +172,6 @@ async function writeVerifiedTag(userId: number, discordId: string, tag: string):
   }
 }
 
-/**
- * Le tag est-il libre, ou déjà certifié par un autre compte du site ?
- *
- * Le refus porte sur l'**identifiant** et non sur la chaîne du tag : deux
- * comptes peuvent écrire le même pseudo (rien ne l'empêche, et l'un des deux se
- * trompe), mais un seul peut prouver l'identifiant qui va avec. C'est le même
- * espace de noms que la connexion Discord, dont `bg_users.discord_id` est
- * unique.
- */
-async function discordIdTakenByAnother(discordId: string, userId: number): Promise<boolean> {
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT id FROM bg_users WHERE discord_id = ? AND id <> ? LIMIT 1`,
-    [discordId, userId],
-  );
-  return rows.length > 0;
-}
 
 /**
  * Contrôle posé sur l'identifiant **une fois résolu**, avant qu'un message privé
@@ -254,8 +246,16 @@ export async function certifyLinkedDiscordTag(
  * @throws INVALID_DISCORD_HANDLE Un identifiant numérique, une chaîne vide : il
  *   n'y a pas de **tag** à certifier. La connexion accepte un identifiant en
  *   repli, la certification non — c'est un pseudo qu'elle publie à l'arbitrage.
- * @throws DISCORD_ALREADY_LINKED Un autre compte du site a déjà prouvé ce
- *   Discord.
+ *
+ * **Aucun refus ne dit si ce Discord est déjà rattaché ailleurs.** Ce refus
+ * partait ici, avant tout message privé : n'importe quel membre connecté
+ * apprenait, pour n'importe quel pseudo et sans laisser de trace chez
+ * l'intéressé, si la personne avait un compte BlueGenji — l'oracle que la
+ * demande de code de connexion a cessé d'être (`docs/AUTHORIZATION_RULES.md`
+ * §1.1). Le code part donc de la même façon dans les deux cas, et le refus
+ * (`DISCORD_ALREADY_LINKED`) n'est rendu qu'à la **confirmation**, par l'index
+ * unique de `bg_users.discord_id` — à qui détient le code, donc le Discord.
+ *
  * @throws DISCORD_USER_NOT_FOUND / BOT_INTERNAL_UNREACHABLE / DISCORD_DM_FAILED
  *   Remontées telles quelles de la résolution et de l'envoi.
  */
@@ -276,10 +276,6 @@ export async function startDiscordVerification(
 
   const discordId = await resolveDiscordUser(tag);
 
-  if (await discordIdTakenByAnother(discordId, userId)) {
-    throw new Error("DISCORD_ALREADY_LINKED");
-  }
-
   // **Avant le défi et avant l'envoi** : ce qui suit fait vibrer le téléphone de
   // quelqu'un, et un plafond posé après n'aurait plus rien à refuser.
   guardBeforeSend?.(discordId);
@@ -295,23 +291,28 @@ export async function startDiscordVerification(
  * identifiant numérique n'a aucun tag à certifier — il vient de la page de
  * connexion, pas d'ici — et le refus le dit (`INVALID_DISCORD_HANDLE`).
  *
- * @throws CODE_INVALID_OR_EXPIRED Code faux, périmé, déjà consommé, ou quota
- *   d'essais épuisé : un seul message pour tous ces cas, qui ne se distinguent
- *   pas du point de vue de qui essaie.
+ * Le défi est désigné par son jeton (`challenge`) : l'identifiant Discord n'est
+ * relu que **sur la ligne**, une fois le code juste.
+ *
+ * @throws CODE_INVALID_OR_EXPIRED Code faux, périmé, déjà consommé, quota
+ *   d'essais épuisé ou jeton inconnu : un seul message pour tous ces cas, qui
+ *   ne se distinguent pas du point de vue de qui essaie.
+ * @throws DISCORD_ALREADY_LINKED Un autre compte du site détient ce Discord.
  */
 export async function confirmDiscordVerification(
   userId: number,
-  discordId: string,
+  challenge: string,
   code: string,
 ): Promise<{ tag: string }> {
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
+
+  const proof = await consumeDiscordLoginChallenge(challenge, code);
+  if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
+  const { discordId } = proof;
   // Relu après l'aller-retour du joueur : son compte a pu se rattacher entre la
   // demande et la confirmation, et on ne déplace jamais une porte d'entrée.
   if (row.discord_id && row.discord_id !== discordId) throw new Error("DISCORD_ID_MISMATCH");
-
-  const proof = await consumeDiscordChallenge(discordId, code);
-  if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
   if (!proof.handle) throw new Error("INVALID_DISCORD_HANDLE");
 
   // Le code reçu en message privé **est** la porte, ici : sur un compte qui ne
@@ -330,10 +331,7 @@ export async function confirmDiscordVerification(
  * à son échec, sinon il masque comme « dernier émis » celui que le joueur
  * détient vraiment.
  */
-async function sendHandleChallenge(
-  discordId: string,
-  tag: string,
-): Promise<{ status: "CODE_SENT"; discordId: string; expiresAt: string }> {
+async function sendHandleChallenge(discordId: string, tag: string): Promise<CodeSent> {
   const challenge = await createDiscordLoginChallenge(discordId, tag);
   try {
     await sendDiscordLoginCode(discordId, challenge.code);
@@ -344,7 +342,7 @@ async function sendHandleChallenge(
 
   return {
     status: "CODE_SENT",
-    discordId,
+    challenge: challenge.challengeToken,
     expiresAt: challenge.expiresAt.toISOString(),
   };
 }
@@ -364,17 +362,19 @@ async function sendHandleChallenge(
  * peut mettre à jour que le pseudo de *ce* compte Discord — un pseudo qui résout
  * ailleurs est refusé (`DISCORD_ID_MISMATCH`). Un compte sans Discord rattache
  * par le même geste (`discord_link_method = 'DM_CODE'`), sauf si un autre compte
- * du site détient déjà ce Discord.
+ * du site détient déjà ce Discord — refus rendu à la **confirmation** seulement,
+ * pour la raison dite sur {@link startDiscordVerification} : le rendre ici
+ * ferait de la demande un oracle.
  *
  * @throws INVALID_DISCORD_HANDLE Chaîne vide ou identifiant numérique.
- * @throws DISCORD_ID_MISMATCH Le pseudo désigne un autre compte Discord.
- * @throws DISCORD_ALREADY_LINKED Ce Discord est rattaché à un autre compte.
+ * @throws DISCORD_ID_MISMATCH Le pseudo désigne un autre compte Discord que
+ *   celui déjà rattaché **à ce compte** : rien n'y est dit d'un tiers.
  */
 export async function startDiscordHandleUpdate(
   userId: number,
   handle: string,
   guardBeforeSend?: ResolvedDiscordIdGuard,
-): Promise<{ status: "CODE_SENT"; discordId: string; expiresAt: string }> {
+): Promise<CodeSent> {
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
 
@@ -383,9 +383,6 @@ export async function startDiscordHandleUpdate(
 
   const discordId = await resolveDiscordUser(tag);
   if (row.discord_id && row.discord_id !== discordId) throw new Error("DISCORD_ID_MISMATCH");
-  if (!row.discord_id && (await discordIdTakenByAnother(discordId, userId))) {
-    throw new Error("DISCORD_ALREADY_LINKED");
-  }
 
   // Avant le défi et avant l'envoi, comme pour la certification.
   guardBeforeSend?.(discordId);
@@ -413,19 +410,21 @@ export async function startDiscordHandleUpdate(
  *
  * @throws CODE_INVALID_OR_EXPIRED Code faux, périmé, consommé ou brûlé.
  * @throws DISCORD_ID_MISMATCH Le compte a un autre Discord rattaché.
- * @throws DISCORD_ALREADY_LINKED Un autre compte a rattaché ce Discord entre-temps.
+ * @throws DISCORD_ALREADY_LINKED Un autre compte du site détient ce Discord.
  */
 export async function confirmDiscordHandleUpdate(
   userId: number,
-  discordId: string,
+  challenge: string,
   code: string,
 ): Promise<{ tag: string }> {
   const row = await loadDiscordRow(userId);
   if (!row) throw new Error("PROFILE_NOT_FOUND");
+
+  const proof = await consumeDiscordLoginChallenge(challenge, code);
+  if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
+  const { discordId } = proof;
   if (row.discord_id && row.discord_id !== discordId) throw new Error("DISCORD_ID_MISMATCH");
 
-  const proof = await consumeDiscordChallenge(discordId, code);
-  if (!proof) throw new Error("CODE_INVALID_OR_EXPIRED");
   // Un défi né d'un identifiant numérique (connexion en repli) n'a aucun pseudo.
   const tag = normalizeDiscordHandle(proof.handle ?? "");
   if (!tag) throw new Error("INVALID_DISCORD_HANDLE");

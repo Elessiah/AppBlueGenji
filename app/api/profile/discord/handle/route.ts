@@ -3,7 +3,8 @@
  * par message privé) » d'« Applications connectées ».
  *
  * `POST { handle }` fait résoudre le pseudo par le bot et envoie un code à six
- * chiffres en message privé ; `PUT { discordId, code }` le confirme, et le
+ * chiffres en message privé et rend le jeton du défi ; `PUT { challenge, code }`
+ * le confirme, et le
  * pseudo enregistré est celui **retenu sur le défi**, jamais une valeur du
  * client. La règle vit dans `lib/server/discord-verification.ts`
  * (`startDiscordHandleUpdate` / `confirmDiscordHandleUpdate`) ; la route garde
@@ -25,13 +26,16 @@ import {
   startDiscordHandleUpdate,
 } from "@/lib/server/discord-verification";
 import { readJsonBody } from "@/lib/server/request-body";
+import { isDiscordChallengeToken } from "@/lib/server/users-service";
 
 /** Codes de refus et leur statut — les mêmes que la certification. */
 function discordHandleStatusFor(message: string): number {
   switch (message) {
     case "INVALID_DISCORD_HANDLE":
+    case "INVALID_CHALLENGE":
     case "INVALID_CODE":
       return 400;
+
     case "DISCORD_ID_MISMATCH":
     case "DISCORD_ALREADY_LINKED":
       return 409;
@@ -91,17 +95,16 @@ export async function PUT(req: Request) {
 
   try {
     const body = (await readJsonBody(req)) as {
-      discordId?: unknown;
+      challenge?: unknown;
       code?: unknown;
     };
-    const discordId =
-      typeof body.discordId === "string" ? body.discordId.trim() : "";
     const code = typeof body.code === "string" ? body.code.trim() : "";
-    if (!/^\d{5,32}$/.test(discordId))
-      return fail("INVALID_DISCORD_HANDLE", 400);
+    if (!isDiscordChallengeToken(body.challenge))
+      return fail("INVALID_CHALLENGE", 400);
     if (!/^\d{6}$/.test(code)) return fail("INVALID_CODE", 400);
 
-    const result = await confirmDiscordHandleUpdate(user.id, discordId, code);
+    const result = await confirmDiscordHandleUpdate(user.id, body.challenge, code);
+
     return ok({ status: "UPDATED", ...result });
   } catch (error) {
     const message = (error as Error).message || "DISCORD_HANDLE_UPDATE_FAILED";

@@ -11,6 +11,7 @@ const VERIFICATION_ERRORS: Record<string, string> = {
     "Renseigne un tag Discord (un pseudo, pas un identifiant numérique) : c'est lui qui sera certifié.",
   INVALID_CODE: "Le code doit contenir 6 chiffres.",
   CODE_INVALID_OR_EXPIRED: "Code invalide ou expiré. Recommence la certification.",
+  INVALID_CHALLENGE: "Demande de code introuvable. Recommence la certification.",
 
   // Le tag résout vers un compte Discord différent de celui déjà relié au
   // compte : on ne déplace pas une porte d'entrée, c'est au joueur de trancher.
@@ -81,6 +82,8 @@ const HANDLE_UPDATE_ERRORS: Record<string, string> = {
   INVALID_DISCORD_HANDLE:
     "Renseigne ton pseudo Discord (un pseudo, pas un identifiant numérique).",
   CODE_INVALID_OR_EXPIRED: "Code invalide ou expiré. Demande un nouveau code.",
+  INVALID_CHALLENGE: "Demande de code introuvable. Demande un nouveau code.",
+
   DISCORD_ID_MISMATCH:
     "Ce pseudo appartient à un autre compte Discord que celui rattaché à ton compte BlueGenji. Vérifie le pseudo : on ne remplace pas un compte Discord par un autre.",
   DISCORD_ALREADY_LINKED:
