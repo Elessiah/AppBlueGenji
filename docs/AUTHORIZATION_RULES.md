@@ -119,16 +119,58 @@ pouvoir sur la plateforme.
   se devinait, et cinq codes faux sur chacun des derniers numéros auraient
   brûlé tous les codes en vol du site sans connaître personne.
 
-- **Les routes qui ouvrent ou ferment une session vérifient leur provenance.**
-  `SameSite=Lax` protège les routes authentifiées, pas celles qui *posent* la
-  session : elles n'ont besoin d'aucun cookie pour agir. Un formulaire
-  `enctype=text/plain` d'un site tiers, dont le nom de champ reconstitue un
-  JSON, connectait la victime au compte de l'attaquant (code Discord de
-  l'attaquant), ou la déconnectait. `rejectCrossSiteRequest`
-  (`lib/server/request-origin.ts`) refuse en **403** une provenance étrangère
-  (`Sec-Fetch-Site`, sinon `Origin`) et en **415** un corps qui n'est pas
-  déclaré `application/json`, en première instruction des trois `POST` de
-  `/api/auth/*`.
+  **La certification du tag non plus.** `POST /api/profile/discord` (et
+  « Mettre à jour mon pseudo », `POST /api/profile/discord/handle`) rejouait
+  cet oracle pour tout membre connecté sans `discord_id` : pour n'importe quel
+  pseudo, `DISCORD_ALREADY_LINKED` disait — **avant** tout message privé, donc
+  sans trace chez l'intéressé — que ce Discord avait un compte BlueGenji, et
+  `CODE_SENT` rendait l'identifiant résolu. La demande répond désormais de la
+  même façon que le Discord soit rattaché ailleurs ou non, et ne rend que le
+  **jeton du défi** (`challenge`) ; la confirmation désigne le défi par ce jeton
+  (`consumeDiscordLoginChallenge`, comme la connexion) et relit l'identifiant
+  sur la ligne. Le refus `DISCORD_ALREADY_LINKED` n'est plus rendu qu'à la
+  **confirmation**, par l'index unique de `bg_users.discord_id`, donc à qui
+  détient le code — c'est-à-dire le Discord. Contrepartie assumée : un code
+  part vers un Discord déjà rattaché ailleurs, comme la page de connexion en
+  envoie déjà à n'importe quel pseudo ; le plafond par compte visé
+  (`DISCORD_CODE_REQUEST_RULE`) et les deux bornes en base s'appliquent.
+
+- **Toute écriture sous `/api/` vérifie sa provenance.** `SameSite=Lax` ne
+  protège les routes authentifiées qu'à moitié : il refuse le cookie de session
+  à un site **tiers**, pas à un **sous-domaine voisin** du même domaine, dont
+  la requête est *same-site*. Un tel sous-domaine — compromis, ou confié à un
+  tiers — faisait donc agir la session d'un membre ou du staff sur n'importe
+  quelle route authentifiée, routes d'administration comprises (§7), et
+  plusieurs n'ont même pas de corps (inscription, adhésion, départ d'équipe,
+  forfait, avancée d'un tournoi, lancement forcé). Le middleware
+  (`middleware.ts`, `apiWriteNeedsProvenance`) passe donc toute requête
+  `POST`/`PUT`/`PATCH`/`DELETE` sous `/api/` par `rejectCrossSiteRequest`
+  (`lib/server/request-origin.ts`) : **403** `CROSS_SITE_REQUEST` sauf
+  `Sec-Fetch-Site: same-origin` (ou `none`), sinon un `Origin` qui est l'un des
+  hôtes du site ; une requête qui ne porte ni l'un ni l'autre passe — aucun
+  navigateur ne les omet tous deux sur une écriture inter-sites, et un client
+  hors navigateur n'a pas de cookie de victime. Posé là, le contrôle couvre la
+  route ajoutée demain. Les lectures (`GET`, `HEAD`, `OPTIONS` : rappels OAuth,
+  flux SSE, images) ne sont pas regardées, et deux écritures **anonymes** sont
+  exemptées, faute de session à faire agir : `/api/csp-report` (rapports émis
+  par le navigateur lui-même) et `/api/visits`.
+
+  **Le type du corps, là où il est lu.** `readJsonBody` refuse
+  (`UNSUPPORTED_CONTENT_TYPE`) un corps qui n'est pas **déclaré** JSON
+  (`application/json`, un type `+json`, `application/csp-report`), sans rien
+  lire : un formulaire HTML ne sait envoyer que `text/plain`,
+  `application/x-www-form-urlencoded` ou `multipart/form-data`. C'est une
+  seconde ligne — le contrôle de provenance ferme déjà ce formulaire.
+
+- **Les routes qui ouvrent ou ferment une session le reposent elles-mêmes.**
+  Elles n'ont besoin d'aucun cookie pour agir, `SameSite` ne les protège donc
+  de rien : un formulaire `enctype=text/plain` d'un site tiers, dont le nom de
+  champ reconstitue un JSON, connectait la victime au compte de l'attaquant
+  (code Discord de l'attaquant), ou la déconnectait. `rejectCrossSiteRequest`
+  est appelé en première instruction des trois `POST` de `/api/auth/*`, avec
+  en plus un refus en **415** d'un corps qui n'est pas exactement
+  `application/json` — sans dépendre du périmètre du middleware.
+
 
 - **Une réponse d'erreur ne porte qu'un code.** `fail` ne publie que ce qui a
   la forme d'un code (`lib/shared/api-error-code.ts`) : un message d'exception

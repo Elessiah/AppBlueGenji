@@ -220,9 +220,21 @@ moyen de connexion. L'état est relu à la confirmation, le compte ayant pu se
 rattacher entre-temps.
 
 Un Discord déjà certifié par un **autre compte du site** est refusé de même
-(`DISCORD_ALREADY_LINKED`, 409). Deux contrôles qui ne font pas double emploi : le
-`SELECT` préalable donne le refus lisible, l'index unique sur `discord_id` tranche
-la course entre deux certifications simultanées.
+(`DISCORD_ALREADY_LINKED`, 409) — mais **à la confirmation seulement**, par
+l'index unique sur `discord_id`. Un `SELECT` préalable le rendait dès la
+demande, avant tout message privé : n'importe quel membre connecté apprenait
+alors, pour n'importe quel pseudo et sans trace chez l'intéressé, si la personne
+avait un compte BlueGenji — l'oracle que la demande de code de connexion a cessé
+d'être (`docs/AUTHORIZATION_RULES.md` §1.1). La demande répond donc de la même
+façon dans les deux cas, et le refus ne revient qu'à qui détient le code.
+
+Pour la même raison, la demande ne rend **pas l'identifiant Discord résolu**
+(une coordonnée) mais le **jeton du défi** : `POST` → `{ status: "CODE_SENT",
+challenge, expiresAt }`, puis `PUT { challenge, code }`. La confirmation relit
+l'identifiant sur la ligne du défi (`consumeDiscordLoginChallenge`, celle de la
+connexion) ; un jeton mal formé est refusé en 400 `INVALID_CHALLENGE`. Même
+forme pour « Mettre à jour mon pseudo » (`/api/profile/discord/handle`).
+
 
 ## Ce qui défait la certification
 
