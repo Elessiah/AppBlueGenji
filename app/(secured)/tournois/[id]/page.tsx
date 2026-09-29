@@ -515,6 +515,10 @@ export default function TournamentDetailPage() {
   // donc la phase affichée que si c'est elle.
   const swissMetaIsSelectedPhase =
     !isMulti || (selectedPhase !== null && selectedPhase.id === detail.currentPhaseId);
+  // Clé des vues à manches : changer de phase les remonte, et leur zone de
+  // manches se rouvre sur la dernière (`revealKey` ne suffit pas quand deux
+  // phases ont autant de manches).
+  const phaseViewKey = selectedPhase ? `phase-${selectedPhase.id}` : "tournament";
   const hasThirdPlaceForPhase = isMulti && selectedPhase ? selectedPhase.hasThirdPlaceMatch : detail.card.hasThirdPlaceMatch;
 
   const bracketOrder: BracketType[] =
@@ -687,6 +691,9 @@ export default function TournamentDetailPage() {
           ) : formatForBracket === "SURVIVAL" && detail.survival ? (
             <>
               <SurvivalView
+                // Une vue par phase : la rangée de manches se rouvre sur la
+                // dernière de la phase choisie, même à nombre de manches égal.
+                key={phaseViewKey}
                 survival={detail.survival}
                 matches={filteredMatches}
                 allTournamentMatches={detail.matches}
@@ -733,6 +740,7 @@ export default function TournamentDetailPage() {
             // le serveur ne charge le classement suisse que de celle-ci.
             <>
               <SwissView
+                key={phaseViewKey}
                 swiss={detail.swiss}
                 matches={filteredMatches}
                 allTournamentMatches={detail.matches}
@@ -754,6 +762,7 @@ export default function TournamentDetailPage() {
             // nommait ses rondes « Quart de finale 1…12 ».
             <>
               <SwissRounds
+                key={phaseViewKey}
                 matches={filteredMatches}
                 allTournamentMatches={detail.matches}
                 totalRounds={null}

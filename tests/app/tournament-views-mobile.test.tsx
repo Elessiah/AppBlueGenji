@@ -103,6 +103,14 @@ describe("Phase suisse d'un multi-phases", () => {
     expect(current).not.toContain("{finishedPhaseStandings}");
   });
 
+  it("remonte les vues à manches à chaque changement de phase", () => {
+    for (const view of ["<SurvivalView", "<SwissView", "<SwissRounds"]) {
+      const at = page.search(new RegExp(`${view}\\r?\\n`));
+      expect(at).toBeGreaterThan(-1);
+      expect(page.slice(at, page.indexOf("/>", at))).toContain("key={phaseViewKey}");
+    }
+  });
+
   it("les rondes sont un export du module de la vue suisse, chargé à la demande", () => {
     expect(swiss).toMatch(/export function SwissRounds\b/);
     expect(page).toContain(
