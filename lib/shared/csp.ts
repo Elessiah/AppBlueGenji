@@ -71,23 +71,11 @@
  * **serveur**, et toutes les autres images passant par son origine (relais de
  * logos partenaires, `/api/uploads/…`). `'self'` couvre le reste.
  *
- * **3. Google One Tap est la seule iframe du site, et elle est nommée.** Le
- * script `accounts.google.com/gsi/client` rend son invite dans un cadre qui
- * lui appartient — ni `<script src>` ni `fetch` ordinaires n'y suffisent,
- * contrairement à l'échange de code OAuth classique, qui ne quitte jamais le
- * serveur. Quatre directives s'ouvrent donc, et seulement à cette origine :
- * `script-src` (le script lui-même, avec `strict-dynamic` : un hôte seul n'y
- * suffit pas), `frame-src` (le cadre de l'invite), `connect-src` (les appels
- * du script à Google) et `style-src` (la feuille de styles de l'invite,
- * chargée par un `<link>` que `'unsafe-inline'` ne couvre pas — vu en la
- * faisant refuser, avant d'y penser). Rien d'autre ne les emprunte, donc rien d'autre
- * ne peut se faire passer pour Google Identity Services par cette ouverture.
- *
- * L'invite n'est plus chargée que par `/connexion`, et pourtant ces ouvertures
- * restent posées sur **toutes** les pages : une navigation client ne relit pas
- * d'en-tête, le document garde la politique de la page par laquelle on est
- * arrivé. Les réserver à `/connexion` casserait l'invite pour qui y vient par
- * un lien depuis l'accueil — c'est-à-dire presque tout le monde.
+ * **3. Aucune iframe, aucune origine tierce.** Le site n'ouvre sa politique à
+ * aucun domaine étranger : l'invite Google One Tap, qui en exigeait quatre
+ * (`script-src`, `style-src`, `connect-src`, `frame-src` vers
+ * `accounts.google.com`), a été retirée — la connexion Google passe par le
+ * bouton OAuth classique, dont l'échange de code ne quitte jamais le serveur.
  *
  * **Si une page casse après un ajout**, le réflexe est de lire le collecteur
  * (`/api/csp-report`) avant de toucher à la politique : en application, un
@@ -146,14 +134,6 @@ export const PATHNAME_HEADER = "x-pathname";
 export const CSP_NONCE_HEADER = "x-nonce";
 
 /**
- * Origine de Google Identity Services (One Tap), ouverte à quatre directives
- * (`script-src`, `style-src`, `connect-src`, `frame-src`) — une seule
- * constante plutôt que quatre littéraux, pour qu'un changement d'origine ou
- * une cinquième ouverture ne demande jamais de les retrouver un par un.
- */
-const GOOGLE_IDENTITY_ORIGIN = "https://accounts.google.com";
-
-/**
  * Rédige la politique.
  *
  * Deux directives méritent leur justification, les autres se lisent seules :
@@ -166,11 +146,7 @@ const GOOGLE_IDENTITY_ORIGIN = "https://accounts.google.com";
  * - `style-src` garde `'unsafe-inline'`, sans échappatoire : le site pose des
  *   styles en ligne (`style={{…}}`) à de nombreux endroits, et un nonce ne
  *   couvre pas un attribut `style`. La restreindre demanderait de réécrire ces
- *   endroits en CSS Modules ; c'est un chantier, pas une ligne d'en-tête. Elle
- *   ouvre aussi `https://accounts.google.com` : l'invite One Tap charge sa
- *   propre feuille de styles (`gsi/style`) par un `<link>`, que
- *   `'unsafe-inline'` ne couvre pas — constaté en la faisant refuser, pas
- *   déduit de la documentation de Google.
+ *   endroits en CSS Modules ; c'est un chantier, pas une ligne d'en-tête.
  *
  * @param nonce Nonce de la requête, déjà encodé en base64.
  * @param options `dev` autorise `'unsafe-eval'`, dont le rafraîchissement à chaud de Next a besoin.
@@ -182,19 +158,13 @@ export function contentSecurityPolicy(nonce: string, options: { dev: boolean }):
     `'nonce-${nonce}'`,
     "'strict-dynamic'",
     "'unsafe-inline'",
-    // Google Identity Services (One Tap) : `strict-dynamic` ignore les hôtes
-    // pour tout script chargé *par* un script nommé, mais le premier — le
-    // `<script src>` de `gsi/client` lui-même — doit encore porter le nonce
-    // pour être accepté (posé côté composant, `components/auth/google-one-tap.tsx`).
-    // L'hôte reste listé pour les navigateurs qui ignorent `strict-dynamic`.
-    GOOGLE_IDENTITY_ORIGIN,
     ...(options.dev ? ["'unsafe-eval'"] : []),
   ];
 
   const directives: string[] = [
     "default-src 'self'",
     `script-src ${scriptSrc.join(" ")}`,
-    `style-src 'self' 'unsafe-inline' ${GOOGLE_IDENTITY_ORIGIN}`,
+    "style-src 'self' 'unsafe-inline'",
     // `https://lh3.googleusercontent.com` a été admis ici le temps d'une PR :
     // l'avatar d'un compte Google était servi par Google, et le mode rapport
     // l'avait signalé dès le premier chargement — ce qu'aucune lecture du code
@@ -207,18 +177,14 @@ export function contentSecurityPolicy(nonce: string, options: { dev: boolean }):
     // tierce, le collecteur le dirait au premier chargement.
     "img-src 'self' data: blob:",
     "font-src 'self' data:",
-    // `accounts.google.com` : les appels que `gsi/client` fait lui-même
-    // (résolution du compte, jeton). Rien d'autre côté site ne quitte `'self'`.
-    `connect-src 'self' ${GOOGLE_IDENTITY_ORIGIN}`,
+    "connect-src 'self'",
     "media-src 'self'",
     "worker-src 'self' blob:",
     "manifest-src 'self'",
-    // Une seule origine ouverte, et nommée : le cadre de l'invite Google One
-    // Tap. Aucune autre iframe n'existe dans le site, ni de son côté ni du
-    // nôtre — celle-ci mise à part, les deux se ferment.
+    // Aucune iframe dans le site, ni de son côté ni du nôtre : les deux se ferment.
     // `frame-ancestors` double `X-Frame-Options: SAMEORIGIN`, que les
     // navigateurs récents ignorent au profit de la CSP.
-    `frame-src ${GOOGLE_IDENTITY_ORIGIN}`,
+    "frame-src 'none'",
     "frame-ancestors 'self'",
     "object-src 'none'",
     // `base-uri` n'a pas d'équivalent ailleurs : une balise `<base>` injectée

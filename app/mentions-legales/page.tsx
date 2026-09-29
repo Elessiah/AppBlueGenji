@@ -289,10 +289,9 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           <Link href="/rgpd#cookies">politique de confidentialité</Link>.
         </p>
         <p>
-          Aucun traceur publicitaire ni outil de mesure d&apos;audience externe n&apos;est utilisé.
-          Seule exception, sur la page de connexion et après votre accord : l&apos;invite de
-          connexion de Google peut déposer un cookie <code>g_state</code>. La communication entre
-          votre navigateur et le serveur est chiffrée (HTTPS).
+          Aucun traceur publicitaire, outil de mesure d&apos;audience externe ni cookie tiers
+          n&apos;est utilisé. La communication entre votre navigateur et le serveur est chiffrée
+          (HTTPS).
         </p>
       </>
     ),

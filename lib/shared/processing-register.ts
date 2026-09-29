@@ -32,7 +32,7 @@ import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notification
 import { RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-30";
+export const REGISTER_UPDATED_AT = "2026-09-29";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -40,6 +40,14 @@ export const REGISTER_UPDATED_AT = "2026-09-30";
  * pas annoncer une durée que le code ne tient pas.
  */
 export const SESSION_RETENTION_DAYS = 30;
+
+/**
+ * Mécanisme d'un transfert vers les États-Unis (RGPD art. 45 et 46), nommé une
+ * fois pour le registre et pour `/rgpd` : « dans le cadre des garanties propres
+ * à chacun » ne désignait aucune garantie.
+ */
+export const US_TRANSFER_MECHANISM =
+  "décision d'adéquation (UE) 2023/1795 du 10 juillet 2023 (EU-U.S. Data Privacy Framework) pour un destinataire certifié, à défaut clauses contractuelles types de la Commission européenne (art. 46 RGPD)";
 export const DISCORD_CODE_VALIDITY_MINUTES = 10;
 
 export interface RegisterController {
@@ -80,7 +88,7 @@ export function registerController(): RegisterController {
     seat: "Janvilliers (France)",
     contact: RGPD_CONTACT_LINE,
     dpo: "Aucun délégué à la protection des données désigné (désignation non obligatoire) — contact RGPD ci-dessus",
-    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country}`,
+    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur un Raspberry Pi, à Caen)`,
   };
 }
 
@@ -135,15 +143,11 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Connecter un joueur à son compte sans mot de passe",
     subPurposes: [
       "Connexion par Google, Discord ou Blizzard (OAuth)",
-      "Invite de connexion Google One Tap, sur la seule page de connexion et seulement si le visiteur l'a demandée (case à part, décochée par défaut — consentement)",
       "Connexion par code à six chiffres envoyé en message privé Discord par le bot",
       "Rattachement de plusieurs moyens de connexion à un même compte",
     ],
     legalBasis: "Exécution du service demandé par le joueur (contrat)",
-    dataSubjects: [
-      "Joueurs inscrits sur le site",
-      "Visiteurs de la page de connexion ayant coché l'invite Google One Tap",
-    ],
+    dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
       "Identifiants techniques opaques Google, Discord et Blizzard",
       "Identifiant Discord et pseudo Discord (connexion par code ou par bouton), enregistré sans être certifié — la certification, qui l'expose, est un geste distinct (T04)",
@@ -161,7 +165,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Discord, qui achemine le message privé contenant le code",
     ],
     transfers: [
-      "Possibles vers les États-Unis, selon le fournisseur que le joueur choisit pour se connecter (Google, Discord, Blizzard), dans le cadre des garanties propres à chacun",
+      `Possibles vers les États-Unis, selon le fournisseur que le joueur choisit pour se connecter (Google, Discord, Blizzard) : ${US_TRANSFER_MECHANISM}`,
     ],
     security: [
       ...COMMON_SECURITY,
@@ -196,7 +200,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Staff d'arbitrage et d'administration",
       "Discord, qui achemine le message privé d'une demande d'adhésion",
     ],
-    transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${US_TRANSFER_MECHANISM}`],
     security: [
       ...COMMON_SECURITY,
       "Modification d'un score verrouillée dès que la manche suivante est entamée",
@@ -234,7 +238,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et caster d'un même match, de son lancement à sa fin",
       "Discord, qui achemine les messages",
     ],
-    transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${US_TRANSFER_MECHANISM}`],
     security: [
       ...COMMON_SECURITY,
       "Pseudo non certifié invisible de tous, administrateurs compris ; pseudo certifié jamais montré à un visiteur sans compte",
@@ -265,7 +269,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Discord (hébergement du salon)",
       "Responsable technique (journaux du serveur)",
     ],
-    transfers: ["États-Unis : Discord, dans le cadre des garanties propres à Discord"],
+    transfers: [`États-Unis : Discord — ${US_TRANSFER_MECHANISM}`],
     security: [...COMMON_SECURITY, "Salon privé, accès restreint par rôle Discord"],
   },
   {
@@ -336,7 +340,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiants d'utilisateurs : le temps nécessaire aux temps de recharge et à la modération",
     ],
     recipients: ["Staff de l'association", "Discord (plateforme d'exécution)"],
-    transfers: ["États-Unis : Discord, dans le cadre des garanties propres à Discord"],
+    transfers: [`États-Unis : Discord — ${US_TRANSFER_MECHANISM}`],
     security: COMMON_SECURITY,
   },
   {
@@ -357,9 +361,12 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Images : le temps de leur présence sur le site (retirées dans l'heure qui suit leur suppression)",
       `Journal des suppressions : ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours par entrée`,
     ],
-    recipients: ["Responsable technique de l'association, seul détenteur des clés de déchiffrement"],
+    recipients: [
+      "Responsable technique de l'association, seul détenteur des clés de déchiffrement",
+      "Microsoft (OneDrive personnel de l'hébergeur du site), qui stocke les copies chiffrées sans pouvoir les lire",
+    ],
     transfers: [
-      "Hébergement chez Microsoft (OneDrive) : données chiffrées avant envoi avec une clé que seule l'association détient — Microsoft stocke sans pouvoir lire",
+      `Possibles vers les États-Unis : Microsoft (OneDrive personnel de l'hébergeur du site), qui stocke des données chiffrées avant envoi avec une clé que seule l'association détient, sans pouvoir les lire — ${US_TRANSFER_MECHANISM}`,
     ],
     security: [
       "Chiffrement avant envoi (age pour les archives, rclone crypt pour les images et le journal)",
@@ -386,7 +393,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: ["Durée du compte (effacées avec lui)"],
     recipients: ["Le joueur lui-même", "Discord, qui achemine le message privé"],
-    transfers: ["États-Unis : Discord (acheminement des messages privés), dans le cadre des garanties propres à Discord"],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${US_TRANSFER_MECHANISM}`],
     security: [...COMMON_SECURITY, "Une annonce réservée avant l'envoi, pour qu'aucun compte ne la reçoive deux fois"],
   },
   {
@@ -421,7 +428,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
     ],
-    transfers: ["États-Unis : Discord (acheminement des alertes et des messages privés), dans le cadre des garanties propres à Discord"],
+    transfers: [`États-Unis : Discord (acheminement des alertes et des messages privés) — ${US_TRANSFER_MECHANISM}`],
     security: [
       ...COMMON_SECURITY,
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
@@ -456,7 +463,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Le service de push de son navigateur (Google, Mozilla, Apple ou Microsoft), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
     transfers: [
-      "États-Unis : service de push du navigateur choisi par le joueur, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291), dans le cadre des garanties propres à chaque fournisseur",
+      `États-Unis : service de push du navigateur choisi par le joueur, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${US_TRANSFER_MECHANISM}`,
     ],
     security: [
       ...COMMON_SECURITY,
