@@ -1,5 +1,6 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { registerCurrentUserTeam } from "@/lib/server/tournaments-service";
 import { isRegistrationFilterError } from "@/lib/shared/registration-filters";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
@@ -13,6 +14,10 @@ export async function POST(_: Request, context: { params: Promise<{ id: string }
   if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
+
+  // Tournoi non publié : même 404 qu'un identifiant inexistant, avant tout
+  // autre refus (`write-visibility.ts`).
+  if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   try {
     await registerCurrentUserTeam(tournamentId, user.id);

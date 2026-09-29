@@ -89,7 +89,7 @@ async function loadSiteCounts(): Promise<SiteCounts> {
       SELECT
         (SELECT COUNT(*) FROM bg_users) AS players,
         (SELECT COUNT(*) FROM bg_teams WHERE solo_user_id IS NULL) AS teams,
-        (SELECT COUNT(*) FROM bg_tournaments) AS tournaments
+        (SELECT COUNT(*) FROM bg_tournaments WHERE start_visibility_at <= NOW()) AS tournaments
     `);
     const row = rows[0];
     return {
