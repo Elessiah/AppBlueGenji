@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
@@ -84,6 +84,7 @@ export default function TeamsPage() {
   }, [teams, deferredQuery, gameFilter, sort]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
+  const gridRef = useRef<HTMLDivElement>(null);
   const page = useProgressiveList(
     filtered,
     JSON.stringify([deferredQuery.trim().toLowerCase(), gameFilter, sort]),
@@ -225,12 +226,18 @@ export default function TeamsPage() {
           </div>
 
           <div style={{ paddingTop: 24 }}>
-            <div className={s.tmGrid}>
+            <div className={s.tmGrid} ref={gridRef}>
               {page.visible.map((t) => (
                 <TeamCard key={t.id} team={t} />
               ))}
             </div>
-            <DirectoryShowMore hidden={page.hidden} noun="équipes" onShowMore={page.showMore} />
+            <DirectoryShowMore
+              hidden={page.hidden}
+              shown={page.visible.length}
+              noun="équipes"
+              gridRef={gridRef}
+              onShowMore={page.showMore}
+            />
           </div>
         </div>
       </section>

@@ -2,7 +2,11 @@ import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
 import { DirectoryShowMore } from "@/app/(secured)/_shared/DirectoryShowMore";
 import { useProgressiveList } from "@/lib/shared/hooks/useProgressiveList";
-import { DIRECTORY_PAGE_SIZE, hiddenCount, nextVisibleCount } from "@/lib/shared/progressive-list";
+import {
+  DIRECTORY_PAGE_SIZE,
+  hiddenCount,
+  nextVisibleCount,
+} from "@/lib/shared/progressive-list";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -11,10 +15,13 @@ import { readSource } from "../../helpers/read-source";
  */
 
 const noop = () => undefined;
+const gridRef = { current: null };
 
 describe("nextVisibleCount", () => {
   it("ajoute une page", () => {
-    expect(nextVisibleCount(DIRECTORY_PAGE_SIZE, 500)).toBe(DIRECTORY_PAGE_SIZE * 2);
+    expect(nextVisibleCount(DIRECTORY_PAGE_SIZE, 500)).toBe(
+      DIRECTORY_PAGE_SIZE * 2,
+    );
   });
 
   it("ne dépasse jamais le total", () => {
@@ -45,7 +52,8 @@ describe("hiddenCount", () => {
 describe("DIRECTORY_PAGE_SIZE", () => {
   // La dernière rangée d'une page reste pleine à 2, 3 ou 4 colonnes.
   it("est un multiple de 2, 3 et 4", () => {
-    for (const columns of [2, 3, 4]) expect(DIRECTORY_PAGE_SIZE % columns).toBe(0);
+    for (const columns of [2, 3, 4])
+      expect(DIRECTORY_PAGE_SIZE % columns).toBe(0);
   });
 });
 
@@ -79,30 +87,78 @@ describe("useProgressiveList (source)", () => {
   // dépliée dès qu'on rétablit les filtres d'avant : l'état se réécrit au rendu.
   it("réécrit l'état quand les filtres changent", () => {
     const source = readSource("lib/shared/hooks/useProgressiveList.ts");
-    expect(source).toMatch(/if \(state\.key !== resetKey\) \{[^}]*setState\(\{ key: resetKey/);
+    expect(source).toMatch(
+      /if \(state\.key !== resetKey\) \{[^}]*setState\(\{ key: resetKey/,
+    );
   });
 });
 
 describe("DirectoryShowMore", () => {
   it("disparaît quand tout est affiché", () => {
-    expect(renderToStaticMarkup(<DirectoryShowMore hidden={0} noun="joueurs" onShowMore={noop} />)).toBe("");
+    expect(
+      renderToStaticMarkup(
+        <DirectoryShowMore
+          hidden={0}
+          shown={48}
+          gridRef={gridRef}
+          noun="joueurs"
+          onShowMore={noop}
+        />,
+      ),
+    ).toBe("");
   });
 
   it("annonce la page ajoutée et le reste", () => {
-    const html = renderToStaticMarkup(<DirectoryShowMore hidden={305} noun="joueurs" onShowMore={noop} />);
+    const html = renderToStaticMarkup(
+      <DirectoryShowMore
+        hidden={305}
+        shown={48}
+        gridRef={gridRef}
+        noun="joueurs"
+        onShowMore={noop}
+      />,
+    );
     expect(html).toContain("Voir plus (48 sur 305 restants)");
   });
 
   it("n'annonce jamais plus que ce qui reste", () => {
-    const html = renderToStaticMarkup(<DirectoryShowMore hidden={1} noun="équipes" onShowMore={noop} />);
+    const html = renderToStaticMarkup(
+      <DirectoryShowMore
+        hidden={1}
+        shown={48}
+        gridRef={gridRef}
+        noun="équipes"
+        onShowMore={noop}
+      />,
+    );
     expect(html).toContain("Voir plus (1 sur 1 restant)");
   });
 
   // WCAG 2.5.3 : le nom accessible commence par le texte visible.
   it("a un nom accessible qui commence par le texte visible et nomme l'annuaire", () => {
-    const html = renderToStaticMarkup(<DirectoryShowMore hidden={20} noun="équipes" onShowMore={noop} />);
-    expect(html).toContain('aria-label="Voir plus (20 sur 20 restants) · équipes"');
+    const html = renderToStaticMarkup(
+      <DirectoryShowMore
+        hidden={20}
+        shown={48}
+        gridRef={gridRef}
+        noun="équipes"
+        onShowMore={noop}
+      />,
+    );
+    expect(html).toContain(
+      'aria-label="Voir plus (20 sur 20 restants) · équipes"',
+    );
     expect(html).toContain('type="button"');
+  });
+});
+
+describe("DirectoryShowMore (focus)", () => {
+  // WCAG 2.4.3 : le dernier clic retire le bouton ; le focus ne doit pas
+  // retomber sur <body>, il rejoint la première carte ajoutée.
+  it("déplace le focus vers la première carte ajoutée", () => {
+    const source = readSource("app/(secured)/_shared/DirectoryShowMore.tsx");
+    expect(source).toContain("gridRef.current?.children.item(shown)");
+    expect(source).toMatch(/\?\.focus\(\)/);
   });
 });
 
@@ -115,6 +171,10 @@ describe("annuaires", () => {
       expect(source).toContain("useProgressiveList(");
       expect(source).toContain("page.visible.map(");
       expect(source).toContain("<DirectoryShowMore");
+      // La grille reçoit la référence par laquelle le focus rejoint la
+      // première carte ajoutée.
+      expect(source).toMatch(/Grid\} ref=\{gridRef\}/);
+      expect(source).toContain("gridRef={gridRef}");
       expect(source).not.toMatch(/filtered\.map\(/);
     },
   );

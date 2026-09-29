@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
 import { useToast } from "@/components/ui/toast";
@@ -79,6 +79,7 @@ export default function PlayersPage() {
   }, [listed, deferredQuery, roleFilter, statusFilter, sort]);
 
   // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
+  const gridRef = useRef<HTMLDivElement>(null);
   const page = useProgressiveList(
     filtered,
     JSON.stringify([deferredQuery.trim().toLowerCase(), roleFilter, statusFilter, sort, showDeleted]),
@@ -253,12 +254,18 @@ export default function PlayersPage() {
           </div>
 
           <div style={{ paddingTop: 24 }}>
-            <div className={s.plGrid}>
+            <div className={s.plGrid} ref={gridRef}>
               {page.visible.map((p) => (
                 <PlayerCard key={p.id} player={p} />
               ))}
             </div>
-            <DirectoryShowMore hidden={page.hidden} noun="joueurs" onShowMore={page.showMore} />
+            <DirectoryShowMore
+              hidden={page.hidden}
+              shown={page.visible.length}
+              noun="joueurs"
+              gridRef={gridRef}
+              onShowMore={page.showMore}
+            />
           </div>
         </div>
       </section>
