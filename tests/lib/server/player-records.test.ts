@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, jest } from "@jest/globals";
-import { getPlayerStats, loadPlayerRecords } from "@/lib/server/stats-service";
+import { getPlayerStats, loadAllPlayerRecords, loadPlayerRecords } from "@/lib/server/stats-service";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
@@ -123,6 +123,35 @@ describe("loadPlayerRecords", () => {
     expect(sql).toMatch(/FROM bg_team_members\s+WHERE user_id IN \(\?, \?\)/);
     expect(sql).toMatch(/FROM bg_teams\s+WHERE solo_user_id IN \(\?, \?\)/);
     expect(params).toEqual([7, 9, 7, 9]);
+  });
+
+  // L'annuaire lit tous les comptes : aucune liste `IN`, qui ne filtrerait rien.
+  it("lit toutes les appartenances sans liste d'identifiants (loadAllPlayerRecords)", async () => {
+    const execute = await mockDb(fakeDb([membershipRow(7, 5)], [matchRow()], [registrationRow()]));
+
+    const records = await loadAllPlayerRecords();
+
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).not.toMatch(/\bIN \(/);
+    expect(sql).toMatch(/FROM bg_team_members\s+UNION ALL/);
+    expect(sql).toMatch(/FROM bg_teams\s+WHERE solo_user_id IS NOT NULL/);
+    expect(params).toEqual([]);
+    expect(execute).toHaveBeenCalledTimes(3);
+    // Matchs et inscriptions non plus : la liste des équipes du site y
+    // porterait un paramètre par équipe, trois fois.
+    for (const [text, values] of execute.mock.calls.slice(1) as [string, unknown[]][]) {
+      expect(text).not.toMatch(/\bIN \(/);
+      expect(values).toEqual([]);
+    }
+    expect(records.get(7)).toEqual({ wins: 1, losses: 0, tournamentsPlayed: 1 });
+  });
+
+  it("donne le même bilan que loadPlayerRecords", async () => {
+    const memberships = [membershipRow(7, 5), membershipRow(9, 9)];
+    await mockDb(fakeDb(memberships, [matchRow()], [registrationRow()]));
+    const partial = await loadPlayerRecords([7, 9]);
+    await mockDb(fakeDb(memberships, [matchRow()], [registrationRow()]));
+    expect(await loadAllPlayerRecords()).toEqual(partial);
   });
 
   // Trois requêtes pour toute la page, quel que soit le nombre de joueurs.

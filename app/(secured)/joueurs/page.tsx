@@ -1,13 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import type { PublicUserProfile, PlayerRole } from "@/lib/shared/types";
 import { isFreeAgent } from "@/lib/shared/player-roster-status";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
+import { DirectoryShowMore } from "../_shared/DirectoryShowMore";
+import { useProgressiveList } from "@/lib/shared/hooks/useProgressiveList";
 import { UserX } from "lucide-react";
 import { PlayerCard } from "./cards/PlayerCard";
 import s from "../_shared/annuaire.module.css";
@@ -57,8 +59,11 @@ export default function PlayersPage() {
     [players, showDeleted],
   );
 
+  // La recherche filtre sur une valeur **différée** : la frappe met le champ à
+  // jour tout de suite, le refiltrage de la grille suit sans la bloquer.
+  const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     let r = listed.filter((p) => {
       if (q && !`${p.pseudo} ${p.team?.name || ""}`.toLowerCase().includes(q)) return false;
       if (roleFilter !== "all" && !(p.roles || []).includes(roleFilter as PlayerRole)) return false;
@@ -71,7 +76,14 @@ export default function PlayersPage() {
     if (sort === "pseudo") r.sort((a, b) => a.pseudo.localeCompare(b.pseudo, "fr"));
     if (sort === "tournaments") r.sort((a, b) => (b.tournamentsCount || 0) - (a.tournamentsCount || 0));
     return r;
-  }, [listed, query, roleFilter, statusFilter, sort]);
+  }, [listed, deferredQuery, roleFilter, statusFilter, sort]);
+
+  // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const page = useProgressiveList(
+    filtered,
+    JSON.stringify([deferredQuery.trim().toLowerCase(), roleFilter, statusFilter, sort, showDeleted]),
+  );
 
   // Le prédicat partagé (#139) posé sur la liste **affichée** (#142) : les deux
   // conditions du compteur venaient de branches différentes et aucune ne
@@ -242,11 +254,18 @@ export default function PlayersPage() {
           </div>
 
           <div style={{ paddingTop: 24 }}>
-            <div className={s.plGrid}>
-              {filtered.map((p) => (
+            <div className={s.plGrid} ref={gridRef}>
+              {page.visible.map((p) => (
                 <PlayerCard key={p.id} player={p} />
               ))}
             </div>
+            <DirectoryShowMore
+              hidden={page.hidden}
+              shown={page.visible.length}
+              noun="joueurs"
+              gridRef={gridRef}
+              onShowMore={page.showMore}
+            />
           </div>
         </div>
       </section>

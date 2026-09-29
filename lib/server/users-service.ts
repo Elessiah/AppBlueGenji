@@ -40,7 +40,7 @@ import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-identity";
 import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
-import { getPlayerEntityStats, loadPlayerRecords } from "@/lib/server/stats-service";
+import { getPlayerEntityStats, loadAllPlayerRecords } from "@/lib/server/stats-service";
 import { cachedStats } from "@/lib/server/stats-cache";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { isLegacyDeletedPseudo, pickAnonymousPseudo, ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
@@ -305,7 +305,6 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     ...applyVisibility(mapPublicUser(row), Number(row.id) === viewerId),
     isDeleted: Boolean(row.is_deleted),
   }));
-  const userIds = baseUsers.map((u) => u.id);
 
   // Les badges de jeu se dérivent des tags bruts : jouer à OW/MR n'est pas
   // une donnée privée (seule la chaîne exacte du battletag l'est), donc ils
@@ -319,9 +318,11 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     }),
   );
 
-  if (userIds.length === 0) return baseUsers;
+  if (baseUsers.length === 0) return baseUsers;
 
-  // Get current team memberships and roles
+  // Appartenances en cours de **tout le site** : l'annuaire lit tous les
+  // comptes, une liste `IN (?, …)` de tous leurs identifiants ne filtrait rien
+  // et grossissait la requête d'un paramètre par compte.
   const [teamMemberships] = await db.execute<
     (RowDataPacket & {
       user_id: number;
@@ -333,9 +334,7 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
     `SELECT tm.user_id, tm.team_id, t.name AS team_name, tm.roles_json
      FROM bg_team_members tm
      JOIN bg_teams t ON t.id = tm.team_id
-     WHERE tm.user_id IN (${userIds.map(() => "?").join(",")})
-       AND tm.left_at IS NULL`,
-    userIds,
+     WHERE tm.left_at IS NULL`,
   );
 
   const membershipByUserId = new Map(teamMemberships.map((m) => [m.user_id, m]));
@@ -351,9 +350,10 @@ export async function listPlayers(viewerId: number): Promise<PublicUserProfile[]
   // équipes du site —, il est mutualisé (`stats-cache.ts`) : le bilan ne dépend
   // pas du lecteur, contrairement aux lignes de compte ci-dessus, qui restent
   // lues à chaque appel pour qu'un réglage de visibilité s'applique aussitôt.
-  // La clé ne porte pas la liste : un compte né pendant la fenêtre n'a encore
-  // aucun match, le repli à zéro ci-dessous dit déjà son bilan.
-  const recordsByUserId = await cachedStats("player-records", () => loadPlayerRecords(userIds));
+  // Le chargeur porte sur **tous** les comptes, sans liste d'identifiants : un
+  // compte né pendant la fenêtre n'a encore aucun match, le repli à zéro
+  // ci-dessous dit déjà son bilan.
+  const recordsByUserId = await cachedStats("player-records", () => loadAllPlayerRecords());
 
   return baseUsers.map((user) => {
     const membership = membershipByUserId.get(user.id);

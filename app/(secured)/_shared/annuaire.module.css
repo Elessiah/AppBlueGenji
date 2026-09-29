@@ -344,6 +344,46 @@
   color: var(--ink-mute);
 }
 
+/* « Voir plus » d'un annuaire (`DirectoryShowMore`). */
+.showMoreRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+.showMoreBtn {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--blue-300);
+  padding: 9px 14px;
+  border: 1px solid rgba(90, 200, 255, 0.25);
+  border-radius: var(--r-cy-sm);
+  background: rgba(90, 200, 255, 0.04);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.showMoreBtn:hover {
+  background: rgba(90, 200, 255, 0.1);
+  border-color: rgba(90, 200, 255, 0.45);
+}
+.showMoreBtn:focus-visible {
+  outline: 2px solid rgba(90, 200, 255, 0.6);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .showMoreBtn {
+    transition: none;
+  }
+}
+/* Sur téléphone, une cible pleine largeur : le bouton suit une longue grille
+   qu'on fait défiler au pouce. */
+@media (max-width: 640px) {
+  .showMoreBtn {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
 /* ---------- TEAM CARD (Equipes) ---------- */
 .tmGrid {
   display: grid;

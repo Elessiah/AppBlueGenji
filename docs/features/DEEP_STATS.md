@@ -193,6 +193,23 @@ suit chaque score. Un match entre deux équipes du même joueur, rangé sous les
 deux, n'est compté qu'une fois. C'est `collectForPlayer`, extrait de
 `getPlayerEntityStats`, qui garantit l'identité du crédit.
 
+L'annuaire passe par `loadAllPlayerRecords`, la même mécanique **sans liste
+d'identifiants** : il lit tous les comptes, et un `IN (?, …)` de tous leurs
+identifiants — posé deux fois dans l'union des engagements, une fois encore
+dans la lecture des équipes courantes de `listPlayers` — ne filtrait rien tout
+en portant un paramètre par compte. `loadPlayerRecords(ids)` reste pour une
+liste réellement partielle.
+
+### Rendu des annuaires
+
+`/joueurs` et `/equipes` chargent la liste entière (filtres et compteurs la
+lisent toute) mais n'en **rendent** qu'une page de 48 cartes, étendue par
+« Voir plus » (`lib/shared/progressive-list.ts` pur, `useProgressiveList`,
+`DirectoryShowMore`) ; tout filtre modifié repart de la première page. La
+recherche filtre sur une valeur différée (`useDeferredValue`) : le champ suit la
+frappe, la grille suit sans la bloquer. Avant, 353 cartes étaient rendues
+d'un coup sur le jeu de test, et chaque frappe les re-rendait toutes.
+
 ## Classement du site
 
 `getTeamRankingPosition` (`lib/server/ranking-service.ts`) situe l'équipe dans le
