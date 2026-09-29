@@ -43,7 +43,7 @@ import { subscribeTournament } from "./live";
 import { getTournamentSnapshotFrame } from "./tournaments/snapshot";
 import { snapshotFrameBytes, type StreamEncoding } from "./tournament-stream-frames";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
-import { nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
+import { computeTournamentState, nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
 import type { TournamentSnapshot } from "@/lib/shared/types";
 
 /**
@@ -76,6 +76,27 @@ export const ROOM_READ_RETRY_MS = 30_000;
 export const SCORE_DEADLINE_MARGIN_MS = 1_000;
 
 /**
+ * Relecture après une bascule d'état **manquée** : la salle s'est réveillée à
+ * l'heure dite, mais l'instantané lu venait du cache (3 s,
+ * `SNAPSHOT_TTL_MS` de `./tournaments/snapshot`) — posé juste avant la bascule
+ * par une connexion ou une lecture de secours —, si bien que l'entretien à la
+ * lecture n'a pas joué. Relire une fois le cache expiré. Doit rester supérieur
+ * au TTL du cache (`tests/lib/server/tournament-snapshot.test.ts` le vérifie).
+ */
+export const STATE_CATCH_UP_MS = 4_000;
+
+/**
+ * L'état stocké du tournoi retarde-t-il sur ses dates ? Une date illisible ne
+ * dit rien : on ne conclut pas au retard.
+ */
+export function isStateOverdue(card: TournamentSnapshot["card"], now: number): boolean {
+  if (card.state === "FINISHED") return false;
+  const dates = [card.registrationOpenAt, card.registrationCloseAt, card.startAt];
+  if (dates.some((date) => !Number.isFinite(Date.parse(String(date))))) return false;
+  return computeTournamentState(card, now) !== card.state;
+}
+
+/**
  * Prochain instant où la salle doit relire l'instantané d'elle-même, ou `null`
  * s'il n'y en a aucun.
  *
@@ -85,10 +106,18 @@ export const SCORE_DEADLINE_MARGIN_MS = 1_000;
  *   clôture des inscriptions, coup d'envoi), le délai de report de score le
  *   plus proche (`score_deadline_at`, que l'entretien à la lecture tranche),
  *   et le filet de sécurité.
+ * - Une bascule **déjà passée** que l'instantané ne reflète pas encore
+ *   ({@link isStateOverdue}) se rattrape après `stateCatchUpMs` : sans cela,
+ *   `nextTournamentStateChangeAt` ne rendant que des instants futurs, elle
+ *   tomberait jusqu'au filet — un coup d'envoi annoncé cinq minutes en retard.
  *
  * Exportée pour être vérifiable directement.
  */
-export function nextRoomWakeAt(snapshot: TournamentSnapshot, now: number): number | null {
+export function nextRoomWakeAt(
+  snapshot: TournamentSnapshot,
+  now: number,
+  stateCatchUpMs: number = STATE_CATCH_UP_MS,
+): number | null {
   const { card } = snapshot;
   if (card.state === "FINISHED") return null;
 
@@ -103,6 +132,7 @@ export function nextRoomWakeAt(snapshot: TournamentSnapshot, now: number): numbe
     now,
   );
   if (boundary !== null) wakeAt = Math.min(wakeAt, boundary);
+  if (isStateOverdue(card, now)) wakeAt = Math.min(wakeAt, now + stateCatchUpMs);
 
   for (const match of snapshot.matches ?? []) {
     if (match.status !== "AWAITING_CONFIRMATION" || !match.scoreDeadlineAt) continue;
@@ -255,6 +285,12 @@ type Room = {
   flushing: boolean;
   /** Un changement est arrivé pendant un envoi : il faudra repasser. */
   dirtyAgain: boolean;
+  /**
+   * La dernière lecture montrait déjà une bascule d'état en retard. Une
+   * seconde lecture en retard n'est plus l'effet du cache mais d'un entretien
+   * qui n'aboutit pas : on retente alors au pas lent, jamais en boucle serrée.
+   */
+  stateOverdue: boolean;
 };
 
 const rooms = new Map<number, Room>();
@@ -427,7 +463,10 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     // Réveil à la prochaine échéance connue (bascule d'état, report expiré),
     // à l'heure exacte : sans lui, il faudrait compter sur chaque client pour
     // se réveiller seul, ce qui ferait repartir cent requêtes à la même seconde.
-    scheduleMaintenance(tournamentId, room, nextRoomWakeAt(frame.snapshot, now));
+    const overdue = isStateOverdue(frame.snapshot.card, now);
+    const catchUpMs = overdue && room.stateOverdue ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS;
+    room.stateOverdue = overdue;
+    scheduleMaintenance(tournamentId, room, nextRoomWakeAt(frame.snapshot, now, catchUpMs));
 
     if (Number.isFinite(nextDelay)) scheduleFlush(tournamentId, room, nextDelay);
   } finally {
@@ -487,6 +526,7 @@ function openRoom(tournamentId: number, known?: TournamentSnapshot): Room {
     flushAt: 0,
     flushing: false,
     dirtyAgain: false,
+    stateOverdue: false,
   };
 
   // L'événement lui-même ne sert qu'à réveiller la salle : ce qui part aux

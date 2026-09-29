@@ -206,6 +206,16 @@ publient. Le réveil est replanifié à chaque lecture — c'est toujours la
 dernière qui sait quelle est la prochaine échéance —, et une lecture en échec
 est retentée après 30 s (`ROOM_READ_RETRY_MS`).
 
+Piège de ce réveil à l'heure exacte : la lecture peut servir un instantané
+**en cache** (3 s) posé juste avant la bascule par une connexion ou une lecture
+de secours, et l'entretien à la lecture ne joue alors pas. La bascule étant
+passée, `nextTournamentStateChangeAt` ne la rend plus, et le coup d'envoi
+tomberait jusqu'au filet de 5 min. Un état stocké qui retarde sur ses dates
+(`isStateOverdue`) fait donc relire après `STATE_CATCH_UP_MS` (4 s, plus que le
+cache) ; s'il retarde encore à cette relecture, ce n'est plus le cache mais un
+entretien qui n'aboutit pas, et la salle passe au pas de 30 s plutôt que de
+boucler.
+
 ### Rendu du plateau
 
 Chaque instantané arrive désérialisé à neuf : un seul « Prêt » remplaçait les

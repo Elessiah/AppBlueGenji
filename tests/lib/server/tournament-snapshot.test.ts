@@ -32,7 +32,9 @@ import {
   getTournamentSnapshotFrame,
   invalidateTournamentSnapshot,
   snapshotFrameOf,
+  SNAPSHOT_TTL_MS,
 } from "@/lib/server/tournaments/snapshot";
+import { STATE_CATCH_UP_MS } from "@/lib/server/tournament-broadcast";
 import {
   getMatchRows,
   getRegistrationRows,
@@ -185,6 +187,11 @@ describe("getTournamentSnapshotFrame — mutualisation", () => {
   it("rend null pour un tournoi inexistant", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(null);
     expect(await getTournamentSnapshot(TOURNAMENT_ID)).toBeNull();
+  });
+
+  it("expire avant le rattrapage d'une bascule manquée par la salle", () => {
+    // Relire avant l'expiration resservirait le même instantané périmé.
+    expect(STATE_CATCH_UP_MS).toBeGreaterThan(SNAPSHOT_TTL_MS);
   });
 
   it("expose l'instantané encodé comme une vue sur la trame, sans copie", async () => {

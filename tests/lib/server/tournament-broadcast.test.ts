@@ -26,7 +26,10 @@ import {
 import { publishTournamentEvent } from "@/lib/server/live";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
 
-const FAR_FUTURE = "2099-01-01T00:00:00.000Z";
+// Un tournoi en cours dont les jalons sont passés : aucune bascule à venir ni en retard.
+const OPENED_AT = "2000-01-01T00:00:00.000Z";
+const CLOSED_AT = "2000-01-02T00:00:00.000Z";
+const STARTED_AT = "2000-01-03T00:00:00.000Z";
 
 function frameOf(
   version: string,
@@ -38,9 +41,9 @@ function frameOf(
     card: {
       id: 1,
       state: "RUNNING",
-      registrationOpenAt: FAR_FUTURE,
-      registrationCloseAt: FAR_FUTURE,
-      startAt: FAR_FUTURE,
+      registrationOpenAt: OPENED_AT,
+      registrationCloseAt: CLOSED_AT,
+      startAt: STARTED_AT,
       ...card,
     },
     matches,

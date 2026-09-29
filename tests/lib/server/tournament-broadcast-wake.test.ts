@@ -17,7 +17,9 @@ import {
   ROOM_READ_RETRY_MS,
   ROOM_SAFETY_NET_MS,
   SCORE_DEADLINE_MARGIN_MS,
+  STATE_CATCH_UP_MS,
   budgetDelayMs,
+  isStateOverdue,
   joinTournamentRoom,
   nextRoomWakeAt,
   resetTournamentBroadcast,
@@ -27,7 +29,10 @@ import { publishTournamentEvent } from "@/lib/server/live";
 import { GZIP_STREAM_HEADER } from "@/lib/server/sse-gzip";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
 
-const FAR_FUTURE = "2099-01-01T00:00:00.000Z";
+// Un tournoi en cours dont les jalons sont passés : aucune bascule à venir ni en retard.
+const OPENED_AT = "2000-01-01T00:00:00.000Z";
+const CLOSED_AT = "2000-01-02T00:00:00.000Z";
+const STARTED_AT = "2000-01-03T00:00:00.000Z";
 const iso = (ms: number) => new Date(ms).toISOString();
 
 function frameOf(
@@ -40,9 +45,9 @@ function frameOf(
     card: {
       id: 1,
       state: "RUNNING",
-      registrationOpenAt: FAR_FUTURE,
-      registrationCloseAt: FAR_FUTURE,
-      startAt: FAR_FUTURE,
+      registrationOpenAt: OPENED_AT,
+      registrationCloseAt: CLOSED_AT,
+      startAt: STARTED_AT,
       ...card,
     },
     matches,
@@ -178,6 +183,37 @@ describe("nextRoomWakeAt", () => {
     expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + ROOM_READ_RETRY_MS);
   });
 
+  it("rattrape vite une bascule déjà passée que l'instantané ne reflète pas", () => {
+    // L'instantané lu à l'heure de la bascule venait du cache : l'entretien n'a
+    // pas joué. Sans rattrapage, la bascule passée n'est plus une échéance
+    // future, et le coup d'envoi n'arriverait qu'au filet, 5 min plus tard.
+    const snapshot = snapshotOf({
+      state: "REGISTRATION",
+      registrationOpenAt: iso(NOW - 120_000),
+      registrationCloseAt: iso(NOW - 60_000),
+      startAt: iso(NOW - 1_000),
+    });
+    expect(isStateOverdue(snapshot.card, NOW)).toBe(true);
+    expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + STATE_CATCH_UP_MS);
+    expect(nextRoomWakeAt(snapshot, NOW, ROOM_READ_RETRY_MS)).toBe(NOW + ROOM_READ_RETRY_MS);
+  });
+
+  it("ne conclut pas au retard sur des dates illisibles ni sur un état à jour", () => {
+    expect(isStateOverdue(snapshotOf({ state: "RUNNING", startAt: "??" }).card, NOW)).toBe(false);
+    expect(
+      isStateOverdue(
+        snapshotOf({
+          state: "RUNNING",
+          registrationOpenAt: iso(NOW - 3),
+          registrationCloseAt: iso(NOW - 2),
+          startAt: iso(NOW - 1),
+        }).card,
+        NOW,
+      ),
+    ).toBe(false);
+    expect(isStateOverdue(snapshotOf({ state: "FINISHED" }).card, NOW)).toBe(false);
+  });
+
   it("ignore un délai illisible", () => {
     const snapshot = snapshotOf({ state: "RUNNING" }, [
       { status: "AWAITING_CONFIRMATION", scoreDeadlineAt: "pas une date" },
@@ -261,6 +297,36 @@ describe("tournament-broadcast — réveil d'entretien", () => {
     await advance(60_000 + SCORE_DEADLINE_MARGIN_MS);
     expect(getFrame).toHaveBeenCalledTimes(2);
     expect(viewer.received).toEqual(['data: "v2"', 'data: "v3"']);
+  });
+
+  it("relit après le cache une bascule manquée, puis au pas lent si elle persiste", async () => {
+    const start = Date.now() + 10_000;
+    const beforeKickoff = {
+      state: "UPCOMING" as const,
+      registrationOpenAt: iso(start - 120_000),
+      registrationCloseAt: iso(start - 60_000),
+      startAt: iso(start),
+    };
+    const viewer = plainSubscriber("v1");
+    joinTournamentRoom(1, viewer.handle, frameOf("v1", beforeKickoff).snapshot);
+
+    // À l'heure du coup d'envoi, la lecture sert encore l'instantané en cache.
+    getFrame.mockResolvedValue(frameOf("v1", beforeKickoff));
+    await advance(10_000);
+    expect(getFrame).toHaveBeenCalledTimes(1);
+
+    // Rattrapage une fois le cache expiré — toujours en retard (entretien qui
+    // n'aboutit pas) : la salle ne boucle pas, elle passe au pas lent.
+    await advance(STATE_CATCH_UP_MS);
+    expect(getFrame).toHaveBeenCalledTimes(2);
+    await advance(STATE_CATCH_UP_MS);
+    expect(getFrame).toHaveBeenCalledTimes(2);
+
+    // L'entretien finit par passer : le tournoi est en cours.
+    getFrame.mockResolvedValue(frameOf("v2", { ...beforeKickoff, state: "RUNNING" }));
+    await advance(ROOM_READ_RETRY_MS - STATE_CATCH_UP_MS);
+    expect(getFrame).toHaveBeenCalledTimes(3);
+    expect(viewer.received).toEqual(['data: "v2"']);
   });
 
   it("retente une lecture en échec sans attendre le filet", async () => {
