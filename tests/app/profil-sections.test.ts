@@ -238,18 +238,18 @@ describe("Aucune section ne se dessine deux fois", () => {
  * titre visé devient le seul élément qu'on ne voit pas.
  */
 describe("L'ancre tombe sous la barre de navigation", () => {
-  it("réserve au moins la hauteur de la barre", () => {
-    const margin = css.match(/scroll-margin-top:\s*(\d+)px/);
-    expect(margin).not.toBeNull();
-    // 52 px de pastille + 2 × 14 px de rembourrage : la barre est haute de 80.
-    expect(Number(margin![1])).toBeGreaterThanOrEqual(80);
+  it("ne pose aucune marge en dur, qui s'ajouterait à la marge mesurée", () => {
+    expect(css).not.toMatch(/scroll-margin-top:\s*\d+px/);
   });
 
-  it("mesure bien la barre que la page a au-dessus d'elle", () => {
-    // Le jour où la barre grandit, ce test dit où relire la marge.
+  it("confie l'arrivée à la hauteur mesurée de la barre", () => {
+    // `ArenaNav` est collante et se déclare comme l'en-tête à mesurer ; la
+    // marge globale lit cette mesure (`lib/shared/sticky-header.ts`).
     expect(arenaNav).toContain("position: sticky");
-    expect(arenaNav).toMatch(/width:\s*52px/);
-    expect(arenaNav).toMatch(/padding:\s*14px 0/);
+    expect(readFileSync(join(ROOT, "components/arena-nav.tsx"), "utf8")).toContain("data-sticky-header");
+    expect(readFileSync(join(ROOT, "app/globals.css"), "utf8")).toMatch(
+      /scroll-padding-top:\s*calc\(var\(--sticky-header-h/,
+    );
   });
 });
 

@@ -42,7 +42,7 @@ describe("ArenaNav — page courante et pictogrammes", () => {
   });
 
   it("nomme sa navigation", () => {
-    expect(arenaNav()).toContain('<nav class="nav" aria-label="Navigation principale">');
+    expect(arenaNav()).toContain('<nav class="nav" aria-label="Navigation principale" data-sticky-header="true">');
   });
 
   it("masque les pictogrammes aux technologies d'assistance", () => {
