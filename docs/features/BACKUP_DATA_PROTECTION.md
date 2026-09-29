@@ -111,7 +111,7 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   journal (mot de passe dans la configuration rclone du serveur, copie de
   secours hors du serveur). Aucune clé ne part chez Microsoft, qui stocke sans
   pouvoir lire. Le script des images **refuse** un remote qui n'est pas de type
-  `crypt` (seul `UPLOADS_ALLOW_PLAINTEXT=true` passe outre, à ne jamais poser).
+  `crypt`, sans exception : aucun réglage ne permet d'envoyer en clair.
   Le chiffrement au repos de Microsoft et le transport HTTPS/TLS de l'API
   OneDrive ne sont que des **mesures complémentaires**.
 - **Durée** : archives 30 jours ; images le temps de leur présence sur le site ;
