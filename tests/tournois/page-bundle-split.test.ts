@@ -66,13 +66,13 @@ describe("paquet de la fiche tournoi", () => {
 describe("filet d'un chargement à la demande (orReload)", () => {
   const chunkError = () => Object.assign(new Error("Loading chunk 42 failed."), { name: "ChunkLoadError" });
 
-  const makeEnv = (stamp: string | null, now = 1_000_000, modal = false) => {
-    const state = { stamp, reloads: 0, modal, writable: true, pending: [] as Array<() => void> };
+  const makeEnv = (stamp: string | null, now = 1_000_000, safe = true) => {
+    const state = { stamp, reloads: 0, safe, writable: true, pending: [] as Array<() => void> };
     const env: LazyReloadEnv = {
       now: () => now,
-      safeNow: () => !state.modal,
       whenSafe: (callback) => {
-        state.pending.push(callback);
+        if (state.safe) callback();
+        else state.pending.push(callback);
       },
       readStamp: () => state.stamp,
       writeStamp: (value) => {
@@ -101,33 +101,36 @@ describe("filet d'un chargement à la demande (orReload)", () => {
     expect((Loaded as () => null)()).toBeNull();
   });
 
-  it("attend qu'il soit sûr de recharger (modale ouverte, hors ligne)", async () => {
-    const { env, state } = makeEnv(null, 1_000_000, true);
+  it("attend qu'il soit sûr de recharger (modale ouverte, site injoignable)", async () => {
+    const { env, state } = makeEnv(null, 1_000_000, false);
     const Loaded = await orReload(Promise.reject(chunkError()), env);
     expect(state.reloads).toBe(0);
     expect(state.stamp).toBeNull();
     expect((Loaded as () => null)()).toBeNull();
     expect(state.pending).toHaveLength(1);
-    state.modal = false;
     state.pending[0]();
     expect(state.reloads).toBe(1);
   });
 
   it("ne recharge pas deux fois dans la minute", () => {
     const { env, state } = makeEnv(String(1_000_000 - LAZY_RELOAD_COOLDOWN_MS + 1));
-    expect(reloadAfterChunkError(env)).toBe(false);
+    reloadAfterChunkError(env);
     expect(state.reloads).toBe(0);
   });
 
   it("recharge de nouveau une fois la minute écoulée ou sur une marque illisible", () => {
-    expect(reloadAfterChunkError(makeEnv(String(1_000_000 - LAZY_RELOAD_COOLDOWN_MS)).env)).toBe(true);
-    expect(reloadAfterChunkError(makeEnv("n'importe quoi").env)).toBe(true);
+    const old = makeEnv(String(1_000_000 - LAZY_RELOAD_COOLDOWN_MS));
+    reloadAfterChunkError(old.env);
+    expect(old.state.reloads).toBe(1);
+    const garbage = makeEnv("n'importe quoi");
+    reloadAfterChunkError(garbage.env);
+    expect(garbage.state.reloads).toBe(1);
   });
 
   it("ne recharge pas quand la marque ne peut pas être écrite (pas de boucle)", () => {
     const { env, state } = makeEnv(null);
     state.writable = false;
-    expect(reloadAfterChunkError(env)).toBe(false);
+    reloadAfterChunkError(env);
     expect(state.reloads).toBe(0);
   });
 
@@ -156,7 +159,7 @@ describe("filet d'un chargement à la demande (orReload)", () => {
   });
 
   it("ne fait rien hors navigateur", async () => {
-    expect(reloadAfterChunkError(null)).toBe(false);
+    expect(() => reloadAfterChunkError(null)).not.toThrow();
     const Loaded = await orReload(Promise.reject(chunkError()), null);
     expect((Loaded as () => null)()).toBeNull();
   });
