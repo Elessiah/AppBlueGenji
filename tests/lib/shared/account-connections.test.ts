@@ -235,6 +235,14 @@ describe("Discord : deux lignes, une seule identité", () => {
     expect(row.note).toContain("bouton Discord");
   });
 
+  it("n'affirme pas la porte d'un rattachement antérieur à la colonne", () => {
+    // `null` = on ne sait pas : certains de ces comptes sont entrés par code.
+    const row = discordBotRowState(withDiscord(null, { GOOGLE: true }));
+    expect(row.linked).toBe(false);
+    expect(row.note).not.toContain("bouton");
+    expect(row.note).toContain("ligne Discord");
+  });
+
   it("propose de rattacher par code un compte sans Discord", () => {
     const row = discordBotRowState(connections({ GOOGLE: true }));
     expect(row).toMatchObject({ linked: false, handleAction: "LINK", canDisconnect: false, refusal: null });
@@ -249,6 +257,6 @@ describe("Discord : deux lignes, une seule identité", () => {
 describe("LINK_REFUSALS — l'annulation d'un rattachement", () => {
   it("laisse voyager l'annulation et l'état périmé jusqu'au profil", () => {
     expect(isLinkRefusal("LINK_CANCELLED")).toBe(true);
-    expect(isLinkRefusal("LINK_EXPIRED")).toBe(true);
+    expect(isLinkRefusal("LINK_STATE_MISMATCH")).toBe(true);
   });
 });

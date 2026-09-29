@@ -234,7 +234,7 @@ connexion compte Discord une fois — ce qu'il est.
 
 **Un rattachement annulé revient sur `/profil`.** Un rappel sans `code`
 (annulation chez le fournisseur) ou dont l'état ne correspond pas revient avec
-`?connection_error=LINK_CANCELLED` / `LINK_EXPIRED` quand le cookie d'état,
+`?connection_error=LINK_CANCELLED` / `LINK_STATE_MISMATCH` quand le cookie d'état,
 émis pour cette porte, dit `LINK`. Cookie expiré (plus de dix minutes) : rien ne
 dit plus qu'il s'agissait d'un rattachement, et le repli reste `/connexion`.
 

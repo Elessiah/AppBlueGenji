@@ -227,13 +227,13 @@ describe("completeOAuth — contrôles d'état", () => {
     expect(linkOAuthIdentity).not.toHaveBeenCalled();
   });
 
-  it("ramène au profil un rattachement revenu avec un état qui ne correspond pas", async () => {
+  it("ramène au profil un rattachement revenu avec un autre état que celui émis", async () => {
     jest.mocked(consumeOAuthState).mockResolvedValue(linkState("DISCORD", "un-autre-etat"));
 
     const response = await callback("DISCORD");
 
     expect(response.headers.get("location")).toBe(
-      "http://localhost:3000/profil?connection_error=LINK_EXPIRED&provider=discord",
+      "http://localhost:3000/profil?connection_error=LINK_STATE_MISMATCH&provider=discord",
     );
     expect(linkOAuthIdentity).not.toHaveBeenCalled();
   });

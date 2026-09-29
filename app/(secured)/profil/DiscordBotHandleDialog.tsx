@@ -110,6 +110,12 @@ export function DiscordBotHandleDialog({
       );
       onUpdated(payload.tag ?? "");
     } catch (e) {
+      // Deux refus du code ne se lèvent pas en retapant : le compte a changé de
+      // Discord entre la demande et la confirmation, ou le défi n'avait aucun
+      // pseudo. Ils désignent le **pseudo** — on revient donc à sa saisie avant
+      // de les dire, sans quoi le champ marqué ne serait pas à l'écran.
+      const reason = (e as Error).message;
+      if (reason === "DISCORD_ID_MISMATCH" || reason === "INVALID_DISCORD_HANDLE") restart();
       refuse(e);
     } finally {
       setLoading(false);
@@ -255,7 +261,9 @@ export function DiscordBotHandleDialog({
             <div
               style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}
             >
-              <CyberButton variant="ghost" type="button" onClick={onClose}>
+              {/* Fermé pendant un envoi : fermer perdrait l'identifiant du code
+                  déjà parti, et en redemander un consomme le quota. */}
+              <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
                 Annuler
               </CyberButton>
               <CyberButton variant="primary" type="submit" disabled={loading}>
@@ -308,7 +316,9 @@ export function DiscordBotHandleDialog({
                 gap: 10,
               }}
             >
-              <CyberButton variant="ghost" type="button" onClick={onClose}>
+              {/* Fermé pendant un envoi : fermer perdrait l'identifiant du code
+                  déjà parti, et en redemander un consomme le quota. */}
+              <CyberButton variant="ghost" type="button" disabled={loading} onClick={onClose}>
                 Annuler
               </CyberButton>
               <CyberButton

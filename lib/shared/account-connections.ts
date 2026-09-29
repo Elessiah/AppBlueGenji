@@ -222,7 +222,11 @@ export function discordBotRowState(connections: readonly AccountConnection[]): D
       ? `Pseudo Discord : ${discord.handle}`
       : "Rattaché par code en message privé"
     : anyLinked
-      ? "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour."
+      ? // `null` = rattachement antérieur à la colonne : la porte est inconnue,
+        // la phrase ne l'affirme donc pas — elle ne dit que où se retirer.
+        discord?.method === "OAUTH"
+        ? "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour."
+        : "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour."
       : "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.";
   return {
     linked,
@@ -261,10 +265,10 @@ export const LINK_REFUSALS: readonly string[] = [
   "NOT_CONFIGURED",
   "OAUTH_FAILED",
   "LINK_FAILED",
-  // Rattachement annulé chez le fournisseur, ou revenu sur un état qui ne
-  // correspond plus : le joueur revient sur `/profil`, pas sur `/connexion`.
+  // Rattachement annulé chez le fournisseur, ou revenu sur un état qui n'est
+  // pas celui émis : le joueur revient sur `/profil`, pas sur `/connexion`.
   "LINK_CANCELLED",
-  "LINK_EXPIRED",
+  "LINK_STATE_MISMATCH",
 ];
 
 /** Ce motif peut-il être écrit dans l'URL de retour ? */
