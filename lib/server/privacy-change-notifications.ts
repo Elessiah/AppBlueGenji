@@ -5,6 +5,7 @@ import { notifyUsers, toNotificationRecipient, type NotificationRecipient } from
 import { privacyChangePush } from "@/lib/shared/push-messages";
 import { siteBaseUrl } from "@/lib/server/site-url";
 import { isMissingTableError } from "@/lib/server/mysql-errors";
+import { privacyAudienceSql } from "@/lib/server/privacy-consent";
 import { webPushConfig } from "@/lib/server/web-push";
 import {
   PRIVACY_DM_MIN_INTERVAL_DAYS,
@@ -71,6 +72,7 @@ type CandidateRow = RowDataPacket & {
   discord_pseudo: string | null;
   discord_verified_at: string | null;
   created_at: string | null;
+  google_linked: 0 | 1 | null;
 };
 
 type DoneRow = RowDataPacket & { user_id: number; change_id: string };
@@ -107,13 +109,14 @@ async function queryCandidates(settled: readonly PrivacyChange[], withPush: bool
   const db = await getDatabase();
   const clause = settled
     .map(
-      () => `(u.created_at < ?
+      (change) => `(u.created_at < ? AND ${privacyAudienceSql(change)}
           AND NOT EXISTS (SELECT 1 FROM bg_privacy_acknowledgments a WHERE a.user_id = u.id AND a.change_id = ?)
           AND NOT EXISTS (SELECT 1 FROM bg_privacy_change_notifications n WHERE n.user_id = u.id AND n.change_id = ?))`,
     )
     .join(" OR ");
   const [rows] = await db.query<CandidateRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.created_at
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at, u.created_at,
+            u.google_sub IS NOT NULL AS google_linked
        FROM bg_users u
       WHERE u.is_deleted = 0
         AND (u.discord_id IS NOT NULL OR (u.discord_verified_at IS NOT NULL AND u.discord_pseudo IS NOT NULL)
@@ -199,6 +202,7 @@ async function runSweep(now: Date): Promise<number> {
         done.get(userId) ?? [],
         privacyChangeDay(now),
         changes,
+        { googleLinked: Number(row.google_linked) === 1 },
       ),
       now,
     );

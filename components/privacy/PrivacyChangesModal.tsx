@@ -120,6 +120,20 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
                     ))}
                   </ul>
                 )}
+                {change.links && change.links.length > 0 && (
+                  <ul className={styles.changeLinks}>
+                    {change.links.map((link) => (
+                      <li key={link.href}>
+                        {/* Suivre le lien vaut prise de connaissance : la
+                            modale ne se tait que sur `/rgpd`, elle couvrirait
+                            sinon l'écran même où elle envoie agir. */}
+                        <Link href={link.href} onClick={() => void acknowledge()}>
+                          {link.label}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </li>
             ))}
           </ol>

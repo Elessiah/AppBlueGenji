@@ -70,7 +70,49 @@ export type PrivacyChange = {
   summary: string;
   /** Le détail, une puce par règle. */
   details: readonly string[];
+  /**
+   * Les comptes concernés, quand ce ne sont pas **tous** ceux créés avant la
+   * publication (`PrivacyAudience`). Absent : tout compte antérieur.
+   */
+  audience?: PrivacyAudience;
+  /**
+   * Liens vers les écrans où agir, rendus sous le détail par la modale. Le
+   * message Discord ne les porte pas : il renvoie déjà au site.
+   */
+  links?: readonly PrivacyChangeLink[];
 };
+
+/** Un lien d'une entrée : chemin du site et libellé. */
+export type PrivacyChangeLink = { href: string; label: string };
+
+/**
+ * Sous-ensemble de comptes auquel une entrée s'adresse, en plus de la date de
+ * création. `GOOGLE_LINKED` : un compte qui porte une identité Google
+ * (`bg_users.google_sub`). Le site ne sait pas par quelle porte un compte est
+ * **né** — il ne garde que les identités rattachées —, si bien qu'un compte né
+ * par Discord puis rattaché à Google est compté : une entrée ciblée ainsi doit
+ * donc se rédiger au conditionnel (« a pu »).
+ */
+export type PrivacyAudience = "GOOGLE_LINKED";
+
+/**
+ * Ce qu'on sait d'un compte pour décider des entrées ciblées. Un fait absent
+ * vaut **faux** : dans le doute, une entrée ciblée se tait plutôt que d'être
+ * montrée à qui elle ne parle pas.
+ */
+export type PrivacyAccountFacts = { googleLinked?: boolean };
+
+/** Une entrée s'adresse-t-elle à ce compte (date de création mise à part) ? */
+export function privacyChangeReachesAccount(change: PrivacyChange, facts: PrivacyAccountFacts): boolean {
+  switch (change.audience) {
+    case undefined:
+      return true;
+    case "GOOGLE_LINKED":
+      return facts.googleLinked === true;
+    default:
+      return false;
+  }
+}
 
 /**
  * Événement de fenêtre émis quand le joueur a pris connaissance des
@@ -293,6 +335,31 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Le site et le bot sont hébergés en France (à Caen). Une nouvelle section « Destinataires et transferts » de la politique de confidentialité dit ce qui part chez Discord, Google, Blizzard, le service de push de ton navigateur et Microsoft (sauvegardes chiffrées), et sur quel fondement un transfert vers les États-Unis repose.",
       "Rien ne change pour ton compte : les moyens de connexion (hors l'invite) et les données conservées restent les mêmes.",
     ],
+  },  // Le reliquat de la connexion Google sans nom réel (#269) : la règle vaut
+  // depuis le 30 septembre 2026, et les comptes créés avant gardent le pseudo
+  // et la photo que Google leur a donnés. Décision : **rien n'est modifié
+  // d'office** — ni renommage, ni masquage —, le titulaire est informé une
+  // fois et invité à les changer. Ciblée sur les comptes qui portent une
+  // identité Google (`GOOGLE_LINKED`) : le site ne sait pas par quelle porte
+  // un compte est né, d'où le conditionnel. La date est celle de la règle, pas
+  // celle du déploiement de cette entrée : c'est elle qui sépare les comptes
+  // concernés des autres (`publishedAt` borne la création).
+  {
+    id: "2026-09-comptes-google-anterieurs",
+    publishedAt: "2026-09-30",
+    audience: "GOOGLE_LINKED",
+    title: "Ton pseudo et ta photo ont pu venir de Google",
+    summary:
+      "Ton compte, créé avant le 30 septembre 2026, est relié à Google : son pseudo et sa photo ont pu venir de ton profil Google. Rien n'a été changé à ta place : vérifie-les dans « Mon profil ».",
+    details: [
+      "Jusqu'au 30 septembre 2026, un compte créé par une connexion Google recevait pour pseudo le nom de ce compte Google, souvent un prénom et un nom réels, et sa photo Google était copiée sur le site et affichée aux autres membres. Depuis, un compte créé par Google reçoit un pseudo neutre, et la photo importée reste masquée tant que tu ne choisis pas de l'afficher.",
+      "Rien n'a été modifié sur ton compte. Si ton pseudo est ton nom réel, remplace-le. Si ta photo vient de Google et que tu ne veux pas la montrer, change-la, supprime-la, ou décoche « Avatar » dans la section « Confidentialité » pour la masquer.",
+      "Si ton compte a été créé autrement (Discord, Blizzard) ou si tu as déjà changé ton pseudo et ta photo, tu n'as rien à faire.",
+    ],
+    links: [
+      { href: "/profil#identite", label: "Changer mon pseudo ou mon avatar" },
+      { href: "/profil#confidentialite", label: "Masquer mon avatar" },
+    ],
   },
 ];
 
@@ -348,17 +415,22 @@ export function publishedPrivacyChanges(
  *   `null` si inconnu — auquel cas tout ce qui n'est pas acquitté est dû.
  * @param acknowledged Identifiants déjà acquittés par ce compte.
  * @param today Jour de Paris (`privacyChangeDay`).
+ * @param facts Ce qu'on sait du compte, pour les entrées ciblées (`audience`).
  */
 export function pendingPrivacyChanges(
   accountCreatedAt: string | null,
   acknowledged: Iterable<string>,
   today: string,
   changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
+  facts: PrivacyAccountFacts = {},
 ): PrivacyChange[] {
   const done = new Set(acknowledged);
   const createdDay = accountCreatedAt ? accountCreatedAt.slice(0, 10) : null;
   return publishedPrivacyChanges(today, changes).filter(
-    (change) => !done.has(change.id) && (createdDay === null || createdDay < change.publishedAt),
+    (change) =>
+      !done.has(change.id) &&
+      (createdDay === null || createdDay < change.publishedAt) &&
+      privacyChangeReachesAccount(change, facts),
   );
 }
 
