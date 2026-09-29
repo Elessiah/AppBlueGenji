@@ -124,6 +124,19 @@ Le verrou réutilise `hasScoreInput` de `lib/shared/match-lock.ts` : compte comm
 saisie un score (même 0), un vainqueur, un forfait ou un report en attente. Les
 byes et matchs fantômes sont ignorés — leur score est posé par le moteur.
 
+La fenêtre se juge **sous verrou**. `reorderSeeding` ouvre sa transaction par
+`lockTournamentRow` puis par un `SELECT id FROM bg_matches WHERE tournament_id = ?
+FOR UPDATE` (table seule : MariaDB refuse `FOR UPDATE OF`), **avant** toute
+lecture ordinaire — sous `REPEATABLE READ`, c'est la première lecture ordinaire
+qui fige l'instantané. Jugée sur des lectures ordinaires, la borne ne tenait que
+hors concurrence : un premier report validé entre le contrôle et
+`deleteAllMatches` échappait à l'instantané, et le plateau régénéré l'effaçait
+alors que le joueur avait reçu un succès. Désormais un report (ou un forfait) en
+cours fait attendre le réordonnancement, qui le voit et refuse en
+`SEEDING_LOCKED` ; un report arrivé après attend la fin du réordonnancement et
+trouve son match supprimé (`MATCH_NOT_FOUND`) — un refus visible, jamais une
+saisie perdue en silence.
+
 Deux raisons de verrouillage, exposées à l'interface :
 
 | `lockReason` | Sens |
@@ -226,5 +239,6 @@ faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` (409
 - `tests/lib/server/tournament-snapshot.test.ts` — `seedingSource` porté par
   l'instantané, `manual_seeding` compris.
 - `tests/tournois/seeding-service.test.ts` — écriture des seeds, reconstruction
-  du plateau, refus (verrou, permutation invalide, tournoi inconnu).
+  du plateau, refus (verrou, permutation invalide, tournoi inconnu), verrous du
+  tournoi et des matchs posés avant toute lecture.
 - `tests/app/api/admin/seeding.test.ts` — permissions et codes d'erreur.
