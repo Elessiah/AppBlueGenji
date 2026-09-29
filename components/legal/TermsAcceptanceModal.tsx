@@ -15,7 +15,29 @@ import {
   TERMS_REQUIRED_EVENT,
   TERMS_VERSION,
 } from "@/lib/shared/terms-of-use";
+import {
+  TERMS_POSTPONED_COOKIE,
+  TERMS_POSTPONED_MAX_AGE_SECONDS,
+  TERMS_POSTPONED_VALUE,
+  termsModalSilencedOn,
+} from "@/lib/shared/global-modals";
 import styles from "./TermsAcceptanceModal.module.css";
+
+/**
+ * Pose (douze heures au plus) ou efface le report « Plus tard ».
+ * `lax` et non `strict` : un lien ouvert depuis Discord est une navigation
+ * venue d'un autre site, qui n'emporte pas un cookie `strict` — la modale
+ * reviendrait justement dans le cas que le report doit couvrir.
+ */
+function writePostponedCookie(postponed: boolean): void {
+  try {
+    document.cookie = postponed
+      ? `${TERMS_POSTPONED_COOKIE}=${TERMS_POSTPONED_VALUE}; path=/; samesite=lax; max-age=${TERMS_POSTPONED_MAX_AGE_SECONDS}`
+      : `${TERMS_POSTPONED_COOKIE}=; path=/; samesite=lax; max-age=0`;
+  } catch {
+    // Cookies refusés : le report reste effectif pour la vue courante.
+  }
+}
 
 interface TermsAcceptanceModalProps {
   /** Le compte gère une équipe sans avoir accepté les conditions en vigueur. */
@@ -30,11 +52,14 @@ interface TermsAcceptanceModalProps {
  *
  * Celui qui la reçoit n'a fait aucun geste où l'on aurait pu lui demander son
  * accord : on le lui demande donc au passage suivant, sur n'importe quelle
- * page. « Plus tard » ferme la fenêtre sans rien enregistrer — les gestes de
+ * page. « Plus tard » ferme la fenêtre sans rien accepter, pour douze heures
+ * (cookie `bg_terms_later`, lu par la mise en page racine) — gardé dans le seul
+ * état React, le report tombait à chaque chargement complet. Les gestes de
  * gestion restent refusés (`TERMS_ACCEPTANCE_REQUIRED`), et la fenêtre revient
- * dès que l'un d'eux est tenté (`TERMS_REQUIRED_EVENT`).
+ * dès que l'un d'eux est tenté (`TERMS_REQUIRED_EVENT`), report ou non.
  *
- * Elle se tait sur la page des conditions elle-même, qu'elle invite à lire.
+ * Elle se tait sur la page des conditions elle-même, qu'elle invite à lire, et
+ * sur la connexion, dont la modale de consentement doit rester seule.
  */
 export function TermsAcceptanceModal({ initiallyRequired, privacyPending }: TermsAcceptanceModalProps) {
   const { showError, showSuccess } = useToast();
@@ -61,9 +86,11 @@ export function TermsAcceptanceModal({ initiallyRequired, privacyPending }: Term
     return () => window.removeEventListener(PRIVACY_CHANGES_ANSWERED_EVENT, onAnswered);
   }, [privacyPending]);
 
-  const open = mounted && requested && privacyAnswered && pathname !== TERMS_PATH;
+  const open = mounted && requested && privacyAnswered && !termsModalSilencedOn(pathname);
   const later = () => {
-    if (!busy) setRequested(false);
+    if (busy) return;
+    writePostponedCookie(true);
+    setRequested(false);
   };
   const dialogRef = useDialogBehavior({ open, onClose: later, locked: busy });
   const backdrop = useBackdropDismiss(later, busy);
@@ -80,6 +107,7 @@ export function TermsAcceptanceModal({ initiallyRequired, privacyPending }: Term
         body: JSON.stringify({ version: TERMS_VERSION }),
       });
       if (!response.ok) throw new Error();
+      writePostponedCookie(false);
       setRequested(false);
       showSuccess("Merci, tu peux gérer ton équipe.");
     } catch {

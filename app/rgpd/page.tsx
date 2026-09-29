@@ -272,6 +272,13 @@ export default async function RgpdPage() {
               votre visite.
             </li>
             <li>
+              <strong>bg_terms_later</strong> — déposé uniquement <strong>si vous reportez
+              l&apos;acceptation des conditions d&apos;utilisation</strong> (bouton « Plus tard »),
+              pour ne pas vous la redemander à chaque page. Il ne contient que la valeur « 1 »,
+              jamais d&apos;identifiant de personne, dure douze heures au plus, et disparaît plus
+              tôt à chaque connexion ou déconnexion, ou dès que vous acceptez.
+            </li>
+            <li>
               <strong>bg_a11y</strong> — déposé uniquement <strong>si vous activez un réglage
               d&apos;accessibilité</strong> (bouton en bas à gauche : contraste, police, focus…),
               pour l&apos;appliquer dès l&apos;affichage des pages suivantes. Il ne contient que la
