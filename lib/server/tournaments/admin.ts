@@ -327,9 +327,16 @@ export async function adminSaveMatchScores(
       winner_team_id
      FROM bg_matches
      WHERE id = ?
-     LIMIT 1`,
+     LIMIT 1
+     FOR UPDATE`,
     [matchId],
   );
+  // Lecture **verrouillante** (table seule, MariaDB) : un réordonnancement du
+  // seeding (`./seeding`) verrouille les matchs du tournoi avant de juger sa
+  // fenêtre puis détruit le plateau. Lu sans verrou, ce match paraissait encore
+  // là, l'`UPDATE` attendait la fin du réordonnancement puis ne touchait plus
+  // aucune ligne — et la route annonçait un succès. Sous verrou, l'arbitrage
+  // attend et reçoit `MATCH_NOT_FOUND`, ou passe avant et ferme la fenêtre.
 
   if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
   const match = matches[0];
@@ -426,9 +433,12 @@ export async function adminResolveMatch(
       phase_id
      FROM bg_matches
      WHERE id = ?
-     LIMIT 1`,
+     LIMIT 1
+     FOR UPDATE`,
     [matchId],
   );
+  // Verrouillante pour la même raison qu'`adminSaveMatchScores` : sans elle, un
+  // résultat validé pendant un réordonnancement du seeding se perdait en silence.
 
   if (matches.length === 0) throw new Error("MATCH_NOT_FOUND");
   const match = matches[0];
