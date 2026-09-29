@@ -32,6 +32,26 @@ export function isTransactionAborted(error: unknown): boolean {
 }
 
 /**
+ * Message qu'InnoDB (MySQL comme MariaDB) attache à un interblocage.
+ *
+ * Les routes ne voient pas l'erreur mysql2 mais seulement son message —
+ * `fail(error.message, 500)` est le motif de toutes —, si bien que la
+ * reconnaissance doit aussi se faire sur le texte.
+ */
+const DEADLOCK_MESSAGE = /^Deadlock found when trying to get lock\b/i;
+
+/**
+ * `true` si ce message d'exception est celui d'un **interblocage**.
+ *
+ * Pendant de `isTransactionAborted` pour qui ne tient que le message :
+ * `fail()` (`lib/server/http.ts`) s'en sert pour rendre, sur **toute** route,
+ * un refus lisible (« réessaie ») plutôt qu'une panne générique.
+ */
+export function isDeadlockMessage(message: unknown): boolean {
+  return typeof message === "string" && DEADLOCK_MESSAGE.test(message);
+}
+
+/**
  * `true` si la table n'existe pas.
  *
  * Six tables de `lib/server/database.ts` — et elles seules — sont créées dans

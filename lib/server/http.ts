@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { publicErrorCode } from "@/lib/shared/api-error-code";
+import { isDeadlockMessage } from "@/lib/server/mysql-errors";
+import { CONCURRENT_UPDATE_RETRY, publicErrorCode } from "@/lib/shared/api-error-code";
 
 export type ApiError = { error: string };
 
@@ -37,6 +38,19 @@ export function fail<T extends object = Record<string, never>>(
   // Même chemin pour un corps non déclaré JSON (`readJsonBody`) : c'est un
   // refus de la requête, jamais une panne du serveur.
   if (message === "UNSUPPORTED_CONTENT_TYPE") status = 415;
+  // Interblocage : InnoDB a défait la transaction de cette requête au profit
+  // d'une écriture concurrente (saisie de score contre réordonnancement du
+  // seeding, par exemple). Rien n'est écrit, et ce n'est ni une panne ni une
+  // requête fautive : un conflit (409) que l'interface traduit en « réessaie ».
+  // Posé ici, il vaut pour toute route qui transmet le message de l'erreur
+  // (`fail(error.message, …)`, le motif courant) — pas pour celles qui le
+  // remplacent par un code fixe avant d'appeler `fail()`.
+  if (isDeadlockMessage(message)) {
+    console.warn(`[api] écriture annulée par un interblocage, rendue en ${CONCURRENT_UPDATE_RETRY} :`, message);
+    return NextResponse.json({ ...details, error: CONCURRENT_UPDATE_RETRY } as ApiError & Partial<T>, {
+      status: 409,
+    });
+  }
 
   const code = publicErrorCode(message, status);
   if (code !== message) {

@@ -135,10 +135,18 @@ puis le tournoi dans la réconciliation. InnoDB défait alors l'une des deux —
 pas forcément le réordonnancement, qui tient les verrous de tous les matchs du
 tournoi. Défait, le réordonnancement **rejoue** sa transaction, jusqu'à trois
 fois (`REORDER_DEADLOCK_ATTEMPTS`) : il voit la saisie commitée et refuse en
-`SEEDING_LOCKED`. Si c'est la saisie qui est défaite, elle échoue en erreur
+`SEEDING_LOCKED`. Si c'est la saisie qui est défaite, elle échoue en refus
 visible (ses chemins ne rejouent pas) et le réordonnancement passe — jamais un
-score perdu en silence. Décision requise : traduire cet interblocage en message
-lisible (« réessaie ») côté saisie de score, hors du périmètre de ce correctif. Jugée sur des lectures ordinaires, la borne ne tenait que
+score perdu en silence. Ce refus est lisible : `fail()` (`lib/server/http.ts`)
+reconnaît le message d'interblocage (`isDeadlockMessage`,
+`lib/server/mysql-errors.ts`) et le rend en **409 `CONCURRENT_UPDATE_RETRY`**,
+que l'interface traduit en « rien n'a été enregistré, réessaie » — sur toute
+route qui transmet le message de l'erreur à `fail()` : report d'un joueur,
+arbitrage (enregistrer, valider), forfait de manche et gestes du lancement
+(`launchFailure`). Une route qui le remplace par un code fixe garde son refus
+générique.
+La saisie n'est pas rejouée d'office : c'est au joueur de la renvoyer, sur le
+plateau tel qu'il est devenu. Jugée sur des lectures ordinaires, la borne ne tenait que
 hors concurrence : un premier report validé entre le contrôle et
 `deleteAllMatches` échappait à l'instantané, et le plateau régénéré l'effaçait
 alors que le joueur avait reçu un succès. Toute écriture de score lit son match
