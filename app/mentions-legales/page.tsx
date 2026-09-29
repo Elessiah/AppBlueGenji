@@ -296,13 +296,16 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           Le site n&apos;utilise que des cookies <strong>techniques</strong> : la session d&apos;un
           membre connecté, l&apos;état d&apos;une connexion en cours, vos réglages
           d&apos;accessibilité et le souvenir des annonces de recrutement déjà vues. Aucun ne permet
-          de suivi publicitaire. Leur liste complète, avec leur durée, figure dans la{" "}
+          de suivi publicitaire. Leur liste complète, avec celle des autres données que le site
+          garde dans votre navigateur (stockage local, stockage de session, cache de la page
+          hors ligne) et leur durée, figure dans la{" "}
           <Link href="/rgpd#cookies">politique de confidentialité</Link>.
         </p>
         <p>
           Aucun traceur publicitaire, outil de mesure d&apos;audience externe ni cookie tiers
-          n&apos;est utilisé. La communication entre votre navigateur et le serveur est chiffrée
-          (HTTPS).
+          n&apos;est utilisé. La fréquentation du site est mesurée par le site lui-même, sans
+          cookie : voir la <Link href="/rgpd#audience">mesure d&apos;audience</Link>. La
+          communication entre votre navigateur et le serveur est chiffrée (HTTPS).
         </p>
       </>
     ),

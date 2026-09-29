@@ -23,6 +23,10 @@
  * doivent dire la même chose, sans quoi la confirmation annonce une suppression
  * complète là où le serveur anonymise.
  */
+import {
+  ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+  BACKUP_RETENTION_DAYS,
+} from "./account-deletion-journal";
 
 /**
  * Ce qu'un compte laisse derrière lui.
@@ -167,7 +171,7 @@ export function accountDeletionConfirmation(
     case "OWNED_TEAMS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es propriétaire d'une équipe, que personne ne pourrait plus gérer sans toi. Transfère-la ou dissous-la d'abord pour un effacement complet. ${irreversible}`;
     case null:
-      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte sera effacé entièrement, sans laisser de trace sur le site. ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement. Resteront seulement les sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur. ${irreversible}`;
     default:
       return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${irreversible}`;
   }
@@ -194,7 +198,7 @@ export function accountDeletionOutcome(
     case "OWNED_TEAMS":
       return "Compte supprimé. Ton équipe garde un propriétaire anonyme.";
     case null:
-      return "Compte effacé. Il ne reste aucune trace de ton passage sur le site.";
+      return "Compte effacé. Ton compte et ton profil ont disparu du site ; seules restent les traces décrites par la politique de confidentialité et son registre (sauvegardes, journal des suppressions, mesure d'audience).";
     default:
       return "Compte supprimé.";
   }

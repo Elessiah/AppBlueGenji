@@ -155,7 +155,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Si tu rattaches ton compte Battle.net, Blizzard renseigne ton BattleTag et le remplace à chaque connexion. Sa visibilité sur ton profil ne change pas.",
       "Ta photo de profil est copiée sur nos serveurs à la connexion : aucune page du site ne fait plus appel à Google pour l'afficher, et un avatar que tu masques l'est partout, accueil compris.",
       "Supprimer ton compte l'efface entièrement s'il n'a laissé aucune trace. S'il a joué ou organisé un tournoi, ou s'il possède une équipe, il est anonymisé et seul le palmarès sportif reste. Tu peux exporter tes données à tout moment depuis Mon profil.",
-      "Seuls des cookies techniques sont déposés. La fréquentation du site est mesurée par une empreinte non réversible : ni ton adresse IP ni ton compte ne sont enregistrés avec tes visites. Le flux d'activité public du bot n'affiche aucun identifiant Discord.",
+      "Seuls des cookies techniques sont déposés. La fréquentation du site est mesurée par une empreinte salée d'un secret que seule l'association détient : ni ton adresse IP ni ton compte ne sont enregistrés tels quels avec tes visites. Le flux d'activité public du bot n'affiche aucun identifiant Discord.",
       "Le journal d'activité que le staff suit sur Discord ne nomme aucun joueur : il parle d'équipes et écrit « un joueur », y compris en tournoi individuel.",
     ],
   },
@@ -299,7 +299,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary: `Le détail des visites du site (page vue, date) est désormais effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours.`,
     details: [
       `Chaque visite gardait jusqu'ici, sans limite de durée, une empreinte salée du visiteur, la page vue et la date. Ce détail est maintenant effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après avoir été reporté dans un compteur par jour qui ne garde que le nombre de visites.`,
-      "Pour compter les visiteurs uniques depuis la mise en service, le site garde une seule empreinte par visiteur, sans page ni date. Elle ne permet pas de remonter à toi, et ni ton adresse IP ni ton compte ne sont enregistrés.",
+      "Pour compter les visiteurs uniques depuis la mise en service, le site garde une seule empreinte par visiteur, sans page ni date. Sans le secret du serveur, elle ne se rattache à personne ; l'association, qui le détient, peut la recalculer. Ni ton adresse IP ni ton compte ne sont enregistrés tels quels.",
     ],
   },
   // La connexion par Discord ne certifie plus le tag : l'exposition à
