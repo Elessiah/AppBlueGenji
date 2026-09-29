@@ -761,6 +761,22 @@ permission : un tag Discord **certifié** et un compte Battle.net **rattaché**
 ne peut pas le caster (`CASTER_IS_PLAYER`), un match n'a qu'un caster
 (`MATCH_ALREADY_CASTED`), et l'on se retire soi-même (`DELETE`).
 
+**Aucun lien avec le match n'est exigé, et c'est une décision.** Tout porteur
+de `live` peut s'inscrire sur n'importe quel match non terminé, et
+reçoit alors les contacts de la modale de lancement (§2.3 : un ou deux joueurs
+par équipe, BattleTag masqué compris). Ni assignation par l'arbitrage, ni
+tournoi désigné, ni plafond de matchs simultanés : `live` est un droit de
+diffusion **confié par le staff** (rôles `ADMIN`, `ARBITRE`, `CASTER`, attribués
+par `roles`), et joindre les équipes du match qu'on diffuse fait partie de ce
+métier. L'exposition est déclarée aux joueurs (`PRIVACY_CHANGES`
+`2026-09-lancement-des-matchs`) et au registre (T04). Retirer `live` à un
+compte l'empêche de s'inscrire sur un nouveau match, mais **ne défait pas** ses
+inscriptions en cours : permission et identité ne sont contrôlées qu'à
+l'inscription (`castBlockReason`), et `GET /api/me/match-launches` sert les
+contacts sur la seule colonne `caster_user_id`. Pour l'écarter d'un match déjà
+pris, l'arbitrage le retire (`DELETE /api/matches/[id]/caster`, §4.9) — écart
+consigné dans `ERREUR.txt`.
+
 `live` ouvre enfin la **rediff** d'un match terminé
 (`PUT /api/admin/matches/[matchId]/replay`, lien YouTube posé seulement sur une
 rencontre réellement disputée — `canHaveReplay`). Voir

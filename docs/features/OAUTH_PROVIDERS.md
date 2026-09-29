@@ -55,7 +55,7 @@ journal Discord descendent tous de la même liste.
 | Fournisseur | Portée | Ce que le site en retient |
 | --- | --- | --- |
 | Google | `openid profile` | `google_sub`, la photo (copiée, **masquée**) — le nom n'est **pas** repris |
-| Discord | `identify` | `discord_id`, le pseudo (**certifié**), la photo (copiée) |
+| Discord | `identify` | `discord_id`, le pseudo (**non certifié** — certifié d'un clic sur `/profil`), la photo (copiée) |
 | Blizzard | `openid` | `blizzard_sub`, le BattleTag |
 
 Ni adresse e-mail, ni liste de serveurs. Le scope `email` a disparu de la demande

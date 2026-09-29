@@ -104,6 +104,13 @@ Trois conditions de plus que la permission :
   prime partout (`resolveMatchParty`) ;
 - un seul caster par match (`MATCH_ALREADY_CASTED`).
 
+Rien d'autre n'est exigé : tout porteur de `live` peut caster n'importe quel
+match non terminé et en recevoir les contacts — droit de diffusion
+confié par le staff, exposition déclarée (`PRIVACY_CHANGES`
+`2026-09-lancement-des-matchs`, registre T04). Retirer `live` ne défait pas
+les inscriptions déjà prises : c'est l'arbitrage qui retire le caster d'un
+match. Voir `docs/AUTHORIZATION_RULES.md` §4.5.
+
 Le motif voyage dans `TournamentViewerContext.castBlock`, par les deux portes
 (flux et lecture REST). L'ancien libellé « ＋ Caster » du bandeau de diffusion,
 qui ouvrait la configuration du stream, devient « ＋ Live » : deux boutons
