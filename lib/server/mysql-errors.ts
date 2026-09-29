@@ -38,7 +38,7 @@ export function isTransactionAborted(error: unknown): boolean {
  * `fail(error.message, 500)` est le motif de toutes —, si bien que la
  * reconnaissance doit aussi se faire sur le texte.
  */
-const DEADLOCK_MESSAGE = /^Deadlock found when trying to get lock/i;
+const DEADLOCK_MESSAGE = /^Deadlock found when trying to get lock\b/i;
 
 /**
  * `true` si ce message d'exception est celui d'un **interblocage**.
