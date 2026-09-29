@@ -11,6 +11,7 @@
  * une taille de lecture. Les cartes d'aperçu (`components/og`) sont des images
  * rendues à 1200 px, hors du champ.
  */
+import { describe, expect, it } from "@jest/globals";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
