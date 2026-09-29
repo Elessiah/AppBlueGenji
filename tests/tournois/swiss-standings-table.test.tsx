@@ -133,15 +133,18 @@ describe("classement de la ronde suisse", () => {
     const html = render(TWO_TEAMS);
     // Les colonnes suivent leur cellule la plus large ; seul le nom est élastique,
     // avec un plancher qui suit la police.
-    expect(html).toContain("grid-template-columns:auto minmax(6em, 1fr) auto auto auto auto auto;");
+    // Les pistes vivent dans la feuille (`RankingViews.module.css`), où la
+    // requête média étroite les règle ; le tableau n'en porte que la classe.
+    expect(html).toContain('role="table" aria-label="Classement du tournoi" class="swissTable"');
     expect(count(html, "grid-template-columns:subgrid")).toBe(2 + TWO_TEAMS.length + 1);
     // Aucune largeur de colonne écrite à la main dans le tableau, aucun fantôme.
     const table = html.slice(html.indexOf('role="table"'), html.indexOf("À points égaux"));
     expect(table).not.toMatch(/(?:min-)?width:\d+px/);
     expect(table).not.toContain("visibility:hidden");
-    // La colonne d'action ajoute une piste, rien de plus.
+    // La colonne d'action ajoute une piste, rien de plus — posée par la feuille.
+    expect(html).not.toContain("data-with-action");
     expect(render(TWO_TEAMS, { canForfeit: () => true })).toContain(
-      "grid-template-columns:auto minmax(6em, 1fr) auto auto auto auto auto auto;",
+      'class="swissTable" data-with-action=""',
     );
   });
 

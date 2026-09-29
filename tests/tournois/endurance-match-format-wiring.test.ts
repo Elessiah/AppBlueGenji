@@ -29,7 +29,7 @@ const PAGE = readFileSync(
 function enduranceRenderMatch(): string {
   const start = PAGE.indexOf("<EnduranceView");
   expect(start).toBeGreaterThan(-1);
-  const end = PAGE.indexOf(") : detail.card.format", start);
+  const end = PAGE.indexOf(") : formatForBracket", start);
   expect(end).toBeGreaterThan(start);
   return PAGE.slice(start, end);
 }

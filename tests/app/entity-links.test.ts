@@ -172,8 +172,12 @@ describe("Classements — le nom de l'engagé garde sa place", () => {
       if (name === "SwissView") {
         // Le classement suisse est une grille (tâche 9 d'`ACCESSIBILITE.md`) :
         // le nom y est la seule piste élastique, avec un plancher qui suit la
-        // police, et les autres colonnes n'ont plus de largeur figée.
-        expect(code).toContain("minmax(6em, 1fr)");
+        // police, et les autres colonnes n'ont plus de largeur figée. Les pistes
+        // vivent dans la feuille, pour que la requête média étroite les règle.
+        expect(code).toContain("className={styles.swissTable}");
+        expect(read("app/(secured)/tournois/[id]/_components/RankingViews.module.css")).toContain(
+          "minmax(6em, 1fr)",
+        );
         return;
       }
       // `flex: 1` vaut `flex: 1 1 0%` : le nom ne pèse alors rien dans la

@@ -188,7 +188,8 @@ describe("page du tournoi — ce que dit la zone des matchs vide", () => {
     // La Survie, la Ronde suisse et BlueGenji Survie ne passent pas par la zone
     // générique : sans ce relais, elles seraient les seules à promettre des
     // matchs à venir sur un tournoi clos sans avoir été joué.
-    expect(source.match(/emptyLabel=\{noMatchesLabel\}/g)).toHaveLength(3);
+    // Quatre relais : les rondes seules d'une phase suisse close comptent aussi.
+    expect(source.match(/emptyLabel=\{noMatchesLabel\}/g)).toHaveLength(4);
     for (const view of ["SurvivalView", "SwissView", "EnduranceView"]) {
       const component = readFileSync(
         join(__dirname, "..", "..", "app", "(secured)", "tournois", "[id]", "_components", `${view}.tsx`),
