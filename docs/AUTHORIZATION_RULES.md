@@ -486,7 +486,10 @@ Règles structurelles qui tiennent quel que soit le rôle :
   et l'écriture, ou rôles réécrits sans `OWNER` au moment même où il le
   recevait, ou nouveau propriétaire exclu ou parti), ou **avec deux** (deux
   transferts simultanés) — et le staff n'a aucun droit pour réparer une équipe
-  réelle (§3.2).
+  réelle (§3.2). La **dissolution** (`softDeleteTeam`) prend la même ligne
+  d'équipe et y **rejuge** son droit : `OWNER` relu sous verrou, ou fantôme
+  relue fantôme pour le staff — sans quoi un vieil onglet de l'ancien
+  propriétaire dissolvait l'équipe qu'il venait de transférer.
 - Retirer une invitation ou une demande en attente (`cancelInvitation`,
   `DELETE /api/invitations/[id]`) revient à qui l'a émise, au sens de l'acte :
   la **gestion** de l'équipe pour une invitation, le **joueur** pour sa demande.

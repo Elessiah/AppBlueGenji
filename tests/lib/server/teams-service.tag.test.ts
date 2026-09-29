@@ -276,11 +276,14 @@ describe("softDeleteTeam — sigle", () => {
     poolExecute
       .mockResolvedValueOnce([[{ deleted_at: null }], []]) // pas déjà dissoute
       .mockResolvedValueOnce([[{ roles_json: JSON.stringify(["OWNER"]) }], []]); // OWNER
-    connectionExecute.mockResolvedValue([{ affectedRows: 1 }, []]);
+    connectionExecute
+      .mockResolvedValueOnce([[{ logo_url: null, deleted_at: null, is_ghost: 0 }], []]) // équipe sous verrou
+      .mockResolvedValueOnce([[{ roles_json: JSON.stringify(["OWNER"]) }], []]) // OWNER, relu sous verrou
+      .mockResolvedValue([{ affectedRows: 1 }, []]);
 
     await softDeleteTeam(1, 12);
 
-    const [anonymize] = connectionExecute.mock.calls[1] as [string, unknown[]];
+    const [anonymize] = connectionExecute.mock.calls[2] as [string, unknown[]];
     // Une équipe dissoute garde sa ligne pour ses statistiques : sans cette
     // remise à NULL, son sigle resterait pris à jamais sur tout le site.
     expect(anonymize).toMatch(/SET deleted_at = NOW\(\)/);

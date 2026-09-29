@@ -1050,10 +1050,8 @@ export async function softDeleteTeam(
 ): Promise<void> {
   const db = await getDatabase();
   if (await teamIsDeleted(teamId)) throw new Error("TEAM_ALREADY_DELETED");
-  if (
-    !(await userOwnsTeam(teamId, requesterId))
-    && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))
-  ) {
+  const viaOwnership = await userOwnsTeam(teamId, requesterId);
+  if (!viaOwnership && !(await ghostAdminOverride(teamId, viewerManagesGhostTeams))) {
     throw new Error("FORBIDDEN");
   }
 
@@ -1064,11 +1062,25 @@ export async function softDeleteTeam(
 
     // Le logo est relu sous verrou, en toute première instruction : c'est le
     // fichier que la dissolution retire, et il n'est effacé qu'après le commit.
-    const [locked] = await connection.execute<(RowDataPacket & { logo_url: string | null })[]>(
-      `SELECT logo_url FROM bg_teams WHERE id = ? FOR UPDATE`,
+    // Ce verrou est celui des gestes du roster (`withTeamRosterLock`) : le droit
+    // de dissoudre est donc **rejugé** dessous — lu seulement avant, un vieil
+    // onglet de l'ancien propriétaire dissolvait l'équipe qu'il venait de
+    // transférer, et le staff une fantôme reprise entre-temps.
+    const [locked] = await connection.execute<
+      (RowDataPacket & { logo_url: string | null; deleted_at: Date | null; is_ghost: 0 | 1 })[]
+    >(
+      `SELECT logo_url, deleted_at, is_ghost FROM bg_teams WHERE id = ? FOR UPDATE`,
       [teamId],
     );
-    previousLogoUrl = locked[0]?.logo_url ?? null;
+    if (locked.length === 0) throw new Error("FORBIDDEN");
+    if (locked[0].deleted_at) throw new Error("TEAM_ALREADY_DELETED");
+    if (viaOwnership) {
+      const roles = await lockMemberRoles(connection, teamId, requesterId);
+      if (!roles || !roles.includes("OWNER")) throw new Error("FORBIDDEN");
+    } else if (locked[0].is_ghost !== 1) {
+      throw new Error("FORBIDDEN");
+    }
+    previousLogoUrl = locked[0].logo_url ?? null;
 
     // Anonymise les données saisies par l'utilisateur et libère les deux
     // identités uniques : le nom **et le sigle**. Le sigle vaut sur tout le
