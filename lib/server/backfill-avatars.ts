@@ -63,7 +63,15 @@ async function main(): Promise<void> {
     for (const row of rows) {
       const stored = await importRemoteAvatar(row.avatar_url, row.id);
       if (stored) {
-        await db.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ?`, [stored, row.id]);
+        // Masquée, comme toute photo importée (`adoptRemoteAvatar`) : l'URL
+        // étrangère n'était servie à personne (`visibleAvatarUrl` la rejette),
+        // la copier en laissant `visible_avatar` à son défaut la publierait
+        // d'office — jusqu'à la vitrine, par l'entrée solo resynchronisée
+        // ci-dessous.
+        await db.execute(
+          `UPDATE bg_users SET avatar_url = ?, visible_avatar = 0 WHERE id = ?`,
+          [stored, row.id],
+        );
         done += 1;
         console.log(`  · ${row.pseudo} (#${row.id}) → ${stored}`);
       } else {

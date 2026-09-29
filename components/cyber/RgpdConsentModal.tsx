@@ -91,8 +91,8 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
         >
           <li>
             Uniquement des <strong>pseudonymes</strong> (pseudo site, Discord, jeux) et un
-            avatar — aucun nom réel, téléphone ni adresse : un compte créé par Google reçoit un
-            pseudo neutre, jamais ton nom, et la photo copiée depuis Google ou Discord reste
+            avatar — aucun nom réel, téléphone ni adresse : un compte créé par Google reçoit
+            désormais un pseudo neutre, jamais ton nom, et la photo copiée depuis Google ou Discord reste
             masquée tant que tu ne l&apos;affiches pas. L&apos;<strong>identifiant</strong> du
             fournisseur par lequel tu te connectes (Google, Discord ou Blizzard) est aussi
             conservé pour l&apos;authentification.

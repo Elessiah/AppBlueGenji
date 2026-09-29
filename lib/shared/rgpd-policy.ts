@@ -22,7 +22,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // public et non masquable. Il naît désormais sous un pseudo neutre ; Discord
     // et Blizzard donnent un pseudonyme de jeu (tag, BattleTag sans son numéro).
     finalite:
-      "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil",
+      "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil. Un compte créé par Google avant le 30 septembre 2026 a pu recevoir le nom de ton compte Google : si c'est le cas, remplace-le dans Mon profil",
     base: "Consentement",
     duree: "Durée du compte",
   },
@@ -103,7 +103,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // La photo copiée depuis Google ou Discord n'est pas un choix du joueur :
     // elle naît masquée (`adoptRemoteAvatar`), et seul le joueur la publie.
     finalite:
-      "Affichage sur le profil et les brackets. Téléversé par toi, ou copié sur nos serveurs depuis Google ou Discord à la connexion — la photo copiée reste masquée tant que tu ne coches pas « Avatar » dans Mon profil",
+      "Affichage sur le profil et les brackets. Téléversé par toi, ou copié sur nos serveurs depuis Google ou Discord à la connexion — depuis le 30 septembre 2026, la photo copiée reste masquée tant que tu ne coches pas « Avatar » dans Mon profil (une photo copiée avant cette date reste affichée : décoche « Avatar » pour la masquer)",
     base: "Consentement",
     duree: "Durée du compte",
   },
