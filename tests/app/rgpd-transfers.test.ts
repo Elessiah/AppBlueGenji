@@ -31,6 +31,8 @@ describe("/rgpd — destinataires et transferts", () => {
     expect(section).toMatch(/chiffrés sur le Raspberry Pi avant tout envoi/);
     expect(section).toMatch(/jamais transmise à\s+Microsoft/);
     expect(section).toMatch(/mesures complémentaires/);
-    expect(section).toMatch(/Microsoft Corporation/);
+    // Le mécanisme de Microsoft vient du registre, jamais d'une phrase recopiée.
+    expect(section).toContain('transferBasis(["MICROSOFT"])');
+    expect(section).not.toMatch(/certification EU-U\.S\. Data Privacy Framework\s+de Microsoft/);
   });
 });

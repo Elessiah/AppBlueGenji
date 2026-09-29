@@ -558,8 +558,8 @@ export default async function RgpdPage() {
           <p>
             <strong>Sauvegardes.</strong> Elles sont déposées sur le OneDrive d&apos;un{" "}
             {ONEDRIVE_BACKUP_FRAMEWORK} : le site n&apos;affirme donc aucun lieu de stockage, et un
-            transfert vers les États-Unis repose sur la certification EU-U.S. Data Privacy Framework
-            de Microsoft Corporation. La garantie que tient
+            transfert vers les États-Unis repose sur le mécanisme de Microsoft Corporation (
+            {transferBasis(["MICROSOFT"])}). La garantie que tient
             l&apos;association est ailleurs : archives de la base, images, logos masqués et journal
             des suppressions sont <strong>chiffrés sur le Raspberry Pi avant tout envoi</strong>,
             avec une clé que seule l&apos;association détient et qui n&apos;est jamais transmise à
