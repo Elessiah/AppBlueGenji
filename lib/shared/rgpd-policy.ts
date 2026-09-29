@@ -43,7 +43,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
       "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs, de leur caster et de l'arbitrage, tant que le tournoi n'est pas terminé",
-    base: "Exécution du contrat",
+    base: "Consentement",
     duree: "Durée du compte",
   },
   {
@@ -60,7 +60,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // connexion (contrat), son **exposition** repose sur la certification
     // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot. Enregistré à ta connexion par Discord, sans être certifié : visible de toi seul, administrateurs compris, tant que tu ne le certifies pas",
+      "Authentification Discord, notifications bot. Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
     base: "Exécution du contrat",
     duree: "Durée du compte",
   },

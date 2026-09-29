@@ -27,8 +27,6 @@ test.describe("Consentement RGPD", () => {
     const accept = page.getByRole("button", { name: /^Continuer$/ });
     await expect(accept).toBeDisabled();
     await dialog.getByRole("checkbox", { name: /conditions d.utilisation/ }).check();
-    // L'invite Google One Tap est une case à part, décochée par défaut.
-    await expect(dialog.getByRole("checkbox", { name: /Google One Tap/ })).not.toBeChecked();
 
     // Tant que la popup est ouverte, la voie Discord est masquée derrière.
     await accept.click();

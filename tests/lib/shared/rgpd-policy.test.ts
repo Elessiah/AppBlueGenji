@@ -62,8 +62,8 @@ describe("DONNEES_PROFIL", () => {
 
   it("dit que le tag Discord enregistré à la connexion n'est pas certifié, donc privé", () => {
     const tag = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Discord");
-    expect(tag?.finalite).toMatch(/sans être certifié/i);
-    expect(tag?.finalite).toMatch(/visible de toi seul, administrateurs compris/i);
+    expect(tag?.finalite).toMatch(/Enregistré à ta connexion par Discord, ou saisi par toi/);
+    expect(tag?.finalite).toMatch(/sans certification, invisible de tous, administrateurs compris/);
   });
 
   it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {
@@ -122,9 +122,16 @@ describe("DONNEES_PROFIL", () => {
     for (const entry of DONNEES_PROFIL) {
       expect(["Exécution du contrat", "Consentement"]).toContain(entry.base);
     }
-    expect(DONNEES_PROFIL.find((d) => d.donnee === "Certification du pseudo Discord")?.base).toBe(
-      "Consentement",
-    );
+    // Données facultatives, renseignées et publiées au choix du joueur : un
+    // compte fonctionne sans elles, le contrat ne les exige pas.
+    for (const donnee of [
+      "Certification du pseudo Discord",
+      "Pseudo Overwatch",
+      "Pseudo Marvel Rivals",
+      "Avatar",
+    ]) {
+      expect(DONNEES_PROFIL.find((d) => d.donnee === donnee)?.base).toBe("Consentement");
+    }
   });
 
   it("every profile entry has a non-empty finalite and duree", () => {

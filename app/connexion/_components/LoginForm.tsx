@@ -137,7 +137,9 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
     } catch {
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
-    setOneTapChoice(allowOneTap);
+    // Sans invite possible, la modale n'a pas posé la question : un choix
+    // antérieur n'est ni confirmé ni retiré.
+    if (oneTap) setOneTapChoice(allowOneTap);
     setConsentGiven(true);
   };
 
@@ -492,7 +494,11 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         porté par `useDialogBehavior`, pas par l'ordre.
       */}
       {!consentGiven && (
-        <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
+        <RgpdConsentModal
+          onAccept={acceptConsent}
+          onRefuse={refuseConsent}
+          oneTapAvailable={oneTap !== null}
+        />
       )}
     </main>
   );

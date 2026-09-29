@@ -10,6 +10,12 @@ interface RgpdConsentModalProps {
   /** `oneTap` : le visiteur a coché l'invite Google One Tap (décochée par défaut). */
   onAccept: (choices: { oneTap: boolean }) => void;
   onRefuse: () => void;
+  /**
+   * L'invite peut-elle s'afficher ici (`GOOGLE_CLIENT_ID` configuré, visiteur
+   * sans session) ? Sinon la case n'est pas proposée : un accord recueilli pour
+   * rien ne se retirerait nulle part, la carte ne montrant pas la sienne.
+   */
+  oneTapAvailable: boolean;
 }
 
 /**
@@ -29,7 +35,7 @@ interface RgpdConsentModalProps {
  * Revenir en arrière (`onRefuse`) ne déclenche aucune requête
  * d'authentification : rien n'est enregistré.
  */
-export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) {
+export function RgpdConsentModal({ onAccept, onRefuse, oneTapAvailable }: RgpdConsentModalProps) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
   // données : le site n'a pas de formulaire d'inscription, un compte naît à la
   // première connexion — l'entrée de cette page est donc le seul endroit où les
@@ -142,6 +148,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
           . Si tu reviens en arrière, aucune donnée ne sera enregistrée.
         </p>
 
+        {oneTapAvailable && (
         <label
           style={{
             display: "flex",
@@ -166,6 +173,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
             reçoit alors mon adresse IP et peut déposer un cookie <strong>g_state</strong>.
           </span>
         </label>
+        )}
 
         <label
           style={{
@@ -203,7 +211,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
           <CyberButton
             variant="primary"
             type="button"
-            onClick={() => onAccept({ oneTap: oneTapChecked })}
+            onClick={() => onAccept({ oneTap: oneTapAvailable && oneTapChecked })}
             disabled={!termsChecked}
             style={{ flex: 1, minWidth: 160 }}
           >
