@@ -85,11 +85,17 @@ async function loadListSponsors(): Promise<Sponsor[]> {
   }
 }
 
-/** Renvoie l'URL du logo d'un sponsor (ou `null`) — lue par le relais du logo. */
+/**
+ * Renvoie l'URL du logo d'un sponsor **publié** (ou `null`) — lue par le relais
+ * du logo, public et sans compte. Même borne que `listSponsors` : un partenaire
+ * inactif (brouillon, partenariat terminé) n'a rien à montrer, et le relais ne
+ * doit pas faire télécharger au serveur l'image d'une ligne que personne n'a
+ * publiée. Un identifiant inactif et un identifiant inconnu sont le même 404.
+ */
 export async function getSponsorLogoUrl(id: number): Promise<string | null> {
   const db = await getDatabase();
   const [rows] = await db.execute<SponsorRow[]>(
-    `SELECT logo_url AS logoUrl FROM bg_sponsors WHERE id = ? LIMIT 1`,
+    `SELECT logo_url AS logoUrl FROM bg_sponsors WHERE id = ? AND active = 1 LIMIT 1`,
     [id]
   );
   return rows.length > 0 ? rows[0].logoUrl : null;

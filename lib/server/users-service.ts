@@ -22,6 +22,7 @@ import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { listPrivacyAcknowledgments } from "@/lib/server/privacy-consent";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
@@ -1342,6 +1343,18 @@ export async function updateOwnProfile(
   // une ligne fraîchement anonymisée — puis `syncSoloEntryIdentity` republiait
   // ce pseudo dans les brackets et jusqu'à la carte de match en direct de la
   // vitrine. La suppression est irréversible : c'est elle qui doit gagner.
+  //
+  // Masquer un avatar **visible** en change aussi le fichier d'adresse (plus
+  // bas) : on relit donc l'état d'avant, seule la bascule doit renommer — le
+  // formulaire renvoie le réglage à chaque sauvegarde.
+  let hidesVisibleAvatar = false;
+  if (patch.visibility?.avatar === false) {
+    const [before] = await db.execute<(RowDataPacket & { visible_avatar: 0 | 1 })[]>(
+      `SELECT visible_avatar FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    hidesVisibleAvatar = before[0]?.visible_avatar === 1;
+  }
   let result: ResultSetHeader;
   try {
     [result] = await db.execute<ResultSetHeader>(
@@ -1410,6 +1423,17 @@ export async function updateOwnProfile(
   // bien « la ligne vivante n'existe plus ». On sort avant la synchronisation
   // de l'entrée solo, qui republierait l'identité qu'on vient de refuser.
   if (result.affectedRows === 0) throw new Error(ACCOUNT_DELETED_ERROR);
+
+  // Masqué, l'avatar disparaît des réponses mais son fichier restait servi sans
+  // session à la même adresse : on le renomme, l'ancienne adresse meurt. Un
+  // échec n'annule pas le réglage, déjà écrit — il se journalise.
+  if (hidesVisibleAvatar) {
+    try {
+      await rotateHiddenAvatarFile(userId);
+    } catch (error) {
+      console.error("[avatar-rotation] renommage impossible", error);
+    }
+  }
 
   // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
   // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
