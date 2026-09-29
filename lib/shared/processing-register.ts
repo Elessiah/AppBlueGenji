@@ -27,7 +27,7 @@ import {
   SITE_VISIT_WINDOW_MINUTES,
 } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
+import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
@@ -476,25 +476,27 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       "Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, RGPD, hébergeur, autre)",
       "Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester",
-      "Masquer un logo d'équipe signalé, puis le rétablir ou le supprimer définitivement",
+      "Masquer un logo d'équipe ou un avatar de joueur signalé, puis le rétablir ou le supprimer définitivement",
+      "Accuser réception d'une notification de contenu illicite, puis notifier à son auteur la décision et les voies de recours",
+      "Répondre aux demandes d'exercice des droits et aux demandes adressées à l'hébergeur, dont celles des autorités",
       "Alerter les administrateurs sur Discord, sans donnée nominative",
     ],
     legalBasis:
-      "Consentement du signalant (case à l'envoi) ; obligation légale de l'hébergeur de traiter les notifications de contenu illicite (règlement (UE) 2022/2065, art. 16) et d'en permettre la contestation (art. 20)",
+      "Obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres",
     dataSubjects: [
       "Signalants, membres ou non (titulaires de droits, représentants, visiteurs)",
       "Joueurs et membres des équipes visés par un signalement",
     ],
     dataCategories: [
       "Catégorie, description, éléments désignés et page d'origine du signalement",
-      "Compte du signalant s'il est connecté ; nom et adresse électronique qu'il indique, et sa qualité (droit d'auteur)",
+      `Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, ${copyrightNoticeElementsText()}`,
       "Contestations : texte, compte de leur auteur et adresse facultative",
-      "Logos d'équipe masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
+      "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
     ],
     sensitiveData: "Aucune",
     retention: [
-      `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage — prolongée tant qu'un logo masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_DAYS / 30} mois au plus après la décision)`,
-      `Logo masqué : ${LOGO_QUARANTINE_DAYS / 30} mois au plus sans contestation (délai de contestation du règlement (UE) 2022/2065, art. 20), puis suppression définitive ; contesté, jusqu'à la décision`,
+      `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_DAYS / 30} mois au plus après la décision)`,
+      `Logo ou avatar masqué : ${LOGO_QUARANTINE_DAYS / 30} mois au plus sans contestation (délai de contestation du règlement (UE) 2022/2065, art. 20), puis suppression définitive ; contesté, jusqu'à la décision`,
     ],
     recipients: [
       "Administrateurs de l'association",
@@ -506,7 +508,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       ...COMMON_SECURITY,
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
       "Plafonds d'envoi par personne et par heure",
-      "Logo masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
+      "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
     ],
   },
   {

@@ -41,6 +41,7 @@ import {
   formatTargetNotice,
   isConcernedByReport,
   missingReplyChannel,
+  reportRequiresConsent,
   nextReportStatus,
   reportAdminHref,
   reportAlertMode,
@@ -271,6 +272,28 @@ export async function resolveReportTargets(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Le signalant peut-il recevoir une réponse **sans** adresse ? Seulement par un
+ * tag Discord **certifié** : le site n'envoie aucun courriel, une session seule
+ * ne porte aucun message, et un identifiant Discord rattaché sans tag certifié
+ * ne se lit nulle part — le panneau ne montre que le compte, et un tag non
+ * certifié est invisible des administrateurs eux-mêmes (`canViewDiscordTag`).
+ * Le tag certifié, lui, se lit sur la fiche du signalant.
+ * Interrogé seulement quand la catégorie appelle une réponse et qu'aucune
+ * adresse n'est donnée — ailleurs la réponse ne change rien.
+ */
+async function isReplyReachable(userId: number | null): Promise<boolean> {
+  if (userId === null) return false;
+  const db = await getDatabase();
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_users
+      WHERE id = ? AND is_deleted = 0 AND discord_verified_at IS NOT NULL
+      LIMIT 1`,
+    [userId],
+  );
+  return rows.length > 0;
+}
+
+/**
  * Enregistre un signalement, puis prévient le propriétaire et le président de
  * l'association sur Discord.
  *
@@ -286,7 +309,7 @@ export async function resolveReportTargets(
  *
  * @throws REPORT_TARGETS_REQUIRE_LOGIN Des cibles désignées sans compte.
  * @throws REPORT_REPLY_CHANNEL_REQUIRED Une demande qui appelle une réponse
- *   (RGPD, hébergeur), envoyée sans compte ni adresse.
+ *   (RGPD, hébergeur), envoyée sans adresse ni tag Discord certifié.
  * @throws REPORTS_SATURATED Afflux au-delà du plafond **dur** de l'heure
  *   (`REPORTS_HOURLY_HARD_CAP`). Sous lui, le dépôt est toujours accepté ;
  *   au-delà du plafond d'alerte, seule l'alerte est retenue (`reportAlertMode`).
@@ -295,7 +318,11 @@ export async function resolveReportTargets(
 export async function createReport(submission: ReportSubmission, viewer: ReportViewer): Promise<number> {
   if (submission.category === "CONTEST") return createContest(submission, viewer);
   if (viewer.userId === null && submission.targets.length > 0) throw new Error("REPORT_TARGETS_REQUIRE_LOGIN");
-  if (missingReplyChannel(submission, viewer.userId !== null)) throw new Error("REPORT_REPLY_CHANNEL_REQUIRED");
+  // `false` d'abord : la base n'est interrogée que si l'adresse manque là où
+  // une réponse est due.
+  if (missingReplyChannel(submission, false) && !(await isReplyReachable(viewer.userId))) {
+    throw new Error("REPORT_REPLY_CHANNEL_REQUIRED");
+  }
   const db = await getDatabase();
   const connection = await db.getConnection();
   let reportId: number;
@@ -313,7 +340,7 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
       `INSERT INTO bg_reports
          (category, description, page_path, reporter_user_id, contact_name, contact_email,
           rights_relation, consent_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ${reportRequiresConsent(submission.category) ? "NOW()" : "NULL"})`,
       [
         submission.category,
         submission.description,
@@ -686,6 +713,10 @@ async function recentlyNotifiedTargets(
  */
 async function createContest(submission: ReportSubmission, viewer: ReportViewer): Promise<number> {
   if (viewer.userId === null) throw new Error("REPORT_CONTEST_LOGIN_REQUIRED");
+  // Une décision motivée est due à qui conteste (DSA, art. 20.5).
+  if (missingReplyChannel(submission, false) && !(await isReplyReachable(viewer.userId))) {
+    throw new Error("REPORT_REPLY_CHANNEL_REQUIRED");
+  }
   const parentId = submission.parentReportId;
   if (parentId === null) throw new Error("REPORT_NOT_CONCERNED");
   const userId = viewer.userId;
@@ -723,7 +754,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_reports
          (category, parent_report_id, description, page_path, reporter_user_id, contact_email, consent_at)
-       VALUES ('CONTEST', ?, ?, ?, ?, ?, NOW())`,
+       VALUES ('CONTEST', ?, ?, ?, ?, ?, NULL)`,
       [parentId, submission.description, submission.pagePath, userId, submission.contactEmail],
     );
     contestId = Number(inserted.insertId);

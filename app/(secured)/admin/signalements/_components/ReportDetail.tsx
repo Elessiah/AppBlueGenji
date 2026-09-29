@@ -8,6 +8,7 @@ import {
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_STATUS_LABELS,
   RIGHTS_RELATION_LABELS,
+  reportFollowUpDuty,
   type ReportAction,
   type ReportTargetRef,
   type ReportView,
@@ -50,6 +51,8 @@ export function ReportDetail({
   const titleId = useId();
   const noteId = useId();
   const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
+  // Le site n'envoie aucun courriel : ce retour part de l'association, à la main.
+  const followUp = reportFollowUpDuty(report.category);
   const [resolving, setResolving] = useState(false);
   const [note, setNote] = useState("");
 
@@ -260,11 +263,20 @@ export function ReportDetail({
             <dd>{RIGHTS_RELATION_LABELS[report.rightsRelation]}</dd>
           </div>
         )}
+        {followUp && (
+          <div>
+            <dt>Retour dû</dt>
+            <dd>{followUp}</dd>
+          </div>
+        )}
       </dl>
 
       {report.contests.length > 0 && (
         <>
           <h3 className={styles.sectionTitle}>Contestations ({report.contests.length})</h3>
+          {/* Une contestation n'est jamais listée seule : son retour dû se
+              rappelle ici, sous le signalement qu'elle vise. */}
+          <p className={styles.muted}>Retour dû : {reportFollowUpDuty("CONTEST")}</p>
           <ul className={styles.contests}>
             {report.contests.map((contest) => (
               <li key={contest.id} className={styles.contest}>

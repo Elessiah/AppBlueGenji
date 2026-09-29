@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "@jest/globals";
 import {
   CONTESTABLE_TARGET_TYPES,
@@ -7,6 +8,8 @@ import {
   REPORT_DESCRIPTION_MAX_LENGTH,
   REPORT_DESCRIPTION_MIN_LENGTH,
   REPORT_MAX_TARGETS,
+  COPYRIGHT_NOTICE_ELEMENTS,
+  NOTIFIER_FOLLOW_UP,
   REPORT_PRIVACY_NOTICE,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_TARGET_NOTICES_DAILY_CAP,
@@ -33,6 +36,11 @@ import {
   reportRetainedUntil,
   reportTargetFromPath,
   reportTargetHref,
+  copyrightNoticeElementsText,
+  reportFollowUpDuty,
+  reportLegalBasisNotice,
+  reportRequiresConsent,
+  reportRightsNotice,
   validateReportSubmission,
   type ReportAction,
   type ReportStatus,
@@ -140,10 +148,20 @@ describe("validateReportSubmission — refus", () => {
     ["qualité inconnue", { rightsRelation: "OWNER" }, "REPORT_RIGHTS_RELATION_REQUIRED"],
     ["bonne foi non déclarée", { goodFaith: false }, "REPORT_GOOD_FAITH_REQUIRED"],
     ["bonne foi non booléenne", { goodFaith: "oui" }, "REPORT_GOOD_FAITH_REQUIRED"],
-    ["consentement absent", { consent: undefined }, "REPORT_CONSENT_REQUIRED"],
-    ["consentement non strict", { consent: "true" }, "REPORT_CONSENT_REQUIRED"],
   ])("%s", (_label, overrides, error) => {
     expect(validateReportSubmission(copyright(overrides))).toEqual({ ok: false, error });
+  });
+
+  it.each<[string, unknown]>([
+    ["absent", undefined],
+    ["non strict", "true"],
+  ])("exige le consentement %s là où la catégorie en demande un", (_label, consent) => {
+    for (const category of ["BUG", "OTHER"] as const) {
+      expect(validateReportSubmission({ category, description: DESCRIPTION, consent })).toEqual({
+        ok: false,
+        error: "REPORT_CONSENT_REQUIRED",
+      });
+    }
   });
 
   it("refuse une cible que la catégorie ne permet pas de désigner", () => {
@@ -409,19 +427,21 @@ describe("registre des catégories", () => {
     ).toEqual({ ok: false, error: "REPORT_TARGET_NOT_ALLOWED" });
   });
 
-  it("exige un moyen de réponse pour RGPD et Hébergeur seulement", () => {
+  it("exige un moyen de réponse pour RGPD, Hébergeur et Contestation seulement", () => {
     const flagged = REPORT_CATEGORIES.filter((category) => REPORT_CATEGORY_DEFINITIONS[category].requiresReplyChannel);
-    expect(flagged).toEqual(["RGPD", "HOSTING"]);
+    expect(flagged).toEqual(["RGPD", "HOSTING", "CONTEST"]);
     expect(missingReplyChannel({ category: "RGPD", contactEmail: null }, false)).toBe(true);
     expect(missingReplyChannel({ category: "RGPD", contactEmail: null }, true)).toBe(false);
     expect(missingReplyChannel({ category: "HOSTING", contactEmail: "a@b.fr" }, false)).toBe(false);
     expect(missingReplyChannel({ category: "BUG", contactEmail: null }, false)).toBe(false);
-    expect(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED")).toMatch(/adresse.*connecte-toi/);
+    expect(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED")).toMatch(/adresse.*tag Discord certifié/);
   });
 
   it("dit comment exercer ses droits sans renvoyer à une adresse", () => {
-    expect(REPORT_PRIVACY_NOTICE.rights).toContain("catégorie « RGPD »");
-    expect(REPORT_PRIVACY_NOTICE.rights).not.toMatch(/en écrivant/);
+    for (const category of REPORT_CATEGORIES) {
+      expect(reportRightsNotice(category)).toContain("catégorie « RGPD »");
+      expect(reportRightsNotice(category)).not.toMatch(/en écrivant/);
+    }
   });
 
   it("n'exige nom et qualité que du droit d'auteur", () => {
@@ -433,6 +453,85 @@ describe("registre des catégories", () => {
     expect(REPORT_PRIVACY_NOTICE.recipients).toContain("peuvent lire ta description");
     expect(REPORT_PRIVACY_NOTICE.recipients).toContain("jamais ton nom");
     expect(REPORT_PRIVACY_NOTICE.retention).toContain(`${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours`);
+  });
+});
+
+describe("base légale par catégorie", () => {
+  it("ne demande de consentement que pour bug et autre", () => {
+    expect(REPORT_CATEGORIES.filter(reportRequiresConsent)).toEqual(["BUG", "OTHER"]);
+  });
+
+  it.each(["RGPD", "COPYRIGHT", "HOSTING", "MODERATION"] as const)(
+    "accepte une demande %s sans case d'accord : l'association est tenue de la traiter",
+    (category) => {
+      const result = validateReportSubmission({
+        category,
+        description: DESCRIPTION,
+        contactName: "Club Exemple",
+        contactEmail: "a@b.fr",
+        rightsRelation: "HOLDER",
+        goodFaith: true,
+      });
+      expect(result.ok).toBe(true);
+    },
+  );
+
+  it("accepte une contestation sans case d'accord", () => {
+    expect(validateReportSubmission({ category: "CONTEST", parentReportId: 3, description: DESCRIPTION }).ok).toBe(true);
+  });
+
+  it("annonce l'obligation légale sans accord, et le consentement ailleurs", () => {
+    for (const category of REPORT_CATEGORIES) {
+      const notice = reportLegalBasisNotice(category);
+      if (reportRequiresConsent(category)) {
+        expect(notice).toMatch(/consentement/);
+        expect(reportRightsNotice(category)).toMatch(/retirer ton consentement/);
+      } else {
+        expect(notice).toMatch(/obligation/);
+        expect(notice).toMatch(/Aucun accord n'est demandé/);
+        expect(reportRightsNotice(category)).not.toMatch(/consentement/);
+        // Pas d'effacement promis pendant le traitement (RGPD, art. 17.3.b).
+        expect(reportRightsNotice(category)).toMatch(/effacement, une fois la demande traitée/);
+      }
+    }
+    expect(reportLegalBasisNotice("RGPD")).toMatch(/art\. 6\.1\.c et 12/);
+    expect(reportLegalBasisNotice("CONTEST")).toMatch(/art\. 20/);
+  });
+});
+
+describe("éléments d'une notification de droit d'auteur", () => {
+  it("suit les champs exigés par le formulaire, adresse électronique comprise", () => {
+    const text = copyrightNoticeElementsText();
+    expect(text).toContain("adresse électronique");
+    expect(text).toContain("qualité");
+    expect(text).toContain("bonne foi");
+    expect(text).toMatch(/, la raison de la demande et une déclaration de bonne foi$/);
+    for (const element of COPYRIGHT_NOTICE_ELEMENTS) expect(text).toContain(element);
+  });
+
+  it("rappelle au panneau le retour dû au notifiant, et à lui seul", () => {
+    expect(reportFollowUpDuty("COPYRIGHT")).toMatch(/16\.4 et 16\.5/);
+    expect(reportFollowUpDuty("RGPD")).toMatch(/mois/);
+    expect(reportFollowUpDuty("HOSTING")).not.toBeNull();
+    expect(reportFollowUpDuty("MODERATION")).toMatch(/16\.4 et 16\.5/);
+    expect(reportFollowUpDuty("CONTEST")).toMatch(/décision motivée.*20\.5/);
+    for (const category of ["BUG", "OTHER"] as const) {
+      expect(reportFollowUpDuty(category)).toBeNull();
+    }
+    expect(NOTIFIER_FOLLOW_UP).toMatch(/accusé de réception.*voies de recours/);
+  });
+
+  // Trois versions divergentes en circulaient (« adresse » lue postale,
+  // qualité oubliée) : chaque texte lit désormais la liste unique.
+  it.each([
+    "app/mentions-legales/page.tsx",
+    "app/rgpd/page.tsx",
+    "lib/shared/terms-of-use.ts",
+    "lib/shared/processing-register.ts",
+  ])("%s lit la liste unique et n'en recopie aucune", (file) => {
+    const source = readFileSync(file, "utf8");
+    expect(source).toContain("copyrightNoticeElementsText()");
+    expect(source).not.toMatch(/nom et l(&apos;|')adresse de son auteur/);
   });
 });
 

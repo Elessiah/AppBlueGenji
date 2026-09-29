@@ -1140,7 +1140,9 @@ async function runMigrations(db: Pool): Promise<void> {
       contact_name VARCHAR(120) NULL,
       contact_email VARCHAR(191) NULL,
       rights_relation ENUM('HOLDER', 'AGENT', 'THIRD_PARTY') NULL,
-      consent_at DATETIME NOT NULL,
+      -- NULL : catégorie traitée par obligation légale, sans case d'accord
+      -- (legalBasis de la catégorie, lib/shared/content-reports.ts).
+      consent_at DATETIME NULL,
       assignee_user_id BIGINT NULL,
       resolution_note TEXT NULL,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -1366,6 +1368,10 @@ async function runMigrations(db: Pool): Promise<void> {
     // certifié n'a de toute façon plus rien à certifier.
     `ALTER TABLE bg_users ADD COLUMN discord_pseudo_from_discord TINYINT(1) NOT NULL DEFAULT 0
        AFTER discord_link_method`,
+    // Signalements traités par obligation légale (RGPD, droit d'auteur,
+    // hébergeur, contestation) : plus de case d'accord, donc pas de date de
+    // consentement. Idempotent, rejouable.
+    `ALTER TABLE bg_reports MODIFY COLUMN consent_at DATETIME NULL`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

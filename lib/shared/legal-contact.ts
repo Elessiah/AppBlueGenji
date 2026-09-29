@@ -39,3 +39,12 @@ export const REPORT_FORM_NAME = "Signaler un problème";
  * pages qui le font plutôt que de l'écrire.
  */
 export const RGPD_CONTACT_LINE = `Courriel et téléphone de l'association (mentions légales du site) — formulaire « ${REPORT_FORM_NAME} » du site (pied de page), catégorie « RGPD » — ou Discord : ${LEGAL_CONTACT_DISCORD} (hébergeur technique)`;
+
+/**
+ * Langues dans lesquelles l'association reçoit les demandes des autorités à
+ * son point de contact unique (règlement européen sur les services
+ * numériques, art. 11.3 : une langue officielle de l'État d'établissement et,
+ * le cas échéant, une langue largement comprise). Affichées par les mentions
+ * légales, section « Point de contact des autorités ».
+ */
+export const AUTHORITY_CONTACT_LANGUAGES: readonly string[] = ["français", "anglais"];
