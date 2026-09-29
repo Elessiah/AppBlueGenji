@@ -94,7 +94,7 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
           <span role="columnheader">ÉQUIPE</span>
           <span role="columnheader">V–D</span>
           <span role="columnheader">PTS</span>
-          <span role="columnheader" aria-label="Tendance">TR</span>
+          <span role="columnheader" className={styles.trendHead} aria-label="Tendance" title="Tendance">TR</span>
         </div>
 
         {rows.length === 0 ? (

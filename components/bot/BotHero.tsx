@@ -2,14 +2,19 @@ import Link from "next/link";
 import { DiscordIcon } from "./DiscordIcon";
 import { CyberButton } from "@/components/cyber";
 import { botInviteScopesLabel, botInviteUrl } from "@/lib/server/bot-invite";
+import { botStatusOf, isBotOnline } from "@/lib/shared/bot-status-summary";
+import type { BotStatus } from "@/lib/shared/types";
 
-export function BotHero() {
+export function BotHero({ status }: { status: BotStatus | null }) {
   const inviteUrl = botInviteUrl();
+  // La pastille verte de l'avatar suit la case « État » : allumée sur un bot
+  // opérationnel, absente sinon (injoignable, dégradé, état illisible).
+  const online = isBotOnline(botStatusOf(status));
   return (
     <div className="bot-hero">
       <div className="bot-id">
-        <div className="bot-avatar">
-          <svg width="48" height="48" viewBox="0 0 40 40" fill="none">
+        <div className={online ? "bot-avatar online" : "bot-avatar"}>
+          <svg width="48" height="48" viewBox="0 0 40 40" fill="none" aria-hidden="true">
             <path
               d="M20 3 L36 12 V28 L20 37 L4 28 V12 Z"
               stroke="#5ac8ff"

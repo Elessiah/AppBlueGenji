@@ -21,8 +21,9 @@ describe("page tournois — barre de recherche et filtres", () => {
   });
 
   it("le raccourci affiché suit la plateforme, plus un « ⌘K » figé", () => {
-    expect(page).toContain("searchShortcutLabel(navigator.platform || navigator.userAgent)");
-    expect(page).toContain("<span className={s.searchKbd}>{shortcutLabel}</span>");
+    expect(page).toContain("useSearchShortcut(searchInputRef)");
+    expect(page).toContain("aria-keyshortcuts={SEARCH_ARIA_KEYSHORTCUTS}");
+    expect(page).toMatch(/<span className=\{s\.searchKbd\} aria-hidden="true">\s*\{shortcutLabel\}/);
     expect(page).not.toContain(">⌘K<");
   });
 

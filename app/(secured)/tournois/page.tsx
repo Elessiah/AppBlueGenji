@@ -19,6 +19,8 @@ import { FinishedCard } from "./cards/FinishedCard";
 import { StateCard } from "./cards/StateCard";
 import { priorityBannerIds } from "./cards/card-image";
 import { Section } from "./Section";
+import { useSearchShortcut } from "@/lib/shared/hooks/useSearchShortcut";
+import { SEARCH_ARIA_KEYSHORTCUTS } from "@/lib/shared/search-shortcut";
 import {
   filterBuckets,
   filterTournamentsByGame,
@@ -27,7 +29,6 @@ import {
   flattenBuckets,
   countByGame,
   needsFinishedArchive,
-  searchShortcutLabel,
   sectionEmptyMessage,
   type GameFilter,
 } from "./_lib/buckets";
@@ -147,9 +148,6 @@ export default function TournamentsPage() {
   // l'archive arrivée entre-temps.
   const wantFinishedArchiveRef = useRef(wantFinishedArchive);
   wantFinishedArchiveRef.current = wantFinishedArchive;
-  // « Ctrl+K » par défaut (sûr pour le rendu serveur) : la vraie plateforme
-  // ne se lit que côté client, une fois montée.
-  const [shortcutLabel, setShortcutLabel] = useState("Ctrl+K");
 
   // `silent` : les rafraîchissements de fond ne doivent pas couvrir l'écran de
   // notifications pour un incident réseau passager. Seul le premier chargement,
@@ -259,20 +257,7 @@ export default function TournamentsPage() {
       .catch(() => setIsAdmin(false));
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
-
-  useEffect(() => {
-    setShortcutLabel(searchShortcutLabel(navigator.platform || navigator.userAgent));
-  }, []);
+  const shortcutLabel = useSearchShortcut(searchInputRef);
 
   useEffect(() => {
     setExpandedSections(new Set());
@@ -461,11 +446,14 @@ export default function TournamentsPage() {
               <input
                 ref={searchInputRef}
                 aria-label="Rechercher un tournoi"
+                aria-keyshortcuts={SEARCH_ARIA_KEYSHORTCUTS}
                 placeholder="Rechercher un tournoi, un format…"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
-              <span className={s.searchKbd}>{shortcutLabel}</span>
+              <span className={s.searchKbd} aria-hidden="true">
+                {shortcutLabel}
+              </span>
             </div>
             <div className={s.filterRow}>
               {[

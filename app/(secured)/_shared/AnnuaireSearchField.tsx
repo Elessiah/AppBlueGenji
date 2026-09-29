@@ -1,21 +1,21 @@
 "use client";
 
-import type { ChangeEventHandler } from "react";
+import { useRef, type ChangeEventHandler } from "react";
+import { useSearchShortcut } from "@/lib/shared/hooks/useSearchShortcut";
+import { SEARCH_ARIA_KEYSHORTCUTS } from "@/lib/shared/search-shortcut";
 import s from "./annuaire.module.css";
 
 type AnnuaireSearchFieldProps = {
   value: string;
   onChange: ChangeEventHandler<HTMLInputElement>;
   placeholder: string;
-  shortcut?: string;
+  /** Nom accessible du champ — le placeholder n'en est pas un. */
+  label: string;
 };
 
-export function AnnuaireSearchField({
-  value,
-  onChange,
-  placeholder,
-  shortcut = "⌘K",
-}: AnnuaireSearchFieldProps) {
+export function AnnuaireSearchField({ value, onChange, placeholder, label }: AnnuaireSearchFieldProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const shortcutLabel = useSearchShortcut(inputRef);
   return (
     <div className={s.search}>
       <span className={s.searchIcon}>
@@ -24,8 +24,17 @@ export function AnnuaireSearchField({
           <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
         </svg>
       </span>
-      <input placeholder={placeholder} value={value} onChange={onChange} />
-      <span className={s.searchKbd}>{shortcut}</span>
+      <input
+        ref={inputRef}
+        aria-label={label}
+        aria-keyshortcuts={SEARCH_ARIA_KEYSHORTCUTS}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+      />
+      <span className={s.searchKbd} aria-hidden="true">
+        {shortcutLabel}
+      </span>
     </div>
   );
 }

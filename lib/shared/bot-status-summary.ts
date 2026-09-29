@@ -72,12 +72,28 @@ export function resolveBotStatusLabel(status: string | null | undefined): BotSta
   return status as BotStatusLabel;
 }
 
-/** Ce que la case affiche en gros : la valeur reçue, ou un tiret. */
+/** Les états connus, dits en français — « OPERATIONAL » est le mot du bot. */
+const STATUS_DISPLAYS: Record<BotStatus["status"], string> = {
+  OPERATIONAL: "Opérationnel",
+  DEGRADED: "Dégradé",
+  DOWN: "Hors service",
+};
+
+/** Ce que la case affiche en gros : l'état traduit, ou un tiret. */
 export function botStatusDisplay(status: string | null | undefined): string {
   if (!status) return "—";
+  const label = resolveBotStatusLabel(status);
+  if (label === "OPERATIONAL" || label === "DEGRADED" || label === "DOWN") {
+    return STATUS_DISPLAYS[label];
+  }
   // Un état inconnu se montre **tel quel** : c'est une information pour qui
   // lit la page, et la ligne du dessous dira qu'on ne sait pas le lire.
   return status;
+}
+
+/** Le bot se dit-il en ligne ? Seul `OPERATIONAL` allume les pastilles vertes. */
+export function isBotOnline(status: string | null | undefined): boolean {
+  return resolveBotStatusLabel(status) === "OPERATIONAL";
 }
 
 /** Le sous-titre, jamais vide. */

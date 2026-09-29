@@ -7,6 +7,7 @@ import {
   botStatusOf,
   botStatusSummary,
   botUptimeLabel,
+  isBotOnline,
 } from "@/lib/shared/bot-status-summary";
 import { botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
@@ -58,13 +59,13 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
 
   return (
     <div className="status-strip">
-      <div className={`status-cell ${statusLabel === "OPERATIONAL" ? "online" : ""}`}>
-        <span className="lbl">Status</span>
+      <div className={`status-cell ${isBotOnline(statusLabel) ? "online" : ""}`}>
+        <span className="lbl">État</span>
         <span className="val">{botStatusDisplay(statusLabel)}</span>
         <span className="sub">{botStatusSummary(statusLabel)}</span>
       </div>
       <div className="status-cell">
-        <span className="lbl">Uptime</span>
+        <span className="lbl">En service</span>
         <span className="val">{uptime}</span>
         <span className="sub">Depuis le dernier démarrage</span>
       </div>
@@ -74,12 +75,12 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
         <span className="sub">Build · {buildDate}</span>
       </div>
       <div className="status-cell">
-        <span className="lbl">Gateway latency</span>
+        <span className="lbl">Latence passerelle</span>
         <span className="val">{latency === null ? "—" : `${latency} ms`}</span>
         <span className="sub">Passerelle Discord · WebSocket</span>
       </div>
       <div className="status-cell">
-        <span className="lbl">Shards</span>
+        <span className="lbl">Fragments (shards)</span>
         <span className="val">{shards}</span>
         <span className="sub">Connexions à la passerelle</span>
       </div>

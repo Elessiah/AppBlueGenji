@@ -6,7 +6,6 @@ import {
   filterBuckets,
   flattenBuckets,
   countByGame,
-  searchShortcutLabel,
   hasActiveFilter,
   sectionEmptyMessage,
   finishedBeyondList,
@@ -211,19 +210,6 @@ describe("flattenBuckets", () => {
 
   it("renvoie une liste vide pour des paniers vides", () => {
     expect(flattenBuckets(mockBuckets())).toEqual([]);
-  });
-});
-
-describe("searchShortcutLabel", () => {
-  it("dit ⌘K sur un clavier Apple", () => {
-    expect(searchShortcutLabel("MacIntel")).toBe("⌘K");
-    expect(searchShortcutLabel("iPhone")).toBe("⌘K");
-    expect(searchShortcutLabel("iPad")).toBe("⌘K");
-  });
-
-  it("dit Ctrl+K partout ailleurs, Windows compris", () => {
-    expect(searchShortcutLabel("Win32")).toBe("Ctrl+K");
-    expect(searchShortcutLabel("Linux x86_64")).toBe("Ctrl+K");
   });
 });
 

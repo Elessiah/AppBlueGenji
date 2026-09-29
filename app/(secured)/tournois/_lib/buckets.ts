@@ -65,18 +65,6 @@ export function countByGame(buckets: TournamentBuckets, gameFilter: GameFilter):
   return 0;
 }
 
-/**
- * Libellé du raccourci de la recherche, selon la plateforme : « ⌘K »
- * n'existe que sur un clavier Apple, `Ctrl+K` fonctionne partout ailleurs
- * (Windows, Linux) — y compris là où le raccourci était pourtant affiché en
- * `⌘K`. Prend une chaîne de plateforme (`navigator.platform` ou, à défaut,
- * `navigator.userAgent`) plutôt que de lire `navigator` elle-même, pour
- * rester testable sans DOM.
- */
-export function searchShortcutLabel(platform: string): string {
-  return /Mac|iPhone|iPad|iPod/i.test(platform) ? "⌘K" : "Ctrl+K";
-}
-
 /** Un filtre (recherche ou pastille de jeu) change ce qu'une section vide veut dire. */
 export function hasActiveFilter(query: string, gameFilter: GameFilter): boolean {
   return query.trim() !== "" || gameFilter !== "all";

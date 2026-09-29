@@ -53,7 +53,7 @@ describe("BotKpis — une charge amputée ne fait pas tomber la page", () => {
     } as unknown as BotKpisType;
     const html = renderToStaticMarkup(<BotKpis kpis={broken} />);
     expect(html).not.toContain("[object Object]");
-    expect(html).toContain("Channels relayés");
+    expect(html).toContain("Salons relayés");
   });
 
   it("survit à une charge absente", () => {
