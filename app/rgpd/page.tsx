@@ -655,8 +655,8 @@ export default async function RgpdPage() {
           <p>
             <strong>Quand cette politique change</strong>, chaque membre inscrit
             avant le changement en est informé à sa visite suivante, par une
-            fenêtre qui résume ce qui change, et en message privé Discord s&apos;il ne
-            revient pas. C&apos;est une information : aucun accord n&apos;est demandé, et la
+            fenêtre qui résume ce qui change, et, s&apos;il ne revient pas, en message
+            privé Discord ou par notification push s&apos;il les a activées. C&apos;est une information : aucun accord n&apos;est demandé, et la
             lire ne retire aucun des droits décrits ci-dessus. Ce qui repose sur votre
             consentement se règle dans « Mon profil », sans perdre votre compte.
           </p>
