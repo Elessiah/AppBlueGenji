@@ -49,11 +49,13 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
 | `OTHER` — Autre | joueurs, équipes, tournois | — |
 | `CONTEST` — Contestation | aucune (rattachée à `parentReportId`) | être visé ; connecté |
 
-**`RGPD` et `HOSTING` remplacent une adresse électronique.** Le site n'en publie
-plus aucune (`lib/shared/legal-contact.ts`) : une adresse écrite dans une page, ou
-dans ce dépôt public, est moissonnée par les robots. Une demande d'exercice des
-droits ou un courrier à l'éditeur ou à l'hébergeur passe donc par le formulaire,
-ou sur Discord auprès du tag `LEGAL_CONTACT_DISCORD`. Ni l'une ni l'autre ne
+**`RGPD` et `HOSTING` trient les demandes à l'éditeur et à l'hébergeur.** Le
+courriel de l'association est publié (mentions légales, `/rgpd`), mais **jamais en
+clair** : une adresse écrite dans une page, ou dans ce dépôt public, est moissonnée
+par les robots — elle se révèle au clic (`lib/shared/obfuscated-contact.ts`). Une
+demande d'exercice des droits ou un courrier à l'éditeur ou à l'hébergeur passe
+donc par ce courriel, par le formulaire, ou sur Discord auprès du tag
+`LEGAL_CONTACT_DISCORD`. Ni l'une ni l'autre ne
 désigne de cible : une demande sur ses propres données n'a personne à prévenir,
 et un contenu illicite d'un membre se signale par « Droit d'auteur » ou
 « Modération », qui savent le masquer et le faire contester. `/rgpd` ouvre le

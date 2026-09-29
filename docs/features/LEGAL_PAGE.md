@@ -15,7 +15,8 @@ hero avec faits clés et sections numérotées (`SECTION 0X`).
 |---|---|
 | Éditeur du site | Statuts de l'association (loi 1901, siège social, objet) |
 | Directeur de la publication | Président de l'association |
-| Hébergement | Même serveur que `celine-houssin.fr` (Keryan Houssin, particulier bénévole de l'association — aucun SIREN : la LCEN ne demande à l'hébergeur que nom, adresse et téléphone) |
+| Éditeur — courriel et téléphone | Coordonnées de l'association, révélées au clic (`ProtectedContact`, valeurs encodées dans `lib/shared/obfuscated-contact.ts`) |
+| Hébergement technique | `lib/shared/site-host.ts` : Keryan Houssin, particulier bénévole de l'association, site et bot sur un Raspberry Pi à Caen — aucun SIREN : la LCEN ne demande à l'hébergeur que nom, adresse et téléphone ; le téléphone se révèle au clic. Distinct de l'association, « hébergeur des contenus de ses membres » au sens du DSA |
 | Propriété intellectuelle | Droits réservés à l'association |
 | Données personnelles (RGPD) | Bulletin d'adhésion + Règlement UE 2016/679 |
 | Cookies | Cookie de session `bg_session` uniquement, aucun traceur tiers |
