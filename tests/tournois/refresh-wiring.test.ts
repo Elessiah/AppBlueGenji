@@ -70,7 +70,10 @@ describe("flux SSE — le contrat de la route", () => {
   it("garde la connexion ouverte sans réveiller le client", () => {
     // Une ligne de commentaire SSE n'est pas remise à `onmessage`, et le proxy
     // ne doit pas mettre le flux en tampon.
-    expect(stream).toContain("`: ping\\n\\n`");
+    expect(stream).toContain("pingFrameBytes(encoding)");
+    expect(read("lib/server/tournament-stream-frames.ts")).toContain(
+      'encoder.encode(": ping\\n\\n")',
+    );
     expect(stream).toContain('"X-Accel-Buffering": "no"');
   });
 });

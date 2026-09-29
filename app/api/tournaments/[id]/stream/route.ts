@@ -26,6 +26,13 @@ import {
   decideStreamWrite,
   STREAM_QUEUE_HIGH_WATER_BYTES,
 } from "@/lib/server/stream-backpressure";
+import { acceptsGzip, GZIP_STREAM_HEADER } from "@/lib/server/sse-gzip";
+import { snapshotFrameOf } from "@/lib/server/tournaments/snapshot";
+import {
+  connectedFrameBytes,
+  pingFrameBytes,
+  type StreamEncoding,
+} from "@/lib/server/tournament-stream-frames";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -129,7 +136,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   }
 
   // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
-  // 154 ko sur un gros plateau), ni ouvrir de salle, ni armer de battement.
+  // 238 ko sur un gros plateau), ni ouvrir de salle, ni armer de battement.
   // C'est sous spam F5 que ce cas se présente — précisément quand ce travail
   // inutile coûte le plus cher.
   if (req.signal.aborted) {
@@ -140,7 +147,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return new Response(null, { status: 204 });
   }
 
-  const encoder = new TextEncoder();
+  // Compression du flux (`lib/server/sse-gzip.ts`) : tout navigateur l'accepte
+  // pour `EventSource`, et l'instantané d'un gros plateau y fond de 238 Ko à
+  // ~14 Ko — autant de budget de sortie rendu à la salle.
+  const encoding: StreamEncoding = acceptsGzip(req.headers.get("accept-encoding"))
+    ? "gzip"
+    : "identity";
 
   /**
    * Nettoyage de la connexion, hissé hors de `start` pour que `cancel` puisse
@@ -203,18 +215,28 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
       };
 
       try {
+        // L'en-tête gzip part une fois, avant toute trame : chaque trame qui
+        // suit est un morceau *deflate* autonome. Dix octets, hors
+        // contre-pression — la file est vide à ce stade.
+        if (encoding === "gzip") controller.enqueue(GZIP_STREAM_HEADER);
+
         // Tout ce dont la page a besoin pour s'afficher, dès la connexion :
-        // aucun appel REST supplémentaire dans le cas nominal.
+        // aucun appel REST supplémentaire dans le cas nominal. L'instantané
+        // n'est pas resérialisé : ses octets — déjà comprimés, le cas échéant —
+        // sont repris de la trame en cache ; seule l'enveloppe est propre au
+        // lecteur.
         write(
-          encoder.encode(
-            `data: ${JSON.stringify({
+          connectedFrameBytes(
+            {
               type: "connected",
               tournamentId,
               tier,
               viewer,
-              snapshot,
               emittedAt: new Date().toISOString(),
-            })}\n\n`,
+            },
+            snapshot,
+            snapshotFrameOf(snapshot),
+            encoding,
           ),
         );
 
@@ -228,16 +250,21 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         // diffusion en héritait sans l'avoir reçue, et restait sur un plateau
         // périmé — jusqu'au prochain changement, c'est-à-dire indéfiniment sur
         // un tournoi calme.
-        leaveRoom = joinTournamentRoom(tournamentId, {
-          tier,
-          version: snapshot.version,
-          send: write,
-          close: cleanup,
-        });
+        leaveRoom = joinTournamentRoom(
+          tournamentId,
+          {
+            tier,
+            encoding,
+            version: snapshot.version,
+            send: write,
+            close: cleanup,
+          },
+          snapshot,
+        );
 
         heartbeat = setInterval(() => {
           try {
-            write(encoder.encode(`: ping\n\n`));
+            write(pingFrameBytes(encoding));
           } catch {
             cleanup();
           }
@@ -281,7 +308,12 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream",
+      // `no-transform` reste : il écarte la compression **tamponnante** d'un
+      // mandataire ou du serveur de Next, qui retiendrait les trames. La nôtre
+      // vide après chaque trame (`lib/server/sse-gzip.ts`).
       "Cache-Control": "no-cache, no-transform",
+      ...(encoding === "gzip" ? { "Content-Encoding": "gzip" } : {}),
+      Vary: "Accept-Encoding",
       Connection: "keep-alive",
       // Neutralise la mise en tampon d'un reverse proxy, qui retiendrait les
       // messages et ferait croire à un flux mort.

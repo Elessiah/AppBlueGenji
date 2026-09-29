@@ -4,6 +4,7 @@ import { type CSSProperties } from "react";
 import type { BracketMatch, SwissMeta, SwissStandingRow } from "@/lib/shared/types";
 import { formatPoints } from "@/lib/shared/swiss";
 import { MatchRow } from "./MatchRow";
+import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
 import { EntrantName } from "./EntrantName";
 
@@ -449,9 +450,8 @@ export function SwissView({
                             match={match}
                             adminResolvable={adminResolvable(match)}
                             onOpenAdminModal={onOpenAdminModal}
-                            allMatches={allTournamentMatches}
+                            scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, "SWISS")}
                             roundNumber={match.roundNumber}
-                            format="SWISS"
                           />
                         );
                       })}

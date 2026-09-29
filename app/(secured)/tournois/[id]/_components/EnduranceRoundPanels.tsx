@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { MatchRow } from "./MatchRow";
+import { isMatchScoreLocked } from "../_lib/score-lock";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import {
   defaultOpenEnduranceRound,
@@ -128,9 +129,8 @@ export function EnduranceRoundPanels({
                   match={match}
                   adminResolvable={adminResolvable(match)}
                   onOpenAdminModal={onOpenAdminModal}
-                  allMatches={allTournamentMatches}
+                  scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
                   roundNumber={match.roundNumber}
-                  format={format}
                 />
               ))}
             </div>

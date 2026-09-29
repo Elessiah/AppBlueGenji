@@ -145,7 +145,13 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
 - **Modale globale** — `components/match-launch/MatchLaunchCenter.tsx`, montée
   par `app/layout.tsx` pour tout compte connecté. Interrogation à 8 s pendant un
   lancement, 30 s pendant un match, 60 s sinon ; suspendue onglet caché
-  (`useClientPower().clocks`). Elle s'ouvre d'office au lancement puis au départ
+  (`useClientPower().clocks`). Sur la fiche d'un tournoi, elle n'attend pas sa
+  relève : le flux signale chaque changement d'une rencontre du lecteur —
+  joueur **ou** caster ; lobby, « Prêt », lancement — par
+  `MATCH_LAUNCH_REFRESH_EVENT` (`viewerLaunchChanged`,
+  `lib/shared/viewer-alerts.ts`), regroupé à 300 ms en une lecture. Une réponse
+  plus ancienne que celle déjà affichée est ignorée (numéro de séquence), et un
+  changement de cadence ne relance plus de lecture en double. Elle s'ouvre d'office au lancement puis au départ
   (annonce, dix minutes), une fois par phase et par session ; fermée, elle laisse
   une pastille pour la rouvrir. Au-dessus du recrutement (1200), sous les
   changements de confidentialité (1300) — et **elle attend** qu'un choix de

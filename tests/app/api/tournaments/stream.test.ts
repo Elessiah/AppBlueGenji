@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { constants as zlibConstants, gunzipSync } from "node:zlib";
 import type { TournamentSnapshot, TournamentViewerContext } from "@/lib/shared/types";
 
 /**
@@ -437,5 +438,62 @@ describe("GET /api/tournaments/[id]/stream — garde de visibilité", () => {
     const response = await GET(new Request("http://t/"), params("5"));
 
     expect(response.status).toBe(404);
+  });
+});
+
+/**
+ * Le flux partait en clair — 238 Ko par instantané sur un gros plateau. Il est
+ * désormais compressé pour tout client qui accepte gzip (tout navigateur, pour
+ * `EventSource`), sans tampon : chaque trame se décode dès son arrivée.
+ */
+describe("GET /api/tournaments/[id]/stream — compression", () => {
+  const gzipRequest = () =>
+    new Request("http://t/", { headers: { "Accept-Encoding": "gzip, br" } });
+
+  /** Lit ce qui est déjà en file : l'en-tête gzip, puis la trame d'ouverture. */
+  async function readOpening(response: Response): Promise<Buffer> {
+    const reader = response.body!.getReader();
+    const chunks: Uint8Array[] = [];
+    for (let i = 0; i < 2; i += 1) {
+      const { value } = await reader.read();
+      if (value) chunks.push(value);
+    }
+    await reader.cancel();
+    return Buffer.concat(chunks);
+  }
+
+  it("compresse le flux d'un client qui accepte gzip", async () => {
+    const response = await GET(gzipRequest(), params("5"));
+
+    expect(response.headers.get("Content-Encoding")).toBe("gzip");
+    expect(response.headers.get("Vary")).toBe("Accept-Encoding");
+    // `no-transform` reste : il écarte la compression tamponnante d'un tiers.
+    expect(response.headers.get("Cache-Control")).toContain("no-transform");
+
+    const text = gunzipSync(await readOpening(response), {
+      finishFlush: zlibConstants.Z_SYNC_FLUSH,
+    }).toString("utf8");
+    const message = JSON.parse(text.slice("data: ".length, -2));
+    expect(message.type).toBe("connected");
+    expect(message.snapshot).toEqual(snapshotWith([]));
+    expect(message.tier).toBe("STANDARD");
+  });
+
+  it("laisse le flux en clair pour un client qui ne l'annonce pas", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+
+    expect(response.headers.get("Content-Encoding")).toBeNull();
+    const message = await firstMessage(response);
+    expect(message.type).toBe("connected");
+    expect(message.snapshot).toEqual(snapshotWith([]));
+  });
+
+  it("n'emploie pas gzip quand le client le refuse explicitement", async () => {
+    const response = await GET(
+      new Request("http://t/", { headers: { "Accept-Encoding": "gzip;q=0, br" } }),
+      params("5"),
+    );
+    expect(response.headers.get("Content-Encoding")).toBeNull();
+    await response.body!.cancel();
   });
 });

@@ -195,9 +195,8 @@ function renderMatch(value: BracketMatch) {
         match={value}
         adminResolvable={false}
         onOpenAdminModal={() => {}}
-        allMatches={[value]}
+        scoreLocked={false}
         roundNumber={value.roundNumber}
-        format="SINGLE"
       />
     </ToastProvider>,
   );

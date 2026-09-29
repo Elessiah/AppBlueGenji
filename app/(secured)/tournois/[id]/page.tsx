@@ -237,6 +237,46 @@ export default function TournamentDetailPage() {
     [detail?.registrations],
   );
 
+  // Le match est lancé et le lecteur y est engagé : la modale offre la saisie
+  // du score (`lib/shared/match-launch.ts`, même règle que le serveur).
+  //
+  // Mémorisées, et donc déclarées avant les retours anticipés : elles
+  // descendent dans chaque `MatchRow` par `PlayerScoreProvider`, et deux
+  // flèches neuves à chaque rendu changeraient la valeur du contexte à chaque
+  // instantané — toutes les cartes, pourtant mémorisées, se redessineraient.
+  // Leurs dépendances tiennent au lecteur, pas au plateau : l'horloge n'y joue
+  // aucun rôle (`canPlayersReportScore` ne rend `LAUNCHED` que sur une
+  // écriture, que le flux apporte avec un nouvel objet de match).
+  const viewerMyTeamId = detail?.myTeamId ?? null;
+  const viewerReportTeamIds = detail?.canCreateReportsForTeamIds;
+  const viewerCanActForEntrant = detail?.canRegisterEntrant ?? false;
+  /**
+   * Le suivi est arrêté : ce qui est affiché ne bouge plus. On retire donc les
+   * actions plutôt que de les laisser échouer une par une — une équipe qui
+   * saisit son score en fin de manche n'a aucun moyen de deviner que son
+   * plateau date de plusieurs minutes.
+   */
+  const frozen = fatal !== null;
+  const canReportScore = useCallback(
+    (match: BracketMatch): boolean =>
+      !frozen &&
+      viewerMyTeamId !== null &&
+      (viewerReportTeamIds?.includes(viewerMyTeamId) ?? false) &&
+      canPlayersReportScore(match, Date.now()),
+    [frozen, viewerMyTeamId, viewerReportTeamIds],
+  );
+  const canOpenPlayerScore = useCallback(
+    (match: BracketMatch): boolean =>
+      canOpenPlayerScoreDialog({
+        match,
+        myTeamId: viewerMyTeamId,
+        canReportScore: canReportScore(match),
+        canActForEntrant: viewerCanActForEntrant,
+        frozen,
+      }),
+    [canReportScore, viewerMyTeamId, viewerCanActForEntrant, frozen],
+  );
+
   // Échec définitif avant même d'avoir reçu quoi que ce soit : sans ce cas, la
   // page resterait sur « Chargement… » pour toujours — le seul état où il ne
   // reste que le F5, et où il ne sert à rien.
@@ -269,14 +309,6 @@ export default function TournamentDetailPage() {
     // la lecture REST de secours (`FIRST_SNAPSHOT_TIMEOUT_MS`).
     return <TournamentLoading />;
   }
-
-  /**
-   * Le suivi est arrêté : ce qui est affiché ne bouge plus. On retire donc les
-   * actions plutôt que de les laisser échouer une par une — une équipe qui
-   * saisit son score en fin de manche n'a aucun moyen de deviner que son
-   * plateau date de plusieurs minutes.
-   */
-  const frozen = fatal !== null;
 
   /**
    * Retour en arrière : le stade que le geste effacerait, ou le motif du refus.
@@ -315,23 +347,6 @@ export default function TournamentDetailPage() {
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
   const wording = participantWording(detail.card.participantType);
-
-  // Le match est lancé et le lecteur y est engagé : la modale offre la saisie
-  // du score (`lib/shared/match-launch.ts`, même règle que le serveur).
-  const canReportScore = (match: BracketMatch): boolean =>
-    !frozen &&
-    detail.myTeamId !== null &&
-    detail.canCreateReportsForTeamIds.includes(detail.myTeamId) &&
-    canPlayersReportScore(match, Date.now());
-
-  const canOpenPlayerScore = (match: BracketMatch): boolean =>
-    canOpenPlayerScoreDialog({
-      match,
-      myTeamId: detail.myTeamId,
-      canReportScore: canReportScore(match),
-      canActForEntrant: detail.canRegisterEntrant,
-      frozen,
-    });
 
   const canAdminResolve = (match: BracketMatch): boolean => {
     if (frozen) return false;
