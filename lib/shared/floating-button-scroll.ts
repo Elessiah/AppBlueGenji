@@ -22,5 +22,12 @@
 /** Délai d'immobilité après lequel les boutons réapparaissent. */
 export const FLOATING_BUTTON_SETTLE_MS = 400;
 
+/**
+ * Une modale ouverte. Les boutons flottants s'y rangent (feuilles : même
+ * sélecteur dans `:has()`), et le menu d'accessibilité, offert au-dessus
+ * d'elles, y prend Échap quand le focus est resté dans la modale.
+ */
+export const OPEN_MODAL_SELECTOR = '[aria-modal="true"]';
+
 /** Attribut posé sur `<html>` pendant un défilement de la page. */
 export const PAGE_SCROLLING_ATTRIBUTE = "data-page-scrolling";

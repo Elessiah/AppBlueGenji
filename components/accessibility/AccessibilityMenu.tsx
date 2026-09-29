@@ -16,6 +16,7 @@ import {
   resolveMenuOpener,
   type AccessibilityMenuRequest,
 } from "@/lib/shared/accessibility-menu-request";
+import { OPEN_MODAL_SELECTOR } from "@/lib/shared/floating-button-scroll";
 import styles from "./AccessibilityMenu.module.css";
 
 /**
@@ -122,7 +123,7 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
       if (event.key !== "Escape") return;
       const active = document.activeElement;
       const inside = active !== null && rootRef.current?.contains(active) === true;
-      const inModal = active?.closest?.('[aria-modal="true"]') != null;
+      const inModal = active?.closest?.(OPEN_MODAL_SELECTOR) != null;
       if (!inside && !inModal && active !== null && active !== document.body) return;
       setOpen(false);
       if (inside) restoreFocus();

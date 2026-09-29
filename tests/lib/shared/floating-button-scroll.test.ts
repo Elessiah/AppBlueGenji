@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
-import { FLOATING_BUTTON_SETTLE_MS, PAGE_SCROLLING_ATTRIBUTE } from "@/lib/shared/floating-button-scroll";
+import {
+  FLOATING_BUTTON_SETTLE_MS,
+  OPEN_MODAL_SELECTOR,
+  PAGE_SCROLLING_ATTRIBUTE,
+} from "@/lib/shared/floating-button-scroll";
 import { readSource } from "../../helpers/read-source";
 
 const stripComments = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -158,7 +162,8 @@ describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", ()
 
   it("le menu, lui, prend Échap quand le focus est resté dans la modale", () => {
     const menu = readSource("components/accessibility/AccessibilityMenu.tsx");
-    expect(menu).toContain(`const inModal = active?.closest?.('[aria-modal="true"]') != null;`);
+    expect(menu).toContain("const inModal = active?.closest?.(OPEN_MODAL_SELECTOR) != null;");
+    expect(OPEN_MODAL_SELECTOR).toBe('[aria-modal="true"]');
     expect(menu).toContain("if (!inside && !inModal && active !== null && active !== document.body) return;");
   });
 
