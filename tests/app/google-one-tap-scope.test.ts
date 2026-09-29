@@ -66,6 +66,13 @@ describe("Google One Tap — périmètre de chargement", () => {
     const form = source("app", "connexion", "_components", "LoginForm.tsx");
     expect(form).toContain("window.localStorage.removeItem(ONE_TAP_STORAGE_KEY)");
     expect(source("app", "rgpd", "page.tsx")).toContain("bg_one_tap_consent");
+  });
+
+  it("le choix reste modifiable sur la carte, après la modale : retirer est aussi simple qu'accorder", () => {
+    const form = source("app", "connexion", "_components", "LoginForm.tsx");
+    expect(form).toContain("onChange={(event) => setOneTapChoice(event.target.checked)}");
+    // Présente sur les deux états de la carte (avant et après la demande de code).
+    expect(form.match(/\{oneTapToggle\}/g)).toHaveLength(2);
     expect(form).toMatch(/setConsentRead\(true\)/);
   });
 

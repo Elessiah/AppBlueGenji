@@ -115,19 +115,63 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
     setConsentRead(true);
   }, []);
 
+  /**
+   * Retient le choix One Tap. Un refus **efface** un accord antérieur : la case
+   * décochée vaut retrait — aussi simple que l'accord (RGPD art. 7.3), d'où la
+   * même case sur la carte de connexion, pour changer d'avis après la modale.
+   */
+  const setOneTapChoice = (allow: boolean) => {
+    try {
+      if (allow) window.localStorage.setItem(ONE_TAP_STORAGE_KEY, "1");
+      else window.localStorage.removeItem(ONE_TAP_STORAGE_KEY);
+    } catch {
+      // localStorage indisponible (mode privé) : le choix vaut pour la page.
+    }
+    setOneTapAllowed(allow);
+  };
+
   const acceptConsent = ({ oneTap: allowOneTap }: { oneTap: boolean }) => {
     try {
       window.localStorage.setItem(CONSENT_STORAGE_KEY, NOTICE_VERSION);
       window.localStorage.setItem(TERMS_STORAGE_KEY, String(TERMS_VERSION));
-      // Un refus **efface** un accord antérieur : la case décochée vaut retrait.
-      if (allowOneTap) window.localStorage.setItem(ONE_TAP_STORAGE_KEY, "1");
-      else window.localStorage.removeItem(ONE_TAP_STORAGE_KEY);
     } catch {
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
-    setOneTapAllowed(allowOneTap);
+    setOneTapChoice(allowOneTap);
     setConsentGiven(true);
   };
+
+  // La case One Tap reste sur la carte : sans elle, un accord donné dans la
+  // modale ne se retirerait plus qu'en vidant le stockage du navigateur. Rien à
+  // proposer quand l'invite n'a pas lieu d'être (`oneTap` absent).
+  // Un seul identifiant : la carte ne rend jamais ses deux états à la fois.
+  const oneTapToggle = oneTap ? (
+    <label
+      htmlFor="login-one-tap"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 8,
+        marginTop: 10,
+        fontSize: 12,
+        lineHeight: 1.5,
+        color: "var(--ink-mute)",
+        cursor: "pointer",
+      }}
+    >
+      <input
+        id="login-one-tap"
+        type="checkbox"
+        checked={oneTapAllowed}
+        onChange={(event) => setOneTapChoice(event.target.checked)}
+        style={{ marginTop: 2 }}
+      />
+      <span>
+        Me proposer l&apos;invite <strong>Google One Tap</strong> sur cette page (Google reçoit
+        alors mon adresse IP et peut déposer un cookie g_state).
+      </span>
+    </label>
+  ) : null;
 
   // Les conditions ne voyagent qu'une fois le stockage **lu** et le
   // consentement **donné** : `consentGiven` part à `true` pour ne pas faire
@@ -244,6 +288,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
               termsAccepted={termsAccepted}
               environmentNotice={loginEnvironmentNotice(environment)}
             />
+            {oneTapToggle}
 
             {/*
               Le séparateur **nomme** ce qui suit. « OU » seul laissait croire à
@@ -310,6 +355,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
               termsAccepted={termsAccepted}
               environmentNotice={loginEnvironmentNotice(environment)}
             />
+            {oneTapToggle}
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
