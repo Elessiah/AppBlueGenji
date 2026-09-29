@@ -27,7 +27,15 @@ export async function GET(req: Request) {
   const hiddenOnly = url.searchParams.get("scope") === "hidden";
   if (hiddenOnly && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
-  const buckets = await listTournamentBuckets(search, hiddenOnly ? { hiddenOnly: true } : {});
+  // `finished=all` : l'archive entière des tournois terminés, que la liste
+  // courante tronque aux plus récents (`finishedTotals` dit ce qui manque).
+  // `/tournois` ne la demande qu'une fois le lecteur allé la chercher.
+  const allFinished = url.searchParams.get("finished") === "all";
+
+  const buckets = await listTournamentBuckets(
+    search,
+    hiddenOnly ? { hiddenOnly: true } : allFinished ? { allFinished: true } : {},
+  );
   return ok({ buckets });
 }
 

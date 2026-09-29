@@ -23,8 +23,10 @@ import {
   filterBuckets,
   filterTournamentsByGame,
   filterTournamentsByQuery,
+  finishedBeyondList,
   flattenBuckets,
   countByGame,
+  needsFinishedArchive,
   searchShortcutLabel,
   sectionEmptyMessage,
   type GameFilter,
@@ -136,6 +138,10 @@ export default function TournamentsPage() {
     () => new Set(DEFAULT_OPEN_SECTIONS),
   );
   const [isAdmin, setIsAdmin] = useState(false);
+  // L'archive entière des terminés n'est demandée qu'une fois le lecteur allé
+  // la chercher (`needsFinishedArchive`), puis gardée : la relâcher au premier
+  // filtre effacé ferait recharger la liste à chaque frappe.
+  const [wantFinishedArchive, setWantFinishedArchive] = useState(false);
   // « Ctrl+K » par défaut (sûr pour le rendu serveur) : la vraie plateforme
   // ne se lit que côté client, une fois montée.
   const [shortcutLabel, setShortcutLabel] = useState("Ctrl+K");
@@ -146,7 +152,10 @@ export default function TournamentsPage() {
   const load = useCallback(
     async (silent = false, signal?: AbortSignal) => {
       try {
-        const all = await fetchBuckets("/api/tournaments", signal);
+        const all = await fetchBuckets(
+          wantFinishedArchive ? "/api/tournaments?finished=all" : "/api/tournaments",
+          signal,
+        );
         // On garde la référence précédente quand rien n'a changé : sinon chaque
         // relecture de fond redessinerait toute la liste et réarmerait le
         // minuteur de bascule, pour un contenu identique.
@@ -158,7 +167,7 @@ export default function TournamentsPage() {
         showError((e as Error).message);
       }
     },
-    [showError],
+    [showError, wantFinishedArchive],
   );
 
   useEffect(() => {
@@ -263,6 +272,11 @@ export default function TournamentsPage() {
     setExpandedSections(new Set());
   }, [query, gameFilter]);
 
+  const finishedExpanded = expandedSections.has("finished");
+  useEffect(() => {
+    if (needsFinishedArchive(query, gameFilter, finishedExpanded)) setWantFinishedArchive(true);
+  }, [query, gameFilter, finishedExpanded]);
+
   const toggleSection = (key: LimitedSectionKey) =>
     setExpandedSections((prev) => {
       const next = new Set(prev);
@@ -320,7 +334,10 @@ export default function TournamentsPage() {
   const totalRunning = filteredBuckets.running.length;
   const totalRegistration = filteredBuckets.registration.length;
   const totalUpcoming = filteredBuckets.upcoming.length;
-  const totalFinished = filteredBuckets.finished.length;
+  // Sans recherche, les terminés que la liste tronquée ne porte pas comptent
+  // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
+  const finishedBeyond = (key: GameFilter) => (query.trim() ? 0 : finishedBeyondList(buckets, key));
+  const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
 
   const showHidden = isAdmin && hiddenTournaments.length > 0;
 
@@ -384,6 +401,7 @@ export default function TournamentsPage() {
   // pastille dit ce que donnerait SON filtre, pas celui déjà actif).
   const countGame = (key: GameFilter) =>
     countByGame(queryFilteredBuckets, key) +
+    finishedBeyond(key) +
     (showHidden ? filterTournamentsByGame(queryFilteredHidden, key).length : 0);
 
   // Une section dépliée montre le total réel, jamais un compte figé au clic.

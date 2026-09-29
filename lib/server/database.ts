@@ -1049,6 +1049,25 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Le détail ci-dessus n'est gardé que `SITE_VISIT_DETAIL_RETENTION_DAYS`
+  // jours : les totaux « depuis toujours » vivent dans ces deux tables, qui ne
+  // gardent ni page ni heure. Un jour révolu devient une ligne de compteur ; un
+  // visiteur, une empreinte — c'est le seul moyen de compter les visiteurs
+  // uniques depuis la mise en service sans relire tout l'historique.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_site_visit_days (
+      day DATE PRIMARY KEY,
+      visits INT UNSIGNED NOT NULL DEFAULT 0,
+      first_visit_at DATETIME NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_site_visitors (
+      visitor_key CHAR(64) PRIMARY KEY,
+      authenticated TINYINT(1) NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Changements du traitement des données (`lib/shared/privacy-changes.ts`) :
   // une ligne par changement **accepté**, avec sa date — c'est la trace du
   // consentement, que l'export RGPD rend au joueur. Le registre vit dans le
@@ -1542,6 +1561,27 @@ async function runMigrations(db: Pool): Promise<void> {
         );
       }
     }
+  }
+
+  // Les visiteurs uniques « depuis toujours » se comptent désormais sur
+  // `bg_site_visitors`, alimentée à chaque visite enregistrée : sur une base qui
+  // tourne, elle naît vide alors que le détail garde tout l'historique. Elle est
+  // remplie **une fois**, avant le premier repli du détail (qui effacerait les
+  // empreintes à reprendre) — vide, c'est qu'aucune visite n'a encore été
+  // enregistrée par la version qui l'alimente. À retirer une fois constaté
+  // joué en production.
+  try {
+    const [seeded] = await db.execute<RowDataPacket[]>(`SELECT 1 FROM bg_site_visitors LIMIT 1`);
+    if (seeded.length === 0) {
+      await db.execute(
+        `INSERT INTO bg_site_visitors (visitor_key, authenticated)
+         SELECT visitor_key, MAX(authenticated) FROM bg_site_visits GROUP BY visitor_key
+         ON DUPLICATE KEY UPDATE
+           authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated))`,
+      );
+    }
+  } catch (error) {
+    reportSchemaFailure(error, "INSERT INTO bg_site_visitors (reprise des empreintes)");
   }
 
   // La mise en avant d'une annonce de recrutement (`highlight` : `NONE` /

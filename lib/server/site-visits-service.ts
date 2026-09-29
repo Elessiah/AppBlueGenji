@@ -3,9 +3,14 @@
  *
  * Le compteur vit dans `bg_site_visits` : une ligne par visite, une visite
  * valant l'arrivée d'un visiteur (les chargements suivants d'une même fenêtre de
- * {@link SITE_VISIT_WINDOW_MINUTES} minutes sont regroupés). Rien n'est
- * pré-agrégé : les totaux se recalculent à la lecture, donc une purge de la
- * table se répercute d'elle-même.
+ * {@link SITE_VISIT_WINDOW_MINUTES} minutes sont regroupés). Ce détail n'est
+ * gardé que {@link SITE_VISIT_DETAIL_RETENTION_DAYS} jours : les jours révolus
+ * sont **repliés** en un compteur par jour (`bg_site_visit_days`) puis effacés,
+ * et chaque visiteur laisse une seule empreinte dans `bg_site_visitors`. Les
+ * fenêtres glissantes se lisent sur le détail, les totaux « depuis toujours »
+ * sur ces deux tables — si bien que la lecture ne grandit plus avec
+ * l'historique : elle relisait toute la table, sept `COUNT(DISTINCT …)` à
+ * chaque synchronisation.
  *
  * Vie privée : seule une empreinte SHA-256 salée est stockée
  * ({@link lib/shared/site-visits.visitorIdentitySource}) — jamais l'IP, ni le
@@ -32,6 +37,7 @@ import {
 } from "./rate-limit";
 import {
   normalizeVisitPath,
+  SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
   visitorIdentitySource,
 } from "@/lib/shared/site-visits";
@@ -58,7 +64,8 @@ const VISIT_RATE_RULE: RateLimitRule = {
 let lastBotSyncAt = 0;
 
 interface VisitStatsRow extends RowDataPacket {
-  total_visits: number | string | null;
+  recent_visits: number | string | null;
+  archived_visits: number | string | null;
   unique_visitors: number | string | null;
   identified_visitors: number | string | null;
   visits_24h: number | string | null;
@@ -67,7 +74,8 @@ interface VisitStatsRow extends RowDataPacket {
   unique_7d: number | string | null;
   visits_30d: number | string | null;
   unique_30d: number | string | null;
-  first_visit_at: string | Date | null;
+  first_recent_visit_at: string | Date | null;
+  first_archived_visit_at: string | Date | null;
   last_visit_at: string | Date | null;
 }
 
@@ -223,9 +231,87 @@ export async function recordSiteVisit(input: {
   );
 
   const recorded = result.affectedRows > 0;
-  if (recorded) chargeVisitToRateLimit(input.ip);
+  if (recorded) {
+    chargeVisitToRateLimit(input.ip);
+    await rememberVisitor(visitorKey, authenticated);
+  }
 
   return { recorded };
+}
+
+/**
+ * Inscrit l'empreinte d'un visiteur à la liste des visiteurs uniques « depuis
+ * toujours », que le repli du détail ne sait pas reconstituer (deux jours
+ * repliés ne disent pas combien de visiteurs ils ont en commun).
+ *
+ * Meilleur effort : la visite est déjà comptée, et un échec ici ne doit pas la
+ * faire passer pour perdue. `authenticated` ne redescend jamais — un visiteur
+ * compté connecté une fois l'est pour le total, comme le
+ * `COUNT(DISTINCT CASE WHEN authenticated = 1 …)` qu'il remplace.
+ */
+async function rememberVisitor(visitorKey: string, authenticated: number): Promise<void> {
+  try {
+    const db = await getDatabase();
+    await db.execute(
+      `INSERT INTO bg_site_visitors (visitor_key, authenticated)
+       VALUES (?, ?)
+       ON DUPLICATE KEY UPDATE
+         authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated))`,
+      [visitorKey, authenticated],
+    );
+  } catch (error) {
+    console.error("[site-visits] Empreinte du visiteur non retenue pour le total.", error);
+  }
+}
+
+/**
+ * Replie les jours révolus du détail en compteurs journaliers, puis les efface.
+ *
+ * La borne est **un jour**, lue une fois et réutilisée par les deux écritures :
+ * `NOW()` relu entre le report et l'effacement ferait effacer une visite qui
+ * n'a pas été reportée. Un jour étant replié en entier ou pas du tout, aucune
+ * journée n'est partagée entre le compteur et le détail. Les deux écritures
+ * sont dans une transaction : un report sans effacement compterait deux fois.
+ *
+ * @returns Le nombre de visites repliées.
+ */
+export async function rollUpExpiredSiteVisits(): Promise<number> {
+  const db = await getDatabase();
+  const connection = await db.getConnection();
+  try {
+    const [bounds] = await connection.execute<(RowDataPacket & { cutoff: string | null })[]>(
+      `SELECT DATE_FORMAT(CURDATE() - INTERVAL ? DAY, '%Y-%m-%d') AS cutoff`,
+      [SITE_VISIT_DETAIL_RETENTION_DAYS],
+    );
+    const cutoff = bounds[0]?.cutoff;
+    if (!cutoff) return 0;
+
+    await connection.beginTransaction();
+    try {
+      await connection.execute(
+        `INSERT INTO bg_site_visit_days (day, visits, first_visit_at)
+         SELECT DATE(created_at), COUNT(*), MIN(created_at)
+         FROM bg_site_visits
+         WHERE created_at < ?
+         GROUP BY DATE(created_at)
+         ON DUPLICATE KEY UPDATE
+           visits = bg_site_visit_days.visits + VALUES(visits),
+           first_visit_at = LEAST(bg_site_visit_days.first_visit_at, VALUES(first_visit_at))`,
+        [cutoff],
+      );
+      const [deleted] = await connection.execute<ResultSetHeader>(
+        `DELETE FROM bg_site_visits WHERE created_at < ?`,
+        [cutoff],
+      );
+      await connection.commit();
+      return deleted.affectedRows;
+    } catch (error) {
+      await connection.rollback().catch(() => undefined);
+      throw error;
+    }
+  } finally {
+    connection.release();
+  }
 }
 
 /**
@@ -239,18 +325,24 @@ export async function recordSiteVisit(input: {
 export async function getSiteVisitStats(): Promise<SiteVisitStats | null> {
   try {
     const db = await getDatabase();
+    // Le détail ne couvre que les derniers jours (repli ci-dessus) : c'est lui
+    // qu'on balaie, pour les fenêtres glissantes et les visites pas encore
+    // repliées. Les totaux « depuis toujours » viennent des deux tables de
+    // cumul, par des sous-requêtes sur leur clé.
     const [rows] = await db.execute<VisitStatsRow[]>(
       `SELECT
-         COUNT(*) AS total_visits,
-         COUNT(DISTINCT visitor_key) AS unique_visitors,
-         COUNT(DISTINCT CASE WHEN authenticated = 1 THEN visitor_key END) AS identified_visitors,
+         COUNT(*) AS recent_visits,
+         (SELECT COALESCE(SUM(visits), 0) FROM bg_site_visit_days) AS archived_visits,
+         (SELECT COUNT(*) FROM bg_site_visitors) AS unique_visitors,
+         (SELECT COUNT(*) FROM bg_site_visitors WHERE authenticated = 1) AS identified_visitors,
          SUM(created_at >= NOW() - INTERVAL 1 DAY) AS visits_24h,
          COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL 1 DAY THEN visitor_key END) AS unique_24h,
          SUM(created_at >= NOW() - INTERVAL 7 DAY) AS visits_7d,
          COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL 7 DAY THEN visitor_key END) AS unique_7d,
          SUM(created_at >= NOW() - INTERVAL 30 DAY) AS visits_30d,
          COUNT(DISTINCT CASE WHEN created_at >= NOW() - INTERVAL 30 DAY THEN visitor_key END) AS unique_30d,
-         MIN(created_at) AS first_visit_at,
+         MIN(created_at) AS first_recent_visit_at,
+         (SELECT MIN(first_visit_at) FROM bg_site_visit_days) AS first_archived_visit_at,
          MAX(created_at) AS last_visit_at
        FROM bg_site_visits`,
     );
@@ -259,7 +351,7 @@ export async function getSiteVisitStats(): Promise<SiteVisitStats | null> {
     if (!row) return emptySiteVisitStats();
 
     return {
-      totalVisits: count(row.total_visits),
+      totalVisits: count(row.archived_visits) + count(row.recent_visits),
       uniqueVisitors: count(row.unique_visitors),
       visitsLast24h: count(row.visits_24h),
       uniqueVisitorsLast24h: count(row.unique_24h),
@@ -268,7 +360,10 @@ export async function getSiteVisitStats(): Promise<SiteVisitStats | null> {
       visitsLast30Days: count(row.visits_30d),
       uniqueVisitorsLast30Days: count(row.unique_30d),
       identifiedVisitors: count(row.identified_visitors),
-      firstVisitAt: toIso(row.first_visit_at as string | null),
+      // Un jour replié est toujours antérieur au détail restant.
+      firstVisitAt: toIso(
+        (row.first_archived_visit_at ?? row.first_recent_visit_at) as string | null,
+      ),
       lastVisitAt: toIso(row.last_visit_at as string | null),
     };
   } catch {
@@ -296,6 +391,14 @@ export async function getSiteVisitStats(): Promise<SiteVisitStats | null> {
 export async function syncSiteVisitStatsToBot(force = false): Promise<boolean> {
   const now = Date.now();
   if (!force && now - lastBotSyncAt < BOT_SYNC_INTERVAL_MS) return false;
+
+  // Le repli suit la cadence de la synchronisation : au plus une fois toutes
+  // les cinq minutes, et seulement quand des visites arrivent. Son échec ne
+  // prive pas le bot de ses chiffres — le détail restant est simplement plus
+  // long, et le prochain passage repliera.
+  await rollUpExpiredSiteVisits().catch((error: unknown) => {
+    console.error("[site-visits] Repli des visites anciennes impossible.", error);
+  });
 
   const stats = await getSiteVisitStats();
   if (!stats) return false;
