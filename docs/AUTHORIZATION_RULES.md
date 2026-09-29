@@ -471,7 +471,22 @@ Règles structurelles qui tiennent quel que soit le rôle :
   demande d'adhésion et à l'acceptation. L'acceptation est **atomique**
   (`acceptIntoTeam`) : verrou sur la ligne du joueur, puis invitation réservée
   par un `UPDATE … WHERE status = 'PENDING'` — deux acceptations simultanées ne
-  peuvent plus toutes deux passer.
+  peuvent plus toutes deux passer. La **création** (`createTeam`) prend le même
+  verrou, en toute première instruction de sa transaction, et y relit
+  l'appartenance : lue sur le pool, deux créations lancées ensemble (deux
+  onglets) — ou une création et une acceptation — passaient toutes deux.
+- Les gestes qui réécrivent un roster existant — rôles
+  (`updateTeamMemberRoles`), transfert de propriété, exclusion, départ — se
+  jouent dans une transaction qui verrouille **la ligne de l'équipe**
+  (`withTeamRosterLock`), après la ligne du destinataire pour un transfert
+  (ordre d'`acceptIntoTeam` : joueur, puis équipe), et relisent les rôles sous
+  ce verrou. Chaque écriture doit apparier exactement une appartenance en cours,
+  sans quoi tout est défait (`MEMBER_NOT_FOUND`). Lus avant, les rôles
+  laissaient une équipe **sans `OWNER`** (destinataire parti entre la lecture
+  et l'écriture, ou rôles réécrits sans `OWNER` au moment même où il le
+  recevait, ou nouveau propriétaire exclu ou parti), ou **avec deux** (deux
+  transferts simultanés) — et le staff n'a aucun droit pour réparer une équipe
+  réelle (§3.2).
 - Retirer une invitation ou une demande en attente (`cancelInvitation`,
   `DELETE /api/invitations/[id]`) revient à qui l'a émise, au sens de l'acte :
   la **gestion** de l'équipe pour une invitation, le **joueur** pour sa demande.
