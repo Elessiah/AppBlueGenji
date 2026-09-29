@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { loadSeedingBoard, reorderSeeding } from "@/lib/server/tournaments/seeding";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /** Ordre de seeding courant + fenêtre d'édition. */
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -36,7 +37,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     return fail("INVALID_TOURNAMENT_ID", 400);
   }
 
-  const body = (await req.json().catch(() => ({}))) as { teamIds?: unknown };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { teamIds?: unknown };
   if (!Array.isArray(body.teamIds) || body.teamIds.length === 0) {
     return fail("INVALID_SEED_ORDER", 400);
   }

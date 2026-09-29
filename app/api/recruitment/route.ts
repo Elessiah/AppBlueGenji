@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { createRecruitmentAd, listRecruitmentAds } from "@/lib/server/recruitment-service";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
   const user = await getCurrentUser().catch(() => null);
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
 
   let body: Record<string, unknown>;
   try {
-    body = (await req.json()) as Record<string, unknown>;
+    body = (await readJsonBody(req)) as Record<string, unknown>;
   } catch {
     return fail("INVALID_BODY", 400);
   }

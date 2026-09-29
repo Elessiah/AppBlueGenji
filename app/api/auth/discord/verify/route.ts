@@ -8,6 +8,7 @@ import {
   isDiscordChallengeToken,
 } from "@/lib/server/users-service";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
+import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request) {
   // Avant tout : un formulaire d'un autre site posant le code **de
@@ -16,7 +17,7 @@ export async function POST(req: Request) {
   if (crossSite) return crossSite;
 
   try {
-    const body = (await req.json()) as {
+    const body = (await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES)) as {
       challenge?: unknown;
       code?: string;
       pseudo?: string;

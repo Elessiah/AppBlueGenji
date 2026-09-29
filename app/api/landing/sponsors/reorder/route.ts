@@ -3,6 +3,7 @@ import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { reorderSponsors } from "@/lib/server/sponsors-service";
 import { validateReorderIds } from "@/lib/shared/reorder";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
@@ -11,7 +12,7 @@ export async function PUT(req: Request) {
 
   let body: { ids?: unknown };
   try {
-    body = (await req.json()) as typeof body;
+    body = (await readJsonBody(req)) as typeof body;
   } catch {
     return fail("INVALID_BODY", 400);
   }

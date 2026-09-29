@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { claimGhostTeam } from "@/lib/server/ghost-teams-service";
 import { getUserIdByPseudo } from "@/lib/server/users-service";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * **Propose** une équipe fantôme à un joueur réel. Réservé à la permission
@@ -24,7 +25,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   try {
-    const body = (await req.json()) as { pseudo?: string };
+    const body = (await readJsonBody(req)) as { pseudo?: string };
     const pseudo = (body.pseudo ?? "").trim();
     if (!pseudo) return fail("INVALID_PSEUDO", 400);
 

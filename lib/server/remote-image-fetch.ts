@@ -5,6 +5,7 @@ import {
   isPrivateImageHostname,
   parseRemoteImageUrl,
 } from "@/lib/shared/remote-image";
+import { pinnedHttpsGet } from "@/lib/server/pinned-https";
 
 /**
  * Aller chercher une image sur une origine étrangère, sans lui laisser le
@@ -25,6 +26,8 @@ import {
 /** Même plafond de taille qu'à l'import (`lib/server/image-upload.ts`). */
 export const MAX_REMOTE_IMAGE_BYTES = 5 * 1024 * 1024;
 const FETCH_TIMEOUT_MS = 5_000;
+/** Agent annoncé aux hébergeurs d'images. */
+export const REMOTE_IMAGE_USER_AGENT = "BlueGenji-ImageRelay/1.0";
 /**
  * Redirections suivies **à la main**, pour revalider l'hôte à chaque saut :
  * `fetch` les suit sinon jusqu'à n'importe quelle destination, ce qui rendrait
@@ -49,10 +52,11 @@ const resolveWithSystem: HostResolver = async (hostname) =>
  * une seule adresse interne suffit à refuser, le client HTTP pouvant choisir
  * n'importe laquelle. Une résolution qui échoue est un refus.
  *
- * Reste hors de portée le **rebinding** : `fetch` résout à nouveau le nom en se
- * connectant, et un serveur DNS hostile peut répondre autre chose la seconde
- * fois. Le fermer demande de fixer l'adresse de connexion dans l'agent HTTP,
- * que le `fetch` intégré à Node n'expose pas sans dépendance.
+ * Ce contrôle préalable refuse tôt, sans ouvrir de socket ; il ne suffirait
+ * pas seul — un client HTTP qui résout **de nouveau** le nom en se connectant
+ * laisserait un serveur DNS hostile répondre autre chose la seconde fois
+ * (*rebinding*). D'où la connexion par `pinnedHttpsGet`, dont le socket
+ * n'utilise que les adresses que ce même jugement vient d'accepter.
  */
 export async function hostResolvesPublicly(
   hostname: string,
@@ -111,11 +115,18 @@ export async function fetchRemoteImage(
     try {
       let res: Response;
       try {
-        res = await fetch(target, {
-          redirect: "manual",
+        // Pas le `fetch` intégré : il résoudrait le nom une seconde fois en se
+        // connectant. `pinnedHttpsGet` connecte le socket à l'adresse que le
+        // jugement vient d'accepter, et ne suit aucune redirection.
+        res = await pinnedHttpsGet(target, {
           signal: controller.signal,
-          headers: { Accept: "image/*" },
-          cache: "no-store",
+          // `node:https` n'envoie aucun `User-Agent`, là où `fetch` envoyait
+          // `node` : certains hébergeurs (Wikimedia, des règles Cloudflare)
+          // refusent une requête qui n'en porte pas, et le logo disparaîtrait
+          // sans bruit.
+          headers: { Accept: "image/*", "User-Agent": REMOTE_IMAGE_USER_AGENT },
+          resolve: resolveHost,
+          isAllowedAddress: (address) => !isPrivateImageHostname(address),
         });
       } catch {
         return null;

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function PATCH(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -12,7 +13,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   const matchId_ = Number(matchId);
   if (!Number.isInteger(matchId_) || matchId_ <= 0) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await req.json()) as {
+  const body = (await readJsonBody(req)) as {
     team1Score?: unknown;
     team2Score?: unknown;
     forfeitTeamId?: unknown;

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { deleteAboutPillar, updateAboutPillar } from "@/lib/server/about-pillars-service";
+import { readJsonBody } from "@/lib/server/request-body";
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -20,7 +21,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
   let body: { title?: unknown; text?: unknown };
   try {
-    body = (await req.json()) as typeof body;
+    body = (await readJsonBody(req)) as typeof body;
   } catch {
     return fail("INVALID_BODY", 400);
   }

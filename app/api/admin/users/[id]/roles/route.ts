@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setUserRoles } from "@/lib/server/users-service";
 import { can, isPlatformRole } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Remplace l'ensemble des rôles de permission d'un utilisateur cible.
@@ -32,7 +33,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   // Un admin ne peut pas modifier ses propres rôles (évite tout auto-verrouillage).
   if (targetId === user.id) return fail("CANNOT_MODIFY_SELF", 400);
 
-  const body = (await req.json().catch(() => null)) as { roles?: unknown } | null;
+  const body = (await readJsonBody(req).catch(() => null)) as { roles?: unknown } | null;
   if (!Array.isArray(body?.roles) || !body.roles.every(isPlatformRole)) {
     return fail("INVALID_PAYLOAD", 400);
   }

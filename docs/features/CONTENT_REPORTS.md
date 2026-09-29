@@ -133,7 +133,38 @@ et au plus une fois par heure depuis la mise en page racine
 - `REPORT_SUBMIT_RULE` : 5 envois par 30 min, par compte ou par IP.
 - `REPORTS_HOURLY_CAP` : 60 signalements par heure **tous auteurs confondus**,
   en base — la seule borne qui tienne sans identité, et chaque envoi écrit en
-  privé à deux personnes.
+  privé à deux personnes. Elle borne l'**alerte**, jamais le dépôt : elle a
+  d'abord refusé l'envoi (429), et six IP suffisaient alors à fermer le seul
+  canal que le site publie — notification d'un contenu illicite, demande RGPD,
+  question d'hébergeur. Au-delà, le signalement est enregistré et visible au
+  panneau ; la direction reçoit **une** alerte qui annonce l'afflux, au plus une
+  par heure (`reportAlertMode` : `ALERT`, puis `SATURATION_NOTICE` au premier
+  signalement au-delà du plafond depuis la dernière annonce, puis `SILENT`). Pas
+  « au 61ᵉ » : le compte de l'heure est lu sans verrou, deux envois simultanés
+  peuvent lire 59 et le suivant 61, et l'annonce ne partirait jamais. Un
+  signalement de nouveau alerté (rythme retombé) réarme l'annonce : un second
+  pic dans l'heure est annoncé à son tour.
+- `REPORTS_HOURLY_HARD_CAP` : 600 par heure, au-delà desquels le dépôt est
+  refusé (`REPORTS_SATURATED` → 429) — une borne sur la croissance de la table,
+  qu'il faut une soixantaine d'IP pour tenir pleine.
+- `REPORT_TARGET_NOTICES_DAILY_CAP` et `REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS` :
+  un compte fait prévenir les personnes visées par au plus **3** signalements
+  désignant un joueur ou une équipe par 24 h (un tournoi désigné ne prévient
+  personne, il ne compte pas), et seulement s'il a au moins **48 h**. Désigner une équipe
+  fait écrire le bot à chacun de ses membres : sans borne par auteur, quelques
+  comptes gratuits écrivaient chaque jour à tout le site, et Discord pouvait
+  classer le bot comme spammeur — ce qui couperait aussi la connexion par code.
+  Au-delà, le signalement est enregistré et reste consultable par les personnes
+  visées (`/signalements/[id]`, formulaire de contestation) ; seul le message est
+  retenu (`reporterMayWarnTargets`). Les deux bornes — reprévenance d'une cible
+  et plafond de l'auteur — se **réservent** sous un verrou nommé
+  (`reserveTargetNotices`) : cinq signalements simultanés sur une équipe
+  liraient sinon tous « personne n'a été prévenu ». L'envoi se fait **hors** du
+  verrou — tenu pendant l'appel au bot, il gardait une connexion du pool par
+  signalement en attente. Seules les cibles qui ont
+  donné un destinataire sont marquées (`notified_at`), et la marque est rendue,
+  **cible par cible** (un envoi par cible), si rien ne lui est parvenu (bot
+  injoignable, aucun appareil abonné).
 - `REPORT_TARGET_SEARCH_RULE` : la recherche de cibles est réservée aux comptes
   connectés (l'annuaire l'est) et plafonnée.
 
@@ -141,7 +172,9 @@ et au plus une fois par heure depuis la mise en page racine
 
 `bg_reports` (dont `parent_report_id` pour une contestation) et
 `bg_report_targets` (sans clé étrangère vers la cible : une équipe dissoute
-n'emporte pas le signalement ; `label_snapshot` garde le nom). L'export RGPD
+n'emporte pas le signalement ; `label_snapshot` garde le nom ; `notified_at`
+dit si la cible a réellement été prévenue — c'est lui, et non la seule
+désignation, que relisent le délai de reprévenance et le plafond de l'auteur). L'export RGPD
 d'un compte rend ses signalements et contestations, **coordonnées saisies
 comprises** (nom, adresse, qualité, page) ; l'anonymisation les
 détache de lui. Fiche `T11` du registre des traitements ; section

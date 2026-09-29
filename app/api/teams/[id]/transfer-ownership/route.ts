@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { getTeamDetail, transferTeamOwnership } from "@/lib/server/teams-service";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
@@ -14,7 +15,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   }
 
   try {
-    const body = (await req.json()) as { newOwnerUserId?: number };
+    const body = (await readJsonBody(req)) as { newOwnerUserId?: number };
     if (!body.newOwnerUserId || !Number.isInteger(body.newOwnerUserId)) {
       return fail("MISSING_USER_ID", 400);
     }

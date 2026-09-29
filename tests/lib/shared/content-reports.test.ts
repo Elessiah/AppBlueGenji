@@ -9,7 +9,13 @@ import {
   REPORT_MAX_TARGETS,
   REPORT_PRIVACY_NOTICE,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
+  REPORT_TARGET_NOTICES_DAILY_CAP,
+  REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS,
+  REPORTS_HOURLY_CAP,
+  REPORTS_HOURLY_HARD_CAP,
+  REPORTS_SATURATION_NOTICE_INTERVAL_MS,
   formatContestAlert,
+  formatReportsSaturatedAlert,
   formatReportAlert,
   formatTargetNotice,
   isConcernedByReport,
@@ -19,7 +25,9 @@ import {
   nextReportStatus,
   normalizeReportPagePath,
   reportAdminHref,
+  reportAlertMode,
   reportConcernedHref,
+  reporterMayWarnTargets,
   reportErrorMessage,
   reportPurgeDate,
   reportRetainedUntil,
@@ -457,5 +465,62 @@ describe("reportErrorMessage", () => {
   it("retombe sur une phrase pour un code inconnu ou absent", () => {
     expect(reportErrorMessage(undefined)).toMatch(/Réessaie/);
     expect(reportErrorMessage("BOOM")).toMatch(/Réessaie/);
+  });
+});
+
+describe("reportAlertMode", () => {
+  const now = 10 * REPORTS_SATURATION_NOTICE_INTERVAL_MS;
+
+  it("alerte sous le plafond, annonce la saturation, puis se tait", () => {
+    expect(reportAlertMode(0, null, now)).toBe("ALERT");
+    expect(reportAlertMode(REPORTS_HOURLY_CAP - 1, null, now)).toBe("ALERT");
+    expect(reportAlertMode(REPORTS_HOURLY_CAP, null, now)).toBe("SATURATION_NOTICE");
+    expect(reportAlertMode(REPORTS_HOURLY_CAP + 1, now - 1000, now)).toBe("SILENT");
+    expect(reportAlertMode(REPORTS_HOURLY_HARD_CAP - 1, now - 1000, now)).toBe("SILENT");
+  });
+
+  it("annonce la saturation même si le plafond exact n'a jamais été lu", () => {
+    // Deux envois simultanés lisent 59, le suivant 61 : l'annonce doit partir.
+    expect(reportAlertMode(REPORTS_HOURLY_CAP + 1, null, now)).toBe("SATURATION_NOTICE");
+  });
+
+  it("réannonce une saturation qui dure au-delà de l'intervalle", () => {
+    expect(
+      reportAlertMode(REPORTS_HOURLY_CAP + 5, now - REPORTS_SATURATION_NOTICE_INTERVAL_MS, now),
+    ).toBe("SATURATION_NOTICE");
+  });
+
+  it("garde le refus du dépôt bien au-delà du plafond d'alerte", () => {
+    // Six IP suffisaient à fermer le canal quand l'alerte et le dépôt
+    // partageaient le même plafond.
+    expect(REPORTS_HOURLY_HARD_CAP).toBeGreaterThanOrEqual(REPORTS_HOURLY_CAP * 10);
+  });
+
+  it("rédige l'alerte de saturation sans rien du signalement", () => {
+    const text = formatReportsSaturatedAlert({ adminUrl: "https://site.test/admin/signalements" });
+    expect(text).toContain(String(REPORTS_HOURLY_CAP));
+    expect(text).toContain("https://site.test/admin/signalements");
+  });
+});
+
+describe("reporterMayWarnTargets", () => {
+  it("laisse un compte établi prévenir les personnes visées, dans la limite du jour", () => {
+    const age = REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS;
+    expect(reporterMayWarnTargets({ accountAgeHours: age, earlierReportsWithTargets: 0 })).toBe(true);
+    expect(
+      reporterMayWarnTargets({ accountAgeHours: age, earlierReportsWithTargets: REPORT_TARGET_NOTICES_DAILY_CAP - 1 }),
+    ).toBe(true);
+    expect(
+      reporterMayWarnTargets({ accountAgeHours: age, earlierReportsWithTargets: REPORT_TARGET_NOTICES_DAILY_CAP }),
+    ).toBe(false);
+  });
+
+  it("ne laisse pas un compte ouvert pour l'occasion faire écrire le bot", () => {
+    expect(
+      reporterMayWarnTargets({
+        accountAgeHours: REPORT_TARGET_NOTICE_MIN_ACCOUNT_AGE_HOURS - 1,
+        earlierReportsWithTargets: 0,
+      }),
+    ).toBe(false);
   });
 });

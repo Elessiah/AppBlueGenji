@@ -6,6 +6,7 @@ import { POST } from "@/app/api/csp-report/route";
 import { CSP_REPORT_RULE } from "@/lib/server/api-guard";
 import { logCspViolations, parseCspReport } from "@/lib/server/csp-reports";
 import { resetRateLimit } from "@/lib/server/rate-limit";
+import { SMALL_JSON_BODY_MAX_BYTES } from "@/lib/server/request-body";
 
 function cspReq(body: unknown, headers: Record<string, string> = {}) {
   return new Request("http://localhost/api/csp-report", {
@@ -39,6 +40,13 @@ describe("POST /api/csp-report", () => {
     await POST(cspReq({ "csp-report": {} }));
 
     expect(logCspViolations).toHaveBeenCalledWith(parsed);
+  });
+
+  it("refuse de lire un corps démesuré — route anonyme, lue avant tout contrôle", async () => {
+    const res = await POST(cspReq({ "csp-report": { "script-sample": "x".repeat(SMALL_JSON_BODY_MAX_BYTES) } }));
+
+    expect(res.status).toBe(204);
+    expect(parseCspReport).not.toHaveBeenCalled();
   });
 
   it("répond 204 sans journaliser sur un corps illisible", async () => {

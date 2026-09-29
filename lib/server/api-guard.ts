@@ -194,6 +194,35 @@ export const ISSUE_REPORT_RULE: RateLimitRule = {
 };
 
 /**
+ * Téléversements d'image (avatar, logo d'équipe, photo de bénévole, logo et
+ * bandeau de partenaire, image de tournoi), par compte.
+ *
+ * Chaque envoi fait lire jusqu'à 5 Mo, décoder et réencoder une image par
+ * `sharp` — le travail le plus lourd qu'un compte puisse commander au serveur,
+ * un Raspberry Pi. Vingt en dix minutes couvrent un recadrage raté puis refait
+ * plusieurs fois ; au-delà, c'est une boucle.
+ */
+export const IMAGE_UPLOAD_RULE: RateLimitRule = {
+  name: "image-upload",
+  limit: 20,
+  windowMs: 10 * 60_000,
+};
+
+/**
+ * Signalements de problème, par utilisateur et **par jour**.
+ *
+ * Le plafond de dix minutes borne une rafale, pas une journée : seul, il
+ * laissait un engagé écrire à tous les arbitres sept cents fois par jour, et
+ * quelques comptes suffisaient à faire classer le bot comme spammeur par
+ * Discord. Vingt couvrent largement une soirée de tournoi difficile.
+ */
+export const ISSUE_REPORT_DAILY_RULE: RateLimitRule = {
+  name: "tournament-issue-report-daily",
+  limit: 20,
+  windowMs: 24 * 60 * 60_000,
+};
+
+/**
  * Envois du formulaire « Signaler un problème », par compte ou, sans compte,
  * par IP.
  *

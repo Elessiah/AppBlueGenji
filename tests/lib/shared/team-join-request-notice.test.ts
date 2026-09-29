@@ -3,6 +3,7 @@ import {
   TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS,
   formatTeamJoinRequestNotice,
   shouldNotifyTeamJoinRequest,
+  TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP,
   teamJoinNoticeRecipients,
   type TeamJoinNoticeMember,
 } from "@/lib/shared/team-join-request-notice";
@@ -63,14 +64,23 @@ describe("teamJoinNoticeRecipients", () => {
 
 describe("shouldNotifyTeamJoinRequest", () => {
   it("écrit pour la seule demande de la fenêtre", () => {
-    expect(shouldNotifyTeamJoinRequest(1)).toBe(true);
+    expect(shouldNotifyTeamJoinRequest({ toThisTeam: 1, toAnyTeam: 1 })).toBe(true);
     // Une lecture qui ne verrait pas encore la ligne : prévenir plutôt que taire.
-    expect(shouldNotifyTeamJoinRequest(0)).toBe(true);
+    expect(shouldNotifyTeamJoinRequest({ toThisTeam: 0, toAnyTeam: 0 })).toBe(true);
   });
 
   it("se tait sur une demande retirée puis redéposée dans la fenêtre", () => {
-    expect(shouldNotifyTeamJoinRequest(2)).toBe(false);
-    expect(shouldNotifyTeamJoinRequest(10)).toBe(false);
+    expect(shouldNotifyTeamJoinRequest({ toThisTeam: 2, toAnyTeam: 2 })).toBe(false);
+    expect(shouldNotifyTeamJoinRequest({ toThisTeam: 10, toAnyTeam: 10 })).toBe(false);
+  });
+
+  it("se tait au-delà du plafond du jour, toutes équipes confondues", () => {
+    expect(
+      shouldNotifyTeamJoinRequest({ toThisTeam: 1, toAnyTeam: TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP }),
+    ).toBe(true);
+    expect(
+      shouldNotifyTeamJoinRequest({ toThisTeam: 1, toAnyTeam: TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP + 1 }),
+    ).toBe(false);
   });
 
   it("borne la fenêtre à un jour", () => {

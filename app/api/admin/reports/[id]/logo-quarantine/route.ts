@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { hideTeamLogo, hideUserAvatarForReport } from "@/lib/server/logo-quarantine";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 const TEAM_ERRORS = ["TEAM_NOT_TARGETED", "TEAM_HAS_NO_LOGO", "LOGO_CHANGED", "LOGO_NOT_MOVABLE", "LOGO_FILE_MISSING"];
 const USER_ERRORS = ["USER_NOT_TARGETED", "USER_HAS_NO_AVATAR", "AVATAR_CHANGED", "AVATAR_NOT_MOVABLE", "AVATAR_FILE_MISSING"];
@@ -19,7 +20,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const { id } = await context.params;
   const reportId = Number(id);
   if (!Number.isSafeInteger(reportId) || reportId <= 0) return fail("INVALID_REPORT_ID", 400);
-  const body = (await req.json().catch(() => ({}))) as { targetType?: unknown; targetId?: unknown };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { targetType?: unknown; targetId?: unknown };
   const targetType = body.targetType;
   if (targetType !== "TEAM" && targetType !== "USER") return fail("INVALID_TARGET_TYPE", 400);
   const targetId = Number(body.targetId);

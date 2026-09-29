@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { createSponsor, listSponsors } from "@/lib/server/sponsors-service";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
   try {
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
 
   let body: Record<string, unknown>;
   try {
-    body = (await req.json()) as Record<string, unknown>;
+    body = (await readJsonBody(req)) as Record<string, unknown>;
   } catch {
     return fail("INVALID_BODY", 400);
   }

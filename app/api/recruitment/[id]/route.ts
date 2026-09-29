@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteRecruitmentAd, updateRecruitmentAd } from "@/lib/server/recruitment-service";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
@@ -20,7 +21,7 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
   let body: Record<string, unknown>;
   try {
-    body = (await req.json()) as Record<string, unknown>;
+    body = (await readJsonBody(req)) as Record<string, unknown>;
   } catch {
     return fail("INVALID_BODY", 400);
   }

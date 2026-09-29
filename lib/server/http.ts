@@ -30,6 +30,10 @@ export function fail<T extends object = Record<string, never>>(
    */
   details?: T,
 ): NextResponse<ApiError & Partial<T>> {
+  // Un corps refusé par la lecture bornée (`PAYLOAD_TOO_LARGE`,
+  // `lib/server/request-body.ts`) remonte souvent par le `catch` générique
+  // d'une route, qui l'aurait rendu en 400 ou 500 : c'est un 413 partout.
+  if (message === "PAYLOAD_TOO_LARGE") status = 413;
   const code = publicErrorCode(message, status);
   if (code !== message) {
     console.error(`[api] message d'erreur non public remplacé par ${code} (${status}) :`, message);

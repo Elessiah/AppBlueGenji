@@ -13,10 +13,11 @@ import { fail, ok } from "@/lib/server/http";
 import { deleteSubscription, saveSubscription } from "@/lib/server/push-subscriptions";
 import { webPushConfig } from "@/lib/server/web-push";
 import { parsePushSubscription } from "@/lib/shared/push-notifications";
+import { readJsonBody } from "@/lib/server/request-body";
 
 async function readJson(req: Request): Promise<unknown> {
   try {
-    return await req.json();
+    return await readJsonBody(req);
   } catch {
     return null;
   }

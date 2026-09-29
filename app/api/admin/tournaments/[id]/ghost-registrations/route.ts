@@ -4,6 +4,7 @@ import { listGhostTeams } from "@/lib/server/ghost-teams-service";
 import { registerGhostTeams } from "@/lib/server/tournaments-service";
 import { parseGhostBatch, registrationErrorTeamId } from "@/lib/shared/ghost-registration";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 function readTournamentId(raw: string): number | null {
   const tournamentId = Number(raw);
@@ -50,7 +51,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const tournamentId = readTournamentId(id);
   if (tournamentId === null) return fail("INVALID_TOURNAMENT_ID", 400);
 
-  const body = (await req.json().catch(() => ({}))) as { teamIds?: unknown };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { teamIds?: unknown };
   const selection = parseGhostBatch(body.teamIds);
   if (!selection.ok) return fail(selection.error, 400);
 

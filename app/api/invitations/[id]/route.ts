@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
 import { cancelInvitation, respondToInvitation } from "@/lib/server/teams-service";
 import { JOIN_CONFLICTS } from "@/lib/server/team-invite-roles";
+import { readJsonBody } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";
 
 /** Accepte ou refuse une invitation/demande en attente. Body: { accept: boolean }. */
@@ -15,7 +16,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!Number.isInteger(invitationId) || invitationId <= 0) return fail("INVALID_INVITATION_ID", 400);
 
   try {
-    const body = (await req.json()) as { accept?: boolean };
+    const body = (await readJsonBody(req)) as { accept?: boolean };
     await respondToInvitation(user.id, invitationId, Boolean(body.accept));
     return ok({ ok: true });
   } catch (error) {

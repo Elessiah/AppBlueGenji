@@ -4,6 +4,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { rollbackCurrentRound } from "@/lib/server/tournaments/rollback";
 import { formatRoundRolledBackLog } from "@/lib/shared/bot-logs";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Efface le dernier stade joué du tournoi et le ramène à l'instant qui le
@@ -100,7 +101,7 @@ const MAX_STAGE_KEY_LENGTH = 32;
  */
 async function readExpectedStage(request: Request): Promise<string | undefined> {
   try {
-    const body = (await request.json()) as { expectedStage?: unknown };
+    const body = (await readJsonBody(request)) as { expectedStage?: unknown };
     const stage = body?.expectedStage;
     if (typeof stage !== "string") return undefined;
     return stage.length > 0 && stage.length <= MAX_STAGE_KEY_LENGTH ? stage : undefined;
