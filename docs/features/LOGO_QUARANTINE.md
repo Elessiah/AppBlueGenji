@@ -31,7 +31,8 @@ HIDDEN ──(contestation acceptée, « Rétablir »)──▶ RESTORED
   `{ targetType: "TEAM" | "USER", targetId }`) — n'est possible que pour une
   cible **visée par ce signalement** : c'est ce lien qui permet de contester.
   Les membres actuels de l'équipe, ou le joueur, reçoivent un message privé qui
-  donne la **date de suppression définitive** et le lien de contestation.
+  expose les motifs de la décision (voir « Exposé des motifs » plus bas), la
+  **date de suppression définitive** et le lien de contestation.
 - **Rétablir** (`restoreReportedImage`, une seule fonction pour les deux
   domaines) remet le fichier à la même adresse et prévient la personne
   concernée. Refusé si elle a envoyé une autre image entre-temps
@@ -43,14 +44,44 @@ HIDDEN ──(contestation acceptée, « Rétablir »)──▶ RESTORED
   message du masquage l'a déjà dite. La page du signalement montre toute image
   supprimée, pas seulement celles qui attendent.
 
-## Durée : six mois (`LOGO_QUARANTINE_DAYS = 180`)
+## Durée : six mois civils (`LOGO_QUARANTINE_MONTHS = 6`)
 
-C'est la durée pendant laquelle le DSA impose de pouvoir contester une décision
-de modération (art. 20.1, « au moins six mois »). Un logo d'équipe ou un avatar
-n'oblige à rien de plus tôt, et plus longtemps n'aurait plus d'objet. **Une
+C'est le délai de contestation d'une décision de modération que le DSA fixe aux
+plateformes en ligne (art. 20.1, « au moins six mois »), et que l'association
+applique ; les textes du site ne disent pas qu'il lui est imposé. Six mois
+**civils**, et non 180 jours : 180 jours sont plus courts que six mois à partir
+d'un 1er mars (184), et la date annoncée tombait avant l'échéance revendiquée.
+`logoQuarantinePurgeDate` compte **au calendrier de Paris**, celui de la date
+annoncée : au calendrier UTC, un masquage le 1er mars à 0 h 30 à Paris (28
+février en UTC) finissait le 29 août. Un quantième absent du mois d'arrivée
+déborde sur le suivant, et une heure avalée par un changement d'heure est
+rendue : le délai peut s'allonger, jamais raccourcir. Un logo d'équipe ou un
+avatar n'oblige à rien de plus tôt, et plus longtemps n'aurait plus d'objet. **Une
 image contestée n'est jamais supprimée d'office** (`canAutoPurgeLogo`) :
 l'échéance passée, elle attend que l'association archive le signalement ou la
 rétablisse.
+
+## Exposé des motifs
+
+Masquer ou supprimer une image est une décision de modération : chaque message
+privé qui l'annonce (`formatLogoHiddenNotice`, `formatLogoRemovedNotice` et
+leurs pendants d'avatar) donne, dans cet ordre, la **décision** (masquée mais
+conservée, ou supprimée), le **motif**, les **faits retenus** (le signalement,
+lisible sur sa page — ou « constat de la modération » hors signalement), le
+fait que la décision est prise **sans traitement automatisé**, le
+**fondement** — la clause des conditions d'utilisation invoquée, avec le lien
+vers `TERMS_PATH#contenus` — et les **voies de recours** : la contestation
+auprès de l'association, puis le juge compétent (DSA art. 17.3).
+
+Le fondement se déduit de la catégorie du signalement (`moderationGroundsFor`) :
+`COPYRIGHT` → atteinte présumée aux droits d'un tiers, tout le reste (et le
+retrait hors signalement) → règles du site. La phrase de réponse suit le motif
+— « si vous en détenez les droits » pour le premier, « si l'image respecte les
+règles, expliquez pourquoi » pour le second — : un logo retiré comme contraire
+aux règles n'a rien à répondre sur ses droits d'auteur. Côté serveur, le
+masquage lit la catégorie en vérifiant que le signalement vise la cible
+(`assertTargeted`) ; les avis de suppression la relisent (`reportGrounds`),
+leurs appelants ne connaissant que l'identifiant du signalement.
 
 ## Où va le fichier
 
@@ -103,7 +134,7 @@ ligne de `bg_logo_quarantines` `PURGED`, close à l'instant de son ouverture
 (`isImmediateLogoRemoval`), rattachée au signalement —, si bien que le panneau
 et la fiche de la cible la montrent, et la personne concernée est prévenue en
 message privé avec le lien pour **contester** (DSA art. 17 et 20). Son
-`purge_after` est la fin du délai de contestation (six mois) : le signalement
+`purge_after` est la fin du délai de contestation (six mois civils) : le signalement
 est gardé jusque-là.
 
 Hors de tout signalement, `DELETE /api/admin/teams/[id]/logo` (fiche

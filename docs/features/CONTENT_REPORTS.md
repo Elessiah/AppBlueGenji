@@ -29,10 +29,16 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
      message part avant que l'association ait rien lu, et sans cette borne le
      formulaire servirait à faire écrire le bot en boucle à une équipe entière.
      Le signalement de plus reste contestable depuis le formulaire.
-3. **Contester.** Seule une personne visée peut contester
-   (`isConcernedByReport`), depuis `/signalements/[id]` ou par la catégorie
-   « Contestation » du même formulaire. Une contestation d'un signalement
-   **archivé le rouvre**, et la direction est prévenue.
+3. **Contester** (`canContestReport`). Une personne visée conteste à tout
+   moment (`isConcernedByReport`), depuis `/signalements/[id]` ou par la
+   catégorie « Contestation » du même formulaire. L'**auteur du signalement**
+   conteste la décision prise — y compris celle de ne pas agir (art. 20.1 DSA,
+   réclamation de l'auteur d'une notification) — par la même catégorie, **une
+   fois le dossier archivé** et s'il a signalé depuis son compte (seul moyen de
+   le reconnaître) ; `/signalements/[id]` ne lui est pas ouverte, elle montre
+   aux visés ce qui les concerne. Une contestation d'un signalement **archivé le
+   rouvre**, et la direction est prévenue — l'alerte dit si elle vient d'une
+   personne visée ou de l'auteur.
 4. **Traiter.** `/admin/signalements` (permission `moderation`, réservée à
    `ADMIN`) : prise en charge, masquage ou suppression d'un logo, archivage avec
    une note, réouverture.
