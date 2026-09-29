@@ -11,18 +11,6 @@
   z-index: 120;
 }
 
-/* Une modale ouverte passe devant tout ce qui flotte : le bouton, au-dessus
-   des voiles de page (80, 90), couvrait la case « J'ai lu et j'accepte » de la
-   modale de consentement de `/connexion`. Il se retire donc tant qu'une
-   modale est ouverte — la règle est posée sur la présence d'une modale, pas
-   sur une liste de `z-index` à tenir à jour. Contrepartie assumée : le menu
-   n'est pas offert pendant une modale. Il ne l'était déjà pas au clavier (le
-   piège de tabulation de `useDialogBehavior` le laisse hors d'atteinte), et
-   les réglages déjà cochés restent appliqués — ils sont posés sur `<html>`. */
-:global(html:has([aria-modal="true"]:not([hidden]))) .root {
-  visibility: hidden;
-}
-
 /* Un disque plein de bleu glacier — la couleur de la marque, à pleine
    intensité pour qu'on le trouve — et le logo en bleu nuit, découpé par un
    masque : le fichier n'apporte que sa forme, la couleur est celle d'ici. Le
@@ -377,4 +365,36 @@
     opacity: 0.15;
     pointer-events: none;
   }
+}
+
+/* Une modale ouverte : le bouton, en bas à gauche, couvrait la case « J'ai lu
+   et j'accepte » de la modale de consentement de `/connexion` — et passait
+   sous d'autres voiles (1000, 1250). Le masquer retirerait le menu à qui en a
+   besoin pour lire une modale qu'on ne peut pas écarter (changements de
+   confidentialité, conditions) : il reste donc offert, au-dessus de tous les
+   voiles, mais réduit et remonté dans le coin haut gauche, où il ne recouvre
+   que la marge du voile et le rembourrage du panneau — les modales sont
+   centrées. Le panneau s'ouvre alors vers le bas. La règle est posée sur la
+   présence d'une modale, pas sur une liste de `z-index` à tenir à jour. */
+:global(html:has([aria-modal="true"]:not([hidden]))) .root {
+  top: 8px;
+  bottom: auto;
+  left: 8px;
+  z-index: 1300;
+}
+
+:global(html:has([aria-modal="true"]:not([hidden]))) .fab {
+  width: 36px;
+  height: 36px;
+}
+
+:global(html:has([aria-modal="true"]:not([hidden]))) .icon {
+  width: 30px;
+  height: 30px;
+}
+
+:global(html:has([aria-modal="true"]:not([hidden]))) .panel {
+  top: calc(100% + 10px);
+  bottom: auto;
+  transform-origin: top left;
 }

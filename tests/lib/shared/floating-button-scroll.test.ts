@@ -86,13 +86,35 @@ describe("les flottants passent sous le voile d'une modale ouverte", () => {
   const modalOpen = String.raw`html:has\(\[aria-modal="true"\]:not\(\[hidden\]\)\)`;
 
   it.each([
-    ["components/accessibility/AccessibilityMenu.module.css", String.raw`:global\(${modalOpen}\) \.root`],
     ["components/client-power-badge.module.css", String.raw`:global\(${modalOpen}\) \.root`],
     ["components/match-launch/MatchLaunchCenter.module.css", String.raw`:global\(${modalOpen}\) \.fab`],
     ["app/globals.css", String.raw`${modalOpen} \.cta-float-help`],
   ])("%s", (file, selector) => {
     const css = stripComments(readSource(file));
     expect(css).toMatch(new RegExp(`${selector}\\s*\\{[^}]*visibility:\\s*hidden;`));
+  });
+});
+
+describe("le menu d'accessibilité reste offert pendant une modale", () => {
+  const css = stripComments(readSource("components/accessibility/AccessibilityMenu.module.css"));
+  const modalOpen = String.raw`:global\(html:has\(\[aria-modal="true"\]:not\(\[hidden\]\)\)\)`;
+  const block = (selector: string) =>
+    css.match(new RegExp(String.raw`${modalOpen} ${selector}\s*\{([^}]*)\}`))?.[1] ?? "";
+
+  it("n'est jamais masqué : une modale qu'on ne peut pas écarter doit rester lisible", () => {
+    expect(css).not.toMatch(/visibility:\s*hidden/);
+  });
+
+  it("passe au-dessus de tous les voiles, remonté dans le coin haut gauche", () => {
+    const root = block(String.raw`\.root`);
+    expect(root).toMatch(/top:\s*8px;/);
+    expect(root).toMatch(/bottom:\s*auto;/);
+    expect(Number(root.match(/z-index:\s*(\d+)/)?.[1])).toBeGreaterThan(1250);
+  });
+
+  it("se réduit, et son panneau s'ouvre vers le bas", () => {
+    expect(block(String.raw`\.fab`)).toMatch(/width:\s*36px;/);
+    expect(block(String.raw`\.panel`)).toMatch(/top:\s*calc\(100% \+ \d+px\);[^]*bottom:\s*auto;/);
   });
 });
 
