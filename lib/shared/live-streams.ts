@@ -140,7 +140,7 @@ export function normalizeStreamUrl(input: unknown): string | null {
   }
 
   if (url.protocol !== "https:" && url.protocol !== "http:") return null;
-  // `https://user:pass@twitch.tv/...` passerait la liste blanche tout en
+  // `https://user:…@twitch.tv/...` (identifiants avant l'hôte) passerait la liste blanche tout en
   // affichant un hôte trompeur dans certains clients.
   if (url.username || url.password) return null;
   if (url.port) return null;

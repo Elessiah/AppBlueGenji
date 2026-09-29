@@ -2,7 +2,7 @@
 import mysql, { type ExecuteValues, type Pool, type PoolConnection, type ResultSetHeader, type RowDataPacket } from "mysql2/promise";
 import { isSchemaNoOpError, isUnknownColumnError } from "@/lib/server/mysql-errors";
 import { createOnceGate, withMigrationLock } from "@/lib/server/migration-lock";
-import { CONTACT_DISCORD_URL_KEY } from "@/lib/shared/contact";
+import { CONTACT_DISCORD_URL_KEY, CONTACT_EMAIL_KEY, SUPERSEDED_CONTACT_EMAILS } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
 
 /**
@@ -1656,8 +1656,8 @@ async function runMigrations(db: Pool): Promise<void> {
   // Rattrapages permanents
   // ───────────────────────────────────────────────────────────────────────────
   //
-  // Deux filets, et non des migrations à cocher : leur cause peut se reproduire,
-  // et ils sont donc **volontairement** rejoués à chaque démarrage. Tous deux
+  // Trois filets, et non des migrations à cocher : leur cause peut se reproduire,
+  // et ils sont donc **volontairement** rejoués à chaque démarrage. Tous trois
   // sont idempotents et ne trouvent rien à faire dans le cas nominal.
 
   // L'invitation Discord est une constante partout **sauf** en pied de page, où
@@ -1677,6 +1677,25 @@ async function runMigrations(db: Pool): Promise<void> {
         WHERE setting_key = ?
           AND setting_value IN (${placeholders})`,
       [DISCORD_INVITE_URL, CONTACT_DISCORD_URL_KEY, ...SUPERSEDED_DISCORD_INVITE_URLS],
+    );
+  } catch {
+    // Rattrapage remis au prochain démarrage.
+  }
+
+  // Même panne pour le courriel du pied de page (`contact_email`) : un ancien
+  // défaut y a écrit une adresse **fausse**, que le site affichait sur toutes les
+  // pages vitrine comme celle de l'association. Elle est **vidée** — le canal
+  // disparaît du pied de page, le vrai courriel figurant dans les mentions
+  // légales —, et seules les adresses fausses connues le sont : celle que le
+  // staff a saisie lui appartient.
+  try {
+    const placeholders = SUPERSEDED_CONTACT_EMAILS.map(() => "?").join(", ");
+    await db.execute(
+      `UPDATE bg_settings
+          SET setting_value = ''
+        WHERE setting_key = ?
+          AND setting_value IN (${placeholders})`,
+      [CONTACT_EMAIL_KEY, ...SUPERSEDED_CONTACT_EMAILS],
     );
   } catch {
     // Rattrapage remis au prochain démarrage.

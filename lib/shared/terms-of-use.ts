@@ -163,7 +163,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "droit-applicable",
     title: "Droit applicable",
     paragraphs: [
-      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou son adresse de contact, en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents.",
+      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou son courriel (donné dans les mentions légales), en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents.",
     ],
   },
 ];

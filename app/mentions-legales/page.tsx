@@ -7,6 +7,8 @@ import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
+import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 
@@ -152,11 +154,16 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           scène, ainsi que la retransmission en direct des événements et tournois.
         </p>
         <p>
-          <strong>Contact :</strong> via le serveur{" "}
+          <strong>Courriel :</strong>{" "}
+          <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
+          <br />
+          <strong>Téléphone :</strong>{" "}
+          <ProtectedContact encoded={ASSOCIATION_PHONE_ENCODED} kind="phone" owner="de l'association" />
+          <br />
+          <strong>Discord :</strong>{" "}
           <a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">
-            Discord de l&apos;association
+            serveur de l&apos;association (nouvel onglet)
           </a>
-          .
         </p>
       </>
     ),
@@ -173,23 +180,26 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
   },
   {
     id: "hebergement",
-    title: "Hébergement",
-    meta: "HÉBERGEUR",
+    title: "Hébergement technique",
+    meta: "HÉBERGEUR TECHNIQUE",
     body: (
       <>
         <p>
-          Le site est hébergé sur le même serveur que{" "}
-          <a href="https://celine-houssin.fr" target="_blank" rel="noreferrer">
-            celine-houssin.fr
-          </a>
-          , par :
+          Le site et le bot Discord de l&apos;association tournent sur {SITE_HOST.machine}, fourni
+          et administré par son <strong>hébergeur technique</strong> :
         </p>
         <p>
           <strong>{SITE_HOST.name}</strong> — {SITE_HOST.status}
           <br />
           {SITE_HOST.address}
           <br />
-          Téléphone : {SITE_HOST.phone}
+          Téléphone :{" "}
+          <ProtectedContact encoded={SITE_HOST.phoneEncoded} kind="phone" owner="de l'hébergeur" />
+        </p>
+        <p>
+          L&apos;hébergeur technique fournit la machine. Il ne faut pas le confondre avec
+          l&apos;association, qui est l&apos;<a href="#contenus-membres">hébergeur des contenus de
+          ses membres</a> au sens du règlement européen sur les services numériques.
         </p>
         <p>
           Pour écrire à l&apos;hébergeur ou à l&apos;éditeur : bouton <strong>« {REPORT_FORM_NAME} »</strong>{" "}
@@ -222,12 +232,13 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
   {
     id: "contenus-membres",
     title: "Contenus des membres et signalement",
-    meta: "HÉBERGEUR · DSA ART. 16",
+    meta: "HÉBERGEUR DES CONTENUS · DSA ART. 16",
     body: (
       <>
         <p>
           Pour les contenus que publient ses membres, l&apos;association agit en qualité
-          d&apos;<strong>hébergeur</strong> (loi pour la confiance dans l&apos;économie numérique,
+          d&apos;<strong>hébergeur de ces contenus</strong> — distinct de l&apos;hébergeur
+          technique, qui fournit la machine (loi pour la confiance dans l&apos;économie numérique,
           art. 6 ; règlement européen sur les services numériques, art. 6) : elle ne les contrôle pas
           avant publication, et chaque membre garantit détenir les droits sur ce qu&apos;il publie,
           comme le prévoient les{" "}
@@ -268,7 +279,8 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           2016/679), vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement
           et de portabilité des données vous concernant, ainsi que d&apos;un droit d&apos;opposition
           au traitement. Ces droits peuvent être exercés par le bouton « {REPORT_FORM_NAME} » en bas de
-          chaque page, catégorie « RGPD », ou sur Discord auprès de <strong>{LEGAL_CONTACT_DISCORD}</strong>. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
+          chaque page, catégorie « RGPD », au courriel de l&apos;association donné plus haut, ou sur
+          Discord auprès de <strong>{LEGAL_CONTACT_DISCORD}</strong>, hébergeur technique. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
           <Link href="/rgpd">politique de confidentialité</Link>.
         </p>
       </>

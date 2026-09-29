@@ -63,7 +63,9 @@ const FORM_FR = `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page 
 const FORM_EN = `The **“${REPORT_FORM_NAME}”** form at the bottom of every page of the site`;
 const DISCORD_GUIDELINES = "https://discord.com/guidelines";
 const PRIVACY_HREF = "/privacy-policy-bot";
-// Aucune adresse électronique : le site n'en publie pas (`lib/shared/legal-contact.ts`).
+// Aucune adresse électronique ici : le courriel de l'association ne s'écrit
+// jamais en clair, il se révèle au clic sur les pages du site
+// (`lib/shared/legal-contact.ts`), ce que ces textes ne savent pas faire.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
 /* -------------------------------------------------------------------------- */

@@ -3,10 +3,16 @@ import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { getContactInfo, setContactInfo } from "@/lib/server/contact-service";
 import { readJsonBody } from "@/lib/server/request-body";
+import { toPublicContact } from "@/lib/shared/contact";
 
+/**
+ * Lecture publique : le courriel part **encodé**, comme dans le pied de page
+ * (`lib/shared/obfuscated-contact.ts`) — une route anonyme qui le rendrait en
+ * clair serait le chemin le plus court pour un robot.
+ */
 export async function GET() {
   const contact = await getContactInfo();
-  return ok({ contact });
+  return ok({ contact: toPublicContact(contact) });
 }
 
 export async function PUT(req: Request) {

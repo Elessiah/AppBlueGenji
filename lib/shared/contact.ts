@@ -6,6 +6,7 @@
  * client/serveur.
  */
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
+import { ASSOCIATION_EMAIL_ENCODED, decodeContact, encodeContact } from "@/lib/shared/obfuscated-contact";
 
 export type ContactInfo = {
   email: string;
@@ -21,13 +22,45 @@ export const CONTACT_DISCORD_URL_KEY = "contact_discord_url";
 /**
  * Secours tant que rien n'a été enregistré en base. Le lien Discord y est
  * l'invitation canonique du site : un défaut qui pointerait ailleurs ferait
- * mentir la page contact de toute installation neuve.
+ * mentir la page contact de toute installation neuve. Le courriel est celui de
+ * l'association, décodé ici plutôt qu'écrit : ce dépôt est public
+ * (`lib/shared/obfuscated-contact.ts`).
  */
 export const DEFAULT_CONTACT: ContactInfo = {
-  email: "presse@bluegenji-esport.fr",
+  email: decodeContact(ASSOCIATION_EMAIL_ENCODED),
   discordTag: "",
   discordUrl: DISCORD_INVITE_URL,
 };
+
+/**
+ * Adresses de contact **fausses** qu'un défaut antérieur a pu écrire en base
+ * (`bg_settings.contact_email`) : le rattrapage de `lib/server/database.ts` les
+ * vide au démarrage. Encodées, pour la même raison que les autres coordonnées —
+ * une adresse, même fausse, écrite dans le dépôt reste une adresse moissonnée.
+ */
+export const SUPERSEDED_CONTACT_EMAILS: readonly string[] = [
+  "=InZuQncvB3cl1Saq5WZnVWdsJGQlN3clJHc",
+].map(decodeContact);
+
+/**
+ * Coordonnées telles qu'elles partent vers une page : le courriel **encodé**,
+ * que seul le navigateur décode, après un geste du visiteur. Les composants
+ * clients recevant leurs props dans le HTML, un courriel passé en clair y
+ * figurerait pour tout robot.
+ */
+export type PublicContactInfo = {
+  emailEncoded: string;
+  discordTag: string;
+  discordUrl: string;
+};
+
+export function toPublicContact(contact: ContactInfo): PublicContactInfo {
+  return {
+    emailEncoded: encodeContact(contact.email),
+    discordTag: contact.discordTag,
+    discordUrl: contact.discordUrl,
+  };
+}
 
 export const EMAIL_MAX = 254;
 export const DISCORD_TAG_MAX = 64;

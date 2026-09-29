@@ -130,9 +130,9 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresReplyChannel: false,
     descriptionPlaceholder: "Ce que tu faisais, ce que tu attendais, ce qui s'est passé…",
   },
-  // Les deux catégories suivantes reçoivent ce qu'une adresse électronique
-  // publiée recevait (`lib/shared/legal-contact.ts`) : le site n'en publie plus
-  // aucune. Ni l'une ni l'autre ne désigne de cible — une demande sur ses
+  // Les deux catégories suivantes trient les demandes faites à l'éditeur et à
+  // l'hébergeur (`lib/shared/legal-contact.ts`) ; le courriel de l'association,
+  // révélé au clic sur les mentions légales, en est l'autre chemin. Ni l'une ni l'autre ne désigne de cible — une demande sur ses
   // propres données n'a personne à prévenir, et un contenu illicite d'un joueur
   // ou d'une équipe se signale par « Droit d'auteur » ou « Modération », qui
   // savent le masquer et le faire contester.
