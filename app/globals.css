@@ -415,6 +415,47 @@ textarea,
   color: #ffd9df;
 }
 
+/*
+ * Zone de tap étendue (WCAG 2.5.8) : un petit contrôle garde son dessin, et un
+ * pseudo-élément transparent, centré sur lui, porte la zone sensible à
+ * `--tap-min` (24 px, le plancher ; `.tap-target-lg` vise 44 px pour un geste
+ * sans retour). Rien ne bouge dans la mise en page — un rembourrage agrandirait
+ * aussi la carte de match, sur laquelle l'arbre cale ses connecteurs.
+ *
+ * `position: relative` est posé à spécificité nulle : un contrôle déjà
+ * positionné (`.aboveOverlay`, `z-index: 2` au-dessus de la plaque des cartes
+ * d'annuaire) garde le sien, et le pseudo-élément hérite de son étage.
+ *
+ * `.btn` rogne ce qui déborde (`overflow: hidden`, pour son reflet au survol),
+ * et le rognage vaut aussi pour la zone sensible : sur un `.btn` étendu, le
+ * débordement est rendu et le reflet retiré.
+ */
+:where(.tap-target) {
+  position: relative;
+}
+
+.tap-target::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: max(100%, var(--tap-min, 24px));
+  height: max(100%, var(--tap-min, 24px));
+  transform: translate(-50%, -50%);
+}
+
+.tap-target-lg {
+  --tap-min: 44px;
+}
+
+.btn.tap-target {
+  overflow: visible;
+}
+
+.btn.tap-target::before {
+  content: none;
+}
+
 .searchbar {
   --search-color: 89, 212, 255;
   display: flex;

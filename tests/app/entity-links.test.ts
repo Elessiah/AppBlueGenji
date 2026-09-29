@@ -228,7 +228,7 @@ describe("Cartes d'annuaire — deux destinations, sans ancre imbriquée", () =>
     expect(code).toContain("<TeamLink");
     expect(code).toContain("teamId={player.team.id}");
     // Sans remonter au-dessus de la plaque, le lien serait recouvert par elle.
-    expect(code).toContain("className={s.aboveOverlay}");
+    expect(code).toContain("className={`${s.aboveOverlay} tap-target`}");
   });
 
   it("couvre toute la carte", () => {

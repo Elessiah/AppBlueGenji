@@ -320,7 +320,7 @@ export function SwissView({
                               <button
                                 type="button"
                                 onClick={() => onForfeit(team.teamId, team.teamName)}
-                                className="btn"
+                                className="btn tap-target tap-target-lg"
                                 title={
                                   isMine
                                     ? "Abandonner : votre équipe quitte définitivement le tournoi"

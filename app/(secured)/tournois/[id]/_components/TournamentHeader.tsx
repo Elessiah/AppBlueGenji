@@ -126,7 +126,7 @@ export function TournamentHeader({
     <div className="ds-header green">
       <div className={`ds-header-body ${s.shell}`}>
         <div className={s.utility}>
-          <Link href="/tournois" onClick={onBackClick} className={s.back}>
+          <Link href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>
             <span aria-hidden="true">←</span> {backInSite ? "Retour" : "Tous les tournois"}
           </Link>
           <div className={s.viewer}>
