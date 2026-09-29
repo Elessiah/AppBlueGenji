@@ -190,7 +190,7 @@ export function SurvivalView({
                   </span>
                   <span
                     style={{
-                      fontSize: 10,
+                      fontSize: 11,
                       textTransform: "uppercase",
                       letterSpacing: "0.04em",
                       color: meta.color,
@@ -220,7 +220,7 @@ export function SurvivalView({
                       }
                       style={{
                         padding: "3px 8px",
-                        fontSize: 10,
+                        fontSize: 11,
                         textTransform: "uppercase",
                         letterSpacing: "0.04em",
                         background: "rgba(255,157,46,0.12)",
@@ -297,7 +297,7 @@ export function SurvivalView({
                       {isBarrageRound && (
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize: 11,
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             color: AMBER,
@@ -312,7 +312,7 @@ export function SurvivalView({
                       {cut && (
                         <span
                           style={{
-                            fontSize: 10,
+                            fontSize: 11,
                             textTransform: "uppercase",
                             letterSpacing: "0.05em",
                             color: AMBER,

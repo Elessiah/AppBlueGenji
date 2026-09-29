@@ -244,7 +244,7 @@ export function LoginForm() {
             */}
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
-              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em", whiteSpace: "nowrap" }}>
+              <span className="mono" style={{ fontSize: 11, letterSpacing: "0.14em", whiteSpace: "nowrap" }}>
                 OU CODE PAR MESSAGE PRIVÉ
               </span>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
@@ -303,7 +303,7 @@ export function LoginForm() {
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
-              <span className="mono" style={{ fontSize: 10, letterSpacing: "0.2em", whiteSpace: "nowrap" }}>
+              <span className="mono" style={{ fontSize: 11, letterSpacing: "0.14em", whiteSpace: "nowrap" }}>
                 OU CODE PAR MESSAGE PRIVÉ
               </span>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />

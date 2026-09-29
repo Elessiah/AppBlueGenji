@@ -148,7 +148,7 @@
   padding-top: 16px;
   border-top: 1px solid var(--line);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--ink-dim);
 }

@@ -38,12 +38,12 @@
 .icon {
   display: inline-grid;
   place-items: center;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: #5ac8ff;
   color: #06080c;
-  font-size: 8px;
+  font-size: 11px;
   line-height: 1;
 }
 

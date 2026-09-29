@@ -47,7 +47,7 @@ const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--text-2)" };
 /** Bouton d'abandon du classement. */
 const FORFEIT_BUTTON_STYLE: CSSProperties = {
   padding: "3px 8px",
-  fontSize: 10,
+  fontSize: 11,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
   background: "rgba(255,157,46,0.12)",
@@ -185,7 +185,7 @@ export function SwissView({
                     style={{
                       ...SUBGRID,
                       padding: "4px 10px",
-                      fontSize: 10,
+                      fontSize: 11,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
                       color: "var(--text-2)",
@@ -293,7 +293,7 @@ export function SwissView({
                         <span
                           role="cell"
                           title={team.byes > 0 ? "Victoire d'office reçue (effectif impair)" : undefined}
-                          style={{ fontSize: 10, color: AMBER }}
+                          style={{ fontSize: 11, color: AMBER }}
                         >
                           {team.byes > 0 && (
                             <>
@@ -306,7 +306,7 @@ export function SwissView({
                           role="cell"
                           style={{
                             ...RIGHT,
-                            fontSize: 10,
+                            fontSize: 11,
                             textTransform: "uppercase",
                             letterSpacing: "0.04em",
                             color: meta.color,
@@ -440,7 +440,7 @@ export function SwissRounds({
                   {isFinalRound && (
                     <span
                       style={{
-                        fontSize: 10,
+                        fontSize: 11,
                         textTransform: "uppercase",
                         letterSpacing: "0.05em",
                         color: AMBER,

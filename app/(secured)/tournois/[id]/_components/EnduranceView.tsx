@@ -220,7 +220,7 @@ function EnduranceHistory({
       {/* Une case rouge n'est lisible qu'accompagnée de ce qu'elle veut dire :
           la légende n'apparaît que s'il y a effectivement un forfait à lire. */}
       {endurance.standings.some((standing) => standing.status === "FORFEIT") && (
-        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "8px 0 0" }}>
+        <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "8px 0 0" }}>
           FF = FORFAIT SUR TOUT LE RESTE DU TOURNOI
         </p>
       )}
@@ -232,7 +232,7 @@ function EnduranceHistory({
       {endurance.standings.some((standing) =>
         standing.rounds.some((cell) => enduranceCellPenalty(cell) > 0),
       ) && (
-        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "8px 0 0" }}>
+        <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "8px 0 0" }}>
           SOULIGNÉ EN AMBRE = PÉNALITÉ D&apos;ARBITRAGE SUR CETTE MANCHE
         </p>
       )}
@@ -318,7 +318,7 @@ function PenaltyLog({
                 aria-label={`Retirer la pénalité de ${penalty.points} point(s) infligée à ${penalty.teamName}`}
                 style={{
                   padding: "2px 8px",
-                  fontSize: 10,
+                  fontSize: 11,
                   textTransform: "uppercase",
                   letterSpacing: "0.04em",
                 }}
@@ -527,7 +527,7 @@ export function EnduranceView({
                       aria-label={`Infliger une pénalité d'endurance à ${standing.teamName}`}
                       style={{
                         padding: "3px 8px",
-                        fontSize: 10,
+                        fontSize: 11,
                         textTransform: "uppercase",
                         letterSpacing: "0.04em",
                         background: "rgba(255,157,46,0.12)",
@@ -555,7 +555,7 @@ export function EnduranceView({
                       }
                       style={{
                         padding: "3px 8px",
-                        fontSize: 10,
+                        fontSize: 11,
                         textTransform: "uppercase",
                         letterSpacing: "0.04em",
                         background: "rgba(255,157,46,0.12)",
@@ -581,7 +581,7 @@ export function EnduranceView({
       </div>
 
       {showOutLegend && (
-        <p className="mono" style={{ fontSize: 10, color: "var(--text-2)", margin: "0 0 24px" }}>
+        <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "0 0 24px" }}>
           HORS COURSE = CAPITAL RESTANT, MAIS PLUS AUCUNE CHANCE D&apos;ATTEINDRE LES PLAY-OFFS
           {endurance.maxRounds === null ? "" : ` DANS LES ${endurance.maxRounds} MANCHES PRÉVUES`}
         </p>

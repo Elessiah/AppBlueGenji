@@ -115,7 +115,7 @@ export function Coche({
             alignItems: "center",
             justifyContent: "center",
             transition: "all 0.15s",
-            fontSize: 10,
+            fontSize: 11,
             color: "var(--bg-0)",
             fontWeight: 900,
             lineHeight: 1,

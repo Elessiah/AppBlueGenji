@@ -99,19 +99,19 @@ export default async function AssociationPage() {
                 `<main>` n'est pas un repère de premier niveau (RGAA 12.6). */}
             <div className={styles.heroSide}>
               <div className={styles.heroFact}>
-                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
+                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
                   FONDÉE EN
                 </span>
                 <span className="num" style={{ fontSize: 28 }}>2020</span>
               </div>
               <div className={styles.heroFact}>
-                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
+                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
                   SIÈGE
                 </span>
                 <span style={{ fontSize: 17 }}>Janvilliers</span>
               </div>
               <div className={styles.heroFact}>
-                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 10, letterSpacing: "0.2em" }}>
+                <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
                   STATUT
                 </span>
                 <span style={{ fontSize: 17 }}>Association loi 1901</span>
