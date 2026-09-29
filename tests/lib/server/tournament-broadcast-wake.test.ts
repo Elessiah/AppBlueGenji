@@ -407,6 +407,30 @@ describe("tournament-broadcast — réveil d'entretien", () => {
     expect(late.received).toEqual(['data: "v2"']);
   });
 
+  it("ne repousse pas une échéance proche après une lecture en échec", async () => {
+    // Un coup d'envoi dans 5 s ; une écriture publiée entre-temps tombe sur une
+    // base en panne. Le délai d'essai (30 s) ne doit pas remplacer le réveil.
+    const start = Date.now() + 5_000;
+    const beforeKickoff = {
+      state: "UPCOMING" as const,
+      registrationOpenAt: iso(start - 120_000),
+      registrationCloseAt: iso(start - 60_000),
+      startAt: iso(start),
+    };
+    const viewer = plainSubscriber("v1");
+    await settledJoin(frameOf("v1", beforeKickoff), viewer);
+
+    getFrame.mockRejectedValueOnce(new Error("ECONNRESET"));
+    publish();
+    await advance(0);
+    expect(getFrame).toHaveBeenCalledTimes(1);
+
+    getFrame.mockResolvedValue(frameOf("v2", { ...beforeKickoff, state: "RUNNING" }));
+    await advance(5_000);
+    expect(getFrame).toHaveBeenCalledTimes(2);
+    expect(viewer.received).toEqual(['data: "v2"']);
+  });
+
   it("retente une lecture en échec sans attendre le filet", async () => {
     const running = frameOf("v1");
     const viewer = plainSubscriber("v1");

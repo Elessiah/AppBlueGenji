@@ -326,6 +326,8 @@ type Room = {
   unsubscribe: () => void;
   /** Réveil d'entretien : la prochaine échéance connue (`nextRoomWakeAt`). */
   maintenance: ReturnType<typeof setTimeout> | null;
+  /** Instant visé par `maintenance`. */
+  maintenanceAt: number;
   flushTimer: ReturnType<typeof setTimeout> | null;
   /** Instant visé par `flushTimer`, pour qu'une demande plus urgente le devance. */
   flushAt: number;
@@ -423,7 +425,7 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
       frame = await getTournamentSnapshotFrame(tournamentId);
     } catch {
       // Incident passager : on retente plus tard, sans attendre le filet.
-      scheduleMaintenance(tournamentId, room, Date.now() + ROOM_READ_RETRY_MS);
+      scheduleMaintenance(tournamentId, room, Date.now() + ROOM_READ_RETRY_MS, true);
       return;
     }
 
@@ -550,12 +552,23 @@ function closeGoneRoom(tournamentId: number, room: Room): void {
  * (Re)programme le réveil d'entretien à `wakeAt` (`null` : aucun). Remplace le
  * précédent : c'est toujours la dernière lecture qui sait quelle est la
  * prochaine échéance.
+ *
+ * `keepEarlier` : ne remplace le réveil en place que s'il est plus tardif. Sert
+ * après une lecture en échec, qui ne sait rien de la prochaine échéance — un
+ * coup d'envoi dans trois secondes ne doit pas glisser au délai d'essai.
  */
-function scheduleMaintenance(tournamentId: number, room: Room, wakeAt: number | null): void {
+function scheduleMaintenance(
+  tournamentId: number,
+  room: Room,
+  wakeAt: number | null,
+  keepEarlier = false,
+): void {
+  if (keepEarlier && room.maintenance && wakeAt !== null && room.maintenanceAt <= wakeAt) return;
   if (room.maintenance) clearTimeout(room.maintenance);
   room.maintenance = null;
   if (wakeAt === null || rooms.get(tournamentId) !== room) return;
 
+  room.maintenanceAt = wakeAt;
   room.maintenance = setTimeout(() => {
     room.maintenance = null;
     if (rooms.get(tournamentId) === room) void flush(tournamentId, room);
@@ -569,6 +582,7 @@ function openRoom(tournamentId: number, known?: TournamentSnapshot): Room {
     states: new Map<TournamentSubscriber, SubscriberState>(),
     unsubscribe: () => undefined,
     maintenance: null,
+    maintenanceAt: 0,
     flushTimer: null,
     flushAt: 0,
     flushing: false,
