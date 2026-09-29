@@ -143,9 +143,14 @@
   color: var(--ink);
   margin-bottom: 6px;
   line-height: 1.15;
-  white-space: nowrap;
+  /* Deux lignes avant les points de suspension : sur une seule, un nom long
+     d'équipe se réduisait à son préfixe. */
   overflow: hidden;
-  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
 }
 
 .tag {

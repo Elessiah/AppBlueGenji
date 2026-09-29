@@ -166,7 +166,8 @@
   outline: none;
   padding: 14px 4px;
   font-family: var(--font-sans);
-  font-size: 14px;
+  /* 16 px au moins : en dessous, iOS Safari zoome la page au focus du champ. */
+  font-size: 16px;
   color: var(--ink);
 }
 .search input:not([type="checkbox"]):not([type="radio"])::placeholder {
@@ -181,6 +182,14 @@
   border: 1px solid var(--line-strong-cy);
   border-radius: 4px;
   padding: 3px 7px;
+}
+
+/* Sur un écran tactile, le raccourci clavier n'a pas d'objet : la pastille
+   prenait la place de l'aide et se faisait rogner à 320 px. */
+@media (hover: none) {
+  .searchKbd {
+    display: none;
+  }
 }
 
 .filters {

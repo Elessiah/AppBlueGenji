@@ -84,13 +84,19 @@
 }
 
 /* Le nom est le lien (`TeamLink`), dernier enfant de la cellule : l'ancien
-   sélecteur `span:last-child` ne l'atteignait pas, si bien qu'un nom long
-   passait sur trois lignes au lieu de s'abréger (le `title` le donne entier). */
+   sélecteur `span:last-child` ne l'atteignait pas. Deux lignes au plus, puis
+   points de suspension (le `title` le donne entier) : sur une seule ligne, un
+   nom s'abrégeait à ~13 caractères en mobile, et trois « Test - Bracket … »
+   devenaient indiscernables. */
 .team > :last-child {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow-wrap: anywhere;
+  line-height: 1.25;
 }
 
 .wl {
@@ -158,5 +164,18 @@
   .row {
     grid-template-columns: 24px minmax(0, 1fr) 56px 40px 30px;
     gap: 8px;
+  }
+}
+
+/* Très petit écran : la tendance (colonne secondaire) cède sa place au nom. */
+@media (max-width: 400px) {
+  .tableHead,
+  .row {
+    grid-template-columns: 24px minmax(0, 1fr) 56px 40px;
+  }
+
+  .trend,
+  .trendHead {
+    display: none;
   }
 }

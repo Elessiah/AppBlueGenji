@@ -154,6 +154,7 @@ export default function PlayersPage() {
 
           <div className={s.toolbar}>
             <AnnuaireSearchField
+              label="Rechercher un joueur"
               placeholder="Rechercher un pseudo, une équipe…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
