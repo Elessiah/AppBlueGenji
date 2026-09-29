@@ -334,7 +334,12 @@ export function publishedPrivacyChanges(
  * jour même ou après, non — le compte s'est inscrit sous la politique déjà à
  * jour. Un changement pas encore publié (après `today`) ne concerne personne.
  * La comparaison se fait sur le **jour** (`AAAA-MM-JJ`, donc en chaînes) :
- * `created_at` arrive de MySQL en `dateStrings`.
+ * `created_at` arrive de MySQL en `dateStrings`, au fuseau du serveur de base
+ * (hébergé en France, donc le jour de Paris ; aucun fuseau n'est posé sur le
+ * pool). Sur une base en UTC, un compte né entre minuit et deux heures (Paris)
+ * serait daté de la veille et verrait un changement du jour même — un
+ * changement déjà en vigueur, donc sans dommage ; l'erreur inverse, taire un
+ * changement dû, est impossible par ce biais.
  *
  * @param accountCreatedAt `created_at` du compte (`AAAA-MM-JJ HH:MM:SS` ou ISO),
  *   `null` si inconnu — auquel cas tout ce qui n'est pas acquitté est dû.
