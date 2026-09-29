@@ -51,7 +51,7 @@ export default async function BotPage() {
       <main>
         <div className="container">
           <BotCrumb />
-          <BotHero />
+          <BotHero status={status} />
           <BotStatusStrip status={status} />
           <BotKpis kpis={kpis} />
 

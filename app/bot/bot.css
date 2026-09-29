@@ -28,11 +28,6 @@
   background: rgba(0,0,0,0.3);
   color: var(--ink-mute);
 }
-.bot-crumb .endpoint .dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: #6bd48a;
-  box-shadow: 0 0 6px rgba(107, 212, 138, 0.6);
-}
 
 /* ---------- Bot identity header ---------- */
 .bot-hero {
@@ -57,7 +52,11 @@
     linear-gradient(180deg, var(--bg-2), var(--bg-1));
   box-shadow: 0 0 calc(40px * var(--glow, 1)) rgba(90,200,255,calc(0.12 * var(--glow, 1)));
 }
-.bot-avatar::after {
+/* Pastille « en ligne » : posée **seulement** quand le bot se dit
+   opérationnel (`.online`, décidé par `BotHero` sur la même charge que la
+   case « État »). En dur, elle restait verte au-dessus d'un « Le bot n'a pas
+   répondu à la page ». */
+.bot-avatar.online::after {
   content: "";
   position: absolute; right: -3px; bottom: -3px;
   width: 18px; height: 18px;
@@ -593,7 +592,10 @@
 .invite-inner {
   position: relative; z-index: 1;
   display: grid;
-  grid-template-columns: 1.2fr 1fr;
+  /* `minmax(0, …)` : une piste `fr` a pour minimum la largeur de son contenu,
+     et un mot insécable (« MODERATE_MEMBERS ») poussait la carte au-delà de
+     l'écran, où `overflow: hidden` rognait titre et paragraphe. */
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
   gap: 48px;
   align-items: start;
 }
@@ -604,6 +606,7 @@
   line-height: 1.05;
   margin-bottom: 14px;
 }
+.invite-copy h3, .invite-copy p { overflow-wrap: anywhere; }
 .invite-copy h3 .a { color: var(--blue-500); }
 .invite-copy p {
   color: var(--ink-mute);
@@ -630,7 +633,7 @@
 }
 .perm {
   display: grid;
-  grid-template-columns: 18px 1fr auto;
+  grid-template-columns: 18px minmax(0, 1fr) minmax(0, auto);
   gap: 14px;
   align-items: center;
   padding: 10px 14px;
@@ -641,6 +644,7 @@
 .perm svg.check { color: #6bd48a; }
 .perm .lbl { font-size: 13px; color: var(--ink); }
 .perm .scope { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.14em; color: var(--ink-dim); }
+.perm .lbl, .perm .scope { overflow-wrap: anywhere; }
 
 /* ---------- Section header for /bot ---------- */
 .bot-section-head {
@@ -691,7 +695,7 @@
 }
 @media (max-width: 860px) {
   .bot-docs-list { grid-template-columns: 1fr; }
-  .invite-inner { grid-template-columns: 1fr; gap: 32px; }
+  .invite-inner { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .invite-card { padding: 28px; }
   /* Hero bot : on empile identité + CTA */
   .bot-hero {

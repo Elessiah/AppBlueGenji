@@ -12,7 +12,7 @@ export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
     },
     {
       key: "channels",
-      lbl: "Channels relayés",
+      lbl: "Salons relayés",
       data: kpis?.channels,
     },
     {
