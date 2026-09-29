@@ -29,7 +29,8 @@ const SAFE_POLL_MS = 1_000;
 export interface LazyReloadEnv {
   now: () => number;
   readStamp: () => string | null;
-  writeStamp: (value: string) => void;
+  /** Rend `false` si la marque n'a pas pu être écrite. */
+  writeStamp: (value: string) => boolean;
   reload: () => void;
   /**
    * Recharger maintenant est sûr : aucune modale ouverte (une saisie peut y
@@ -62,8 +63,9 @@ function browserEnv(): LazyReloadEnv | null {
     writeStamp: (value) => {
       try {
         window.sessionStorage.setItem(LAZY_RELOAD_KEY, value);
+        return true;
       } catch {
-        // Stockage indisponible : on recharge quand même.
+        return false;
       }
     },
     reload: () => window.location.reload(),
@@ -87,9 +89,24 @@ function reloadNow(env: LazyReloadEnv): boolean {
   const last = Number(env.readStamp());
   const now = env.now();
   if (Number.isFinite(last) && last > 0 && now - last < LAZY_RELOAD_COOLDOWN_MS) return false;
-  env.writeStamp(String(now));
+  // Sans marque écrite, rien ne bornerait les rechargements suivants (stockage
+  // bloqué) : mieux vaut un composant vide qu'une page qui recharge en boucle.
+  if (!env.writeStamp(String(now))) return false;
   env.reload();
   return true;
+}
+
+/**
+ * Le chargement a échoué faute de fichier (déploiement, réseau) — le seul cas
+ * qu'un rechargement répare. Une erreur levée par le module lui-même (un bogue)
+ * n'en est pas un : elle doit remonter, pas se déguiser en composant vide.
+ */
+export function isChunkLoadError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  if (error.name === "ChunkLoadError") return true;
+  return /Loading (CSS )?chunk \S+ failed|Failed to fetch dynamically imported module|error loading dynamically imported module|Importing a module script failed/i.test(
+    error.message,
+  );
 }
 
 /**
@@ -111,7 +128,8 @@ export function orReload<P>(
   load: Promise<ComponentType<P>>,
   env?: LazyReloadEnv | null,
 ): Promise<ComponentType<P>> {
-  return load.catch(() => {
+  return load.catch((error: unknown) => {
+    if (!isChunkLoadError(error)) throw error;
     reloadAfterChunkError(env === undefined ? browserEnv() : env);
     const Empty: ComponentType<P> = () => null;
     return Empty;

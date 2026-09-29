@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   LAZY_RELOAD_COOLDOWN_MS,
+  isChunkLoadError,
   orReload,
   reloadAfterChunkError,
   type LazyReloadEnv,
@@ -63,8 +64,10 @@ describe("paquet de la fiche tournoi", () => {
 });
 
 describe("filet d'un chargement à la demande (orReload)", () => {
+  const chunkError = () => Object.assign(new Error("Loading chunk 42 failed."), { name: "ChunkLoadError" });
+
   const makeEnv = (stamp: string | null, now = 1_000_000, modal = false) => {
-    const state = { stamp, reloads: 0, modal, pending: [] as Array<() => void> };
+    const state = { stamp, reloads: 0, modal, writable: true, pending: [] as Array<() => void> };
     const env: LazyReloadEnv = {
       now: () => now,
       safeNow: () => !state.modal,
@@ -74,6 +77,7 @@ describe("filet d'un chargement à la demande (orReload)", () => {
       readStamp: () => state.stamp,
       writeStamp: (value) => {
         state.stamp = value;
+        return state.writable;
       },
       reload: () => {
         state.reloads += 1;
@@ -91,7 +95,7 @@ describe("filet d'un chargement à la demande (orReload)", () => {
 
   it("recharge la page sur un fichier disparu et rend un composant vide", async () => {
     const { env, state } = makeEnv(null);
-    const Loaded = await orReload(Promise.reject(new Error("ChunkLoadError")), env);
+    const Loaded = await orReload(Promise.reject(chunkError()), env);
     expect(state.reloads).toBe(1);
     expect(state.stamp).toBe("1000000");
     expect((Loaded as () => null)()).toBeNull();
@@ -99,7 +103,7 @@ describe("filet d'un chargement à la demande (orReload)", () => {
 
   it("attend qu'il soit sûr de recharger (modale ouverte, hors ligne)", async () => {
     const { env, state } = makeEnv(null, 1_000_000, true);
-    const Loaded = await orReload(Promise.reject(new Error("ChunkLoadError")), env);
+    const Loaded = await orReload(Promise.reject(chunkError()), env);
     expect(state.reloads).toBe(0);
     expect(state.stamp).toBeNull();
     expect((Loaded as () => null)()).toBeNull();
@@ -120,9 +124,40 @@ describe("filet d'un chargement à la demande (orReload)", () => {
     expect(reloadAfterChunkError(makeEnv("n'importe quoi").env)).toBe(true);
   });
 
+  it("ne recharge pas quand la marque ne peut pas être écrite (pas de boucle)", () => {
+    const { env, state } = makeEnv(null);
+    state.writable = false;
+    expect(reloadAfterChunkError(env)).toBe(false);
+    expect(state.reloads).toBe(0);
+  });
+
+  it("laisse remonter une erreur qui n'est pas un fichier manquant", async () => {
+    const { env, state } = makeEnv(null);
+    const bug = new TypeError("x is not a function");
+    await expect(orReload(Promise.reject(bug), env)).rejects.toBe(bug);
+    expect(state.reloads).toBe(0);
+  });
+
+  it.each<[string, boolean]>([
+    ["Loading chunk 123 failed.", true],
+    ["Loading CSS chunk 7 failed.", true],
+    ["Failed to fetch dynamically imported module: https://x/a.js", true],
+    ["error loading dynamically imported module", true],
+    ["Importing a module script failed.", true],
+    ["x is not a function", false],
+  ])("reconnaît « %s » : %s", (message, expected) => {
+    expect(isChunkLoadError(new Error(message))).toBe(expected);
+  });
+
+  it("reconnaît une ChunkLoadError par son nom, et rien qui ne soit une Error", () => {
+    expect(isChunkLoadError(chunkError())).toBe(true);
+    expect(isChunkLoadError("Loading chunk 1 failed")).toBe(false);
+    expect(isChunkLoadError(null)).toBe(false);
+  });
+
   it("ne fait rien hors navigateur", async () => {
     expect(reloadAfterChunkError(null)).toBe(false);
-    const Loaded = await orReload(Promise.reject(new Error("x")), null);
+    const Loaded = await orReload(Promise.reject(chunkError()), null);
     expect((Loaded as () => null)()).toBeNull();
   });
 });
