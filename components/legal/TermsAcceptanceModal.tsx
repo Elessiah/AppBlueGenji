@@ -22,12 +22,17 @@ import {
 } from "@/lib/shared/global-modals";
 import styles from "./TermsAcceptanceModal.module.css";
 
-/** Pose (cookie de session, sans `max-age`) ou efface le report « Plus tard ». */
+/**
+ * Pose (cookie de session, sans `max-age`) ou efface le report « Plus tard ».
+ * `lax` et non `strict` : un lien ouvert depuis Discord est une navigation
+ * venue d'un autre site, qui n'emporte pas un cookie `strict` — la modale
+ * reviendrait justement dans le cas que le report doit couvrir.
+ */
 function writePostponedCookie(postponed: boolean): void {
   try {
     document.cookie = postponed
-      ? `${TERMS_POSTPONED_COOKIE}=${TERMS_POSTPONED_VALUE}; path=/; samesite=strict`
-      : `${TERMS_POSTPONED_COOKIE}=; path=/; samesite=strict; max-age=0`;
+      ? `${TERMS_POSTPONED_COOKIE}=${TERMS_POSTPONED_VALUE}; path=/; samesite=lax`
+      : `${TERMS_POSTPONED_COOKIE}=; path=/; samesite=lax; max-age=0`;
   } catch {
     // Cookies refusés : le report reste effectif pour la vue courante.
   }

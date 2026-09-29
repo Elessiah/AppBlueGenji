@@ -93,6 +93,20 @@ describe("câblage des modales globales", () => {
     expect(terms).not.toMatch(/writePostponedCookie[\s\S]*?max-age=\d{2,}/);
   });
 
+  it("le report survit à un lien ouvert depuis un autre site (lax, jamais strict)", () => {
+    expect(terms).toContain("samesite=lax");
+    expect(terms).not.toContain("samesite=strict");
+  });
+
+  it("le report tombe à l'ouverture et à la fermeture d'une session", () => {
+    const auth = readSource("lib/server/auth.ts");
+    const create = auth.match(/export async function createSession[\s\S]*?\n\}/)?.[0] ?? "";
+    const clear = auth.match(/export async function clearSession[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(create).toContain("forgetTermsPostponement(cookieStore)");
+    expect(clear).toContain("forgetTermsPostponement(cookieStore)");
+    expect(auth).toMatch(/cookieStore\.set\(TERMS_POSTPONED_COOKIE, "", \{[^}]*maxAge: 0/);
+  });
+
   it("la modale des conditions se tait par la règle partagée", () => {
     expect(terms).toContain("!termsModalSilencedOn(pathname)");
   });

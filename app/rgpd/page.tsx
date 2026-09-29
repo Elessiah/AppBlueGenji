@@ -275,8 +275,8 @@ export default async function RgpdPage() {
               <strong>bg_terms_later</strong> — déposé uniquement <strong>si vous reportez
               l&apos;acceptation des conditions d&apos;utilisation</strong> (bouton « Plus tard »),
               pour ne pas vous la redemander à chaque page. Il ne contient que la valeur « 1 »,
-              jamais d&apos;identifiant de personne, et disparaît à la fermeture du navigateur ou
-              dès que vous acceptez.
+              jamais d&apos;identifiant de personne, et disparaît à la fermeture du navigateur, à
+              chaque connexion ou déconnexion, ou dès que vous acceptez.
             </li>
             <li>
               <strong>bg_a11y</strong> — déposé uniquement <strong>si vous activez un réglage

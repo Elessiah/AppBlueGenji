@@ -5,6 +5,7 @@ import type { RowDataPacket, ResultSetHeader } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { SESSION_RETENTION_DAYS } from "@/lib/shared/processing-register";
 import { localAvatarUrl } from "@/lib/shared/avatar";
+import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 
@@ -97,6 +98,16 @@ export async function createSession(userId: number): Promise<void> {
     ...baseCookieOptions(),
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
+  forgetTermsPostponement(cookieStore);
+}
+
+/**
+ * Le report « Plus tard » des conditions (`bg_terms_later`) n'est lié à aucun
+ * compte : il tombe à chaque ouverture et fermeture de session, sans quoi le
+ * report d'un joueur vaudrait pour le suivant sur un ordinateur partagé.
+ */
+function forgetTermsPostponement(cookieStore: Awaited<ReturnType<typeof cookies>>): void {
+  cookieStore.set(TERMS_POSTPONED_COOKIE, "", { path: "/", sameSite: "lax", maxAge: 0 });
 }
 
 export async function clearSession(): Promise<void> {
@@ -110,6 +121,7 @@ export async function clearSession(): Promise<void> {
     ...baseCookieOptions(),
     maxAge: 0,
   });
+  forgetTermsPostponement(cookieStore);
 }
 
 /**
