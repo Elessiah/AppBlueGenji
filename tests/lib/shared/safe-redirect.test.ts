@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
+import { DEFAULT_REDIRECT, safeRedirectPath, signedInLoginRedirect } from "@/lib/shared/safe-redirect";
 
 /**
  * La destination d'après connexion, et pourquoi elle ne peut pas venir de l'URL
@@ -138,5 +138,40 @@ describe("câblage des trois portes", () => {
     const flow = source(join("lib", "server", "oauth-flow.ts"));
     expect(flow).toMatch(/safeRedirectPath\(saved\.redirectTo/);
     expect(flow).not.toMatch(/new URL\(saved\.redirectTo/);
+  });
+});
+
+/**
+ * Un visiteur déjà connecté qui ouvre `/connexion` voyait le formulaire et la
+ * modale d'entrée d'un nouveau compte. Il est envoyé là où il allait — par le
+ * même filtre qu'au retour d'une connexion, et jamais vers `/connexion`
+ * elle-même, que la page redirigerait vers elle-même à l'infini.
+ */
+describe("signedInLoginRedirect", () => {
+  it("rend la destination demandée quand elle est un chemin du site", () => {
+    expect(signedInLoginRedirect("/equipes/12?tab=roster#membres")).toBe("/equipes/12?tab=roster#membres");
+  });
+
+  it.each<[unknown]>([[undefined], [""], [["/profil"]], ["https://exemple.invalid"], ["//exemple.invalid"]])(
+    "retombe sur la destination par défaut pour %p",
+    (value) => {
+      expect(signedInLoginRedirect(value)).toBe(DEFAULT_REDIRECT);
+    },
+  );
+
+  it.each<[string]>([["/connexion"], ["/connexion/"], ["/connexion?redirect=/profil"], ["/connexion#x"], ["/connexion/autre"]])(
+    "n'envoie jamais vers la page de connexion (%s)",
+    (value) => {
+      expect(signedInLoginRedirect(value)).toBe(DEFAULT_REDIRECT);
+    },
+  );
+
+  it("ne confond pas une page dont le nom commence par « connexion »", () => {
+    expect(signedInLoginRedirect("/connexions")).toBe("/connexions");
+  });
+
+  it("est appliquée par la page avant tout rendu du formulaire", () => {
+    const page = readFileSync(join(__dirname, "..", "..", "..", "app", "connexion", "page.tsx"), "utf8");
+    expect(page).toMatch(/if \(user\) redirect\(signedInLoginRedirect\(params\.redirect\)\)/);
   });
 });
