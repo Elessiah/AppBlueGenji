@@ -40,9 +40,13 @@ import { toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
-import { reportConcernedHref, type ReportPerson } from "@/lib/shared/content-reports";
+import { reportConcernedHref, type ReportCategory, type ReportPerson } from "@/lib/shared/content-reports";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
+import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import {
+  MODERATION_TERMS_ANCHOR,
+  moderationGroundsFor,
+  type ModerationGrounds,
   canAutoPurgeLogo,
   formatAvatarHiddenLog,
   formatAvatarHiddenNotice,
@@ -187,21 +191,41 @@ async function assertTargeted(
   reportId: number,
   targetType: "TEAM" | "USER",
   targetId: number,
-): Promise<void> {
+): Promise<ModerationGrounds> {
   const db = await getDatabase();
-  const [reports] = await db.execute<RowDataPacket[]>(
-    `SELECT r.id FROM bg_reports r
+  const [reports] = await db.execute<(RowDataPacket & { category: ReportCategory })[]>(
+    `SELECT r.category FROM bg_reports r
      JOIN bg_report_targets t ON t.report_id = r.id AND t.target_type = ? AND t.target_id = ?
      WHERE r.id = ? AND r.parent_report_id IS NULL LIMIT 1`,
     [targetType, targetId, reportId],
   );
-  if (reports.length > 0) return;
+  if (reports.length > 0) return moderationGroundsFor(reports[0].category);
   const [exists] = await db.execute<RowDataPacket[]>(
     `SELECT id FROM bg_reports WHERE id = ? AND parent_report_id IS NULL LIMIT 1`,
     [reportId],
   );
   if (exists.length === 0) throw new Error("REPORT_NOT_FOUND");
   throw new Error(targetType === "TEAM" ? "TEAM_NOT_TARGETED" : "USER_NOT_TARGETED");
+}
+
+/** Adresse de la clause des conditions d'utilisation que les messages invoquent. */
+function moderationTermsUrl(): string {
+  return `${siteCanonicalBase()}${TERMS_PATH}#${MODERATION_TERMS_ANCHOR}`;
+}
+
+/**
+ * Le fondement d'une décision rattachée à ce signalement — relu en base,
+ * l'appelant ne connaissant que son identifiant. Hors signalement, ou
+ * signalement déjà effacé : les règles du site.
+ */
+async function reportGrounds(reportId: number | null): Promise<ModerationGrounds> {
+  if (reportId === null) return moderationGroundsFor(null);
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { category: ReportCategory })[]>(
+    `SELECT category FROM bg_reports WHERE id = ? LIMIT 1`,
+    [reportId],
+  );
+  return moderationGroundsFor(rows[0]?.category ?? null);
 }
 
 /**
@@ -211,11 +235,14 @@ async function assertTargeted(
  */
 export function notifyTeamLogoRemoved(teamId: number, teamName: string, reportId: number | null): void {
   const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-  void teamMemberRecipients(teamId)
-    .then((recipients) =>
+  void Promise.all([reportGrounds(reportId), teamMemberRecipients(teamId)])
+    .then(([grounds, recipients]) =>
       notifyUsers(recipients, {
         topic: "MODERATION",
-        discord: { message: formatLogoRemovedNotice({ teamName, url }), context: "logo-removed" },
+        discord: {
+          message: formatLogoRemovedNotice({ teamName, url, grounds, termsUrl: moderationTermsUrl() }),
+          context: "logo-removed",
+        },
         push: moderationPush({ kind: "REMOVED", teamName, teamId, reportId }),
       }),
     )
@@ -229,11 +256,14 @@ export function notifyTeamLogoRemoved(teamId: number, teamName: string, reportId
  */
 export function notifyUserAvatarRemoved(userId: number, reportId: number | null): void {
   const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-  void userRecipient(userId)
-    .then((recipients) =>
+  void Promise.all([reportGrounds(reportId), userRecipient(userId)])
+    .then(([grounds, recipients]) =>
       notifyUsers(recipients, {
         topic: "MODERATION",
-        discord: { message: formatAvatarRemovedNotice({ url }), context: "avatar-removed" },
+        discord: {
+          message: formatAvatarRemovedNotice({ url, grounds, termsUrl: moderationTermsUrl() }),
+          context: "avatar-removed",
+        },
         push: moderationPush({ kind: "REMOVED", reportId }),
       }),
     )
@@ -427,7 +457,7 @@ export async function deleteUserAvatarForReport(
  */
 export async function hideTeamLogo(reportId: number, teamId: number, actor: ReportPerson): Promise<LogoQuarantineView> {
   const db = await getDatabase();
-  await assertTargeted(reportId, "TEAM", teamId);
+  const grounds = await assertTargeted(reportId, "TEAM", teamId);
 
   const [teams] = await db.execute<(RowDataPacket & { name: string; logo_url: string | null })[]>(
     `SELECT name, logo_url FROM bg_teams WHERE id = ? AND solo_user_id IS NULL LIMIT 1`,
@@ -508,7 +538,10 @@ export async function hideTeamLogo(reportId: number, teamId: number, actor: Repo
     .then((recipients) =>
       notifyUsers(recipients, {
         topic: "MODERATION",
-        discord: { message: formatLogoHiddenNotice({ teamName, purgeAfter, url }), context: "logo-hidden" },
+        discord: {
+          message: formatLogoHiddenNotice({ teamName, purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }),
+          context: "logo-hidden",
+        },
         push: moderationPush({ kind: "HIDDEN", teamName, teamId, reportId }),
       }),
     )
@@ -545,7 +578,7 @@ export async function hideUserAvatarForReport(
   actor: ReportPerson,
 ): Promise<LogoQuarantineView> {
   const db = await getDatabase();
-  await assertTargeted(reportId, "USER", userId);
+  const grounds = await assertTargeted(reportId, "USER", userId);
 
   const [users] = await db.execute<(RowDataPacket & { pseudo: string; avatar_url: string | null })[]>(
     `SELECT pseudo, avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 LIMIT 1`,
@@ -602,7 +635,10 @@ export async function hideUserAvatarForReport(
     .then((recipients) =>
       notifyUsers(recipients, {
         topic: "MODERATION",
-        discord: { message: formatAvatarHiddenNotice({ purgeAfter, url }), context: "avatar-hidden" },
+        discord: {
+          message: formatAvatarHiddenNotice({ purgeAfter, url, grounds, termsUrl: moderationTermsUrl() }),
+          context: "avatar-hidden",
+        },
         push: moderationPush({ kind: "HIDDEN", reportId }),
       }),
     )

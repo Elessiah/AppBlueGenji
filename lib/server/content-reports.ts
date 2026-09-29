@@ -35,6 +35,7 @@ import {
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
   REPORT_TARGET_SEARCH_LIMIT,
   REPORT_TARGET_SEARCH_MIN_LENGTH,
+  canContestReport,
   formatContestAlert,
   formatReportAlert,
   formatReportsSaturatedAlert,
@@ -726,12 +727,13 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
   let contestId: number;
   let parentCategory: ReportCategory;
   let reopened = false;
+  let by: "TARGET" | "NOTIFIER";
   let receivedInLastHour: number;
   try {
     await connection.beginTransaction();
     const [parents] = await connection.execute<
-      (RowDataPacket & { category: ReportCategory; status: ReportStatus })[]
-    >(`SELECT category, status FROM bg_reports WHERE id = ? FOR UPDATE`, [parentId]);
+      (RowDataPacket & { category: ReportCategory; status: ReportStatus; reporter_user_id: number | null })[]
+    >(`SELECT category, status, reporter_user_id FROM bg_reports WHERE id = ? FOR UPDATE`, [parentId]);
     if (parents.length === 0) throw new Error("REPORT_NOT_CONCERNED");
     parentCategory = parents[0].category;
 
@@ -740,14 +742,19 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
       [parentId],
     );
     const teamIds = await loadViewerTeamIds(userId, connection);
-    const concerned = isConcernedByReport(
+    const targets = targetRows.map((row) => ({ type: row.target_type, id: Number(row.target_id) }));
+    const allowed = canContestReport(
       { userId, teamIds },
       {
         category: parentCategory,
-        targets: targetRows.map((row) => ({ type: row.target_type, id: Number(row.target_id) })),
+        status: parents[0].status,
+        reporterUserId: parents[0].reporter_user_id === null ? null : Number(parents[0].reporter_user_id),
+        targets,
       },
     );
-    if (!concerned) throw new Error("REPORT_NOT_CONCERNED");
+    if (!allowed) throw new Error("REPORT_NOT_CONCERNED");
+    // Visé **et** auteur, il conteste en visé : c'est ce que l'alerte doit dire.
+    by = isConcernedByReport({ userId, teamIds }, { category: parentCategory, targets }) ? "TARGET" : "NOTIFIER";
 
     receivedInLastHour = await countRecentReports(connection);
 
@@ -779,6 +786,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     parentId,
     parentCategory,
     reopened,
+    by,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(parentId)}`,
   });
   alertLeadership(receivedInLastHour, message, contestId, true);
@@ -907,8 +915,9 @@ export async function getConcernedReport(reportId: number, viewerUserId: number)
 }
 
 /**
- * Les signalements qui visent ce lecteur (choix du formulaire de
- * contestation), du plus récent au plus ancien.
+ * Les signalements que ce lecteur peut contester (choix du formulaire de
+ * contestation), du plus récent au plus ancien : ceux qui le visent, et ceux
+ * qu'il a envoyés une fois archivés — même règle que `canContestReport`.
  */
 export async function listContestableReports(viewerUserId: number): Promise<ContestableReportOption[]> {
   const teamIds = await loadViewerTeamIds(viewerUserId);
@@ -918,14 +927,16 @@ export async function listContestableReports(viewerUserId: number): Promise<Cont
     clauses.push(`(t.target_type = 'TEAM' AND t.target_id IN (${teamIds.map(() => "?").join(", ")}))`);
     params.push(...teamIds);
   }
+  params.push(viewerUserId);
   const db = await getDatabase();
   const [rows] = await db.execute<
     (RowDataPacket & { id: number; category: ReportCategory; status: ReportStatus; created_at: Date | string })[]
   >(
-    `SELECT DISTINCT r.id, r.category, r.status, r.created_at
+    `SELECT r.id, r.category, r.status, r.created_at
      FROM bg_reports r
-     JOIN bg_report_targets t ON t.report_id = r.id
-     WHERE r.category <> 'CONTEST' AND (${clauses.join(" OR ")})
+     WHERE r.category <> 'CONTEST'
+       AND (EXISTS (SELECT 1 FROM bg_report_targets t WHERE t.report_id = r.id AND (${clauses.join(" OR ")}))
+            OR (r.reporter_user_id = ? AND r.status = 'RESOLVED'))
      ORDER BY r.created_at DESC, r.id DESC`,
     params,
   );

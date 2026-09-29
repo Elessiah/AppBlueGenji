@@ -22,7 +22,7 @@
  * contenir n'importe quoi, ne part jamais.
  */
 
-import { LOGO_QUARANTINE_DAYS, type LogoQuarantineView } from "./logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS, type LogoQuarantineView } from "./logo-quarantine";
 import { discordInline } from "./discord-text";
 
 /**
@@ -199,7 +199,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
   },
   CONTEST: {
     label: "Contestation",
-    hint: "Répondre à un signalement qui te vise, toi ou ton équipe.",
+    hint: "Répondre à un signalement qui te vise, toi ou ton équipe — ou contester la décision prise sur ton propre signalement.",
     icon: "⚖",
     targets: [],
     requiresContact: false,
@@ -641,6 +641,32 @@ export function isConcernedByReport(
 }
 
 /**
+ * Ce lecteur peut-il contester ce signalement ?
+ *
+ * Deux publics, deux moments. Une **personne visée** conteste à tout moment
+ * (`isConcernedByReport`) : ce qu'elle conteste, c'est le signalement et ce
+ * qu'il a fait décider sur son image. L'**auteur du signalement**, lui,
+ * conteste la **décision prise** sur sa notification — y compris celle de ne
+ * pas agir —, donc une fois le dossier archivé : c'est l'ouverture de la
+ * réclamation que l'art. 20.1 du règlement sur les services numériques fait à
+ * l'auteur d'une notification. Il faut un compte : c'est le seul moyen de le
+ * reconnaître comme l'auteur.
+ */
+export function canContestReport(
+  viewer: ReportConcernViewer,
+  report: {
+    category: ReportCategory;
+    status: ReportStatus;
+    reporterUserId: number | null;
+    targets: readonly ReportTargetRef[];
+  },
+): boolean {
+  if (report.category === "CONTEST") return false;
+  if (isConcernedByReport(viewer, report)) return true;
+  return report.reporterUserId === viewer.userId && report.status === "RESOLVED";
+}
+
+/**
  * Message privé aux personnes visées par un signalement : les joueurs désignés
  * et les membres des équipes désignées.
  *
@@ -667,13 +693,16 @@ export function formatContestAlert(input: {
   parentId: number;
   parentCategory: ReportCategory;
   reopened: boolean;
+  /** Qui conteste : une personne visée, ou l'auteur du signalement (`canContestReport`). */
+  by: "TARGET" | "NOTIFIER";
   adminUrl: string;
 }): string {
   const label = REPORT_CATEGORY_DEFINITIONS[input.parentCategory].label;
   const state = input.reopened ? " Le signalement était archivé : il est réactivé." : "";
+  const author = input.by === "NOTIFIER" ? "l'auteur du signalement" : "une personne visée";
   return (
     `⚖️ Contestation #${input.contestId} du signalement #${input.parentId} (${label}), ` +
-    `envoyée par une personne visée.${state} À traiter : ${input.adminUrl}`
+    `envoyée par ${author}.${state} À traiter : ${input.adminUrl}`
   );
 }
 
@@ -693,10 +722,10 @@ export const REPORT_PRIVACY_NOTICE = {
   recipients:
     "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ton adresse, ta description ni le pseudo d'un joueur. Les joueurs et les membres des équipes visés peuvent lire ta description pour y répondre — jamais ton nom, ton adresse ni ton compte — et en sont prévenus par message, sauf depuis un compte tout juste créé ou au-delà d'une limite quotidienne par compte.",
   contestRecipients:
-    "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. L'auteur du signalement n'est pas informé de ta contestation.",
+    "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. Ni l'auteur du signalement ni les personnes qu'il vise ne sont informés de ta contestation.",
   // La prolongation est dite ici, et non seulement sur `/rgpd` : c'est cette
   // phrase-là que le signalant lit avant d'envoyer.
-  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo ou un avatar est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_DAYS / 30} mois au plus).`,
+  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo ou un avatar est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_MONTHS} mois au plus).`,
 } as const;
 
 /**
@@ -762,7 +791,7 @@ export function copyrightNoticeElementsText(): string {
  * (`reportFollowUpDuty`).
  */
 export const NOTIFIER_FOLLOW_UP =
-  "L'auteur d'une notification reçoit, à l'adresse qu'il indique (exigée en droit d'auteur, facultative ailleurs), un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes.";
+  "L'auteur d'une notification reçoit, à l'adresse qu'il indique (exigée en droit d'auteur, facultative ailleurs), un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes. S'il a signalé depuis son compte, il peut contester cette décision — y compris celle de ne pas agir — par la catégorie « Contestation » du même formulaire, une fois le signalement archivé.";
 
 /**
  * Le retour que l'association **doit** à l'auteur d'un signalement, rappelé
@@ -822,7 +851,7 @@ export function reportErrorMessage(code: string | null | undefined): string {
     case "REPORT_TARGETS_REQUIRE_LOGIN":
       return "Connecte-toi pour désigner des joueurs, équipes ou tournois — ou décris-les dans ton message.";
     case "REPORT_NOT_CONCERNED":
-      return "Tu ne peux contester qu'un signalement qui te vise, toi ou une équipe dont tu es membre.";
+      return "Tu ne peux contester qu'un signalement qui te vise, toi ou une équipe dont tu es membre — ou la décision prise sur un signalement que tu as envoyé, une fois le dossier archivé.";
     case "REPORTS_SATURATED":
       return "Trop de signalements reçus en peu de temps. Réessaie plus tard, ou écris-nous sur Discord.";
     case "TOO_MANY_REQUESTS":

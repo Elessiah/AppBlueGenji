@@ -28,7 +28,7 @@ import {
 } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
-import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
@@ -475,7 +475,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Recevoir et traiter les signalements adressés à l'association, dont les notifications de contenu illicite",
     subPurposes: [
       "Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, RGPD, hébergeur, autre)",
-      "Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester",
+      "Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester ; permettre à l'auteur d'un signalement de contester la décision prise",
       "Masquer un logo d'équipe ou un avatar de joueur signalé, puis le rétablir ou le supprimer définitivement",
       "Accuser réception d'une notification de contenu illicite, puis notifier à son auteur la décision et les voies de recours",
       "Répondre aux demandes d'exercice des droits et aux demandes adressées à l'hébergeur, dont celles des autorités",
@@ -495,8 +495,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_DAYS / 30} mois au plus après la décision)`,
-      `Logo ou avatar masqué : ${LOGO_QUARANTINE_DAYS / 30} mois au plus sans contestation (délai de contestation du règlement (UE) 2022/2065, art. 20), puis suppression définitive ; contesté, jusqu'à la décision`,
+      `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
+      `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
     ],
     recipients: [
       "Administrateurs de l'association",

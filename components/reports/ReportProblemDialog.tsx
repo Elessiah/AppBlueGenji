@@ -355,14 +355,15 @@ export function ReportProblemDialog({
                     <Link href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
                       Connecte-toi
                     </Link>{" "}
-                    pour contester un signalement : seuls les joueurs visés et les membres des équipes visées
-                    peuvent le faire.
+                    pour contester un signalement : seuls les joueurs visés, les membres des équipes visées
+                    et l&apos;auteur du signalement, une fois le dossier archivé, peuvent le faire.
                   </p>
                 ) : contestOf !== undefined ? (
                   <p className={styles.lead}>Tu contestes le signalement n° {contestOf}.</p>
                 ) : contestable !== null && contestable.length === 0 ? (
                   <p className={styles.anonNote}>
-                    Aucun signalement ne te vise, ni toi ni ton équipe : il n&apos;y a rien à contester.
+                    Aucun signalement ne te vise, ni toi ni ton équipe, et aucun de ceux que tu as envoyés
+                    n&apos;est archivé : il n&apos;y a rien à contester.
                   </p>
                 ) : (
                   <div className="field">
