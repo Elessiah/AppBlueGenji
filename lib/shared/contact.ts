@@ -6,7 +6,7 @@
  * client/serveur.
  */
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
-import { ASSOCIATION_EMAIL_ENCODED, decodeContact, encodeContact } from "@/lib/shared/obfuscated-contact";
+import { decodeContact, encodeContact } from "@/lib/shared/obfuscated-contact";
 
 export type ContactInfo = {
   email: string;
@@ -22,12 +22,14 @@ export const CONTACT_DISCORD_URL_KEY = "contact_discord_url";
 /**
  * Secours tant que rien n'a été enregistré en base. Le lien Discord y est
  * l'invitation canonique du site : un défaut qui pointerait ailleurs ferait
- * mentir la page contact de toute installation neuve. Le courriel est celui de
- * l'association, décodé ici plutôt qu'écrit : ce dépôt est public
- * (`lib/shared/obfuscated-contact.ts`).
+ * mentir la page contact de toute installation neuve. Aucun courriel par
+ * défaut : le pied de page n'en montre qu'un que le staff a saisi, sur toute
+ * base — le rattrapage qui vide l'ancien faux défaut (`lib/server/database.ts`)
+ * rend ainsi le même pied de page qu'une installation neuve. Le courriel de
+ * l'association figure, lui, dans les mentions légales.
  */
 export const DEFAULT_CONTACT: ContactInfo = {
-  email: decodeContact(ASSOCIATION_EMAIL_ENCODED),
+  email: "",
   discordTag: "",
   discordUrl: DISCORD_INVITE_URL,
 };

@@ -10,7 +10,7 @@ import {
   SUPERSEDED_CONTACT_EMAILS,
   toPublicContact,
 } from "@/lib/shared/contact";
-import { ASSOCIATION_EMAIL_ENCODED, decodeContact, encodeContact } from "@/lib/shared/obfuscated-contact";
+import { decodeContact, encodeContact } from "@/lib/shared/obfuscated-contact";
 
 describe("validateEmail", () => {
   it("accepts and normalises a valid address", () => {
@@ -112,9 +112,8 @@ describe("validateContactInfo", () => {
     expect(validateContactInfo(DEFAULT_CONTACT).ok).toBe(true);
   });
 
-  it("le courriel par défaut est celui de l'association, décodé", () => {
-    expect(DEFAULT_CONTACT.email).toBe(decodeContact(ASSOCIATION_EMAIL_ENCODED));
-    expect(DEFAULT_CONTACT.email.endsWith(["gmail", "com"].join("."))).toBe(true);
+  it("aucun courriel par défaut : même pied de page qu'après le rattrapage", () => {
+    expect(DEFAULT_CONTACT.email).toBe("");
   });
 });
 

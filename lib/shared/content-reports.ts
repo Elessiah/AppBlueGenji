@@ -714,7 +714,8 @@ export function reportErrorMessage(code: string | null | undefined): string {
  * seau commun que n'importe qui pouvait vider — cinq envois par demi-heure et
  * par IP, donc six IP pour le tenir plein en continu, et avec lui **tous** les
  * signalements : notification d'un contenu illicite (LCEN, DSA), demande RGPD,
- * question d'hébergeur, c'est-à-dire le seul canal que le site publie. Ce qui
+ * question d'hébergeur, c'est-à-dire le canal que le site met au pied de
+ * chaque page. Ce qui
  * doit être borné est l'**alerte**, pas le dépôt : au-delà, le signalement est
  * enregistré et visible au panneau, et une seule alerte par heure dit que les
  * suivants n'en feront plus (`reportAlertMode`). Soixante par heure, c'est bien au-delà
