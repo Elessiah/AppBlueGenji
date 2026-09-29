@@ -24,6 +24,7 @@ import { DISCORD_TAG_AUDIENCE } from "@/lib/shared/identity-sharing";
 import { CodedError, LOGIN_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 
 /**
  * Information d'entrée **lue** dans ce navigateur, à sa version. Ce n'est plus un
@@ -273,7 +274,27 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         />
       )}
       <div className="fabric" />
-      <CyberCard ticks style={{ padding: 48, width: "min(480px, calc(100vw - 32px))" }}>
+      <CyberCard
+        ticks
+        style={{ padding: "clamp(24px, 6vw, 48px)", width: "min(480px, calc(100vw - 32px))" }}
+      >
+        {/*
+          La page n'a pas d'en-tête : ce lien est la seule sortie vers le site.
+          Il était en bas de carte, en mono 11 px — sous le pli sur mobile, et
+          une cible minuscule. En tête, en texte courant, 44 px de haut.
+        */}
+        <Link
+          href="/"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            minHeight: 44,
+            fontSize: 14,
+            color: "var(--ink-mute)",
+          }}
+        >
+          ← Retour à l&apos;accueil
+        </Link>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <h1 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 8 }}>
             Connexion
@@ -324,7 +345,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                   {...fieldErrors.aria("handle", "login-discord-handle-help")}
                 />
                 <FieldErrorText fieldId={LOGIN_FIELD_IDS.handle} message={fieldErrors.message("handle")} />
-                <span id="login-discord-handle-help" className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
+                <span id="login-discord-handle-help" style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
                   Le bot doit partager un serveur avec toi pour t&apos;écrire en privé, que tu
                   saisisses ton tag ou ton ID : l&apos;ID évite seulement la recherche de ton tag.
                   Pas encore sur un de ses serveurs ?{" "}
@@ -390,7 +411,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                   serveur, pas une seconde lecture du même motif.
                 */}
                 {isCertifiableDiscordHandle(handle) && (
-                  <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
+                  <span style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
                     Te connecter par ce code <strong>enregistre ce tag</strong>, sans le certifier :
                     il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite
                     dans « Mon profil », {DISCORD_TAG_AUDIENCE}
@@ -437,7 +458,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                   placeholder="Ton pseudo"
                   aria-describedby="login-site-pseudo-help"
                 />
-                <span id="login-site-pseudo-help" className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
+                <span id="login-site-pseudo-help" style={{ ...LOGIN_HELP_TEXT_STYLE, marginTop: 4 }}>
                   Seulement à la création de ton compte : si tu en as déjà un, il garde son pseudo.
                 </span>
               </div>
@@ -475,16 +496,6 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
             </div>
           </>
         )}
-
-        <div style={{ marginTop: 24, textAlign: "center" }}>
-          <Link
-            href="/"
-            className="mono"
-            style={{ fontSize: 11, color: "var(--ink-mute)", letterSpacing: "0.14em" }}
-          >
-            ← RETOUR ACCUEIL
-          </Link>
-        </div>
       </CyberCard>
       {/*
         Rendue **après** la carte, dont elle recouvre pourtant l'écran : l'ordre

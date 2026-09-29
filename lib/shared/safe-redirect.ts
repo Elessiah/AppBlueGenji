@@ -63,3 +63,18 @@ export function safeRedirectPath(value: unknown, fallback: string = DEFAULT_REDI
 
   return candidate;
 }
+
+/** Chemin de la page de connexion, exclu des destinations d'un visiteur déjà connecté. */
+const LOGIN_PATH = "/connexion";
+
+/**
+ * Destination d'un visiteur **déjà connecté** qui ouvre `/connexion` : là où il
+ * allait (`?redirect=`, filtré par `safeRedirectPath`), `DEFAULT_REDIRECT`
+ * sinon. Une destination qui ramène à `/connexion` elle-même est écartée — la
+ * page redirigerait vers elle-même à l'infini.
+ */
+export function signedInLoginRedirect(value: unknown): string {
+  const target = safeRedirectPath(value);
+  const path = target.split(/[?#]/, 1)[0].replace(/\/+$/, "");
+  return path === LOGIN_PATH || path.startsWith(`${LOGIN_PATH}/`) ? DEFAULT_REDIRECT : target;
+}
