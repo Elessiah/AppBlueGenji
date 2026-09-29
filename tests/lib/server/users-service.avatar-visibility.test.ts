@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
+jest.mock("@/lib/server/avatar-rotation");
 
 import { updateOwnProfile } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
+import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { fakePool } from "../../helpers/sql-double";
 
 /**
@@ -65,5 +67,51 @@ describe("updateOwnProfile — resynchronisation de l'entrée solo", () => {
     mockDb();
     await updateOwnProfile(42, { visibility: { overwatch: true } });
     expect(syncMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("updateOwnProfile — renommage du fichier d'un avatar masqué", () => {
+  const rotateMock = jest.mocked(rotateHiddenAvatarFile);
+
+  function mockDbWith(visibleBefore: 0 | 1) {
+    const execute = jest
+      .fn<() => Promise<unknown>>()
+      .mockResolvedValueOnce([[{ visible_avatar: visibleBefore }]])
+      .mockResolvedValue([{ affectedRows: 1 }]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  }
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    syncMock.mockResolvedValue(undefined);
+    rotateMock.mockResolvedValue("/api/uploads/avatars/42-new.webp");
+  });
+
+  it("renomme le fichier à la bascule visible → masqué", async () => {
+    mockDbWith(1);
+    await updateOwnProfile(42, { visibility: { avatar: false } });
+    expect(rotateMock).toHaveBeenCalledWith(42);
+  });
+
+  it("ne renomme pas un avatar déjà masqué — le formulaire renvoie le réglage à chaque sauvegarde", async () => {
+    mockDbWith(0);
+    await updateOwnProfile(42, { visibility: { avatar: false } });
+    expect(rotateMock).not.toHaveBeenCalled();
+  });
+
+  it("ne renomme rien quand l'avatar redevient visible", async () => {
+    mockDb();
+    await updateOwnProfile(42, { visibility: { avatar: true } });
+    expect(rotateMock).not.toHaveBeenCalled();
+  });
+
+  it("un échec du renommage n'annule pas le réglage déjà écrit", async () => {
+    mockDbWith(1);
+    rotateMock.mockRejectedValueOnce(new Error("disque"));
+    const spy = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    await expect(updateOwnProfile(42, { visibility: { avatar: false } })).resolves.toBeUndefined();
+    expect(spy).toHaveBeenCalled();
+    expect(syncMock).toHaveBeenCalledWith(42);
+    spy.mockRestore();
   });
 });
