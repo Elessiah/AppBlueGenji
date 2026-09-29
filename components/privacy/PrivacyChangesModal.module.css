@@ -16,8 +16,8 @@
   width: min(640px, 100%);
   max-height: calc(100dvh - 32px);
   /* Modale bloquante (ni Échap ni clic à côté) : sur un écran bas (téléphone en
-     paysage), ses boutons doivent rester atteignables — la modale défile plutôt
-     que de pousser « J'accepte » / « Je refuse » sous le bord de l'écran. */
+     paysage), son bouton doit rester atteignable — la modale défile plutôt
+     que de pousser « J'ai pris connaissance » sous le bord de l'écran. */
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;

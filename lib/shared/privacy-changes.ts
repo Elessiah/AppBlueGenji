@@ -50,8 +50,8 @@ import {
 /** Un changement du traitement des données, tel qu'il est présenté au joueur. */
 export type PrivacyChange = {
   /**
-   * Identifiant **stable** : c'est lui qu'on enregistre à l'acceptation. Le
-   * renommer ferait réapparaître le changement à tous ceux qui l'ont accepté.
+   * Identifiant **stable** : c'est lui qu'on enregistre à la prise de connaissance. Le
+   * renommer ferait réapparaître le changement à tous ceux qui l'ont lu.
    * Minuscules, chiffres et tirets (`PRIVACY_CHANGE_ID_PATTERN`).
    */
   id: string;
@@ -89,7 +89,7 @@ export const PRIVACY_CHANGE_ID_MAX_LENGTH = 80;
 /**
  * Le registre, **dans l'ordre de publication** et en ajout seul : une entrée
  * publiée ne se retire ni ne se renomme (son identifiant est en base chez
- * chaque compte qui l'a acceptée). Une erreur de rédaction se corrige sur
+ * chaque compte qui l'a lue). Une erreur de rédaction se corrige sur
  * place ; un changement de fond est une **nouvelle** entrée.
  */
 export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
@@ -315,7 +315,7 @@ export function privacyChangeDay(now: Date): string {
  * Les changements déjà publiés le jour `today` (`publishedAt <= today`), dans
  * l'ordre du registre. Une entrée datée du lendemain n'existe pas encore pour
  * les joueurs : ni modale, ni message Discord, ni date de mise à jour de
- * `/rgpd`, ni prise de connaissance acceptée par la route.
+ * `/rgpd`, ni prise de connaissance enregistrée par la route.
  */
 export function publishedPrivacyChanges(
   today: string,
@@ -352,7 +352,7 @@ export function pendingPrivacyChanges(
   );
 }
 
-/** Refus d'une demande d'acceptation mal formée. */
+/** Refus d'une demande de prise de connaissance mal formée. */
 export const INVALID_PRIVACY_CHANGES = "INVALID_PRIVACY_CHANGES";
 /**
  * Refus d'une prise de connaissance qui nomme un changement absent du registre,
