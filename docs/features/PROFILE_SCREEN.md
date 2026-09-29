@@ -200,10 +200,10 @@ les deux écrans qui les affichent y puisent :
 | `GAME_TAG_NOTICE` | Les identifiants de jeu servent à s'ajouter entre joueurs, jamais à des statistiques. |
 
 Le module n'expose que des **chaînes**, jamais d'assembleur : l'**entrée en
-matière** diffère selon l'écran (« Te connecter par Discord *certifie ce tag* »
-à la connexion, la phrase du verrou sur le profil) et aucun des deux ne peut
-passer par une fonction commune — la connexion met du `<strong>` dans la sienne,
-que rien qui rende une chaîne ne porte. Chaque écran compose donc son entrée en
+matière** diffère selon l'écran (à la connexion, `DISCORD_LOGIN_TAG_NOTICE`
+dit que se connecter par Discord enregistre le tag **sans le certifier** ; sur le
+profil, la phrase du verrou) et aucun des deux ne peut passer par une fonction
+commune. Chaque écran compose donc son entrée en
 matière puis **concatène les constantes**, qui restent la seule rédaction de la
 promesse.
 
