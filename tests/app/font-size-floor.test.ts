@@ -14,7 +14,8 @@
  * Les schémas de `/regles` (`RuleDiagram.tsx`) sont écartés **nommément** :
  * leur texte est en unités SVG, mis à l'échelle avec le schéma, et monter ses
  * 9-10,5 unités sans refaire la mise en page ferait chevaucher les libellés —
- * décision consignée dans `ERREUR.txt`.
+ * texte réduit sur mobile **accepté** (décision de l'utilisateur, voir le
+ * « Plancher de taille » de `CLAUDE.md`).
  */
 import { describe, expect, it } from "@jest/globals";
 import { readdirSync, readFileSync, statSync } from "node:fs";
