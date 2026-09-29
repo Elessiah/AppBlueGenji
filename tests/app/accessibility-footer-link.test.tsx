@@ -164,8 +164,9 @@ describe("PublicFooter — accessibilité", () => {
 
   it("dégage sa dernière ligne du bouton flottant d'accessibilité", () => {
     const css = readSource("components/cyber/landing/PublicFooter.module.css");
-    // Bouton : 24 px du bord + 54 px (16 + 48 sous 720 px). Mêmes valeurs que
-    // le `scroll-padding-bottom` global.
+    // Boutons flottants du bas (« ? », témoin ; sous 720 px, le bouton
+    // d'accessibilité, 16 + 48 px). Mêmes valeurs que le
+    // `scroll-padding-bottom` global.
     expect(css).toMatch(/\.root \{[^}]*padding: 30px 0 92px;/);
     expect(css).toMatch(/@media \(max-width: 720px\) \{\s*\.root \{\s*padding-bottom: 76px;/);
   });

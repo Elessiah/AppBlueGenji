@@ -152,14 +152,45 @@ describe("éléments flottants — pas de chevauchement", () => {
   const mobile = (css: string) => css.indexOf("@media (max-width: 720px)");
 
   it("le bouton d'accessibilité est à gauche, le « ? » et le témoin à droite", () => {
-    expect(menu).toMatch(/\.root \{[^}]*left: 24px/);
+    expect(menu).toMatch(/\.root \{[^}]*left: 0;/);
     expect(declarations(".cta-float-help")).toMatch(/right: 28px/);
     expect(badge).toMatch(/\.root \{[^}]*right: 28px/);
   });
 
-  it("les notifications passent au-dessus du bouton, sur ordinateur", () => {
-    const top = px(menu, ".root", "bottom") + px(menu, ".fab", "height");
-    expect(px(toast, ".stack", "bottom")).toBeGreaterThan(top);
+  it("sur ordinateur, le bouton est un onglet collé au bord gauche, centré sur la hauteur", () => {
+    const height = px(menu, ".fab", "height");
+    expect(menu).toMatch(new RegExp(String.raw`\.root \{[^}]*top: calc\(50% - ${height / 2}px\);`));
+    expect(menu).toMatch(/\.fab \{[^}]*border-radius: 0 12px 12px 0;/);
+  });
+
+  it("sur ordinateur, l'onglet tient dans la gouttière de la colonne : il ne couvre aucun contenu", () => {
+    const globals = stripComments(readSource("app/globals.css"));
+    const rule = /@media \(min-width: 721px\) \{\s*\.page-shell \{\s*width: min\(1200px, calc\(100vw - (\d+)px\)\);/.exec(
+      globals,
+    );
+    expect(rule).not.toBeNull();
+    // Gouttière gauche au plus juste : une barre de défilement de 16 px
+    // retranchée de la largeur utile, le reste partagé entre les deux bords.
+    const gutter = (Number(rule![1]) - 16) / 2;
+    expect(gutter).toBeGreaterThanOrEqual(px(menu, ".fab", "width") + 4);
+    // Après le bloc de 920 px, qui resserre la colonne : il doit l'emporter
+    // entre 721 et 920 px.
+    expect(rule!.index).toBeGreaterThan(globals.indexOf("@media (max-width: 920px)"));
+  });
+
+  it("sur ordinateur, le panneau s'ouvre à droite de l'onglet", () => {
+    expect(px(menu, ".panel", "left")).toBeGreaterThan(px(menu, ".fab", "width"));
+    expect(menu).toMatch(/\.panel \{[^}]*position: fixed;[^}]*translate: 0 -50%;/);
+  });
+
+  it("sous 720 px, le bouton redevient un disque dans le coin bas gauche", () => {
+    const root = menu.slice(menu.indexOf(".root {", mobile(menu)));
+    expect(root).toMatch(/^\.root \{\s*left: 16px;\s*top: auto;\s*bottom: 16px;/);
+    expect(menu.slice(mobile(menu))).toMatch(/\.fab \{[^}]*border-radius: 999px;/);
+  });
+
+  it("les notifications, sur ordinateur, tiennent le coin sans recouvrir l'onglet", () => {
+    expect(px(toast, ".stack", "left")).toBeGreaterThan(px(menu, ".fab", "width"));
   });
 
   it("les notifications passent au-dessus du bouton, sous 720 px", () => {
@@ -195,7 +226,7 @@ describe("éléments flottants — pas de chevauchement", () => {
   });
 
   it("sur ordinateur, la pile s'arrête à la moitié de l'écran, loin de la pastille de droite", () => {
-    expect(toast).toMatch(/\.stack \{[^}]*max-width: min\(420px, calc\(50vw - 40px\)\)/);
+    expect(toast).toMatch(/\.stack \{[^}]*max-width: min\(420px, calc\(50vw - 56px\)\)/);
   });
 
   it("la marge de défilement tient l'élément focalisé au-dessus du bouton", () => {
@@ -204,7 +235,7 @@ describe("éléments flottants — pas de chevauchement", () => {
       Number(m[1]),
     );
     expect(sheet).toMatch(/@media \(max-width: 720px\) \{\s*html \{\s*scroll-padding-bottom: \d+px;/);
-    expect(desktop).toBeGreaterThanOrEqual(px(menu, ".root", "bottom") + px(menu, ".fab", "height"));
+    expect(desktop).toBeGreaterThanOrEqual(phone);
     expect(phone).toBeGreaterThanOrEqual(
       px(menu, ".root", "bottom", mobile(menu)) + px(menu, ".fab", "height", mobile(menu)),
     );
@@ -219,7 +250,10 @@ describe("éléments flottants — pas de chevauchement", () => {
   });
 
   it("le bouton tient la cible minimale de 24 px, et plus", () => {
-    expect(px(menu, ".fab", "width")).toBeGreaterThanOrEqual(44);
+    // L'onglet : 24 px au moins sur sa largeur (WCAG 2.5.8), 44 px sur sa
+    // hauteur ; le disque du téléphone, 44 px dans les deux sens.
+    expect(px(menu, ".fab", "width")).toBeGreaterThanOrEqual(24);
+    expect(px(menu, ".fab", "height")).toBeGreaterThanOrEqual(44);
     expect(px(menu, ".fab", "width", mobile(menu))).toBeGreaterThanOrEqual(44);
   });
 });
