@@ -54,7 +54,7 @@ journal Discord descendent tous de la même liste.
 
 | Fournisseur | Portée | Ce que le site en retient |
 | --- | --- | --- |
-| Google | `openid profile` | `google_sub`, la photo (copiée), le nom (proposé comme pseudo) |
+| Google | `openid profile` | `google_sub`, la photo (copiée, **masquée**) — le nom n'est **pas** repris |
 | Discord | `identify` | `discord_id`, le pseudo (**certifié**), la photo (copiée) |
 | Blizzard | `openid` | `blizzard_sub`, le BattleTag |
 
@@ -68,6 +68,17 @@ effacé du même geste les adresses collectées avant la règle — voir
 Les photos sont **copiées** chez nous (`adoptRemoteAvatar`), jamais relayées :
 une URL de CDN rangée en base annoncerait l'IP de chaque visiteur au
 fournisseur, à chaque affichage. Voir `USER_AVATAR_IMPORT.md`.
+
+**Aucun nom réel.** Le `name` d'un profil Google — le plus souvent un prénom et
+un nom — servait de pseudo à la création d'un compte : un pseudo est public et
+ne se masque pas, et le site promettait ailleurs (`/rgpd`, modale de
+consentement, registre T01) de ne reposer que sur des pseudonymes. Il n'est plus
+lu : `GoogleUserInfo` et `GoogleProfilePayload` n'ont plus de champ `name`,
+`OAuthIdentity` n'a plus de `displayName`, et un compte créé par Google naît sous
+un pseudo neutre (`playerNNNNN`) que le joueur remplace depuis « Mon profil ». La
+portée `profile` reste demandée — c'est elle qui donne la photo —, Google
+continue donc d'envoyer le nom, que le site ignore. Les comptes créés avant la
+règle gardent leur pseudo (voir `ERREUR.txt`).
 
 ### Discord : la connexion certifie le tag
 

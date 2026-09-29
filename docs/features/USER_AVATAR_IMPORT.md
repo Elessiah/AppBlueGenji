@@ -119,6 +119,23 @@ par connexion, et l'effacer aurait détruit la photo choisie.
 **Contrepartie assumée** : une photo changée **côté Google** ne se propage plus
 au site. Elle se change sur `/profil`, où l'on choisit déjà la sienne.
 
+## La photo importée naît masquée
+
+L'écriture qui pose la copie pose aussi `visible_avatar = 0`, dans la même
+instruction. La photo n'est pas un choix du joueur : elle vient du fournisseur
+par lequel il s'est connecté, et le défaut de la colonne (`1`) la publiait
+d'office à tout membre connecté — et, par le logo de son entrée solo, jusqu'à la
+carte du direct de la vitrine publique. C'est une mise à disposition sans
+intervention de l'intéressé, que la protection des données par défaut exclut
+(RGPD art. 25.2). Le joueur la rend visible d'une case sur « Mon profil ».
+
+Le réglage n'est posé qu'à l'import : un avatar téléversé n'est jamais concerné,
+et l'entrée solo n'a rien à resynchroniser — l'import n'a lieu qu'en l'absence
+d'avatar local, donc l'entrée n'en portait aucun. Les photos importées avant la
+règle restent publiées : rien ne les distingue d'un avatar téléversé (même
+dossier, même nommage), et les masquer d'office est une décision laissée à
+l'association (`ERREUR.txt`).
+
 ## L'import ne fait jamais échouer une connexion
 
 `importRemoteAvatar` rend `null` plutôt que de lever, quelle que soit la cause :
