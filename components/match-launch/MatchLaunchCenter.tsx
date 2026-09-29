@@ -525,7 +525,7 @@ function IdentityLine({
           )}
           <button
             type="button"
-            className={styles.copy}
+            className={`${styles.copy} tap-target`}
             onClick={() => void onCopy(value, kind)}
             aria-label={`Copier le ${kind} ${value}`}
           >

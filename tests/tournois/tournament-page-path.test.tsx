@@ -89,7 +89,7 @@ describe("squelette de chargement", () => {
 
 describe("retour", () => {
   it("est un lien vers la liste, qui ne revient dans l'historique que sur le site", () => {
-    expect(header).toContain('<Link href="/tournois" onClick={onBackClick} className={s.back}>');
+    expect(header).toContain('<Link href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>');
     expect(header).toContain(
       "if (!isPlainLeftClick(event) || !canReturnInSite(readSiteBackInput())) return;",
     );

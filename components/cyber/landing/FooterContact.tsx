@@ -74,7 +74,7 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
         {contact.email && (
           <li className={styles.item}>
             <span className={styles.itemLabel}>Email</span>
-            <a href={`mailto:${contact.email}`}>{contact.email}</a>
+            <a className="tap-target" href={`mailto:${contact.email}`}>{contact.email}</a>
           </li>
         )}
         {contact.discordTag && (
@@ -86,7 +86,7 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
         {contact.discordUrl && (
           <li className={styles.item}>
             <span className={styles.itemLabel}>Serveur</span>
-            <a href={contact.discordUrl} target="_blank" rel="noreferrer">
+            <a className="tap-target" href={contact.discordUrl} target="_blank" rel="noreferrer">
               Serveur Discord
             </a>
           </li>

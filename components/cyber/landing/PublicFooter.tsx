@@ -45,27 +45,27 @@ export async function PublicFooter() {
           <div>
             <div className={styles.heading}>COMPÉTITIONS</div>
             <ul>
-              <li><Link href="/tournois">Tournois actifs</Link></li>
-              <li><Link href="/tournois">Archives</Link></li>
-              <li><Link href="/joueurs">Classement</Link></li>
-              <li><a href={REGLEMENT_URL} target="_blank" rel="noreferrer">Règlement</a></li>
+              <li><Link className="tap-target" href="/tournois">Tournois actifs</Link></li>
+              <li><Link className="tap-target" href="/tournois">Archives</Link></li>
+              <li><Link className="tap-target" href="/joueurs">Classement</Link></li>
+              <li><a className="tap-target" href={REGLEMENT_URL} target="_blank" rel="noreferrer">Règlement</a></li>
             </ul>
           </div>
           <div>
             <div className={styles.heading}>COMMUNAUTÉ</div>
             <ul>
-              <li><a href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">Discord</a></li>
-              <li><Link href="/#sponsors">Partenaires</Link></li>
-              <li><Link href="/benevoles">Bénévoles</Link></li>
-              <li><Link href="/bot">Bot</Link></li>
+              <li><a className="tap-target" href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">Discord</a></li>
+              <li><Link className="tap-target" href="/#sponsors">Partenaires</Link></li>
+              <li><Link className="tap-target" href="/benevoles">Bénévoles</Link></li>
+              <li><Link className="tap-target" href="/bot">Bot</Link></li>
             </ul>
           </div>
           <div>
             <div className={styles.heading}>ASSOCIATION</div>
             <ul>
-              <li><Link href="/association#manifeste">Manifeste</Link></li>
-              <li><Link href="/benevoles">Équipe bénévole</Link></li>
-              <li><Link href="/#sponsors">Partenariats</Link></li>
+              <li><Link className="tap-target" href="/association#manifeste">Manifeste</Link></li>
+              <li><Link className="tap-target" href="/benevoles">Équipe bénévole</Link></li>
+              <li><Link className="tap-target" href="/#sponsors">Partenariats</Link></li>
             </ul>
           </div>
           <div>
@@ -75,15 +75,15 @@ export async function PublicFooter() {
           <div>
             <div className={styles.heading}>LÉGAL</div>
             <ul>
-              <li><Link href="/mentions-legales">Mentions légales</Link></li>
-              <li><Link href={TERMS_PATH}>Conditions d&apos;utilisation</Link></li>
-              <li><Link href="/rgpd">RGPD</Link></li>
-              <li><a href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
-              <li><Link href="/rgpd#cookies">Cookies</Link></li>
-              <li><AccessibilityFooterLink className={styles.linkButton} /></li>
+              <li><Link className="tap-target" href="/mentions-legales">Mentions légales</Link></li>
+              <li><Link className="tap-target" href={TERMS_PATH}>Conditions d&apos;utilisation</Link></li>
+              <li><Link className="tap-target" href="/rgpd">RGPD</Link></li>
+              <li><a className="tap-target" href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
+              <li><Link className="tap-target" href="/rgpd#cookies">Cookies</Link></li>
+              <li><AccessibilityFooterLink className={`${styles.linkButton} tap-target`} /></li>
               {/* Mention imposée par le RGAA sur chaque page, dans ses termes
                   exacts : l'état de conformité se lit sans ouvrir la page. */}
-              <li><Link href="/accessibilite">{accessibilityFooterLabel()}</Link></li>
+              <li><Link className="tap-target" href="/accessibilite">{accessibilityFooterLabel()}</Link></li>
             </ul>
           </div>
         </div>

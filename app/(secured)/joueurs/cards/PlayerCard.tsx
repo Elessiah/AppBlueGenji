@@ -86,7 +86,7 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
               {PLAYER_ROSTER_STATUS_LABEL.ROSTER} ·{" "}
               <TeamLink
                 teamId={player.team.id}
-                className={s.aboveOverlay}
+                className={`${s.aboveOverlay} tap-target`}
                 title={`Voir la fiche de ${player.team.name}`}
               >
                 <em>{player.team.name.toUpperCase()}</em>

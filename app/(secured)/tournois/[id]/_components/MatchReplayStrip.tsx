@@ -37,7 +37,7 @@ export function MatchReplayStrip({ match }: { match: BracketMatch }) {
   const editButton = showEdit && (
     <button
       type="button"
-      className={`btn ghost ${styles.edit}`}
+      className={`btn ghost tap-target ${styles.edit}`}
       onClick={() => openReplay(match)}
       title={compact ? "Modifier la rediff" : undefined}
       aria-label={
