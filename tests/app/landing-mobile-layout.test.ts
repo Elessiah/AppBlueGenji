@@ -116,17 +116,29 @@ describe("partenaires", () => {
 });
 
 describe("classement", () => {
-  it("abrège le nom de l'équipe — le lien, dernier enfant de la cellule", () => {
+  it("borne le nom de l'équipe à deux lignes — le lien, dernier enfant de la cellule", () => {
     const name = blockFor(/\.team > :last-child\s*\{/, leaderboard);
     expect(name).toMatch(/min-width:\s*0\s*;/);
-    expect(name).toMatch(/text-overflow:\s*ellipsis\s*;/);
-    expect(name).toMatch(/white-space:\s*nowrap\s*;/);
+    expect(name).toMatch(/-webkit-line-clamp:\s*2\s*;/);
+    expect(name).toMatch(/overflow:\s*hidden\s*;/);
+    expect(name).not.toMatch(/white-space:\s*nowrap/);
     expect(stripComments(leaderboard)).not.toContain("span:last-child");
   });
 
   it("resserre les colonnes chiffrées en mobile", () => {
     expect(blockFor(/\.row\s*\{/, mediaBlock(leaderboard, "(max-width: 720px)"))).toMatch(
       /grid-template-columns:\s*24px minmax\(0, 1fr\) 56px 40px 30px\s*;/,
+    );
+  });
+
+  it("cède la colonne de tendance au nom sous 400 px", () => {
+    const narrow = mediaBlock(leaderboard, "(max-width: 400px)");
+    expect(blockFor(/\.row\s*\{/, narrow)).toMatch(
+      /grid-template-columns:\s*24px minmax\(0, 1fr\) 56px 40px\s*;/,
+    );
+    expect(blockFor(/\.trendHead\s*\{/, narrow)).toMatch(/display:\s*none\s*;/);
+    expect(readSource("components/cyber/landing/Leaderboard.tsx")).toContain(
+      "className={styles.trendHead}",
     );
   });
 });

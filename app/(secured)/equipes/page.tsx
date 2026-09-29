@@ -162,6 +162,7 @@ export default function TeamsPage() {
 
           <div className={s.toolbar}>
             <AnnuaireSearchField
+              label="Rechercher une équipe"
               placeholder="Rechercher une équipe, un tag, une région…"
               value={query}
               onChange={(e) => setQuery(e.target.value)}

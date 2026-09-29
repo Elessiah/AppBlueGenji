@@ -19,12 +19,19 @@ d'autre.
 Le champ porte un `aria-label="Rechercher un tournoi"` : le placeholder seul
 n'est pas un nom accessible, il disparaît à la frappe.
 
-Le raccourci affiché suit la plateforme (`searchShortcutLabel`, pur) : « ⌘K »
-sur un clavier Apple (`Mac`, `iPhone`, `iPad`, `iPod` dans
-`navigator.platform`), « Ctrl+K » partout ailleurs — y compris Windows et
-Linux, où le raccourci fonctionne (`Ctrl` est déjà lu par le gestionnaire de
-touches) mais s'affichait en `⌘K`. Valeur par défaut `Ctrl+K` au rendu serveur
-(sûre, sans DOM), corrigée une fois côté client au montage.
+Le raccourci affiché suit la plateforme (`searchShortcutLabel`, pur, dans
+`lib/shared/search-shortcut.ts`) : « ⌘K » sur un clavier Apple (`Mac`,
+`iPhone`, `iPad`, `iPod` dans `navigator.platform`), « Ctrl+K » partout
+ailleurs. Valeur par défaut `Ctrl+K` au rendu serveur (sûre, sans DOM),
+corrigée une fois côté client au montage. Libellé **et** touche passent par
+`useSearchShortcut(ref)`, partagé avec les annuaires `/equipes` et `/joueurs`
+(`AnnuaireSearchField`) : ceux-ci affichaient « ⌘K » en dur sans écouter la
+moindre touche. La pastille est `aria-hidden` (le champ porte
+`aria-keyshortcuts`) et **masquée sous `(hover: none)`** : sur un écran
+tactile elle ne sert à rien et se faisait rogner à 320 px.
+
+Les trois champs de recherche sont en **16 px** : en dessous, iOS Safari zoome
+la page au focus.
 
 ## Pastilles de jeu
 
