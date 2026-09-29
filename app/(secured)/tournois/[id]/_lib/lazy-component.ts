@@ -14,7 +14,9 @@ import type { ComponentType } from "react";
  * - **jamais sous une modale ouverte** — plusieurs de ces chargements partent
  *   sans geste du lecteur (une vue ou un classement de phase qui paraît avec un
  *   instantané du flux), et recharger ferait perdre une saisie en cours pour un
- *   bloc que personne n'a demandé : le rechargement **attend** qu'elle se ferme ;
+ *   bloc que personne n'a demandé : le rechargement **attend** qu'elle se ferme
+ *   (et que le navigateur soit en ligne), et renonce si le lecteur a changé de
+ *   page entre-temps ;
  * - **une fois par minute au plus** — si le fichier manque encore juste après
  *   un rechargement, le déploiement lui-même est en cause, et boucler n'y
  *   changerait rien : le composant reste vide, la page reste debout.
@@ -22,22 +24,32 @@ import type { ComponentType } from "react";
 
 export const LAZY_RELOAD_KEY = "bg_lazy_chunk_reload_at";
 export const LAZY_RELOAD_COOLDOWN_MS = 60_000;
-const MODAL_POLL_MS = 1_000;
+const SAFE_POLL_MS = 1_000;
 
 export interface LazyReloadEnv {
   now: () => number;
   readStamp: () => string | null;
   writeStamp: (value: string) => void;
   reload: () => void;
-  /** Une modale est ouverte : une saisie peut y être en cours. */
-  modalOpen: () => boolean;
-  /** Rappelle `callback` une fois toutes les modales fermées. */
-  whenNoModal: (callback: () => void) => void;
+  /**
+   * Recharger maintenant est sûr : aucune modale ouverte (une saisie peut y
+   * être en cours) et le navigateur en ligne (hors ligne, le rechargement
+   * tomberait sur la page d'erreur du navigateur au lieu de laisser le flux se
+   * reconnecter).
+   */
+  safeNow: () => boolean;
+  /**
+   * Rappelle `callback` dès que recharger devient sûr — et jamais si le
+   * lecteur a quitté la page entre-temps : on rechargerait alors une autre
+   * page, peut-être en pleine saisie.
+   */
+  whenSafe: (callback: () => void) => void;
 }
 
 function browserEnv(): LazyReloadEnv | null {
   if (typeof window === "undefined") return null;
-  const modalOpen = () => document.querySelector('[aria-modal="true"]') !== null;
+  const safeNow = () =>
+    navigator.onLine !== false && document.querySelector('[aria-modal="true"]') === null;
   return {
     now: () => Date.now(),
     readStamp: () => {
@@ -55,13 +67,18 @@ function browserEnv(): LazyReloadEnv | null {
       }
     },
     reload: () => window.location.reload(),
-    modalOpen,
-    whenNoModal: (callback) => {
+    safeNow,
+    whenSafe: (callback) => {
+      const path = window.location.pathname;
       const timer = window.setInterval(() => {
-        if (modalOpen()) return;
+        if (window.location.pathname !== path) {
+          window.clearInterval(timer);
+          return;
+        }
+        if (!safeNow()) return;
         window.clearInterval(timer);
         callback();
-      }, MODAL_POLL_MS);
+      }, SAFE_POLL_MS);
     },
   };
 }
@@ -76,14 +93,14 @@ function reloadNow(env: LazyReloadEnv): boolean {
 }
 
 /**
- * Recharge la page après un chargement raté — tout de suite si aucune modale
- * n'est ouverte, sinon à sa fermeture. Rend `false` quand rien n'est (encore)
+ * Recharge la page après un chargement raté — tout de suite si c'est sûr
+ * (`safeNow`), sinon dès que ça le devient. Rend `false` quand rien n'est (encore)
  * rechargé.
  */
 export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): boolean {
   if (!env) return false;
-  if (env.modalOpen()) {
-    env.whenNoModal(() => reloadNow(env));
+  if (!env.safeNow()) {
+    env.whenSafe(() => reloadNow(env));
     return false;
   }
   return reloadNow(env);

@@ -67,8 +67,8 @@ describe("filet d'un chargement à la demande (orReload)", () => {
     const state = { stamp, reloads: 0, modal, pending: [] as Array<() => void> };
     const env: LazyReloadEnv = {
       now: () => now,
-      modalOpen: () => state.modal,
-      whenNoModal: (callback) => {
+      safeNow: () => !state.modal,
+      whenSafe: (callback) => {
         state.pending.push(callback);
       },
       readStamp: () => state.stamp,
@@ -97,7 +97,7 @@ describe("filet d'un chargement à la demande (orReload)", () => {
     expect((Loaded as () => null)()).toBeNull();
   });
 
-  it("attend la fermeture d'une modale ouverte pour recharger (saisie en cours)", async () => {
+  it("attend qu'il soit sûr de recharger (modale ouverte, hors ligne)", async () => {
     const { env, state } = makeEnv(null, 1_000_000, true);
     const Loaded = await orReload(Promise.reject(new Error("ChunkLoadError")), env);
     expect(state.reloads).toBe(0);
