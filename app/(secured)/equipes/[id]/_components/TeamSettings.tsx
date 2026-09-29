@@ -127,6 +127,8 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
       );
       showSuccess("Équipe mise à jour.");
       onChanged();
+      // Le bouton « Mon équipe » de la barre porte le nom : il doit suivre.
+      router.refresh();
     } catch (e) {
       // `teamApi` lève le code du refus tel quel : c'est lui qui désigne le
       // champ (nom ou sigle déjà pris, que le contrôle local ne peut pas voir).
@@ -213,6 +215,8 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
         managedAsGhost ? "Équipe fantôme supprimée." : "Équipe dissoute. Ses statistiques restent consultables.",
       );
       router.push("/equipes");
+      // La barre ne doit plus annoncer une équipe dissoute.
+      router.refresh();
       return true;
     } catch (e) {
       showError(teamErrorMessage((e as Error).message));

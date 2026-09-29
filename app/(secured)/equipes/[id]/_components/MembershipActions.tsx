@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import type { TeamDetailResponse, TeamJoinRequest } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { PlayerLink } from "@/components/entity-link";
@@ -20,6 +21,7 @@ interface MembershipActionsProps {
 
 export function MembershipActions({ team, requests, onChanged, onRequestsChanged }: MembershipActionsProps) {
   const { showError, showSuccess } = useToast();
+  const router = useRouter();
   const teamId = team.team.id;
   const [busy, setBusy] = useState(false);
   const [confirmLeave, setConfirmLeave] = useState(false);
@@ -36,6 +38,10 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     try {
       showSuccess(await request());
       onChanged();
+      // La barre de navigation vient de la mise en page serveur de l'espace
+      // connecté, que l'App Router ne rejoue pas d'une page à l'autre : sans
+      // ce rafraîchissement, elle garderait l'état d'avant jusqu'au F5.
+      router.refresh();
       onRequestsChanged();
       return true;
     } catch (e) {
