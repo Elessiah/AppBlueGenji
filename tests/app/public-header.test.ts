@@ -31,9 +31,13 @@ describe("PublicHeader — bouton « partie compétitive »", () => {
     expect(loggedOutJsx).toContain("/connexion");
   });
 
-  it("conserve l'avatar cliquable vers le profil à côté du CTA", () => {
-    expect(source).toMatch(/href="\/profil"/);
-    expect(source).toContain("user.pseudo");
+  it("pose le menu du compte (profil, équipe, déconnexion) à côté du CTA", () => {
+    expect(source).toContain("<AccountMenu pseudo={user.pseudo}");
+    expect(source).toContain("activeTeam={activeTeam}");
+  });
+
+  it("ne transmet au client que l'identité de l'équipe, pas ses rôles", () => {
+    expect(source).toContain("{ teamId: team.teamId, teamName: team.teamName }");
   });
 });
 

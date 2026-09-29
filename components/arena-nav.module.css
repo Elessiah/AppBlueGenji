@@ -164,38 +164,43 @@
   box-shadow: 0 0 18px rgba(90, 200, 255, 0.35);
 }
 
-.avatarChip {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 14px 6px 6px;
-  border: 1px solid var(--line-strong-cy);
-  border-radius: 999px;
-  background: var(--cyber-bg-1);
-  transition: border-color 0.15s;
-  text-decoration: none;
+/* Hauteur de la barre : elle reste collée en haut de l'écran, chaque pixel
+   est pris au contenu. En paysage bas (téléphone couché, zoom 200 % d'un
+   portable), elle cesse d'être collante — 110 px sur 360 laissaient deux tiers
+   d'écran à la page. */
+@media (max-height: 500px) {
+  .nav {
+    position: relative;
+  }
 }
 
-.avatarChip:hover {
-  border-color: rgba(90, 200, 255, 0.35);
-}
+/* ── Portable, tablette : « Accueil » / « Mon équipe » en pictogramme seul ──
+   Entre 721 et 1150 px les libellés passaient sur deux lignes et rognaient le
+   pseudo. Le libellé reste lu par les technologies d'assistance (le nom
+   accessible du lien ne change pas). */
+@media (max-width: 1150px) {
+  .navHomeLabel {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
 
-.avatarChip img {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 1px solid var(--line-strong-cy);
-}
-
-.avatarChip .chipName {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--ink);
-  letter-spacing: 0.02em;
-  max-width: 120px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  .navHome {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+    min-height: 36px;
+    padding: 6px 10px;
+    font-size: 14px;
+    letter-spacing: 0;
+  }
 }
 
 /* ── Tablette : on resserre les espacements ── */
@@ -214,22 +219,35 @@
 }
 
 /* ── Mobile : passage sur deux lignes (logo + avatar en haut, liens en bas) ──
-   Les raccourcis « Accueil » / « Mon équipe » sont masqués (l'accueil reste
-   accessible via le logo, l'équipe via l'onglet Équipes). */
+   Les raccourcis « Accueil » / « Mon équipe » sont masqués : l'accueil reste
+   accessible par le logo, l'équipe par le menu du compte (sous l'avatar).
+   Espacements resserrés : collante, la barre prenait 110 px. */
 @media (max-width: 720px) {
   .navInner {
     grid-template-columns: auto 1fr;
     grid-template-areas:
       "logo right"
       "left left";
-    gap: 12px 16px;
-    padding: 12px 0;
+    gap: 4px 16px;
+    padding: 8px 0 4px;
   }
 
   .navLogo {
     grid-area: logo;
-    width: 44px;
-    height: 44px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .navLogo::after {
+    inset: -8px;
+  }
+
+  .navLink {
+    padding: 6px 0;
+  }
+
+  .navLinkActive::after {
+    bottom: -5px;
   }
 
   .navRight {
@@ -290,11 +308,11 @@
   text-align: center;
 }
 
-/* Sous 1100 px, la barre ne tient plus « Accueil » sur une ligne avec ce lien
-   en toutes lettres : le libellé passe en lecture seule pour les technologies
+/* Sous 1150 px — même seuil que les pictogrammes d'« Accueil » —, la barre ne
+   tient plus ce lien en toutes lettres : le libellé passe en lecture seule pour les technologies
    d'assistance (le nom accessible reste « Signalements »), le drapeau et le
    compteur restent visibles. */
-@media (max-width: 1100px) {
+@media (max-width: 1150px) {
   .navReportsLabel {
     position: absolute;
     width: 1px;

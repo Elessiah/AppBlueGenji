@@ -1,10 +1,14 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
 
 let mockPathname: string | null = "/equipes/12";
-jest.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
+jest.mock("next/navigation", () => ({
+  usePathname: () => mockPathname,
+  useRouter: () => ({ push: () => undefined, refresh: () => undefined }),
+}));
 
 import { renderToStaticMarkup } from "react-dom/server";
 import { ArenaNav } from "@/components/arena-nav";
+import { ToastProvider } from "@/components/ui/toast";
 import {
   PublicNavMenu,
   PublicNavPanel,
@@ -13,7 +17,11 @@ import {
 import { readSource } from "../helpers/read-source";
 
 const arenaNav = (activeTeam: { teamId: number; teamName: string } | null = null) =>
-  renderToStaticMarkup(<ArenaNav pseudo="Nova" avatarUrl={null} activeTeam={activeTeam} />);
+  renderToStaticMarkup(
+    <ToastProvider>
+      <ArenaNav pseudo="Nova" avatarUrl={null} activeTeam={activeTeam} />
+    </ToastProvider>,
+  );
 
 /** Les liens `<a>` du rendu qui portent `aria-current="page"`. */
 const currentLinks = (html: string) =>
@@ -39,8 +47,8 @@ describe("ArenaNav — page courante et pictogrammes", () => {
 
   it("masque les pictogrammes aux technologies d'assistance", () => {
     const html = arenaNav({ teamId: 3, teamName: "Les Ours" });
-    expect(html).toContain('<span aria-hidden="true">⌂</span> Accueil');
-    expect(html).toContain('<span aria-hidden="true">🛡</span> Mon équipe');
+    expect(html).toContain('<span aria-hidden="true">⌂</span> <span class="navHomeLabel">Accueil</span>');
+    expect(html).toContain('<span aria-hidden="true">🛡</span> <span class="navHomeLabel">Mon équipe</span>');
     // Le nom accessible du lien d'équipe commence par son texte visible (2.5.3).
     expect(html).toContain('aria-label="Mon équipe : Les Ours"');
   });
@@ -110,10 +118,10 @@ describe("handleMenuEscape", () => {
   });
 });
 
-describe("PublicHeader — lien du profil", () => {
-  it("fait commencer son nom accessible par le pseudo affiché (WCAG 2.5.3)", () => {
+describe("PublicHeader — menu du compte", () => {
+  it("rend le même menu du compte que l'espace connecté", () => {
     const source = readSource("components/cyber/landing/PublicHeader.tsx");
-    expect(source).toContain("aria-label={`${user.pseudo}, mon profil`}");
+    expect(source).toContain("<AccountMenu pseudo={user.pseudo}");
     expect(source).not.toContain('aria-label="Mon profil"');
   });
 });

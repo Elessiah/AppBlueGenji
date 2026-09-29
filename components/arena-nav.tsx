@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoWithGlow } from "./logo-with-glow";
-import { UserAvatar } from "./user-avatar";
+import { AccountMenu } from "./account-menu";
 import { isNavLinkActive } from "@/lib/shared/nav-active";
 import { REPORTS_ADMIN_PATH } from "@/lib/shared/content-reports";
 import s from "./arena-nav.module.css";
@@ -64,7 +64,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
           {/* Les pictogrammes sont décoratifs : lus à voix haute, « ⌂ » et
               « 🛡 » précédaient le nom du lien d'un mot sans rapport. */}
           <Link href="/" className={s.navHome}>
-            <span aria-hidden="true">⌂</span> Accueil
+            <span aria-hidden="true">⌂</span> <span className={s.navHomeLabel}>Accueil</span>
           </Link>
           {activeTeam && (
             <Link
@@ -73,7 +73,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
               aria-label={`Mon équipe : ${activeTeam.teamName}`}
               title={activeTeam.teamName}
             >
-              <span aria-hidden="true">🛡</span> Mon équipe
+              <span aria-hidden="true">🛡</span> <span className={s.navHomeLabel}>Mon équipe</span>
             </Link>
           )}
           {openReports !== null && (
@@ -91,10 +91,9 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
               )}
             </Link>
           )}
-          <Link href="/profil" className={s.avatarChip}>
-            <UserAvatar src={avatarUrl} pseudo={pseudo} size={30} borderWidth={1} decorative />
-            <span className={s.chipName}>{pseudo}</span>
-          </Link>
+          {/* Profil, équipe et déconnexion, à portée de main sur toutes les
+              largeurs — sous 720 px, c'est le seul chemin vers sa propre équipe. */}
+          <AccountMenu pseudo={pseudo} avatarUrl={avatarUrl} activeTeam={activeTeam} />
         </div>
       </div>
     </nav>

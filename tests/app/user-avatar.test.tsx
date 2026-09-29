@@ -86,8 +86,7 @@ describe("écrans qui affichent un avatar", () => {
   const screens = [
     "app/(secured)/joueurs/[id]/page.tsx",
     "app/(secured)/profil/page.tsx",
-    "components/arena-nav.tsx",
-    "components/cyber/landing/PublicHeader.tsx",
+    "components/account-menu.tsx",
   ];
 
   it.each(screens)("%s ne référence aucun fichier de repli", (file) => {

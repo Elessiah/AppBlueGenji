@@ -1,8 +1,9 @@
 import Link from "next/link";
 import Image from "next/image";
-import { UserAvatar } from "@/components/user-avatar";
+import { AccountMenu } from "@/components/account-menu";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
+import { getUserActiveTeam } from "@/lib/server/teams-service";
 import { PublicNavMenu } from "./PublicNavMenu";
 import styles from "./PublicHeader.module.css";
 
@@ -14,7 +15,8 @@ import styles from "./PublicHeader.module.css";
  *
  * Actions à droite selon l'état de session :
  * - **Connecté** : bouton « Accéder à la partie compétitive » (→ `/tournois`,
- *   l'espace sécurisé) suivi de l'avatar cliquable menant au profil.
+ *   l'espace sécurisé) suivi du menu du compte (`AccountMenu` : profil,
+ *   équipe, déconnexion).
  * - **Déconnecté** : un seul bouton « Rejoindre » (primary) vers `/connexion`,
  *   qui sert aussi de page de connexion.
  *
@@ -23,6 +25,10 @@ import styles from "./PublicHeader.module.css";
  */
 export async function PublicHeader() {
   const user = await getCurrentUser().catch(() => null);
+  // L'équipe n'alimente qu'une entrée du menu du compte : une lecture ratée
+  // la retire, elle ne fait pas tomber l'en-tête.
+  const team = user ? await getUserActiveTeam(user.id).catch(() => null) : null;
+  const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
 
   return (
     <header className={styles.root}>
@@ -58,23 +64,10 @@ export async function PublicHeader() {
                   <span className={styles.ctaShort}>Compétition →</span>
                 </Link>
               </CyberButton>
-              {/* Le libellé **commence** par le pseudo affiché (WCAG 2.5.3) :
-                  « Mon profil » seul remplaçait le texte visible, et la
-                  commande vocale ne répondait plus à ce qu'on lit. */}
-              <Link
-                href="/profil"
-                aria-label={`${user.pseudo}, mon profil`}
-                style={{ display: "inline-flex", alignItems: "center", gap: 10 }}
-              >
-                <UserAvatar
-                  src={user.avatarUrl}
-                  pseudo={user.pseudo}
-                  size={30}
-                  borderWidth={1.5}
-                  decorative
-                />
-                <span>{user.pseudo}</span>
-              </Link>
+              {/* Profil, équipe et déconnexion : le même menu que dans
+                  l'espace connecté. Son nom accessible commence par le pseudo
+                  affiché (WCAG 2.5.3). */}
+              <AccountMenu pseudo={user.pseudo} avatarUrl={user.avatarUrl} activeTeam={activeTeam} />
             </>
           ) : (
             <CyberButton variant="primary" asChild>
