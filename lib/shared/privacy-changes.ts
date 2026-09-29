@@ -175,9 +175,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       `La plateforme est sauvegardée dans des archives chiffrées gardées ${BACKUP_RETENTION_DAYS} jours, et une suppression de compte reste acquise même si une sauvegarde est restaurée.`,
     details: [
-      `La base de données est sauvegardée chaque semaine dans une archive chiffrée avant envoi, avec une clé que Microsoft ne détient pas, puis hébergée chez Microsoft (OneDrive), qui la stocke sans pouvoir la lire. Chaque archive est détruite au bout de ${BACKUP_RETENTION_DAYS} jours, sans passer par une corbeille.`,
+      `La base de données est sauvegardée chaque semaine dans une archive chiffrée avant envoi, avec une clé que seule l'association détient, puis hébergée chez Microsoft (OneDrive), qui la stocke sans pouvoir la lire. Chaque archive est détruite au bout de ${BACKUP_RETENTION_DAYS} jours, sans passer par une corbeille.`,
       "Les images téléversées (avatars, logos) sont copiées, chiffrées, chaque heure. Une image retirée du site disparaît de la sauvegarde dans l'heure.",
-      `Une donnée supprimée peut donc subsister jusqu'à ${BACKUP_RETENTION_DAYS} jours dans ces archives, qu'on ne peut pas corriger une à une. Pour qu'un compte supprimé ne revienne jamais, chaque suppression de compte est notée dans un journal — numéro et date de création du compte, date de suppression, rien d'autre — gardé ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours : si une sauvegarde devait être restaurée, les suppressions de compte intervenues depuis sont réappliquées avant la remise en service ; les autres effacements postérieurs à l'archive (tag retiré, réglage modifié…) ne le sont pas.`,
+      `Une donnée supprimée peut donc subsister jusqu'à ${BACKUP_RETENTION_DAYS} jours dans ces archives, qu'on ne peut pas corriger une à une. Pour qu'elle ne revienne jamais, chaque suppression de compte est notée dans un journal — numéro et date de création du compte, date de suppression, rien d'autre — gardé ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours : si une sauvegarde devait être restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en service.`,
     ],
   },
   // Le masquage du BattleTag ne valait jusqu'ici pour personne d'autre que son

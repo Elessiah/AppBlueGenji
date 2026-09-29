@@ -35,7 +35,9 @@ affichées dans le tableau « Données collectées ») :
   coordonnées et avatar effacés, la ligne restant pour que le palmarès des
   équipes adverses tienne debout. Dans les deux cas c'est immédiat, jamais un
   job différé. Les copies de sauvegarde chiffrées gardent le compte **30 jours au
-  plus**, et une restauration rejoue les suppressions intervenues depuis. Voir
+  plus**, et une restauration rejoue les suppressions **de compte** intervenues
+  depuis — et elles seules : un autre effacement postérieur à l'archive (tag
+  retiré, réglage modifié…) reviendrait avec elle. Voir
   `docs/features/ACCOUNT_DELETION.md` et `docs/features/BACKUP_DATA_PROTECTION.md`.
 - **Aucune mention de SIRET / SIREN / RNA** sur le site : l'association n'en publie pas, et l'hébergeur, particulier bénévole, n'en a pas.
 

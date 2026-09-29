@@ -145,13 +145,16 @@ export default async function RgpdPage() {
           <p>
             <strong>Données obligatoires et facultatives.</strong> Un compte n&apos;a besoin,
             pour exister, que d&apos;un moyen de connexion — l&apos;identifiant Google, Discord
-            ou Blizzard du fournisseur choisi (et, pour Discord, le pseudo qu&apos;il transmet)
-            — et d&apos;un pseudo site, attribué d&apos;office à la création. Sans moyen de
-            connexion, aucun compte ne peut être créé : les pages publiques restent lisibles,
-            mais on ne peut ni rejoindre une équipe ni s&apos;inscrire à un tournoi. Les autres
-            données de profil (pseudos de jeu, certification du tag Discord, avatar, majorité)
-            sont facultatives, et le compte fonctionne sans elles, à deux limites près :
-            un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
+            ou Blizzard du fournisseur choisi — et d&apos;un pseudo site, attribué d&apos;office à
+            la création. Sans moyen de connexion, aucun compte ne peut être créé : les pages
+            publiques restent lisibles, mais on ne peut ni rejoindre une équipe ni
+            s&apos;inscrire à un tournoi. Le fournisseur transmet en outre ce que le tableau
+            décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
+            BattleTag par Blizzard (tenu à jour à chaque connexion tant que le compte
+            Battle.net est rattaché), la photo par Google ou Discord (copiée, et masquée
+            tant que tu ne l&apos;affiches pas). Ce que tu renseignes toi-même (pseudos de jeu
+            saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
+            et le compte fonctionne sans, à deux limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
             compte Battle.net rattaché, et un membre du staff de diffusion ne peut
             s&apos;inscrire comme caster d&apos;un match sans les deux.
           </p>
