@@ -7,6 +7,7 @@ import {
   scrollAreaAccessibility,
   watchScrollOverflow,
 } from "@/lib/shared/scroll-overflow";
+import { SCROLL_REVEAL_ATTRIBUTE, revealScrollLeft } from "@/lib/shared/scroll-reveal";
 
 type ScrollOrientation = "x" | "y" | "both";
 
@@ -30,6 +31,14 @@ interface ScrollAreaProps {
    * repère (`lib/shared/scroll-overflow.ts`).
    */
   ariaLabel?: string;
+  /**
+   * Clé de l'élément « courant » de la zone, marqué `data-scroll-reveal` (étape
+   * de frise, manche en cours). À chaque **changement** de clé — montage compris
+   * —, la zone défile à l'horizontale juste assez pour le montrer
+   * (`lib/shared/scroll-reveal.ts`). Jamais à un autre rendu : le lecteur qui
+   * défile lui-même garde la main. `null` ou absent : rien n'est défilé.
+   */
+  revealKey?: string | number | null;
 }
 
 const OVERFLOW: Record<ScrollOrientation, CSSProperties> = {
@@ -39,8 +48,8 @@ const OVERFLOW: Record<ScrollOrientation, CSSProperties> = {
 };
 
 // Masque les 18 derniers pixels : le contenu s'efface au lieu d'être tranché.
-const FADE_MASK =
-  "linear-gradient(to right, transparent 0, #000 18px, #000 calc(100% - 18px), transparent 100%)";
+const FADE_WIDTH = 18;
+const FADE_MASK = `linear-gradient(to right, transparent 0, #000 ${FADE_WIDTH}px, #000 calc(100% - ${FADE_WIDTH}px), transparent 100%)`;
 
 /**
  * Zone défilante du design system.
@@ -66,6 +75,7 @@ export function ScrollArea({
   className,
   style,
   ariaLabel,
+  revealKey = null,
 }: ScrollAreaProps) {
   const ref = useRef<HTMLElement>(null);
   // `true` tant que rien n'est mesuré : le rendu serveur et le premier rendu
@@ -91,6 +101,29 @@ export function ScrollArea({
       },
     );
   }, []);
+
+  // Les réglages de la zone sont relus par une référence : seule la clé
+  // déclenche, un changement de dégradé ne désigne pas un nouvel élément courant.
+  const revealSettings = useRef({ orientation, fade });
+  revealSettings.current = { orientation, fade };
+  useEffect(() => {
+    const element = ref.current;
+    if (revealKey === null || !element || revealSettings.current.orientation === "y") return;
+    const target = element.querySelector<HTMLElement>(`[${SCROLL_REVEAL_ATTRIBUTE}]`);
+    if (!target) return;
+    const zone = element.getBoundingClientRect();
+    const box = target.getBoundingClientRect();
+    // Origine du contenu, indépendante du défilement courant.
+    const origin = zone.left + element.clientLeft - element.scrollLeft;
+    element.scrollLeft = revealScrollLeft({
+      scrollLeft: element.scrollLeft,
+      viewportWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+      targetStart: box.left - origin,
+      targetEnd: box.right - origin,
+      margin: revealSettings.current.fade ? FADE_WIDTH : 0,
+    });
+  }, [revealKey]);
 
   const classes = ["scroll-area", subtle ? "scroll-subtle" : null, className]
     .filter(Boolean)

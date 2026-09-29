@@ -6,6 +6,8 @@ import { MatchRow } from "./MatchRow";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
 import { EntrantName } from "./EntrantName";
+import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
+import styles from "./RankingViews.module.css";
 
 const COL_W = 226;
 const BORDER = "var(--border, #444)";
@@ -50,6 +52,7 @@ export function SurvivalView({
   emptyLabel = "Aucun match pour l'instant.",
 }: SurvivalViewProps) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
+  const lastRound = roundNums.length > 0 ? roundNums[roundNums.length - 1] : null;
   const activeCount = survival.standings.filter((s) => s.status === "ACTIVE").length;
   const barrageRounds = survival.barrageRounds ?? 0;
   // Pendant le barrage, le danger porte sur ses deux participants (le perdant
@@ -157,10 +160,8 @@ export function SurvivalView({
               return (
                 <div
                   key={team.teamId}
+                  className={styles.survivalRow}
                   style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 10,
                     padding: "7px 10px",
                     borderTop: idx === 0 ? "none" : `1px solid ${BORDER}`,
                     borderLeft: inDanger ? `3px solid ${AMBER}` : "3px solid transparent",
@@ -200,6 +201,9 @@ export function SurvivalView({
                     {meta.label}
                   </span>
                   {forfeitable && (
+                    // Sous 720 px, l'action passe sous le nom : à côté, elle
+                    // l'écrasait à « Test - … ».
+                    <span className={styles.survivalAction}>
                     <button
                       type="button"
                       onClick={() => onForfeit(team.teamId, team.teamName)}
@@ -215,7 +219,6 @@ export function SurvivalView({
                           : `Déclarer l'abandon de ${team.teamName}`
                       }
                       style={{
-                        flexShrink: 0,
                         padding: "3px 8px",
                         fontSize: 10,
                         textTransform: "uppercase",
@@ -227,6 +230,7 @@ export function SurvivalView({
                     >
                       Abandonner
                     </button>
+                    </span>
                   )}
                 </div>
               );
@@ -250,6 +254,9 @@ export function SurvivalView({
         <ScrollArea
           ariaLabel="Rounds du tournoi — défilement horizontal"
           style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}
+          // Posés côte à côte, le round qui se joue était hors champ à droite
+          // sur mobile : la zone s'ouvre sur le dernier.
+          revealKey={lastRound}
         >
           {roundNums.length === 0 ? (
             <p style={{ color: "var(--text-2)", fontSize: 14 }}>{emptyLabel}</p>
@@ -262,7 +269,11 @@ export function SurvivalView({
                 const isBarrageRound = barrageRounds > 0 && roundNum <= barrageRounds;
                 const cut = isCutRound(roundNum, cutSchedule);
                 return (
-                  <div key={roundNum} style={{ flexShrink: 0, width: COL_W }}>
+                  <div
+                    key={roundNum}
+                    style={{ flexShrink: 0, width: COL_W }}
+                    {...(roundNum === lastRound ? { [SCROLL_REVEAL_ATTRIBUTE]: "" } : {})}
+                  >
                     <div
                       style={{
                         display: "flex",
