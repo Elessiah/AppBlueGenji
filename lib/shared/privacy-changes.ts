@@ -562,7 +562,13 @@ export const PRIVACY_DM_SETTLE_DAYS = 7;
  */
 export const PRIVACY_DM_MIN_INTERVAL_DAYS = 30;
 
-/** `now − days`, au jour (`AAAA-MM-JJ`, UTC — comme la comparaison des publications). */
+/**
+ * `now − days`, au jour (`AAAA-MM-JJ`, UTC). Pas le jour de Paris de
+ * `privacyChangeDay` : ces bornes ne règlent que le calendrier des messages
+ * Discord (délai d'une semaine, fenêtre de 60 jours), où deux heures d'écart
+ * n'ont pas d'effet ; ce qui décide si un changement est publié reste
+ * `publishedPrivacyChanges`.
+ */
 function dayBefore(now: Date, days: number): string {
   return new Date(now.getTime() - days * 86_400_000).toISOString().slice(0, 10);
 }
