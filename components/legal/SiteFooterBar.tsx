@@ -19,13 +19,13 @@ export function SiteFooterBar({ authenticated }: { authenticated: boolean }) {
         <ReportProblemButton authenticated={authenticated} className={styles.report} icon />
         <ul className={styles.links}>
           <li>
-            <Link href={TERMS_PATH}>Conditions d&apos;utilisation</Link>
+            <Link className="tap-target" href={TERMS_PATH}>Conditions d&apos;utilisation</Link>
           </li>
           <li>
-            <Link href="/mentions-legales">Mentions légales</Link>
+            <Link className="tap-target" href="/mentions-legales">Mentions légales</Link>
           </li>
           <li>
-            <Link href="/rgpd">Confidentialité</Link>
+            <Link className="tap-target" href="/rgpd">Confidentialité</Link>
           </li>
         </ul>
         <span className={styles.copy}>© 2026 BlueGenji</span>

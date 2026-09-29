@@ -155,7 +155,7 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
           {showOpen && (
             <button
               type="button"
-              className={`btn ${styles.primary}`}
+              className={`btn tap-target ${styles.primary}`}
               onClick={() =>
                 window.dispatchEvent(
                   new CustomEvent(MATCH_LAUNCH_OPEN_EVENT, { detail: { matchId: match.id } }),
@@ -169,7 +169,7 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
           {showClaim && (
             <button
               type="button"
-              className={`btn ghost ${styles.small}`}
+              className={`btn tap-target ghost ${styles.small}`}
               disabled={busy}
               aria-disabled={castBlock !== null}
               title={castBlock === "CASTER_IDENTITY_REQUIRED" ? CAST_IDENTITY_NOTICE : undefined}
@@ -182,7 +182,7 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
           {showRelease && (
             <button
               type="button"
-              className={`btn ghost ${styles.small}`}
+              className={`btn tap-target ghost ${styles.small}`}
               disabled={busy}
               onClick={() =>
                 void run(
@@ -200,7 +200,7 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
           {showHostSwap && (
             <button
               type="button"
-              className={`btn ghost ${styles.small}`}
+              className={`btn tap-target ghost ${styles.small}`}
               disabled={busy}
               onClick={swapHost}
               aria-label={`Changer l'équipe hôte de ${matchLabel}`}
@@ -212,7 +212,7 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
           {showForce && (
             <button
               type="button"
-              className={`btn ${styles.small} ${styles.force}`}
+              className={`btn tap-target ${styles.small} ${styles.force}`}
               disabled={busy}
               onClick={() => setConfirmForce(true)}
               aria-label={`Forcer le lancement de ${matchLabel}`}

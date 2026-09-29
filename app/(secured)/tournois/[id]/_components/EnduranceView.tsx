@@ -522,7 +522,7 @@ export function EnduranceView({
                     <button
                       type="button"
                       onClick={() => onPenalize(standing.teamId)}
-                      className="btn"
+                      className="btn tap-target"
                       title={`Retirer des points d'endurance à ${standing.teamName}`}
                       aria-label={`Infliger une pénalité d'endurance à ${standing.teamName}`}
                       style={{
@@ -542,7 +542,7 @@ export function EnduranceView({
                     <button
                       type="button"
                       onClick={() => onForfeit(standing.teamId, standing.teamName)}
-                      className="btn"
+                      className="btn tap-target"
                       title={
                         isMine
                           ? `Abandonner : ${wording.subject} quittera définitivement le tournoi`

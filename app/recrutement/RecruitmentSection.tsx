@@ -408,7 +408,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
         {preview.truncated && (
           <button
             type="button"
-            className={styles.readMore}
+            className={`${styles.readMore} tap-target`}
             onClick={() => openDetail(ad)}
             aria-haspopup="dialog"
           >

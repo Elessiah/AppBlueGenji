@@ -180,7 +180,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         {showToggle && (
           <button
             type="button"
-            className="btn"
+            className="btn tap-target"
             disabled={busy}
             onClick={() => void toggleOnAir(state !== "LIVE")}
             aria-label={
@@ -202,7 +202,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         {canSchedule && (
           <button
             type="button"
-            className="btn ghost"
+            className="btn ghost tap-target"
             onClick={() => openSchedule(match)}
             aria-label={
               startAtLabel === null
@@ -218,7 +218,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
         {showConfig && (
           <button
             type="button"
-            className="btn ghost"
+            className="btn ghost tap-target"
             onClick={() => openConfig(match)}
             // « Diffuser » et non « Caster » : s'inscrire comme caster est un
             // autre geste, celui du bandeau de lancement (`MatchLaunchStrip`).
