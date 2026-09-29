@@ -34,3 +34,17 @@ export function isSearchShortcut(event: ShortcutKeyEvent): boolean {
     event.key.toLowerCase() === "k"
   );
 }
+
+/**
+ * Le raccourci ne s'applique que sur la page nue : une modale ouverte
+ * (`aria-modal`) garde le focus — l'envoyer sur le champ, derrière le voile,
+ * le ferait sortir du piège de `useDialogBehavior` vers un contrôle invisible —
+ * et une touche déjà prise en charge par un autre gestionnaire n'est pas
+ * reprise.
+ */
+export function shouldHandleSearchShortcut(
+  event: ShortcutKeyEvent & Pick<KeyboardEvent, "defaultPrevented">,
+  modalOpen: boolean,
+): boolean {
+  return !modalOpen && !event.defaultPrevented && isSearchShortcut(event);
+}

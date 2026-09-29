@@ -3,8 +3,8 @@
 import { useEffect, useState, type RefObject } from "react";
 import {
   DEFAULT_SEARCH_SHORTCUT_LABEL,
-  isSearchShortcut,
   searchShortcutLabel,
+  shouldHandleSearchShortcut,
 } from "@/lib/shared/search-shortcut";
 
 /**
@@ -17,7 +17,8 @@ export function useSearchShortcut(inputRef: RefObject<HTMLInputElement | null>):
   useEffect(() => {
     setLabel(searchShortcutLabel(navigator.platform || navigator.userAgent));
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!isSearchShortcut(event)) return;
+      const modalOpen = document.querySelector('[aria-modal="true"]') !== null;
+      if (!shouldHandleSearchShortcut(event, modalOpen)) return;
       event.preventDefault();
       inputRef.current?.focus();
     };

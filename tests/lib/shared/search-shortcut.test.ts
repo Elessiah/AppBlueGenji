@@ -3,6 +3,7 @@ import {
   DEFAULT_SEARCH_SHORTCUT_LABEL,
   isSearchShortcut,
   searchShortcutLabel,
+  shouldHandleSearchShortcut,
 } from "@/lib/shared/search-shortcut";
 
 type Modifiers = Partial<Record<"metaKey" | "ctrlKey" | "altKey" | "shiftKey", boolean>>;
@@ -49,5 +50,26 @@ describe("isSearchShortcut", () => {
   it("laisse passer les combinaisons avec Alt ou Maj", () => {
     expect(isSearchShortcut(key("k", { ctrlKey: true, shiftKey: true }))).toBe(false);
     expect(isSearchShortcut(key("k", { metaKey: true, altKey: true }))).toBe(false);
+  });
+});
+
+describe("shouldHandleSearchShortcut", () => {
+  const ctrlK = { ...key("k", { ctrlKey: true }), defaultPrevented: false };
+
+  it("prend le raccourci sur la page nue", () => {
+    expect(shouldHandleSearchShortcut(ctrlK, false)).toBe(true);
+  });
+
+  it("laisse le focus dans une modale ouverte", () => {
+    expect(shouldHandleSearchShortcut(ctrlK, true)).toBe(false);
+  });
+
+  it("ne reprend pas une touche déjà traitée ailleurs", () => {
+    expect(shouldHandleSearchShortcut({ ...ctrlK, defaultPrevented: true }, false)).toBe(false);
+  });
+
+  it("ignore toute autre touche", () => {
+    const ctrlJ = { ...key("j", { ctrlKey: true }), defaultPrevented: false };
+    expect(shouldHandleSearchShortcut(ctrlJ, false)).toBe(false);
   });
 });
