@@ -530,7 +530,10 @@ export default async function RgpdPage() {
               <strong>Durée</strong> : le temps du traitement, puis{" "}
               {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l&apos;archivage — prolongée tant
               qu&apos;un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être
-              contesté par son équipe ou son joueur. Un compte supprimé n&apos;y laisse pas son pseudo.
+              contesté par son équipe ou son joueur, et portée à {LOGO_QUARANTINE_MONTHS} mois civils
+              après l&apos;archivage pour un signalement de droit d&apos;auteur ou de modération envoyé
+              depuis un compte, le temps que son auteur puisse contester la décision. Un compte
+              supprimé n&apos;y laisse pas son pseudo.
             </li>
           </ul>
 

@@ -22,7 +22,7 @@
  * contenir n'importe quoi, ne part jamais.
  */
 
-import { LOGO_QUARANTINE_MONTHS, type LogoQuarantineView } from "./logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS, logoQuarantinePurgeDate, type LogoQuarantineView } from "./logo-quarantine";
 import { discordInline } from "./discord-text";
 
 /**
@@ -507,17 +507,35 @@ export function reportPurgeDate(resolvedAt: Date): Date {
 }
 
 /**
+ * L'auteur de ce signalement pourra-t-il contester la décision prise ? Une
+ * notification de contenu envoyée depuis un compte (`canContestReport`) : le
+ * signalement est alors gardé le temps de ce délai (`reportRetainedUntil`).
+ */
+export function notifierMayContest(report: { category: ReportCategory; reporterUserId: number | null }): boolean {
+  return report.reporterUserId !== null && NOTIFIER_CONTESTABLE_CATEGORIES.includes(report.category);
+}
+
+/**
  * Date d'effacement d'un signalement archivé, **telle que la purge la tient**
  * (`purgeExpiredReports`) : trente jours après l'archivage, repoussés tant
  * qu'un logo masqué — ou supprimé, le temps que sa décision se conteste —
- * reste attaché au dossier. Le panneau l'annonce ; sans les quarantaines, il
- * annoncerait une date que la purge ne respecte pas.
+ * reste attaché au dossier, et, quand son auteur peut contester la décision
+ * (`notifierMayContest`), jusqu'à la fin de ce délai — six mois civils après
+ * l'archivage, comme la quarantaine : effacé au trentième jour, le signalement
+ * ne serait plus contestable, et l'art. 20.1 du règlement sur les services
+ * numériques qu'on invoque en demande six. Le panneau l'annonce ; sans ces
+ * prolongations, il annoncerait une date que la purge ne respecte pas.
  */
 export function reportRetainedUntil(
   resolvedAt: Date,
   quarantines: readonly Pick<LogoQuarantineView, "status" | "purgeAfter">[],
+  heldForNotifier = false,
 ): Date {
   let until = reportPurgeDate(resolvedAt);
+  if (heldForNotifier) {
+    const contestEnd = logoQuarantinePurgeDate(resolvedAt);
+    if (contestEnd.getTime() > until.getTime()) until = contestEnd;
+  }
   for (const quarantine of quarantines) {
     if (quarantine.status === "RESTORED") continue;
     const end = new Date(quarantine.purgeAfter);
@@ -739,7 +757,7 @@ export const REPORT_PRIVACY_NOTICE = {
     "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. Ni l'auteur du signalement ni les personnes qu'il vise ne sont informés de ta contestation.",
   // La prolongation est dite ici, et non seulement sur `/rgpd` : c'est cette
   // phrase-là que le signalant lit avant d'envoyer.
-  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo ou un avatar est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_MONTHS} mois au plus).`,
+  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo ou un avatar est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_MONTHS} mois au plus). Un signalement de droit d'auteur ou de modération envoyé depuis ton compte est gardé ${LOGO_QUARANTINE_MONTHS} mois après sa résolution, le temps que tu puisses contester la décision.`,
 } as const;
 
 /**

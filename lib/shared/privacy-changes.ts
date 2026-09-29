@@ -395,6 +395,20 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
   },
+  // L'auteur d'un signalement de contenu peut contester la décision prise (DSA
+  // art. 20.1) : son signalement est donc gardé le temps de ce délai, au lieu
+  // de trente jours après l'archivage — une durée de conservation qui change.
+  {
+    id: "2026-10-signalements-contestation-auteur",
+    publishedAt: "2026-10-01",
+    title: "Signalements : l'auteur peut contester la décision",
+    summary: `Si tu signales un contenu (droit d'auteur, modération) depuis ton compte, tu peux désormais contester la décision prise, y compris celle de ne pas agir. Ton signalement est gardé ${LOGO_QUARANTINE_MONTHS} mois après sa résolution, au lieu de 30 jours, le temps de ce délai.`,
+    details: [
+      "La contestation se fait par la catégorie « Contestation » du formulaire « Signaler un problème », une fois le signalement archivé. Elle est lue par les administrateurs de l'association ; les personnes visées n'en sont pas informées.",
+      `Un signalement de bug, une demande RGPD ou à l'hébergeur, ou un signalement envoyé sans compte, est toujours effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après son archivage — plus tard si un logo ou un avatar a été masqué ou supprimé à sa suite.`,
+    ],
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

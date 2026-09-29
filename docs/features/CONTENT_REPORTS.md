@@ -162,7 +162,14 @@ effacé `REPORT_RETENTION_DAYS_AFTER_RESOLUTION` (30) jours plus tard, cibles et
 contestations comprises (cascade) — **sauf** s'il tient encore une image
 masquée (logo ou avatar), ou une image supprimée dont le délai de contestation
 court : il est gardé jusqu'à cette échéance (la personne concernée doit
-pouvoir contester). La suppression d'un compte
+pouvoir contester). Une notification de contenu envoyée depuis un compte
+(`notifierMayContest`) est gardée **six mois civils** après l'archivage, le
+délai où son auteur peut contester la décision : effacée au trentième jour, elle
+ne serait plus contestable. Ce délai se compte au calendrier de Paris, que SQL
+ne connaît pas : `purgeExpiredReports` relit les candidates et les juge par
+`reportRetainedUntil` — la même fonction que la date affichée au panneau —, puis
+efface par lots en reposant les conditions (un dossier rouvert entre-temps
+reste). La suppression d'un compte
 visé efface le pseudo relevé sur ses cibles (`label_snapshot`) : le panneau
 retombe sinon sur ce relevé dès que le compte n'est plus vivant. La purge est **datée**, donc une base restaurée d'une sauvegarde se
 repurge d'elle-même. Elle tourne à chaque envoi, à chaque ouverture du panneau,

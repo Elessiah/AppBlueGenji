@@ -125,7 +125,7 @@ describe("createReport", () => {
         markRoute,
         usersRoute(),
         membersRoute(),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -164,7 +164,7 @@ describe("createReport", () => {
         markRoute,
         usersRoute(),
         membersRoute(),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -201,7 +201,7 @@ describe("createReport", () => {
           // L'auteur du signalement, membre de l'équipe qu'il signale.
           { team_id: 4, id: 3, pseudo: "Auteur", discord_id: "900000000000000003", discord_pseudo: null, discord_verified_at: null },
         ]),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -250,7 +250,7 @@ describe("createReport", () => {
         ]),
         // L'équipe n'a aucun membre joignable : elle n'est pas « prévenue ».
         membersRoute([]),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -291,7 +291,7 @@ describe("createReport", () => {
         membersRoute([
           { team_id: 4, id: 9, pseudo: "Membre", discord_id: "900000000000000009", discord_pseudo: null, discord_verified_at: null },
         ]),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -318,7 +318,7 @@ describe("createReport", () => {
         usersRoute([
           { id: 8, pseudo: "PseudoSecret", discord_id: "900000000000000008", discord_pseudo: null, discord_verified_at: null },
         ]),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -349,7 +349,7 @@ describe("createReport", () => {
           { target_type: "TEAM", target_id: 4 },
           { target_type: "USER", target_id: 8 },
         ]),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -367,7 +367,7 @@ describe("createReport", () => {
 
   it("ne prévient personne pour un signalement sans joueur ni équipe", async () => {
     install(
-      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]],
       [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 13 }]]],
     );
     await createReport(submission({ category: "BUG", targets: [] }), { userId: null, managesTournaments: false });
@@ -419,7 +419,7 @@ describe("createReport", () => {
 
   it("accepte une demande RGPD sans adresse d'un compte au tag Discord certifié, sans date de consentement", async () => {
     install(
-      [reachableRoute(true), [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [reachableRoute(true), [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]],
       [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 16 }]]],
     );
     await expect(
@@ -434,7 +434,7 @@ describe("createReport", () => {
 
   it("ne consulte pas le compte quand une adresse est donnée", async () => {
     install(
-      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]],
       [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 17 }]]],
     );
     await expect(
@@ -450,7 +450,7 @@ describe("createReport", () => {
 
   it("date le consentement d'une catégorie qui en demande un, et d'elle seule", async () => {
     install(
-      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]],
       [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 18 }]]],
     );
     await createReport(submission({ category: "BUG", targets: [] }), { userId: null, managesTournaments: false });
@@ -460,7 +460,7 @@ describe("createReport", () => {
 
   it("accepte le signalement sans cible d'un visiteur sans compte", async () => {
     install(
-      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]],
       [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 15 }]]],
     );
     await expect(
@@ -490,7 +490,7 @@ describe("createReport", () => {
     ];
     const bug = submission({ category: "BUG", targets: [] });
 
-    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(REPORTS_HOURLY_CAP));
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]], routes(REPORTS_HOURLY_CAP));
     await expect(createReport(bug, { userId: 3, managesTournaments: false })).resolves.toBe(70);
     expect(connection.commit).toHaveBeenCalled();
     expect(pushLeadershipAlert).toHaveBeenCalledTimes(1);
@@ -500,16 +500,16 @@ describe("createReport", () => {
     expect(notice).not.toContain("#70");
 
     jest.mocked(pushLeadershipAlert).mockClear();
-    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(REPORTS_HOURLY_CAP + 1));
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]], routes(REPORTS_HOURLY_CAP + 1));
     await expect(createReport(bug, { userId: 3, managesTournaments: false })).resolves.toBe(70);
     expect(connection.commit).toHaveBeenCalled();
     expect(pushLeadershipAlert).not.toHaveBeenCalled();
 
     // Le rythme retombe, puis un second pic dans l'heure : il est annoncé à son
     // tour, sans quoi les alertes se tairaient sans que rien ne le dise.
-    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(0));
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]], routes(0));
     await createReport(bug, { userId: 3, managesTournaments: false });
-    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]], routes(REPORTS_HOURLY_CAP + 1));
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]], routes(REPORTS_HOURLY_CAP + 1));
     jest.mocked(pushLeadershipAlert).mockClear();
     await createReport(bug, { userId: 3, managesTournaments: false });
     expect(jest.mocked(pushLeadershipAlert).mock.calls[0]?.[0]).toContain(`Plus de ${REPORTS_HOURLY_CAP} signalements`);
@@ -523,7 +523,7 @@ describe("createReport", () => {
       [
         cooldownRoute(),
         reporterRoute(ageHours, earlier),
-        [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+        [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       ],
       [
         countRoute(0),
@@ -569,7 +569,7 @@ describe("createReport", () => {
     );
 
     install(
-      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]],
       [
         countRoute(0),
         [/FROM bg_tournaments/, () => [[hidden]]],
@@ -758,10 +758,29 @@ describe("applyReportAction", () => {
 });
 
 describe("conservation", () => {
+  const day = 24 * 60 * 60 * 1000;
+  const ago = (days: number) => new Date(Date.now() - days * day);
+
   it("n'efface que des signalements d'origine archivés depuis trente jours, sans logo masqué en attente", async () => {
-    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 3 }]]]);
+    install([
+      [
+        /SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/,
+        () => [
+          [
+            { id: 1, category: "BUG", reporter_user_id: 5, resolved_at: ago(31) },
+            { id: 2, category: "COPYRIGHT", reporter_user_id: null, resolved_at: ago(31) },
+            { id: 3, category: "MODERATION", reporter_user_id: 7, resolved_at: ago(200) },
+          ],
+        ],
+      ],
+      [/DELETE FROM bg_reports/, () => [{ affectedRows: 3 }]],
+    ]);
     await expect(purgeExpiredReports()).resolves.toBe(3);
     const [sql] = pool.execute.mock.calls[0];
+    const [deleteSql, ids] = pool.execute.mock.calls[1];
+    expect(ids).toEqual([1, 2, 3]);
+    // Les conditions sont reposées à l'effacement : un dossier rouvert entre-temps reste.
+    expect(deleteSql).toMatch(/id IN \(\?, \?, \?\) AND status = 'RESOLVED'/);
     expect(sql).toMatch(/status = 'RESOLVED'/);
     expect(sql).toMatch(/parent_report_id IS NULL/);
     expect(sql).toMatch(/INTERVAL 30 DAY/);
@@ -772,8 +791,25 @@ describe("conservation", () => {
     expect(sql).not.toMatch(/RESTORED/);
   });
 
+  it("garde six mois civils la notification que son auteur peut encore contester", async () => {
+    install([
+      [
+        /SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/,
+        () => [
+          [
+            { id: 4, category: "COPYRIGHT", reporter_user_id: 5, resolved_at: ago(31) },
+            { id: 5, category: "MODERATION", reporter_user_id: 5, resolved_at: ago(150) },
+          ],
+        ],
+      ],
+    ]);
+    await expect(purgeExpiredReports()).resolves.toBe(0);
+    // Rien à effacer : aucune instruction `DELETE`.
+    expect(pool.execute).toHaveBeenCalledTimes(1);
+  });
+
   it("purge au plus une fois par heure, les logos échus avant les signalements", async () => {
-    install([[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]]);
+    install([[/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]]]);
     const start = 1_000_000_000_000;
     schedulePurgeExpiredReports(start);
     schedulePurgeExpiredReports(start + 10 * 60 * 1000);
@@ -981,7 +1017,7 @@ describe("listReportsByAuthor", () => {
 describe("listReports", () => {
   it("range les contestations sous leur signalement d'origine, jamais à part", async () => {
     install([
-      [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]],
+      [/SELECT id, category, reporter_user_id, resolved_at FROM bg_reports/, () => [[]]],
       [
         /FROM bg_reports r\s+LEFT JOIN bg_users reporter/,
         () => [

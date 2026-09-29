@@ -22,6 +22,7 @@ import {
   formatReportAlert,
   formatTargetNotice,
   canContestReport,
+  notifierMayContest,
   isConcernedByReport,
   isPlausibleEmail,
   missingReplyChannel,
@@ -46,6 +47,7 @@ import {
   type ReportAction,
   type ReportStatus,
 } from "@/lib/shared/content-reports";
+import { logoQuarantinePurgeDate } from "@/lib/shared/logo-quarantine";
 
 const DESCRIPTION = "Le logo de cette équipe reprend celui de notre club, déposé.";
 
@@ -379,6 +381,24 @@ describe("messages Discord — aucun joueur nommé", () => {
     });
     expect(byNotifier).not.toContain("réactivé");
     expect(byNotifier).toContain("envoyée par l'auteur du signalement");
+  });
+});
+
+describe("conservation d'une notification que son auteur peut contester", () => {
+  it("ne vaut que pour une notification de contenu envoyée depuis un compte", () => {
+    expect(notifierMayContest({ category: "COPYRIGHT", reporterUserId: 5 })).toBe(true);
+    expect(notifierMayContest({ category: "MODERATION", reporterUserId: 5 })).toBe(true);
+    expect(notifierMayContest({ category: "COPYRIGHT", reporterUserId: null })).toBe(false);
+    expect(notifierMayContest({ category: "BUG", reporterUserId: 5 })).toBe(false);
+  });
+
+  it("garde le signalement six mois civils après l'archivage, le délai de contestation", () => {
+    const resolvedAt = new Date("2026-03-01T10:00:00.000Z");
+    expect(reportRetainedUntil(resolvedAt, [], true).toISOString()).toBe(
+      logoQuarantinePurgeDate(resolvedAt).toISOString(),
+    );
+    // Sans auteur à attendre : trente jours.
+    expect(reportRetainedUntil(resolvedAt, [], false).toISOString()).toBe("2026-03-31T10:00:00.000Z");
   });
 });
 

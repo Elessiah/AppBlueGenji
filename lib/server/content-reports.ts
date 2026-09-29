@@ -36,6 +36,7 @@ import {
   REPORT_TARGET_SEARCH_LIMIT,
   REPORT_TARGET_SEARCH_MIN_LENGTH,
   NOTIFIER_CONTESTABLE_CATEGORIES,
+  notifierMayContest,
   canContestReport,
   formatContestAlert,
   formatReportAlert,
@@ -1072,7 +1073,14 @@ export async function listReports(): Promise<ReportView[]> {
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
       updatedAt: toIso(row.updated_at) ?? new Date().toISOString(),
       resolvedAt: resolvedAt ? resolvedAt.toISOString() : null,
-      purgeAt: row.status === "RESOLVED" && resolvedAt ? reportRetainedUntil(resolvedAt, held).toISOString() : null,
+      purgeAt:
+        row.status === "RESOLVED" && resolvedAt
+          ? reportRetainedUntil(
+              resolvedAt,
+              held,
+              notifierMayContest({ category: row.category, reporterUserId: row.reporter_user_id }),
+            ).toISOString()
+          : null,
       reporter: person(row.reporter_user_id, row.reporter_pseudo),
       contactName: row.contact_name,
       contactEmail: row.contact_email,
@@ -1232,9 +1240,7 @@ const ACTION_AUDIT_LABELS: Record<ReportAction, string> = {
  */
 export async function purgeExpiredReports(): Promise<number> {
   const db = await getDatabase();
-  const [result] = await db.execute<ResultSetHeader>(
-    `DELETE FROM bg_reports
-     WHERE status = 'RESOLVED'
+  const expired = `status = 'RESOLVED'
        AND parent_report_id IS NULL
        AND resolved_at < NOW() - INTERVAL ${Number(REPORT_RETENTION_DAYS_AFTER_RESOLUTION)} DAY
        -- Un logo encore masqué au titre de ce signalement le garde : c'est sur
@@ -1245,10 +1251,40 @@ export async function purgeExpiredReports(): Promise<number> {
          SELECT 1 FROM bg_logo_quarantines q
          WHERE q.report_id = bg_reports.id
            AND (q.status = 'HIDDEN' OR (q.status = 'PURGED' AND q.purge_after > NOW()))
-       )`,
-  );
-  return Number(result.affectedRows);
+       )`;
+  // Les notifications que leur auteur peut contester restent six mois civils
+  // (`reportRetainedUntil`) : ce délai se compte au calendrier de Paris, que
+  // SQL ne connaît pas — les candidates sont donc relues et jugées ici, par la
+  // même fonction que la date affichée au panneau.
+  const [candidates] = await db.execute<
+    (RowDataPacket & { id: number; category: ReportCategory; reporter_user_id: number | null; resolved_at: Date | string })[]
+  >(`SELECT id, category, reporter_user_id, resolved_at FROM bg_reports WHERE ${expired}`);
+  const now = Date.now();
+  const due = candidates
+    .filter((row) => {
+      const heldForNotifier = notifierMayContest({
+        category: row.category,
+        reporterUserId: row.reporter_user_id === null ? null : Number(row.reporter_user_id),
+      });
+      return reportRetainedUntil(new Date(row.resolved_at), [], heldForNotifier).getTime() <= now;
+    })
+    .map((row) => Number(row.id));
+  let deleted = 0;
+  for (let start = 0; start < due.length; start += PURGE_BATCH_SIZE) {
+    const batch = due.slice(start, start + PURGE_BATCH_SIZE);
+    // Les conditions sont reposées : un signalement rouvert par une
+    // contestation entre la lecture et l'effacement ne part pas.
+    const [result] = await db.execute<ResultSetHeader>(
+      `DELETE FROM bg_reports WHERE id IN (${batch.map(() => "?").join(", ")}) AND ${expired}`,
+      batch,
+    );
+    deleted += Number(result.affectedRows);
+  }
+  return deleted;
 }
+
+/** Signalements effacés par instruction : borne la taille d'une liste `IN`. */
+const PURGE_BATCH_SIZE = 500;
 
 const PURGE_INTERVAL_MS = 60 * 60 * 1000;
 const purgeState = globalThis as typeof globalThis & { __bgReportsPurgedAt?: number };

@@ -726,6 +726,9 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     expect(sql).toMatch(/c\.reporter_user_id <> r\.reporter_user_id/);
     // Auteur inconnu d'un côté ou de l'autre : dans le doute, la contestation compte.
     expect(sql).toMatch(/r\.reporter_user_id IS NULL OR c\.reporter_user_id IS NULL/);
+    // Auteur et visé à la fois : sa contestation défend l'image, elle compte.
+    expect(sql).toMatch(/t\.target_type = 'USER' AND t\.target_id = c\.reporter_user_id/);
+    expect(sql).toMatch(/tm\.user_id = c\.reporter_user_id\s+AND tm\.left_at IS NULL/);
   });
 });
 
