@@ -328,6 +328,18 @@ logos-là au démarrage, en une écriture idempotente rejouée à chaque fois �
 filet, pas une migration à cocher. Le chemin inverse (l'avatar redevient public)
 est tenu par `syncSoloEntryIdentity`, appelé sur la bascule du réglage.
 
+Retirer l'URL des réponses ne suffisait pas : le **fichier** restait sous
+`public/uploads/avatars`, servi sans session par `/api/uploads/avatars/…` et par
+le serveur statique, à la même adresse — quiconque l'avait vue avant le masquage
+gardait l'image. La bascule visible → masqué **renomme** donc le fichier sous un
+nouveau nom aléatoire (`rotateHiddenAvatarFile`, `lib/server/avatar-rotation.ts`,
+appelé par `updateOwnProfile`) : l'ancienne adresse rend 404 partout, et seul le
+titulaire, à qui sa fiche rend l'URL même masquée, apprend la nouvelle. Fichier
+renommé avant l'écriture, remis en place si elle n'aboutit pas ; l'`UPDATE`
+porte l'ancienne URL dans son `WHERE`, un téléversement concurrent n'est jamais
+écrasé. Seule limite, que rien ne rattrape : la copie déjà gardée dans le cache
+d'un navigateur qui l'a affichée.
+
 Deux points volontaires, à ne pas prendre pour des fuites :
 
 - Les **badges de jeu** (OW / MR) restent affichés même quand le tag exact est
@@ -745,6 +757,10 @@ fait refuser par `NOT_A_GHOST_TEAM` comme une équipe réelle, et reste exclue d
 En **lecture**, ces contenus sont publics (`GET` sans garde) — c'est leur raison
 d'être. Une seule nuance : `GET /api/recruitment` ne renvoie les annonces
 masquées qu'à un porteur de `recruitment`.
+Le relais de logo des partenaires (`GET /api/landing/sponsors/[id]/logo`) suit
+la même borne que la liste : il ne relit que les partenaires **publiés**
+(`active = 1`). Un brouillon énuméré par identifiant rend 404, et le serveur ne
+télécharge pas l'image distante d'une ligne que personne n'a publiée.
 
 Un `ARBITRE` ou un `CASTER` **ne peut pas** modifier le site vitrine, et un
 `COMMUNITY_MANAGER` ne peut pas toucher aux tournois.

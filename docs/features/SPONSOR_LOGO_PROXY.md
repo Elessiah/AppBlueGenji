@@ -49,7 +49,9 @@ Public, plafonné par `LANDING_READ_RULE` comme les autres lectures de la vitrin
 
 Ce n'est **pas un relais d'images ouvert** : la route ne prend qu'un identifiant
 de partenaire et **relit l'URL en base**. L'espace des adresses atteignables est
-exactement celui des lignes que le staff `showcase` a créées — on ne peut pas lui
+exactement celui des lignes que le staff `showcase` a créées **et publiées**
+(`active = 1`, la borne de la liste : un partenaire en préparation ne se voit
+pas en énumérant les identifiants) — on ne peut pas lui
 faire chercher une image arbitraire en lui passant une URL.
 
 Garde-fous, tous rendus en **404** (jamais 500, jamais 403 : pour le navigateur,
