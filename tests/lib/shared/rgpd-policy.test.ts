@@ -168,8 +168,18 @@ describe("DONNEE_TOURNOIS", () => {
 });
 
 describe("DROITS", () => {
-  it("has exactly 6 GDPR rights (art. 15–22)", () => {
-    expect(DROITS).toHaveLength(6);
+  it("liste les huit droits : art. 15 à 21, retrait du consentement, directives post-mortem", () => {
+    expect(DROITS).toHaveLength(8);
+  });
+
+  it("couvre le droit à la limitation (art. 18)", () => {
+    const limitation = DROITS.find((d) => d.title.toLowerCase().includes("limitation"));
+    expect(limitation?.text).toMatch(/art\. 18/);
+  });
+
+  it("couvre les directives après le décès (art. 85 loi Informatique et Libertés)", () => {
+    const directives = DROITS.find((d) => /décès/.test(d.title));
+    expect(directives?.text).toMatch(/art\. 85 de la loi Informatique et Libertés/);
   });
 
   it("covers the right to erasure (effacement)", () => {
@@ -205,6 +215,11 @@ describe("DONNEE_SAUVEGARDES", () => {
   it("annonce la durée réelle des sauvegardes, pas « quelques jours »", () => {
     expect(DONNEE_SAUVEGARDES.duree).toBe(`${BACKUP_RETENTION_DAYS} jours au plus`);
     expect(BACKUP_RETENTION_DAYS).toBe(30);
+  });
+
+  it("nomme le détenteur réel de la clé, pas « seule l'association »", () => {
+    expect(DONNEE_SAUVEGARDES.finalite).not.toMatch(/seule l'association/);
+    expect(DONNEE_SAUVEGARDES.finalite).toMatch(/responsable technique/);
   });
 
   it("nomme l'hébergeur et le chiffrement", () => {
