@@ -18,6 +18,7 @@ import { isValidSeedOrder, seedingLockReason, type SeedingEntry, type SeedingLoc
 import type { MatchScoreState } from "@/lib/shared/match-lock";
 import { loadTournamentRow, getMatchRows, deleteAllMatches, resetRegistrationRanks } from "./repository";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { lockTournamentRow } from "./registration";
 import { publishUpdatedEvent } from "./notifications";
 
 export type SeedingBoard = {
@@ -26,6 +27,20 @@ export type SeedingBoard = {
   lockReason: SeedingLockReason;
   manualSeeding: boolean;
 };
+
+/**
+ * Pose le verrou sur les matchs du tournoi, **table seule** : MariaDB (la
+ * production) refuse `FOR UPDATE OF`, et un `FOR UPDATE` sur la jointure de
+ * `getMatchRows` verrouillerait aussi les lignes d'équipe. Un report de score
+ * écrit son match sous `SELECT … FOR UPDATE` (`./scoring`), le forfait aussi
+ * (`./player-forfeit`) : poser ce verrou-ci les fait attendre la fin du
+ * réordonnancement, ou le fait attendre la leur.
+ */
+async function lockTournamentMatches(connection: PoolConnection, tournamentId: number): Promise<void> {
+  await connection.execute(`SELECT id FROM bg_matches WHERE tournament_id = ? FOR UPDATE`, [
+    tournamentId,
+  ]);
+}
 
 /** Vue « score » des matchs du tournoi, pour la règle de verrouillage partagée. */
 function toScoreStates(rows: Awaited<ReturnType<typeof getMatchRows>>): MatchScoreState[] {
@@ -131,6 +146,19 @@ export async function reorderSeeding(tournamentId: number, orderedTeamIds: numbe
 
   try {
     await connection.beginTransaction();
+
+    // Deux verrous, en toute première instruction, avant la moindre lecture
+    // ordinaire : sous `REPEATABLE READ`, c'est elle qui fige l'instantané de
+    // la transaction (voir `lockTournamentRow`). La fenêtre « jusqu'à la
+    // première saisie de score » se juge ensuite sur les matchs relus **après**
+    // l'attente. Sans cela, un premier report validé entre ce contrôle et
+    // `deleteAllMatches` échappait à l'instantané : le plateau régénéré
+    // l'effaçait, et le joueur, qui avait reçu un succès, n'en savait rien.
+    // Le verrou du tournoi sérialise les gestes du staff (inscription, retrait,
+    // autre réordonnancement) ; celui des matchs, les reports et forfaits, qui
+    // ne verrouillent que leur match.
+    await lockTournamentRow(connection, tournamentId);
+    await lockTournamentMatches(connection, tournamentId);
 
     const tournament = await loadTournamentRow(connection, tournamentId);
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
