@@ -10,12 +10,16 @@
   justify-content: center;
   padding: 16px;
   overflow-y: auto;
+  /* Le défilement du voile ne se propage pas à la page dessous. */
+  overscroll-behavior: contain;
 }
 
 .dialog {
   width: 100%;
   max-width: 760px;
   margin: auto;
+  /* Plus grand côté de l'aperçu du résultat, lu par le composant. */
+  --crop-preview-box: 180px;
   background: var(--cyber-bg-2, #14181f);
   border: 1px solid var(--line-strong-cy, rgba(90, 200, 255, 0.35));
   border-radius: var(--r-cy-md, 12px);
@@ -161,6 +165,13 @@
   color: var(--text-1, #c4cad4);
 }
 
+/* L'aide clavier ne décrit aucun geste possible sur un écran tactile. */
+@media (pointer: coarse) {
+  .hintKeys {
+    display: none;
+  }
+}
+
 .side {
   display: flex;
   flex-direction: column;
@@ -240,4 +251,62 @@
   outline: 2px solid var(--blue-300, #8fdcff);
   outline-offset: 2px;
   border-radius: 3px;
+}
+
+/* Petits écrans et téléphone en paysage : l'aperçu se réduit (à 180 px, il
+   dépassait la zone de recadrage elle-même), l'image laisse de la hauteur aux
+   actions, et celles-ci restent collées au bas de la zone visible — le cadre
+   occupant presque toute l'image, on ne peut pas faire défiler le voile en
+   glissant dessus (`touch-action: none`) pour aller les chercher. */
+@media (max-width: 640px), (max-height: 560px) {
+  .backdrop {
+    padding: 8px;
+  }
+
+  .dialog {
+    --crop-preview-box: 96px;
+    padding: 16px 14px 0;
+  }
+
+  .title {
+    margin-bottom: 10px;
+    font-size: 16px;
+  }
+
+  .layout {
+    gap: 12px;
+  }
+
+  .side {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+  }
+
+  .caption {
+    flex-basis: 100%;
+  }
+
+  .preview {
+    flex-shrink: 0;
+  }
+
+  .tools {
+    flex: 1 1 140px;
+  }
+
+  .footer {
+    position: sticky;
+    bottom: 0;
+    margin: 12px -14px 0;
+    padding: 10px 14px;
+    background: var(--cyber-bg-2, #14181f);
+    border-top: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+  }
+}
+
+@media (max-height: 560px) {
+  .image {
+    max-height: 48vh;
+  }
 }

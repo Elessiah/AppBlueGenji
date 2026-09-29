@@ -146,9 +146,6 @@ const HANDLE_LABELS: Record<CropHandle, string> = {
 
 const pct = (value: number) => `${value}%`;
 
-/** Plus grand côté de l'aperçu du résultat, en pixels d'écran. */
-const PREVIEW_BOX_PX = 180;
-
 /** La poignée sous le pointeur, ou `null` pour le cadre lui-même. */
 function handleOf(target: EventTarget): CropHandle | null {
   const handle = (target as HTMLElement).dataset?.handle;
@@ -349,9 +346,15 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
           </div>
           <p id={hintId} className={s.hint}>
             Fais glisser le cadre pour choisir la zone gardée, tire un coin pour le redimensionner
-            {aspect !== null ? " (proportions imposées)" : ""}. Au clavier : flèches pour le déplacer
-            (Maj pour aller plus vite), + et − pour l&apos;agrandir ou le réduire, Origine pour revenir
-            au cadre proposé.
+            {aspect !== null ? " (proportions imposées)" : ""}.
+            {/* L'aide clavier se tait sur un écran tactile, où elle ne
+                décrivait aucun geste possible : les boutons de l'aperçu y
+                tiennent le même rôle. */}
+            <span className={s.hintKeys}>
+              {" "}
+              Au clavier : flèches pour le déplacer (Maj pour aller plus vite), + et − pour
+              l&apos;agrandir ou le réduire, Origine pour revenir au cadre proposé.
+            </span>
           </p>
         </div>
 
@@ -365,7 +368,10 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
                 // Largeur **et** hauteur bornées par la largeur seule : un plafond
                 // de hauteur posé à part écraserait la fenêtre sans la rétrécir,
                 // et l'aperçu ne montrerait plus la forme gardée.
-                width: `min(100%, ${Math.round(PREVIEW_BOX_PX * Math.min(1, box.width / box.height))}px)`,
+                // Le plus grand côté vient de la feuille (`--crop-preview-box`) :
+                // réduit sur un petit écran, où un aperçu de 180 px dépassait la
+                // zone de recadrage elle-même et repoussait les actions.
+                width: `min(100%, calc(var(--crop-preview-box) * ${Math.min(1, box.width / box.height).toFixed(4)}))`,
               }}
             >
               <img src={url} alt="" className={s.previewImage} style={previewImageStyle} draggable={false} />
