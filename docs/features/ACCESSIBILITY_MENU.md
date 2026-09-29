@@ -1,6 +1,6 @@
 # Menu d'accessibilité et pauses (notifications, bandeau)
 
-Un bouton flottant, en bas à gauche de **toutes** les pages, ouvre un menu de
+Un bouton flottant, au bord gauche de **toutes** les pages, ouvre un menu de
 réglages d'accessibilité. Deux règles de conception, voulues ensemble :
 
 1. **Tout ce qui change l'apparence du site est désactivé par défaut** et ne
@@ -53,10 +53,35 @@ Deux pièges de spécificité, tenus dans la feuille :
 
 ## Le bouton et son panneau (`components/accessibility/AccessibilityMenu.tsx`)
 
-- **Coin bas-gauche**, le seul libre : à droite vivent le bouton « ? » des
-  règles (`.cta-float-help`) et le témoin du régime de charge. Les
-  notifications, qui tenaient ce coin, montent au-dessus du bouton.
-- Disque plein de bleu glacier, logo en bleu nuit découpé par un **masque CSS**
+- **Onglet collé au bord gauche, à mi-hauteur** (28 × 64 px) au-delà de
+  720 px. Il tenait le coin bas gauche, où il couvrait « Inscrire mon équipe »
+  sur la fiche d'un tournoi (1280 × 720, vue staff) à certaines positions de
+  défilement : un coin est là où le contenu d'une colonne finit par passer en
+  défilant, et aucune position fixe posée *sur* la colonne n'y échappe. Le bord
+  gauche est **hors** de la colonne : `.page-shell` y réserve une gouttière
+  d'au moins 32 px (`@media (min-width: 721px)`, `calc(100vw - 80px)`, placée
+  après le bloc de 920 px qu'elle doit emporter), où l'onglet tient avec 4 px
+  d'écart — il ne couvre donc aucun contenu de l'espace connecté, à aucune
+  position de défilement. Mi-hauteur plutôt que haut ou bas : le haut est à
+  l'en-tête collant, le bas aux notifications. Les coins droits restent au
+  bouton « ? » des règles (`.cta-float-help`) et au témoin du régime de charge.
+  Le panneau s'ouvre à droite de l'onglet, centré sur la hauteur de l'écran
+  (`position: fixed` + `translate`, que l'animation d'ouverture ne réécrit pas).
+  Cible : 28 px de large (au-dessus des 24 px de WCAG 2.5.8), 64 px de haut.
+- **Sous 720 px**, la gouttière n'a plus que 12 px : le bouton redevient un
+  **disque de 48 px dans le coin bas gauche**, s'estompe pendant un défilement
+  (`floating-button-scroll.ts`) et son panneau s'ouvre vers le haut.
+- **Notifications** : en bas à gauche, à 40 px du bord sur ordinateur (jamais
+  sur l'onglet, même quand la pile monte jusqu'à lui) ; sous 720 px, elles
+  montent au-dessus du disque.
+- **Modale ouverte** : le bouton reste offert, au-dessus de tous les voiles,
+  réduit à un disque de 36 px en haut à gauche, panneau ouvert vers le bas ;
+  il se retire seulement sous le recadrage d'image.
+- **Limite connue** : les pages vitrine (colonnes de 1240 px en
+  `calc(100vw - 40px)`) ne réservent pas cette gouttière ; l'onglet peut y
+  mordre de quelques pixels le bord de la colonne à mi-hauteur
+  (`ACCESSIBILITE.md`).
+- Bleu glacier plein, logo en bleu nuit découpé par un **masque CSS**
   (`public/accessibility-icon.webp`, dérivé du logo fourni) : le fichier
   n'apporte que la forme, la couleur est celle de la feuille — y compris en
   contrastes forcés, où elle devient `ButtonText`.
@@ -74,8 +99,9 @@ Deux pièges de spécificité, tenus dans la feuille :
   rend le focus au bouton — mais ne répond que si le focus est dans le menu ou
   nulle part : une modale ouverte par-dessus (lancement de match) garde le sien.
 - `html { scroll-padding-bottom }` (92 px, 76 px sous 720 px) : un défilement
-  déclenché par le focus arrête l'élément atteint au-dessus du bouton au lieu
-  de le cacher dessous (WCAG 2.4.11). Invisible tant qu'on ne tabule pas, donc
+  déclenché par le focus arrête l'élément atteint au-dessus des boutons
+  flottants du bas (le disque d'accessibilité sous 720 px, le « ? » et le
+  témoin) au lieu de le cacher dessous (WCAG 2.4.11). Invisible tant qu'on ne tabule pas, donc
   acquis pour tous.
 - Panneau opaque — un texte qui transparaît derrière des réglages de
   lisibilité serait un contresens.
