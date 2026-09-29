@@ -67,6 +67,16 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(markup).toMatch(/t&#x27;opposer à un traitement/);
   });
 
+  it("rend les liens d'action d'une entrée, et aucun pour une entrée qui n'en a pas", () => {
+    const withLinks: PrivacyChange = {
+      ...PRIVACY_CHANGES[0],
+      links: [{ href: "/profil#identite", label: "Changer mon pseudo" }],
+    };
+    expect(render([withLinks])).toContain('href="/profil#identite"');
+    expect(render([withLinks])).toContain("Changer mon pseudo");
+    expect(render([{ ...PRIVACY_CHANGES[0], links: undefined }])).not.toContain("/profil#");
+  });
+
   it("parle au singulier pour un seul changement", () => {
     expect(render([PRIVACY_CHANGES[0]])).toContain("Nos règles de confidentialité ont changé");
   });
@@ -82,6 +92,10 @@ describe("PrivacyChangesModal — contrats du geste", () => {
   it("envoie les identifiants montrés, pas « tout ce qui est dû »", () => {
     expect(source).toContain('fetch("/api/profile/privacy-changes"');
     expect(source).toContain("changeIds: changes.map((change) => change.id)");
+  });
+
+  it("suivre un lien d'action vaut prise de connaissance", () => {
+    expect(source).toContain("onClick={() => void acknowledge()}");
   });
 
   it("ne touche jamais au compte : ni aperçu ni route de suppression", () => {

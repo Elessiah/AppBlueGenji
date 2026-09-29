@@ -35,6 +35,7 @@ type Candidate = {
   discord_pseudo: string | null;
   discord_verified_at: string | null;
   created_at: string;
+  google_linked: 0 | 1;
 };
 
 function candidate(overrides: Partial<Candidate> = {}): Candidate {
@@ -45,6 +46,8 @@ function candidate(overrides: Partial<Candidate> = {}): Candidate {
     discord_pseudo: null,
     discord_verified_at: null,
     created_at: "2025-01-01 00:00:00",
+    // Relié à Google : toutes les entrées, ciblées comprises, le concernent.
+    google_linked: 1,
     ...overrides,
   };
 }
@@ -120,7 +123,10 @@ describe("dispatchPrivacyChangeNotifications", () => {
     await dispatchPrivacyChangeNotifications(NOW);
 
     const message = jest.mocked(pushDiscordDirectMessages).mock.calls[0][0] as string;
-    for (const change of PRIVACY_CHANGES.slice(first.length)) expect(message).toContain(change.title);
+    // Le message suivant nomme à son tour ce qu'il peut, dans l'ordre du registre.
+    const second = privacyChangesForOneMessage(PRIVACY_CHANGES.slice(first.length), siteBaseUrl());
+    expect(second.length).toBeGreaterThan(0);
+    for (const change of second) expect(message).toContain(change.title);
     for (const change of first) expect(message).not.toContain(change.title);
   });
 
@@ -133,6 +139,26 @@ describe("dispatchPrivacyChangeNotifications", () => {
     expect(select.sql).toContain("NOT EXISTS (SELECT 1 FROM bg_privacy_acknowledgments");
     expect(select.sql).toContain("NOT EXISTS (SELECT 1 FROM bg_privacy_change_notifications");
     expect(select.sql).toMatch(/LIMIT 20$/);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+  });
+
+  it("filtre en base les entrées ciblées sur leur public (compte relié à Google)", async () => {
+    const calls = fakeDb();
+    await dispatchPrivacyChangeNotifications(NOW);
+    const select = calls.find((c) => c.sql.startsWith("SELECT u.id, u.pseudo"))!;
+    expect(select.sql).toContain("u.google_sub IS NOT NULL AS google_linked");
+    expect(select.sql).toContain("u.created_at < ? AND u.google_sub IS NOT NULL AND NOT EXISTS");
+  });
+
+  it("n'annonce pas une entrée ciblée Google à un compte qui n'y est pas relié", async () => {
+    const targeted = PRIVACY_CHANGES.filter((c) => c.audience === "GOOGLE_LINKED");
+    expect(targeted.length).toBeGreaterThan(0);
+    // Tout le reste est déjà lu : seule l'entrée ciblée resterait due.
+    fakeDb({
+      candidates: [candidate({ google_linked: 0 })],
+      done: PRIVACY_CHANGES.filter((c) => !c.audience).map((c) => ({ user_id: 1, change_id: c.id })),
+    });
+    expect(await dispatchPrivacyChangeNotifications(NOW)).toBe(0);
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 

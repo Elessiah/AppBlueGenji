@@ -7,6 +7,7 @@ import {
   acknowledgePrivacyChanges,
   listPrivacyAcknowledgments,
   loadPendingPrivacyChanges,
+  privacyAudienceSql,
 } from "@/lib/server/privacy-consent";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
 import { fakePool } from "../../helpers/sql-double";
@@ -41,7 +42,7 @@ describe("loadPendingPrivacyChanges", () => {
   });
 
   it("lit création et prises de connaissance en une seule requête, compte vivant seulement", async () => {
-    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", change_id: null }]);
+    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql, params] = execute.mock.calls[0] as unknown as [string, unknown[]];
@@ -53,11 +54,22 @@ describe("loadPendingPrivacyChanges", () => {
 
   it("retire les changements déjà lus", async () => {
     mockExecute([
-      { created_at: "2025-01-01 10:00:00", change_id: PRIVACY_CHANGES[0].id },
+      { created_at: "2025-01-01 10:00:00", google_linked: 1, change_id: PRIVACY_CHANGES[0].id },
     ]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(pending.map((c) => c.id)).not.toContain(PRIVACY_CHANGES[0].id);
     expect(pending).toHaveLength(PRIVACY_CHANGES.length - 1);
+  });
+
+  it("tait une entrée ciblée Google à un compte qui n'est pas relié à Google", async () => {
+    const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 0, change_id: null }]);
+    const pending = await loadPendingPrivacyChanges(7);
+    const [sql] = execute.mock.calls[0] as unknown as [string];
+    expect(flat(sql)).toContain("u.google_sub IS NOT NULL AS google_linked");
+    const targeted = PRIVACY_CHANGES.filter((c) => c.audience === "GOOGLE_LINKED").map((c) => c.id);
+    expect(targeted.length).toBeGreaterThan(0);
+    for (const id of targeted) expect(pending.map((c) => c.id)).not.toContain(id);
+    expect(pending).toHaveLength(PRIVACY_CHANGES.length - targeted.length);
   });
 
   it("n'impose rien à un compte créé après la dernière publication", async () => {
@@ -100,5 +112,14 @@ describe("listPrivacyAcknowledgments", () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].changeId).toBe("a");
     expect(rows[0].acceptedAt).toMatch(/^2026-09-24/);
+  });
+});
+
+describe("privacyAudienceSql", () => {
+  const base = PRIVACY_CHANGES[0];
+  it("traduit chaque cible en condition sur la ligne u", () => {
+    expect(privacyAudienceSql({ ...base, audience: undefined })).toBe("1 = 1");
+    expect(privacyAudienceSql({ ...base, audience: "GOOGLE_LINKED" })).toBe("u.google_sub IS NOT NULL");
+    expect(privacyAudienceSql({ ...base, audience: "AUTRE" as never })).toBe("1 = 0");
   });
 });
