@@ -16,7 +16,7 @@
 .stat :global(.mono) {
   margin-top: 4px;
   display: inline-block;
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--ink-mute);
   text-transform: uppercase;
@@ -33,7 +33,7 @@
 
 .action {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -81,7 +81,7 @@
 
 .actionPrimary {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--cyber-bg, #06080b);
@@ -107,7 +107,7 @@
   margin-top: 14px;
   width: 100%;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-mute);
@@ -159,7 +159,7 @@
 
 .modalLabel {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--ink-mute);

@@ -71,7 +71,7 @@ export function BotHero({ status }: { status: BotStatus | null }) {
             </a>
           </CyberButton>
         </div>
-        <span className="mono" style={{ fontSize: 10, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
+        <span className="mono" style={{ fontSize: 11, letterSpacing: "0.18em", color: "var(--ink-dim)" }}>
           OAUTH2 · {botInviteScopesLabel()} · GRATUIT
         </span>
       </div>

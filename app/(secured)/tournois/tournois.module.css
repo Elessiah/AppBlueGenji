@@ -113,7 +113,7 @@
 .searchKbd {
   margin-right: 10px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.1em;
   color: var(--ink-mute);
   border: 1px solid var(--line-strong-cy);
@@ -137,7 +137,7 @@
 
 .chip {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   padding: 9px 14px;
@@ -153,7 +153,7 @@
 }
 
 .chip .num {
-  font-size: 10px;
+  font-size: 11px;
   color: var(--ink-dim);
 }
 
@@ -474,7 +474,7 @@ a.sectionNavLink:focus-visible {
   gap: 6px;
   padding: 4px 10px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   border-radius: 999px;
@@ -521,7 +521,7 @@ a.sectionNavLink:focus-visible {
 
 .cardGame {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.22em;
   color: var(--ink-mute);
   text-transform: uppercase;
@@ -544,7 +544,7 @@ a.sectionNavLink:focus-visible {
 
 .cardSub {
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 11px;
   letter-spacing: 0.18em;
   color: var(--blue-300);
   text-transform: uppercase;
@@ -563,7 +563,7 @@ a.sectionNavLink:focus-visible {
 
 .cardMetaLbl {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   color: var(--ink-mute);
   text-transform: uppercase;
@@ -660,7 +660,7 @@ a.sectionNavLink:focus-visible {
 
 .cardFootLbl {
   font-family: var(--font-mono);
-  font-size: 9px;
+  font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--ink-mute);

@@ -56,7 +56,9 @@ body {
     radial-gradient(520px 360px at 14% 2%, rgba(90, 200, 255, 0.16), transparent 58%),
     radial-gradient(420px 300px at 88% -4%, rgba(90, 200, 255, 0.1), transparent 58%),
     linear-gradient(180deg, #06070a, var(--bg-0) 55%, #06070a);
-  font-family: var(--font-body), sans-serif;
+  /* Inter par défaut : Exo 2 (`--font-body`) est dépréciée, et un texte qui
+     n'en demandait aucune y retombait — d'où des modales mi-Inter, mi-Exo 2. */
+  font-family: var(--font-sans), sans-serif;
 }
 
 a {
@@ -1070,7 +1072,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 
 .ds-stat-label {
   color: var(--text-2);
-  font-size: 10px;
+  font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
