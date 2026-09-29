@@ -3,6 +3,7 @@
 import { TERMS_ACCEPTANCE_REQUIRED, TERMS_REQUIRED_EVENT } from "@/lib/shared/terms-of-use";
 import { useCallback, useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import type {
   BracketMatch,
@@ -28,45 +29,52 @@ import {
 } from "@/lib/shared/tournament-rollback";
 import { canForfeitTeam } from "./_lib/forfeit";
 import { RulesHelpFab } from "@/components/rules/RulesHelpFab";
-import { AdminScoreDialog } from "./_components/AdminScoreDialog";
-import { PlayerScoreDialog } from "./_components/PlayerScoreDialog";
 import { PlayerScoreProvider } from "./_lib/player-score-context";
-import { GhostRegistrationDialog } from "./_components/GhostRegistrationDialog";
-import { MatchLiveDialog } from "./_components/MatchLiveDialog";
-import { MatchScheduleDialog } from "./_components/MatchScheduleDialog";
-import { MatchReplayDialog } from "./_components/MatchReplayDialog";
 import { LiveProvider } from "./_lib/live-context";
 import { canPlayersReportScore } from "@/lib/shared/match-launch";
 import { IssueReportProvider } from "./_lib/issue-report-context";
-import { IssueReportDialog } from "./_components/IssueReportDialog";
 import { RegistrationsPanel } from "./_components/RegistrationsPanel";
-import { EntrantContactsPanel } from "./_components/EntrantContactsPanel";
 import { tournamentGrantsContactAccess } from "@/lib/shared/discord-identity";
-import { BracketPreview } from "./_components/BracketPreview";
 import { BracketSections } from "./_components/BracketSections";
-import { SurvivalView } from "./_components/SurvivalView";
 import { PhaseTimeline } from "./_components/PhaseTimeline";
-import { PhaseStandingsBlock } from "./_components/PhaseStandingsBlock";
 import {
   defaultSelectedPhaseId,
   visibleRulesFormat,
 } from "./_lib/phases";
-import { SwissView } from "./_components/SwissView";
-import { EnduranceView } from "./_components/EnduranceView";
 import { EntrantProvider } from "./_lib/entrant-link";
 import { buildEntrantLogoMap } from "@/lib/shared/entrant-logos";
 import { MatchAnchorProvider } from "./_lib/match-anchor-context";
 import { useMatchAnchor } from "./_hooks/useMatchAnchor";
 import { TournamentProgress } from "./_components/TournamentProgress";
 import { TournamentLoading } from "./_components/TournamentLoading";
-import { DeleteTournamentDialog } from "./_components/DeleteTournamentDialog";
-import { RollbackRoundDialog } from "./_components/RollbackRoundDialog";
-import { EndurancePenaltyDialog } from "./_components/EndurancePenaltyDialog";
-import { AdvanceTournamentDialog } from "./_components/AdvanceTournamentDialog";
 import { TournamentHeader } from "./_components/TournamentHeader";
-import { TournamentImageDialog } from "./_components/TournamentImageDialog";
 import styles from "./page.module.css";
-import { ConfirmActionDialog } from "./_components/ConfirmActionDialog";
+
+// Découpage du paquet : un spectateur ne voit qu'un format et n'ouvre presque
+// jamais un dialogue. Les vues propres à un format et les panneaux du staff
+// partent donc dans leur propre fichier, chargé au premier rendu qui les
+// affiche ; les dialogues (tous rendus sous condition d'ouverture) au geste qui
+// les ouvre. `ssr: false` : la page ne peint aucun de ces blocs avant le
+// premier instantané du flux, un rendu serveur n'aurait rien à y mettre.
+const SurvivalView = dynamic(() => import("./_components/SurvivalView").then((m) => m.SurvivalView), { ssr: false });
+const SwissView = dynamic(() => import("./_components/SwissView").then((m) => m.SwissView), { ssr: false });
+const EnduranceView = dynamic(() => import("./_components/EnduranceView").then((m) => m.EnduranceView), { ssr: false });
+const BracketPreview = dynamic(() => import("./_components/BracketPreview").then((m) => m.BracketPreview), { ssr: false });
+const PhaseStandingsBlock = dynamic(() => import("./_components/PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock), { ssr: false });
+const EntrantContactsPanel = dynamic(() => import("./_components/EntrantContactsPanel").then((m) => m.EntrantContactsPanel), { ssr: false });
+const AdminScoreDialog = dynamic(() => import("./_components/AdminScoreDialog").then((m) => m.AdminScoreDialog), { ssr: false });
+const PlayerScoreDialog = dynamic(() => import("./_components/PlayerScoreDialog").then((m) => m.PlayerScoreDialog), { ssr: false });
+const GhostRegistrationDialog = dynamic(() => import("./_components/GhostRegistrationDialog").then((m) => m.GhostRegistrationDialog), { ssr: false });
+const MatchLiveDialog = dynamic(() => import("./_components/MatchLiveDialog").then((m) => m.MatchLiveDialog), { ssr: false });
+const MatchScheduleDialog = dynamic(() => import("./_components/MatchScheduleDialog").then((m) => m.MatchScheduleDialog), { ssr: false });
+const MatchReplayDialog = dynamic(() => import("./_components/MatchReplayDialog").then((m) => m.MatchReplayDialog), { ssr: false });
+const IssueReportDialog = dynamic(() => import("./_components/IssueReportDialog").then((m) => m.IssueReportDialog), { ssr: false });
+const DeleteTournamentDialog = dynamic(() => import("./_components/DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog), { ssr: false });
+const RollbackRoundDialog = dynamic(() => import("./_components/RollbackRoundDialog").then((m) => m.RollbackRoundDialog), { ssr: false });
+const EndurancePenaltyDialog = dynamic(() => import("./_components/EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog), { ssr: false });
+const AdvanceTournamentDialog = dynamic(() => import("./_components/AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog), { ssr: false });
+const TournamentImageDialog = dynamic(() => import("./_components/TournamentImageDialog").then((m) => m.TournamentImageDialog), { ssr: false });
+const ConfirmActionDialog = dynamic(() => import("./_components/ConfirmActionDialog").then((m) => m.ConfirmActionDialog), { ssr: false });
 
 /** Confirmation en attente d'un geste irréversible (abandon, retrait de pénalité). */
 interface PendingConfirm {
