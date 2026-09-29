@@ -466,7 +466,7 @@ export function ReportProblemDialog({
                     <span className={styles.optional}>
                       {definition.requiresReplyChannel
                         ? authenticated
-                          ? "(obligatoire sans compte Discord rattaché)"
+                          ? "(obligatoire sans tag Discord certifié)"
                           : "(obligatoire sans compte)"
                         : "(facultatif)"}
                     </span>
@@ -481,7 +481,7 @@ export function ReportProblemDialog({
                   />
                   <p className={styles.hint}>
                     {authenticated
-                      ? "Sans adresse, l'association te répondra sur Discord, si ton compte Discord est rattaché ou ton tag certifié."
+                      ? "Sans adresse, l'association te répondra sur Discord, si ton tag Discord est certifié."
                       : definition.requiresReplyChannel
                         ? "Sans compte, c'est la seule façon pour l'association de te répondre."
                         : "Sans adresse, l'association ne pourra pas te tenir au courant."}

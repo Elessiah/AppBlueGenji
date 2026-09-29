@@ -273,8 +273,11 @@ export async function resolveReportTargets(
 
 /**
  * Le signalant peut-il recevoir une réponse **sans** adresse ? Seulement par un
- * compte Discord prouvé (identifiant rattaché ou tag certifié) : le site
- * n'envoie aucun courriel, et une session seule ne porte aucun message.
+ * tag Discord **certifié** : le site n'envoie aucun courriel, une session seule
+ * ne porte aucun message, et un identifiant Discord rattaché sans tag certifié
+ * ne se lit nulle part — le panneau ne montre que le compte, et un tag non
+ * certifié est invisible des administrateurs eux-mêmes (`canViewDiscordTag`).
+ * Le tag certifié, lui, se lit sur la fiche du signalant.
  * Interrogé seulement quand la catégorie appelle une réponse et qu'aucune
  * adresse n'est donnée — ailleurs la réponse ne change rien.
  */
@@ -283,7 +286,7 @@ async function isReplyReachable(userId: number | null): Promise<boolean> {
   const db = await getDatabase();
   const [rows] = await db.execute<RowDataPacket[]>(
     `SELECT 1 FROM bg_users
-      WHERE id = ? AND is_deleted = 0 AND (discord_id IS NOT NULL OR discord_verified_at IS NOT NULL)
+      WHERE id = ? AND is_deleted = 0 AND discord_verified_at IS NOT NULL
       LIMIT 1`,
     [userId],
   );
@@ -306,7 +309,7 @@ async function isReplyReachable(userId: number | null): Promise<boolean> {
  *
  * @throws REPORT_TARGETS_REQUIRE_LOGIN Des cibles désignées sans compte.
  * @throws REPORT_REPLY_CHANNEL_REQUIRED Une demande qui appelle une réponse
- *   (RGPD, hébergeur), envoyée sans adresse ni compte Discord prouvé.
+ *   (RGPD, hébergeur), envoyée sans adresse ni tag Discord certifié.
  * @throws REPORTS_SATURATED Afflux au-delà du plafond **dur** de l'heure
  *   (`REPORTS_HOURLY_HARD_CAP`). Sous lui, le dépôt est toujours accepté ;
  *   au-delà du plafond d'alerte, seule l'alerte est retenue (`reportAlertMode`).

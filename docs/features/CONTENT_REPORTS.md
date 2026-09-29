@@ -44,8 +44,8 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
 | `COPYRIGHT` — Droit d'auteur | joueurs, équipes, tournois | `COPYRIGHT_NOTICE_ELEMENTS` : nom + adresse électronique, qualité (`RightsRelation`), description, déclaration de bonne foi | obligation légale (DSA, art. 16) |
 | `MODERATION` — Modération | joueurs, équipes | — | obligation légale (DSA, art. 16) |
 | `BUG` — Bug | aucune | case d'accord | consentement |
-| `RGPD` — RGPD | aucune | adresse, sauf compte Discord prouvé | obligation légale (RGPD, art. 6.1.c et 12) |
-| `HOSTING` — Hébergeur | aucune | adresse, sauf compte Discord prouvé | obligation légale (DSA, art. 11 et 16) |
+| `RGPD` — RGPD | aucune | adresse, sauf tag Discord certifié | obligation légale (RGPD, art. 6.1.c et 12) |
+| `HOSTING` — Hébergeur | aucune | adresse, sauf tag Discord certifié | obligation légale (DSA, art. 11 et 16) |
 | `OTHER` — Autre | joueurs, équipes, tournois | case d'accord | consentement |
 | `CONTEST` — Contestation | aucune (rattachée à `parentReportId`) | être visé ; connecté | obligation légale (DSA, art. 20) |
 
@@ -90,7 +90,8 @@ pas l'effacement avant la fin du traitement (RGPD, art. 17.3.b).
 
 **Une réponse due a toujours un canal.** `RGPD` et `HOSTING`
 (`requiresReplyChannel`) exigent une adresse électronique sauf d'un compte dont le
-Discord est prouvé (identifiant rattaché ou tag certifié) — le site n'envoie aucun
+tag Discord est certifié (le seul que l'administration lise sur la fiche du
+signalant ; un identifiant rattaché seul ne se voit nulle part) — le site n'envoie aucun
 courriel et un signalant ne suit pas son signalement en ligne. La route le relit
 en base (`isReplyReachable`) ; le formulaire, qui ne connaît que la session, pose
 la question au plus large.

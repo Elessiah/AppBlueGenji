@@ -518,8 +518,7 @@ export default async function RgpdPage() {
             </li>
             <li>
               <strong>Réponse</strong> : une demande RGPD ou adressée à l&apos;hébergeur exige une
-              adresse électronique, sauf d&apos;un compte dont le Discord est rattaché ou le tag
-              certifié — le site n&apos;envoie aucun courriel, la réponse part de l&apos;association,
+              adresse électronique, sauf d&apos;un compte dont le tag Discord est certifié — le site n&apos;envoie aucun courriel, la réponse part de l&apos;association,
               à l&apos;adresse indiquée ou sur Discord.
             </li>
             <li>

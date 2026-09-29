@@ -399,12 +399,12 @@ describe("createReport", () => {
   );
 
   const reachableRoute = (reachable: boolean): Route => [
-    /SELECT 1 FROM bg_users\s+WHERE id = \? AND is_deleted = 0 AND \(discord_id IS NOT NULL OR discord_verified_at IS NOT NULL\)/,
+    /SELECT 1 FROM bg_users\s+WHERE id = \? AND is_deleted = 0 AND discord_verified_at IS NOT NULL/,
     () => [reachable ? [{ 1: 1 }] : []],
   ];
 
   it.each(["RGPD", "HOSTING"] as const)(
-    "refuse une demande %s d'un compte sans Discord prouvé ni adresse : le site n'envoie aucun courriel",
+    "refuse une demande %s d'un compte sans tag Discord certifié ni adresse : le site n'envoie aucun courriel",
     async (category) => {
       install([reachableRoute(false)], []);
       await expect(
@@ -417,7 +417,7 @@ describe("createReport", () => {
     },
   );
 
-  it("accepte une demande RGPD sans adresse d'un compte Discord prouvé, sans date de consentement", async () => {
+  it("accepte une demande RGPD sans adresse d'un compte au tag Discord certifié, sans date de consentement", async () => {
     install(
       [reachableRoute(true), [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
       [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 16 }]]],

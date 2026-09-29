@@ -463,8 +463,9 @@ export function reportRequiresConsent(category: ReportCategory): boolean {
  * rien pour la donner : ni adresse, ni compte **joignable**.
  *
  * Un compte ne suffit pas : le site n'envoie aucun courriel, et un signalant ne
- * suit pas son signalement en ligne — seul un compte Discord **prouvé**
- * (identifiant rattaché ou tag certifié) permet à l'association de répondre.
+ * suit pas son signalement en ligne. Seul un tag Discord **certifié**, que les
+ * administrateurs lisent sur la fiche du signalant, permet à l'association de
+ * répondre.
  * Un demandeur connecté sans lui recevait la promesse d'une réponse sous un
  * mois sans qu'aucun canal ne la porte. La validation ne connaît pas le compte :
  * la route (`createReport`) pose cette question à part, sur la base ; le
@@ -775,9 +776,9 @@ export function reportFollowUpDuty(category: ReportCategory): string | null {
     case "CONTEST":
       return "Contestation : notifier la décision motivée à la personne ou à l'équipe qui conteste, sur Discord ou à l'adresse indiquée (DSA, art. 20.5).";
     case "RGPD":
-      return "Demande d'exercice des droits : répondre dans le mois (RGPD, art. 12), à l'adresse indiquée ou sur le Discord du compte.";
+      return "Demande d'exercice des droits : répondre dans le mois (RGPD, art. 12), à l'adresse indiquée ou au tag Discord certifié du compte.";
     case "HOSTING":
-      return "Demande adressée à l'hébergeur : accuser réception et répondre, à l'adresse indiquée ou sur le Discord du compte.";
+      return "Demande adressée à l'hébergeur : accuser réception et répondre, à l'adresse indiquée ou au tag Discord certifié du compte.";
     default:
       return null;
   }
@@ -802,7 +803,7 @@ export function reportErrorMessage(code: string | null | undefined): string {
     case "REPORT_CONTACT_REQUIRED":
       return "Indique ton nom et une adresse électronique : un signalement de droit d'auteur doit pouvoir être suivi.";
     case "REPORT_REPLY_CHANNEL_REQUIRED":
-      return "Indique une adresse électronique pour qu'on puisse te répondre : sans compte, ou sans compte Discord rattaché, c'est le seul moyen.";
+      return "Indique une adresse électronique pour qu'on puisse te répondre : sans compte, ou sans tag Discord certifié, c'est le seul moyen.";
     case "REPORT_CONTACT_TOO_LONG":
       return "Le nom indiqué est trop long.";
     case "REPORT_INVALID_EMAIL":

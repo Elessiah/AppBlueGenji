@@ -434,7 +434,7 @@ describe("registre des catégories", () => {
     expect(missingReplyChannel({ category: "RGPD", contactEmail: null }, true)).toBe(false);
     expect(missingReplyChannel({ category: "HOSTING", contactEmail: "a@b.fr" }, false)).toBe(false);
     expect(missingReplyChannel({ category: "BUG", contactEmail: null }, false)).toBe(false);
-    expect(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED")).toMatch(/adresse.*Discord rattaché/);
+    expect(reportErrorMessage("REPORT_REPLY_CHANNEL_REQUIRED")).toMatch(/adresse.*tag Discord certifié/);
   });
 
   it("dit comment exercer ses droits sans renvoyer à une adresse", () => {

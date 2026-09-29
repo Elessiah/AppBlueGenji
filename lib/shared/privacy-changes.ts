@@ -390,7 +390,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Une demande RGPD, un signalement de droit d'auteur, un contenu signalé en modération, une demande à l'hébergeur ou une contestation n'exigent plus de cocher une case d'accord : l'association est tenue de les traiter. Pour les autres signalements, rien ne change.",
     details: [
       "Ces catégories reposent désormais sur l'obligation légale de l'association (RGPD, art. 12 ; règlement européen sur les services numériques, art. 11, 16 et 20), et non plus sur ton consentement : il n'y a donc plus de consentement à retirer pour elles, mais ta demande est toujours traitée. Tu gardes tes droits d'accès et de rectification ; l'effacement attend que la demande soit traitée, l'association étant tenue de la traiter (RGPD, art. 17.3.b).",
-      "Une demande RGPD ou adressée à l'hébergeur demande une adresse électronique si ton compte n'a pas de Discord rattaché ni de tag certifié : le site n'envoie aucun courriel, et sans elle l'association ne pourrait pas te répondre.",
+      "Une demande RGPD ou adressée à l'hébergeur demande une adresse électronique si ton tag Discord n'est pas certifié : le site n'envoie aucun courriel, et sans elle l'association ne pourrait pas te répondre.",
       "L'auteur d'un signalement de droit d'auteur reçoit un accusé de réception, puis la décision prise et les voies de recours, à l'adresse qu'il indique.",
     ],
     links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
