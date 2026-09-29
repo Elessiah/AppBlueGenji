@@ -38,7 +38,7 @@ pipeline de `CLAUDE.md`.
 2. **Ajouter une tâche** : même chemin, à la suite, même format (critère,
    constat, à faire), avec le numéro qui suit le dernier attribué — relu sur
    `main` au moment du push et avancé dans le même commit. Les numéros ne
-   sont **pas** réattribués : **dernier numéro attribué — 20**.
+   sont **pas** réattribués : **dernier numéro attribué — 21**.
 3. **Abandonner une tâche** (ou ne la régler qu'en partie) : la remettre ici
    par un commit direct sur `main`, sous son numéro d'origine. La PR qui règle
    une tâche n'a rien à retirer de ce fichier.
@@ -50,3 +50,19 @@ pipeline de `CLAUDE.md`.
 - **À faire** : parcours complet avec NVDA (Windows) et VoiceOver (macOS / iOS)
   — connexion, inscription d'une équipe, report de score, menu d'accessibilité.
   Aucun test automatique ne remplace celui-là.
+
+## 21. Onglet d'accessibilité sur la colonne des pages vitrine
+
+- **Critère** : WCAG 2.4.11 (focus non masqué) · RGAA 10 (contenu masqué par
+  un élément fixe).
+- **Constat** : au-delà de 720 px, le bouton d'accessibilité est un onglet de
+  28 px collé au bord gauche, à mi-hauteur
+  (`components/accessibility/AccessibilityMenu.module.css`). L'espace connecté
+  lui réserve une gouttière de 32 px (`.page-shell`, `app/globals.css`), mais
+  les pages vitrine gardent des colonnes en `min(1240px, calc(100vw - 40px))`
+  (accueil, association, pied de page public…) : entre 721 et ~1300 px de
+  large, l'onglet mord de 8 à 16 px le bord gauche de la colonne quand un
+  contenu passe à mi-hauteur.
+- **À faire** : réserver la même gouttière aux colonnes vitrine (un jeton
+  partagé plutôt que quatorze `calc` à tenir), puis vérifier qu'aucun
+  contrôle focalisable ne passe sous l'onglet.
