@@ -39,15 +39,15 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
 
 ## Catégories (`REPORT_CATEGORY_DEFINITIONS`)
 
-| Catégorie | Cibles | Exigences |
-|---|---|---|
-| `COPYRIGHT` — Droit d'auteur | joueurs, équipes, tournois | nom + adresse, qualité (`RightsRelation`), déclaration de bonne foi |
-| `MODERATION` — Modération | joueurs, équipes | — |
-| `BUG` — Bug | aucune | — |
-| `RGPD` — RGPD | aucune | — (adresse facultative, comme ailleurs) |
-| `HOSTING` — Hébergeur | aucune | — |
-| `OTHER` — Autre | joueurs, équipes, tournois | — |
-| `CONTEST` — Contestation | aucune (rattachée à `parentReportId`) | être visé ; connecté |
+| Catégorie | Cibles | Exigences | Base légale |
+|---|---|---|---|
+| `COPYRIGHT` — Droit d'auteur | joueurs, équipes, tournois | `COPYRIGHT_NOTICE_ELEMENTS` : nom + adresse électronique, qualité (`RightsRelation`), description, déclaration de bonne foi | obligation légale (DSA, art. 16) |
+| `MODERATION` — Modération | joueurs, équipes | case d'accord | consentement |
+| `BUG` — Bug | aucune | case d'accord | consentement |
+| `RGPD` — RGPD | aucune | adresse, sauf compte Discord prouvé | obligation légale (RGPD, art. 6.1.c et 12) |
+| `HOSTING` — Hébergeur | aucune | adresse, sauf compte Discord prouvé | obligation légale (DSA, art. 11 et 16) |
+| `OTHER` — Autre | joueurs, équipes, tournois | case d'accord | consentement |
+| `CONTEST` — Contestation | aucune (rattachée à `parentReportId`) | être visé ; connecté | obligation légale (DSA, art. 20) |
 
 **`RGPD` et `HOSTING` trient les demandes à l'éditeur et à l'hébergeur.** Le
 courriel de l'association est publié (mentions légales, `/rgpd`), mais **jamais en
@@ -74,9 +74,37 @@ enregistré ni transmis —, et l'étape « Modération » le rappelle
 les contenus du site (pseudo, nom d'équipe, logo…).
 
 La validation (`validateReportSubmission`) est **unique** et partagée par le
-formulaire et `POST /api/reports`. Le consentement RGPD est une case obligatoire
-du formulaire ; les phrases qui l'accompagnent (`REPORT_PRIVACY_NOTICE`) sont
+formulaire et `POST /api/reports`. Les phrases d'information
+(`REPORT_PRIVACY_NOTICE`, `reportLegalBasisNotice`, `reportRightsNotice`) sont
 celles qui engagent l'association.
+
+**Pas de case d'accord là où l'association est tenue de traiter**
+(`ReportCategoryDefinition.legalBasis`, `reportRequiresConsent`). Une demande
+d'exercice des droits, une notification de contenu illicite, une demande à
+l'hébergeur ou une contestation ne peuvent pas dépendre d'un « consentement » :
+il ne serait pas libre, et son retrait ferait effacer une demande à traiter. Ces
+catégories n'affichent que l'information, `consent_at` reste `NULL` ; la case
+reste pour modération, bug et autre.
+
+**Une réponse due a toujours un canal.** `RGPD` et `HOSTING`
+(`requiresReplyChannel`) exigent une adresse électronique sauf d'un compte dont le
+Discord est prouvé (identifiant rattaché ou tag certifié) — le site n'envoie aucun
+courriel et un signalant ne suit pas son signalement en ligne. La route le relit
+en base (`isReplyReachable`) ; le formulaire, qui ne connaît que la session, pose
+la question au plus large.
+
+**Le retour au notifiant se fait à la main** (DSA, art. 16.4 et 16.5) :
+accusé de réception, puis décision et voies de recours, à l'adresse indiquée
+(`NOTIFIER_FOLLOW_UP`, lu par les mentions légales, les conditions et `/rgpd`).
+Le dossier du panneau le rappelle (« Retour dû », `reportFollowUpDuty`) pour le
+droit d'auteur, le RGPD et l'hébergeur. Le **point de contact des autorités**
+(art. 11) est publié dans les mentions légales : courriel protégé et catégorie
+« Hébergeur », langues `AUTHORITY_CONTACT_LANGUAGES`.
+
+**Une seule liste des éléments d'une notification** (`COPYRIGHT_NOTICE_ELEMENTS`,
+`copyrightNoticeElementsText`), celle du formulaire, lue par les mentions
+légales, les conditions d'utilisation, `/rgpd` et la fiche T11 ; et « logo ou
+avatar » partout où le masquage est décrit.
 
 ## Ce qui part sur Discord — et ce qui n'y part pas
 
