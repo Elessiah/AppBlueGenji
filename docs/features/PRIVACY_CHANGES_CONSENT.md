@@ -191,7 +191,7 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
 
 | Table | Contenu | Suppression du compte |
 | --- | --- | --- |
-| `bg_privacy_acknowledgments` | `(user_id, change_id, accepted_at)` — la trace de l'information (la colonne garde son nom d'origine) | Cascade à l'effacement ; conservée à l'anonymisation (un identifiant et une date) |
+| `bg_privacy_acknowledgments` | `(user_id, change_id, accepted_at)` — la trace de l'information (la colonne garde son nom d'origine) | Cascade à l'effacement ; effacée aussi à l'anonymisation (`anonymizeAccount` : elle ne concerne plus personne) |
 | `bg_privacy_change_notifications` | `(user_id, change_id, sent_at)` | Idem |
 
 Les prises de connaissance figurent dans l'export RGPD (`privacyAcknowledgments`,
