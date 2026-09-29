@@ -427,7 +427,6 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                   onClick={() => void setReady(false)}
                   disabled={busy}
                   aria-pressed="true"
-                  data-autofocus
                   title="Cliquer pour annuler ton « Prêt »"
                 >
                   {busy ? "…" : "✓ Prêt — annuler"}
@@ -439,6 +438,11 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                   onClick={() => setConfirming(true)}
                   disabled={busy}
                   aria-pressed="false"
+                  // Focus d'ouverture : ce bouton n'ouvre que la confirmation,
+                  // un Entrée égaré ne déclare donc rien. Ni « annuler » (un
+                  // clic retire le « Prêt » sans confirmation) ni un lien ne
+                  // sont marqués : la modale s'ouvre d'elle-même, parfois
+                  // pendant une saisie ailleurs dans la page.
                   data-autofocus
                 >
                   {partyWord}
@@ -463,14 +467,10 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                   Autre match ({pending.filter((info) => info.matchId !== current.matchId).length})
                 </button>
               )}
-              {/* Focus d'ouverture : « Prêt » quand le lecteur peut le donner
-                  (marqué plus haut, premier dans l'ordre), sinon ce lien —
-                  jamais le premier « Copier » des fiches contacts. */}
               <Link
                 className="btn ghost"
                 href={tournamentMatchHref(current.tournamentId, current.matchId)}
                 onClick={close}
-                data-autofocus
               >
                 Voir le match
               </Link>

@@ -102,22 +102,27 @@ describe("modale de lancement sur un petit écran", () => {
     expect(sticky).toContain("background: var(--cyber-bg-1");
   });
 
-  it("le focus d'ouverture va à « Prêt », puis à « Voir le match »", () => {
-    const readyOff = tsx.indexOf("{partyWord}");
-    const readyOn = tsx.indexOf("✓ Prêt — annuler");
-    const view = tsx.indexOf("Voir le match");
-    const firstCopy = tsx.indexOf("Copier\n");
-    for (const label of [readyOff, readyOn, view]) {
-      const opening = tsx.lastIndexOf("<", tsx.lastIndexOf(">", label));
-      expect(tsx.slice(opening, label)).toContain("data-autofocus");
-    }
-    // Les boutons « Copier » ne sont jamais marqués.
-    const copyOpening = tsx.lastIndexOf("<button", firstCopy);
-    expect(tsx.slice(copyOpening, firstCopy)).not.toContain("data-autofocus");
-    // « Prêt » précède « Voir le match » dans le DOM : c'est lui que le premier
-    // élément marqué désigne quand il est rendu.
-    expect(readyOn).toBeLessThan(view);
-    expect(readyOff).toBeLessThan(view);
+  it("le focus d'ouverture va au seul « Prêt » qui ouvre une confirmation", () => {
+    const openingOf = (label: string) => {
+      const at = tsx.indexOf(label);
+      expect(at).toBeGreaterThan(-1);
+      return tsx.slice(tsx.lastIndexOf("<", tsx.lastIndexOf(">", at)), at);
+    };
+    const readyOff = openingOf("{partyWord}");
+    expect(readyOff).toContain("data-autofocus");
+    expect(readyOff).toContain("setConfirming(true)");
+    // Un Entrée égaré sur une modale ouverte d'office ne doit rien déclencher :
+    // ni retrait du « Prêt » (sans confirmation), ni navigation.
+    expect(openingOf("✓ Prêt — annuler")).not.toContain("data-autofocus");
+    expect(openingOf("Voir le match")).not.toContain("data-autofocus");
+    expect(openingOf("Copier\n")).not.toContain("data-autofocus");
+    expect(tsx.match(/^\s*data-autofocus$/gm)).toHaveLength(1);
+  });
+
+  it("un élément focalisé au clavier n'est pas caché sous la barre collée", () => {
+    expect(rule(css, ".modal")).toMatch(/scroll-padding-bottom: \d+px/);
+    const mobile = css.match(/@media \(max-width: 640px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
+    expect(mobile).toMatch(/\.modal \{[^}]*scroll-padding-bottom: \d+px/);
   });
 
   it("les noms d'équipe des fiches passent à la ligne au lieu d'être rognés", () => {

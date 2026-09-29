@@ -160,10 +160,13 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
   empilée en dernier, prenait le piège de focus sous l'autre. Sur téléphone,
   la barre d'actions (« Prêt », « Voir le match », « Fermer ») et la
   confirmation sont **collées au bas** de la modale (`position: sticky`) : les
-  fiches contacts la poussaient sous la ligne de flottaison. Le focus
-  d'ouverture va à « Prêt » (`data-autofocus`), à défaut à « Voir le match »,
-  jamais au premier « Copier » ; les noms d'équipe des fiches passent à la
-  ligne au lieu d'être rognés.
+  fiches contacts la poussaient sous la ligne de flottaison ; un
+  `scroll-padding-bottom` ramène au-dessus d'elle l'élément focalisé au
+  clavier. Le focus d'ouverture va au « Prêt » qui **ouvre la confirmation**
+  (`data-autofocus`) — jamais à « Prêt — annuler » ni à un lien : la modale
+  s'ouvre d'elle-même, parfois pendant une saisie, et un Entrée égaré ne doit
+  rien déclencher. Les noms d'équipe des fiches passent à la ligne au lieu
+  d'être rognés.
 - **Carte de match** — `MatchLaunchStrip` : « Lancement · N/M prêts », hôte,
   caster ; pour les parties, un bouton qui ouvre la modale
   (`MATCH_LAUNCH_OPEN_EVENT`) ; pour l'arbitrage, « ⇄ Hôte » et « ▶ Forcer ».

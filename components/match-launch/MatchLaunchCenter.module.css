@@ -15,6 +15,9 @@
 
 .modal {
   --modal-pad: 26px;
+  /* Hauteur de la barre d'actions collée au bas : un élément focalisé au
+     clavier (« Copier ») est ramené au-dessus d'elle, jamais dessous. */
+  scroll-padding-bottom: 110px;
   width: min(780px, 100%);
   max-height: calc(100dvh - 32px);
   overflow-y: auto;
@@ -457,6 +460,7 @@
 @media (max-width: 640px) {
   .modal {
     --modal-pad: 18px;
+    scroll-padding-bottom: 170px;
   }
 
   .sides {
