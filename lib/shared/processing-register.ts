@@ -357,7 +357,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       `Détail des visites (empreinte, page, date) effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après report dans un compteur par jour qui ne garde que le nombre de visites`,
-      "Une empreinte par visiteur, sans page ni date, conservée sans limite de durée pour le nombre de visiteurs uniques depuis la mise en service, y compris après la suppression du compte",
+      "Une empreinte par visiteur, sans page ni date mais avec l'indicateur « visiteur connecté », conservée sans limite de durée pour le nombre de visiteurs uniques depuis la mise en service, y compris après la suppression du compte",
       "Adresse IP, navigateur et identifiant du compte jamais enregistrés tels quels",
     ],
     recipients: [

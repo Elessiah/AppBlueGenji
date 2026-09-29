@@ -450,7 +450,8 @@ export default async function RgpdPage() {
             date) est effacé au bout de {SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après avoir
             été reporté dans un compteur par jour qui ne garde que le nombre de visites. Pour
             compter les visiteurs uniques depuis la mise en service, le site garde en outre
-            une empreinte par visiteur, sans page ni date,{" "}
+            une empreinte par visiteur, sans page ni date mais avec l&apos;indicateur
+            « visiteur connecté »,{" "}
             <strong>sans limite de durée</strong> — y compris après la suppression d&apos;un
             compte.
           </p>

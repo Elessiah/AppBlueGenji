@@ -299,7 +299,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary: `Le détail des visites du site (page vue, date) est désormais effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours.`,
     details: [
       `Chaque visite gardait jusqu'ici, sans limite de durée, une empreinte salée du visiteur, la page vue et la date. Ce détail est maintenant effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après avoir été reporté dans un compteur par jour qui ne garde que le nombre de visites.`,
-      "Pour compter les visiteurs uniques depuis la mise en service, le site garde une seule empreinte par visiteur, sans page ni date. Sans le secret du serveur, elle ne se rattache à personne ; l'association, qui le détient, peut la recalculer. Ni ton adresse IP ni ton compte ne sont enregistrés tels quels.",
+      "Pour compter les visiteurs uniques depuis la mise en service, le site garde une seule empreinte par visiteur, sans page ni date, avec la seule mention « connecté ou non ». Sans le secret du serveur, elle ne se rattache à personne ; l'association, qui le détient, peut la recalculer. Ni ton adresse IP ni ton compte ne sont enregistrés tels quels.",
     ],
   },
   // La connexion par Discord ne certifie plus le tag : l'exposition à

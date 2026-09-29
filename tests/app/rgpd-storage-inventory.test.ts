@@ -109,7 +109,11 @@ describe("/rgpd — mesure d'audience", () => {
     expect(text).toContain("/stats-site");
     expect(text).toContain("y compris après la suppression du compte");
     expect(text).not.toContain("ne désigne aucune personne");
-    expect(REGISTER_UPDATED_AT).toBe("2026-09-30");
+    // La date ne fait qu'avancer : une PR suivante qui touche le registre la repousse.
+    expect(REGISTER_UPDATED_AT >= "2026-09-30").toBe(true);
+    // Chaque empreinte gardée sans limite porte aussi l'indicateur de connexion.
+    expect(text).toContain("avec l'indicateur « visiteur connecté », conservée sans limite");
+    expect(audience).toMatch(/avec l&apos;indicateur\s+« visiteur connecté »/);
   });
 
   it("ne laisse aucune entrée des changements affirmer une empreinte irréversible", () => {
