@@ -11,6 +11,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/staff-audit");
 jest.mock("@/lib/server/solo-entries-service");
+jest.mock("@/lib/server/avatar-rotation");
 jest.mock("@/lib/server/site-url", () => ({ siteCanonicalBase: () => "https://site.test" }));
 
 import { copyFile, rename, unlink } from "node:fs/promises";
@@ -18,6 +19,7 @@ import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import {
   avatarFileLocations,
   avatarQuarantineDirectory,
@@ -546,6 +548,8 @@ describe("restoreReportedImage", () => {
     expect(rename).toHaveBeenCalledWith(HIDDEN_AVATAR, LIVE_AVATAR);
     expect(connection.execute).toHaveBeenCalledWith(expect.stringMatching(/UPDATE bg_users SET avatar_url = \?/), [AVATAR, 9]);
     expect(syncSoloEntryIdentityOn).toHaveBeenCalledWith(expect.anything(), 9);
+    // Masqué pendant la quarantaine, il ne doit pas revenir à son adresse publique.
+    expect(rotateHiddenAvatarFile).toHaveBeenCalledWith(9);
     expect(connection.commit).toHaveBeenCalled();
     const [, recipients, context] = jest.mocked(pushDiscordDirectMessages).mock.calls[0];
     expect(context).toBe("avatar-restored");

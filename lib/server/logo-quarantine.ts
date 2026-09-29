@@ -38,6 +38,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { toIso } from "@/lib/server/serialization";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { reportConcernedHref, type ReportPerson } from "@/lib/shared/content-reports";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
@@ -788,6 +789,15 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
       )
       .catch((error) => console.error("[moderation] équipe non prévenue du rétablissement", error));
   } else {
+    // Rétabli à son adresse d'origine, déjà vue de tous. Si le joueur a masqué
+    // son avatar pendant la quarantaine, la bascule n'a rien pu renommer
+    // (`avatar_url` était vide) : le renommage se joue donc ici — sans effet sur
+    // un avatar visible.
+    try {
+      await rotateHiddenAvatarFile(Number(row.target_id));
+    } catch (error) {
+      console.error("[moderation] avatar rétabli non renommé", error);
+    }
     publishStaffAction(`✅ Avatar d'${ANONYMOUS_PLAYER_LABEL} rétabli par le staff (contestation acceptée).`, {
       id: actor.userId,
       pseudo: actor.pseudo,

@@ -182,6 +182,17 @@ describe("sponsors-service", () => {
       await mockDb(jest.fn<SqlQuery>().mockResolvedValue([[]]));
       expect(await getSponsorLogoUrl(999)).toBeNull();
     });
+
+    it("ne relit que les partenaires publiés — un brouillon n'est pas relayé", async () => {
+      // Le relais est public et sans compte : énumérer les identifiants ne doit
+      // pas révéler le logo d'un partenariat en préparation.
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+      await mockDb(execute);
+      expect(await getSponsorLogoUrl(3)).toBeNull();
+      const [sql, params] = execute.mock.calls[0];
+      expect(sql).toMatch(/WHERE id = \? AND active = 1/);
+      expect(params).toEqual([3]);
+    });
   });
 
   describe("getSponsorImageUrls", () => {

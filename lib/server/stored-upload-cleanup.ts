@@ -41,14 +41,28 @@ const REFERENCE_QUERIES = [
   "SELECT 1 FROM bg_logo_quarantines WHERE status = 'HIDDEN' AND logo_url IN (?, ?) LIMIT 1",
 ] as const;
 
-/** Vrai si une ligne désigne encore ce fichier, sous sa forme servie ou disque. */
-export async function isUploadReferenced(url: string): Promise<boolean> {
+/**
+ * Vrai si une ligne désigne encore ce fichier, sous sa forme servie ou disque.
+ *
+ * @param options.exceptUserAvatar Ignore l'avatar de ce compte — « un autre que
+ *   son titulaire désigne-t-il ce fichier ? » (`lib/server/avatar-rotation.ts`).
+ */
+export async function isUploadReferenced(
+  url: string,
+  options: { exceptUserAvatar?: number } = {},
+): Promise<boolean> {
   const disk = toDiskUploadPath(url);
   if (!disk) return false;
   const served = toServedUploadUrl(disk);
   const db = await getDatabase();
-  for (const sql of REFERENCE_QUERIES) {
-    const params = sql.includes("banner_url") ? [served, disk, served, disk] : [served, disk];
+  const exceptUser = options.exceptUserAvatar;
+  for (const base of REFERENCE_QUERIES) {
+    let sql: string = base;
+    const params: (string | number)[] = sql.includes("banner_url") ? [served, disk, served, disk] : [served, disk];
+    if (exceptUser !== undefined && sql.startsWith("SELECT 1 FROM bg_users ")) {
+      sql = sql.replace(" LIMIT 1", " AND id <> ? LIMIT 1");
+      params.push(exceptUser);
+    }
     const [rows] = await db.execute<RowDataPacket[]>(sql, params);
     if (rows.length > 0) return true;
   }

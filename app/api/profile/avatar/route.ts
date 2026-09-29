@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
-import { getUserById, updateUserAvatar } from "@/lib/server/users-service";
+import { updateUserAvatar } from "@/lib/server/users-service";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isImageUploadError } from "@/lib/shared/image-upload-errors";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
@@ -44,7 +44,6 @@ export async function POST(req: Request) {
   if (!crop.ok) return fail(IMAGE_CROP_INVALID, 400);
 
   try {
-    const current = await getUserById(user.id);
     const diskPath = await processAndStoreImage(file, "avatar", user.id, crop.crop);
     const servedUrl = toServedUploadUrl(diskPath);
     // Un téléversement parti avant une suppression de compte reprend **après**
@@ -52,14 +51,17 @@ export async function POST(req: Request) {
     // alors refusée, et c'est le fichier déjà posé sur le disque qu'il faut
     // reprendre — servi par `/api/uploads/avatars/…`, il survivrait seul à un
     // compte effacé dont on vient de promettre qu'il ne resterait rien.
-    if (!(await updateUserAvatar(user.id, servedUrl))) {
+    // L'adresse remplacée est rendue par l'écriture, relue sous le même verrou :
+    // relue avant, elle pouvait avoir été renommée entre-temps (masquage).
+    const replaced = await updateUserAvatar(user.id, servedUrl);
+    if (!replaced) {
       // Le refus est le fait à rendre. Un `unlink` qui échoue ici ne doit pas le
       // masquer derrière un 400 : le compte est supprimé, c'est un 409 que
       // l'écran attend pour le dire en français.
       await discardStoredImage(diskPath);
       return fail(ACCOUNT_DELETED_ERROR, 409);
     }
-    await discardStoredImage(toDiskUploadPath(current?.avatarUrl));
+    await discardStoredImage(toDiskUploadPath(replaced.previousUrl));
     return ok({ avatarUrl: servedUrl });
   } catch (error) {
     // Seuls les refus d'image sortent tels quels : ils disent au joueur quoi
@@ -76,7 +78,6 @@ export async function DELETE() {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
 
-  const current = await getUserById(user.id);
   // **La base d'abord, le fichier ensuite.** L'ordre inverse effaçait l'image
   // avant l'écriture qui la déréférence : `updateUserAvatar` peut échouer (la
   // route n'a pas de `try/catch`, contrairement au POST) et `avatar_url`
@@ -86,7 +87,8 @@ export async function DELETE() {
   // plus rien, et annoncer « avatar supprimé » sur une écriture qui n'a rien
   // apparié serait faux. Ici, rien à reprendre — le fichier est encore là,
   // c'est le mode « anonymisation » qui l'emporte de son côté.
-  if (!(await updateUserAvatar(user.id, null))) return fail(ACCOUNT_DELETED_ERROR, 409);
-  await discardStoredImage(toDiskUploadPath(current?.avatarUrl));
+  const replaced = await updateUserAvatar(user.id, null);
+  if (!replaced) return fail(ACCOUNT_DELETED_ERROR, 409);
+  await discardStoredImage(toDiskUploadPath(replaced.previousUrl));
   return ok({ avatarUrl: null });
 }

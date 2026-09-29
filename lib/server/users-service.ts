@@ -22,6 +22,7 @@ import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { listPrivacyAcknowledgments } from "@/lib/server/privacy-consent";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
+import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
@@ -1345,6 +1346,18 @@ export async function updateOwnProfile(
   // une ligne fraîchement anonymisée — puis `syncSoloEntryIdentity` republiait
   // ce pseudo dans les brackets et jusqu'à la carte de match en direct de la
   // vitrine. La suppression est irréversible : c'est elle qui doit gagner.
+  //
+  // Masquer un avatar **visible** en change aussi le fichier d'adresse (plus
+  // bas) : on relit donc l'état d'avant, seule la bascule doit renommer — le
+  // formulaire renvoie le réglage à chaque sauvegarde.
+  let hidesVisibleAvatar = false;
+  if (patch.visibility?.avatar === false) {
+    const [before] = await db.execute<(RowDataPacket & { visible_avatar: 0 | 1 })[]>(
+      `SELECT visible_avatar FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    hidesVisibleAvatar = before[0]?.visible_avatar === 1;
+  }
   let result: ResultSetHeader;
   try {
     [result] = await db.execute<ResultSetHeader>(
@@ -1430,6 +1443,18 @@ export async function updateOwnProfile(
   // fiche de profil, l'entrée solo continuant de la servir à tout le site.
   if (patch.pseudo || patch.visibility?.avatar !== undefined) {
     await syncSoloEntryIdentity(userId);
+  }
+
+  // Masqué, l'avatar disparaît des réponses mais son fichier restait servi sans
+  // session à la même adresse : on le renomme, l'ancienne adresse meurt. Un
+  // échec n'annule pas le réglage, déjà écrit — il se journalise. Après la
+  // resynchronisation : l'entrée solo, vidée, ne compte plus pour un partage.
+  if (hidesVisibleAvatar) {
+    try {
+      await rotateHiddenAvatarFile(userId);
+    } catch (error) {
+      console.error("[avatar-rotation] renommage impossible", error);
+    }
   }
 }
 
@@ -1977,22 +2002,50 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
  * toute neuve sur une ligne fraîchement anonymisée — publiquement servie par
  * `/api/uploads/avatars/…`, c'est-à-dire précisément ce que la suppression
  * venait d'effacer. Sur un compte effacé, la ligne a disparu et l'écriture ne
- * touche rien, mais le fichier, lui, est déjà sur le disque : d'où un booléen
+ * touche rien, mais le fichier, lui, est déjà sur le disque : d'où `null`
  * rendu, que l'appelant traduit en ménage.
+ *
+ * L'adresse **remplacée** est rendue, relue sous verrou dans la même
+ * transaction que l'écriture : c'est le fichier à effacer. Relue avant, hors
+ * verrou, elle pouvait avoir changé entre-temps — le renommage d'un avatar
+ * masqué (`lib/server/avatar-rotation.ts`) déplace justement le fichier —, et
+ * l'appelant effaçait l'ancien nom, en vain, en laissant le nouveau sur le
+ * disque sans que plus rien ne le désigne, ni ne l'efface avec le compte.
+ *
+ * @returns `{ previousUrl }` si l'écriture a eu lieu, `null` sinon.
  */
 export async function updateUserAvatar(
   userId: number,
   avatarPath: string | null,
-): Promise<boolean> {
+): Promise<{ previousUrl: string | null } | null> {
   const db = await getDatabase();
-  const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
-    [avatarPath, userId],
-  );
-  if (result.affectedRows === 0) return false;
+  const connection = await db.getConnection();
+  let previousUrl: string | null;
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+      `SELECT avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
+      [userId],
+    );
+    if (rows.length === 0) {
+      await connection.rollback();
+      return null;
+    }
+    previousUrl = rows[0].avatar_url;
+    await connection.execute<ResultSetHeader>(
+      `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
+      [avatarPath, userId],
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => undefined);
+    throw error;
+  } finally {
+    connection.release();
+  }
   // Le logo de l'entrée solo est l'avatar du joueur.
   await syncSoloEntryIdentity(userId);
-  return true;
+  return { previousUrl };
 }
 
 /**
