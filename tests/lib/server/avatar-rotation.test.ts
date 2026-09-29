@@ -57,13 +57,15 @@ function mockDb(row: Row, affectedRows = 1, current: string | null = null) {
 }
 
 describe("rotatedAvatarTarget", () => {
-  it("garde la forme de l'URL et ne change que le nom du fichier", () => {
+  it("écrit la forme servie et ne change que le nom du fichier", () => {
     const target = rotatedAvatarTarget(OLD_URL, 42);
     expect(target).not.toBeNull();
     expect(target!.from).toBe(path.join(AVATARS, "42-aaaa.webp"));
     expect(target!.url).toMatch(/^\/api\/uploads\/avatars\/42-[0-9a-f]{16}\.webp$/);
     expect(target!.to).toBe(path.join(AVATARS, target!.url.split("/").pop()!));
-    expect(rotatedAvatarTarget("/uploads/avatars/42-aaaa.webp", 42)!.url).toMatch(/^\/uploads\/avatars\/42-/);
+    // Une ancienne forme `/uploads/…` est convertie : le vidage complet du cache
+    // de l'optimiseur qu'elle impose ne se paie qu'une fois.
+    expect(rotatedAvatarTarget("/uploads/avatars/42-aaaa.webp", 42)!.url).toMatch(/^\/api\/uploads\/avatars\/42-/);
   });
 
   it("tire un nom neuf à chaque fois", () => {

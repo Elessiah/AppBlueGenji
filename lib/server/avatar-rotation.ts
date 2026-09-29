@@ -4,7 +4,7 @@ import { copyFile, readdir, readFile, rename, rm, unlink } from "node:fs/promise
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
-import { toDiskUploadPath } from "@/lib/shared/uploads";
+import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
 
 /**
  * Change l'adresse du fichier d'un avatar qu'on vient de **masquer**.
@@ -191,9 +191,11 @@ const AVATAR_FILENAME = /^[A-Za-z0-9_-]+\.webp$/;
 const AVATAR_DISK_PREFIX = "/uploads/avatars/";
 
 /**
- * Chemins d'origine et de destination d'un renommage, et l'URL à écrire — même
- * forme que l'ancienne (`/api/uploads/…` ou `/uploads/…`). `null` pour tout ce
- * qui n'est pas un avatar téléversé chez nous.
+ * Chemins d'origine et de destination d'un renommage, et l'URL à écrire —
+ * toujours sous la forme servie (`/api/uploads/…`), celle de toute écriture
+ * actuelle : une ancienne forme `/uploads/…` est ainsi convertie au premier
+ * renommage, et ne coûte qu'une fois le vidage complet du cache de
+ * l'optimiseur. `null` pour tout ce qui n'est pas un avatar téléversé chez nous.
  */
 export function rotatedAvatarTarget(
   avatarUrl: string,
@@ -208,6 +210,6 @@ export function rotatedAvatarTarget(
   return {
     from: path.join(dir, filename),
     to: path.join(dir, nextName),
-    url: avatarUrl.slice(0, avatarUrl.length - filename.length) + nextName,
+    url: toServedUploadUrl(`${AVATAR_DISK_PREFIX}${nextName}`),
   };
 }
