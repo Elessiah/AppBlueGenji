@@ -1,3 +1,43 @@
+/* ---------- En-tête ----------
+   Même gabarit que la fiche d'équipe (`TeamHeader.module.css`) : la ligne
+   titre + « ← Joueurs » ne passait pas à la ligne, si bien que `.ds-header`
+   (`overflow: hidden`) rognait le bouton dès 390 px — et le faisait disparaître
+   sur la fiche d'un compte supprimé, dont l'étiquette élargit le bloc. */
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-width: 0;
+}
+
+.titles {
+  min-width: 0;
+}
+
+/* Un pseudo long se coupe plutôt que d'être rogné à 320 px. */
+.name {
+  overflow-wrap: anywhere;
+}
+
+.back {
+  padding: 9px 18px;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .top {
+    flex-direction: column-reverse;
+  }
+}
+
 /* Aide sous un champ de la fiche : même gabarit que `.hint` de `/profil`
    (12 px, `--text-1`), pour que les deux écrans parlent du même ton. */
 .hint {
