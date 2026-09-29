@@ -324,7 +324,7 @@ export default async function RgpdPage() {
             </li>
             <li>
               <strong>bg_a11y</strong> — déposé uniquement <strong>si vous activez un réglage
-              d&apos;accessibilité</strong> (bouton en bas à gauche : contraste, police, focus…),
+              d&apos;accessibilité</strong> (bouton au bord gauche de l&apos;écran : contraste, police, focus…),
               pour l&apos;appliquer dès l&apos;affichage des pages suivantes. Il ne contient que la
               liste des réglages choisis, jamais d&apos;identifiant de personne, dure un an et
               disparaît quand vous les désactivez tous.

@@ -3,10 +3,10 @@
    réglage « Contraste renforcé », tous au-dessus de 4,5:1. Le fond est posé
    ici, opaque, pour que le contraste ne dépende pas de ce qui se trouve
    derrière (dégradé du `body`, décor d'une page).
-   Le rembourrage du bas dégage la dernière ligne du bouton flottant
-   d'accessibilité (fixe en bas à gauche, 78 px du bord) : en fin de page, rien
-   ne défile plus pour la faire sortir de dessous. Mêmes valeurs que le
-   `scroll-padding-bottom` de `app/globals.css`. */
+   Le rembourrage du bas dégage la dernière ligne des boutons flottants du bas
+   (« ? » et témoin à droite ; sous 720 px, le bouton d'accessibilité, 64 px du
+   bord) : en fin de page, rien ne défile plus pour la faire sortir de dessous.
+   Mêmes valeurs que le `scroll-padding-bottom` de `app/globals.css`. */
 .root {
   position: relative;
   z-index: 1;

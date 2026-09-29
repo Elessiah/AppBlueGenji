@@ -104,7 +104,7 @@ export const KNOWN_ISSUES: readonly KnownIssue[] = [
       "atteignent un rapport de contraste de 2,8:1 à 3,3:1 sur les fonds du site, sous les 4,5:1 attendus. " +
       "C'est un choix d'apparence assumé.",
     workaround:
-      "Le réglage « Contraste renforcé » du menu d'accessibilité (bouton en bas à gauche de chaque page) " +
+      "Le réglage « Contraste renforcé » du menu d'accessibilité (bouton au bord gauche de chaque page) " +
       "porte les textes secondaires au-dessus de 4,5:1 ; vérifié sur les pages principales du site " +
       "(vitrine, connexion, annuaires, fiches, profil, formulaires, fiches de tournoi).",
   },

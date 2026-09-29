@@ -48,7 +48,8 @@ interface AccessibilityMenuProps {
 }
 
 /**
- * Bouton flottant d'accessibilité, en bas à gauche, et son menu.
+ * Bouton flottant d'accessibilité — onglet au bord gauche, à mi-hauteur (disque en bas
+ * à gauche sous 720 px) — et son menu.
  *
  * Le coin gauche est le seul libre : à droite vivent le bouton « ? » des règles
  * (pages de tournoi) et le témoin du régime de charge. Les notifications, qui

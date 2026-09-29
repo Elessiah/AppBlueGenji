@@ -9,8 +9,10 @@
 .inner {
   width: min(1240px, calc(100vw - 32px));
   margin: 0 auto;
-  /* Le bouton flottant d'accessibilité (54 px, à 24 px du bord bas-gauche)
-     recouvrait le premier geste de la barre : on lui laisse sa place. */
+  /* Le bouton flottant d'accessibilité recouvrait le premier geste de la
+     barre : on lui laisse sa place — disque de 48 px à 16 px du bord bas gauche
+     sous 720 px, onglet de 28 px collé au bord gauche à mi-hauteur au-delà (où
+     la barre peut passer en défilant, sa gouttière n'ayant que 16 px). */
   padding-inline-start: 72px;
   display: flex;
   flex-wrap: wrap;

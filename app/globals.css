@@ -1613,6 +1613,18 @@ html {
   }
 }
 
+/* Gouttière gauche réservée à l'onglet d'accessibilité (28 px, collé au bord
+   gauche à mi-hauteur — `components/accessibility/AccessibilityMenu.module.css`).
+   Au-delà de 720 px, la colonne de l'espace connecté laisse au moins 32 px de
+   chaque côté (40 px moins la moitié d'une barre de défilement de 16 px) :
+   l'onglet ne couvre alors aucun contenu, à aucune position de défilement.
+   Posée après le bloc de 920 px, qu'elle doit emporter entre 721 et 920 px. */
+@media (min-width: 721px) {
+  .page-shell {
+    width: min(1200px, calc(100vw - 80px));
+  }
+}
+
 /* Survol des cartes partenaires (page /partenaires) — remplace le hover JS
    qui cassait le rendu (handlers d'événement interdits en Server Component). */
 .sponsor-slot:hover {
@@ -1850,10 +1862,11 @@ input[type="radio"]:disabled:checked {
   }
 }
 
-/* Marge de défilement sous le bouton d'accessibilité (fixe, en bas à gauche) :
-   quand le focus clavier fait défiler la page, l'élément atteint s'arrête
-   au-dessus de lui au lieu de finir caché dessous (WCAG 2.4.11). Pas un
-   réglage : rien ne change à l'œil tant qu'on ne tabule pas. */
+/* Marge de défilement sous les boutons flottants du bas (« ? » et témoin du
+   régime de charge à droite ; sous 720 px, le bouton d'accessibilité à
+   gauche) : quand le focus clavier fait défiler la page, l'élément atteint
+   s'arrête au-dessus d'eux au lieu de finir caché dessous (WCAG 2.4.11). Pas
+   un réglage : rien ne change à l'œil tant qu'on ne tabule pas. */
 html {
   scroll-padding-bottom: 92px;
 }
