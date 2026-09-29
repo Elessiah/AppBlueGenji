@@ -48,12 +48,25 @@ natures :
   | --- | --- |
   | `createBracketIfMissing` | élimination sans `bracket_size`, ou sans aucun match |
   | `resolveExpiredScoreReports` | une manche `AWAITING_CONFIRMATION` dont le délai est passé |
-  | `tryAutoResolveByes` | un bye ou un match fantôme encore ouvert |
+  | `tryAutoResolveByes` | un bye ou un match fantôme **résolvable** (`RESOLVABLE_BYE_SQL` / `RESOLVABLE_GHOST_SQL`, partagés avec la résolution) |
   | `finalizeTournamentIfDone` | élimination dont toutes les rencontres sont jouées |
   | `finalizeUnderfilledTournament` | moins de `MIN_ENTRANTS_FOR_MATCHES` engagés |
 
 Un plateau en cours, sans bye ni report expiré, ne coûte donc plus rien à la
 passe.
+
+**La précondition des byes est celle de la résolution, mot pour mot.** Elle
+disait d'abord « une case est vide sur un match ouvert », ce qui attrape toute
+case qui attend le vainqueur d'un match non joué — l'état normal de tout arbre
+en cours : sur la base seedée, 17 des 22 éliminations en cours étaient
+entretenues à chaque balayage (une transaction `syncTournamentState` complète,
+dont un `SELECT … FOR UPDATE` par match en lancement, en concurrence avec les
+« Prêt » des joueurs) sans qu'aucune n'ait un bye à trancher.
+`tryAutoResolveByes` n'agit que sur une case qu'**aucun match non terminé
+n'alimente plus** ; ses deux prédicats sont donc exportés de `byes.ts` et
+réemployés tels quels dans l'`EXISTS` — deux copies auraient divergé. Mesuré
+sur la base seedée après une passe : 17 tournois retenus pour les byes avant,
+0 après, et la clause passe de ~40 ms à ~14 ms.
 
 **Ce que le filtre n'a pas à couvrir**, et pas par oubli : la *reconstruction*
 d'un plateau dont l'effectif aurait changé. Les inscriptions sont closes avant
