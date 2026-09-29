@@ -15,6 +15,8 @@ interface LogoWithGlowProps {
   size?: "sm" | "md" | "lg";
   borderRadius?: number;
   borderColor?: string;
+  /** Fichier injoignable : l'appelant rend alors son propre repli. */
+  onError?: () => void;
 }
 
 const sizeConfigs = {
@@ -31,6 +33,7 @@ export function LogoWithGlow({
   size = "sm",
   borderRadius = 12,
   borderColor = "rgba(89,212,255,0.3)",
+  onError,
 }: LogoWithGlowProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const target = useRef({ x: 0, y: 0 });
@@ -196,6 +199,7 @@ export function LogoWithGlow({
           alt={alt}
           width={width}
           height={height}
+          onError={onError}
           style={{
             width,
             height,

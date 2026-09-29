@@ -220,8 +220,8 @@
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(13, 16, 22, 0.92);
-  backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
 }
 
 /* `:global` obligatoire : `.btn` vient du style global, et CSS Modules

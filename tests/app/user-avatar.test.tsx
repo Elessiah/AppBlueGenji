@@ -162,4 +162,12 @@ describe("UserAvatar — adresse qui ne répond plus", () => {
     expect(source).toContain("onError={() => setFailedSrc(src)}");
     expect(source).toContain("if (src && src !== failedSrc)");
   });
+
+  it("vaut aussi pour l'avatar à halo (fiche joueur)", () => {
+    const source = readFileSync(join(process.cwd(), "components/user-avatar.tsx"), "utf8");
+    // Les deux rendus d'image — `LogoWithGlow` et `Image` — portent le repli.
+    expect(source.match(/onError=\{\(\) => setFailedSrc\(src\)\}/g)).toHaveLength(2);
+    const glow = readFileSync(join(process.cwd(), "components/logo-with-glow.tsx"), "utf8");
+    expect(glow).toContain("onError={onError}");
+  });
 });
