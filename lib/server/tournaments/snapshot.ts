@@ -212,7 +212,7 @@ function snapshotVersion(payloadJson: string): string {
  * Assemble la trame SSE **sans re-sérialiser l'instantané**.
  *
  * L'empreinte se calcule déjà sur le JSON du contenu ; le repasser dans un
- * `JSON.stringify` d'enveloppe referait le même travail sur les mêmes 150 ko
+ * `JSON.stringify` d'enveloppe referait le même travail sur les mêmes 238 ko
  * (mesure faite sur un tournoi à 128 équipes, 254 matchs) à chaque
  * construction, sur une machine qui n'en a pas les moyens. On referme donc
  * l'objet déjà sérialisé après y avoir glissé sa version.

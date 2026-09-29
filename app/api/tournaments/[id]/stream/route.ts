@@ -136,7 +136,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   }
 
   // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
-  // 154 ko sur un gros plateau), ni ouvrir de salle, ni armer de battement.
+  // 238 ko sur un gros plateau), ni ouvrir de salle, ni armer de battement.
   // C'est sous spam F5 que ce cas se présente — précisément quand ce travail
   // inutile coûte le plus cher.
   if (req.signal.aborted) {

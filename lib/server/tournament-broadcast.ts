@@ -136,9 +136,10 @@ export const MAX_STREAMS_PER_USER = 4;
  * Budget de sortie d'une salle, en octets par seconde.
  *
  * Le regroupement par palier borne la *fréquence* des envois, pas leur poids.
- * Or l'instantané d'un tournoi à 128 équipes en double élimination pèse ~150 ko
- * (254 matchs) — et dans un tournoi de cette taille, les inscrits, tous
- * prioritaires, sont 128. Un score rapporté produirait donc près de 20 Mo à
+ * Or l'instantané d'un tournoi à 128 équipes en double élimination pèse
+ * ~238 ko en clair, ~13 ko compressé (254 matchs) — et dans un tournoi de cette
+ * taille, les inscrits, tous prioritaires, sont 128. En clair, un score
+ * rapporté produirait donc près de 30 Mo à
  * écrire d'un coup : le lien du Raspberry Pi ne suit pas, et la mémoire des
  * tampons de socket monte d'autant.
  *
@@ -164,7 +165,7 @@ export const MAX_BUDGET_DELAY_MS = 60_000;
  * et applique le résultat comme plancher commun.
  *
  * Commun, parce qu'un plancher par palier renversait leur ordre : dans un
- * tournoi à 128 équipes (154 ko d'instantané), les 128 inscrits — tous
+ * tournoi à 128 équipes (238 ko d'instantané), les 128 inscrits — tous
  * prioritaires — héritaient d'une fenêtre de 38 s quand la vingtaine de
  * spectateurs était servie toutes les 20 s. Les équipes qui jouent recevaient
  * leur plateau deux fois moins souvent que ceux qui les regardent.
