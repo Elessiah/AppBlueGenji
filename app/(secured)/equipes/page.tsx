@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import type { TeamListItem } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
 import { Ticker } from "@/components/cyber/Ticker";
 import { BgCanvas } from "../_shared/BgCanvas";
 import { AnnuaireSearchField } from "../_shared/AnnuaireSearchField";
+import { DirectoryShowMore } from "../_shared/DirectoryShowMore";
+import { useProgressiveList } from "@/lib/shared/hooks/useProgressiveList";
 import { TeamCard } from "./cards/TeamCard";
 import { HighlightStrip } from "./cards/HighlightStrip";
 import { GhostTeamDialog } from "./GhostTeamDialog";
@@ -60,8 +62,10 @@ export default function TeamsPage() {
     loadTeams();
   }, [loadTeams]);
 
+  // Recherche différée : le champ suit la frappe, la grille suit sans la bloquer.
+  const deferredQuery = useDeferredValue(query);
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = deferredQuery.trim().toLowerCase();
     let r = teams.filter((t) => {
       // Le sigle est un nom court : on cherche une équipe par « BG » comme par
       // son nom complet.
@@ -77,7 +81,13 @@ export default function TeamsPage() {
     if (sort === "wins") r.sort((a, b) => b.wins - a.wins);
     if (sort === "members") r.sort((a, b) => b.membersCount - a.membersCount);
     return r;
-  }, [teams, query, gameFilter, sort]);
+  }, [teams, deferredQuery, gameFilter, sort]);
+
+  // Rendu borné à une page de cartes ; tout filtre modifié repart de la première.
+  const page = useProgressiveList(
+    filtered,
+    JSON.stringify([deferredQuery.trim().toLowerCase(), gameFilter, sort]),
+  );
 
   const totalMembers = teams.reduce((sum, t) => sum + t.membersCount, 0);
   const countOw = teams.filter((t) => t.games.includes("OW")).length;
@@ -216,10 +226,11 @@ export default function TeamsPage() {
 
           <div style={{ paddingTop: 24 }}>
             <div className={s.tmGrid}>
-              {filtered.map((t) => (
+              {page.visible.map((t) => (
                 <TeamCard key={t.id} team={t} />
               ))}
             </div>
+            <DirectoryShowMore hidden={page.hidden} noun="équipes" onShowMore={page.showMore} />
           </div>
         </div>
       </section>

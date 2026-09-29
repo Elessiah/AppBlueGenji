@@ -476,25 +476,29 @@ export type PlayerRecord = RecordSummary;
 
 type UserMembershipRow = MembershipRow & { user_id: number };
 
-/** Périodes d'appartenance de plusieurs joueurs, en une lecture. */
+/**
+ * Périodes d'appartenance de plusieurs joueurs, en une lecture.
+ *
+ * `null` = tous les joueurs du site (annuaire) : aucune liste `IN`, qui ne
+ * filtrerait rien et porterait un paramètre par compte, deux fois.
+ */
 async function loadMembershipsForUsers(
   db: Awaited<ReturnType<typeof getDatabase>>,
-  userIds: number[],
+  userIds: number[] | null,
 ): Promise<Map<number, Membership[]>> {
-  const list = placeholders(userIds.length);
+  const list = userIds === null ? "" : placeholders(userIds.length);
   const [rows] = await db.execute<UserMembershipRow[]>(
     // Le filtre vit **dans chaque branche** de l'union : posé au-dessus, il
     // ferait scanner toutes les adhésions du site plutôt que d'attaquer
-    // l'index `user_id`. Comme dans `users-service`, les identifiants passent
-    // donc deux fois.
+    // l'index `user_id`. Les identifiants passent donc deux fois.
     `SELECT user_id, team_id, joined_at, left_at
-     FROM bg_team_members
-     WHERE user_id IN (${list})
+     FROM bg_team_members${userIds === null ? "" : `
+     WHERE user_id IN (${list})`}
      UNION ALL
      SELECT solo_user_id AS user_id, id AS team_id, created_at AS joined_at, NULL AS left_at
      FROM bg_teams
-     WHERE solo_user_id IN (${list})`,
-    [...userIds, ...userIds],
+     WHERE solo_user_id ${userIds === null ? "IS NOT NULL" : `IN (${list})`}`,
+    userIds === null ? [] : [...userIds, ...userIds],
   );
 
   const byUser = new Map<number, Membership[]>();
@@ -527,9 +531,21 @@ async function loadMembershipsForUsers(
  * mémoire, sur des listes déjà chargées.
  */
 export async function loadPlayerRecords(userIds: number[]): Promise<Map<number, PlayerRecord>> {
-  const records = new Map<number, PlayerRecord>();
-  if (userIds.length === 0) return records;
+  if (userIds.length === 0) return new Map();
+  return loadRecords(userIds);
+}
 
+/**
+ * Bilans de **tous** les joueurs du site, pour l'annuaire `/joueurs` : mêmes
+ * trois requêtes que `loadPlayerRecords`, sans liste d'identifiants — l'annuaire
+ * lit tous les comptes, un `IN` de tous leurs identifiants ne filtrait rien.
+ */
+export async function loadAllPlayerRecords(): Promise<Map<number, PlayerRecord>> {
+  return loadRecords(null);
+}
+
+async function loadRecords(userIds: number[] | null): Promise<Map<number, PlayerRecord>> {
+  const records = new Map<number, PlayerRecord>();
   const db = await getDatabase();
   const membershipsByUser = await loadMembershipsForUsers(db, userIds);
   const teamIds = [
