@@ -9,6 +9,7 @@ import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { accessibilityFooterLabel } from "@/lib/shared/accessibility-statement";
+import { can } from "@/lib/shared/permissions";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
@@ -18,7 +19,8 @@ export async function PublicFooter() {
     getContactInfo(),
     getCurrentUser().catch(() => null),
   ]);
-  const isAdmin = Boolean(user?.isAdmin);
+  // Même garde que `PUT /api/association/contact` (§1.4) : la permission, pas `isAdmin`.
+  const canEditContact = can(user, "showcase");
 
   return (
     // `a11y-always-contrast` : le pied de page se lit toujours en contraste
@@ -68,7 +70,7 @@ export async function PublicFooter() {
           </div>
           <div>
             <div className={styles.heading}>CONTACT</div>
-            <FooterContact initialContact={contact} isAdmin={isAdmin} />
+            <FooterContact initialContact={contact} isAdmin={canEditContact} />
           </div>
           <div>
             <div className={styles.heading}>LÉGAL</div>
