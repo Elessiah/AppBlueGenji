@@ -67,11 +67,11 @@ export function ConnectedAppsSection({
   /**
    * Appelée dès qu'un rattachement ou un retrait a abouti.
    *
-   * Rattacher Discord **certifie** le tag, le retirer **décertifie** : la
-   * pastille du formulaire d'à côté doit tomber ou apparaître dans le même
-   * geste, sinon l'écran annonce une exposition qui n'existe pas (ou tait celle
-   * qui vient de commencer). Le profil relit son état Discord, comme il le fait
-   * déjà après chaque sauvegarde.
+   * Rattacher Discord **réécrit** le tag (et le décertifie s'il a changé), le
+   * retirer **décertifie** : la pastille et le bouton « Certifier mon tag » du
+   * formulaire d'à côté doivent suivre dans le même geste, sinon l'écran
+   * annonce une exposition qui n'existe plus. Le profil relit son état
+   * Discord, comme il le fait déjà après chaque sauvegarde.
    */
   onChanged,
 }: {

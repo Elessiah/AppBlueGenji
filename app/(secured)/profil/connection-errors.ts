@@ -20,7 +20,8 @@ const CONNECTION_ERRORS: Record<string, string> = {
   // Le compte porte déjà une autre identité de ce fournisseur. On ne déplace
   // pas une porte d'entrée. Le cas le plus courant n'est **pas** un joueur qui
   // veut changer de compte, mais un joueur qui reconfirme le sien (c'est ainsi
-  // qu'un compte relié à Discord certifie son tag) en étant connecté, chez le
+  // qu'un compte relié à Discord fait nommer son pseudo par Discord, avant de
+  // le certifier d'un clic) en étant connecté, chez le
   // fournisseur, sous un autre compte : la phrase donne d'abord ce geste-là, et
   // ne propose le retrait qu'ensuite — le conseiller d'emblée pousserait à
   // détacher la bonne identité.
@@ -59,7 +60,8 @@ export function connectionErrorMessage(code: string | null | undefined): string 
  *
  * Deux cas, parce que le même retour couvre deux gestes : **ajouter** une
  * application, et **reconfirmer** celle qui l'était déjà — c'est le chemin par
- * lequel un compte relié à Discord certifie son tag. Annoncer « rattaché » à qui
+ * lequel un compte relié à Discord fait nommer son pseudo, qu'il certifie
+ * ensuite d'un clic (la reconfirmation, elle, ne certifie rien). Annoncer « rattaché » à qui
  * l'était déjà décrirait un changement qui n'a pas eu lieu, et tairait celui qui
  * a eu lieu : le pseudo a été relu auprès du fournisseur.
  */
@@ -68,7 +70,7 @@ export function connectionSuccessMessage(provider: OAuthProvider | null, refresh
   const label = OAUTH_PROVIDER_LABELS[provider];
   if (!refreshed) return `${label} est maintenant rattaché à ton compte.`;
   return provider === "DISCORD"
-    ? "Discord reconfirmé : ton pseudo a été relu auprès de Discord."
+    ? "Discord reconfirmé : ton pseudo a été relu auprès de Discord. S'il a changé, il n'est plus certifié : certifie-le de nouveau pour rester joignable."
     : `${label} reconfirmé : les informations de ton compte ont été relues.`;
 }
 
