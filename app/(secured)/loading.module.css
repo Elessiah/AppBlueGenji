@@ -1,0 +1,53 @@
+.shell {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px 0;
+}
+
+.bar,
+.card {
+  background: var(--cyber-bg-2);
+  border-radius: var(--r-cy-sm);
+  animation: pulse 1.4s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+.title {
+  width: min(320px, 70%);
+  height: 28px;
+}
+
+.line {
+  width: min(520px, 90%);
+  height: 14px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.card {
+  height: 140px;
+  border-radius: var(--r-cy-md);
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar,
+  .card {
+    animation: none;
+  }
+}
