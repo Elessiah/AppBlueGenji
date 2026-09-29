@@ -85,6 +85,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: IssueReportD
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="issue-report-title"
         tabIndex={-1}
         style={{

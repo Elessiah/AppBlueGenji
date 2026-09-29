@@ -102,12 +102,12 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="tournament-image-title"
         tabIndex={-1}
         style={{
           width: "100%",
           maxWidth: 760,
-          maxHeight: "calc(100vh - 32px)",
           display: "flex",
           flexDirection: "column",
           background: "var(--cyber-bg-2, #14181f)",

@@ -427,6 +427,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                   onClick={() => void setReady(false)}
                   disabled={busy}
                   aria-pressed="true"
+                  data-autofocus
                   title="Cliquer pour annuler ton « Prêt »"
                 >
                   {busy ? "…" : "✓ Prêt — annuler"}
@@ -438,6 +439,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                   onClick={() => setConfirming(true)}
                   disabled={busy}
                   aria-pressed="false"
+                  data-autofocus
                 >
                   {partyWord}
                 </button>
@@ -461,10 +463,14 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                   Autre match ({pending.filter((info) => info.matchId !== current.matchId).length})
                 </button>
               )}
+              {/* Focus d'ouverture : « Prêt » quand le lecteur peut le donner
+                  (marqué plus haut, premier dans l'ordre), sinon ce lien —
+                  jamais le premier « Copier » des fiches contacts. */}
               <Link
                 className="btn ghost"
                 href={tournamentMatchHref(current.tournamentId, current.matchId)}
                 onClick={close}
+                data-autofocus
               >
                 Voir le match
               </Link>

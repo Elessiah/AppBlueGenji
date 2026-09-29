@@ -119,6 +119,7 @@ export function EndurancePenaltyDialog({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="endurance-penalty-title"
         tabIndex={-1}
         style={{
