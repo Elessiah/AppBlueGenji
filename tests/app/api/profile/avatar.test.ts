@@ -7,8 +7,8 @@ jest.mock("@/lib/server/users-service");
 import { DELETE, POST } from "@/app/api/profile/avatar/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
-import { getUserById, updateUserAvatar } from "@/lib/server/users-service";
-import { authUser, publicUserProfile } from "../../../helpers/auth-user";
+import { updateUserAvatar } from "@/lib/server/users-service";
+import { authUser } from "../../../helpers/auth-user";
 
 const user = authUser({ id: 42 });
 
@@ -27,7 +27,7 @@ describe("POST /api/profile/avatar", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     // L'écriture réussit, sauf mention contraire : un compte vivant.
-    jest.mocked(updateUserAvatar).mockResolvedValue(true);
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -47,7 +47,7 @@ describe("POST /api/profile/avatar", () => {
 
   it("stores the avatar under its served url (not the raw disk path)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/42-abc.webp");
 
     const res = await POST(fileReq(pngFile()));
@@ -62,7 +62,7 @@ describe("POST /api/profile/avatar", () => {
 
   it("transmet la zone choisie dans la modale de recadrage", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/42-abc.webp");
     const crop = { x: 0.1, y: 0.2, width: 0.5, height: 0.5 };
 
@@ -81,9 +81,7 @@ describe("POST /api/profile/avatar", () => {
 
   it("deletes the previous avatar file (served url → disk path)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest
-      .mocked(getUserById)
-      .mockResolvedValue(publicUserProfile({ avatarUrl: "/api/uploads/avatars/old.webp" }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "/api/uploads/avatars/old.webp" });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/new.webp");
 
     await POST(fileReq(pngFile()));
@@ -92,9 +90,7 @@ describe("POST /api/profile/avatar", () => {
 
   it("does not delete external avatar urls (google/discord)", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest
-      .mocked(getUserById)
-      .mockResolvedValue(publicUserProfile({ avatarUrl: "https://cdn.discord.com/x.png" }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "https://cdn.discord.com/x.png" });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/new.webp");
 
     await POST(fileReq(pngFile()));
@@ -103,7 +99,7 @@ describe("POST /api/profile/avatar", () => {
 
   it("surfaces processing errors as 400", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
     jest.mocked(processAndStoreImage).mockRejectedValue(new Error("IMAGE_TOO_LARGE"));
 
     const res = await POST(fileReq(pngFile()));
@@ -116,7 +112,7 @@ describe("POST /api/profile/avatar", () => {
     // (chemin, bibliothèque) qui partait tel quel dans le corps du 400.
     jest.spyOn(console, "error").mockImplementation(() => undefined);
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
     jest.mocked(processAndStoreImage).mockRejectedValue(
       new Error("EACCES: permission denied, open '/srv/app/public/uploads/avatars/x.webp'"),
     );
@@ -134,7 +130,7 @@ describe("DELETE /api/profile/avatar", () => {
     // Le compte est vivant, sauf mention contraire — et le dire ici plutôt que
     // de l'hériter du bloc précédent : `clearAllMocks` ne retire pas les
     // implémentations, si bien que ce bloc vivait sur le réglage du voisin.
-    jest.mocked(updateUserAvatar).mockResolvedValue(true);
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -147,9 +143,7 @@ describe("DELETE /api/profile/avatar", () => {
 
   it("clears the avatar and removes the stored file", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest
-      .mocked(getUserById)
-      .mockResolvedValue(publicUserProfile({ avatarUrl: "/api/uploads/avatars/old.webp" }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "/api/uploads/avatars/old.webp" });
 
     const res = await DELETE();
     expect(res.status).toBe(200);
@@ -166,13 +160,11 @@ describe("DELETE /api/profile/avatar", () => {
    */
   it("n'efface le fichier qu'une fois la ligne mise à jour", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({
-      avatarUrl: "/api/uploads/avatars/old.webp",
-    }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "/api/uploads/avatars/old.webp" });
     const order: string[] = [];
     jest.mocked(updateUserAvatar).mockImplementation(async () => {
       order.push("db");
-      return true;
+      return { previousUrl: "/api/uploads/avatars/old.webp" };
     });
     jest.mocked(deleteStoredImage).mockImplementation(async () => {
       order.push("file");
@@ -185,10 +177,8 @@ describe("DELETE /api/profile/avatar", () => {
 
   it("refuse en 409 quand la ligne n'accepte plus rien, et garde le fichier", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({
-      avatarUrl: "/api/uploads/avatars/old.webp",
-    }));
-    jest.mocked(updateUserAvatar).mockResolvedValue(false);
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "/api/uploads/avatars/old.webp" });
+    jest.mocked(updateUserAvatar).mockResolvedValue(null);
 
     const res = await DELETE();
 
@@ -215,9 +205,9 @@ describe("POST /api/profile/avatar — course avec la suppression du compte", ()
    */
   it("reprend le fichier qu'il vient d'écrire quand la ligne n'accepte plus rien", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/42-new.webp");
-    jest.mocked(updateUserAvatar).mockResolvedValue(false);
+    jest.mocked(updateUserAvatar).mockResolvedValue(null);
 
     const res = await POST(fileReq(pngFile()));
 
@@ -228,11 +218,9 @@ describe("POST /api/profile/avatar — course avec la suppression du compte", ()
 
   it("ne touche pas à l'ancienne photo d'un compte qu'il n'a pas modifié", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({
-      avatarUrl: "/api/uploads/avatars/old.webp",
-    }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "/api/uploads/avatars/old.webp" });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/42-new.webp");
-    jest.mocked(updateUserAvatar).mockResolvedValue(false);
+    jest.mocked(updateUserAvatar).mockResolvedValue(null);
 
     await POST(fileReq(pngFile()));
 
@@ -256,7 +244,7 @@ describe("avatar — l'échec du ménage ne dément pas la base", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.mocked(getCurrentUser).mockResolvedValue(user);
-    jest.mocked(updateUserAvatar).mockResolvedValue(true);
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
   });
   afterEach(() => {
     jest.restoreAllMocks();
@@ -269,9 +257,7 @@ describe("avatar — l'échec du ménage ne dément pas la base", () => {
   }
 
   it("DELETE rend 200 quand l'ancien fichier ne peut pas être retiré", async () => {
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({
-      avatarUrl: "/api/uploads/avatars/42-old.webp",
-    }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "/api/uploads/avatars/42-old.webp" });
     jest.mocked(deleteStoredImage).mockRejectedValue(unlinkRefused());
 
     const res = await DELETE();
@@ -283,9 +269,7 @@ describe("avatar — l'échec du ménage ne dément pas la base", () => {
   });
 
   it("POST rend 200 quand l'ancien fichier ne peut pas être retiré", async () => {
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({
-      avatarUrl: "/api/uploads/avatars/42-old.webp",
-    }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: "/api/uploads/avatars/42-old.webp" });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/42-new.webp");
     jest.mocked(deleteStoredImage).mockRejectedValue(unlinkRefused());
 
@@ -299,9 +283,9 @@ describe("avatar — l'échec du ménage ne dément pas la base", () => {
     // Deux faits se disputent la réponse : le compte supprimé et l'`unlink`
     // refusé. Seul le premier intéresse l'écran, qui n'a de phrase française
     // que pour lui — le second sortait en 400 par le `catch` de la route.
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
     jest.mocked(processAndStoreImage).mockResolvedValue("/uploads/avatars/42-new.webp");
-    jest.mocked(updateUserAvatar).mockResolvedValue(false);
+    jest.mocked(updateUserAvatar).mockResolvedValue(null);
     jest.mocked(deleteStoredImage).mockRejectedValue(unlinkRefused());
 
     const res = await POST(fileReq(pngFile()));
@@ -313,7 +297,7 @@ describe("avatar — l'échec du ménage ne dément pas la base", () => {
   it("laisse tout de même passer un échec d'écriture du fichier téléversé", async () => {
     // La garde ne couvre que le **ménage**. Un téléversement qui ne s'écrit pas
     // n'a rien produit : le refus est le fait à rendre.
-    jest.mocked(getUserById).mockResolvedValue(publicUserProfile({ avatarUrl: null }));
+    jest.mocked(updateUserAvatar).mockResolvedValue({ previousUrl: null });
     jest.mocked(processAndStoreImage).mockRejectedValue(new Error("IMAGE_TOO_LARGE"));
 
     const res = await POST(fileReq(pngFile()));

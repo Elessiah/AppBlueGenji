@@ -1988,22 +1988,50 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
  * toute neuve sur une ligne fraîchement anonymisée — publiquement servie par
  * `/api/uploads/avatars/…`, c'est-à-dire précisément ce que la suppression
  * venait d'effacer. Sur un compte effacé, la ligne a disparu et l'écriture ne
- * touche rien, mais le fichier, lui, est déjà sur le disque : d'où un booléen
+ * touche rien, mais le fichier, lui, est déjà sur le disque : d'où `null`
  * rendu, que l'appelant traduit en ménage.
+ *
+ * L'adresse **remplacée** est rendue, relue sous verrou dans la même
+ * transaction que l'écriture : c'est le fichier à effacer. Relue avant, hors
+ * verrou, elle pouvait avoir changé entre-temps — le renommage d'un avatar
+ * masqué (`lib/server/avatar-rotation.ts`) déplace justement le fichier —, et
+ * l'appelant effaçait l'ancien nom, en vain, en laissant le nouveau sur le
+ * disque sans que plus rien ne le désigne, ni ne l'efface avec le compte.
+ *
+ * @returns `{ previousUrl }` si l'écriture a eu lieu, `null` sinon.
  */
 export async function updateUserAvatar(
   userId: number,
   avatarPath: string | null,
-): Promise<boolean> {
+): Promise<{ previousUrl: string | null } | null> {
   const db = await getDatabase();
-  const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
-    [avatarPath, userId],
-  );
-  if (result.affectedRows === 0) return false;
+  const connection = await db.getConnection();
+  let previousUrl: string | null;
+  try {
+    await connection.beginTransaction();
+    const [rows] = await connection.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+      `SELECT avatar_url FROM bg_users WHERE id = ? AND is_deleted = 0 FOR UPDATE`,
+      [userId],
+    );
+    if (rows.length === 0) {
+      await connection.rollback();
+      return null;
+    }
+    previousUrl = rows[0].avatar_url;
+    await connection.execute<ResultSetHeader>(
+      `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
+      [avatarPath, userId],
+    );
+    await connection.commit();
+  } catch (error) {
+    await connection.rollback().catch(() => undefined);
+    throw error;
+  } finally {
+    connection.release();
+  }
   // Le logo de l'entrée solo est l'avatar du joueur.
   await syncSoloEntryIdentity(userId);
-  return true;
+  return { previousUrl };
 }
 
 /**

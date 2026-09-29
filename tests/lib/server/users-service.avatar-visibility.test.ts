@@ -4,11 +4,11 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/avatar-rotation");
 
-import { updateOwnProfile } from "@/lib/server/users-service";
+import { updateOwnProfile, updateUserAvatar } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
-import { fakePool } from "../../helpers/sql-double";
+import { connectionMock, fakeConnection, fakePool } from "../../helpers/sql-double";
 
 /**
  * Masquer son avatar doit l'**effacer** de l'entrée solo, pas seulement cesser
@@ -113,5 +113,43 @@ describe("updateOwnProfile — renommage du fichier d'un avatar masqué", () => 
     expect(spy).toHaveBeenCalled();
     expect(syncMock).toHaveBeenCalledWith(42);
     spy.mockRestore();
+  });
+});
+
+describe("updateUserAvatar — l'adresse remplacée est lue sous le verrou de l'écriture", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    syncMock.mockResolvedValue(undefined);
+  });
+
+  function mockConnection(rows: unknown[]) {
+    const connection = connectionMock();
+    connection.execute.mockResolvedValueOnce([rows]).mockResolvedValue([{ affectedRows: 1 }]);
+    connection.beginTransaction.mockResolvedValue(undefined);
+    connection.commit.mockResolvedValue(undefined);
+    connection.rollback.mockResolvedValue(undefined);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ getConnection: async () => fakeConnection(connection) }));
+    return connection;
+  }
+
+  it("rend l'adresse relue sous verrou, celle qu'il faut effacer", async () => {
+    // Relue avant et hors verrou, elle pouvait avoir été renommée par le
+    // masquage : l'appelant effaçait l'ancien nom et laissait le nouveau.
+    const connection = mockConnection([{ avatar_url: "/api/uploads/avatars/42-renomme.webp" }]);
+    expect(await updateUserAvatar(42, "/api/uploads/avatars/42-neuf.webp")).toEqual({
+      previousUrl: "/api/uploads/avatars/42-renomme.webp",
+    });
+    expect(connection.execute.mock.calls[0][0]).toMatch(/FOR UPDATE/);
+    expect(connection.commit).toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalled();
+    expect(syncMock).toHaveBeenCalledWith(42);
+  });
+
+  it("rend null pour un compte supprimé, sans rien écrire", async () => {
+    const connection = mockConnection([]);
+    expect(await updateUserAvatar(42, null)).toBeNull();
+    expect(connection.execute).toHaveBeenCalledTimes(1);
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(syncMock).not.toHaveBeenCalled();
   });
 });
