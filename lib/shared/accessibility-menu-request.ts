@@ -1,7 +1,7 @@
 /**
  * Ouverture du menu d'accessibilité depuis ailleurs que son bouton flottant.
  *
- * Le bouton, en bas à gauche, se manque : un visiteur qui cherche « accessibilité »
+ * Le bouton, un onglet au bord gauche de l'écran, se manque : un visiteur qui cherche « accessibilité »
  * regarde d'abord le pied de page, comme sur la plupart des sites. Le lien qu'on y
  * pose n'ouvre pas une seconde copie du menu — deux copies auraient deux états —,
  * il **demande** au menu unique, monté par la mise en page racine, de s'ouvrir.

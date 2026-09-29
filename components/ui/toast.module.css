@@ -1,18 +1,21 @@
-/* Pile des notifications, en bas à gauche — **au-dessus** du bouton
-   d'accessibilité (`components/accessibility/AccessibilityMenu.module.css`),
-   qui occupe le coin : 24 px de marge + 54 px de bouton + 14 px d'écart.
+/* Pile des notifications, en bas à gauche. Sur ordinateur, le bouton
+   d'accessibilité (`components/accessibility/AccessibilityMenu.module.css`)
+   est un onglet de 28 px collé au bord gauche à mi-hauteur : la pile tient le
+   coin, à 40 px du bord pour ne jamais le recouvrir si elle monte jusqu'à
+   lui. Sous 720 px, où le bouton reprend le coin, elle passe au-dessus de lui
+   (voir plus bas).
    Sa largeur s'arrête à la moitié de l'écran : la pastille de réouverture du
    lancement de match (`MatchLaunchCenter`, en bas à droite, 84 px du bas)
    occupe la même hauteur de l'autre côté, et la pile passerait dessus. */
 .stack {
   position: fixed;
-  bottom: 92px;
-  left: 24px;
+  bottom: 24px;
+  left: 40px;
   z-index: 9999;
   display: flex;
   flex-direction: column;
   gap: 10px;
-  max-width: min(420px, calc(50vw - 40px));
+  max-width: min(420px, calc(50vw - 56px));
   pointer-events: none;
 }
 

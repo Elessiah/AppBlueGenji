@@ -148,7 +148,7 @@ export default function AccessibilityStatementPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            Le bouton en bas à gauche de chaque page ouvre le <strong>menu d&apos;accessibilité</strong>.
+            Le bouton au bord gauche de chaque page (en bas à gauche sur téléphone) ouvre le <strong>menu d&apos;accessibilité</strong>.
             Ses réglages sont désactivés par défaut et gardés dans votre navigateur :
           </p>
           <ul>

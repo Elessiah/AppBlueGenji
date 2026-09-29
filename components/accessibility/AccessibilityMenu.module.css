@@ -1,13 +1,21 @@
-/* Bouton d'accessibilité, en bas à gauche : le seul coin libre. À droite
-   vivent le bouton « ? » des règles (`.cta-float-help`, 78 px du bas) et le
-   témoin du régime de charge (24 px du bas) ; les notifications, qui tenaient
-   ce coin, montent au-dessus du bouton (`components/ui/toast.module.css`).
+/* Bouton d'accessibilité : un **onglet collé au bord gauche, à mi-hauteur**.
+   Il tenait le coin bas gauche, où il couvrait « Inscrire mon équipe » sur la
+   fiche d'un tournoi (1280 × 720) à certaines positions de défilement : un
+   coin est justement l'endroit où le contenu d'une colonne finit par passer
+   en défilant, et aucune position fixe *par-dessus* la colonne ne peut
+   l'éviter. Le bord gauche, lui, est hors de la colonne : l'onglet (28 px)
+   tient dans la gouttière que `.page-shell` réserve au-delà de 720 px
+   (`app/globals.css`, 32 px au moins), donc ne couvre rien, quelle que soit
+   la position de défilement. Mi-hauteur plutôt que haut : le haut est à
+   l'en-tête collant, le bas aux notifications. Les coins droits restent au
+   « ? » des règles et au témoin du régime de charge. Sous 720 px, où la
+   gouttière n'a plus que 12 px, il redevient un disque en bas à gauche.
    Au-dessus des boutons flottants dans l'empilement (100, 110) : ouvert, le
    panneau doit passer devant tout ce qui flotte. */
 .root {
   position: fixed;
-  left: 24px;
-  bottom: 24px;
+  left: 0;
+  top: calc(50% - 32px);
   z-index: 120;
 }
 
@@ -19,11 +27,11 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: 28px;
+  height: 64px;
   padding: 0;
   border: 0;
-  border-radius: 999px;
+  border-radius: 0 12px 12px 0;
   background: var(--blue-500, #5ac8ff);
   color: #04121c;
   cursor: pointer;
@@ -39,7 +47,7 @@
 }
 
 .fab:hover {
-  transform: translateY(-2px);
+  transform: translateX(2px);
   background: var(--blue-300, #8fd5ff);
   box-shadow:
     0 0 0 3px rgba(5, 6, 10, 0.85),
@@ -59,8 +67,8 @@
 /* Le logo est lui-même un cercle : il remplit presque le disque, et son
    anneau extérieur fait bordure. */
 .icon {
-  width: 46px;
-  height: 46px;
+  width: 24px;
+  height: 24px;
   background-color: currentColor;
   -webkit-mask: url("/accessibility-icon.webp") center / contain no-repeat;
   mask: url("/accessibility-icon.webp") center / contain no-repeat;
@@ -87,14 +95,19 @@
   line-height: 1;
 }
 
+/* Le panneau s'ouvre à droite de l'onglet, centré sur la hauteur de l'écran
+   (`translate` et non `transform`, que l'animation d'ouverture réécrit). Fixe
+   et non absolu : ancré sur l'onglet, un panneau plus haut que lui déborderait
+   de l'écran. */
 .panel {
-  position: absolute;
-  left: 0;
-  bottom: calc(100% + 14px);
+  position: fixed;
+  left: 40px;
+  top: 50%;
+  translate: 0 -50%;
   display: flex;
   flex-direction: column;
-  width: min(360px, calc(100vw - 48px));
-  max-height: min(660px, calc(100dvh - 120px));
+  width: min(360px, calc(100vw - 56px));
+  max-height: min(660px, calc(100dvh - 32px));
   padding: 14px 14px 12px;
   border: 1px solid rgba(90, 200, 255, 0.3);
   border-radius: 14px;
@@ -104,7 +117,7 @@
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
   color: var(--text-1, #c4ccd8);
   font-family: var(--font-sans), sans-serif;
-  transform-origin: bottom left;
+  transform-origin: left center;
   animation: a11yPanelIn 0.16s ease-out;
 }
 
@@ -334,17 +347,26 @@
   }
 }
 
-/* Sous 720 px, les autres éléments flottants se resserrent aussi (le « ? »
-   à 18 px du bord, le témoin au centre) : même marge ici. */
+/* Sous 720 px, la gouttière n'a plus que 12 px : l'onglet couvrirait le début
+   des lignes à mi-hauteur. Il redevient un disque dans le coin bas gauche, à
+   16 px du bord comme les autres éléments flottants (le « ? » à 18 px, le
+   témoin au centre), et les notifications montent au-dessus de lui
+   (`components/ui/toast.module.css`). Le panneau s'ouvre alors vers le haut. */
 @media (max-width: 720px) {
   .root {
     left: 16px;
+    top: auto;
     bottom: 16px;
   }
 
   .fab {
     width: 48px;
     height: 48px;
+    border-radius: 999px;
+  }
+
+  .fab:hover {
+    transform: translateY(-2px);
   }
 
   .icon {
@@ -353,8 +375,14 @@
   }
 
   .panel {
+    position: absolute;
+    left: 0;
+    top: auto;
+    bottom: calc(100% + 14px);
+    translate: none;
     width: calc(100vw - 32px);
     max-height: calc(100dvh - 96px);
+    transform-origin: bottom left;
   }
 
   /* Pendant un défilement, le bouton s'efface et laisse passer le toucher :
@@ -367,7 +395,7 @@
   }
 }
 
-/* Une modale ouverte : le bouton, en bas à gauche, couvrait la case « J'ai lu
+/* Une modale ouverte : le bouton, alors en bas à gauche, couvrait la case « J'ai lu
    et j'accepte » de la modale de consentement de `/connexion` — et passait
    sous d'autres voiles (1000, 1250). Le masquer retirerait le menu à qui en a
    besoin pour lire une modale qu'on ne peut pas écarter (changements de
@@ -386,6 +414,7 @@
 :global(html:has([aria-modal="true"]:not([hidden]))) .fab {
   width: 36px;
   height: 36px;
+  border-radius: 999px;
 }
 
 :global(html:has([aria-modal="true"]:not([hidden]))) .icon {
@@ -394,8 +423,12 @@
 }
 
 :global(html:has([aria-modal="true"]:not([hidden]))) .panel {
+  position: absolute;
+  left: 0;
   top: calc(100% + 10px);
   bottom: auto;
+  translate: none;
+  max-height: min(660px, calc(100dvh - 70px));
   transform-origin: top left;
 }
 
