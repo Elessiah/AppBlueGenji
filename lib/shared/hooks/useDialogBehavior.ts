@@ -74,7 +74,9 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     // `focus()` échouerait en silence et laisserait le focus derrière le voile.
     const focusablesIn = (root: Element | null) =>
       Array.from(root?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
-        (el) => el.offsetParent !== null || el === document.activeElement,
+        (el) =>
+          (el.offsetParent !== null && getComputedStyle(el).visibility !== "hidden") ||
+          el === document.activeElement,
       );
     const focusables = () => focusablesIn(containerRef.current);
     const candidates = focusables();
@@ -90,23 +92,18 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       // Les écouteurs de toutes les couches vivent sur `window` : seule celle du
       // dessus doit réagir, sinon un `Échap` les fermerait toutes d'un coup.
       if (!dialogStack.isTop(token)) return;
-      // Une couche marquée `data-dialog-exempt` (le menu d'accessibilité, offert
-      // au-dessus des modales) garde son clavier **tant que son panneau est
-      // ouvert** (`aria-expanded="true"`) : Échap y ferme le panneau et non la
-      // modale — qui perdrait sa saisie —, et Tab y circule, jusqu'à ce qu'il en
-      // sorte : il revient alors dans la modale, jamais sur la page derrière le
-      // voile. Panneau fermé, la couche est traitée comme le reste de la page.
-      const layer = (event.target as HTMLElement | null)?.closest?.("[data-dialog-exempt]") ?? null;
-      if (layer?.querySelector('[aria-expanded="true"]')) {
-        if (event.key === "Escape") return;
-        if (event.key === "Tab") {
-          const own = focusablesIn(layer);
-          const edge = event.shiftKey ? own[0] : own[own.length - 1];
-          if (event.target !== edge) return;
-        }
-      }
+      // Couches marquées `data-dialog-exempt` : le menu d'accessibilité, offert
+      // au-dessus des modales (une modale qu'on ne peut pas écarter doit rester
+      // lisible, contraste ou texte agrandi compris). Elles entrent dans le
+      // cycle de tabulation, après la modale.
+      const layers = Array.from(document.querySelectorAll("[data-dialog-exempt]"));
 
       if (event.key === "Escape") {
+        // Panneau d'une couche ouvert : Échap le referme lui (son écouteur est
+        // sur `document`), pas la modale — qui perdrait sa saisie. La question
+        // porte sur le panneau et non sur la cible : Safari ne focalise pas un
+        // bouton cliqué, le focus peut être resté dans la modale.
+        if (layers.some((layer) => layer.querySelector('[aria-expanded="true"]'))) return;
         if (lockedRef.current) return;
         // Un champ `combobox` dont la liste est ouverte répond d'abord à Échap
         // (il la referme) : l'écouteur est posé en capture sur `window`, il
@@ -127,31 +124,38 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       }
       if (event.key !== "Tab") return;
 
-      // Piège à focus : la tabulation boucle entre le premier et le dernier
-      // élément focalisable de la modale.
+      // Piège à focus : la tabulation parcourt la modale, puis les couches
+      // exemptées, et reboucle. À l'intérieur de chaque bloc, l'ordre natif
+      // est gardé (groupes de boutons radio compris) : seuls les bords sont
+      // tenus.
       const items = focusables();
       if (items.length === 0) {
         event.preventDefault();
         containerRef.current?.focus();
         return;
       }
+      const extra = layers.flatMap((layer) => focusablesIn(layer));
       const start = items[0];
       const end = items[items.length - 1];
       const active = document.activeElement;
-      const inside = containerRef.current?.contains(active as Node) ?? false;
+      const inModal = containerRef.current?.contains(active as Node) ?? false;
+      const inLayer = !inModal && extra.length > 0 && layers.some((layer) => layer.contains(active as Node));
 
-      if (!inside) {
+      const go = (el: HTMLElement) => {
         event.preventDefault();
-        (event.shiftKey ? end : start).focus();
+        el.focus();
+      };
+      if (inLayer) {
+        if (!event.shiftKey && active === extra[extra.length - 1]) go(start);
+        else if (event.shiftKey && active === extra[0]) go(end);
         return;
       }
-      if (event.shiftKey && active === start) {
-        event.preventDefault();
-        end.focus();
-      } else if (!event.shiftKey && active === end) {
-        event.preventDefault();
-        start.focus();
+      if (!inModal) {
+        go(event.shiftKey ? end : start);
+        return;
       }
+      if (event.shiftKey && active === start) go(extra[extra.length - 1] ?? end);
+      else if (!event.shiftKey && active === end) go(extra[0] ?? start);
     };
 
     window.addEventListener("keydown", onKeyDown, true);

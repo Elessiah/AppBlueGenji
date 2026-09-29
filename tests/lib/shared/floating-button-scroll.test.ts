@@ -133,23 +133,31 @@ describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", ()
     expect(menu).toContain("a11y-always-contrast`} data-dialog-exempt>");
   });
 
-  it("le piège de tabulation et Échap de la modale l'ignorent", () => {
-    const hook = readSource("lib/shared/hooks/useDialogBehavior.ts");
-    const exempt = hook.indexOf('closest?.("[data-dialog-exempt]")');
-    expect(exempt).toBeGreaterThan(-1);
-    // Posé avant Échap et Tab : les deux touches sont concernées.
-    expect(exempt).toBeLessThan(hook.indexOf('if (lockedRef.current) return;'));
-    expect(exempt).toBeLessThan(hook.indexOf('event.key !== "Tab"'));
+  const hook = readSource("lib/shared/hooks/useDialogBehavior.ts");
+  const escape = hook.slice(hook.indexOf('if (event.key === "Escape") {'), hook.indexOf('if (event.key !== "Tab") return;'));
+  const tab = hook.slice(hook.indexOf('if (event.key !== "Tab") return;'), hook.indexOf('window.addEventListener("keydown"'));
+
+  it("Échap referme le panneau ouvert, pas la modale — quelle que soit la cible", () => {
+    // Safari ne focalise pas un bouton cliqué : la question porte sur le panneau.
+    expect(escape).toMatch(
+      /if \(layers\.some\(\(layer\) => layer\.querySelector\('\[aria-expanded="true"\]'\)\)\) return;/,
+    );
+    expect(escape).not.toContain("event.target as HTMLElement | null)?.closest");
+    expect(escape.indexOf("layers.some(")).toBeLessThan(escape.indexOf("closeRef.current()"));
   });
 
-  it("ne l'exempte que panneau ouvert, et rend le focus à la modale quand Tab en sort", () => {
-    const hook = readSource("lib/shared/hooks/useDialogBehavior.ts");
-    const block = hook.slice(hook.indexOf('closest?.("[data-dialog-exempt]")'), hook.indexOf("if (lockedRef.current) return;"));
-    expect(block).toContain(`if (layer?.querySelector('[aria-expanded="true"]')) {`);
-    expect(block).toMatch(/if \(event\.key === "Escape"\) return;/);
-    // Au bord de la couche, la touche retombe dans le piège : `inside` est faux,
-    // le focus repart en tête (ou en queue) de la modale.
-    expect(block).toMatch(/const edge = event\.shiftKey \? own\[0\] : own\[own\.length - 1\];\s*if \(event\.target !== edge\) return;/);
+  it("le bouton entre dans le cycle de tabulation, après la modale", () => {
+    expect(hook).toContain('document.querySelectorAll("[data-dialog-exempt]")');
+    expect(tab).toContain("const extra = layers.flatMap((layer) => focusablesIn(layer));");
+    // Bords de la modale → la couche ; bords de la couche → la modale.
+    expect(tab).toMatch(/if \(event\.shiftKey && active === start\) go\(extra\[extra\.length - 1\] \?\? end\);/);
+    expect(tab).toMatch(/else if \(!event\.shiftKey && active === end\) go\(extra\[0\] \?\? start\);/);
+    expect(tab).toMatch(/if \(!event\.shiftKey && active === extra\[extra\.length - 1\]\) go\(start\);/);
+    expect(tab).toMatch(/else if \(event\.shiftKey && active === extra\[0\]\) go\(end\);/);
+  });
+
+  it("n'offre jamais au clavier un élément masqué", () => {
+    expect(hook).toContain('getComputedStyle(el).visibility !== "hidden"');
   });
 });
 
