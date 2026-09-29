@@ -41,69 +41,64 @@ export default function CreateTournamentPage() {
   }, [router, showError]);
 
   return (
-    <>
-      <Link href="/" className="cta-float-home home">
-        ⌂ Accueil
-      </Link>
-      <section className="fade-in container">
-        <div style={{ marginBottom: 28 }}>
-          <Link
-            href="/tournois"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 6,
-              fontSize: 13,
-              color: "var(--ink-mute)",
-            }}
-          >
-            ← Tournois
-          </Link>
-          <h1
-            className="display"
-            style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px", lineHeight: 1.1 }}
-          >
-            Créer un tournoi
-          </h1>
-          <p style={{ color: "var(--ink-mute)", margin: 0, fontSize: 14 }}>
-            Définis les phases temporelles, le jeu et le format de bracket.
-          </p>
-        </div>
-
-        <TournamentForm
-          mode="create"
-          initialValues={defaultTournamentFormValues()}
-          editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
-          submitLabel="Créer le tournoi"
-          onSubmit={async (values, image) => {
-            const response = await fetch("/api/tournaments", {
-              method: "POST",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(toApiPayload(values)),
-            });
-            const payload = (await response.json()) as { error?: string; id?: number };
-            if (!response.ok || !payload.id) {
-              // Le code voyage avec sa phrase : la notification lit la phrase,
-              // le formulaire tire du code le champ à signaler.
-              const code = payload.error || "TOURNAMENT_CREATE_FAILED";
-              throw new CodedError(code, mapError(code));
-            }
-            // L'image ne peut partir qu'une fois le tournoi né : elle se range sous
-            // son identifiant. Son échec ne défait pas la création — le tournoi
-            // existe, on le dit, et l'image s'ajoute ensuite depuis sa fiche.
-            try {
-              await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop);
-              showSuccess("Tournoi créé.");
-            } catch (error) {
-              showError(
-                `Tournoi créé, mais son image n'a pas été enregistrée : ${(error as Error).message} Ajoute-la depuis la fiche du tournoi.`,
-              );
-            }
-            router.push(`/tournois/${payload.id}`);
-            router.refresh();
+    <section className="fade-in container">
+      <div style={{ marginBottom: 28 }}>
+        <Link
+          href="/tournois"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
+            fontSize: 13,
+            color: "var(--ink-mute)",
           }}
-        />
-      </section>
-    </>
+        >
+          ← Tournois
+        </Link>
+        <h1
+          className="display"
+          style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px", lineHeight: 1.1 }}
+        >
+          Créer un tournoi
+        </h1>
+        <p style={{ color: "var(--ink-mute)", margin: 0, fontSize: 14 }}>
+          Définis les phases temporelles, le jeu et le format de bracket.
+        </p>
+      </div>
+
+      <TournamentForm
+        mode="create"
+        initialValues={defaultTournamentFormValues()}
+        editableFields={new Set(ALL_TOURNAMENT_FIELDS)}
+        submitLabel="Créer le tournoi"
+        onSubmit={async (values, image) => {
+          const response = await fetch("/api/tournaments", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(toApiPayload(values)),
+          });
+          const payload = (await response.json()) as { error?: string; id?: number };
+          if (!response.ok || !payload.id) {
+            // Le code voyage avec sa phrase : la notification lit la phrase,
+            // le formulaire tire du code le champ à signaler.
+            const code = payload.error || "TOURNAMENT_CREATE_FAILED";
+            throw new CodedError(code, mapError(code));
+          }
+          // L'image ne peut partir qu'une fois le tournoi né : elle se range sous
+          // son identifiant. Son échec ne défait pas la création — le tournoi
+          // existe, on le dit, et l'image s'ajoute ensuite depuis sa fiche.
+          try {
+            await applyImageChange(payload.id, imagePickerChange(null, image), image.file, image.crop);
+            showSuccess("Tournoi créé.");
+          } catch (error) {
+            showError(
+              `Tournoi créé, mais son image n'a pas été enregistrée : ${(error as Error).message} Ajoute-la depuis la fiche du tournoi.`,
+            );
+          }
+          router.push(`/tournois/${payload.id}`);
+          router.refresh();
+        }}
+      />
+    </section>
   );
 }

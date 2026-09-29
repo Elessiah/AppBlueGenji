@@ -357,9 +357,9 @@ export default function PlayerDetailPage() {
           {data.teamsTimeline.map((entry) => (
             <div className="table-row" key={`${entry.teamId}-${entry.joinedAt}`}>
               <TeamLink teamId={entry.teamId}>{entry.teamName}</TeamLink>
-              <span>{entry.roles.join(", ")}</span>
-              <span>{formatLocalDate(entry.joinedAt)}</span>
-              <span>{entry.leftAt ? formatLocalDate(entry.leftAt) : "Actif"}</span>
+              <span data-label="Rôles">{entry.roles.join(", ")}</span>
+              <span data-label="Début">{formatLocalDate(entry.joinedAt)}</span>
+              <span data-label="Fin">{entry.leftAt ? formatLocalDate(entry.leftAt) : "Actif"}</span>
             </div>
           ))}
         </div>
@@ -374,16 +374,16 @@ export default function PlayerDetailPage() {
             <span>Tournoi</span>
             <span>Statut</span>
             <span>Bilan</span>
-            <span>Rank</span>
+            <span>Classement</span>
           </div>
           {data.tournaments.map((entry) => (
             <div className="table-row" key={`${entry.tournamentId}-${entry.playedAt}`}>
               <Link href={`/tournois/${entry.tournamentId}`}>{entry.tournamentName}</Link>
-              <span>{entry.state}</span>
-              <span>
+              <span data-label="Statut">{entry.state}</span>
+              <span data-label="Bilan">
                 {entry.wins}W / {entry.losses}L
               </span>
-              <span>{entry.finalRank ?? "-"}</span>
+              <span data-label="Classement">{entry.finalRank ?? "-"}</span>
             </div>
           ))}
         </div>

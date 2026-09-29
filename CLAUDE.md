@@ -346,7 +346,8 @@ Règle universelle : via `useToast()` (`@/components/ui/toast`), bottom-left ove
 
 ### Classes CSS Supprimées (Phase 7)
 - `.ds-hero`, `.ds-chip` (toutes variantes)
-- `.cta-float` (conservé `.cta-float-home`)
+- `.cta-float`, puis `.cta-float-home` (dernier flottant « ⌂ Accueil », retiré de `/tournois/creer` : il masquait le bord des champs et invitait à partir sans enregistrer)
+- **Tableaux `.table-row` sous 920 px** : repli en pile, en-tête masqué, chaque valeur qui ne se lit pas seule porte son intitulé par `data-label` (rendu en `::before`) — un nouveau tableau libelle ses cellules de valeur
 - `.shimmer`, `.glow-pulse-*`, `.float-subtle`, `.tournament-card`
 - Réduction : 1549 → 1283 lignes dans `app/globals.css` (-266 lignes)
 

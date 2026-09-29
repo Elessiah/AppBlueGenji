@@ -26,8 +26,8 @@ export function PhaseStandingsTable({ standings }: PhaseStandingsTableProps) {
             name={standing.teamName}
             textStyle={{ overflowWrap: "anywhere" }}
           />
-          <span>{standing.rank ?? "-"}</span>
-          <span>
+          <span data-label="Rang">{standing.rank ?? "-"}</span>
+          <span data-label="Qualifiée">
             {standing.qualified ? (
               <Pill variant="blue" style={{ fontSize: 12 }}>
                 ✓

@@ -141,7 +141,9 @@ export default function CreateTeamPage() {
         Le rôle Owner est automatiquement attribué au créateur.
       </p>
 
-      <CyberCard ticks>
+      {/* Même marge interne que le formulaire de tournoi : sans elle, les
+          champs touchaient le bord de la carte et le premier libellé son trait. */}
+      <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
         <form onSubmit={onSubmit} style={{ display: "flex", flexDirection: "column", gap: 20 }}>
           <div className="form-grid">
             <div className="field">
