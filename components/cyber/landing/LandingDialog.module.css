@@ -17,18 +17,24 @@
   overflow-y: auto;
 }
 
-/* Bouton « × » : flottant à droite, collé en haut du panneau pendant qu'il
-   défile. Les marges négatives le logent dans le rembourrage du panneau. */
+/* Bouton « × » : à droite, collé en haut du panneau pendant qu'il défile. Les
+   panneaux des sections sont des colonnes flex, où un `float` ne fait rien :
+   `align-self` le pousse à droite, sur sa propre ligne (le titre, en dessous,
+   ne passe jamais sous lui), et la marge basse négative rend l'écart que le
+   `gap` de la colonne ajouterait. Le `float` sert un panneau qui ne serait pas
+   en flex. Les marges négatives le logent dans le rembourrage du panneau. */
 .close {
   position: sticky;
   top: 0;
   z-index: 1;
   float: right;
+  align-self: flex-end;
+  flex-shrink: 0;
   display: grid;
   place-items: center;
   width: 32px;
   height: 32px;
-  margin: -12px -12px 4px 8px;
+  margin: -12px -12px -14px 8px;
   padding: 0;
   border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
   border-radius: 999px;

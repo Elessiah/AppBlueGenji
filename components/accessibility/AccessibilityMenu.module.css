@@ -15,7 +15,10 @@
    des voiles de page (80, 90), couvrait la case « J'ai lu et j'accepte » de la
    modale de consentement de `/connexion`. Il se retire donc tant qu'une
    modale est ouverte — la règle est posée sur la présence d'une modale, pas
-   sur une liste de `z-index` à tenir à jour. */
+   sur une liste de `z-index` à tenir à jour. Contrepartie assumée : le menu
+   n'est pas offert pendant une modale. Il ne l'était déjà pas au clavier (le
+   piège de tabulation de `useDialogBehavior` le laisse hors d'atteinte), et
+   les réglages déjà cochés restent appliqués — ils sont posés sur `<html>`. */
 :global(html:has([aria-modal="true"]:not([hidden]))) .root {
   visibility: hidden;
 }

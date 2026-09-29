@@ -177,6 +177,8 @@ describe("LandingDialog — fermeture d'en-tête et listes déroulantes", () => 
   it("le place avant le contenu, pour qu'il reste collé en haut du panneau", () => {
     expect(dialog.indexOf("data-dialog-close")).toBeLessThan(dialog.indexOf("{children}"));
     expect(css).toMatch(/\.close\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;/);
+    // Les panneaux sont des colonnes flex : un `float` seul y serait ignoré.
+    expect(css).toMatch(/\.close\s*\{[^}]*align-self:\s*flex-end;/);
   });
 
   it("habille les listes déroulantes, et rend la flèche native en contrastes forcés", () => {
