@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
-import { findTournamentsNeedingSync } from "@/lib/server/tournaments/sync-scope";
+import {
+  BOTH_REPORTED_SQL,
+  SINGLE_REPORT_SQL,
+  findTournamentsNeedingSync,
+} from "@/lib/server/tournaments/sync-scope";
+import { STALLED_ALERT_KEY } from "@/lib/server/tournaments/bot-logs";
+import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { RESOLVABLE_BYE_SQL, RESOLVABLE_GHOST_SQL } from "@/lib/server/tournaments/byes";
 
 /**
@@ -152,6 +158,30 @@ describe("findTournamentsNeedingSync — entretien dû", () => {
     const sql = await maintenanceSql();
     expect(sql).toContain("m.status = 'AWAITING_CONFIRMATION'");
     expect(sql).toContain("m.score_deadline_at <= NOW()");
+  });
+
+  // Un conflit expiré n'est pas tranché par l'entretien, seulement escaladé —
+  // une fois. Le retenir à chaque balayage entretenait son tournoi pour rien
+  // jusqu'à l'arbitrage (3 tournois sur une base seedée).
+  it("ne retient d'un report expiré que ce que la résolution peut faire avancer", async () => {
+    const sql = (await maintenanceSql()).replace(/\s+/g, " ");
+    expect(sql).toContain(`AND (${SINGLE_REPORT_SQL} OR (${BOTH_REPORTED_SQL}`);
+    expect(sql).toContain(
+      `m.score_deadline_at <= NOW() - INTERVAL ${SCORE_REPORT_TIMEOUT_MINUTES} MINUTE`,
+    );
+    expect(sql).toContain(
+      `NOT EXISTS (SELECT 1 FROM bg_referee_alerts a WHERE a.match_id = m.id AND a.alert_key = '${STALLED_ALERT_KEY}')`,
+    );
+    expect(sql).toContain("m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL AND (");
+  });
+
+  it("distingue un report unique d'un double report", () => {
+    expect(SINGLE_REPORT_SQL).toContain(" <> ");
+    expect(BOTH_REPORTED_SQL).toMatch(/\) AND \(/);
+    for (const predicate of [SINGLE_REPORT_SQL, BOTH_REPORTED_SQL]) {
+      expect(predicate).toContain("m.team1_report_opponent_score IS NOT NULL");
+      expect(predicate).toContain("m.team2_report_opponent_score IS NOT NULL");
+    }
   });
 
   // La question est celle même de `tryAutoResolveByes`, pas « une case est
