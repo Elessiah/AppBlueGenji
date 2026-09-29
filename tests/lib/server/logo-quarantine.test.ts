@@ -718,6 +718,15 @@ describe("purgeQuarantinedLogo / purgeDueQuarantines", () => {
     await flush();
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
+
+  it("ne compte pas la contestation de l'auteur du signalement : elle ne défend pas l'image", async () => {
+    install([[/FROM bg_logo_quarantines q\s+LEFT JOIN bg_reports r/, () => [[]]]]);
+    await purgeDueQuarantines(new Date("2026-07-01T00:00:00Z"));
+    const [sql] = pool.execute.mock.calls[0];
+    expect(sql).toMatch(/c\.reporter_user_id <> r\.reporter_user_id/);
+    // Auteur inconnu d'un côté ou de l'autre : dans le doute, la contestation compte.
+    expect(sql).toMatch(/r\.reporter_user_id IS NULL OR c\.reporter_user_id IS NULL/);
+  });
 });
 
 describe("quarantinedLogoFile", () => {

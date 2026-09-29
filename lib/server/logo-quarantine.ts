@@ -919,12 +919,22 @@ type DueRow = RowDataPacket & {
  * Supprime d'office les logos dont la quarantaine est échue et qui n'attendent
  * aucune décision (`canAutoPurgeLogo`). Entraîné par le trafic, avec la purge
  * des signalements.
+ *
+ * Seule la contestation d'une **personne visée** retient l'image : celle de
+ * l'auteur du signalement (`canContestReport`) conteste la décision dans
+ * l'autre sens — il voudrait l'image partie, pas gardée —, et la compter
+ * prolongerait au-delà de l'échéance annoncée la garde d'une image que
+ * personne n'a défendue. Un compte effacé (auteur `NULL`) compte comme visé :
+ * dans le doute, on garde.
  */
 export async function purgeDueQuarantines(now: Date = new Date()): Promise<number> {
   const db = await getDatabase();
   const [rows] = await db.execute<DueRow[]>(
     `SELECT q.id, q.purge_after, q.report_id, r.status AS report_status,
-            EXISTS (SELECT 1 FROM bg_reports c WHERE c.parent_report_id = q.report_id) AS contested
+            EXISTS (SELECT 1 FROM bg_reports c
+                    WHERE c.parent_report_id = q.report_id
+                      AND (r.reporter_user_id IS NULL OR c.reporter_user_id IS NULL
+                           OR c.reporter_user_id <> r.reporter_user_id)) AS contested
      FROM bg_logo_quarantines q
      LEFT JOIN bg_reports r ON r.id = q.report_id
      WHERE q.status = 'HIDDEN' AND q.purge_after <= ?`,

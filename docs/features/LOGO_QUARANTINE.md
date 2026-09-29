@@ -59,7 +59,9 @@ rendue : le délai peut s'allonger, jamais raccourcir. Un logo d'équipe ou un
 avatar n'oblige à rien de plus tôt, et plus longtemps n'aurait plus d'objet. **Une
 image contestée n'est jamais supprimée d'office** (`canAutoPurgeLogo`) :
 l'échéance passée, elle attend que l'association archive le signalement ou la
-rétablisse.
+rétablisse. Seule la contestation d'une **personne visée** compte : celle de
+l'auteur du signalement (qui voudrait l'image partie, pas gardée) ne retient
+rien, sans quoi elle prolongerait la garde au-delà de l'échéance annoncée.
 
 ## Exposé des motifs
 
