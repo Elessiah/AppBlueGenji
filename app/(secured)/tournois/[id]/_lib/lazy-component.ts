@@ -8,14 +8,21 @@ import type { ComponentType } from "react";
  * un `ChunkLoadError` au rendu et, faute de frontière d'erreur, remplacerait
  * toute la page par l'écran d'erreur de Next.
  *
- * Un échec recharge donc la page (le code neuf est la seule réparation), **une
- * fois par minute au plus** — un réseau réellement coupé ne doit pas la faire
- * boucler — et jamais sous une modale ouverte. Sinon, le composant est remplacé par un rendu vide : le dialogue
- * ne s'ouvre pas, mais la page reste.
+ * Un échec recharge donc la page, le code neuf étant la seule réparation
+ * (`next/dynamic` garde le résultat du chargeur en mémoire : un composant de
+ * repli y resterait jusqu'au prochain rechargement complet). Deux bornes :
+ * - **jamais sous une modale ouverte** — plusieurs de ces chargements partent
+ *   sans geste du lecteur (une vue ou un classement de phase qui paraît avec un
+ *   instantané du flux), et recharger ferait perdre une saisie en cours pour un
+ *   bloc que personne n'a demandé : le rechargement **attend** qu'elle se ferme ;
+ * - **une fois par minute au plus** — si le fichier manque encore juste après
+ *   un rechargement, le déploiement lui-même est en cause, et boucler n'y
+ *   changerait rien : le composant reste vide, la page reste debout.
  */
 
 export const LAZY_RELOAD_KEY = "bg_lazy_chunk_reload_at";
 export const LAZY_RELOAD_COOLDOWN_MS = 60_000;
+const MODAL_POLL_MS = 1_000;
 
 export interface LazyReloadEnv {
   now: () => number;
@@ -24,10 +31,13 @@ export interface LazyReloadEnv {
   reload: () => void;
   /** Une modale est ouverte : une saisie peut y être en cours. */
   modalOpen: () => boolean;
+  /** Rappelle `callback` une fois toutes les modales fermées. */
+  whenNoModal: (callback: () => void) => void;
 }
 
 function browserEnv(): LazyReloadEnv | null {
   if (typeof window === "undefined") return null;
+  const modalOpen = () => document.querySelector('[aria-modal="true"]') !== null;
   return {
     now: () => Date.now(),
     readStamp: () => {
@@ -41,24 +51,22 @@ function browserEnv(): LazyReloadEnv | null {
       try {
         window.sessionStorage.setItem(LAZY_RELOAD_KEY, value);
       } catch {
-        // Stockage indisponible : on recharge quand même, une fois.
+        // Stockage indisponible : on recharge quand même.
       }
     },
     reload: () => window.location.reload(),
-    modalOpen: () => document.querySelector('[aria-modal="true"]') !== null,
+    modalOpen,
+    whenNoModal: (callback) => {
+      const timer = window.setInterval(() => {
+        if (modalOpen()) return;
+        window.clearInterval(timer);
+        callback();
+      }, MODAL_POLL_MS);
+    },
   };
 }
 
-/**
- * Recharge la page si aucun rechargement de ce type n'a eu lieu depuis une
- * minute et qu'aucune modale n'est ouverte. Plusieurs de ces chargements
- * partent sans geste du lecteur (une vue ou un classement de phase qui paraît
- * avec un instantané du flux) : recharger alors ferait perdre un score en cours
- * de saisie pour un bloc que personne n'a demandé.
- */
-export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): boolean {
-  if (!env) return false;
-  if (env.modalOpen()) return false;
+function reloadNow(env: LazyReloadEnv): boolean {
   const last = Number(env.readStamp());
   const now = env.now();
   if (Number.isFinite(last) && last > 0 && now - last < LAZY_RELOAD_COOLDOWN_MS) return false;
@@ -67,7 +75,21 @@ export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()):
   return true;
 }
 
-/** Enveloppe le chargement d'un composant : un échec recharge la page ou rend un composant vide. */
+/**
+ * Recharge la page après un chargement raté — tout de suite si aucune modale
+ * n'est ouverte, sinon à sa fermeture. Rend `false` quand rien n'est (encore)
+ * rechargé.
+ */
+export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): boolean {
+  if (!env) return false;
+  if (env.modalOpen()) {
+    env.whenNoModal(() => reloadNow(env));
+    return false;
+  }
+  return reloadNow(env);
+}
+
+/** Enveloppe le chargement d'un composant : un échec recharge la page et rend un composant vide d'ici là. */
 export function orReload<P>(
   load: Promise<ComponentType<P>>,
   env?: LazyReloadEnv | null,

@@ -64,10 +64,13 @@ describe("paquet de la fiche tournoi", () => {
 
 describe("filet d'un chargement à la demande (orReload)", () => {
   const makeEnv = (stamp: string | null, now = 1_000_000, modal = false) => {
-    const state = { stamp, reloads: 0 };
+    const state = { stamp, reloads: 0, modal, pending: [] as Array<() => void> };
     const env: LazyReloadEnv = {
       now: () => now,
-      modalOpen: () => modal,
+      modalOpen: () => state.modal,
+      whenNoModal: (callback) => {
+        state.pending.push(callback);
+      },
       readStamp: () => state.stamp,
       writeStamp: (value) => {
         state.stamp = value;
@@ -94,12 +97,16 @@ describe("filet d'un chargement à la demande (orReload)", () => {
     expect((Loaded as () => null)()).toBeNull();
   });
 
-  it("ne recharge jamais sous une modale ouverte (saisie en cours)", async () => {
+  it("attend la fermeture d'une modale ouverte pour recharger (saisie en cours)", async () => {
     const { env, state } = makeEnv(null, 1_000_000, true);
     const Loaded = await orReload(Promise.reject(new Error("ChunkLoadError")), env);
     expect(state.reloads).toBe(0);
     expect(state.stamp).toBeNull();
     expect((Loaded as () => null)()).toBeNull();
+    expect(state.pending).toHaveLength(1);
+    state.modal = false;
+    state.pending[0]();
+    expect(state.reloads).toBe(1);
   });
 
   it("ne recharge pas deux fois dans la minute", () => {
