@@ -271,12 +271,14 @@ describe("createReport", () => {
     expect(release?.[1]).toEqual([12, "USER", 8]);
   });
 
-  it("rend la marque de la seule cible à qui rien n'est parvenu", async () => {
-    // Le joueur reçoit son message, l'équipe non (bot tombé entre les deux).
-    jest
-      .mocked(pushDiscordDirectMessages)
-      .mockResolvedValueOnce({ sent: 1, unresolved: [], failed: [] })
-      .mockResolvedValueOnce(null);
+  it.each([
+    ["bot tombé entre les deux", null],
+    ["envoi qui lève", new Error("boom")],
+  ])("rend la marque de la seule cible à qui rien n'est parvenu (%s)", async (_label, teamOutcome) => {
+    // Le joueur reçoit son message, l'équipe non.
+    const mocked = jest.mocked(pushDiscordDirectMessages).mockResolvedValueOnce({ sent: 1, unresolved: [], failed: [] });
+    if (teamOutcome instanceof Error) mocked.mockRejectedValueOnce(teamOutcome);
+    else mocked.mockResolvedValueOnce(teamOutcome);
     install(
       [
         cooldownRoute(),

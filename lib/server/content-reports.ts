@@ -515,18 +515,27 @@ export async function notifyReportTargets(
     if (!plan) return;
 
     const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-    const undelivered: NoticeTarget[] = [];
     // Un envoi par cible : la marque se rend **cible par cible**. Jugée sur le
     // total, une équipe joignable seulement sur Discord restait marquée quand le
     // bot était injoignable, dès qu'un joueur désigné à côté recevait un push.
-    for (const group of plan) {
-      const report = await notifyUsers(group.recipients, {
-        topic: "CONTENT_REPORT",
-        discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
-        push: contentReportPush({ reportId, category }),
-      });
-      if ((report.discord?.sent ?? 0) + report.pushed === 0) undelivered.push(group.target);
-    }
+    // En parallèle, pour que le verrou ne soit tenu que le temps d'un envoi ; et
+    // un envoi qui échoue compte pour « rien remis », sans quoi sa marque
+    // survivrait à l'exception.
+    const outcomes = await Promise.allSettled(
+      plan.map((group) =>
+        notifyUsers(group.recipients, {
+          topic: "CONTENT_REPORT",
+          discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
+          push: contentReportPush({ reportId, category }),
+        }),
+      ),
+    );
+    const undelivered = plan
+      .filter((_, index) => {
+        const outcome = outcomes[index];
+        return outcome.status === "rejected" || (outcome.value.discord?.sent ?? 0) + outcome.value.pushed === 0;
+      })
+      .map((group) => group.target);
     if (undelivered.length > 0) {
       await connection.execute(
         `UPDATE bg_report_targets SET notified_at = NULL
