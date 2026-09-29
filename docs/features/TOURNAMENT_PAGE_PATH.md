@@ -73,3 +73,28 @@ ouverte. Rien ne ferme la modale pendant que le geste est en vol.
 La modale se referme d'elle-même quand le suivi est arrêté (page) ou quand le
 bouton qui l'a ouverte disparaît (lancement forcé, match lancé entre-temps par
 un autre arbitre).
+
+## 5. Un paquet par besoin, pas un paquet pour tous
+
+La fiche chargeait 215 Ko de JavaScript au premier affichage (61 Ko propres à
+la route) : les quatre vues de format et les treize dialogues d'arbitrage
+partaient chez chaque spectateur, qui ne voit qu'un format et n'ouvre presque
+jamais un dialogue. Ils passent désormais par `next/dynamic` (`ssr: false`) :
+
+- **vues de format et panneaux du staff** (`SurvivalView`, `SwissView`,
+  `EnduranceView`, `BracketPreview`, `PhaseStandingsBlock`,
+  `EntrantContactsPanel`) — chargées au premier rendu qui les affiche ;
+- **dialogues** — tous rendus sous condition d'ouverture, donc chargés au geste
+  qui les ouvre.
+
+Mesure `next build` : 61 → 38,2 Ko propres, **215 → 186 Ko** au premier
+chargement. `BracketSections` reste dans le paquet : il sert l'élimination (le
+cas le plus courant) et l'arbre de la BG Survie. Aucun rendu serveur n'est
+perdu : la page n'affiche rien de ces blocs avant le premier instantané du flux.
+Chaque chargement passe par `orReload` (`_lib/lazy-component.ts`) : la fiche
+reste ouverte tout un tournoi, et un déploiement survenu depuis supprime les
+anciens fichiers — sans filet, le 404 lèverait un `ChunkLoadError` au rendu et
+Next remplacerait toute la page par son écran d'erreur. L'échec recharge donc la
+page — une fois sûr (aucune modale ouverte, site qui répond de nouveau, lecteur resté sur la fiche), une fois par minute au plus —, le composant restant vide d'ici là ; une erreur qui n'est pas un fichier manquant remonte telle quelle.
+Un composant ajouté à la fiche et réservé à un public ou à un format suit la
+même règle ; `tests/tournois/page-bundle-split.test.ts` tient la liste.
