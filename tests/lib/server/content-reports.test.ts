@@ -606,6 +606,17 @@ describe("createReport — contestation", () => {
     );
   });
 
+  it("exige un canal pour la décision motivée : adresse ou tag Discord certifié", async () => {
+    install(
+      [[/SELECT 1 FROM bg_users\s+WHERE id = \? AND is_deleted = 0 AND discord_verified_at IS NOT NULL/, () => [[]]]],
+      [],
+    );
+    await expect(
+      createReport({ ...contest, contactEmail: null }, { userId: 5, managesTournaments: false }),
+    ).rejects.toThrow("REPORT_REPLY_CHANNEL_REQUIRED");
+    expect(connection.execute).not.toHaveBeenCalled();
+  });
+
   it("n'accepte que la contestation d'une personne visée — même refus pour un signalement inexistant", async () => {
     install([], parentRoutes("OPEN", [{ report_id: 12, target_type: "TEAM", target_id: 99, label_snapshot: "Autre" }]));
     await expect(createReport(contest, { userId: 5, managesTournaments: false })).rejects.toThrow("REPORT_NOT_CONCERNED");

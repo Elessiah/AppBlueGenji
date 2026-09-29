@@ -713,6 +713,10 @@ async function recentlyNotifiedTargets(
  */
 async function createContest(submission: ReportSubmission, viewer: ReportViewer): Promise<number> {
   if (viewer.userId === null) throw new Error("REPORT_CONTEST_LOGIN_REQUIRED");
+  // Une décision motivée est due à qui conteste (DSA, art. 20.5).
+  if (missingReplyChannel(submission, false) && !(await isReplyReachable(viewer.userId))) {
+    throw new Error("REPORT_REPLY_CHANNEL_REQUIRED");
+  }
   const parentId = submission.parentReportId;
   if (parentId === null) throw new Error("REPORT_NOT_CONCERNED");
   const userId = viewer.userId;

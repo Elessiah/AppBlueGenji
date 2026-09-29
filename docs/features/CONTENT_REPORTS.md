@@ -47,7 +47,7 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
 | `RGPD` — RGPD | aucune | adresse, sauf tag Discord certifié | obligation légale (RGPD, art. 6.1.c et 12) |
 | `HOSTING` — Hébergeur | aucune | adresse, sauf tag Discord certifié | obligation légale (DSA, art. 11 et 16) |
 | `OTHER` — Autre | joueurs, équipes, tournois | case d'accord | consentement |
-| `CONTEST` — Contestation | aucune (rattachée à `parentReportId`) | être visé ; connecté | obligation légale (DSA, art. 20) |
+| `CONTEST` — Contestation | aucune (rattachée à `parentReportId`) | être visé ; connecté ; adresse, sauf tag Discord certifié | obligation légale (DSA, art. 20) |
 
 **`RGPD` et `HOSTING` trient les demandes à l'éditeur et à l'hébergeur.** Le
 courriel de l'association est publié (mentions légales, `/rgpd`), mais **jamais en
@@ -88,7 +88,7 @@ catégories n'affichent que l'information, `consent_at` reste `NULL` ; la case
 reste pour bug et autre. Pour ces catégories, `reportRightsNotice` ne promet
 pas l'effacement avant la fin du traitement (RGPD, art. 17.3.b).
 
-**Une réponse due a toujours un canal.** `RGPD` et `HOSTING`
+**Une réponse due a toujours un canal.** `RGPD`, `HOSTING` et `CONTEST`
 (`requiresReplyChannel`) exigent une adresse électronique sauf d'un compte dont le
 tag Discord est certifié (le seul que l'administration lise sur la fiche du
 signalant ; un identifiant rattaché seul ne se voit nulle part) — le site n'envoie aucun

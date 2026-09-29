@@ -427,9 +427,9 @@ describe("registre des catégories", () => {
     ).toEqual({ ok: false, error: "REPORT_TARGET_NOT_ALLOWED" });
   });
 
-  it("exige un moyen de réponse pour RGPD et Hébergeur seulement", () => {
+  it("exige un moyen de réponse pour RGPD, Hébergeur et Contestation seulement", () => {
     const flagged = REPORT_CATEGORIES.filter((category) => REPORT_CATEGORY_DEFINITIONS[category].requiresReplyChannel);
-    expect(flagged).toEqual(["RGPD", "HOSTING"]);
+    expect(flagged).toEqual(["RGPD", "HOSTING", "CONTEST"]);
     expect(missingReplyChannel({ category: "RGPD", contactEmail: null }, false)).toBe(true);
     expect(missingReplyChannel({ category: "RGPD", contactEmail: null }, true)).toBe(false);
     expect(missingReplyChannel({ category: "HOSTING", contactEmail: "a@b.fr" }, false)).toBe(false);

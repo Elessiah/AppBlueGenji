@@ -92,9 +92,10 @@ export interface ReportCategoryDefinition {
   /** Qualité vis-à-vis du droit invoqué, et déclaration de bonne foi. */
   requiresRightsDeclaration: boolean;
   /**
-   * Une réponse est due : sans compte, une adresse est exigée
+   * Une réponse est due : sans tag Discord certifié, une adresse est exigée
    * (`missingReplyChannel`). Une demande RGPD appelle une réponse sous un mois
-   * (art. 12) ; reçue sans compte ni adresse, personne ne pourrait la donner.
+   * (art. 12), une contestation une décision motivée (DSA, art. 20.5) ;
+   * reçues sans canal, personne ne pourrait les donner.
    */
   requiresReplyChannel: boolean;
   /**
@@ -203,7 +204,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     targets: [],
     requiresContact: false,
     requiresRightsDeclaration: false,
-    requiresReplyChannel: false,
+    requiresReplyChannel: true,
     legalBasis: "LEGAL_OBLIGATION",
     descriptionPlaceholder:
       "Pourquoi le signalement est infondé : licence, autorisation du titulaire, création de l'équipe, contexte…",
@@ -772,9 +773,9 @@ export function reportFollowUpDuty(category: ReportCategory): string | null {
     case "COPYRIGHT":
       return "Notification de contenu illicite : accuser réception à l'adresse indiquée, puis notifier la décision et les voies de recours (DSA, art. 16.4 et 16.5).";
     case "MODERATION":
-      return "Notification d'un contenu du site : si une adresse ou un compte Discord le permet, accuser réception, puis notifier la décision et les voies de recours (DSA, art. 16.4 et 16.5).";
+      return "Notification d'un contenu du site : si une adresse ou un tag Discord certifié le permet, accuser réception, puis notifier la décision et les voies de recours (DSA, art. 16.4 et 16.5).";
     case "CONTEST":
-      return "Contestation : notifier la décision motivée à la personne ou à l'équipe qui conteste, sur Discord ou à l'adresse indiquée (DSA, art. 20.5).";
+      return "Contestation : notifier la décision motivée à la personne qui conteste, à l'adresse indiquée ou à son tag Discord certifié (DSA, art. 20.5).";
     case "RGPD":
       return "Demande d'exercice des droits : répondre dans le mois (RGPD, art. 12), à l'adresse indiquée ou au tag Discord certifié du compte.";
     case "HOSTING":
