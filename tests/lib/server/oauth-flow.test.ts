@@ -206,6 +206,49 @@ describe("completeOAuth — contrôles d'état", () => {
     expect(fetchBlizzardUser).not.toHaveBeenCalled();
   });
 
+  const linkState = (provider: OAuthProvider, state = STATE) => ({
+    provider,
+    state,
+    redirectTo: "/profil",
+    intent: "LINK" as const,
+    termsAccepted: false,
+  });
+
+  it("ramène au profil un **rattachement** annulé chez le fournisseur", async () => {
+    // Rappel sans `code` : le joueur a refusé l'autorisation. Il était sur
+    // `/profil`, il y revient — pas sur `/connexion`.
+    jest.mocked(consumeOAuthState).mockResolvedValue(linkState("DISCORD"));
+
+    const response = await callback("DISCORD", `?error=access_denied&state=${STATE}`);
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/profil?connection_error=LINK_CANCELLED&provider=discord",
+    );
+    expect(linkOAuthIdentity).not.toHaveBeenCalled();
+  });
+
+  it("ramène au profil un rattachement revenu avec un état qui ne correspond pas", async () => {
+    jest.mocked(consumeOAuthState).mockResolvedValue(linkState("DISCORD", "un-autre-etat"));
+
+    const response = await callback("DISCORD");
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/profil?connection_error=LINK_EXPIRED&provider=discord",
+    );
+    expect(linkOAuthIdentity).not.toHaveBeenCalled();
+  });
+
+  it("ne tient pas pour un rattachement l'état émis pour une autre porte", async () => {
+    // L'intention n'est crue que sur la porte qui l'a émise.
+    jest.mocked(consumeOAuthState).mockResolvedValue(linkState("GOOGLE"));
+
+    const response = await callback("BLIZZARD", "");
+
+    expect(response.headers.get("location")).toBe(
+      "http://localhost:3000/connexion?error=params&provider=blizzard",
+    );
+  });
+
   it("consomme le cookie même quand le rappel est inexploitable", async () => {
     // Un état qui a échoué ne doit pas rester rejouable dix minutes durant.
     jest.mocked(consumeOAuthState).mockResolvedValue(null);
