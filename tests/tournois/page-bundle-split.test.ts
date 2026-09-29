@@ -63,10 +63,11 @@ describe("paquet de la fiche tournoi", () => {
 });
 
 describe("filet d'un chargement à la demande (orReload)", () => {
-  const makeEnv = (stamp: string | null, now = 1_000_000) => {
+  const makeEnv = (stamp: string | null, now = 1_000_000, modal = false) => {
     const state = { stamp, reloads: 0 };
     const env: LazyReloadEnv = {
       now: () => now,
+      modalOpen: () => modal,
       readStamp: () => state.stamp,
       writeStamp: (value) => {
         state.stamp = value;
@@ -90,6 +91,14 @@ describe("filet d'un chargement à la demande (orReload)", () => {
     const Loaded = await orReload(Promise.reject(new Error("ChunkLoadError")), env);
     expect(state.reloads).toBe(1);
     expect(state.stamp).toBe("1000000");
+    expect((Loaded as () => null)()).toBeNull();
+  });
+
+  it("ne recharge jamais sous une modale ouverte (saisie en cours)", async () => {
+    const { env, state } = makeEnv(null, 1_000_000, true);
+    const Loaded = await orReload(Promise.reject(new Error("ChunkLoadError")), env);
+    expect(state.reloads).toBe(0);
+    expect(state.stamp).toBeNull();
     expect((Loaded as () => null)()).toBeNull();
   });
 

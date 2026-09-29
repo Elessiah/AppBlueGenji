@@ -10,7 +10,7 @@ import type { ComponentType } from "react";
  *
  * Un échec recharge donc la page (le code neuf est la seule réparation), **une
  * fois par minute au plus** — un réseau réellement coupé ne doit pas la faire
- * boucler. Au-delà, le composant est remplacé par un rendu vide : le dialogue
+ * boucler — et jamais sous une modale ouverte. Sinon, le composant est remplacé par un rendu vide : le dialogue
  * ne s'ouvre pas, mais la page reste.
  */
 
@@ -22,6 +22,8 @@ export interface LazyReloadEnv {
   readStamp: () => string | null;
   writeStamp: (value: string) => void;
   reload: () => void;
+  /** Une modale est ouverte : une saisie peut y être en cours. */
+  modalOpen: () => boolean;
 }
 
 function browserEnv(): LazyReloadEnv | null {
@@ -43,12 +45,20 @@ function browserEnv(): LazyReloadEnv | null {
       }
     },
     reload: () => window.location.reload(),
+    modalOpen: () => document.querySelector('[aria-modal="true"]') !== null,
   };
 }
 
-/** Recharge la page si aucun rechargement de ce type n'a eu lieu depuis une minute. */
+/**
+ * Recharge la page si aucun rechargement de ce type n'a eu lieu depuis une
+ * minute et qu'aucune modale n'est ouverte. Plusieurs de ces chargements
+ * partent sans geste du lecteur (une vue ou un classement de phase qui paraît
+ * avec un instantané du flux) : recharger alors ferait perdre un score en cours
+ * de saisie pour un bloc que personne n'a demandé.
+ */
 export function reloadAfterChunkError(env: LazyReloadEnv | null = browserEnv()): boolean {
   if (!env) return false;
+  if (env.modalOpen()) return false;
   const last = Number(env.readStamp());
   const now = env.now();
   if (Number.isFinite(last) && last > 0 && now - last < LAZY_RELOAD_COOLDOWN_MS) return false;
