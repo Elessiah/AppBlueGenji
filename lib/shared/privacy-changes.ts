@@ -140,6 +140,12 @@ export const PRIVACY_CHANGE_ID_MAX_LENGTH = 80;
  * publiée ne se retire ni ne se renomme (son identifiant est en base chez
  * chaque compte qui l'a lue). Une erreur de rédaction se corrige sur
  * place ; un changement de fond est une **nouvelle** entrée.
+ *
+ * « Changement de fond » s'entend du **traitement**, pas de sa description.
+ * Deux entrées disaient l'empreinte de mesure d'audience « non réversible » :
+ * c'était une description inexacte d'un traitement resté le même (l'association
+ * détient le sel), corrigée sur place comme `/rgpd#audience` et la fiche T06 —
+ * une entrée ne s'ajoute que lorsque le traitement change.
  */
 export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   {

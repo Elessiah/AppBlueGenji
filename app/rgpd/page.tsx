@@ -388,8 +388,8 @@ export default async function RgpdPage() {
             </li>
           </ul>
           <p>
-            À l&apos;exception de <strong>bg:last-visit-ping</strong>, qui sert la mesure
-            d&apos;audience décrite ci-dessous, ces éléments ne demandent pas votre
+            <strong>bg:last-visit-ping</strong> relève de la mesure d&apos;audience, dont les
+            conditions sont décrites ci-dessous. Les autres éléments ne demandent pas votre
             consentement : l&apos;article 82 de la loi
             Informatique et Libertés en dispense les traceurs qui sont strictement nécessaires
             au service que vous demandez, ou qui ont pour seule finalité de le permettre. Aucun
@@ -461,10 +461,12 @@ export default async function RgpdPage() {
             par la commande <code>/stats-site</code> du bot Discord, ouverte à tout membre d&apos;un serveur où le bot est installé.
           </p>
           <p>
-            <strong>Votre droit d&apos;opposition.</strong> Vous pouvez vous opposer à cette
-            mesure (art. 21 du RGPD) par le formulaire « {REPORT_FORM_NAME} », catégorie RGPD,
-            ou auprès de <strong>{LEGAL_CONTACT_DISCORD}</strong> sur Discord. Aucun réglage du
-            site ne permet encore de la désactiver vous-même.
+            <strong>Votre droit d&apos;opposition.</strong> Le droit de vous opposer à cette
+            mesure (art. 21 du RGPD) s&apos;exerce, comme vos autres droits, par le formulaire
+            « {REPORT_FORM_NAME} », catégorie RGPD, ou auprès de{" "}
+            <strong>{LEGAL_CONTACT_DISCORD}</strong> sur Discord. Le site ne sait pas encore
+            l&apos;appliquer de lui-même : aucun réglage ne permet de désactiver la mesure, ni
+            d&apos;en exclure vos visites à venir.
           </p>
         </div>
       </section>
