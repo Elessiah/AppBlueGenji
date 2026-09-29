@@ -2,8 +2,13 @@ import { describe, expect, it } from "@jest/globals";
 
 import {
   CROSS_SITE_REQUEST,
+  PROVENANCE_EXEMPT_API_PATHS,
   UNSUPPORTED_CONTENT_TYPE,
+  apiWriteNeedsProvenance,
+  isJsonContentType,
+  isWriteMethod,
   requestOriginRefusal,
+
   type RequestOriginSignals,
 } from "@/lib/shared/request-origin";
 
@@ -97,5 +102,64 @@ describe("requestOriginRefusal — type du corps", () => {
     expect(
       requestOriginRefusal(signals({ secFetchSite: "cross-site", contentType: "text/plain" }), json),
     ).toBe(CROSS_SITE_REQUEST);
+  });
+});
+
+describe("isJsonContentType", () => {
+  it.each([
+    ["application/json"],
+    ["application/json; charset=utf-8"],
+    ["  APPLICATION/JSON  "],
+    ["application/reports+json"],
+    ["application/csp-report"],
+  ])("tient %s pour un corps JSON", (contentType) => {
+    expect(isJsonContentType(contentType)).toBe(true);
+  });
+
+  it.each<[string | null]>([
+    [null],
+    [""],
+    ["text/plain"],
+    ["text/plain;charset=UTF-8"],
+    ["application/x-www-form-urlencoded"],
+    ["multipart/form-data; boundary=x"],
+    // Un suffixe hors du type `application/` n'est pas un corps JSON déclaré.
+    ["text/x+json"],
+    ["application/jsonp"],
+  ])("refuse %s", (contentType) => {
+    expect(isJsonContentType(contentType)).toBe(false);
+  });
+});
+
+describe("apiWriteNeedsProvenance", () => {
+  it.each([["POST"], ["PUT"], ["PATCH"], ["DELETE"], ["post"]])(
+    "exige la provenance d'une écriture %s sous /api/",
+    (method) => {
+      expect(apiWriteNeedsProvenance("/api/tournaments/12/register", method)).toBe(true);
+      expect(isWriteMethod(method)).toBe(true);
+    },
+  );
+
+  it.each([["GET"], ["HEAD"], ["OPTIONS"]])(
+    "laisse passer une lecture %s — rappels OAuth, flux SSE, images",
+    (method) => {
+      expect(isWriteMethod(method)).toBe(false);
+      expect(apiWriteNeedsProvenance("/api/auth/google/callback", method)).toBe(false);
+      expect(apiWriteNeedsProvenance("/api/tournaments/12/stream", method)).toBe(false);
+    },
+  );
+
+  it("exempte les deux écritures anonymes, et elles seules", () => {
+    expect(PROVENANCE_EXEMPT_API_PATHS).toEqual(["/api/csp-report", "/api/visits"]);
+    expect(apiWriteNeedsProvenance("/api/csp-report", "POST")).toBe(false);
+    expect(apiWriteNeedsProvenance("/api/visits/", "POST")).toBe(false);
+    // Un préfixe commun n'exempte rien.
+    expect(apiWriteNeedsProvenance("/api/visits-admin", "POST")).toBe(true);
+    expect(apiWriteNeedsProvenance("/api/csp-report/x", "POST")).toBe(true);
+  });
+
+  it("ne regarde que /api/", () => {
+    expect(apiWriteNeedsProvenance("/tournois", "POST")).toBe(false);
+    expect(apiWriteNeedsProvenance("/apiculture", "POST")).toBe(false);
   });
 });

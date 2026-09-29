@@ -39,10 +39,15 @@ function siteHosts(req: Request): string[] {
 }
 
 /**
- * Refuse une requête d'ouverture ou de fermeture de session venue d'un autre
- * site (voir `lib/shared/request-origin.ts`). Rend la réponse à retourner telle
- * quelle, ou `null` si la requête peut continuer.
+ * Refuse une requête venue d'un autre site (voir `lib/shared/request-origin.ts`).
+ * Rend la réponse à retourner telle quelle, ou `null` si la requête peut
+ * continuer.
  *
+ * Le middleware l'applique à **toute écriture** sous `/api/` ; les routes qui
+ * ouvrent ou ferment une session la reposent en plus, pour le contrôle du type
+ * du corps et pour ne pas dépendre du périmètre du middleware.
+ *
+
  * À poser **en toute première instruction** des routes concernées, avant tout
  * plafond de débit : une requête forgée ne doit pas consommer le quota d'une IP
  * — ni, surtout, envoyer un message privé.

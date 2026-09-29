@@ -12,7 +12,7 @@ jest.mock("@/lib/server/users-service", () => {
     // ferait passer ce test sans rien prouver de la règle.
     normalizeDiscordHandle: actual.normalizeDiscordHandle,
     createDiscordLoginChallenge: jest.fn(),
-    consumeDiscordChallenge: jest.fn(),
+    consumeDiscordLoginChallenge: jest.fn(),
     discardDiscordChallenge: jest.fn(),
   };
 });
@@ -26,7 +26,7 @@ import {
 import { getDatabase } from "@/lib/server/database";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import {
-  consumeDiscordChallenge,
+  consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
   discardDiscordChallenge,
 } from "@/lib/server/users-service";
@@ -61,7 +61,12 @@ const sendMock = sendDiscordLoginCode as jest.MockedFunction<typeof sendDiscordL
 const createChallengeMock = createDiscordLoginChallenge as jest.MockedFunction<
   typeof createDiscordLoginChallenge
 >;
-const consumeMock = consumeDiscordChallenge as jest.MockedFunction<typeof consumeDiscordChallenge>;
+const consumeMock = consumeDiscordLoginChallenge as jest.MockedFunction<
+  typeof consumeDiscordLoginChallenge
+>;
+
+/** Jeton du défi rendu à la demande — et seul moyen de le désigner ensuite. */
+const CHALLENGE = "t".repeat(32);
 const discardMock = discardDiscordChallenge as jest.MockedFunction<typeof discardDiscordChallenge>;
 
 /**
@@ -78,9 +83,6 @@ function fakeDb(state: UserState, otherAccountHolds: string | null = null) {
       return [[{ ...state }]];
     }
 
-    if (q.startsWith("SELECT id FROM bg_users WHERE discord_id = ? AND id <> ?")) {
-      return [otherAccountHolds !== null && params[0] === otherAccountHolds ? [{ id: 1234 }] : []];
-    }
 
     // Certification en un clic : rejoue les conditions du `WHERE`, qui sont
     // toute la règle — rattaché, pseudo nommé par Discord, même tag.
@@ -95,6 +97,11 @@ function fakeDb(state: UserState, otherAccountHolds: string | null = null) {
     }
 
     if (q.startsWith("UPDATE bg_users")) {
+      // L'index unique de `bg_users.discord_id` : c'est lui, et lui seul, qui
+      // refuse un Discord détenu par un autre compte du site.
+      if (state.discord_id === null && otherAccountHolds !== null && params[0] === otherAccountHolds) {
+        throw Object.assign(new Error("Duplicate entry"), { code: "ER_DUP_ENTRY" });
+      }
       writes.push({ sql: q, params });
       // `COALESCE(discord_id, ?)` : l'identifiant n'est posé que s'il manquait.
       state.discord_id = state.discord_id ?? String(params[0]);
@@ -230,11 +237,14 @@ describe("startDiscordVerification — le compte Google", () => {
 
     const result = await startDiscordVerification(7, "@keryan");
 
+    // Le jeton du défi, **jamais l'identifiant résolu** : la demande n'est pas
+    // un oracle qui dirait quel compte Discord porte ce pseudo.
     expect(result).toEqual({
       status: "CODE_SENT",
-      discordId: "900000000000000002",
+      challenge: CHALLENGE,
       expiresAt: "2026-09-20T12:10:00.000Z",
     });
+    expect(result).not.toHaveProperty("discordId");
     expect(createChallengeMock).toHaveBeenCalledWith("900000000000000002", "keryan");
     expect(sendMock).toHaveBeenCalledWith("900000000000000002", "123456");
     // Rien n'est certifié avant le code.
@@ -252,12 +262,22 @@ describe("startDiscordVerification — le compte Google", () => {
     expect(discardMock).toHaveBeenCalledWith(77);
   });
 
-  it("refuse un Discord déjà certifié par un autre compte du site", async () => {
+  /**
+   * **La demande n'est pas un oracle.** Qu'un autre compte du site détienne ce
+   * Discord ou non, la réponse a la même forme : le refus rendu ici, avant tout
+   * message privé, disait à n'importe quel membre si une personne nommée avait
+   * un compte BlueGenji. Il ne vient qu'à la confirmation, à qui détient le code.
+   */
+  it("répond de la même façon qu'un autre compte détienne ce Discord ou non", async () => {
     fakeDb({ ...GOOGLE_ACCOUNT }, "900000000000000009");
     resolveMock.mockResolvedValue("900000000000000009");
+    const held = await startDiscordVerification(7, "keryan");
 
-    await expect(startDiscordVerification(7, "keryan")).rejects.toThrow("DISCORD_ALREADY_LINKED");
-    expect(createChallengeMock).not.toHaveBeenCalled();
+    fakeDb({ ...GOOGLE_ACCOUNT });
+    const free = await startDiscordVerification(7, "keryan");
+
+    expect(held).toEqual(free);
+    expect(createChallengeMock).toHaveBeenCalledTimes(2);
   });
 });
 
@@ -278,11 +298,13 @@ describe("startDiscordVerification — ce qui n'est pas un tag", () => {
 describe("confirmDiscordVerification", () => {
   it("écrit le tag du défi, pas celui que le client renvoie", async () => {
     const db = fakeDb({ ...GOOGLE_ACCOUNT });
-    consumeMock.mockResolvedValue({ handle: "keryan" });
+    consumeMock.mockResolvedValue({ handle: "keryan", discordId: "900000000000000002" });
 
-    const result = await confirmDiscordVerification(7, "900000000000000002", "123456");
+    const result = await confirmDiscordVerification(7, CHALLENGE, "123456");
 
     expect(result).toEqual({ tag: "keryan" });
+    // Le défi est désigné par son jeton ; l'identifiant vient de sa ligne.
+    expect(consumeMock).toHaveBeenCalledWith(CHALLENGE, "123456");
     expect(db.state.discord_pseudo).toBe("keryan");
     expect(db.state.discord_verified_at).not.toBeNull();
   });
@@ -298,11 +320,22 @@ describe("confirmDiscordVerification", () => {
    */
   it("rattache l'identifiant au compte : il pourra désormais se connecter par Discord", async () => {
     const db = fakeDb({ ...GOOGLE_ACCOUNT });
-    consumeMock.mockResolvedValue({ handle: "keryan" });
+    consumeMock.mockResolvedValue({ handle: "keryan", discordId: "900000000000000002" });
 
-    await confirmDiscordVerification(7, "900000000000000002", "123456");
+    await confirmDiscordVerification(7, CHALLENGE, "123456");
 
     expect(db.state.discord_id).toBe("900000000000000002");
+  });
+
+  it("refuse à la confirmation un Discord détenu par un autre compte du site", async () => {
+    // Le refus retiré de la demande : l'index unique le tranche à l'écriture.
+    const db = fakeDb({ ...GOOGLE_ACCOUNT }, "900000000000000009");
+    consumeMock.mockResolvedValue({ handle: "keryan", discordId: "900000000000000009" });
+
+    await expect(confirmDiscordVerification(7, CHALLENGE, "123456")).rejects.toThrow(
+      "DISCORD_ALREADY_LINKED",
+    );
+    expect(db.state.discord_id).toBeNull();
   });
 
   it("ne déplace pas un identifiant déjà posé : `COALESCE` le préserve", async () => {
@@ -310,9 +343,9 @@ describe("confirmDiscordVerification", () => {
     // l'écriture elle-même doit le refuser : une porte d'entrée ne se déplace
     // pas, même par accident.
     const db = fakeDb({ ...LINKED_ACCOUNT });
-    consumeMock.mockResolvedValue({ handle: "keryan" });
+    consumeMock.mockResolvedValue({ handle: "keryan", discordId: "900000000000000001" });
 
-    await confirmDiscordVerification(7, "900000000000000001", "123456");
+    await confirmDiscordVerification(7, CHALLENGE, "123456");
 
     expect(db.state.discord_id).toBe("900000000000000001");
     expect(db.writes[0].sql).toContain("discord_id = COALESCE(discord_id, ?)");
@@ -325,7 +358,7 @@ describe("confirmDiscordVerification", () => {
     const db = fakeDb({ ...GOOGLE_ACCOUNT });
     consumeMock.mockResolvedValue(null);
 
-    await expect(confirmDiscordVerification(7, "900000000000000002", "000000")).rejects.toThrow(
+    await expect(confirmDiscordVerification(7, CHALLENGE, "000000")).rejects.toThrow(
       "CODE_INVALID_OR_EXPIRED",
     );
     expect(db.writes).toHaveLength(0);
@@ -334,9 +367,9 @@ describe("confirmDiscordVerification", () => {
   it("refuse un défi sans tag : il vient de la page de connexion", async () => {
     // Une demande faite par identifiant numérique n'a aucun tag à certifier.
     const db = fakeDb({ ...GOOGLE_ACCOUNT });
-    consumeMock.mockResolvedValue({ handle: null });
+    consumeMock.mockResolvedValue({ handle: null, discordId: "900000000000000002" });
 
-    await expect(confirmDiscordVerification(7, "900000000000000002", "123456")).rejects.toThrow(
+    await expect(confirmDiscordVerification(7, CHALLENGE, "123456")).rejects.toThrow(
       "INVALID_DISCORD_HANDLE",
     );
     expect(db.writes).toHaveLength(0);
@@ -344,14 +377,15 @@ describe("confirmDiscordVerification", () => {
 
   it("relit l'état du compte : un rattachement survenu entre-temps fait refuser", async () => {
     const db = fakeDb({ ...LINKED_ACCOUNT });
-    consumeMock.mockResolvedValue({ handle: "keryan" });
+    consumeMock.mockResolvedValue({ handle: "keryan", discordId: "111111111111111111" });
 
-    await expect(confirmDiscordVerification(7, "111111111111111111", "123456")).rejects.toThrow(
+    await expect(confirmDiscordVerification(7, CHALLENGE, "123456")).rejects.toThrow(
       "DISCORD_ID_MISMATCH",
     );
-    // Le code n'est même pas consommé : on refuse avant de brûler un essai.
-    expect(consumeMock).not.toHaveBeenCalled();
+    // L'identifiant n'est connu qu'une fois le défi consommé : le refus vient
+    // après, mais rien n'est écrit.
     expect(db.writes).toHaveLength(0);
+
   });
 });
 

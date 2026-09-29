@@ -27,6 +27,7 @@ import {
   startDiscordVerification,
 } from "@/lib/server/discord-verification";
 import { readJsonBody } from "@/lib/server/request-body";
+import { isDiscordChallengeToken } from "@/lib/server/users-service";
 
 /**
  * Codes de refus et leur statut.
@@ -38,6 +39,7 @@ import { readJsonBody } from "@/lib/server/request-body";
 function statusFor(message: string): number {
   switch (message) {
     case "INVALID_DISCORD_HANDLE":
+    case "INVALID_CHALLENGE":
     case "INVALID_CODE":
       return 400;
     // Le tag désigne un autre compte Discord que celui déjà rattaché : ce n'est
@@ -130,13 +132,15 @@ export async function PUT(req: Request) {
   if (throttled) return throttled;
 
   try {
-    const body = (await readJsonBody(req)) as { discordId?: string; code?: string };
-    const discordId = (body.discordId ?? "").trim();
-    const code = (body.code ?? "").trim();
-    if (!/^\d{5,32}$/.test(discordId)) return fail("INVALID_DISCORD_HANDLE", 400);
+    // Le défi est désigné par le jeton que la demande a rendu, jamais par
+    // l'identifiant Discord : elle ne le rend plus (voir `CodeSent`).
+    const body = (await readJsonBody(req)) as { challenge?: unknown; code?: unknown };
+    const code = typeof body.code === "string" ? body.code.trim() : "";
+    if (!isDiscordChallengeToken(body.challenge)) return fail("INVALID_CHALLENGE", 400);
     if (!/^\d{6}$/.test(code)) return fail("INVALID_CODE", 400);
 
-    const result = await confirmDiscordVerification(user.id, discordId, code);
+    const result = await confirmDiscordVerification(user.id, body.challenge, code);
+
     return ok({ status: "VERIFIED", ...result });
   } catch (error) {
     const message = (error as Error).message || "DISCORD_VERIFICATION_FAILED";

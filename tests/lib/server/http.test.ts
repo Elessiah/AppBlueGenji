@@ -59,6 +59,17 @@ describe("http", () => {
       }
     });
 
+    it("rend 415 pour un corps non déclaré JSON, quel que soit le statut demandé", async () => {
+      // `readJsonBody` le lève ; une route qui le rendrait en 500 ferait passer
+      // le refus d'un formulaire forgé pour une panne du serveur.
+      for (const status of [400, 500]) {
+        const response = fail("UNSUPPORTED_CONTENT_TYPE", status);
+        expect(response.status).toBe(415);
+        await expect(response.json()).resolves.toEqual({ error: "UNSUPPORTED_CONTENT_TYPE" });
+      }
+    });
+
+
     it("returns error object", async () => {
       const response = fail("SOMETHING_WENT_WRONG");
       const body = await response.json();

@@ -68,7 +68,7 @@ export function DiscordVerificationDialog({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const [handle, setHandle] = useState(initialTag);
-  const [discordId, setDiscordId] = useState("");
+  const [challenge, setChallenge] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const fieldErrors = useFieldErrors(DISCORD_VERIFICATION_FIELD_ERRORS, FIELD_IDS);
@@ -100,7 +100,7 @@ export function DiscordVerificationDialog({
         error?: string;
         status?: "VERIFIED" | "CODE_SENT";
         tag?: string;
-        discordId?: string;
+        challenge?: string;
         expiresAt?: string;
       };
       if (!response.ok) throw new Error(payload.error ?? "");
@@ -111,7 +111,7 @@ export function DiscordVerificationDialog({
         return;
       }
 
-      setDiscordId(payload.discordId ?? "");
+      setChallenge(payload.challenge ?? "");
       showSuccess(
         `Code envoyé en message privé Discord (expiration : ${new Date(
           payload.expiresAt ?? "",
@@ -132,20 +132,33 @@ export function DiscordVerificationDialog({
       const response = await fetch("/api/profile/discord", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ discordId, code }),
+        body: JSON.stringify({ challenge, code }),
       });
       const payload = (await response.json()) as { error?: string; tag?: string };
       if (!response.ok) throw new Error(payload.error ?? "");
       showSuccess("Tag Discord certifié.");
       onVerified(payload.tag ?? handle);
     } catch (e) {
+      // Ces refus arrivent code **consommé** : le retaper ne rendrait plus que
+      // « code invalide ou expiré ». Le Discord détenu par un autre compte n'est
+      // dit qu'ici (la demande ne doit rien révéler d'un tiers) ; comme un
+      // rattachement changé entre-temps ou un défi sans tag, il se lève au tag.
+      const reason = (e as Error).message;
+      if (
+        reason === "DISCORD_ALREADY_LINKED" ||
+        reason === "DISCORD_ID_MISMATCH" ||
+        reason === "INVALID_DISCORD_HANDLE"
+      ) {
+        restartVerification();
+      }
       refuse(e);
     } finally {
+
       setLoading(false);
     }
   };
 
-  const awaitingCode = discordId !== "";
+  const awaitingCode = challenge !== "";
 
   // Changer d'étape démonte le bouton qui vient d'être activé : sans ce relais,
   // le focus tomberait sur `<body>` et le champ de la nouvelle étape ne serait
@@ -159,7 +172,7 @@ export function DiscordVerificationDialog({
 
   /** Retour à la demande de code, tag conservé : le précédent est perdu. */
   const restartVerification = () => {
-    setDiscordId("");
+    setChallenge("");
     setCode("");
     fieldErrors.clear();
   };

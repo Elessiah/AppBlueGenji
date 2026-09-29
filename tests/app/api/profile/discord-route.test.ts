@@ -35,6 +35,9 @@ const confirmMock = confirmDiscordVerification as jest.MockedFunction<
 >;
 const stateMock = getDiscordAccountState as jest.MockedFunction<typeof getDiscordAccountState>;
 
+/** Jeton de défi bien formé (32 caractères base64url), qui ne désigne personne. */
+const CHALLENGE = "A".repeat(32);
+
 const USER = authUser({ id: 7 });
 
 function post(body: unknown) {
@@ -71,7 +74,7 @@ describe("garde d'accès", () => {
 
     expect((await GET()).status).toBe(401);
     expect((await post({ handle: "keryan" })).status).toBe(401);
-    expect((await put({ discordId: "900000000000000001", code: "123456" })).status).toBe(401);
+    expect((await put({ challenge: CHALLENGE, code: "123456" })).status).toBe(401);
   });
 
   it("ne demande **aucune** permission : c'est son propre compte", async () => {
@@ -94,20 +97,19 @@ describe("POST — ouvrir la certification", () => {
     expect(startMock).toHaveBeenCalledWith(7, "keryan", expect.any(Function));
   });
 
-  it("rend l'identifiant et l'échéance quand un code part", async () => {
+  it("rend le jeton du défi et l'échéance quand un code part — jamais l'identifiant Discord", async () => {
     startMock.mockResolvedValue({
       status: "CODE_SENT",
-      discordId: "900000000000000002",
+      challenge: CHALLENGE,
       expiresAt: "2026-09-20T12:10:00.000Z",
     });
 
     const response = await post({ handle: "keryan" });
 
     expect(response.status).toBe(200);
-    expect(await response.json()).toMatchObject({
-      status: "CODE_SENT",
-      discordId: "900000000000000002",
-    });
+    const payload = await response.json();
+    expect(payload).toMatchObject({ status: "CODE_SENT", challenge: CHALLENGE });
+    expect(payload).not.toHaveProperty("discordId");
   });
 
   it("traite un corps vide comme un tag manquant", async () => {
@@ -123,7 +125,7 @@ describe("POST — ouvrir la certification", () => {
     // vidant le seau que la page de connexion consulte, elle, avant d'envoyer.
     startMock.mockImplementation(async (_userId, _handle, guard) => {
       guard?.("900000000000000002");
-      return { status: "CODE_SENT", discordId: "900000000000000002", expiresAt: "x" };
+      return { status: "CODE_SENT", challenge: CHALLENGE, expiresAt: "x" };
     });
 
     for (let i = 0; i < DISCORD_CODE_REQUEST_RULE.limit; i += 1) {
@@ -148,7 +150,7 @@ describe("POST — ouvrir la certification", () => {
 
     startMock.mockImplementation(async (_userId, _handle, guard) => {
       guard?.("900000000000000002");
-      return { status: "CODE_SENT", discordId: "900000000000000002", expiresAt: "x" };
+      return { status: "CODE_SENT", challenge: CHALLENGE, expiresAt: "x" };
     });
     for (let i = 0; i < DISCORD_CODE_REQUEST_RULE.limit; i += 1) {
       expect((await post({ handle: "keryan" })).status).toBe(200);
@@ -181,7 +183,7 @@ describe("PUT — confirmer avec le code", () => {
     }
 
     confirmMock.mockResolvedValue({ tag: "keryan" });
-    const response = await put({ discordId: "900000000000000002", code: "123456" });
+    const response = await put({ challenge: CHALLENGE, code: "123456" });
 
     expect(response.status).toBe(200);
   });
@@ -190,18 +192,21 @@ describe("PUT — confirmer avec le code", () => {
   it("certifie et rend le tag écrit", async () => {
     confirmMock.mockResolvedValue({ tag: "keryan" });
 
-    const response = await put({ discordId: "900000000000000002", code: "123456" });
+    const response = await put({ challenge: CHALLENGE, code: "123456" });
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ status: "VERIFIED", tag: "keryan" });
-    expect(confirmMock).toHaveBeenCalledWith(7, "900000000000000002", "123456");
+    expect(confirmMock).toHaveBeenCalledWith(7, CHALLENGE, "123456");
   });
 
   it("contrôle la forme avant d'appeler le service", async () => {
     for (const body of [
-      { discordId: "pas-un-id", code: "123456" },
-      { discordId: "900000000000000002", code: "12345" },
-      { discordId: "900000000000000002", code: "abcdef" },
+      { challenge: "pas-un-jeton", code: "123456" },
+      // L'ancienne forme, désignant le défi par l'identifiant Discord.
+      { discordId: "900000000000000002", code: "123456" },
+
+      { challenge: CHALLENGE, code: "12345" },
+      { challenge: CHALLENGE, code: "abcdef" },
       {},
     ]) {
       expect((await put(body)).status).toBe(400);
@@ -242,7 +247,7 @@ describe("traduction des refus", () => {
   it.each(cases)("rend %s en %i sur PUT, le même statut qu'en POST", async (code, status) => {
     confirmMock.mockRejectedValue(new Error(code));
 
-    const response = await put({ discordId: "900000000000000002", code: "123456" });
+    const response = await put({ challenge: CHALLENGE, code: "123456" });
     expect(response.status).toBe(status);
   });
 });

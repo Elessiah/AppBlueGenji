@@ -44,7 +44,7 @@ export function DiscordBotHandleDialog({
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const [handle, setHandle] = useState("");
-  const [discordId, setDiscordId] = useState("");
+  const [challenge, setChallenge] = useState("");
   const [code, setCode] = useState("");
   const [loading, setLoading] = useState(false);
   const fieldErrors = useFieldErrors(
@@ -71,11 +71,11 @@ export function DiscordBotHandleDialog({
       });
       const payload = (await response.json()) as {
         error?: string;
-        discordId?: string;
+        challenge?: string;
         expiresAt?: string;
       };
       if (!response.ok) throw new Error(payload.error ?? "");
-      setDiscordId(payload.discordId ?? "");
+      setChallenge(payload.challenge ?? "");
       showSuccess(
         `Code envoyé en message privé Discord (expiration : ${new Date(
           payload.expiresAt ?? "",
@@ -96,7 +96,7 @@ export function DiscordBotHandleDialog({
       const response = await fetch("/api/profile/discord/handle", {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ discordId, code }),
+        body: JSON.stringify({ challenge, code }),
       });
       const payload = (await response.json()) as {
         error?: string;
@@ -110,19 +110,27 @@ export function DiscordBotHandleDialog({
       );
       onUpdated(payload.tag ?? "");
     } catch (e) {
-      // Deux refus du code ne se lèvent pas en retapant : le compte a changé de
-      // Discord entre la demande et la confirmation, ou le défi n'avait aucun
-      // pseudo. Ils désignent le **pseudo** — on revient donc à sa saisie avant
-      // de les dire, sans quoi le champ marqué ne serait pas à l'écran.
+      // Trois refus du code ne se lèvent pas en retapant : le compte a changé de
+      // Discord entre la demande et la confirmation, ce Discord est rattaché à
+      // un autre compte (dit ici et non à la demande, qui ne doit rien révéler
+      // d'un tiers), ou le défi n'avait aucun pseudo. Ils désignent le
+      // **pseudo** — on revient donc à sa saisie avant de les dire, sans quoi le
+      // champ marqué ne serait pas à l'écran.
+
       const reason = (e as Error).message;
-      if (reason === "DISCORD_ID_MISMATCH" || reason === "INVALID_DISCORD_HANDLE") restart();
+      if (
+        reason === "DISCORD_ID_MISMATCH" ||
+        reason === "DISCORD_ALREADY_LINKED" ||
+        reason === "INVALID_DISCORD_HANDLE"
+      )
+        restart();
       refuse(e);
     } finally {
       setLoading(false);
     }
   };
 
-  const awaitingCode = discordId !== "";
+  const awaitingCode = challenge !== "";
   // Changer d'étape démonte le bouton activé : le focus suit le champ suivant.
   const previousStep = useRef(awaitingCode);
   useEffect(() => {
@@ -134,7 +142,7 @@ export function DiscordBotHandleDialog({
   }, [awaitingCode]);
 
   const restart = () => {
-    setDiscordId("");
+    setChallenge("");
     setCode("");
     fieldErrors.clear();
   };
