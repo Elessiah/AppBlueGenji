@@ -4,24 +4,25 @@ import { toIso } from "@/lib/server/serialization";
 import {
   PRIVACY_CHANGES,
   pendingPrivacyChanges,
+  privacyChangeDay,
   type PrivacyChange,
 } from "@/lib/shared/privacy-changes";
 
 /**
- * Lecture et écriture de l'acceptation des changements du traitement des
+ * Lecture et écriture de la prise de connaissance des changements du traitement des
  * données (`lib/shared/privacy-changes.ts`).
  */
 
 type PendingRow = RowDataPacket & { created_at: string | null; change_id: string | null };
 
 /**
- * Les changements qu'un compte n'a pas encore acceptés.
+ * Les changements publiés dont un compte n'a pas encore pris connaissance.
  *
  * Une seule requête — la mise en page racine l'appelle à chaque page d'un
- * visiteur connecté : la date de création et les acceptations arrivent
+ * visiteur connecté : la date de création et les prises de connaissance arrivent
  * ensemble par une jointure externe. Registre vide : aucune requête du tout.
  *
- * Un compte supprimé n'a rien à accepter (`is_deleted = 0`) : la session l'a
+ * Un compte supprimé n'a rien à lire (`is_deleted = 0`) : la session l'a
  * déjà écarté, la condition le redit pour qui appellerait sans elle.
  */
 export async function loadPendingPrivacyChanges(userId: number): Promise<PrivacyChange[]> {
@@ -38,16 +39,20 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
   if (rows.length === 0) return [];
 
   const acknowledged = rows.flatMap((row) => (row.change_id ? [row.change_id] : []));
-  return pendingPrivacyChanges(rows[0].created_at ? String(rows[0].created_at) : null, acknowledged);
+  return pendingPrivacyChanges(
+    rows[0].created_at ? String(rows[0].created_at) : null,
+    acknowledged,
+    privacyChangeDay(new Date()),
+  );
 }
 
 /**
- * Enregistre l'acceptation de changements **déjà validés** par
+ * Enregistre la prise de connaissance de changements **déjà validés** par
  * `checkPrivacyAcknowledgement`.
  *
- * `INSERT IGNORE` : accepter deux fois (deux onglets, double clic) n'est pas une
+ * `INSERT IGNORE` : acquitter deux fois (deux onglets, double clic) n'est pas une
  * erreur, la première date fait foi. L'insertion passe par un `SELECT` sur la
- * ligne du compte vivant : une acceptation arrivée après la suppression du
+ * ligne du compte vivant : un acquittement arrivé après la suppression du
  * compte ne se pose pas sur une ligne anonymisée.
  */
 export async function acknowledgePrivacyChanges(userId: number, changeIds: readonly string[]): Promise<void> {
@@ -64,7 +69,7 @@ export async function acknowledgePrivacyChanges(userId: number, changeIds: reado
   );
 }
 
-/** Acceptations d'un compte, pour l'export RGPD — la date est la preuve du consentement. */
+/** Prises de connaissance d'un compte, pour l'export RGPD — la date prouve que l'information a été présentée (la colonne `accepted_at` garde son nom d'origine). */
 export async function listPrivacyAcknowledgments(
   userId: number,
 ): Promise<{ changeId: string; acceptedAt: string }[]> {

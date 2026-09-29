@@ -1075,8 +1075,9 @@ async function runMigrations(db: Pool): Promise<void> {
   `);
 
   // Changements du traitement des données (`lib/shared/privacy-changes.ts`) :
-  // une ligne par changement **accepté**, avec sa date — c'est la trace du
-  // consentement, que l'export RGPD rend au joueur. Le registre vit dans le
+  // une ligne par changement **dont le joueur a pris connaissance**, avec sa
+  // date — la trace de l'information, que l'export RGPD rend au joueur
+  // (`accepted_at` garde son nom d'origine : aucun accord n'est demandé). Le registre vit dans le
   // code, pas en base : `change_id` n'a donc pas de clé étrangère.
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_privacy_acknowledgments (

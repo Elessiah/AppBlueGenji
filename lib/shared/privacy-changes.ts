@@ -1,23 +1,35 @@
 /**
- * Changements du traitement des données personnelles, et ce que chaque compte
- * en a déjà accepté.
+ * Changements du traitement des données personnelles, et ce dont chaque compte
+ * a déjà pris connaissance.
  *
  * **Ajouter une entrée à `PRIVACY_CHANGES` est le seul geste à faire** quand
  * une modification change ce que le site collecte, qui le lit, combien de temps
  * il le garde ou ce qu'une suppression emporte. Rien d'autre n'est à brancher :
  *
  * - la modale `PrivacyChangesModal` (montée par `app/layout.tsx`) la présente à
- *   chaque compte **une seule fois**, avec un bouton « J'accepte » et un bouton
- *   « Je refuse, je supprime mon compte » ;
+ *   chaque compte **une seule fois**, à partir de sa date de publication, avec
+ *   un seul bouton : « J'ai pris connaissance » ;
  * - les changements **se cumulent** — un joueur revenu après trois entrées les
- *   voit toutes les trois dans la même modale, et une acceptation les acquitte
+ *   voit toutes les trois dans la même modale, et un clic les acquitte
  *   ensemble (`bg_privacy_acknowledgments`, une ligne par changement) ;
- * - chaque compte joignable sur Discord qui ne l'a pas accepté sur le site
- *   en reçoit un résumé en message privé, une seule fois par changement, une
+ * - chaque compte joignable sur Discord qui n'en a pas pris connaissance sur
+ *   le site en reçoit un résumé en message privé, une seule fois par changement, une
  *   semaine après sa publication et au plus un message par mois — les
  *   changements rapprochés partent ensemble
  *   (`lib/server/privacy-change-notifications.ts`) ;
  * - la mention « Dernière mise à jour » de `/rgpd` suit la dernière entrée.
+ *
+ * **La modale informe, elle ne demande jamais d'accepter** (RGPD, art. 12 à
+ * 14). Un traitement fondé sur l'intérêt légitime ou sur l'exécution du service
+ * ne se soumet pas à l'accord du joueur : sa contrepartie est le droit
+ * d'opposition (art. 21), que la politique de confidentialité décrit — jamais
+ * la suppression du compte. Un traitement fondé sur le **consentement** ne se
+ * recueille pas ici non plus : un accord dont le refus coûterait le compte ne
+ * serait pas libre (art. 7.4). Il passe par un réglage du site, refusable sans
+ * rien perdre d'autre (case décochée par défaut, geste réversible), et l'entrée
+ * qui l'annonce nomme ce réglage. Un changement qui élargirait un traitement
+ * fondé sur le consentement **sans** réglage pour le refuser n'est pas
+ * publiable en l'état : il faut d'abord le réglage.
  *
  * Module **pur** : le registre, la décision « qu'est-ce que ce compte n'a pas
  * encore vu ? » et la rédaction du message Discord se testent sans base.
@@ -44,9 +56,12 @@ export type PrivacyChange = {
    */
   id: string;
   /**
-   * Date de publication, `AAAA-MM-JJ`. Un compte **créé ce jour-là ou après**
-   * ne voit pas le changement : il a consenti à la politique déjà à jour en
-   * s'inscrivant. Poser la date de mise en production prévue.
+   * Date de publication, `AAAA-MM-JJ`, jour de Paris. Un compte **créé ce
+   * jour-là ou après** ne voit pas le changement : il s'est inscrit sous la
+   * politique déjà à jour. Poser la date de mise en production prévue : une
+   * entrée datée du futur reste muette jusqu'à ce jour-là
+   * (`publishedPrivacyChanges`) — annoncée plus tôt, elle décrirait une règle
+   * qui ne s'applique pas encore.
    */
   publishedAt: string;
   /** Titre court, affiché en tête du changement et dans le message Discord. */
@@ -58,8 +73,8 @@ export type PrivacyChange = {
 };
 
 /**
- * Événement de fenêtre émis quand le joueur a accepté les changements
- * présentés. Les autres modales de la mise en page racine (lancement d'un match)
+ * Événement de fenêtre émis quand le joueur a pris connaissance des
+ * changements présentés. Les autres modales de la mise en page racine (lancement d'un match)
  * attendent ce signal pour s'ouvrir : deux modales ouvertes ensemble se
  * disputeraient le piège de focus, et celle du dessous le gagnerait.
  */
@@ -261,7 +276,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // les destinataires et les transferts hors UE qui existaient déjà.
   {
     id: "2026-10-retrait-google-one-tap",
-    publishedAt: "2026-10-01",
+    // Retrait mergé le 2026-09-29 (#278), avec les deux entrées précédentes :
+    // même mise en production, même date. L'identifiant, déjà publié, garde
+    // son « 2026-10 ».
+    publishedAt: "2026-09-30",
     title: "Plus d'invite Google, destinataires nommés",
     summary:
       "L'invite « Continuer avec Google » de la page de connexion est retirée : aucune page du site ne fait plus appel à Google dans ton navigateur. La politique de confidentialité nomme désormais chaque destinataire de tes données et les transferts hors de l'Union.",
@@ -273,35 +291,73 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   },
 ];
 
+/** Fuseau des dates de publication : celui de l'association. */
+export const PRIVACY_CHANGE_TIME_ZONE = "Europe/Paris";
+
+const PARIS_DAY = new Intl.DateTimeFormat("en-CA", {
+  timeZone: PRIVACY_CHANGE_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 /**
- * Les changements qu'un compte n'a pas encore acceptés, dans l'ordre du
- * registre.
+ * Le jour de Paris à l'instant `now`, `AAAA-MM-JJ` — celui auquel se comparent
+ * les dates de publication. Pas le jour UTC : entre minuit et deux heures, ce
+ * serait encore la veille, et un changement publié « aujourd'hui » attendrait.
+ */
+export function privacyChangeDay(now: Date): string {
+  const parts = Object.fromEntries(PARIS_DAY.formatToParts(now).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+/**
+ * Les changements déjà publiés le jour `today` (`publishedAt <= today`), dans
+ * l'ordre du registre. Une entrée datée du lendemain n'existe pas encore pour
+ * les joueurs : ni modale, ni message Discord, ni date de mise à jour de
+ * `/rgpd`, ni prise de connaissance acceptée par la route.
+ */
+export function publishedPrivacyChanges(
+  today: string,
+  changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
+): PrivacyChange[] {
+  return changes.filter((change) => change.publishedAt <= today);
+}
+
+/**
+ * Les changements publiés dont un compte n'a pas encore pris connaissance, dans
+ * l'ordre du registre.
  *
  * Un changement publié **avant** la création du compte le concerne ; publié le
- * jour même ou après, non — le compte a consenti à la politique déjà à jour.
+ * jour même ou après, non — le compte s'est inscrit sous la politique déjà à
+ * jour. Un changement pas encore publié (après `today`) ne concerne personne.
  * La comparaison se fait sur le **jour** (`AAAA-MM-JJ`, donc en chaînes) :
- * `created_at` arrive de MySQL en `dateStrings`, et comparer des jours évite
- * toute question de fuseau.
+ * `created_at` arrive de MySQL en `dateStrings`.
  *
  * @param accountCreatedAt `created_at` du compte (`AAAA-MM-JJ HH:MM:SS` ou ISO),
- *   `null` si inconnu — auquel cas tout ce qui n'est pas accepté est dû.
- * @param acknowledged Identifiants déjà acceptés par ce compte.
+ *   `null` si inconnu — auquel cas tout ce qui n'est pas acquitté est dû.
+ * @param acknowledged Identifiants déjà acquittés par ce compte.
+ * @param today Jour de Paris (`privacyChangeDay`).
  */
 export function pendingPrivacyChanges(
   accountCreatedAt: string | null,
   acknowledged: Iterable<string>,
+  today: string,
   changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
 ): PrivacyChange[] {
   const done = new Set(acknowledged);
   const createdDay = accountCreatedAt ? accountCreatedAt.slice(0, 10) : null;
-  return changes.filter(
+  return publishedPrivacyChanges(today, changes).filter(
     (change) => !done.has(change.id) && (createdDay === null || createdDay < change.publishedAt),
   );
 }
 
 /** Refus d'une demande d'acceptation mal formée. */
 export const INVALID_PRIVACY_CHANGES = "INVALID_PRIVACY_CHANGES";
-/** Refus d'une acceptation qui nomme un changement absent du registre. */
+/**
+ * Refus d'une prise de connaissance qui nomme un changement absent du registre,
+ * ou pas encore publié — qu'aucune modale n'a donc pu montrer.
+ */
 export const UNKNOWN_PRIVACY_CHANGE = "UNKNOWN_PRIVACY_CHANGE";
 
 export type PrivacyAcknowledgementCheck =
@@ -309,17 +365,20 @@ export type PrivacyAcknowledgementCheck =
   | { ok: false; error: typeof INVALID_PRIVACY_CHANGES | typeof UNKNOWN_PRIVACY_CHANGE };
 
 /**
- * Valide les identifiants envoyés à l'acceptation.
+ * Valide les identifiants envoyés à la prise de connaissance.
  *
  * L'écran envoie **ce qu'il a montré**, jamais « tout ce qui est dû » : un
  * changement publié entre l'affichage de la modale et le clic ne doit pas être
- * accepté par un joueur qui ne l'a pas lu. Le serveur se contente donc de
- * vérifier que chaque identifiant existe — un identifiant inconnu est refusé
- * plutôt qu'ignoré, sans quoi une faute de frappe côté client enregistrerait
- * une acceptation partielle en répondant « c'est fait ».
+ * acquitté par un joueur qui ne l'a pas lu. Le serveur se contente donc de
+ * vérifier que chaque identifiant est publié — un identifiant inconnu ou daté
+ * du futur est refusé plutôt qu'ignoré, sans quoi une faute de frappe côté
+ * client enregistrerait un acquittement partiel en répondant « c'est fait ».
+ *
+ * @param today Jour de Paris (`privacyChangeDay`).
  */
 export function checkPrivacyAcknowledgement(
   requested: unknown,
+  today: string,
   changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
 ): PrivacyAcknowledgementCheck {
   if (!Array.isArray(requested) || requested.length === 0 || requested.length > changes.length) {
@@ -328,7 +387,7 @@ export function checkPrivacyAcknowledgement(
   if (!requested.every((id): id is string => typeof id === "string")) {
     return { ok: false, error: INVALID_PRIVACY_CHANGES };
   }
-  const known = new Set(changes.map((change) => change.id));
+  const known = new Set(publishedPrivacyChanges(today, changes).map((change) => change.id));
   if (!requested.every((id) => known.has(id))) {
     return { ok: false, error: UNKNOWN_PRIVACY_CHANGE };
   }
@@ -359,12 +418,16 @@ export function formatPrivacyChangeDate(day: string): string {
 /**
  * Le mois de la dernière mise à jour de la politique, pour `/rgpd`
  * (« septembre 2026 ») — dérivé du registre, pour que la page ne puisse plus
- * annoncer une date antérieure au dernier changement présenté aux joueurs.
+ * annoncer une date antérieure au dernier changement présenté aux joueurs — ni
+ * postérieure au jour où on la lit.
+ *
+ * @param today Jour de Paris (`privacyChangeDay`).
  */
 export function privacyPolicyUpdatedLabel(
+  today: string,
   changes: readonly PrivacyChange[] = PRIVACY_CHANGES,
 ): string | null {
-  const last = changes.at(-1);
+  const last = publishedPrivacyChanges(today, changes).at(-1);
   if (!last) return null;
   const [year, month] = last.publishedAt.split("-").map(Number);
   return `${MONTHS[month - 1]} ${year}`;
@@ -383,8 +446,8 @@ export const PRIVACY_DM_MAX_LENGTH = 1800;
 /**
  * Le message privé Discord qui annonce des changements.
  *
- * Un **résumé**, pas le texte complet : le détail et le choix (accepter ou
- * supprimer son compte) vivent sur le site, où le joueur est connecté. Le
+ * Un **résumé**, pas le texte complet : le détail vit sur le site, où le
+ * joueur est connecté. Aucun accord n'est demandé, ni ici ni là-bas. Le
  * message nomme chaque changement par son titre et son résumé, puis dit où
  * décider. Borné sous le plafond du bot : au-delà, les derniers changements
  * sont comptés plutôt que coupés au milieu d'une phrase.
@@ -413,8 +476,8 @@ function layoutPrivacyChangesMessage(
       : "🔐 **BlueGenji — nos règles de confidentialité ont changé**";
   const where = siteUrl ? ` sur ${siteUrl}` : " sur le site";
   const footer =
-    `Le détail t'attend à ta prochaine visite${where} : tu pourras ${changes.length > 1 ? "les " : "l'"}accepter, ` +
-    "ou refuser et supprimer ton compte. Politique complète : " +
+    `Le détail t'attend à ta prochaine visite${where}. Aucun accord ne t'est demandé : ` +
+    "la politique de confidentialité dit comment t'opposer à un traitement ou exercer tes autres droits. Politique complète : " +
     (siteUrl ? `${siteUrl.replace(/\/$/, "")}/rgpd` : "page « RGPD » du site") +
     ".";
 
@@ -466,8 +529,8 @@ export function privacyChangesForOneMessage(
 /**
  * Au-delà de cette ancienneté, un changement ne s'annonce plus sur Discord.
  *
- * Le message privé est une **annonce**, pas le consentement — la modale s'en
- * charge, sans limite de temps. Un compte qui rattache Discord un an après un
+ * Le message privé n'est qu'un relais : la modale présente le changement sur
+ * le site, sans limite de temps. Un compte qui rattache Discord un an après un
  * changement n'a pas à recevoir une nouvelle vieille d'un an ; et la borne
  * garde la requête de balayage courte, le registre ne faisant que grandir.
  */
@@ -481,7 +544,7 @@ export const PRIVACY_DM_WINDOW_DAYS = 60;
  * muet, et le jour où il annonce un match, personne ne le lit plus. Or la
  * modale informe déjà tout joueur qui revient sur le site — le message privé
  * ne sert qu'à celui qui ne revient pas. On lui laisse donc une semaine : un
- * joueur actif accepte dans la modale et ne reçoit **rien**, et les changements
+ * joueur actif lit la modale et ne reçoit **rien**, et les changements
  * publiés en rafale pendant ce délai partent dans **un** message.
  */
 export const PRIVACY_DM_SETTLE_DAYS = 7;
