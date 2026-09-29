@@ -115,3 +115,10 @@ que l'afficher à l'envers.
   re-parcourir tout le plateau indéfiniment pour un affichage figé.
 - Les animations (pulsation du jalon courant, liseré de tête) s'éteignent sous
   `prefers-reduced-motion`.
+- Sur un écran étroit, la frise (780 px) **défile jusqu'à l'étape courante** au
+  montage puis à chaque changement d'étape, jamais entre deux : sur mobile elle
+  s'ouvrait sur « Masqué » et l'étape courante était hors champ. Mécanisme
+  partagé avec les rangées de manches de la Survie et de la Ronde suisse, qui
+  s'ouvrent sur la dernière : `ScrollArea` reçoit un `revealKey` et défile
+  jusqu'à l'élément marqué `data-scroll-reveal`, du plus petit défilement
+  possible, marge du dégradé de bord comprise (`lib/shared/scroll-reveal.ts`).

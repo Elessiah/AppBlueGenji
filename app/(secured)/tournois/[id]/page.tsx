@@ -61,6 +61,7 @@ import { orReload } from "./_lib/lazy-component";
 // recharge la page au lieu de la faire tomber.
 const SurvivalView = dynamic(() => orReload(import("./_components/SurvivalView").then((m) => m.SurvivalView)), { ssr: false });
 const SwissView = dynamic(() => orReload(import("./_components/SwissView").then((m) => m.SwissView)), { ssr: false });
+const SwissRounds = dynamic(() => orReload(import("./_components/SwissView").then((m) => m.SwissRounds)), { ssr: false });
 const EnduranceView = dynamic(() => orReload(import("./_components/EnduranceView").then((m) => m.EnduranceView)), { ssr: false });
 const BracketPreview = dynamic(() => orReload(import("./_components/BracketPreview").then((m) => m.BracketPreview)), { ssr: false });
 const PhaseStandingsBlock = dynamic(() => orReload(import("./_components/PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock)), { ssr: false });
@@ -509,6 +510,15 @@ export default function TournamentDetailPage() {
     : detail.matches;
 
   const formatForBracket = isMulti && selectedPhase ? selectedPhase.format : detail.card.format;
+  // Le classement suisse de l'instantané est celui du tournoi, ou — en
+  // multi-phases — de la seule phase **en cours** (`snapshot.ts`). Il ne décrit
+  // donc la phase affichée que si c'est elle.
+  const swissMetaIsSelectedPhase =
+    !isMulti || (selectedPhase !== null && selectedPhase.id === detail.currentPhaseId);
+  // Clé des vues à manches : changer de phase les remonte, et leur zone de
+  // manches se rouvre sur la dernière (`revealKey` ne suffit pas quand deux
+  // phases ont autant de manches).
+  const phaseViewKey = selectedPhase ? `phase-${selectedPhase.id}` : "tournament";
   const hasThirdPlaceForPhase = isMulti && selectedPhase ? selectedPhase.hasThirdPlaceMatch : detail.card.hasThirdPlaceMatch;
 
   const bracketOrder: BracketType[] =
@@ -681,6 +691,9 @@ export default function TournamentDetailPage() {
           ) : formatForBracket === "SURVIVAL" && detail.survival ? (
             <>
               <SurvivalView
+                // Une vue par phase : la rangée de manches se rouvre sur la
+                // dernière de la phase choisie, même à nombre de manches égal.
+                key={phaseViewKey}
                 survival={detail.survival}
                 matches={filteredMatches}
                 allTournamentMatches={detail.matches}
@@ -722,42 +735,41 @@ export default function TournamentDetailPage() {
               showNextRound={detail.isAdmin && detail.card.state === "RUNNING" && !frozen}
               qualificationFormat={detail.card.matchFormat}
             />
-          ) : detail.card.format === "SWISS" && detail.swiss ? (
-            <SwissView
-              swiss={detail.swiss}
-              matches={detail.matches}
-              allTournamentMatches={detail.matches}
-              myTeamId={detail.myTeamId}
-              isFinished={detail.card.state === "FINISHED"}
-              adminResolvable={canAdminResolve}
-              onOpenAdminModal={openAdminScore}
-              canForfeit={canForfeit}
-              onForfeit={forfeitTeam}
-              emptyLabel={noMatchesLabel}
-            />
-          ) : formatForBracket === "SWISS" ? (
+          ) : formatForBracket === "SWISS" && detail.swiss && swissMetaIsSelectedPhase ? (
+            // Tournoi suisse, ou phase suisse **en cours** d'un multi-phases :
+            // le serveur ne charge le classement suisse que de celle-ci.
             <>
-              {brackets.length > 0 ? (
-                brackets.map(({ type, matches }) => (
-                  <div key={type} className={styles.bracket}>
-                    <BracketSections
-                      bracketType={type}
-                      bracketLabel={bracketLabels[type]}
-                      showBracketLabel={brackets.length > 1}
-                      matches={matches}
-                      allTournamentMatches={detail.matches}
-                      myTeamId={detail.myTeamId}
-                      adminResolvable={canAdminResolve}
-                      onOpenAdminModal={openAdminScore}
-                      format={formatForBracket}
-                    />
-                  </div>
-                ))
-              ) : (
-                <p className={styles.empty}>
-                  {noMatchesLabel}
-                </p>
-              )}
+              <SwissView
+                key={phaseViewKey}
+                swiss={detail.swiss}
+                matches={filteredMatches}
+                allTournamentMatches={detail.matches}
+                myTeamId={detail.myTeamId}
+                isFinished={detail.card.state === "FINISHED"}
+                adminResolvable={canAdminResolve}
+                onOpenAdminModal={openAdminScore}
+                canForfeit={canForfeit}
+                onForfeit={forfeitTeam}
+                emptyLabel={noMatchesLabel}
+              />
+              {/* Pas de `finishedPhaseStandings` ici : la phase en cours ne
+                  se clôt qu'avec le tournoi (dernière phase), et la vue porte
+                  déjà son classement — il s'afficherait deux fois. */}
+            </>
+          ) : formatForBracket === "SWISS" ? (
+            // Phase suisse close d'un multi-phases : ses rondes, et son
+            // classement de phase dessous. Jamais un arbre à élimination, qui
+            // nommait ses rondes « Quart de finale 1…12 ».
+            <>
+              <SwissRounds
+                key={phaseViewKey}
+                matches={filteredMatches}
+                allTournamentMatches={detail.matches}
+                totalRounds={null}
+                adminResolvable={canAdminResolve}
+                onOpenAdminModal={openAdminScore}
+                emptyLabel={noMatchesLabel}
+              />
               {finishedPhaseStandings}
             </>
           ) : !filteredMatches.length ? (

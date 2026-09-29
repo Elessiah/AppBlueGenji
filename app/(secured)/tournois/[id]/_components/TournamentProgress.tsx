@@ -6,6 +6,7 @@ import {
   computeTournamentProgress,
   formatStageCountdown,
 } from "@/lib/shared/tournament-progress";
+import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { EntrantName } from "./EntrantName";
 import styles from "./TournamentProgress.module.css";
@@ -96,6 +97,10 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
         subtle
         fade
         ariaLabel="Frise de progression du tournoi — défilement horizontal"
+        // La frise (780 px) s'ouvrait sur son début : sur mobile, l'étape
+        // courante était hors champ. Elle défile jusqu'à elle au montage, puis
+        // à chaque changement d'étape — jamais entre deux.
+        revealKey={progress.current}
       >
         <div className={styles.rail}>
           <div className={styles.trackWrap}>
@@ -142,6 +147,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
                     className={styles.node}
                     style={{ left: `${(index / lastIndex) * 100}%` }}
                     aria-current={stage.status === "CURRENT" ? "step" : undefined}
+                    {...(stage.status === "CURRENT" ? { [SCROLL_REVEAL_ATTRIBUTE]: "" } : {})}
                     title={stage.hint}
                   >
                     <span className={dotClass} aria-hidden="true" />

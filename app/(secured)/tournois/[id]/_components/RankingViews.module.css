@@ -1,0 +1,68 @@
+/* =========================================================
+   Classements des vues Survie et Ronde suisse — mise en page étroite
+   ========================================================= */
+
+/* --- Ronde suisse : pistes du tableau ---------------------
+   Toutes les colonnes prennent la largeur de leur cellule la plus large, sauf
+   le nom, qui prend le reste — avec un plancher (en `em`, qui suit la police).
+   La colonne d'action n'existe que si une ligne au moins porte le bouton
+   d'abandon (`data-with-action`). */
+.swissTable {
+  display: grid;
+  grid-template-columns: auto minmax(6em, 1fr) auto auto auto auto auto;
+  column-gap: 10px;
+}
+
+.swissTable[data-with-action] {
+  grid-template-columns: auto minmax(6em, 1fr) auto auto auto auto auto auto;
+}
+
+/* Cellule d'action : `display` vit ici et jamais en ligne, où il battrait le
+   masquage des cellules vides sous 720 px. */
+.swissAction {
+  display: flex;
+}
+
+/* --- Survie : cellule d'action d'une ligne ---------------- */
+.survivalRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.survivalAction {
+  display: flex;
+  flex-shrink: 0;
+}
+
+/* Sous 720 px, la colonne « Abandonner » écrasait les noms (« Test - … ») ou
+   sortait du tableau : l'action passe **sous** le nom, sur sa propre ligne,
+   alignée sur lui. */
+@media (max-width: 720px) {
+  .swissTable[data-with-action] {
+    grid-template-columns: auto minmax(6em, 1fr) auto auto auto auto auto;
+  }
+
+  .swissAction {
+    grid-column: 2 / -1;
+    padding-top: 4px;
+  }
+
+  /* La cellule existe sur toutes les lignes dès qu'une seule porte le bouton :
+     sans bouton, elle ajouterait une ligne vide sous chaque équipe. L'en-tête
+     de colonne part avec elle, la colonne n'existant plus à cette largeur. */
+  .swissAction:not(:has(button)) {
+    display: none;
+  }
+
+  .survivalRow {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .survivalAction {
+    flex-basis: 100%;
+    /* Rang (22 px) + écart (10 px) : le bouton s'aligne sur le nom. */
+    padding-left: 32px;
+  }
+}
