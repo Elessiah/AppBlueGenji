@@ -47,7 +47,6 @@ export async function POST(req: Request) {
         subject: profile.sub,
         handle: null,
         avatarUrl: profile.picture ?? null,
-        displayName: profile.name ?? null,
       },
       { termsAccepted: body.termsAccepted === true },
     );

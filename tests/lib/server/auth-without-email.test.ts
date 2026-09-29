@@ -93,7 +93,7 @@ describe("createOrGetGoogleUser — l'identité est le `sub`, jamais l'adresse",
       sql.startsWith("INSERT INTO bg_users") ? [{ insertId: 12 }] : undefined,
     );
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf" }, { termsAccepted: true });
 
     expect(queries.some((q) => q.sql.includes("WHERE email"))).toBe(false);
   });
@@ -103,7 +103,7 @@ describe("createOrGetGoogleUser — l'identité est le `sub`, jamais l'adresse",
       sql.startsWith("INSERT INTO bg_users") ? [{ insertId: 12 }] : undefined,
     );
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf" }, { termsAccepted: true });
 
     const insert = queries.find((q) => q.sql.startsWith("INSERT INTO bg_users"))!;
     expect(insert.sql).toContain("(pseudo, avatar_url, google_sub)");

@@ -70,11 +70,11 @@ const OAUTH_CLIENTS: Record<OAuthProvider, OAuthClient> = {
       return {
         provider: "GOOGLE",
         subject: profile.sub,
-        // Google ne donne aucun tag que le site ait à ranger : son nom
-        // d'affichage ne sert qu'à proposer un pseudo à la création.
+        // Google ne donne aucun tag que le site ait à ranger, et son nom
+        // d'affichage — un nom réel, le plus souvent — n'est pas repris :
+        // le compte naît sous un pseudo neutre (`createOrGetGoogleUser`).
         handle: null,
         avatarUrl: profile.picture ?? null,
-        displayName: profile.name ?? null,
       };
     },
   },
@@ -91,7 +91,6 @@ const OAUTH_CLIENTS: Record<OAuthProvider, OAuthClient> = {
         // premier que la certification publie à l'arbitrage.
         handle: user.username,
         avatarUrl: discordAvatarUrl(user),
-        displayName: user.global_name ?? user.username,
       };
     },
   },
@@ -105,7 +104,6 @@ const OAUTH_CLIENTS: Record<OAuthProvider, OAuthClient> = {
         handle: user.battletag ?? null,
         // Battle.net ne sert aucune photo de profil par l'`userinfo`.
         avatarUrl: null,
-        displayName: user.battletag ?? null,
       };
     },
   },

@@ -71,7 +71,6 @@ import type {
  */
 export type GoogleProfilePayload = {
   sub: string;
-  name?: string;
   picture?: string;
 };
 
@@ -470,8 +469,14 @@ export async function createOrGetGoogleUser(
   // tout seul : depuis `/profil`, un joueur **déjà connecté** rattache un second
   // fournisseur (`lib/server/account-identities.ts`). Une identité Google
   // inconnue, elle, ouvre un compte neuf — et rien d'autre.
-  const pseudoSource = profile.name ?? `player${Date.now().toString().slice(-5)}`;
-  const pseudo = await ensureUniquePseudo(pseudoSource);
+  //
+  // **Le pseudo n'est jamais tiré du nom Google.** Le `name` d'un profil Google
+  // est le plus souvent un prénom et un nom réels, et un pseudo est public et
+  // ne se masque pas : le reprendre démentait la promesse « aucun nom réel »
+  // (`/rgpd`, modale de consentement, registre T01). Le compte naît donc sous
+  // un pseudo neutre, que le joueur remplace depuis « Mon profil » — et le nom
+  // ne traverse même plus la frontière du fournisseur (`GoogleProfilePayload`).
+  const pseudo = await ensureUniquePseudo(`player${Date.now().toString().slice(-5)}`);
 
   // L'avatar n'est pas posé ici : le nom du fichier porte l'identifiant du
   // compte, qui n'existe qu'une fois la ligne écrite. La photo est copiée juste
@@ -499,6 +504,15 @@ export async function createOrGetGoogleUser(
  * site — c'est ce que `visibleAvatarUrl` exige à la sortie. Discord sert ses
  * avatars depuis son propre CDN : même geste, même raison, donc la même
  * fonction.
+ *
+ * **La photo importée naît masquée** (`visible_avatar = 0`). Le joueur ne l'a
+ * pas choisie : elle vient du fournisseur par lequel il s'est connecté, et la
+ * publier d'office à tout membre connecté — et, par l'entrée solo, jusqu'à la
+ * vitrine publique — serait une mise à disposition sans intervention de
+ * l'intéressé (RGPD art. 25.2). Il la rend visible d'une case sur « Mon
+ * profil ». Le réglage n'est posé qu'ici, à l'import : un avatar téléversé à la
+ * main n'est jamais concerné, et l'entrée solo n'a rien à resynchroniser — il
+ * n'y avait aucun avatar local avant l'import (`shouldImportRemoteAvatar`).
  *
  * Silencieux par construction : un CDN indisponible ne doit pas faire échouer
  * une connexion. Le compte reste alors sans avatar — pastille à initiale — et
@@ -530,7 +544,7 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
   // sans lui, une photo personnelle orpheline survivait à un compte dont on
   // venait de promettre qu'il ne resterait rien.
   const [result] = await db.execute<ResultSetHeader>(
-    `UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`,
+    `UPDATE bg_users SET avatar_url = ?, visible_avatar = 0 WHERE id = ? AND is_deleted = 0`,
     [stored, userId],
   );
   if (Number(result.affectedRows) === 0) {

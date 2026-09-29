@@ -54,7 +54,7 @@ describe("POST /api/auth/google/one-tap", () => {
   });
 
   it("ouvre une session sur un jeton valide, par le même aiguillage que les trois autres portes", async () => {
-    verifyMock.mockResolvedValue({ sub: "google-sub-1", name: "Nova", picture: "https://example/pic.png" });
+    verifyMock.mockResolvedValue({ sub: "google-sub-1", picture: "https://example/pic.png" });
 
     const res = await attempt("jeton-valide");
 
@@ -65,7 +65,6 @@ describe("POST /api/auth/google/one-tap", () => {
         subject: "google-sub-1",
         handle: null,
         avatarUrl: "https://example/pic.png",
-        displayName: "Nova",
       },
       { termsAccepted: false },
     );
@@ -106,7 +105,7 @@ describe("POST /api/auth/google/one-tap — CSRF de connexion", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetRateLimit(GOOGLE_ONE_TAP_RULE.name);
-    verifyMock.mockResolvedValue({ sub: "attaquant", name: "A" });
+    verifyMock.mockResolvedValue({ sub: "attaquant" });
     createUserMock.mockResolvedValue(42);
     createSessionMock.mockResolvedValue(undefined);
   });

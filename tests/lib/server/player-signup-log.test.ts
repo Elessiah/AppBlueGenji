@@ -92,7 +92,7 @@ describe("inscription par Google", () => {
   it("annonce le compte qui vient de naître", async () => {
     fakeDb([]);
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true });
+    await createOrGetGoogleUser({ sub: "google-sub-neuf" }, { termsAccepted: true });
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);
     // Le compte n'est **pas** nommé : ni pseudo, ni identifiant (qui mène à
@@ -109,7 +109,7 @@ describe("inscription par Google", () => {
     fakeDb([{ id: 7, google_sub: "google-sub-neuf", discord_id: null }]);
 
     await expect(
-      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true }),
+      createOrGetGoogleUser({ sub: "google-sub-neuf" }, { termsAccepted: true }),
     ).resolves.toBe(7);
 
     expect(sendBotLog).not.toHaveBeenCalled();
@@ -124,7 +124,7 @@ describe("inscription par Google", () => {
     fakeDb([{ id: 7, google_sub: null, discord_id: "123456789" }]);
 
     await expect(
-      createOrGetGoogleUser({ sub: "google-sub-neuf", name: "Nova" }, { termsAccepted: true }),
+      createOrGetGoogleUser({ sub: "google-sub-neuf" }, { termsAccepted: true }),
     ).resolves.toBe(4242);
 
     expect(sendBotLog).toHaveBeenCalledTimes(1);

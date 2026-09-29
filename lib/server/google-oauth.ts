@@ -10,7 +10,8 @@
  */
 export type GoogleUserInfo = {
   sub: string;
-  name?: string;
+  // Pas de `name` : Google le rend avec la portée `profile`, mais c'est le plus
+  // souvent un nom réel et le site n'en fait rien (`createOrGetGoogleUser`).
   picture?: string;
 };
 

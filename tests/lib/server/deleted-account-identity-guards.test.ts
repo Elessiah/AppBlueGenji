@@ -106,7 +106,7 @@ describe("rattachement d'une identité OAuth — jamais sur une ligne morte", ()
     provider: OAuthIdentity["provider"],
     subject: string,
     handle: string | null = null,
-  ): OAuthIdentity => ({ provider, subject, handle, avatarUrl: null, displayName: null });
+  ): OAuthIdentity => ({ provider, subject, handle, avatarUrl: null });
 
   const identities: [string, OAuthIdentity][] = [
     ["GOOGLE", identity("GOOGLE", "g-1")],

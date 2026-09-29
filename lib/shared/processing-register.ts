@@ -103,7 +103,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     legalBasis: "Consentement (création du compte, choix des données affichées)",
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
-      "Pseudo du site, avatar (copié sur nos serveurs)",
+      "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)",
       "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord",
       "Majorité déclarée (oui / non / non renseignée)",
       "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",

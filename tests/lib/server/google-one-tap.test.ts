@@ -75,7 +75,9 @@ describe("verifyGoogleOneTapCredential", () => {
 
     const identity = await verifyGoogleOneTapCredential(credential);
 
-    expect(identity).toEqual({ sub: "42", name: "Nova", picture: "https://example/pic.png" });
+    // Le jeton porte le nom du compte Google ; il n'en sort pas — un nom réel
+    // n'a rien à faire dans un compte fait de pseudonymes.
+    expect(identity).toEqual({ sub: "42", picture: "https://example/pic.png" });
   });
 
   it("ne relit le jeu de clés qu'une fois pour deux vérifications", async () => {

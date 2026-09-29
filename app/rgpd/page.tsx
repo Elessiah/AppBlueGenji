@@ -88,6 +88,12 @@ export default async function RgpdPage() {
           <p>
             BlueGenji ne demande aucun nom réel, aucun numéro de téléphone, aucune
             adresse postale. L'ensemble des données repose sur des pseudonymes de jeu.
+            Google transmet le nom de ton compte avec ta photo : depuis le 30 septembre
+            2026, il n&apos;est ni repris ni conservé, un compte créé par Google reçoit un
+            pseudo neutre que tu remplaces dans Mon profil, et la photo copiée depuis
+            Google ou Discord reste masquée tant que tu ne choisis pas de l&apos;afficher.
+            Un compte créé par Google avant cette date a pu recevoir le nom de ce compte
+            pour pseudo : si c&apos;est le tien, change-le dans Mon profil.
           </p>
         </div>
         <table className={styles.dataTable} style={{ marginTop: 24 }}>

@@ -129,7 +129,6 @@ const identity = (overrides: Partial<OAuthIdentity> = {}): OAuthIdentity => ({
   subject: "123456789012345678",
   handle: "nova",
   avatarUrl: null,
-  displayName: "Nova",
   ...overrides,
 });
 
@@ -152,7 +151,6 @@ describe("createOrGetOAuthUser", () => {
     expect(createOrGetGoogleUser).toHaveBeenCalledWith(
       {
         sub: "sub",
-        name: "Nova",
         picture: undefined,
       },
       CONSENT,
