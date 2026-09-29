@@ -809,8 +809,8 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   border-radius: 999px;
   border: 1px solid rgba(90, 200, 255, 0.38);
   background: rgba(18, 36, 68, 0.72);
-  backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
+  backdrop-filter: blur(16px);
   color: var(--blue-300);
   font-family: var(--font-mono);
   font-size: 20px;
