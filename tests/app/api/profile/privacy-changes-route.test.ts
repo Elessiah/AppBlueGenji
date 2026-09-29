@@ -64,8 +64,8 @@ describe("POST /api/profile/privacy-changes", () => {
     expect(await refused.json()).toEqual({ error: "UNKNOWN_PRIVACY_CHANGE" });
     expect(acknowledgePrivacyChanges).not.toHaveBeenCalled();
 
-    // Minuit passé à Paris (encore la veille en UTC) : publiée.
-    atInstant(`${entry.publishedAt}T00:30:00+02:00`);
+    // 23 h 30 UTC la veille : minuit passé à Paris en toute saison (UTC+1 ou +2).
+    atInstant(`${entry.publishedAt}T00:30:00+01:00`);
     expect((await POST(req({ changeIds: [entry.id] }))).status).toBe(200);
   });
 
