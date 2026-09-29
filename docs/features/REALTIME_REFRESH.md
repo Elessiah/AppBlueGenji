@@ -214,7 +214,11 @@ tomberait jusqu'au filet de 5 min. Un état stocké qui retarde sur ses dates
 (`isStateOverdue`) fait donc relire après `STATE_CATCH_UP_MS` (4 s, plus que le
 cache) ; s'il retarde encore à cette relecture, ce n'est plus le cache mais un
 entretien qui n'aboutit pas, et la salle passe au pas de 30 s plutôt que de
-boucler.
+boucler. Même rattrapage pour un **report unique** expiré (`isRoomOverdue`).
+Un **conflit** de score expiré, en revanche, n'est pas une échéance manquée :
+rien ne le tranche avant l'arbitrage, et la salle n'attend que son escalade
+(`score_deadline_at` + `SCORE_REPORT_TIMEOUT_MINUTES`) ou le filet — le relire
+toutes les 30 s rouvrirait le battement supprimé.
 
 ### Rendu du plateau
 

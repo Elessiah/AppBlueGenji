@@ -45,6 +45,7 @@ import { snapshotFrameBytes, type StreamEncoding } from "./tournament-stream-fra
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import { computeTournamentState, nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
 import type { TournamentSnapshot } from "@/lib/shared/types";
+import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 
 /**
  * Filet de sécurité d'une salle occupée : au plus tard, elle relit l'instantané
@@ -76,14 +77,17 @@ export const ROOM_READ_RETRY_MS = 30_000;
 export const SCORE_DEADLINE_MARGIN_MS = 1_000;
 
 /**
- * Relecture après une bascule d'état **manquée** : la salle s'est réveillée à
- * l'heure dite, mais l'instantané lu venait du cache (3 s,
- * `SNAPSHOT_TTL_MS` de `./tournaments/snapshot`) — posé juste avant la bascule
- * par une connexion ou une lecture de secours —, si bien que l'entretien à la
- * lecture n'a pas joué. Relire une fois le cache expiré. Doit rester supérieur
- * au TTL du cache (`tests/lib/server/tournament-snapshot.test.ts` le vérifie).
+ * Relecture après une échéance **manquée** : la salle s'est réveillée à l'heure
+ * dite, mais l'instantané lu venait du cache (3 s, `SNAPSHOT_TTL_MS` de
+ * `./tournaments/snapshot`) — posé juste avant par une connexion ou une lecture
+ * de secours —, si bien que l'entretien à la lecture n'a pas joué. Relire une
+ * fois le cache expiré. Doit rester supérieur au TTL du cache
+ * (`tests/lib/server/tournament-snapshot.test.ts` le vérifie).
  */
 export const STATE_CATCH_UP_MS = 4_000;
+
+/** Délai de l'escalade d'un conflit de score à l'arbitrage, après le délai de report. */
+const CONFLICT_ESCALATION_MS = SCORE_REPORT_TIMEOUT_MINUTES * 60_000;
 
 /**
  * L'état stocké du tournoi retarde-t-il sur ses dates ? Une date illisible ne
@@ -96,6 +100,35 @@ export function isStateOverdue(card: TournamentSnapshot["card"], now: number): b
   return computeTournamentState(card, now) !== card.state;
 }
 
+type DeadlineMatch = TournamentSnapshot["matches"][number];
+
+/** Délai de report d'un match en attente de confirmation, ou `null`. */
+function scoreDeadlineOf(match: DeadlineMatch): number | null {
+  if (match.status !== "AWAITING_CONFIRMATION" || !match.scoreDeadlineAt) return null;
+  const deadline = Date.parse(match.scoreDeadlineAt);
+  return Number.isFinite(deadline) ? deadline : null;
+}
+
+/**
+ * Deux reports contradictoires : l'expiration du délai ne tranche rien
+ * (`resolveExpiredScoreReports`), le match attend l'arbitrage.
+ */
+function isScoreConflict(match: DeadlineMatch): boolean {
+  return Boolean(match.team1Report) && Boolean(match.team2Report);
+}
+
+/**
+ * L'instantané retarde-t-il sur une échéance déjà passée que l'entretien à la
+ * lecture aurait dû jouer — bascule d'état, ou report **unique** expiré ?
+ */
+export function isRoomOverdue(snapshot: TournamentSnapshot, now: number): boolean {
+  if (isStateOverdue(snapshot.card, now)) return true;
+  return (snapshot.matches ?? []).some((match) => {
+    const deadline = scoreDeadlineOf(match);
+    return deadline !== null && !isScoreConflict(match) && deadline + SCORE_DEADLINE_MARGIN_MS <= now;
+  });
+}
+
 /**
  * Prochain instant où la salle doit relire l'instantané d'elle-même, ou `null`
  * s'il n'y en a aucun.
@@ -105,18 +138,21 @@ export function isStateOverdue(card: TournamentSnapshot["card"], now: number): b
  * - Sinon, la plus proche de : la prochaine bascule d'état (ouverture ou
  *   clôture des inscriptions, coup d'envoi), le délai de report de score le
  *   plus proche (`score_deadline_at`, que l'entretien à la lecture tranche),
- *   et le filet de sécurité.
- * - Une bascule **déjà passée** que l'instantané ne reflète pas encore
- *   ({@link isStateOverdue}) se rattrape après `stateCatchUpMs` : sans cela,
- *   `nextTournamentStateChangeAt` ne rendant que des instants futurs, elle
- *   tomberait jusqu'au filet — un coup d'envoi annoncé cinq minutes en retard.
+ *   l'escalade d'un conflit de score à l'arbitrage, et le filet de sécurité.
+ * - Une échéance **déjà passée** que l'instantané ne reflète pas encore
+ *   ({@link isRoomOverdue}) se rattrape après `catchUpMs` : les échéances
+ *   passées n'étant plus des instants futurs, elle tomberait sinon jusqu'au
+ *   filet — un coup d'envoi annoncé cinq minutes en retard.
+ * - Un **conflit** dont le délai est passé n'est pas une échéance manquée :
+ *   rien ne le tranche avant l'arbitrage. Seule son escalade compte ; le
+ *   relire toutes les 30 s rouvrirait le battement que ce réveil supprime.
  *
  * Exportée pour être vérifiable directement.
  */
 export function nextRoomWakeAt(
   snapshot: TournamentSnapshot,
   now: number,
-  stateCatchUpMs: number = STATE_CATCH_UP_MS,
+  catchUpMs: number = STATE_CATCH_UP_MS,
 ): number | null {
   const { card } = snapshot;
   if (card.state === "FINISHED") return null;
@@ -132,17 +168,20 @@ export function nextRoomWakeAt(
     now,
   );
   if (boundary !== null) wakeAt = Math.min(wakeAt, boundary);
-  if (isStateOverdue(card, now)) wakeAt = Math.min(wakeAt, now + stateCatchUpMs);
+  if (isRoomOverdue(snapshot, now)) wakeAt = Math.min(wakeAt, now + catchUpMs);
 
   for (const match of snapshot.matches ?? []) {
-    if (match.status !== "AWAITING_CONFIRMATION" || !match.scoreDeadlineAt) continue;
-    const deadline = Date.parse(match.scoreDeadlineAt);
-    if (!Number.isFinite(deadline)) continue;
-    // Une échéance déjà passée n'a pas été tranchée par la lecture qui vient
-    // d'avoir lieu (incident, course) : on retente après le délai d'essai, pas
-    // en boucle serrée.
-    const target = deadline + SCORE_DEADLINE_MARGIN_MS;
-    wakeAt = Math.min(wakeAt, target > now ? target : now + ROOM_READ_RETRY_MS);
+    const deadline = scoreDeadlineOf(match);
+    if (deadline === null) continue;
+    const expiry = deadline + SCORE_DEADLINE_MARGIN_MS;
+    if (expiry > now) {
+      wakeAt = Math.min(wakeAt, expiry);
+      continue;
+    }
+    if (isScoreConflict(match)) {
+      const escalation = deadline + CONFLICT_ESCALATION_MS + SCORE_DEADLINE_MARGIN_MS;
+      if (escalation > now) wakeAt = Math.min(wakeAt, escalation);
+    }
   }
   return wakeAt;
 }
@@ -286,11 +325,11 @@ type Room = {
   /** Un changement est arrivé pendant un envoi : il faudra repasser. */
   dirtyAgain: boolean;
   /**
-   * La dernière lecture montrait déjà une bascule d'état en retard. Une
+   * La dernière lecture montrait déjà une échéance manquée (`isRoomOverdue`). Une
    * seconde lecture en retard n'est plus l'effet du cache mais d'un entretien
    * qui n'aboutit pas : on retente alors au pas lent, jamais en boucle serrée.
    */
-  stateOverdue: boolean;
+  overdue: boolean;
 };
 
 const rooms = new Map<number, Room>();
@@ -463,9 +502,9 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     // Réveil à la prochaine échéance connue (bascule d'état, report expiré),
     // à l'heure exacte : sans lui, il faudrait compter sur chaque client pour
     // se réveiller seul, ce qui ferait repartir cent requêtes à la même seconde.
-    const overdue = isStateOverdue(frame.snapshot.card, now);
-    const catchUpMs = overdue && room.stateOverdue ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS;
-    room.stateOverdue = overdue;
+    const overdue = isRoomOverdue(frame.snapshot, now);
+    const catchUpMs = overdue && room.overdue ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS;
+    room.overdue = overdue;
     scheduleMaintenance(tournamentId, room, nextRoomWakeAt(frame.snapshot, now, catchUpMs));
 
     if (Number.isFinite(nextDelay)) scheduleFlush(tournamentId, room, nextDelay);
@@ -526,7 +565,7 @@ function openRoom(tournamentId: number, known?: TournamentSnapshot): Room {
     flushAt: 0,
     flushing: false,
     dirtyAgain: false,
-    stateOverdue: false,
+    overdue: false,
   };
 
   // L'événement lui-même ne sert qu'à réveiller la salle : ce qui part aux

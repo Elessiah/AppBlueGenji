@@ -19,6 +19,7 @@ import {
   SCORE_DEADLINE_MARGIN_MS,
   STATE_CATCH_UP_MS,
   budgetDelayMs,
+  isRoomOverdue,
   isStateOverdue,
   joinTournamentRoom,
   nextRoomWakeAt,
@@ -28,6 +29,7 @@ import {
 import { publishTournamentEvent } from "@/lib/server/live";
 import { GZIP_STREAM_HEADER } from "@/lib/server/sse-gzip";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
+import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 
 // Un tournoi en cours dont les jalons sont passés : aucune bascule à venir ni en retard.
 const OPENED_AT = "2000-01-01T00:00:00.000Z";
@@ -176,11 +178,48 @@ describe("nextRoomWakeAt", () => {
     expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + 45_000 + SCORE_DEADLINE_MARGIN_MS);
   });
 
-  it("retente sans boucler sur un délai déjà dépassé", () => {
+  it("rattrape un report unique expiré que la lecture n'a pas tranché, sans boucler", () => {
+    // Lecture servie par le cache juste avant le délai : rattrapage une fois le
+    // cache expiré, puis au pas lent si le retard persiste.
     const snapshot = snapshotOf({ state: "RUNNING" }, [
-      { status: "AWAITING_CONFIRMATION", scoreDeadlineAt: iso(NOW - 10_000) },
+      {
+        status: "AWAITING_CONFIRMATION",
+        scoreDeadlineAt: iso(NOW - 10_000),
+        team1Report: { score: 2, opponentScore: 1 },
+        team2Report: null,
+      },
     ]);
-    expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + ROOM_READ_RETRY_MS);
+    expect(isRoomOverdue(snapshot, NOW)).toBe(true);
+    expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + STATE_CATCH_UP_MS);
+    expect(nextRoomWakeAt(snapshot, NOW, ROOM_READ_RETRY_MS)).toBe(NOW + ROOM_READ_RETRY_MS);
+  });
+
+  it("n'attend d'un conflit expiré que son escalade à l'arbitrage", () => {
+    // Deux reports contradictoires : l'expiration ne tranche rien. Relire toutes
+    // les 30 s jusqu'à l'arbitrage rouvrirait le battement supprimé.
+    const conflict = (deadline: number) => ({
+      status: "AWAITING_CONFIRMATION",
+      scoreDeadlineAt: iso(deadline),
+      team1Report: { score: 2, opponentScore: 1 },
+      team2Report: { score: 2, opponentScore: 1 },
+    });
+    const escalation = SCORE_REPORT_TIMEOUT_MINUTES * 60_000;
+
+    // Délai passé depuis longtemps, escalade dans une minute.
+    const fresh = snapshotOf({ state: "RUNNING" }, [conflict(NOW - escalation + 60_000)]);
+    expect(isRoomOverdue(fresh, NOW)).toBe(false);
+    expect(nextRoomWakeAt(fresh, NOW)).toBe(NOW + 60_000 + SCORE_DEADLINE_MARGIN_MS);
+
+    // Délai tout juste passé : l'escalade est loin, le filet l'emporte — et
+    // surtout pas une relecture toutes les 30 s.
+    const recent = snapshotOf({ state: "RUNNING" }, [conflict(NOW - 10_000)]);
+    expect(nextRoomWakeAt(recent, NOW)).toBe(
+      Math.min(NOW + ROOM_SAFETY_NET_MS, NOW - 10_000 + escalation + SCORE_DEADLINE_MARGIN_MS),
+    );
+
+    // Escalade passée : plus rien à attendre que le filet.
+    const stalled = snapshotOf({ state: "RUNNING" }, [conflict(NOW - escalation - 60_000)]);
+    expect(nextRoomWakeAt(stalled, NOW)).toBe(NOW + ROOM_SAFETY_NET_MS);
   });
 
   it("rattrape vite une bascule déjà passée que l'instantané ne reflète pas", () => {
