@@ -335,11 +335,12 @@ type Room = {
   /** Un changement est arrivé pendant un envoi : il faudra repasser. */
   dirtyAgain: boolean;
   /**
-   * La dernière lecture montrait déjà une échéance manquée (`isRoomOverdue`). Une
-   * seconde lecture en retard n'est plus l'effet du cache mais d'un entretien
-   * qui n'aboutit pas : on retente alors au pas lent, jamais en boucle serrée.
+   * Première lecture montrant une échéance manquée (`isRoomOverdue`), ou
+   * `null`. Une lecture encore en retard **après l'expiration du cache** n'est
+   * plus l'effet du cache mais d'un entretien qui n'aboutit pas : on retente
+   * alors au pas lent, jamais en boucle serrée.
    */
-  overdue: boolean;
+  overdueSince: number | null;
 };
 
 const rooms = new Map<number, Room>();
@@ -512,10 +513,22 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     // Réveil à la prochaine échéance connue (bascule d'état, report expiré),
     // à l'heure exacte : sans lui, il faudrait compter sur chaque client pour
     // se réveiller seul, ce qui ferait repartir cent requêtes à la même seconde.
+    //
+    // Une échéance manquée se rattrape après le cache ; elle ne passe au pas
+    // lent que si elle survit à une lecture faite **après** l'expiration du
+    // cache — une autre lecture tombée dans la fenêtre (une connexion au coup
+    // d'envoi) relit le même instantané et ne prouve rien. Tant qu'on rattrape,
+    // un réveil déjà plus proche est gardé.
     const overdue = isRoomOverdue(frame.snapshot, now);
-    const catchUpMs = overdue && room.overdue ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS;
-    room.overdue = overdue;
-    scheduleMaintenance(tournamentId, room, nextRoomWakeAt(frame.snapshot, now, catchUpMs));
+    if (!overdue) room.overdueSince = null;
+    else room.overdueSince ??= now;
+    const persistent = room.overdueSince !== null && now - room.overdueSince >= STATE_CATCH_UP_MS;
+    scheduleMaintenance(
+      tournamentId,
+      room,
+      nextRoomWakeAt(frame.snapshot, now, persistent ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS),
+      overdue && !persistent,
+    );
 
     if (Number.isFinite(nextDelay)) scheduleFlush(tournamentId, room, nextDelay);
   } finally {
@@ -587,7 +600,7 @@ function openRoom(tournamentId: number, known?: TournamentSnapshot): Room {
     flushAt: 0,
     flushing: false,
     dirtyAgain: false,
-    overdue: false,
+    overdueSince: null,
   };
 
   // L'événement lui-même ne sert qu'à réveiller la salle : ce qui part aux

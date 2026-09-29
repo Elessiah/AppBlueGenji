@@ -407,6 +407,32 @@ describe("tournament-broadcast — réveil d'entretien", () => {
     expect(late.received).toEqual(['data: "v2"']);
   });
 
+  it("ne passe pas au pas lent sur une seconde lecture du même cache", async () => {
+    // Au coup d'envoi, une connexion relit l'instantané en cache pendant la
+    // fenêtre de rattrapage : ce n'est pas la preuve d'un entretien en échec.
+    const start = Date.now() + 10_000;
+    const beforeKickoff = {
+      state: "UPCOMING" as const,
+      registrationOpenAt: iso(start - 120_000),
+      registrationCloseAt: iso(start - 60_000),
+      startAt: iso(start),
+    };
+    const viewer = plainSubscriber("v1");
+    await settledJoin(frameOf("v1", beforeKickoff), viewer);
+
+    await advance(10_000); // Réveil à l'heure : lecture du cache, en retard.
+    await advance(1_000);
+    publish(); // Une autre lecture, toujours dans la fenêtre.
+    await advance(0);
+    expect(getFrame).toHaveBeenCalledTimes(2);
+
+    // Le rattrapage tient à 4 s de la première lecture en retard.
+    getFrame.mockResolvedValue(frameOf("v2", { ...beforeKickoff, state: "RUNNING" }));
+    await advance(STATE_CATCH_UP_MS - 1_000);
+    expect(getFrame).toHaveBeenCalledTimes(3);
+    expect(viewer.received).toEqual(['data: "v2"']);
+  });
+
   it("ne repousse pas une échéance proche après une lecture en échec", async () => {
     // Un coup d'envoi dans 5 s ; une écriture publiée entre-temps tombe sur une
     // base en panne. Le délai d'essai (30 s) ne doit pas remplacer le réveil.
