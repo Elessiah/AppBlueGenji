@@ -16,8 +16,8 @@
   width: min(640px, 100%);
   max-height: calc(100dvh - 32px);
   /* Modale bloquante (ni Échap ni clic à côté) : sur un écran bas (téléphone en
-     paysage), ses boutons doivent rester atteignables — la modale défile plutôt
-     que de pousser « J'accepte » / « Je refuse » sous le bord de l'écran. */
+     paysage), son bouton doit rester atteignable — la modale défile plutôt
+     que de pousser « J'ai pris connaissance » sous le bord de l'écran. */
   overflow-y: auto;
   overscroll-behavior: contain;
   display: flex;
@@ -58,22 +58,20 @@
   font-size: 13px;
 }
 
-.policyLink a,
-.warning a {
+.policyLink a {
   color: var(--blue-300);
   text-decoration: underline;
   text-decoration-color: rgba(90, 200, 255, 0.4);
   text-underline-offset: 2px;
 }
 
-.policyLink a:focus-visible,
-.warning a:focus-visible {
+.policyLink a:focus-visible {
   outline: 2px solid var(--blue-500);
   outline-offset: 2px;
   border-radius: 2px;
 }
 
-/* La liste défile seule : le titre et les deux boutons restent en vue, quel
+/* La liste défile seule : le titre et le bouton restent en vue, quel
    que soit le nombre de changements cumulés. */
 .changes {
   flex: 1 1 auto;
@@ -147,84 +145,14 @@
   color: var(--ink-mute);
 }
 
+/* Un seul geste, « J'ai pris connaissance » : aligné à droite comme la
+   validation des autres modales, pleine largeur au pouce (voir plus bas). */
 .actions {
   display: flex;
-  flex-wrap: wrap-reverse;
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
   margin-top: 4px;
-}
-
-/* Le refus n'est pas un lien discret qu'on devine : il a la taille d'un bouton,
-   dans la couleur du danger, sans rivaliser avec l'acceptation. */
-.refuse,
-.confirmDelete {
-  min-height: 40px;
-  padding: 10px 16px;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--danger);
-  background: transparent;
-  border: 1px solid rgba(var(--danger-rgb), 0.4);
-  border-radius: var(--r-cy-sm, 8px);
-  cursor: pointer;
-  transition: background 0.16s ease, border-color 0.16s ease;
-}
-
-.refuse:hover:not(:disabled),
-.confirmDelete:hover:not(:disabled) {
-  background: rgba(var(--danger-rgb), 0.1);
-  border-color: rgba(var(--danger-rgb), 0.6);
-}
-
-/* À la confirmation, le bouton destructeur devient le geste principal de
-   l'étape — plein, donc sans ambiguïté sur ce qu'il fait. */
-.confirmDelete {
-  color: #fff;
-  background: rgba(var(--danger-rgb), 0.85);
-  border-color: rgba(var(--danger-rgb), 0.9);
-}
-
-.confirmDelete:hover:not(:disabled) {
-  background: rgb(var(--danger-rgb));
-}
-
-.refuse:focus-visible,
-.confirmDelete:focus-visible {
-  outline: 2px solid var(--blue-500);
-  outline-offset: 2px;
-}
-
-.refuse:disabled,
-.confirmDelete:disabled {
-  cursor: not-allowed;
-  color: var(--ink-dim);
-  background: transparent;
-  border-color: var(--line-soft);
-}
-
-.dangerEyebrow {
-  color: var(--danger);
-}
-
-.warning {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px;
-  border: 1px solid rgba(var(--danger-rgb), 0.35);
-  border-radius: var(--r-cy-md, 10px);
-  background: rgba(var(--danger-rgb), 0.08);
-}
-
-.warning p {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--ink);
 }
 
 @media (max-width: 480px) {

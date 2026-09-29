@@ -12,6 +12,7 @@ import {
   buildPrivacyChangesMessage,
   privacyChangesForOneMessage,
   pendingPrivacyChanges,
+  privacyChangeDay,
   privacyDmBatch,
   settledPrivacyChanges,
   type PrivacyChange,
@@ -23,7 +24,7 @@ import {
  *
  * **Le site rédige, le bot distribue** — même canal que les rappels de match
  * (`POST /internal/notify/dm`), aucune route nouvelle côté bot. Chaque compte
- * joignable reçoit **un** message par lot de changements qu'il n'a ni acceptés
+ * joignable reçoit **un** message par lot de changements qu'il n'a ni lus sur le site
  * ni déjà reçus : un joueur absent pendant trois changements en reçoit un seul
  * message qui les nomme tous les trois. Quand ils ne tiennent pas tous sous le
  * plafond du bot, le message nomme ce qui tient et le reste part au balayage
@@ -33,7 +34,7 @@ import {
  * **Discord est le seul canal de l'association, il ne se spamme pas.** Le
  * message attend que le plus ancien changement dû ait une semaine
  * (`PRIVACY_DM_SETTLE_DAYS`) — le temps que la modale touche les joueurs
- * actifs, qui acceptent et ne reçoivent rien — et ne part pas moins d'un mois
+ * actifs, qui la lisent et ne reçoivent rien — et ne part pas moins d'un mois
  * (`PRIVACY_DM_MIN_INTERVAL_DAYS`) après le précédent. Les changements publiés
  * entre-temps ne sont pas perdus : ils rejoignent le message suivant.
  *
@@ -78,7 +79,7 @@ type DoneRow = RowDataPacket & { user_id: number; change_id: string };
  * Les comptes à qui un message est dû maintenant.
  *
  * Une condition par changement **ayant passé le délai de la modale**, jointes
- * par `OR` : le compte existait avant sa publication, ne l'a pas accepté, ne
+ * par `OR` : le compte existait avant sa publication, n'en a pas pris connaissance, ne
  * l'a pas reçu. Puis l'intervalle entre deux messages : aucune annonce reçue
  * depuis `PRIVACY_DM_MIN_INTERVAL_DAYS` jours. Les deux filtres sont en base et
  * non après coup, pour la limite du lot : des comptes écartés en mémoire
@@ -191,9 +192,14 @@ async function runSweep(now: Date): Promise<number> {
     const recipient = toNotificationRecipient(row, "proven");
     const userId = recipient.userId;
     // Tous les changements dus, récents compris — mais seulement si l'un d'eux a
-    // passé le délai : la relecture peut avoir vu une acceptation depuis.
+    // passé le délai : la relecture peut avoir vu une prise de connaissance depuis.
     const due = privacyDmBatch(
-      pendingPrivacyChanges(row.created_at ? String(row.created_at) : null, done.get(userId) ?? [], changes),
+      pendingPrivacyChanges(
+        row.created_at ? String(row.created_at) : null,
+        done.get(userId) ?? [],
+        privacyChangeDay(now),
+        changes,
+      ),
       now,
     );
     if (due.length === 0) continue;

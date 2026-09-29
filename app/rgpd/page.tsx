@@ -27,7 +27,7 @@ import {
   PROCESSING_ACTIVITIES,
   transferBasis,
 } from "@/lib/shared/processing-register";
-import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
+import { privacyChangeDay, privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
@@ -70,7 +70,7 @@ export default async function RgpdPage() {
   // La date suit le dernier changement présenté aux joueurs
   // (`lib/shared/privacy-changes.ts`) : écrite à la main, elle restait en juin
   // pendant que la politique changeait.
-  const updatedLabel = privacyPolicyUpdatedLabel() ?? "septembre 2026";
+  const updatedLabel = privacyPolicyUpdatedLabel(privacyChangeDay(new Date())) ?? "septembre 2026";
   return (
     <PublicPageShell>
       {/* HERO */}
@@ -651,6 +651,14 @@ export default async function RgpdPage() {
               cnil.fr
             </a>
             .
+          </p>
+          <p>
+            <strong>Quand cette politique change</strong>, chaque membre inscrit
+            avant le changement en est informé à sa visite suivante, par une
+            fenêtre qui résume ce qui change, et, s&apos;il ne revient pas, en message
+            privé Discord ou par notification push s&apos;il les a activées. C&apos;est une information : aucun accord n&apos;est demandé, et la
+            lire ne retire aucun des droits décrits ci-dessus. Ce qui repose sur votre
+            consentement se règle dans « Mon profil », sans perdre votre compte.
           </p>
         </div>
         <div className={styles.updateLine}>

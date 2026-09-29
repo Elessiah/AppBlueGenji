@@ -116,6 +116,8 @@ describe("rédacteurs", () => {
   it("données : nomme le premier changement et compte les autres", () => {
     expect(privacyChangePush(["A"]).body).toMatch(/^A\. /);
     expect(privacyChangePush(["A", "B"]).body).toContain("(et 1 autre)");
+    // Une information : la notification ne demande ni réponse ni accord.
+    expect(privacyChangePush(["A"]).body).not.toMatch(/réponse|accept|accord/);
     expect(privacyChangePush(["A", "B", "C"]).body).toContain("(et 2 autres)");
     expect(privacyChangePush([]).url).toBe("/rgpd");
   });

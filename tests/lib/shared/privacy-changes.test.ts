@@ -18,6 +18,8 @@ import {
   checkPrivacyAcknowledgement,
   formatPrivacyChangeDate,
   pendingPrivacyChanges,
+  privacyChangeDay,
+  publishedPrivacyChanges,
   privacyChangesForOneMessage,
   privacyChangesHeading,
   privacyDmBatch,
@@ -34,6 +36,8 @@ const A = change("a", "2026-01-10");
 const B = change("b", "2026-03-05");
 const C = change("c", "2026-06-20");
 const REGISTRY = [A, B, C];
+/** Un jour postérieur à tout le registre de test : tout y est publié. */
+const TODAY = "2099-01-01";
 
 /**
  * Le registre est ce qu'un agent modifie pour déclencher la modale : ces tests
@@ -131,41 +135,85 @@ describe("PRIVACY_CHANGES — intégrité du registre", () => {
 
 describe("pendingPrivacyChanges", () => {
   it("cumule tous les changements non acceptés, dans l'ordre du registre", () => {
-    expect(pendingPrivacyChanges("2025-12-01 10:00:00", [], REGISTRY)).toEqual([A, B, C]);
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", [], TODAY, REGISTRY)).toEqual([A, B, C]);
   });
 
   it("retire ceux déjà acceptés", () => {
-    expect(pendingPrivacyChanges("2025-12-01 10:00:00", ["b"], REGISTRY)).toEqual([A, C]);
-    expect(pendingPrivacyChanges("2025-12-01 10:00:00", ["a", "b", "c"], REGISTRY)).toEqual([]);
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", ["b"], TODAY, REGISTRY)).toEqual([A, C]);
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", ["a", "b", "c"], TODAY, REGISTRY)).toEqual([]);
   });
 
   it("ignore les changements publiés le jour de la création du compte ou après", () => {
     // Créé le jour de B : il a consenti à la politique qui contenait déjà B.
-    expect(pendingPrivacyChanges("2026-03-05 23:59:59", [], REGISTRY)).toEqual([C]);
-    expect(pendingPrivacyChanges("2026-03-04 23:59:59", [], REGISTRY)).toEqual([B, C]);
-    expect(pendingPrivacyChanges("2026-07-01 00:00:00", [], REGISTRY)).toEqual([]);
+    expect(pendingPrivacyChanges("2026-03-05 23:59:59", [], TODAY, REGISTRY)).toEqual([C]);
+    expect(pendingPrivacyChanges("2026-03-04 23:59:59", [], TODAY, REGISTRY)).toEqual([B, C]);
+    expect(pendingPrivacyChanges("2026-07-01 00:00:00", [], TODAY, REGISTRY)).toEqual([]);
   });
 
   it("accepte une date ISO", () => {
-    expect(pendingPrivacyChanges("2026-03-10T08:00:00.000Z", [], REGISTRY)).toEqual([C]);
+    expect(pendingPrivacyChanges("2026-03-10T08:00:00.000Z", [], TODAY, REGISTRY)).toEqual([C]);
   });
 
   it("date inconnue : tout ce qui n'est pas accepté est dû", () => {
-    expect(pendingPrivacyChanges(null, ["a"], REGISTRY)).toEqual([B, C]);
+    expect(pendingPrivacyChanges(null, ["a"], TODAY, REGISTRY)).toEqual([B, C]);
   });
 
   it("ignore un identifiant accepté qui n'existe plus au registre", () => {
-    expect(pendingPrivacyChanges(null, ["zzz"], REGISTRY)).toEqual([A, B, C]);
+    expect(pendingPrivacyChanges(null, ["zzz"], TODAY, REGISTRY)).toEqual([A, B, C]);
   });
 
   it("registre vide : rien à présenter", () => {
-    expect(pendingPrivacyChanges(null, [], [])).toEqual([]);
+    expect(pendingPrivacyChanges(null, [], TODAY, [])).toEqual([]);
+  });
+
+  it("tait une entrée datée du futur jusqu'à sa date, borne comprise", () => {
+    // Vu la veille de C : « Nos règles ont changé » daté du lendemain.
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", [], "2026-06-19", REGISTRY)).toEqual([A, B]);
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", [], "2026-06-20", REGISTRY)).toEqual([A, B, C]);
+    expect(pendingPrivacyChanges(null, [], "2025-01-01", REGISTRY)).toEqual([]);
+  });
+});
+
+describe("privacyChangeDay — jour de Paris", () => {
+  it("passe au lendemain à minuit à Paris, pas à minuit UTC", () => {
+    // Heure d'été (UTC+2) : 22 h 30 UTC le 29 est déjà le 30 à Paris.
+    expect(privacyChangeDay(new Date("2026-09-29T21:59:59Z"))).toBe("2026-09-29");
+    expect(privacyChangeDay(new Date("2026-09-29T22:00:00Z"))).toBe("2026-09-30");
+    // Heure d'hiver (UTC+1).
+    expect(privacyChangeDay(new Date("2026-12-31T22:59:59Z"))).toBe("2026-12-31");
+    expect(privacyChangeDay(new Date("2026-12-31T23:00:00Z"))).toBe("2027-01-01");
+  });
+
+  it("rend le format des dates de publication", () => {
+    expect(privacyChangeDay(new Date("2026-01-05T12:00:00Z"))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+});
+
+describe("publishedPrivacyChanges", () => {
+  it("ne garde que les entrées publiées au jour dit, dans l'ordre", () => {
+    expect(publishedPrivacyChanges("2026-03-04", REGISTRY)).toEqual([A]);
+    expect(publishedPrivacyChanges("2026-03-05", REGISTRY)).toEqual([A, B]);
+    expect(publishedPrivacyChanges(TODAY, REGISTRY)).toEqual(REGISTRY);
+  });
+});
+
+describe("PRIVACY_CHANGES — aucune entrée ne fait accepter", () => {
+  it("n'invite jamais à accepter ni à supprimer son compte pour refuser", () => {
+    for (const entry of PRIVACY_CHANGES) {
+      const text = [entry.title, entry.summary, ...entry.details].join(" ");
+      expect(text).not.toMatch(/j.accepte|accepter ce changement|je refuse|refuser et supprimer/i);
+    }
+  });
+
+  it("date le retrait de Google One Tap du lendemain de sa mise en ligne, pas d'octobre", () => {
+    const entry = PRIVACY_CHANGES.find((change) => change.id === "2026-10-retrait-google-one-tap");
+    expect(entry?.publishedAt).toBe("2026-09-30");
   });
 });
 
 describe("checkPrivacyAcknowledgement", () => {
   it("accepte des identifiants connus, dédoublonnés", () => {
-    expect(checkPrivacyAcknowledgement(["a", "c", "a"], REGISTRY)).toEqual({ ok: true, ids: ["a", "c"] });
+    expect(checkPrivacyAcknowledgement(["a", "c", "a"], TODAY, REGISTRY)).toEqual({ ok: true, ids: ["a", "c"] });
   });
 
   it.each([
@@ -175,11 +223,19 @@ describe("checkPrivacyAcknowledgement", () => {
     ["élément non textuel", ["a", 3]],
     ["plus long que le registre", ["a", "b", "c", "a"]],
   ])("refuse une demande mal formée (%s)", (_label, value) => {
-    expect(checkPrivacyAcknowledgement(value, REGISTRY)).toEqual({ ok: false, error: INVALID_PRIVACY_CHANGES });
+    expect(checkPrivacyAcknowledgement(value, TODAY, REGISTRY)).toEqual({ ok: false, error: INVALID_PRIVACY_CHANGES });
+  });
+
+  it("refuse un identifiant pas encore publié : aucune modale n'a pu le montrer", () => {
+    expect(checkPrivacyAcknowledgement(["a", "c"], "2026-06-19", REGISTRY)).toEqual({
+      ok: false,
+      error: UNKNOWN_PRIVACY_CHANGE,
+    });
+    expect(checkPrivacyAcknowledgement(["c"], "2026-06-20", REGISTRY)).toEqual({ ok: true, ids: ["c"] });
   });
 
   it("refuse un identifiant inconnu plutôt que de l'ignorer", () => {
-    expect(checkPrivacyAcknowledgement(["a", "inconnu"], REGISTRY)).toEqual({
+    expect(checkPrivacyAcknowledgement(["a", "inconnu"], TODAY, REGISTRY)).toEqual({
       ok: false,
       error: UNKNOWN_PRIVACY_CHANGE,
     });
@@ -194,9 +250,12 @@ describe("mise en forme", () => {
   });
 
   it("dérive la mise à jour de /rgpd de la dernière entrée", () => {
-    expect(privacyPolicyUpdatedLabel(REGISTRY)).toBe("juin 2026");
-    expect(privacyPolicyUpdatedLabel([])).toBeNull();
-    expect(privacyPolicyUpdatedLabel()).toMatch(/^[a-zéû]+ \d{4}$/);
+    expect(privacyPolicyUpdatedLabel(TODAY, REGISTRY)).toBe("juin 2026");
+    expect(privacyPolicyUpdatedLabel(TODAY, [])).toBeNull();
+    // Une entrée pas encore publiée n'avance pas la date affichée.
+    expect(privacyPolicyUpdatedLabel("2026-06-19", REGISTRY)).toBe("mars 2026");
+    expect(privacyPolicyUpdatedLabel("2025-01-01", REGISTRY)).toBeNull();
+    expect(privacyPolicyUpdatedLabel(privacyChangeDay(new Date()))).toMatch(/^[a-zéû]+ \d{4}$/);
   });
 
   it("compte les changements dans le titre", () => {
@@ -212,7 +271,8 @@ describe("buildPrivacyChangesMessage", () => {
     expect(message).toContain("**Titre a** (10 janvier 2026) — Résumé a.");
     expect(message).toContain("**Titre c**");
     expect(message).toContain("https://bluegenji.fr/rgpd");
-    expect(message).toMatch(/supprimer ton compte/);
+    expect(message).toMatch(/Aucun accord ne t.est demandé/);
+    expect(message).not.toMatch(/supprimer ton compte|accepter/);
   });
 
   it("parle au singulier pour un seul changement", () => {

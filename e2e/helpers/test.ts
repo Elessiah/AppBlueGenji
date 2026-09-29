@@ -22,8 +22,8 @@ import { test as base, expect, type Page } from "@playwright/test";
  * clic, sur un `intercepts pointer events` qui ne nomme pas la cause. Les deux
  * premières se referment par « Plus tard », qui n'enregistre rien (ni
  * acceptation, ni annonce lue au-delà du cookie du navigateur de test). La
- * troisième n'a pas de « plus tard » — elle ne se ferme qu'en acceptant ou en
- * supprimant le compte — : on l'**accepte**, seule écriture de ce garde, faite
+ * troisième n'a pas de « plus tard » — elle ne se ferme que par « J'ai pris
+ * connaissance » — : on la **lit**, seule écriture de ce garde, faite
  * au nom du compte de test (`bg_privacy_acknowledgments`, une fois par
  * compte et par changement).
  *
@@ -58,9 +58,11 @@ export async function dismissSiteOverlays(page: Page): Promise<void> {
     { noWaitAfter: true },
   );
 
+  // Reconnue à son titre, qui ne change pas pendant l'envoi, là où le bouton
+  // devient « Enregistrement… » et ne la désignerait plus.
   const privacyChanges = page
     .getByRole("dialog")
-    .filter({ has: page.getByRole("button", { name: "Je refuse, je supprime mon compte" }) });
+    .filter({ has: page.getByRole("heading", { name: /règles de confidentialité/ }) });
 
   await page.addLocatorHandler(
     privacyChanges.first(),
@@ -68,9 +70,9 @@ export async function dismissSiteOverlays(page: Page): Promise<void> {
       await expect(async () => {
         // Un clic reçu pose « Enregistrement… » à la place du libellé, le
         // temps de la requête (longue en développement, la route se compile) :
-        // on ne reclique que si le bouton dit encore « J'accepte ».
-        const accept = privacyChanges.getByRole("button", { name: "J'accepte", exact: true });
-        if (await accept.isVisible()) await accept.click({ timeout: 2_000 });
+        // on ne reclique que si le bouton dit encore « J'ai pris connaissance ».
+        const acknowledge = privacyChanges.getByRole("button", { name: "J'ai pris connaissance", exact: true });
+        if (await acknowledge.isVisible()) await acknowledge.click({ timeout: 2_000 });
         await expect(privacyChanges).toHaveCount(0, { timeout: 5_000 });
       }).toPass({ timeout: 20_000 });
     },

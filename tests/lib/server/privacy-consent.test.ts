@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 
@@ -22,9 +22,25 @@ function mockExecute(result: unknown[]) {
 describe("loadPendingPrivacyChanges", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Après tout le registre, sauf mention contraire : chaque entrée est publiée.
+    jest.useFakeTimers({ now: new Date("2099-01-01T12:00:00Z"), doNotFake: ["nextTick", "queueMicrotask"] });
   });
 
-  it("lit création et acceptations en une seule requête, compte vivant seulement", async () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("tait une entrée pas encore publiée au jour de Paris", async () => {
+    const last = PRIVACY_CHANGES.at(-1)!;
+    // Midi UTC la veille de sa publication.
+    jest.setSystemTime(new Date(Date.parse(`${last.publishedAt}T12:00:00Z`) - 86_400_000));
+    mockExecute([{ created_at: "2025-01-01 10:00:00", change_id: null }]);
+    const pending = await loadPendingPrivacyChanges(7);
+    expect(pending.map((c) => c.id)).not.toContain(last.id);
+    expect(pending.every((c) => c.publishedAt < last.publishedAt)).toBe(true);
+  });
+
+  it("lit création et prises de connaissance en une seule requête, compte vivant seulement", async () => {
     const execute = mockExecute([{ created_at: "2025-01-01 10:00:00", change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(execute).toHaveBeenCalledTimes(1);
@@ -35,7 +51,7 @@ describe("loadPendingPrivacyChanges", () => {
     expect(pending.map((c) => c.id)).toEqual(PRIVACY_CHANGES.map((c) => c.id));
   });
 
-  it("retire les changements déjà acceptés", async () => {
+  it("retire les changements déjà lus", async () => {
     mockExecute([
       { created_at: "2025-01-01 10:00:00", change_id: PRIVACY_CHANGES[0].id },
     ]);

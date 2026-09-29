@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from "@jest/globals";
+import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/privacy-consent");
@@ -19,8 +19,22 @@ function req(body: unknown) {
   });
 }
 
+/** Seule l'horloge est simulée : les promesses du corps de requête tournent normalement. */
+function atInstant(iso: string) {
+  jest.useFakeTimers({
+    now: new Date(iso),
+    doNotFake: ["nextTick", "setImmediate", "setTimeout", "setInterval", "queueMicrotask", "clearTimeout", "clearInterval"],
+  });
+}
+
 describe("POST /api/profile/privacy-changes", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   beforeEach(() => {
+    // Après tout le registre : chaque entrée est publiée.
+    atInstant("2099-01-01T12:00:00Z");
     jest.clearAllMocks();
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     jest.mocked(acknowledgePrivacyChanges).mockResolvedValue(undefined);
@@ -38,6 +52,21 @@ describe("POST /api/profile/privacy-changes", () => {
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ acknowledged: ids });
     expect(acknowledgePrivacyChanges).toHaveBeenCalledWith(42, ids);
+  });
+
+  it("refuse une entrée pas encore publiée au jour de Paris, sans rien écrire", async () => {
+    const entry = PRIVACY_CHANGES.at(-1)!;
+    // 23 h 30 à Paris la veille de la publication : encore la veille.
+    const eve = new Date(Date.parse(`${entry.publishedAt}T00:00:00Z`) - 3 * 3_600_000).toISOString();
+    atInstant(eve);
+    const refused = await POST(req({ changeIds: [entry.id] }));
+    expect(refused.status).toBe(400);
+    expect(await refused.json()).toEqual({ error: "UNKNOWN_PRIVACY_CHANGE" });
+    expect(acknowledgePrivacyChanges).not.toHaveBeenCalled();
+
+    // 23 h 30 UTC la veille : minuit passé à Paris en toute saison (UTC+1 ou +2).
+    atInstant(`${entry.publishedAt}T00:30:00+01:00`);
+    expect((await POST(req({ changeIds: [entry.id] }))).status).toBe(200);
   });
 
   it("refuse un identifiant inconnu sans rien écrire", async () => {

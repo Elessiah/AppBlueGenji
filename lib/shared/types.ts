@@ -877,8 +877,9 @@ export type PersonalDataExport = {
   teamsTimeline: UserTeamTimeline[];
   tournaments: TeamHistoryRow[];
   /**
-   * Changements du traitement des données acceptés, avec leur date — la trace
-   * du consentement (`lib/shared/privacy-changes.ts`).
+   * Changements du traitement des données dont le joueur a pris connaissance,
+   * avec leur date — la trace de l'information (`lib/shared/privacy-changes.ts`).
+   * Le champ garde le nom `acceptedAt` : le format de l'export ne change pas.
    */
   privacyAcknowledgments: { changeId: string; acceptedAt: string }[];
   /** Acceptations des conditions d'utilisation, avec la version et l'écran (`lib/shared/terms-of-use.ts`). */

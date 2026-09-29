@@ -448,15 +448,15 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   {
     ref: "T10",
     name: "Information des joueurs sur les changements de politique",
-    purpose: "Informer chaque compte d'un changement du traitement de ses données, et recueillir son acceptation ou son refus",
+    purpose: "Informer chaque compte d'un changement du traitement de ses données",
     subPurposes: [
-      "Présenter les changements non encore acceptés à la connexion (« J'accepte » ou « Je refuse, je supprime mon compte »)",
-      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables qui ne l'ont pas accepté sur le site, une semaine après sa publication et au plus un message par mois",
+      "Présenter à la visite suivante les changements publiés dont le compte n'a pas encore pris connaissance (« J'ai pris connaissance » — aucun accord n'est demandé)",
+      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables qui n'en ont pas pris connaissance sur le site, une semaine après sa publication et au plus un message par mois",
     ],
-    legalBasis: "Obligation d'information (RGPD, articles 12 à 14) et consentement du joueur",
+    legalBasis: "Obligation légale d'information (RGPD, articles 12 à 14)",
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
-      "Changements acceptés par le compte, avec la date d'acceptation",
+      "Changements dont le compte a pris connaissance, avec la date",
       "Annonces Discord déjà envoyées au compte, avec leur date",
       "Identifiant Discord ou pseudo Discord certifié, pour adresser l'annonce",
     ],
