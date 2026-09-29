@@ -318,7 +318,7 @@ export function pushErrorMessage(code: string | null | undefined): string {
  */
 export const PUSH_SUBSCRIPTION_RETENTION_DAYS = 180;
 
-/** Chemin du service worker — à la racine, pour que sa portée couvre tout le site. */
+/** Chemin du service worker du site (notifications et page hors ligne) — à la racine, pour que sa portée couvre tout le site. */
 export const PUSH_SERVICE_WORKER_PATH = "/push-sw.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
