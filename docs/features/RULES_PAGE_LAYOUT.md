@@ -19,4 +19,4 @@
 
 `lib/shared/rules-page-outline.ts` (pur) écrit le plan **une fois** — ancres fixes (`RULES_PAGE_ANCHORS`), ancre de chaque règle (`ruleSectionAnchors`, préfixée `regle-` et départagée si deux titres se ressemblent), sommaire (`rulesPageOutline`) — et la page comme le sommaire le lisent. Une ancre renommée d'un seul côté donnerait un lien qui ne mène nulle part, sans erreur ; `tests/lib/shared/rules-page-outline.test.ts` vérifie que la page pose bien chaque ancre du plan.
 
-Les cibles s'arrêtent sous l'en-tête collant (`scroll-margin-top: 96px` sur tout `[id]` du contenu).
+Les cibles s'arrêtent sous l'en-tête collant (`html { scroll-padding-top }` calé sur la hauteur mesurée de l'en-tête, voir `docs/features/ERROR_PAGES_AND_ANCHORS.md`) ; le sommaire collant se pose à cette même hauteur (`--sticky-header-h`).
