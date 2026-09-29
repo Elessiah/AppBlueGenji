@@ -4,7 +4,8 @@ import {
   MAX_BOT_FEED_STREAMS,
   MAX_BOT_FEED_STREAMS_PER_CLIENT,
   acquireBotFeedSlot,
-  canAcquireBotFeedSlot,
+  MAX_PENDING_BOT_FEED_EVICTIONS,
+  reserveBotFeedEvictionAttempt,
   botFeedStreamCount,
   resetBotFeedSlots,
 } from "@/lib/server/bot-feed-guard";
@@ -158,19 +159,35 @@ describe("acquireBotFeedSlot", () => {
     expect(evict).toHaveBeenCalledTimes(1);
   });
 
-  it("dit, sans rien réserver, si une place serait accordée — et ne déloge que sur demande", () => {
+  it("réserve des tentatives d'éviction bornées, sans rien déloger", () => {
     const evict = jest.fn();
     acquireBotFeedSlot("10.0.0.1", evict);
     acquireBotFeedSlot("10.0.0.1", evict);
     for (let i = 2; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
 
-    expect(canAcquireBotFeedSlot("10.0.2.1")).toBe(true);
     expect(acquireBotFeedSlot("10.0.2.1", undefined, { allowEviction: false })).toBeNull();
+    const attempts = Array.from({ length: MAX_PENDING_BOT_FEED_EVICTIONS }, (_, i) =>
+      reserveBotFeedEvictionAttempt(`10.0.2.${i}`),
+    );
+    expect(attempts.every((attempt) => attempt !== null)).toBe(true);
+    // Une rafale ne passe pas au-delà : chaque tentative ouvrirait une connexion au bot.
+    expect(reserveBotFeedEvictionAttempt("10.0.3.1")).toBeNull();
     expect(evict).not.toHaveBeenCalled();
     expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
 
+    attempts[0]!();
+    attempts[0]!();
+    expect(reserveBotFeedEvictionAttempt("10.0.3.1")).not.toBeNull();
+  });
+
+  it("ne réserve pas de tentative quand aucune place ne serait accordée", () => {
+    for (let i = 0; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
     // Un lecteur ordinaire ne déloge pas un autre lecteur ordinaire.
-    expect(canAcquireBotFeedSlot("10.0.1.2")).toBe(false);
+    expect(reserveBotFeedEvictionAttempt("10.0.2.1")).toBeNull();
+  });
+
+  it("ne réserve pas de tentative quand une place est libre", () => {
+    expect(reserveBotFeedEvictionAttempt("10.0.2.1")).toBeNull();
   });
 
   it("garde un plafond par client plus étroit que le plafond global", () => {

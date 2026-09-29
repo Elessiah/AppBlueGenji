@@ -21,7 +21,7 @@
  * passe par la même porte.
  */
 import { BOT_FEED_OPEN_RULE, enforceRateLimit, requestClientIp } from '@/lib/server/api-guard';
-import { acquireBotFeedSlot, canAcquireBotFeedSlot } from '@/lib/server/bot-feed-guard';
+import { acquireBotFeedSlot, reserveBotFeedEvictionAttempt } from '@/lib/server/bot-feed-guard';
 import { redactSseChunk } from '@/lib/shared/bot-feed-redaction';
 
 export const runtime = 'nodejs';
@@ -48,7 +48,10 @@ export async function GET(req: Request): Promise<Response> {
   // fait qu'une fois le bot joint : couper un lecteur pour un nouveau venu que
   // le bot injoignable laisserait sans rien ne servirait personne.
   let release = acquireBotFeedSlot(clientIp, evict, { allowEviction: false });
-  if (!release && !canAcquireBotFeedSlot(clientIp)) return tooMany();
+  // Sans place libre : une tentative d'éviction, réservée et bornée — sans quoi
+  // chaque nouveau venu d'une rafale ouvrirait sa connexion au bot hors plafond.
+  const attempt = release ? null : reserveBotFeedEvictionAttempt(clientIp);
+  if (!release && !attempt) return tooMany();
 
   const baseUrl = (process.env.BOT_INTERNAL_URL || 'http://127.0.0.1:4400').replace(/\/+$/, '');
   const headers: Record<string, string> = { accept: 'text/event-stream' };
@@ -66,15 +69,18 @@ export async function GET(req: Request): Promise<Response> {
     });
   } catch {
     release?.();
+    attempt?.();
     return new Response('event: error\ndata: BOT_UNREACHABLE\n\n', { status: 503, headers: { 'Content-Type': 'text/event-stream' } });
   }
   if (!upstream.ok || !upstream.body) {
     release?.();
+    attempt?.();
     return new Response(`event: error\ndata: BOT_${upstream.status}\n\n`, { status: 502, headers: { 'Content-Type': 'text/event-stream' } });
   }
   if (!release) {
     // Le bot répond : c'est maintenant qu'on fait place, s'il y a toujours lieu.
     release = acquireBotFeedSlot(clientIp, evict);
+    attempt?.();
     if (!release) {
       void upstream.body.cancel().catch(() => undefined);
       return tooMany();

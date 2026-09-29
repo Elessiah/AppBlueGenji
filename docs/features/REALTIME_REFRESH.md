@@ -399,9 +399,12 @@ accumule, jamais un autre lecteur ordinaire, et le client délogé ne reprend pa
 sa place en se reconnectant. Un visiteur sans IP connue compte pour un client à
 une place — rien ne dit que deux inconnus sont la même personne : il n'est
 jamais délogé, et n'en déloge qu'un client identifié qui accumule. On ne
-déloge qu'une fois le bot joint (`canAcquireBotFeedSlot` avant l'appel, éviction
-après) : couper un lecteur pour un nouveau venu que le bot injoignable laisse
-sans rien ne servirait personne, et chaque reconnexion en couperait un autre. Le flux délogé voit sa connexion au bot coupée et se termine
+déloge qu'une fois le bot joint (`reserveBotFeedEvictionAttempt` avant l'appel,
+éviction après) : couper un lecteur pour un nouveau venu que le bot injoignable
+laisse sans rien ne servirait personne, et chaque reconnexion en couperait un
+autre. Ces tentatives ouvrent une connexion au bot sans place : elles sont
+réservées et bornées (`MAX_PENDING_BOT_FEED_EVICTIONS` = 2), sans quoi une
+rafale de nouveaux venus dépasserait le plafond côté bot. Le flux délogé voit sa connexion au bot coupée et se termine
 proprement ; il faut désormais une IP par place pour fermer le direct à tous.
 
 L'IP retenue est celle **ajoutée par le proxy** (`X-Forwarded-For` lu depuis la

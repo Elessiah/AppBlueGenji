@@ -136,18 +136,37 @@ export function acquireBotFeedSlot(
 }
 
 /**
- * Vrai si `acquireBotFeedSlot` accorderait une place à ce client maintenant,
- * au besoin en délogeant un flux — sans rien réserver ni déloger.
- *
- * Sert à la route à refuser **avant** d'appeler le bot, et à ne déloger qu'une
- * fois le bot joint : délogé pour un nouveau venu que le bot injoignable
- * laisse sans rien, un lecteur aurait été coupé pour rien, et chaque
- * reconnexion automatique en couperait un autre.
+ * Tentatives d'éviction en cours : autant de connexions au bot ouvertes **sans**
+ * place, le temps de savoir s'il répond. Bornées, sans quoi une rafale de
+ * nouveaux venus passerait toute le même contrôle et ouvrirait chacune une
+ * connexion au bot au-delà du plafond.
  */
-export function canAcquireBotFeedSlot(clientKey: string | null): boolean {
+export const MAX_PENDING_BOT_FEED_EVICTIONS = 2;
+
+let pendingEvictions = 0;
+
+/**
+ * Réserve une **tentative d'éviction** : ce client obtiendrait une place en
+ * délogeant un flux, et la route va d'abord joindre le bot. `null` si aucune
+ * place ne lui serait accordée, ou si trop de tentatives sont déjà en cours.
+ *
+ * On ne déloge qu'une fois le bot joint : délogé pour un nouveau venu que le
+ * bot injoignable laisse sans rien, un lecteur aurait été coupé pour rien, et
+ * chaque reconnexion automatique en couperait un autre. La fonction rendue
+ * clôt la tentative et peut être appelée plusieurs fois.
+ */
+export function reserveBotFeedEvictionAttempt(clientKey: string | null): (() => void) | null {
+  if (pendingEvictions >= MAX_PENDING_BOT_FEED_EVICTIONS) return null;
   const held = heldBy(clientKey);
-  if (clientKey !== null && held >= MAX_BOT_FEED_STREAMS_PER_CLIENT) return false;
-  return slots.length < MAX_BOT_FEED_STREAMS || slotToEvict(held) !== null;
+  if (clientKey !== null && held >= MAX_BOT_FEED_STREAMS_PER_CLIENT) return null;
+  if (slots.length < MAX_BOT_FEED_STREAMS || slotToEvict(held) === null) return null;
+  pendingEvictions += 1;
+  let done = false;
+  return () => {
+    if (done) return;
+    done = true;
+    pendingEvictions -= 1;
+  };
 }
 
 /** Nombre de flux ouverts (diagnostic, tests). */
@@ -159,4 +178,5 @@ export function botFeedStreamCount(): number {
 export function resetBotFeedSlots(): void {
   slots.length = 0;
   perClient.clear();
+  pendingEvictions = 0;
 }
