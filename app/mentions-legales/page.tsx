@@ -191,8 +191,6 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           {SITE_HOST.address}
           <br />
           Téléphone : {SITE_HOST.phone}
-          <br />
-          SIREN : {SITE_HOST.siren}
         </p>
         <p>
           Pour écrire à l&apos;hébergeur ou à l&apos;éditeur : bouton <strong>« {REPORT_FORM_NAME} »</strong>{" "}
