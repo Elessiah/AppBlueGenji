@@ -80,7 +80,7 @@ export function registerController(): RegisterController {
     seat: "Janvilliers (France)",
     contact: RGPD_CONTACT_LINE,
     dpo: "Aucun délégué à la protection des données désigné (désignation non obligatoire) — contact RGPD ci-dessus",
-    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}, SIREN ${SITE_HOST.siren}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country}`,
+    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country}`,
   };
 }
 

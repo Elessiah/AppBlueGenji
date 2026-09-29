@@ -9,10 +9,14 @@
  */
 export const SITE_HOST = {
   name: "Keryan Houssin",
-  status: "Auto-entrepreneur",
+  /**
+   * Particulier, et non professionnel : l'hébergement est un service rendu
+   * bénévolement à l'association. Aucun SIREN à publier — l'hébergeur n'en a
+   * pas, et la LCEN ne demande de lui que nom, adresse et téléphone.
+   */
+  status: "Particulier, bénévole de l'association",
   address: "13 rue du Chemin Fourchue, 14000 Caen, France",
   phone: "06 02 22 49 56",
-  siren: "930 888 342",
   /** Pays où les données sont hébergées — c'est ce qui décide d'un transfert hors UE. */
   country: "France",
 } as const;

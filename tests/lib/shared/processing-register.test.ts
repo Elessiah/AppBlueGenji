@@ -159,6 +159,15 @@ describe("registerController", () => {
     expect(page).toContain("{SITE_HOST.address}");
     expect(page).not.toContain("Chemin Fourchue");
   });
+
+  it("ne publie aucun SIREN : l'hébergeur est un particulier bénévole, sans immatriculation", () => {
+    const page = readFileSync(join(__dirname, "..", "..", "..", "app", "mentions-legales", "page.tsx"), "utf8");
+    expect(page).not.toMatch(/SIRE[NT]/i);
+    expect(controller.host).not.toMatch(/SIRE[NT]/i);
+    expect(controller.host).toContain("bénévole");
+    expect(Object.keys(SITE_HOST)).not.toContain("siren");
+    expect(controller.host).not.toMatch(/\d{3} \d{3} \d{3}/);
+  });
 });
 
 describe("csvCell", () => {

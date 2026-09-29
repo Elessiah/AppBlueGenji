@@ -15,7 +15,7 @@ hero avec faits clés et sections numérotées (`SECTION 0X`).
 |---|---|
 | Éditeur du site | Statuts de l'association (loi 1901, siège social, objet) |
 | Directeur de la publication | Président de l'association |
-| Hébergement | Même serveur que `celine-houssin.fr` (Keryan Houssin, auto-entrepreneur) |
+| Hébergement | Même serveur que `celine-houssin.fr` (Keryan Houssin, particulier bénévole de l'association — aucun SIREN : la LCEN ne demande à l'hébergeur que nom, adresse et téléphone) |
 | Propriété intellectuelle | Droits réservés à l'association |
 | Données personnelles (RGPD) | Bulletin d'adhésion + Règlement UE 2016/679 |
 | Cookies | Cookie de session `bg_session` uniquement, aucun traceur tiers |
