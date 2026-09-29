@@ -156,6 +156,12 @@ describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", ()
     expect(tab).toMatch(/else if \(event\.shiftKey && active === extra\[0\]\) go\(end\);/);
   });
 
+  it("le menu, lui, prend Échap quand le focus est resté dans la modale", () => {
+    const menu = readSource("components/accessibility/AccessibilityMenu.tsx");
+    expect(menu).toContain(`const inModal = active?.closest?.('[aria-modal="true"]') != null;`);
+    expect(menu).toContain("if (!inside && !inModal && active !== null && active !== document.body) return;");
+  });
+
   it("n'offre jamais au clavier un élément masqué", () => {
     expect(hook).toContain('getComputedStyle(el).visibility !== "hidden"');
   });

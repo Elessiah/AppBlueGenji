@@ -112,14 +112,18 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
 
   useEffect(() => {
     if (!open) return;
-    // Échap ne répond que si le focus est dans le menu, ou nulle part : une
-    // modale ouverte par-dessus (lancement de match) traite son propre Échap,
-    // et le focus ne doit pas lui être repris.
+    // Échap répond si le focus est dans le menu, nulle part, ou dans une
+    // modale : le menu passe au-dessus des modales, et tant que son panneau
+    // est ouvert `useDialogBehavior` lui laisse Échap (Safari ne focalisant pas
+    // un bouton cliqué, le focus a pu rester dans la modale). Le focus n'est
+    // alors pas repris à la modale. Ailleurs dans la page, Échap appartient à
+    // ce qui a le focus.
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       const active = document.activeElement;
       const inside = active !== null && rootRef.current?.contains(active) === true;
-      if (!inside && active !== null && active !== document.body) return;
+      const inModal = active?.closest?.('[aria-modal="true"]') != null;
+      if (!inside && !inModal && active !== null && active !== document.body) return;
       setOpen(false);
       if (inside) restoreFocus();
       else returnFocusRef.current = null;

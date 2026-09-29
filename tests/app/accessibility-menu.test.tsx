@@ -152,8 +152,11 @@ describe("AccessibilityMenu — comportement (source)", () => {
     expect(source).toMatch(/document\.removeEventListener\("focusin", onOutside\)/);
   });
 
-  it("laisse Échap à une modale ouverte par-dessus, sans lui reprendre le focus", () => {
-    expect(source).toMatch(/if \(!inside && active !== null && active !== document\.body\) return;/);
+  it("laisse Échap à ce qui a le focus hors modale, et le prend dans une modale sans lui reprendre le focus", () => {
+    // Le menu passe au-dessus des modales ; panneau ouvert, `useDialogBehavior`
+    // lui cède Échap. Le focus n'est rendu au bouton que s'il était dans le menu.
+    expect(source).toMatch(/if \(!inside && !inModal && active !== null && active !== document\.body\) return;/);
+    expect(source).toMatch(/if \(inside\) restoreFocus\(\);/);
   });
 
   it("place le panneau après le bouton dans le document : Tab y entre", () => {
