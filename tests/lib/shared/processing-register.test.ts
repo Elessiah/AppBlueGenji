@@ -11,6 +11,7 @@ import {
   REGISTER_EXPORT_COLUMNS,
   REGISTER_UPDATED_AT,
   SESSION_RETENTION_DAYS,
+  US_TRANSFER_MECHANISM,
   csvCell,
   registerController,
   registerExportFilename,
@@ -240,9 +241,30 @@ describe("bases légales : le registre et la politique disent la même chose", (
     expect(byRef("T04").legalBasis).toMatch(/jamais acquise par la seule connexion/);
   });
 
-  it("ne dit plus que One Tap suit l'acceptation de la politique : il suit une case", () => {
-    const t02 = byRef("T02");
-    expect(t02.subPurposes.join(" ")).toMatch(/décochée par défaut/);
-    expect(t02.subPurposes.join(" ")).not.toMatch(/après acceptation de la politique/);
+  it("ne mentionne plus l'invite Google One Tap, retirée du site", () => {
+    const text = JSON.stringify(PROCESSING_ACTIVITIES);
+    expect(text).not.toMatch(/One Tap/i);
+  });
+
+  it("nomme le mécanisme de chaque transfert hors UE, jamais « les garanties propres à chacun »", () => {
+    for (const activity of PROCESSING_ACTIVITIES) {
+      for (const transfer of activity.transfers) {
+        expect(transfer).not.toMatch(/garanties propres/);
+        if (transfer !== "Aucun") expect(transfer).toContain(US_TRANSFER_MECHANISM);
+      }
+    }
+    expect(US_TRANSFER_MECHANISM).toMatch(/2023\/1795/);
+    expect(US_TRANSFER_MECHANISM).toMatch(/clauses contractuelles types/);
+  });
+
+  it("nomme Microsoft, destinataire des sauvegardes chiffrées (T09), avec le pays du transfert", () => {
+    const backups = PROCESSING_ACTIVITIES.find((a) => a.transfers.join(" ").includes("OneDrive"));
+    expect(backups).toBeDefined();
+    expect(backups!.recipients.join(" ")).toMatch(/Microsoft/);
+    expect(backups!.transfers.join(" ")).toMatch(/États-Unis/);
+  });
+
+  it("dit où le site et le bot sont hébergés", () => {
+    expect(registerController().host).toMatch(/Raspberry Pi, à Caen/);
   });
 });
