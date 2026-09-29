@@ -398,6 +398,66 @@ describe("createReport", () => {
     },
   );
 
+  const reachableRoute = (reachable: boolean): Route => [
+    /SELECT 1 FROM bg_users\s+WHERE id = \? AND is_deleted = 0 AND \(discord_id IS NOT NULL OR discord_verified_at IS NOT NULL\)/,
+    () => [reachable ? [{ 1: 1 }] : []],
+  ];
+
+  it.each(["RGPD", "HOSTING"] as const)(
+    "refuse une demande %s d'un compte sans Discord prouvé ni adresse : le site n'envoie aucun courriel",
+    async (category) => {
+      install([reachableRoute(false)], []);
+      await expect(
+        createReport(submission({ category, targets: [], contactName: null, contactEmail: null, rightsRelation: null }), {
+          userId: 3,
+          managesTournaments: false,
+        }),
+      ).rejects.toThrow("REPORT_REPLY_CHANNEL_REQUIRED");
+      expect(connection.execute).not.toHaveBeenCalled();
+    },
+  );
+
+  it("accepte une demande RGPD sans adresse d'un compte Discord prouvé, sans date de consentement", async () => {
+    install(
+      [reachableRoute(true), [/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 16 }]]],
+    );
+    await expect(
+      createReport(submission({ category: "RGPD", targets: [], contactName: null, contactEmail: null, rightsRelation: null }), {
+        userId: 3,
+        managesTournaments: false,
+      }),
+    ).resolves.toBe(16);
+    const insert = jest.mocked(connection.execute).mock.calls.find(([sql]) => /INSERT INTO bg_reports/.test(String(sql)));
+    expect(String(insert?.[0])).toMatch(/VALUES \(\?, \?, \?, \?, \?, \?, \?, NULL\)/);
+  });
+
+  it("ne consulte pas le compte quand une adresse est donnée", async () => {
+    install(
+      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 17 }]]],
+    );
+    await expect(
+      createReport(submission({ category: "HOSTING", targets: [], contactName: null, rightsRelation: null }), {
+        userId: 3,
+        managesTournaments: false,
+      }),
+    ).resolves.toBe(17);
+    expect(jest.mocked(pool.execute).mock.calls.some(([sql]) => /discord_verified_at IS NOT NULL/.test(String(sql)))).toBe(
+      false,
+    );
+  });
+
+  it("date le consentement d'une catégorie qui en demande un, et d'elle seule", async () => {
+    install(
+      [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
+      [countRoute(0), [/INSERT INTO bg_reports/, () => [{ insertId: 18 }]]],
+    );
+    await createReport(submission({ category: "BUG", targets: [] }), { userId: null, managesTournaments: false });
+    const insert = jest.mocked(connection.execute).mock.calls.find(([sql]) => /INSERT INTO bg_reports/.test(String(sql)));
+    expect(String(insert?.[0])).toMatch(/VALUES \(\?, \?, \?, \?, \?, \?, \?, NOW\(\)\)/);
+  });
+
   it("accepte le signalement sans cible d'un visiteur sans compte", async () => {
     install(
       [[/DELETE FROM bg_reports/, () => [{ affectedRows: 0 }]]],
