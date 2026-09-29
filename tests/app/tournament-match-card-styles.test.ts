@@ -99,7 +99,7 @@ describe("feuilles de la carte et de la fiche — jetons définis", () => {
 
 describe("classement d'une phase terminée — un seul bloc, un vrai titre", () => {
   it("la page le rend par PhaseStandingsBlock, jamais par trois copies", () => {
-    expect(PAGE).toContain('import { PhaseStandingsBlock } from "./_components/PhaseStandingsBlock"');
+    expect(PAGE).toContain('import("./_components/PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock)');
     expect(PAGE.match(/<PhaseStandingsBlock /g)).toHaveLength(1);
     expect(PAGE).not.toContain("<PhaseStandingsTable");
     // Rendu sous les trois vues qui en ont un (survie, suisse, élimination).
