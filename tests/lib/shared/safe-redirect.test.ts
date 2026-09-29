@@ -172,6 +172,8 @@ describe("signedInLoginRedirect", () => {
 
   it("est appliquée par la page avant tout rendu du formulaire", () => {
     const page = readFileSync(join(__dirname, "..", "..", "..", "app", "connexion", "page.tsx"), "utf8");
-    expect(page).toMatch(/if \(user\) redirect\(signedInLoginRedirect\(params\.redirect\)\)/);
+    expect(page).toMatch(
+      /if \(user && params\.error === undefined\) redirect\(signedInLoginRedirect\(params\.redirect\)\)/,
+    );
   });
 });

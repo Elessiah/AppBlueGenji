@@ -79,3 +79,8 @@ tout rendu, par `signedInLoginRedirect` : la destination demandée
 (`?redirect=`, filtrée par `safeRedirectPath` comme aux trois portes), ou
 `/tournois`. Une destination qui ramène à `/connexion` elle-même est écartée —
 la page se redirigerait vers elle-même à l'infini.
+
+Exception : un compte connecté qui arrive avec `?error=` reste sur la page, qui
+annonce le refus. Un rattachement OAuth raté avant la lecture de son intention
+(`params`, `state`) retombe encore ici plutôt que sur `/profil` (consigné dans
+`ERREUR.txt`), et le rediriger ferait disparaître le message.

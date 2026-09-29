@@ -30,14 +30,17 @@ import { LoginForm, type OneTapConfig } from "./_components/LoginForm";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ redirect?: string | string[] }>;
+  searchParams: Promise<{ redirect?: string | string[]; error?: string | string[] }>;
 }) {
   const [user, requestHeaders, params] = await Promise.all([
     getCurrentUser(),
     headers(),
     searchParams,
   ]);
-  if (user) redirect(signedInLoginRedirect(params.redirect));
+  // Sauf s'il arrive avec un refus à lire (`?error=`) : un rattachement OAuth
+  // raté avant la lecture de l'intention (`params`, `state`) retombe ici, et le
+  // rediriger ferait disparaître le message sans rien dire.
+  if (user && params.error === undefined) redirect(signedInLoginRedirect(params.redirect));
   const clientId = process.env.GOOGLE_CLIENT_ID?.trim() || null;
   // Même nonce que celui que le middleware appose sur les scripts de Next :
   // c'est lui qui rend le `<script src="…gsi/client">` recevable sous
