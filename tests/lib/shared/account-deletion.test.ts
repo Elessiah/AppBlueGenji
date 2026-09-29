@@ -1,5 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+  BACKUP_RETENTION_DAYS,
+} from "@/lib/shared/account-deletion-journal";
+import {
   ACCOUNT_DELETED_ERROR,
   RETENTION_UNKNOWN,
   ACCOUNT_DELETED_WRITE_MESSAGE,
@@ -138,7 +142,7 @@ describe("accountDeletionConfirmation", () => {
     expect(unknown).not.toContain("statistiques");
     // Ni « ton compte sera effacé entièrement », ni « le compte devient
     // anonyme » : les deux issues sont nommées comme possibles, aucune promise.
-    expect(unknown).not.toMatch(/sera effacé entièrement, sans laisser/);
+    expect(unknown).not.toMatch(/seront effacés entièrement/);
     expect(unknown).not.toMatch(/seront effacées \(le compte devient anonyme\)/);
     expect(unknown).toMatch(/anonyme ou effacé/);
   });
@@ -149,7 +153,27 @@ describe("accountDeletionConfirmation", () => {
     // annonce un effacement complet.
     const surprise = accountDeletionConfirmation("N_IMPORTE_QUOI" as never);
     expect(surprise).toBe(accountDeletionConfirmation(RETENTION_UNKNOWN));
-    expect(accountDeletionConfirmation(null)).toContain("effacé entièrement");
+    expect(accountDeletionConfirmation(null)).toContain("effacés entièrement");
+  });
+
+  it("n'annonce pas un effacement sans trace : nomme ce qui reste, avec ses durées", () => {
+    // Restent les sauvegardes, le journal des suppressions, l'empreinte de
+    // mesure d'audience et, pour le staff, les journaux du serveur.
+    const erase = accountDeletionConfirmation(null);
+    expect(erase).not.toMatch(/sans laisser de trace|aucune trace/);
+    expect(erase).toContain(`sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours)`);
+    expect(erase).toContain(`(au moins ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours)`);
+    expect(erase).toContain("mesure d'audience");
+    expect(erase).toContain("journaux du serveur");
+  });
+
+  it("nomme ces mêmes restes pour une anonymisation et pour l'inconnu", () => {
+    for (const reason of ["TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS", RETENTION_UNKNOWN] as const) {
+      const text = accountDeletionConfirmation(reason);
+      expect(text).toContain(`sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours)`);
+      expect(text).toContain("mesure d'audience");
+      expect(text).toMatch(/irréversible\.$/);
+    }
   });
 
   it("annonce le pseudo d'emprunt dès qu'une ligne reste, et jamais sinon", () => {
@@ -162,7 +186,9 @@ describe("accountDeletionConfirmation", () => {
 
 describe("accountDeletionOutcome", () => {
   it("décrit ce qui vient d'être fait, et pas l'autre cas", () => {
-    expect(accountDeletionOutcome(null)).toContain("aucune trace");
+    expect(accountDeletionOutcome(null)).toContain("Compte effacé");
+    expect(accountDeletionOutcome(null)).not.toContain("aucune trace");
+    expect(accountDeletionOutcome(null)).toMatch(/sauvegardes, journal des suppressions, mesure d'audience/);
     expect(accountDeletionOutcome("TOURNAMENTS")).toContain("pseudo d'emprunt");
     expect(accountDeletionOutcome(null)).not.toContain("pseudo d'emprunt");
   });
@@ -179,7 +205,7 @@ describe("accountDeletionOutcome", () => {
     // deux : un aperçu en échec suivi d'une réponse illisible annonçait donc
     // une disparition totale que rien n'avait prouvée.
     const unknown = accountDeletionOutcome(RETENTION_UNKNOWN);
-    expect(unknown).not.toContain("aucune trace");
+    expect(unknown).not.toContain("effacé");
     expect(unknown).not.toContain("anonyme");
     expect(unknown).toContain("supprimé");
   });

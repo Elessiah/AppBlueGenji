@@ -92,6 +92,15 @@ Aucun cookie n'est posé pour le comptage, et aucun chemin n'est conservé au-de
 de sa partie « page » (query string et fragment sont retirés, donc aucun
 paramètre d'URL n'est archivé).
 
+L'empreinte n'en reste pas moins une donnée **pseudonymisée**, donc personnelle :
+l'association détient le sel et peut recalculer l'empreinte d'un compte (`u:<id>`)
+ou d'un couple IP + navigateur. C'est ainsi que `/rgpd#audience` la présente
+(finalité, intérêt légitime, durées, destinataires — dont la commande publique
+`/stats-site`, qui ne sert que des totaux —, droit d'opposition), en accord avec
+la fiche T06 du registre. Deux points restent à trancher et sont consignés dans
+`ERREUR.txt` : un moyen technique de s'opposer, et une durée pour l'empreinte de
+`bg_site_visitors`, aujourd'hui gardée sans limite.
+
 ### Identité du visiteur et abus
 
 L'empreinte étant dérivée d'en-têtes fournis par le client, la fenêtre de session

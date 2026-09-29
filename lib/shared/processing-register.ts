@@ -33,7 +33,7 @@ import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notification
 import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-29";
+export const REGISTER_UPDATED_AT = "2026-09-30";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -346,10 +346,10 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Mesure d'audience du site",
     purpose: "Connaître la fréquentation du site",
     subPurposes: ["Compter visites et visiteurs uniques (24 h, 7 jours, 30 jours, total)"],
-    legalBasis: "Intérêt légitime (statistiques de fréquentation, sans cookie ni traceur tiers)",
+    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie ni traceur tiers ; droit d'opposition (art. 21) exercé par le formulaire de signalement, catégorie RGPD, ou auprès du contact Discord",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
-      "Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : elle rend un visiteur unique sans permettre de remonter à lui",
+      "Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : donnée pseudonymisée — sans le secret, elle ne se rattache à personne, mais l'association, qui le détient, peut recalculer l'empreinte d'un compte ou d'un couple IP et navigateur",
       "Page consultée (sans paramètres d'URL), date",
       "Indicateur « visiteur connecté » (oui / non), sans le compte concerné",
       `Plusieurs chargements d'un même visiteur en ${SITE_VISIT_WINDOW_MINUTES} minutes ne comptent qu'une visite`,
@@ -357,14 +357,17 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       `Détail des visites (empreinte, page, date) effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après report dans un compteur par jour qui ne garde que le nombre de visites`,
-      "Une empreinte par visiteur, sans page ni date, conservée sans limite de durée pour le nombre de visiteurs uniques depuis la mise en service — elle ne désigne aucune personne",
-      "Adresse IP, navigateur et identifiant du compte jamais enregistrés",
+      "Une empreinte par visiteur, sans page ni date mais avec l'indicateur « visiteur connecté », conservée sans limite de durée pour le nombre de visiteurs uniques depuis la mise en service, y compris après la suppression du compte",
+      "Adresse IP, navigateur et identifiant du compte jamais enregistrés tels quels",
     ],
-    recipients: ["Staff de l'association (commande Discord des statistiques)"],
+    recipients: [
+      "Staff de l'association",
+      "Tout membre d'un serveur Discord où le bot est installé, pour les seuls totaux (visites et visiteurs), par la commande publique /stats-site",
+    ],
     transfers: ["Aucun"],
     security: [
       ...COMMON_SECURITY,
-      "Aucun cookie de mesure ; le secret de salage n'est ni en base ni dans les sauvegardes, et sans lui aucune visite n'est comptée",
+      "Aucun cookie de mesure — une seule valeur de stockage de session (bg:last-visit-ping), jamais transmise, évite de signaler deux fois un même chargement ; le secret de salage n'est ni en base ni dans les sauvegardes, et sans lui aucune visite n'est comptée",
     ],
   },
   {

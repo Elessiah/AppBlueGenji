@@ -35,6 +35,7 @@ import {
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
+import { SITE_VISIT_DETAIL_RETENTION_DAYS, SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
@@ -81,9 +82,11 @@ export default async function RgpdPage() {
           Politique de<br />confidentialité
         </h1>
         <p style={{ marginTop: 20, fontSize: 15, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 560 }}>
-          BlueGenji ne collecte que les données strictement nécessaires au fonctionnement
-          de la plateforme. Aucune revente de données, aucun traceur publicitaire ni
-          analytique, aucune publicité ciblée.
+          BlueGenji ne collecte que les données nécessaires au fonctionnement de la
+          plateforme et à la mesure de sa fréquentation. Aucune revente de données, aucun traceur publicitaire, aucun
+          outil d&apos;analyse tiers, aucune publicité ciblée. La fréquentation du site est
+          mesurée par le site lui-même : voir{" "}
+          <Link href="#audience">Mesure d&apos;audience</Link>.
         </p>
       </section>
 
@@ -287,18 +290,22 @@ export default async function RgpdPage() {
         <div className={styles.prose}>
           <p>
             BlueGenji n'utilise <strong>aucun cookie publicitaire, aucun traceur
-            analytique tiers</strong> (Google Analytics, Meta Pixel, etc.), aucun
-            service de fingerprinting.
+            analytique tiers</strong> (Google Analytics, Meta Pixel, etc.). La mesure
+            d&apos;audience du site n&apos;emploie aucun cookie : elle est décrite{" "}
+            <Link href="#audience">plus bas</Link>.
           </p>
           <p>
-            Seuls des cookies techniques sont déposés :
+            Voici la liste de tout ce que le site dépose ou lit dans votre navigateur
+            (cookies, stockage local, stockage de session, cache) :
           </p>
           <ul>
             <li>
               <strong>bg_session</strong> — cookie de session httpOnly, sameSite=lax,
               durée 30 jours, déposé <strong>à la connexion</strong>. Il contient
-              uniquement un jeton opaque haché (SHA-256) permettant de vous identifier
-              sur la plateforme. Il est supprimé à la déconnexion.
+              uniquement un jeton aléatoire, qui ne dit rien de vous et permet de vous
+              reconnaître sur la plateforme ; nos serveurs n&apos;en gardent que
+              l&apos;empreinte (SHA-256), jamais le jeton lui-même. Il est supprimé à la
+              déconnexion.
             </li>
             <li>
               <strong>bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>{" "}
@@ -342,7 +349,23 @@ export default async function RgpdPage() {
             <li>
               <strong>bg:last-visit-ping</strong> — une valeur du stockage de session, effacée à la
               fermeture de l&apos;onglet : l&apos;heure du dernier signalement de visite, pour ne pas
-              compter deux fois le même chargement. Elle n&apos;identifie personne.
+              compter deux fois le même chargement. Elle n&apos;identifie personne et
+              n&apos;est jamais transmise ; ce que le serveur reçoit d&apos;une visite est
+              décrit sous <Link href="#audience">Mesure d&apos;audience</Link>.
+            </li>
+            <li>
+              <strong>bg_match_launch_dismissed</strong> — une valeur du stockage de session,
+              effacée à la fermeture de l&apos;onglet, posée <strong>si vous fermez la fenêtre de
+              lancement d&apos;un match</strong> : le numéro du match et l&apos;étape de son
+              lancement, pour ne pas vous la rouvrir dans cet onglet. Jamais transmise au
+              serveur.
+            </li>
+            <li>
+              <strong>bg_lazy_chunk_reload_at</strong> — une valeur du stockage de session,
+              effacée à la fermeture de l&apos;onglet, posée seulement <strong>si une partie
+              de la page d&apos;un tournoi n&apos;a pas pu se charger</strong> (après une mise à
+              jour du site) : l&apos;heure du rechargement automatique qui a suivi, pour ne pas
+              recharger plus d&apos;une fois par minute. Jamais transmise au serveur.
             </li>
             <li>
               <strong>bg_rgpd_consent</strong> et <strong>bg_terms_consent</strong> — deux valeurs
@@ -353,17 +376,99 @@ export default async function RgpdPage() {
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
               numéro de version, dès que votre compte existe.
             </li>
+            <li>
+              <strong>Service worker et cache « bg-offline »</strong> — le site installe dans
+              votre navigateur, <strong>pour tout visiteur</strong>, un petit programme (
+              <code>/push-sw.js</code>) qui met en cache une seule page, la page « hors
+              ligne » du site, affichée à la place de l&apos;erreur du navigateur quand le réseau
+              manque. Ce cache ne contient que cette page, identique pour tous : aucune donnée
+              vous concernant. Le même programme reçoit les notifications, seulement si vous
+              les activez (voir <Link href="#notifications">Notifications</Link>). Il reste
+              jusqu&apos;à ce que vous effaciez les données du site dans votre navigateur.
+            </li>
           </ul>
           <p>
-            Aucun bandeau de consentement cookies n&apos;est requis pour ces cookies strictement
-            nécessaires au fonctionnement du service ou déposés à votre demande (directive
-            ePrivacy, art. 5.3, exemption cookies fonctionnels).
+            <strong>bg:last-visit-ping</strong> relève de la mesure d&apos;audience, dont les
+            conditions sont décrites ci-dessous. Les autres éléments ne demandent pas votre
+            consentement : l&apos;article 82 de la loi
+            Informatique et Libertés en dispense les traceurs qui sont strictement nécessaires
+            au service que vous demandez, ou qui ont pour seule finalité de le permettre. Aucun
+            d&apos;entre eux ne sert à la publicité ni au suivi d&apos;un site à l&apos;autre.
           </p>
           <p>
             <strong>Aucun service tiers n&apos;est chargé dans votre navigateur</strong>, et aucun
             cookie tiers n&apos;est déposé. Se connecter par Google, Discord ou Blizzard vous mène
             sur la page du fournisseur, qui vous ramène ici : l&apos;échange qui suit se fait entre
             notre serveur et le sien.
+          </p>
+        </div>
+      </section>
+
+      {/* MESURE D'AUDIENCE — registre T06 */}
+      <section id="audience" className={styles.section}>
+        <header className={styles.head}>
+          <div>
+            <span className="eyebrow">MESURE D&apos;AUDIENCE</span>
+            <h2 className={styles.sectionTitle}>Mesure d&apos;audience</h2>
+          </div>
+          <span className={styles.meta}>REGISTRE T06</span>
+        </header>
+        <div className={styles.prose}>
+          <p>
+            <strong>Finalité.</strong> Connaître la fréquentation du site : nombre de visites
+            et de visiteurs uniques sur 24 heures, 7 jours, 30 jours et depuis la mise en
+            service. Aucun outil tiers n&apos;est employé, et rien n&apos;en sert à la publicité.
+          </p>
+          <p>
+            <strong>Ce qui est transmis.</strong> Quand vous arrivez sur le site, par
+            n&apos;importe quelle page (y compris la page de connexion, avant toute création de
+            compte), votre navigateur signale au serveur le chemin de cette page, sans ses
+            paramètres. La navigation d&apos;une page à l&apos;autre ne le fait pas, et un même
+            onglet ne le refait normalement pas avant {SITE_VISIT_WINDOW_MINUTES} minutes ; côté serveur,
+            plusieurs arrivées en {SITE_VISIT_WINDOW_MINUTES} minutes ne comptent qu&apos;une
+            visite.
+          </p>
+          <p>
+            <strong>Ce qui est enregistré.</strong> Le serveur calcule une empreinte
+            (SHA-256) mêlée à un secret qu&apos;il est seul à détenir : elle est dérivée de
+            votre compte si vous êtes connecté, sinon de votre adresse IP et de votre
+            navigateur (user-agent). Il enregistre cette empreinte, la page, la date et un
+            indicateur « visiteur connecté » (oui ou non). Votre adresse IP, votre navigateur
+            et l&apos;identifiant de votre compte ne sont jamais enregistrés tels quels.
+          </p>
+          <p>
+            <strong>Une donnée pseudonymisée, pas anonyme.</strong> Sans le secret, personne
+            ne peut rattacher une empreinte à une personne. Mais l&apos;association le détient :
+            elle peut recalculer l&apos;empreinte d&apos;un compte, ou d&apos;une adresse IP
+            associée à un navigateur, et retrouver les visites correspondantes. Ces
+            empreintes sont donc des données personnelles au sens du RGPD.
+          </p>
+          <p>
+            <strong>Base légale.</strong> L&apos;intérêt légitime de l&apos;association à
+            connaître la fréquentation de son site (art. 6.1.f du RGPD).
+          </p>
+          <p>
+            <strong>Durée de conservation.</strong> Le détail des visites (empreinte, page,
+            date) est effacé au bout de {SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après avoir
+            été reporté dans un compteur par jour qui ne garde que le nombre de visites. Pour
+            compter les visiteurs uniques depuis la mise en service, le site garde en outre
+            une empreinte par visiteur, sans page ni date mais avec l&apos;indicateur
+            « visiteur connecté »,{" "}
+            <strong>sans limite de durée</strong> — y compris après la suppression d&apos;un
+            compte.
+          </p>
+          <p>
+            <strong>Destinataires.</strong> Le staff de l&apos;association. Les totaux
+            (nombres de visites et de visiteurs, sans aucune empreinte) sont aussi affichés
+            par la commande <code>/stats-site</code> du bot Discord, ouverte à tout membre d&apos;un serveur où le bot est installé.
+          </p>
+          <p>
+            <strong>Votre droit d&apos;opposition.</strong> Le droit de vous opposer à cette
+            mesure (art. 21 du RGPD) s&apos;exerce, comme vos autres droits, par le formulaire
+            « {REPORT_FORM_NAME} », catégorie RGPD, ou auprès de{" "}
+            <strong>{LEGAL_CONTACT_DISCORD}</strong> sur Discord. Le site ne sait pas encore
+            l&apos;appliquer de lui-même : aucun réglage ne permet de désactiver la mesure, ni
+            d&apos;en exclure vos visites à venir.
           </p>
         </div>
       </section>
