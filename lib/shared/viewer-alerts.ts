@@ -42,12 +42,22 @@ type AlertMatch = {
   phaseId: number;
   /** Horodatage de la dernière écriture : change à chaque saisie sur la ligne. */
   updatedAt?: string;
+  /** Caster inscrit : ses rencontres sont aussi celles du lecteur. */
+  casterUserId?: number | null;
+  /** État du lancement (`lib/shared/match-launch.ts`). */
+  lobbyOpenedAt?: string | null;
+  launchedAt?: string | null;
+  team1Ready?: boolean;
+  team2Ready?: boolean;
+  casterReady?: boolean;
 };
 
 /** Ce dont la comparaison a besoin — satisfait par `TournamentDetail`. */
 export type ViewerAlertDetail = {
   card: { state: string };
   myTeamId: number | null;
+  /** Compte du lecteur : repère les rencontres qu'il caste. */
+  viewerUserId?: number | null;
   /**
    * Engagées au nom desquelles le lecteur peut reporter un score
    * (`TournamentViewerContext`) : « score à confirmer » ne sonne que pour
@@ -169,18 +179,64 @@ export function touchesViewerMatches(
 ): boolean {
   if (!previous) return true;
   if (previous.card.state !== next.card.state) return true;
-  const me = next.myTeamId;
-  if (me === null) return false;
-  return viewerMatchesFingerprint(previous, me) !== viewerMatchesFingerprint(next, me);
+  return viewerMatchesFingerprint(previous, next) !== viewerMatchesFingerprint(next, next);
 }
 
-/** Empreinte des rencontres d'une engagée : ce qui, s'il bouge, doit se voir. */
-function viewerMatchesFingerprint(detail: ViewerAlertDetail, teamId: number): string {
+/**
+ * La modale de lancement (`components/match-launch/MatchLaunchCenter.tsx`)
+ * doit-elle relire sa liste ?
+ *
+ * Elle vit d'une interrogation de `/api/me/match-launches` (8 à 60 s), alors
+ * que la fiche du tournoi reçoit dans la seconde ce qui la concerne : lobby
+ * ouvert, « Prêt » adverse, lancement. Le bandeau de la carte annonçait « 1/2
+ * prêts » pendant que la modale, au-dessus, disait encore 0/2. La page lui
+ * signale donc chaque changement **réel** d'une rencontre du lecteur — joueur
+ * **ou** caster —, ce qui ne coûte qu'une lecture par changement, et aucune
+ * quand rien ne bouge.
+ *
+ * Rien au premier instantané : la modale fait sa propre lecture au montage.
+ */
+export function viewerLaunchChanged(
+  previous: ViewerAlertDetail | null,
+  next: ViewerAlertDetail,
+): boolean {
+  if (!previous) return false;
+  return viewerMatchesFingerprint(previous, next) !== viewerMatchesFingerprint(next, next);
+}
+
+/**
+ * Rencontre du lecteur : son engagée y joue, ou il la caste. Le lecteur est
+ * lu sur `viewer` (le dernier instantané), pour que les deux empreintes
+ * comparées portent sur la même personne.
+ */
+function isViewerMatch(match: AlertMatch, viewer: ViewerAlertDetail): boolean {
+  if (involves(match, viewer.myTeamId)) return true;
+  const me = viewer.viewerUserId ?? null;
+  return me !== null && match.casterUserId === me;
+}
+
+/**
+ * Empreinte des rencontres du lecteur : ce qui, s'il bouge, doit se voir — y
+ * compris l'état du lancement (lobby, « Prêt » de chaque partie, lancement),
+ * que rien ne garantit de lire dans `updatedAt`.
+ */
+function viewerMatchesFingerprint(detail: ViewerAlertDetail, viewer: ViewerAlertDetail): string {
   return detail.matches
-    .filter((match) => involves(match, teamId))
-    .map(
-      (match) =>
-        `${match.id}:${match.status}:${match.team1Id ?? ""}:${match.team2Id ?? ""}:${match.updatedAt ?? ""}`,
+    .filter((match) => isViewerMatch(match, viewer))
+    .map((match) =>
+      [
+        match.id,
+        match.status,
+        match.team1Id ?? "",
+        match.team2Id ?? "",
+        match.updatedAt ?? "",
+        match.lobbyOpenedAt ?? "",
+        match.launchedAt ?? "",
+        match.team1Ready ? 1 : 0,
+        match.team2Ready ? 1 : 0,
+        match.casterReady ? 1 : 0,
+        match.casterUserId ?? "",
+      ].join(":"),
     )
     .sort()
     .join("|");

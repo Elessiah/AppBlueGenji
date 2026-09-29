@@ -5,6 +5,7 @@ import type { BracketMatch, BracketType, TournamentFormat } from "@/lib/shared/t
 import { ScrollArea } from "@/components/cyber";
 import { useSlotHeight } from "../_hooks/useSlotHeight";
 import { MatchRow } from "./MatchRow";
+import { isMatchScoreLocked } from "../_lib/score-lock";
 
 
 const CARD_W = 210;
@@ -227,9 +228,8 @@ export function BracketTree({
                             match={match}
                             adminResolvable={adminResolvable(match)}
                             onOpenAdminModal={onOpenAdminModal}
-                            allMatches={allTournamentMatches}
+                            scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
                             roundNumber={roundNum}
-                            format={format}
                           />
                         </div>
                       </div>

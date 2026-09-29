@@ -64,7 +64,34 @@ export type TournamentSnapshotFrame = {
   version: string;
   /** Message SSE complet, déjà sérialisé et encodé en UTF-8. */
   frame: Uint8Array;
+  /**
+   * L'instantané seul (version comprise), en JSON UTF-8 — une **vue** sur
+   * `frame`, sans copie. C'est le morceau lourd de toute trame qui porte
+   * l'instantané : la trame de connexion le réutilise tel quel au lieu de
+   * resérialiser 238 Ko par lecteur, et la compression du flux
+   * (`lib/server/tournament-stream-frames.ts`) ne le comprime qu'une fois.
+   */
+  snapshotJson: Uint8Array;
 };
+
+/**
+ * Trame de l'instantané, retrouvée depuis l'instantané lui-même.
+ *
+ * La route du flux reçoit l'instantané par la porte gardée
+ * (`getVisibleTournamentSnapshot`), jamais la trame — c'est voulu, la trame ne
+ * consultant pas la visibilité. Mais elle a besoin de ses octets pour composer
+ * sa trame de connexion. Cette table les lui rend **à partir d'un instantané
+ * qu'elle détient déjà** : elle ne donne accès à rien de plus que ce que la
+ * porte gardée a laissé passer. Un instantané qui ne vient pas du cache (un
+ * test, un objet recomposé) n'y figure pas, et l'appelant retombe sur la
+ * sérialisation.
+ */
+const frameBySnapshot = new WeakMap<TournamentSnapshot, TournamentSnapshotFrame>();
+
+/** Trame d'un instantané sorti du cache, ou `null` (voir `frameBySnapshot`). */
+export function snapshotFrameOf(snapshot: TournamentSnapshot): TournamentSnapshotFrame | null {
+  return frameBySnapshot.get(snapshot) ?? null;
+}
 
 const encoder = new TextEncoder();
 
@@ -201,13 +228,37 @@ export function buildFrame(
   payloadJson: string,
   version: string,
 ): Uint8Array {
+  return encodeSnapshotFrame(tournamentId, payloadJson, version).frame;
+}
+
+/**
+ * Trame et vue sur l'instantané qu'elle porte. La tête (`data: {…,"snapshot":`)
+ * et la queue (`}\n\n`) ne contiennent que des valeurs passées par
+ * `JSON.stringify`, l'instantané en occupe tout le milieu.
+ */
+function encodeSnapshotFrame(
+  tournamentId: number,
+  payloadJson: string,
+  version: string,
+): { frame: Uint8Array; snapshotJson: Uint8Array } {
   const encodedVersion = JSON.stringify(version);
   const body = payloadJson.slice(1, -1);
   const snapshotJson = body ? `{${body},"version":${encodedVersion}}` : `{"version":${encodedVersion}}`;
-  return encoder.encode(
+  const head = encoder.encode(
     `data: {"type":"snapshot","tournamentId":${JSON.stringify(tournamentId)},` +
-      `"version":${encodedVersion},"snapshot":${snapshotJson}}\n\n`,
+      `"version":${encodedVersion},"snapshot":`,
   );
+  const json = encoder.encode(snapshotJson);
+  const tail = encoder.encode("}\n\n");
+
+  const frame = new Uint8Array(head.byteLength + json.byteLength + tail.byteLength);
+  frame.set(head, 0);
+  frame.set(json, head.byteLength);
+  frame.set(tail, head.byteLength + json.byteLength);
+  return {
+    frame,
+    snapshotJson: frame.subarray(head.byteLength, head.byteLength + json.byteLength),
+  };
 }
 
 async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFrame | null> {
@@ -352,7 +403,10 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     const version = snapshotVersion(payloadJson);
     const snapshot: TournamentSnapshot = { ...payload, version };
 
-    return { snapshot, version, frame: buildFrame(tournamentId, payloadJson, version) };
+    const encoded = encodeSnapshotFrame(tournamentId, payloadJson, version);
+    const result: TournamentSnapshotFrame = { snapshot, version, ...encoded };
+    frameBySnapshot.set(snapshot, result);
+    return result;
   } finally {
     connection.release();
   }

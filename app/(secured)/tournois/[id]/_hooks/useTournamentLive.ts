@@ -5,7 +5,13 @@ import { REFRESH_CADENCE, FOCUS_REFRESH_MIN_INTERVAL_MS } from "@/lib/shared/ref
 import { mapError } from "../_lib/error-map";
 import { playAlertChime } from "../_lib/sounds";
 import { clearAttention, raiseAttention } from "../_lib/attention";
-import { isPersonalAlert, touchesViewerMatches, viewerAlert } from "@/lib/shared/viewer-alerts";
+import {
+  isPersonalAlert,
+  touchesViewerMatches,
+  viewerAlert,
+  viewerLaunchChanged,
+} from "@/lib/shared/viewer-alerts";
+import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
 import {
   nextViewerMatchFocusChangeAt,
   powerPolicy,
@@ -25,6 +31,7 @@ import {
   INITIAL_LIVE_STATE,
   parseLiveMessage,
   reconnectDelayMs,
+  shareUnchanged,
   shouldCommitFetched,
   shouldRefreshViewerContext,
   type LiveFailure,
@@ -158,6 +165,13 @@ export function useTournamentLive(tournamentId: number) {
           if (isPersonalAlert(alert)) playAlertChime(alert);
           raiseAttention(alert);
         }
+        // La modale de lancement ne vit que de sa propre interrogation : on lui
+        // signale ce que le flux vient d'apprendre sur une rencontre du lecteur
+        // (lobby, « Prêt », lancement), plutôt que de la laisser le découvrir
+        // jusqu'à une minute plus tard. Elle regroupe ces signaux.
+        if (viewerLaunchChanged(previous.detail, next.detail)) {
+          window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
+        }
       }
       updateMatchFocus();
 
@@ -277,8 +291,12 @@ export function useTournamentLive(tournamentId: number) {
           throw new Error(payload.error || "TOURNAMENT_LOAD_FAILED");
         }
 
-        if (!shouldCommitFetched(stateRef.current.detail, payload, force)) return null;
-        commit({ tier: stateRef.current.tier, detail: payload });
+        const current = stateRef.current.detail;
+        if (!shouldCommitFetched(current, payload, force)) return null;
+        // Même partage structurel que pour le flux : une relecture ne doit pas
+        // redessiner les cartes qu'elle n'a pas changées.
+        const detail = current ? { ...payload, ...shareUnchanged(current, payload) } : payload;
+        commit({ tier: stateRef.current.tier, detail });
         return null;
       } catch (e) {
         if (!silent) showError(mapError((e as Error).message));

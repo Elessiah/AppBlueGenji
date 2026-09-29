@@ -1,6 +1,7 @@
 "use client";
 
-import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
+import { memo } from "react";
+import type { BracketMatch } from "@/lib/shared/types";
 import { matchAnchorId } from "@/lib/shared/match-anchor";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import { canReportOwnMatch, teamLabel } from "@/lib/shared/match-card-viewer";
@@ -14,7 +15,6 @@ import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { pendingScoreProposal } from "../_lib/score-form";
-import { isMatchScoreLocked } from "../_lib/score-lock";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip } from "./MatchReplayStrip";
@@ -27,18 +27,30 @@ interface MatchRowProps {
   match: BracketMatch;
   adminResolvable: boolean;
   onOpenAdminModal: (match: BracketMatch) => void;
-  allMatches: BracketMatch[];
+  /**
+   * Score verrouillé (`isMatchScoreLocked`, `_lib/score-lock.ts`) : calculé par
+   * la vue et passé en booléen, et non la liste du plateau entier — celle-ci
+   * change à chaque instantané, et en faire une prop redessinait toutes les
+   * cartes pour un score qui n'en concernait qu'une.
+   */
+  scoreLocked: boolean;
   roundNumber: number;
-  format: TournamentFormat;
 }
 
-export function MatchRow({
+/**
+ * Carte d'un match, **mémorisée** : l'instantané du flux garde la référence
+ * des matchs qu'il n'a pas changés (`shareUnchanged`, `_lib/live-state.ts`), si
+ * bien qu'un « Prêt » ou un score ne redessine que la carte concernée, et non
+ * les 254 d'un gros plateau. Toute prop ajoutée doit donc rester stable d'un
+ * instantané à l'autre (booléen, identifiant, rappel mémorisé) — un objet ou
+ * une flèche neufs à chaque rendu annuleraient la mémorisation sans bruit.
+ */
+export const MatchRow = memo(function MatchRow({
   match,
   adminResolvable,
   onOpenAdminModal,
-  allMatches,
+  scoreLocked,
   roundNumber,
-  format,
 }: MatchRowProps) {
   // Signalement : réservé aux engagés du tournoi, et seulement sur une manche
   // dont les deux adversaires sont connus — il n'y a rien à arbitrer sur une
@@ -83,12 +95,6 @@ export function MatchRow({
   // que le nul — rien ne teinte les lignes — mais pas le même mot : « Match
   // nul » y annoncerait une rencontre disputée et partagée.
   const isDoubleForfeit = isMatchDoubleForfeit(match);
-
-  // Même règle que le garde-fou serveur (`lib/shared/match-lock.ts`) : le score
-  // n'est plus éditable dès que la manche suivante porte une saisie. Calculé
-  // une fois pour tout le plateau (`_lib/score-lock.ts`) : posée carte par
-  // carte, la question coûtait un parcours du plateau à chacune.
-  const scoreLocked = isMatchScoreLocked(match.id, allMatches, format);
 
   const rowClass = (win: boolean): string =>
     [styles.row, win ? styles.winner : hasWinner ? styles.decided : ""].filter(Boolean).join(" ");
@@ -236,4 +242,4 @@ export function MatchRow({
       )}
     </div>
   );
-}
+});

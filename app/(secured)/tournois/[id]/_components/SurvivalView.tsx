@@ -3,6 +3,7 @@
 import type { BracketMatch, SurvivalMeta, SurvivalStandingRow } from "@/lib/shared/types";
 import { isCutRound, nextCutRound, teamsToEliminate } from "@/lib/shared/survival";
 import { MatchRow } from "./MatchRow";
+import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
 import { EntrantName } from "./EntrantName";
 
@@ -350,9 +351,8 @@ export function SurvivalView({
                             match={match}
                             adminResolvable={adminResolvable(match)}
                             onOpenAdminModal={onOpenAdminModal}
-                            allMatches={allTournamentMatches}
+                            scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, "SURVIVAL")}
                             roundNumber={match.roundNumber}
-                            format="SURVIVAL"
                           />
                         );
                       })}
