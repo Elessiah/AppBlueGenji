@@ -321,7 +321,7 @@ function previewSurvival(input: TournamentPreviewInput): TournamentPreview {
     format: "SURVIVAL",
     seedingSource: input.seedingSource,
     entrants,
-    roundLabel: plan.isBarrage ? "Barrage (round 1)" : "Round 1",
+    roundLabel: plan.isBarrage ? "Barrage (manche 1)" : "Manche 1",
     roundsUnit: "round",
     pairings,
     bracketSize: null,

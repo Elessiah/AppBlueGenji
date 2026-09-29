@@ -8,6 +8,7 @@ import {
   watchScrollOverflow,
 } from "@/lib/shared/scroll-overflow";
 import { SCROLL_REVEAL_ATTRIBUTE, revealScrollLeft } from "@/lib/shared/scroll-reveal";
+import { horizontalScrollHint } from "@/lib/shared/scroll-hint";
 
 type ScrollOrientation = "x" | "y" | "both";
 
@@ -82,6 +83,22 @@ export function ScrollArea({
   // client doivent coïncider, et le défaut prudent est « atteignable ».
   const [overflowing, setOverflowing] = useState(true);
   const [focused, setFocused] = useState(false);
+  // Indice tactile des bords où il reste du contenu (`lib/shared/scroll-hint.ts`).
+  // Inutile avec `fade`, qui dessine déjà les deux bords, et sur l'axe vertical.
+  const hinted = orientation !== "y" && !fade;
+  const [hint, setHint] = useState<string | null>(null);
+  const hintedRef = useRef(hinted);
+  hintedRef.current = hinted;
+  const updateHint = () => {
+    const element = ref.current;
+    setHint(element && hintedRef.current ? horizontalScrollHint(element) : null);
+  };
+  const updateHintRef = useRef(updateHint);
+  updateHintRef.current = updateHint;
+
+  useEffect(() => {
+    updateHintRef.current();
+  }, [hinted]);
 
   useEffect(() => {
     const element = ref.current;
@@ -90,6 +107,7 @@ export function ScrollArea({
       element,
       ({ overflowing: next, active }) => {
         setOverflowing(next);
+        updateHintRef.current();
         if (active) setFocused(true);
       },
       {
@@ -123,6 +141,7 @@ export function ScrollArea({
       targetEnd: box.right - origin,
       margin: revealSettings.current.fade ? FADE_WIDTH : 0,
     });
+    updateHintRef.current();
   }, [revealKey]);
 
   const classes = ["scroll-area", subtle ? "scroll-subtle" : null, className]
@@ -139,6 +158,8 @@ export function ScrollArea({
       ref={ref}
       className={classes}
       {...scrollAreaAccessibility({ overflowing, focused, ariaLabel })}
+      data-scroll-hint={hint ?? undefined}
+      onScroll={hinted ? updateHint : undefined}
       onFocus={(event: FocusEvent<HTMLElement>) => {
         if (isOwnFocusEvent(event)) setFocused(true);
       }}

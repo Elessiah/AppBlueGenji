@@ -181,6 +181,20 @@ et réamorce le format.
   états, compteurs et `current_phase_id` — sans quoi `startPhase` serait rejoué
   sur une phase déjà marquée RUNNING avec un plateau mélangé.
 
+## Liste repliée
+
+Au-delà de seize inscrites, la liste ne montre que les seize premières lignes,
+suivies d'un bouton réversible « Voir toute la liste (N de plus) » /
+« Réduire la liste » (`_lib/registrations-list.ts`). Sur téléphone, un tournoi
+à 128 engagées rendait sinon une fiche de 16 000 px, où plateau et frise
+devenaient introuvables. L'état déplié est un drapeau, pas un compte figé : une
+liste dépliée le reste quand le flux y ajoute une ligne. Une flèche « ↓ » qui
+ferait passer une ligne sous la dernière visible déplie la liste d'elle-même,
+pour que la ligne déplacée et son bouton restent à l'écran. Un appui sur la
+poignée `⠿` la déplie aussi, de façon synchrone (`flushSync`), **avant** que le
+geste ne relève les emplacements : ils ne sont mesurés qu'une fois, au premier
+appui, et une ligne masquée à cet instant ne serait jamais une cible.
+
 ## Surfaces
 
 | Élément | Emplacement |

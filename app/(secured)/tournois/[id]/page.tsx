@@ -18,6 +18,8 @@ import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
 import { mapError } from "./_lib/error-map";
+import { registrationConfirmText } from "./_lib/registration-confirm";
+import { formatLocalDateTime } from "@/lib/shared/dates";
 import { MatchFormatProvider } from "./_lib/match-format-context";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
@@ -87,6 +89,8 @@ interface PendingConfirm {
   body: string[];
   confirmLabel: string;
   pendingLabel: string;
+  /** Ton du bouton de confirmation : `danger` par défaut (geste qui retire). */
+  tone?: "danger" | "primary";
   run: () => Promise<boolean>;
 }
 
@@ -472,7 +476,10 @@ export default function TournamentDetailPage() {
       ? null
       : detail.endurance?.standings.find((s) => s.teamId === penaltyTeamId) ?? null;
 
-  const registerTeam = async () => {
+  // Inscription : confirmée d'abord (`_lib/registration-confirm.ts`), et le
+  // bouton de la modale reste désactivé pendant l'envoi — un double appui ne
+  // part donc qu'une fois.
+  const performRegister = async () => {
     try {
       const response = await fetch(`/api/tournaments/${tournamentId}/register`, {
         method: "POST",
@@ -480,15 +487,28 @@ export default function TournamentDetailPage() {
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) {
         // Refus faute des conditions d'utilisation : la modale d'acceptation
-        // (mise en page racine) s'ouvre, le toast dit pourquoi.
-        if (payload.error === TERMS_ACCEPTANCE_REQUIRED) window.dispatchEvent(new Event(TERMS_REQUIRED_EVENT));
+        // (mise en page racine) s'ouvre, le toast dit pourquoi. La confirmation
+        // se ferme alors (`true`) : deux modales empilées se disputeraient le focus.
+        if (payload.error === TERMS_ACCEPTANCE_REQUIRED) {
+          showError(mapError(payload.error));
+          // Après la fermeture de la confirmation, qui rend le focus en partant.
+          window.setTimeout(() => window.dispatchEvent(new Event(TERMS_REQUIRED_EVENT)), 0);
+          return true;
+        }
         throw new Error(payload.error || "REGISTRATION_FAILED");
       }
       showSuccess("Inscription validée.");
       void refresh();
+      return true;
     } catch (e) {
       showError(mapError((e as Error).message));
+      return false;
     }
+  };
+
+  const registerTeam = () => {
+    const text = registrationConfirmText(detail.card, formatLocalDateTime(detail.card.startAt));
+    setPendingConfirm({ ...text, tone: "primary", run: performRegister });
   };
 
   const isMulti = detail.card.format === "MULTI";
@@ -966,6 +986,7 @@ export default function TournamentDetailPage() {
           title={pendingConfirm.title}
           confirmLabel={pendingConfirm.confirmLabel}
           pendingLabel={pendingConfirm.pendingLabel}
+          tone={pendingConfirm.tone}
           onClose={() => setPendingConfirm(null)}
           onConfirm={pendingConfirm.run}
         >

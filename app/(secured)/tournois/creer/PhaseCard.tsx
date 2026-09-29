@@ -479,7 +479,7 @@ export function PhaseCard({
               <>
                 <div className="field">
                   <label htmlFor={fieldId("survivalRoundsBeforeFirstCut")}>
-                    Rounds avant la première coupe
+                    Manches avant la première coupe
                   </label>
                   <NumberInput
                     id={fieldId("survivalRoundsBeforeFirstCut")}
@@ -505,7 +505,7 @@ export function PhaseCard({
 
                 <div className="field">
                   <label htmlFor={fieldId("survivalRoundsPerCut")}>
-                    Rounds entre les coupes suivantes
+                    Manches entre les coupes suivantes
                   </label>
                   <NumberInput
                     id={fieldId("survivalRoundsPerCut")}

@@ -12,6 +12,12 @@ export interface ConfirmActionDialogProps {
   children: ReactNode;
   confirmLabel: string;
   pendingLabel: string;
+  /**
+   * Ton du bouton de confirmation. `danger` (défaut) pour un geste qui retire
+   * ou sanctionne ; `primary` pour un engagement, comme l'inscription, qui ne
+   * se défait pas seul mais n'est pas une perte.
+   */
+  tone?: "danger" | "primary";
   onClose: () => void;
   /**
    * Exécute le geste. Rend `true` s'il a abouti : la modale ne se ferme qu'alors,
@@ -22,7 +28,8 @@ export interface ConfirmActionDialogProps {
 
 /**
  * Confirmation commune des gestes irréversibles de la fiche tournoi — abandon,
- * retrait d'une pénalité, lancement forcé d'un match.
+ * retrait d'une pénalité, lancement forcé d'un match, et inscription (qu'un
+ * joueur ne peut pas défaire seul : ton `primary`, le geste n'est pas une perte).
  *
  * Ils passaient par `window.confirm`, quand leurs voisins (retour en arrière,
  * suppression, retrait d'un engagé) ont une modale : une boîte système qu'un
@@ -40,6 +47,7 @@ export function ConfirmActionDialog({
   children,
   confirmLabel,
   pendingLabel,
+  tone = "danger",
   onClose,
   onConfirm,
 }: ConfirmActionDialogProps) {
@@ -83,7 +91,7 @@ export function ConfirmActionDialog({
           <button type="button" className="btn ghost" onClick={onClose} disabled={busy} data-autofocus>
             Annuler
           </button>
-          <button type="submit" className="btn danger" disabled={busy}>
+          <button type="submit" className={tone === "danger" ? "btn danger" : "btn"} disabled={busy}>
             {busy ? pendingLabel : confirmLabel}
           </button>
         </form>

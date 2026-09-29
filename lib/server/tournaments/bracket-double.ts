@@ -8,6 +8,12 @@ import {
 } from "./repository";
 import { statusFromTeams } from "./_internal";
 import { tryAutoResolveByes } from "./byes";
+import {
+  LOWER_FINAL_WINNER_PLACEHOLDER,
+  UPPER_FINAL_WINNER_PLACEHOLDER,
+  lowerWinnerPlaceholder,
+  upperLoserPlaceholder,
+} from "@/lib/shared/bracket-placeholders";
 
 async function linkMatchWinner(
   connection: PoolConnection,
@@ -49,7 +55,7 @@ async function linkMatchLoserWithPlaceholder(
 ): Promise<void> {
   await linkMatchLoser(connection, sourceMatchId, targetMatchId, targetSlot);
 
-  const placeholderText = `Perdant match ${sourceMatchNumber} du upper R${sourceRound}`;
+  const placeholderText = upperLoserPlaceholder(sourceRound, sourceMatchNumber);
   if (targetSlot === 1) {
     await connection.execute(
       `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
@@ -118,7 +124,7 @@ export async function createDoubleEliminationBracket(
         await linkMatchWinner(connection, source, grandFinalMatchId, 1);
         await connection.execute(
           `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
-          [`Gagnant du upper bracket`, grandFinalMatchId],
+          [UPPER_FINAL_WINNER_PLACEHOLDER, grandFinalMatchId],
         );
       }
 
@@ -160,7 +166,7 @@ export async function createDoubleEliminationBracket(
     for (let lbRound = 1; lbRound < lowerRoundsCount; lbRound += 1) {
       for (let matchIndex = 0; matchIndex < lower[lbRound].length; matchIndex += 1) {
         const source = lower[lbRound][matchIndex];
-        const placeholder = `Gagnant match ${matchIndex + 1} du lower R${lbRound}`;
+        const placeholder = lowerWinnerPlaceholder(lbRound, matchIndex + 1);
 
         if (lbRound % 2 === 1) {
           const target = lower[lbRound + 1]?.[matchIndex];
@@ -198,7 +204,7 @@ export async function createDoubleEliminationBracket(
       await linkMatchWinner(connection, lower[lowerRoundsCount][0], grandFinalMatchId, 2);
       await connection.execute(
         `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
-        [`Gagnant du lower bracket`, grandFinalMatchId],
+        [LOWER_FINAL_WINNER_PLACEHOLDER, grandFinalMatchId],
       );
     }
   }

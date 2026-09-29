@@ -85,7 +85,7 @@ export function SurvivalView({
   const cadenceLabel =
     survival.roundsBeforeFirstCut === survival.roundsPerCut
       ? `Coupe ${everyRounds}`
-      : `1re coupe au round ${survival.roundsBeforeFirstCut + barrageRounds}, puis ${everyRounds}`;
+      : `1re coupe à la manche ${survival.roundsBeforeFirstCut + barrageRounds}, puis ${everyRounds}`;
 
   const champion = isFinished ? survival.standings.find((s) => s.rank === 1) : null;
 
@@ -111,7 +111,7 @@ export function SurvivalView({
       {/* Bandeau récap + action forfait */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
         <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
-          Round {survival.currentRound || "—"} · {activeCount} équipe{activeCount > 1 ? "s" : ""} en lice
+          Manche {survival.currentRound || "—"} · {activeCount} équipe{activeCount > 1 ? "s" : ""} en lice
         </span>
         <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
           {cadenceLabel}
@@ -252,7 +252,7 @@ export function SurvivalView({
 
         {/* Rounds en colonnes (même esprit que les arbres d'élimination) */}
         <ScrollArea
-          ariaLabel="Rounds du tournoi — défilement horizontal"
+          ariaLabel="Manches du tournoi — défilement horizontal"
           style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}
           // Posés côte à côte, le round qui se joue était hors champ à droite
           // sur mobile : la zone s'ouvre sur le dernier.
@@ -292,7 +292,7 @@ export function SurvivalView({
                           fontWeight: 600,
                         }}
                       >
-                        Round {roundNum}
+                        Manche {roundNum}
                       </span>
                       {isBarrageRound && (
                         <span

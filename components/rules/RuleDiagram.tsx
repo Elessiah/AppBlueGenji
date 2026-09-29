@@ -372,7 +372,7 @@ function SurvivalDiagram() {
     >
       <ArrowDefs />
 
-      <ColumnLabel x={20} y={18}>Classement du round</ColumnLabel>
+      <ColumnLabel x={20} y={18}>Classement de la manche</ColumnLabel>
       {rows(8, 20, 30, 6, "r1")}
 
       {/* Appariements par paires adjacentes. */}
@@ -414,7 +414,7 @@ function SurvivalDiagram() {
 
       <Elbow from={[352, 150]} to={[400, 150]} color={BLUE} />
 
-      <ColumnLabel x={412} y={18}>Round suivant</ColumnLabel>
+      <ColumnLabel x={412} y={18}>Manche suivante</ColumnLabel>
       {rows(6, 412, 30, 4, "r2")}
 
       <text x={412} y={222} fill={MUTE} fontSize={11} fontFamily={MONO}>
@@ -436,7 +436,7 @@ function SurvivalDiagram() {
         ⚖ EFFECTIF IMPAIR
       </text>
       <text x={426} y={278} fill={MUTE} fontSize={11} fontFamily={MONO}>
-        Round 1 : barrage entre les
+        Manche 1 : barrage entre les
       </text>
       <text x={426} y={294} fill={MUTE} fontSize={11} fontFamily={MONO}>
         2 dernières, le perdant sort.
