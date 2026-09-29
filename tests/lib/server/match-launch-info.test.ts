@@ -393,6 +393,7 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     expect(info.viewer.role).toBe("TEAM1");
     expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster", battletag: "Caster#1" });
   });
+
   it("tait le caster d'un compte supprimé", async () => {
     state.candidates = [candidate({ caster_user_id: CASTER })];
     state.users = [{ id: CASTER, pseudo: "compte_supprime_1", discord_pseudo: null, discord_verified_at: null, overwatch_battletag: null, blizzard_sub: null, visible_overwatch: 0, is_deleted: 1 }];
