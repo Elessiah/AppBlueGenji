@@ -220,6 +220,14 @@ rien ne le tranche avant l'arbitrage, et la salle n'attend que son escalade
 (`score_deadline_at` + `SCORE_REPORT_TIMEOUT_MINUTES`) ou le filet — le relire
 toutes les 30 s rouvrirait le battement supprimé.
 
+L'ancien battement rattrapait aussi, sans le dire, un lecteur arrivé pendant
+une diffusion : la route lit l'instantané, résout le contexte du lecteur, puis
+l'abonne — une écriture diffusée entre les deux le laissait sur la version
+d'avant. Sans battement, rien ne l'aurait rattrapé avant le filet (jamais sur
+un tournoi terminé). Un abonné qui rejoint avec une version déclenche donc un
+**contrôle d'arrivée** immédiat : la lecture sort presque toujours du cache
+que la route vient de remplir, et rien n'est écrit si la version n'a pas bougé.
+
 ### Rendu du plateau
 
 Chaque instantané arrive désérialisé à neuf : un seul « Prêt » remplaçait les

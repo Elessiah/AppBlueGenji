@@ -262,11 +262,26 @@ describe("nextRoomWakeAt", () => {
 });
 
 describe("tournament-broadcast — réveil d'entretien", () => {
+  /**
+   * Abonne un lecteur qui tient `frame`, puis laisse passer le contrôle
+   * d'arrivée (une lecture, sans envoi) : les tests comptent ensuite les seules
+   * lectures du réveil.
+   */
+  async function settledJoin(
+    frame: TournamentSnapshotFrame,
+    viewer: ReturnType<typeof plainSubscriber>,
+  ): Promise<void> {
+    getFrame.mockResolvedValue(frame);
+    joinTournamentRoom(1, viewer.handle, frame.snapshot);
+    await advance(0);
+    expect(viewer.received).toEqual([]);
+    getFrame.mockClear();
+  }
+
   it("ne relit jamais l'instantané d'un tournoi terminé qu'on regarde", async () => {
     const finished = frameOf("v1", { state: "FINISHED" });
-    getFrame.mockResolvedValue(finished);
     const viewer = plainSubscriber("v1");
-    joinTournamentRoom(1, viewer.handle, finished.snapshot);
+    await settledJoin(finished, viewer);
 
     await advance(60 * 60_000);
 
@@ -287,9 +302,8 @@ describe("tournament-broadcast — réveil d'entretien", () => {
   });
 
   it("n'attend plus 30 s pour un tournoi en cours sans échéance", async () => {
-    const running = frameOf("v1");
     const viewer = plainSubscriber("v1");
-    joinTournamentRoom(1, viewer.handle, running.snapshot);
+    await settledJoin(frameOf("v1"), viewer);
 
     await advance(ROOM_SAFETY_NET_MS - 1_000);
     expect(getFrame).not.toHaveBeenCalled();
@@ -306,7 +320,7 @@ describe("tournament-broadcast — réveil d'entretien", () => {
       { status: "AWAITING_CONFIRMATION", scoreDeadlineAt: iso(deadline) },
     ]);
     const viewer = plainSubscriber("v1");
-    joinTournamentRoom(1, viewer.handle, running.snapshot);
+    await settledJoin(running, viewer);
 
     await advance(89_000);
     expect(getFrame).not.toHaveBeenCalled();
@@ -319,9 +333,8 @@ describe("tournament-broadcast — réveil d'entretien", () => {
   });
 
   it("replanifie son réveil sur chaque nouvelle lecture", async () => {
-    const running = frameOf("v1");
     const viewer = plainSubscriber("v1");
-    joinTournamentRoom(1, viewer.handle, running.snapshot);
+    await settledJoin(frameOf("v1"), viewer);
 
     // Un report est saisi : la lecture qui suit découvre son délai.
     const deadline = Date.now() + 60_000;
@@ -347,10 +360,9 @@ describe("tournament-broadcast — réveil d'entretien", () => {
       startAt: iso(start),
     };
     const viewer = plainSubscriber("v1");
-    joinTournamentRoom(1, viewer.handle, frameOf("v1", beforeKickoff).snapshot);
+    await settledJoin(frameOf("v1", beforeKickoff), viewer);
 
     // À l'heure du coup d'envoi, la lecture sert encore l'instantané en cache.
-    getFrame.mockResolvedValue(frameOf("v1", beforeKickoff));
     await advance(10_000);
     expect(getFrame).toHaveBeenCalledTimes(1);
 
@@ -366,6 +378,24 @@ describe("tournament-broadcast — réveil d'entretien", () => {
     await advance(ROOM_READ_RETRY_MS - STATE_CATCH_UP_MS);
     expect(getFrame).toHaveBeenCalledTimes(3);
     expect(viewer.received).toEqual(['data: "v2"']);
+  });
+
+  it("rattrape à l'arrivée un lecteur qui a manqué une diffusion", async () => {
+    // La route lit v1, puis résout le contexte du lecteur : pendant ce temps,
+    // un score est diffusé (v2) aux abonnés déjà là. Sans contrôle d'arrivée,
+    // le nouveau venu resterait sur v1 jusqu'au filet — ou pour toujours sur
+    // un tournoi terminé.
+    const early = plainSubscriber(null);
+    getFrame.mockResolvedValue(frameOf("v2", { state: "FINISHED" }));
+    joinTournamentRoom(1, early.handle);
+    publish();
+    await advance(0);
+    expect(early.received).toEqual(['data: "v2"']);
+
+    const late = plainSubscriber("v1");
+    joinTournamentRoom(1, late.handle, frameOf("v1", { state: "FINISHED" }).snapshot);
+    await advance(0);
+    expect(late.received).toEqual(['data: "v2"']);
   });
 
   it("retente une lecture en échec sans attendre le filet", async () => {

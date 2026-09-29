@@ -609,6 +609,15 @@ export function joinTournamentRoom(
   // premier envoi lui parviendra alors, quitte à faire double emploi.
   room.states.set(subscriber, { version: subscriber.version ?? null, lastSentAt: 0 });
 
+  // Contrôle d'arrivée : entre la lecture d'ouverture de la route et cet
+  // abonnement, une écriture a pu être diffusée aux autres — ce lecteur tient
+  // alors la version d'avant, et plus rien ne le rattraperait avant la
+  // prochaine échéance (5 min, jamais sur un tournoi terminé). La salle
+  // repasse donc tout de suite : la lecture sort presque toujours du cache
+  // (3 s) que la route vient de remplir, et rien n'est écrit si la version
+  // n'a pas bougé.
+  if (subscriber.version) scheduleFlush(tournamentId, room, 0);
+
   return () => {
     room.subscribers.delete(subscriber);
     room.states.delete(subscriber);
