@@ -14,9 +14,11 @@ Deux systèmes de rôles **indépendants** cohabitent, et rien ne les mélange :
 - les **rôles d'équipe** (`TeamRole`) — position dans un roster : `OWNER`,
   `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`.
 
-Un `ADMIN` n'a **aucun** pouvoir sur une équipe dont il n'est pas membre (seule
-exception : les équipes fantômes, voir §5). Un `OWNER` d'équipe n'a **aucun**
-pouvoir sur la plateforme.
+Un `ADMIN` n'a **aucun** pouvoir sur la gestion d'une équipe dont il n'est pas
+membre. Deux exceptions, et deux seulement : les équipes fantômes (§5), et le
+**retrait d'un logo** au titre de la modération (§6.1) — un geste d'hébergeur sur
+un contenu publié, qui ne touche ni au roster, ni au nom, ni aux inscriptions.
+Un `OWNER` d'équipe n'a **aucun** pouvoir sur la plateforme.
 
 ---
 
@@ -244,27 +246,28 @@ pouvoir sur la plateforme.
   d'un message privé. Chaque demande laisse par ailleurs une trace chez la
   victime, qui reçoit le message.
 
-### 1.2 Les six permissions
+### 1.2 Les sept permissions
 
 | Permission    | Domaine                                                          |
 | ------------- | ---------------------------------------------------------------- |
 | `tournaments` | Créer et gérer les tournois, arbitrer les matchs                  |
 | `casting`     | **Lecture seule** de l'aperçu du plateau avant lancement          |
-| `live`        | **Écriture** de l'état de diffusion d'un match (antenne, chaîne)  |
+| `live`        | **Écriture** de l'état de diffusion d'un match (antenne, chaîne, rediff) |
 | `showcase`    | Site vitrine + association                                        |
 | `recruitment` | Annonces de recrutement                                           |
 | `roles`       | Attribution des rôles de plateforme                               |
+| `moderation`  | Signalements, retrait et quarantaine d'un logo ou d'un avatar (§6.1) |
 
 ### 1.3 Qui a quoi
 
-| Rôle                | `tournaments` | `casting` | `live` | `showcase` | `recruitment` | `roles` |
-| ------------------- | :-----------: | :-------: | :----: | :--------: | :-----------: | :-----: |
-| `ADMIN`             | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `ARBITRE`           | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `CASTER`            | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ |
-| `COMMUNITY_MANAGER` | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| `RECRUTEUR`         | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ |
-| *(aucun rôle)*      | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Rôle                | `tournaments` | `casting` | `live` | `showcase` | `recruitment` | `roles` | `moderation` |
+| ------------------- | :-----------: | :-------: | :----: | :--------: | :-----------: | :-----: | :----------: |
+| `ADMIN`             | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `ARBITRE`           | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `CASTER`            | ❌ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ |
+| `COMMUNITY_MANAGER` | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ | ❌ |
+| `RECRUTEUR`         | ❌ | ❌ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| *(aucun rôle)*      | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 
 Les rôles sont **cumulables** : un compte `ARBITRE` + `RECRUTEUR` obtient
 l'union des deux lignes. `ADMIN` est un super-rôle — `can()` lui rend `true` sur
@@ -299,8 +302,12 @@ d'écriture que partout ailleurs.
 - Téléverser ou retirer son avatar (`POST` / `DELETE /api/profile/avatar`).
 - Exporter toutes ses données personnelles (`GET /api/profile/export`, RGPD
   art. 20).
-- Anonymiser son compte (`DELETE /api/profile`) — la session est détruite dans
-  la foulée.
+- Supprimer son compte (`DELETE /api/profile`, aperçu en lecture seule par
+  `GET /api/profile/deletion`) — **effacé** s'il n'a laissé aucune trace
+  (aucun match joué ni entrée solo inscrite, aucun tournoi organisé, aucune
+  équipe vivante possédée),
+  **anonymisé** sinon ; la session est détruite dans la foulée. Voir
+  `docs/features/ACCOUNT_DELETION.md`.
 
 Toutes ces routes agissent sur `user.id` **pris de la session**, jamais sur un
 identifiant fourni par le corps de la requête : il n'existe aucun chemin pour
@@ -309,7 +316,10 @@ modifier le profil d'autrui.
 ### 2.2 Ce qu'il ne peut pas faire
 
 - ❌ Modifier le profil, l'avatar ou les réglages d'un autre compte — aucune
-  route ne l'expose, **pas même pour un `ADMIN`**.
+  route ne l'expose, **pas même pour un `ADMIN`**. Seule exception : la
+  modération (`moderation`, `ADMIN` seul) peut **retirer** l'avatar d'un joueur
+  (`DELETE /api/admin/users/[id]/avatar`, ou depuis un signalement), sans rien
+  pouvoir y mettre à la place (§6.1).
 - ❌ Se donner des rôles : `POST /api/admin/users/[id]/roles` refuse en
   `400 CANNOT_MODIFY_SELF` quand la cible est l'appelant. Un compte sans `ADMIN`
   est de toute façon refusé en `403` avant d'y arriver.
@@ -330,6 +340,13 @@ modifier le profil d'autrui.
 
 Le masquage est appliqué **côté serveur, à la source** : le champ masqué vaut
 `null` dans la réponse, il n'est pas seulement caché à l'affichage.
+
+**L'avatar masqué a un lecteur de plus : la modération.** Le sélecteur de cibles
+des signalements, lu depuis le panneau d'administration par un porteur de
+`moderation` (`isModerator`, `lib/server/content-reports.ts`), rend l'avatar
+d'un joueur même masqué — on ne décide pas du retrait d'une image qu'on ne voit
+pas. Le même sélecteur, ouvert à tout membre qui rédige un signalement, applique
+`visibleAvatarUrl` comme partout ailleurs.
 
 **Le BattleTag masqué a un public restreint, pas nul.** Masqué, il quitte la
 fiche publique et l'annuaire, mais reste lisible là où il sert à jouer — ce que
@@ -420,9 +437,10 @@ Deux points volontaires, à ne pas prendre pour des fuites :
   `isAdmin` et le champ `roles` (celui qui sert à l'édition) ne sont renseignés
   **que pour un viewer administrateur**.
 
-Ni l'e-mail, ni le `google_sub`, ni le `discord_id` ne sortent jamais d'un profil
-consulté par un tiers ; ils n'apparaissent que dans l'export RGPD du
-propriétaire.
+Ni le `google_sub`, ni le `discord_id`, ni le `blizzard_sub` ne sortent jamais
+d'un profil consulté par un tiers ; ils n'apparaissent que dans l'export RGPD du
+propriétaire. Aucune adresse électronique n'est plus stockée : la colonne
+`bg_users.email` a été supprimée (`docs/DATABASE_SCHEMA.md`).
 
 ### 2.4 Le tag Discord — un public, et un réglage qui ne vaut que certifié
 
@@ -469,12 +487,13 @@ sans savoir qui de son roster devait encore certifier.
 
 Le filtrage est posé **à la sortie** (`visibleDiscordTag`), comme celui de
 l'avatar : un écran ajouté demain n'a rien à afficher plutôt qu'à se souvenir
-d'une règle. Trois lectures y passent — `getFullProfile`, le panneau de contacts
+d'une règle. Trois lectures y passent — `getFullProfile` (fiche d'un joueur, et
+profil du titulaire lu par `GET /api/profile`), le panneau de contacts
 d'un tournoi (`GET /api/admin/tournaments/[id]/contacts`, qui n'a plus que la
 certification à appliquer, en SQL, puisque tout joueur listé est engagé dans *ce*
-tournoi), la modale de lancement d'un match (`GET /api/me/match-launches`, qui
+tournoi) et la modale de lancement d'un match (`GET /api/me/match-launches`, qui
 seule établit `sharesMatchLobby` — lecteur partie du match, match en lancement ou
-lancé) et le profil du titulaire. Rien de tout cela n'entre dans
+lancé). Rien de tout cela n'entre dans
 `TournamentSnapshot`, qui est diffusé tel quel à tous les abonnés du flux.
 
 ---
@@ -573,8 +592,10 @@ Règles structurelles qui tiennent quel que soit le rôle :
   sur un statut global.
 - ❌ Se hisser `OWNER` d'une équipe où il est `MANAGER`.
 - ❌ Toucher à quoi que ce soit en tant qu'`ADMIN` du site : les rôles de
-  plateforme n'ouvrent aucun droit sur une équipe **réelle**. La seule
-  dérogation vise les équipes fantômes (§5).
+  plateforme n'ouvrent aucun droit de gestion sur une équipe **réelle**. La seule
+  dérogation vise les équipes fantômes (§5) ; le retrait ou la mise en
+  quarantaine d'un **logo** par la modération (§6.1) n'est pas de la gestion,
+  c'est le geste d'hébergeur sur un contenu signalé.
 
 ---
 
@@ -630,10 +651,12 @@ d'existence. Même règle, même 404. Le compteur public de la vitrine
   (`POST /api/admin/tournaments/[id]/ghost-registrations`), et rien d'autre : une
   équipe réelle ou une entrée solo se fait refuser par `NOT_A_GHOST_TEAM`.
 - **Le tournoi peut poser des conditions** (`lib/shared/registration-filters.ts`) :
-  un effectif minimal et une exigence de tag Discord certifié
-  (`NONE` / `ANY_PLAYER` / `ALL_PLAYERS`). Trois refus distincts, en **409** — la
-  saisie est bonne, c'est l'état de l'équipe qui ne convient pas, et il se
-  corrige. Deux portées à retenir : les **équipes fantômes** n'y sont pas soumises
+  un effectif minimal, une exigence de tag Discord **certifié** et une exigence
+  de compte Battle.net **rattaché** (lue sur `blizzard_sub`, jamais sur le
+  BattleTag saisi), ces deux dernières en `NONE` / `ANY_PLAYER` / `ALL_PLAYERS`.
+  Cinq refus distincts (`REGISTRATION_FILTER_ERRORS`), en **409** — la saisie
+  est bonne, c'est l'état de l'équipe qui ne convient pas, et il se corrige.
+  L'effectif minimal ne s'applique pas en tournoi individuel. Deux portées à retenir : les **équipes fantômes** n'y sont pas soumises
   (le contrôle vit dans `registerCurrentUserTeam`, jamais dans le tronc commun),
   et une inscription **déjà enregistrée** n'est jamais relue. Voir
   `docs/features/REGISTRATION_FILTERS.md`.
@@ -693,8 +716,9 @@ Réservé à `ADMIN` et `ARBITRE` :
 
 - créer un tournoi (`POST /api/tournaments`) ;
 - l'éditer (`PATCH /api/tournaments/[id]/edit`) — dans la fenêtre autorisée :
-  tout tant qu'il est caché, cinq champs une fois annoncé, **rien** une fois
-  lancé ou terminé ;
+  tout tant qu'il est caché, huit champs une fois annoncé (`RESTRICTED_FIELDS` :
+  nom, description, clôture des inscriptions, début, effectif maximal et les
+  trois conditions d'inscription de §4.2), **rien** une fois lancé ou terminé ;
 - l'avancer d'une étape par anticipation — ouverture des inscriptions, clôture,
   coup d'envoi (`POST /api/admin/tournaments/[id]/advance`) ;
 - réordonner le seeding (`PATCH .../seeding`), jusqu'à la première saisie de
@@ -735,6 +759,11 @@ permission : un tag Discord **certifié** et un compte Battle.net **rattaché**
 (`castBlockReason`, refus `CASTER_IDENTITY_REQUIRED` → 409). Un joueur du match
 ne peut pas le caster (`CASTER_IS_PLAYER`), un match n'a qu'un caster
 (`MATCH_ALREADY_CASTED`), et l'on se retire soi-même (`DELETE`).
+
+`live` ouvre enfin la **rediff** d'un match terminé
+(`PUT /api/admin/matches/[matchId]/replay`, lien YouTube posé seulement sur une
+rencontre réellement disputée — `canHaveReplay`). Voir
+`docs/features/MATCH_REPLAYS.md`.
 
 `live` n'ouvre **rien d'autre** : ni score, ni horaire, ni seeding, ni édition.
 
@@ -828,7 +857,8 @@ paramètre `viewerManagesGhostTeams` des fonctions de `teams-service` :
   accord : engagé malgré lui dans un tournoi vivant, le joueur verrait son tag
   Discord certifié et son BattleTag masqué ouverts à l'arbitrage (§2.3) ;
 - ❌ la dérogation ne s'applique **jamais** à une équipe réelle : le même staff
-  n'a aucun droit sur une équipe qui a des membres.
+  n'a aucun droit sur une équipe qui a des membres (le retrait d'un logo par la
+  modération, §6.1, relève d'une autre permission et d'un autre geste).
 
 Une **entrée solo** (`bg_teams.solo_user_id`) représente un joueur dans un
 tournoi individuel. Ce n'est pas une équipe : elle naît avec `is_ghost = 0`, se
@@ -857,6 +887,36 @@ télécharge pas l'image distante d'une ligne que personne n'a publiée.
 
 Un `ARBITRE` ou un `CASTER` **ne peut pas** modifier le site vitrine, et un
 `COMMUNITY_MANAGER` ne peut pas toucher aux tournois.
+
+### 6.1 Modération (permission `moderation`, `ADMIN` seul)
+
+L'association est **hébergeur** des contenus de ses membres : retirer le contenu
+d'un tiers engage sa responsabilité, ce n'est ni un geste d'arbitrage ni un geste
+de vitrine — d'où une permission propre, que seul `ADMIN` porte. Elle ouvre :
+
+- le panneau des signalements (`GET /api/admin/reports`,
+  `PATCH /api/admin/reports/[id]` : prise en charge, archivage, réouverture) ;
+- la **quarantaine** (`POST /api/admin/reports/[id]/logo-quarantine`) et le
+  **retrait immédiat** (`POST /api/admin/reports/[id]/logo-removal`) du logo
+  d'une équipe ou de l'avatar d'un joueur **visés par le signalement** — refus
+  `TEAM_NOT_TARGETED` / `USER_NOT_TARGETED` sinon ;
+- le retrait direct, hors signalement, du logo d'une équipe
+  (`DELETE /api/admin/teams/[id]/logo`) ou de l'avatar d'un joueur
+  (`DELETE /api/admin/users/[id]/avatar`) ;
+- la gestion des quarantaines (`/api/admin/logo-quarantines/[id]` : aperçu du
+  fichier masqué, rétablissement, suppression définitive avant échéance) ;
+- la lecture de l'avatar **masqué** d'un joueur dans le sélecteur de cibles du
+  panneau (§2.3).
+
+Ces gestes **retirent**, ils ne remplacent jamais : la modération ne pose ni logo
+ni avatar, ne touche ni au roster, ni au nom, ni aux inscriptions. L'équipe ou
+le joueur est prévenu en message privé, avec le lien pour contester. Voir
+`docs/features/CONTENT_REPORTS.md` et `docs/features/LOGO_QUARANTINE.md`.
+
+Côté membres, **signaler** n'exige aucun rôle (§8), **désigner des cibles** exige
+un compte, et seules les personnes visées lisent et contestent le dossier
+(`GET /api/reports/[id]`, `REPORT_NOT_CONCERNED` → 403 sinon, sans jamais
+l'identité du signalant).
 
 ---
 
@@ -894,6 +954,22 @@ Volontairement ouvert, à connaître pour ne pas le confondre avec un trou :
   plafond de 30 insertions par IP et par minute.
 - `GET /api/uploads/[...path]` — sert `public/uploads/`, avec refus de toute
   remontée de dossier et liste blanche d'extensions.
+- `GET /api/landing/sponsors/[id]/logo` — relais du logo d'un partenaire
+  **publié**, qui relit l'URL en base et ne prend qu'un identifiant (§6).
+- `POST /api/reports` — signaler un problème, **sans compte** : plafonné par
+  compte ou, à défaut, par IP (5 par demi-heure). Désigner des cibles ou
+  contester exige une session (401 sinon) — chaque cible reçoit un message
+  privé, et un formulaire anonyme ferait écrire le bot à qui l'on veut.
+- `POST /api/csp-report` — le collecteur des violations de la politique de
+  sécurité du contenu, que le navigateur appelle sans session : plafonné par IP,
+  journalisé une fois par cause et par heure, rien n'est stocké.
+
+Ouvertes à **tout compte connecté**, sans rôle :
+
+- `/api/push/*` — la clé publique et les sujets proposés au lecteur
+  (`GET /api/push`), ses abonnements (`POST` / `DELETE /api/push/subscriptions`)
+  et ses sujets (`PUT /api/push/topics`), toujours sur `user.id` pris de la
+  session.
 - Les routes d'authentification (`/api/auth/*`), par nature — ouvertes, mais
   **plafonnées** : voir §1.1 pour le code Discord, qui est un secret et se
   compte comme tel.
@@ -925,8 +1001,11 @@ Des refus légitimes ne relèvent pas des permissions, et ne doivent pas être
 - **Plafonds de débit** (`lib/server/rate-limit.ts`, réglages dans
   `lib/server/api-guard.ts`) — indépendants des rôles. Deux d'entre eux ne sont
   pas de simples garde-fous de charge mais des **contrôles d'accès** : ceux du
-  code de connexion Discord (§1.1), qui portent sur le compte visé et non sur
-  l'appelant, précisément parce qu'une identité d'appelant se renouvelle.
+  code de connexion Discord (§1.1). Celui de la **demande** porte sur le compte
+  visé et non sur l'appelant, précisément parce qu'une identité d'appelant se
+  renouvelle ; celui de la **vérification** porte sur le couple (défi visé, IP
+  appelante), sans quoi dix codes bidon fermeraient la connexion d'un joueur
+  nommé. La borne qui tient réellement la force brute reste en base (§1.1).
 
 ---
 
@@ -940,3 +1019,4 @@ Des refus légitimes ne relèvent pas des permissions, et ne doivent pas être
 - [`docs/features/TOURNAMENT_DELETION.md`](features/TOURNAMENT_DELETION.md) — le seul `isAdmin` du projet
 - [`docs/features/SAFE_LOGIN_REDIRECT.md`](features/SAFE_LOGIN_REDIRECT.md) — redirection d'après connexion
 - [`docs/features/RGPD_DATA_RIGHTS.md`](features/RGPD_DATA_RIGHTS.md) — export et anonymisation
+- [`docs/features/CONTENT_REPORTS.md`](features/CONTENT_REPORTS.md) — signalements et modération (§6.1)
