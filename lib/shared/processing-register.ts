@@ -40,6 +40,7 @@ export const REGISTER_UPDATED_AT = "2026-10-01";
  * pas annoncer une durée que le code ne tient pas.
  */
 export const SESSION_RETENTION_DAYS = 30;
+export const DISCORD_CODE_VALIDITY_MINUTES = 10;
 
 /**
  * Mécanisme d'un transfert vers les États-Unis (RGPD art. 45 et 46), nommé une
@@ -48,7 +49,6 @@ export const SESSION_RETENTION_DAYS = 30;
  */
 export const US_TRANSFER_MECHANISM =
   "décision d'adéquation (UE) 2023/1795 du 10 juillet 2023 (EU-U.S. Data Privacy Framework) pour un destinataire certifié, à défaut clauses contractuelles types de la Commission européenne (art. 46 RGPD)";
-export const DISCORD_CODE_VALIDITY_MINUTES = 10;
 
 export interface RegisterController {
   name: string;
