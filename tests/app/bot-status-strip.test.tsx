@@ -95,7 +95,7 @@ describe("BotStatusStrip — une charge amputée ne fait pas tomber la page", ()
       const html = renderToStaticMarkup(
         <BotStatusStrip status={payload as unknown as BotStatus} />,
       );
-      expect(html).toContain("Gateway latency");
+      expect(html).toContain("Latence passerelle");
       // Une case sans valeur porte un tiret, jamais « NaN » ni « undefined ».
       expect(html).not.toContain("NaN");
       expect(html).not.toContain("undefined");
