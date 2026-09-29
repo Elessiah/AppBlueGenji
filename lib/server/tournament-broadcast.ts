@@ -125,7 +125,15 @@ export function isRoomOverdue(snapshot: TournamentSnapshot, now: number): boolea
   if (isStateOverdue(snapshot.card, now)) return true;
   return (snapshot.matches ?? []).some((match) => {
     const deadline = scoreDeadlineOf(match);
-    return deadline !== null && !isScoreConflict(match) && deadline + SCORE_DEADLINE_MARGIN_MS <= now;
+    if (deadline === null) return false;
+    if (!isScoreConflict(match)) return deadline + SCORE_DEADLINE_MARGIN_MS <= now;
+    // Un conflit ne se tranche pas à l'expiration, mais son **escalade** à
+    // l'arbitrage est posée par l'entretien à la lecture : si la lecture faite
+    // à l'heure de l'escalade venait du cache, une relecture — une seule, dans
+    // la fenêtre qui suit — la rattrape. Au-delà, l'escalade est posée ou
+    // réservée, et le conflit n'attend plus que l'arbitrage.
+    const escalatedFor = now - (deadline + CONFLICT_ESCALATION_MS + SCORE_DEADLINE_MARGIN_MS);
+    return escalatedFor >= 0 && escalatedFor < STATE_CATCH_UP_MS;
   });
 }
 

@@ -217,6 +217,15 @@ describe("nextRoomWakeAt", () => {
       Math.min(NOW + ROOM_SAFETY_NET_MS, NOW - 10_000 + escalation + SCORE_DEADLINE_MARGIN_MS),
     );
 
+    // Escalade tout juste échue : la lecture a pu venir du cache, une relecture
+    // la rattrape — une seule, la fenêtre étant plus courte que le rattrapage.
+    const escalating = snapshotOf({ state: "RUNNING" }, [
+      conflict(NOW - escalation - SCORE_DEADLINE_MARGIN_MS),
+    ]);
+    expect(isRoomOverdue(escalating, NOW)).toBe(true);
+    expect(nextRoomWakeAt(escalating, NOW)).toBe(NOW + STATE_CATCH_UP_MS);
+    expect(isRoomOverdue(escalating, NOW + STATE_CATCH_UP_MS)).toBe(false);
+
     // Escalade passée : plus rien à attendre que le filet.
     const stalled = snapshotOf({ state: "RUNNING" }, [conflict(NOW - escalation - 60_000)]);
     expect(nextRoomWakeAt(stalled, NOW)).toBe(NOW + ROOM_SAFETY_NET_MS);
