@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { copyFile, rename, unlink } from "node:fs/promises";
+import { copyFile, readdir, readFile, rename, rm, unlink } from "node:fs/promises";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
@@ -22,8 +22,16 @@ import { toDiskUploadPath } from "@/lib/shared/uploads";
  * elle ne fermerait pas le chemin du serveur statique, et chaque image du site
  * paierait une lecture de base pour un cas rare.
  *
- * Ce que le renommage ne rattrape pas, et que rien ne peut rattraper : la copie
- * déjà gardée dans le cache d'un navigateur qui l'a affichée.
+ * **L'optimiseur d'images garde sa propre copie.** `UserAvatar` passe par
+ * `next/image` : ce que les lecteurs chargent est `/_next/image?url=<ancienne
+ * adresse>&w=…`, que Next sert depuis `.next/cache/images` sans relire la
+ * source tant que l'entrée est fraîche (un an, la durée annoncée par
+ * `/api/uploads`) — et qu'il sert encore une fois périmée, en la gardant quand
+ * la source répond 404. Le renommage purge donc ces entrées
+ * (`purgeOptimizedCopies`).
+ *
+ * Ce que rien ne peut rattraper : la copie déjà gardée dans le cache d'un
+ * navigateur qui l'a affichée.
  *
  * **Un fichier désigné ailleurs est copié, pas renommé.** Un logo de partenaire
  * ou d'équipe, une photo de bénévole acceptent une adresse collée, donc aussi
@@ -33,11 +41,11 @@ import { toDiskUploadPath } from "@/lib/shared/uploads";
  * son réglage ne peut pas défaire. L'entrée solo du joueur ne compte pas : elle
  * a déjà été vidée par la resynchronisation, que l'appelant joue avant.
  *
- * Ordre des gestes : le fichier est renommé **avant** l'écriture, et remis en
- * place si l'écriture n'aboutit pas (ligne anonymisée, avatar remplacé ou
- * réaffiché entre-temps) — l'inverse laisserait une base qui désigne un fichier
- * absent. L'`UPDATE` porte l'ancienne URL et le masquage dans son `WHERE`, si
- * bien qu'un téléversement concurrent n'est jamais écrasé.
+ * Ordre des gestes : le fichier est renommé **avant** l'écriture — l'inverse
+ * laisserait une base qui désigne un fichier absent. L'`UPDATE` porte
+ * l'ancienne URL et le masquage dans son `WHERE`, si bien qu'un téléversement
+ * concurrent n'est jamais écrasé. Si l'écriture n'aboutit pas, voir
+ * `undoRotation`.
  *
  * @returns La nouvelle URL, ou `null` si rien n'a été renommé (avatar visible,
  *   absent, étranger au site, fichier déjà introuvable, course perdue).
@@ -55,7 +63,9 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
   if (!target) return null;
 
   const shared = await isUploadReferenced(row.avatar_url, { exceptUserAvatar: userId });
+  let original: Buffer | null = null;
   try {
+    if (!shared) original = await readFile(target.from);
     await (shared ? copyFile(target.from, target.to) : rename(target.from, target.to));
   } catch (error) {
     // Déjà absent (quarantaine, ménage) : il n'y a plus rien à servir.
@@ -72,11 +82,82 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
     );
     written = result.affectedRows > 0;
   } finally {
-    if (!written) {
-      await (shared ? unlink(target.to) : rename(target.to, target.from)).catch(() => undefined);
+    if (!written) await undoRotation(userId, row.avatar_url, target, shared);
+  }
+  // Un fichier partagé reste servi à l'ancienne adresse : ses variantes
+  // optimisées n'en disent pas plus que lui.
+  if (written && original) await purgeOptimizedCopies(original);
+  return written ? target.url : null;
+}
+
+/**
+ * Défait un renommage dont l'écriture n'a pas abouti. Le fichier n'est remis en
+ * place que si la ligne désigne **encore** l'ancienne adresse (avatar réaffiché
+ * entre-temps). Remplacé ou effacé — ou si on ne sait pas le dire, la lecture
+ * échouant —, il est supprimé : le téléversement concurrent a déjà tenté
+ * d'effacer l'ancien fichier, en vain puisqu'il était renommé, et le remettre en
+ * place republierait un avatar masqué que plus rien ne désigne ni n'effacera.
+ * Une copie (fichier partagé) est toujours supprimée, l'original n'ayant pas
+ * bougé.
+ */
+async function undoRotation(
+  userId: number,
+  oldUrl: string,
+  target: { from: string; to: string },
+  shared: boolean,
+): Promise<void> {
+  let stillDesignated = false;
+  if (!shared) {
+    try {
+      const db = await getDatabase();
+      const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+        `SELECT avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+        [userId],
+      );
+      stillDesignated = rows[0]?.avatar_url === oldUrl;
+    } catch {
+      stillDesignated = false;
     }
   }
-  return written ? target.url : null;
+  const undo = stillDesignated ? rename(target.to, target.from) : unlink(target.to);
+  await undo.catch(() => undefined);
+}
+
+/** Cache de l'optimiseur de `next/image` (`distDir` par défaut, celui du projet). */
+export function optimizedImageCacheDirectory(): string {
+  return path.join(process.cwd(), ".next", "cache", "images");
+}
+
+/**
+ * Efface les variantes optimisées d'une image source. Next range chaque variante
+ * dans `<cache>/<clé>/<maxAge>.<expireAt>.<etag>.<upstreamEtag>.<extension>`,
+ * où `upstreamEtag` est le SHA-256 base64url des octets de la **source**
+ * (`getImageEtag`) : on reconnaît donc toutes les variantes — largeurs,
+ * formats, adresse `/uploads` ou `/api/uploads` — sans connaître leur clé. Au
+ * mieux : un cache absent, ou un format de nom qui changerait avec Next, ne fait
+ * qu'échouer à purger.
+ *
+ * @returns Le nombre d'entrées effacées.
+ */
+export async function purgeOptimizedCopies(source: Buffer): Promise<number> {
+  const upstreamEtag = crypto.createHash("sha256").update(source).digest("base64url");
+  const root = optimizedImageCacheDirectory();
+  let purged = 0;
+  try {
+    for (const entry of await readdir(root)) {
+      const dir = path.join(root, entry);
+      const files = await readdir(dir).catch(() => [] as string[]);
+      if (files.some((file) => file.split(".")[3] === upstreamEtag)) {
+        await rm(dir, { recursive: true, force: true });
+        purged += 1;
+      }
+    }
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
+      console.error("[avatar-rotation] cache de l'optimiseur non purgé", error);
+    }
+  }
+  return purged;
 }
 
 /** Nom d'un avatar tel que `storeImageBuffer` l'écrit. */

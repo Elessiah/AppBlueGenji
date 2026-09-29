@@ -1,14 +1,27 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("node:fs/promises", () => ({ rename: jest.fn(), copyFile: jest.fn(), unlink: jest.fn() }));
+jest.mock("node:fs/promises", () => ({
+  rename: jest.fn(),
+  copyFile: jest.fn(),
+  unlink: jest.fn(),
+  readFile: jest.fn(),
+  readdir: jest.fn(),
+  rm: jest.fn(),
+}));
 jest.mock("@/lib/server/stored-upload-cleanup");
 
+import crypto from "node:crypto";
 import path from "node:path";
-import { copyFile, rename, unlink } from "node:fs/promises";
+import { copyFile, readdir, readFile, rename, rm, unlink } from "node:fs/promises";
 import { isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
 import { getDatabase } from "@/lib/server/database";
-import { rotateHiddenAvatarFile, rotatedAvatarTarget } from "@/lib/server/avatar-rotation";
+import {
+  optimizedImageCacheDirectory,
+  purgeOptimizedCopies,
+  rotateHiddenAvatarFile,
+  rotatedAvatarTarget,
+} from "@/lib/server/avatar-rotation";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 
 /**
@@ -20,15 +33,25 @@ import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 const renameMock = jest.mocked(rename);
 const copyMock = jest.mocked(copyFile);
 const unlinkMock = jest.mocked(unlink);
+const readFileMock = jest.mocked(readFile);
+// `readdir` a plusieurs surcharges : le double est typé sur celle qui rend des noms.
+const readdirMock = readdir as unknown as jest.Mock<(dir: string) => Promise<string[]>>;
+const rmMock = jest.mocked(rm);
 const referencedMock = jest.mocked(isUploadReferenced);
 const AVATARS = path.join(process.cwd(), "public", "uploads", "avatars");
 const OLD_URL = "/api/uploads/avatars/42-aaaa.webp";
+const BYTES = Buffer.from("avatar");
+const UPSTREAM = crypto.createHash("sha256").update(BYTES).digest("base64url");
 
-function mockDb(row: { avatar_url: string | null; visible_avatar: 0 | 1 } | null, affectedRows = 1) {
+type Row = { avatar_url: string | null; visible_avatar: 0 | 1 } | null;
+
+/** Lecture initiale, écriture, puis (course perdue) relecture de la ligne. */
+function mockDb(row: Row, affectedRows = 1, current: string | null = null) {
   const execute = jest
     .fn<SqlQuery>()
     .mockResolvedValueOnce([row ? [row] : []])
-    .mockResolvedValueOnce([{ affectedRows }]);
+    .mockResolvedValueOnce([{ affectedRows }])
+    .mockResolvedValueOnce([[{ avatar_url: current }]]);
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
   return execute;
 }
@@ -67,27 +90,10 @@ describe("rotateHiddenAvatarFile", () => {
     renameMock.mockResolvedValue(undefined);
     copyMock.mockResolvedValue(undefined);
     unlinkMock.mockResolvedValue(undefined);
+    readFileMock.mockResolvedValue(BYTES);
+    readdirMock.mockResolvedValue([]);
+    rmMock.mockResolvedValue(undefined);
     referencedMock.mockResolvedValue(false);
-  });
-
-  it("copie au lieu de renommer quand une autre ligne désigne le fichier", async () => {
-    // Un logo de partenaire collé depuis l'adresse d'un avatar : le renommer
-    // casserait cette image-là sans bruit.
-    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 });
-    referencedMock.mockResolvedValueOnce(true);
-    const url = await rotateHiddenAvatarFile(42);
-    expect(url).not.toBeNull();
-    expect(referencedMock).toHaveBeenCalledWith(OLD_URL, { exceptUserAvatar: 42 });
-    expect(renameMock).not.toHaveBeenCalled();
-    expect(copyMock.mock.calls[0][0]).toBe(path.join(AVATARS, "42-aaaa.webp"));
-  });
-
-  it("efface la copie quand l'écriture n'aboutit pas", async () => {
-    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 }, 0);
-    referencedMock.mockResolvedValueOnce(true);
-    expect(await rotateHiddenAvatarFile(42)).toBeNull();
-    expect(unlinkMock).toHaveBeenCalledWith(copyMock.mock.calls[0][1]);
-    expect(renameMock).not.toHaveBeenCalled();
   });
 
   it("renomme le fichier puis écrit la nouvelle URL, bornée à l'ancienne", async () => {
@@ -99,6 +105,16 @@ describe("rotateHiddenAvatarFile", () => {
     const [sql, params] = execute.mock.calls[1];
     expect(sql).toMatch(/avatar_url = \? AND visible_avatar = 0 AND is_deleted = 0/);
     expect(params).toEqual([url, 42, OLD_URL]);
+  });
+
+  it("purge les variantes de l'optimiseur d'images une fois l'adresse changée", async () => {
+    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 });
+    readdirMock.mockResolvedValueOnce(["k1", "k2"]).mockResolvedValueOnce([`60.123.etag.${UPSTREAM}.webp`]).mockResolvedValueOnce([
+      "60.123.etag.autre.webp",
+    ]);
+    await rotateHiddenAvatarFile(42);
+    expect(rmMock).toHaveBeenCalledTimes(1);
+    expect(rmMock).toHaveBeenCalledWith(path.join(optimizedImageCacheDirectory(), "k1"), { recursive: true, force: true });
   });
 
   it("ne touche à rien si l'avatar est visible", async () => {
@@ -117,9 +133,10 @@ describe("rotateHiddenAvatarFile", () => {
 
   it("n'écrit rien si le fichier a déjà disparu (quarantaine, ménage)", async () => {
     const execute = mockDb({ avatar_url: OLD_URL, visible_avatar: 0 });
-    renameMock.mockRejectedValueOnce(Object.assign(new Error("absent"), { code: "ENOENT" }));
+    readFileMock.mockRejectedValueOnce(Object.assign(new Error("absent"), { code: "ENOENT" }));
     expect(await rotateHiddenAvatarFile(42)).toBeNull();
     expect(execute).toHaveBeenCalledTimes(1);
+    expect(renameMock).not.toHaveBeenCalled();
   });
 
   it("propage une autre erreur de disque", async () => {
@@ -128,21 +145,76 @@ describe("rotateHiddenAvatarFile", () => {
     await expect(rotateHiddenAvatarFile(42)).rejects.toThrow("disque");
   });
 
-  it("remet le fichier en place quand la course est perdue", async () => {
-    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 }, 0);
+  it("remet le fichier en place si la ligne désigne encore l'ancienne adresse (réaffiché entre-temps)", async () => {
+    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 }, 0, OLD_URL);
     expect(await rotateHiddenAvatarFile(42)).toBeNull();
     expect(renameMock).toHaveBeenCalledTimes(2);
     const [[from, to], [back, origin]] = renameMock.mock.calls;
     expect([back, origin]).toEqual([to, from]);
+    expect(unlinkMock).not.toHaveBeenCalled();
+    expect(rmMock).not.toHaveBeenCalled();
   });
 
-  it("remet le fichier en place quand l'écriture échoue, et propage", async () => {
+  it("supprime le fichier renommé si un téléversement concurrent a remplacé l'avatar", async () => {
+    // Le téléversement a tenté d'effacer l'ancien fichier, en vain : le remettre
+    // en place republierait un avatar masqué que plus rien ne désigne.
+    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 }, 0, "/api/uploads/avatars/42-neuf.webp");
+    expect(await rotateHiddenAvatarFile(42)).toBeNull();
+    expect(renameMock).toHaveBeenCalledTimes(1);
+    expect(unlinkMock).toHaveBeenCalledWith(renameMock.mock.calls[0][1]);
+  });
+
+  it("supprime le fichier renommé quand l'écriture échoue, et propage", async () => {
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ avatar_url: OLD_URL, visible_avatar: 0 }]])
+      .mockRejectedValueOnce(new Error("base"))
       .mockRejectedValueOnce(new Error("base"));
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     await expect(rotateHiddenAvatarFile(42)).rejects.toThrow("base");
-    expect(renameMock).toHaveBeenCalledTimes(2);
+    expect(unlinkMock).toHaveBeenCalledWith(renameMock.mock.calls[0][1]);
+  });
+
+  it("copie au lieu de renommer quand une autre ligne désigne le fichier", async () => {
+    // Un logo de partenaire collé depuis l'adresse d'un avatar : le renommer
+    // casserait cette image-là sans bruit.
+    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 });
+    referencedMock.mockResolvedValueOnce(true);
+    const url = await rotateHiddenAvatarFile(42);
+    expect(url).not.toBeNull();
+    expect(referencedMock).toHaveBeenCalledWith(OLD_URL, { exceptUserAvatar: 42 });
+    expect(renameMock).not.toHaveBeenCalled();
+    expect(copyMock.mock.calls[0][0]).toBe(path.join(AVATARS, "42-aaaa.webp"));
+    expect(rmMock).not.toHaveBeenCalled();
+  });
+
+  it("efface la copie quand l'écriture n'aboutit pas", async () => {
+    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 }, 0, OLD_URL);
+    referencedMock.mockResolvedValueOnce(true);
+    expect(await rotateHiddenAvatarFile(42)).toBeNull();
+    expect(unlinkMock).toHaveBeenCalledWith(copyMock.mock.calls[0][1]);
+    expect(renameMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("purgeOptimizedCopies", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    rmMock.mockResolvedValue(undefined);
+  });
+
+  it("reconnaît les variantes au SHA-256 base64url de la source, comme Next", async () => {
+    readdirMock
+      .mockResolvedValueOnce(["a", "b", "c"])
+      .mockResolvedValueOnce([`31536000.1.e1.${UPSTREAM}.webp`])
+      .mockResolvedValueOnce([`31536000.1.e2.${UPSTREAM}.avif`])
+      .mockResolvedValueOnce(["31536000.1.e3.ailleurs.webp"]);
+    expect(await purgeOptimizedCopies(BYTES)).toBe(2);
+  });
+
+  it("ne fait rien sans cache", async () => {
+    readdirMock.mockRejectedValueOnce(Object.assign(new Error("absent"), { code: "ENOENT" }));
+    expect(await purgeOptimizedCopies(BYTES)).toBe(0);
+    expect(rmMock).not.toHaveBeenCalled();
   });
 });

@@ -340,8 +340,15 @@ porte l'ancienne URL dans son `WHERE`, un téléversement concurrent n'est jamai
 écrasé. Un fichier qu'une autre ligne désigne (logo de partenaire ou d'équipe
 collé depuis l'adresse de l'avatar) est **copié** plutôt que renommé : cette
 publication-là n'est pas celle du joueur, et la casser sans bruit n'est pas le
-rôle de son réglage. Seule limite, que rien ne rattrape : la copie déjà gardée
-dans le cache d'un navigateur qui l'a affichée. `UserAvatar` retombe sur
+rôle de son réglage. Les variantes que l'optimiseur de `next/image` garde dans
+`.next/cache/images` (servies par `/_next/image?url=<ancienne adresse>`, et
+conservées par Next même quand la source répond 404) sont purgées au passage,
+reconnues à l'empreinte de la source. Une écriture perdue contre un
+téléversement concurrent **supprime** le fichier renommé au lieu de le remettre
+en place, sans quoi l'ancien avatar reviendrait servi sans que rien ne le
+désigne. Les avatars masqués **avant** cette règle se rattrapent une fois par
+`NODE_ENV=production npm run rotate:hidden-avatars`. Seule limite, que rien ne
+rattrape : la copie déjà gardée dans le cache d'un navigateur qui l'a affichée. `UserAvatar` retombe sur
 l'initiale quand l'ancienne adresse ne répond plus (barre de navigation rendue
 avant le masquage).
 

@@ -22,6 +22,7 @@
     "seed:view": "tsx lib/server/seed-view.ts",
     "backfill:avatars": "tsx lib/server/backfill-avatars.ts",
     "replay:deletions": "tsx lib/server/replay-account-deletions.ts",
+    "rotate:hidden-avatars": "tsx lib/server/rotate-hidden-avatars.ts",
     "push:keys": "tsx lib/server/generate-vapid-keys.ts"
   },
   "dependencies": {

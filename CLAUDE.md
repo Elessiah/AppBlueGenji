@@ -20,6 +20,7 @@ npm run seed         # Populate MySQL with test data (matrice de cas, voir ci-de
 npm run seed:view    # Inspect seeded test data
 NODE_ENV=production npm run backfill:avatars  # Rapatrie les photos restées chez leur hébergeur (prévu pour la prod)
 NODE_ENV=production npm run replay:deletions  # Après restauration d'une sauvegarde : rejoue les suppressions de compte (--dry-run d'abord)
+NODE_ENV=production npm run rotate:hidden-avatars  # Une fois après déploiement : renomme le fichier des avatars déjà masqués
 npm run push:keys    # Tire une paire de clés VAPID (notifications push) — une fois pour toutes
 ./update.sh          # Déploiement (voir docs/DEPLOYMENT.md — et n'effacez jamais les journaux pm2 à la main)
 ```
