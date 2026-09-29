@@ -82,7 +82,9 @@ reviendra).
 
 Elle se tait sur `/rgpd` (elle y couvrirait la politique qu'elle invite à lire)
 et fait taire la **modale** de recrutement tant qu'un choix est dû — deux modales
-ne se superposent pas ; la banderole de recrutement, elle, reste.
+ne se superposent pas ; la banderole de recrutement, elle, reste. La modale
+défile elle-même (`overflow-y: auto`) : bloquante, elle doit garder ses deux
+boutons atteignables sur un écran bas (téléphone en paysage).
 
 ## L'annonce Discord
 

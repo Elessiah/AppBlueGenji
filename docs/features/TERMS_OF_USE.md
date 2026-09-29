@@ -24,9 +24,17 @@ connecte toujours.
 Recevoir la main sur une équipe (propriété transférée, rôle de gérant, fantôme
 confiée) ne passe par aucun geste de celui qui la reçoit. La mise en page racine
 pose donc la question à chaque chargement (`needsTermsForTeamManagement`) et
-présente les conditions ; « Plus tard » ferme la fenêtre, mais les gestes de
-gestion restent refusés en **409 `TERMS_ACCEPTANCE_REQUIRED`**, et ce refus
-rouvre la fenêtre (`TERMS_REQUIRED_EVENT`).
+présente les conditions ; « Plus tard » ferme la fenêtre pour la **session**
+(cookie de session `bg_terms_later`, valeur `1`, lu par la mise en page — gardé
+dans le seul état React, le report tombait à chaque F5, nouvel onglet ou lien
+ouvert depuis Discord), mais les gestes de gestion restent refusés en
+**409 `TERMS_ACCEPTANCE_REQUIRED`**, et ce refus rouvre la fenêtre
+(`TERMS_REQUIRED_EVENT`), report ou non.
+
+La fenêtre se tait sur `/conditions-utilisation` et sur `/connexion`, et fait
+taire la modale d'arrivée du recrutement tant qu'elle s'ouvre d'elle-même :
+deux modales ne se superposent pas (`lib/shared/global-modals.ts`, ordre
+confidentialité → conditions → recrutement).
 
 ## Gestes de gestion soumis aux conditions
 
