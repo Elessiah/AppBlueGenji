@@ -159,7 +159,17 @@ describe("signedInLoginRedirect", () => {
     },
   );
 
-  it.each<[string]>([["/connexion"], ["/connexion/"], ["/connexion?redirect=/profil"], ["/connexion#x"], ["/connexion/autre"]])(
+  it.each<[string]>([
+    ["/connexion"],
+    ["/connexion/"],
+    ["/connexion?redirect=/profil"],
+    ["/connexion#x"],
+    ["/connexion/autre"],
+    ["/tournois/../connexion?redirect=/tournois/../connexion"],
+    ["/./connexion"],
+    ["/%63onnexion"],
+    ["/%E0%A4%A"],
+  ])(
     "n'envoie jamais vers la page de connexion (%s)",
     (value) => {
       expect(signedInLoginRedirect(value)).toBe(DEFAULT_REDIRECT);

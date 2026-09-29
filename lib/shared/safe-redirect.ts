@@ -71,10 +71,19 @@ const LOGIN_PATH = "/connexion";
  * Destination d'un visiteur **déjà connecté** qui ouvre `/connexion` : là où il
  * allait (`?redirect=`, filtré par `safeRedirectPath`), `DEFAULT_REDIRECT`
  * sinon. Une destination qui ramène à `/connexion` elle-même est écartée — la
- * page redirigerait vers elle-même à l'infini.
+ * page redirigerait vers elle-même à l'infini. La comparaison porte sur le
+ * chemin **tel que le navigateur le résoudra** (`.`/`..` retirés, encodage
+ * défait) : `/tournois/../connexion` ou `/%63onnexion` y mènent aussi.
  */
 export function signedInLoginRedirect(value: unknown): string {
   const target = safeRedirectPath(value);
-  const path = target.split(/[?#]/, 1)[0].replace(/\/+$/, "");
+  let path: string;
+  try {
+    path = decodeURIComponent(new URL(target, "http://site.invalid").pathname);
+  } catch {
+    // Encodage illisible : dans le doute, la destination par défaut.
+    return DEFAULT_REDIRECT;
+  }
+  path = path.replace(/\/+$/, "");
   return path === LOGIN_PATH || path.startsWith(`${LOGIN_PATH}/`) ? DEFAULT_REDIRECT : target;
 }
