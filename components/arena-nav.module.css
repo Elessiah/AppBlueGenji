@@ -5,8 +5,8 @@
   top: 0;
   z-index: 50;
   background: rgba(7, 10, 16, 0.82);
-  backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
 }
 
 /* Liseré néon dégradé : s'estompe sur les bords + halo, pas de trait brut */

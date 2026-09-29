@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import type { ComponentType } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
@@ -124,5 +126,24 @@ describe("priorityBannerIds — bandeaux chargés en priorité", () => {
     const lazy = imgTags(renderToStaticMarkup(<RegistrationCard t={card({ image: cover })} />))[0];
     expect(eager).not.toContain('loading="lazy"');
     expect(lazy).toContain('loading="lazy"');
+  });
+});
+
+/**
+ * Un fichier injoignable (restauration sans images, purge) ne laisse pas une
+ * icône d'image cassée : l'image disparaît, comme pour un tournoi qui n'en a
+ * pas. `onError` ne se déclenche que dans un navigateur, d'où un contrôle sur
+ * la source — le rendu serveur ci-dessus couvre le reste.
+ */
+describe("image de tournoi — fichier injoignable", () => {
+  const source = readFileSync(join(process.cwd(), "components/tournament-image.tsx"), "utf8");
+
+  it("est un composant client, seul à pouvoir écouter l'échec", () => {
+    expect(source.trimStart().startsWith('"use client"')).toBe(true);
+  });
+
+  it("retombe sur l'absence d'image, bandeau comme pastille, mémorisé par adresse", () => {
+    expect(source.match(/onError=\{\(\) => setFailedUrl\(image\.url\)\}/g)).toHaveLength(2);
+    expect(source.match(/image\.url === failedUrl\) return null/g)).toHaveLength(2);
   });
 });
