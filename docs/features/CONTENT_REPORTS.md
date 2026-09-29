@@ -218,7 +218,10 @@ et au plus une fois par heure depuis la mise en page racine
 
 ## Données
 
-`bg_reports` (dont `parent_report_id` pour une contestation) et
+`bg_reports` (dont `parent_report_id` pour une contestation, et `contest_role` —
+`TARGET` ou `NOTIFIER`, écrit à la contestation, `NULL` pour celles d'avant la
+colonne, toutes de personnes visées : seule une contestation `TARGET` retient
+une image masquée à l'échéance) et
 `bg_report_targets` (sans clé étrangère vers la cible : une équipe dissoute
 n'emporte pas le signalement ; `label_snapshot` garde le nom ; `notified_at`
 dit si la cible a réellement été prévenue — c'est lui, et non la seule

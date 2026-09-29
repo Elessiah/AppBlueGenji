@@ -762,9 +762,9 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
 
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_reports
-         (category, parent_report_id, description, page_path, reporter_user_id, contact_email, consent_at)
-       VALUES ('CONTEST', ?, ?, ?, ?, ?, NULL)`,
-      [parentId, submission.description, submission.pagePath, userId, submission.contactEmail],
+         (category, parent_report_id, contest_role, description, page_path, reporter_user_id, contact_email, consent_at)
+       VALUES ('CONTEST', ?, ?, ?, ?, ?, ?, NULL)`,
+      [parentId, by, submission.description, submission.pagePath, userId, submission.contactEmail],
     );
     contestId = Number(inserted.insertId);
 

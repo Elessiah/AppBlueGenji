@@ -635,7 +635,7 @@ describe("createReport — contestation", () => {
 
     const insert = connection.execute.mock.calls.find(([sql]) => /INSERT INTO bg_reports/.test(sql));
     expect(insert?.[0]).toMatch(/'CONTEST'/);
-    expect(insert?.[1]).toEqual([12, "Nous détenons les droits sur ce logo.", "/equipes/4", 5, "juridique@exemple.fr"]);
+    expect(insert?.[1]).toEqual([12, "TARGET", "Nous détenons les droits sur ce logo.", "/equipes/4", 5, "juridique@exemple.fr"]);
     expect(connection.execute.mock.calls.some(([sql]) => /SET status = 'OPEN'/.test(sql))).toBe(false);
     const [message, context] = jest.mocked(pushLeadershipAlert).mock.calls[0];
     expect(context).toBe("content-report-contest");
@@ -661,6 +661,9 @@ describe("createReport — contestation", () => {
     await expect(createReport(contest, { userId: 5, managesTournaments: false })).resolves.toBe(20);
     const message = jest.mocked(pushLeadershipAlert).mock.calls[0][0];
     expect(message).toContain("envoyée par l'auteur du signalement");
+    // Écrit avec la contestation : la purge des images masquées le relit tel quel.
+    const insert = connection.execute.mock.calls.find(([sql]) => /INSERT INTO bg_reports/.test(sql));
+    expect((insert?.[1] as unknown[])[1]).toBe("NOTIFIER");
     expect(message).toContain("réactivé");
 
     // Avant la décision, il n'a rien à contester ; un autre compte non plus.

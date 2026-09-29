@@ -924,10 +924,12 @@ type DueRow = RowDataPacket & {
  * l'auteur du signalement (`canContestReport`) conteste la décision dans
  * l'autre sens — il voudrait l'image partie, pas gardée —, et la compter
  * prolongerait au-delà de l'échéance annoncée la garde d'une image que
- * personne n'a défendue. L'auteur qui est **aussi** visé (joueur désigné, ou
- * membre actuel d'une équipe désignée) conteste en visé, comme `createContest`
- * le compte ; et un compte effacé (auteur `NULL`) compte comme visé : dans le
- * doute, on garde.
+ * personne n'a défendue. Qui conteste est **écrit avec la contestation**
+ * (`contest_role`, décidé par `createContest`) et jamais redéduit ici : relu
+ * sur l'appartenance du jour, un auteur-membre qui quitte l'équipe après avoir
+ * défendu son logo ferait supprimer l'image que sa contestation retenait.
+ * `NULL` — contestation d'avant la colonne — vaut personne visée : seules
+ * celles-là pouvaient alors contester.
  */
 export async function purgeDueQuarantines(now: Date = new Date()): Promise<number> {
   const db = await getDatabase();
@@ -935,19 +937,7 @@ export async function purgeDueQuarantines(now: Date = new Date()): Promise<numbe
     `SELECT q.id, q.purge_after, q.report_id, r.status AS report_status,
             EXISTS (SELECT 1 FROM bg_reports c
                     WHERE c.parent_report_id = q.report_id
-                      AND (r.reporter_user_id IS NULL OR c.reporter_user_id IS NULL
-                           OR c.reporter_user_id <> r.reporter_user_id
-                           -- Auteur **et** visé : il conteste en visé, comme
-                           -- \`createContest\` le compte.
-                           OR EXISTS (
-                             SELECT 1 FROM bg_report_targets t
-                             WHERE t.report_id = q.report_id
-                               AND ((t.target_type = 'USER' AND t.target_id = c.reporter_user_id)
-                                    OR (t.target_type = 'TEAM' AND EXISTS (
-                                          SELECT 1 FROM bg_team_members tm
-                                          WHERE tm.team_id = t.target_id AND tm.user_id = c.reporter_user_id
-                                            AND tm.left_at IS NULL))))
-                          )) AS contested
+                      AND (c.contest_role IS NULL OR c.contest_role = 'TARGET')) AS contested
      FROM bg_logo_quarantines q
      LEFT JOIN bg_reports r ON r.id = q.report_id
      WHERE q.status = 'HIDDEN' AND q.purge_after <= ?`,
