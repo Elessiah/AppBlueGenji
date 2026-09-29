@@ -49,6 +49,7 @@ import { TournamentProgress } from "./_components/TournamentProgress";
 import { TournamentLoading } from "./_components/TournamentLoading";
 import { TournamentHeader } from "./_components/TournamentHeader";
 import styles from "./page.module.css";
+import { orReload } from "./_lib/lazy-component";
 
 // Découpage du paquet : un spectateur ne voit qu'un format et n'ouvre presque
 // jamais un dialogue. Les vues propres à un format et les panneaux du staff
@@ -56,25 +57,27 @@ import styles from "./page.module.css";
 // affiche ; les dialogues (tous rendus sous condition d'ouverture) au geste qui
 // les ouvre. `ssr: false` : la page ne peint aucun de ces blocs avant le
 // premier instantané du flux, un rendu serveur n'aurait rien à y mettre.
-const SurvivalView = dynamic(() => import("./_components/SurvivalView").then((m) => m.SurvivalView), { ssr: false });
-const SwissView = dynamic(() => import("./_components/SwissView").then((m) => m.SwissView), { ssr: false });
-const EnduranceView = dynamic(() => import("./_components/EnduranceView").then((m) => m.EnduranceView), { ssr: false });
-const BracketPreview = dynamic(() => import("./_components/BracketPreview").then((m) => m.BracketPreview), { ssr: false });
-const PhaseStandingsBlock = dynamic(() => import("./_components/PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock), { ssr: false });
-const EntrantContactsPanel = dynamic(() => import("./_components/EntrantContactsPanel").then((m) => m.EntrantContactsPanel), { ssr: false });
-const AdminScoreDialog = dynamic(() => import("./_components/AdminScoreDialog").then((m) => m.AdminScoreDialog), { ssr: false });
-const PlayerScoreDialog = dynamic(() => import("./_components/PlayerScoreDialog").then((m) => m.PlayerScoreDialog), { ssr: false });
-const GhostRegistrationDialog = dynamic(() => import("./_components/GhostRegistrationDialog").then((m) => m.GhostRegistrationDialog), { ssr: false });
-const MatchLiveDialog = dynamic(() => import("./_components/MatchLiveDialog").then((m) => m.MatchLiveDialog), { ssr: false });
-const MatchScheduleDialog = dynamic(() => import("./_components/MatchScheduleDialog").then((m) => m.MatchScheduleDialog), { ssr: false });
-const MatchReplayDialog = dynamic(() => import("./_components/MatchReplayDialog").then((m) => m.MatchReplayDialog), { ssr: false });
-const IssueReportDialog = dynamic(() => import("./_components/IssueReportDialog").then((m) => m.IssueReportDialog), { ssr: false });
-const DeleteTournamentDialog = dynamic(() => import("./_components/DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog), { ssr: false });
-const RollbackRoundDialog = dynamic(() => import("./_components/RollbackRoundDialog").then((m) => m.RollbackRoundDialog), { ssr: false });
-const EndurancePenaltyDialog = dynamic(() => import("./_components/EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog), { ssr: false });
-const AdvanceTournamentDialog = dynamic(() => import("./_components/AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog), { ssr: false });
-const TournamentImageDialog = dynamic(() => import("./_components/TournamentImageDialog").then((m) => m.TournamentImageDialog), { ssr: false });
-const ConfirmActionDialog = dynamic(() => import("./_components/ConfirmActionDialog").then((m) => m.ConfirmActionDialog), { ssr: false });
+// `orReload` : un fichier disparu (déploiement survenu depuis l'ouverture)
+// recharge la page au lieu de la faire tomber.
+const SurvivalView = dynamic(() => orReload(import("./_components/SurvivalView").then((m) => m.SurvivalView)), { ssr: false });
+const SwissView = dynamic(() => orReload(import("./_components/SwissView").then((m) => m.SwissView)), { ssr: false });
+const EnduranceView = dynamic(() => orReload(import("./_components/EnduranceView").then((m) => m.EnduranceView)), { ssr: false });
+const BracketPreview = dynamic(() => orReload(import("./_components/BracketPreview").then((m) => m.BracketPreview)), { ssr: false });
+const PhaseStandingsBlock = dynamic(() => orReload(import("./_components/PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock)), { ssr: false });
+const EntrantContactsPanel = dynamic(() => orReload(import("./_components/EntrantContactsPanel").then((m) => m.EntrantContactsPanel)), { ssr: false });
+const AdminScoreDialog = dynamic(() => orReload(import("./_components/AdminScoreDialog").then((m) => m.AdminScoreDialog)), { ssr: false });
+const PlayerScoreDialog = dynamic(() => orReload(import("./_components/PlayerScoreDialog").then((m) => m.PlayerScoreDialog)), { ssr: false });
+const GhostRegistrationDialog = dynamic(() => orReload(import("./_components/GhostRegistrationDialog").then((m) => m.GhostRegistrationDialog)), { ssr: false });
+const MatchLiveDialog = dynamic(() => orReload(import("./_components/MatchLiveDialog").then((m) => m.MatchLiveDialog)), { ssr: false });
+const MatchScheduleDialog = dynamic(() => orReload(import("./_components/MatchScheduleDialog").then((m) => m.MatchScheduleDialog)), { ssr: false });
+const MatchReplayDialog = dynamic(() => orReload(import("./_components/MatchReplayDialog").then((m) => m.MatchReplayDialog)), { ssr: false });
+const IssueReportDialog = dynamic(() => orReload(import("./_components/IssueReportDialog").then((m) => m.IssueReportDialog)), { ssr: false });
+const DeleteTournamentDialog = dynamic(() => orReload(import("./_components/DeleteTournamentDialog").then((m) => m.DeleteTournamentDialog)), { ssr: false });
+const RollbackRoundDialog = dynamic(() => orReload(import("./_components/RollbackRoundDialog").then((m) => m.RollbackRoundDialog)), { ssr: false });
+const EndurancePenaltyDialog = dynamic(() => orReload(import("./_components/EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog)), { ssr: false });
+const AdvanceTournamentDialog = dynamic(() => orReload(import("./_components/AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
+const TournamentImageDialog = dynamic(() => orReload(import("./_components/TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
+const ConfirmActionDialog = dynamic(() => orReload(import("./_components/ConfirmActionDialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
 
 /** Confirmation en attente d'un geste irréversible (abandon, retrait de pénalité). */
 interface PendingConfirm {
