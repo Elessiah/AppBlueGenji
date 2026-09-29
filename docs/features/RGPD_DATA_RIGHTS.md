@@ -61,13 +61,15 @@ affichées dans le tableau « Données collectées ») :
   `bluegenji-donnees-<id>.json`).
 - **UI** : bouton « Exporter mes données » sur `/profil`.
 
-## 4. Changements du traitement — acceptation par les comptes existants
+## 4. Changements du traitement — information des comptes existants
 
-Le consentement de la section 2 ne vaut que pour la politique en vigueur à
-l'inscription. Quand elle change, chaque compte existant voit une modale qui
-**cumule** les changements qu'il n'a pas encore acceptés, avec deux issues :
-« J'accepte » ou « Je refuse, je supprime mon compte » (confirmation et
-avertissement d'irréversibilité). Les comptes joignables sur Discord en reçoivent
+Quand la politique change, chaque compte existant voit, à partir de la date de
+publication, une modale qui **cumule** les changements dont il n'a pas encore
+pris connaissance, avec un seul bouton : « J'ai pris connaissance ». Elle
+informe (art. 12 à 14) et ne demande aucun accord : ce qui repose sur
+l'intérêt légitime ou le service se discute par le droit d'opposition, ce qui
+repose sur le consentement se refuse par son réglage, et jamais par la
+suppression du compte. Les comptes joignables sur Discord en reçoivent
 aussi un résumé en message privé. Déclencher = ajouter une entrée à
 `PRIVACY_CHANGES` (`lib/shared/privacy-changes.ts`). Voir
 `docs/features/PRIVACY_CHANGES_CONSENT.md`.
@@ -84,5 +86,5 @@ aussi un résumé en message privé. Déclencher = ajouter une entrée à
 | `lib/server/users-service.ts` | `exportOwnData()` / `deleteOwnAccount()` |
 | `app/(secured)/profil/page.tsx` | Bouton d'export + mentions OW/Marvel |
 | `lib/shared/privacy-changes.ts` | Registre des changements du traitement |
-| `components/privacy/PrivacyChangesModal.tsx` | Modale d'acceptation des changements |
+| `components/privacy/PrivacyChangesModal.tsx` | Modale d'information sur les changements |
 | `app/api/profile/privacy-changes/route.ts` | Enregistrement de l'acceptation |

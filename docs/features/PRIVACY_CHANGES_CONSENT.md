@@ -1,9 +1,38 @@
-# Changements du traitement des données — acceptation et annonce
+# Changements du traitement des données — information et annonce
 
 Quand la façon dont le site traite les données personnelles change, chaque
-compte existant doit en être **informé** et doit pouvoir **refuser** — refuser
-voulant dire ne plus avoir de compte, puisque le site ne fonctionne pas sans les
-données qu'il décrit. Ce document décrit le mécanisme qui s'en charge.
+compte existant doit en être **informé** (RGPD, art. 12 à 14, et 13.3 pour une
+finalité nouvelle). Ce document décrit le mécanisme qui s'en charge.
+
+## Informer, pas faire accepter
+
+Le mécanisme demandait d'abord d'**accepter** chaque changement, le refus
+menant à la suppression du compte (« J'accepte » / « Je refuse, je supprime
+mon compte »). Un audit juridique l'a écarté, pour deux raisons qui valent
+chacune pour une famille de traitements :
+
+- **Intérêt légitime ou exécution du service** : le RGPD impose d'informer, pas
+  de faire accepter. La contrepartie est le **droit d'opposition** (art. 21),
+  décrit sur `/rgpd` et exercé par le formulaire de signalement (catégorie RGPD)
+  — jamais la suppression du compte.
+- **Consentement** : un accord dont le refus coûte le compte n'est pas libre
+  (art. 7.4). Il se recueille par un **réglage du site**, refusable sans rien
+  perdre d'autre (case décochée par défaut, geste réversible : « Tag Discord »,
+  « Certifier mon tag », notifications push…), et l'entrée qui annonce le
+  changement nomme ce réglage.
+
+La modale n'a donc plus qu'un bouton, **« J'ai pris connaissance »**, et aucune
+issue vers la suppression. Corollaire pour le registre : un changement qui
+élargirait un traitement fondé sur le consentement **sans** réglage pour le
+refuser n'est pas publiable en l'état — il faut d'abord le réglage.
+
+**Décision requise** (hors du code) : la base légale des contacts présentés au
+lancement d'un match (`2026-09-lancement-des-matchs` — tag Discord certifié et
+BattleTag montrés à l'adversaire et au caster). Si c'est l'exécution du service
+(il faut se joindre pour jouer le match), l'information suffit ; si c'est le
+consentement donné en certifiant son tag, il faut un réglage qui refuse ce
+public-là sans retirer la certification — aujourd'hui, le seul refus possible
+est de retirer son tag.
 
 ## Déclencher : ajouter une entrée au registre
 
@@ -14,7 +43,7 @@ la PR même qui change le traitement :
 // lib/shared/privacy-changes.ts — à la FIN de PRIVACY_CHANGES
 {
   id: "2026-11-historique-des-visites",   // stable, minuscules et tirets, ≤ 80
-  publishedAt: "2026-11-04",              // date de mise en production prévue
+  publishedAt: "2026-11-04",              // date de mise en production prévue (jour de Paris)
   title: "Historique des visites raccourci",
   summary: "Une ou deux phrases qui disent l'essentiel (reprises sur Discord).",
   details: [
@@ -29,26 +58,34 @@ Tout le reste suit seul :
 | --- | --- |
 | Modale à la prochaine page de chaque compte concerné | `app/layout.tsx` → `components/privacy/PrivacyChangesModal.tsx` |
 | Message privé Discord aux comptes joignables | `lib/server/privacy-change-notifications.ts` |
-| « Dernière mise à jour » de `/rgpd` | `privacyPolicyUpdatedLabel()` |
+| « Dernière mise à jour » de `/rgpd` | `privacyPolicyUpdatedLabel(today)` |
 
 **Règles du registre** (tenues par `tests/lib/shared/privacy-changes.test.ts`) :
 ajout seul, dans l'ordre des dates ; un identifiant publié ne se renomme ni ne
-se retire (il est en base chez chaque compte qui l'a accepté — le renommer ferait
+se retire (il est en base chez chaque compte qui l'a lu — le renommer ferait
 réapparaître la modale à tous) ; une coquille se corrige sur place, un changement
 de fond est une **nouvelle** entrée. Penser aussi à mettre `/rgpd` à jour : la
 modale résume, la politique fait foi.
 
 ## Qui voit quoi
 
-`pendingPrivacyChanges` : un changement est dû à un compte s'il ne l'a pas
-accepté **et** s'il a été publié **après le jour de création** du compte — un
-compte créé le jour même ou après a consenti à la politique déjà à jour en
-s'inscrivant. La comparaison porte sur le jour (`AAAA-MM-JJ`, en chaînes) : aucun
-fuseau n'entre en jeu.
+`pendingPrivacyChanges` : un changement est dû à un compte s'il n'en a pas pris
+connaissance, s'il est **publié** (`publishedAt <= aujourd'hui`) **et** s'il a
+été publié **après le jour de création** du compte — un compte créé le jour même
+ou après s'est inscrit sous la politique déjà à jour. La comparaison porte sur le
+jour (`AAAA-MM-JJ`, en chaînes), « aujourd'hui » étant le **jour de Paris**
+(`privacyChangeDay`) : le jour UTC serait encore la veille entre minuit et deux
+heures.
+
+**Une entrée datée du futur reste muette** jusqu'à sa date
+(`publishedPrivacyChanges`) : ni modale, ni message Discord, ni « Dernière mise à
+jour » de `/rgpd`, et la route refuse d'en enregistrer la lecture
+(`UNKNOWN_PRIVACY_CHANGE`). Présentée aussitôt, elle annonçait « Nos règles ont
+changé » daté du lendemain, pour une règle qui ne s'appliquait pas encore.
 
 Les changements **se cumulent** : un joueur absent pendant trois changements les
-lit tous les trois dans la même modale, sous un titre qui les compte, et une seule
-acceptation les acquitte tous.
+lit tous les trois dans la même modale, sous un titre qui les compte, et un seul
+clic les acquitte tous.
 
 Limite assumée : un compte créé entre `publishedAt` et le déploiement effectif ne
 verra pas le changement. D'où la consigne de poser la date de mise en production
@@ -62,29 +99,26 @@ recrutement : la liste est dans le HTML initial, sans aller-retour. La lecture
 connecté, et une panne de lecture n'empêche pas la page de s'afficher (la modale
 reviendra).
 
-- **« J'accepte »** → `POST /api/profile/privacy-changes` avec les identifiants
-  **montrés**, jamais « tout ce qui est dû » : un changement publié entre
-  l'affichage et le clic n'est pas accepté par qui ne l'a pas lu. Le serveur
-  refuse un identifiant inconnu (`UNKNOWN_PRIVACY_CHANGE`) plutôt que de
-  l'ignorer, et une demande mal formée (`INVALID_PRIVACY_CHANGES`), en 400.
-  `INSERT IGNORE` : accepter deux fois n'est pas une erreur, la première date
-  fait foi. L'insertion ne se pose que sur un compte vivant (`is_deleted = 0`).
-- **« Je refuse, je supprime mon compte »** → une seconde étape, en
-  `alertdialog`, qui décrit ce que la suppression va faire : même aperçu
-  (`GET /api/profile/deletion`) et mêmes phrases (`accountDeletionConfirmation`)
-  que `/profil`, l'avertissement que rien ne sera récupérable, et un lien qui
-  **télécharge** l'export (`/api/profile/export`) — `/profil` serait couvert par
-  la même modale, son bouton d'export inatteignable. La suppression passe par la
-  route ordinaire (`DELETE /api/profile`), donc tout part comme depuis `/profil`.
-- **Ni Échap ni clic à côté ne la ferment** : Échap ramène seulement de la
-  confirmation à la lecture. Ne rien choisir la fait revenir au chargement
-  suivant.
+- **« J'ai pris connaissance »**, seul bouton → `POST /api/profile/privacy-changes`
+  avec les identifiants **montrés**, jamais « tout ce qui est dû » : un
+  changement publié entre l'affichage et le clic n'est pas acquitté par qui ne
+  l'a pas lu. Le serveur refuse un identifiant inconnu ou pas encore publié
+  (`UNKNOWN_PRIVACY_CHANGE`) plutôt que de l'ignorer, et une demande mal formée
+  (`INVALID_PRIVACY_CHANGES`), en 400. `INSERT IGNORE` : acquitter deux fois
+  n'est pas une erreur, la première date fait foi. L'insertion ne se pose que
+  sur un compte vivant (`is_deleted = 0`).
+- **Aucun refus, aucune suppression** : l'introduction dit qu'aucun accord n'est
+  demandé, et le pied renvoie aux réglages de « Mon profil » (ce qui repose sur
+  le consentement) et à `/rgpd` (opposition et autres droits). La suppression du
+  compte reste où elle a toujours été, sur `/profil`.
+- **Ni Échap ni clic à côté ne la ferment** : ne rien faire la fait revenir au
+  chargement suivant.
 
 Elle se tait sur `/rgpd` (elle y couvrirait la politique qu'elle invite à lire)
-et fait taire la **modale** de recrutement tant qu'un choix est dû — deux modales
-ne se superposent pas ; la banderole de recrutement, elle, reste. La modale
-défile elle-même (`overflow-y: auto`) : bloquante, elle doit garder ses deux
-boutons atteignables sur un écran bas (téléphone en paysage).
+et fait taire la **modale** de recrutement tant qu'une lecture est due — deux
+modales ne se superposent pas ; la banderole de recrutement, elle, reste. La
+modale défile elle-même (`overflow-y: auto`) : bloquante, elle doit garder son
+bouton atteignable sur un écran bas (téléphone en paysage).
 
 ## L'annonce Discord
 
@@ -102,7 +136,7 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   compris. Deux règles, dans le module pur :
   - **délai de la modale** (`PRIVACY_DM_SETTLE_DAYS`, 7 jours) : un compte n'est
     prévenu que lorsque son plus ancien changement dû a une semaine. Un joueur
-    qui revient sur le site dans l'intervalle accepte dans la modale et ne
+    qui revient sur le site dans l'intervalle lit la modale et ne
     reçoit **rien** — le message ne sert qu'à qui ne revient pas ;
   - **un message par mois au plus** (`PRIVACY_DM_MIN_INTERVAL_DAYS`, 30 jours,
     jugé en base sur `sent_at`) : un changement publié le lendemain d'un
@@ -128,8 +162,8 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   `docs/DEPLOYMENT.md`) : l'intervalle est lu avant la réservation, et deux
   processus concurrents pourraient tous deux l'enjamber.
 - **Un message par compte**, qui résume (titre, date, résumé) tous les
-  changements qu'il n'a ni acceptés ni déjà reçus, et renvoie au site pour
-  décider. Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
+  changements qu'il n'a ni lus sur le site ni déjà reçus, et renvoie au site
+  pour le détail — en disant qu'aucun accord n'est demandé. Borné à 1 800 caractères (plafond du bot) : le balayage n'envoie et
   ne **réserve** que les changements qu'un message peut nommer tous
   (`privacyChangesForOneMessage`), et le reste part au message suivant — un mois plus tard au plus tôt, l'intervalle minimal valant pour lui aussi (revers : un premier message parti tard dans la fenêtre de 60 jours peut en laisser sortir ce reste avant le suivant ; la modale, elle, l'a présenté). Le
   repli qui *compte* les derniers (« … et 1 autre ») ne suffit pas à l'envoi :
@@ -148,8 +182,8 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
   rien n'est lu ni réservé.
 - **Par lots de 20 comptes**, pour que le bot, qui écrit en série, réponde dans
   son délai — un dépassement ferait rendre puis renvoyer un lot déjà parti.
-- **Fenêtre de 60 jours** (`PRIVACY_DM_WINDOW_DAYS`) : le message est une
-  annonce, pas le consentement. Un compte qui rattache Discord un an après un
+- **Fenêtre de 60 jours** (`PRIVACY_DM_WINDOW_DAYS`) : le message n'est qu'un
+  relais de la modale. Un compte qui rattache Discord un an après un
   changement ne reçoit pas une nouvelle d'un an ; la modale, elle, n'a pas de
   limite.
 
@@ -157,10 +191,22 @@ nouvelle, le bot n'écrit qu'aux membres du serveur BlueGenji.
 
 | Table | Contenu | Suppression du compte |
 | --- | --- | --- |
-| `bg_privacy_acknowledgments` | `(user_id, change_id, accepted_at)` — la trace du consentement | Cascade à l'effacement ; conservée à l'anonymisation (un identifiant et une date) |
+| `bg_privacy_acknowledgments` | `(user_id, change_id, accepted_at)` — la trace de l'information (la colonne garde son nom d'origine) | Cascade à l'effacement ; conservée à l'anonymisation (un identifiant et une date) |
 | `bg_privacy_change_notifications` | `(user_id, change_id, sent_at)` | Idem |
 
-Les acceptations figurent dans l'export RGPD (`privacyAcknowledgments`).
+Les prises de connaissance figurent dans l'export RGPD (`privacyAcknowledgments`,
+champ `acceptedAt` inchangé pour ne pas casser le format). Registre : T10, base
+« obligation légale d'information ».
+
+## Dates corrigées
+
+`2026-10-retrait-google-one-tap` portait `publishedAt: "2026-10-01"` alors que
+le retrait a été mergé le 29 septembre 2026 (#278) : sa date est ramenée au
+**30 septembre**, celle des deux entrées livrées le même jour (#272, mesure
+d'audience) — l'ordre du registre est tenu, et entre deux dates plausibles la
+plus tardive est la plus sûre (un compte créé entre les deux lit un changement
+déjà vrai plutôt que d'en manquer un). L'identifiant, déjà publié, garde son
+« 2026-10 ».
 
 ## Mise en production initiale
 
