@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import type { AuthUser } from "@/lib/shared/types";
+import type { AuthUser } from "@/lib/server/auth";
 
 // AUTHORIZATION_RULES §1.4 : le bouton « Modifier » du contact suit la garde de
 // `PUT /api/association/contact`, `can(user, "showcase")` — jamais `isAdmin`.
@@ -24,7 +24,9 @@ async function canEdit(user: AuthUser | null): Promise<string | undefined> {
   return html.match(/data-can-edit="(true|false)"/)?.[1];
 }
 
-beforeEach(() => currentUser.mockReset());
+beforeEach(() => {
+  currentUser.mockReset();
+});
 
 describe("PublicFooter — édition du contact", () => {
   it("l'ouvre au community manager, qui porte `showcase`", async () => {
