@@ -159,10 +159,11 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
   `PRIVACY_CHANGES_ANSWERED_EVENT`) : ouvertes ensemble, la modale de lancement,
   empilée en dernier, prenait le piège de focus sous l'autre. Sur téléphone,
   la barre d'actions (« Prêt », « Voir le match », « Fermer ») et la
-  confirmation sont **collées au bas** de la modale (`position: sticky`) : les
-  fiches contacts la poussaient sous la ligne de flottaison ; un
-  `scroll-padding-bottom` ramène au-dessus d'elle l'élément focalisé au
-  clavier. Le focus d'ouverture va au « Prêt » qui **ouvre la confirmation**
+  confirmation restent **au bas** de la modale, hors de la zone qui défile (une
+  `ScrollArea` porte en-tête, fiches et notifications) : les fiches contacts la
+  poussaient sous la ligne de flottaison. Pas de `position: sticky` — collée,
+  la barre masquait l'élément focalisé au clavier, et la compenser par un
+  `scroll-padding` faisait défiler la modale à l'ouverture. Le focus d'ouverture va au « Prêt » qui **ouvre la confirmation**
   (`data-autofocus`) — jamais à « Prêt — annuler » ni à un lien : la modale
   s'ouvre d'elle-même, parfois pendant une saisie, et un Entrée égaré ne doit
   rien déclencher. Les noms d'équipe des fiches passent à la ligne au lieu

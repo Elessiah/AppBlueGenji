@@ -13,23 +13,30 @@
   backdrop-filter: blur(4px);
 }
 
+/* La modale ne défile pas elle-même : son contenu défile dans `.scroll`, et
+   la barre d'actions reste en dessous, toujours visible (voir `.footer`). */
 .modal {
   --modal-pad: 26px;
-  /* Hauteur de la barre d'actions collée au bas : un élément focalisé au
-     clavier (« Copier ») est ramené au-dessus d'elle, jamais dessous. */
-  scroll-padding-bottom: 110px;
   width: min(780px, 100%);
+  max-height: calc(100vh - 32px); /* repli : navigateurs sans `dvh` */
   max-height: calc(100dvh - 32px);
-  overflow-y: auto;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: var(--modal-pad);
   background: var(--cyber-bg-1, #0c0f14);
   border: 1px solid rgba(90, 200, 255, 0.3);
   border-radius: var(--r-cy-lg, 14px);
   box-shadow: 0 24px 70px rgba(0, 0, 0, 0.75),
     0 0 40px rgba(90, 200, 255, calc(0.12 * var(--glow, 1)));
+}
+
+.scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: var(--modal-pad) var(--modal-pad) 18px;
 }
 
 .modal[data-phase="LOBBY"] {
@@ -333,16 +340,16 @@
   color: var(--ink-mute);
 }
 
-/* Barre d'actions collée au bas de la modale : c'est elle qu'on vient
+/* Barre d'actions au bas de la modale : c'est elle qu'on vient
    chercher (« Prêt »), et sur un téléphone les fiches contacts la poussaient
-   sous la ligne de flottaison. Elle mange le rembourrage du bas pour rester
-   collée au bord, sur un fond opaque par-dessus ce qui défile. */
+   sous la ligne de flottaison. Hors de la zone qui défile plutôt que collée
+   (`sticky`) dedans : collée, elle masquait l'élément focalisé au clavier, et
+   la compenser par un `scroll-padding` faisait défiler la modale à
+   l'ouverture — le « Prêt » focalisé tombant dans la zone réservée, l'en-tête
+   (quel match, combien de prêts) sortait de l'écran. */
 .footer,
 .confirm {
-  position: sticky;
-  bottom: calc(-1 * var(--modal-pad));
-  z-index: 1;
-  margin: 0 calc(-1 * var(--modal-pad)) calc(-1 * var(--modal-pad));
+  flex-shrink: 0;
   padding: 14px var(--modal-pad) var(--modal-pad);
   background: var(--cyber-bg-1, #0c0f14);
   border-top: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
@@ -460,7 +467,6 @@
 @media (max-width: 640px) {
   .modal {
     --modal-pad: 18px;
-    scroll-padding-bottom: 170px;
   }
 
   .sides {

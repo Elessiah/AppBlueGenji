@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { ScrollArea } from "@/components/cyber";
 import { PushNotificationsPanel } from "@/components/notifications/PushNotificationsPanel";
 import { usePathname } from "next/navigation";
 import { PRIVACY_POLICY_PATH } from "@/components/privacy/PrivacyChangesModal";
@@ -338,60 +339,62 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
         tabIndex={-1}
         data-phase={current.phase}
       >
-        <header className={styles.head}>
-          <span className="eyebrow">
-            {current.phase === "LAUNCHED" ? "MATCH LANCÉ" : "LANCEMENT DU MATCH"} ·{" "}
-            {current.tournamentName}
-          </span>
-          <h2 id={titleId} className={styles.title}>
-            <span className={styles.titleTeam}>{current.team1.name}</span>
-            {/* « VS » se lit « vé-esse » : l'oreille reçoit « contre », hors
-                écran. Un `aria-label` sur ce `<span>` sans rôle serait interdit
-                (`aria-prohibited-attr`) — et c'est ce titre qui nomme la modale. */}
-            <span className={styles.vs} aria-hidden="true">
-              VS
+        <ScrollArea orientation="y" className={styles.scroll} ariaLabel="Détails du match">
+          <header className={styles.head}>
+            <span className="eyebrow">
+              {current.phase === "LAUNCHED" ? "MATCH LANCÉ" : "LANCEMENT DU MATCH"} ·{" "}
+              {current.tournamentName}
             </span>
-            <span className="sr-only"> contre </span>
-            <span className={styles.titleTeam}>{current.team2.name}</span>
-          </h2>
-          <p id={statusId} className={styles.status} data-phase={current.phase} role="status">
-            {current.phase === "LOBBY" && (
-              <>
-                En attente des « Prêt » —{" "}
-                <strong className="num">
-                  {count.ready}/{count.expected}
-                </strong>{" "}
-                prêts
-                {autoAt && <> · lancement automatique à <span className="num">{autoAt}</span></>}
-              </>
-            )}
-            {current.phase === "LAUNCHED" && <>Le match est lancé — bonne partie !</>}
-            {current.phase === "SCHEDULED" && (
-              <>Début prévu à <span className="num">{startAt ?? "—"}</span></>
-            )}
-          </p>
-        </header>
+            <h2 id={titleId} className={styles.title}>
+              <span className={styles.titleTeam}>{current.team1.name}</span>
+              {/* « VS » se lit « vé-esse » : l'oreille reçoit « contre », hors
+                  écran. Un `aria-label` sur ce `<span>` sans rôle serait interdit
+                  (`aria-prohibited-attr`) — et c'est ce titre qui nomme la modale. */}
+              <span className={styles.vs} aria-hidden="true">
+                VS
+              </span>
+              <span className="sr-only"> contre </span>
+              <span className={styles.titleTeam}>{current.team2.name}</span>
+            </h2>
+            <p id={statusId} className={styles.status} data-phase={current.phase} role="status">
+              {current.phase === "LOBBY" && (
+                <>
+                  En attente des « Prêt » —{" "}
+                  <strong className="num">
+                    {count.ready}/{count.expected}
+                  </strong>{" "}
+                  prêts
+                  {autoAt && <> · lancement automatique à <span className="num">{autoAt}</span></>}
+                </>
+              )}
+              {current.phase === "LAUNCHED" && <>Le match est lancé — bonne partie !</>}
+              {current.phase === "SCHEDULED" && (
+                <>Début prévu à <span className="num">{startAt ?? "—"}</span></>
+              )}
+            </p>
+          </header>
 
-        <div className={styles.body}>
-          <div className={styles.sides}>
-            <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} />
-            <div className={styles.divider} aria-hidden="true">
-              VS
+          <div className={styles.body}>
+            <div className={styles.sides}>
+              <SideCard side={current.team1} isHost={current.hostTeamId === current.team1.teamId} phase={current.phase} onCopy={copy} />
+              <div className={styles.divider} aria-hidden="true">
+                VS
+              </div>
+              <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
             </div>
-            <SideCard side={current.team2} isHost={current.hostTeamId === current.team2.teamId} phase={current.phase} onCopy={copy} />
+
+            <CasterCard caster={current.caster} phase={current.phase} onCopy={copy} />
           </div>
 
-          <CasterCard caster={current.caster} phase={current.phase} onCopy={copy} />
-        </div>
-
-        {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici
-            que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
-            fois l'appareil abonné. */}
-        <PushNotificationsPanel
-          variant="compact"
-          topics={["MATCH_START"]}
-          lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
-        />
+          {/* Le même réglage que sur /profil, sous sa forme compacte : c'est ici
+              que le joueur découvre qu'il aurait pu être prévenu. Il se tait une
+              fois l'appareil abonné. */}
+          <PushNotificationsPanel
+            variant="compact"
+            topics={["MATCH_START"]}
+            lead="Sois prévenu du départ de tes prochains matchs, même le site fermé."
+          />
+        </ScrollArea>
 
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
             (arbitrage, délai) la referme d'elle-même. */}

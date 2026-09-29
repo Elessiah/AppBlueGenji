@@ -94,12 +94,25 @@ describe("modale de lancement sur un petit écran", () => {
   const tsx = read(join(ROOT, "components", "match-launch", "MatchLaunchCenter.tsx"));
   const css = stripComments(read(join(ROOT, "components", "match-launch", "MatchLaunchCenter.module.css")));
 
-  it("la barre d'actions et la confirmation sont collées au bas", () => {
-    const sticky = css.match(/\.footer,\n\.confirm \{[^}]*\}/)?.[0] ?? "";
-    expect(sticky).toContain("position: sticky");
-    expect(sticky).toContain("bottom: calc(-1 * var(--modal-pad))");
-    // Fond opaque : ce qui défile dessous ne doit pas transparaître.
-    expect(sticky).toContain("background: var(--cyber-bg-1");
+  it("la barre d'actions et la confirmation restent sous la zone qui défile", () => {
+    // La modale ne défile pas ; son contenu défile dans une <ScrollArea>, et les
+    // actions en sont des sœurs, donc toujours visibles.
+    const modal = rule(css, ".modal");
+    expect(modal).toContain("overflow: hidden");
+    expect(modal).toContain("max-height: calc(100dvh - 32px)");
+    expect(rule(css, ".scroll")).toContain("min-height: 0");
+    const bar = css.match(/\.footer,\n\.confirm \{[^}]*\}/)?.[0] ?? "";
+    expect(bar).toContain("flex-shrink: 0");
+    // Ni `sticky` ni `scroll-padding` : la barre collée masquait le focus, et
+    // sa compensation faisait défiler la modale à l'ouverture.
+    expect(css).not.toContain("position: sticky");
+    expect(css).not.toContain("scroll-padding");
+    const scrollOpen = tsx.indexOf("className={styles.scroll}");
+    const scrollClose = tsx.indexOf("</ScrollArea>");
+    expect(scrollOpen).toBeGreaterThan(-1);
+    expect(tsx.slice(scrollOpen, scrollClose)).toContain("<header");
+    expect(tsx.slice(scrollOpen, scrollClose)).not.toContain("{partyWord}");
+    expect(tsx.indexOf("{partyWord}")).toBeGreaterThan(scrollClose);
   });
 
   it("le focus d'ouverture va au seul « Prêt » qui ouvre une confirmation", () => {
@@ -117,12 +130,6 @@ describe("modale de lancement sur un petit écran", () => {
     expect(openingOf("Voir le match")).not.toContain("data-autofocus");
     expect(openingOf("Copier\n")).not.toContain("data-autofocus");
     expect(tsx.match(/^\s*data-autofocus$/gm)).toHaveLength(1);
-  });
-
-  it("un élément focalisé au clavier n'est pas caché sous la barre collée", () => {
-    expect(rule(css, ".modal")).toMatch(/scroll-padding-bottom: \d+px/);
-    const mobile = css.match(/@media \(max-width: 640px\) \{[\s\S]*?\n\}/)?.[0] ?? "";
-    expect(mobile).toMatch(/\.modal \{[^}]*scroll-padding-bottom: \d+px/);
   });
 
   it("les noms d'équipe des fiches passent à la ligne au lieu d'être rognés", () => {
