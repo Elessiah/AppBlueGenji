@@ -36,13 +36,13 @@
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { DISCORD_NAMED_PSEUDO_SQL } from "@/lib/server/discord-pseudo-sql";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import {
   adoptRemoteAvatar,
   createOrGetBlizzardUser,
   createOrGetDiscordUser,
   createOrGetGoogleUser,
-  DISCORD_NAMED_PSEUDO_SQL,
   normalizeBattletag,
   normalizeDiscordHandle,
   type TermsConsent,

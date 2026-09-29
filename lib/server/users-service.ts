@@ -42,6 +42,7 @@ import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadAllPlayerRecords } from "@/lib/server/stats-service";
 import { cachedStats } from "@/lib/server/stats-cache";
+import { DISCORD_NAMED_PSEUDO_SQL } from "@/lib/server/discord-pseudo-sql";
 import { playedMatchSql } from "@/lib/shared/ranking";
 import { isLegacyDeletedPseudo, pickAnonymousPseudo, ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
 import type {
@@ -554,29 +555,6 @@ export async function adoptRemoteAvatar(userId: number, picture: string | undefi
     });
   }
 }
-
-/**
- * Affectations SQL qui enregistrent un pseudo **nommé par Discord** — à la
- * connexion ou au rattachement —, **sans le certifier**.
- *
- * Se connecter est un acte d'authentification, pas un consentement à
- * l'exposition que porte la certification (`lib/shared/discord-identity.ts`) :
- * la connexion enregistre donc le dernier pseudo que Discord a donné et marque
- * son origine (`discord_pseudo_from_discord = 1`), ce qui permet ensuite de le
- * certifier d'un clic depuis `/profil` (`certifyLinkedDiscordTag`).
- *
- * Une certification déjà donnée **survit** tant que le pseudo ne change pas —
- * elle porte sur ce tag-là — et **tombe** s'il change, comme toute modification
- * du tag (`updateOwnProfile`) : le joueur a consenti à exposer un pseudo précis,
- * pas celui qu'il prendra demain. Le `CASE` précède l'affectation du pseudo,
- * MySQL évaluant de gauche à droite ; `<=>` parce que l'ancien peut être `NULL`.
- *
- * Deux paramètres, tous deux le pseudo normalisé.
- */
-export const DISCORD_NAMED_PSEUDO_SQL = `discord_verified_at = CASE
-             WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END,
-           discord_pseudo = ?,
-           discord_pseudo_from_discord = 1`;
 
 /**
  * Retrouve (ou crée) le compte rattaché à cet identifiant Discord.
