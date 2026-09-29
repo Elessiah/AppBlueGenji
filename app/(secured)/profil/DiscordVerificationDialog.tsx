@@ -139,8 +139,21 @@ export function DiscordVerificationDialog({
       showSuccess("Tag Discord certifié.");
       onVerified(payload.tag ?? handle);
     } catch (e) {
+      // Ces refus arrivent code **consommé** : le retaper ne rendrait plus que
+      // « code invalide ou expiré ». Le Discord détenu par un autre compte n'est
+      // dit qu'ici (la demande ne doit rien révéler d'un tiers) ; comme un
+      // rattachement changé entre-temps ou un défi sans tag, il se lève au tag.
+      const reason = (e as Error).message;
+      if (
+        reason === "DISCORD_ALREADY_LINKED" ||
+        reason === "DISCORD_ID_MISMATCH" ||
+        reason === "INVALID_DISCORD_HANDLE"
+      ) {
+        restartVerification();
+      }
       refuse(e);
     } finally {
+
       setLoading(false);
     }
   };

@@ -34,6 +34,10 @@ export function fail<T extends object = Record<string, never>>(
   // `lib/server/request-body.ts`) remonte souvent par le `catch` générique
   // d'une route, qui l'aurait rendu en 400 ou 500 : c'est un 413 partout.
   if (message === "PAYLOAD_TOO_LARGE") status = 413;
+  // Même chemin pour un corps non déclaré JSON (`readJsonBody`) : c'est un
+  // refus de la requête, jamais une panne du serveur.
+  if (message === "UNSUPPORTED_CONTENT_TYPE") status = 415;
+
   const code = publicErrorCode(message, status);
   if (code !== message) {
     console.error(`[api] message d'erreur non public remplacé par ${code} (${status}) :`, message);

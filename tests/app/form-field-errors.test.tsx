@@ -257,6 +257,12 @@ describe("certification Discord — code refusé", () => {
     expect(src).toMatch(/const restartVerification = \(\) => \{\s*setChallenge\(""\);\s*setCode\(""\);\s*fieldErrors\.clear\(\);/);
   });
 
+  it("un Discord détenu ailleurs, dit à la confirmation, ramène au tag : le code est déjà consommé", () => {
+    const src = code("app/(secured)/profil/DiscordVerificationDialog.tsx");
+    expect(src).toMatch(/reason === "DISCORD_ALREADY_LINKED"[\s\S]{0,200}\)\s*\{\s*restartVerification\(\);/);
+  });
+
+
   it("changer d'étape porte le focus sur le champ de la nouvelle étape, jamais au montage", () => {
     // Le bouton activé se démonte avec son étape : sans relais, le focus
     // tomberait sur `<body>`.
