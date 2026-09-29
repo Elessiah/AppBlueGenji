@@ -91,10 +91,12 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
 }
 
 /**
- * Défait un renommage dont l'écriture n'a pas abouti. Le fichier n'est remis en
- * place que si la ligne désigne **encore** l'ancienne adresse (avatar réaffiché
- * entre-temps). Remplacé ou effacé — ou si on ne sait pas le dire, la lecture
- * échouant —, il est supprimé : le téléversement concurrent a déjà tenté
+ * Défait un renommage dont l'écriture n'a pas abouti. Selon ce que la ligne
+ * désigne à la relecture : le **nouveau** fichier (réponse perdue après le
+ * commit) → rien à défaire ; l'**ancienne** adresse (avatar réaffiché
+ * entre-temps), ou relecture impossible → remis en place, on ne détruit pas ce
+ * que la base désigne peut-être encore. Remplacé ou effacé, il est supprimé :
+ * le téléversement concurrent a déjà tenté
  * d'effacer l'ancien fichier, en vain puisqu'il était renommé, et le remettre en
  * place republierait un avatar masqué que plus rien ne désigne ni n'effacera.
  * Une copie (fichier partagé) est toujours supprimée, l'original n'ayant pas
@@ -103,23 +105,30 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
 async function undoRotation(
   userId: number,
   oldUrl: string,
-  target: { from: string; to: string },
+  target: { from: string; to: string; url: string },
   shared: boolean,
 ): Promise<void> {
-  let stillDesignated = false;
-  if (!shared) {
-    try {
-      const db = await getDatabase();
-      const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
-        `SELECT avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
-        [userId],
-      );
-      stillDesignated = rows[0]?.avatar_url === oldUrl;
-    } catch {
-      stillDesignated = false;
-    }
+  // `undefined` : la ligne n'a pas pu être relue.
+  let current: string | null | undefined;
+  try {
+    const db = await getDatabase();
+    const [rows] = await db.execute<(RowDataPacket & { avatar_url: string | null })[]>(
+      `SELECT avatar_url FROM bg_users WHERE id = ? LIMIT 1`,
+      [userId],
+    );
+    current = rows[0]?.avatar_url ?? null;
+  } catch {
+    current = undefined;
   }
-  const undo = stillDesignated ? rename(target.to, target.from) : unlink(target.to);
+  // L'écriture a abouti malgré l'erreur (réponse perdue après le commit) : la
+  // ligne désigne déjà le nouveau fichier, il reste en place.
+  if (current === target.url) return;
+  let undo: Promise<void>;
+  if (shared) undo = unlink(target.to);
+  // Encore désignée, ou impossible à dire : on ne détruit rien, l'avatar
+  // retrouve son adresse — la base la désigne peut-être toujours.
+  else if (current === oldUrl || current === undefined) undo = rename(target.to, target.from);
+  else undo = unlink(target.to);
   await undo.catch(() => undefined);
 }
 

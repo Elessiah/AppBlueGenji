@@ -164,7 +164,9 @@ describe("rotateHiddenAvatarFile", () => {
     expect(unlinkMock).toHaveBeenCalledWith(renameMock.mock.calls[0][1]);
   });
 
-  it("supprime le fichier renommé quand l'écriture échoue, et propage", async () => {
+  it("remet le fichier en place quand la base ne répond plus, et propage", async () => {
+    // Ni l'écriture ni la relecture : on ne sait pas ce que la ligne désigne,
+    // on ne détruit donc rien.
     const execute = jest
       .fn<SqlQuery>()
       .mockResolvedValueOnce([[{ avatar_url: OLD_URL, visible_avatar: 0 }]])
@@ -172,7 +174,25 @@ describe("rotateHiddenAvatarFile", () => {
       .mockRejectedValueOnce(new Error("base"));
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
     await expect(rotateHiddenAvatarFile(42)).rejects.toThrow("base");
-    expect(unlinkMock).toHaveBeenCalledWith(renameMock.mock.calls[0][1]);
+    const [[from, to], [back, origin]] = renameMock.mock.calls;
+    expect([back, origin]).toEqual([to, from]);
+    expect(unlinkMock).not.toHaveBeenCalled();
+  });
+
+  it("garde le nouveau fichier quand l'écriture a abouti malgré l'erreur (réponse perdue)", async () => {
+    let written = "";
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ avatar_url: OLD_URL, visible_avatar: 0 }]])
+      .mockImplementationOnce(async (_sql, params) => {
+        written = (params as string[])[0];
+        throw new Error("connexion coupée");
+      })
+      .mockImplementationOnce(async () => [[{ avatar_url: written }]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await expect(rotateHiddenAvatarFile(42)).rejects.toThrow("connexion coupée");
+    expect(renameMock).toHaveBeenCalledTimes(1);
+    expect(unlinkMock).not.toHaveBeenCalled();
   });
 
   it("copie au lieu de renommer quand une autre ligne désigne le fichier", async () => {
