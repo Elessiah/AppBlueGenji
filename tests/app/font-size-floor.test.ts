@@ -29,7 +29,7 @@ function walk(dir: string, out: string[] = []): string[] {
     if (statSync(path).isDirectory()) {
       if (name === "node_modules" || name === "og") continue;
       walk(path, out);
-    } else if (/\.(css|tsx)$/.test(name)) {
+    } else if (/\.(css|tsx?)$/.test(name)) {
       out.push(path);
     }
   }
@@ -38,7 +38,7 @@ function walk(dir: string, out: string[] = []): string[] {
 
 const EXCLUDED = new Set([join(ROOT, "components", "rules", "RuleDiagram.tsx")]);
 
-const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))].filter(
+const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components")), ...walk(join(ROOT, "lib"))].filter(
   (file) => !EXCLUDED.has(file),
 );
 
