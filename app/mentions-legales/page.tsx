@@ -295,9 +295,10 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         </p>
         <p>
           Conformément au Règlement Général sur la Protection des Données (RGPD — Règlement UE
-          2016/679), vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement
-          et de portabilité des données vous concernant, ainsi que d&apos;un droit d&apos;opposition
-          au traitement. Ces droits peuvent être exercés par le bouton « {REPORT_FORM_NAME} » en bas de
+          2016/679), vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement,
+          de limitation et de portabilité des données vous concernant, ainsi que d&apos;un droit
+          d&apos;opposition au traitement, et vous pouvez définir des directives relatives à leur
+          sort après votre décès (art. 85 de la loi Informatique et Libertés). Ces droits peuvent être exercés par le bouton « {REPORT_FORM_NAME} » en bas de
           chaque page, catégorie « RGPD », au courriel de l&apos;association donné plus haut, ou sur
           Discord auprès de <strong>{LEGAL_CONTACT_DISCORD}</strong>, hébergeur technique. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
           <Link href="/rgpd">politique de confidentialité</Link>.

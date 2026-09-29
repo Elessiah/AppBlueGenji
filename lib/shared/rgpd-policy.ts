@@ -136,12 +136,13 @@ export const DONNEE_TOURNOIS: DonneEntry = {
  * gardées six mois. La durée vient désormais de la constante que le script de
  * sauvegarde doit respecter (`BACKUP_RETENTION_DAYS`), et la phrase nomme les
  * deux choses qui rendent cette survie acceptable : le chiffrement (Microsoft
- * héberge sans pouvoir lire) et le rejeu des suppressions à la restauration.
+ * héberge sans pouvoir lire) et le rejeu des suppressions de compte à la
+ * restauration — les seules qui soient rejouées.
  */
 export const DONNEE_SAUVEGARDES: DonneEntry = {
   donnee: "Copies de sauvegarde",
   finalite:
-    "Reprise après incident (panne, corruption). Chiffrées avant envoi, avec une clé que seule l'association détient, puis hébergées chez Microsoft (OneDrive)",
+    "Reprise après incident (panne, corruption). Chiffrées avant envoi, avec une clé que détient le seul responsable technique de l'association (qui est aussi l'hébergeur du site), puis hébergées chez Microsoft (OneDrive)",
   base: "Intérêt légitime",
   duree: `${BACKUP_RETENTION_DAYS} jours au plus`,
 };
@@ -160,6 +161,10 @@ export const DROITS: DroitEntry[] = [
     text: "Vous pouvez demander la suppression de votre compte et de vos données de profil. Voir ci-dessus pour les données de palmarès.",
   },
   {
+    title: "Droit à la limitation",
+    text: "Vous pouvez demander que vos données soient conservées sans être autrement utilisées le temps que nous vérifiions leur exactitude ou que nous examinions votre opposition, ou lorsque vous en avez besoin pour faire valoir un droit en justice alors que nous n'en aurions plus l'usage (art. 18).",
+  },
+  {
     title: "Droit d'opposition",
     text: "Vous pouvez vous opposer au traitement de vos données fondé sur l'intérêt légitime (historique de tournois).",
   },
@@ -170,5 +175,9 @@ export const DROITS: DroitEntry[] = [
   {
     title: "Droit de retrait du consentement",
     text: "Vous pouvez retirer votre consentement à tout moment sans que cela affecte la licéité du traitement antérieur.",
+  },
+  {
+    title: "Directives après votre décès",
+    text: "Vous pouvez définir des directives sur la conservation, l'effacement et la communication de vos données après votre décès (art. 85 de la loi Informatique et Libertés). Des directives propres à ce site se transmettent à l'association par les mêmes moyens que les autres demandes.",
   },
 ];
