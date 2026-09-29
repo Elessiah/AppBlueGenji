@@ -7,6 +7,7 @@ import { RecruitmentHighlight } from "@/components/recruitment-highlight";
 import { VisitTracker } from "@/components/visit-tracker";
 import { ServiceWorkerRegistration } from "@/components/service-worker-registration";
 import { SiteNavigationTracker } from "@/components/site-navigation-tracker";
+import { StickyHeaderOffset } from "@/components/sticky-header-offset";
 import { ClientPowerRoot } from "@/components/client-power-root";
 import { PrivacyChangesModal } from "@/components/privacy/PrivacyChangesModal";
 import { AccessibilityMenu } from "@/components/accessibility/AccessibilityMenu";
@@ -229,6 +230,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           <VisitTracker />
           <ServiceWorkerRegistration />
           <SiteNavigationTracker />
+          <StickyHeaderOffset />
           <ClientPowerRoot />
           {/* Deux modales ne se superposent pas : tant qu'un choix de
               confidentialité ou les conditions attendent une réponse, et sur

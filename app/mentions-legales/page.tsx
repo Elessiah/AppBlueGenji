@@ -61,7 +61,6 @@ export default function MentionsLegalesPage() {
           key={section.title}
           id={section.id}
           className={styles.section}
-          style={{ scrollMarginTop: 96 }}
         >
           <header className={styles.head}>
             <div>

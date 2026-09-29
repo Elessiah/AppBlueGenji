@@ -83,9 +83,8 @@
   flex-direction: column;
   gap: 10px;
   padding: 22px;
-  /* Cible d'un lien profond `#annonce-<id>` : la carte ne doit pas se retrouver
-     collée sous l'en-tête collant quand le navigateur saute à l'ancre. */
-  scroll-margin-top: 96px;
+  /* Cible d'un lien profond `#annonce-<id>` : l'arrivée sous l'en-tête collant
+     est tenue par `html { scroll-padding-top }` (hauteur mesurée). */
 }
 
 .cardHead {

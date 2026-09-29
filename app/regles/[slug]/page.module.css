@@ -112,10 +112,6 @@
   }
 }
 
-/* Toute cible d'ancre du sommaire s'arrête sous l'en-tête collant. */
-.content [id] {
-  scroll-margin-top: 96px;
-}
 
 .section {
   padding: 28px 0 12px;
