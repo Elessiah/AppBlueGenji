@@ -360,6 +360,39 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
     expect(info.team2).toMatchObject({ isGhost: true, ready: true, contacts: [] });
   });
 
+  // AUTHORIZATION_RULES §2.3 : le caster inscrit est une partie du match —
+  // exposition déclarée (`PRIVACY_CHANGES`, `2026-09-lancement-des-matchs`).
+  it("montre au caster inscrit le BattleTag masqué des contacts", async () => {
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ caster_user_id: VIEWER })];
+    state.members = [
+      member(TEAM1, 2, {
+        roles_json: JSON.stringify(["CAPITAINE"]),
+        discord_pseudo: "cap",
+        discord_verified_at: OPENED,
+        overwatch_battletag: "Masque#1",
+        blizzard_sub: "s2",
+      }),
+    ];
+    state.users = [
+      { id: VIEWER, pseudo: "Caster", discord_pseudo: null, discord_verified_at: null, overwatch_battletag: null, blizzard_sub: null, visible_overwatch: 0, is_deleted: 0 },
+    ];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.viewer.role).toBe("CASTER");
+    expect(info.team1.contacts).toEqual([
+      expect.objectContaining({ userId: 2, discordTag: "cap", battletag: "Masque#1" }),
+    ]);
+  });
+
+  it("montre aux joueurs le BattleTag masqué du caster inscrit", async () => {
+    state.candidates = [candidate({ caster_user_id: CASTER })];
+    state.users = [
+      { id: CASTER, pseudo: "Caster", discord_pseudo: "caster", discord_verified_at: OPENED, overwatch_battletag: "Caster#1", blizzard_sub: "sub", visible_overwatch: 0, is_deleted: 0 },
+    ];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.viewer.role).toBe("TEAM1");
+    expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster", battletag: "Caster#1" });
+  });
   it("tait le caster d'un compte supprimé", async () => {
     state.candidates = [candidate({ caster_user_id: CASTER })];
     state.users = [{ id: CASTER, pseudo: "compte_supprime_1", discord_pseudo: null, discord_verified_at: null, overwatch_battletag: null, blizzard_sub: null, visible_overwatch: 0, is_deleted: 1 }];
