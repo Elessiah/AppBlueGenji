@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { type ContactInfo, validateContactInfo } from "@/lib/shared/contact";
+import { type ContactInfo, type PublicContactInfo, toPublicContact, validateContactInfo } from "@/lib/shared/contact";
+import { decodeContact } from "@/lib/shared/obfuscated-contact";
+import { ProtectedContact } from "@/components/ui/protected-contact";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { LandingDialog } from "./LandingDialog";
@@ -9,7 +11,8 @@ import styles from "./FooterContact.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 
 interface FooterContactProps {
-  initialContact: ContactInfo;
+  /** Courriel encodé : le pied de page est rendu dans le HTML de toutes les pages. */
+  initialContact: PublicContactInfo;
   isAdmin: boolean;
 }
 
@@ -18,23 +21,27 @@ interface FooterContactProps {
  * admins peuvent personnaliser les trois canaux via une fenêtre d'édition
  * (même API `PUT /api/association/contact`). Les liens héritent du style
  * `.columns a` du footer.
+ *
+ * Le courriel n'arrive **qu'encodé** et ne se lit qu'au clic sur « Afficher
+ * l'adresse » (`ProtectedContact`) ; la fenêtre d'édition le décode à
+ * l'ouverture, un geste du staff lui aussi.
  */
 export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
   const { showError, showSuccess } = useToast();
-  const [contact, setContact] = useState<ContactInfo>(initialContact);
-  const [form, setForm] = useState<ContactInfo>(initialContact);
+  const [contact, setContact] = useState<PublicContactInfo>(initialContact);
+  const [form, setForm] = useState<ContactInfo>(() => editableContact(initialContact));
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   function openEdit() {
-    setForm(contact);
+    setForm(editableContact(contact));
     setOpen(true);
   }
 
   function close() {
     if (busy) return;
     setOpen(false);
-    setForm(contact);
+    setForm(editableContact(contact));
   }
 
   async function submit() {
@@ -56,7 +63,7 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
         showError(data.error ? ERROR_MESSAGES[data.error] ?? `Échec : ${data.error}` : "Échec de l'enregistrement.");
         return;
       }
-      setContact(data.contact);
+      setContact(toPublicContact(data.contact));
       setOpen(false);
       showSuccess("Coordonnées de contact mises à jour.");
     } catch {
@@ -66,15 +73,22 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
     }
   }
 
-  const hasAny = contact.email || contact.discordTag || contact.discordUrl;
+  const hasAny = contact.emailEncoded || contact.discordTag || contact.discordUrl;
 
   return (
     <>
       <ul>
-        {contact.email && (
+        {contact.emailEncoded && (
           <li className={styles.item}>
             <span className={styles.itemLabel}>Email</span>
-            <a className="tap-target" href={`mailto:${contact.email}`}>{contact.email}</a>
+            {/* `key` : une adresse révélée puis modifiée par le staff doit
+                repartir masquée, pas garder l'ancienne valeur décodée. */}
+            <ProtectedContact
+              key={contact.emailEncoded}
+              encoded={contact.emailEncoded}
+              kind="email"
+              owner="de l'association"
+            />
           </li>
         )}
         {contact.discordTag && (
@@ -121,7 +135,7 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
               className={styles.input}
               value={form.email}
               maxLength={254}
-              placeholder="contact@bluegenji-esport.fr"
+              placeholder="Adresse de l'association"
               onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             />
           </label>
@@ -160,6 +174,14 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
       )}
     </>
   );
+}
+
+function editableContact(contact: PublicContactInfo): ContactInfo {
+  return {
+    email: decodeContact(contact.emailEncoded),
+    discordTag: contact.discordTag,
+    discordUrl: contact.discordUrl,
+  };
 }
 
 const ERROR_MESSAGES: Record<string, string> = {

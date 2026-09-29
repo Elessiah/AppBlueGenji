@@ -10,6 +10,7 @@ import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { accessibilityFooterLabel } from "@/lib/shared/accessibility-statement";
 import { can } from "@/lib/shared/permissions";
+import { toPublicContact } from "@/lib/shared/contact";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
@@ -70,7 +71,7 @@ export async function PublicFooter() {
           </div>
           <div>
             <div className={styles.heading}>CONTACT</div>
-            <FooterContact initialContact={contact} isAdmin={canEditContact} />
+            <FooterContact initialContact={toPublicContact(contact)} isAdmin={canEditContact} />
           </div>
           <div>
             <div className={styles.heading}>LÉGAL</div>

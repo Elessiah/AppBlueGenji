@@ -10,7 +10,14 @@ import {
   DONNEE_TOURNOIS,
   DROITS,
 } from "@/lib/shared/rgpd-policy";
-import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import {
+  ASSOCIATION_NAME,
+  ASSOCIATION_SEAT,
+  LEGAL_CONTACT_DISCORD,
+  REPORT_FORM_NAME,
+} from "@/lib/shared/legal-contact";
+import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
+import { ProtectedContact } from "@/components/ui/protected-contact";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
@@ -86,7 +93,14 @@ export default async function RgpdPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            <strong>BlueGenji</strong> — association loi 1901, siège social à Janvilliers.
+            L&apos;association <strong>{ASSOCIATION_NAME}</strong> — association loi 1901, siège
+            social : {ASSOCIATION_SEAT}.
+          </p>
+          <p>
+            Courriel :{" "}
+            <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
+            {" · "}Téléphone :{" "}
+            <ProtectedContact encoded={ASSOCIATION_PHONE_ENCODED} kind="phone" owner="de l'association" />
           </p>
           <p>
             Pour toute question relative à vos données personnelles, contactez-nous
@@ -579,16 +593,23 @@ export default async function RgpdPage() {
         <div className={styles.prose}>
           <p>
             Pour exercer l'un de vos droits ou poser une question relative au
-            traitement de vos données, contactez le responsable de traitement par
-            le formulaire « {REPORT_FORM_NAME} », présent en bas de chaque page,
-            catégorie <strong>RGPD</strong> — ou sur Discord. Nous répondons dans un
+            traitement de vos données, contactez l&apos;association par le
+            formulaire « {REPORT_FORM_NAME} », présent en bas de chaque page,
+            catégorie <strong>RGPD</strong> — ou par son courriel (section&nbsp;01),
+            ou sur Discord. Nous répondons dans un
             délai maximum d'<strong>un mois</strong> (art. 12 RGPD).
           </p>
         </div>
         <div className={styles.contactBlock} style={{ marginTop: 24 }}>
           <span className={styles.contactLabel}>Contact RGPD</span>
           <span className={styles.contactValue}>Formulaire « {REPORT_FORM_NAME} », catégorie RGPD</span>
-          <span className={styles.contactSub}>Ou sur Discord : {LEGAL_CONTACT_DISCORD}</span>
+          <span className={styles.contactSub}>
+            Ou par courriel :{" "}
+            <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
+          </span>
+          <span className={styles.contactSub}>
+            Ou sur Discord : {LEGAL_CONTACT_DISCORD} (hébergeur technique du site)
+          </span>
           <div style={{ marginTop: 12 }}>
             <ReportProblemButton
               authenticated={Boolean(user)}

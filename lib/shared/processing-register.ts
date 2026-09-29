@@ -18,7 +18,8 @@
  * code chaque fois qu'il y en a une : c'est ce qui les empêche de mentir.
  *
  * Module pur : aucune lecture d'environnement. Le contact ne comporte aucune
- * adresse électronique (`lib/shared/legal-contact.ts`).
+ * adresse en clair — il renvoie aux pages qui la révèlent au clic
+ * (`lib/shared/legal-contact.ts`).
  */
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
@@ -29,7 +30,7 @@ import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
-import { RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
+import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-10-01";
@@ -54,7 +55,7 @@ export interface RegisterController {
   name: string;
   legalForm: string;
   seat: string;
-  /** Moyens de joindre le responsable — aucune adresse électronique (`lib/shared/legal-contact.ts`). */
+  /** Moyens de joindre le responsable — aucune adresse en clair (`lib/shared/legal-contact.ts`). */
   contact: string;
   dpo: string;
   /** Hébergeur du site, sous-traitant : il héberge les données de tous les traitements. */
@@ -83,12 +84,12 @@ export interface ProcessingActivity {
 
 export function registerController(): RegisterController {
   return {
-    name: "BlueGenji",
+    name: ASSOCIATION_NAME,
     legalForm: "Association loi 1901",
-    seat: "Janvilliers (France)",
+    seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE,
     dpo: "Aucun délégué à la protection des données désigné (désignation non obligatoire) — contact RGPD ci-dessus",
-    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur un Raspberry Pi, à Caen)`,
+    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
 

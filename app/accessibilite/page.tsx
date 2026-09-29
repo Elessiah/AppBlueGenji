@@ -4,6 +4,8 @@ import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import { ASSOCIATION_EMAIL_ENCODED } from "@/lib/shared/obfuscated-contact";
+import { ProtectedContact } from "@/components/ui/protected-contact";
 import {
   ACCESSIBILITY_STANDARD,
   AUDIT_CONFORMITY_RATE,
@@ -25,12 +27,16 @@ export const metadata: Metadata = pageMetadata({
 });
 
 /**
- * Les moyens de nous joindre, repris là où une demande est proposée. Aucune
- * adresse électronique : le site n'en publie pas (`lib/shared/legal-contact.ts`).
+ * Les moyens de nous joindre, repris là où une demande est proposée. Le courriel
+ * n'y est jamais en clair : il se révèle au clic (`lib/shared/legal-contact.ts`).
  */
 function ContactList() {
   return (
     <ul>
+      <li>
+        Par courriel :{" "}
+        <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
+      </li>
       <li>
         Par le formulaire « {REPORT_FORM_NAME} », en bas de chaque page (catégorie « Autre »)
       </li>

@@ -6,6 +6,7 @@ jest.mock("@/lib/server/contact-service");
 import { GET, PUT } from "@/app/api/association/contact/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/contact-service";
+import { decodeContact, encodeContact } from "@/lib/shared/obfuscated-contact";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });
@@ -29,11 +30,17 @@ describe("GET /api/association/contact", () => {
     jest.restoreAllMocks();
   });
 
-  it("returns the contact info without auth", async () => {
+  it("returns the contact info without auth, email encoded", async () => {
     jest.mocked(service.getContactInfo).mockResolvedValue(CONTACT);
     const res = await GET();
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ contact: CONTACT });
+    const body = (await res.json()) as { contact: { emailEncoded: string } };
+    expect(body).toEqual({
+      contact: { emailEncoded: encodeContact(CONTACT.email), discordTag: "bluegenji", discordUrl: "https://discord.gg/x" },
+    });
+    // Une route anonyme ne rend jamais le courriel en clair.
+    expect(JSON.stringify(body)).not.toContain(CONTACT.email);
+    expect(decodeContact(body.contact.emailEncoded)).toBe(CONTACT.email);
   });
 });
 
