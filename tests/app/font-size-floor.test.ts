@@ -10,6 +10,11 @@
  * `font-size: 0` reste permis : c'est une technique de masquage du texte, pas
  * une taille de lecture. Les cartes d'aperçu (`components/og`) sont des images
  * rendues à 1200 px, hors du champ.
+ *
+ * Les schémas de `/regles` (`RuleDiagram.tsx`) sont écartés **nommément** :
+ * leur texte est en unités SVG, mis à l'échelle avec le schéma, et monter ses
+ * 9-10,5 unités sans refaire la mise en page ferait chevaucher les libellés —
+ * décision consignée dans `ERREUR.txt`.
  */
 import { describe, expect, it } from "@jest/globals";
 import { readdirSync, readFileSync, statSync } from "node:fs";
@@ -31,13 +36,19 @@ function walk(dir: string, out: string[] = []): string[] {
   return out;
 }
 
-const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))];
+const EXCLUDED = new Set([join(ROOT, "components", "rules", "RuleDiagram.tsx")]);
+
+const FILES = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))].filter(
+  (file) => !EXCLUDED.has(file),
+);
 
 /** Tailles littérales en px (CSS) ou nombres nus (style en ligne React). */
 const PATTERNS = [
   /font-size:\s*(\d+(?:\.\d+)?)px/g,
   /fontSize:\s*"(\d+(?:\.\d+)?)px"/g,
   /fontSize:\s*(\d+(?:\.\d+)?)\s*[,}\n]/g,
+  /fontSize=\{(\d+(?:\.\d+)?)\}/g,
+  /fontSize="(\d+(?:\.\d+)?)(?:px)?"/g,
 ];
 
 describe("plancher de taille de texte", () => {
