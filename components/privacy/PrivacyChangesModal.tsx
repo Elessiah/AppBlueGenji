@@ -60,24 +60,48 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
 
   if (!open) return null;
 
+  const record = async () => {
+    const response = await fetch("/api/profile/privacy-changes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ changeIds: changes.map((change) => change.id) }),
+    });
+    if (!response.ok) throw new Error();
+  };
+
+  const close = () => {
+    setAnswered(true);
+    window.dispatchEvent(new Event(PRIVACY_CHANGES_ANSWERED_EVENT));
+  };
+
   const acknowledge = async () => {
     if (busy) return;
     setBusy(true);
     try {
-      const response = await fetch("/api/profile/privacy-changes", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ changeIds: changes.map((change) => change.id) }),
-      });
-      if (!response.ok) throw new Error();
-      setAnswered(true);
-      window.dispatchEvent(new Event(PRIVACY_CHANGES_ANSWERED_EVENT));
+      await record();
+      close();
       showSuccess("C'est noté, merci.");
     } catch {
       showError("Ta lecture n'a pas pu être enregistrée. Réessaie dans un instant.");
     } finally {
       setBusy(false);
     }
+  };
+
+  /**
+   * Suivre un lien d'action vaut prise de connaissance, et la modale se ferme
+   * **aussitôt** : elle ne se tait que sur `/rgpd`, et attendre la réponse la
+   * laisserait couvrir l'écran même où elle envoie agir — pour de bon si
+   * l'enregistrement échoue. Un échec la fait simplement revenir au chargement
+   * suivant, ce que le message annonce. Un enregistrement déjà en cours (clic
+   * sur le bouton juste avant) n'est pas doublé.
+   */
+  const followLink = () => {
+    close();
+    if (busy) return;
+    record().catch(() => {
+      showError("Ta lecture n'a pas pu être enregistrée : ces informations te seront présentées de nouveau.");
+    });
   };
 
   return (
@@ -124,10 +148,7 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
                   <ul className={styles.changeLinks}>
                     {change.links.map((link) => (
                       <li key={link.href}>
-                        {/* Suivre le lien vaut prise de connaissance : la
-                            modale ne se tait que sur `/rgpd`, elle couvrirait
-                            sinon l'écran même où elle envoie agir. */}
-                        <Link href={link.href} onClick={() => void acknowledge()}>
+                        <Link href={link.href} onClick={followLink}>
                           {link.label}
                         </Link>
                       </li>

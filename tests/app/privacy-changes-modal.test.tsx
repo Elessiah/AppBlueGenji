@@ -94,8 +94,14 @@ describe("PrivacyChangesModal — contrats du geste", () => {
     expect(source).toContain("changeIds: changes.map((change) => change.id)");
   });
 
-  it("suivre un lien d'action vaut prise de connaissance", () => {
-    expect(source).toContain("onClick={() => void acknowledge()}");
+  it("suivre un lien d'action vaut prise de connaissance et ferme la modale sans attendre", () => {
+    expect(source).toContain("onClick={followLink}");
+    const body = source.slice(source.indexOf("const followLink = () => {"));
+    // Fermée avant l'envoi : elle ne doit pas rester sur l'écran où elle envoie.
+    expect(body.indexOf("close();")).toBeGreaterThan(-1);
+    expect(body.indexOf("close();")).toBeLessThan(body.indexOf("record()"));
+    // Pas de second enregistrement si le bouton en a déjà lancé un.
+    expect(body.indexOf("if (busy) return;")).toBeLessThan(body.indexOf("record()"));
   });
 
   it("ne touche jamais au compte : ni aperçu ni route de suppression", () => {
