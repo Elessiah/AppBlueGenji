@@ -274,6 +274,9 @@ export function ReportDetail({
       {report.contests.length > 0 && (
         <>
           <h3 className={styles.sectionTitle}>Contestations ({report.contests.length})</h3>
+          {/* Une contestation n'est jamais listée seule : son retour dû se
+              rappelle ici, sous le signalement qu'elle vise. */}
+          <p className={styles.muted}>Retour dû : {reportFollowUpDuty("CONTEST")}</p>
           <ul className={styles.contests}>
             {report.contests.map((contest) => (
               <li key={contest.id} className={styles.contest}>
