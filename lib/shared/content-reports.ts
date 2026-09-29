@@ -103,13 +103,17 @@ export interface ReportCategoryDefinition {
    * `LEGAL_OBLIGATION` : l'association est **tenue** de traiter la demande —
    * exercice d'un droit (RGPD, art. 12), notification d'un contenu illicite
    * (DSA, art. 16), demande adressée à l'hébergeur (DSA, art. 11 et 16),
-   * contestation d'une décision de modération (DSA, art. 20). Y exiger un
+   * contestation d'une décision de modération (DSA, art. 20), contenu du site
+   * signalé en modération (DSA, art. 16). Y exiger un
    * consentement subordonnait un droit à un accord qui n'est pas libre, et
    * dont le retrait ferait effacer une demande qu'elle doit traiter : aucune
    * case n'est donc demandée, le formulaire informe seulement.
    *
-   * `CONSENT` : le reste (modération des règles du site, bug, autre), où la
-   * case d'accord est gardée.
+   * La modération en fait partie : un pseudo, un nom d'équipe ou un logo
+   * haineux ou diffamatoire se signale par elle, et c'est une notification de
+   * contenu illicite comme une autre.
+   *
+   * `CONSENT` : le reste (bug, autre), où la case d'accord est gardée.
    */
   legalBasis: ReportLegalBasis;
   /** Aide du champ de description. */
@@ -137,7 +141,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
-    legalBasis: "CONSENT",
+    legalBasis: "LEGAL_OBLIGATION",
     descriptionPlaceholder: "Quel contenu du site, sur quelle page, et ce qui ne va pas…",
   },
   BUG: {
@@ -702,6 +706,7 @@ export function reportLegalBasisNotice(category: ReportCategory): string {
     case "RGPD":
       return "Base légale : l'obligation légale de répondre à une demande d'exercice des droits (RGPD, art. 6.1.c et 12). Aucun accord n'est demandé : ta demande sera traitée.";
     case "COPYRIGHT":
+    case "MODERATION":
       return "Base légale : l'obligation faite à l'hébergeur de traiter les notifications de contenu illicite (règlement européen sur les services numériques, art. 16). Aucun accord n'est demandé : ta notification sera traitée.";
     case "HOSTING":
       return "Base légale : l'obligation faite à l'hébergeur de recevoir et de traiter les demandes qui lui sont adressées, dont celles des autorités (règlement européen sur les services numériques, art. 11 et 16). Aucun accord n'est demandé : ta demande sera traitée.";
@@ -714,8 +719,14 @@ export function reportLegalBasisNotice(category: ReportCategory): string {
 
 /** Droits annoncés par le formulaire ; le retrait du consentement n'est dit que là où il existe. */
 export function reportRightsNotice(category: ReportCategory): string {
-  const withdrawal = reportRequiresConsent(category) ? ", ou retirer ton consentement" : "";
-  return `Tu peux demander l'accès, la rectification ou l'effacement de ces données${withdrawal}, par ce formulaire (catégorie « RGPD ») ou sur Discord (voir la politique de confidentialité).`;
+  const channel = "par ce formulaire (catégorie « RGPD ») ou sur Discord (voir la politique de confidentialité)";
+  if (reportRequiresConsent(category)) {
+    return `Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, ${channel}.`;
+  }
+  // L'effacement ne peut pas être promis tant que la demande doit être
+  // traitée : le traitement est alors nécessaire au respect d'une obligation
+  // légale (RGPD, art. 17.3.b).
+  return `Tu peux demander l'accès à ces données ou leur rectification ${channel} ; leur effacement, une fois la demande traitée — pas avant, l'association étant tenue de la traiter (RGPD, art. 17.3.b).`;
 }
 
 /**
@@ -759,6 +770,10 @@ export function reportFollowUpDuty(category: ReportCategory): string | null {
   switch (category) {
     case "COPYRIGHT":
       return "Notification de contenu illicite : accuser réception à l'adresse indiquée, puis notifier la décision et les voies de recours (DSA, art. 16.4 et 16.5).";
+    case "MODERATION":
+      return "Notification d'un contenu du site : si une adresse ou un compte Discord le permet, accuser réception, puis notifier la décision et les voies de recours (DSA, art. 16.4 et 16.5).";
+    case "CONTEST":
+      return "Contestation : notifier la décision motivée à la personne ou à l'équipe qui conteste, sur Discord ou à l'adresse indiquée (DSA, art. 20.5).";
     case "RGPD":
       return "Demande d'exercice des droits : répondre dans le mois (RGPD, art. 12), à l'adresse indiquée ou sur le Discord du compte.";
     case "HOSTING":

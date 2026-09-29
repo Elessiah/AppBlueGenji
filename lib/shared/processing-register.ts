@@ -482,7 +482,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Alerter les administrateurs sur Discord, sans donnée nominative",
     ],
     legalBasis:
-      "Obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de modération, de bug et autres",
+      "Obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres",
     dataSubjects: [
       "Signalants, membres ou non (titulaires de droits, représentants, visiteurs)",
       "Joueurs et membres des équipes visés par un signalement",

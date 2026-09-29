@@ -42,7 +42,7 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
 | Catégorie | Cibles | Exigences | Base légale |
 |---|---|---|---|
 | `COPYRIGHT` — Droit d'auteur | joueurs, équipes, tournois | `COPYRIGHT_NOTICE_ELEMENTS` : nom + adresse électronique, qualité (`RightsRelation`), description, déclaration de bonne foi | obligation légale (DSA, art. 16) |
-| `MODERATION` — Modération | joueurs, équipes | case d'accord | consentement |
+| `MODERATION` — Modération | joueurs, équipes | — | obligation légale (DSA, art. 16) |
 | `BUG` — Bug | aucune | case d'accord | consentement |
 | `RGPD` — RGPD | aucune | adresse, sauf compte Discord prouvé | obligation légale (RGPD, art. 6.1.c et 12) |
 | `HOSTING` — Hébergeur | aucune | adresse, sauf compte Discord prouvé | obligation légale (DSA, art. 11 et 16) |
@@ -80,11 +80,13 @@ celles qui engagent l'association.
 
 **Pas de case d'accord là où l'association est tenue de traiter**
 (`ReportCategoryDefinition.legalBasis`, `reportRequiresConsent`). Une demande
-d'exercice des droits, une notification de contenu illicite, une demande à
-l'hébergeur ou une contestation ne peuvent pas dépendre d'un « consentement » :
+d'exercice des droits, une notification de contenu illicite (droit d'auteur, ou
+modération d'un contenu du site), une demande à l'hébergeur ou une contestation
+ne peuvent pas dépendre d'un « consentement » :
 il ne serait pas libre, et son retrait ferait effacer une demande à traiter. Ces
 catégories n'affichent que l'information, `consent_at` reste `NULL` ; la case
-reste pour modération, bug et autre.
+reste pour bug et autre. Pour ces catégories, `reportRightsNotice` ne promet
+pas l'effacement avant la fin du traitement (RGPD, art. 17.3.b).
 
 **Une réponse due a toujours un canal.** `RGPD` et `HOSTING`
 (`requiresReplyChannel`) exigent une adresse électronique sauf d'un compte dont le
@@ -97,7 +99,8 @@ la question au plus large.
 accusé de réception, puis décision et voies de recours, à l'adresse indiquée
 (`NOTIFIER_FOLLOW_UP`, lu par les mentions légales, les conditions et `/rgpd`).
 Le dossier du panneau le rappelle (« Retour dû », `reportFollowUpDuty`) pour le
-droit d'auteur, le RGPD et l'hébergeur. Le **point de contact des autorités**
+droit d'auteur, la modération, le RGPD, l'hébergeur et la contestation (décision
+motivée, DSA art. 20.5). Le **point de contact des autorités**
 (art. 11) est publié dans les mentions légales : courriel protégé et catégorie
 « Hébergeur », langues `AUTHORITY_CONTACT_LANGUAGES`.
 

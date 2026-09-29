@@ -510,10 +510,10 @@ export default async function RgpdPage() {
             <li>
               <strong>Base légale</strong> : l&apos;<strong>obligation légale</strong> pour une demande
               d&apos;exercice des droits (catégorie RGPD — RGPD, art. 6.1.c et 12), une notification de
-              contenu illicite (droit d&apos;auteur — règlement européen sur les services numériques,
-              art. 16), une demande adressée à l&apos;hébergeur (art. 11 et 16) et une contestation
+              contenu illicite (droit d&apos;auteur ou modération d&apos;un contenu du site — règlement
+              européen sur les services numériques, art. 16), une demande adressée à l&apos;hébergeur (art. 11 et 16) et une contestation
               (art. 20) : aucune case d&apos;accord n&apos;y est demandée, la demande est traitée. Pour
-              les autres catégories (modération, bug, autre), le <strong>consentement</strong>,
+              les autres catégories (bug, autre), le <strong>consentement</strong>,
               recueilli par une case à l&apos;envoi et retirable par la catégorie RGPD.
             </li>
             <li>

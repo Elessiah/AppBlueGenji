@@ -156,7 +156,7 @@ describe("validateReportSubmission — refus", () => {
     ["absent", undefined],
     ["non strict", "true"],
   ])("exige le consentement %s là où la catégorie en demande un", (_label, consent) => {
-    for (const category of ["MODERATION", "BUG", "OTHER"] as const) {
+    for (const category of ["BUG", "OTHER"] as const) {
       expect(validateReportSubmission({ category, description: DESCRIPTION, consent })).toEqual({
         ok: false,
         error: "REPORT_CONSENT_REQUIRED",
@@ -457,11 +457,11 @@ describe("registre des catégories", () => {
 });
 
 describe("base légale par catégorie", () => {
-  it("ne demande de consentement que pour modération, bug et autre", () => {
-    expect(REPORT_CATEGORIES.filter(reportRequiresConsent)).toEqual(["MODERATION", "BUG", "OTHER"]);
+  it("ne demande de consentement que pour bug et autre", () => {
+    expect(REPORT_CATEGORIES.filter(reportRequiresConsent)).toEqual(["BUG", "OTHER"]);
   });
 
-  it.each(["RGPD", "COPYRIGHT", "HOSTING"] as const)(
+  it.each(["RGPD", "COPYRIGHT", "HOSTING", "MODERATION"] as const)(
     "accepte une demande %s sans case d'accord : l'association est tenue de la traiter",
     (category) => {
       const result = validateReportSubmission({
@@ -490,6 +490,8 @@ describe("base légale par catégorie", () => {
         expect(notice).toMatch(/obligation/);
         expect(notice).toMatch(/Aucun accord n'est demandé/);
         expect(reportRightsNotice(category)).not.toMatch(/consentement/);
+        // Pas d'effacement promis pendant le traitement (RGPD, art. 17.3.b).
+        expect(reportRightsNotice(category)).toMatch(/effacement, une fois la demande traitée/);
       }
     }
     expect(reportLegalBasisNotice("RGPD")).toMatch(/art\. 6\.1\.c et 12/);
@@ -511,7 +513,9 @@ describe("éléments d'une notification de droit d'auteur", () => {
     expect(reportFollowUpDuty("COPYRIGHT")).toMatch(/16\.4 et 16\.5/);
     expect(reportFollowUpDuty("RGPD")).toMatch(/mois/);
     expect(reportFollowUpDuty("HOSTING")).not.toBeNull();
-    for (const category of ["MODERATION", "BUG", "OTHER", "CONTEST"] as const) {
+    expect(reportFollowUpDuty("MODERATION")).toMatch(/16\.4 et 16\.5/);
+    expect(reportFollowUpDuty("CONTEST")).toMatch(/décision motivée.*20\.5/);
+    for (const category of ["BUG", "OTHER"] as const) {
       expect(reportFollowUpDuty(category)).toBeNull();
     }
     expect(NOTIFIER_FOLLOW_UP).toMatch(/accusé de réception.*voies de recours/);
