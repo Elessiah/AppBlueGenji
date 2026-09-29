@@ -380,7 +380,7 @@
   top: 8px;
   bottom: auto;
   left: 8px;
-  z-index: 1300;
+  z-index: 1310;
 }
 
 :global(html:has([aria-modal="true"]:not([hidden]))) .fab {

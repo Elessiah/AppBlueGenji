@@ -89,6 +89,10 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       // Les écouteurs de toutes les couches vivent sur `window` : seule celle du
       // dessus doit réagir, sinon un `Échap` les fermerait toutes d'un coup.
       if (!dialogStack.isTop(token)) return;
+      // Une couche marquée `data-dialog-exempt` (le menu d'accessibilité, offert
+      // au-dessus des modales) garde son clavier : Tab y circule, et Échap y
+      // ferme son panneau et non la modale — qui perdrait sa saisie.
+      if ((event.target as HTMLElement | null)?.closest?.("[data-dialog-exempt]")) return;
 
       if (event.key === "Escape") {
         if (lockedRef.current) return;

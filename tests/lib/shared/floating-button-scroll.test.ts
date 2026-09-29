@@ -109,12 +109,32 @@ describe("le menu d'accessibilité reste offert pendant une modale", () => {
     const root = block(String.raw`\.root`);
     expect(root).toMatch(/top:\s*8px;/);
     expect(root).toMatch(/bottom:\s*auto;/);
-    expect(Number(root.match(/z-index:\s*(\d+)/)?.[1])).toBeGreaterThan(1250);
+    // Au-dessus du voile des changements de confidentialité, qu'on ne peut pas
+    // écarter : c'est pour lui que le menu doit rester offert.
+    const privacy = stripComments(readSource("components/privacy/PrivacyChangesModal.module.css"));
+    const layers = [...privacy.matchAll(/z-index:\s*(\d+)/g)].map((m) => Number(m[1]));
+    expect(Number(root.match(/z-index:\s*(\d+)/)?.[1])).toBeGreaterThan(Math.max(1250, ...layers));
   });
 
   it("se réduit, et son panneau s'ouvre vers le bas", () => {
     expect(block(String.raw`\.fab`)).toMatch(/width:\s*36px;/);
     expect(block(String.raw`\.panel`)).toMatch(/top:\s*calc\(100% \+ \d+px\);[^]*bottom:\s*auto;/);
+  });
+});
+
+describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", () => {
+  it("est marqué comme couche exemptée du piège de la modale", () => {
+    const menu = readSource("components/accessibility/AccessibilityMenu.tsx");
+    expect(menu).toContain("a11y-always-contrast`} data-dialog-exempt>");
+  });
+
+  it("le piège de tabulation et Échap de la modale l'ignorent", () => {
+    const hook = readSource("lib/shared/hooks/useDialogBehavior.ts");
+    const exempt = hook.indexOf('closest?.("[data-dialog-exempt]")');
+    expect(exempt).toBeGreaterThan(-1);
+    // Posé avant Échap et Tab : les deux touches sont concernées.
+    expect(exempt).toBeLessThan(hook.indexOf('event.key === "Escape"'));
+    expect(exempt).toBeLessThan(hook.indexOf('event.key !== "Tab"'));
   });
 });
 

@@ -62,7 +62,7 @@ describe("AccessibilityMenu — rendu serveur", () => {
   it("se rend toujours en contraste renforcé, réglage coché ou non", () => {
     for (const settings of [[], ["contrast"]] as A11ySettingKey[][]) {
       const html = renderToStaticMarkup(<AccessibilityMenu initialSettings={settings} />);
-      expect(html).toMatch(/^<div class="root a11y-always-contrast">/);
+      expect(html).toMatch(/^<div class="root a11y-always-contrast" data-dialog-exempt="true">/);
     }
   });
 
