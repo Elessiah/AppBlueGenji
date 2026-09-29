@@ -81,7 +81,14 @@ export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
         {contact.emailEncoded && (
           <li className={styles.item}>
             <span className={styles.itemLabel}>Email</span>
-            <ProtectedContact encoded={contact.emailEncoded} kind="email" owner="de l'association" />
+            {/* `key` : une adresse révélée puis modifiée par le staff doit
+                repartir masquée, pas garder l'ancienne valeur décodée. */}
+            <ProtectedContact
+              key={contact.emailEncoded}
+              encoded={contact.emailEncoded}
+              kind="email"
+              owner="de l'association"
+            />
           </li>
         )}
         {contact.discordTag && (

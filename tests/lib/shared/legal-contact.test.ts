@@ -166,7 +166,9 @@ describe("éditeur et moyens de le joindre", () => {
     const footer = readSource("components/cyber/landing/PublicFooter.tsx");
     expect(footer).toContain("initialContact={toPublicContact(contact)}");
     const contact = readSource("components/cyber/landing/FooterContact.tsx");
-    expect(contact).toContain("<ProtectedContact encoded={contact.emailEncoded}");
+    expect(contact).toContain("encoded={contact.emailEncoded}");
+    // Une adresse modifiée repart masquée : le composant est remonté sur sa valeur.
+    expect(contact).toContain("key={contact.emailEncoded}");
     expect(contact).not.toContain("mailto:");
   });
 
