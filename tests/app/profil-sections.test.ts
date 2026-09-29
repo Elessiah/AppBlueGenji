@@ -200,15 +200,25 @@ describe("La page rejoue le saut vers l'ancre", () => {
     expect(page).toContain("profileSectionIdFromHash(window.location.hash)");
   });
 
-  it("le lit une seule fois, au montage, et non à chaque rafraîchissement", () => {
+  it("le lit une seule fois, et non à chaque rafraîchissement", () => {
     // `data` est remplacé à chaque sauvegarde : relire `window.location.hash`
     // à ce moment-là ramènerait le lecteur à l'ancre cliquée bien plus tôt.
+    expect(page.match(/profileSectionIdFromHash\(window\.location\.hash\)/g)).toHaveLength(1);
+    expect(page).toMatch(
+      /if \(requestedSection\.current === undefined\) \{\s*requestedSection\.current = profileSectionIdFromHash\(window\.location\.hash\);/,
+    );
+    // Le saut honoré (ou l'absence d'ancre constatée) arrête toute relecture.
+    expect(page).toContain("if (!data || sectionHonoured.current) return;");
+  });
+
+  it("le lit une fois le profil chargé, pas au montage", () => {
+    // Arrivé d'une autre page par un lien client, le composant est monté avant
+    // que Next ne pousse la nouvelle URL : l'initialiseur lisait l'ancien fragment.
+    expect(page).not.toMatch(/useState<string \| null>\(\(\) =>\s*typeof window === "undefined" \? null : profileSectionIdFromHash/);
+    const guard = page.indexOf("if (!data || sectionHonoured.current) return;");
     const capture = page.indexOf("profileSectionIdFromHash(window.location.hash)");
-    const effect = page.indexOf("sectionHonoured.current = true");
-    expect(capture).toBeLessThan(effect);
-    expect(page).toContain("useState<string | null>(() =>");
-    const effectBody = page.slice(page.indexOf("if (!data || !requestedSection"), effect);
-    expect(effectBody).not.toContain("window.location.hash");
+    expect(guard).toBeGreaterThan(-1);
+    expect(guard).toBeLessThan(capture);
   });
 
   it("indexe par le registre total et non par la liste filtrée", () => {

@@ -275,25 +275,35 @@ export default function ProfilePage() {
    * de la page. Les liens de la navigation marchaient, eux, parce qu'on clique
    * forcément après la réponse.
    *
-   * L'ancre demandée est lue **une seule fois, au montage**, et non à chaque
-   * passage de l'effet : `window.location.hash` garde le dernier lien cliqué,
-   * et `data` est remplacé à chaque sauvegarde — relire le fragment aurait
-   * remonté le lecteur à la section qu'il avait visitée dix minutes plus tôt au
-   * moment où il enregistre son profil depuis une autre.
+   * L'ancre demandée est lue **une seule fois**, au premier passage de
+   * l'effet où le profil est chargé, et non à chaque passage : `window.location.hash`
+   * garde le dernier lien cliqué, et `data` est remplacé à chaque sauvegarde —
+   * relire le fragment aurait remonté le lecteur à la section qu'il avait
+   * visitée dix minutes plus tôt au moment où il enregistre son profil depuis
+   * une autre. Pas au montage non plus : arrivé par un lien d'une autre page
+   * (la modale des changements de confidentialité), le composant est monté
+   * **avant** que Next ne pousse la nouvelle URL, et l'initialiseur y lisait
+   * encore le fragment — vide — de la page quittée.
    */
-  const [requestedSection] = useState<string | null>(() =>
-    typeof window === "undefined" ? null : profileSectionIdFromHash(window.location.hash),
-  );
+  const requestedSection = useRef<string | null | undefined>(undefined);
   const sectionHonoured = useRef(false);
   useEffect(() => {
-    if (!data || !requestedSection || sectionHonoured.current) return;
+    if (!data || sectionHonoured.current) return;
+    if (requestedSection.current === undefined) {
+      requestedSection.current = profileSectionIdFromHash(window.location.hash);
+    }
+    const sectionId = requestedSection.current;
+    if (!sectionId) {
+      sectionHonoured.current = true;
+      return;
+    }
     // Une section conditionnelle peut n'être pas encore là : on retentera au
     // prochain rendu plutôt que de tenir le saut pour fait.
-    const target = document.getElementById(requestedSection);
+    const target = document.getElementById(sectionId);
     if (!target) return;
     sectionHonoured.current = true;
     target.scrollIntoView({ block: "start" });
-  }, [data, invitations.length, requestedSection]);
+  }, [data, invitations.length]);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
