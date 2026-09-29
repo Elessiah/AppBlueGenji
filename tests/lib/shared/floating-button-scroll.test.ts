@@ -133,8 +133,18 @@ describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", ()
     const exempt = hook.indexOf('closest?.("[data-dialog-exempt]")');
     expect(exempt).toBeGreaterThan(-1);
     // Posé avant Échap et Tab : les deux touches sont concernées.
-    expect(exempt).toBeLessThan(hook.indexOf('event.key === "Escape"'));
+    expect(exempt).toBeLessThan(hook.indexOf('if (lockedRef.current) return;'));
     expect(exempt).toBeLessThan(hook.indexOf('event.key !== "Tab"'));
+  });
+
+  it("ne l'exempte que panneau ouvert, et rend le focus à la modale quand Tab en sort", () => {
+    const hook = readSource("lib/shared/hooks/useDialogBehavior.ts");
+    const block = hook.slice(hook.indexOf('closest?.("[data-dialog-exempt]")'), hook.indexOf("if (lockedRef.current) return;"));
+    expect(block).toContain(`if (layer?.querySelector('[aria-expanded="true"]')) {`);
+    expect(block).toMatch(/if \(event\.key === "Escape"\) return;/);
+    // Au bord de la couche, la touche retombe dans le piège : `inside` est faux,
+    // le focus repart en tête (ou en queue) de la modale.
+    expect(block).toMatch(/const edge = event\.shiftKey \? own\[0\] : own\[own\.length - 1\];\s*if \(event\.target !== edge\) return;/);
   });
 });
 

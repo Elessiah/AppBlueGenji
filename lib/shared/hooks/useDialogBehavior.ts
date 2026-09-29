@@ -72,10 +72,11 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
     // le conteneur (rendu focalisable par `tabIndex={-1}` côté appelant). Le
     // champ marqué est pris **parmi** les focalisables : désactivé ou masqué,
     // `focus()` échouerait en silence et laisserait le focus derrière le voile.
-    const focusables = () =>
-      Array.from(containerRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
+    const focusablesIn = (root: Element | null) =>
+      Array.from(root?.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR) ?? []).filter(
         (el) => el.offsetParent !== null || el === document.activeElement,
       );
+    const focusables = () => focusablesIn(containerRef.current);
     const candidates = focusables();
     const preferred = candidates.find((el) => el.hasAttribute("data-autofocus"));
     // Un bouton « × » d'en-tête (`data-dialog-close`) vient en tête du DOM pour
@@ -90,9 +91,20 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       // dessus doit réagir, sinon un `Échap` les fermerait toutes d'un coup.
       if (!dialogStack.isTop(token)) return;
       // Une couche marquée `data-dialog-exempt` (le menu d'accessibilité, offert
-      // au-dessus des modales) garde son clavier : Tab y circule, et Échap y
-      // ferme son panneau et non la modale — qui perdrait sa saisie.
-      if ((event.target as HTMLElement | null)?.closest?.("[data-dialog-exempt]")) return;
+      // au-dessus des modales) garde son clavier **tant que son panneau est
+      // ouvert** (`aria-expanded="true"`) : Échap y ferme le panneau et non la
+      // modale — qui perdrait sa saisie —, et Tab y circule, jusqu'à ce qu'il en
+      // sorte : il revient alors dans la modale, jamais sur la page derrière le
+      // voile. Panneau fermé, la couche est traitée comme le reste de la page.
+      const layer = (event.target as HTMLElement | null)?.closest?.("[data-dialog-exempt]") ?? null;
+      if (layer?.querySelector('[aria-expanded="true"]')) {
+        if (event.key === "Escape") return;
+        if (event.key === "Tab") {
+          const own = focusablesIn(layer);
+          const edge = event.shiftKey ? own[0] : own[own.length - 1];
+          if (event.target !== edge) return;
+        }
+      }
 
       if (event.key === "Escape") {
         if (lockedRef.current) return;
