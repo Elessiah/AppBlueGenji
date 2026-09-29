@@ -142,13 +142,13 @@ export function moderationPush(input: {
   };
 }
 
-/** Des changements du traitement des données attendent l'accord du joueur. */
+/** Des changements du traitement des données sont à lire — une information, aucun accord n'est demandé. */
 export function privacyChangePush(titles: readonly string[]): PushContent {
   const first = titles[0] ?? "Traitement de tes données";
   const more = titles.length > 1 ? ` (et ${titles.length - 1} autre${titles.length > 2 ? "s" : ""})` : "";
   return {
     title: "Tes données : ce qui change",
-    body: `${first}${more}. Lis-le et donne ta réponse à ta prochaine visite.`,
+    body: `${first}${more}. Le détail t'attend à ta prochaine visite.`,
     url: "/rgpd",
     tag: "privacy-change",
   };
