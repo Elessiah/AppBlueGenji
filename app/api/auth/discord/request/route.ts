@@ -73,8 +73,8 @@ export async function POST(req: Request) {
     const throttled = enforceRateLimit(DISCORD_CODE_REQUEST_RULE, discordId);
     if (throttled) return throttled;
 
-    // Le tag part avec le défi : c'est lui qui sera certifié si le code
-    // revient juste (`consumeDiscordChallenge`). Un identifiant numérique n'en
+    // Le tag part avec le défi : c'est lui qui sera enregistré (non certifié)
+    // si le code revient juste (`consumeDiscordChallenge`). Un identifiant numérique n'en
     // est pas un, `normalizeDiscordHandle` le laisse tomber.
     const challenge = await createDiscordLoginChallenge(discordId, handle);
 

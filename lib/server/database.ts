@@ -223,6 +223,11 @@ async function runMigrations(db: Pool): Promise<void> {
   // sur les rattachements antérieurs à la colonne : ils ne se classent pas après
   // coup (`lib/shared/account-connections.ts`).
   //
+  // `discord_pseudo_from_discord` dit d'où vient `discord_pseudo` : `1` quand
+  // Discord l'a nommé (connexion, rattachement, code reçu), `0` pour une saisie.
+  // C'est la condition de la certification **en un clic** d'un compte rattaché
+  // (`certifyLinkedDiscordTag`) : on n'y certifie jamais ce qu'un joueur a tapé.
+  //
   // `visible_pseudo` survit sans lecteur : le pseudo n'est plus masquable (c'est
   // l'identité de base du joueur : brackets, rosters, feuilles de match), la
   // colonne est conservée pour ne pas casser les installs.
@@ -235,6 +240,7 @@ async function runMigrations(db: Pool): Promise<void> {
       discord_pseudo VARCHAR(64) NULL,
       discord_verified_at DATETIME NULL,
       discord_link_method ENUM('DM_CODE', 'OAUTH') NULL,
+      discord_pseudo_from_discord TINYINT(1) NOT NULL DEFAULT 0,
       google_sub VARCHAR(191) NULL UNIQUE,
       blizzard_sub VARCHAR(191) NULL UNIQUE,
       is_adult TINYINT(1) NULL DEFAULT NULL,
@@ -1352,6 +1358,13 @@ async function runMigrations(db: Pool): Promise<void> {
     // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles
     // ont reçu un message.
     `ALTER TABLE bg_report_targets ADD COLUMN notified_at DATETIME NULL AFTER label_snapshot`,
+    // Origine du tag Discord : la connexion n'en certifie plus aucun, elle
+    // l'enregistre, et un compte rattaché certifie d'un clic — un pseudo
+    // **nommé par Discord** seulement. `0` par défaut et **aucun remplissage** :
+    // on ne sait pas quels tags anciens ont été tapés à la main. Un tag déjà
+    // certifié n'a de toute façon plus rien à certifier.
+    `ALTER TABLE bg_users ADD COLUMN discord_pseudo_from_discord TINYINT(1) NOT NULL DEFAULT 0
+       AFTER discord_link_method`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

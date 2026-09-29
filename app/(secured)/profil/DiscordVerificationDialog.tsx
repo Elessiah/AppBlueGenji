@@ -30,25 +30,26 @@ const FIELD_IDS = { handle: "discord-verify-handle", code: "discord-verify-code"
  * règle qui l'applique), et le bouton de confirmation ne vient qu'après. C'est un
  * consentement, pas une formalité.
  *
- * **Deux parcours, selon ce que le compte a déjà prouvé.** Un compte sans
+ * **Trois parcours, selon ce que le compte a déjà prouvé.** Un compte sans
  * Discord rattaché envoie son tag au bot, qui le retrouve parmi les membres des
  * serveurs qu'il partage avec lui, puis confirme par le code reçu en message
- * privé. Un compte **déjà relié** ne passe plus du tout par le bot : il repart
- * chez Discord (`/api/auth/discord/start?intent=link`), qui nomme lui-même le
- * pseudo de l'identité déjà rattachée, et le rattachement le réécrit certifié.
- *
- * La recherche par le bot était un contresens pour ce second cas : un compte
- * venu par OAuth n'a jamais eu besoin de partager un serveur avec le bot, si
- * bien que la recherche balayait **tous** ses serveurs sans trouver personne —
- * assez longtemps pour dépasser le délai de l'appel, que le site rendait alors en
- * « bot non joignable ». Et même aboutie, elle aurait répondu « tag
- * introuvable ». On demandait au bot de prouver ce que Discord atteste déjà.
+ * privé. Un compte **déjà relié** dont Discord a nommé le pseudo à la connexion
+ * certifie **d'un clic** : la preuve est faite, il ne manque que le
+ * consentement — ni bot, ni code, ni aller-retour. Un compte relié sans pseudo
+ * nommé par Discord (retiré, ou tapé à la main avant le rattachement) repart
+ * chez Discord (`/api/auth/discord/start?intent=link`), qui le nomme ; il revient
+ * ensuite le certifier.
  */
 export type DiscordVerificationDialogProps = {
   /** Tag actuellement saisi dans le formulaire, proposé d'emblée. */
   initialTag: string;
   /** Un identifiant Discord est-il déjà rattaché au compte ? */
   linked: boolean;
+  /**
+   * Le tag enregistré a-t-il été nommé par Discord ? Un compte rattaché le
+   * certifie alors d'un clic ; sinon il repasse par Discord pour qu'il le nomme.
+   */
+  attested: boolean;
   onClose: () => void;
   /** Appelé avec le tag certifié, pour que la page se remette à jour. */
   onVerified: (tag: string) => void;
@@ -57,6 +58,7 @@ export type DiscordVerificationDialogProps = {
 export function DiscordVerificationDialog({
   initialTag,
   linked,
+  attested,
   onClose,
   onVerified,
 }: DiscordVerificationDialogProps) {
@@ -217,8 +219,9 @@ export function DiscordVerificationDialog({
         </h2>
 
         <p style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 14px" }}>
-          {DISCORD_VERIFICATION_PURPOSE} La certification est <strong>facultative</strong> : sans
-          elle, ton tag reste invisible pour tout le monde, administrateurs compris.
+          {DISCORD_VERIFICATION_PURPOSE} La certification est <strong>facultative</strong> et
+          ne se fait que par ce geste — se connecter par Discord ne la donne pas : sans elle, ton
+          tag reste invisible pour tout le monde, administrateurs compris.
         </p>
 
         <p
@@ -250,16 +253,34 @@ export function DiscordVerificationDialog({
           ))}
         </ul>
 
-        {linked ? (
+        {linked && attested && initialTag ? (
+          <form onSubmit={requestVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {/* Le pseudo a déjà été nommé par Discord à ta connexion : la preuve
+                est faite, ce clic ne donne que le consentement. Le tag est
+                montré tel qu'il sera exposé — c'est lui, et rien d'autre. */}
+            <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
+              Pseudo donné par Discord à ta dernière connexion : <strong>{initialTag}</strong>. Il
+              suffit de confirmer — ni code, ni nouvelle autorisation Discord.
+            </p>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <CyberButton variant="ghost" type="button" onClick={onClose}>
+                Annuler
+              </CyberButton>
+              <CyberButton variant="primary" type="submit" disabled={loading}>
+                {loading ? "Certification…" : "Certifier ce tag"}
+              </CyberButton>
+            </div>
+          </form>
+        ) : linked ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {/* `--ink-mute` et non `--ink-dim` : c'est la seule phrase qui dit
                 pourquoi le bouton quitte la page, elle doit se lire avant le
                 clic. */}
             <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
-              Ton compte est déjà relié à Discord : c&apos;est Discord qui confirme ton pseudo. Tu
-              passes par sa page d&apos;autorisation, avec le compte Discord déjà relié, puis tu
-              reviens ici avec ton pseudo certifié — sans code ni serveur commun avec le bot. Un
-              pseudo fait uniquement de chiffres n&apos;est pas certifiable.
+              Ton compte est relié à Discord, mais aucun pseudo donné par Discord n&apos;est
+              enregistré. Passe par sa page d&apos;autorisation, avec le compte Discord déjà relié :
+              il nommera ton pseudo, que tu pourras ensuite certifier ici d&apos;un clic. Un pseudo
+              fait uniquement de chiffres n&apos;est pas certifiable.
             </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
               <CyberButton variant="ghost" type="button" onClick={onClose}>

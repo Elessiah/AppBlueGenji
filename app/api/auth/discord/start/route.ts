@@ -2,7 +2,8 @@
  * Départ de l'aller-retour OAuth Discord.
  *
  * **À ne pas confondre avec `../request`**, qui envoie le code à six chiffres en
- * message privé. Les deux ouvrent le même compte, et les deux certifient le tag ;
+ * message privé. Les deux ouvrent le même compte, et les deux enregistrent le
+ * tag — sans le certifier, geste distinct fait depuis le profil ;
  * celle-ci ne demande rien au bot, donc fonctionne pour qui n'est pas sur le
  * serveur BlueGenji.
  *

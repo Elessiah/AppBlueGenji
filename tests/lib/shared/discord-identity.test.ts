@@ -260,11 +260,12 @@ describe("les textes de consentement", () => {
     expect(joined).not.toContain("modifiant ton tag");
   });
 
-  it("disent que le retrait ne tient pas face à une connexion par Discord", () => {
-    // Se connecter par Discord certifie le tag tout seul : annoncer une
-    // annulation définitive serait promettre ce que le site ne tient pas.
+  it("disent qu'une connexion par Discord réenregistre le tag sans le recertifier", () => {
+    // Le retrait tient désormais : la connexion enregistre le pseudo, seul le
+    // geste de certification l'ouvre de nouveau.
     const joined = DISCORD_VERIFICATION_EXPOSURE.join(" ").toLowerCase();
-    expect(joined).toMatch(/prochaine connexion par discord/);
+    expect(joined).toMatch(/connexion par discord réenregistre ensuite ton pseudo, mais sans le certifier/);
+    expect(joined).not.toMatch(/jusqu'à ta prochaine connexion/);
   });
 
   it("nomment les parties d'un match et la durée de l'exposition", () => {

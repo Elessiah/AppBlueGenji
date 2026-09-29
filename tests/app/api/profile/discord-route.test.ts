@@ -75,7 +75,7 @@ describe("garde d'accès", () => {
   });
 
   it("ne demande **aucune** permission : c'est son propre compte", async () => {
-    stateMock.mockResolvedValue({ tag: null, verified: false, linked: false });
+    stateMock.mockResolvedValue({ tag: null, verified: false, linked: false, attested: false });
 
     expect((await GET()).status).toBe(200);
   });
@@ -217,6 +217,10 @@ describe("traduction des refus", () => {
     // tag, ou rester sur son compte de connexion).
     ["DISCORD_ID_MISMATCH", 409],
     ["DISCORD_ALREADY_LINKED", 409],
+    ["DISCORD_NOT_LINKED", 409],
+    ["DISCORD_TAG_MISSING", 409],
+    ["DISCORD_TAG_NOT_ATTESTED", 409],
+    ["DISCORD_TAG_CHANGED", 409],
     ["CODE_INVALID_OR_EXPIRED", 401],
     ["DISCORD_USER_NOT_FOUND", 404],
     ["PROFILE_NOT_FOUND", 404],

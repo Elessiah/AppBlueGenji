@@ -5,16 +5,16 @@
  * et `/verify`), qui reste en place et qui sert un autre cas : le joueur *déjà
  * présent sur le serveur BlueGenji*, à qui le bot sait écrire en message privé.
  * Les deux chemins aboutissent au même endroit — `createOrGetDiscordUser`, donc
- * le même compte, le même `discord_id`, le même **tag certifié**.
+ * le même compte, le même `discord_id`, le même tag enregistré.
  *
- * **Pourquoi la certification est acquise ici.** La certification demande une
- * preuve que le compte Discord revendiqué appartient bien au joueur
- * (`lib/shared/discord-identity.ts`). Un aller-retour OAuth mené jusqu'au bout
- * *est* cette preuve, et une meilleure que le code : c'est Discord lui-même qui
- * nomme l'identifiant et le pseudo, là où le code ne fait que prouver l'accès
- * aux messages privés d'un identifiant que le site avait résolu de son côté. Le
- * pseudo relu ici n'est donc jamais celui que le client renvoie — il ne renvoie
- * rien.
+ * **La connexion prouve, elle ne certifie pas.** Un aller-retour OAuth mené
+ * jusqu'au bout prouve que le compte Discord appartient bien au joueur — c'est
+ * Discord lui-même qui nomme l'identifiant et le pseudo, et le pseudo relu ici
+ * n'est donc jamais celui que le client renvoie (il ne renvoie rien). Mais la
+ * certification est aussi un **consentement** à l'exposition du tag
+ * (`lib/shared/discord-identity.ts`), et se connecter n'en est pas un : le tag
+ * est enregistré non certifié, et le joueur le certifie d'un clic sur `/profil`
+ * — ce clic-là ne redemande aucune preuve, celle-ci est faite.
  *
  * **Portée demandée : `identify`, et c'est tout.** Ni `email` (plus rien ne
  * rattache un compte par son adresse), ni `guilds` (le site n'a pas à savoir sur

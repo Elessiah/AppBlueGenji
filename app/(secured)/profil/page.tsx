@@ -108,7 +108,9 @@ export default function ProfilePage() {
     tag: string | null;
     verified: boolean;
     linked: boolean | null;
-  }>({ tag: null, verified: false, linked: null });
+    /** Tag nommé par Discord : certifiable d'un clic sur un compte rattaché. */
+    attested: boolean;
+  }>({ tag: null, verified: false, linked: null, attested: false });
   // Le tag **tel qu'il est enregistré**, indépendamment de ce qui est tapé : il
   // décide si la sauvegarde a quelque chose à dire sur ce champ. Sans lui, la
   // seule façon de le savoir était l'état du verrou — un renseignement que
@@ -166,7 +168,12 @@ export default function ProfilePage() {
     try {
       const res = await fetch("/api/profile/discord", { cache: "no-store" });
       if (!res.ok) return;
-      const payload = (await res.json()) as { tag: string | null; verified: boolean; linked: boolean };
+      const payload = (await res.json()) as {
+        tag: string | null;
+        verified: boolean;
+        linked: boolean;
+        attested: boolean;
+      };
       // Une lecture dépassée n'écrit rien : ce qu'elle a vu est plus vieux que
       // ce que l'écran affiche déjà.
       if (seq !== discordReadSeq.current) return;
@@ -388,7 +395,7 @@ export default function ProfilePage() {
    */
   const onDiscordTagRemove = async () => {
     if (!window.confirm(
-      "Retirer ton tag Discord ? L'organisation ne pourra plus te joindre pendant un tournoi.\n\nAttention : ta prochaine connexion par Discord le réenregistrera automatiquement, certifié. Pour ne plus être joignable durablement, entre par une autre porte.",
+      "Retirer ton tag Discord ? L'organisation ne pourra plus te joindre pendant un tournoi.\n\nTa prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera invisible de tous tant que tu ne le certifieras pas de nouveau.",
     )) {
       return;
     }
@@ -417,7 +424,7 @@ export default function ProfilePage() {
       // administrateurs le voient » à côté d'un champ qu'on vient de vider. La
       // réponse du `PATCH` porte déjà la vérité — le tag est parti, donc la
       // certification avec (toute modification du tag la défait).
-      setDiscordState((prev) => ({ ...prev, tag: null, verified: false }));
+      setDiscordState((prev) => ({ ...prev, tag: null, verified: false, attested: false }));
       await loadDiscordState();
       showSuccess("Tag Discord retiré.");
     } catch (e) {
@@ -602,11 +609,12 @@ export default function ProfilePage() {
       )}
       {verifyOpen && (
         <DiscordVerificationDialog
-          initialTag={discordPseudo}
+          initialTag={discordState.linked === true ? (discordState.tag ?? "") : discordPseudo}
           /* L'inconnu n'est pas un rattachement : le dialogue n'est de toute
              façon atteignable qu'avec un état lu, ses deux boutons étant sous
              un `linked` connu. */
           linked={discordState.linked === true}
+          attested={discordState.attested}
           onClose={() => setVerifyOpen(false)}
           onVerified={(tag) => {
             setVerifyOpen(false);
@@ -618,7 +626,7 @@ export default function ProfilePage() {
             // `PATCH` en 409, exactement ce que cette référence existe pour
             // empêcher.
             setSavedDiscordPseudo(tag);
-            setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true }));
+            setDiscordState((prev) => ({ ...prev, tag, verified: true, linked: true, attested: true }));
           }}
         />
       )}
@@ -843,10 +851,10 @@ export default function ProfilePage() {
                       className="btn"
                       onClick={() => setVerifyOpen(true)}
                       /* Sans tag enregistré il n'y a rien à *certifier* : le
-                         geste est d'en poser un — et il se prouve tout seul,
-                         le dialogue renvoyant un compte rattaché chez Discord,
-                         qui nomme le pseudo et le rattachement l'écrit
-                         certifié. */
+                         geste est d'en poser un — le dialogue renvoie alors
+                         chez Discord, qui nomme le pseudo, que le joueur
+                         certifie ensuite d'un clic. Avec un tag nommé par
+                         Discord, le dialogue certifie d'un clic. */
                       aria-label={
                         discordState.tag
                           ? "Certifier mon tag Discord"

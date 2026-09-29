@@ -225,8 +225,12 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
     );
 
     const update = find(statements, "UPDATE bg_users SET discord_id")!;
-    expect(update.sql).toContain("discord_verified_at = NOW()");
-    expect(update.params).toEqual(["123456789012345678", "nouveau_tag", 7]);
+    // Réécrit et marqué « nommé par Discord », jamais certifié : un pseudo
+    // qui change fait même tomber la certification d'avant.
+    expect(update.sql).not.toContain("discord_verified_at = NOW()");
+    expect(update.sql).toContain("WHEN discord_pseudo <=> ? THEN discord_verified_at ELSE NULL END");
+    expect(update.sql).toContain("discord_pseudo_from_discord = 1");
+    expect(update.params).toEqual(["123456789012345678", "nouveau_tag", "nouveau_tag", 7]);
   });
 
   it("refuse une identité déjà prise par un autre compte du site", async () => {
@@ -252,14 +256,16 @@ describe("linkOAuthIdentity — on ne déplace jamais une porte", () => {
     await expect(linkOAuthIdentity(7, identity())).rejects.toThrow("IDENTITY_ALREADY_LINKED");
   });
 
-  it("certifie le tag Discord en le rattachant", async () => {
+  it("enregistre le tag Discord en le rattachant, sans le certifier", async () => {
+    // Rattacher une porte n'est pas consentir à l'exposition du tag.
     const { statements } = fakeDb(emptyRow);
 
     await expect(linkOAuthIdentity(7, identity())).resolves.toBe("LINKED");
 
     const update = find(statements, "UPDATE bg_users SET discord_id")!;
     expect(update.sql).toContain("discord_pseudo = ?");
-    expect(update.sql).toContain("discord_verified_at = NOW()");
+    expect(update.sql).toContain("discord_pseudo_from_discord = 1");
+    expect(update.sql).not.toContain("NOW()");
   });
 
   it("rattache sans certifier quand le pseudo n'est qu'une suite de chiffres", async () => {
@@ -398,7 +404,10 @@ describe("unlinkOAuthIdentity — on ne mure jamais la dernière", () => {
 
     const update = find(statements, "discord_id = NULL")!;
     expect(update.sql).toContain("discord_verified_at = NULL");
-    expect(update.sql).not.toContain("discord_pseudo");
+    expect(update.sql).not.toMatch(/discord_pseudo\s*=/);
+    // Le pseudo reste, mais son origine part : un autre Discord rattaché
+    // ensuite ne doit pas le certifier d'un clic.
+    expect(update.sql).toContain("discord_pseudo_from_discord = 0");
   });
 
   it("garde le BattleTag en retirant Blizzard", async () => {

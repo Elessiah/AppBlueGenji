@@ -11,12 +11,13 @@
  * (`lib/shared/oauth-providers.ts`), donc même l'oubli d'un `<a>` n'est plus
  * possible.
  *
- * **Discord en tête, et ce n'est pas décoratif** : c'est la seule porte qui
- * certifie le tag au passage, donc celle qui évite au joueur une démarche
- * ultérieure sur `/profil`. La phrase sous le bouton le dit avant le clic —
- * annoncer l'exposition après coup serait la subir.
+ * **Discord en tête** : c'est la porte qui enregistre le tag Discord au
+ * passage, que le joueur n'a plus qu'à certifier d'un clic sur `/profil` s'il
+ * veut être joignable. La phrase sous le bouton le dit avant le clic — qu'elle
+ * **ne certifie pas**, et qui lirait le tag une fois certifié.
  */
 import { CyberButton } from "@/components/cyber/CyberButton";
+import { DISCORD_LOGIN_TAG_NOTICE } from "@/lib/shared/identity-sharing";
 import {
   OAUTH_PROVIDER_LABELS,
   OAUTH_PROVIDER_SLUGS,
@@ -29,7 +30,7 @@ const LOGIN_ORDER: readonly OAuthProvider[] = ["DISCORD", "GOOGLE", "BLIZZARD"];
 
 /** Ce que chaque porte apporte en plus d'une session, dit en une ligne. */
 const PROVIDER_NOTES: Partial<Record<OAuthProvider, string>> = {
-  DISCORD: "Certifie ton tag Discord : l'organisation peut te joindre pendant un tournoi.",
+  DISCORD: DISCORD_LOGIN_TAG_NOTICE,
   BLIZZARD: "Renseigne ton BattleTag automatiquement.",
 };
 

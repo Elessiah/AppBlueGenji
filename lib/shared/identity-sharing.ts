@@ -32,6 +32,18 @@ export const DISCORD_TAG_AUDIENCE =
   "les administrateurs le voient, les arbitres tant que tu es engagé dans un tournoi, et les joueurs et le caster de ton match le temps de la rencontre, à partir de son lancement ; les autres joueurs, seulement si tu le rends visible dans tes réglages de confidentialité. Jamais personne d'autre.";
 
 /**
+ * Ce que la connexion par Discord fait du pseudo — dit **sous le bouton**, avant
+ * le clic, et au-dessus du code reçu en message privé.
+ *
+ * Se connecter **n'est pas** certifier : la connexion enregistre le pseudo que
+ * Discord donne, invisible de tous, et la certification — qui ouvre le tag à
+ * l'organisation — reste un geste distinct, sur `/profil`. La phrase dit les
+ * deux, et qui lirait le tag une fois certifié, pour que le joueur sache ce que
+ * ce geste-là ouvrirait avant d'avoir à le faire.
+ */
+export const DISCORD_LOGIN_TAG_NOTICE = `Enregistre ton pseudo Discord sans le certifier : il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite d'un clic dans « Mon profil », ${DISCORD_TAG_AUDIENCE}`;
+
+/**
  * Ce que la case « Tag Discord » des réglages de visibilité ouvre, et ce
  * qu'elle n'ouvre pas.
  *

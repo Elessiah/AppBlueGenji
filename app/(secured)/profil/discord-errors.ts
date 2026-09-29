@@ -19,6 +19,17 @@ const VERIFICATION_ERRORS: Record<string, string> = {
   DISCORD_ALREADY_LINKED:
     "Ce compte Discord est déjà certifié par un autre compte du site. Contacte l'organisation si c'est bien le tien.",
 
+  // Certification en un clic d'un compte rattaché : l'état a changé sous
+  // l'écran, ou le tag n'est pas de ceux que Discord a nommés.
+  DISCORD_NOT_LINKED:
+    "Ton compte n'est plus relié à Discord. Recharge la page pour certifier ton tag par code.",
+  DISCORD_TAG_MISSING:
+    "Aucun tag n'est enregistré : reconnecte Discord pour qu'il nomme ton pseudo, puis certifie-le.",
+  DISCORD_TAG_NOT_ATTESTED:
+    "Ce tag n'a pas été donné par Discord : reconnecte Discord pour qu'il nomme ton pseudo, puis certifie-le.",
+  DISCORD_TAG_CHANGED:
+    "Ton tag Discord vient de changer. Recharge la page pour voir celui que tu certifies.",
+
   DISCORD_USER_NOT_FOUND:
     "Tag introuvable : le bot doit partager un serveur avec toi. Rejoins le serveur BlueGenji, puis réessaie.",
   DISCORD_DM_FAILED:

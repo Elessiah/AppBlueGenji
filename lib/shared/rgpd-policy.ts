@@ -1,6 +1,16 @@
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 
-export type LegalBase = "Consentement" | "Intérêt légitime";
+/**
+ * Bases légales citées par la politique — les mêmes que le registre
+ * (`processing-register.ts`) : une donnée n'a qu'une base.
+ *
+ * **Le compte et l'authentification reposent sur le contrat** (art. 6.1.b) : un
+ * consentement demandé pour des données sans lesquelles le compte n'existe pas
+ * ne serait pas libre (art. 7.4). Le **consentement** est réservé à ce que le
+ * joueur choisit en plus — une certification qui l'expose, une donnée
+ * facultative qu'il renseigne et publie.
+ */
+export type LegalBase = "Exécution du contrat" | "Consentement" | "Intérêt légitime";
 
 export interface DonneEntry {
   donnee: string;
@@ -23,7 +33,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // et Blizzard donnent un pseudonyme de jeu (tag, BattleTag sans son numéro).
     finalite:
       "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil. Un compte créé par Google avant le 30 septembre 2026 a pu recevoir le nom de ton compte Google : si c'est le cas, remplace-le dans Mon profil",
-    base: "Consentement",
+    base: "Exécution du contrat",
     duree: "Durée du compte",
   },
   {
@@ -45,23 +55,25 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // uniquement à deux publics. La phrase dit les deux régimes, parce que les
     // deux existent en base au même instant — et le troisième public, les autres
     // joueurs, qui n'existe que si le titulaire coche « Tag Discord ».
+    //
+    // Deux bases, donc deux lignes : l'enregistrement du pseudo sert la
+    // connexion (contrat), son **exposition** repose sur la certification
+    // (consentement, ligne suivante).
     finalite:
-      "Authentification Discord, notifications bot. Une fois certifié : contact par l'organisation pendant un tournoi (administrateurs en permanence, arbitres tant que le joueur est engagé) et entre les parties d'un match (joueurs des deux équipes et caster), de son lancement à sa fin ; visible des autres joueurs connectés seulement si tu coches « Tag Discord » dans Mon profil. Non certifié : visible de son seul titulaire, case cochée ou non",
-    base: "Consentement",
+      "Authentification Discord, notifications bot. Enregistré à ta connexion par Discord, ou saisi par toi (compte sans Discord rattaché) ; sans certification, invisible de tous, administrateurs compris",
+    base: "Exécution du contrat",
     duree: "Durée du compte",
   },
   {
     donnee: "Certification du pseudo Discord",
-    // **Les deux chemins sont nommés.** Le second se produit sans qu'on le
-    // demande : se connecter par Discord *est* la preuve, donc le tag ressort
-    // certifié de la connexion. Une déclaration qui ne parlerait que du bouton
-    // de `/profil` laisserait croire que l'exposition suppose toujours un geste
-    // délibéré — et un membre qui entre toujours par Discord ne verrait jamais
-    // cette page-là.
+    // **Un geste distinct, et le seul.** Se connecter par Discord ne la donne
+    // plus : s'authentifier n'est pas consentir à une exposition, et le refuser
+    // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
+    // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Atteste que le compte Discord appartient bien au joueur ; conditionne l'exposition du tag à l'organisation. Obtenue depuis Mon profil, ou automatiquement en te connectant par Discord. Perdue dès que le tag est modifié",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs en permanence, arbitres tant que tu es engagé dans un tournoi, joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
-    duree: "Jusqu'à modification du tag, ou durée du compte",
+    duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },
   {
     donnee: "ID Discord",
@@ -70,7 +82,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // que c'est ce qui explique qu'on ne puisse pas retirer le dernier.
     finalite:
       "Moyen de connexion (bouton Discord, ou code reçu en message privé) — stocké uniquement si tu rattaches Discord. Sert aussi au bot pour t'écrire en message privé (rappels de match, demande d'adhésion à une équipe que tu gères). Retirable depuis Mon profil tant qu'il t'en reste un autre",
-    base: "Consentement",
+    base: "Exécution du contrat",
     duree: "Durée du compte",
   },
   {
@@ -82,14 +94,14 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // personne.
     finalite:
       "Moyen de connexion (bouton Google) — identifiant technique opaque. Aucune adresse e-mail n'est demandée ni conservée, et le nom de ton compte Google n'est pas repris. Retirable depuis Mon profil tant qu'il t'en reste un autre",
-    base: "Consentement",
+    base: "Exécution du contrat",
     duree: "Durée du compte",
   },
   {
     donnee: "Identifiant Blizzard",
     finalite:
       "Moyen de connexion (bouton Blizzard) — identifiant technique opaque. Renseigne et tient à jour ton BattleTag. Retirable depuis Mon profil tant qu'il t'en reste un autre",
-    base: "Consentement",
+    base: "Exécution du contrat",
     duree: "Durée du compte",
   },
   {

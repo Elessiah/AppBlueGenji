@@ -8,39 +8,64 @@ import { join } from "node:path";
  * la propriété qui compte est de structure — quel chemin prend un compte déjà
  * relié à Discord.
  *
- * Il passait par la résolution du tag **par le bot**, qui balaie les serveurs
- * qu'il partage avec le joueur. Un compte venu par OAuth Discord, ou par un code
- * demandé avec son identifiant numérique, n'en partage souvent aucun : la
- * recherche les parcourait tous, dépassait le délai, et le profil annonçait
- * « bot non joignable ».
+ * La connexion ne certifie plus le tag : elle l'enregistre, nommé par Discord.
+ * Un compte relié certifie donc **d'un clic** ce pseudo-là — ni bot (qui ne
+ * retrouve pas un compte venu par OAuth), ni code, ni aller-retour OAuth. Seul
+ * un compte relié **sans** pseudo nommé par Discord repasse chez Discord.
  */
 const dialog = readFileSync(
   join(process.cwd(), "app/(secured)/profil/DiscordVerificationDialog.tsx"),
   "utf8",
 );
+const page = readFileSync(join(process.cwd(), "app/(secured)/profil/page.tsx"), "utf8");
 
-/** La branche rendue quand le compte porte déjà un `discord_id`. */
-function linkedBranch(): string {
-  const start = dialog.indexOf("{linked ? (");
-  const end = dialog.indexOf(") : !awaitingCode ? (");
+function slice(from: string, to: string): string {
+  const start = dialog.indexOf(from);
+  const end = dialog.indexOf(to);
   expect(start).toBeGreaterThan(-1);
   expect(end).toBeGreaterThan(start);
   return dialog.slice(start, end);
 }
 
-describe("certification d'un compte déjà relié à Discord", () => {
-  it("repart chez Discord, en rattachement, au lieu d'interroger le bot", () => {
-    expect(linkedBranch()).toContain('oauthStartPath("DISCORD", { intent: "LINK" })');
+/** Compte relié dont Discord a nommé le pseudo : un clic. */
+const oneClickBranch = () => slice("{linked && attested && initialTag ? (", ") : linked ? (");
+/** Compte relié sans pseudo nommé par Discord : retour chez Discord. */
+const relinkBranch = () => slice(") : linked ? (", ") : !awaitingCode ? (");
+
+describe("certification d'un compte relié dont Discord a nommé le pseudo", () => {
+  it("certifie d'un clic, par la route de certification, sans quitter la page", () => {
+    const branch = oneClickBranch();
+    expect(branch).toContain("onSubmit={requestVerification}");
+    expect(branch).not.toContain("oauthStartPath");
+    expect(branch).not.toContain("<input");
   });
 
-  it("n'envoie aucun tag au bot et n'attend aucun code", () => {
-    const branch = linkedBranch();
-    expect(branch).not.toContain("onSubmit");
-    expect(branch).not.toContain("fetch(");
+  it("montre le tag qui sera exposé, et rien d'autre", () => {
+    expect(oneClickBranch()).toContain("<strong>{initialTag}</strong>");
   });
 
-  it("navigue par un lien : l'aller-retour OAuth quitte la page", () => {
-    expect(linkedBranch()).toMatch(/<a href=\{oauthStartPath/);
+  it("la page lui passe le tag **enregistré**, pas celui du champ", () => {
+    expect(page).toContain(
+      'initialTag={discordState.linked === true ? (discordState.tag ?? "") : discordPseudo}',
+    );
+    expect(page).toContain("attested={discordState.attested}");
+  });
+});
+
+describe("certification d'un compte relié sans pseudo nommé par Discord", () => {
+  it("repart chez Discord, en rattachement, pour qu'il nomme le pseudo", () => {
+    expect(relinkBranch()).toContain('oauthStartPath("DISCORD", { intent: "LINK" })');
+    expect(relinkBranch()).toMatch(/<a href=\{oauthStartPath/);
+  });
+
+  it("dit qu'il faudra revenir certifier : le retour ne certifie rien", () => {
+    expect(relinkBranch()).toMatch(/certifier ici\s+d&apos;un clic/);
+  });
+});
+
+describe("ce que le dialogue ne promet plus", () => {
+  it("dit que la connexion ne donne pas la certification", () => {
+    expect(dialog).toMatch(/se connecter par Discord ne la donne pas/);
   });
 
   it("ne promet plus une certification « immédiate » par le bot", () => {

@@ -2,8 +2,9 @@
  * Certification du tag Discord du compte connecté.
  *
  * Deux verbes, un seul objet : `POST` ouvre la certification (et la **termine**
- * sur place quand l'identifiant Discord est déjà prouvé), `PUT` la confirme avec
- * le code reçu. La règle vit dans `lib/server/discord-verification.ts` ; la
+ * d'un clic quand un Discord est rattaché — le corps ne porte alors que le tag
+ * montré, en garde, jamais une valeur écrite), `PUT` la confirme avec le code
+ * reçu. La règle vit dans `lib/server/discord-verification.ts` ; la
  * route ne fait que garder l'accès, plafonner et traduire en HTTP.
  *
  * Aucun `DELETE` : la certification **se perd avec le tag**, par
@@ -44,6 +45,12 @@ function statusFor(message: string): number {
     // trancher (corriger son tag, ou rester sur son compte de connexion).
     case "DISCORD_ID_MISMATCH":
     case "DISCORD_ALREADY_LINKED":
+    // Certification en un clic d'un compte rattaché : l'état du compte a changé
+    // sous l'écran, ou le tag n'est pas de ceux que Discord a nommés.
+    case "DISCORD_NOT_LINKED":
+    case "DISCORD_TAG_MISSING":
+    case "DISCORD_TAG_NOT_ATTESTED":
+    case "DISCORD_TAG_CHANGED":
       return 409;
     case "CODE_INVALID_OR_EXPIRED":
       return 401;

@@ -18,6 +18,7 @@ jest.mock("@/lib/server/users-service", () => {
 });
 
 import {
+  certifyLinkedDiscordTag,
   confirmDiscordVerification,
   getDiscordAccountState,
   startDiscordVerification,
@@ -36,7 +37,7 @@ import { fakePool } from "../../helpers/sql-double";
  *
  * Quatre propriétés, et chacune correspond à une panne qu'on veut interdire :
  *
- * 1. **un compte déjà relié se certifie sans code** — lui en redemander un
+ * 1. **un compte déjà relié se certifie d'un clic** — lui redemander une preuve
  *    rejouerait une preuve qu'on détient ;
  * 2. **on ne déplace jamais une porte d'entrée** — `discord_id` est un moyen de
  *    connexion, un tag qui résout ailleurs est refusé, pas rattaché ;
@@ -52,6 +53,7 @@ type UserState = {
   discord_id: string | null;
   discord_pseudo: string | null;
   discord_verified_at: Date | null;
+  discord_pseudo_from_discord: number;
 };
 
 const resolveMock = resolveDiscordUser as jest.MockedFunction<typeof resolveDiscordUser>;
@@ -72,12 +74,24 @@ function fakeDb(state: UserState, otherAccountHolds: string | null = null) {
   const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
     const q = String(sql).replace(/\s+/g, " ").trim();
 
-    if (q.startsWith("SELECT discord_id, discord_pseudo, discord_verified_at")) {
+    if (q.startsWith("SELECT discord_id, discord_pseudo, discord_verified_at, discord_pseudo_from_discord")) {
       return [[{ ...state }]];
     }
 
     if (q.startsWith("SELECT id FROM bg_users WHERE discord_id = ? AND id <> ?")) {
       return [otherAccountHolds !== null && params[0] === otherAccountHolds ? [{ id: 1234 }] : []];
+    }
+
+    // Certification en un clic : rejoue les conditions du `WHERE`, qui sont
+    // toute la règle — rattaché, pseudo nommé par Discord, même tag.
+    if (q.startsWith("UPDATE bg_users SET discord_verified_at = COALESCE(discord_verified_at, NOW())")) {
+      writes.push({ sql: q, params });
+      const matches =
+        state.discord_id !== null &&
+        state.discord_pseudo_from_discord === 1 &&
+        state.discord_pseudo === params[1];
+      if (matches) state.discord_verified_at ??= new Date("2026-09-20T12:00:00Z");
+      return [{ affectedRows: matches ? 1 : 0 }];
     }
 
     if (q.startsWith("UPDATE bg_users")) {
@@ -86,6 +100,7 @@ function fakeDb(state: UserState, otherAccountHolds: string | null = null) {
       state.discord_id = state.discord_id ?? String(params[0]);
       state.discord_pseudo = String(params[1]);
       state.discord_verified_at = new Date("2026-09-20T12:00:00Z");
+      state.discord_pseudo_from_discord = 1;
       return [{ affectedRows: 1 }];
     }
 
@@ -100,12 +115,15 @@ const GOOGLE_ACCOUNT: UserState = {
   discord_id: null,
   discord_pseudo: null,
   discord_verified_at: null,
+  discord_pseudo_from_discord: 0,
 };
 
+/** Compte relié dont la connexion a enregistré le pseudo nommé par Discord. */
 const LINKED_ACCOUNT: UserState = {
   discord_id: "900000000000000001",
-  discord_pseudo: null,
+  discord_pseudo: "keryan",
   discord_verified_at: null,
+  discord_pseudo_from_discord: 1,
 };
 
 beforeEach(() => {
@@ -121,32 +139,85 @@ beforeEach(() => {
 });
 
 describe("startDiscordVerification — le compte déjà relié à Discord", () => {
-  it("certifie sur place, sans message privé", async () => {
-    // « La pression d'un bouton » : l'identifiant a été prouvé à la connexion,
-    // le site n'a plus qu'à vérifier que le tag saisi le désigne.
+  it("certifie d'un clic le pseudo nommé par Discord : ni bot, ni code", async () => {
+    // La preuve est faite à la connexion ; le clic n'apporte que le
+    // consentement.
     const db = fakeDb({ ...LINKED_ACCOUNT });
-    resolveMock.mockResolvedValue("900000000000000001");
 
     const result = await startDiscordVerification(7, "keryan");
 
     expect(result).toEqual({ status: "VERIFIED", tag: "keryan" });
+    expect(resolveMock).not.toHaveBeenCalled();
     expect(createChallengeMock).not.toHaveBeenCalled();
     expect(sendMock).not.toHaveBeenCalled();
-    expect(db.state.discord_pseudo).toBe("keryan");
     expect(db.state.discord_verified_at).not.toBeNull();
   });
 
-  it("refuse un tag qui désigne un autre compte Discord, sans rien écrire", async () => {
-    // On ne déplace jamais une porte d'entrée : `discord_id` est un moyen de
-    // connexion, le rattacher ailleurs déplacerait la serrure.
+  it("n'écrit jamais le tag envoyé par le client, il ne sert que de garde", async () => {
     const db = fakeDb({ ...LINKED_ACCOUNT });
-    resolveMock.mockResolvedValue("111111111111111111");
 
-    await expect(startDiscordVerification(7, "quelquun_dautre")).rejects.toThrow(
-      "DISCORD_ID_MISMATCH",
+    await startDiscordVerification(7, "keryan");
+
+    const [update] = db.writes;
+    expect(update.sql).not.toMatch(/discord_pseudo\s*=\s*\?,/);
+    expect(update.sql).toContain("AND discord_pseudo = ?");
+    expect(update.sql).toContain("AND discord_pseudo_from_discord = 1");
+    expect(update.sql).toContain("AND discord_id IS NOT NULL");
+    expect(update.sql).toContain("is_deleted = 0");
+    expect(update.params).toEqual([7, "keryan"]);
+  });
+
+  it("refuse un tag que l'écran montrait mais qui a changé depuis", async () => {
+    // Une connexion depuis un autre appareil a réenregistré un autre pseudo.
+    const db = fakeDb({ ...LINKED_ACCOUNT, discord_pseudo: "nouveau_pseudo" });
+
+    await expect(startDiscordVerification(7, "keryan")).rejects.toThrow("DISCORD_TAG_CHANGED");
+    expect(db.state.discord_verified_at).toBeNull();
+  });
+
+  it("refuse un tag tapé à la main : il n'a pas été nommé par Discord", async () => {
+    const db = fakeDb({ ...LINKED_ACCOUNT, discord_pseudo_from_discord: 0 });
+
+    await expect(startDiscordVerification(7, "keryan")).rejects.toThrow(
+      "DISCORD_TAG_NOT_ATTESTED",
     );
-    expect(db.writes).toHaveLength(0);
-    expect(createChallengeMock).not.toHaveBeenCalled();
+    expect(db.state.discord_verified_at).toBeNull();
+    expect(resolveMock).not.toHaveBeenCalled();
+  });
+
+  it("refuse quand aucun tag n'est enregistré", async () => {
+    fakeDb({ ...LINKED_ACCOUNT, discord_pseudo: null });
+
+    await expect(startDiscordVerification(7, "")).rejects.toThrow("DISCORD_TAG_MISSING");
+  });
+
+  it("ne rejette pas un tag déjà certifié : le geste est idempotent", async () => {
+    const certifiedAt = new Date("2026-01-01T00:00:00Z");
+    const db = fakeDb({ ...LINKED_ACCOUNT, discord_verified_at: certifiedAt });
+
+    await expect(startDiscordVerification(7, "keryan")).resolves.toEqual({
+      status: "VERIFIED",
+      tag: "keryan",
+    });
+    // `COALESCE` : la date d'origine n'est pas réécrite.
+    expect(db.state.discord_verified_at).toBe(certifiedAt);
+  });
+});
+
+describe("certifyLinkedDiscordTag", () => {
+  it("dit qu'un compte détaché entre-temps n'a plus de Discord", async () => {
+    fakeDb({ ...GOOGLE_ACCOUNT, discord_pseudo: "keryan", discord_pseudo_from_discord: 1 });
+
+    await expect(certifyLinkedDiscordTag(7, "keryan")).rejects.toThrow("DISCORD_NOT_LINKED");
+  });
+
+  it("dit qu'un compte supprimé est introuvable", async () => {
+    const { execute } = fakeDb({ ...LINKED_ACCOUNT });
+    execute.mockImplementation(async (sql: string) =>
+      String(sql).includes("UPDATE") ? [{ affectedRows: 0 }] : [[]],
+    );
+
+    await expect(certifyLinkedDiscordTag(7, "keryan")).rejects.toThrow("PROFILE_NOT_FOUND");
   });
 });
 
@@ -239,12 +310,15 @@ describe("confirmDiscordVerification", () => {
     // l'écriture elle-même doit le refuser : une porte d'entrée ne se déplace
     // pas, même par accident.
     const db = fakeDb({ ...LINKED_ACCOUNT });
-    resolveMock.mockResolvedValue("900000000000000001");
+    consumeMock.mockResolvedValue({ handle: "keryan" });
 
-    await startDiscordVerification(7, "keryan");
+    await confirmDiscordVerification(7, "900000000000000001", "123456");
 
     expect(db.state.discord_id).toBe("900000000000000001");
     expect(db.writes[0].sql).toContain("discord_id = COALESCE(discord_id, ?)");
+    // Et la méthode d'un rattachement déjà noué n'est pas réécrite.
+    expect(db.writes[0].sql).toContain("discord_link_method = COALESCE(discord_link_method, ?)");
+    expect(db.writes[0].sql).toContain("discord_pseudo_from_discord = 1");
   });
 
   it("refuse un code faux sans rien écrire", async () => {
@@ -287,25 +361,39 @@ describe("getDiscordAccountState", () => {
       discord_id: "900000000000000001",
       discord_pseudo: "keryan",
       discord_verified_at: new Date("2026-09-01T00:00:00Z"),
+      discord_pseudo_from_discord: 1,
     });
 
     expect(await getDiscordAccountState(7)).toEqual({
       tag: "keryan",
       verified: true,
       linked: true,
+      attested: true,
     });
   });
 
   it("distingue « tag saisi » de « tag prouvé »", async () => {
     // C'est l'état de tous les comptes d'avant la certification : un tag en
     // base, aucune preuve, et donc aucune exposition.
-    fakeDb({ discord_id: null, discord_pseudo: "tag_non_prouve", discord_verified_at: null });
+    fakeDb({
+      discord_id: null,
+      discord_pseudo: "tag_non_prouve",
+      discord_verified_at: null,
+      discord_pseudo_from_discord: 0,
+    });
 
     expect(await getDiscordAccountState(7)).toEqual({
       tag: "tag_non_prouve",
       verified: false,
       linked: false,
+      attested: false,
     });
+  });
+
+  it("ne dit pas « nommé par Discord » sans tag", async () => {
+    fakeDb({ ...LINKED_ACCOUNT, discord_pseudo: null });
+
+    expect((await getDiscordAccountState(7)).attested).toBe(false);
   });
 });
 

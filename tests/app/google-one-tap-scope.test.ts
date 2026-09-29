@@ -52,7 +52,38 @@ describe("Google One Tap — périmètre de chargement", () => {
     // laisserait partir le script avant la lecture du stockage.
     expect(form).toMatch(/useState\(true\)/);
     expect(form).toMatch(/const \[consentRead, setConsentRead\] = useState\(false\)/);
-    expect(form).toMatch(/oneTap && consentRead && consentGiven && \(/);
+    // Et seulement si la case « Google One Tap » a été cochée : c'est le seul
+    // consentement de la page, décoché par défaut.
+    expect(form).toMatch(/oneTap && consentRead && consentGiven && oneTapAllowed && \(/);
+    expect(form).toMatch(/const \[oneTapAllowed, setOneTapAllowed\] = useState\(false\)/);
+    expect(form).toMatch(/setOneTapAllowed\(oneTapChoice === "1"\)/);
+  });
+
+  it("la case One Tap est décochée par défaut, et un refus efface un accord antérieur", () => {
+    const modal = source("components", "cyber", "RgpdConsentModal.tsx");
+    expect(modal).toMatch(/const \[oneTapChecked, setOneTapChecked\] = useState\(false\)/);
+    expect(modal).toContain("onAccept({ oneTap: oneTapAvailable && oneTapChecked })");
+    const form = source("app", "connexion", "_components", "LoginForm.tsx");
+    expect(form).toContain("window.localStorage.removeItem(ONE_TAP_STORAGE_KEY)");
+    expect(source("app", "rgpd", "page.tsx")).toContain("bg_one_tap_consent");
+  });
+
+  it("la modale ne propose la case que si l'invite peut s'afficher", () => {
+    // Sans `GOOGLE_CLIENT_ID`, un accord recueilli pour rien ne se retirerait
+    // nulle part : la carte ne montre pas sa case.
+    const modal = source("components", "cyber", "RgpdConsentModal.tsx");
+    expect(modal).toContain("{oneTapAvailable && (");
+    expect(modal).toContain("onAccept({ oneTap: oneTapAvailable && oneTapChecked })");
+    const form = source("app", "connexion", "_components", "LoginForm.tsx");
+    expect(form).toContain("oneTapAvailable={oneTap !== null}");
+    expect(form).toContain("if (oneTap) setOneTapChoice(allowOneTap);");
+  });
+
+  it("le choix reste modifiable sur la carte, après la modale : retirer est aussi simple qu'accorder", () => {
+    const form = source("app", "connexion", "_components", "LoginForm.tsx");
+    expect(form).toContain("onChange={(event) => setOneTapChoice(event.target.checked)}");
+    // Présente sur les deux états de la carte (avant et après la demande de code).
+    expect(form.match(/\{oneTapToggle\}/g)).toHaveLength(2);
     expect(form).toMatch(/setConsentRead\(true\)/);
   });
 

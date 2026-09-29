@@ -108,34 +108,53 @@ réutilisée telle quelle, avec ses deux bornes en base (cinq essais par code, c
 codes par quart d'heure, cf. `docs/AUTHORIZATION_RULES.md` §1.1). Un second
 mécanisme de secret, moins éprouvé, n'aurait rien apporté.
 
-Deux chemins, une seule règle :
+**La connexion prouve, elle ne certifie pas.** Se connecter par Discord — bouton
+OAuth ou code en message privé — prouve que le compte Discord appartient au
+joueur, mais s'authentifier n'est pas consentir à l'exposition que la
+certification ouvre : un consentement doit être un geste spécifique, et le
+refuser ne doit pas coûter la porte d'entrée (RGPD, art. 4.11 et 7.4). La
+connexion **enregistre** donc le dernier pseudo que Discord a donné, **non
+certifié** — invisible de tous, comme tout tag non certifié — et marque son
+origine (`bg_users.discord_pseudo_from_discord = 1`, par
+`DISCORD_NAMED_PSEUDO_SQL`, partagé par `createOrGetDiscordUser` et
+`linkOAuthIdentity`). Une certification déjà donnée **survit** si le pseudo ne
+change pas, et **tombe** s'il change : le joueur a consenti à exposer ce
+pseudo-là.
 
-- **Compte déjà relié à Discord** (né par l'OAuth, par le code en message
-  privé, ou certifié une première fois) : la preuve existe, il l'a faite en
-  ouvrant sa session. Le dialogue le renvoie **chez Discord**
-  (`/api/auth/discord/start?intent=link`) : le rattachement retrouve la même
-  identité, ne déplace aucune porte, et réécrit certifié le pseudo que Discord
-  nomme (`linkOAuthIdentity` rend alors `REFRESHED`, et le profil annonce
-  « Discord reconfirmé » plutôt qu'un rattachement qui n'a pas eu lieu). Aucun
-  appel au bot.
+Trois cas pour certifier, tous depuis `/profil` :
+
+- **Compte relié à Discord, pseudo nommé par Discord** (né par l'OAuth, par le
+  code en message privé, ou rattaché depuis « Applications connectées ») : la
+  preuve existe, il ne manque que le consentement. **Un clic** sur « Certifier
+  mon tag » suffit (`certifyLinkedDiscordTag`) — ni aller-retour OAuth, ni code,
+  ni bot. Le site certifie le pseudo **que Discord a nommé**, jamais une saisie :
+  le client n'envoie que le tag qu'il affichait, qui sert de garde
+  (`DISCORD_TAG_CHANGED` si une connexion depuis un autre appareil l'a remplacé
+  entre-temps). Une seule instruction, conditions comprises (`discord_id` posé,
+  origine Discord, même tag, compte vivant) ; la relecture ne fait que nommer le
+  refus (`DISCORD_NOT_LINKED`, `DISCORD_TAG_MISSING`, `DISCORD_TAG_NOT_ATTESTED`,
+  tous en 409).
+- **Compte relié, tag sans origine Discord** — aucun tag (retiré, ou pseudo
+  Discord entièrement numérique), ou tag **tapé à la main** avant le
+  rattachement (dont tous les tags antérieurs à la colonne, ajoutée à `0` sans
+  remplissage : on ne sait pas lesquels l'ont été) : le dialogue renvoie **chez
+  Discord** (`/api/auth/discord/start?intent=link`), qui nomme le pseudo ; le
+  joueur revient le certifier d'un clic.
 - **Compte sans Discord rattaché** : rien n'a été prouvé. Le bot résout le tag,
-  code en message privé, puis confirmation.
+  code en message privé, puis confirmation — qui pose `discord_id` et certifie
+  d'un même geste, le dialogue ayant énoncé l'exposition avant.
 
-### Pourquoi un compte relié ne passe plus par le bot
+L'origine se **perd** quand le tag est saisi (`updateOwnProfile`), quand
+Discord est détaché (le pseudo reste, mais un autre Discord rattaché ensuite ne
+doit pas certifier d'un clic le pseudo de l'ancien) et à l'anonymisation.
 
-Il y passait : le site envoyait le tag au bot et vérifiait qu'il résolvait vers
-l'identifiant déjà rattaché. Or le bot ne résout un tag qu'en cherchant parmi les
-membres des serveurs **qu'il partage** avec le joueur, un serveur après l'autre.
-Un compte venu par OAuth Discord — ou par un code demandé avec son identifiant
-numérique, le repli prévu justement pour qui n'est sur aucun de ces serveurs —
-n'en partage souvent aucun : la recherche les parcourait **tous**, dépassait les
-trois secondes de l'appel, et le profil annonçait « bot non joignable ». Aboutie,
-elle aurait de toute façon répondu « tag introuvable ». On demandait au bot de
-prouver ce que Discord atteste lui-même en un aller-retour.
-
-Le chemin serveur (`startDiscordVerification` qui conclut sur place quand le tag
-résout vers l'identifiant rattaché) est **conservé** : il reste une preuve juste,
-et un compte rattaché entre l'ouverture du profil et le clic y aboutit encore.
+**Comptes certifiés automatiquement avant la règle** : leurs certifications
+sont **gardées**. Les défaire en silence fermerait des inscriptions (condition
+« Discord vérifié ») et couperait l'arbitrage en plein tournoi ; les garder
+sans rien dire laisserait une exposition que personne n'a choisie. L'entrée
+`2026-09-certification-discord-volontaire` de `PRIVACY_CHANGES` le signale à
+leur titulaire, avec le geste qui la retire (retirer son tag : la connexion
+suivante le réenregistre non certifié).
 
 **« Trop lent » n'est plus « injoignable ».** Une **résolution de tag** qui
 dépasse son délai lève désormais `BOT_RESOLVE_TIMEOUT` (504), distinct de
@@ -162,21 +181,13 @@ et ne propose le retrait qu'ensuite — l'inverse pousserait à détacher la bon
 identité. Un pseudo Discord fait uniquement de chiffres reste non certifiable par
 ce chemin comme par les autres, et le dialogue le dit avant le clic.
 
-**Se connecter par Discord certifie le tag**, sans le moindre geste
-supplémentaire : la route de connexion **consomme** le défi
-(`consumeDiscordChallenge`) au lieu de le vérifier, récupère le tag qui a servi à
-résoudre l'identifiant, et `createOrGetDiscordUser` l'écrit certifié. Tous les
-comptes nés par cette porte se certifient donc à leur prochaine connexion, sans
-migration.
-
-**L'exposition est donc annoncée sur les deux chemins, pas seulement dans le
-dialogue.** C'est le seul endroit où la certification se produit sans qu'on l'ait
-demandée : un membre qui entre toujours par Discord et n'avait jamais rempli le
-champ « Pseudo Discord » verrait son handle devenir lisible par les
-administrateurs et l'arbitrage. La deuxième étape de `/connexion` porte donc la
-phrase — ce que la certification ouvre, à qui, et le geste qui l'annule — et
-`lib/shared/rgpd-policy.ts` déclare les **deux** voies. Le geste d'annulation
-existait déjà ; encore faut-il savoir qu'il y a quelque chose à annuler.
+**L'exposition est annoncée avant chaque geste.** Sous le bouton Discord de
+`/connexion` et au-dessus du code (`DISCORD_LOGIN_TAG_NOTICE`) : la connexion
+enregistre le tag sans le certifier, et la phrase dit qui le lirait une fois
+certifié. Dans le dialogue de certification : chaque public et sa portée
+(`DISCORD_VERIFICATION_EXPOSURE`). `lib/shared/rgpd-policy.ts` fonde
+l'enregistrement du pseudo sur le contrat, et la certification sur le
+consentement.
 
 ### Le tag écrit est celui du défi, jamais celui du client
 
@@ -215,7 +226,8 @@ la course entre deux certifications simultanées.
 
 ## Ce qui défait la certification
 
-> **Toute modification du tag la fait perdre.**
+> **Toute modification du tag la fait perdre** — saisie à la main, ou pseudo
+> différent nommé par Discord à la connexion (`DISCORD_NAMED_PSEUDO_SQL`).
 
 Elle ne dit pas « ce compte a un Discord » (c'est `discord_id`) mais « le tag
 stocké a été prouvé » : un tag réécrit n'a rien prouvé. `updateOwnProfile` pose le
@@ -245,8 +257,8 @@ ferait d'un compte anonymisé un compte « vérifié » sans tag.
 Deux façons d'écrire `bg_users.discord_pseudo` coexistaient sans se connaître :
 la **saisie libre** de `/profil`, que la certification vient prouver ensuite, et
 le **rattachement OAuth** — connexion par Discord ou ajout de Discord dans
-« Applications connectées » —, qui écrit le pseudo que Discord nomme lui-même et
-le pose certifié (`linkOAuthIdentity`).
+« Applications connectées » —, qui écrit le pseudo que Discord nomme lui-même,
+**non certifié**, prêt à être certifié d'un clic (`linkOAuthIdentity`).
 
 Laisser la première ouverte une fois la seconde faite ne pouvait produire que du
 faux. Le champ invitait à réécrire à la main une donnée que le fournisseur venait
@@ -322,7 +334,7 @@ lettres plutôt que de laisser croire à un chargement raté.
 
 Le refus **nomme les deux gestes qui le lèvent**, et seulement ceux qui existent
 toujours : se renommer sur Discord puis se reconnecter (la connexion réécrit le
-tag et le recertifie), ou **retirer son tag** — le geste d'annulation de
+tag, non certifié — à certifier de nouveau d'un clic), ou **retirer son tag** — le geste d'annulation de
 l'exposition, que la route accepte parce qu'il n'efface rien d'autre. Détacher
 Discord depuis « Applications connectées » rend bien le tag à la saisie libre
 (`unlinkOAuthIdentity`), mais la phrase ne le nomme pas : ce n'est pas un geste
@@ -367,8 +379,8 @@ et sa sortie (recharger), sans affirmer un rattachement que rien n'établit.
   tag : posés sur le tag, ils disparaissaient tous les deux à l'état que le
   retrait vient de produire (rattaché, sans tag), ne laissant qu'une reconnexion
   par Discord. Sans tag enregistré le bouton dit « Enregistrer mon tag » : il n'y
-  a rien à *certifier*, et le geste se prouve seul — le dialogue renvoie chez
-  Discord, qui nomme le pseudo, et le rattachement l'écrit certifié.
+  a rien à *certifier* — le dialogue renvoie chez Discord, qui nomme le pseudo,
+  que le joueur certifie ensuite d'un clic.
   **Le formulaire ne soumet que ce qu'il a changé** : il renvoyait le tag de son
   instantané de montage à chaque sauvegarde, si bien qu'un tag réécrit ailleurs
   entre-temps (renommage sur Discord puis connexion depuis un autre appareil)

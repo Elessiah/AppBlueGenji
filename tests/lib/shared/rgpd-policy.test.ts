@@ -60,43 +60,41 @@ describe("DONNEES_PROFIL", () => {
     expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);
   });
 
-  it("dit les deux régimes du tag Discord : certifié exposé, non certifié privé", () => {
-    // La finalité a changé avec la certification, et une déclaration restée sur
-    // l'ancienne serait fausse : le tag certifié est une coordonnée de contact
-    // exposée à l'organisation. Les deux régimes coexistent en base, la phrase
-    // doit donc nommer les deux.
+  it("dit que le tag Discord enregistré à la connexion n'est pas certifié, donc privé", () => {
     const tag = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Discord");
-    expect(tag?.finalite).toMatch(/certifié/i);
-    expect(tag?.finalite).toMatch(/arbitres?/i);
-    expect(tag?.finalite).toMatch(/Non certifié/i);
+    expect(tag?.finalite).toMatch(/Enregistré à ta connexion par Discord, ou saisi par toi/);
+    expect(tag?.finalite).toMatch(/sans certification, invisible de tous, administrateurs compris/);
   });
 
-  it("déclare le public choisi du tag Discord : les autres joueurs, sur la case « Tag Discord »", () => {
-    // La politique fait foi : la case ouvre un public que la modale annonce,
-    // `/rgpd` doit le nommer aussi.
-    const tag = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Discord");
-    expect(tag?.finalite).toMatch(/autres joueurs connectés/i);
-    expect(tag?.finalite).toContain("« Tag Discord »");
-  });
-
-  it("déclare la certification elle-même, et qu'elle se perd", () => {
+  it("déclare, sur la certification, chaque public qu'elle ouvre — et celui qu'on choisit", () => {
     const certification = DONNEES_PROFIL.find(
       (d) => d.donnee === "Certification du pseudo Discord",
     );
-    expect(certification?.finalite).toMatch(/modifié/i);
+    expect(certification?.finalite).toMatch(/administrateurs en permanence/i);
+    expect(certification?.finalite).toMatch(/arbitres/i);
+    expect(certification?.finalite).toMatch(/caster de ton match/i);
+    expect(certification?.finalite).toMatch(/autres joueurs connectés/i);
+    expect(certification?.finalite).toContain("« Tag Discord »");
   });
 
-  it("nomme les **deux** chemins de certification, dont celui qui n'est pas demandé", () => {
-    // Se connecter par Discord certifie le tag tout seul (c'est la preuve
-    // même), donc l'exposition peut commencer sans qu'aucun bouton ait été
-    // pressé. Une déclaration qui ne parlerait que de « Mon profil » laisserait
-    // croire à un geste toujours délibéré — et un membre qui entre toujours par
-    // Discord ne visite peut-être jamais cette page.
+  it("déclare que la certification se retire, et qu'elle se perd au changement de pseudo", () => {
+    const certification = DONNEES_PROFIL.find(
+      (d) => d.donnee === "Certification du pseudo Discord",
+    );
+    expect(certification?.finalite).toMatch(/retirant ton tag/i);
+    expect(certification?.finalite).toMatch(/pseudo change/i);
+  });
+
+  it("dit que la certification est un geste du joueur, que la connexion ne donne pas", () => {
+    // La base « Consentement » ne tient que si le geste est distinct : se
+    // connecter est un acte d'authentification, pas un consentement.
     const certification = DONNEES_PROFIL.find(
       (d) => d.donnee === "Certification du pseudo Discord",
     );
     expect(certification?.finalite).toMatch(/profil/i);
-    expect(certification?.finalite).toMatch(/connect/i);
+    expect(certification?.finalite).toMatch(/se connecter par Discord ne la donne pas/i);
+    expect(certification?.finalite).not.toMatch(/automatiquement/i);
+    expect(certification?.base).toBe("Consentement");
   });
 
   it("discloses that the Discord user ID is stored for Discord login", () => {
@@ -105,9 +103,34 @@ describe("DONNEES_PROFIL", () => {
     expect(idDiscord?.finalite).toMatch(/Discord/);
   });
 
-  it("every profile entry uses Consentement as legal basis", () => {
+  it("fonde le compte et la connexion sur le contrat, et non sur un consentement", () => {
+    // Un consentement demandé pour des données sans lesquelles le compte
+    // n'existe pas ne serait pas libre (RGPD art. 7.4) — et le registre (T01,
+    // T02) les fonde déjà sur le contrat : une donnée n'a qu'une base.
+    for (const donnee of [
+      "Pseudo site",
+      "Pseudo Discord",
+      "ID Discord",
+      "Identifiant Google",
+      "Identifiant Blizzard",
+    ]) {
+      expect(DONNEES_PROFIL.find((d) => d.donnee === donnee)?.base).toBe("Exécution du contrat");
+    }
+  });
+
+  it("réserve le consentement à ce que le joueur choisit en plus", () => {
     for (const entry of DONNEES_PROFIL) {
-      expect(entry.base).toBe("Consentement");
+      expect(["Exécution du contrat", "Consentement"]).toContain(entry.base);
+    }
+    // Données facultatives, renseignées et publiées au choix du joueur : un
+    // compte fonctionne sans elles, le contrat ne les exige pas.
+    for (const donnee of [
+      "Certification du pseudo Discord",
+      "Pseudo Overwatch",
+      "Pseudo Marvel Rivals",
+      "Avatar",
+    ]) {
+      expect(DONNEES_PROFIL.find((d) => d.donnee === donnee)?.base).toBe("Consentement");
     }
   });
 

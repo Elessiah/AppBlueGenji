@@ -20,15 +20,24 @@ import { OAuthButtons } from "./OAuthButtons";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
-import {
-  DISCORD_CERTIFICATION_UNDO,
-  DISCORD_TAG_AUDIENCE,
-} from "@/lib/shared/identity-sharing";
+import { DISCORD_TAG_AUDIENCE } from "@/lib/shared/identity-sharing";
 import { CodedError, LOGIN_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 
+/**
+ * Information d'entrée **lue** dans ce navigateur, à sa version. Ce n'est plus un
+ * consentement (le compte repose sur l'exécution du service) : la clé garde son
+ * nom historique, et sa valeur `"2"` fait revoir une fois la modale à qui avait
+ * accepté l'ancienne, où l'invite Google était acquise d'office.
+ */
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
+const NOTICE_VERSION = "2";
+/**
+ * Seul vrai consentement de la page : l'invite Google One Tap, cochée à part
+ * dans la modale, décochée par défaut. `"1"` = accordé ; absente = refusé.
+ */
+const ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
 /**
  * Version des conditions d'utilisation acceptée dans ce navigateur, gardée à
  * côté du consentement RGPD : une nouvelle version fait réapparaître la
@@ -52,9 +61,9 @@ export type OneTapConfig = { clientId: string; nonce?: string };
  *
  * `oneTap` vaut `null` quand l'invite n'a pas lieu d'être (visiteur déjà
  * connecté, `GOOGLE_CLIENT_ID` absent). Sinon l'invite n'est montée qu'une fois
- * le consentement **lu et accordé** : c'est la seule page du site qui fasse
- * charger un script de Google, et elle ne le fait qu'à qui est venu se
- * connecter et l'a accepté.
+ * l'information d'entrée lue **et** la case « Google One Tap » cochée : c'est la
+ * seule page du site qui fasse charger un script de Google, et elle ne le fait
+ * qu'à qui l'a demandé, par une case à part, décochée par défaut.
  */
 export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   const router = useRouter();
@@ -75,9 +84,10 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(false);
-  // Consentement RGPD requis avant toute création de compte. Tant qu'il n'est
-  // pas accordé, la carte de connexion est masquée derrière la popup et aucune
-  // requête d'authentification n'est déclenchée.
+  // Information RGPD et conditions d'utilisation, avant toute création de
+  // compte. Tant qu'elles ne sont pas lues et acceptées, la carte de connexion
+  // est masquée derrière la popup et aucune requête d'authentification n'est
+  // déclenchée.
   const [consentGiven, setConsentGiven] = useState(true);
   // `consentGiven` part à `true` pour ne pas faire clignoter la modale au
   // premier rendu : il ne dit donc rien tant que le stockage n'a pas été lu.
@@ -85,30 +95,85 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   // ferait partir le script chez Google avant même qu'on sache si le visiteur a
   // consenti.
   const [consentRead, setConsentRead] = useState(false);
+  // Invite Google One Tap : montée seulement sur accord explicite.
+  const [oneTapAllowed, setOneTapAllowed] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     let stored: string | null = null;
     let terms: string | null = null;
+    let oneTapChoice: string | null = null;
     try {
       stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
       terms = window.localStorage.getItem(TERMS_STORAGE_KEY);
+      oneTapChoice = window.localStorage.getItem(ONE_TAP_STORAGE_KEY);
     } catch {
       // localStorage indisponible (mode privé) : la modale redemande.
     }
-    setConsentGiven(stored === "1" && terms === String(TERMS_VERSION));
+    setConsentGiven(stored === NOTICE_VERSION && terms === String(TERMS_VERSION));
+    setOneTapAllowed(oneTapChoice === "1");
     setConsentRead(true);
   }, []);
 
-  const acceptConsent = () => {
+  /**
+   * Retient le choix One Tap. Un refus **efface** un accord antérieur : la case
+   * décochée vaut retrait — aussi simple que l'accord (RGPD art. 7.3), d'où la
+   * même case sur la carte de connexion, pour changer d'avis après la modale.
+   */
+  const setOneTapChoice = (allow: boolean) => {
     try {
-      window.localStorage.setItem(CONSENT_STORAGE_KEY, "1");
+      if (allow) window.localStorage.setItem(ONE_TAP_STORAGE_KEY, "1");
+      else window.localStorage.removeItem(ONE_TAP_STORAGE_KEY);
+    } catch {
+      // localStorage indisponible (mode privé) : le choix vaut pour la page.
+    }
+    setOneTapAllowed(allow);
+  };
+
+  const acceptConsent = ({ oneTap: allowOneTap }: { oneTap: boolean }) => {
+    try {
+      window.localStorage.setItem(CONSENT_STORAGE_KEY, NOTICE_VERSION);
       window.localStorage.setItem(TERMS_STORAGE_KEY, String(TERMS_VERSION));
     } catch {
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
+    // Sans invite possible, la modale n'a pas posé la question : un choix
+    // antérieur n'est ni confirmé ni retiré.
+    if (oneTap) setOneTapChoice(allowOneTap);
     setConsentGiven(true);
   };
+
+  // La case One Tap reste sur la carte : sans elle, un accord donné dans la
+  // modale ne se retirerait plus qu'en vidant le stockage du navigateur. Rien à
+  // proposer quand l'invite n'a pas lieu d'être (`oneTap` absent).
+  // Un seul identifiant : la carte ne rend jamais ses deux états à la fois.
+  const oneTapToggle = oneTap ? (
+    <label
+      htmlFor="login-one-tap"
+      style={{
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 8,
+        marginTop: 10,
+        fontSize: 12,
+        lineHeight: 1.5,
+        color: "var(--ink-mute)",
+        cursor: "pointer",
+      }}
+    >
+      <input
+        id="login-one-tap"
+        type="checkbox"
+        checked={oneTapAllowed}
+        onChange={(event) => setOneTapChoice(event.target.checked)}
+        style={{ marginTop: 2 }}
+      />
+      <span>
+        Me proposer l&apos;invite <strong>Google One Tap</strong> sur cette page (Google reçoit
+        alors mon adresse IP et peut déposer un cookie g_state).
+      </span>
+    </label>
+  ) : null;
 
   // Les conditions ne voyagent qu'une fois le stockage **lu** et le
   // consentement **donné** : `consentGiven` part à `true` pour ne pas faire
@@ -199,7 +264,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
-      {oneTap && consentRead && consentGiven && (
+      {oneTap && consentRead && consentGiven && oneTapAllowed && (
         <GoogleOneTap
           clientId={oneTap.clientId}
           nonce={oneTap.nonce}
@@ -225,6 +290,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
               termsAccepted={termsAccepted}
               environmentNotice={loginEnvironmentNotice(environment)}
             />
+            {oneTapToggle}
 
             {/*
               Le séparateur **nomme** ce qui suit. « OU » seul laissait croire à
@@ -291,6 +357,7 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
               termsAccepted={termsAccepted}
               environmentNotice={loginEnvironmentNotice(environment)}
             />
+            {oneTapToggle}
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
@@ -311,27 +378,22 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
                   disabled
                 />
                 {/*
-                  **La seule annonce de l'exposition sur ce chemin-ci.** Entrer
-                  par Discord *est* la preuve que la certification demande
-                  (`lib/shared/discord-identity.ts`), si bien que ce code
-                  certifie le tag tout seul — sans passer par le dialogue de
-                  `/profil`, qui est l'endroit où l'exposition est d'ordinaire
-                  énoncée public par public. Sans cette phrase, un membre qui
-                  n'avait jamais renseigné son tag le verrait s'ouvrir à
-                  l'organisation sans qu'on le lui ait dit. Le geste
-                  d'annulation est nommé, parce qu'il faut savoir qu'il y a
-                  quelque chose à annuler.
+                  Ce que ce code fait du tag : il l'**enregistre**, sans le
+                  certifier. Se connecter n'est pas consentir à l'exposition
+                  (`lib/shared/discord-identity.ts`) ; la certification reste un
+                  clic distinct sur `/profil`, et la phrase dit qui lirait le tag
+                  une fois ce clic fait.
 
                   Elle ne s'affiche **que si la saisie est un tag** : un
                   identifiant numérique (qui évite la recherche du tag par le
-                  bot) ne certifie rien, et promettre une certification qui
-                  n'aura pas lieu est pire que se taire. Le prédicat est celui
-                  du serveur, pas une seconde lecture du même motif.
+                  bot) n'enregistre aucun pseudo. Le prédicat est celui du
+                  serveur, pas une seconde lecture du même motif.
                 */}
                 {isCertifiableDiscordHandle(handle) && (
                   <span className="mono" style={{ fontSize: 10, color: "var(--ink-dim)", letterSpacing: "0.08em", marginTop: 4, lineHeight: 1.5 }}>
-                    Te connecter par Discord <strong>certifie ce tag</strong> :{" "}
-                    {DISCORD_TAG_AUDIENCE} {DISCORD_CERTIFICATION_UNDO}
+                    Te connecter par ce code <strong>enregistre ce tag</strong>, sans le certifier :
+                    il reste invisible de tous, administrateurs compris. Si tu le certifies ensuite
+                    dans « Mon profil », {DISCORD_TAG_AUDIENCE}
                   </span>
                 )}
               </div>
@@ -432,7 +494,11 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         porté par `useDialogBehavior`, pas par l'ordre.
       */}
       {!consentGiven && (
-        <RgpdConsentModal onAccept={acceptConsent} onRefuse={refuseConsent} />
+        <RgpdConsentModal
+          onAccept={acceptConsent}
+          onRefuse={refuseConsent}
+          oneTapAvailable={oneTap !== null}
+        />
       )}
     </main>
   );

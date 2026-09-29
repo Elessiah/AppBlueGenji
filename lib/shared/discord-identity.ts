@@ -15,7 +15,11 @@
  * n'ait rien dit. Un tag **non vérifié garde donc ses propriétés d'origine** —
  * invisible à tous, administrateurs compris. La vérification est le geste par
  * lequel le joueur accepte l'exposition, et elle est facultative : un compte qui
- * ne la fait pas reste exactement dans l'état où il était.
+ * ne la fait pas reste exactement dans l'état où il était. **Se connecter par
+ * Discord ne la donne pas** : la connexion prouve le compte et enregistre le
+ * pseudo, mais s'authentifier n'est pas consentir à une exposition — et le
+ * refuser ne doit pas coûter la porte Discord. Un compte rattaché certifie
+ * ensuite d'un clic, sans nouvelle preuve.
  *
  * Elle sert accessoirement à ce que le tag soit **juste** : rien n'empêchait
  * d'écrire celui d'un autre dans ce champ, et un arbitre qui écrit au mauvais
@@ -182,11 +186,10 @@ export function visibleDiscordTag(
  * Le tag est-il **vérifiable en un clic** ?
  *
  * Un compte né par Discord — ou qui s'y est déjà rattaché — a **déjà** prouvé
- * son identifiant : il l'a fait en ouvrant sa session, par le code reçu en
- * message privé. Lui redemander un code pour le même compte serait rejouer une
- * preuve qu'on détient. Le site se contente alors de vérifier que le tag saisi
- * **désigne cet identifiant-là** (résolution par le bot), et certifie sur
- * place.
+ * son identifiant en ouvrant sa session (bouton OAuth ou code reçu en message
+ * privé), et c'est Discord qui a nommé son pseudo. Lui redemander une preuve
+ * serait rejouer ce qu'on détient : le clic ne donne que le consentement, et le
+ * site certifie le pseudo que Discord a nommé — jamais une saisie.
  *
  * Le second cas — aucun identifiant lié — est celui d'un compte Google : la
  * preuve n'existe pas encore, il faut la faire, donc un code.
@@ -216,7 +219,7 @@ export const DISCORD_VERIFICATION_EXPOSURE: readonly string[] = [
   "Les arbitres le voient uniquement quand tu es engagé dans un tournoi en cours ou à venir — plus après.",
   "Les joueurs et le caster de ton match le voient le temps de la rencontre, à partir de son lancement — pour s'ajouter et créer le salon.",
   "Les autres joueurs du site ne le voient que si tu le rends visible dans tes réglages de confidentialité. Il n'apparaît sur aucune page publique.",
-  "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle — jusqu'à ta prochaine connexion par Discord, qui le réenregistre.",
+  "Tu peux annuler à tout moment en retirant ton tag depuis « Mon profil » : la certification est perdue, et l'exposition avec elle. Une connexion par Discord réenregistre ensuite ton pseudo, mais sans le certifier : seul ce geste-ci le certifie.",
 ];
 
 /**

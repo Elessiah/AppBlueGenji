@@ -6,8 +6,10 @@
  * ensuite prouver (code reçu en message privé, ou simple bouton quand le compte
  * porte déjà un `discord_id`). La seconde est le **rattachement OAuth** : la
  * connexion par Discord, comme l'ajout de Discord dans « Applications
- * connectées », écrit le pseudo que Discord nomme lui-même et le pose certifié
- * (`lib/server/account-identities.ts`).
+ * connectées », écrit le pseudo que Discord nomme lui-même — **sans le
+ * certifier** : la certification reste un clic distinct, qui ne redemande
+ * aucune preuve (`lib/server/account-identities.ts`,
+ * `certifyLinkedDiscordTag`).
  *
  * Laisser la première ouverte une fois la seconde faite ne pouvait produire que
  * du faux : le champ invitait à réécrire à la main une donnée que le
@@ -150,11 +152,11 @@ export function discordTagLockNotice(state: {
     // que personne ne voit ce tag. Proposer d'arrêter une exposition qui
     // n'existe pas pousserait à effacer une donnée sans raison. Le retrait reste
     // offert par le bouton d'à côté, il n'a simplement rien à promettre.
-    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} ${rename} Tu peux aussi le retirer.`;
+    return `Ton compte Discord est rattaché, mais ce pseudo n'est pas certifié : ${DISCORD_TAG_UNVERIFIED_AUDIENCE} Te connecter par Discord ne le certifie pas : c'est « Certifier mon tag » qui le fait. ${rename} Tu peux aussi le retirer.`;
   }
   // Qui lit le tag est une **promesse** du site, rédigée une seule fois dans
   // `identity-sharing.ts` et partagée avec `/connexion` : la recopier ici
   // laisserait les deux écrans promettre deux publics différents au premier
   // ajustement de l'un.
-  return `Ton compte Discord est rattaché et ce pseudo est certifié : ${DISCORD_TAG_AUDIENCE} ${rename} Pour cesser d'être joignable, retire-le.`;
+  return `Ton compte Discord est rattaché et ce pseudo est certifié : ${DISCORD_TAG_AUDIENCE} ${rename} Un nouveau pseudo arrive non certifié, à certifier de nouveau. Pour cesser d'être joignable, retire-le.`;
 }

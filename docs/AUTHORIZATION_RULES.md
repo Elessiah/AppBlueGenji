@@ -367,8 +367,12 @@ La clause « non certifié » passe **avant** les rôles, et ce n'est pas un dé
 d'écriture : c'est elle qui protège les comptes qui ont saisi leur tag sous le
 régime « visible de moi seul », et placée après elle serait oubliée au premier
 rôle ajouté. La certification est facultative et porte le consentement à
-l'exposition (`docs/features/DISCORD_VERIFICATION.md`) ; elle se perd à toute
-modification du tag.
+l'exposition (`docs/features/DISCORD_VERIFICATION.md`) : elle ne s'obtient **que**
+par un geste distinct sur `/profil` — un clic pour un compte relié à Discord, qui
+certifie le pseudo que Discord a nommé, un code en message privé sinon. **Se
+connecter par Discord ne certifie pas** : la connexion enregistre le pseudo, non
+certifié, donc invisible de tous. Elle se perd à toute modification du tag, et se
+retire en retirant son tag.
 
 « Tournoi vivant » = tout état sauf `FINISHED` : le besoin de joindre un joueur
 naît du tournoi et s'éteint avec lui. Le fait est **global**, pas relatif au
