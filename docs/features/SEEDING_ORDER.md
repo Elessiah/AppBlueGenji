@@ -124,11 +124,14 @@ Le verrou réutilise `hasScoreInput` de `lib/shared/match-lock.ts` : compte comm
 saisie un score (même 0), un vainqueur, un forfait ou un report en attente. Les
 byes et matchs fantômes sont ignorés — leur score est posé par le moteur.
 
-La fenêtre se juge **sous verrou**. `reorderSeeding` ouvre sa transaction par
-`lockTournamentRow` puis par un `SELECT id FROM bg_matches WHERE tournament_id = ?
-FOR UPDATE` (table seule : MariaDB refuse `FOR UPDATE OF`), **avant** toute
-lecture ordinaire — sous `REPEATABLE READ`, c'est la première lecture ordinaire
-qui fige l'instantané. Jugée sur des lectures ordinaires, la borne ne tenait que
+La fenêtre se juge **sous verrou**. `reorderSeeding` ouvre sa transaction par un
+`SELECT id FROM bg_matches WHERE tournament_id = ? FOR UPDATE` (table seule :
+MariaDB refuse `FOR UPDATE OF`) puis par `lockTournamentRow`, **avant** toute
+lecture ordinaire. Les matchs d'abord : c'est l'ordre des chemins de score, qui
+tiennent leur match puis verrouillent le tournoi dans la réconciliation
+(`reconcilePhases`) — l'ordre inverse finissait en interblocage. Et avant toute
+lecture ordinaire parce que, sous `REPEATABLE READ`, c'est la première qui fige
+l'instantané. Jugée sur des lectures ordinaires, la borne ne tenait que
 hors concurrence : un premier report validé entre le contrôle et
 `deleteAllMatches` échappait à l'instantané, et le plateau régénéré l'effaçait
 alors que le joueur avait reçu un succès. Toute écriture de score lit son match

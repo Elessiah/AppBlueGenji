@@ -623,7 +623,7 @@ Réservé à `ADMIN` et `ARBITRE` :
 - l'avancer d'une étape par anticipation — ouverture des inscriptions, clôture,
   coup d'envoi (`POST /api/admin/tournaments/[id]/advance`) ;
 - réordonner le seeding (`PATCH .../seeding`), jusqu'à la première saisie de
-  score — borne jugée **sous verrou** (ligne du tournoi puis matchs, en toute
+  score — borne jugée **sous verrou** (matchs puis ligne du tournoi, en toute
   première instruction), sans quoi un report concurrent était effacé par le
   plateau régénéré ;
 - **retirer un engagé du plateau**

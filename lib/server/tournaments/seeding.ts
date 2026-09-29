@@ -154,11 +154,16 @@ export async function reorderSeeding(tournamentId: number, orderedTeamIds: numbe
     // l'attente. Sans cela, un premier report validé entre ce contrôle et
     // `deleteAllMatches` échappait à l'instantané : le plateau régénéré
     // l'effaçait, et le joueur, qui avait reçu un succès, n'en savait rien.
-    // Le verrou du tournoi sérialise les gestes du staff (inscription, retrait,
-    // autre réordonnancement) ; celui des matchs, les reports et forfaits, qui
-    // ne verrouillent que leur match.
-    await lockTournamentRow(connection, tournamentId);
+    // Le verrou des matchs sérialise les saisies de score (reports, forfaits,
+    // arbitrage), qui verrouillent leur match ; celui du tournoi, les gestes du
+    // staff (inscription, retrait, autre réordonnancement).
+    //
+    // Les matchs **d'abord** : c'est l'ordre des chemins de score, qui tiennent
+    // leur match puis verrouillent la ligne du tournoi dans la réconciliation
+    // (`reconcilePhases`). Pris dans l'ordre inverse, une saisie concurrente
+    // finissait en interblocage (`ER_LOCK_DEADLOCK`, un 500) au lieu d'attendre.
     await lockTournamentMatches(connection, tournamentId);
+    await lockTournamentRow(connection, tournamentId);
 
     const tournament = await loadTournamentRow(connection, tournamentId);
     if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");

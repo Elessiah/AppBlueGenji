@@ -218,7 +218,7 @@ describe("reorderSeeding", () => {
     expect(sqls.some((sql) => /current_phase_id = NULL/.test(sql))).toBe(true);
   });
 
-  it("verrouille le tournoi puis ses matchs avant toute lecture ordinaire", async () => {
+  it("verrouille les matchs puis le tournoi avant toute lecture ordinaire", async () => {
     // Sous REPEATABLE READ, la première lecture ordinaire fige l'instantané :
     // posés après, les verrous laisseraient juger la fenêtre sur un état
     // d'avant l'attente, et un report concurrent serait effacé par le plateau
@@ -245,7 +245,9 @@ describe("reorderSeeding", () => {
 
     await reorderSeeding(5, [2, 1]);
 
-    expect(order.slice(0, 4)).toEqual(["lock-tournament", "lock-matches", "tournament", "entries"]);
+    // Matchs d'abord : l'ordre des chemins de score (match, puis tournoi dans
+    // la réconciliation) — l'inverse finirait en interblocage.
+    expect(order.slice(0, 4)).toEqual(["lock-matches", "lock-tournament", "tournament", "entries"]);
     expect(order).toContain("matches");
     expect(order.indexOf("lock-matches")).toBeLessThan(order.indexOf("matches"));
   });
