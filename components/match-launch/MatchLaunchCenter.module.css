@@ -497,3 +497,38 @@
     bottom: 76px;
   }
 }
+
+/* La pastille « Mon match » suit les autres boutons flottants
+   (`floating-button-scroll.ts`) : sous le voile d'une modale — la sienne
+   comprise —, estompée au défilement en mobile, et réduite à son libellé sous
+   720 px (le nom des équipes la portait à ~245 px sur la largeur d'un
+   téléphone ; la modale les donne). */
+:global(html:has([aria-modal="true"]:not([hidden]))) .fab {
+  visibility: hidden;
+}
+
+@media (max-width: 720px) {
+  .fab {
+    transition: opacity 0.2s ease;
+  }
+
+  .fabTeams {
+    display: none;
+  }
+
+  :global(html[data-page-scrolling]) .fab:not(:focus) {
+    opacity: 0.15;
+    pointer-events: none;
+  }
+}
+
+/* L'étape de confirmation reçoit le focus quand elle remplace « Prêt » : le
+   bouton focalisé disparaissait, et le focus sortait de la modale. */
+.confirm:focus {
+  outline: none;
+}
+
+.confirm:focus-visible {
+  outline: 2px solid var(--blue-300, #5ac8ff);
+  outline-offset: -2px;
+}

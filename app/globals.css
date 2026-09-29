@@ -875,6 +875,11 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
     0 0 0 4px var(--blue-glow);
 }
 
+/* Sous le voile d'une modale, quel que soit son `z-index`. */
+html:has([aria-modal="true"]:not([hidden])) .cta-float-help {
+  visibility: hidden;
+}
+
 @media (max-width: 720px) {
   .cta-float-help {
     bottom: 20px;
@@ -882,6 +887,13 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
     width: 44px;
     height: 44px;
     font-size: 18px;
+  }
+
+  /* Estompé pendant un défilement, comme les autres boutons flottants
+     (`lib/shared/floating-button-scroll.ts`), sauf s'il a le focus. */
+  html[data-page-scrolling] .cta-float-help:not(:focus) {
+    opacity: 0.15;
+    pointer-events: none;
   }
 }
 

@@ -110,6 +110,12 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   const [launches, setLaunches] = useState<MatchLaunchInfo[]>([]);
   const [openMatchId, setOpenMatchId] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
+  // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la
+  // confirmation retirent chacun le bouton qui l'avait, et le focus sortait
+  // alors de la modale (sur `<body>`). Consommé par l'effet plus bas.
+  const pendingFocusRef = useRef<"confirm" | "ready" | null>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  const readyRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const dismissedRef = useRef<Set<string> | null>(null);
 
@@ -240,8 +246,10 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   const dialogRef = useDialogBehavior({
     open: current !== null,
     onClose: () => {
-      if (confirming) setConfirming(false);
-      else close();
+      if (confirming) {
+        pendingFocusRef.current = "ready";
+        setConfirming(false);
+      } else close();
     },
     locked: busy,
   });
@@ -268,8 +276,11 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
             : "« Prêt » annulé.",
       );
       setConfirming(false);
+      pendingFocusRef.current = "ready";
       await refresh();
     } catch (error) {
+      // Le bouton, désactivé le temps de l'envoi, a pu perdre le focus.
+      pendingFocusRef.current = confirming ? "confirm" : "ready";
       showError(launchErrorMessage((error as Error).message));
     } finally {
       setBusy(false);
@@ -284,6 +295,16 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
       showError("Copie impossible : sélectionne le texte à la main.");
     }
   };
+
+  // Rend le focus demandé une fois l'envoi fini et le nouvel état rendu. Sans
+  // cible (le bouton n'est plus offert), le focus va à la modale elle-même.
+  useEffect(() => {
+    const target = pendingFocusRef.current;
+    if (target === null || busy) return;
+    pendingFocusRef.current = null;
+    const element = target === "confirm" ? confirmRef.current : readyRef.current;
+    (element ?? dialogRef.current)?.focus();
+  });
 
   const pending = launches.filter((info) => info.phase === "LOBBY" || info.phase === "LAUNCHED");
 
@@ -320,6 +341,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   const startAt = formatTime(current.startAt);
   const titleId = `match-launch-title-${current.matchId}`;
   const statusId = `match-launch-status-${current.matchId}`;
+  const confirmTextId = `match-launch-confirm-${current.matchId}`;
   const nextMatchId = nextLaunchMatchId(
     pending.map((info) => info.matchId),
     current.matchId,
@@ -399,15 +421,29 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
             (arbitrage, délai) la referme d'elle-même. */}
         {confirming && current.phase === "LOBBY" ? (
-          <div className={styles.confirm}>
-            <p className={styles.confirmText}>
+          <div
+            ref={confirmRef}
+            className={styles.confirm}
+            role="group"
+            aria-labelledby={confirmTextId}
+            tabIndex={-1}
+          >
+            <p id={confirmTextId} className={styles.confirmText}>
               {current.viewer.role === "CASTER"
                 ? "Confirmes-tu être prêt à caster ce match ?"
                 : "Confirmes-tu que ton équipe est au complet et prête à jouer ?"}{" "}
               Le match démarre dès que toutes les parties sont prêtes.
             </p>
             <div className={styles.actions}>
-              <button type="button" className="btn ghost" onClick={() => setConfirming(false)} disabled={busy}>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={() => {
+                  pendingFocusRef.current = "ready";
+                  setConfirming(false);
+                }}
+                disabled={busy}
+              >
                 Retour
               </button>
               <button
@@ -425,6 +461,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
             {current.phase === "LOBBY" && current.viewer.canDeclareReady && (
               current.viewer.ready ? (
                 <button
+                  ref={readyRef}
                   type="button"
                   className={`btn ${styles.readyOn}`}
                   onClick={() => void setReady(false)}
@@ -436,9 +473,13 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                 </button>
               ) : (
                 <button
+                  ref={readyRef}
                   type="button"
                   className={`btn ${styles.readyButton}`}
-                  onClick={() => setConfirming(true)}
+                  onClick={() => {
+                    pendingFocusRef.current = "confirm";
+                    setConfirming(true);
+                  }}
                   disabled={busy}
                   aria-pressed="false"
                   // Focus d'ouverture : ce bouton n'ouvre que la confirmation,

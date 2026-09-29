@@ -9,9 +9,9 @@ import styles from "./PublicNavMenu.module.css";
 type NavLink = { href: string; label: string };
 
 const LINKS: NavLink[] = [
-  { href: "/#tournois", label: "Tournois" },
+  { href: "/tournois", label: "Tournois" },
   { href: "/regles", label: "Règles des tournois" },
-  { href: "/#equipes", label: "Équipes" },
+  { href: "/equipes", label: "Équipes" },
   { href: "/joueurs", label: "Joueurs" },
   { href: "/recrutement", label: "Recrutement" },
   { href: "/bot", label: "Bot" },

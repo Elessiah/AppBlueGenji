@@ -78,8 +78,12 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       );
     const candidates = focusables();
     const preferred = candidates.find((el) => el.hasAttribute("data-autofocus"));
+    // Un bouton « × » d'en-tête (`data-dialog-close`) vient en tête du DOM pour
+    // rester collé en haut du panneau : il n'est pas ce qu'on vient faire dans
+    // la modale, le focus d'ouverture va au premier contrôle qui suit.
+    const firstContent = candidates.find((el) => !el.hasAttribute("data-dialog-close"));
 
-    (preferred ?? candidates[0] ?? containerRef.current)?.focus();
+    (preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus();
 
     const onKeyDown = (event: KeyboardEvent) => {
       // Les écouteurs de toutes les couches vivent sur `window` : seule celle du

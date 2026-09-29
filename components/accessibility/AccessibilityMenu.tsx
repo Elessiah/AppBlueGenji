@@ -16,7 +16,6 @@ import {
   resolveMenuOpener,
   type AccessibilityMenuRequest,
 } from "@/lib/shared/accessibility-menu-request";
-import { FLOATING_BUTTON_SETTLE_MS, shouldFadeFloatingButton } from "@/lib/shared/floating-button-scroll";
 import styles from "./AccessibilityMenu.module.css";
 
 /**
@@ -142,34 +141,6 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
       document.removeEventListener("focusin", onOutside);
     };
   }, [open, restoreFocus]);
-
-  // Estompé pendant un défilement (en mobile seulement, par la feuille) : il
-  // recouvrait le début des lignes là où le geste s'arrêtait. L'attribut est
-  // posé sur le DOM plutôt qu'en état React — un défilement ne re-rend rien.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || open) return;
-    let timer: number | undefined;
-    const settle = () => {
-      delete root.dataset.scrolling;
-    };
-    const onScroll = () => {
-      const focusWithin = root.contains(document.activeElement);
-      if (!shouldFadeFloatingButton({ menuOpen: false, focusWithin })) {
-        settle();
-        return;
-      }
-      root.dataset.scrolling = "true";
-      window.clearTimeout(timer);
-      timer = window.setTimeout(settle, FLOATING_BUTTON_SETTLE_MS);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.clearTimeout(timer);
-      settle();
-    };
-  }, [open]);
 
   const update = (next: A11ySettingKey[]) => {
     setSettings(next);
