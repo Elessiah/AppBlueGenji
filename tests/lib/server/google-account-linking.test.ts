@@ -98,7 +98,6 @@ function fakeDb(
 
 const profile = (overrides: Partial<GoogleProfilePayload> = {}): GoogleProfilePayload => ({
   sub: "google-sub-neuf",
-  name: "Nova",
   ...overrides,
 });
 
@@ -132,7 +131,7 @@ describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
     // demandée à Google —, ni photo : la colonne d'avatar naît à `NULL` et ne
     // reçoit qu'un fichier copié chez nous, le nom du fichier portant
     // l'identifiant du compte, qui n'existe pas encore.
-    expect(insert.params).toEqual(["Nova", "google-sub-neuf"]);
+    expect(insert.params).toEqual([expect.stringMatching(/^player\d+$/), "google-sub-neuf"]);
     expect(insert.sql).not.toContain("email");
     expect(insert.sql).toContain("NULL");
   });
@@ -157,12 +156,15 @@ describe("createOrGetGoogleUser — aucune revendication par l'adresse", () => {
     expect(find(statements, "INSERT INTO bg_users")).toBeUndefined();
   });
 
-  it("se passe d'un nom d'affichage sans échouer", async () => {
-    // Google n'en promet aucun. Le pseudo retombe alors sur une valeur
-    // fabriquée, et la création aboutit — un compte sans pseudo n'existe pas.
+  it("ne reprend **jamais** le nom Google comme pseudo", async () => {
+    // Le `name` d'un profil Google est le plus souvent un prénom et un nom
+    // réels, et un pseudo est public sans réglage pour le masquer. Même glissé
+    // dans l'objet par un appelant, il n'atteint pas la base : le compte naît
+    // sous un pseudo neutre, que le joueur remplace depuis son profil.
     const { statements } = fakeDb([]);
+    const withRealName = { sub: "google-sub-neuf", name: "Jeanne Dupont" };
 
-    await createOrGetGoogleUser({ sub: "google-sub-neuf" }, { termsAccepted: true });
+    await createOrGetGoogleUser(withRealName, { termsAccepted: true });
 
     const insert = find(statements, "INSERT INTO bg_users")!;
     expect(String(insert.params[0])).toMatch(/^player\d+$/);

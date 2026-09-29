@@ -65,7 +65,6 @@ describe("POST /api/auth/google/one-tap", () => {
         subject: "google-sub-1",
         handle: null,
         avatarUrl: "https://example/pic.png",
-        displayName: "Nova",
       },
       { termsAccepted: false },
     );

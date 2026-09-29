@@ -246,7 +246,6 @@ describe("completeOAuth — connexion", () => {
         subject: "sub-1",
         handle: null,
         avatarUrl: "https://exemple.test/a.png",
-        displayName: "Nova",
       },
       { termsAccepted: true },
     );

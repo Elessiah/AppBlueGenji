@@ -119,3 +119,41 @@ describe("adoptRemoteAvatar — la photo ne se pose pas sur une ligne morte", ()
     ).resolves.toBeUndefined();
   });
 });
+
+/**
+ * **La photo importée naît masquée.** Elle vient du fournisseur, pas d'un choix
+ * du joueur : la publier d'office l'aurait mise à disposition de tout membre
+ * connecté — et, par l'entrée solo, de la vitrine publique — sans qu'il ait rien
+ * fait (RGPD art. 25.2).
+ */
+describe("adoptRemoteAvatar — protection par défaut", () => {
+  it("pose l'avatar et le masque dans la même écriture", async () => {
+    const { queries } = fakeDb({ alive: true });
+
+    await adoptRemoteAvatar(7, "https://cdn.example.invalid/a.png");
+
+    const update = queries.find((q) => q.sql.startsWith("UPDATE bg_users"))!;
+    expect(update.sql).toContain("avatar_url = ?");
+    expect(update.sql).toContain("visible_avatar = 0");
+    expect(update.params).toEqual(["/api/uploads/avatars/7-new.webp", 7]);
+  });
+
+  it("ne touche pas au réglage quand rien n'est importé", async () => {
+    const { queries } = fakeDb({ alive: true });
+    jest.mocked(importRemoteAvatar).mockResolvedValue(null);
+
+    await adoptRemoteAvatar(7, "https://cdn.example.invalid/a.png");
+
+    expect(queries.some((q) => q.sql.startsWith("UPDATE bg_users"))).toBe(false);
+  });
+
+  it("ne touche pas au réglage d'un compte qui a déjà son propre avatar", async () => {
+    const { queries } = fakeDb({ alive: true });
+    jest.mocked(shouldImportRemoteAvatar).mockReturnValue(false);
+
+    await adoptRemoteAvatar(7, "https://cdn.example.invalid/a.png");
+
+    expect(importRemoteAvatar).not.toHaveBeenCalled();
+    expect(queries.some((q) => q.sql.startsWith("UPDATE bg_users"))).toBe(false);
+  });
+});
