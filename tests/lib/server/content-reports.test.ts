@@ -919,7 +919,8 @@ describe("listContestableReports", () => {
     const [sql, params] = pool.execute.mock.calls[1];
     expect(sql).toMatch(/r.category <> 'CONTEST'/);
     expect(sql).toMatch(/r\.reporter_user_id = \? AND r\.status = 'RESOLVED'/);
-    expect(params).toEqual([5, 4, 6, 5]);
+    expect(sql).toMatch(/r\.category IN \(\?, \?\)/);
+    expect(params).toEqual([5, 4, 6, 5, "COPYRIGHT", "MODERATION"]);
   });
 });
 

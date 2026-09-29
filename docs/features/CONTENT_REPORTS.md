@@ -31,7 +31,8 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
      Le signalement de plus reste contestable depuis le formulaire.
 3. **Contester** (`canContestReport`). Une personne visée conteste à tout
    moment (`isConcernedByReport`), depuis `/signalements/[id]` ou par la
-   catégorie « Contestation » du même formulaire. L'**auteur du signalement**
+   catégorie « Contestation » du même formulaire. L'**auteur d'un signalement
+   de contenu** (`NOTIFIER_CONTESTABLE_CATEGORIES` : droit d'auteur, modération)
    conteste la décision prise — y compris celle de ne pas agir (art. 20.1 DSA,
    réclamation de l'auteur d'une notification) — par la même catégorie, **une
    fois le dossier archivé** et s'il a signalé depuis son compte (seul moyen de

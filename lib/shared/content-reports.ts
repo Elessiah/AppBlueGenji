@@ -199,7 +199,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
   },
   CONTEST: {
     label: "Contestation",
-    hint: "Répondre à un signalement qui te vise, toi ou ton équipe — ou contester la décision prise sur ton propre signalement.",
+    hint: "Répondre à un signalement qui te vise, toi ou ton équipe — ou contester la décision prise sur ton propre signalement de droit d'auteur ou de modération.",
     icon: "⚖",
     targets: [],
     requiresContact: false,
@@ -641,6 +641,14 @@ export function isConcernedByReport(
 }
 
 /**
+ * Catégories dont l'auteur peut contester la décision : les notifications d'un
+ * contenu du site (DSA, art. 16), seules à aboutir à une décision de
+ * modération. La liste sert aussi la requête du formulaire
+ * (`listContestableReports`), pour que les deux disent la même règle.
+ */
+export const NOTIFIER_CONTESTABLE_CATEGORIES: readonly ReportCategory[] = ["COPYRIGHT", "MODERATION"];
+
+/**
  * Ce lecteur peut-il contester ce signalement ?
  *
  * Deux publics, deux moments. Une **personne visée** conteste à tout moment
@@ -650,7 +658,9 @@ export function isConcernedByReport(
  * pas agir —, donc une fois le dossier archivé : c'est l'ouverture de la
  * réclamation que l'art. 20.1 du règlement sur les services numériques fait à
  * l'auteur d'une notification. Il faut un compte : c'est le seul moyen de le
- * reconnaître comme l'auteur.
+ * reconnaître comme l'auteur. Seulement pour une notification de **contenu**
+ * (`NOTIFIER_CONTESTABLE_CATEGORIES`) : un bug ou une demande RGPD archivés
+ * n'ont pas de décision de modération à contester.
  */
 export function canContestReport(
   viewer: ReportConcernViewer,
@@ -663,7 +673,11 @@ export function canContestReport(
 ): boolean {
   if (report.category === "CONTEST") return false;
   if (isConcernedByReport(viewer, report)) return true;
-  return report.reporterUserId === viewer.userId && report.status === "RESOLVED";
+  return (
+    NOTIFIER_CONTESTABLE_CATEGORIES.includes(report.category) &&
+    report.reporterUserId === viewer.userId &&
+    report.status === "RESOLVED"
+  );
 }
 
 /**
@@ -851,7 +865,7 @@ export function reportErrorMessage(code: string | null | undefined): string {
     case "REPORT_TARGETS_REQUIRE_LOGIN":
       return "Connecte-toi pour désigner des joueurs, équipes ou tournois — ou décris-les dans ton message.";
     case "REPORT_NOT_CONCERNED":
-      return "Tu ne peux contester qu'un signalement qui te vise, toi ou une équipe dont tu es membre — ou la décision prise sur un signalement que tu as envoyé, une fois le dossier archivé.";
+      return "Tu ne peux contester qu'un signalement qui te vise, toi ou une équipe dont tu es membre — ou la décision prise sur un signalement de droit d'auteur ou de modération que tu as envoyé, une fois le dossier archivé.";
     case "REPORTS_SATURATED":
       return "Trop de signalements reçus en peu de temps. Réessaie plus tard, ou écris-nous sur Discord.";
     case "TOO_MANY_REQUESTS":

@@ -35,6 +35,7 @@ import {
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
   REPORT_TARGET_SEARCH_LIMIT,
   REPORT_TARGET_SEARCH_MIN_LENGTH,
+  NOTIFIER_CONTESTABLE_CATEGORIES,
   canContestReport,
   formatContestAlert,
   formatReportAlert,
@@ -927,7 +928,8 @@ export async function listContestableReports(viewerUserId: number): Promise<Cont
     clauses.push(`(t.target_type = 'TEAM' AND t.target_id IN (${teamIds.map(() => "?").join(", ")}))`);
     params.push(...teamIds);
   }
-  params.push(viewerUserId);
+  const notifierCategories = NOTIFIER_CONTESTABLE_CATEGORIES.map(() => "?").join(", ");
+  const queryParams: (number | string)[] = [...params, viewerUserId, ...NOTIFIER_CONTESTABLE_CATEGORIES];
   const db = await getDatabase();
   const [rows] = await db.execute<
     (RowDataPacket & { id: number; category: ReportCategory; status: ReportStatus; created_at: Date | string })[]
@@ -936,9 +938,9 @@ export async function listContestableReports(viewerUserId: number): Promise<Cont
      FROM bg_reports r
      WHERE r.category <> 'CONTEST'
        AND (EXISTS (SELECT 1 FROM bg_report_targets t WHERE t.report_id = r.id AND (${clauses.join(" OR ")}))
-            OR (r.reporter_user_id = ? AND r.status = 'RESOLVED'))
+            OR (r.reporter_user_id = ? AND r.status = 'RESOLVED' AND r.category IN (${notifierCategories})))
      ORDER BY r.created_at DESC, r.id DESC`,
-    params,
+    queryParams,
   );
   return rows.map((row) => ({
     id: Number(row.id),

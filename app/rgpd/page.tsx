@@ -551,9 +551,10 @@ export default async function RgpdPage() {
           <p>
             Une personne visée peut contester — un joueur désigné, ou un membre actuel d&apos;une
             équipe désignée —, depuis la page du signalement ou par la catégorie{" "}
-            <strong>« Contestation »</strong> du même formulaire. L&apos;auteur du signalement
-            peut, lui, contester la décision prise — y compris celle de ne pas agir — par la même
-            catégorie, une fois le signalement archivé, s&apos;il l&apos;a envoyé depuis son compte. La contestation est rangée sous le
+            <strong>« Contestation »</strong> du même formulaire. L&apos;auteur d&apos;un signalement
+            de droit d&apos;auteur ou de modération peut, lui, contester la décision prise — y compris
+            celle de ne pas agir — par la même catégorie, une fois le signalement archivé, s&apos;il
+            l&apos;a envoyé depuis son compte. La contestation est rangée sous le
             signalement d&apos;origine et lue par les administrateurs, qui en sont prévenus sur Discord.
             Contester un signalement <strong>déjà archivé le rouvre</strong>. Ni l&apos;auteur du
             signalement ni les personnes visées ne sont informés de la contestation ; elle est conservée et effacée avec

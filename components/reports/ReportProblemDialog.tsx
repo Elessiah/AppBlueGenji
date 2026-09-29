@@ -356,7 +356,8 @@ export function ReportProblemDialog({
                       Connecte-toi
                     </Link>{" "}
                     pour contester un signalement : seuls les joueurs visés, les membres des équipes visées
-                    et l&apos;auteur du signalement, une fois le dossier archivé, peuvent le faire.
+                    et l&apos;auteur d&apos;un signalement de droit d&apos;auteur ou de modération, une fois le
+                    dossier archivé, peuvent le faire.
                   </p>
                 ) : contestOf !== undefined ? (
                   <p className={styles.lead}>Tu contestes le signalement n° {contestOf}.</p>

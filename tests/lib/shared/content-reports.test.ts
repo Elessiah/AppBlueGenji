@@ -397,6 +397,13 @@ describe("canContestReport", () => {
     // Pas encore de décision à contester.
     expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "OPEN" })).toBe(false);
     expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "IN_PROGRESS" })).toBe(false);
+    expect(canContestReport(viewer, { ...base, category: "MODERATION", reporterUserId: 5, status: "RESOLVED" })).toBe(true);
+  });
+
+  it("n'ouvre à l'auteur que les notifications de contenu : un bug archivé n'a pas de décision à contester", () => {
+    for (const category of ["BUG", "RGPD", "HOSTING", "OTHER"] as const) {
+      expect(canContestReport(viewer, { ...base, category, reporterUserId: 5, status: "RESOLVED" })).toBe(false);
+    }
   });
 
   it("refuse tout autre lecteur, et une contestation ne se conteste pas", () => {
