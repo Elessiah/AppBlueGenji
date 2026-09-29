@@ -3,10 +3,12 @@ import Link from "next/link";
 import { CyberButton } from "@/components/cyber";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { ErrorPanel } from "@/components/error-page/ErrorPanel";
-import { NOT_FOUND_COPY, NOT_FOUND_LINKS } from "@/lib/shared/error-pages";
+import { NOT_FOUND_COPY, NOT_FOUND_LINKS, errorPageTitle } from "@/lib/shared/error-pages";
 
 export const metadata: Metadata = {
-  title: NOT_FOUND_COPY.title,
+  // `absolute` : le gabarit de titre de la mise en page racine ne vaut que pour
+  // ses segments enfants, et cette page partage son segment.
+  title: { absolute: errorPageTitle(NOT_FOUND_COPY) },
   robots: { index: false, follow: false },
 };
 

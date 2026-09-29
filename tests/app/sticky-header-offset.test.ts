@@ -75,7 +75,13 @@ describe("marge d'ancre sous l'en-tête collant", () => {
 
   it("aucune cible ne pose de marge en pixels, qui s'ajouterait à la marge globale", () => {
     const offenders = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))]
-      .filter((file) => /scroll-margin-top:\s*\d+px|scrollMarginTop:\s*\d+/.test(readSource(file)))
+      // Le raccourci (`scroll-margin`, `scrollMargin`) et l'axe de bloc
+      // posent aussi la marge du haut ; seul l'axe en ligne reste libre.
+      .filter((file) =>
+        /scroll-margin(?:-top|-block(?:-start)?)?:\s*\d+px|scrollMargin(?:Top|Block(?:Start)?)?:\s*\d+/.test(
+          readSource(file),
+        ),
+      )
       .map((file) => relative(ROOT, file));
     expect(offenders).toEqual([]);
   });

@@ -99,6 +99,9 @@ describe("app/not-found.tsx et app/global-error.tsx", () => {
     expect(source).toContain("<PublicPageShell>");
     expect(source).toContain("NOT_FOUND_LINKS");
     expect(source).toMatch(/robots:\s*\{\s*index:\s*false/);
+    // Même segment que la mise en page racine : son gabarit ne s'y applique
+    // pas, le titre complet est donc posé en `absolute`.
+    expect(source).toContain("title: { absolute: errorPageTitle(NOT_FOUND_COPY) }");
   });
 
   it("le dernier filet rend un document complet en français", () => {
