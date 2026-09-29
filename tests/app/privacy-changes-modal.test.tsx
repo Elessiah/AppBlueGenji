@@ -38,7 +38,7 @@ describe("PrivacyChangesModal — rendu serveur", () => {
       expect(render([...PRIVACY_CHANGES])).toMatch(/role="dialog"/);
     }
   });
-  it("ne rend rien quand tout est accepté", () => {
+  it("ne rend rien quand tout a été lu", () => {
     expect(render([])).not.toMatch(/role="dialog"/);
   });
 
@@ -54,12 +54,17 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(markup).toContain(PRIVACY_CHANGES[0].details[0].slice(0, 40).replace(/'/g, "&#x27;"));
   });
 
-  it("offre les deux issues, et elles seules", () => {
+  it("informe sans rien faire accepter : un seul bouton, aucune suppression", () => {
     const markup = render([PRIVACY_CHANGES[0]]);
-    expect(markup).toContain("J&#x27;accepte");
-    expect(markup).toContain("Je refuse, je supprime mon compte");
+    expect(markup).toContain("J&#x27;ai pris connaissance");
+    expect(markup).toContain("aucun accord ne t&#x27;est demandé");
+    // Ni acceptation, ni refus qui coûterait le compte (RGPD, art. 7.4 et 21).
+    expect(markup).not.toMatch(/J&#x27;accepte|Je refuse|supprime mon compte|Supprimer définitivement/);
     expect(markup).not.toMatch(/Plus tard|Fermer/);
+    expect(markup.match(/<button/g)).toHaveLength(1);
+    // L'opposition et les autres droits : la politique, ouverte à côté.
     expect(markup).toContain('href="/rgpd"');
+    expect(markup).toMatch(/t&#x27;opposer à un traitement/);
   });
 
   it("parle au singulier pour un seul changement", () => {
@@ -79,26 +84,15 @@ describe("PrivacyChangesModal — contrats du geste", () => {
     expect(source).toContain("changeIds: changes.map((change) => change.id)");
   });
 
-  it("supprime le compte par la route ordinaire, après aperçu du plan", () => {
-    expect(source).toContain('fetch("/api/profile/deletion"');
-    expect(source).toContain('fetch("/api/profile", { method: "DELETE" })');
-    expect(source).toContain("accountDeletionConfirmation(subject)");
-    expect(source).toContain("Supprimer définitivement mon compte");
+  it("ne touche jamais au compte : ni aperçu ni route de suppression", () => {
+    expect(source).not.toContain("/api/profile/deletion");
+    expect(source).not.toMatch(/method: "DELETE"/);
+    expect(source).not.toContain("account-deletion");
   });
 
   it("n'est pas refermable par Échap ni par un clic à côté", () => {
-    expect(source).toMatch(/if \(step === "CONFIRM_DELETE"\) setStep\("REVIEW"\)/);
+    expect(source).toContain("onClose: () => {}");
     expect(source).not.toMatch(/overlay[^>]*onClick/);
-  });
-
-  it("ne pose jamais le focus sur le bouton de refus", () => {
-    // Au montage, rien : la liste reçoit le focus. En confirmation, le premier
-    // bouton est « Retour » ; au retour en lecture, c'est la liste.
-    expect(source).toContain("mountedStep.current === step");
-    expect(source).toContain(`querySelector<HTMLElement>('[role="region"]')`);
-    const confirmStep = source.slice(source.indexOf("SUPPRESSION DÉFINITIVE"));
-    expect(confirmStep.indexOf("Retour")).toBeGreaterThan(-1);
-    expect(confirmStep.indexOf("Retour")).toBeLessThan(confirmStep.indexOf("Supprimer définitivement mon compte"));
   });
 
   it("passe par useToast pour les retours, jamais un message en ligne", () => {

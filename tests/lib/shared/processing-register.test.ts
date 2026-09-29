@@ -97,9 +97,13 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(retention).toMatch(/sans limite/);
   });
 
-  it("déclare l'acceptation des changements de politique et leur annonce Discord", () => {
+  it("déclare l'information sur les changements de politique et leur annonce Discord", () => {
     const t10 = byRef("T10");
-    expect(t10.dataCategories.join(" ")).toMatch(/accept/i);
+    expect(t10.dataCategories.join(" ")).toMatch(/pris connaissance/i);
+    // Informer n'est pas faire consentir (art. 12 à 14) : aucun accord n'est recueilli.
+    expect(t10.legalBasis).toMatch(/information/i);
+    expect(t10.legalBasis).not.toMatch(/consentement/i);
+    expect(t10.subPurposes.join(" ")).not.toMatch(/supprime mon compte|J'accepte/);
     expect(t10.subPurposes.join(" ")).toMatch(/Discord/);
     expect(t10.retention.join(" ")).toMatch(/Durée du compte/);
   });
