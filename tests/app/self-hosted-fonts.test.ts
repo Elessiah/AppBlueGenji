@@ -98,7 +98,9 @@ describe("polices hébergées dans le dépôt", () => {
       const isLatin = /Latin$/.test(face.name);
       // Précharger un sous-ensemble ferait télécharger ses glyphes à chaque
       // page, même quand aucun n'y figure.
-      expect(face.body.includes("preload: false")).toBe(!isLatin);
+      // Exo 2, dépréciée, n'est plus la police par défaut : même son latin
+      // n'est plus préchargé.
+      expect(face.body.includes("preload: false")).toBe(!isLatin || face.name === "exo2Latin");
       // Un seul repli ajusté par famille : celui du latin, placé en fin de pile.
       expect(face.body.includes("adjustFontFallback: false")).toBe(!isLatin);
     }
