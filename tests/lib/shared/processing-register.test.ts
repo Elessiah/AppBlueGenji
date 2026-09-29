@@ -11,7 +11,12 @@ import {
   REGISTER_EXPORT_COLUMNS,
   REGISTER_UPDATED_AT,
   SESSION_RETENTION_DAYS,
-  US_TRANSFER_MECHANISM,
+  ALL_TRANSFER_RECIPIENTS,
+  DPF_ADEQUACY_DECISION,
+  ONEDRIVE_BACKUP_FRAMEWORK,
+  STANDARD_CONTRACTUAL_CLAUSES,
+  TRANSFER_RECIPIENTS,
+  transferBasis,
   csvCell,
   registerController,
   registerExportFilename,
@@ -250,18 +255,74 @@ describe("bases légales : le registre et la politique disent la même chose", (
     for (const activity of PROCESSING_ACTIVITIES) {
       for (const transfer of activity.transfers) {
         expect(transfer).not.toMatch(/garanties propres/);
-        if (transfer !== "Aucun") expect(transfer).toContain(US_TRANSFER_MECHANISM);
+        // Plus de formule conditionnelle : chaque transfert dit sur quoi il repose.
+        expect(transfer).not.toMatch(/à défaut|pour un destinataire certifié/);
+        if (transfer !== "Aucun") {
+          expect(transfer).toMatch(/2023\/1795|clauses contractuelles types/);
+        }
       }
     }
-    expect(US_TRANSFER_MECHANISM).toMatch(/2023\/1795/);
-    expect(US_TRANSFER_MECHANISM).toMatch(/clauses contractuelles types/);
+    expect(DPF_ADEQUACY_DECISION).toMatch(/2023\/1795/);
+    expect(DPF_ADEQUACY_DECISION).toMatch(/10 juillet 2023/);
+    expect(STANDARD_CONTRACTUAL_CLAUSES).toMatch(/clauses contractuelles types/);
+  });
+
+  it("rattache Google, Microsoft, Apple, Mozilla et Discord au DPF, Blizzard aux clauses contractuelles types", () => {
+    expect(ALL_TRANSFER_RECIPIENTS).toHaveLength(Object.keys(TRANSFER_RECIPIENTS).length);
+    for (const r of ["GOOGLE", "MICROSOFT", "APPLE", "MOZILLA", "DISCORD"] as const) {
+      expect(TRANSFER_RECIPIENTS[r].mechanism).toBe("DPF");
+    }
+    expect(TRANSFER_RECIPIENTS.BLIZZARD.mechanism).toBe("SCC");
+  });
+
+  describe("transferBasis", () => {
+    it("nomme un destinataire certifié au singulier", () => {
+      expect(transferBasis(["DISCORD"])).toBe(
+        `Discord, certifié EU-U.S. Data Privacy Framework : ${DPF_ADEQUACY_DECISION}`,
+      );
+    });
+
+    it("regroupe par mécanisme et sépare les deux groupes", () => {
+      expect(transferBasis(["GOOGLE", "DISCORD", "BLIZZARD"])).toBe(
+        `Google et Discord, certifiés EU-U.S. Data Privacy Framework : ${DPF_ADEQUACY_DECISION} ; Blizzard : ${STANDARD_CONTRACTUAL_CLAUSES}`,
+      );
+    });
+
+    it("énumère trois noms ou plus avec une virgule et un « et » final", () => {
+      expect(transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])).toMatch(
+        /^Google, Mozilla, Apple et Microsoft, certifiés /,
+      );
+    });
+
+    it("ignore les doublons, et rend une chaîne vide sans destinataire", () => {
+      expect(transferBasis(["DISCORD", "DISCORD"])).toBe(transferBasis(["DISCORD"]));
+      expect(transferBasis([])).toBe("");
+    });
+
+    it("nomme seul Blizzard sans groupe DPF", () => {
+      expect(transferBasis(["BLIZZARD"])).toBe(`Blizzard : ${STANDARD_CONTRACTUAL_CLAUSES}`);
+    });
   });
 
   it("nomme Microsoft, destinataire des sauvegardes chiffrées (T09), avec le pays du transfert", () => {
-    const backups = PROCESSING_ACTIVITIES.find((a) => a.transfers.join(" ").includes("OneDrive"));
+    const backups = PROCESSING_ACTIVITIES.find((a) => a.recipients.join(" ").includes("OneDrive"));
     expect(backups).toBeDefined();
     expect(backups!.recipients.join(" ")).toMatch(/Microsoft/);
     expect(backups!.transfers.join(" ")).toMatch(/États-Unis/);
+    expect(backups!.transfers.join(" ")).toContain(transferBasis(["MICROSOFT"]));
+  });
+
+  it("n'affirme aucun lieu de stockage des sauvegardes, ni un DPA qu'un compte personnel n'a pas", () => {
+    const backups = PROCESSING_ACTIVITIES.find((a) => a.recipients.join(" ").includes("OneDrive"))!;
+    const text = JSON.stringify(backups);
+    expect(text).not.toMatch(/Irlande|Pays-Bas|Data Protection Addendum|\bDPA\b/);
+    expect(text).toContain(ONEDRIVE_BACKUP_FRAMEWORK);
+    expect(ONEDRIVE_BACKUP_FRAMEWORK).toMatch(/Contrat de services Microsoft/);
+    expect(ONEDRIVE_BACKUP_FRAMEWORK).toMatch(/lieu de stockage non garanti/);
+    // La garantie est le chiffrement côté association ; celui de Microsoft n'est qu'un complément.
+    expect(backups.security.join(" ")).toMatch(/avant tout envoi/);
+    expect(backups.security.join(" ")).toMatch(/aucune clé n'est transmise à Microsoft/);
+    expect(backups.security.join(" ")).toMatch(/Mesures complémentaires de Microsoft/);
   });
 
   it("dit où le site et le bot sont hébergés", () => {

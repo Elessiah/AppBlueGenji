@@ -33,7 +33,7 @@ import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notification
 import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-10-01";
+export const REGISTER_UPDATED_AT = "2026-09-29";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -44,12 +44,80 @@ export const SESSION_RETENTION_DAYS = 30;
 export const DISCORD_CODE_VALIDITY_MINUTES = 10;
 
 /**
- * Mécanisme d'un transfert vers les États-Unis (RGPD art. 45 et 46), nommé une
- * fois pour le registre et pour `/rgpd` : « dans le cadre des garanties propres
- * à chacun » ne désignait aucune garantie.
+ * Encadrement des transferts hors de l'Union européenne (RGPD art. 45 et 46),
+ * **destinataire par destinataire** : la formule conditionnelle d'avant
+ * (« adéquation pour un destinataire certifié, à défaut clauses contractuelles
+ * types ») ne disait pour aucun d'eux sur quoi il reposait. Écrit une fois pour
+ * le registre et pour `/rgpd`.
  */
-export const US_TRANSFER_MECHANISM =
-  "décision d'adéquation (UE) 2023/1795 du 10 juillet 2023 (EU-U.S. Data Privacy Framework) pour un destinataire certifié, à défaut clauses contractuelles types de la Commission européenne (art. 46 RGPD)";
+export type TransferRecipient = "DISCORD" | "GOOGLE" | "MICROSOFT" | "APPLE" | "MOZILLA" | "BLIZZARD";
+
+/** Décision d'adéquation qui couvre les entreprises certifiées EU-U.S. Data Privacy Framework. */
+export const DPF_ADEQUACY_DECISION =
+  "décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)";
+
+/** Clauses contractuelles types, pour un destinataire dont le transfert ne repose pas sur le DPF. */
+export const STANDARD_CONTRACTUAL_CLAUSES =
+  "clauses contractuelles types de la Commission européenne (art. 46 RGPD), intégrées à ses conditions d'utilisation";
+
+export type TransferMechanism = "DPF" | "SCC";
+
+export const TRANSFER_RECIPIENTS: Record<TransferRecipient, { name: string; mechanism: TransferMechanism }> = {
+  DISCORD: { name: "Discord", mechanism: "DPF" },
+  GOOGLE: { name: "Google", mechanism: "DPF" },
+  MICROSOFT: { name: "Microsoft", mechanism: "DPF" },
+  APPLE: { name: "Apple", mechanism: "DPF" },
+  MOZILLA: { name: "Mozilla", mechanism: "DPF" },
+  BLIZZARD: { name: "Blizzard", mechanism: "SCC" },
+};
+
+/** Tous les destinataires hors UE, dans l'ordre où `/rgpd` les nomme. */
+export const ALL_TRANSFER_RECIPIENTS: readonly TransferRecipient[] = [
+  "DISCORD",
+  "GOOGLE",
+  "MICROSOFT",
+  "APPLE",
+  "MOZILLA",
+  "BLIZZARD",
+];
+
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
+}
+
+/**
+ * Le mécanisme de chaque destinataire nommé, regroupé par mécanisme :
+ * « Google et Discord, certifiés EU-U.S. Data Privacy Framework : décision
+ * d'adéquation… ; Blizzard : clauses contractuelles types… ». Liste vide →
+ * chaîne vide.
+ */
+export function transferBasis(recipients: readonly TransferRecipient[]): string {
+  const unique = recipients.filter((r, i) => recipients.indexOf(r) === i);
+  const named = (mechanism: TransferMechanism) =>
+    unique.filter((r) => TRANSFER_RECIPIENTS[r].mechanism === mechanism).map((r) => TRANSFER_RECIPIENTS[r].name);
+  const dpf = named("DPF");
+  const scc = named("SCC");
+  const parts: string[] = [];
+  if (dpf.length > 0) {
+    const certified = dpf.length > 1 ? "certifiés" : "certifié";
+    parts.push(`${joinNames(dpf)}, ${certified} EU-U.S. Data Privacy Framework : ${DPF_ADEQUACY_DECISION}`);
+  }
+  if (scc.length > 0) parts.push(`${joinNames(scc)} : ${STANDARD_CONTRACTUAL_CLAUSES}`);
+  return parts.join(" ; ");
+}
+
+/**
+ * Cadre des sauvegardes déposées sur OneDrive. Le compte est **personnel** : il
+ * relève du Contrat de services Microsoft et de sa déclaration de
+ * confidentialité, sans contrat de sous-traitance (le DPA de Microsoft ne vaut
+ * que pour ses offres professionnelles), et Microsoft n'y garantit aucun lieu de
+ * stockage — d'où aucune localisation affirmée. La garantie que tient
+ * l'association est le chiffrement avant envoi, sur sa propre machine ; le
+ * chiffrement au repos de Microsoft et le TLS en transit ne font que s'y ajouter.
+ */
+export const ONEDRIVE_BACKUP_FRAMEWORK =
+  "compte Microsoft personnel, régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft";
 
 export interface RegisterController {
   name: string;
@@ -166,7 +234,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Discord, qui achemine le message privé contenant le code",
     ],
     transfers: [
-      `Possibles vers les États-Unis, selon le fournisseur que le joueur choisit pour se connecter (Google, Discord, Blizzard) : ${US_TRANSFER_MECHANISM}`,
+      `Possibles vers les États-Unis, selon le fournisseur que le joueur choisit pour se connecter — ${transferBasis(["GOOGLE", "DISCORD", "BLIZZARD"])}`,
     ],
     security: [
       ...COMMON_SECURITY,
@@ -201,7 +269,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Staff d'arbitrage et d'administration",
       "Discord, qui achemine le message privé d'une demande d'adhésion",
     ],
-    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${US_TRANSFER_MECHANISM}`],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY,
       "Modification d'un score verrouillée dès que la manche suivante est entamée",
@@ -239,7 +307,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et caster d'un même match, de son lancement à sa fin",
       "Discord, qui achemine les messages",
     ],
-    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${US_TRANSFER_MECHANISM}`],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY,
       "Pseudo non certifié invisible de tous, administrateurs compris ; pseudo certifié jamais montré à un visiteur sans compte",
@@ -270,7 +338,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Discord (hébergement du salon)",
       "Responsable technique (journaux du serveur)",
     ],
-    transfers: [`États-Unis : Discord — ${US_TRANSFER_MECHANISM}`],
+    transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
     security: [...COMMON_SECURITY, "Salon privé, accès restreint par rôle Discord"],
   },
   {
@@ -341,7 +409,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiants d'utilisateurs : le temps nécessaire aux temps de recharge et à la modération",
     ],
     recipients: ["Staff de l'association", "Discord (plateforme d'exécution)"],
-    transfers: [`États-Unis : Discord — ${US_TRANSFER_MECHANISM}`],
+    transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
     security: COMMON_SECURITY,
   },
   {
@@ -364,15 +432,16 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "Responsable technique de l'association, seul détenteur des clés de déchiffrement",
-      "Microsoft (OneDrive personnel de l'hébergeur du site), qui stocke les copies chiffrées sans pouvoir les lire",
+      `Microsoft (OneDrive de l'hébergeur du site — ${ONEDRIVE_BACKUP_FRAMEWORK}), qui stocke les copies chiffrées sans pouvoir les lire`,
     ],
     transfers: [
-      `Possibles vers les États-Unis : Microsoft (OneDrive personnel de l'hébergeur du site), qui stocke des données chiffrées avant envoi avec une clé que seule l'association détient, sans pouvoir les lire — ${US_TRANSFER_MECHANISM}`,
+      `Possibles vers les États-Unis (lieu de stockage non garanti par Microsoft) : Microsoft, qui ne reçoit que des données chiffrées avant envoi avec une clé que seule l'association détient — ${transferBasis(["MICROSOFT"])}`,
     ],
     security: [
-      "Chiffrement avant envoi (age pour les archives, rclone crypt pour les images et le journal)",
+      "Chiffrement sur le serveur de l'association avant tout envoi (age pour les archives, rclone crypt pour les images, les logos masqués et le journal) : aucune clé n'est transmise à Microsoft",
+      "Mesures complémentaires de Microsoft : chiffrement au repos de ses serveurs, envoi chiffré en transit (HTTPS/TLS)",
       "Suppression définitive, sans corbeille ni historique de versions",
-      "Clés de déchiffrement conservées hors du serveur",
+      "Clé privée des archives conservée hors du serveur ; clé des images et du journal sur le seul serveur, avec une copie de secours hors du serveur",
       "Suppressions de compte rejouées avant toute remise en service après restauration",
     ],
   },
@@ -394,7 +463,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: ["Durée du compte (effacées avec lui)"],
     recipients: ["Le joueur lui-même", "Discord, qui achemine le message privé"],
-    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${US_TRANSFER_MECHANISM}`],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
     security: [...COMMON_SECURITY, "Une annonce réservée avant l'envoi, pour qu'aucun compte ne la reçoive deux fois"],
   },
   {
@@ -429,7 +498,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
     ],
-    transfers: [`États-Unis : Discord (acheminement des alertes et des messages privés) — ${US_TRANSFER_MECHANISM}`],
+    transfers: [`États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY,
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
@@ -464,7 +533,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Le service de push de son navigateur (Google, Mozilla, Apple ou Microsoft), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
     transfers: [
-      `États-Unis : service de push du navigateur choisi par le joueur, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${US_TRANSFER_MECHANISM}`,
+      `États-Unis : service de push du navigateur choisi par le joueur, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
     ],
     security: [
       ...COMMON_SECURITY,

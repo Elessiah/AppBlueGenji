@@ -21,7 +21,12 @@ import { ProtectedContact } from "@/components/ui/protected-contact";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { PROCESSING_ACTIVITIES, US_TRANSFER_MECHANISM } from "@/lib/shared/processing-register";
+import {
+  ALL_TRANSFER_RECIPIENTS,
+  ONEDRIVE_BACKUP_FRAMEWORK,
+  PROCESSING_ACTIVITIES,
+  transferBasis,
+} from "@/lib/shared/processing-register";
 import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
@@ -540,15 +545,28 @@ export default async function RgpdPage() {
               messages chiffrés qu&apos;il ne peut pas lire.
             </li>
             <li>
-              <strong>Microsoft</strong> (OneDrive personnel de l&apos;hébergeur, stockage possible
-              aux États-Unis) : les sauvegardes, <strong>chiffrées avant envoi</strong> avec une clé
-              que seule l&apos;association détient — Microsoft les stocke sans pouvoir les lire.
+              <strong>Microsoft</strong> (OneDrive) : les sauvegardes, <strong>chiffrées avant
+              envoi</strong> avec une clé que seule l&apos;association détient — Microsoft les
+              stocke sans pouvoir les lire.
             </li>
           </ul>
           <p>
-            Un transfert vers les États-Unis repose sur la {US_TRANSFER_MECHANISM}. Le détail, par
-            traitement, figure au registre ci-dessous.
+            <strong>Encadrement des transferts.</strong> Ces services peuvent traiter ou héberger
+            des données aux États-Unis. Le transfert y repose, pour chacun, sur :{" "}
+            {transferBasis(ALL_TRANSFER_RECIPIENTS)}.
           </p>
+          <p>
+            <strong>Sauvegardes.</strong> Elles sont déposées sur le OneDrive d&apos;un{" "}
+            {ONEDRIVE_BACKUP_FRAMEWORK} : le site n&apos;affirme donc aucun lieu de stockage, et un
+            transfert vers les États-Unis repose sur le mécanisme de Microsoft Corporation (
+            {transferBasis(["MICROSOFT"])}). La garantie que tient
+            l&apos;association est ailleurs : archives de la base, images, logos masqués et journal
+            des suppressions sont <strong>chiffrés sur le Raspberry Pi avant tout envoi</strong>,
+            avec une clé que seule l&apos;association détient et qui n&apos;est jamais transmise à
+            Microsoft. Le chiffrement au repos de ses serveurs par Microsoft et le chiffrement en
+            transit (HTTPS/TLS) s&apos;y ajoutent comme mesures complémentaires.
+          </p>
+          <p>Le détail, par traitement, figure au registre ci-dessous.</p>
         </div>
       </section>
 

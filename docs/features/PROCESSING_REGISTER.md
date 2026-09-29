@@ -25,6 +25,20 @@ plus la **base légale**, que le modèle ne demande pas mais qu'on attend de
 retrouver en cas de contrôle. Chaque traitement a une référence stable (`T01`…),
 qui sert d'ancre (`/rgpd/registre#t09`) et de repère dans une réponse à la CNIL.
 
+## Transferts : un mécanisme par destinataire
+
+`TRANSFER_RECIPIENTS` rattache chaque destinataire hors UE à **son** mécanisme —
+Google, Microsoft, Apple, Mozilla et Discord à la décision d'adéquation
+(UE) 2023/1795 (EU-U.S. Data Privacy Framework), Blizzard aux clauses
+contractuelles types —, et `transferBasis([...])` en rédige la phrase, regroupée
+par mécanisme, pour le registre comme pour `/rgpd`. La formule d'avant
+(« adéquation pour un destinataire certifié, à défaut clauses contractuelles
+types ») ne disait pour aucun sur quoi il reposait. Un destinataire ajouté
+demain s'ajoute au registre avec son mécanisme, vérifié sur la liste officielle
+du DPF. Les sauvegardes OneDrive ont leur cadre à part
+(`ONEDRIVE_BACKUP_FRAMEWORK` : compte personnel, sans contrat de sous-traitance
+ni lieu de stockage garanti), voir `BACKUP_DATA_PROTECTION.md`.
+
 ## Les durées ne peuvent pas mentir
 
 Le registre cite une durée ; le code en applique une. Pour qu'elles soient la
