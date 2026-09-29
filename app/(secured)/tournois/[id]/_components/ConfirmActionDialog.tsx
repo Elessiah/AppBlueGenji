@@ -28,7 +28,8 @@ export interface ConfirmActionDialogProps {
 
 /**
  * Confirmation commune des gestes irréversibles de la fiche tournoi — abandon,
- * retrait d'une pénalité, lancement forcé d'un match.
+ * retrait d'une pénalité, lancement forcé d'un match, et inscription (qu'un
+ * joueur ne peut pas défaire seul : ton `primary`, le geste n'est pas une perte).
  *
  * Ils passaient par `window.confirm`, quand leurs voisins (retour en arrière,
  * suppression, retrait d'un engagé) ont une modale : une boîte système qu'un
