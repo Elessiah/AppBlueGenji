@@ -13,7 +13,13 @@ import { TERMS_VERSION } from "../lib/shared/terms-of-use";
  *    ni DEV_AUTH_USER_ID).
  */
 
+// La page de connexion redirige un visiteur déjà connecté (`app/connexion/page.tsx`) :
+// sous le bypass DEV_AUTH, elle n'affiche jamais le formulaire.
+const SIGNED_IN_SKIP = "Bypass DEV_AUTH actif : /connexion redirige le visiteur connecté.";
+
 test.describe("Consentement RGPD", () => {
+  test.skip(!!process.env.E2E_AUTH_USER, SIGNED_IN_SKIP);
+
   test("affiche la popup à la première visite et débloque la connexion après acceptation", async ({
     page,
   }) => {
@@ -53,7 +59,22 @@ test.describe("Consentement RGPD", () => {
   });
 });
 
+test.describe("Connexion déjà ouverte", () => {
+  test.skip(!process.env.E2E_AUTH_USER, "Sans bypass DEV_AUTH, aucune session à rediriger.");
+
+  test("renvoie le visiteur connecté vers sa destination, jamais vers le formulaire", async ({
+    page,
+  }) => {
+    await page.goto("/connexion?redirect=/equipes");
+    await expect(page).toHaveURL(/\/equipes$/);
+    await page.goto("/connexion?redirect=https://exemple.invalid");
+    await expect(page).toHaveURL(/\/tournois$/);
+  });
+});
+
 test.describe("Connexion", () => {
+  test.skip(!!process.env.E2E_AUTH_USER, SIGNED_IN_SKIP);
+
   // L'utilisateur a déjà consenti (RGPD et conditions d'utilisation en
   // vigueur) : la popup ne s'affiche pas et les voies d'authentification sont
   // directement actionnables. Le gate de consentement est couvert séparément

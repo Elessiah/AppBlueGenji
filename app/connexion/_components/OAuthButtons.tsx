@@ -18,6 +18,7 @@
  */
 import { CyberButton } from "@/components/cyber/CyberButton";
 import { DISCORD_LOGIN_TAG_NOTICE } from "@/lib/shared/identity-sharing";
+import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 import {
   OAUTH_PROVIDER_LABELS,
   OAUTH_PROVIDER_SLUGS,
@@ -105,17 +106,7 @@ export function OAuthButtons({
               </a>
             </CyberButton>
             {note ? (
-              <p
-                className="mono"
-                id={noteId}
-                style={{
-                  fontSize: 10,
-                  color: "var(--ink-dim)",
-                  letterSpacing: "0.08em",
-                  lineHeight: 1.5,
-                  margin: "6px 0 0",
-                }}
-              >
+              <p id={noteId} style={{ ...LOGIN_HELP_TEXT_STYLE, margin: "6px 0 0" }}>
                 {note}
               </p>
             ) : null}
