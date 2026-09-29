@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   LOGIN_PATH,
+  TERMS_POSTPONED_MAX_AGE_SECONDS,
   TERMS_POSTPONED_VALUE,
   isTermsPostponed,
   recruitmentModalSilenced,
@@ -90,7 +91,11 @@ describe("câblage des modales globales", () => {
   it("« Plus tard » pose le cookie de session, l'acceptation l'efface", () => {
     expect(terms).toMatch(/const later = \(\) => \{[\s\S]*?writePostponedCookie\(true\)/);
     expect(terms).toContain("writePostponedCookie(false)");
-    expect(terms).not.toMatch(/writePostponedCookie[\s\S]*?max-age=\d{2,}/);
+    expect(terms).toContain("max-age=${TERMS_POSTPONED_MAX_AGE_SECONDS}");
+  });
+
+  it("borne le report à douze heures (la restauration de session garde un cookie sans durée)", () => {
+    expect(TERMS_POSTPONED_MAX_AGE_SECONDS).toBe(12 * 60 * 60);
   });
 
   it("le report survit à un lien ouvert depuis un autre site (lax, jamais strict)", () => {

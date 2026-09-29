@@ -203,7 +203,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // signalant doit tenir même quand personne n'ouvre le panneau.
   schedulePurgeExpiredReports();
   const termsRequired = await termsRequiredFor(user?.id);
-  // « Plus tard » tient pour la session (cookie) : sans quoi la modale revenait
+  // « Plus tard » tient douze heures (cookie) : sans quoi la modale revenait
   // à chaque chargement complet. Un geste de gestion refusé la rouvre malgré lui.
   const termsPostponed = isTermsPostponed(cookieStore.get(TERMS_POSTPONED_COOKIE)?.value);
   const termsDueOnLoad = termsModalDueOnLoad({

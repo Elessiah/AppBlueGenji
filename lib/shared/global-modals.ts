@@ -19,13 +19,22 @@ import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 export const LOGIN_PATH = "/connexion";
 
 /**
- * Cookie de **session** posé par « Plus tard » sur la modale des conditions :
- * sans lui, le report ne vivait que dans l'état React et la modale revenait à
- * chaque chargement complet (F5, nouvel onglet, lien ouvert depuis Discord).
- * Il ne contient que `1`, aucun identifiant ; il disparaît à la fermeture du
- * navigateur, et un geste de gestion refusé rouvre la modale malgré lui.
+ * Cookie posé par « Plus tard » sur la modale des conditions : sans lui, le
+ * report ne vivait que dans l'état React et la modale revenait à chaque
+ * chargement complet (F5, nouvel onglet, lien ouvert depuis Discord). Il ne
+ * contient que `1`, aucun identifiant ; il dure au plus
+ * {@link TERMS_POSTPONED_MAX_AGE_SECONDS}, tombe à chaque connexion et
+ * déconnexion, et un geste de gestion refusé rouvre la modale malgré lui.
  */
 export const TERMS_POSTPONED_COOKIE = "bg_terms_later";
+
+/**
+ * Durée du report : douze heures. Un cookie de session sans `max-age` ne
+ * « disparaît à la fermeture du navigateur » que si la restauration de session
+ * est coupée — activée, il revient au redémarrage et le report tiendrait tant
+ * que dure la session du site (30 jours). La durée est donc posée, pas espérée.
+ */
+export const TERMS_POSTPONED_MAX_AGE_SECONDS = 12 * 60 * 60;
 
 /** Valeur unique du cookie de report. */
 export const TERMS_POSTPONED_VALUE = "1";

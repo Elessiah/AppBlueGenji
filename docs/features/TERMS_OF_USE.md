@@ -24,14 +24,22 @@ connecte toujours.
 Recevoir la main sur une équipe (propriété transférée, rôle de gérant, fantôme
 confiée) ne passe par aucun geste de celui qui la reçoit. La mise en page racine
 pose donc la question à chaque chargement (`needsTermsForTeamManagement`) et
-présente les conditions ; « Plus tard » ferme la fenêtre pour la **session**
-(cookie de session `bg_terms_later`, valeur `1`, `SameSite=Lax` pour survivre
-à un lien ouvert depuis Discord, effacé à chaque connexion et déconnexion
-puisqu'il n'est lié à aucun compte, lu par la mise en page — gardé
-dans le seul état React, le report tombait à chaque F5, nouvel onglet ou lien
-ouvert depuis Discord), mais les gestes de gestion restent refusés en
-**409 `TERMS_ACCEPTANCE_REQUIRED`**, et ce refus rouvre la fenêtre
+présente les conditions. « Plus tard » ferme la fenêtre pour **douze heures au
+plus** ; les gestes de gestion restent refusés en **409
+`TERMS_ACCEPTANCE_REQUIRED`**, et ce refus rouvre la fenêtre
 (`TERMS_REQUIRED_EVENT`), report ou non.
+
+Le report vit dans un cookie `bg_terms_later` (valeur `1`), lu par la mise en
+page : gardé dans le seul état React, il tombait à chaque F5, nouvel onglet ou
+lien ouvert depuis Discord. Trois réglages le tiennent :
+
+- `max-age` **posé** (12 h) — un cookie sans durée revient au redémarrage du
+  navigateur quand la restauration de session est active ;
+- `SameSite=Lax` — un lien ouvert depuis Discord est une navigation venue d'un
+  autre site, qui n'emporte pas un cookie `Strict` ;
+- **effacé à chaque connexion et déconnexion** (`createSession` /
+  `clearSession`) — il n'est lié à aucun compte, et le report d'un joueur ne
+  doit pas valoir pour le suivant sur un ordinateur partagé.
 
 La fenêtre se tait sur `/conditions-utilisation` et sur `/connexion`, et fait
 taire la modale d'arrivée du recrutement tant qu'elle s'ouvre d'elle-même :
