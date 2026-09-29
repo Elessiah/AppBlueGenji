@@ -35,7 +35,8 @@ describe("loadPendingPrivacyChanges", () => {
     const last = PRIVACY_CHANGES.at(-1)!;
     // Midi UTC la veille de sa publication.
     jest.setSystemTime(new Date(Date.parse(`${last.publishedAt}T12:00:00Z`) - 86_400_000));
-    mockExecute([{ created_at: "2025-01-01 10:00:00", change_id: null }]);
+    // Relié à Google : seule la date peut taire la dernière entrée, même ciblée.
+    mockExecute([{ created_at: "2025-01-01 10:00:00", google_linked: 1, change_id: null }]);
     const pending = await loadPendingPrivacyChanges(7);
     expect(pending.map((c) => c.id)).not.toContain(last.id);
     expect(pending.every((c) => c.publishedAt < last.publishedAt)).toBe(true);

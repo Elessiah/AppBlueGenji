@@ -95,7 +95,10 @@ export type PrivacyChangeLink = { href: string; label: string };
  * (`bg_users.google_sub`). Le site ne sait pas par quelle porte un compte est
  * **né** — il ne garde que les identités rattachées —, si bien qu'un compte né
  * par Discord puis rattaché à Google est compté : une entrée ciblée ainsi doit
- * donc se rédiger au conditionnel (« a pu »).
+ * donc se rédiger au conditionnel (« a pu »). L'inverse échappe à la cible :
+ * un compte né par Google puis détaché de Google (`google_sub` remis à `NULL`)
+ * n'en garde aucune trace en base, et n'est donc pas compté — limite assumée,
+ * faute d'un fait qui la lèverait sans nouvelle collecte.
  */
 export type PrivacyAudience = "GOOGLE_LINKED";
 

@@ -118,7 +118,10 @@ d'avant gardent le pseudo et la photo que Google leur a donnés. Décision de
 l'association : **rien n'est modifié d'office**, le titulaire est informé une fois
 et invité à les changer. Le site ne sait pas par quelle porte un compte est
 **né**, seulement quelles identités il porte : un compte né par Discord puis
-relié à Google est donc compté, d'où une entrée rédigée au conditionnel. Sa date
+relié à Google est donc compté, d'où une entrée rédigée au conditionnel. À
+l'inverse, un compte né par Google puis **détaché** de Google (autre porte
+rattachée, `google_sub` remis à `NULL`) n'en garde aucune trace et n'est pas
+informé : limite assumée, aucun fait ne la lève sans nouvelle collecte. Sa date
 est celle de la règle et non celle du déploiement de l'entrée — c'est elle qui
 sépare les comptes concernés, `publishedAt` bornant la création.
 
