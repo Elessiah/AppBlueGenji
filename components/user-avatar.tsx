@@ -79,8 +79,10 @@ export function UserAvatar({
   // image cassée : masquer son avatar **renomme** le fichier
   // (`lib/server/avatar-rotation.ts`), et la barre de navigation — rendue par
   // la mise en page, qu'une sauvegarde de profil ne recharge pas — garde
-  // l'ancienne adresse jusqu'au prochain chargement complet. Mémorisé par
-  // adresse : une nouvelle URL retente l'image.
+  // l'ancienne adresse jusqu'au prochain chargement complet ; un fichier
+  // disparu (restauration sans images, purge) fait de même. Mémorisé par
+  // adresse : une nouvelle URL retente l'image. Vaut pour les deux rendus,
+  // halo compris.
   const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
   if (src && src !== failedSrc) {
@@ -94,6 +96,7 @@ export function UserAvatar({
           size="sm"
           borderRadius={999}
           borderColor={borderColor}
+          onError={() => setFailedSrc(src)}
         />
       );
     }

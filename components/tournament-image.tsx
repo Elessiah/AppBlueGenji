@@ -1,5 +1,7 @@
+"use client";
+
 import Image from "next/image";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import {
   imageObjectPosition,
   tournamentImageSlot,
@@ -18,6 +20,12 @@ import s from "./tournament-image.module.css";
  *
  * L'image est **décorative** (`alt=""`) : elle est toujours posée à côté du nom
  * du tournoi, qu'une alternative textuelle ne ferait que répéter.
+ *
+ * Un fichier **injoignable** (restauration sans images, purge) rend lui aussi
+ * **rien** plutôt qu'une icône d'image cassée : c'est le même repli que
+ * l'absence d'image. D'où un composant client — `onError` ne s'écoute que dans
+ * le navigateur. L'échec est mémorisé **par adresse** : une nouvelle image
+ * (remplacée depuis la fiche, arrivée par le flux) retente le chargement.
  */
 
 type BannerProps = {
@@ -33,7 +41,8 @@ type BannerProps = {
 
 /** Bandeau d'une **illustration** ; rien pour un logo ou sans image. */
 export function TournamentImageBanner({ image, sizes, className, fade = true, priority }: BannerProps) {
-  if (!image || tournamentImageSlot(image) !== "BANNER") return null;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (!image || tournamentImageSlot(image) !== "BANNER" || image.url === failedUrl) return null;
   return (
     <div className={[s.banner, fade ? s.bannerFade : "", className ?? ""].filter(Boolean).join(" ")}>
       <Image
@@ -43,6 +52,7 @@ export function TournamentImageBanner({ image, sizes, className, fade = true, pr
         sizes={sizes}
         priority={priority}
         className={s.cover}
+        onError={() => setFailedUrl(image.url)}
         style={{ objectPosition: imageObjectPosition(image) }}
       />
     </div>
@@ -62,14 +72,23 @@ type EmblemProps = {
 
 /** Pastille d'un **logo** ; rien pour une illustration ou sans image. */
 export function TournamentImageEmblem({ image, size, className, priority }: EmblemProps) {
-  if (!image || tournamentImageSlot(image) !== "EMBLEM") return null;
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (!image || tournamentImageSlot(image) !== "EMBLEM" || image.url === failedUrl) return null;
   return (
     <div
       className={[s.emblem, className ?? ""].filter(Boolean).join(" ")}
       style={{ "--tournament-emblem-size": `${size}px` } as CSSProperties}
     >
       <div className={s.emblemFrame}>
-        <Image src={image.url} alt="" fill sizes={`${size * 2}px`} priority={priority} className={s.contain} />
+        <Image
+          src={image.url}
+          alt=""
+          fill
+          sizes={`${size * 2}px`}
+          priority={priority}
+          className={s.contain}
+          onError={() => setFailedUrl(image.url)}
+        />
       </div>
     </div>
   );
