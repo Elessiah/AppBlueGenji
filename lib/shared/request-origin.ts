@@ -1,9 +1,14 @@
 /**
- * Une requête qui **ouvre ou ferme une session** vient-elle du site lui-même ?
+ * Une requête vient-elle du site lui-même ?
  *
- * `SameSite=Lax` protège les routes authentifiées : un site tiers ne peut pas y
- * faire porter le cookie de la victime. Il ne protège **pas** celles qui
- * *posent* la session — elles n'ont besoin d'aucun cookie pour agir. Un site
+ * Posée d'abord sur les routes qui **ouvrent ou ferment une session**, puis
+ * étendue à **toute écriture** sous `/api/` (`middleware.ts`), parce que
+ * `SameSite=Lax` ne protège qu'à moitié les routes authentifiées : il refuse le
+ * cookie à un site **tiers**, pas à un sous-domaine voisin du même domaine —
+ * une requête *same-site*, que ce module refuse justement comme non maîtrisée.
+ *
+ * Les routes qui *posent* la session, elles, ne sont pas protégées du tout par
+ * `SameSite` — elles n'ont besoin d'aucun cookie pour agir. Un site
  * tiers soumettait donc, en navigation de premier niveau, un
  * `<form method=post enctype=text/plain>` dont le nom de champ reconstitue un
  * JSON valide (`{"credential":"<jeton de l'attaquant>","x":"` + `=` + `"}`) :
@@ -32,6 +37,58 @@ export const CROSS_SITE_REQUEST = "CROSS_SITE_REQUEST";
 export const UNSUPPORTED_CONTENT_TYPE = "UNSUPPORTED_CONTENT_TYPE";
 
 export type RequestOriginRefusal = typeof CROSS_SITE_REQUEST | typeof UNSUPPORTED_CONTENT_TYPE;
+
+/** Type de média d'un `Content-Type` (sans paramètres), en minuscules. */
+function mediaTypeOf(contentType: string | null): string {
+  return (contentType ?? "").split(";")[0].trim().toLowerCase();
+}
+
+/**
+ * Le corps est-il **déclaré** en JSON ? `application/json`, tout type suffixé
+ * `+json` (`application/reports+json`, rapports CSP de l'API Reporting) et
+ * `application/csp-report` (rapports de l'ancienne directive `report-uri`).
+ *
+ * Aucun des trois n'est à la portée d'un formulaire HTML, qui ne sait envoyer
+ * que `text/plain`, `application/x-www-form-urlencoded` ou
+ * `multipart/form-data` ; un `fetch` d'un autre site qui en poserait un
+ * déclencherait une requête préalable CORS, que le site ne satisfait pas.
+ */
+export function isJsonContentType(contentType: string | null): boolean {
+  const mediaType = mediaTypeOf(contentType);
+  return (
+    mediaType === "application/json" ||
+    mediaType === "application/csp-report" ||
+    /^application\/[a-z0-9.+-]+\+json$/.test(mediaType)
+  );
+}
+
+/**
+ * Méthodes qui ne font qu'**écrire** : le contrôle de provenance ne vise
+ * qu'elles. Une lecture (`GET`, `HEAD`, `OPTIONS`) n'a rien à défendre — les
+ * rappels OAuth et le flux SSE en sont, et un site tiers ne lit de toute façon
+ * pas la réponse.
+ */
+export function isWriteMethod(method: string): boolean {
+  return !["GET", "HEAD", "OPTIONS"].includes(method.toUpperCase());
+}
+
+/**
+ * Routes d'écriture **exemptées** du contrôle de provenance du middleware.
+ *
+ * Deux routes anonymes, qui ne font agir aucune session et ne lisent aucun
+ * cookie : le collecteur CSP (`/api/csp-report`), dont les rapports sont émis
+ * par le navigateur lui-même, avec une provenance qu'aucune norme ne fixe, et
+ * le compteur de visites (`/api/visits`). Refuser l'un ou l'autre ne
+ * protégerait rien et ferait perdre, en silence, un signal.
+ */
+export const PROVENANCE_EXEMPT_API_PATHS: readonly string[] = ["/api/csp-report", "/api/visits"];
+
+/** La route d'écriture `pathname` doit-elle prouver sa provenance ? */
+export function apiWriteNeedsProvenance(pathname: string, method: string): boolean {
+  if (!pathname.startsWith("/api/") || !isWriteMethod(method)) return false;
+  const path = pathname.replace(/\/+$/, "");
+  return !PROVENANCE_EXEMPT_API_PATHS.includes(path);
+}
 
 export interface RequestOriginSignals {
   /** En-tête `Sec-Fetch-Site`, ou `null`. */
@@ -86,8 +143,8 @@ export function requestOriginRefusal(
   }
 
   if (options.requireJson) {
-    const mediaType = (signals.contentType ?? "").split(";")[0].trim().toLowerCase();
-    if (mediaType !== "application/json") return UNSUPPORTED_CONTENT_TYPE;
+    if (mediaTypeOf(signals.contentType) !== "application/json") return UNSUPPORTED_CONTENT_TYPE;
+
   }
 
   return null;

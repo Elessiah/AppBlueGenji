@@ -1,6 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
+import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
 
 /** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
 export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
@@ -24,6 +26,8 @@ export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
  * en-tête de réponse, qui, lui, suit {@link CSP_MODE}.
  */
 export function middleware(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/api/")) return guardApiRequest(request);
+
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
   const nonce = btoa(String.fromCharCode(...bytes));
@@ -55,16 +59,41 @@ export function middleware(request: NextRequest) {
 }
 
 /**
+ * Toute **écriture** sous `/api/` doit venir du site lui-même.
+ *
+ * `SameSite=Lax` ne refuse le cookie de session qu'à un site **tiers** : un
+ * sous-domaine voisin du même domaine est *same-site*, et son formulaire ou son
+ * `fetch` fait porter la session du visiteur jusqu'à n'importe quelle route
+ * authentifiée — plusieurs d'entre elles agissent sans corps (inscription,
+ * départ d'équipe, forfait, avancée d'un tournoi), routes d'administration
+ * comprises. Posé ici, le contrôle couvre la route ajoutée demain sans que
+ * personne ait à s'en souvenir : c'est le seul endroit par où passent toutes.
+ *
+ * Les lectures passent sans rien regarder (`NextResponse.next()`, aucun en-tête
+ * touché) : rappels OAuth, flux SSE, images servies. Deux écritures anonymes
+ * sont exemptées (`PROVENANCE_EXEMPT_API_PATHS`).
+ */
+function guardApiRequest(request: NextRequest) {
+  if (!apiWriteNeedsProvenance(request.nextUrl.pathname, request.method)) {
+    return NextResponse.next();
+  }
+  return rejectCrossSiteRequest(request, { requireJson: false }) ?? NextResponse.next();
+}
+
+/**
  * Périmètre du middleware.
  *
- * Tout sauf `/api/`, les fichiers déjà bâtis et les icônes : une politique n'a
- * rien à dire d'une réponse JSON ou d'une image, et la route de flux
- * (`/api/tournaments/[id]/stream`) tient une connexion ouverte que rien ne doit
- * venir envelopper.
+ * Deux entrées, pour deux rôles. La première couvre les **pages** — tout
+
+ * sauf `/api/`, les fichiers déjà bâtis et les icônes : une politique n'a rien
+ * à dire d'une réponse JSON ou d'une image. Les préchargements du routeur en
+ * sont exclus par `missing` : ils ne rendent pas de document, donc leur nonce
+ * ne servirait à personne — et chacun en aurait consommé un.
  *
- * Les préchargements du routeur sont exclus par `missing` : ils ne rendent pas
- * de document, donc leur nonce ne servirait à personne — et chacun en aurait
- * consommé un.
+ * La seconde couvre `/api/`, pour le seul contrôle de provenance des écritures
+ * ({@link guardApiRequest}) : aucune politique n'y est posée, et une lecture —
+ * la route de flux (`/api/tournaments/[id]/stream`) tient une connexion ouverte
+ * — ressort telle qu'elle est entrée.
  */
 export const config = {
   matcher: [
@@ -75,5 +104,6 @@ export const config = {
         { type: "header", key: "purpose", value: "prefetch" },
       ],
     },
+    "/api/:path*",
   ],
 };
