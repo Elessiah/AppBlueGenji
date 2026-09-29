@@ -139,3 +139,22 @@
     transform: translateX(-50%);
   }
 }
+
+/* Sous le voile des modales, comme les autres boutons flottants
+   (`floating-button-scroll.ts`, `AccessibilityMenu.module.css`). */
+:global(html:has([aria-modal="true"]:not([hidden]))) .root {
+  visibility: hidden;
+}
+
+/* Estompé pendant un défilement en mobile, sauf panneau ouvert ou focus
+   dedans : en match, il est l'un des quatre flottants du bas de l'écran. */
+@media (max-width: 720px) {
+  .pill {
+    transition: opacity 0.2s ease;
+  }
+
+  :global(html[data-page-scrolling]) .root:not(:focus-within):not(:has([aria-expanded="true"])) .pill {
+    opacity: 0.15;
+    pointer-events: none;
+  }
+}

@@ -359,9 +359,51 @@
 
   /* Pendant un défilement, le bouton s'efface et laisse passer le toucher :
      il recouvrait le début des lignes là où le geste s'arrêtait (gouttière de
-     16 px). Il revient dès que la page est immobile (`floating-button-scroll.ts`). */
-  .root[data-scrolling="true"] .fab {
+     16 px). Il revient dès que la page est immobile (`floating-button-scroll.ts`)
+     — et ne s'efface jamais menu ouvert ou focus dedans. */
+  :global(html[data-page-scrolling]) .root:not(:focus-within):not(:has([aria-expanded="true"])) .fab {
     opacity: 0.15;
     pointer-events: none;
   }
+}
+
+/* Une modale ouverte : le bouton, en bas à gauche, couvrait la case « J'ai lu
+   et j'accepte » de la modale de consentement de `/connexion` — et passait
+   sous d'autres voiles (1000, 1250). Le masquer retirerait le menu à qui en a
+   besoin pour lire une modale qu'on ne peut pas écarter (changements de
+   confidentialité, conditions) : il reste donc offert, au-dessus de tous les
+   voiles, mais réduit et remonté dans le coin haut gauche, où il ne recouvre
+   que la marge du voile et le rembourrage du panneau — les modales sont
+   centrées. Le panneau s'ouvre alors vers le bas. La règle est posée sur la
+   présence d'une modale, pas sur une liste de `z-index` à tenir à jour. */
+:global(html:has([aria-modal="true"]:not([hidden]))) .root {
+  top: 8px;
+  bottom: auto;
+  left: 8px;
+  z-index: 1310;
+}
+
+:global(html:has([aria-modal="true"]:not([hidden]))) .fab {
+  width: 36px;
+  height: 36px;
+}
+
+:global(html:has([aria-modal="true"]:not([hidden]))) .icon {
+  width: 30px;
+  height: 30px;
+}
+
+:global(html:has([aria-modal="true"]:not([hidden]))) .panel {
+  top: calc(100% + 10px);
+  bottom: auto;
+  transform-origin: top left;
+}
+
+/* Exception : le recadrage d'image (`components/ui/image-crop-dialog.tsx`,
+   reconnu à ses poignées `[data-handle]`) occupe tout l'écran d'un téléphone —
+   8 px de voile, son titre et les poignées du cadre passent sous le coin haut
+   gauche. C'est un outil qu'on referme d'un geste, pas un texte à lire : le
+   bouton s'y retire. */
+:global(html:has([aria-modal="true"]:not([hidden]) [data-handle])) .root {
+  visibility: hidden;
 }

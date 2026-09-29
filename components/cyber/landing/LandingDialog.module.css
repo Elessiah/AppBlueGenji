@@ -16,3 +16,72 @@
   max-height: calc(100dvh - 40px);
   overflow-y: auto;
 }
+
+/* Bouton « × » : à droite, collé en haut du panneau pendant qu'il défile. Les
+   panneaux des sections sont des colonnes flex, où un `float` ne fait rien :
+   `align-self` le pousse à droite, sur sa propre ligne (le titre, en dessous,
+   ne passe jamais sous lui), et la marge basse négative rend l'écart que le
+   `gap` de la colonne ajouterait. Le `float` sert un panneau qui ne serait pas
+   en flex. Les marges négatives le logent dans le rembourrage du panneau. */
+.close {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  float: right;
+  align-self: flex-end;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin: -12px -12px -14px 8px;
+  padding: 0;
+  border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
+  border-radius: 999px;
+  background: var(--cyber-bg-2, #11151c);
+  color: var(--ink);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.close:hover:not(:disabled) {
+  border-color: var(--blue-500, #5ac8ff);
+  color: var(--blue-100, #e6f6ff);
+}
+
+@media (forced-colors: active) {
+  .close:focus-visible {
+    outline: 2px solid Highlight;
+  }
+}
+
+.close:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--blue-500, #5ac8ff);
+}
+
+.close:disabled {
+  color: var(--ink-dim);
+  cursor: not-allowed;
+}
+
+/* Listes déroulantes des formulaires de la vitrine : la flèche native, propre
+   au système, détonnait avec le reste du site — même chevron que `.field`. */
+.panel select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2359d4ff' d='M1 1l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 11px center;
+  padding-right: 35px;
+  cursor: pointer;
+}
+
+@media (forced-colors: active) {
+  .panel select {
+    appearance: auto;
+    background-image: none;
+    padding-right: revert;
+  }
+}

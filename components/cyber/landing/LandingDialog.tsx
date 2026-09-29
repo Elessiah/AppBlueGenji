@@ -71,6 +71,20 @@ export function LandingDialog({
         aria-busy={ariaBusy || undefined}
         tabIndex={-1}
       >
+        {/* Fermeture d'en-tête, collée en haut du panneau : sur téléphone, le
+            bouton « Annuler » d'un long formulaire est à plus de mille pixels,
+            et le voile ne laisse qu'une vingtaine de pixels à viser. */}
+        <button
+          type="button"
+          className={`${styles.close} tap-target`}
+          onClick={onClose}
+          disabled={busy}
+          aria-label="Fermer"
+          title="Fermer"
+          data-dialog-close
+        >
+          <span aria-hidden="true">×</span>
+        </button>
         {children}
       </div>
     </div>,

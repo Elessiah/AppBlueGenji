@@ -150,7 +150,41 @@ describe("useDialogBehavior — focus initial", () => {
     // Pris ailleurs, un champ marqué mais désactivé ou masqué ferait échouer
     // `focus()` en silence : le focus resterait derrière le voile.
     expect(hook).toMatch(/candidates\.find\(\(el\) => el\.hasAttribute\("data-autofocus"\)\)/);
-    expect(hook).toContain("(preferred ?? candidates[0] ?? containerRef.current)?.focus()");
+    expect(hook).toContain("(preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus()");
+  });
+
+  it("passe le bouton « × » d'en-tête pour aller au premier contrôle du contenu", () => {
+    expect(hook).toMatch(/candidates\.find\(\(el\) => !el\.hasAttribute\("data-dialog-close"\)\)/);
+  });
+});
+
+describe("LandingDialog — fermeture d'en-tête et listes déroulantes", () => {
+  const dialog = readFileSync(join(ROOT, "components", "cyber", "landing", "LandingDialog.tsx"), "utf8");
+  const css = stripComments(
+    readFileSync(join(ROOT, "components", "cyber", "landing", "LandingDialog.module.css"), "utf8"),
+  );
+
+  it("porte un bouton « Fermer » nommé, agrandi au toucher, bloqué pendant un envoi", () => {
+    const button = dialog.slice(dialog.indexOf("<button"), dialog.indexOf("</button>"));
+    expect(button).toContain('aria-label="Fermer"');
+    expect(button).toContain("tap-target");
+    expect(button).toContain("onClick={onClose}");
+    expect(button).toContain("disabled={busy}");
+    expect(button).toContain("data-dialog-close");
+    expect(button).toMatch(/<span aria-hidden="true">×<\/span>/);
+  });
+
+  it("le place avant le contenu, pour qu'il reste collé en haut du panneau", () => {
+    expect(dialog.indexOf("data-dialog-close")).toBeLessThan(dialog.indexOf("{children}"));
+    expect(css).toMatch(/\.close\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;/);
+    // Les panneaux sont des colonnes flex : un `float` seul y serait ignoré.
+    expect(css).toMatch(/\.close\s*\{[^}]*align-self:\s*flex-end;/);
+  });
+
+  it("habille les listes déroulantes, et rend la flèche native en contrastes forcés", () => {
+    expect(css).toMatch(/\.panel select\s*\{[^}]*appearance:\s*none;[^}]*background-image:/);
+    const forced = css.slice(css.indexOf("@media (forced-colors: active)"));
+    expect(forced).toMatch(/\.panel select\s*\{[^}]*appearance:\s*auto;/);
   });
 
   it.each(["app/association/BureauSection.tsx", "app/benevoles/BenevolesSection.tsx"])(

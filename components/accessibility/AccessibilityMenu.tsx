@@ -16,7 +16,7 @@ import {
   resolveMenuOpener,
   type AccessibilityMenuRequest,
 } from "@/lib/shared/accessibility-menu-request";
-import { FLOATING_BUTTON_SETTLE_MS, shouldFadeFloatingButton } from "@/lib/shared/floating-button-scroll";
+import { OPEN_MODAL_SELECTOR } from "@/lib/shared/floating-button-scroll";
 import styles from "./AccessibilityMenu.module.css";
 
 /**
@@ -113,14 +113,18 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
 
   useEffect(() => {
     if (!open) return;
-    // Échap ne répond que si le focus est dans le menu, ou nulle part : une
-    // modale ouverte par-dessus (lancement de match) traite son propre Échap,
-    // et le focus ne doit pas lui être repris.
+    // Échap répond si le focus est dans le menu, nulle part, ou dans une
+    // modale : le menu passe au-dessus des modales, et tant que son panneau
+    // est ouvert `useDialogBehavior` lui laisse Échap (Safari ne focalisant pas
+    // un bouton cliqué, le focus a pu rester dans la modale). Le focus n'est
+    // alors pas repris à la modale. Ailleurs dans la page, Échap appartient à
+    // ce qui a le focus.
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
       const active = document.activeElement;
       const inside = active !== null && rootRef.current?.contains(active) === true;
-      if (!inside && active !== null && active !== document.body) return;
+      const inModal = active?.closest?.(OPEN_MODAL_SELECTOR) != null;
+      if (!inside && !inModal && active !== null && active !== document.body) return;
       setOpen(false);
       if (inside) restoreFocus();
       else returnFocusRef.current = null;
@@ -143,34 +147,6 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
     };
   }, [open, restoreFocus]);
 
-  // Estompé pendant un défilement (en mobile seulement, par la feuille) : il
-  // recouvrait le début des lignes là où le geste s'arrêtait. L'attribut est
-  // posé sur le DOM plutôt qu'en état React — un défilement ne re-rend rien.
-  useEffect(() => {
-    const root = rootRef.current;
-    if (!root || open) return;
-    let timer: number | undefined;
-    const settle = () => {
-      delete root.dataset.scrolling;
-    };
-    const onScroll = () => {
-      const focusWithin = root.contains(document.activeElement);
-      if (!shouldFadeFloatingButton({ menuOpen: false, focusWithin })) {
-        settle();
-        return;
-      }
-      root.dataset.scrolling = "true";
-      window.clearTimeout(timer);
-      timer = window.setTimeout(settle, FLOATING_BUTTON_SETTLE_MS);
-    };
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.clearTimeout(timer);
-      settle();
-    };
-  }, [open]);
-
   const update = (next: A11ySettingKey[]) => {
     setSettings(next);
     applySettings(next);
@@ -186,7 +162,7 @@ export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
   return (
     // `a11y-always-contrast` : le menu se lit toujours en contraste renforcé,
     // réglage coché ou non — c'est lui qui permet de l'activer.
-    <div ref={rootRef} className={`${styles.root} a11y-always-contrast`}>
+    <div ref={rootRef} className={`${styles.root} a11y-always-contrast`} data-dialog-exempt>
       <button
         ref={buttonRef}
         type="button"

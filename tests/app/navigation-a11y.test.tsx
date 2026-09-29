@@ -78,6 +78,18 @@ describe("PublicNavPanel — page courante", () => {
     expect(currentLinks(panel("/"))).toEqual([]);
   });
 
+  it("mène aux listes des tournois et des équipes, pas à des sections de l'accueil", () => {
+    const html = panel("/");
+    expect(html).toContain('href="/tournois"');
+    expect(html).toContain('href="/equipes"');
+    expect(html).not.toMatch(/href="\/#/);
+  });
+
+  it("signale les listes des tournois et des équipes comme page courante", () => {
+    expect(currentLinks(panel("/tournois/42"))).toEqual(["Tournois"]);
+    expect(currentLinks(panel("/equipes"))).toEqual(["Équipes"]);
+  });
+
   it("porte l'identifiant que le bouton désigne", () => {
     expect(panel("/")).toContain('<nav id="menu"');
   });
