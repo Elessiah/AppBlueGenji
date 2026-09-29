@@ -790,34 +790,8 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   padding: 10px;
 }
 
-.cta-float-home {
-  position: fixed;
-  bottom: 78px;
-  right: 28px;
-  z-index: 100;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 22px;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(18, 36, 68, 0.70);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  color: var(--text-1);
-  font-weight: 600;
-  font-size: 15px;
-  cursor: pointer;
-  overflow: hidden;
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease, color 0.22s ease;
-}
-
 /* Bouton d'aide flottant des pages de tournoi : pastille ronde « ? » renvoyant
-   vers les règles du mode joué. Même ancrage que .cta-float-home (les deux ne
-   coexistent jamais sur une même page). Empilement (70) : sous les modales de
+   vers les règles du mode joué. Empilement (70) : sous les modales de
    page (80 et plus), qu'il recouvrait sinon — un bouton flottant n'a rien à
    faire devant une boîte de dialogue ouverte. */
 .cta-float-help {
@@ -866,70 +840,6 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
     height: 44px;
     font-size: 18px;
   }
-}
-
-.cta-float-home::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: -85%;
-  width: 55%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
-  transform: skewX(-18deg);
-  transition: left 0.52s ease;
-  pointer-events: none;
-}
-
-.cta-float-home:hover::before {
-  left: 145%;
-}
-
-.cta-float-home:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.36);
-  color: var(--text-0);
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.45),
-    inset 0 1px 0 rgba(255, 255, 255, 0.18);
-}
-
-
-/* Variante cyan */
-.cta-float-home.home {
-  border-color: rgba(89, 212, 255, 0.55);
-  background: rgba(12, 35, 65, 0.75);
-  color: rgb(89, 212, 255);
-  box-shadow:
-    0 4px 24px rgba(0, 0, 0, 0.45),
-    0 0 28px rgba(89, 212, 255, 0.22),
-    inset 0 1px 0 rgba(89, 212, 255, 0.15);
-  animation: ctaGlowCyan 3.2s ease-in-out infinite;
-  animation-play-state: var(--deco-anim-state);
-}
-
-.cta-float-home.home:hover {
-  border-color: rgba(89, 212, 255, 0.68);
-  color: rgb(89, 212, 255);
-  box-shadow:
-    0 8px 28px rgba(0, 0, 0, 0.45),
-    0 0 20px rgba(89, 212, 255, 0.16),
-    inset 0 1px 0 rgba(89, 212, 255, 0.18);
-}
-
-@keyframes ctaGlowBlue {
-  0%, 100% { box-shadow: 0 6px 32px rgba(89, 212, 255, 0.45), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
-  50%       { box-shadow: 0 6px 46px rgba(89, 212, 255, 0.68), 0 2px 8px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.3); }
-}
-
-@keyframes ctaGlowGold {
-  0%, 100% { box-shadow: 0 4px 24px rgba(0,0,0,0.45), 0 0 22px rgba(245,195,58,0.15), inset 0 1px 0 rgba(245,195,58,0.12); }
-  50%       { box-shadow: 0 4px 24px rgba(0,0,0,0.45), 0 0 38px rgba(245,195,58,0.32), inset 0 1px 0 rgba(245,195,58,0.12); }
-}
-
-@keyframes ctaGlowCyan {
-  0%, 100% { box-shadow: 0 4px 24px rgba(0,0,0,0.45), 0 0 28px rgba(89,212,255,0.22), inset 0 1px 0 rgba(89,212,255,0.15); }
-  50%       { box-shadow: 0 4px 24px rgba(0,0,0,0.45), 0 0 42px rgba(89,212,255,0.38), inset 0 1px 0 rgba(89,212,255,0.15); }
 }
 
 /* ── Effets réutilisables 3D ── */
@@ -1526,13 +1436,41 @@ html {
     grid-template-columns: 1fr;
   }
 
+  /* `minmax(0, 1fr)` et non `1fr` : la borne basse de `1fr` vaut la largeur
+     minimale du contenu, si bien qu'un libellé `nowrap` (carte de phase d'un
+     multi-phases) élargissait la colonne au-delà de sa carte et rognait toute
+     la section. Même gabarit que la règle bureau. */
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .table-row {
     grid-template-columns: 1fr;
     gap: 4px;
+  }
+
+  /* Repli en pile : l'en-tête, empilé une seule fois en haut, ne coiffait plus
+     aucune colonne, et chaque ligne n'était qu'une suite de valeurs anonymes
+     (« 6 · 2 / 0 · En lice »). Chaque valeur porte donc son intitulé
+     (`data-label`), et l'en-tête disparaît. Une cellule sans `data-label` (un
+     nom, un lien) se lit seule. */
+  .table-row.table-header {
+    display: none;
+  }
+
+  /* La première ligne visible ne double pas le cadre du tableau. */
+  .table-row.table-header + .table-row {
+    border-top: none;
+  }
+
+  .table-row > [data-label]::before {
+    content: attr(data-label);
+    margin-right: 8px;
+    color: var(--ink-mute);
+    font-size: 11px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
   }
 
   .page-shell {

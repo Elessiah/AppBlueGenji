@@ -296,8 +296,12 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
                 name={reg.teamName}
                 textClassName={styles.name}
               />
-              <span className={styles.muted}>{formatLocalDateTime(reg.registeredAt)}</span>
-              <span className={styles.muted}>{reg.finalRank ?? "-"}</span>
+              <span className={styles.muted} data-label="Inscription">
+                {formatLocalDateTime(reg.registeredAt)}
+              </span>
+              <span className={styles.muted} data-label="Classement final">
+                {reg.finalRank ?? "-"}
+              </span>
               {showActions && (
                 <span className={styles.actions} data-tap-zone>
                   {reorderable && (

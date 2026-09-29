@@ -297,6 +297,27 @@
   .actionsHead {
     display: none;
   }
+
+  /* Ni l'en-tête : empilé une fois en haut, il ne coiffait plus rien, et une
+     ligne se lisait « #1 · Équipe · 10:31:28 · - ». Les valeurs qui ne se
+     lisent pas seules portent leur intitulé (`data-label`), comme le repli
+     global de `.table-row`. */
+  .header {
+    display: none;
+  }
+
+  .header + .row {
+    border-top: none;
+  }
+
+  .row > [data-label]::before {
+    content: attr(data-label);
+    margin-right: 8px;
+    color: var(--ink-mute);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
 }
 
 /*

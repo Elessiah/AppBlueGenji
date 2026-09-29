@@ -475,13 +475,15 @@ export function EnduranceView({
                 background: isMine ? "rgba(89,212,255,0.06)" : undefined,
               }}
             >
-              <span className="num">{standing.rank}</span>
+              <span className="num" data-label="#">
+                {standing.rank}
+              </span>
               <EntrantName
                 teamId={standing.teamId}
                 name={standing.teamName}
                 textStyle={{ fontWeight: isMine ? 700 : undefined, overflowWrap: "anywhere" }}
               />
-              <span className="num">
+              <span className="num" data-label="Endurance">
                 {standing.points}
                 {/*
                   Le cumul des pénalités se lit à côté du capital, pas à sa
@@ -505,12 +507,12 @@ export function EnduranceView({
                   </span>
                 )}
               </span>
-              <span>
+              <span data-label={hasDraws ? "V / N / D" : "V / D"}>
                 {hasDraws
                   ? `${standing.wins} / ${standing.draws} / ${standing.losses}`
                   : `${standing.wins} / ${standing.losses}`}
               </span>
-              <span>
+              <span data-label="Statut">
                 {STATUS_LABELS[standing.status]}
                 {standing.eliminatedRound ? ` (M${standing.eliminatedRound})` : ""}
               </span>
