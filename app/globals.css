@@ -1240,6 +1240,15 @@ html {
   .scroll-area[data-scroll-hint~="end"] {
     --scroll-hint-end: 28px;
   }
+
+  /* Un masque efface tout ce qui est peint hors de la boîte, contour de focus
+     compris : au clavier (tablette avec clavier, toujours « coarse »), l'indice
+     cède la place au repère de focus (WCAG 2.4.7). */
+  .scroll-area[data-scroll-hint]:focus-visible,
+  .scroll-area[data-scroll-hint]:has(:focus-visible) {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
 }
 
 /* ===========================================================

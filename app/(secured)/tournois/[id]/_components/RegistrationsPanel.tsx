@@ -168,9 +168,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
 
   const onDrop = useCallback(
     (next: number[], teamId: number) => {
+      // Lâchée sous la dernière ligne visible, la ligne ne doit pas disparaître.
+      if (mustExpandToShow(next.indexOf(teamId), expanded)) setExpanded(true);
       void applyOrder(next, teamId);
     },
-    [applyOrder],
+    [applyOrder, expanded],
   );
 
   const drag = useSeedingDrag({ order, enabled: reorderable && !busy, onDrop });
@@ -222,7 +224,12 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   const actionsLabel = reorderable && removable ? "Actions" : reorderable ? "Ordre" : "Retrait";
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
-  const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
+  // Pendant un glissement, la liste s'affiche en entier : la cible peut tomber
+  // juste sous la dernière ligne visible, et la ligne tirée n'y disparaît pas.
+  const visibleRows = rows.slice(
+    0,
+    visibleRegistrationCount(rows.length, expanded || drag.draggingTeamId !== null),
+  );
 
   return (
     <div className="ds-block">

@@ -109,6 +109,11 @@ describe("ScrollArea — indice de défilement tactile", () => {
     expect(coarse).toMatch(/mask-image:\s*linear-gradient/);
   });
 
+  it("cède au repère de focus clavier, que le masque effacerait", () => {
+    const coarse = GLOBALS.slice(GLOBALS.indexOf("@media (pointer: coarse)"));
+    expect(coarse).toMatch(/\.scroll-area\[data-scroll-hint\]:focus-visible,\s*\.scroll-area\[data-scroll-hint\]:has\(:focus-visible\)\s*\{[^}]*mask-image:\s*none/);
+  });
+
   it("n'annonce rien avant toute mesure (rendu serveur)", () => {
     expect(renderToStaticMarkup(<ScrollArea ariaLabel="Zone">contenu</ScrollArea>)).not.toContain(
       "data-scroll-hint",

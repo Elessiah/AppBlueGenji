@@ -36,4 +36,14 @@ describe("repli de la liste des inscrites", () => {
     expect(panel).toContain("aria-expanded={expanded}");
     expect(panel).toContain("mustExpandToShow(");
   });
+
+  it("affiche toute la liste pendant un glissement et la déplie au lâcher", () => {
+    const panel = readFileSync(
+      join(__dirname, "..", "..", "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx"),
+      "utf8",
+    );
+    expect(panel).toMatch(/visibleRegistrationCount\(rows\.length, expanded \|\| drag\.draggingTeamId !== null\)/);
+    const onDrop = panel.slice(panel.indexOf("const onDrop"), panel.indexOf("const drag ="));
+    expect(onDrop).toContain("mustExpandToShow(");
+  });
 });
