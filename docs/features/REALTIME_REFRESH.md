@@ -471,8 +471,25 @@ sienne, et celle que l'app ouvre vers le bot pour l'alimenter. D'où un plafond
 par IP **et** un plafond global (`lib/server/bot-feed-guard.ts`) : le second
 n'est pas une ceinture de plus, c'est le seul qui tienne là où l'identité manque.
 La place réservée est rendue par toutes les portes de sortie — fin de l'amont,
-erreur de lecture, annulation du corps, abandon de la requête —, une seule
-oubliée refermant définitivement le plafond au bout de quelques visites.
+erreur de lecture, annulation du corps, abandon de la requête, éviction —, une
+seule oubliée refermant définitivement le plafond au bout de quelques visites.
+
+Plein, le plafond global se **partage** au lieu de refuser : c'était un seau
+commun, et quatorze IP tenant chacune trois flux privaient tous les visiteurs de
+`/bot` du direct (429 permanent). Le client qui tient le plus de flux cède le
+plus ancien des siens, pourvu qu'il en tienne strictement plus que le nouveau
+venu n'en aurait (`slotToEvict`) : un lecteur ordinaire déloge un client qui
+accumule, jamais un autre lecteur ordinaire, et le client délogé ne reprend pas
+sa place en se reconnectant. Un visiteur sans IP connue compte pour un client à
+une place — rien ne dit que deux inconnus sont la même personne : il n'est
+jamais délogé, et n'en déloge qu'un client identifié qui accumule. On ne
+déloge qu'une fois le bot joint (`reserveBotFeedEvictionAttempt` avant l'appel,
+éviction après) : couper un lecteur pour un nouveau venu que le bot injoignable
+laisse sans rien ne servirait personne, et chaque reconnexion en couperait un
+autre. Ces tentatives ouvrent une connexion au bot sans place : elles sont
+réservées et bornées (`MAX_PENDING_BOT_FEED_EVICTIONS` = 2), sans quoi une
+rafale de nouveaux venus dépasserait le plafond côté bot. Le flux délogé voit sa connexion au bot coupée et se termine
+proprement ; il faut désormais une IP par place pour fermer le direct à tous.
 
 L'IP retenue est celle **ajoutée par le proxy** (`X-Forwarded-For` lu depuis la
 droite sur `TRUSTED_PROXY_HOPS` relais) : un en-tête forgé ne permet pas de se
@@ -538,7 +555,7 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 | `tournaments/snapshot.ts` | Construction et mise en cache de l'instantané. |
 | `tournaments/list-cache.ts` | Cache de la liste publique. |
 | `tournaments/notifications.ts` | Publication d'événement **et** invalidation des caches. |
-| `bot-feed-guard.ts` | Plafonds du relais SSE du bot : par IP et global. |
+| `bot-feed-guard.ts` | Plafonds du relais SSE du bot : par IP et global, partagé une fois plein. |
 | `showcase-cache.ts` | Cache des lectures de vitrine (pied de page, bannière, listes). |
 
 ### Client

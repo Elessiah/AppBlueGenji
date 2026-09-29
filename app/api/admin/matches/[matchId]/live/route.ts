@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { setMatchLiveConfig, setMatchOnAir } from "@/lib/server/tournaments/live-streams";
 import { isMatchLiveTrigger } from "@/lib/shared/live-streams";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
@@ -35,7 +36,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await req.json().catch(() => ({}))) as {
+  const body = (await readJsonBody(req).catch(() => ({}))) as {
     trigger?: unknown;
     liveUrl?: unknown;
   };
@@ -69,7 +70,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await req.json().catch(() => ({}))) as { onAir?: unknown };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { onAir?: unknown };
   if (typeof body.onAir !== "boolean") return fail("INVALID_ON_AIR", 400);
 
   try {

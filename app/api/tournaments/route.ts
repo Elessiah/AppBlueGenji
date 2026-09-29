@@ -8,6 +8,7 @@ import {
   validateTournamentInput,
   type TournamentInputBody,
 } from "@/lib/server/tournaments/validation";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -26,7 +27,15 @@ export async function GET(req: Request) {
   const hiddenOnly = url.searchParams.get("scope") === "hidden";
   if (hiddenOnly && !can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
-  const buckets = await listTournamentBuckets(search, hiddenOnly ? { hiddenOnly: true } : {});
+  // `finished=all` : l'archive entière des tournois terminés, que la liste
+  // courante tronque aux plus récents (`finishedTotals` dit ce qui manque).
+  // `/tournois` ne la demande qu'une fois le lecteur allé la chercher.
+  const allFinished = url.searchParams.get("finished") === "all";
+
+  const buckets = await listTournamentBuckets(
+    search,
+    hiddenOnly ? { hiddenOnly: true } : allFinished ? { allFinished: true } : {},
+  );
   return ok({ buckets });
 }
 
@@ -36,7 +45,7 @@ export async function POST(req: Request) {
   if (!can(user, "tournaments")) return fail("FORBIDDEN", 403);
 
   try {
-    const body = (await req.json()) as TournamentInputBody & {
+    const body = (await readJsonBody(req)) as TournamentInputBody & {
       startVisibilityAt?: string;
       registrationOpenAt?: string;
       registrationCloseAt?: string;

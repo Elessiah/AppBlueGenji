@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { createBenevole, listBenevoles } from "@/lib/server/benevoles-service";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
   const benevoles = await listBenevoles();
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     joinedAt?: unknown;
   };
   try {
-    body = (await req.json()) as typeof body;
+    body = (await readJsonBody(req)) as typeof body;
   } catch {
     return fail("INVALID_BODY", 400);
   }

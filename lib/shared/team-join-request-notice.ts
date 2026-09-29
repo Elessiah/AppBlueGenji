@@ -63,14 +63,35 @@ export function teamJoinNoticeRecipients(
 }
 
 /**
- * Faut-il écrire ? Oui pour la **seule** demande de cette personne à cette
- * équipe dans la fenêtre — celle qui vient d'être déposée, d'où `<= 1`.
+ * Équipes **distinctes** qu'une même personne peut faire prévenir de ses
+ * demandes, par fenêtre de `TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS`. Des
+ * équipes, et non des demandes : retirer puis redéposer une demande à la même
+ * équipe ne fait rien partir (borne par équipe), et ne doit pas consommer ce
+ * plafond.
  *
- * @param requestsInWindow Demandes (tous statuts) de ce joueur à cette équipe
- *   créées depuis `TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS`, la nouvelle comprise.
+ * La borne par équipe ne suffit pas : sans plafond sur le nombre d'équipes, un
+ * compte — gratuit par OAuth — demandait à rejoindre chaque équipe du site et
+ * faisait écrire le bot à toutes leurs gestions dans la journée, de quoi faire
+ * classer le bot comme spammeur par Discord (ce qui couperait aussi la
+ * connexion par code). Un joueur qui cherche une équipe en sollicite quelques
+ * unes ; au-delà, ses demandes sont enregistrées et visibles sur les fiches,
+ * seul le message est retenu.
  */
-export function shouldNotifyTeamJoinRequest(requestsInWindow: number): boolean {
-  return requestsInWindow <= 1;
+export const TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP = 5;
+
+/**
+ * Faut-il écrire ? Oui pour la **seule** demande de cette personne à cette
+ * équipe dans la fenêtre — celle qui vient d'être déposée, d'où `<= 1` —, tant
+ * que les équipes qu'elle a sollicitées dans la fenêtre n'excèdent pas
+ * `TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP`.
+ *
+ * @param input.toThisTeam Demandes (tous statuts) de ce joueur à cette équipe
+ *   créées depuis `TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS`, la nouvelle comprise.
+ * @param input.toAnyTeam Équipes **distinctes** sollicitées dans la même fenêtre,
+ *   celle-ci comprise.
+ */
+export function shouldNotifyTeamJoinRequest(input: { toThisTeam: number; toAnyTeam: number }): boolean {
+  return input.toThisTeam <= 1 && input.toAnyTeam <= TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP;
 }
 
 /**

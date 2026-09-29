@@ -50,6 +50,15 @@ describe("http", () => {
       expect(response.status).toBe(404);
     });
 
+    it("rend 413 pour un corps refusé par la lecture bornée, quel que soit le statut demandé", async () => {
+      // Le refus remonte souvent par le `catch` générique d'une route.
+      for (const status of [400, 500]) {
+        const response = fail("PAYLOAD_TOO_LARGE", status);
+        expect(response.status).toBe(413);
+        await expect(response.json()).resolves.toEqual({ error: "PAYLOAD_TOO_LARGE" });
+      }
+    });
+
     it("returns error object", async () => {
       const response = fail("SOMETHING_WENT_WRONG");
       const body = await response.json();

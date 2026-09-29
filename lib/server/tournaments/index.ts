@@ -1,9 +1,11 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type {
+  FinishedTournamentTotals,
   TournamentBuckets,
   TournamentCard,
   TournamentDetail,
   TournamentFormat,
+  TournamentGame,
   TournamentSnapshot,
   TournamentState,
   TournamentViewerContext,
@@ -181,6 +183,7 @@ import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { findTournamentsNeedingSync } from "./sync-scope";
+import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
 import { loadViewerCastBlock } from "./match-launch";
 
 let pendingSync: Promise<void> | null = null;
@@ -551,6 +554,13 @@ export async function createTournament(
  */
 export type TournamentListScope = {
   hiddenOnly?: boolean;
+  /**
+   * Liste publique avec **tous** les tournois terminés. Sans ce drapeau, la
+   * liste publique n'en porte que les `FINISHED_TOURNAMENTS_LIST_LIMIT` plus
+   * récents, et dit combien il y en a en tout (`finishedTotals`). Sans effet
+   * sur une recherche ou sur `hiddenOnly`, déjà complètes.
+   */
+  allFinished?: boolean;
 };
 
 /**
@@ -599,14 +609,56 @@ export async function listTournamentBuckets(
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.
   const isSharedList = !scope.hiddenOnly && !searchTerm?.trim();
-  if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);
+  if (!isSharedList) return loadTournamentBuckets(searchTerm, scope, null);
 
-  return cachedTournamentList("public", () => loadTournamentBuckets(searchTerm, scope));
+  // Deux listes mutualisées : la courante, lue par l'accueil et chaque
+  // ouverture de `/tournois`, ne porte que les terminés les plus récents ;
+  // l'archive entière n'est calculée que pour qui la demande. Le préfixe commun
+  // les fait vider ensemble (`invalidateTournamentLists`).
+  if (scope.allFinished) {
+    return cachedTournamentList("public:all-finished", () =>
+      loadTournamentBuckets(searchTerm, scope, null),
+    );
+  }
+  return cachedTournamentList("public", () =>
+    loadTournamentBuckets(searchTerm, scope, FINISHED_TOURNAMENTS_LIST_LIMIT),
+  );
 }
 
+/**
+ * Nombre de tournois terminés visibles, en tout et par jeu — ce que la liste
+ * tronquée ne porte plus, mais que `/tournois` affiche (sommaire, pastilles de
+ * jeu, « Voir plus »).
+ */
+async function loadFinishedTotals(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  now: Date,
+): Promise<FinishedTournamentTotals> {
+  const [rows] = await db.execute<(RowDataPacket & { game: TournamentGame; total: number | string })[]>(
+    `SELECT t.game, COUNT(*) AS total
+     FROM bg_tournaments t
+     WHERE t.state = 'FINISHED' AND t.start_visibility_at <= ?
+     GROUP BY t.game`,
+    [now],
+  );
+  const totals: FinishedTournamentTotals = { all: 0, byGame: { OW: 0, MR: 0 } };
+  for (const row of rows) {
+    const count = Number(row.total) || 0;
+    totals.all += count;
+    if (row.game === "OW" || row.game === "MR") totals.byGame[row.game] += count;
+  }
+  return totals;
+}
+
+/**
+ * @param finishedLimit Nombre de tournois terminés à porter (les plus
+ * récents, dans l'ordre de la liste), ou `null` pour les porter tous. Borné,
+ * le résultat dit aussi combien il y en a en tout (`finishedTotals`).
+ */
 async function loadTournamentBuckets(
   searchTerm: string | null,
   scope: TournamentListScope,
+  finishedLimit: number | null,
 ): Promise<TournamentBuckets> {
   const db = await getDatabase();
   const now = new Date();
@@ -617,6 +669,23 @@ async function loadTournamentBuckets(
   if (searchTerm && searchTerm.trim()) {
     where.push(`LOWER(t.name) LIKE ?`);
     params.push(`%${searchTerm.trim().toLowerCase()}%`);
+  }
+
+  // La table dérivée n'est pas décorative : ni MariaDB ni MySQL n'acceptent un
+  // `LIMIT` directement dans un `IN (SELECT …)`. Même ordre que la liste, pour
+  // que les terminés portés soient bien les premiers qu'elle affiche.
+  // `finishedLimit` est un entier du module, jamais une entrée.
+  if (finishedLimit !== null) {
+    where.push(
+      `(t.state <> 'FINISHED' OR t.id IN (
+         SELECT recent.id FROM (
+           SELECT f.id FROM bg_tournaments f
+           WHERE f.state = 'FINISHED' AND f.start_visibility_at <= ?
+           ORDER BY f.start_at DESC, f.id DESC
+           LIMIT ${Math.max(0, Math.floor(finishedLimit))}
+         ) recent))`,
+    );
+    params.push(now);
   }
 
   const [rows] = await db.execute<TournamentListRow[]>(
@@ -694,7 +763,7 @@ async function loadTournamentBuckets(
       t.image_fit,
       t.image_focus_x,
       t.image_focus_y
-     ORDER BY t.start_at DESC`,
+     ORDER BY t.start_at DESC, t.id DESC`,
     params,
   );
 
@@ -704,6 +773,19 @@ async function loadTournamentBuckets(
     running: [],
     finished: [],
   };
+
+  // Sans décompte, rien ne dirait que des terminés ont été laissés de côté : une
+  // liste tronquée passerait pour complète, sans « Voir plus », et resterait en
+  // cache ainsi pour tout le monde. On sert alors la liste entière — plus
+  // lourde, jamais fausse — plutôt que de vider `/tournois` pour un compteur.
+  let finishedTotals: FinishedTournamentTotals | null = null;
+  if (finishedLimit !== null) {
+    finishedTotals = await loadFinishedTotals(db, now).catch((error: unknown) => {
+      console.error("[tournaments] décompte des tournois terminés indisponible :", error);
+      return null;
+    });
+    if (finishedTotals === null) return loadTournamentBuckets(searchTerm, scope, null);
+  }
 
   const cards = rows.map(mapCard);
   // Décoratifs : une panne de ces lectures ne doit pas vider `/tournois` et
@@ -720,6 +802,12 @@ async function loadTournamentBuckets(
     if (row.state === "REGISTRATION") buckets.registration.push(card);
     if (row.state === "RUNNING") buckets.running.push(card);
     if (row.state === "FINISHED") buckets.finished.push(card);
+  }
+
+  // Rien n'a été laissé de côté : la liste est complète, et le dit par
+  // l'absence du champ — une page n'a pas à aller chercher une archive vide.
+  if (finishedTotals && finishedTotals.all > buckets.finished.length) {
+    buckets.finishedTotals = finishedTotals;
   }
 
   return buckets;

@@ -15,7 +15,8 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { pushLeadershipAlert } from "@/lib/server/bot-integration";
-import { notifyStaff, notifyUsers, toNotificationRecipient } from "@/lib/server/notify";
+import { notifyStaff, notifyUsers, toNotificationRecipient, type NotificationRecipient } from "@/lib/server/notify";
+import { withNamedLock } from "@/lib/server/named-lock";
 import { contentReportPush, staffReportPush } from "@/lib/shared/push-messages";
 import { siteCanonicalBase } from "@/lib/server/site-url";
 import { publishStaffAction } from "@/lib/server/staff-audit";
@@ -27,7 +28,8 @@ import { canViewTournament, isTournamentPublished } from "@/lib/shared/tournamen
 import { displayTeamTag } from "@/lib/shared/team-tag";
 import type { PersonalDataExport } from "@/lib/shared/types";
 import {
-  REPORTS_HOURLY_CAP,
+  REPORTS_ADMIN_PATH,
+  REPORTS_HOURLY_HARD_CAP,
   REPORT_RESOLUTION_NOTE_MAX_LENGTH,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
@@ -35,16 +37,20 @@ import {
   REPORT_TARGET_SEARCH_MIN_LENGTH,
   formatContestAlert,
   formatReportAlert,
+  formatReportsSaturatedAlert,
   formatTargetNotice,
   isConcernedByReport,
   missingReplyChannel,
   nextReportStatus,
   reportAdminHref,
+  reportAlertMode,
   reportConcernedHref,
   reportRetainedUntil,
+  reporterMayWarnTargets,
   type ConcernedReportView,
   type ContestableReportOption,
   type ReportAction,
+  type ReportAlertMode,
   type ReportCategory,
   type ReportContestView,
   type ReportPerson,
@@ -281,7 +287,9 @@ export async function resolveReportTargets(
  * @throws REPORT_TARGETS_REQUIRE_LOGIN Des cibles désignées sans compte.
  * @throws REPORT_REPLY_CHANNEL_REQUIRED Une demande qui appelle une réponse
  *   (RGPD, hébergeur), envoyée sans compte ni adresse.
- * @throws REPORTS_SATURATED Trop de signalements reçus dans l'heure.
+ * @throws REPORTS_SATURATED Afflux au-delà du plafond **dur** de l'heure
+ *   (`REPORTS_HOURLY_HARD_CAP`). Sous lui, le dépôt est toujours accepté ;
+ *   au-delà du plafond d'alerte, seule l'alerte est retenue (`reportAlertMode`).
  * @throws REPORT_TARGET_NOT_FOUND Une cible n'existe pas ou n'est pas visible.
  */
 export async function createReport(submission: ReportSubmission, viewer: ReportViewer): Promise<number> {
@@ -292,10 +300,11 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
   const connection = await db.getConnection();
   let reportId: number;
   let targets: ReportTargetOption[];
+  let receivedInLastHour: number;
   try {
     await connection.beginTransaction();
 
-    await assertReportsNotSaturated(connection);
+    receivedInLastHour = await countRecentReports(connection);
 
     targets = await resolveReportTargets(submission.targets, viewer, connection);
     if (targets.length !== submission.targets.length) throw new Error("REPORT_TARGET_NOT_FOUND");
@@ -342,11 +351,7 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
     fromMember: viewer.userId !== null,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(reportId)}`,
   });
-  void notifyStaff({
-    topic: "STAFF_REPORT",
-    discord: () => pushLeadershipAlert(message, "content-report"),
-    push: staffReportPush({ reportId, contest: false }),
-  }).catch(() => undefined);
+  alertLeadership(receivedInLastHour, message, reportId, false);
   void notifyReportTargets(reportId, submission.category, targets, viewer.userId).catch((error) => {
     console.error("[reports] personnes visées non prévenues", error);
   });
@@ -355,12 +360,60 @@ export async function createReport(submission: ReportSubmission, viewer: ReportV
   return reportId;
 }
 
-/** @throws REPORTS_SATURATED */
-async function assertReportsNotSaturated(connection: Pick<PoolConnection, "execute">): Promise<void> {
+/**
+ * Signalements reçus dans l'heure, avant celui qu'on s'apprête à écrire.
+ *
+ * @throws REPORTS_SATURATED Au-delà du plafond **dur** : le dépôt est refusé.
+ */
+async function countRecentReports(connection: Pick<PoolConnection, "execute">): Promise<number> {
   const [recent] = await connection.execute<(RowDataPacket & { total: number })[]>(
     `SELECT COUNT(*) AS total FROM bg_reports WHERE created_at > NOW() - INTERVAL 1 HOUR`,
   );
-  if (Number(recent[0]?.total ?? 0) >= REPORTS_HOURLY_CAP) throw new Error("REPORTS_SATURATED");
+  const total = Number(recent[0]?.total ?? 0);
+  if (total >= REPORTS_HOURLY_HARD_CAP) throw new Error("REPORTS_SATURATED");
+  return total;
+}
+
+/**
+ * Dernière annonce de saturation partie de ce processus. En mémoire : au pire,
+ * un processus de plus annonce une fois de plus — jamais une de moins.
+ */
+let lastSaturationNoticeAt: number | null = null;
+
+/**
+ * Prévient la direction (Discord et push) selon le régime de l'heure : l'alerte
+ * du signalement, l'annonce de saturation, ou rien. Appelé **après** le commit :
+ * un dépôt refusé n'annonce rien. Jamais attendu.
+ *
+ * @param receivedInLastHour Compte relu avant l'écriture (`countRecentReports`).
+ */
+function alertLeadership(receivedInLastHour: number, message: string, reportId: number, contest: boolean): void {
+  const now = Date.now();
+  // Décidé et marqué sans `await` entre les deux : deux envois simultanés ne
+  // peuvent pas annoncer la saturation tous les deux.
+  const mode: ReportAlertMode = reportAlertMode(receivedInLastHour, lastSaturationNoticeAt, now);
+  if (mode === "SATURATION_NOTICE") lastSaturationNoticeAt = now;
+  // Le rythme est retombé sous le plafond : l'afflux annoncé est terminé, le
+  // suivant doit l'être de nouveau — sans quoi un second pic dans l'heure
+  // ferait taire les alertes sans que rien ne le dise.
+  if (mode === "ALERT") lastSaturationNoticeAt = null;
+  if (mode === "SILENT") return;
+  const saturated = mode === "SATURATION_NOTICE";
+  const text = saturated
+    ? formatReportsSaturatedAlert({ adminUrl: `${siteCanonicalBase()}${REPORTS_ADMIN_PATH}` })
+    : message;
+  void notifyStaff({
+    topic: "STAFF_REPORT",
+    discord: () => pushLeadershipAlert(text, contest ? "content-report-contest" : "content-report"),
+    push: saturated
+      ? {
+          title: "Afflux de signalements",
+          body: "Les signalements suivants arrivent au panneau sans alerte.",
+          url: REPORTS_ADMIN_PATH,
+          tag: "staff-report-saturated",
+        }
+      : staffReportPush({ reportId, contest }),
+  }).catch(() => undefined);
 }
 
 /**
@@ -390,6 +443,28 @@ type RecipientRow = RowDataPacket & {
   discord_verified_at: Date | string | null;
 };
 
+type Executor = Pick<PoolConnection, "execute">;
+
+/** Verrou nommé qui sérialise la réservation des avis aux personnes visées. */
+const REPORT_TARGET_NOTICE_LOCK = "bg_report_target_notices";
+/**
+ * Attente du verrou. Il n'est tenu que le temps de quelques lectures et d'une
+ * écriture — jamais pendant un envoi —, si bien qu'une attente courte suffit,
+ * et qu'une rafale de signalements n'immobilise pas le pool de connexions.
+ */
+const REPORT_TARGET_NOTICE_LOCK_WAIT_SECONDS = 10;
+
+/** Une cible marquée : joueur ou équipe. */
+type NoticeTarget = readonly ["USER" | "TEAM", number];
+
+/**
+ * Ce qu'une réservation a posé : une cible marquée par groupe, et les personnes
+ * qu'elle prévient. Chaque personne n'est rangée que dans **un** groupe (le
+ * joueur désigné d'abord, puis sa première équipe désignée) : elle ne reçoit
+ * qu'un message, et la remise se juge cible par cible.
+ */
+type TargetNoticePlan = { target: NoticeTarget; recipients: NotificationRecipient[] }[];
+
 /**
  * Prévient les personnes qu'un signalement vise — message privé Discord et
  * notification push : les joueurs désignés et les membres **actuels** des
@@ -400,10 +475,31 @@ type RecipientRow = RowDataPacket & {
  * saisi à la main peut désigner n'importe qui ; le push, lui, part aux
  * appareils que le compte a lui-même abonnés. L'auteur du signalement n'est pas prévenu de son
  * propre signalement. Un tournoi désigné ne prévient personne : il n'a pas de
- * membres, il est organisé par l'association. Une cible déjà visée dans les
- * `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` dernières heures n'est pas reprévenue :
- * le message part avant toute lecture par l'association, et sans cette borne
- * le formulaire servirait à faire écrire le bot en boucle à une équipe.
+ * membres, il est organisé par l'association. Une cible déjà **prévenue** dans
+ * les `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` dernières heures ne l'est pas de
+ * nouveau : le message part avant toute lecture par l'association, et sans
+ * cette borne le formulaire servirait à faire écrire le bot en boucle à une
+ * équipe. Et l'**auteur** est borné lui aussi (`reporterMayWarnTargets`) : un
+ * compte trop récent, ou dont les signalements ont déjà prévenu quelqu'un
+ * `REPORT_TARGET_NOTICES_DAILY_CAP` fois dans la journée, ne fait plus écrire
+ * à personne — le signalement est enregistré, consultable par les personnes
+ * visées, seul le message est retenu.
+ *
+ * Les deux bornes se **réservent**, elles ne se relisent pas : la décision et la
+ * marque (`bg_report_targets.notified_at`) se prennent sous un verrou nommé
+ * (`reserveTargetNotices`), sans quoi cinq signalements simultanés sur une même
+ * équipe liraient tous « personne n'a été prévenu » et écriraient tous. La
+ * marque ne se pose que sur les cibles qui ont donné un destinataire, et elle
+ * est **rendue**, cible par cible, si rien ne lui est parvenu (bot injoignable
+ * et aucun appareil abonné) : une cible marquée à tort rendrait muet pour 24 h
+ * le signalement légitime d'un autre.
+ *
+ * L'envoi se fait **hors** du verrou : tenu pendant l'appel au bot (jusqu'à
+ * 15 s), il gardait une connexion du pool par signalement en attente, et
+ * quelques comptes suffisaient à les prendre toutes. Reste une fenêtre
+ * assumée : un second signalement sur la même cible, arrivé pendant un envoi
+ * qui échoue, se tait sur une marque que le premier rend ensuite. Elle ne
+ * s'ouvre que bot injoignable — cas où le second n'aurait rien remis non plus.
  *
  * Meilleur effort : un bot injoignable laisse le signalement intact, les
  * personnes visées le découvriront quand l'association les contactera.
@@ -414,65 +510,157 @@ export async function notifyReportTargets(
   targets: readonly ReportTargetRef[],
   reporterUserId: number | null,
 ): Promise<void> {
-  const cooled = await recentlyNotifiedTargets(reportId, targets);
+  if (!targets.some((target) => target.type === "USER" || target.type === "TEAM")) return;
+  const db = await getDatabase();
+  const plan = await withNamedLock(db, REPORT_TARGET_NOTICE_LOCK, REPORT_TARGET_NOTICE_LOCK_WAIT_SECONDS, (connection) =>
+    reserveTargetNotices(connection, reportId, targets, reporterUserId),
+  );
+  if (!plan) return;
+
+  const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
+  // Un envoi par cible : la marque se rend **cible par cible**. Jugée sur le
+  // total, une équipe joignable seulement sur Discord restait marquée quand le
+  // bot était injoignable, dès qu'un joueur désigné à côté recevait un push. Un
+  // envoi qui échoue compte pour « rien remis », sans quoi sa marque survivrait
+  // à l'exception.
+  const outcomes = await Promise.allSettled(
+    plan.map((group) =>
+      notifyUsers(group.recipients, {
+        topic: "CONTENT_REPORT",
+        discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
+        push: contentReportPush({ reportId, category }),
+      }),
+    ),
+  );
+  const undelivered = plan
+    .filter((_, index) => {
+      const outcome = outcomes[index];
+      return outcome.status === "rejected" || (outcome.value.discord?.sent ?? 0) + outcome.value.pushed === 0;
+    })
+    .map((group) => group.target);
+  if (undelivered.length > 0) {
+    await db.execute(
+      `UPDATE bg_report_targets SET notified_at = NULL
+       WHERE report_id = ? AND (${undelivered.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
+      [reportId, ...undelivered.flat()],
+    );
+  }
+}
+
+/**
+ * Sous le verrou : écarte les cibles déjà prévenues, applique le plafond de
+ * l'auteur, relève les destinataires et **marque** les cibles qui en ont donné
+ * un. `null` quand il n'y a personne à prévenir.
+ */
+async function reserveTargetNotices(
+  connection: Executor,
+  reportId: number,
+  targets: readonly ReportTargetRef[],
+  reporterUserId: number | null,
+): Promise<TargetNoticePlan | null> {
+  const cooled = await recentlyNotifiedTargets(connection, reportId, targets);
   const notYetWarned = (target: ReportTargetRef) => !cooled.has(`${target.type}:${target.id}`);
   const userIds = targets.filter((target) => target.type === "USER" && notYetWarned(target)).map((target) => target.id);
   const teamIds = targets.filter((target) => target.type === "TEAM" && notYetWarned(target)).map((target) => target.id);
-  if (userIds.length === 0 && teamIds.length === 0) return;
+  if (userIds.length === 0 && teamIds.length === 0) return null;
+  if (reporterUserId !== null && !(await reporterMayWarn(connection, reportId, reporterUserId))) {
+    console.info(`[reports] signalement #${reportId} : personnes visées non prévenues (compte récent ou plafond du jour)`);
+    return null;
+  }
 
-  const clauses: string[] = [];
-  const params: number[] = [];
+  const notReporter = (row: RecipientRow) => reporterUserId === null || Number(row.id) !== reporterUserId;
+  const assigned = new Set<number>();
+  const plan: TargetNoticePlan = [];
+
   if (userIds.length > 0) {
-    clauses.push(`u.id IN (${userIds.map(() => "?").join(", ")})`);
-    params.push(...userIds);
+    const [rows] = await connection.execute<RecipientRow[]>(
+      `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+       FROM bg_users u
+       WHERE u.is_deleted = 0 AND u.id IN (${userIds.map(() => "?").join(", ")})`,
+      userIds,
+    );
+    for (const row of rows.filter(notReporter)) {
+      assigned.add(Number(row.id));
+      plan.push({ target: ["USER", Number(row.id)] as const, recipients: [toNotificationRecipient(row, "proven")] });
+    }
   }
   if (teamIds.length > 0) {
-    clauses.push(
-      `u.id IN (SELECT tm.user_id FROM bg_team_members tm
-                WHERE tm.left_at IS NULL AND tm.team_id IN (${teamIds.map(() => "?").join(", ")}))`,
+    const [rows] = await connection.execute<(RecipientRow & { team_id: number })[]>(
+      `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+       FROM bg_team_members tm
+       JOIN bg_users u ON u.id = tm.user_id
+       WHERE tm.left_at IS NULL AND u.is_deleted = 0 AND tm.team_id IN (${teamIds.map(() => "?").join(", ")})`,
+      teamIds,
     );
-    params.push(...teamIds);
+    for (const teamId of teamIds) {
+      const recipients: NotificationRecipient[] = [];
+      for (const row of rows) {
+        if (Number(row.team_id) !== teamId || !notReporter(row) || assigned.has(Number(row.id))) continue;
+        assigned.add(Number(row.id));
+        recipients.push(toNotificationRecipient(row, "proven"));
+      }
+      // Une équipe sans membre à prévenir (ou dont chacun l'est déjà par un
+      // autre groupe) n'est pas marquée : rien ne lui a été envoyé en son nom.
+      if (recipients.length > 0) plan.push({ target: ["TEAM", teamId] as const, recipients });
+    }
   }
+  if (plan.length === 0) return null;
+  const marked = plan.map((group) => group.target);
 
-  const db = await getDatabase();
-  const [rows] = await db.execute<RecipientRow[]>(
-    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
-     FROM bg_users u
-     WHERE u.is_deleted = 0 AND (${clauses.join(" OR ")})`,
-    params,
+  await connection.execute(
+    `UPDATE bg_report_targets SET notified_at = NOW()
+     WHERE report_id = ? AND (${marked.map(() => "(target_type = ? AND target_id = ?)").join(" OR ")})`,
+    [reportId, ...marked.flat()],
   );
+  return plan;
+}
 
-  const recipients = rows
-    .filter((row) => reporterUserId === null || Number(row.id) !== reporterUserId)
-    .map((row) => toNotificationRecipient(row, "proven"));
-  if (recipients.length === 0) return;
-
-  const url = `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
-  await notifyUsers(recipients, {
-    topic: "CONTENT_REPORT",
-    discord: { message: formatTargetNotice({ category, url }), context: "content-report-target" },
-    push: contentReportPush({ reportId, category }),
+/**
+ * L'auteur de ce signalement peut-il faire écrire aux personnes visées ?
+ * Ancienneté de son compte, et ses **autres** signalements qui ont réellement
+ * prévenu quelqu'un (`bg_report_targets.notified_at`) dans les dernières
+ * 24 heures — un tournoi désigné, une cible déjà prévenue ou un envoi retenu
+ * ne comptent pas —, jugés par `reporterMayWarnTargets`. Lu sous le verrou de
+ * la réservation, le compte est exact. Un compte introuvable ne fait écrire à
+ * personne.
+ */
+async function reporterMayWarn(connection: Executor, reportId: number, reporterUserId: number): Promise<boolean> {
+  const [rows] = await connection.execute<(RowDataPacket & { age_hours: number; earlier: number })[]>(
+    `SELECT TIMESTAMPDIFF(HOUR, u.created_at, NOW()) AS age_hours,
+            (SELECT COUNT(DISTINCT r.id)
+             FROM bg_reports r
+             JOIN bg_report_targets t ON t.report_id = r.id
+             WHERE r.reporter_user_id = u.id AND r.id <> ?
+               AND t.notified_at > NOW() - INTERVAL 24 HOUR) AS earlier
+     FROM bg_users u
+     WHERE u.id = ?`,
+    [reportId, reporterUserId],
+  );
+  if (rows.length === 0) return false;
+  return reporterMayWarnTargets({
+    accountAgeHours: Number(rows[0].age_hours),
+    earlierReportsWithTargets: Number(rows[0].earlier),
   });
 }
 
 /**
- * Cibles de ce signalement déjà visées par un **autre** signalement depuis
- * moins de `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` : elles ont été prévenues, le
- * message de plus est retenu (clés `TYPE:id`).
+ * Cibles de ce signalement déjà **prévenues** par un autre signalement depuis
+ * moins de `REPORT_TARGET_NOTICE_COOLDOWN_HOURS` (`notified_at`) : le message
+ * de plus est retenu (clés `TYPE:id`). Une cible seulement désignée — par un
+ * compte retenu, par exemple — ne compte pas : elle n'a rien reçu.
  */
 async function recentlyNotifiedTargets(
+  connection: Executor,
   reportId: number,
   targets: readonly ReportTargetRef[],
 ): Promise<Set<string>> {
   const refs = targets.filter((target) => target.type === "USER" || target.type === "TEAM");
   if (refs.length === 0) return new Set();
-  const db = await getDatabase();
-  const [rows] = await db.execute<(RowDataPacket & { target_type: ReportTargetType; target_id: number })[]>(
+  const [rows] = await connection.execute<(RowDataPacket & { target_type: ReportTargetType; target_id: number })[]>(
     `SELECT DISTINCT t.target_type, t.target_id
      FROM bg_report_targets t
-     JOIN bg_reports r ON r.id = t.report_id
-     WHERE r.id <> ?
-       AND r.created_at > NOW() - INTERVAL ${Number(REPORT_TARGET_NOTICE_COOLDOWN_HOURS)} HOUR
+     WHERE t.report_id <> ?
+       AND t.notified_at > NOW() - INTERVAL ${Number(REPORT_TARGET_NOTICE_COOLDOWN_HOURS)} HOUR
        AND (${refs.map(() => "(t.target_type = ? AND t.target_id = ?)").join(" OR ")})`,
     [reportId, ...refs.flatMap((target) => [target.type, target.id])],
   );
@@ -507,6 +695,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
   let contestId: number;
   let parentCategory: ReportCategory;
   let reopened = false;
+  let receivedInLastHour: number;
   try {
     await connection.beginTransaction();
     const [parents] = await connection.execute<
@@ -529,7 +718,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     );
     if (!concerned) throw new Error("REPORT_NOT_CONCERNED");
 
-    await assertReportsNotSaturated(connection);
+    receivedInLastHour = await countRecentReports(connection);
 
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_reports
@@ -561,11 +750,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     reopened,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(parentId)}`,
   });
-  void notifyStaff({
-    topic: "STAFF_REPORT",
-    discord: () => pushLeadershipAlert(message, "content-report-contest"),
-    push: staffReportPush({ reportId: contestId, contest: true }),
-  }).catch(() => undefined);
+  alertLeadership(receivedInLastHour, message, contestId, true);
   return contestId;
 }
 

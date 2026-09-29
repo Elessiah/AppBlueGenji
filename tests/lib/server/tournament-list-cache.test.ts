@@ -69,7 +69,7 @@ describe("listTournamentBuckets — portée mutualisée", () => {
     expect(index).toContain(
       "const isSharedList = !scope.hiddenOnly && !searchTerm?.trim();",
     );
-    expect(index).toContain("if (!isSharedList) return loadTournamentBuckets(searchTerm, scope);");
+    expect(index).toContain("if (!isSharedList) return loadTournamentBuckets(searchTerm, scope, null);");
     expect(index).toContain('cachedTournamentList("public"');
   });
 

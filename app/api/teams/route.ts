@@ -12,6 +12,7 @@ import {
   checkTeamName,
   teamFieldsAreText,
 } from "@/lib/shared/team-name";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   try {
-    const body = (await req.json()) as {
+    const body = (await readJsonBody(req)) as {
       name?: string;
       description?: string | null;
       tag?: string | null;

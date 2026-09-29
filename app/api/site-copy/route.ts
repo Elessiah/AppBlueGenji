@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { getSiteCopy, resetSiteCopy, setSiteCopy } from "@/lib/server/site-copy-service";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /** Textes du site vitrine (défauts compris). Lecture publique. */
 export async function GET() {
@@ -16,7 +17,7 @@ export async function PATCH(req: Request) {
 
   let body: { key?: unknown; value?: unknown };
   try {
-    body = (await req.json()) as typeof body;
+    body = (await readJsonBody(req)) as typeof body;
   } catch {
     return fail("INVALID_BODY", 400);
   }

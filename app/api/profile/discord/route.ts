@@ -25,6 +25,7 @@ import {
   getDiscordAccountState,
   startDiscordVerification,
 } from "@/lib/server/discord-verification";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Codes de refus et leur statut.
@@ -87,7 +88,7 @@ export async function POST(req: Request) {
   if (throttled) return throttled;
 
   try {
-    const body = (await req.json()) as { handle?: string };
+    const body = (await readJsonBody(req)) as { handle?: string };
 
     // Le plafond par **compte Discord visé** — celui qui protège le téléphone de
     // quelqu'un — ne peut être posé qu'une fois le tag résolu, et il doit
@@ -122,7 +123,7 @@ export async function PUT(req: Request) {
   if (throttled) return throttled;
 
   try {
-    const body = (await req.json()) as { discordId?: string; code?: string };
+    const body = (await readJsonBody(req)) as { discordId?: string; code?: string };
     const discordId = (body.discordId ?? "").trim();
     const code = (body.code ?? "").trim();
     if (!/^\d{5,32}$/.test(discordId)) return fail("INVALID_DISCORD_HANDLE", 400);

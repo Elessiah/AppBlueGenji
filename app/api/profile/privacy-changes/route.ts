@@ -12,6 +12,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { acknowledgePrivacyChanges } from "@/lib/server/privacy-consent";
 import { checkPrivacyAcknowledgement, INVALID_PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -19,7 +20,7 @@ export async function POST(req: Request) {
 
   let body: { changeIds?: unknown };
   try {
-    body = (await req.json()) as { changeIds?: unknown };
+    body = (await readJsonBody(req)) as { changeIds?: unknown };
   } catch {
     return fail(INVALID_PRIVACY_CHANGES, 400);
   }

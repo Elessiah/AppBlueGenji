@@ -322,6 +322,13 @@ existante, `bg_users.terms_version` et `terms_accepted_at`, sont écrites aux
 **deux** endroits (`CREATE TABLE` et `RECENT_SCHEMA_CHANGES`), sans remplissage :
 on n'attribue pas une acceptation que personne n'a donnée.
 
+`bg_report_targets.notified_at` (instant où la cible a été prévenue, `NULL` si
+rien ne lui a été envoyé) est venue ensuite, aux deux endroits elle aussi, sans
+remplissage : on ne sait pas quelles lignes antérieures ont reçu un message.
+C'est elle que relisent le délai de reprévenance et le plafond quotidien de
+l'auteur — compter une cible seulement *désignée* laissait un compte neuf,
+retenu par son plafond, rendre muet le signalement d'un autre.
+
 ## Voir aussi
 
 - `lib/server/migration-lock.ts` — la porte à passage unique et le verrou nommé

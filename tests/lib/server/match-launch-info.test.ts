@@ -7,6 +7,7 @@ import type { PoolConnection } from "mysql2/promise";
 import { withConnection } from "@/lib/server/database";
 import { publishMatchUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { listViewerMatchLaunches } from "@/lib/server/tournaments/match-launch-info";
+import { invalidateTournamentLists } from "@/lib/server/tournaments/list-cache";
 import { fakeConnection } from "../../helpers/sql-double";
 
 /**
@@ -70,6 +71,10 @@ function member(teamId: number, userId: number, overrides: Record<string, unknow
 }
 
 type World = {
+  /** Un tournoi est-il en cours sur le site ? */
+  running: boolean;
+  /** Requêtes reçues, dans l'ordre. */
+  reads: string[];
   viewerMemberships: { team_id: number; roles_json: string }[];
   viewerSolo: { id: number }[];
   candidates: Candidate[];
@@ -83,6 +88,8 @@ let state: World;
 function connectionFor(world: World): PoolConnection {
   const execute = async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
+    world.reads.push(sql);
+    if (sql.includes("AS running")) return [[{ running: world.running ? 1 : 0 }], []];
     if (sql.startsWith("UPDATE")) {
       world.writes.push(sql);
       return [{ affectedRows: 1 }, []];
@@ -120,7 +127,12 @@ function connectionFor(world: World): PoolConnection {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  // Le drapeau « un tournoi est en cours » est mutualisé : chaque test repart
+  // d'un cache vide.
+  invalidateTournamentLists();
   state = {
+    running: true,
+    reads: [],
     viewerMemberships: [{ team_id: TEAM1, roles_json: JSON.stringify(["CAPITAINE"]) }],
     viewerSolo: [],
     candidates: [candidate()],
@@ -232,6 +244,53 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
     state.viewerMemberships = [];
     state.candidates = [];
     await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
+  });
+});
+
+describe("listViewerMatchLaunches — coût de l'interrogation", () => {
+  // La modale interroge toutes les minutes sur chaque onglet d'un compte
+  // connecté : quand rien ne se joue sur le site, la réponse ne doit rien lire.
+  it("ne lit rien d'autre que le drapeau quand aucun tournoi n'est en cours", async () => {
+    state.running = false;
+
+    await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
+
+    expect(state.reads).toEqual([
+      expect.stringContaining("SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING')"),
+    ]);
+  });
+
+  it("mutualise le drapeau entre les lecteurs", async () => {
+    state.running = false;
+
+    await listViewerMatchLaunches(viewer);
+    await listViewerMatchLaunches({ id: 2, roles: [] });
+
+    expect(state.reads.filter((sql) => sql.includes("AS running"))).toHaveLength(1);
+  });
+
+  it("relit le drapeau une fois les listes de tournois invalidées", async () => {
+    state.running = false;
+    await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
+
+    state.running = true;
+    invalidateTournamentLists();
+
+    await expect(listViewerMatchLaunches(viewer)).resolves.toHaveLength(1);
+  });
+
+  // Le cas courant — des tournois en cours, aucun match pour ce lecteur — ne
+  // coûte qu'une lecture : ses équipes sont lues dans la requête des matchs.
+  it("s'arrête à la requête des matchs quand le lecteur n'en a aucun", async () => {
+    state.candidates = [];
+
+    await expect(listViewerMatchLaunches(viewer)).resolves.toEqual([]);
+
+    const afterFlag = state.reads.filter((sql) => !sql.includes("AS running"));
+    expect(afterFlag).toHaveLength(1);
+    expect(afterFlag[0]).toContain("t.name AS tournament_name");
+    expect(afterFlag[0]).toContain("FROM bg_team_members tm WHERE tm.user_id = ? AND tm.left_at IS NULL");
+    expect(afterFlag[0]).toContain("SELECT st.id FROM bg_teams st WHERE st.solo_user_id = ?");
   });
 });
 

@@ -3,6 +3,7 @@ import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { reorderBenevoleCategories } from "@/lib/server/benevoles-service";
 import { validateCategoryReorder } from "@/lib/shared/benevoles";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /** Réordonne les catégories de bénévoles (admin uniquement). */
 export async function PUT(req: Request) {
@@ -12,7 +13,7 @@ export async function PUT(req: Request) {
 
   let body: { categories?: unknown };
   try {
-    body = (await req.json()) as typeof body;
+    body = (await readJsonBody(req)) as typeof body;
   } catch {
     return fail("INVALID_BODY", 400);
   }

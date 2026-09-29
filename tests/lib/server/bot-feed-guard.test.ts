@@ -1,9 +1,11 @@
-import { beforeEach, describe, expect, it } from "@jest/globals";
+import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 import {
   MAX_BOT_FEED_STREAMS,
   MAX_BOT_FEED_STREAMS_PER_CLIENT,
   acquireBotFeedSlot,
+  MAX_PENDING_BOT_FEED_EVICTIONS,
+  reserveBotFeedEvictionAttempt,
   botFeedStreamCount,
   resetBotFeedSlots,
 } from "@/lib/server/bot-feed-guard";
@@ -73,8 +75,6 @@ describe("acquireBotFeedSlot", () => {
     }
 
     expect(acquireBotFeedSlot(null)).toBeNull();
-    // Le plafond global vaut pour tout le monde, identifié ou non.
-    expect(acquireBotFeedSlot("10.0.0.1")).toBeNull();
   });
 
   it("refuse au-delà du plafond global, même répartis sur des clients distincts", () => {
@@ -83,6 +83,111 @@ describe("acquireBotFeedSlot", () => {
     }
 
     expect(acquireBotFeedSlot("10.9.9.9")).toBeNull();
+  });
+
+  /**
+   * Le plafond global était un seau commun : quatorze IP tenant trois flux
+   * chacune privaient tous les visiteurs de `/bot` du direct. Plein, il se
+   * partage : le client qui en tient le plus cède son plus ancien flux.
+   */
+  it("déloge le plus ancien flux du client qui en accumule, au profit d'un nouveau venu", () => {
+    const evictions: string[] = [];
+    const hoarders = Math.ceil(MAX_BOT_FEED_STREAMS / MAX_BOT_FEED_STREAMS_PER_CLIENT);
+    let opened = 0;
+    for (let ip = 0; ip < hoarders && opened < MAX_BOT_FEED_STREAMS; ip += 1) {
+      for (let n = 0; n < MAX_BOT_FEED_STREAMS_PER_CLIENT && opened < MAX_BOT_FEED_STREAMS; n += 1) {
+        const label = `10.0.0.${ip}#${n}`;
+        expect(acquireBotFeedSlot(`10.0.0.${ip}`, () => evictions.push(label))).not.toBeNull();
+        opened += 1;
+      }
+    }
+    expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
+
+    expect(acquireBotFeedSlot("192.168.1.1")).not.toBeNull();
+
+    // Le premier flux du premier client à en tenir le plus : le plus ancien.
+    expect(evictions).toEqual(["10.0.0.0#0"]);
+    expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
+  });
+
+  it("ne déloge jamais un lecteur qui n'en tient pas plus que le nouveau venu", () => {
+    const evict = jest.fn();
+    for (let i = 0; i < MAX_BOT_FEED_STREAMS; i += 1) {
+      acquireBotFeedSlot(`10.0.1.${i}`, evict);
+    }
+    expect(acquireBotFeedSlot("10.9.9.9")).toBeNull();
+    expect(evict).not.toHaveBeenCalled();
+  });
+
+  it("ne laisse pas un client délogé reprendre sa place en se reconnectant", () => {
+    for (let i = 0; i < MAX_BOT_FEED_STREAMS - 2; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+    acquireBotFeedSlot("10.0.0.1");
+    acquireBotFeedSlot("10.0.0.1");
+    // Plein : 38 lecteurs à un flux, un client à deux.
+    expect(acquireBotFeedSlot("10.0.2.1")).not.toBeNull();
+    // Le client délogé n'en tient plus qu'un, comme les autres : il attend.
+    expect(acquireBotFeedSlot("10.0.0.1")).toBeNull();
+  });
+
+  it("rend la place du flux délogé une seule fois, même s'il la libère ensuite", () => {
+    let releaseVictim: (() => void) | null = null;
+    releaseVictim = acquireBotFeedSlot("10.0.0.1", () => releaseVictim?.());
+    acquireBotFeedSlot("10.0.0.1");
+    for (let i = 0; i < MAX_BOT_FEED_STREAMS - 2; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+
+    expect(acquireBotFeedSlot("10.0.3.1")).not.toBeNull();
+    releaseVictim!();
+
+    expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
+  });
+
+  it("ne compte pas les visiteurs sans IP connue comme un seul client", () => {
+    // Rien ne dit que deux inconnus sont la même personne : les regrouper
+    // ferait déloger un lecteur à un seul onglet au profit d'un visiteur identifié.
+    const evict = jest.fn();
+    for (let i = 0; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(null, evict);
+    expect(acquireBotFeedSlot("10.0.0.1")).toBeNull();
+    expect(evict).not.toHaveBeenCalled();
+  });
+
+  it("fait céder un client identifié qui accumule à un visiteur sans IP connue", () => {
+    const evict = jest.fn();
+    acquireBotFeedSlot("10.0.0.1", evict);
+    acquireBotFeedSlot("10.0.0.1");
+    for (let i = 2; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(null);
+    expect(acquireBotFeedSlot(null)).not.toBeNull();
+    expect(evict).toHaveBeenCalledTimes(1);
+  });
+
+  it("réserve des tentatives d'éviction bornées, sans rien déloger", () => {
+    const evict = jest.fn();
+    acquireBotFeedSlot("10.0.0.1", evict);
+    acquireBotFeedSlot("10.0.0.1", evict);
+    for (let i = 2; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+
+    expect(acquireBotFeedSlot("10.0.2.1", undefined, { allowEviction: false })).toBeNull();
+    const attempts = Array.from({ length: MAX_PENDING_BOT_FEED_EVICTIONS }, (_, i) =>
+      reserveBotFeedEvictionAttempt(`10.0.2.${i}`),
+    );
+    expect(attempts.every((attempt) => attempt !== null)).toBe(true);
+    // Une rafale ne passe pas au-delà : chaque tentative ouvrirait une connexion au bot.
+    expect(reserveBotFeedEvictionAttempt("10.0.3.1")).toBeNull();
+    expect(evict).not.toHaveBeenCalled();
+    expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
+
+    attempts[0]!();
+    attempts[0]!();
+    expect(reserveBotFeedEvictionAttempt("10.0.3.1")).not.toBeNull();
+  });
+
+  it("ne réserve pas de tentative quand aucune place ne serait accordée", () => {
+    for (let i = 0; i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+    // Un lecteur ordinaire ne déloge pas un autre lecteur ordinaire.
+    expect(reserveBotFeedEvictionAttempt("10.0.2.1")).toBeNull();
+  });
+
+  it("ne réserve pas de tentative quand une place est libre", () => {
+    expect(reserveBotFeedEvictionAttempt("10.0.2.1")).toBeNull();
   });
 
   it("garde un plafond par client plus étroit que le plafond global", () => {

@@ -1,5 +1,6 @@
 import { CSP_REPORT_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { logCspViolations, parseCspReport } from "@/lib/server/csp-reports";
+import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
   if (throttled) return throttled;
 
   try {
-    logCspViolations(parseCspReport(await req.json()));
+    logCspViolations(parseCspReport(await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES)));
   } catch {
     // Corps absent, tronqué ou pas du JSON : il n'y a rien à en tirer et rien
     // à dire à l'expéditeur.

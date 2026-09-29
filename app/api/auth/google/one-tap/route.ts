@@ -15,6 +15,7 @@ import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { createOrGetOAuthUser } from "@/lib/server/account-identities";
 import { verifyGoogleOneTapCredential } from "@/lib/server/google-one-tap";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
+import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request) {
   // Avant tout : un formulaire d'un autre site posant le jeton **de
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
   if (crossSite) return crossSite;
 
   try {
-    const body = (await req.json()) as { credential?: string; termsAccepted?: boolean };
+    const body = (await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES)) as { credential?: string; termsAccepted?: boolean };
     const credential = (body.credential ?? "").trim();
     if (!credential) return fail("MISSING_CREDENTIAL", 400);
 

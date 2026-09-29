@@ -318,13 +318,14 @@ describe("Schéma — la règle des deux endroits", () => {
     // `CREATE TABLE` des tables de notification et les deux rattrapages
     // permanents gardent leur `catch` muet, et c'est voulu — un rappel perdu
     // vaut mieux qu'un report de score en erreur.
-    // Onze : la boucle des changements récents, les quatre retraits de colonne,
+    // Douze : la boucle des changements récents, les quatre retraits de colonne,
     // les deux reports qui précèdent un retrait (`user_id` → `authenticated`
     // des visites, `highlight` → `priority` des annonces de recrutement),
     // `launched_at`, dont le remplissage ne suit que l'ajout effectif, et les
     // trois étapes du défaut de `open_to_recruitment` (lecture, bascule,
-    // remplissage), chacune sous son propre libellé.
-    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(11);
+    // remplissage), chacune sous son propre libellé, et la reprise unique des
+    // empreintes de visiteurs dans `bg_site_visitors`.
+    expect([...migrations.matchAll(/reportSchemaFailure\(error, /g)]).toHaveLength(12);
     expect(migrations).not.toMatch(/catch\s*\{\s*\}/);
     expect(migrations).not.toMatch(/catch\s*\{\s*\/\/[^\n]*\n\s*\}/);
   });

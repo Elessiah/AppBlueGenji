@@ -6,6 +6,8 @@ jest.mock("@/lib/server/tournaments/issue-reports");
 import { POST } from "@/app/api/tournaments/[id]/report-issue/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { reportTournamentIssue } from "@/lib/server/tournaments/issue-reports";
+import { ISSUE_REPORT_DAILY_RULE, ISSUE_REPORT_RULE } from "@/lib/server/api-guard";
+import { resetRateLimit } from "@/lib/server/rate-limit";
 import { authUser } from "../../../helpers/auth-user";
 
 type SessionUser = Awaited<ReturnType<typeof getCurrentUser>>;
@@ -153,5 +155,25 @@ describe("POST /api/tournaments/[id]/report-issue", () => {
     const res = await POST(jsonReq(VALID), params("5"));
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: "TOO_MANY_REQUESTS" });
+  });
+
+  /**
+   * Le plafond de dix minutes ne bornait qu'une rafale : un engagé pouvait
+   * écrire à tous les arbitres sept cents fois par jour.
+   */
+  it("plafonne aussi les signalements d'un même joueur sur la journée", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(player());
+
+    let accepted = 0;
+    for (let i = 0; i < ISSUE_REPORT_DAILY_RULE.limit; i++) {
+      // Chaque rafale est « oubliée » : seul le plafond du jour reste en jeu.
+      resetRateLimit(ISSUE_REPORT_RULE.name);
+      if ((await POST(jsonReq(VALID), params("5"))).status === 200) accepted += 1;
+    }
+    expect(accepted).toBe(ISSUE_REPORT_DAILY_RULE.limit);
+
+    resetRateLimit(ISSUE_REPORT_RULE.name);
+    expect((await POST(jsonReq(VALID), params("5"))).status).toBe(429);
+    expect(ISSUE_REPORT_DAILY_RULE.windowMs).toBe(24 * 60 * 60_000);
   });
 });

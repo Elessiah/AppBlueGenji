@@ -30,10 +30,18 @@ describe("page tournois — section « Tournois invisibles »", () => {
     // rafraîchissement de fond), mais elle reste étrangère aux invisibles.
     const start = page.indexOf("const load = useCallback(");
     expect(start).toBeGreaterThan(-1);
-    const publicLoad = page.slice(start, page.indexOf("[showError],", start));
+    const end = page.indexOf("[showError, wantFinishedArchive],", start);
+    expect(end).toBeGreaterThan(start);
+    const publicLoad = page.slice(start, end);
 
-    expect(publicLoad).toContain('fetchBuckets("/api/tournaments", signal)');
+    // La liste courante, ou l'archive entière des terminés une fois demandée.
+    expect(publicLoad).toContain(
+      'wantFinishedArchive ? "/api/tournaments?finished=all" : "/api/tournaments"',
+    );
     expect(publicLoad).not.toContain("scope=hidden");
+    // Une relecture de fond partie avant la demande d'archive ne doit pas
+    // remettre la liste tronquée par-dessus l'archive arrivée entre-temps.
+    expect(publicLoad).toContain("if (wantFinishedArchive !== wantFinishedArchiveRef.current) return;");
   });
 
   it("réserve la section au staff et la masque quand il n'y a rien", () => {
@@ -59,7 +67,7 @@ describe("page tournois — section « Tournois invisibles »", () => {
 
   it("compte les invisibles dans les pastilles de jeu du staff, filtrés par la recherche en cours", () => {
     expect(page).toMatch(
-      /countByGame\(queryFilteredBuckets, key\) \+\s*\(showHidden \? filterTournamentsByGame\(queryFilteredHidden, key\)\.length : 0\)/,
+      /countByGame\(queryFilteredBuckets, key\) \+\s*finishedBeyond\(key\) \+\s*\(showHidden \? filterTournamentsByGame\(queryFilteredHidden, key\)\.length : 0\)/,
     );
   });
 

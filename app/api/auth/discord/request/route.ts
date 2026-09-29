@@ -8,6 +8,7 @@ import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integ
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users-service";
+import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
 function mapRequestError(message: string): { code: string; status: number } {
   if (message === "BOT_INTERNAL_UNREACHABLE") {
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
   if (ipThrottled) return ipThrottled;
 
   try {
-    const body = (await req.json()) as { discordId?: string; handle?: string };
+    const body = (await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES)) as { discordId?: string; handle?: string };
     // `handle` = tag Discord ou ID ; `discordId` conservé pour rétrocompat.
     const handle = (body.handle ?? body.discordId ?? "").trim();
 

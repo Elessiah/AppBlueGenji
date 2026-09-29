@@ -166,9 +166,28 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
 
 | Route | Qui | Effet |
 |---|---|---|
-| `GET /api/me/match-launches` | connecté | matchs du lecteur à présenter |
+| `GET /api/me/match-launches` | connecté | matchs du lecteur à présenter (voir coût ci-dessous) |
 | `POST /api/matches/[id]/ready` | partie du match | `{ ready }` |
 | `POST /api/matches/[id]/caster` | `live` + identité vérifiée | s'inscrire |
 | `DELETE /api/matches/[id]/caster` | le caster, ou `tournaments` | se retirer / retirer |
 | `POST /api/admin/matches/[id]/launch` | `tournaments` | lancer sans attendre |
 | `PUT /api/admin/matches/[id]/host` | `tournaments` | `{ teamId \| null }` |
+
+### Coût de l'interrogation
+
+La modale interroge `GET /api/me/match-launches` toutes les minutes sur chaque
+onglet visible d'un compte connecté. Chaque appel faisait trois lectures
+(appartenances, entrée solo, matchs candidats), même quand aucun tournoi ne se
+jouait sur le site. Désormais :
+
+- **aucun tournoi en cours** → aucune lecture propre au lecteur : le drapeau
+  « un tournoi est-il en cours ? » est mutualisé avec les listes de tournois
+  (`cachedTournamentList("running-exists")`) et vidé avec elles à chaque
+  écriture sur un tournoi — un tournoi qui démarre est donc vu aussitôt ;
+- **tournois en cours, lecteur sans match** — le cas courant → **une** lecture :
+  ses équipes sont lues dans la requête des matchs candidats, et ses rôles ne
+  sont relus que s'il en a un.
+
+La cadence d'interrogation, elle, n'a pas changé : l'espacer pour les non-engagés
+retarderait la modale au moment précis où un tournoi démarre, et l'appel à vide
+ne coûte plus qu'une lecture de session.

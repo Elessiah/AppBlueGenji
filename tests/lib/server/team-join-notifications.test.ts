@@ -9,13 +9,14 @@ import { getDatabase } from "@/lib/server/database";
 import { pushDiscordDirectMessages } from "@/lib/server/bot-integration";
 import { pushToUsers } from "@/lib/server/push-subscriptions";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
+import { TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP } from "@/lib/shared/team-join-request-notice";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
-type Rows = { requests?: number; team?: { name: string } | null; members?: Record<string, unknown>[] };
+type Rows = { requests?: number; allTeams?: number; team?: { name: string } | null; members?: Record<string, unknown>[] };
 
-function mockDb({ requests = 1, team = { name: "Les Glaciers" }, members = [] }: Rows) {
+function mockDb({ requests = 1, allTeams, team = { name: "Les Glaciers" }, members = [] }: Rows) {
   const execute = jest.fn<SqlQuery>(async (sql) => {
-    if (sql.includes("COUNT(*)")) return [[{ n: requests }], []];
+    if (sql.includes("AS any_team")) return [[{ this_team: String(requests), any_team: allTeams ?? requests }], []];
     if (sql.includes("FROM bg_teams")) return [team === null ? [] : [team], []];
     if (sql.includes("FROM bg_team_members")) return [members, []];
     throw new Error(`requête inattendue : ${sql}`);
@@ -72,6 +73,21 @@ describe("notifyTeamJoinRequest", () => {
     expect(execute).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * La borne par équipe laissait un compte demander à rejoindre toutes les
+   * équipes du site, et faire écrire le bot à toutes leurs gestions.
+   */
+  it("se tait au-delà du plafond de demandes du jour, toutes équipes confondues", async () => {
+    mockDb({ requests: 1, allTeams: TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP + 1, members: [row()] });
+    await notifyTeamJoinRequest(5, 42);
+    expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
+    expect(pushToUsers).not.toHaveBeenCalled();
+
+    mockDb({ requests: 1, allTeams: TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP, members: [row()] });
+    await notifyTeamJoinRequest(5, 42);
+    expect(pushDiscordDirectMessages).toHaveBeenCalledTimes(1);
+  });
+
   it("n'écrit pas sur Discord à une gestion sans moyen prouvé, mais la prévient en push", async () => {
     mockDb({ members: [row({ id: 9, discord_id: null, discord_verified_at: null })] });
     await notifyTeamJoinRequest(5, 42);
@@ -97,13 +113,15 @@ describe("notifyTeamJoinRequest", () => {
     expect(pushDiscordDirectMessages).not.toHaveBeenCalled();
   });
 
-  it("compte les demandes du joueur à cette équipe, et ne lit que la gestion vivante", async () => {
+  it("compte les demandes du joueur, à cette équipe et à toutes, et ne lit que la gestion vivante", async () => {
     const execute = mockDb({ members: [row()] });
 
     await notifyTeamJoinRequest(5, 42);
 
-    const count = execute.mock.calls.find(([sql]) => sql.includes("COUNT(*)"))!;
+    const count = execute.mock.calls.find(([sql]) => sql.includes("AS any_team"))!;
     expect(count[0]).toMatch(/kind = 'REQUEST'/);
+    // Des équipes distinctes : redéposer une demande à la même équipe ne consomme pas le plafond.
+    expect(count[0]).toMatch(/SUM\(team_id = \?\) AS this_team, COUNT\(DISTINCT team_id\) AS any_team/);
     expect(count[0]).toMatch(/INTERVAL 24 HOUR/);
     expect(count[1]).toEqual([5, 42]);
     const members = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_team_members"))!;

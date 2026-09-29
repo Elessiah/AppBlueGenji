@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchReplayUrl } from "@/lib/server/tournaments/match-replay";
 import { can } from "@/lib/shared/permissions";
+import { readJsonBody } from "@/lib/server/request-body";
 
 function parseMatchId(raw: string): number | null {
   const matchId = Number(raw);
@@ -24,7 +25,7 @@ export async function PUT(req: Request, context: { params: Promise<{ matchId: st
   const matchId = parseMatchId(rawMatchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await req.json().catch(() => ({}))) as { replayUrl?: unknown };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { replayUrl?: unknown };
   const raw = body.replayUrl ?? null;
   if (raw !== null && typeof raw !== "string") return fail("INVALID_REPLAY_URL", 400);
 

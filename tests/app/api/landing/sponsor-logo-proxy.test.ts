@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
+// La connexion à adresse fixée (`pinned-https.ts`) passe par `node:https` ;
+// ici, elle est rendue au `fetch` simulé de chaque cas.
+jest.mock("@/lib/server/pinned-https", () => ({
+  pinnedHttpsGet: (url: URL, init: { headers: Record<string, string>; signal: AbortSignal }) =>
+    globalThis.fetch(url, { headers: init.headers, signal: init.signal, redirect: "manual" }),
+}));
+
 // Le nom est résolu avant chaque saut : un hôte de test doit résoudre vers une
 // adresse publique, sans dépendre du réseau de la machine qui lance les tests.
 jest.mock("node:dns/promises", () => ({

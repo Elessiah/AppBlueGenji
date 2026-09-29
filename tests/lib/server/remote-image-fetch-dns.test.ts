@@ -1,5 +1,17 @@
 import { afterEach, describe, expect, it, jest } from "@jest/globals";
-import { fetchRemoteImage, hostResolvesPublicly, type HostResolver } from "@/lib/server/remote-image-fetch";
+
+// La connexion à adresse fixée (`pinned-https.ts`) passe par `node:https` ;
+// ici, elle est rendue au `fetch` simulé de chaque cas.
+jest.mock("@/lib/server/pinned-https", () => ({
+  pinnedHttpsGet: (url: URL, init: { headers: Record<string, string>; signal: AbortSignal }) =>
+    globalThis.fetch(url, { headers: init.headers, signal: init.signal, redirect: "manual" }),
+}));
+import {
+  REMOTE_IMAGE_USER_AGENT,
+  fetchRemoteImage,
+  hostResolvesPublicly,
+  type HostResolver,
+} from "@/lib/server/remote-image-fetch";
 
 /**
  * Le filtre d'hôte ne jugeait que le nom écrit dans l'URL : un domaine public
@@ -85,5 +97,8 @@ describe("fetchRemoteImage — résolution à chaque saut", () => {
       resolveHost: resolver(["93.184.215.14"]),
     });
     expect(fetched?.contentType).toBe("image/png");
+    // `node:https` n'en pose aucun : certains hébergeurs refusent sans.
+    const init = jest.mocked(globalThis.fetch).mock.calls[0][1];
+    expect((init?.headers as Record<string, string>)["User-Agent"]).toBe(REMOTE_IMAGE_USER_AGENT);
   });
 });

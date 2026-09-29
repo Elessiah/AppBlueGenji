@@ -3,7 +3,9 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 import { GET } from "@/app/api/bot/feed/stream/route";
 import { BOT_FEED_OPEN_RULE } from "@/lib/server/api-guard";
 import {
+  MAX_BOT_FEED_STREAMS,
   MAX_BOT_FEED_STREAMS_PER_CLIENT,
+  acquireBotFeedSlot,
   botFeedStreamCount,
   resetBotFeedSlots,
 } from "@/lib/server/bot-feed-guard";
@@ -88,6 +90,56 @@ describe("GET /api/bot/feed/stream — garde-fous", () => {
     expect(globalThis.fetch).not.toHaveBeenCalled();
 
     for (const response of held) await drain(response);
+  });
+
+  it("coupe sa connexion au bot quand le plafond plein le déloge", async () => {
+    const signals: AbortSignal[] = [];
+    globalThis.fetch = jest.fn(async (_url: unknown, init?: RequestInit) => {
+      signals.push(init!.signal!);
+      // Un amont qui ne se tarit jamais seul : seule l'éviction peut le fermer.
+      return new Response(new ReadableStream<Uint8Array>({ pull: () => new Promise<void>(() => undefined) }));
+    }) as never;
+    const held = [await GET(request()), await GET(request())];
+    for (let i = botFeedStreamCount(); i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+
+    // Un lecteur de plus : ce client, qui en tient deux, cède le plus ancien.
+    expect(acquireBotFeedSlot("198.51.100.1")).not.toBeNull();
+
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+    // Le flux délogé se termine, et sa place n'est pas rendue deux fois.
+    await drain(held[0]);
+    expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
+    await held[1].body!.cancel();
+  });
+
+  it("ne déloge personne pour un nouveau venu que le bot injoignable laisserait sans rien", async () => {
+    const evict = jest.fn();
+    acquireBotFeedSlot("10.0.0.1", evict);
+    acquireBotFeedSlot("10.0.0.1", evict);
+    for (let i = botFeedStreamCount(); i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+    globalThis.fetch = jest.fn(async () => {
+      throw new Error("ECONNREFUSED");
+    }) as never;
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(503);
+    expect(evict).not.toHaveBeenCalled();
+    expect(botFeedStreamCount()).toBe(MAX_BOT_FEED_STREAMS);
+  });
+
+  it("déloge seulement une fois le bot joint", async () => {
+    const evict = jest.fn();
+    acquireBotFeedSlot("10.0.0.1", evict);
+    acquireBotFeedSlot("10.0.0.1", evict);
+    for (let i = botFeedStreamCount(); i < MAX_BOT_FEED_STREAMS; i += 1) acquireBotFeedSlot(`10.0.1.${i}`);
+
+    const response = await GET(request());
+
+    expect(response.status).toBe(200);
+    expect(evict).toHaveBeenCalledTimes(1);
+    await drain(response);
   });
 
   it("rend la place quand le flux amont se termine", async () => {

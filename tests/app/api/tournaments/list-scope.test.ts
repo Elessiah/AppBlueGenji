@@ -84,6 +84,21 @@ describe("GET /api/tournaments — portée", () => {
     expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, {});
   });
 
+  it("sert l'archive entière des terminés à qui la demande", async () => {
+    const res = await get("/api/tournaments?finished=all");
+
+    expect(res.status).toBe(200);
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { allFinished: true });
+  });
+
+  it("ne mêle pas l'archive des terminés à la portée des invisibles", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+
+    await get("/api/tournaments?scope=hidden&finished=all");
+
+    expect(service.listTournamentBuckets).toHaveBeenCalledWith(null, { hiddenOnly: true });
+  });
+
   it("retombe sur la vue publique pour une portée inconnue", async () => {
     await get("/api/tournaments?scope=mine");
 

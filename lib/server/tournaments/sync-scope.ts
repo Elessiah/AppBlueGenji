@@ -32,6 +32,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
+import { RESOLVABLE_BYE_SQL, RESOLVABLE_GHOST_SQL } from "./byes";
 import { computeTournamentState } from "./state";
 import type { TournamentRow } from "./_internal";
 
@@ -65,7 +66,11 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  *
  * - plateau d'élimination absent (`createBracketIfMissing`) ;
  * - report de score dont le délai a expiré (`resolveExpiredScoreReports`) ;
- * - bye ou match fantôme encore ouvert (`tryAutoResolveByes`) ;
+ * - bye ou match fantôme **résolvable** (`tryAutoResolveByes`) — la condition
+ *   même de la résolution, et non « une case est vide » : une case qui attend
+ *   le vainqueur d'un match non joué est l'état normal de tout arbre en cours,
+ *   et la retenir faisait entretenir à chaque balayage des tournois où la
+ *   résolution n'avait rien à faire ;
  * - match entré en lancement sans que son délai ait été ouvert, ou dont le
  *   délai de lancement d'office est écoulé (`maintainMatchLaunches`) ;
  * - élimination dont toutes les rencontres sont jouées : la clôture reste à
@@ -76,8 +81,8 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  */
 async function findDueMaintenance(connection: PoolConnection): Promise<number[]> {
   const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    // `MIN_ENTRANTS_FOR_MATCHES` et `LAUNCH_AUTO_DELAY_MINUTES` sont des
-    // constantes de module, jamais une entrée : rien d'externe n'atteint ces
+    // `MIN_ENTRANTS_FOR_MATCHES`, `LAUNCH_AUTO_DELAY_MINUTES` et les deux
+    // prédicats de `./byes` sont des constantes de module, jamais une entrée : rien d'externe n'atteint ces
     // interpolations.
     `SELECT t.id
      FROM bg_tournaments t
@@ -104,9 +109,7 @@ async function findDueMaintenance(connection: PoolConnection): Promise<number[]>
                                     OR m.lobby_opened_at <= NOW() - INTERVAL ${LAUNCH_AUTO_DELAY_MINUTES} MINUTE))))
          OR EXISTS (SELECT 1 FROM bg_matches m
                     WHERE m.tournament_id = t.id AND m.phase_id = 0
-                      AND m.status <> 'COMPLETED'
-                      AND m.winner_team_id IS NULL
-                      AND (m.team1_id IS NULL OR m.team2_id IS NULL))
+                      AND (${RESOLVABLE_BYE_SQL} OR ${RESOLVABLE_GHOST_SQL}))
          OR (t.format IN ('SINGLE', 'DOUBLE')
              AND EXISTS (SELECT 1 FROM bg_matches m
                          WHERE m.tournament_id = t.id AND m.phase_id = 0)

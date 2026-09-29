@@ -1049,6 +1049,25 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Le détail ci-dessus n'est gardé que `SITE_VISIT_DETAIL_RETENTION_DAYS`
+  // jours : les totaux « depuis toujours » vivent dans ces deux tables, qui ne
+  // gardent ni page ni heure. Un jour révolu devient une ligne de compteur ; un
+  // visiteur, une empreinte — c'est le seul moyen de compter les visiteurs
+  // uniques depuis la mise en service sans relire tout l'historique.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_site_visit_days (
+      day DATE PRIMARY KEY,
+      visits INT UNSIGNED NOT NULL DEFAULT 0,
+      first_visit_at DATETIME NOT NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_site_visitors (
+      visitor_key CHAR(64) PRIMARY KEY,
+      authenticated TINYINT(1) NOT NULL DEFAULT 0
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Changements du traitement des données (`lib/shared/privacy-changes.ts`) :
   // une ligne par changement **accepté**, avec sa date — c'est la trace du
   // consentement, que l'export RGPD rend au joueur. Le registre vit dans le
@@ -1136,12 +1155,15 @@ async function runMigrations(db: Pool): Promise<void> {
   // équipe dissoute ou un compte effacé ne doivent pas emporter le signalement
   // qui les visait. Le libellé est relevé à l'envoi pour la même raison — le
   // panneau dit encore de quoi il s'agissait quand la fiche n'existe plus.
+  // `notified_at` : instant où la cible a été prévenue, `NULL` si rien ne lui a
+  // été envoyé (tournoi, cible déjà prévenue, auteur retenu par son plafond).
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_report_targets (
       report_id BIGINT NOT NULL,
       target_type ENUM('USER', 'TEAM', 'TOURNAMENT') NOT NULL,
       target_id BIGINT NOT NULL,
       label_snapshot VARCHAR(191) NULL,
+      notified_at DATETIME NULL,
       PRIMARY KEY (report_id, target_type, target_id),
       INDEX idx_bg_report_targets_target (target_type, target_id),
       CONSTRAINT fk_bg_report_targets_report FOREIGN KEY (report_id)
@@ -1325,6 +1347,11 @@ async function runMigrations(db: Pool): Promise<void> {
     // d'abord sur la colonne (`ER_DUP_FIELDNAME`, toléré).
     `ALTER TABLE bg_discord_login_challenges ADD COLUMN lookup_hash CHAR(64) NULL AFTER discord_id,
        ADD UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)`,
+    // Cible d'un signalement réellement prévenue : le délai de reprévenance et
+    // le plafond de l'auteur ne comptent plus que les messages partis. `NULL`
+    // pour les lignes d'avant, **sans remplissage** — on ne sait pas lesquelles
+    // ont reçu un message.
+    `ALTER TABLE bg_report_targets ADD COLUMN notified_at DATETIME NULL AFTER label_snapshot`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
@@ -1534,6 +1561,30 @@ async function runMigrations(db: Pool): Promise<void> {
         );
       }
     }
+  }
+
+  // Les visiteurs uniques « depuis toujours » se comptent désormais sur
+  // `bg_site_visitors`, alimentée à chaque visite enregistrée : sur une base qui
+  // tourne, elle naît vide alors que le détail garde tout l'historique. Elle est
+  // remplie **une fois**, avant le premier repli du détail (qui effacerait les
+  // empreintes à reprendre) — vide, c'est qu'aucune visite n'a encore été
+  // enregistrée par la version qui l'alimente. Un échec ici ne perd rien pour
+  // de bon : le repli reporte lui-même les empreintes de ce qu'il efface
+  // (`rollUpExpiredSiteVisits`), le total est seulement en retard le temps que
+  // le détail restant soit replié. À retirer une fois constaté joué en
+  // production.
+  try {
+    const [seeded] = await db.execute<RowDataPacket[]>(`SELECT 1 FROM bg_site_visitors LIMIT 1`);
+    if (seeded.length === 0) {
+      await db.execute(
+        `INSERT INTO bg_site_visitors (visitor_key, authenticated)
+         SELECT visitor_key, MAX(authenticated) FROM bg_site_visits GROUP BY visitor_key
+         ON DUPLICATE KEY UPDATE
+           authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated))`,
+      );
+    }
+  } catch (error) {
+    reportSchemaFailure(error, "INSERT INTO bg_site_visitors (reprise des empreintes)");
   }
 
   // La mise en avant d'une annonce de recrutement (`highlight` : `NONE` /

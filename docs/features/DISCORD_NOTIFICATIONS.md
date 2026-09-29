@@ -201,7 +201,9 @@ quand le site décroche qu'il faut pouvoir joindre un arbitre.
 
 Le plafond de débit (`ISSUE_REPORT_RULE`) est étroit à rebours des autres — cinq
 par dix minutes et par utilisateur : chaque appel fait vibrer le téléphone de
-tous les arbitres.
+tous les arbitres. Il ne bornait qu'une rafale — sept cents messages par jour
+restaient possibles —, d'où un second plafond, `ISSUE_REPORT_DAILY_RULE`
+(vingt par 24 h et par utilisateur), qui couvre une soirée difficile.
 
 ## Configuration
 

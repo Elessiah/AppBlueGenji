@@ -5,6 +5,7 @@ import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { BATTLETAG_LOCKED } from "@/lib/shared/battletag-lock";
 import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";
 import { isProfileInputError } from "@/lib/shared/profile-input-errors";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /** Les refus de `deleteOwnAccount` qui sortent tels quels : ils ont un sens pour l'écran. */
 const ACCOUNT_DELETION_REFUSALS: ReadonlySet<string> = new Set([
@@ -27,7 +28,7 @@ export async function PATCH(req: Request) {
   if (!user) return fail("UNAUTHORIZED", 401);
 
   try {
-    const body = (await req.json()) as {
+    const body = (await readJsonBody(req)) as {
       pseudo?: string;
       overwatchBattletag?: string | null;
       marvelRivalsTag?: string | null;

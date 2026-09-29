@@ -8,6 +8,7 @@ import {
 import { ALL_TOURNAMENT_FIELDS } from "@/lib/shared/tournament-edit";
 import { can } from "@/lib/shared/permissions";
 import { NextResponse } from "next/server";
+import { readJsonBody } from "@/lib/server/request-body";
 
 /**
  * Édition d'un tournoi. `GET` rend la fenêtre d'édition et les valeurs à
@@ -52,7 +53,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   const checked = await guard(id);
   if (checked.error) return checked.error;
 
-  const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+  const body = (await readJsonBody(req).catch(() => ({}))) as Record<string, unknown>;
 
   // Liste blanche : le corps ne peut porter que des champs éditables connus.
   // Recopier le corps tel quel laisserait un client écrire n'importe quelle

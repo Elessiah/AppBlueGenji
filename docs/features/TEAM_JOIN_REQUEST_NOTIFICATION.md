@@ -41,6 +41,17 @@ confondus. La demande, elle, est toujours enregistrée : seul le message est
 retenu. Aucune table de plus — les lignes de `bg_team_invitations` suffisent à
 compter.
 
+La borne par équipe ne borne pas le **nombre** d'équipes : un compte — gratuit
+par OAuth — demandait à rejoindre chaque équipe du site et faisait écrire le bot
+à toutes leurs gestions dans la journée. D'où un second plafond, toutes équipes
+confondues : un joueur fait prévenir au plus `TEAM_JOIN_REQUEST_NOTICES_DAILY_CAP`
+(5) équipes **distinctes** dans la fenêtre ; au-delà, ses demandes sont
+enregistrées et visibles sur les fiches, sans message. Des équipes et non des
+demandes : redéposer à la même équipe ne fait rien partir, cela ne doit pas
+consommer le plafond. Les deux comptes se lisent en une seule requête
+(`SUM(team_id = ?)`, `COUNT(DISTINCT team_id)`), et `shouldNotifyTeamJoinRequest`
+les juge ensemble.
+
 ## Ce qui ne déclenche rien
 
 - Une demande qui **rejoint directement** l'équipe (une invitation l'attendait) :

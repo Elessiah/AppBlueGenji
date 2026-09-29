@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, requestClientIp, VISIT_REQUEST_RULE } from "@/lib/server/api-guard";
 import { ok } from "@/lib/server/http";
 import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
+import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
 
   let path: unknown = "/";
   try {
-    const body = (await req.json()) as { path?: unknown };
+    const body = (await readJsonBody(req, SMALL_JSON_BODY_MAX_BYTES)) as { path?: unknown };
     path = body?.path;
   } catch {
     // Corps absent ou illisible : on enregistre quand même la visite, sur `/`.

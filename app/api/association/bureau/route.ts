@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { can } from "@/lib/shared/permissions";
 import { fail, ok } from "@/lib/server/http";
 import { createBureauMember, listBureauMembers } from "@/lib/server/bureau-service";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
   const members = await listBureauMembers();
@@ -15,7 +16,7 @@ export async function POST(req: Request) {
 
   let body: { name?: unknown; role?: unknown; initials?: unknown; color?: unknown };
   try {
-    body = (await req.json()) as typeof body;
+    body = (await readJsonBody(req)) as typeof body;
   } catch {
     return fail("INVALID_BODY", 400);
   }

@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { setMatchReady } from "@/lib/server/tournaments/match-launch";
 import { launchFailure, parseMatchIdParam } from "@/lib/server/tournaments/match-launch-routes";
+import { readJsonBody } from "@/lib/server/request-body";
 
 const STATUSES: Readonly<Record<string, number>> = {
   MATCH_NOT_FOUND: 404,
@@ -25,7 +26,7 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   const matchId = parseMatchIdParam((await context.params).matchId);
   if (matchId === null) return fail("INVALID_MATCH_ID", 400);
 
-  const body = (await req.json().catch(() => ({}))) as { ready?: unknown };
+  const body = (await readJsonBody(req).catch(() => ({}))) as { ready?: unknown };
   if (typeof body.ready !== "boolean") return fail("INVALID_READY_VALUE", 400);
 
   try {

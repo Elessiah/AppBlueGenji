@@ -20,6 +20,17 @@
 /** Durée pendant laquelle les chargements d'un même visiteur restent une seule visite. */
 export const SITE_VISIT_WINDOW_MINUTES = 30;
 
+/**
+ * Durée de conservation du **détail** des visites (une ligne par visite : page,
+ * heure, empreinte), en jours pleins.
+ *
+ * Au-delà, les jours révolus sont repliés en un compteur par jour
+ * (`bg_site_visit_days`) puis effacés : la plus large fenêtre publiée est de
+ * trente jours, le jour de plus garde cette fenêtre entière quelle que soit
+ * l'heure du repli. Le registre des traitements cite cette constante.
+ */
+export const SITE_VISIT_DETAIL_RETENTION_DAYS = 31;
+
 /** Longueur maximale d'un chemin stocké (aligné sur la colonne SQL). */
 export const MAX_VISIT_PATH_LENGTH = 191;
 

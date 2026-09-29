@@ -21,7 +21,10 @@
  * adresse électronique (`lib/shared/legal-contact.ts`).
  */
 import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
+import {
+  SITE_VISIT_DETAIL_RETENTION_DAYS,
+  SITE_VISIT_WINDOW_MINUTES,
+} from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
@@ -29,7 +32,7 @@ import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notification
 import { RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-28";
+export const REGISTER_UPDATED_AT = "2026-09-30";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -278,7 +281,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Visites conservées sans limite de durée pour le total depuis la mise en service — elles ne désignent aucune personne",
+      `Détail des visites (empreinte, page, date) effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après report dans un compteur par jour qui ne garde que le nombre de visites`,
+      "Une empreinte par visiteur, sans page ni date, conservée sans limite de durée pour le nombre de visiteurs uniques depuis la mise en service — elle ne désigne aucune personne",
       "Adresse IP, navigateur et identifiant du compte jamais enregistrés",
     ],
     recipients: ["Staff de l'association (commande Discord des statistiques)"],

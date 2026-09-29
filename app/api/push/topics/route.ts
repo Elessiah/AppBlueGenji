@@ -9,6 +9,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { saveDisabledTopics } from "@/lib/server/push-subscriptions";
 import { sanitizeDisabledTopics } from "@/lib/shared/push-notifications";
+import { readJsonBody } from "@/lib/server/request-body";
 
 export async function PUT(req: Request) {
   const user = await getCurrentUser();
@@ -18,7 +19,7 @@ export async function PUT(req: Request) {
 
   let body: { disabledTopics?: unknown } | null;
   try {
-    body = (await req.json()) as { disabledTopics?: unknown };
+    body = (await readJsonBody(req)) as { disabledTopics?: unknown };
   } catch {
     return fail("INVALID_PUSH_TOPICS", 400);
   }

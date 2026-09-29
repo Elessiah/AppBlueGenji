@@ -21,7 +21,8 @@
  * est son IP, et elle n'est connue que si un proxy de confiance l'a posée
  * (`requestClientIp`). Là où elle manque, le plafond par client ne borne rien —
  * `enforceRateLimit` fait le même constat et préfère ne pas compter que compter
- * faux. Le plafond global, lui, tient dans tous les cas.
+ * faux. Le plafond global, lui, tient dans tous les cas — et, atteint, il se
+ * **partage** entre clients au lieu de refuser tout nouveau venu.
  */
 
 /**
@@ -37,46 +38,145 @@ export const MAX_BOT_FEED_STREAMS_PER_CLIENT = 3;
  */
 export const MAX_BOT_FEED_STREAMS = 40;
 
-let open = 0;
+/**
+ * Une place tenue : son client (`null` = IP inconnue) et de quoi fermer le flux
+ * qui l'occupe.
+ */
+type Slot = { clientKey: string | null; evict: () => void; released: boolean };
+
+/** Places tenues, de la plus ancienne à la plus récente. */
+const slots: Slot[] = [];
+/**
+ * Places par client **identifié**. Les visiteurs sans IP connue n'y figurent
+ * pas : rien ne dit que deux d'entre eux sont la même personne, les compter
+ * ensemble ferait déloger un lecteur à un seul onglet au motif que d'autres
+ * inconnus en tiennent. Chacun vaut donc un client à une place — jamais une
+ * cible du partage, et jamais un nouveau venu qui en tiendrait déjà.
+ */
 const perClient = new Map<string, number>();
+
+function heldBy(clientKey: string | null): number {
+  return clientKey === null ? 0 : perClient.get(clientKey) ?? 0;
+}
+
+function releaseSlot(slot: Slot): void {
+  if (slot.released) return;
+  slot.released = true;
+  const index = slots.indexOf(slot);
+  if (index >= 0) slots.splice(index, 1);
+  if (slot.clientKey === null) return;
+  const current = heldBy(slot.clientKey);
+  if (current <= 1) perClient.delete(slot.clientKey);
+  else perClient.set(slot.clientKey, current - 1);
+}
+
+/**
+ * Le flux à fermer pour faire place à un client qui en tient déjà `held`, ou
+ * `null` s'il n'y a pas lieu d'en fermer un.
+ *
+ * Le plafond global était un seau commun : quatorze IP gardant chacune trois
+ * flux ouverts privaient **tous** les visiteurs de `/bot` du direct, en 429
+ * permanent. Plein, il se partage désormais : le client qui tient le **plus**
+ * de flux cède le plus ancien des siens, pourvu qu'il en tienne strictement
+ * plus que le nouveau venu n'en aurait une fois servi. Un lecteur ordinaire
+ * (un onglet) déloge donc un client qui en accumule, jamais un autre lecteur
+ * ordinaire — et le client délogé ne reprend pas sa place en se reconnectant,
+ * puisqu'il n'en tient alors pas plus que les autres. Pour fermer le direct à
+ * tous, il faut désormais une IP par place, et non plus une par trois.
+ */
+function slotToEvict(held: number): Slot | null {
+  let victimKey: string | undefined;
+  let victimHeld = held + 1;
+  for (const [key, count] of perClient) {
+    if (count > victimHeld) {
+      victimKey = key;
+      victimHeld = count;
+    }
+  }
+  if (victimKey === undefined) return null;
+  return slots.find((slot) => slot.clientKey === victimKey) ?? null;
+}
 
 /**
  * Réserve une place, ou `null` si l'un des deux plafonds est atteint.
  *
  * `clientKey` vaut `null` quand l'IP n'est pas connue : seul le plafond global
- * s'applique alors. La fonction rendue libère la place et **peut être appelée
- * plusieurs fois** — un flux se termine par plusieurs portes (fin de l'amont,
- * annulation du corps, abandon de la requête), et aucune ne sait si une autre
- * l'a précédée.
+ * s'applique alors. Plein, le plafond global se **partage** plutôt que de
+ * refuser (voir `slotToEvict`) : `evict` est alors appelé sur le flux délogé,
+ * qui doit se fermer — sa place est rendue dans le même geste.
+ *
+ * La fonction rendue libère la place et **peut être appelée plusieurs fois** —
+ * un flux se termine par plusieurs portes (fin de l'amont, annulation du corps,
+ * abandon de la requête, éviction), et aucune ne sait si une autre l'a
+ * précédée.
  */
-export function acquireBotFeedSlot(clientKey: string | null): (() => void) | null {
-  if (open >= MAX_BOT_FEED_STREAMS) return null;
-
-  const held = clientKey === null ? 0 : perClient.get(clientKey) ?? 0;
+export function acquireBotFeedSlot(
+  clientKey: string | null,
+  evict: () => void = () => undefined,
+  options: { allowEviction?: boolean } = {},
+): (() => void) | null {
+  const held = heldBy(clientKey);
   if (clientKey !== null && held >= MAX_BOT_FEED_STREAMS_PER_CLIENT) return null;
 
-  open += 1;
-  if (clientKey !== null) perClient.set(clientKey, held + 1);
+  if (slots.length >= MAX_BOT_FEED_STREAMS) {
+    const victim = options.allowEviction === false ? null : slotToEvict(held);
+    if (!victim) return null;
+    releaseSlot(victim);
+    try {
+      victim.evict();
+    } catch {
+      // Fermer un flux déjà parti n'est pas un échec : la place est rendue.
+    }
+  }
 
-  let released = false;
+  const slot: Slot = { clientKey, evict, released: false };
+  slots.push(slot);
+  if (clientKey !== null) perClient.set(clientKey, held + 1);
+  return () => releaseSlot(slot);
+}
+
+/**
+ * Tentatives d'éviction en cours : autant de connexions au bot ouvertes **sans**
+ * place, le temps de savoir s'il répond. Bornées, sans quoi une rafale de
+ * nouveaux venus passerait toute le même contrôle et ouvrirait chacune une
+ * connexion au bot au-delà du plafond.
+ */
+export const MAX_PENDING_BOT_FEED_EVICTIONS = 2;
+
+let pendingEvictions = 0;
+
+/**
+ * Réserve une **tentative d'éviction** : ce client obtiendrait une place en
+ * délogeant un flux, et la route va d'abord joindre le bot. `null` si aucune
+ * place ne lui serait accordée, ou si trop de tentatives sont déjà en cours.
+ *
+ * On ne déloge qu'une fois le bot joint : délogé pour un nouveau venu que le
+ * bot injoignable laisse sans rien, un lecteur aurait été coupé pour rien, et
+ * chaque reconnexion automatique en couperait un autre. La fonction rendue
+ * clôt la tentative et peut être appelée plusieurs fois.
+ */
+export function reserveBotFeedEvictionAttempt(clientKey: string | null): (() => void) | null {
+  if (pendingEvictions >= MAX_PENDING_BOT_FEED_EVICTIONS) return null;
+  const held = heldBy(clientKey);
+  if (clientKey !== null && held >= MAX_BOT_FEED_STREAMS_PER_CLIENT) return null;
+  if (slots.length < MAX_BOT_FEED_STREAMS || slotToEvict(held) === null) return null;
+  pendingEvictions += 1;
+  let done = false;
   return () => {
-    if (released) return;
-    released = true;
-    open -= 1;
-    if (clientKey === null) return;
-    const current = perClient.get(clientKey) ?? 0;
-    if (current <= 1) perClient.delete(clientKey);
-    else perClient.set(clientKey, current - 1);
+    if (done) return;
+    done = true;
+    pendingEvictions -= 1;
   };
 }
 
 /** Nombre de flux ouverts (diagnostic, tests). */
 export function botFeedStreamCount(): number {
-  return open;
+  return slots.length;
 }
 
 /** Remet les compteurs à zéro. Réservé aux tests. */
 export function resetBotFeedSlots(): void {
-  open = 0;
+  slots.length = 0;
   perClient.clear();
+  pendingEvictions = 0;
 }

@@ -128,6 +128,33 @@ function noPendingFeederSql(slotSql: string | null): string {
 }
 
 /**
+ * Exemption que `tryAutoResolveByes` trancherait **tout de suite** : match
+ * ouvert, une seule équipe présente, et plus aucun match non terminé
+ * n'alimente la case vide. Porte sur l'alias `m` de `bg_matches`.
+ *
+ * Exportée pour `findDueMaintenance` (`./sync-scope`), qui doit poser
+ * **exactement** la même question : une clause plus large — « une case est
+ * vide » — y attrapait toute case qui attend le vainqueur d'un match non joué,
+ * situation normale de tout arbre en cours, et faisait entretenir à chaque
+ * balayage des tournois où la résolution n'avait rien à faire.
+ */
+export const RESOLVABLE_BYE_SQL = `(m.status <> 'COMPLETED'
+        AND m.winner_team_id IS NULL
+        AND ((m.team1_id IS NULL AND m.team2_id IS NOT NULL) OR (m.team1_id IS NOT NULL AND m.team2_id IS NULL))
+        AND ${noPendingFeederSql("CASE WHEN m.team1_id IS NULL THEN 1 ELSE 2 END")})`;
+
+/**
+ * Match fantôme que `tryAutoResolveByes` clôturerait tout de suite : aucune
+ * équipe, et plus aucun match non terminé ne l'alimente. Même contrat que
+ * `RESOLVABLE_BYE_SQL`.
+ */
+export const RESOLVABLE_GHOST_SQL = `(m.status <> 'COMPLETED'
+        AND m.winner_team_id IS NULL
+        AND m.team1_id IS NULL
+        AND m.team2_id IS NULL
+        AND ${noPendingFeederSql(null)})`;
+
+/**
  * Tranche d'office ce que le plateau ne peut plus disputer : exemptions (une
  * seule équipe, case vide sans alimentation en attente) et matchs fantômes
  * (aucune équipe). Chaque passe lit ses candidats **une fois**, alimentation
@@ -158,10 +185,7 @@ export async function tryAutoResolveByes(
       FROM bg_matches m
       WHERE m.tournament_id = ?
         AND m.phase_id = ?
-        AND m.status <> 'COMPLETED'
-        AND m.winner_team_id IS NULL
-        AND ((m.team1_id IS NULL AND m.team2_id IS NOT NULL) OR (m.team1_id IS NOT NULL AND m.team2_id IS NULL))
-        AND ${noPendingFeederSql("CASE WHEN m.team1_id IS NULL THEN 1 ELSE 2 END")}`,
+        AND ${RESOLVABLE_BYE_SQL}`,
       [tournamentId, phaseId],
     );
 
@@ -187,11 +211,7 @@ export async function tryAutoResolveByes(
        FROM bg_matches m
        WHERE m.tournament_id = ?
          AND m.phase_id = ?
-         AND m.status <> 'COMPLETED'
-         AND m.winner_team_id IS NULL
-         AND m.team1_id IS NULL
-         AND m.team2_id IS NULL
-         AND ${noPendingFeederSql(null)}`,
+         AND ${RESOLVABLE_GHOST_SQL}`,
       [tournamentId, phaseId],
     );
 
