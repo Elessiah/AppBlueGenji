@@ -78,6 +78,21 @@ fond, et une section dépliée sur « 46 » ne doit pas rester bornée à ce chi
 quand un rafraîchissement en apporte 50 — elle montre alors les 50 sans qu'on
 ait besoin de redéplier.
 
+### L'archive des terminés, à la demande
+
+La liste publique mutualisée (`listTournamentBuckets(null)`, lue par l'accueil
+et par chaque ouverture de `/tournois`) ne porte plus que les
+`FINISHED_TOURNAMENTS_LIST_LIMIT` (12) tournois terminés les plus récents —
+elle chargeait tout l'historique, résumés compris, pour une section qui en
+montre douze repliée. Elle dit alors ce qu'elle a laissé de côté
+(`finishedTotals` : en tout et par jeu), si bien que le sommaire, les pastilles
+de jeu et « Voir plus (N) » comptent l'archive entière sans l'avoir reçue
+(`finishedBeyondList`). L'archive elle-même est servie par
+`GET /api/tournaments?finished=all`, mutualisée à part : la page la demande dès
+que le lecteur va la chercher — « Voir plus » sur les terminés, une recherche ou
+un filtre de jeu (`needsFinishedArchive`) — puis la garde pour le reste de la
+visite.
+
 ## « Créer un tournoi »
 
 Le bouton était un `<button>` posé dans un `<Link>` — deux contrôles

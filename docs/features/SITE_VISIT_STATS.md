@@ -53,7 +53,29 @@ injoignable, en indiquant l'ancienneté de la mesure.
 | `app/api/visits/route.ts` | Endpoint public d'enregistrement. Ne renvoie jamais d'erreur au visiteur (`recorded: false` en cas de souci). |
 | `lib/shared/site-visits.ts` | Logique pure : normalisation du chemin, composition de l'identité du visiteur, lecture de `X-Forwarded-For`. |
 | `lib/server/site-visits-service.ts` | Enregistrement, agrégation, poussée vers le bot. |
-| `bg_site_visits` | Une ligne par visite : empreinte, compte éventuel, chemin, date. |
+| `bg_site_visits` | Une ligne par visite : empreinte, drapeau « connecté », chemin, date. **Gardée `SITE_VISIT_DETAIL_RETENTION_DAYS` (31) jours.** |
+| `bg_site_visit_days` | Une ligne par jour révolu : nombre de visites, heure de la première. |
+| `bg_site_visitors` | Une empreinte par visiteur, et s'il a été vu connecté — rien d'autre. |
+
+### Repli du détail
+
+Les totaux « depuis toujours » se recalculaient à la lecture : sept
+`COUNT(DISTINCT …)` sur toute la table, toutes les cinq minutes dès qu'il y a
+des visites, sur une table que rien ne purgeait — mesuré à ~3 s pour 500 000
+visites. Le détail n'est plus gardé que 31 jours :
+
+- à chaque synchronisation (donc au plus toutes les cinq minutes),
+  `rollUpExpiredSiteVisits` reporte les **jours entiers** antérieurs à la borne
+  dans `bg_site_visit_days`, puis les efface — une seule borne, lue une fois, et
+  une transaction : un report sans effacement compterait deux fois ;
+- chaque visite enregistrée inscrit l'empreinte de son visiteur dans
+  `bg_site_visitors` (un `INSERT … ON DUPLICATE KEY UPDATE`) : deux jours
+  repliés ne disent pas combien de visiteurs ils ont en commun, le total des
+  visiteurs uniques ne peut donc venir que de là. La table a été remplie une
+  fois, au démarrage, depuis le détail existant ;
+- la lecture balaie le seul détail restant (fenêtres 24 h / 7 j / 30 j) et lit
+  les totaux sur les deux tables de cumul. Même base de 500 000 visites :
+  ~0,25 s au lieu de ~3 s, et le coût ne grandit plus avec l'historique.
 
 ### Vie privée
 

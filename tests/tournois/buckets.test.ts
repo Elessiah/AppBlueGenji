@@ -9,6 +9,8 @@ import {
   searchShortcutLabel,
   hasActiveFilter,
   sectionEmptyMessage,
+  finishedBeyondList,
+  needsFinishedArchive,
 } from "@/app/(secured)/tournois/_lib/buckets";
 import { tournamentCard } from "../helpers/tournament-card";
 
@@ -251,5 +253,56 @@ describe("sectionEmptyMessage", () => {
     expect(sectionEmptyMessage("Aucun tournoi en cours actuellement.", "", "mr")).toBe(
       "Aucun résultat pour cette recherche.",
     );
+  });
+});
+
+describe("finishedBeyondList", () => {
+  // La liste publique ne porte que les terminés les plus récents : les
+  // compteurs de la page doivent quand même annoncer l'archive entière.
+  const truncated = mockBuckets({
+    finished: [
+      mockCard({ id: 1, game: "OW", state: "FINISHED" }),
+      mockCard({ id: 2, game: "OW", state: "FINISHED" }),
+      mockCard({ id: 3, game: "MR", state: "FINISHED" }),
+    ],
+    finishedTotals: { all: 20, byGame: { OW: 14, MR: 6 } },
+  });
+
+  it("compte les terminés que la liste tronquée ne porte pas", () => {
+    expect(finishedBeyondList(truncated, "all")).toBe(17);
+  });
+
+  it("compte par jeu, contre les seuls terminés de ce jeu", () => {
+    expect(finishedBeyondList(truncated, "ow")).toBe(12);
+    expect(finishedBeyondList(truncated, "mr")).toBe(5);
+  });
+
+  it("ne compte rien quand la liste est complète", () => {
+    expect(finishedBeyondList(mockBuckets({ finished: [mockCard({ state: "FINISHED" })] }), "all")).toBe(0);
+  });
+
+  it("ne rend jamais un compte négatif, même sur des totaux en retard", () => {
+    expect(
+      finishedBeyondList(
+        mockBuckets({
+          finished: [mockCard({ id: 1, game: "OW" }), mockCard({ id: 2, game: "OW" })],
+          finishedTotals: { all: 1, byGame: { OW: 1, MR: 0 } },
+        }),
+        "ow",
+      ),
+    ).toBe(0);
+  });
+});
+
+describe("needsFinishedArchive", () => {
+  it("n'exige pas l'archive d'un lecteur qui ne la cherche pas", () => {
+    expect(needsFinishedArchive("", "all", false)).toBe(false);
+    expect(needsFinishedArchive("   ", "all", false)).toBe(false);
+  });
+
+  it("l'exige dès que le lecteur déplie les terminés, cherche ou filtre par jeu", () => {
+    expect(needsFinishedArchive("", "all", true)).toBe(true);
+    expect(needsFinishedArchive("coupe", "all", false)).toBe(true);
+    expect(needsFinishedArchive("", "mr", false)).toBe(true);
   });
 });

@@ -29,6 +29,7 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
+import { SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -223,6 +224,18 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Les notifications ne s'activent que sur ton geste, appareil par appareil, depuis « Mon profil » ; tu choisis les sujets, et tu les désactives quand tu veux.",
       "Le site garde l'adresse d'abonnement que ton navigateur lui donne et ses clés de chiffrement. Le message passe par le service de push de ton navigateur (Google, Mozilla, Apple ou Microsoft), chiffré pour ton seul appareil : ce service ne peut pas le lire.",
       `Un abonnement est effacé à sa désactivation, quand ton navigateur le révoque, avec ton compte, ou au bout de ${PUSH_SUBSCRIPTION_RETENTION_DAYS} jours sans notification remise. Aucune notification ne porte le pseudo d'un joueur.`,
+    ],
+  },
+  // Une durée de conservation raccourcie : le détail de la mesure d'audience,
+  // gardé jusqu'ici sans limite, est effacé après report en compteurs.
+  {
+    id: "2026-09-mesure-audience-duree",
+    publishedAt: "2026-09-30",
+    title: `Fréquentation du site : le détail des visites gardé ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours`,
+    summary: `Le détail des visites du site (page vue, date) est désormais effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours.`,
+    details: [
+      `Chaque visite gardait jusqu'ici, sans limite de durée, une empreinte salée du visiteur, la page vue et la date. Ce détail est maintenant effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après avoir été reporté dans un compteur par jour qui ne garde que le nombre de visites.`,
+      "Pour compter les visiteurs uniques depuis la mise en service, le site garde une seule empreinte par visiteur, sans page ni date. Elle ne permet pas de remonter à toi, et ni ton adresse IP ni ton compte ne sont enregistrés.",
     ],
   },
 ];

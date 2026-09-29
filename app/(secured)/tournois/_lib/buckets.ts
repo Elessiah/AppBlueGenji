@@ -91,3 +91,35 @@ export function hasActiveFilter(query: string, gameFilter: GameFilter): boolean 
 export function sectionEmptyMessage(whenUnfiltered: string, query: string, gameFilter: GameFilter): string {
   return hasActiveFilter(query, gameFilter) ? "Aucun résultat pour cette recherche." : whenUnfiltered;
 }
+
+/**
+ * Tournois terminés que la liste courante ne porte pas, pour un filtre de jeu.
+ *
+ * La liste publique ne transporte que les terminés les plus récents
+ * (`FINISHED_TOURNAMENTS_LIST_LIMIT`) et dit combien il y en a en tout
+ * (`finishedTotals`) : le sommaire, les pastilles de jeu et « Voir plus »
+ * comptent donc l'archive entière sans l'avoir reçue. Zéro quand la liste est
+ * complète. À n'ajouter qu'en l'absence de recherche — un total ne dit pas
+ * combien de tournois absents une recherche aurait retenus.
+ */
+export function finishedBeyondList(buckets: TournamentBuckets, gameFilter: GameFilter): number {
+  const totals = buckets.finishedTotals;
+  if (!totals) return 0;
+  const total =
+    gameFilter === "all" ? totals.all : totals.byGame[gameFilter === "ow" ? "OW" : "MR"] ?? 0;
+  return Math.max(0, total - filterTournamentsByGame(buckets.finished, gameFilter).length);
+}
+
+/**
+ * Le lecteur va-t-il chercher dans l'archive des terminés ? Une recherche, un
+ * filtre de jeu ou la section « Terminés » dépliée portent sur **tous** les
+ * tournois terminés, que la liste courante tronque : il faut alors l'archive
+ * entière (`GET /api/tournaments?finished=all`).
+ */
+export function needsFinishedArchive(
+  query: string,
+  gameFilter: GameFilter,
+  finishedExpanded: boolean,
+): boolean {
+  return finishedExpanded || hasActiveFilter(query, gameFilter);
+}

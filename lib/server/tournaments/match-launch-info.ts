@@ -41,6 +41,7 @@ import {
   toLaunchInput,
   type LaunchMatchRow,
 } from "./match-launch";
+import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 /**
@@ -105,16 +106,39 @@ async function loadViewerTeams(connection: PoolConnection, userId: number): Prom
   return teams;
 }
 
-async function loadCandidates(
-  connection: PoolConnection,
-  userId: number,
-  teamIds: number[],
-): Promise<CandidateRow[]> {
-  const teamFilter =
-    teamIds.length > 0
-      ? `OR m.team1_id IN (${teamIds.map(() => "?").join(", ")})
-         OR m.team2_id IN (${teamIds.map(() => "?").join(", ")})`
-      : "";
+/**
+ * Un tournoi est-il en cours sur le site ? Sans lui, aucun match n'est à
+ * présenter, à personne : la modale interroge sa route toutes les minutes sur
+ * chaque onglet ouvert d'un compte connecté, et chaque appel faisait trois
+ * lectures pour rendre une liste vide.
+ *
+ * La réponse est **la même pour tous** : elle est mutualisée avec les listes de
+ * tournois, et vidée avec elles à chaque écriture sur un tournoi
+ * (`publishUpdatedEvent`) — un tournoi qui démarre est donc vu aussitôt. Le
+ * retard ne tient qu'à une bascule d'état que personne n'a encore écrite, et
+ * aucun match n'existe alors en base pour ce tournoi.
+ */
+function hasRunningTournament(): Promise<boolean> {
+  return cachedTournamentList("running-exists", () =>
+    withConnection(async (connection) => {
+      const [rows] = await connection.execute<(RowDataPacket & { running: number })[]>(
+        `SELECT EXISTS (SELECT 1 FROM bg_tournaments WHERE state = 'RUNNING') AS running`,
+      );
+      return Number(rows[0]?.running ?? 0) === 1;
+    }),
+  );
+}
+
+/**
+ * Matchs à présenter au lecteur : ceux d'une équipe qu'il représente (membre
+ * en cours ou entrée solo) ou qu'il caste. Les équipes du lecteur sont lues
+ * **dans** la requête : un lecteur qui n'a aucun match — le cas courant — ne
+ * coûte qu'une lecture, et ses rôles ne sont relus que s'il en a un.
+ */
+async function loadCandidates(connection: PoolConnection, userId: number): Promise<CandidateRow[]> {
+  const viewerTeams = `(SELECT tm.team_id FROM bg_team_members tm
+                        WHERE tm.user_id = ? AND tm.left_at IS NULL
+                        UNION SELECT st.id FROM bg_teams st WHERE st.solo_user_id = ?)`;
   const [rows] = await connection.execute<CandidateRow[]>(
     `SELECT
        m.id, m.tournament_id, t.state AS tournament_state, m.status, m.is_bye,
@@ -133,9 +157,11 @@ async function loadCandidates(
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        AND (m.start_at IS NULL OR m.start_at <= NOW() + INTERVAL ${LAUNCH_LOOKAHEAD_MINUTES} MINUTE)
-       AND (m.caster_user_id = ? ${teamFilter})
+       AND (m.caster_user_id = ?
+            OR m.team1_id IN ${viewerTeams}
+            OR m.team2_id IN ${viewerTeams})
      ORDER BY m.start_at IS NULL, m.start_at, m.id`,
-    [userId, ...teamIds, ...teamIds],
+    [userId, userId, userId, userId, userId],
   );
   return rows;
 }
@@ -237,13 +263,16 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
 
 /** Matchs du lecteur à présenter dans la modale de lancement. */
 export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaunchInfo[]> {
+  if (!(await hasRunningTournament())) return [];
+
   return withConnection(async (connection) => {
-    const teams = await loadViewerTeams(connection, viewer.id);
-    const teamIds = [...teams.keys()];
-    let rows = await loadCandidates(connection, viewer.id, teamIds);
+    let rows = await loadCandidates(connection, viewer.id);
+    if (rows.length === 0) return [];
     if (await maintainIfDue(connection, rows)) {
-      rows = await loadCandidates(connection, viewer.id, teamIds);
+      rows = await loadCandidates(connection, viewer.id);
+      if (rows.length === 0) return [];
     }
+    const teams = await loadViewerTeams(connection, viewer.id);
 
     const now = Date.now();
     const visible = rows

@@ -13,6 +13,19 @@ export const TEAM_ROLES: TeamRole[] = [
 export const SCORE_REPORT_TIMEOUT_MINUTES = 10;
 
 /**
+ * Tournois terminés portés par la liste publique mutualisée : les plus
+ * récents seulement, autant que la section « Terminés » de `/tournois` en
+ * montre repliée.
+ *
+ * La liste chargeait **tous** les tournois terminés depuis l'origine, résumés
+ * compris (championne, déroulement), pour l'accueil comme pour `/tournois`,
+ * qui n'en affiche que douze — un coût qui grandissait avec l'historique. Le
+ * reste s'obtient à la demande (`GET /api/tournaments?finished=all`), quand le
+ * lecteur déplie la section ou cherche dans l'archive.
+ */
+export const FINISHED_TOURNAMENTS_LIST_LIMIT = 12;
+
+/**
  * Effectif minimal pour qu'un tournoi ait un match à jouer.
  *
  * En deçà, le coup d'envoi ne lance rien : le tournoi est clos sur-le-champ et

@@ -462,6 +462,19 @@ export type TournamentBuckets = {
   registration: TournamentCard[];
   running: TournamentCard[];
   finished: TournamentCard[];
+  /**
+   * Présent **seulement** quand `finished` est tronqué aux plus récents
+   * (`FINISHED_TOURNAMENTS_LIST_LIMIT`, liste publique mutualisée) : le
+   * nombre de tournois terminés qu'elle aurait portés en entier, en tout et
+   * par jeu. Absent, `finished` est complet.
+   */
+  finishedTotals?: FinishedTournamentTotals;
+};
+
+/** Décompte des tournois terminés d'une liste dont le panier est tronqué. */
+export type FinishedTournamentTotals = {
+  all: number;
+  byGame: Record<TournamentGame, number>;
 };
 
 /**
