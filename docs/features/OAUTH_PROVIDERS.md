@@ -80,20 +80,22 @@ portée `profile` reste demandée — c'est elle qui donne la photo —, Google
 continue donc d'envoyer le nom, que le site ignore. Les comptes créés avant la
 règle gardent leur pseudo (voir `ERREUR.txt`).
 
-### Discord : la connexion certifie le tag
+### Discord : la connexion enregistre le tag, elle ne le certifie pas
 
-Se connecter par Discord — **par le bouton comme par le code** — pose
-`discord_verified_at`. Un aller-retour OAuth mené jusqu'au bout *est* la preuve
-que demande la certification (`lib/shared/discord-identity.ts`), et une meilleure
-que le code : c'est Discord lui-même qui nomme l'identifiant et le pseudo, là où
-le code ne prouve que l'accès aux messages privés d'un identifiant que le site
-avait résolu de son côté.
+Se connecter par Discord — **par le bouton comme par le code** — enregistre le
+pseudo que Discord nomme, **sans** poser `discord_verified_at`. L'aller-retour
+OAuth prouve que le compte Discord est bien celui du joueur (c'est Discord qui
+nomme l'identifiant et le pseudo), mais la certification est aussi un
+**consentement** à l'exposition (`lib/shared/discord-identity.ts`), et
+s'authentifier n'en est pas un. La connexion marque donc seulement l'origine du
+pseudo (`discord_pseudo_from_discord`), et le joueur le certifie **d'un clic** sur
+`/profil`, sans nouvelle preuve (`docs/features/DISCORD_VERIFICATION.md`).
 
 Le pseudo retenu est `username` et non `global_name` : le premier est le tag
 stable par lequel on retrouve quelqu'un, le second un libellé décoratif que deux
 comptes peuvent partager. Un pseudo entièrement numérique est écarté par
 `normalizeDiscordHandle` — on ne publie pas une suite de chiffres là où un arbitre
-attend un nom — et le compte se rattache alors sans que son tag soit certifié.
+attend un nom — et le compte se rattache alors sans que son tag change.
 
 **Le code par message privé reste**, et garde sa raison d'être : il sert le
 membre du serveur BlueGenji qui préfère ne pas passer par un écran de
