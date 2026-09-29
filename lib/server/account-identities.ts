@@ -72,8 +72,9 @@ export type OAuthIdentity = {
   handle: string | null;
   /** Photo de profil distante, à **copier** chez nous (jamais à relayer). */
   avatarUrl: string | null;
-  /** Nom d'affichage, lu seulement pour proposer un pseudo à la création. */
-  displayName: string | null;
+  // Aucun nom d'affichage : celui de Google est le plus souvent un nom réel, et
+  // le seul usage qu'on en faisait — proposer un pseudo à la création — publiait
+  // ce nom. Le champ a disparu pour qu'aucun écrivain ne le reprenne.
 };
 
 /** La colonne qui porte l'identité de ce fournisseur. */
@@ -144,7 +145,6 @@ export async function createOrGetOAuthUser(identity: OAuthIdentity, consent: Ter
       return createOrGetGoogleUser(
         {
           sub: identity.subject,
-          name: identity.displayName ?? undefined,
           picture: identity.avatarUrl ?? undefined,
         },
         consent,

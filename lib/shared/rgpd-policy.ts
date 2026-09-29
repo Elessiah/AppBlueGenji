@@ -17,7 +17,12 @@ export interface DroitEntry {
 export const DONNEES_PROFIL: DonneEntry[] = [
   {
     donnee: "Pseudo site",
-    finalite: "Identification sur la plateforme, URLs de profil",
+    // **Jamais un nom réel.** Un compte créé par Google recevait le `name` de
+    // son profil Google — un prénom et un nom, le plus souvent — pour pseudo
+    // public et non masquable. Il naît désormais sous un pseudo neutre ; Discord
+    // et Blizzard donnent un pseudonyme de jeu (tag, BattleTag sans son numéro).
+    finalite:
+      "Identification sur la plateforme, URLs de profil. Jamais tiré de ton nom : un compte créé par Discord ou Blizzard reprend ton pseudo Discord ou ton BattleTag (sans son numéro), un compte créé par Google reçoit un pseudo neutre — tu le changes dans Mon profil",
     base: "Consentement",
     duree: "Durée du compte",
   },
@@ -76,7 +81,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // règle. Ce qui reste est un identifiant opaque, qui ne s'affiche à
     // personne.
     finalite:
-      "Moyen de connexion (bouton Google) — identifiant technique opaque. Aucune adresse e-mail n'est demandée ni conservée. Retirable depuis Mon profil tant qu'il t'en reste un autre",
+      "Moyen de connexion (bouton Google) — identifiant technique opaque. Aucune adresse e-mail n'est demandée ni conservée, et le nom de ton compte Google n'est pas repris. Retirable depuis Mon profil tant qu'il t'en reste un autre",
     base: "Consentement",
     duree: "Durée du compte",
   },
@@ -95,7 +100,10 @@ export const DONNEES_PROFIL: DonneEntry[] = [
   },
   {
     donnee: "Avatar",
-    finalite: "Affichage sur le profil et les brackets",
+    // La photo copiée depuis Google ou Discord n'est pas un choix du joueur :
+    // elle naît masquée (`adoptRemoteAvatar`), et seul le joueur la publie.
+    finalite:
+      "Affichage sur le profil et les brackets. Téléversé par toi, ou copié sur nos serveurs depuis Google ou Discord à la connexion — la photo copiée reste masquée tant que tu ne coches pas « Avatar » dans Mon profil",
     base: "Consentement",
     duree: "Durée du compte",
   },

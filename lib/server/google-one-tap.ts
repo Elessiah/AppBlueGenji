@@ -59,7 +59,6 @@ type OneTapPayload = {
   aud?: string;
   exp?: number;
   sub?: string;
-  name?: string;
   picture?: string;
 };
 
@@ -138,5 +137,5 @@ export async function verifyGoogleOneTapCredential(credential: string): Promise<
   }
   if (!payload.sub) throw new Error("GOOGLE_ONE_TAP_INVALID");
 
-  return { sub: payload.sub, name: payload.name, picture: payload.picture };
+  return { sub: payload.sub, picture: payload.picture };
 }
