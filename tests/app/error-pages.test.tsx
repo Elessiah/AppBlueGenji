@@ -9,8 +9,21 @@ import {
   RUNTIME_ERROR_COPY,
   errorPageTitle,
   errorReference,
+  runtimeErrorCopy,
 } from "@/lib/shared/error-pages";
 import { readSource } from "../helpers/read-source";
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: jest.fn(), push: jest.fn(), prefetch: jest.fn() }),
+}));
+
+describe("runtimeErrorCopy", () => {
+  it("ne renvoie à une référence que s'il y en a une", () => {
+    expect(runtimeErrorCopy(null).message).not.toContain("référence");
+    expect(runtimeErrorCopy("abc").message).toContain("la référence ci-dessous");
+    expect(runtimeErrorCopy("abc").title).toBe(RUNTIME_ERROR_COPY.title);
+  });
+});
 
 describe("errorReference", () => {
   it("rend l'empreinte de Next telle quelle", () => {
@@ -50,13 +63,13 @@ describe("ErrorPanel", () => {
   it("nomme sa section par son titre de niveau 1 et rend les actions", () => {
     const html = renderToStaticMarkup(
       <ErrorPanel copy={NOT_FOUND_COPY}>
-        <a href="/">Accueil</a>
+        <button type="button">Accueil</button>
       </ErrorPanel>,
     );
     expect(html).toContain('aria-labelledby="error-page-title"');
     expect(html).toContain('<h1 id="error-page-title"');
     expect(html).toContain("Page introuvable");
-    expect(html).toContain('<a href="/">Accueil</a>');
+    expect(html).toContain('<button type="button">Accueil</button>');
     expect(html).not.toContain("Référence");
   });
 
@@ -89,7 +102,14 @@ describe("app/error.tsx", () => {
   });
 
   it("n'annonce aucune référence sans empreinte", () => {
-    expect(render()).not.toContain("Référence");
+    const html = render();
+    expect(html).not.toContain("Référence");
+    expect(html).not.toContain("référence ci-dessous");
+  });
+
+  it("« Réessayer » redemande la page au serveur avant de relancer le rendu", () => {
+    const source = readSource("app/error.tsx");
+    expect(source).toMatch(/startTransition\(\(\) => \{\s*router\.refresh\(\);\s*reset\(\);/);
   });
 });
 
@@ -108,6 +128,7 @@ describe("app/not-found.tsx et app/global-error.tsx", () => {
     const source = readSource("app/global-error.tsx");
     expect(source).toContain('<html lang="fr">');
     expect(source).toContain("<body");
-    expect(source).toContain("onClick={reset}");
+    // `reset()` rejouerait la réponse fautive : on recharge.
+    expect(source).toContain("window.location.reload()");
   });
 });

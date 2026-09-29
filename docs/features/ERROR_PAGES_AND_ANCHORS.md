@@ -10,15 +10,15 @@ en-tête ni lien de retour — et une erreur d'exécution son « Application err
 | Fichier | Quand | Rendu |
 | --- | --- | --- |
 | `app/not-found.tsx` | URL inconnue, `notFound()` sans limite plus proche | `PublicPageShell` (en-tête, `<main>`, pied de page), « Page introuvable », liens vers l'accueil, les tournois et les règles ; titre « Page introuvable · BlueGenji Esport », `noindex` |
-| `app/error.tsx` | erreur d'exécution d'une page | carte dans `<main>`, bouton « Réessayer » (`reset`) et retour à l'accueil, **référence** = `digest` de Next |
-| `app/global-error.tsx` | erreur de la mise en page racine elle-même | document complet (`<html lang="fr">`), mêmes textes, lien de retour en rechargement complet |
+| `app/error.tsx` | erreur d'exécution d'une page | carte dans `<main>`, « Réessayer » (`router.refresh()` puis `reset()` — `reset()` seul rejouerait la réponse fautive) et retour à l'accueil, **référence** = `digest` de Next |
+| `app/global-error.tsx` | erreur de la mise en page racine elle-même | document complet (`<html lang="fr">`), mêmes textes, « Réessayer » et retour par rechargement complet |
 
 Les textes sont purs, dans `lib/shared/error-pages.ts` ; la carte est
 `components/error-page/ErrorPanel.tsx`, sans état ni accès serveur, pour servir
 à la fois un composant serveur (404) et les limites d'erreur (client).
 `error.tsx` ne peut pas exporter de métadonnées : il rend un `<title>`
 (`errorPageTitle`), que React remonte dans `<head>`. La référence affichée
-n'est que l'empreinte `digest` — le message d'une erreur serveur est masqué en
+n'est que l'empreinte `digest` (le message n'y renvoie que s'il y en a une — `runtimeErrorCopy`) — le message d'une erreur serveur est masqué en
 production, et c'est l'empreinte qui la relie aux journaux pm2.
 
 `error.tsx` n'a pas d'en-tête : `PublicHeader` est un composant serveur

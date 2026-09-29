@@ -33,8 +33,23 @@ export const RUNTIME_ERROR_COPY: ErrorPageCopy = {
   eyebrow: "ERREUR",
   title: "Un problème est survenu",
   message:
-    "La page n'a pas pu s'afficher. Réessaie dans un instant ; si le problème persiste, signale-le avec la référence ci-dessous.",
+    "La page n'a pas pu s'afficher. Réessaie dans un instant ; si le problème persiste, signale-le.",
 };
+
+/**
+ * Textes d'une erreur d'exécution selon qu'une référence l'accompagne : seule
+ * une erreur **serveur** en porte une (le `digest` de Next) — une erreur levée
+ * dans le navigateur n'en a pas, et la phrase ne doit pas renvoyer à une
+ * référence absente.
+ */
+export function runtimeErrorCopy(reference: string | null): ErrorPageCopy {
+  if (!reference) return RUNTIME_ERROR_COPY;
+  return {
+    ...RUNTIME_ERROR_COPY,
+    message:
+      "La page n'a pas pu s'afficher. Réessaie dans un instant ; si le problème persiste, signale-le avec la référence ci-dessous.",
+  };
+}
 
 /** Destinations proposées depuis une page introuvable, dans l'ordre d'affichage. */
 export const NOT_FOUND_LINKS: readonly ErrorPageLink[] = [

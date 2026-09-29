@@ -7,9 +7,9 @@ import { CyberButton } from "@/components/cyber";
 import { ErrorPanel } from "@/components/error-page/ErrorPanel";
 import {
   RETRY_LABEL,
-  RUNTIME_ERROR_COPY,
   errorPageTitle,
   errorReference,
+  runtimeErrorCopy,
 } from "@/lib/shared/error-pages";
 
 /**
@@ -21,22 +21,29 @@ import {
  */
 export default function GlobalError({
   error,
-  reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const reference = errorReference(error.digest);
+  const copy = runtimeErrorCopy(reference);
+
   useEffect(() => {
     console.error(error);
   }, [error]);
 
+  // La mise en page racine est tombée : `reset()` rejouerait la réponse déjà
+  // reçue, qui porte l'erreur. Un rechargement complet redemande tout au
+  // serveur.
+  const retry = () => window.location.reload();
+
   return (
     <html lang="fr">
       <body style={FONT_VARIABLES}>
-        <title>{errorPageTitle(RUNTIME_ERROR_COPY)}</title>
+        <title>{errorPageTitle(copy)}</title>
         <main>
-          <ErrorPanel copy={RUNTIME_ERROR_COPY} reference={errorReference(error.digest)}>
-            <CyberButton type="button" onClick={reset}>
+          <ErrorPanel copy={copy} reference={reference}>
+            <CyberButton type="button" onClick={retry}>
               {RETRY_LABEL}
             </CyberButton>
             <CyberButton asChild variant="ghost">
