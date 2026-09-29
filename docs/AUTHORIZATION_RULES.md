@@ -341,12 +341,13 @@ modifier le profil d'autrui.
 Le masquage est appliqué **côté serveur, à la source** : le champ masqué vaut
 `null` dans la réponse, il n'est pas seulement caché à l'affichage.
 
-**L'avatar masqué a un lecteur de plus : la modération.** Le sélecteur de cibles
-des signalements, lu depuis le panneau d'administration par un porteur de
-`moderation` (`isModerator`, `lib/server/content-reports.ts`), rend l'avatar
-d'un joueur même masqué — on ne décide pas du retrait d'une image qu'on ne voit
-pas. Le même sélecteur, ouvert à tout membre qui rédige un signalement, applique
-`visibleAvatarUrl` comme partout ailleurs.
+**L'avatar masqué a un lecteur de plus : la modération.** Dans le panneau des
+signalements (`listReports`, `GET /api/admin/reports`, permission `moderation`),
+l'aperçu d'un joueur visé montre son avatar même masqué (`isModerator`,
+`lib/server/content-reports.ts`) — sans quoi masquer son avatar masquait du même
+geste le bouton qui permet de le retirer sur signalement. Le sélecteur de cibles
+ouvert à tout membre qui rédige un signalement, lui, applique `visibleAvatarUrl`
+comme partout ailleurs.
 
 **Le BattleTag masqué a un public restreint, pas nul.** Masqué, il quitte la
 fiche publique et l'annuaire, mais reste lisible là où il sert à jouer — ce que
@@ -905,8 +906,8 @@ de vitrine — d'où une permission propre, que seul `ADMIN` porte. Elle ouvre :
   (`DELETE /api/admin/users/[id]/avatar`) ;
 - la gestion des quarantaines (`/api/admin/logo-quarantines/[id]` : aperçu du
   fichier masqué, rétablissement, suppression définitive avant échéance) ;
-- la lecture de l'avatar **masqué** d'un joueur dans le sélecteur de cibles du
-  panneau (§2.3).
+- la lecture de l'avatar **masqué** d'un joueur visé, dans l'aperçu des cibles
+  d'un signalement listé au panneau (§2.3).
 
 Ces gestes **retirent**, ils ne remplacent jamais : la modération ne pose ni logo
 ni avatar, ne touche ni au roster, ni au nom, ni aux inscriptions. L'équipe ou
@@ -914,9 +915,11 @@ le joueur est prévenu en message privé, avec le lien pour contester. Voir
 `docs/features/CONTENT_REPORTS.md` et `docs/features/LOGO_QUARANTINE.md`.
 
 Côté membres, **signaler** n'exige aucun rôle (§8), **désigner des cibles** exige
-un compte, et seules les personnes visées lisent et contestent le dossier
-(`GET /api/reports/[id]`, `REPORT_NOT_CONCERNED` → 403 sinon, sans jamais
-l'identité du signalant).
+un compte, et seules les personnes visées lisent le dossier
+(`GET /api/reports/[id]`, sans jamais l'identité du signalant — **404**
+`REPORT_NOT_FOUND` pour tout autre lecteur, comme pour un dossier inexistant :
+un « interdit » confirmerait son existence) et le contestent (`POST /api/reports`,
+`REPORT_NOT_CONCERNED` → 403 sinon).
 
 ---
 
@@ -963,6 +966,9 @@ Volontairement ouvert, à connaître pour ne pas le confondre avec un trou :
 - `POST /api/csp-report` — le collecteur des violations de la politique de
   sécurité du contenu, que le navigateur appelle sans session : plafonné par IP,
   journalisé une fois par cause et par heure, rien n'est stocké.
+- Les routes d'authentification (`/api/auth/*`), par nature — ouvertes, mais
+  **plafonnées** : voir §1.1 pour le code Discord, qui est un secret et se
+  compte comme tel.
 
 Ouvertes à **tout compte connecté**, sans rôle :
 
@@ -970,9 +976,6 @@ Ouvertes à **tout compte connecté**, sans rôle :
   (`GET /api/push`), ses abonnements (`POST` / `DELETE /api/push/subscriptions`)
   et ses sujets (`PUT /api/push/topics`), toujours sur `user.id` pris de la
   session.
-- Les routes d'authentification (`/api/auth/*`), par nature — ouvertes, mais
-  **plafonnées** : voir §1.1 pour le code Discord, qui est un secret et se
-  compte comme tel.
 
 En revanche, l'annuaire des joueurs (`/api/players`) et celui des équipes
 (`/api/teams`) **exigent une session** : ce sont des données de membres.
