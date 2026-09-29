@@ -502,7 +502,7 @@ export function ReportProblemDialog({
                   </li>
                   <li>{REPORT_PRIVACY_NOTICE.retention}</li>
                   <li>{reportLegalBasisNotice(category)}</li>
-                  {category === "COPYRIGHT" && <li>{NOTIFIER_FOLLOW_UP}</li>}
+                  {(category === "COPYRIGHT" || category === "MODERATION") && <li>{NOTIFIER_FOLLOW_UP}</li>}
                   <li>
                     {reportRightsNotice(category)}{" "}
                     <Link href="/rgpd" target="_blank" rel="noreferrer">

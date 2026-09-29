@@ -262,7 +262,8 @@ export function ReportDetail({
             <dt>Qualité</dt>
             <dd>{RIGHTS_RELATION_LABELS[report.rightsRelation]}</dd>
           </div>
-        )}        {followUp && (
+        )}
+        {followUp && (
           <div>
             <dt>Retour dû</dt>
             <dd>{followUp}</dd>

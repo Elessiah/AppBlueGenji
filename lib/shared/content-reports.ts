@@ -760,7 +760,7 @@ export function copyrightNoticeElementsText(): string {
  * (`reportFollowUpDuty`).
  */
 export const NOTIFIER_FOLLOW_UP =
-  "L'auteur d'une notification reçoit, à l'adresse qu'il indique, un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes.";
+  "L'auteur d'une notification reçoit, à l'adresse qu'il indique (exigée en droit d'auteur, facultative ailleurs), un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes.";
 
 /**
  * Le retour que l'association **doit** à l'auteur d'un signalement, rappelé
