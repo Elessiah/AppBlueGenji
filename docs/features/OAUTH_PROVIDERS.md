@@ -78,7 +78,9 @@ lu : `GoogleUserInfo` et `GoogleProfilePayload` n'ont plus de champ `name`,
 un pseudo neutre (`playerNNNNN`) que le joueur remplace depuis « Mon profil ». La
 portée `profile` reste demandée — c'est elle qui donne la photo —, Google
 continue donc d'envoyer le nom, que le site ignore. Les comptes créés avant la
-règle gardent leur pseudo (voir `ERREUR.txt`).
+règle gardent leur pseudo : rien n'est renommé d'office, leurs titulaires en
+sont informés une fois (entrée ciblée `2026-09-comptes-google-anterieurs`,
+`docs/features/PRIVACY_CHANGES_CONSENT.md`).
 
 ### Discord : la connexion enregistre le tag, elle ne le certifie pas
 

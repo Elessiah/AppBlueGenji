@@ -91,6 +91,40 @@ Limite assumée : un compte créé entre `publishedAt` et le déploiement effect
 verra pas le changement. D'où la consigne de poser la date de mise en production
 prévue plutôt que celle de la rédaction.
 
+## Entrées ciblées
+
+Par défaut une entrée s'adresse à **tout** compte antérieur à sa publication.
+Deux champs facultatifs servent le cas d'une information qui ne concerne qu'une
+partie des comptes :
+
+- `audience` (`PrivacyAudience`) restreint les comptes concernés. Seule valeur :
+  `GOOGLE_LINKED`, un compte qui porte une identité Google (`google_sub`). La
+  règle est écrite deux fois, parce qu'elle est lue deux fois — en mémoire
+  (`privacyChangeReachesAccount`, pour la modale et pour le message) et en base
+  (`privacyAudienceSql`, pour la sélection des destinataires de l'annonce
+  Discord, sans quoi des comptes non concernés occuperaient le lot). Un fait
+  inconnu vaut **faux** : dans le doute, une entrée ciblée se tait.
+- `links` : liens vers les écrans où agir, rendus par la modale sous le détail.
+  Suivre l'un d'eux vaut prise de connaissance **de cette entrée seule** (ses
+  voisines reviennent au chargement suivant) et ferme la modale sans attendre
+  la réponse — elle ne se tait que sur
+  `/rgpd`, elle couvrirait sinon l'écran même où elle envoie. Le message Discord
+  ne les porte pas.
+
+Première entrée ciblée : `2026-09-comptes-google-anterieurs`, le reliquat de la
+connexion Google sans nom réel. Depuis le 30 septembre 2026 un compte créé par
+Google reçoit un pseudo neutre et sa photo importée naît masquée ; les comptes
+d'avant gardent le pseudo et la photo que Google leur a donnés. Décision de
+l'association : **rien n'est modifié d'office**, le titulaire est informé une fois
+et invité à les changer. Le site ne sait pas par quelle porte un compte est
+**né**, seulement quelles identités il porte : un compte né par Discord puis
+relié à Google est donc compté, d'où une entrée rédigée au conditionnel. À
+l'inverse, un compte né par Google puis **détaché** de Google (autre porte
+rattachée, `google_sub` remis à `NULL`) n'en garde aucune trace et n'est pas
+informé : limite assumée, aucun fait ne la lève sans nouvelle collecte. Sa date
+est celle de la règle et non celle du déploiement de l'entrée — c'est elle qui
+sépare les comptes concernés, `publishedAt` bornant la création.
+
 ## La modale
 
 Rendue **côté serveur** par la mise en page racine, comme la mise en avant du

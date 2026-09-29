@@ -13,7 +13,28 @@ import {
  * données (`lib/shared/privacy-changes.ts`).
  */
 
-type PendingRow = RowDataPacket & { created_at: string | null; change_id: string | null };
+type PendingRow = RowDataPacket & {
+  created_at: string | null;
+  google_linked: 0 | 1 | null;
+  change_id: string | null;
+};
+
+/**
+ * Condition SQL d'une entrée ciblée (`PrivacyChange.audience`) sur la ligne
+ * `u` de `bg_users` — la traduction en base de `privacyChangeReachesAccount`,
+ * pour qui filtre les comptes avant de les lire (annonce Discord). Une entrée
+ * sans cible vaut pour tous.
+ */
+export function privacyAudienceSql(change: PrivacyChange): string {
+  switch (change.audience) {
+    case undefined:
+      return "1 = 1";
+    case "GOOGLE_LINKED":
+      return "u.google_sub IS NOT NULL";
+    default:
+      return "1 = 0";
+  }
+}
 
 /**
  * Les changements publiés dont un compte n'a pas encore pris connaissance.
@@ -30,7 +51,7 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
 
   const db = await getDatabase();
   const [rows] = await db.execute<PendingRow[]>(
-    `SELECT u.created_at, a.change_id
+    `SELECT u.created_at, u.google_sub IS NOT NULL AS google_linked, a.change_id
        FROM bg_users u
        LEFT JOIN bg_privacy_acknowledgments a ON a.user_id = u.id
       WHERE u.id = ? AND u.is_deleted = 0`,
@@ -43,6 +64,8 @@ export async function loadPendingPrivacyChanges(userId: number): Promise<Privacy
     rows[0].created_at ? String(rows[0].created_at) : null,
     acknowledged,
     privacyChangeDay(new Date()),
+    PRIVACY_CHANGES,
+    { googleLinked: Number(rows[0].google_linked) === 1 },
   );
 }
 

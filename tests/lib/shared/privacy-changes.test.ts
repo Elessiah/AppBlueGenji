@@ -19,6 +19,7 @@ import {
   formatPrivacyChangeDate,
   pendingPrivacyChanges,
   privacyChangeDay,
+  privacyChangeReachesAccount,
   publishedPrivacyChanges,
   privacyChangesForOneMessage,
   privacyChangesHeading,
@@ -386,5 +387,65 @@ describe("anti-spam des messages privés", () => {
     it("rien à envoyer à qui n'a rien de dû", () => {
       expect(privacyDmBatch([], day("2027-01-01"))).toEqual([]);
     });
+  });
+});
+
+describe("entrées ciblées (audience)", () => {
+  const G = change("g", "2026-04-01", { audience: "GOOGLE_LINKED" });
+  const TARGETED = [A, G, C];
+
+  it("sans cible, une entrée vaut pour tout compte", () => {
+    expect(privacyChangeReachesAccount(A, {})).toBe(true);
+    expect(privacyChangeReachesAccount(A, { googleLinked: false })).toBe(true);
+  });
+
+  it("GOOGLE_LINKED ne vise qu'un compte relié à Google", () => {
+    expect(privacyChangeReachesAccount(G, { googleLinked: true })).toBe(true);
+    expect(privacyChangeReachesAccount(G, { googleLinked: false })).toBe(false);
+  });
+
+  it("un fait inconnu vaut faux : l'entrée ciblée se tait", () => {
+    expect(privacyChangeReachesAccount(G, {})).toBe(false);
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", [], TODAY, TARGETED)).toEqual([A, C]);
+  });
+
+  it("une cible inconnue (valeur inattendue) ne vise personne", () => {
+    const odd = change("x", "2026-04-01", { audience: "AUTRE" as never });
+    expect(privacyChangeReachesAccount(odd, { googleLinked: true })).toBe(false);
+  });
+
+  it("la cible s'ajoute à la date de création, elle ne la remplace pas", () => {
+    const linked = { googleLinked: true };
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", [], TODAY, TARGETED, linked)).toEqual([A, G, C]);
+    // Créé le jour de la publication ou après : non concerné, relié ou non.
+    expect(pendingPrivacyChanges("2026-04-01 00:00:00", [], TODAY, TARGETED, linked)).toEqual([C]);
+    // Déjà lue : plus due.
+    expect(pendingPrivacyChanges("2025-12-01 10:00:00", ["g"], TODAY, TARGETED, linked)).toEqual([A, C]);
+  });
+});
+
+describe("PRIVACY_CHANGES — comptes Google antérieurs au pseudo neutre", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-09-comptes-google-anterieurs")!;
+
+  it("vise les comptes reliés à Google créés avant la règle du 30 septembre 2026", () => {
+    expect(entry).toBeDefined();
+    expect(entry.audience).toBe("GOOGLE_LINKED");
+    expect(entry.publishedAt).toBe("2026-09-30");
+  });
+
+  it("n'annonce aucune modification d'office et renvoie vers le profil", () => {
+    expect(entry.summary).toMatch(/Rien n'a été changé à ta place/);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/profil#identite", "/profil#confidentialite"]);
+  });
+
+  it("parle au conditionnel : le site ne sait pas par quelle porte un compte est né", () => {
+    expect(entry.summary).toMatch(/ont pu venir/);
+  });
+
+  it("n'est pas présentée à un compte sans Google", () => {
+    expect(pendingPrivacyChanges("2025-01-01 00:00:00", [], TODAY).map((c) => c.id)).not.toContain(entry.id);
+    expect(
+      pendingPrivacyChanges("2025-01-01 00:00:00", [], TODAY, PRIVACY_CHANGES, { googleLinked: true }).map((c) => c.id),
+    ).toContain(entry.id);
   });
 });

@@ -132,7 +132,10 @@ export default async function RgpdPage() {
             pseudo neutre que tu remplaces dans Mon profil, et la photo copiée depuis
             Google ou Discord reste masquée tant que tu ne choisis pas de l&apos;afficher.
             Un compte créé par Google avant cette date a pu recevoir le nom de ce compte
-            pour pseudo : si c&apos;est le tien, change-le dans Mon profil.
+            pour pseudo, et sa photo Google a pu être copiée et affichée : rien n&apos;y a
+            été changé d&apos;office. Chaque compte relié à Google et créé avant cette date
+            en est informé une fois à sa prochaine visite, et peut changer son pseudo et
+            sa photo, ou masquer celle-ci, dans Mon profil.
           </p>
         </div>
         {/* Sous 640 px, chaque ligne devient une fiche : les cellules s'empilent

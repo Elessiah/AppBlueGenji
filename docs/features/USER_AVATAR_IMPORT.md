@@ -133,8 +133,11 @@ Le réglage n'est posé qu'à l'import : un avatar téléversé n'est jamais con
 et l'entrée solo n'a rien à resynchroniser — l'import n'a lieu qu'en l'absence
 d'avatar local, donc l'entrée n'en portait aucun. Les photos importées avant la
 règle restent publiées : rien ne les distingue d'un avatar téléversé (même
-dossier, même nommage), et les masquer d'office est une décision laissée à
-l'association (`ERREUR.txt`).
+dossier, même nommage). L'association a choisi de **ne pas** les masquer d'office :
+les titulaires des comptes reliés à Google et créés avant la règle en sont
+informés une fois, par l'entrée `2026-09-comptes-google-anterieurs` du registre
+des changements (`docs/features/PRIVACY_CHANGES_CONSENT.md`, « Entrées ciblées »),
+qui les envoie changer, supprimer ou masquer leur photo.
 
 ## L'import ne fait jamais échouer une connexion
 
