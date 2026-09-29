@@ -60,6 +60,8 @@ describe("Classements — action sous le nom sous 720 px", () => {
     expect(narrow).toMatch(/\.swissAction\s*\{[^}]*grid-column:\s*2 \/ -1/);
     expect(narrow).toMatch(/\.swissTable\[data-with-action\]\s*\{[^}]*grid-template-columns:\s*auto minmax\(6em, 1fr\) auto auto auto auto auto;/);
     expect(narrow).toMatch(/\.survivalAction\s*\{[^}]*flex-basis:\s*100%/);
+    // Une cellule d'action sans bouton ne laisse pas de ligne vide.
+    expect(narrow).toMatch(/\.swissAction:not\(:has\(button\)\)\s*\{\s*display:\s*none;/);
   });
 
   it("les pistes de la ronde suisse ne sont plus posées en ligne, où elles battraient la requête média", () => {
@@ -95,6 +97,8 @@ describe("Phase suisse d'un multi-phases", () => {
       page.indexOf(') : formatForBracket === "SWISS" ? ('),
     );
     expect(current).toContain("matches={filteredMatches}");
+    // Dernière phase close avec le tournoi : la vue porte déjà le classement.
+    expect(current).not.toContain("{finishedPhaseStandings}");
   });
 
   it("les rondes sont un export du module de la vue suisse, chargé à la demande", () => {

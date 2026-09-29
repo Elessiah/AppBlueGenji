@@ -42,6 +42,13 @@
     padding-top: 4px;
   }
 
+  /* La cellule existe sur toutes les lignes dès qu'une seule porte le bouton :
+     sans bouton, elle ajouterait une ligne vide sous chaque équipe. L'en-tête
+     de colonne part avec elle, la colonne n'existant plus à cette largeur. */
+  .swissAction:not(:has(button)) {
+    display: none;
+  }
+
   .survivalRow {
     flex-wrap: wrap;
     row-gap: 4px;
