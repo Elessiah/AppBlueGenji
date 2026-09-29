@@ -56,7 +56,7 @@ export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkCl
 
   if (plain) {
     return (
-      <a ref={linkRef} className={`tap-target ${linkClassName ?? ""}`.trim()} href={contactHref(kind, plain)}>
+      <a ref={linkRef} className={`tap-target ${styles.revealed} ${linkClassName ?? ""}`.trim()} href={contactHref(kind, plain)}>
         {plain}
       </a>
     );
