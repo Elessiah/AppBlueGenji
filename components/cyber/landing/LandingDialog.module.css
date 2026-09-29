@@ -37,10 +37,18 @@
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
 }
 
 .close:hover:not(:disabled) {
   border-color: var(--blue-500, #5ac8ff);
+  color: var(--blue-100, #e6f6ff);
+}
+
+@media (forced-colors: active) {
+  .close:focus-visible {
+    outline: 2px solid Highlight;
+  }
 }
 
 .close:focus-visible {
