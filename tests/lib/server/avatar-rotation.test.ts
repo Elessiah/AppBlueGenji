@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("node:fs/promises", () => ({ rename: jest.fn() }));
+jest.mock("node:fs/promises", () => ({ rename: jest.fn(), copyFile: jest.fn(), unlink: jest.fn() }));
+jest.mock("@/lib/server/stored-upload-cleanup");
 
 import path from "node:path";
-import { rename } from "node:fs/promises";
+import { copyFile, rename, unlink } from "node:fs/promises";
+import { isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
 import { getDatabase } from "@/lib/server/database";
 import { rotateHiddenAvatarFile, rotatedAvatarTarget } from "@/lib/server/avatar-rotation";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
@@ -16,6 +18,9 @@ import { type SqlQuery, fakePool } from "../../helpers/sql-double";
  */
 
 const renameMock = jest.mocked(rename);
+const copyMock = jest.mocked(copyFile);
+const unlinkMock = jest.mocked(unlink);
+const referencedMock = jest.mocked(isUploadReferenced);
 const AVATARS = path.join(process.cwd(), "public", "uploads", "avatars");
 const OLD_URL = "/api/uploads/avatars/42-aaaa.webp";
 
@@ -60,6 +65,29 @@ describe("rotateHiddenAvatarFile", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     renameMock.mockResolvedValue(undefined);
+    copyMock.mockResolvedValue(undefined);
+    unlinkMock.mockResolvedValue(undefined);
+    referencedMock.mockResolvedValue(false);
+  });
+
+  it("copie au lieu de renommer quand une autre ligne désigne le fichier", async () => {
+    // Un logo de partenaire collé depuis l'adresse d'un avatar : le renommer
+    // casserait cette image-là sans bruit.
+    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 });
+    referencedMock.mockResolvedValueOnce(true);
+    const url = await rotateHiddenAvatarFile(42);
+    expect(url).not.toBeNull();
+    expect(referencedMock).toHaveBeenCalledWith(OLD_URL, { exceptUserAvatar: 42 });
+    expect(renameMock).not.toHaveBeenCalled();
+    expect(copyMock.mock.calls[0][0]).toBe(path.join(AVATARS, "42-aaaa.webp"));
+  });
+
+  it("efface la copie quand l'écriture n'aboutit pas", async () => {
+    mockDb({ avatar_url: OLD_URL, visible_avatar: 0 }, 0);
+    referencedMock.mockResolvedValueOnce(true);
+    expect(await rotateHiddenAvatarFile(42)).toBeNull();
+    expect(unlinkMock).toHaveBeenCalledWith(copyMock.mock.calls[0][1]);
+    expect(renameMock).not.toHaveBeenCalled();
   });
 
   it("renomme le fichier puis écrit la nouvelle URL, bornée à l'ancienne", async () => {

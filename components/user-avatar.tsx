@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import type { CSSProperties } from "react";
+import { useState, type CSSProperties } from "react";
 import { avatarInitial } from "@/lib/shared/avatar";
 import { LogoWithGlow } from "./logo-with-glow";
 
@@ -75,8 +75,15 @@ export function UserAvatar({
   // l'arbre d'accessibilité, là où l'omettre la ferait annoncer par son nom de
   // fichier.
   const alt = decorative ? "" : pseudo;
+  // Une adresse qui ne répond plus retombe sur l'initiale plutôt que sur une
+  // image cassée : masquer son avatar **renomme** le fichier
+  // (`lib/server/avatar-rotation.ts`), et la barre de navigation — rendue par
+  // la mise en page, qu'une sauvegarde de profil ne recharge pas — garde
+  // l'ancienne adresse jusqu'au prochain chargement complet. Mémorisé par
+  // adresse : une nouvelle URL retente l'image.
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
 
-  if (src) {
+  if (src && src !== failedSrc) {
     if (glow) {
       return (
         <LogoWithGlow
@@ -98,6 +105,7 @@ export function UserAvatar({
         alt={alt}
         width={size}
         height={size}
+        onError={() => setFailedSrc(src)}
         style={{
           width: size,
           height: size,

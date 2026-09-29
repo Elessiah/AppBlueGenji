@@ -337,8 +337,13 @@ appelé par `updateOwnProfile`) : l'ancienne adresse rend 404 partout, et seul l
 titulaire, à qui sa fiche rend l'URL même masquée, apprend la nouvelle. Fichier
 renommé avant l'écriture, remis en place si elle n'aboutit pas ; l'`UPDATE`
 porte l'ancienne URL dans son `WHERE`, un téléversement concurrent n'est jamais
-écrasé. Seule limite, que rien ne rattrape : la copie déjà gardée dans le cache
-d'un navigateur qui l'a affichée.
+écrasé. Un fichier qu'une autre ligne désigne (logo de partenaire ou d'équipe
+collé depuis l'adresse de l'avatar) est **copié** plutôt que renommé : cette
+publication-là n'est pas celle du joueur, et la casser sans bruit n'est pas le
+rôle de son réglage. Seule limite, que rien ne rattrape : la copie déjà gardée
+dans le cache d'un navigateur qui l'a affichée. `UserAvatar` retombe sur
+l'initiale quand l'ancienne adresse ne répond plus (barre de navigation rendue
+avant le masquage).
 
 Deux points volontaires, à ne pas prendre pour des fuites :
 

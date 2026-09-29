@@ -93,6 +93,18 @@ describe("isUploadReferenced", () => {
     expect(execute.mock.calls.length).toBeGreaterThanOrEqual(6);
   });
 
+  it("peut ignorer l'avatar de son titulaire, et lui seul", async () => {
+    // Masquer un avatar demande « un autre que lui désigne-t-il ce fichier ? » :
+    // la ligne du titulaire le désigne toujours.
+    const execute = mockDb();
+    await isUploadReferenced("/api/uploads/avatars/42-a.webp", { exceptUserAvatar: 42 });
+    const users = execute.mock.calls.find(([sql]) => sql.includes("FROM bg_users"));
+    expect(users?.[0]).toContain("AND id <> ? LIMIT 1");
+    expect(users?.[1]).toEqual(["/api/uploads/avatars/42-a.webp", "/uploads/avatars/42-a.webp", 42]);
+    const others = execute.mock.calls.filter(([sql]) => !sql.includes("FROM bg_users"));
+    expect(others.every(([sql]) => !sql.includes("id <>"))).toBe(true);
+  });
+
   it("ne compte un logo en quarantaine que tant qu'il est masqué", async () => {
     const execute = mockDb();
     await isUploadReferenced("/api/uploads/teams/3-abc.webp");

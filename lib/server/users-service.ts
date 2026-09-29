@@ -1424,23 +1424,24 @@ export async function updateOwnProfile(
   // de l'entrée solo, qui republierait l'identité qu'on vient de refuser.
   if (result.affectedRows === 0) throw new Error(ACCOUNT_DELETED_ERROR);
 
-  // Masqué, l'avatar disparaît des réponses mais son fichier restait servi sans
-  // session à la même adresse : on le renomme, l'ancienne adresse meurt. Un
-  // échec n'annule pas le réglage, déjà écrit — il se journalise.
-  if (hidesVisibleAvatar) {
-    try {
-      await rotateHiddenAvatarFile(userId);
-    } catch (error) {
-      console.error("[avatar-rotation] renommage impossible", error);
-    }
-  }
-
   // L'entrée solo (tournois individuels) affiche le pseudo **et l'avatar** du
   // joueur dans les brackets : elle suit le renommage, et aussi la bascule de
   // visibilité de l'avatar — sans quoi masquer son image n'aurait effacé que la
   // fiche de profil, l'entrée solo continuant de la servir à tout le site.
   if (patch.pseudo || patch.visibility?.avatar !== undefined) {
     await syncSoloEntryIdentity(userId);
+  }
+
+  // Masqué, l'avatar disparaît des réponses mais son fichier restait servi sans
+  // session à la même adresse : on le renomme, l'ancienne adresse meurt. Un
+  // échec n'annule pas le réglage, déjà écrit — il se journalise. Après la
+  // resynchronisation : l'entrée solo, vidée, ne compte plus pour un partage.
+  if (hidesVisibleAvatar) {
+    try {
+      await rotateHiddenAvatarFile(userId);
+    } catch (error) {
+      console.error("[avatar-rotation] renommage impossible", error);
+    }
   }
 }
 

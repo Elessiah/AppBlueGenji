@@ -150,3 +150,17 @@ describe("aucun avatar ne contourne la vérification d'origine", () => {
     expect(source).toContain("avatarUrl: localAvatarUrl(row.avatar_url)");
   });
 });
+
+/**
+ * Masquer son avatar renomme son fichier (`lib/server/avatar-rotation.ts`) ; la
+ * barre de navigation, rendue par la mise en page, garde l'ancienne adresse
+ * jusqu'au prochain chargement complet. Une adresse morte doit retomber sur
+ * l'initiale, pas sur une image cassée.
+ */
+describe("UserAvatar — adresse qui ne répond plus", () => {
+  it("retombe sur l'initiale quand l'image échoue", () => {
+    const source = readFileSync(join(process.cwd(), "components/user-avatar.tsx"), "utf8");
+    expect(source).toContain("onError={() => setFailedSrc(src)}");
+    expect(source).toContain("if (src && src !== failedSrc)");
+  });
+});

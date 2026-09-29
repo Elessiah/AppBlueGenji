@@ -1,8 +1,9 @@
 import crypto from "node:crypto";
 import path from "node:path";
-import { rename } from "node:fs/promises";
+import { copyFile, rename, unlink } from "node:fs/promises";
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { isUploadReferenced } from "@/lib/server/stored-upload-cleanup";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 
 /**
@@ -23,6 +24,14 @@ import { toDiskUploadPath } from "@/lib/shared/uploads";
  *
  * Ce que le renommage ne rattrape pas, et que rien ne peut rattraper : la copie
  * déjà gardée dans le cache d'un navigateur qui l'a affichée.
+ *
+ * **Un fichier désigné ailleurs est copié, pas renommé.** Un logo de partenaire
+ * ou d'équipe, une photo de bénévole acceptent une adresse collée, donc aussi
+ * celle d'un avatar : renommer casserait cette image-là sans bruit. Le compte
+ * reçoit alors une copie sous un nom neuf, et l'ancienne adresse reste servie —
+ * elle l'est par un choix de publication qui n'est pas celui du joueur, et que
+ * son réglage ne peut pas défaire. L'entrée solo du joueur ne compte pas : elle
+ * a déjà été vidée par la resynchronisation, que l'appelant joue avant.
  *
  * Ordre des gestes : le fichier est renommé **avant** l'écriture, et remis en
  * place si l'écriture n'aboutit pas (ligne anonymisée, avatar remplacé ou
@@ -45,8 +54,9 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
   const target = rotatedAvatarTarget(row.avatar_url, userId);
   if (!target) return null;
 
+  const shared = await isUploadReferenced(row.avatar_url, { exceptUserAvatar: userId });
   try {
-    await rename(target.from, target.to);
+    await (shared ? copyFile(target.from, target.to) : rename(target.from, target.to));
   } catch (error) {
     // Déjà absent (quarantaine, ménage) : il n'y a plus rien à servir.
     if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
@@ -62,7 +72,9 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
     );
     written = result.affectedRows > 0;
   } finally {
-    if (!written) await rename(target.to, target.from).catch(() => undefined);
+    if (!written) {
+      await (shared ? unlink(target.to) : rename(target.to, target.from)).catch(() => undefined);
+    }
   }
   return written ? target.url : null;
 }
