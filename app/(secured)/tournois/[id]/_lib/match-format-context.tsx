@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
 import type { TournamentFormat } from "@/lib/shared/types";
@@ -44,8 +44,14 @@ export function MatchFormatProvider({
   tournamentFormat: TournamentFormat;
   children: ReactNode;
 }) {
+  // Valeur stable tant que les formats ne changent pas **de contenu** : chaque
+  // instantané du flux en apporte des objets neufs, et une valeur neuve à
+  // chaque rendu redessinerait toutes les cartes de match, pourtant mémorisées.
+  const key = JSON.stringify([format, playoffFormat, tournamentFormat]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- la clé porte le contenu des trois.
+  const value = useMemo(() => ({ format, playoffFormat, tournamentFormat }), [key]);
   return (
-    <MatchFormatContext.Provider value={{ format, playoffFormat, tournamentFormat }}>
+    <MatchFormatContext.Provider value={value}>
       {children}
     </MatchFormatContext.Provider>
   );

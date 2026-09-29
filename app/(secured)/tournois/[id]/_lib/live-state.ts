@@ -86,9 +86,14 @@ export function parseLiveMessage(raw: string): LiveMessage | null {
  */
 export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveState {
   if (message.type === "connected") {
+    // Une reconnexion renvoie l'instantané entier : ce qui n'a pas bougé
+    // pendant la coupure garde sa référence, comme pour un instantané ordinaire.
+    const snapshot = state.detail
+      ? shareUnchanged(state.detail, message.snapshot)
+      : message.snapshot;
     return {
       tier: message.tier,
-      detail: { ...message.snapshot, ...message.viewer },
+      detail: { ...snapshot, ...message.viewer },
     };
   }
 
@@ -126,14 +131,104 @@ export function applyLiveMessage(state: LiveState, message: LiveMessage): LiveSt
     preview: state.detail.preview,
   };
 
+  const snapshot = shareUnchanged(state.detail, message.snapshot);
   return {
     tier: state.tier,
     detail: {
-      ...message.snapshot,
+      ...snapshot,
       ...viewer,
-      canRegister: canRegisterIn(message.snapshot, viewer),
+      canRegister: canRegisterIn(snapshot, viewer),
     },
   };
+}
+
+/**
+ * Partage structurel : reprend de l'état précédent ce que l'instantané reçu
+ * n'a pas changé.
+ *
+ * Chaque instantané arrive entier et désérialisé à neuf : sans ce partage, le
+ * moindre « Prêt » ou score remplaçait **tous** les objets de match, et les 254
+ * cartes d'un gros plateau se redessinaient alors que 253 n'avaient pas bougé —
+ * `React.memo` n'y pouvait rien, puisqu'aucune prop n'était jamais la même.
+ * Un match, une inscrite ou la table des entrées solo inchangés gardent donc
+ * leur **référence**, et une liste dont aucun élément n'a bougé garde la
+ * sienne (ce qui profite aussi aux calculs mémorisés sur la liste entière,
+ * comme les verrous de score).
+ *
+ * « Inchangé » se juge sur le **contenu**, champ par champ, et non sur
+ * `updatedAt` : un match porte des champs dérivés d'autres lignes (nom d'une
+ * équipe renommée, pseudo du caster) qu'aucune écriture sur la ligne du match
+ * ne date. Le coût est linéaire et sans commune mesure avec un rendu.
+ */
+export function shareUnchanged(
+  previous: TournamentSnapshot,
+  next: TournamentSnapshot,
+): TournamentSnapshot {
+  const matches = shareList(previous.matches, next.matches, (match) => match.id);
+  const registrations = shareList(previous.registrations, next.registrations, (row) => row.teamId);
+  const soloUserIds = sameValue(previous.soloUserIds, next.soloUserIds)
+    ? previous.soloUserIds
+    : next.soloUserIds;
+  if (
+    matches === next.matches &&
+    registrations === next.registrations &&
+    soloUserIds === next.soloUserIds
+  ) {
+    return next;
+  }
+  return { ...next, matches, registrations, soloUserIds };
+}
+
+/**
+ * Liste où chaque élément inchangé (même clé, même contenu) est l'élément
+ * précédent. Si rien n'a bougé — mêmes éléments, même ordre —, la liste
+ * précédente elle-même.
+ */
+function shareList<T extends object>(
+  previous: readonly T[] | undefined,
+  next: T[],
+  keyOf: (item: T) => number,
+): T[] {
+  if (!previous || previous.length === 0) return next;
+  const byKey = new Map<number, T>();
+  for (const item of previous) byKey.set(keyOf(item), item);
+
+  let allReused = previous.length === next.length;
+  const shared = next.map((item, index) => {
+    const before = byKey.get(keyOf(item));
+    if (before !== undefined && sameValue(before, item)) {
+      if (previous[index] !== before) allReused = false;
+      return before;
+    }
+    allReused = false;
+    return item;
+  });
+  return allReused ? (previous as T[]) : shared;
+}
+
+/**
+ * Égalité de contenu de deux valeurs JSON (ce que porte un instantané : ni
+ * fonction, ni date, ni cycle).
+ */
+function sameValue(a: unknown, b: unknown): boolean {
+  if (Object.is(a, b)) return true;
+  if (typeof a !== "object" || typeof b !== "object" || a === null || b === null) return false;
+  if (Array.isArray(a) !== Array.isArray(b)) return false;
+  if (Array.isArray(a)) {
+    const other = b as unknown[];
+    if (a.length !== other.length) return false;
+    for (let i = 0; i < a.length; i += 1) if (!sameValue(a[i], other[i])) return false;
+    return true;
+  }
+  const left = a as Record<string, unknown>;
+  const right = b as Record<string, unknown>;
+  const keys = Object.keys(left);
+  if (keys.length !== Object.keys(right).length) return false;
+  for (const key of keys) {
+    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (!sameValue(left[key], right[key])) return false;
+  }
+  return true;
 }
 
 /**

@@ -31,7 +31,10 @@ import {
   getTournamentSnapshot,
   getTournamentSnapshotFrame,
   invalidateTournamentSnapshot,
+  snapshotFrameOf,
+  SNAPSHOT_TTL_MS,
 } from "@/lib/server/tournaments/snapshot";
+import { STATE_CATCH_UP_MS } from "@/lib/server/tournament-broadcast";
 import {
   getMatchRows,
   getRegistrationRows,
@@ -184,6 +187,29 @@ describe("getTournamentSnapshotFrame — mutualisation", () => {
   it("rend null pour un tournoi inexistant", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(null);
     expect(await getTournamentSnapshot(TOURNAMENT_ID)).toBeNull();
+  });
+
+  it("expire avant le rattrapage d'une bascule manquée par la salle", () => {
+    // Relire avant l'expiration resservirait le même instantané périmé.
+    expect(STATE_CATCH_UP_MS).toBeGreaterThan(SNAPSHOT_TTL_MS);
+  });
+
+  it("expose l'instantané encodé comme une vue sur la trame, sans copie", async () => {
+    // La trame de connexion et la compression du flux réutilisent ces octets :
+    // ils doivent redonner exactement l'instantané, version comprise.
+    const frame = (await getTournamentSnapshotFrame(TOURNAMENT_ID))!;
+    expect(frame.snapshotJson.buffer).toBe(frame.frame.buffer);
+    expect(JSON.parse(new TextDecoder().decode(frame.snapshotJson))).toEqual(
+      JSON.parse(JSON.stringify(frame.snapshot)),
+    );
+  });
+
+  it("retrouve la trame depuis l'instantané qu'elle a produit, et seulement lui", async () => {
+    const frame = (await getTournamentSnapshotFrame(TOURNAMENT_ID))!;
+    expect(snapshotFrameOf(frame.snapshot)).toBe(frame);
+    // Un objet recomposé (un test, une copie) n'y figure pas : l'appelant
+    // retombe alors sur la sérialisation.
+    expect(snapshotFrameOf({ ...frame.snapshot })).toBeNull();
   });
 });
 

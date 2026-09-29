@@ -17,6 +17,7 @@ import {
   shouldCommitFetched,
   shouldRefreshViewerContext,
   reconnectDelayMs,
+  shareUnchanged,
   type LiveState,
 } from "@/app/(secured)/tournois/[id]/_lib/live-state";
 
@@ -530,5 +531,124 @@ describe("shouldCommitFetched", () => {
     // la page sur une donnée périmée sans moyen d'en sortir.
     const stale = { ...detail("v1"), version: "" } as TournamentDetail;
     expect(shouldCommitFetched(detail("v1"), stale, false)).toBe(true);
+  });
+});
+
+/**
+ * Chaque instantané arrive désérialisé à neuf : sans partage structurel, un
+ * seul « Prêt » remplaçait les 254 objets de match d'un gros plateau, et
+ * `React.memo` ne pouvait rien épargner. Ce qui n'a pas bougé garde sa
+ * référence ; ce qui a bougé est pris tel quel.
+ */
+describe("partage structurel des instantanés", () => {
+  /** Copie profonde : ce que rend `JSON.parse` à chaque trame. */
+  const reparsed = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+  const board = [match({ id: 1 }), match({ id: 2, team1Id: 30, team2Id: 40 }), match({ id: 3 })];
+
+  function withBoard(matches: BracketMatch[], over: Partial<TournamentSnapshot> = {}): LiveState {
+    return connected(INITIAL_LIVE_STATE, { matches, ...over });
+  }
+
+  function receive(state: LiveState, next: TournamentSnapshot): LiveState {
+    return applyLiveMessage(state, {
+      type: "snapshot",
+      tournamentId: 7,
+      version: next.version,
+      snapshot: next,
+    });
+  }
+
+  it("garde la référence des matchs inchangés et prend le match modifié", () => {
+    const before = withBoard(board);
+    const changed = reparsed(board);
+    changed[1] = { ...changed[1], team1Ready: true } as BracketMatch;
+
+    const after = receive(before, snapshot({ version: "v2", matches: changed }));
+
+    expect(after.detail!.matches[0]).toBe(before.detail!.matches[0]);
+    expect(after.detail!.matches[2]).toBe(before.detail!.matches[2]);
+    expect(after.detail!.matches[1]).not.toBe(before.detail!.matches[1]);
+    expect(after.detail!.matches[1]).toEqual(changed[1]);
+    expect(after.detail!.version).toBe("v2");
+  });
+
+  it("garde la liste entière quand aucun match n'a bougé", () => {
+    // Un nouvel instantané pour une inscrite de plus : le plateau, lui, est le
+    // même, et les calculs mémorisés sur la liste (verrous de score) tiennent.
+    const before = withBoard(board);
+    const after = receive(
+      before,
+      snapshot({ version: "v2", matches: reparsed(board), soloUserIds: {} }),
+    );
+    expect(after.detail!.matches).toBe(before.detail!.matches);
+    expect(after.detail!.soloUserIds).toBe(before.detail!.soloUserIds);
+    expect(after.detail!.registrations).toBe(before.detail!.registrations);
+  });
+
+  it("prend une nouvelle liste quand l'ordre change, en gardant les éléments", () => {
+    const before = withBoard(board);
+    const reordered = reparsed([board[2], board[0], board[1]]);
+    const after = receive(before, snapshot({ version: "v2", matches: reordered }));
+
+    expect(after.detail!.matches).not.toBe(before.detail!.matches);
+    expect(after.detail!.matches.map((m) => m.id)).toEqual([3, 1, 2]);
+    expect(after.detail!.matches[0]).toBe(before.detail!.matches[2]);
+  });
+
+  it("voit un champ dérivé qu'aucune écriture sur le match ne date", () => {
+    // Une équipe renommée : `updatedAt` du match n'a pas bougé, son contenu si.
+    const before = withBoard(board);
+    const renamed = reparsed(board);
+    renamed[0] = { ...renamed[0], team1Name: "Nouveau nom" };
+    const after = receive(before, snapshot({ version: "v2", matches: renamed }));
+
+    expect(after.detail!.matches[0]).not.toBe(before.detail!.matches[0]);
+    expect(after.detail!.matches[0].team1Name).toBe("Nouveau nom");
+  });
+
+  it("compare le contenu des objets imbriqués, pas leur référence", () => {
+    const report = { team1Score: 2, team2Score: 1, reportedAt: "2026-05-04T12:10:00Z" };
+    const reported = [match({ id: 1, team1Report: report } as Partial<BracketMatch>)];
+    const before = withBoard(reported);
+    const same = receive(before, snapshot({ version: "v2", matches: reparsed(reported) }));
+    expect(same.detail!.matches[0]).toBe(before.detail!.matches[0]);
+
+    const changed = reparsed(reported);
+    changed[0] = { ...changed[0], team1Report: { ...report, team2Score: 2 } } as BracketMatch;
+    const moved = receive(before, snapshot({ version: "v3", matches: changed }));
+    expect(moved.detail!.matches[0]).not.toBe(before.detail!.matches[0]);
+  });
+
+  it("reprend un match disparu puis revenu sans rien garder de l'ancien", () => {
+    const before = withBoard(board);
+    const after = receive(before, snapshot({ version: "v2", matches: reparsed([board[0]]) }));
+    expect(after.detail!.matches).toHaveLength(1);
+    expect(after.detail!.matches[0]).toBe(before.detail!.matches[0]);
+  });
+
+  it("partage aussi à la reconnexion", () => {
+    const before = withBoard(board);
+    const after = connected(before, { version: "v2", matches: reparsed(board) });
+    expect(after.detail!.matches).toBe(before.detail!.matches);
+  });
+
+  it("partage les inscrites inchangées et la table des entrées solo", () => {
+    const before = withBoard(board, { soloUserIds: { 10: 5 } });
+    const next = snapshot({ version: "v2", matches: reparsed(board), soloUserIds: { 10: 5 } });
+    const after = receive(before, next);
+    expect(after.detail!.soloUserIds).toBe(before.detail!.soloUserIds);
+    expect(after.detail!.registrations[0]).toBe(before.detail!.registrations[0]);
+
+    const changedSolo = receive(before, { ...next, version: "v3", soloUserIds: { 10: 6 } });
+    expect(changedSolo.detail!.soloUserIds).toEqual({ 10: 6 });
+  });
+});
+
+describe("shareUnchanged", () => {
+  it("rend l'instantané reçu tel quel quand il n'y a rien à partager", () => {
+    const previous = snapshot({ matches: [], registrations: [], soloUserIds: { 1: 2 } });
+    const next = snapshot({ version: "v2", matches: [match()] });
+    expect(shareUnchanged(previous, next)).toBe(next);
   });
 });

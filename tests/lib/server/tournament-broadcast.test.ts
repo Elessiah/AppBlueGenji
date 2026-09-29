@@ -26,26 +26,39 @@ import {
 import { publishTournamentEvent } from "@/lib/server/live";
 import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
 
-const FAR_FUTURE = "2099-01-01T00:00:00.000Z";
+// Un tournoi en cours dont les jalons sont passés : aucune bascule à venir ni en retard.
+const OPENED_AT = "2000-01-01T00:00:00.000Z";
+const CLOSED_AT = "2000-01-02T00:00:00.000Z";
+const STARTED_AT = "2000-01-03T00:00:00.000Z";
 
-function frameOf(version: string, bytes = 32): TournamentSnapshotFrame {
+function frameOf(
+  version: string,
+  bytes = 32,
+  card: Partial<TournamentSnapshot["card"]> = {},
+  matches: unknown[] = [],
+): TournamentSnapshotFrame {
   const snapshot = {
     card: {
       id: 1,
       state: "RUNNING",
-      registrationOpenAt: FAR_FUTURE,
-      registrationCloseAt: FAR_FUTURE,
-      startAt: FAR_FUTURE,
+      registrationOpenAt: OPENED_AT,
+      registrationCloseAt: CLOSED_AT,
+      startAt: STARTED_AT,
+      ...card,
     },
+    matches,
     version,
   } as unknown as TournamentSnapshot;
 
   // Le poids compte : c'est lui qui déclenche le budget de sortie de la salle.
   const body = `data: ${version}`.padEnd(Math.max(bytes - 2, 1), " ");
+  const frame = new TextEncoder().encode(`${body}\n\n`);
   return {
     snapshot,
     version,
-    frame: new TextEncoder().encode(`${body}\n\n`),
+    frame,
+    // Vue sur la trame, comme en production : ce qui suit « data: ».
+    snapshotJson: frame.subarray("data: ".length, frame.byteLength - 2),
   };
 }
 

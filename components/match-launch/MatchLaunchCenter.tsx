@@ -30,6 +30,12 @@ import styles from "./MatchLaunchCenter.module.css";
 const POLL_LOBBY_MS = 8_000;
 const POLL_ACTIVE_MS = 30_000;
 const POLL_IDLE_MS = 60_000;
+/**
+ * Regroupement des demandes de relecture (`MATCH_LAUNCH_REFRESH_EVENT`) : assez
+ * court pour qu'un « Prêt » adverse se voie dans la seconde, assez long pour
+ * qu'une rafale d'instantanés ne vaille qu'une lecture.
+ */
+const REFRESH_EVENT_COALESCE_MS = 300;
 /** Un match lancé depuis moins longtemps que cela est annoncé d'office. */
 const LAUNCH_ANNOUNCE_WINDOW_MS = 10 * 60_000;
 const DISMISSED_STORAGE_KEY = "bg_match_launch_dismissed";
@@ -85,7 +91,9 @@ function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
  *
  * La liste vient de `/api/me/match-launches`, interrogée à cadence variable et
  * suspendue onglet caché (`useClientPower().clocks`) ; une minuterie la relit à
- * l'heure exacte du prochain match programmé.
+ * l'heure exacte du prochain match programmé, et la fiche d'un tournoi la fait
+ * relire dès que son flux apprend un changement d'une rencontre du lecteur
+ * (`viewerLaunchChanged`, `lib/shared/viewer-alerts.ts`).
  */
 export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?: boolean }) {
   const { showError, showSuccess } = useToast();
@@ -104,11 +112,19 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   const [busy, setBusy] = useState(false);
   const dismissedRef = useRef<Set<string> | null>(null);
 
+  // Numéros de séquence : une réponse lente (relève et signal qui se croisent)
+  // ne doit pas écraser une réponse plus récente déjà appliquée.
+  const requestSeqRef = useRef(0);
+  const appliedSeqRef = useRef(0);
+
   const refresh = useCallback(async () => {
+    const seq = ++requestSeqRef.current;
     try {
       const response = await fetch("/api/me/match-launches", { cache: "no-store" });
       if (!response.ok) return;
       const payload = (await response.json()) as { launches?: MatchLaunchInfo[] };
+      if (seq < appliedSeqRef.current) return;
+      appliedSeqRef.current = seq;
       setLaunches(Array.isArray(payload.launches) ? payload.launches : []);
     } catch {
       // Réseau coupé : la liste actuelle reste, la prochaine relève rattrapera.
@@ -119,10 +135,16 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   const hasActive = launches.some((info) => info.phase !== "SCHEDULED");
   const pollMs = hasLobby ? POLL_LOBBY_MS : hasActive ? POLL_ACTIVE_MS : POLL_IDLE_MS;
 
-  // Relève périodique, suspendue onglet caché et reprise aussitôt au retour.
+  // Lecture au montage et au retour sur l'onglet — et **seulement** là : posée
+  // dans l'effet de relève, qui dépend de `pollMs`, elle repartait à chaque
+  // changement de phase, en double de la lecture qui venait de le révéler.
+  useEffect(() => {
+    if (clocks) void refresh();
+  }, [clocks, refresh]);
+
+  // Relève périodique, suspendue onglet caché.
   useEffect(() => {
     if (!clocks) return;
-    void refresh();
     const timer = setInterval(() => void refresh(), pollMs);
     return () => clearInterval(timer);
   }, [clocks, pollMs, refresh]);
@@ -154,10 +176,21 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
       setOpenMatchId(matchId);
       void refresh();
     };
-    const onRefresh = () => void refresh();
+    // Regroupés : la fiche d'un tournoi signale chaque changement d'une
+    // rencontre du lecteur, et une rafale d'instantanés ne doit valoir qu'une
+    // lecture.
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const onRefresh = () => {
+      if (refreshTimer !== null) return;
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void refresh();
+      }, REFRESH_EVENT_COALESCE_MS);
+    };
     window.addEventListener(MATCH_LAUNCH_OPEN_EVENT, onOpen);
     window.addEventListener(MATCH_LAUNCH_REFRESH_EVENT, onRefresh);
     return () => {
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
       window.removeEventListener(MATCH_LAUNCH_OPEN_EVENT, onOpen);
       window.removeEventListener(MATCH_LAUNCH_REFRESH_EVENT, onRefresh);
     };

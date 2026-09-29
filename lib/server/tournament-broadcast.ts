@@ -16,7 +16,7 @@
  * (`tournaments/snapshot`), l'encode une fois, et écrit la même trame à tous
  * les abonnés. Le coût en base devient indépendant du nombre de spectateurs.
  *
- * Quatre réglages complètent le dispositif :
+ * Cinq réglages complètent le dispositif :
  *
  * - **Regroupement par palier** — les abonnés prioritaires (staff, engagés)
  *   reçoivent la mise à jour dans la seconde ; les spectateurs, par fenêtres
@@ -27,24 +27,172 @@
  *   lourde ({@link ROOM_BYTES_PER_SECOND}). Une salle de 128 inscrits sur un
  *   plateau de 254 matchs ralentit au lieu de saturer le lien.
  * - **Comparaison de version** — rien n'est envoyé si le contenu n'a pas bougé.
- * - **Battement d'entretien** — la salle relit l'instantané périodiquement,
- *   ce qui fait avancer ce qui dépend de l'heure et non d'une action : ouverture
- *   des inscriptions, début du tournoi, arbitrage d'un report expiré. Là encore,
- *   une seule passe pour toute la salle.
+ * - **Réveil d'entretien** — la salle relit l'instantané à la prochaine
+ *   échéance connue, ce qui fait avancer ce qui dépend de l'heure et non d'une
+ *   action : ouverture des inscriptions, début du tournoi, arbitrage d'un report
+ *   expiré. Là encore, une seule passe pour toute la salle — et aucune sur un
+ *   tournoi terminé, que plus aucune heure ne fait bouger.
+ * - **Compression** — chaque trame est compressée une fois pour tous les
+ *   abonnés qui acceptent gzip (`./sse-gzip`), et c'est ce poids-là que le
+ *   budget de sortie compte.
  *
  * Résultat côté joueur : le plateau se met à jour tout seul, y compris quand
  * personne ne touche à rien. Plus aucune raison de marteler F5.
  */
 import { subscribeTournament } from "./live";
 import { getTournamentSnapshotFrame } from "./tournaments/snapshot";
+import { snapshotFrameBytes, type StreamEncoding } from "./tournament-stream-frames";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
-import { nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
+import { computeTournamentState, nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
+import type { TournamentSnapshot } from "@/lib/shared/types";
+import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 
 /**
- * Cadence du battement d'entretien d'une salle occupée. C'est ce qui rattrape
- * les changements qu'aucune écriture n'annonce (une heure qui arrive).
+ * Filet de sécurité d'une salle occupée : au plus tard, elle relit l'instantané
+ * au bout de ce délai, même sans échéance connue.
+ *
+ * Le battement d'entretien rattrape les changements qu'aucune écriture
+ * n'annonce — une heure qui arrive : bascule d'état, report de score expiré.
+ * Il battait toutes les 30 s pour toutes les salles, et chaque battement
+ * reconstruisait l'instantané entier (le cache de 3 s étant toujours expiré) :
+ * lectures des matchs, des inscrites et des classements, sérialisation et
+ * empreinte de ~238 Ko — y compris sur un tournoi **terminé**, ou en cours sans
+ * la moindre échéance, où il ne pouvait rien faire avancer. La salle se réveille
+ * désormais **à la prochaine échéance connue** ({@link nextRoomWakeAt}), et ce
+ * filet ne sert plus qu'à rattraper une écriture qui n'aurait rien publié.
  */
-export const ROOM_MAINTENANCE_MS = 30_000;
+export const ROOM_SAFETY_NET_MS = 5 * 60_000;
+
+/**
+ * Nouvel essai après une lecture d'instantané en échec (incident passager de la
+ * base) : sans lui, une salle dont la lecture échoue attendrait son filet.
+ */
+export const ROOM_READ_RETRY_MS = 30_000;
+
+/**
+ * Marge ajoutée à un délai de report de score avant de relire : la bascule se
+ * fait sur `score_deadline_at <= NOW()` côté base, relire pile à l'échéance
+ * pourrait arriver une fraction de seconde trop tôt.
+ */
+export const SCORE_DEADLINE_MARGIN_MS = 1_000;
+
+/**
+ * Relecture après une échéance **manquée** : la salle s'est réveillée à l'heure
+ * dite, mais l'instantané lu venait du cache (3 s, `SNAPSHOT_TTL_MS` de
+ * `./tournaments/snapshot`) — posé juste avant par une connexion ou une lecture
+ * de secours —, si bien que l'entretien à la lecture n'a pas joué. Relire une
+ * fois le cache expiré. Doit rester supérieur au TTL du cache
+ * (`tests/lib/server/tournament-snapshot.test.ts` le vérifie).
+ */
+export const STATE_CATCH_UP_MS = 4_000;
+
+/** Délai de l'escalade d'un conflit de score à l'arbitrage, après le délai de report. */
+const CONFLICT_ESCALATION_MS = SCORE_REPORT_TIMEOUT_MINUTES * 60_000;
+
+/**
+ * L'état stocké du tournoi retarde-t-il sur ses dates ? Une date illisible ne
+ * dit rien : on ne conclut pas au retard.
+ */
+export function isStateOverdue(card: TournamentSnapshot["card"], now: number): boolean {
+  if (card.state === "FINISHED") return false;
+  const dates = [card.registrationOpenAt, card.registrationCloseAt, card.startAt];
+  if (dates.some((date) => !Number.isFinite(Date.parse(String(date))))) return false;
+  return computeTournamentState(card, now) !== card.state;
+}
+
+type DeadlineMatch = TournamentSnapshot["matches"][number];
+
+/** Délai de report d'un match en attente de confirmation, ou `null`. */
+function scoreDeadlineOf(match: DeadlineMatch): number | null {
+  if (match.status !== "AWAITING_CONFIRMATION" || !match.scoreDeadlineAt) return null;
+  const deadline = Date.parse(match.scoreDeadlineAt);
+  return Number.isFinite(deadline) ? deadline : null;
+}
+
+/**
+ * Deux reports contradictoires : l'expiration du délai ne tranche rien
+ * (`resolveExpiredScoreReports`), le match attend l'arbitrage.
+ */
+function isScoreConflict(match: DeadlineMatch): boolean {
+  return Boolean(match.team1Report) && Boolean(match.team2Report);
+}
+
+/**
+ * L'instantané retarde-t-il sur une échéance déjà passée que l'entretien à la
+ * lecture aurait dû jouer — bascule d'état, ou report **unique** expiré ?
+ */
+export function isRoomOverdue(snapshot: TournamentSnapshot, now: number): boolean {
+  if (isStateOverdue(snapshot.card, now)) return true;
+  return (snapshot.matches ?? []).some((match) => {
+    const deadline = scoreDeadlineOf(match);
+    if (deadline === null) return false;
+    if (!isScoreConflict(match)) return deadline + SCORE_DEADLINE_MARGIN_MS <= now;
+    // Un conflit ne se tranche pas à l'expiration, mais son **escalade** à
+    // l'arbitrage est posée par l'entretien à la lecture : si la lecture faite
+    // à l'heure de l'escalade venait du cache, une relecture — une seule, dans
+    // la fenêtre qui suit — la rattrape. Au-delà, l'escalade est posée ou
+    // réservée, et le conflit n'attend plus que l'arbitrage.
+    const escalatedFor = now - (deadline + CONFLICT_ESCALATION_MS + SCORE_DEADLINE_MARGIN_MS);
+    return escalatedFor >= 0 && escalatedFor < STATE_CATCH_UP_MS;
+  });
+}
+
+/**
+ * Prochain instant où la salle doit relire l'instantané d'elle-même, ou `null`
+ * s'il n'y en a aucun.
+ *
+ * - Un tournoi **terminé** n'a plus d'échéance : seules les écritures (une
+ *   correction d'archive) le font bouger, et elles publient un événement.
+ * - Sinon, la plus proche de : la prochaine bascule d'état (ouverture ou
+ *   clôture des inscriptions, coup d'envoi), le délai de report de score le
+ *   plus proche (`score_deadline_at`, que l'entretien à la lecture tranche),
+ *   l'escalade d'un conflit de score à l'arbitrage, et le filet de sécurité.
+ * - Une échéance **déjà passée** que l'instantané ne reflète pas encore
+ *   ({@link isRoomOverdue}) se rattrape après `catchUpMs` : les échéances
+ *   passées n'étant plus des instants futurs, elle tomberait sinon jusqu'au
+ *   filet — un coup d'envoi annoncé cinq minutes en retard.
+ * - Un **conflit** dont le délai est passé n'est pas une échéance manquée :
+ *   rien ne le tranche avant l'arbitrage. Seule son escalade compte ; le
+ *   relire toutes les 30 s rouvrirait le battement que ce réveil supprime.
+ *
+ * Exportée pour être vérifiable directement.
+ */
+export function nextRoomWakeAt(
+  snapshot: TournamentSnapshot,
+  now: number,
+  catchUpMs: number = STATE_CATCH_UP_MS,
+): number | null {
+  const { card } = snapshot;
+  if (card.state === "FINISHED") return null;
+
+  let wakeAt = now + ROOM_SAFETY_NET_MS;
+  const boundary = nextTournamentStateChangeAt(
+    {
+      state: card.state,
+      registrationOpenAt: card.registrationOpenAt,
+      registrationCloseAt: card.registrationCloseAt,
+      startAt: card.startAt,
+    },
+    now,
+  );
+  if (boundary !== null) wakeAt = Math.min(wakeAt, boundary);
+  if (isRoomOverdue(snapshot, now)) wakeAt = Math.min(wakeAt, now + catchUpMs);
+
+  for (const match of snapshot.matches ?? []) {
+    const deadline = scoreDeadlineOf(match);
+    if (deadline === null) continue;
+    const expiry = deadline + SCORE_DEADLINE_MARGIN_MS;
+    if (expiry > now) {
+      wakeAt = Math.min(wakeAt, expiry);
+      continue;
+    }
+    if (isScoreConflict(match)) {
+      const escalation = deadline + CONFLICT_ESCALATION_MS + SCORE_DEADLINE_MARGIN_MS;
+      if (escalation > now) wakeAt = Math.min(wakeAt, escalation);
+    }
+  }
+  return wakeAt;
+}
 
 /**
  * Délai minimal avant de réessayer un abonné dont la file était pleine
@@ -65,9 +213,10 @@ export const MAX_STREAMS_PER_USER = 4;
  * Budget de sortie d'une salle, en octets par seconde.
  *
  * Le regroupement par palier borne la *fréquence* des envois, pas leur poids.
- * Or l'instantané d'un tournoi à 128 équipes en double élimination pèse ~150 ko
- * (254 matchs) — et dans un tournoi de cette taille, les inscrits, tous
- * prioritaires, sont 128. Un score rapporté produirait donc près de 20 Mo à
+ * Or l'instantané d'un tournoi à 128 équipes en double élimination pèse
+ * ~238 ko en clair, ~13 ko compressé (254 matchs) — et dans un tournoi de cette
+ * taille, les inscrits, tous prioritaires, sont 128. En clair, un score
+ * rapporté produirait donc près de 30 Mo à
  * écrire d'un coup : le lien du Raspberry Pi ne suit pas, et la mémoire des
  * tampons de socket monte d'autant.
  *
@@ -93,7 +242,7 @@ export const MAX_BUDGET_DELAY_MS = 60_000;
  * et applique le résultat comme plancher commun.
  *
  * Commun, parce qu'un plancher par palier renversait leur ordre : dans un
- * tournoi à 128 équipes (154 ko d'instantané), les 128 inscrits — tous
+ * tournoi à 128 équipes (238 ko d'instantané), les 128 inscrits — tous
  * prioritaires — héritaient d'une fenêtre de 38 s quand la vingtaine de
  * spectateurs était servie toutes les 20 s. Les équipes qui jouent recevaient
  * leur plateau deux fois moins souvent que ceux qui les regardent.
@@ -103,13 +252,30 @@ export const MAX_BUDGET_DELAY_MS = 60_000;
  */
 export function budgetDelayMs(frameBytes: number, subscribers: number): number {
   if (subscribers <= 0 || frameBytes <= 0) return 0;
-  const totalBytes = frameBytes * subscribers;
+  return roomBudgetDelayMs(frameBytes * subscribers);
+}
+
+/**
+ * Même budget, exprimé sur le **total** d'octets à écrire. C'est la forme que
+ * la salle emploie : ses abonnés ne reçoivent pas tous le même nombre d'octets,
+ * la trame compressée (`lib/server/sse-gzip.ts`) pesant ~18 fois moins que la
+ * trame en clair — et c'est le poids réellement écrit que le lien subit.
+ */
+export function roomBudgetDelayMs(totalBytes: number): number {
+  if (totalBytes <= 0) return 0;
   return Math.min(MAX_BUDGET_DELAY_MS, Math.ceil((totalBytes * 1000) / ROOM_BYTES_PER_SECOND));
 }
 
 /** Un abonné : son palier de fraîcheur et par où lui écrire. */
 export type TournamentSubscriber = {
   tier: RefreshTier;
+  /**
+   * Encodage de la connexion (`identity` par défaut). La salle choisit les
+   * octets qu'elle lui écrit — la trame en clair ou la trame compressée, toutes
+   * deux calculées une seule fois par version — et compte ceux-là dans son
+   * budget de sortie.
+   */
+  encoding?: StreamEncoding;
   /**
    * Version de l'instantané que cet abonné **détient déjà** au moment où il
    * rejoint la salle — la route en envoie un à la connexion, avant de s'abonner.
@@ -158,13 +324,23 @@ type Room = {
   /** Ce que chaque abonné a reçu, et quand. */
   states: Map<TournamentSubscriber, SubscriberState>;
   unsubscribe: () => void;
-  maintenance: ReturnType<typeof setInterval>;
+  /** Réveil d'entretien : la prochaine échéance connue (`nextRoomWakeAt`). */
+  maintenance: ReturnType<typeof setTimeout> | null;
+  /** Instant visé par `maintenance`. */
+  maintenanceAt: number;
   flushTimer: ReturnType<typeof setTimeout> | null;
   /** Instant visé par `flushTimer`, pour qu'une demande plus urgente le devance. */
   flushAt: number;
   flushing: boolean;
   /** Un changement est arrivé pendant un envoi : il faudra repasser. */
   dirtyAgain: boolean;
+  /**
+   * Première lecture montrant une échéance manquée (`isRoomOverdue`), ou
+   * `null`. Une lecture encore en retard **après l'expiration du cache** n'est
+   * plus l'effet du cache mais d'un entretien qui n'aboutit pas : on retente
+   * alors au pas lent, jamais en boucle serrée.
+   */
+  overdueSince: number | null;
 };
 
 const rooms = new Map<number, Room>();
@@ -192,7 +368,8 @@ function activeTiers(room: Room): RefreshTier[] {
 
 function closeRoom(tournamentId: number, room: Room): void {
   room.unsubscribe();
-  clearInterval(room.maintenance);
+  if (room.maintenance) clearTimeout(room.maintenance);
+  room.maintenance = null;
   if (room.flushTimer) clearTimeout(room.flushTimer);
 
   // Une salle peut se vider pendant qu'un envoi est en attente : le temps que
@@ -248,7 +425,9 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     try {
       frame = await getTournamentSnapshotFrame(tournamentId);
     } catch {
-      return; // Incident passager : le battement d'entretien réessaiera.
+      // Incident passager : on retente plus tard, sans attendre le filet.
+      scheduleMaintenance(tournamentId, room, Date.now() + ROOM_READ_RETRY_MS, true);
+      return;
     }
 
     if (frame === null) {
@@ -278,7 +457,11 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
         now - subscriberState(room, subscriber).lastSentAt >=
           REFRESH_CADENCE[subscriber.tier].pushCoalesceMs,
     );
-    const roomFloor = budgetDelayMs(frame.frame.byteLength, dueAudience.length);
+    let dueBytes = 0;
+    for (const subscriber of dueAudience) {
+      dueBytes += snapshotFrameBytes(frame, subscriber.encoding ?? "identity").byteLength;
+    }
+    const roomFloor = roomBudgetDelayMs(dueBytes);
 
     for (const tier of activeTiers(room)) {
       const audience = [...room.subscribers].filter(
@@ -302,7 +485,8 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
         }
 
         try {
-          if (subscriber.send(frame.frame) === false) {
+          const bytes = snapshotFrameBytes(frame, subscriber.encoding ?? "identity");
+          if (subscriber.send(bytes) === false) {
             // File du client pleine : rien n'est parti. Ni version ni horloge
             // ne bougent, et un nouvel essai est programmé — espacé d'au moins
             // `BACKED_UP_RETRY_MS` : à la fenêtre du palier (1 s), un client
@@ -326,20 +510,25 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
       return;
     }
 
-    // Réveil à l'heure exacte de la prochaine bascule d'état (ouverture des
-    // inscriptions, début du tournoi). Sans lui, il faudrait attendre le
-    // battement d'entretien — ou compter sur chaque client pour se réveiller
-    // seul, ce qui ferait repartir cent requêtes à la même seconde.
-    const boundary = nextTournamentStateChangeAt(
-      {
-        state: frame.snapshot.card.state,
-        registrationOpenAt: frame.snapshot.card.registrationOpenAt,
-        registrationCloseAt: frame.snapshot.card.registrationCloseAt,
-        startAt: frame.snapshot.card.startAt,
-      },
-      now,
+    // Réveil à la prochaine échéance connue (bascule d'état, report expiré),
+    // à l'heure exacte : sans lui, il faudrait compter sur chaque client pour
+    // se réveiller seul, ce qui ferait repartir cent requêtes à la même seconde.
+    //
+    // Une échéance manquée se rattrape après le cache ; elle ne passe au pas
+    // lent que si elle survit à une lecture faite **après** l'expiration du
+    // cache — une autre lecture tombée dans la fenêtre (une connexion au coup
+    // d'envoi) relit le même instantané et ne prouve rien. Tant qu'on rattrape,
+    // un réveil déjà plus proche est gardé.
+    const overdue = isRoomOverdue(frame.snapshot, now);
+    if (!overdue) room.overdueSince = null;
+    else room.overdueSince ??= now;
+    const persistent = room.overdueSince !== null && now - room.overdueSince >= STATE_CATCH_UP_MS;
+    scheduleMaintenance(
+      tournamentId,
+      room,
+      nextRoomWakeAt(frame.snapshot, now, persistent ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS),
+      overdue && !persistent,
     );
-    if (boundary !== null) nextDelay = Math.min(nextDelay, boundary - now);
 
     if (Number.isFinite(nextDelay)) scheduleFlush(tournamentId, room, nextDelay);
   } finally {
@@ -372,21 +561,47 @@ function closeGoneRoom(tournamentId: number, room: Room): void {
   closeRoom(tournamentId, room);
 }
 
-function openRoom(tournamentId: number): Room {
+/**
+ * (Re)programme le réveil d'entretien à `wakeAt` (`null` : aucun). Remplace le
+ * précédent : c'est toujours la dernière lecture qui sait quelle est la
+ * prochaine échéance.
+ *
+ * `keepEarlier` : ne remplace le réveil en place que s'il est plus tardif. Sert
+ * après une lecture en échec, qui ne sait rien de la prochaine échéance — un
+ * coup d'envoi dans trois secondes ne doit pas glisser au délai d'essai.
+ */
+function scheduleMaintenance(
+  tournamentId: number,
+  room: Room,
+  wakeAt: number | null,
+  keepEarlier = false,
+): void {
+  if (keepEarlier && room.maintenance && wakeAt !== null && room.maintenanceAt <= wakeAt) return;
+  if (room.maintenance) clearTimeout(room.maintenance);
+  room.maintenance = null;
+  if (wakeAt === null || rooms.get(tournamentId) !== room) return;
+
+  room.maintenanceAt = wakeAt;
+  room.maintenance = setTimeout(() => {
+    room.maintenance = null;
+    if (rooms.get(tournamentId) === room) void flush(tournamentId, room);
+  }, Math.max(0, wakeAt - Date.now()));
+  room.maintenance.unref?.();
+}
+
+function openRoom(tournamentId: number, known?: TournamentSnapshot): Room {
   const room: Room = {
     subscribers: new Set<TournamentSubscriber>(),
     states: new Map<TournamentSubscriber, SubscriberState>(),
     unsubscribe: () => undefined,
-    maintenance: setInterval(() => {
-      const current = rooms.get(tournamentId);
-      if (current) void flush(tournamentId, current);
-    }, ROOM_MAINTENANCE_MS),
+    maintenance: null,
+    maintenanceAt: 0,
     flushTimer: null,
     flushAt: 0,
     flushing: false,
     dirtyAgain: false,
+    overdueSince: null,
   };
-  room.maintenance.unref?.();
 
   // L'événement lui-même ne sert qu'à réveiller la salle : ce qui part aux
   // abonnés, c'est l'instantané recalculé, identique quel que soit le
@@ -396,6 +611,16 @@ function openRoom(tournamentId: number): Room {
   });
 
   rooms.set(tournamentId, room);
+
+  // Premier réveil, planifié sur l'instantané que le premier abonné vient de
+  // recevoir : rien à relire avant sa prochaine échéance. Sans lui, un réveil
+  // de précaution — la salle ne sait encore rien du tournoi.
+  const now = Date.now();
+  scheduleMaintenance(
+    tournamentId,
+    room,
+    known ? nextRoomWakeAt(known, now) : now + ROOM_READ_RETRY_MS,
+  );
   return room;
 }
 
@@ -406,13 +631,27 @@ function openRoom(tournamentId: number): Room {
 export function joinTournamentRoom(
   tournamentId: number,
   subscriber: TournamentSubscriber,
+  /**
+   * Instantané que cet abonné vient de recevoir, s'il est connu : il sert à
+   * planifier le premier réveil d'une salle qui s'ouvre.
+   */
+  known?: TournamentSnapshot,
 ): () => void {
-  const room = rooms.get(tournamentId) ?? openRoom(tournamentId);
+  const room = rooms.get(tournamentId) ?? openRoom(tournamentId, known);
   room.subscribers.add(subscriber);
   // Ce que l'abonné tient déjà : la salle ne lui réécrira cette version-là que
   // s'il ne l'a pas. Omettre `version` revient à dire « je n'ai rien » — le
   // premier envoi lui parviendra alors, quitte à faire double emploi.
   room.states.set(subscriber, { version: subscriber.version ?? null, lastSentAt: 0 });
+
+  // Contrôle d'arrivée : entre la lecture d'ouverture de la route et cet
+  // abonnement, une écriture a pu être diffusée aux autres — ce lecteur tient
+  // alors la version d'avant, et plus rien ne le rattraperait avant la
+  // prochaine échéance (5 min, jamais sur un tournoi terminé). La salle
+  // repasse donc tout de suite : la lecture sort presque toujours du cache
+  // (3 s) que la route vient de remplir, et rien n'est écrit si la version
+  // n'a pas bougé.
+  if (subscriber.version) scheduleFlush(tournamentId, room, 0);
 
   return () => {
     room.subscribers.delete(subscriber);

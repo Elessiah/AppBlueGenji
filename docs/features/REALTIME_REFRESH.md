@@ -158,6 +158,90 @@ le spectateur.
 Celui qui vient d'agir ne la subit pas : sa page relit immédiatement de son
 côté.
 
+### Compression du flux
+
+Le budget comptait des octets **en clair** : l'instantané d'une double
+élimination à 128 équipes pèse désormais **238 ko** (254 matchs × 41 champs),
+et avec ~256 abonnés le plancher du budget valait 238 ko × 256 / 512 ko/s ≈
+116 s, plafonné à 60 s — **aussi pour le palier prioritaire**. Joueurs et
+arbitres d'un gros plateau ne recevaient plus qu'une mise à jour par minute.
+
+Or ce JSON est très répétitif : **13 ko en gzip** (×18). Le `Cache-Control:
+no-transform` écarte à raison la compression d'un tiers (serveur de Next,
+mandataire), qui **met en tampon** et retiendrait les trames. Le flux se
+compresse donc lui-même (`lib/server/sse-gzip.ts`), sans tampon :
+
+- chaque trame est un morceau *deflate* **autonome** (flux brut neuf, terminé
+  par un vidage synchrone et non par un bloc final) — il ne renvoie à aucun
+  octet précédent et finit aligné sur l'octet, donc se recolle derrière
+  n'importe quel autre ;
+- les mêmes octets partent donc à **tous** les abonnés gzip, chacun derrière son
+  propre en-tête de dix octets (`GZIP_STREAM_HEADER`) : la compression coûte
+  une passe par version (~2,7 ms à 128 équipes), pas une par spectateur ;
+- l'instantané, morceau lourd, est comprimé une fois et partagé par la trame
+  diffusée **et** par la trame de connexion de chaque lecteur
+  (`lib/server/tournament-stream-frames.ts`), qui n'est plus resérialisée
+  (`JSON.stringify` de 238 ko à chaque connexion : 1,4 ms → 0,1 ms) ;
+- le vidage synchrone garantit que le navigateur décode chaque trame dès son
+  arrivée. Aucun bloc de fin n'est écrit — le flux ne se termine que par le
+  départ du client, ou par une fermeture côté serveur qu'`EventSource` lit de
+  toute façon comme une coupure.
+
+Un client qui n'annonce pas gzip (`Accept-Encoding`) reçoit le flux en clair ;
+tout navigateur l'annonce pour `EventSource`. Le budget compte le poids
+**réellement écrit** à chaque abonné (`roomBudgetDelayMs`) : le plancher d'une
+salle de 256 abonnés tombe de 60 s à 6,5 s.
+
+### Réveil d'entretien
+
+La salle relisait l'instantané toutes les 30 s pour rattraper ce que l'heure
+apporte (bascule d'état, report de score expiré) — reconstruction complète,
+le cache de 3 s étant toujours expiré, y compris pour un tournoi **terminé** ou
+en cours sans la moindre échéance. Elle se réveille désormais **à la prochaine
+échéance connue** (`nextRoomWakeAt`) : bascule d'état, `score_deadline_at` le
+plus proche (plus une seconde de marge), et un filet de 5 min
+(`ROOM_SAFETY_NET_MS`) pour une écriture qui n'aurait rien publié. **Aucun**
+réveil sur un tournoi terminé : seules des écritures le font bouger, et elles
+publient. Le réveil est replanifié à chaque lecture — c'est toujours la
+dernière qui sait quelle est la prochaine échéance —, et une lecture en échec
+est retentée après 30 s (`ROOM_READ_RETRY_MS`).
+
+Piège de ce réveil à l'heure exacte : la lecture peut servir un instantané
+**en cache** (3 s) posé juste avant la bascule par une connexion ou une lecture
+de secours, et l'entretien à la lecture ne joue alors pas. La bascule étant
+passée, `nextTournamentStateChangeAt` ne la rend plus, et le coup d'envoi
+tomberait jusqu'au filet de 5 min. Un état stocké qui retarde sur ses dates
+(`isStateOverdue`) fait donc relire après `STATE_CATCH_UP_MS` (4 s, plus que le
+cache) ; s'il retarde encore à cette relecture, ce n'est plus le cache mais un
+entretien qui n'aboutit pas, et la salle passe au pas de 30 s plutôt que de
+boucler. Même rattrapage pour un **report unique** expiré (`isRoomOverdue`).
+Un **conflit** de score expiré, en revanche, n'est pas une échéance manquée :
+rien ne le tranche avant l'arbitrage, et la salle n'attend que son escalade
+(`score_deadline_at` + `SCORE_REPORT_TIMEOUT_MINUTES`) ou le filet — le relire
+toutes les 30 s rouvrirait le battement supprimé.
+
+L'ancien battement rattrapait aussi, sans le dire, un lecteur arrivé pendant
+une diffusion : la route lit l'instantané, résout le contexte du lecteur, puis
+l'abonne — une écriture diffusée entre les deux le laissait sur la version
+d'avant. Sans battement, rien ne l'aurait rattrapé avant le filet (jamais sur
+un tournoi terminé). Un abonné qui rejoint avec une version déclenche donc un
+**contrôle d'arrivée** immédiat : la lecture sort presque toujours du cache
+que la route vient de remplir, et rien n'est écrit si la version n'a pas bougé.
+
+### Rendu du plateau
+
+Chaque instantané arrive désérialisé à neuf : un seul « Prêt » remplaçait les
+254 objets de match, et les 254 `MatchRow` se redessinaient. `applyLiveMessage`
+reprend désormais de l'état précédent ce qui n'a pas changé **de contenu**
+(`shareUnchanged` : matchs, inscrites, entrées solo — la reconnexion et la
+lecture REST de secours aussi), et `MatchRow` est mémorisée. Tout ce qui
+descend jusqu'à elle doit donc rester stable d'un instantané à l'autre : le
+verrou de score lui arrive en **booléen** (`scoreLocked`) et non plus le
+plateau entier, les droits de saisie du contexte `PlayerScoreProvider` sont
+mémorisés, et le contexte du format de match ne change qu'avec son contenu.
+Mesuré sur le jeu de test : 253 cartes sur 254 gardent leur référence, pour
+1,6 ms de comparaison.
+
 ### Contre-pression par connexion — `lib/server/stream-backpressure.ts`
 
 Le budget ménage le lien de la machine ; il ne dit rien d'**une** connexion
@@ -324,7 +408,7 @@ l'événement partaient avant le commit, la salle se réveillait aussitôt,
 reconstruisait l'instantané sur une **autre** connexion — qui ne voit pas le
 plateau en cours d'écriture — et mettait en cache puis diffusait « en cours,
 sans plateau ». Aucun second événement ne venait le corriger, l'état du tournoi
-n'ayant pas changé : la trame périmée tenait jusqu'au battement d'entretien de
+n'ayant pas changé : la trame périmée tenait jusqu'au réveil d'entretien de
 la salle. Sur un rollback, elle aurait annoncé un plateau qui n'a jamais existé.
 
 L'information remonte désormais à l'appelant : `createBracketIfMissing` rend
@@ -465,7 +549,9 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 | `stream-backpressure.ts` | Contre-pression d'un flux SSE : écrire, sauter ou fermer (pur). |
 | `rate-limit.ts` | Seaux à fenêtre fixe (contrôle et débit séparés). |
 | `api-guard.ts` | Plafonds des routes + IP client. |
-| `tournament-broadcast.ts` | Salles SSE : un calcul par tournoi, regroupement par palier, budget de sortie, battement d'entretien, abonné laissé en retard quand sa file est pleine. |
+| `tournament-broadcast.ts` | Salles SSE : un calcul par tournoi, regroupement par palier, budget de sortie, réveil à la prochaine échéance, abonné laissé en retard quand sa file est pleine. |
+| `sse-gzip.ts` | Compression du flux sans tampon : morceaux *deflate* autonomes, partagés par tous les abonnés. |
+| `tournament-stream-frames.ts` | Trames du flux (instantané, connexion, battement) en clair ou compressées, l'instantané comprimé une fois par version. |
 | `tournaments/snapshot.ts` | Construction et mise en cache de l'instantané. |
 | `tournaments/list-cache.ts` | Cache de la liste publique. |
 | `tournaments/notifications.ts` | Publication d'événement **et** invalidation des caches. |
