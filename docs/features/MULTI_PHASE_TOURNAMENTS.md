@@ -160,6 +160,12 @@ diverger.
   la phase sélectionnée pilote la vue affichée (survie, bracket ou suisse) et le
   **bouton flottant d'aide**, qui renvoie aux règles du mode réellement à l'écran
   (`visibleRulesFormat`).
+  Une phase **suisse** n'est jamais dessinée en arbre à élimination (qui nommait
+  ses rondes « Quart de finale 1…12 ») : en cours, elle a la vue suisse complète
+  (classement, départages, abandon), l'instantané ne portant le classement suisse
+  que de la **phase en cours** (`swissMetaIsSelectedPhase`) ; close, elle montre
+  ses rondes seules (`SwissRounds`) puis son classement de phase
+  (`PhaseStandingsBlock`).
 - **Règles publiques** — `/regles/multi-phases`.
 
 ## Cas limites gérés

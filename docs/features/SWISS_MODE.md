@@ -117,6 +117,12 @@ lice, quels que soient leurs points : elles n'ont pas joué le tournoi jusqu'au
 bout. Elles conservent en revanche les points déjà acquis, qui continuent de
 compter dans le Buchholz de leurs anciennes adversaires.
 
+Sous 720 px, le bouton « Abandonner » du classement passe **sous** le nom, sa
+colonne disparaît de la grille (`RankingViews.module.css`, même règle pour la
+Survie) : à côté du nom, il était coupé (« AB ») ou écrasait les noms. Les
+rondes, posées côte à côte, s'ouvrent sur la dernière (`revealKey` de
+`ScrollArea`) plutôt que sur la première.
+
 ## Cycle de vie
 
 1. **REGISTRATION → RUNNING** (`syncTournamentState`) : `initializeSwissTournament`
