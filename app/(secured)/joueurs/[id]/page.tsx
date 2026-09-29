@@ -20,7 +20,6 @@ import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import { ModerationAvatarBar } from "./_components/ModerationAvatarBar";
 import styles from "./player.module.css";
-import { formatRate } from "@/lib/shared/stats";
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
@@ -118,8 +117,10 @@ export default function PlayerDetailPage() {
     <section className="fade-in">
       <div className={deleted ? `ds-header ${styles.deletedHeader}` : "ds-header"}>
         <div className="ds-header-body">
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 18 }}>
+          {/* Même gabarit que la fiche d'équipe : sous 640 px, le retour passe
+              au-dessus du titre au lieu d'être rogné par `.ds-header`. */}
+          <div className={styles.top}>
+            <div className={styles.identity}>
               {deleted ? (
                 <span className={styles.deletedAvatar} aria-hidden="true">
                   <UserX size={30} />
@@ -135,7 +136,7 @@ export default function PlayerDetailPage() {
                   decorative
                 />
               )}
-              <div>
+              <div className={styles.titles}>
                 {deleted && (
                   <span className={styles.deletedBadge}>
                     <UserX size={12} aria-hidden="true" />
@@ -143,7 +144,9 @@ export default function PlayerDetailPage() {
                   </span>
                 )}
                 <h1
-                  className={deleted ? `ds-title ${styles.deletedTitle}` : "ds-title blue"}
+                  className={
+                    deleted ? `ds-title ${styles.name} ${styles.deletedTitle}` : `ds-title blue ${styles.name}`
+                  }
                   style={{ fontSize: "clamp(26px, 3vw, 40px)", marginBottom: 6 }}
                 >
                   {data.profile.pseudo}
@@ -183,7 +186,7 @@ export default function PlayerDetailPage() {
                 </div>
               </div>
             </div>
-            <Link href="/joueurs" className="btn ghost" style={{ padding: "9px 18px", fontSize: 13, flexShrink: 0 }}>
+            <Link href="/joueurs" className={`btn ghost ${styles.back}`}>
               ← Joueurs
             </Link>
           </div>
@@ -195,22 +198,10 @@ export default function PlayerDetailPage() {
               aussi aux équipes qu'il a affrontées.
             </p>
           )}
-
-          <div className="ds-stats" style={{ marginTop: 28 }}>
-            {[
-              { label: "Tournois joués", value: data.stats.tournamentsPlayed },
-              { label: "Tournois gagnés", value: data.stats.tournamentsWon },
-              { label: "Podiums", value: data.stats.podiums },
-              { label: "Victoires", value: data.stats.matchesWon },
-              { label: "Défaites", value: data.stats.matchesLost },
-              { label: "Ratio de victoires", value: formatRate(data.stats.winRate) },
-            ].map((stat) => (
-              <div key={stat.label} className="ds-stat">
-                <div className="ds-stat-label">{stat.label}</div>
-                <div className="ds-stat-value">{stat.value}</div>
-              </div>
-            ))}
-          </div>
+          {/* Pas de rangée de chiffres ici : elle recopiait les tuiles du bloc
+              « Statistiques » juste dessous (≈ 500 px de doublon sur mobile),
+              et « Victoires / Défaites » y comptaient des matchs sans le dire
+              — le bloc les range sous « Bilan des matchs ». */}
         </div>
       </div>
 
