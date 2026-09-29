@@ -19,6 +19,10 @@
  *   (`lib/server/privacy-change-notifications.ts`) ;
  * - la mention « Dernière mise à jour » de `/rgpd` suit la dernière entrée.
  *
+ * Une entrée peut ne viser qu'une partie des comptes (`audience`) et porter des
+ * liens vers l'écran où agir (`links`) : c'est ainsi qu'une information due à
+ * un sous-ensemble de comptes passe par le même mécanisme.
+ *
  * **La modale informe, elle ne demande jamais d'accepter** (RGPD, art. 12 à
  * 14). Un traitement fondé sur l'intérêt légitime ou sur l'exécution du service
  * ne se soumet pas à l'accord du joueur : sa contrepartie est le droit
