@@ -200,13 +200,14 @@ champ `acceptedAt` inchangé pour ne pas casser le format). Registre : T10, base
 
 ## Dates corrigées
 
-`2026-10-retrait-google-one-tap` portait `publishedAt: "2026-10-01"` alors que
-le retrait a été mergé le 29 septembre 2026 (#278) : sa date est ramenée au
-**30 septembre**, celle des deux entrées livrées le même jour (#272, mesure
-d'audience) — l'ordre du registre est tenu, et entre deux dates plausibles la
-plus tardive est la plus sûre (un compte créé entre les deux lit un changement
-déjà vrai plutôt que d'en manquer un). L'identifiant, déjà publié, garde son
-« 2026-10 ».
+`2026-10-retrait-google-one-tap` portait `publishedAt: "2026-10-01"`, et les
+deux entrées qui le précèdent (`2026-09-mesure-audience-duree`,
+`2026-09-certification-discord-volontaire`) `"2026-09-30"`, alors que les trois
+ont été mergées et mises en ligne le **29 septembre 2026** (#278, #272) — un
+audit les a vues en ligne ce jour-là. Les trois sont ramenées au 29 : datées plus
+tard, elles se seraient tues un ou deux jours avec le filtre de publication, puis
+montrées à des comptes inscrits sous la politique déjà à jour. L'ordre du
+registre est tenu ; les identifiants, déjà publiés, ne changent pas.
 
 ## Mise en production initiale
 
