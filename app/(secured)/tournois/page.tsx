@@ -338,6 +338,10 @@ export default function TournamentsPage() {
   // quand même : « Voir plus » et le sommaire annoncent l'archive entière.
   const finishedBeyond = (key: GameFilter) => (query.trim() ? 0 : finishedBeyondList(buckets, key));
   const totalFinished = filteredBuckets.finished.length + finishedBeyond(gameFilter);
+  // Section dépliée, archive demandée mais pas encore reçue : la liste en main
+  // est encore la liste tronquée.
+  const finishedArchiveLoading =
+    finishedExpanded && wantFinishedArchive && buckets.finishedTotals !== undefined;
 
   const showHidden = isAdmin && hiddenTournaments.length > 0;
 
@@ -654,6 +658,14 @@ export default function TournamentsPage() {
                 {visibleSlice("finished", filteredBuckets.finished).map((t) => (
                   <FinishedCard key={t.id} t={t} />
                 ))}
+                {/* L'archive arrive après le clic : sans ce mot, « Voir moins »
+                    s'afficherait sur les douze mêmes cartes, comme si le clic
+                    n'avait rien donné. */}
+                {finishedArchiveLoading && (
+                  <div className={s.showMoreRow} role="status">
+                    Chargement des tournois terminés…
+                  </div>
+                )}
                 <ShowMoreRow
                   sectionTitle="TERMINÉS"
                   total={totalFinished}
