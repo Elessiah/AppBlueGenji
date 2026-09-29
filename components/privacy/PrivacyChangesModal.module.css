@@ -145,9 +145,10 @@
   color: var(--ink-mute);
 }
 
+/* Un seul geste, « J'ai pris connaissance » : aligné à droite comme la
+   validation des autres modales, pleine largeur au pouce (voir plus bas). */
 .actions {
   display: flex;
-  flex-wrap: wrap-reverse;
   justify-content: flex-end;
   align-items: center;
   gap: 10px;
