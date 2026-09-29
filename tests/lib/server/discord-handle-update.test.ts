@@ -11,7 +11,7 @@ jest.mock("@/lib/server/users-service", () => {
     // pseudo.
     normalizeDiscordHandle: actual.normalizeDiscordHandle,
     createDiscordLoginChallenge: jest.fn(),
-    consumeDiscordChallenge: jest.fn(),
+    consumeDiscordLoginChallenge: jest.fn(),
     discardDiscordChallenge: jest.fn(),
   };
 });
@@ -26,7 +26,7 @@ import {
   sendDiscordLoginCode,
 } from "@/lib/server/bot-integration";
 import {
-  consumeDiscordChallenge,
+  consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
   discardDiscordChallenge,
 } from "@/lib/server/users-service";
@@ -68,27 +68,26 @@ function fakeDb(
     ) {
       return [state.is_deleted ? [] : [{ ...state }]];
     }
-    if (
-      q.startsWith("SELECT id FROM bg_users WHERE discord_id = ? AND id <> ?")
-    ) {
-      return [
-        otherAccountHolds !== null && params[0] === otherAccountHolds
-          ? [{ id: 1234 }]
-          : [],
-      ];
-    }
+
     if (
       q.startsWith(
         "UPDATE bg_users SET discord_verified_at = CASE WHEN discord_pseudo <=> ?",
       )
     ) {
       writes.push({ sql: q, params });
-      if (duplicate)
+      const [tag, method, discordId, pseudo, , guardId] = params as string[];
+      // L'index unique de `bg_users.discord_id` : seul juge d'un Discord détenu
+      // par un autre compte du site (la demande ne le consulte plus).
+      const heldElsewhere =
+        otherAccountHolds !== null &&
+        state.discord_id === null &&
+        discordId === otherAccountHolds;
+      if (duplicate || heldElsewhere)
         throw Object.assign(new Error("dup"), {
           code: "ER_DUP_ENTRY",
           errno: 1062,
         });
-      const [tag, method, discordId, pseudo, , guardId] = params as string[];
+
       const matches =
         !state.is_deleted &&
         (state.discord_id === null || state.discord_id === guardId);
@@ -135,6 +134,9 @@ beforeEach(() => {
   jest.mocked(discardDiscordChallenge).mockResolvedValue(undefined);
 });
 
+/** Jeton du défi rendu à la demande — et seul moyen de le désigner ensuite. */
+const CHALLENGE = "t".repeat(32);
+
 describe("startDiscordHandleUpdate", () => {
   it("envoie un code au compte Discord déjà rattaché, pour le pseudo saisi", async () => {
     fakeDb({ ...LINKED_BY_CODE });
@@ -144,9 +146,10 @@ describe("startDiscordHandleUpdate", () => {
 
     expect(result).toEqual({
       status: "CODE_SENT",
-      discordId: "900000000000000001",
+      challenge: CHALLENGE,
       expiresAt: "2026-09-20T12:10:00.000Z",
     });
+    expect(result).not.toHaveProperty("discordId");
     expect(createDiscordLoginChallenge).toHaveBeenCalledWith(
       "900000000000000001",
       "keryan_neuf",
@@ -176,14 +179,18 @@ describe("startDiscordHandleUpdate", () => {
     expect(resolveDiscordUser).not.toHaveBeenCalled();
   });
 
-  it("sans Discord rattaché, refuse un Discord détenu par un autre compte", async () => {
+  it("sans Discord rattaché, ne dit pas si un autre compte détient ce Discord", async () => {
+    // La demande n'est pas un oracle : le refus ne vient qu'à la confirmation,
+    // par l'index unique, à qui détient le code.
     fakeDb({ ...GOOGLE_ACCOUNT }, "900000000000000002");
     jest.mocked(resolveDiscordUser).mockResolvedValue("900000000000000002");
+    const held = await startDiscordHandleUpdate(7, "keryan");
 
-    await expect(startDiscordHandleUpdate(7, "keryan")).rejects.toThrow(
-      "DISCORD_ALREADY_LINKED",
-    );
-    expect(sendDiscordLoginCode).not.toHaveBeenCalled();
+    fakeDb({ ...GOOGLE_ACCOUNT });
+    const free = await startDiscordHandleUpdate(7, "keryan");
+
+    expect(held).toEqual(free);
+    expect(sendDiscordLoginCode).toHaveBeenCalledTimes(2);
   });
 
   it("appelle le garde d'avant-envoi et laisse son refus remonter", async () => {
@@ -225,12 +232,12 @@ describe("confirmDiscordHandleUpdate", () => {
   it("écrit le pseudo du défi, « donné par Discord », et défait la certification s'il change", async () => {
     const db = fakeDb({ ...LINKED_BY_CODE, discord_pseudo_from_discord: 0 });
     jest
-      .mocked(consumeDiscordChallenge)
-      .mockResolvedValue({ handle: "keryan_neuf" });
+      .mocked(consumeDiscordLoginChallenge)
+      .mockResolvedValue({ handle: "keryan_neuf", discordId: "900000000000000001" });
 
     const result = await confirmDiscordHandleUpdate(
       7,
-      "900000000000000001",
+      CHALLENGE,
       "123456",
     );
 
@@ -243,10 +250,10 @@ describe("confirmDiscordHandleUpdate", () => {
   it("garde la certification quand le pseudo ne change pas", async () => {
     const db = fakeDb({ ...LINKED_BY_CODE });
     jest
-      .mocked(consumeDiscordChallenge)
-      .mockResolvedValue({ handle: "keryan" });
+      .mocked(consumeDiscordLoginChallenge)
+      .mockResolvedValue({ handle: "keryan", discordId: "900000000000000001" });
 
-    await confirmDiscordHandleUpdate(7, "900000000000000001", "123456");
+    await confirmDiscordHandleUpdate(7, CHALLENGE, "123456");
 
     expect(db.state.discord_verified_at).toEqual(CERTIFIED_AT);
   });
@@ -254,10 +261,10 @@ describe("confirmDiscordHandleUpdate", () => {
   it("ne réécrit pas la méthode d'un rattachement existant : `OAUTH` ne redescend jamais", async () => {
     const db = fakeDb({ ...LINKED_BY_CODE, discord_link_method: "OAUTH" });
     jest
-      .mocked(consumeDiscordChallenge)
-      .mockResolvedValue({ handle: "keryan" });
+      .mocked(consumeDiscordLoginChallenge)
+      .mockResolvedValue({ handle: "keryan", discordId: "900000000000000001" });
 
-    await confirmDiscordHandleUpdate(7, "900000000000000001", "123456");
+    await confirmDiscordHandleUpdate(7, CHALLENGE, "123456");
 
     expect(db.state.discord_link_method).toBe("OAUTH");
   });
@@ -265,55 +272,60 @@ describe("confirmDiscordHandleUpdate", () => {
   it("rattache par code un compte sans Discord", async () => {
     const db = fakeDb({ ...GOOGLE_ACCOUNT });
     jest
-      .mocked(consumeDiscordChallenge)
-      .mockResolvedValue({ handle: "keryan" });
+      .mocked(consumeDiscordLoginChallenge)
+      .mockResolvedValue({ handle: "keryan", discordId: "900000000000000002" });
 
-    await confirmDiscordHandleUpdate(7, "900000000000000002", "123456");
+    await confirmDiscordHandleUpdate(7, CHALLENGE, "123456");
 
     expect(db.state.discord_id).toBe("900000000000000002");
     expect(db.state.discord_link_method).toBe("DM_CODE");
     expect(db.state.discord_verified_at).toBeNull();
   });
 
-  it("refuse un défi portant un autre compte Discord que celui rattaché, sans le consommer", async () => {
-    fakeDb({ ...LINKED_BY_CODE });
+  it("refuse un défi portant un autre compte Discord que celui rattaché, sans rien écrire", async () => {
+    const db = fakeDb({ ...LINKED_BY_CODE });
+    jest
+      .mocked(consumeDiscordLoginChallenge)
+      .mockResolvedValue({ handle: "keryan", discordId: "900000000000000099" });
 
     await expect(
-      confirmDiscordHandleUpdate(7, "900000000000000099", "123456"),
+      confirmDiscordHandleUpdate(7, CHALLENGE, "123456"),
     ).rejects.toThrow("DISCORD_ID_MISMATCH");
-    expect(consumeDiscordChallenge).not.toHaveBeenCalled();
+    expect(consumeDiscordLoginChallenge).toHaveBeenCalledWith(CHALLENGE, "123456");
+    expect(db.writes).toHaveLength(0);
   });
+
 
   it("refuse un code faux sans rien écrire", async () => {
     const db = fakeDb({ ...LINKED_BY_CODE });
-    jest.mocked(consumeDiscordChallenge).mockResolvedValue(null);
+    jest.mocked(consumeDiscordLoginChallenge).mockResolvedValue(null);
 
     await expect(
-      confirmDiscordHandleUpdate(7, "900000000000000001", "000000"),
+      confirmDiscordHandleUpdate(7, CHALLENGE, "000000"),
     ).rejects.toThrow("CODE_INVALID_OR_EXPIRED");
     expect(db.writes).toHaveLength(0);
   });
 
   it("refuse un défi sans pseudo (connexion par identifiant numérique)", async () => {
     const db = fakeDb({ ...LINKED_BY_CODE });
-    jest.mocked(consumeDiscordChallenge).mockResolvedValue({ handle: null });
+    jest.mocked(consumeDiscordLoginChallenge).mockResolvedValue({ handle: null, discordId: "900000000000000001" });
 
     await expect(
-      confirmDiscordHandleUpdate(7, "900000000000000001", "123456"),
+      confirmDiscordHandleUpdate(7, CHALLENGE, "123456"),
     ).rejects.toThrow("INVALID_DISCORD_HANDLE");
     expect(db.writes).toHaveLength(0);
   });
 
   it("l'écriture porte elle-même la garde : un rattachement changé entre-temps fait refuser", async () => {
     const db = fakeDb({ ...GOOGLE_ACCOUNT });
-    jest.mocked(consumeDiscordChallenge).mockImplementation(async () => {
+    jest.mocked(consumeDiscordLoginChallenge).mockImplementation(async () => {
       // Pendant l'`await`, un autre Discord a été rattaché au compte.
       db.state.discord_id = "900000000000000099";
-      return { handle: "keryan" };
+      return { handle: "keryan", discordId: "900000000000000002" };
     });
 
     await expect(
-      confirmDiscordHandleUpdate(7, "900000000000000002", "123456"),
+      confirmDiscordHandleUpdate(7, CHALLENGE, "123456"),
     ).rejects.toThrow("DISCORD_ID_MISMATCH");
     expect(db.state.discord_pseudo).toBeNull();
   });
@@ -321,11 +333,11 @@ describe("confirmDiscordHandleUpdate", () => {
   it("traduit la course sur l'index unique en `DISCORD_ALREADY_LINKED`", async () => {
     fakeDb({ ...GOOGLE_ACCOUNT }, null, true);
     jest
-      .mocked(consumeDiscordChallenge)
-      .mockResolvedValue({ handle: "keryan" });
+      .mocked(consumeDiscordLoginChallenge)
+      .mockResolvedValue({ handle: "keryan", discordId: "900000000000000002" });
 
     await expect(
-      confirmDiscordHandleUpdate(7, "900000000000000002", "123456"),
+      confirmDiscordHandleUpdate(7, CHALLENGE, "123456"),
     ).rejects.toThrow("DISCORD_ALREADY_LINKED");
   });
 });

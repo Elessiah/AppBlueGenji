@@ -254,7 +254,7 @@ describe("certification Discord — code refusé", () => {
   it("la seconde étape offre de redemander un code, geste que nomme le refus d'un code brûlé", () => {
     const src = code("app/(secured)/profil/DiscordVerificationDialog.tsx");
     expect(src).toMatch(/onClick=\{restartVerification\}>\s*Nouveau code/);
-    expect(src).toMatch(/const restartVerification = \(\) => \{\s*setDiscordId\(""\);\s*setCode\(""\);\s*fieldErrors\.clear\(\);/);
+    expect(src).toMatch(/const restartVerification = \(\) => \{\s*setChallenge\(""\);\s*setCode\(""\);\s*fieldErrors\.clear\(\);/);
   });
 
   it("changer d'étape porte le focus sur le champ de la nouvelle étape, jamais au montage", () => {
