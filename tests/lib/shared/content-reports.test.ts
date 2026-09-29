@@ -21,6 +21,8 @@ import {
   formatReportsSaturatedAlert,
   formatReportAlert,
   formatTargetNotice,
+  canContestReport,
+  notifierMayContest,
   isConcernedByReport,
   isPlausibleEmail,
   missingReplyChannel,
@@ -45,6 +47,7 @@ import {
   type ReportAction,
   type ReportStatus,
 } from "@/lib/shared/content-reports";
+import { logoQuarantinePurgeDate } from "@/lib/shared/logo-quarantine";
 
 const DESCRIPTION = "Le logo de cette équipe reprend celui de notre club, déposé.";
 
@@ -362,13 +365,78 @@ describe("messages Discord — aucun joueur nommé", () => {
       parentId: 8,
       parentCategory: "MODERATION",
       reopened: true,
+      by: "TARGET",
       adminUrl: "https://site.test/admin/signalements?id=8",
     });
     expect(reopened).toContain("Contestation #20 du signalement #8 (Modération)");
+    expect(reopened).toContain("envoyée par une personne visée");
     expect(reopened).toContain("réactivé");
+    const byNotifier = formatContestAlert({
+      contestId: 1,
+      parentId: 2,
+      parentCategory: "BUG",
+      reopened: false,
+      by: "NOTIFIER",
+      adminUrl: "u",
+    });
+    expect(byNotifier).not.toContain("réactivé");
+    expect(byNotifier).toContain("envoyée par l'auteur du signalement");
+  });
+});
+
+describe("conservation d'une notification que son auteur peut contester", () => {
+  it("ne vaut que pour une notification de contenu envoyée depuis un compte", () => {
+    expect(notifierMayContest({ category: "COPYRIGHT", reporterUserId: 5 })).toBe(true);
+    expect(notifierMayContest({ category: "MODERATION", reporterUserId: 5 })).toBe(true);
+    expect(notifierMayContest({ category: "COPYRIGHT", reporterUserId: null })).toBe(false);
+    expect(notifierMayContest({ category: "BUG", reporterUserId: 5 })).toBe(false);
+  });
+
+  it("garde le signalement six mois civils après l'archivage, le délai de contestation", () => {
+    const resolvedAt = new Date("2026-03-01T10:00:00.000Z");
+    expect(reportRetainedUntil(resolvedAt, [], true).toISOString()).toBe(
+      logoQuarantinePurgeDate(resolvedAt).toISOString(),
+    );
+    // Sans auteur à attendre : trente jours.
+    expect(reportRetainedUntil(resolvedAt, [], false).toISOString()).toBe("2026-03-31T10:00:00.000Z");
+  });
+});
+
+describe("canContestReport", () => {
+  const viewer = { userId: 5, teamIds: [3] };
+  const base = { category: "COPYRIGHT" as const, reporterUserId: null, targets: [] };
+
+  it("laisse une personne visée contester à tout moment", () => {
+    for (const status of ["OPEN", "IN_PROGRESS", "RESOLVED"] as const) {
+      expect(canContestReport(viewer, { ...base, status, targets: [{ type: "TEAM", id: 3 }] })).toBe(true);
+    }
+  });
+
+  it("laisse l'auteur du signalement contester la décision, une fois le dossier archivé (DSA art. 20.1)", () => {
+    expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "RESOLVED" })).toBe(true);
+    // Pas encore de décision à contester.
+    expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "OPEN" })).toBe(false);
+    expect(canContestReport(viewer, { ...base, reporterUserId: 5, status: "IN_PROGRESS" })).toBe(false);
+    expect(canContestReport(viewer, { ...base, category: "MODERATION", reporterUserId: 5, status: "RESOLVED" })).toBe(true);
+  });
+
+  it("n'ouvre à l'auteur que les notifications de contenu : un bug archivé n'a pas de décision à contester", () => {
+    for (const category of ["BUG", "RGPD", "HOSTING", "OTHER"] as const) {
+      expect(canContestReport(viewer, { ...base, category, reporterUserId: 5, status: "RESOLVED" })).toBe(false);
+    }
+  });
+
+  it("refuse tout autre lecteur, et une contestation ne se conteste pas", () => {
+    expect(canContestReport(viewer, { ...base, reporterUserId: 6, status: "RESOLVED" })).toBe(false);
+    expect(canContestReport(viewer, { ...base, status: "RESOLVED" })).toBe(false);
     expect(
-      formatContestAlert({ contestId: 1, parentId: 2, parentCategory: "BUG", reopened: false, adminUrl: "u" }),
-    ).not.toContain("réactivé");
+      canContestReport(viewer, {
+        category: "CONTEST",
+        reporterUserId: 5,
+        status: "RESOLVED",
+        targets: [{ type: "USER", id: 5 }],
+      }),
+    ).toBe(false);
   });
 });
 

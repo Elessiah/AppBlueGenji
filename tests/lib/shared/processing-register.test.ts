@@ -24,7 +24,7 @@ import {
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
-import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
@@ -133,7 +133,7 @@ describe("durées : le registre cite les constantes que le code applique", () =>
   it("signalements et logos signalés, aux durées que le service applique", () => {
     const retention = byRef("T11").retention.join(" ");
     expect(retention).toContain(`${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage`);
-    expect(retention).toContain(`${LOGO_QUARANTINE_DAYS / 30} mois`);
+    expect(retention).toContain(`${LOGO_QUARANTINE_MONTHS} mois`);
     // Un logo supprimé retient lui aussi le signalement, le temps de la contestation.
     expect(retention).toContain("masqué ou supprimé");
   });

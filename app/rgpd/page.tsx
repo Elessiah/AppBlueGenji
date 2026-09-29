@@ -35,7 +35,7 @@ import {
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
-import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISIT_DETAIL_RETENTION_DAYS, SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 import styles from "./page.module.css";
@@ -530,7 +530,10 @@ export default async function RgpdPage() {
               <strong>Durée</strong> : le temps du traitement, puis{" "}
               {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l&apos;archivage — prolongée tant
               qu&apos;un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être
-              contesté par son équipe ou son joueur. Un compte supprimé n&apos;y laisse pas son pseudo.
+              contesté par son équipe ou son joueur, et portée à {LOGO_QUARANTINE_MONTHS} mois civils
+              après l&apos;archivage pour un signalement de droit d&apos;auteur ou de modération envoyé
+              depuis un compte, le temps que son auteur puisse contester la décision. Un compte
+              supprimé n&apos;y laisse pas son pseudo.
             </li>
           </ul>
 
@@ -549,12 +552,15 @@ export default async function RgpdPage() {
 
           <h3>3. Le droit de contestation</h3>
           <p>
-            Seule une personne visée peut contester — un joueur désigné, ou un membre actuel d&apos;une
+            Une personne visée peut contester — un joueur désigné, ou un membre actuel d&apos;une
             équipe désignée —, depuis la page du signalement ou par la catégorie{" "}
-            <strong>« Contestation »</strong> du même formulaire. La contestation est rangée sous le
+            <strong>« Contestation »</strong> du même formulaire. L&apos;auteur d&apos;un signalement
+            de droit d&apos;auteur ou de modération peut, lui, contester la décision prise — y compris
+            celle de ne pas agir — par la même catégorie, une fois le signalement archivé, s&apos;il
+            l&apos;a envoyé depuis son compte. La contestation est rangée sous le
             signalement d&apos;origine et lue par les administrateurs, qui en sont prévenus sur Discord.
-            Contester un signalement <strong>déjà archivé le rouvre</strong>. L&apos;auteur du
-            signalement n&apos;est pas informé de la contestation ; elle est conservée et effacée avec
+            Contester un signalement <strong>déjà archivé le rouvre</strong>. Ni l&apos;auteur du
+            signalement ni les personnes visées ne sont informés de la contestation ; elle est conservée et effacée avec
             le signalement qu&apos;elle vise.
           </p>
 
@@ -563,14 +569,16 @@ export default async function RgpdPage() {
             Plutôt que de supprimer tout de suite un logo d&apos;équipe ou un avatar de joueur signalé,
             l&apos;association peut le <strong>masquer</strong> : il cesse aussitôt d&apos;être en ligne
             (le fichier quitte le dossier servi par le site), et il est gardé à part, hors ligne. Les
-            membres de l&apos;équipe, ou le joueur, reçoivent un message privé qui annonce la{" "}
-            <strong>date de suppression définitive</strong>.
+            membres de l&apos;équipe, ou le joueur, reçoivent un message privé qui expose les motifs de
+            la décision (motif, faits retenus, clause des conditions d&apos;utilisation invoquée), les
+            voies de recours et la <strong>date de suppression définitive</strong>.
           </p>
           <ul>
             <li>
-              <strong>Délai</strong> : {LOGO_QUARANTINE_DAYS / 30} mois, la durée pendant laquelle le
-              règlement européen sur les services numériques impose de pouvoir contester une décision
-              de modération (art. 20).
+              <strong>Délai</strong> : {LOGO_QUARANTINE_MONTHS} mois civils, comptés du masquage — le
+              délai de contestation d&apos;une décision de modération que le règlement européen sur les
+              services numériques fixe aux plateformes en ligne (art. 20.1), et que l&apos;association
+              applique.
             </li>
             <li>
               <strong>Sans contestation</strong>, l&apos;image est supprimée définitivement à

@@ -1134,6 +1134,11 @@ async function runMigrations(db: Pool): Promise<void> {
       category ENUM('COPYRIGHT', 'MODERATION', 'BUG', 'RGPD', 'HOSTING', 'OTHER', 'CONTEST') NOT NULL,
       status ENUM('OPEN', 'IN_PROGRESS', 'RESOLVED') NOT NULL DEFAULT 'OPEN',
       parent_report_id BIGINT NULL,
+      -- Contestation seulement : qui conteste, jugé à l'écriture
+      -- (canContestReport) — une personne visée défend une image, l'auteur
+      -- du signalement non. NULL : contestation d'avant la colonne, toutes
+      -- posées par une personne visée.
+      contest_role ENUM('TARGET', 'NOTIFIER') NULL,
       description TEXT NOT NULL,
       page_path VARCHAR(300) NULL,
       reporter_user_id BIGINT NULL,
@@ -1372,6 +1377,11 @@ async function runMigrations(db: Pool): Promise<void> {
     // hébergeur, contestation) : plus de case d'accord, donc pas de date de
     // consentement. Idempotent, rejouable.
     `ALTER TABLE bg_reports MODIFY COLUMN consent_at DATETIME NULL`,
+    // Contestation ouverte à l'auteur du signalement : qui conteste est écrit
+    // avec la contestation, la purge des images masquées ne comptant que celle
+    // d'une personne visée. Aucun remplissage : avant la colonne, seules les
+    // personnes visées pouvaient contester, et `NULL` se lit ainsi.
+    `ALTER TABLE bg_reports ADD COLUMN contest_role ENUM('TARGET', 'NOTIFIER') NULL AFTER parent_report_id`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

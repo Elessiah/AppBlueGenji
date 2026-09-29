@@ -42,7 +42,7 @@
  */
 
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
-import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
@@ -267,7 +267,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Un signalement garde sa catégorie, sa description, les joueurs, équipes ou tournois désignés, le compte de son auteur et, s'il les indique, son nom et son adresse. Il est lu par les administrateurs, puis effacé " +
         `${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après son archivage — plus tard si un logo a été masqué ou supprimé à sa suite, jusqu'à l'échéance de la contestation.`,
       "Si un signalement te vise, toi ou une équipe dont tu es membre, tu reçois un message privé Discord (si ton compte Discord est rattaché ou ton tag certifié). Tu lis ce qui est reproché — jamais qui l'a signalé — et tu peux le contester ; une contestation rouvre un signalement archivé.",
-      `Un logo d'équipe signalé peut être masqué : il n'est plus en ligne, et il est supprimé définitivement au bout de ${LOGO_QUARANTINE_DAYS / 30} mois sans contestation, ou rétabli si la contestation aboutit. Tes coéquipiers et toi en êtes prévenus.`,
+      `Un logo d'équipe signalé peut être masqué : il n'est plus en ligne, et il est supprimé définitivement au bout de ${LOGO_QUARANTINE_MONTHS} mois sans contestation, ou rétabli si la contestation aboutit. Tes coéquipiers et toi en êtes prévenus.`,
       "L'acceptation des conditions d'utilisation (à la création du compte, d'une équipe, ou en recevant la gestion d'une équipe) est enregistrée avec sa date et sa version ; elle figure dans l'export de tes données.",
     ],
   },
@@ -392,6 +392,20 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ces catégories reposent désormais sur l'obligation légale de l'association (RGPD, art. 12 ; règlement européen sur les services numériques, art. 11, 16 et 20), et non plus sur ton consentement : il n'y a donc plus de consentement à retirer pour elles, mais ta demande est toujours traitée. Tu gardes tes droits d'accès et de rectification ; l'effacement attend que la demande soit traitée, l'association étant tenue de la traiter (RGPD, art. 17.3.b).",
       "Une demande RGPD, une demande à l'hébergeur ou une contestation demande une adresse électronique si ton tag Discord n'est pas certifié : le site n'envoie aucun courriel, et sans elle l'association ne pourrait pas te répondre.",
       "L'auteur d'un signalement de droit d'auteur reçoit un accusé de réception, puis la décision prise et les voies de recours, à l'adresse qu'il indique.",
+    ],
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
+  },
+  // L'auteur d'un signalement de contenu peut contester la décision prise (DSA
+  // art. 20.1) : son signalement est donc gardé le temps de ce délai, au lieu
+  // de trente jours après l'archivage — une durée de conservation qui change.
+  {
+    id: "2026-10-signalements-contestation-auteur",
+    publishedAt: "2026-10-01",
+    title: "Signalements : l'auteur peut contester la décision",
+    summary: `Si tu signales un contenu (droit d'auteur, modération) depuis ton compte, tu peux désormais contester la décision prise, y compris celle de ne pas agir. Ton signalement est gardé ${LOGO_QUARANTINE_MONTHS} mois après sa résolution, au lieu de 30 jours, le temps de ce délai.`,
+    details: [
+      "La contestation se fait par la catégorie « Contestation » du formulaire « Signaler un problème », une fois le signalement archivé. Elle est lue par les administrateurs de l'association ; les personnes visées n'en sont pas informées.",
+      `Un signalement de bug, une demande RGPD ou à l'hébergeur, ou un signalement envoyé sans compte, est toujours effacé ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après son archivage — plus tard si un logo ou un avatar a été masqué ou supprimé à sa suite.`,
     ],
     links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
   },

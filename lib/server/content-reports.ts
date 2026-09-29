@@ -35,6 +35,9 @@ import {
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
   REPORT_TARGET_SEARCH_LIMIT,
   REPORT_TARGET_SEARCH_MIN_LENGTH,
+  NOTIFIER_CONTESTABLE_CATEGORIES,
+  notifierMayContest,
+  canContestReport,
   formatContestAlert,
   formatReportAlert,
   formatReportsSaturatedAlert,
@@ -726,12 +729,13 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
   let contestId: number;
   let parentCategory: ReportCategory;
   let reopened = false;
+  let by: "TARGET" | "NOTIFIER";
   let receivedInLastHour: number;
   try {
     await connection.beginTransaction();
     const [parents] = await connection.execute<
-      (RowDataPacket & { category: ReportCategory; status: ReportStatus })[]
-    >(`SELECT category, status FROM bg_reports WHERE id = ? FOR UPDATE`, [parentId]);
+      (RowDataPacket & { category: ReportCategory; status: ReportStatus; reporter_user_id: number | null })[]
+    >(`SELECT category, status, reporter_user_id FROM bg_reports WHERE id = ? FOR UPDATE`, [parentId]);
     if (parents.length === 0) throw new Error("REPORT_NOT_CONCERNED");
     parentCategory = parents[0].category;
 
@@ -740,22 +744,27 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
       [parentId],
     );
     const teamIds = await loadViewerTeamIds(userId, connection);
-    const concerned = isConcernedByReport(
+    const targets = targetRows.map((row) => ({ type: row.target_type, id: Number(row.target_id) }));
+    const allowed = canContestReport(
       { userId, teamIds },
       {
         category: parentCategory,
-        targets: targetRows.map((row) => ({ type: row.target_type, id: Number(row.target_id) })),
+        status: parents[0].status,
+        reporterUserId: parents[0].reporter_user_id === null ? null : Number(parents[0].reporter_user_id),
+        targets,
       },
     );
-    if (!concerned) throw new Error("REPORT_NOT_CONCERNED");
+    if (!allowed) throw new Error("REPORT_NOT_CONCERNED");
+    // Visé **et** auteur, il conteste en visé : c'est ce que l'alerte doit dire.
+    by = isConcernedByReport({ userId, teamIds }, { category: parentCategory, targets }) ? "TARGET" : "NOTIFIER";
 
     receivedInLastHour = await countRecentReports(connection);
 
     const [inserted] = await connection.execute<ResultSetHeader>(
       `INSERT INTO bg_reports
-         (category, parent_report_id, description, page_path, reporter_user_id, contact_email, consent_at)
-       VALUES ('CONTEST', ?, ?, ?, ?, ?, NULL)`,
-      [parentId, submission.description, submission.pagePath, userId, submission.contactEmail],
+         (category, parent_report_id, contest_role, description, page_path, reporter_user_id, contact_email, consent_at)
+       VALUES ('CONTEST', ?, ?, ?, ?, ?, ?, NULL)`,
+      [parentId, by, submission.description, submission.pagePath, userId, submission.contactEmail],
     );
     contestId = Number(inserted.insertId);
 
@@ -779,6 +788,7 @@ async function createContest(submission: ReportSubmission, viewer: ReportViewer)
     parentId,
     parentCategory,
     reopened,
+    by,
     adminUrl: `${siteCanonicalBase()}${reportAdminHref(parentId)}`,
   });
   alertLeadership(receivedInLastHour, message, contestId, true);
@@ -907,8 +917,9 @@ export async function getConcernedReport(reportId: number, viewerUserId: number)
 }
 
 /**
- * Les signalements qui visent ce lecteur (choix du formulaire de
- * contestation), du plus récent au plus ancien.
+ * Les signalements que ce lecteur peut contester (choix du formulaire de
+ * contestation), du plus récent au plus ancien : ceux qui le visent, et ceux
+ * qu'il a envoyés une fois archivés — même règle que `canContestReport`.
  */
 export async function listContestableReports(viewerUserId: number): Promise<ContestableReportOption[]> {
   const teamIds = await loadViewerTeamIds(viewerUserId);
@@ -918,16 +929,19 @@ export async function listContestableReports(viewerUserId: number): Promise<Cont
     clauses.push(`(t.target_type = 'TEAM' AND t.target_id IN (${teamIds.map(() => "?").join(", ")}))`);
     params.push(...teamIds);
   }
+  const notifierCategories = NOTIFIER_CONTESTABLE_CATEGORIES.map(() => "?").join(", ");
+  const queryParams: (number | string)[] = [...params, viewerUserId, ...NOTIFIER_CONTESTABLE_CATEGORIES];
   const db = await getDatabase();
   const [rows] = await db.execute<
     (RowDataPacket & { id: number; category: ReportCategory; status: ReportStatus; created_at: Date | string })[]
   >(
-    `SELECT DISTINCT r.id, r.category, r.status, r.created_at
+    `SELECT r.id, r.category, r.status, r.created_at
      FROM bg_reports r
-     JOIN bg_report_targets t ON t.report_id = r.id
-     WHERE r.category <> 'CONTEST' AND (${clauses.join(" OR ")})
+     WHERE r.category <> 'CONTEST'
+       AND (EXISTS (SELECT 1 FROM bg_report_targets t WHERE t.report_id = r.id AND (${clauses.join(" OR ")}))
+            OR (r.reporter_user_id = ? AND r.status = 'RESOLVED' AND r.category IN (${notifierCategories})))
      ORDER BY r.created_at DESC, r.id DESC`,
-    params,
+    queryParams,
   );
   return rows.map((row) => ({
     id: Number(row.id),
@@ -1059,7 +1073,14 @@ export async function listReports(): Promise<ReportView[]> {
       createdAt: toIso(row.created_at) ?? new Date().toISOString(),
       updatedAt: toIso(row.updated_at) ?? new Date().toISOString(),
       resolvedAt: resolvedAt ? resolvedAt.toISOString() : null,
-      purgeAt: row.status === "RESOLVED" && resolvedAt ? reportRetainedUntil(resolvedAt, held).toISOString() : null,
+      purgeAt:
+        row.status === "RESOLVED" && resolvedAt
+          ? reportRetainedUntil(
+              resolvedAt,
+              held,
+              notifierMayContest({ category: row.category, reporterUserId: row.reporter_user_id }),
+            ).toISOString()
+          : null,
       reporter: person(row.reporter_user_id, row.reporter_pseudo),
       contactName: row.contact_name,
       contactEmail: row.contact_email,
@@ -1219,9 +1240,7 @@ const ACTION_AUDIT_LABELS: Record<ReportAction, string> = {
  */
 export async function purgeExpiredReports(): Promise<number> {
   const db = await getDatabase();
-  const [result] = await db.execute<ResultSetHeader>(
-    `DELETE FROM bg_reports
-     WHERE status = 'RESOLVED'
+  const expired = `status = 'RESOLVED'
        AND parent_report_id IS NULL
        AND resolved_at < NOW() - INTERVAL ${Number(REPORT_RETENTION_DAYS_AFTER_RESOLUTION)} DAY
        -- Un logo encore masqué au titre de ce signalement le garde : c'est sur
@@ -1232,10 +1251,40 @@ export async function purgeExpiredReports(): Promise<number> {
          SELECT 1 FROM bg_logo_quarantines q
          WHERE q.report_id = bg_reports.id
            AND (q.status = 'HIDDEN' OR (q.status = 'PURGED' AND q.purge_after > NOW()))
-       )`,
-  );
-  return Number(result.affectedRows);
+       )`;
+  // Les notifications que leur auteur peut contester restent six mois civils
+  // (`reportRetainedUntil`) : ce délai se compte au calendrier de Paris, que
+  // SQL ne connaît pas — les candidates sont donc relues et jugées ici, par la
+  // même fonction que la date affichée au panneau.
+  const [candidates] = await db.execute<
+    (RowDataPacket & { id: number; category: ReportCategory; reporter_user_id: number | null; resolved_at: Date | string })[]
+  >(`SELECT id, category, reporter_user_id, resolved_at FROM bg_reports WHERE ${expired}`);
+  const now = Date.now();
+  const due = candidates
+    .filter((row) => {
+      const heldForNotifier = notifierMayContest({
+        category: row.category,
+        reporterUserId: row.reporter_user_id === null ? null : Number(row.reporter_user_id),
+      });
+      return reportRetainedUntil(new Date(row.resolved_at), [], heldForNotifier).getTime() <= now;
+    })
+    .map((row) => Number(row.id));
+  let deleted = 0;
+  for (let start = 0; start < due.length; start += PURGE_BATCH_SIZE) {
+    const batch = due.slice(start, start + PURGE_BATCH_SIZE);
+    // Les conditions sont reposées : un signalement rouvert par une
+    // contestation entre la lecture et l'effacement ne part pas.
+    const [result] = await db.execute<ResultSetHeader>(
+      `DELETE FROM bg_reports WHERE id IN (${batch.map(() => "?").join(", ")}) AND ${expired}`,
+      batch,
+    );
+    deleted += Number(result.affectedRows);
+  }
+  return deleted;
 }
+
+/** Signalements effacés par instruction : borne la taille d'une liste `IN`. */
+const PURGE_BATCH_SIZE = 500;
 
 const PURGE_INTERVAL_MS = 60 * 60 * 1000;
 const purgeState = globalThis as typeof globalThis & { __bgReportsPurgedAt?: number };

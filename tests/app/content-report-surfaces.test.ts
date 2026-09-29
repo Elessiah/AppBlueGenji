@@ -116,7 +116,7 @@ describe("politique de confidentialité et registre", () => {
     const rgpd = read("app/rgpd/page.tsx");
     expect(rgpd).toContain('id="signalements"');
     expect(rgpd).toContain("Le droit de contestation");
-    expect(rgpd).toContain("LOGO_QUARANTINE_DAYS");
+    expect(rgpd).toContain("LOGO_QUARANTINE_MONTHS");
     expect(rgpd).toContain("REPORT_RETENTION_DAYS_AFTER_RESOLUTION");
   });
 

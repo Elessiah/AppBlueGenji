@@ -11,7 +11,7 @@ import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "@/lib/shared/co
 import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
-import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
+import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 
 /**
  * Lien externe vers le règlement intérieur (Google Docs).
@@ -254,7 +254,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         <p>
           Un logo d&apos;équipe ou un avatar de joueur signalé peut être <strong>masqué</strong>{" "}
           sans délai : il cesse d&apos;être en ligne, et l&apos;équipe ou le joueur en est prévenu.
-          Il ou elle dispose alors de <strong>{LOGO_QUARANTINE_DAYS / 30} mois</strong> pour
+          Il ou elle dispose alors de <strong>{LOGO_QUARANTINE_MONTHS} mois</strong> pour
           contester depuis la page du signalement ; sans contestation, l&apos;image est supprimée
           définitivement, et si la contestation aboutit, elle est rétablie. Le détail du traitement
           de vos données dans ce cadre figure dans la{" "}

@@ -29,10 +29,17 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
      message part avant que l'association ait rien lu, et sans cette borne le
      formulaire servirait à faire écrire le bot en boucle à une équipe entière.
      Le signalement de plus reste contestable depuis le formulaire.
-3. **Contester.** Seule une personne visée peut contester
-   (`isConcernedByReport`), depuis `/signalements/[id]` ou par la catégorie
-   « Contestation » du même formulaire. Une contestation d'un signalement
-   **archivé le rouvre**, et la direction est prévenue.
+3. **Contester** (`canContestReport`). Une personne visée conteste à tout
+   moment (`isConcernedByReport`), depuis `/signalements/[id]` ou par la
+   catégorie « Contestation » du même formulaire. L'**auteur d'un signalement
+   de contenu** (`NOTIFIER_CONTESTABLE_CATEGORIES` : droit d'auteur, modération)
+   conteste la décision prise — y compris celle de ne pas agir (art. 20.1 DSA,
+   réclamation de l'auteur d'une notification) — par la même catégorie, **une
+   fois le dossier archivé** et s'il a signalé depuis son compte (seul moyen de
+   le reconnaître) ; `/signalements/[id]` ne lui est pas ouverte, elle montre
+   aux visés ce qui les concerne. Une contestation d'un signalement **archivé le
+   rouvre**, et la direction est prévenue — l'alerte dit si elle vient d'une
+   personne visée ou de l'auteur.
 4. **Traiter.** `/admin/signalements` (permission `moderation`, réservée à
    `ADMIN`) : prise en charge, masquage ou suppression d'un logo, archivage avec
    une note, réouverture.
@@ -155,7 +162,14 @@ effacé `REPORT_RETENTION_DAYS_AFTER_RESOLUTION` (30) jours plus tard, cibles et
 contestations comprises (cascade) — **sauf** s'il tient encore une image
 masquée (logo ou avatar), ou une image supprimée dont le délai de contestation
 court : il est gardé jusqu'à cette échéance (la personne concernée doit
-pouvoir contester). La suppression d'un compte
+pouvoir contester). Une notification de contenu envoyée depuis un compte
+(`notifierMayContest`) est gardée **six mois civils** après l'archivage, le
+délai où son auteur peut contester la décision : effacée au trentième jour, elle
+ne serait plus contestable. Ce délai se compte au calendrier de Paris, que SQL
+ne connaît pas : `purgeExpiredReports` relit les candidates et les juge par
+`reportRetainedUntil` — la même fonction que la date affichée au panneau —, puis
+efface par lots en reposant les conditions (un dossier rouvert entre-temps
+reste). La suppression d'un compte
 visé efface le pseudo relevé sur ses cibles (`label_snapshot`) : le panneau
 retombe sinon sur ce relevé dès que le compte n'est plus vivant. La purge est **datée**, donc une base restaurée d'une sauvegarde se
 repurge d'elle-même. Elle tourne à chaque envoi, à chaque ouverture du panneau,
@@ -204,7 +218,10 @@ et au plus une fois par heure depuis la mise en page racine
 
 ## Données
 
-`bg_reports` (dont `parent_report_id` pour une contestation) et
+`bg_reports` (dont `parent_report_id` pour une contestation, et `contest_role` —
+`TARGET` ou `NOTIFIER`, écrit à la contestation, `NULL` pour celles d'avant la
+colonne, toutes de personnes visées : seule une contestation `TARGET` retient
+une image masquée à l'échéance) et
 `bg_report_targets` (sans clé étrangère vers la cible : une équipe dissoute
 n'emporte pas le signalement ; `label_snapshot` garde le nom ; `notified_at`
 dit si la cible a réellement été prévenue — c'est lui, et non la seule

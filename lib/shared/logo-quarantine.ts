@@ -11,9 +11,12 @@
  * définitivement à l'échéance ; si la contestation aboutit, il est rétabli
  * tel quel.
  *
- * **Six mois**, et pas moins : c'est la durée pendant laquelle le règlement
- * européen sur les services numériques impose de pouvoir contester une
- * décision de modération (art. 20.1, « au moins six mois »). Rien n'oblige à
+ * **Six mois civils**, et pas moins : c'est le délai de contestation d'une
+ * décision de modération que le règlement européen sur les services numériques
+ * fixe aux plateformes en ligne (art. 20.1, « au moins six mois »), et que
+ * l'association applique. Six mois **civils** et non 180 jours : 180 jours
+ * sont plus courts que six mois à partir d'un 1er mars (184), si bien que la
+ * date annoncée tombait avant l'échéance revendiquée. Rien n'oblige à
  * supprimer plus tôt un logo d'équipe ou un avatar ; les garder plus
  * longtemps n'aurait plus d'objet.
  *
@@ -28,9 +31,11 @@
  */
 import { ANONYMOUS_PLAYER_LABEL } from "./log-privacy";
 import { discordInline } from "./discord-text";
+// Type seul : `content-reports.ts` importe les valeurs de ce module.
+import type { ReportCategory } from "./content-reports";
 
-/** Durée de la quarantaine avant suppression définitive, en jours. */
-export const LOGO_QUARANTINE_DAYS = 180;
+/** Durée de la quarantaine avant suppression définitive, en mois civils. */
+export const LOGO_QUARANTINE_MONTHS = 6;
 
 /** État d'un logo mis en quarantaine. */
 export type LogoQuarantineStatus = "HIDDEN" | "RESTORED" | "PURGED";
@@ -59,9 +64,55 @@ export interface LogoQuarantineView {
   closedAt: string | null;
 }
 
-/** Échéance de la suppression définitive d'un logo masqué à `hiddenAt`. */
+const PARIS_PARTS = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Europe/Paris",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "numeric",
+  day: "numeric",
+  hour: "numeric",
+  minute: "numeric",
+  second: "numeric",
+});
+
+/** L'heure de Paris d'un instant, écrite comme si c'était de l'UTC (ms, à la seconde). */
+function parisWallClock(instant: number): number {
+  const parts: Record<string, number> = {};
+  for (const part of PARIS_PARTS.formatToParts(new Date(instant))) {
+    if (part.type !== "literal") parts[part.type] = Number(part.value);
+  }
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+}
+
+const HOUR_MS = 60 * 60 * 1000;
+
+/**
+ * Échéance de la suppression définitive d'une image masquée à `hiddenAt` :
+ * **six mois civils plus tard, au calendrier de Paris** — celui de la date
+ * annoncée à l'équipe (`formatQuarantineDate`). Compter au calendrier UTC ne
+ * suffit pas : masqué le 1er mars à 0 h 30 à Paris (le 28 février en UTC), le
+ * logo aurait été supprimé le 29 août au lieu du 1er septembre.
+ *
+ * Un quantième absent du mois d'arrivée (31 août + 6 mois) déborde sur le mois
+ * suivant : le délai s'allonge de quelques jours, il ne raccourcit jamais. Pour
+ * la même raison, une heure avalée par un changement d'heure est rendue.
+ */
 export function logoQuarantinePurgeDate(hiddenAt: Date): Date {
-  return new Date(hiddenAt.getTime() + LOGO_QUARANTINE_DAYS * 24 * 60 * 60 * 1000);
+  const from = new Date(parisWallClock(hiddenAt.getTime()));
+  const target = Date.UTC(
+    from.getUTCFullYear(),
+    from.getUTCMonth() + LOGO_QUARANTINE_MONTHS,
+    from.getUTCDate(),
+    from.getUTCHours(),
+    from.getUTCMinutes(),
+    from.getUTCSeconds(),
+  );
+  // Heure de Paris → instant : l'écart du fuseau se lit à l'arrivée ; deux
+  // passes le stabilisent autour d'un changement d'heure.
+  let instant = target - (parisWallClock(target) - target);
+  instant = target - (parisWallClock(instant) - instant);
+  while (parisWallClock(instant) < target) instant += HOUR_MS;
+  return new Date(instant + hiddenAt.getUTCMilliseconds());
 }
 
 /**
@@ -96,18 +147,107 @@ export function formatQuarantineDate(date: Date): string {
   });
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Exposé des motifs d'une décision sur une image.
+//
+// Masquer ou supprimer une image est une décision de modération : la personne
+// concernée doit en recevoir les motifs (DSA, art. 17.3) — ce qui est décidé,
+// les faits retenus, le recours ou non à un traitement automatisé, le
+// fondement (clause des conditions d'utilisation ou droit d'un tiers) et les
+// voies de recours, internes **et** judiciaires. Chaque message ci-dessous les
+// donne dans cet ordre ; la phrase de réponse suit le motif, un logo retiré
+// comme contraire aux règles n'ayant rien à répondre sur ses droits d'auteur.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Ce qui fonde une décision sur une image : l'atteinte présumée aux droits
+ * d'un tiers (signalement de droit d'auteur), ou les règles du site (tout le
+ * reste, retrait décidé hors de tout signalement compris).
+ */
+export type ModerationGrounds = "THIRD_PARTY_RIGHTS" | "SITE_RULES";
+
+/** Le fondement d'une décision prise à la suite d'un signalement de cette catégorie (`null` : hors signalement). */
+export function moderationGroundsFor(category: ReportCategory | null): ModerationGrounds {
+  return category === "COPYRIGHT" ? "THIRD_PARTY_RIGHTS" : "SITE_RULES";
+}
+
+/** Ancre des conditions d'utilisation où se lit la clause invoquée (`TERMS_SECTIONS`). */
+export const MODERATION_TERMS_ANCHOR = "contenus";
+
+const GROUNDS_TEXT: Record<
+  ModerationGrounds,
+  { reason: string; clause: string; answer: { you: string; yall: string } }
+> = {
+  THIRD_PARTY_RIGHTS: {
+    reason: "atteinte présumée au droit d'auteur ou aux droits d'un tiers",
+    clause:
+      "conditions d'utilisation, « Contenus publiés par les membres » (qui publie une image garantit en détenir les droits)",
+    answer: {
+      you: "si tu en détiens les droits (création, licence, autorisation du titulaire), dis-le",
+      yall: "si vous en détenez les droits (création, licence, autorisation du titulaire), dites-le",
+    },
+  },
+  SITE_RULES: {
+    reason: "image jugée contraire aux conditions d'utilisation du site",
+    clause: "conditions d'utilisation, « Contenus publiés par les membres » et « Comportement »",
+    answer: {
+      you: "si tu estimes que l'image respecte les règles, explique pourquoi",
+      yall: "si vous estimez que l'image respecte les règles, expliquez pourquoi",
+    },
+  },
+};
+
+/**
+ * Motif, faits, mode de décision et fondement — les éléments de l'exposé des
+ * motifs communs à tous les messages. `termsUrl` mène à la clause invoquée.
+ */
+function decisionGroundsText(input: { grounds: ModerationGrounds; fromReport: boolean; termsUrl: string }): string {
+  const text = GROUNDS_TEXT[input.grounds];
+  const facts = input.fromReport
+    ? "un signalement visant cette image, consultable avec ce qu'il reproche sur la page indiquée plus bas"
+    : "constat de la modération, sans signalement préalable";
+  return (
+    `Motif : ${text.reason}. Faits retenus : ${facts}. ` +
+    `Décision prise par un membre de la modération, sans traitement automatisé. ` +
+    `Fondement : ${text.clause} — ${input.termsUrl}.`
+  );
+}
+
+/**
+ * Voies de recours : la contestation auprès de l'association (par la page du
+ * signalement, ou par le formulaire hors signalement), puis le juge.
+ */
+function redressText(input: { grounds: ModerationGrounds; url: string | null; plural: boolean }): string {
+  const answer = GROUNDS_TEXT[input.grounds].answer[input.plural ? "yall" : "you"];
+  const internal = input.url
+    ? `${input.plural ? "contestez" : "conteste"} la décision ici : ${input.url} — ${answer}`
+    : `${input.plural ? "écrivez" : "écris"} à l'association (« Signaler un problème », en bas de chaque page) — ${answer}`;
+  const judicial = input.plural
+    ? "Vous pouvez aussi porter la décision devant le juge compétent."
+    : "Tu peux aussi porter la décision devant le juge compétent.";
+  return `Recours : ${internal}. ${judicial}`;
+}
+
 /**
  * Message privé aux membres d'une équipe dont le logo vient d'être masqué.
  *
  * Il nomme **leur** équipe (c'est à ses membres qu'il s'adresse), dit la
- * conséquence, l'échéance et le moyen de l'empêcher — et rien de l'auteur du
- * signalement.
+ * décision et ses motifs, l'échéance et le moyen de l'empêcher — et rien de
+ * l'auteur du signalement.
  */
-export function formatLogoHiddenNotice(input: { teamName: string; purgeAfter: Date; url: string }): string {
+export function formatLogoHiddenNotice(input: {
+  teamName: string;
+  purgeAfter: Date;
+  url: string;
+  grounds: ModerationGrounds;
+  termsUrl: string;
+}): string {
   return (
-    `🙈 BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été masqué à la suite d'un signalement. ` +
+    `🙈 BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été masqué à la suite d'un signalement : ` +
+    `il n'est plus en ligne, mais il est conservé pour pouvoir être rétabli. ` +
+    `${decisionGroundsText({ grounds: input.grounds, fromReport: true, termsUrl: input.termsUrl })} ` +
     `Sans contestation de votre part, il sera supprimé définitivement le ${formatQuarantineDate(input.purgeAfter)}. ` +
-    `Si vous en détenez les droits, contestez ici : ${input.url}`
+    redressText({ grounds: input.grounds, url: input.url, plural: true })
   );
 }
 
@@ -126,19 +266,23 @@ export function isImmediateLogoRemoval(view: Pick<LogoQuarantineView, "status" |
  * Message privé aux membres d'une équipe dont le logo vient d'être supprimé
  * sans délai (contenu manifestement illicite).
  *
- * Même règle que le masquage : l'équipe apprend la décision et le moyen d'y
- * répondre (DSA art. 17 et 20). Le lien mène au signalement quand la
+ * Même règle que le masquage : l'équipe apprend la décision, ses motifs et le
+ * moyen d'y répondre (DSA art. 17). Le lien mène au signalement quand la
  * suppression en découle ; retiré depuis la fiche de l'équipe, hors de tout
  * signalement, le logo n'a pas de page à contester — le message renvoie alors
  * vers l'association.
  */
-export function formatLogoRemovedNotice(input: { teamName: string; url: string | null }): string {
-  const answer = input.url
-    ? `Si vous en détenez les droits, contestez ici : ${input.url}`
-    : "Si vous en détenez les droits, écrivez à l'association (« Signaler un problème », en bas de chaque page).";
+export function formatLogoRemovedNotice(input: {
+  teamName: string;
+  url: string | null;
+  grounds: ModerationGrounds;
+  termsUrl: string;
+}): string {
   return (
     `🗑️ BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été supprimé par la modération du site` +
-    `${input.url ? " à la suite d'un signalement" : ""}. ${answer}`
+    `${input.url ? " à la suite d'un signalement" : ""}. ` +
+    `${decisionGroundsText({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl })} ` +
+    redressText({ grounds: input.grounds, url: input.url, plural: true })
   );
 }
 
@@ -166,11 +310,18 @@ export function formatLogoHiddenLog(input: { teamName: string; reportId: number;
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** Message privé au joueur dont l'avatar vient d'être masqué. */
-export function formatAvatarHiddenNotice(input: { purgeAfter: Date; url: string }): string {
+export function formatAvatarHiddenNotice(input: {
+  purgeAfter: Date;
+  url: string;
+  grounds: ModerationGrounds;
+  termsUrl: string;
+}): string {
   return (
-    `🙈 BlueGenji — Ton avatar a été masqué à la suite d'un signalement. ` +
+    `🙈 BlueGenji — Ton avatar a été masqué à la suite d'un signalement : ` +
+    `il n'est plus en ligne, mais il est conservé pour pouvoir être rétabli. ` +
+    `${decisionGroundsText({ grounds: input.grounds, fromReport: true, termsUrl: input.termsUrl })} ` +
     `Sans contestation de ta part, il sera supprimé définitivement le ${formatQuarantineDate(input.purgeAfter)}. ` +
-    `Si tu en détiens les droits, conteste-le ici : ${input.url}`
+    redressText({ grounds: input.grounds, url: input.url, plural: false })
   );
 }
 
@@ -179,13 +330,16 @@ export function formatAvatarHiddenNotice(input: { purgeAfter: Date; url: string 
  * (contenu manifestement illicite) — ou par la modération, hors de tout
  * signalement (`url` alors `null`, comme `formatLogoRemovedNotice`).
  */
-export function formatAvatarRemovedNotice(input: { url: string | null }): string {
-  const answer = input.url
-    ? `Si tu en détiens les droits, conteste-le ici : ${input.url}`
-    : "Si tu en détiens les droits, écris à l'association (« Signaler un problème », en bas de chaque page).";
+export function formatAvatarRemovedNotice(input: {
+  url: string | null;
+  grounds: ModerationGrounds;
+  termsUrl: string;
+}): string {
   return (
     `🗑️ BlueGenji — Ton avatar a été supprimé par la modération du site` +
-    `${input.url ? " à la suite d'un signalement" : ""}. ${answer}`
+    `${input.url ? " à la suite d'un signalement" : ""}. ` +
+    `${decisionGroundsText({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl })} ` +
+    redressText({ grounds: input.grounds, url: input.url, plural: false })
   );
 }
 
