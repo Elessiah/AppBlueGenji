@@ -17,6 +17,12 @@
   grid-template-columns: auto minmax(6em, 1fr) auto auto auto auto auto auto;
 }
 
+/* Cellule d'action : `display` vit ici et jamais en ligne, où il battrait le
+   masquage des cellules vides sous 720 px. */
+.swissAction {
+  display: flex;
+}
+
 /* --- Survie : cellule d'action d'une ligne ---------------- */
 .survivalRow {
   display: flex;

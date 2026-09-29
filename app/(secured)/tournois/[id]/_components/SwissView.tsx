@@ -315,7 +315,7 @@ export function SwissView({
                           {meta.label}
                         </span>
                         {anyForfeitable && (
-                          <span role="cell" className={styles.swissAction} style={{ display: "flex" }}>
+                          <span role="cell" className={styles.swissAction}>
                             {forfeitable && (
                               <button
                                 type="button"

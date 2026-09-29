@@ -68,6 +68,8 @@ describe("Classements — action sous le nom sous 720 px", () => {
     expect(swiss).not.toContain("gridTemplateColumns: standingsColumns");
     expect(swiss).toContain("className={styles.swissTable}");
     expect(swiss.match(/className=\{styles\.swissAction\}/g)).toHaveLength(2);
+    // Aucun `display` en ligne sur la cellule : il battrait son masquage étroit.
+    expect(swiss).not.toMatch(/className=\{styles\.swissAction\}\s+style=/);
   });
 
   it("le bouton d'abandon de la survie vit dans sa cellule d'action", () => {
