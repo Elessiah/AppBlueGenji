@@ -74,6 +74,15 @@ describe("useProgressiveList", () => {
   });
 });
 
+describe("useProgressiveList (source)", () => {
+  // Une clé seulement comparée, jamais réécrite, ferait revenir la liste
+  // dépliée dès qu'on rétablit les filtres d'avant : l'état se réécrit au rendu.
+  it("réécrit l'état quand les filtres changent", () => {
+    const source = readSource("lib/shared/hooks/useProgressiveList.ts");
+    expect(source).toMatch(/if \(state\.key !== resetKey\) \{[^}]*setState\(\{ key: resetKey/);
+  });
+});
+
 describe("DirectoryShowMore", () => {
   it("disparaît quand tout est affiché", () => {
     expect(renderToStaticMarkup(<DirectoryShowMore hidden={0} noun="joueurs" onShowMore={noop} />)).toBe("");

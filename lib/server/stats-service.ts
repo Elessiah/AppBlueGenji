@@ -165,13 +165,15 @@ function isoOrEpoch(value: Date | string | null | undefined): string {
  * Byes (`is_bye`) et matchs fantômes (une équipe manquante) sont écartés : leur
  * score est posé par le moteur de tournoi, pas joué — les compter gonflerait
  * artificiellement bilans et séries.
+ *
+ * `null` = les matchs de tout le site (annuaire) : aucune liste `IN`.
  */
 async function loadMatchRows(
   db: Awaited<ReturnType<typeof getDatabase>>,
-  teamIds: number[],
+  teamIds: number[] | null,
 ): Promise<MatchStatRow[]> {
-  if (teamIds.length === 0) return [];
-  const list = placeholders(teamIds.length);
+  if (teamIds !== null && teamIds.length === 0) return [];
+  const list = teamIds === null ? "" : placeholders(teamIds.length);
   const [rows] = await db.execute<MatchStatRow[]>(
     `SELECT
       m.id,
@@ -197,19 +199,20 @@ async function loadMatchRows(
      JOIN bg_tournaments t ON t.id = m.tournament_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-     WHERE ${PLAYED_MATCH_SQL}
-       AND (m.team1_id IN (${list}) OR m.team2_id IN (${list}))
+     WHERE ${PLAYED_MATCH_SQL}${teamIds === null ? "" : `
+       AND (m.team1_id IN (${list}) OR m.team2_id IN (${list}))`}
      ORDER BY played_at ASC, m.id ASC`,
-    [...teamIds, ...teamIds],
+    teamIds === null ? [] : [...teamIds, ...teamIds],
   );
   return rows;
 }
 
+/** Inscriptions d'un ensemble d'équipes ; `null` = tout le site (annuaire). */
 async function loadRegistrationRows(
   db: Awaited<ReturnType<typeof getDatabase>>,
-  teamIds: number[],
+  teamIds: number[] | null,
 ): Promise<RegistrationStatRow[]> {
-  if (teamIds.length === 0) return [];
+  if (teamIds !== null && teamIds.length === 0) return [];
   const [rows] = await db.execute<RegistrationStatRow[]>(
     `SELECT
       r.team_id,
@@ -223,10 +226,10 @@ async function loadRegistrationRows(
       t.start_at,
       t.finished_at
      FROM bg_tournament_registrations r
-     JOIN bg_tournaments t ON t.id = r.tournament_id
-     WHERE r.team_id IN (${placeholders(teamIds.length)})
+     JOIN bg_tournaments t ON t.id = r.tournament_id${teamIds === null ? "" : `
+     WHERE r.team_id IN (${placeholders(teamIds.length)})`}
      ORDER BY played_at DESC`,
-    teamIds,
+    teamIds === null ? [] : teamIds,
   );
   return rows;
 }
@@ -557,9 +560,13 @@ async function loadRecords(userIds: number[] | null): Promise<Map<number, Player
   ];
   if (teamIds.length === 0) return records;
 
+  // Tout le site : matchs et inscriptions sont lus sans liste d'équipes (elle
+  // porterait un paramètre par équipe, trois fois) ; `groupByTeam` ne garde
+  // ensuite que les équipes des joueurs.
+  const scope = userIds === null ? null : teamIds;
   const [matchRows, registrationRows] = await Promise.all([
-    loadMatchRows(db, teamIds),
-    loadRegistrationRows(db, teamIds),
+    loadMatchRows(db, scope),
+    loadRegistrationRows(db, scope),
   ]);
 
   // Les lignes sont rangées **une fois** par équipe : filtrer toutes les lignes

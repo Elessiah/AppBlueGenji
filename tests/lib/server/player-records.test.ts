@@ -137,6 +137,12 @@ describe("loadPlayerRecords", () => {
     expect(sql).toMatch(/FROM bg_teams\s+WHERE solo_user_id IS NOT NULL/);
     expect(params).toEqual([]);
     expect(execute).toHaveBeenCalledTimes(3);
+    // Matchs et inscriptions non plus : la liste des équipes du site y
+    // porterait un paramètre par équipe, trois fois.
+    for (const [text, values] of execute.mock.calls.slice(1) as [string, unknown[]][]) {
+      expect(text).not.toMatch(/\bIN \(/);
+      expect(values).toEqual([]);
+    }
     expect(records.get(7)).toEqual({ wins: 1, losses: 0, tournamentsPlayed: 1 });
   });
 
