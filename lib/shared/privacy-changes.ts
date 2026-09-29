@@ -253,7 +253,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Jusqu'ici, te connecter par Discord (bouton ou code en message privé) certifiait ton tag Discord, donc le rendait lisible des administrateurs, des arbitres pendant tes tournois, et des joueurs et du caster de tes matchs. Désormais, la connexion enregistre seulement ton pseudo Discord, invisible de tous ; c'est le bouton « Certifier mon tag » de « Mon profil » qui l'ouvre à l'organisation.",
       "Si ton tag a été certifié automatiquement, il le reste : l'organisation peut toujours te joindre pendant un tournoi. Pour retirer cette exposition, retire ton tag dans « Mon profil » : ta prochaine connexion par Discord le réenregistrera sans le certifier.",
-      "Le pseudo, les identifiants de connexion et le compte reposent sur l'exécution du service que tu demandes, et non plus sur un consentement : la politique de confidentialité le précise.",
+      "Le pseudo, les identifiants de connexion et le compte reposent sur l'exécution du service que tu demandes, et non plus sur un consentement : la politique de confidentialité le précise. L'invite Google One Tap de la page de connexion ne s'affiche plus que si tu la demandes, par une case décochée par défaut.",
     ],
   },
   // L'invite Google One Tap est retirée : plus aucune page ne fait appel à
@@ -266,7 +266,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "L'invite « Continuer avec Google » de la page de connexion est retirée : aucune page du site ne fait plus appel à Google dans ton navigateur. La politique de confidentialité nomme désormais chaque destinataire de tes données et les transferts hors de l'Union.",
     details: [
-      "La case « Google One Tap » disparaît. Le cookie « g_state » que Google pouvait déposer n'est plus posé, et celui qui resterait est effacé à ta prochaine visite de la page de connexion. Se connecter par Google passe toujours par le bouton de la page de connexion.",
+      "La case « Google One Tap » disparaît. Le cookie « g_state » que Google pouvait déposer n'est plus posé, et celui qui resterait est effacé à ta prochaine visite du site. Se connecter par Google passe toujours par le bouton de la page de connexion.",
       "Le site et le bot sont hébergés en France (à Caen). Une nouvelle section « Destinataires et transferts » de la politique de confidentialité dit ce qui part chez Discord, Google, Blizzard, le service de push de ton navigateur et Microsoft (sauvegardes chiffrées), et sur quel fondement un transfert vers les États-Unis repose.",
       "Rien ne change pour ton compte : les moyens de connexion (hors l'invite) et les données conservées restent les mêmes.",
     ],
