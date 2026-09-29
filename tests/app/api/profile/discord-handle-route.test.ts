@@ -23,6 +23,9 @@ import { authUser } from "../../../helpers/auth-user";
  * gestes partageant leurs refus.
  */
 
+/** Jeton de défi bien formé (32 caractères base64url), qui ne désigne personne. */
+const CHALLENGE = "A".repeat(32);
+
 const USER = authUser({ id: 7 });
 
 const call = (handler: typeof POST, method: "POST" | "PUT", body: unknown) =>
@@ -49,7 +52,7 @@ describe("POST /api/profile/discord/handle", () => {
     jest.mocked(getCurrentUser).mockResolvedValue(null);
     expect((await post({ handle: "keryan" })).status).toBe(401);
     expect(
-      (await put({ discordId: "900000000000000001", code: "123456" })).status,
+      (await put({ challenge: CHALLENGE, code: "123456" })).status,
     ).toBe(401);
     expect(startDiscordHandleUpdate).not.toHaveBeenCalled();
   });
@@ -57,7 +60,7 @@ describe("POST /api/profile/discord/handle", () => {
   it("envoie le code et rend l'identifiant visé", async () => {
     jest.mocked(startDiscordHandleUpdate).mockResolvedValue({
       status: "CODE_SENT",
-      discordId: "900000000000000001",
+      challenge: CHALLENGE,
       expiresAt: "2026-09-20T12:10:00.000Z",
     });
 
@@ -66,7 +69,7 @@ describe("POST /api/profile/discord/handle", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({
       status: "CODE_SENT",
-      discordId: "900000000000000001",
+      challenge: CHALLENGE,
     });
     expect(startDiscordHandleUpdate).toHaveBeenCalledWith(
       7,
@@ -108,7 +111,7 @@ describe("POST /api/profile/discord/handle", () => {
         g?.("900000000000000001");
         return {
           status: "CODE_SENT",
-          discordId: "900000000000000001",
+          challenge: CHALLENGE,
           expiresAt: "x",
         };
       });
@@ -128,7 +131,7 @@ describe("PUT /api/profile/discord/handle", () => {
       .mockResolvedValue({ tag: "keryan" });
 
     const response = await put({
-      discordId: "900000000000000001",
+      challenge: CHALLENGE,
       code: "123456",
       tag: "autre",
     });
@@ -138,18 +141,15 @@ describe("PUT /api/profile/discord/handle", () => {
       status: "UPDATED",
       tag: "keryan",
     });
-    expect(confirmDiscordHandleUpdate).toHaveBeenCalledWith(
-      7,
-      "900000000000000001",
-      "123456",
-    );
+    expect(confirmDiscordHandleUpdate).toHaveBeenCalledWith(7, CHALLENGE, "123456");
+
   });
 
   it("refuse un code mal formé sans rien consommer", async () => {
     expect(
-      (await put({ discordId: "900000000000000001", code: "12" })).status,
+      (await put({ challenge: CHALLENGE, code: "12" })).status,
     ).toBe(400);
-    expect((await put({ discordId: "abc", code: "123456" })).status).toBe(400);
+    expect((await put({ challenge: "pas-un-jeton", code: "123456" })).status).toBe(400);
     expect(confirmDiscordHandleUpdate).not.toHaveBeenCalled();
   });
 
@@ -158,14 +158,14 @@ describe("PUT /api/profile/discord/handle", () => {
       .mocked(confirmDiscordHandleUpdate)
       .mockRejectedValue(new Error("CODE_INVALID_OR_EXPIRED"));
     expect(
-      (await put({ discordId: "900000000000000001", code: "000000" })).status,
+      (await put({ challenge: CHALLENGE, code: "000000" })).status,
     ).toBe(401);
   });
 
   it("ne laisse sortir qu'un code générique d'une panne sans nom", async () => {
     jest.mocked(confirmDiscordHandleUpdate).mockRejectedValue(new Error(""));
     const response = await put({
-      discordId: "900000000000000001",
+      challenge: CHALLENGE,
       code: "123456",
     });
     expect(response.status).toBe(500);

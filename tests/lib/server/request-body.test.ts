@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/request-body";
 import { IMAGE_UPLOAD_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
+import { UNSUPPORTED_CONTENT_TYPE } from "@/lib/shared/request-origin";
 import { IMAGE_UPLOAD_MAX_BYTES } from "@/lib/shared/uploads";
 
 /**
@@ -75,26 +76,66 @@ describe("readBodyBytes", () => {
   });
 });
 
+/** Un envoi JSON, tel que le pose l'écran. */
+function jsonRequest(body: string, contentType = "application/json"): Request {
+  return new Request("http://localhost/api/test", {
+    method: "POST",
+    headers: { "content-type": contentType },
+    body,
+  });
+}
+
 describe("readJsonBody", () => {
   it("analyse un corps JSON sous la borne", async () => {
-    const req = new Request("http://localhost/api/test", { method: "POST", body: JSON.stringify({ a: 1 }) });
-    await expect(readJsonBody(req)).resolves.toEqual({ a: 1 });
+    await expect(readJsonBody(jsonRequest(JSON.stringify({ a: 1 })))).resolves.toEqual({ a: 1 });
   });
 
   it("rejette un corps illisible, comme req.json()", async () => {
-    const req = new Request("http://localhost/api/test", { method: "POST", body: "{" });
-    await expect(readJsonBody(req)).rejects.toThrow(SyntaxError);
+    await expect(readJsonBody(jsonRequest("{"))).rejects.toThrow(SyntaxError);
   });
 
   it("refuse au-delà de la borne donnée", async () => {
-    const req = new Request("http://localhost/api/test", {
-      method: "POST",
-      body: JSON.stringify({ description: "x".repeat(200) }),
-    });
+    const req = jsonRequest(JSON.stringify({ description: "x".repeat(200) }));
     const error = await readJsonBody(req, 100).catch((caught: unknown) => caught);
     expect(isPayloadTooLarge(error)).toBe(true);
   });
+
+  /**
+   * Le formulaire `enctype=text/plain` dont le nom de champ reconstitue un JSON
+   * valide : `req.json()` le lisait comme un envoi de l'écran.
+   */
+  it.each([
+    ["text/plain"],
+    ["text/plain;charset=UTF-8"],
+    ["application/x-www-form-urlencoded"],
+    ["multipart/form-data; boundary=x"],
+  ])("refuse un corps déclaré %s, qu'un formulaire HTML sait envoyer", async (contentType) => {
+    const req = jsonRequest('{"a":"', contentType);
+    await expect(readJsonBody(req)).rejects.toThrow(UNSUPPORTED_CONTENT_TYPE);
+    // Refusé sans rien lire.
+    expect(req.bodyUsed).toBe(false);
+  });
+
+  it("refuse un corps sans type déclaré", async () => {
+    const req = new Request("http://localhost/api/test", {
+      method: "POST",
+      body: new Uint8Array(new TextEncoder().encode("{}")),
+    });
+    expect(req.headers.get("content-type")).toBeNull();
+    await expect(readJsonBody(req)).rejects.toThrow(UNSUPPORTED_CONTENT_TYPE);
+  });
+
+  it.each([
+    ["application/json; charset=utf-8"],
+    ["Application/JSON"],
+    // Rapports CSP : API Reporting, puis ancienne directive `report-uri`.
+    ["application/reports+json"],
+    ["application/csp-report"],
+  ])("accepte un corps déclaré %s", async (contentType) => {
+    await expect(readJsonBody(jsonRequest("{}", contentType))).resolves.toEqual({});
+  });
 });
+
 
 describe("readFormDataBody", () => {
   it("rend le formulaire, fichier compris", async () => {

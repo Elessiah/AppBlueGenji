@@ -131,7 +131,10 @@ describe("app/manifest", () => {
 
 describe("middleware", () => {
   it("ne pose pas de politique de sécurité sur le manifeste, fichier statique", () => {
-    const source = middlewareConfig.matcher[0].source;
+    // La première entrée couvre les pages ; la seconde, `/api/`, n'a rien à
+    // voir avec un fichier statique.
+    const source = (middlewareConfig.matcher[0] as { source: string }).source;
+
     const matches = new RegExp(`^${source}$`).test("/manifest.webmanifest");
     expect(matches).toBe(false);
     // Témoin : une page ordinaire passe toujours par le middleware.

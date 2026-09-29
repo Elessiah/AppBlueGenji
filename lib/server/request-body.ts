@@ -24,6 +24,7 @@
  */
 import { enforceRateLimit, IMAGE_UPLOAD_RULE } from "@/lib/server/api-guard";
 import { fail } from "@/lib/server/http";
+import { UNSUPPORTED_CONTENT_TYPE, isJsonContentType } from "@/lib/shared/request-origin";
 
 /** Code d'erreur levé au-delà de la borne. */
 export const PAYLOAD_TOO_LARGE = "PAYLOAD_TOO_LARGE";
@@ -89,12 +90,22 @@ export async function readBodyBytes(req: Request, maxBytes: number): Promise<Uin
 }
 
 /**
- * `req.json()`, borné. Rejette comme lui sur un corps illisible.
+ * `req.json()`, borné. Rejette comme lui sur un corps illisible — et sur un
+ * corps qui n'est pas **déclaré** en JSON (`isJsonContentType`), sans rien lire.
+ *
+ * `req.json()` ne regardait pas le `Content-Type` : un
+ * `<form enctype=text/plain>` dont le nom de champ reconstitue un JSON était
+ * lu comme un envoi de l'écran. Le contrôle de provenance du middleware ferme
+ * déjà ce formulaire sur tout navigateur qui pose `Sec-Fetch-Site` ou
+ * `Origin` ; celui-ci le ferme même sans eux, là où le corps est lu.
  *
  * @throws PAYLOAD_TOO_LARGE Au-delà de `maxBytes`.
+ * @throws UNSUPPORTED_CONTENT_TYPE Corps non déclaré en JSON.
  */
 export async function readJsonBody(req: Request, maxBytes: number = JSON_BODY_MAX_BYTES): Promise<unknown> {
+  if (!isJsonContentType(req.headers.get("content-type"))) throw new Error(UNSUPPORTED_CONTENT_TYPE);
   const bytes = await readBodyBytes(req, maxBytes);
+
   return JSON.parse(new TextDecoder().decode(bytes));
 }
 
