@@ -129,6 +129,7 @@ export function AdvanceTournamentDialog({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="advance-tournament-title"
         // Le résumé est lu à l'ouverture, avant que le focus n'atteigne les
         // boutons : sans lui, la modale s'annonce par son seul titre et laisse
@@ -138,8 +139,6 @@ export function AdvanceTournamentDialog({
         style={{
           width: "100%",
           maxWidth: 480,
-          maxHeight: "90vh",
-          overflow: "auto",
           background: "var(--cyber-bg-2, #14181f)",
           border: "1px solid var(--line-strong-cy, #2a3340)",
           borderRadius: "var(--r-cy-md, 12px)",

@@ -80,6 +80,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: MatchReplayDialog
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
+        className="dialog-bounded"
         aria-labelledby="match-replay-title"
         tabIndex={-1}
         style={{

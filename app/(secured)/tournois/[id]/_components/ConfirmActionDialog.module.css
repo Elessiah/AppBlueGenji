@@ -12,7 +12,8 @@
 .dialog {
   width: 100%;
   max-width: 440px;
-  max-height: 90vh;
+  max-height: calc(100vh - 32px); /* repli : navigateurs sans `dvh` */
+  max-height: calc(100dvh - 32px);
   overflow: auto;
   padding: 22px;
   background: var(--cyber-bg-2);
