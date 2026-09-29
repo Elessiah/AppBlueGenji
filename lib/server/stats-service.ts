@@ -165,13 +165,15 @@ function isoOrEpoch(value: Date | string | null | undefined): string {
  * Byes (`is_bye`) et matchs fantômes (une équipe manquante) sont écartés : leur
  * score est posé par le moteur de tournoi, pas joué — les compter gonflerait
  * artificiellement bilans et séries.
+ *
+ * `null` = les matchs de tout le site (annuaire) : aucune liste `IN`.
  */
 async function loadMatchRows(
   db: Awaited<ReturnType<typeof getDatabase>>,
-  teamIds: number[],
+  teamIds: number[] | null,
 ): Promise<MatchStatRow[]> {
-  if (teamIds.length === 0) return [];
-  const list = placeholders(teamIds.length);
+  if (teamIds !== null && teamIds.length === 0) return [];
+  const list = teamIds === null ? "" : placeholders(teamIds.length);
   const [rows] = await db.execute<MatchStatRow[]>(
     `SELECT
       m.id,
@@ -197,19 +199,20 @@ async function loadMatchRows(
      JOIN bg_tournaments t ON t.id = m.tournament_id
      LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
      LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-     WHERE ${PLAYED_MATCH_SQL}
-       AND (m.team1_id IN (${list}) OR m.team2_id IN (${list}))
+     WHERE ${PLAYED_MATCH_SQL}${teamIds === null ? "" : `
+       AND (m.team1_id IN (${list}) OR m.team2_id IN (${list}))`}
      ORDER BY played_at ASC, m.id ASC`,
-    [...teamIds, ...teamIds],
+    teamIds === null ? [] : [...teamIds, ...teamIds],
   );
   return rows;
 }
 
+/** Inscriptions d'un ensemble d'équipes ; `null` = tout le site (annuaire). */
 async function loadRegistrationRows(
   db: Awaited<ReturnType<typeof getDatabase>>,
-  teamIds: number[],
+  teamIds: number[] | null,
 ): Promise<RegistrationStatRow[]> {
-  if (teamIds.length === 0) return [];
+  if (teamIds !== null && teamIds.length === 0) return [];
   const [rows] = await db.execute<RegistrationStatRow[]>(
     `SELECT
       r.team_id,
@@ -223,10 +226,10 @@ async function loadRegistrationRows(
       t.start_at,
       t.finished_at
      FROM bg_tournament_registrations r
-     JOIN bg_tournaments t ON t.id = r.tournament_id
-     WHERE r.team_id IN (${placeholders(teamIds.length)})
+     JOIN bg_tournaments t ON t.id = r.tournament_id${teamIds === null ? "" : `
+     WHERE r.team_id IN (${placeholders(teamIds.length)})`}
      ORDER BY played_at DESC`,
-    teamIds,
+    teamIds === null ? [] : teamIds,
   );
   return rows;
 }
@@ -476,25 +479,29 @@ export type PlayerRecord = RecordSummary;
 
 type UserMembershipRow = MembershipRow & { user_id: number };
 
-/** Périodes d'appartenance de plusieurs joueurs, en une lecture. */
+/**
+ * Périodes d'appartenance de plusieurs joueurs, en une lecture.
+ *
+ * `null` = tous les joueurs du site (annuaire) : aucune liste `IN`, qui ne
+ * filtrerait rien et porterait un paramètre par compte, deux fois.
+ */
 async function loadMembershipsForUsers(
   db: Awaited<ReturnType<typeof getDatabase>>,
-  userIds: number[],
+  userIds: number[] | null,
 ): Promise<Map<number, Membership[]>> {
-  const list = placeholders(userIds.length);
+  const list = userIds === null ? "" : placeholders(userIds.length);
   const [rows] = await db.execute<UserMembershipRow[]>(
     // Le filtre vit **dans chaque branche** de l'union : posé au-dessus, il
     // ferait scanner toutes les adhésions du site plutôt que d'attaquer
-    // l'index `user_id`. Comme dans `users-service`, les identifiants passent
-    // donc deux fois.
+    // l'index `user_id`. Les identifiants passent donc deux fois.
     `SELECT user_id, team_id, joined_at, left_at
-     FROM bg_team_members
-     WHERE user_id IN (${list})
+     FROM bg_team_members${userIds === null ? "" : `
+     WHERE user_id IN (${list})`}
      UNION ALL
      SELECT solo_user_id AS user_id, id AS team_id, created_at AS joined_at, NULL AS left_at
      FROM bg_teams
-     WHERE solo_user_id IN (${list})`,
-    [...userIds, ...userIds],
+     WHERE solo_user_id ${userIds === null ? "IS NOT NULL" : `IN (${list})`}`,
+    userIds === null ? [] : [...userIds, ...userIds],
   );
 
   const byUser = new Map<number, Membership[]>();
@@ -527,9 +534,21 @@ async function loadMembershipsForUsers(
  * mémoire, sur des listes déjà chargées.
  */
 export async function loadPlayerRecords(userIds: number[]): Promise<Map<number, PlayerRecord>> {
-  const records = new Map<number, PlayerRecord>();
-  if (userIds.length === 0) return records;
+  if (userIds.length === 0) return new Map();
+  return loadRecords(userIds);
+}
 
+/**
+ * Bilans de **tous** les joueurs du site, pour l'annuaire `/joueurs` : mêmes
+ * trois requêtes que `loadPlayerRecords`, sans liste d'identifiants — l'annuaire
+ * lit tous les comptes, un `IN` de tous leurs identifiants ne filtrait rien.
+ */
+export async function loadAllPlayerRecords(): Promise<Map<number, PlayerRecord>> {
+  return loadRecords(null);
+}
+
+async function loadRecords(userIds: number[] | null): Promise<Map<number, PlayerRecord>> {
+  const records = new Map<number, PlayerRecord>();
   const db = await getDatabase();
   const membershipsByUser = await loadMembershipsForUsers(db, userIds);
   const teamIds = [
@@ -541,9 +560,13 @@ export async function loadPlayerRecords(userIds: number[]): Promise<Map<number, 
   ];
   if (teamIds.length === 0) return records;
 
+  // Tout le site : matchs et inscriptions sont lus sans liste d'équipes (elle
+  // porterait un paramètre par équipe, trois fois) ; seules les lignes des
+  // équipes des joueurs sont ensuite relues, par `groupByTeam`.
+  const scope = userIds === null ? null : teamIds;
   const [matchRows, registrationRows] = await Promise.all([
-    loadMatchRows(db, teamIds),
-    loadRegistrationRows(db, teamIds),
+    loadMatchRows(db, scope),
+    loadRegistrationRows(db, scope),
   ]);
 
   // Les lignes sont rangées **une fois** par équipe : filtrer toutes les lignes
