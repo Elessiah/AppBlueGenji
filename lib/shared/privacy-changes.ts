@@ -266,7 +266,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     summary:
       "L'invite « Continuer avec Google » de la page de connexion est retirée : aucune page du site ne fait plus appel à Google dans ton navigateur. La politique de confidentialité nomme désormais chaque destinataire de tes données et les transferts hors de l'Union.",
     details: [
-      "La case « Google One Tap » disparaît, avec le cookie « g_state » que Google pouvait déposer. Se connecter par Google passe toujours par le bouton de la page de connexion.",
+      "La case « Google One Tap » disparaît. Le cookie « g_state » que Google pouvait déposer n'est plus posé, et celui qui resterait est effacé à ta prochaine visite de la page de connexion. Se connecter par Google passe toujours par le bouton de la page de connexion.",
       "Le site et le bot sont hébergés en France (à Caen). Une nouvelle section « Destinataires et transferts » de la politique de confidentialité dit ce qui part chez Discord, Google, Blizzard, le service de push de ton navigateur et Microsoft (sauvegardes chiffrées), et sur quel fondement un transfert vers les États-Unis repose.",
       "Rien ne change pour ton compte : les moyens de connexion (hors l'invite) et les données conservées restent les mêmes.",
     ],

@@ -34,7 +34,9 @@ const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
 const NOTICE_VERSION = "2";
 /**
  * Accord à l'invite Google One Tap, retirée depuis : la valeur restée dans un
- * navigateur est effacée au passage, rien ne la relit plus.
+ * navigateur est effacée au passage, rien ne la relit plus — de même que le
+ * cookie `g_state` que le script de Google posait sur notre domaine (écrit par
+ * `document.cookie`, donc effaçable ici).
  */
 const LEGACY_ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
 /**
@@ -92,6 +94,7 @@ export function LoginForm() {
     } catch {
       // localStorage indisponible (mode privé) : la modale redemande.
     }
+    document.cookie = "g_state=; Max-Age=0; path=/";
     setConsentGiven(stored === NOTICE_VERSION && terms === String(TERMS_VERSION));
     setConsentRead(true);
   }, []);
