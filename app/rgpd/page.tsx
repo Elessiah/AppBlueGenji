@@ -13,7 +13,7 @@ import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-cont
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { PROCESSING_ACTIVITIES } from "@/lib/shared/processing-register";
+import { PROCESSING_ACTIVITIES, US_TRANSFER_MECHANISM } from "@/lib/shared/processing-register";
 import { privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
@@ -235,7 +235,7 @@ export default async function RgpdPage() {
             <span className="eyebrow">SECTION 05</span>
             <h2 className={styles.sectionTitle}>Cookies & traceurs</h2>
           </div>
-          <span className={styles.meta}>GOOGLE : CONNEXION SEULE</span>
+          <span className={styles.meta}>AUCUN COOKIE TIERS</span>
         </header>
         <div className={styles.prose}>
           <p>
@@ -306,12 +306,6 @@ export default async function RgpdPage() {
               L&apos;acceptation des conditions est aussi conservée sur nos serveurs, avec son
               numéro de version, dès que votre compte existe.
             </li>
-            <li>
-              <strong>bg_one_tap_consent</strong> — une valeur du stockage local, posée
-              <strong> seulement si vous cochez</strong> la case « Google One Tap » de la page de
-              connexion (décochée par défaut) ; la décocher la retire. Elle retient ce choix, qui
-              est fait avant toute création de compte et n&apos;est donc rattaché à personne.
-            </li>
           </ul>
           <p>
             Aucun bandeau de consentement cookies n&apos;est requis pour ces cookies strictement
@@ -319,16 +313,10 @@ export default async function RgpdPage() {
             ePrivacy, art. 5.3, exemption cookies fonctionnels).
           </p>
           <p>
-            <strong>Une seule exception, et sur une seule page.</strong> Sur la page de connexion,
-            et seulement <strong>si vous l&apos;avez demandé</strong> en cochant la case
-            « Google One Tap » (décochée par défaut, base légale : votre consentement), le site
-            charge l&apos;invite de connexion de Google (Google One Tap,{" "}
-            <code>accounts.google.com</code>). Google reçoit alors votre adresse IP, lit sa propre
-            session pour vous proposer de continuer avec votre compte Google, et peut déposer sur
-            notre domaine un cookie <strong>g_state</strong> retenant que vous avez fermé
-            l&apos;invite. Google agit comme responsable de son propre traitement. Aucune autre
-            page du site ne fait appel à Google, et vous pouvez toujours vous connecter par
-            Discord, Blizzard ou un code en message privé.
+            <strong>Aucun service tiers n&apos;est chargé dans votre navigateur</strong>, et aucun
+            cookie tiers n&apos;est déposé. Se connecter par Google, Discord ou Blizzard vous mène
+            sur la page du fournisseur, qui vous ramène ici : l&apos;échange qui suit se fait entre
+            notre serveur et le sien.
           </p>
         </div>
       </section>
@@ -478,6 +466,50 @@ export default async function RgpdPage() {
               {PUSH_SUBSCRIPTION_RETENTION_DAYS} jours sans notification remise.
             </li>
           </ul>
+        </div>
+      </section>
+
+      {/* DESTINATAIRES ET TRANSFERTS — art. 13.1.e et f */}
+      <section id="destinataires" className={styles.section}>
+        <header className={styles.head}>
+          <div>
+            <span className="eyebrow">RGPD · ARTICLES 13 ET 44 À 46</span>
+            <h2 className={styles.sectionTitle}>Destinataires et transferts</h2>
+          </div>
+        </header>
+        <div className={styles.prose}>
+          <p>
+            Le site et le bot Discord de l&apos;association sont hébergés{" "}
+            <strong>en France</strong>, sur un Raspberry Pi installé à Caen, par un bénévole de
+            l&apos;association (voir les{" "}
+            <Link href="/mentions-legales#hebergement">mentions légales</Link>). Vos données
+            n&apos;en sortent que vers les destinataires suivants :
+          </p>
+          <ul>
+            <li>
+              <strong>Discord</strong> (États-Unis) : les messages privés du bot (code de
+              connexion, rappels de match, notifications) et les salons réservés au staff, qui ne
+              portent aucun pseudo de joueur ; et la connexion par Discord, si vous la choisissez.
+            </li>
+            <li>
+              <strong>Google et Blizzard</strong> (États-Unis) : seulement si vous vous connectez
+              par l&apos;un d&apos;eux, qui vous authentifie en responsable de son propre traitement.
+            </li>
+            <li>
+              <strong>Le service de push de votre navigateur</strong> (Google, Mozilla, Apple ou
+              Microsoft) : seulement si vous activez les notifications, et il ne reçoit que des
+              messages chiffrés qu&apos;il ne peut pas lire.
+            </li>
+            <li>
+              <strong>Microsoft</strong> (OneDrive personnel de l&apos;hébergeur, stockage possible
+              aux États-Unis) : les sauvegardes, <strong>chiffrées avant envoi</strong> avec une clé
+              que seule l&apos;association détient — Microsoft les stocke sans pouvoir les lire.
+            </li>
+          </ul>
+          <p>
+            Un transfert vers les États-Unis repose sur la {US_TRANSFER_MECHANISM}. Le détail, par
+            traitement, figure au registre ci-dessous.
+          </p>
         </div>
       </section>
 

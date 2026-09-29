@@ -186,9 +186,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 
   // `getCurrentUser` est mémoïsé par requête (`cache()` de React), donc cet
   // appel ne coûte rien de plus sur les pages où `PublicHeader`/`PublicFooter`
-  // le lisent déjà. L'invite Google One Tap n'est **plus** montée ici : chargée
-  // sur chaque page pour tout visiteur anonyme, elle faisait appel à Google sans
-  // que personne l'ait demandé — elle vit sur `/connexion` (`app/connexion/page.tsx`).
+  // le lisent déjà.
   const user = await getCurrentUser();
   // Lus sur **toutes** les pages, `/rgpd` comprise : la modale s'y tait côté
   // client. Décidé ici, le silence survivrait à la navigation — la mise en

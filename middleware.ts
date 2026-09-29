@@ -2,6 +2,9 @@ import { NextResponse, type NextRequest } from "next/server";
 
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 
+/** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
+export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
+
 /**
  * Pose la politique de sécurité du contenu, avec un nonce par requête.
  *
@@ -41,6 +44,13 @@ export function middleware(request: NextRequest) {
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(CSP_HEADER, policy);
+  // Le cookie `g_state` que posait le script de l'invite Google One Tap,
+  // retirée depuis : il n'a plus de lecteur, et `/rgpd` ne déclare plus aucun
+  // cookie tiers. Effacé au premier document demandé, sur n'importe quelle page
+  // — un compte connecté ne repasse jamais par `/connexion`.
+  if (request.cookies.has(LEGACY_GOOGLE_ONE_TAP_COOKIE)) {
+    response.cookies.delete(LEGACY_GOOGLE_ONE_TAP_COOKIE);
+  }
   return response;
 }
 

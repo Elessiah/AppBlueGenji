@@ -256,6 +256,21 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Le pseudo, les identifiants de connexion et le compte reposent sur l'exécution du service que tu demandes, et non plus sur un consentement : la politique de confidentialité le précise. L'invite Google One Tap de la page de connexion ne s'affiche plus que si tu la demandes, par une case décochée par défaut.",
     ],
   },
+  // L'invite Google One Tap est retirée : plus aucune page ne fait appel à
+  // Google dans le navigateur. La même mise à jour nomme enfin, sur `/rgpd`,
+  // les destinataires et les transferts hors UE qui existaient déjà.
+  {
+    id: "2026-10-retrait-google-one-tap",
+    publishedAt: "2026-10-01",
+    title: "Plus d'invite Google, destinataires nommés",
+    summary:
+      "L'invite « Continuer avec Google » de la page de connexion est retirée : aucune page du site ne fait plus appel à Google dans ton navigateur. La politique de confidentialité nomme désormais chaque destinataire de tes données et les transferts hors de l'Union.",
+    details: [
+      "La case « Google One Tap » disparaît. Le cookie « g_state » que Google pouvait déposer n'est plus posé, et celui qui resterait est effacé à ta prochaine visite du site. Se connecter par Google passe toujours par le bouton de la page de connexion.",
+      "Le site et le bot sont hébergés en France (à Caen). Une nouvelle section « Destinataires et transferts » de la politique de confidentialité dit ce qui part chez Discord, Google, Blizzard, le service de push de ton navigateur et Microsoft (sauvegardes chiffrées), et sur quel fondement un transfert vers les États-Unis repose.",
+      "Rien ne change pour ton compte : les moyens de connexion (hors l'invite) et les données conservées restent les mêmes.",
+    ],
+  },
 ];
 
 /**

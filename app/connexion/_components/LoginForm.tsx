@@ -8,7 +8,6 @@ import { CyberButton } from "@/components/cyber/CyberButton";
 import { CyberCard } from "@/components/cyber/CyberCard";
 import { RgpdConsentModal } from "@/components/cyber/RgpdConsentModal";
 import { DEFAULT_REDIRECT, safeRedirectPath } from "@/lib/shared/safe-redirect";
-import { GoogleOneTap } from "@/components/auth/google-one-tap";
 import { loginErrorMessage, oauthErrorMessage } from "../_lib/login-errors";
 import {
   detectLoginEnvironment,
@@ -29,16 +28,16 @@ import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
 /**
  * Information d'entrée **lue** dans ce navigateur, à sa version. Ce n'est plus un
  * consentement (le compte repose sur l'exécution du service) : la clé garde son
- * nom historique, et sa valeur `"2"` fait revoir une fois la modale à qui avait
- * accepté l'ancienne, où l'invite Google était acquise d'office.
+ * nom historique.
  */
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
 const NOTICE_VERSION = "2";
 /**
- * Seul vrai consentement de la page : l'invite Google One Tap, cochée à part
- * dans la modale, décochée par défaut. `"1"` = accordé ; absente = refusé.
+ * Accord à l'invite Google One Tap, retirée depuis : la valeur restée dans un
+ * navigateur est effacée au passage, rien ne la relit plus (le cookie `g_state`
+ * de Google, lui, est effacé par `middleware.ts`, sur toutes les pages).
  */
-const ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
+const LEGACY_ONE_TAP_STORAGE_KEY = "bg_one_tap_consent";
 /**
  * Version des conditions d'utilisation acceptée dans ce navigateur, gardée à
  * côté du consentement RGPD : une nouvelle version fait réapparaître la
@@ -54,19 +53,8 @@ const TERMS_STORAGE_KEY = "bg_terms_consent";
  */
 const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-code" } as const;
 
-/** Ce qu'il faut à l'invite Google One Tap, résolu côté serveur par `page.tsx`. */
-export type OneTapConfig = { clientId: string; nonce?: string };
-
-/**
- * Formulaire de connexion.
- *
- * `oneTap` vaut `null` quand l'invite n'a pas lieu d'être (visiteur déjà
- * connecté, `GOOGLE_CLIENT_ID` absent). Sinon l'invite n'est montée qu'une fois
- * l'information d'entrée lue **et** la case « Google One Tap » cochée : c'est la
- * seule page du site qui fasse charger un script de Google, et elle ne le fait
- * qu'à qui l'a demandé, par une case à part, décochée par défaut.
- */
-export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
+/** Formulaire de connexion. */
+export function LoginForm() {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(LOGIN_FIELD_ERRORS, LOGIN_FIELD_IDS);
@@ -92,89 +80,32 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
   const [consentGiven, setConsentGiven] = useState(true);
   // `consentGiven` part à `true` pour ne pas faire clignoter la modale au
   // premier rendu : il ne dit donc rien tant que le stockage n'a pas été lu.
-  // L'invite Google attend cette lecture — montée sur la valeur initiale, elle
-  // ferait partir le script chez Google avant même qu'on sache si le visiteur a
-  // consenti.
   const [consentRead, setConsentRead] = useState(false);
-  // Invite Google One Tap : montée seulement sur accord explicite.
-  const [oneTapAllowed, setOneTapAllowed] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     let stored: string | null = null;
     let terms: string | null = null;
-    let oneTapChoice: string | null = null;
     try {
       stored = window.localStorage.getItem(CONSENT_STORAGE_KEY);
       terms = window.localStorage.getItem(TERMS_STORAGE_KEY);
-      oneTapChoice = window.localStorage.getItem(ONE_TAP_STORAGE_KEY);
+      window.localStorage.removeItem(LEGACY_ONE_TAP_STORAGE_KEY);
     } catch {
       // localStorage indisponible (mode privé) : la modale redemande.
     }
     setConsentGiven(stored === NOTICE_VERSION && terms === String(TERMS_VERSION));
-    setOneTapAllowed(oneTapChoice === "1");
     setConsentRead(true);
   }, []);
 
-  /**
-   * Retient le choix One Tap. Un refus **efface** un accord antérieur : la case
-   * décochée vaut retrait — aussi simple que l'accord (RGPD art. 7.3), d'où la
-   * même case sur la carte de connexion, pour changer d'avis après la modale.
-   */
-  const setOneTapChoice = (allow: boolean) => {
-    try {
-      if (allow) window.localStorage.setItem(ONE_TAP_STORAGE_KEY, "1");
-      else window.localStorage.removeItem(ONE_TAP_STORAGE_KEY);
-    } catch {
-      // localStorage indisponible (mode privé) : le choix vaut pour la page.
-    }
-    setOneTapAllowed(allow);
-  };
-
-  const acceptConsent = ({ oneTap: allowOneTap }: { oneTap: boolean }) => {
+  const acceptConsent = () => {
     try {
       window.localStorage.setItem(CONSENT_STORAGE_KEY, NOTICE_VERSION);
       window.localStorage.setItem(TERMS_STORAGE_KEY, String(TERMS_VERSION));
     } catch {
       // localStorage indisponible (mode privé) : on continue en mémoire.
     }
-    // Sans invite possible, la modale n'a pas posé la question : un choix
-    // antérieur n'est ni confirmé ni retiré.
-    if (oneTap) setOneTapChoice(allowOneTap);
     setConsentGiven(true);
   };
-
-  // La case One Tap reste sur la carte : sans elle, un accord donné dans la
-  // modale ne se retirerait plus qu'en vidant le stockage du navigateur. Rien à
-  // proposer quand l'invite n'a pas lieu d'être (`oneTap` absent).
-  // Un seul identifiant : la carte ne rend jamais ses deux états à la fois.
-  const oneTapToggle = oneTap ? (
-    <label
-      htmlFor="login-one-tap"
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        gap: 8,
-        marginTop: 10,
-        fontSize: 12,
-        lineHeight: 1.5,
-        color: "var(--ink-mute)",
-        cursor: "pointer",
-      }}
-    >
-      <input
-        id="login-one-tap"
-        type="checkbox"
-        checked={oneTapAllowed}
-        onChange={(event) => setOneTapChoice(event.target.checked)}
-        style={{ marginTop: 2 }}
-      />
-      <span>
-        Me proposer l&apos;invite <strong>Google One Tap</strong> sur cette page (Google reçoit
-        alors mon adresse IP et peut déposer un cookie g_state).
-      </span>
-    </label>
-  ) : null;
 
   // Les conditions ne voyagent qu'une fois le stockage **lu** et le
   // consentement **donné** : `consentGiven` part à `true` pour ne pas faire
@@ -265,14 +196,6 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
 
   return (
     <main style={{ minHeight: "100vh", display: "grid", placeItems: "center", position: "relative" }}>
-      {oneTap && consentRead && consentGiven && oneTapAllowed && (
-        <GoogleOneTap
-          clientId={oneTap.clientId}
-          nonce={oneTap.nonce}
-          redirect={redirect}
-          termsAccepted={termsAccepted}
-        />
-      )}
       <div className="fabric" />
       <CyberCard
         ticks
@@ -311,7 +234,6 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
               termsAccepted={termsAccepted}
               environmentNotice={loginEnvironmentNotice(environment)}
             />
-            {oneTapToggle}
 
             {/*
               Le séparateur **nomme** ce qui suit. « OU » seul laissait croire à
@@ -378,7 +300,6 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
               termsAccepted={termsAccepted}
               environmentNotice={loginEnvironmentNotice(environment)}
             />
-            {oneTapToggle}
 
             <div style={{ display: "flex", alignItems: "center", gap: 12, margin: "24px 0 16px", color: "var(--ink-dim)" }}>
               <div style={{ flex: 1, height: 1, background: "var(--line-soft)" }} />
@@ -508,7 +429,6 @@ export function LoginForm({ oneTap }: { oneTap: OneTapConfig | null }) {
         <RgpdConsentModal
           onAccept={acceptConsent}
           onRefuse={refuseConsent}
-          oneTapAvailable={oneTap !== null}
         />
       )}
     </main>
