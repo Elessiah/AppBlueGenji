@@ -39,6 +39,9 @@ describe("page tournois — section « Tournois invisibles »", () => {
       'wantFinishedArchive ? "/api/tournaments?finished=all" : "/api/tournaments"',
     );
     expect(publicLoad).not.toContain("scope=hidden");
+    // Une relecture de fond partie avant la demande d'archive ne doit pas
+    // remettre la liste tronquée par-dessus l'archive arrivée entre-temps.
+    expect(publicLoad).toContain("if (wantFinishedArchive !== wantFinishedArchiveRef.current) return;");
   });
 
   it("réserve la section au staff et la masque quand il n'y a rien", () => {

@@ -231,10 +231,14 @@ describe("listTournamentBuckets — tournois terminés bornés", () => {
     expect(buckets).not.toHaveProperty("finishedTotals");
   });
 
-  it("sert la liste sans décompte quand celui-ci est en panne", async () => {
+  // Sans décompte, une liste tronquée passerait pour complète — plus de « Voir
+  // plus », et mise en cache ainsi pour tous : on sert la liste entière.
+  it("sert la liste entière quand le décompte est en panne", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     const execute = jest.fn<SqlQuery>(async (sql: string) => {
-      if (sql.includes("COUNT(r.id)")) return [[finished(1)], undefined];
+      if (sql.includes("COUNT(r.id)")) {
+        return [sql.includes("t.id IN") ? [finished(1)] : [finished(1), finished(2)], undefined];
+      }
       if (sql.includes("GROUP BY t.game")) throw new Error("table verrouillée");
       return [[], undefined];
     });
@@ -242,7 +246,10 @@ describe("listTournamentBuckets — tournois terminés bornés", () => {
 
     const buckets = await listTournamentBuckets(null);
 
-    expect(buckets.finished.map((t) => t.id)).toEqual([1]);
+    const lists = execute.mock.calls.filter(([sql]) => String(sql).includes("COUNT(r.id)"));
+    expect(lists).toHaveLength(2);
+    expect(String(lists[1][0])).not.toContain("t.id IN");
+    expect(buckets.finished.map((t) => t.id)).toEqual([1, 2]);
     expect(buckets).not.toHaveProperty("finishedTotals");
     expect(error).toHaveBeenCalled();
   });

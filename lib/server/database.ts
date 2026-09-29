@@ -1568,8 +1568,11 @@ async function runMigrations(db: Pool): Promise<void> {
   // tourne, elle naît vide alors que le détail garde tout l'historique. Elle est
   // remplie **une fois**, avant le premier repli du détail (qui effacerait les
   // empreintes à reprendre) — vide, c'est qu'aucune visite n'a encore été
-  // enregistrée par la version qui l'alimente. À retirer une fois constaté
-  // joué en production.
+  // enregistrée par la version qui l'alimente. Un échec ici ne perd rien pour
+  // de bon : le repli reporte lui-même les empreintes de ce qu'il efface
+  // (`rollUpExpiredSiteVisits`), le total est seulement en retard le temps que
+  // le détail restant soit replié. À retirer une fois constaté joué en
+  // production.
   try {
     const [seeded] = await db.execute<RowDataPacket[]>(`SELECT 1 FROM bg_site_visitors LIMIT 1`);
     if (seeded.length === 0) {

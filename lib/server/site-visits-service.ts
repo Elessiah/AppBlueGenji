@@ -288,6 +288,20 @@ export async function rollUpExpiredSiteVisits(): Promise<number> {
 
     await connection.beginTransaction();
     try {
+      // Aucune ligne ne part sans que son empreinte soit au total des visiteurs
+      // uniques : `rememberVisitor` peut avoir échoué, ou la reprise du
+      // démarrage (`database.ts`) ne pas avoir abouti — sans ce report, ces
+      // visiteurs disparaîtraient du total avec leur détail, pour toujours.
+      await connection.execute(
+        `INSERT INTO bg_site_visitors (visitor_key, authenticated)
+         SELECT visitor_key, MAX(authenticated)
+         FROM bg_site_visits
+         WHERE created_at < ?
+         GROUP BY visitor_key
+         ON DUPLICATE KEY UPDATE
+           authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated))`,
+        [cutoff],
+      );
       await connection.execute(
         `INSERT INTO bg_site_visit_days (day, visits, first_visit_at)
          SELECT DATE(created_at), COUNT(*), MIN(created_at)

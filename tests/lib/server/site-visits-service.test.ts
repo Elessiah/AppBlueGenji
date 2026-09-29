@@ -529,6 +529,11 @@ describe("rollUpExpiredSiteVisits", () => {
     // visite qui n'a pas été reportée.
     expect(insert[1]).toEqual(["2026-07-01"]);
     expect(remove[1]).toEqual(["2026-07-01"]);
+    // Aucune empreinte ne part avec son détail : le total des visiteurs uniques
+    // ne dépend pas de la reprise du démarrage.
+    const visitors = calls.find(([sql]) => sql.includes("INSERT INTO bg_site_visitors"))!;
+    expect(visitors[1]).toEqual(["2026-07-01"]);
+    expect(calls.indexOf(visitors)).toBeLessThan(calls.indexOf(remove));
     expect(insert[0]).toContain("visits = bg_site_visit_days.visits + VALUES(visits)");
     expect(calls.indexOf(insert)).toBeLessThan(calls.indexOf(remove));
     expect(connection.commit).toHaveBeenCalledTimes(1);

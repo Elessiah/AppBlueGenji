@@ -774,6 +774,19 @@ async function loadTournamentBuckets(
     finished: [],
   };
 
+  // Sans décompte, rien ne dirait que des terminés ont été laissés de côté : une
+  // liste tronquée passerait pour complète, sans « Voir plus », et resterait en
+  // cache ainsi pour tout le monde. On sert alors la liste entière — plus
+  // lourde, jamais fausse — plutôt que de vider `/tournois` pour un compteur.
+  let finishedTotals: FinishedTournamentTotals | null = null;
+  if (finishedLimit !== null) {
+    finishedTotals = await loadFinishedTotals(db, now).catch((error: unknown) => {
+      console.error("[tournaments] décompte des tournois terminés indisponible :", error);
+      return null;
+    });
+    if (finishedTotals === null) return loadTournamentBuckets(searchTerm, scope, null);
+  }
+
   const cards = rows.map(mapCard);
   // Décoratifs : une panne de ces lectures ne doit pas vider `/tournois` et
   // l'accueil, qui s'en passent très bien (les cartes retombent sur leurs
@@ -791,17 +804,10 @@ async function loadTournamentBuckets(
     if (row.state === "FINISHED") buckets.finished.push(card);
   }
 
-  if (finishedLimit !== null) {
-    // Comme les résumés, un décompte en panne ne vide pas la liste : elle part
-    // sans lui, et `/tournois` va chercher l'archive entière dès que le
-    // lecteur cherche ou filtre.
-    const totals = await loadFinishedTotals(db, now).catch((error: unknown) => {
-      console.error("[tournaments] décompte des tournois terminés indisponible :", error);
-      return null;
-    });
-    // Rien n'a été laissé de côté : la liste est complète, et le dit par
-    // l'absence du champ — une page n'a pas à aller chercher une archive vide.
-    if (totals && totals.all > buckets.finished.length) buckets.finishedTotals = totals;
+  // Rien n'a été laissé de côté : la liste est complète, et le dit par
+  // l'absence du champ — une page n'a pas à aller chercher une archive vide.
+  if (finishedTotals && finishedTotals.all > buckets.finished.length) {
+    buckets.finishedTotals = finishedTotals;
   }
 
   return buckets;

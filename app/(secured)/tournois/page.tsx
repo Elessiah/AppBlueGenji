@@ -142,6 +142,11 @@ export default function TournamentsPage() {
   // la chercher (`needsFinishedArchive`), puis gardée : la relâcher au premier
   // filtre effacé ferait recharger la liste à chaque frappe.
   const [wantFinishedArchive, setWantFinishedArchive] = useState(false);
+  // Lu **après** la réponse : une relecture de fond partie avant la demande
+  // d'archive rapporterait la liste tronquée, et l'appliquer effacerait
+  // l'archive arrivée entre-temps.
+  const wantFinishedArchiveRef = useRef(wantFinishedArchive);
+  wantFinishedArchiveRef.current = wantFinishedArchive;
   // « Ctrl+K » par défaut (sûr pour le rendu serveur) : la vraie plateforme
   // ne se lit que côté client, une fois montée.
   const [shortcutLabel, setShortcutLabel] = useState("Ctrl+K");
@@ -156,6 +161,7 @@ export default function TournamentsPage() {
           wantFinishedArchive ? "/api/tournaments?finished=all" : "/api/tournaments",
           signal,
         );
+        if (wantFinishedArchive !== wantFinishedArchiveRef.current) return;
         // On garde la référence précédente quand rien n'a changé : sinon chaque
         // relecture de fond redessinerait toute la liste et réarmerait le
         // minuteur de bascule, pour un contenu identique.
