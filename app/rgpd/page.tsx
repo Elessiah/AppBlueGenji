@@ -30,8 +30,10 @@ import {
 import { privacyChangeDay, privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
+  NOTIFIER_FOLLOW_UP,
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_TARGET_NOTICE_COOLDOWN_HOURS,
+  copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_DAYS } from "@/lib/shared/logo-quarantine";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -473,7 +475,7 @@ export default async function RgpdPage() {
         </div>
       </section>
 
-      {/* SIGNALEMENTS — droit d'auteur, contestation, masquage d'un logo */}
+      {/* SIGNALEMENTS — droit d'auteur, contestation, masquage d'un logo ou d'un avatar */}
       <section id="signalements" className={styles.section}>
         <header className={styles.head}>
           <div>
@@ -489,10 +491,9 @@ export default async function RgpdPage() {
             <strong>tous</strong>, avec ou sans compte. On y choisit une catégorie — droit
             d&apos;auteur, modération, bug, RGPD, hébergeur, autre —, on décrit le problème et, connecté, on désigne les
             joueurs, équipes ou tournois concernés. Un signalement de <strong>droit d&apos;auteur</strong>{" "}
-            exige en plus le nom et l&apos;adresse électronique de son auteur, sa qualité (titulaire des
-            droits, représentant, tiers) et une déclaration de bonne foi : c&apos;est ce que le règlement
-            européen sur les services numériques demande à une notification de contenu illicite
-            (art. 16). Un <strong>comportement en jeu</strong> (insulte, triche, anti-jeu, litige sur
+            indique {copyrightNoticeElementsText()} : c&apos;est ce que le règlement européen sur les
+            services numériques demande à une notification de contenu illicite (art. 16).{" "}
+            {NOTIFIER_FOLLOW_UP} Un <strong>comportement en jeu</strong> (insulte, triche, anti-jeu, litige sur
             Discord) ne se signale pas par ce formulaire mais sur le{" "}
             <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
               portail de support de l&apos;association
@@ -507,9 +508,19 @@ export default async function RgpdPage() {
               l&apos;adresse qu&apos;il indique.
             </li>
             <li>
-              <strong>Base légale</strong> : le consentement, recueilli par une case à l&apos;envoi ;
-              pour un contenu illicite, l&apos;obligation faite à l&apos;hébergeur de traiter les
-              notifications.
+              <strong>Base légale</strong> : l&apos;<strong>obligation légale</strong> pour une demande
+              d&apos;exercice des droits (catégorie RGPD — RGPD, art. 6.1.c et 12), une notification de
+              contenu illicite (droit d&apos;auteur — règlement européen sur les services numériques,
+              art. 16), une demande adressée à l&apos;hébergeur (art. 11 et 16) et une contestation
+              (art. 20) : aucune case d&apos;accord n&apos;y est demandée, la demande est traitée. Pour
+              les autres catégories (modération, bug, autre), le <strong>consentement</strong>,
+              recueilli par une case à l&apos;envoi et retirable par la catégorie RGPD.
+            </li>
+            <li>
+              <strong>Réponse</strong> : une demande RGPD ou adressée à l&apos;hébergeur exige une
+              adresse électronique, sauf d&apos;un compte dont le Discord est rattaché ou le tag
+              certifié — le site n&apos;envoie aucun courriel, la réponse part de l&apos;association,
+              à l&apos;adresse indiquée ou sur Discord.
             </li>
             <li>
               <strong>Destinataires</strong> : les administrateurs de l&apos;association. Une alerte
@@ -519,8 +530,8 @@ export default async function RgpdPage() {
             <li>
               <strong>Durée</strong> : le temps du traitement, puis{" "}
               {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l&apos;archivage — prolongée tant
-              qu&apos;un logo masqué ou supprimé au titre du signalement peut encore être contesté par
-              son équipe. Un compte supprimé n&apos;y laisse pas son pseudo.
+              qu&apos;un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être
+              contesté par son équipe ou son joueur. Un compte supprimé n&apos;y laisse pas son pseudo.
             </li>
           </ul>
 
@@ -573,8 +584,8 @@ export default async function RgpdPage() {
             </li>
             <li>
               Un contenu <strong>manifestement illicite</strong> peut être supprimé sans délai de
-              masquage. L&apos;équipe en est prévenue de la même façon et peut contester la décision
-              pendant le même délai ; si elle aboutit, elle peut renvoyer son logo.
+              masquage. L&apos;équipe ou le joueur en est prévenu de la même façon et peut contester la
+              décision pendant le même délai ; si elle aboutit, l&apos;image peut être renvoyée.
             </li>
           </ul>
           <p>

@@ -47,6 +47,9 @@ export type ReportAction = "TAKE" | "RELEASE" | "RESOLVE" | "REOPEN";
 /** Qualité du signalant vis-à-vis d'un droit d'auteur invoqué. */
 export type RightsRelation = "HOLDER" | "AGENT" | "THIRD_PARTY";
 
+/** Base légale du traitement d'un signalement, par catégorie (`ReportCategoryDefinition.legalBasis`). */
+export type ReportLegalBasis = "CONSENT" | "LEGAL_OBLIGATION";
+
 export const REPORT_CATEGORIES: readonly ReportCategory[] = [
   "COPYRIGHT",
   "MODERATION",
@@ -94,6 +97,21 @@ export interface ReportCategoryDefinition {
    * (art. 12) ; reçue sans compte ni adresse, personne ne pourrait la donner.
    */
   requiresReplyChannel: boolean;
+  /**
+   * Base légale du traitement du signalement (RGPD, art. 6).
+   *
+   * `LEGAL_OBLIGATION` : l'association est **tenue** de traiter la demande —
+   * exercice d'un droit (RGPD, art. 12), notification d'un contenu illicite
+   * (DSA, art. 16), demande adressée à l'hébergeur (DSA, art. 11 et 16),
+   * contestation d'une décision de modération (DSA, art. 20). Y exiger un
+   * consentement subordonnait un droit à un accord qui n'est pas libre, et
+   * dont le retrait ferait effacer une demande qu'elle doit traiter : aucune
+   * case n'est donc demandée, le formulaire informe seulement.
+   *
+   * `CONSENT` : le reste (modération des règles du site, bug, autre), où la
+   * case d'accord est gardée.
+   */
+  legalBasis: ReportLegalBasis;
   /** Aide du champ de description. */
   descriptionPlaceholder: string;
 }
@@ -107,6 +125,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: true,
     requiresRightsDeclaration: true,
     requiresReplyChannel: false,
+    legalBasis: "LEGAL_OBLIGATION",
     descriptionPlaceholder:
       "Quelle œuvre est reproduite, où la voir sur le site, et à qui elle appartient…",
   },
@@ -118,6 +137,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
+    legalBasis: "CONSENT",
     descriptionPlaceholder: "Quel contenu du site, sur quelle page, et ce qui ne va pas…",
   },
   BUG: {
@@ -128,6 +148,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
+    legalBasis: "CONSENT",
     descriptionPlaceholder: "Ce que tu faisais, ce que tu attendais, ce qui s'est passé…",
   },
   // Les deux catégories suivantes trient les demandes faites à l'éditeur et à
@@ -145,6 +166,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: true,
+    legalBasis: "LEGAL_OBLIGATION",
     descriptionPlaceholder:
       "Le droit que tu exerces, le compte concerné (pseudo), et ce que tu demandes précisément…",
   },
@@ -156,6 +178,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: true,
+    legalBasis: "LEGAL_OBLIGATION",
     descriptionPlaceholder: "Qui tu es (particulier, organisme, autorité), l'objet de ta demande, et la page concernée…",
   },
   OTHER: {
@@ -166,6 +189,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
+    legalBasis: "CONSENT",
     descriptionPlaceholder: "Explique-nous le problème…",
   },
   CONTEST: {
@@ -176,6 +200,7 @@ export const REPORT_CATEGORY_DEFINITIONS: Record<ReportCategory, ReportCategoryD
     requiresContact: false,
     requiresRightsDeclaration: false,
     requiresReplyChannel: false,
+    legalBasis: "LEGAL_OBLIGATION",
     descriptionPlaceholder:
       "Pourquoi le signalement est infondé : licence, autorisation du titulaire, création de l'équipe, contexte…",
   },
@@ -403,7 +428,9 @@ export function validateReportSubmission(input: unknown): ReportValidation {
     if (raw.goodFaith !== true) return { ok: false, error: "REPORT_GOOD_FAITH_REQUIRED" };
   }
 
-  if (raw.consent !== true) return { ok: false, error: "REPORT_CONSENT_REQUIRED" };
+  if (reportRequiresConsent(category) && raw.consent !== true) {
+    return { ok: false, error: "REPORT_CONSENT_REQUIRED" };
+  }
 
   return {
     ok: true,
@@ -422,17 +449,28 @@ export function validateReportSubmission(input: unknown): ReportValidation {
   };
 }
 
+/** La catégorie repose sur le consentement du signalant, donc demande la case d'accord. */
+export function reportRequiresConsent(category: ReportCategory): boolean {
+  return REPORT_CATEGORY_DEFINITIONS[category].legalBasis === "CONSENT";
+}
+
 /**
- * Envoi sans compte d'une catégorie qui appelle une réponse
- * (`requiresReplyChannel`), sans adresse pour la donner. La validation ne
- * connaît pas la session : la route (`createReport`) et le formulaire posent
- * cette question à part.
+ * Envoi d'une catégorie qui appelle une réponse (`requiresReplyChannel`) sans
+ * rien pour la donner : ni adresse, ni compte **joignable**.
+ *
+ * Un compte ne suffit pas : le site n'envoie aucun courriel, et un signalant ne
+ * suit pas son signalement en ligne — seul un compte Discord **prouvé**
+ * (identifiant rattaché ou tag certifié) permet à l'association de répondre.
+ * Un demandeur connecté sans lui recevait la promesse d'une réponse sous un
+ * mois sans qu'aucun canal ne la porte. La validation ne connaît pas le compte :
+ * la route (`createReport`) pose cette question à part, sur la base ; le
+ * formulaire ne connaît que la session et la pose au plus large.
  */
 export function missingReplyChannel(
   submission: Pick<ReportSubmission, "category" | "contactEmail">,
-  authenticated: boolean,
+  replyReachable: boolean,
 ): boolean {
-  return REPORT_CATEGORY_DEFINITIONS[submission.category].requiresReplyChannel && !authenticated && !submission.contactEmail;
+  return REPORT_CATEGORY_DEFINITIONS[submission.category].requiresReplyChannel && !replyReachable && !submission.contactEmail;
 }
 
 /**
@@ -634,9 +672,11 @@ export function formatContestAlert(input: {
 }
 
 /**
- * Ce que le formulaire dit **avant** l'envoi, et que la case de consentement
- * accepte. Écrit ici, et non dans le composant, parce que ces phrases engagent
- * l'association : ce qu'on collecte, pourquoi, qui le lit, combien de temps.
+ * Ce que le formulaire dit **avant** l'envoi, et que la case de consentement —
+ * là où la catégorie en demande une — accepte. Écrit ici, et non dans le
+ * composant, parce que ces phrases engagent l'association : ce qu'on collecte,
+ * pourquoi, qui le lit, combien de temps. Base légale et droits dépendent de la
+ * catégorie : `reportLegalBasisNotice`, `reportRightsNotice`.
  */
 export const REPORT_PRIVACY_NOTICE = {
   controller: "Responsable : l'association Bluegenji Esport.",
@@ -649,13 +689,84 @@ export const REPORT_PRIVACY_NOTICE = {
   contestRecipients:
     "Destinataires : les administrateurs de l'association. Une alerte part sur Discord, sans ton nom, ta description ni ton pseudo. L'auteur du signalement n'est pas informé de ta contestation.",
   // La prolongation est dite ici, et non seulement sur `/rgpd` : c'est cette
-  // phrase-là que la case de consentement accepte.
-  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_DAYS / 30} mois au plus).`,
-  legalBasis:
-    "Base légale : ton consentement, et pour un contenu illicite l'obligation faite à l'hébergeur de traiter les notifications (règlement européen sur les services numériques, art. 16).",
-  rights:
-    "Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, par ce formulaire (catégorie « RGPD ») ou sur Discord (voir la politique de confidentialité).",
+  // phrase-là que le signalant lit avant d'envoyer.
+  retention: `Durée : le temps du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa résolution — le signalement est alors effacé. Si un logo ou un avatar est masqué ou supprimé à sa suite, il est gardé jusqu'à l'échéance de la contestation (${LOGO_QUARANTINE_DAYS / 30} mois au plus).`,
 } as const;
+
+/**
+ * Base légale annoncée par le formulaire, **selon la catégorie** : une seule
+ * phrase pour toutes invitait à « consentir » à l'exercice d'un droit.
+ */
+export function reportLegalBasisNotice(category: ReportCategory): string {
+  switch (category) {
+    case "RGPD":
+      return "Base légale : l'obligation légale de répondre à une demande d'exercice des droits (RGPD, art. 6.1.c et 12). Aucun accord n'est demandé : ta demande sera traitée.";
+    case "COPYRIGHT":
+      return "Base légale : l'obligation faite à l'hébergeur de traiter les notifications de contenu illicite (règlement européen sur les services numériques, art. 16). Aucun accord n'est demandé : ta notification sera traitée.";
+    case "HOSTING":
+      return "Base légale : l'obligation faite à l'hébergeur de recevoir et de traiter les demandes qui lui sont adressées, dont celles des autorités (règlement européen sur les services numériques, art. 11 et 16). Aucun accord n'est demandé : ta demande sera traitée.";
+    case "CONTEST":
+      return "Base légale : l'obligation de permettre la contestation d'une décision de modération (règlement européen sur les services numériques, art. 20). Aucun accord n'est demandé : ta contestation sera examinée.";
+    default:
+      return "Base légale : ton consentement, donné par la case ci-dessous.";
+  }
+}
+
+/** Droits annoncés par le formulaire ; le retrait du consentement n'est dit que là où il existe. */
+export function reportRightsNotice(category: ReportCategory): string {
+  const withdrawal = reportRequiresConsent(category) ? ", ou retirer ton consentement" : "";
+  return `Tu peux demander l'accès, la rectification ou l'effacement de ces données${withdrawal}, par ce formulaire (catégorie « RGPD ») ou sur Discord (voir la politique de confidentialité).`;
+}
+
+/**
+ * Ce que contient un signalement de droit d'auteur — **la** liste, lue par le
+ * formulaire, les mentions légales, les conditions d'utilisation, `/rgpd` et la
+ * fiche T11 du registre. Trois versions en circulaient (l'une disait
+ * « adresse », qui se lit postale, une autre oubliait la qualité) : elle suit
+ * désormais les champs que le formulaire exige, dans leur ordre.
+ */
+export const COPYRIGHT_NOTICE_ELEMENTS: readonly string[] = [
+  "le nom ou la raison sociale de son auteur",
+  "son adresse électronique",
+  "sa qualité (titulaire des droits, représentant ou tiers)",
+  "le contenu visé et où le voir sur le site",
+  "la raison de la demande",
+  "une déclaration de bonne foi",
+];
+
+/** `COPYRIGHT_NOTICE_ELEMENTS` en une énumération française (« a, b et c »). */
+export function copyrightNoticeElementsText(): string {
+  const items = [...COPYRIGHT_NOTICE_ELEMENTS];
+  const last = items.pop();
+  return items.length === 0 ? (last ?? "") : `${items.join(", ")} et ${last}`;
+}
+
+/**
+ * Ce que l'auteur d'une notification de contenu illicite reçoit en retour
+ * (DSA, art. 16.4 et 16.5). Le site n'envoie aucun courriel : ces réponses
+ * partent de l'association, à la main, à l'adresse que la notification porte
+ * (exigée en droit d'auteur) — le panneau de traitement le rappelle
+ * (`reportFollowUpDuty`).
+ */
+export const NOTIFIER_FOLLOW_UP =
+  "L'auteur d'une notification reçoit, à l'adresse qu'il indique, un accusé de réception, puis la décision prise à son sujet et les voies de recours qui lui sont ouvertes.";
+
+/**
+ * Le retour que l'association **doit** à l'auteur d'un signalement, rappelé
+ * dans le panneau de traitement — `null` quand aucun n'est dû.
+ */
+export function reportFollowUpDuty(category: ReportCategory): string | null {
+  switch (category) {
+    case "COPYRIGHT":
+      return "Notification de contenu illicite : accuser réception à l'adresse indiquée, puis notifier la décision et les voies de recours (DSA, art. 16.4 et 16.5).";
+    case "RGPD":
+      return "Demande d'exercice des droits : répondre dans le mois (RGPD, art. 12), à l'adresse indiquée ou sur le Discord du compte.";
+    case "HOSTING":
+      return "Demande adressée à l'hébergeur : accuser réception et répondre, à l'adresse indiquée ou sur le Discord du compte.";
+    default:
+      return null;
+  }
+}
 
 /** Phrase française d'un refus de la route, jamais le jeton lui-même. */
 export function reportErrorMessage(code: string | null | undefined): string {
@@ -676,7 +787,7 @@ export function reportErrorMessage(code: string | null | undefined): string {
     case "REPORT_CONTACT_REQUIRED":
       return "Indique ton nom et une adresse électronique : un signalement de droit d'auteur doit pouvoir être suivi.";
     case "REPORT_REPLY_CHANNEL_REQUIRED":
-      return "Indique une adresse pour qu'on puisse te répondre, ou connecte-toi.";
+      return "Indique une adresse électronique pour qu'on puisse te répondre : sans compte, ou sans compte Discord rattaché, c'est le seul moyen.";
     case "REPORT_CONTACT_TOO_LONG":
       return "Le nom indiqué est trop long.";
     case "REPORT_INVALID_EMAIL":

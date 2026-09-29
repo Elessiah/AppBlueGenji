@@ -374,6 +374,27 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/profil#confidentialite", label: "Masquer mon avatar" },
     ],
   },
+  // La base légale des signalements change pour quatre catégories : une
+  // demande RGPD, une notification de droit d'auteur, une demande à
+  // l'hébergeur et une contestation reposent sur l'obligation légale, plus sur
+  // un consentement qui n'était pas libre — le droit de le retirer disparaît
+  // donc pour elles, et une adresse devient exigée d'un compte sans Discord
+  // prouvé (RGPD, hébergeur). Daté du lendemain du déploiement, comme les
+  // entrées précédentes : un compte né le jour même, avant la mise en ligne,
+  // s'est inscrit sous l'ancienne politique.
+  {
+    id: "2026-10-signalements-base-legale",
+    publishedAt: "2026-10-01",
+    title: "Signalements : plus de case d'accord pour exercer un droit",
+    summary:
+      "Une demande RGPD, un signalement de droit d'auteur, une demande à l'hébergeur ou une contestation n'exigent plus de cocher une case d'accord : l'association est tenue de les traiter. Pour les autres signalements, rien ne change.",
+    details: [
+      "Ces quatre catégories reposent désormais sur l'obligation légale de l'association (RGPD, art. 12 ; règlement européen sur les services numériques, art. 11, 16 et 20), et non plus sur ton consentement : il n'y a donc plus de consentement à retirer pour elles, mais ta demande est toujours traitée. Tes droits d'accès, de rectification et d'effacement restent les mêmes.",
+      "Une demande RGPD ou adressée à l'hébergeur demande une adresse électronique si ton compte n'a pas de Discord rattaché ni de tag certifié : le site n'envoie aucun courriel, et sans elle l'association ne pourrait pas te répondre.",
+      "L'auteur d'un signalement de droit d'auteur reçoit un accusé de réception, puis la décision prise et les voies de recours, à l'adresse qu'il indique.",
+    ],
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

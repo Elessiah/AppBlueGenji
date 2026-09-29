@@ -22,6 +22,7 @@
  * Module pur, importable partout.
  */
 
+import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-reports";
 import { LOGO_QUARANTINE_DAYS } from "./logo-quarantine";
 
 /** Version en vigueur. L'avancer redemande l'acceptation. */
@@ -144,11 +145,11 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "signalement",
     title: "Signalement et modération",
     paragraphs: [
-      "Toute personne, membre ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton **« Signaler un problème »** présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer le nom et l'adresse de son auteur, le contenu visé et la raison de la demande.",
+      `Toute personne, membre ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton **« Signaler un problème »** présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer ${copyrightNoticeElementsText()}. ${NOTIFIER_FOLLOW_UP}`,
       "L'association agit comme **hébergeur** des contenus de ses membres : elle ne les contrôle pas avant publication, mais **retire promptement** tout contenu manifestement illicite qui lui est signalé.",
-      "Selon la gravité, l'association peut **retirer un contenu** (par exemple un logo), **retirer une équipe d'un tournoi**, ou **suspendre un compte**.",
+      "Selon la gravité, l'association peut **retirer un contenu** (par exemple un logo ou un avatar), **retirer une équipe d'un tournoi**, ou **suspendre un compte**.",
       "Les joueurs visés par un signalement, et les membres des équipes visées, en sont **prévenus en message privé Discord** (s'ils ont rattaché leur compte Discord ou certifié leur tag). Ils lisent sur la page du signalement ce qui est reproché — jamais qui l'a signalé — et peuvent le **contester** depuis cette page ou par la catégorie « Contestation » du même formulaire ; contester un signalement archivé le rouvre.",
-      `Un logo signalé peut être **masqué** plutôt que supprimé : il n'est plus en ligne, et l'équipe dispose de **${LOGO_QUARANTINE_DAYS / 30} mois** pour contester. Sans contestation, il est supprimé définitivement à l'échéance ; si la contestation aboutit, il est rétabli. Un contenu manifestement illicite peut être supprimé sans délai : l'équipe en est prévenue de la même façon et peut contester la décision.`,
+      `Un logo d'équipe ou un avatar de joueur signalé peut être **masqué** plutôt que supprimé : il n'est plus en ligne, et l'équipe ou le joueur dispose de **${LOGO_QUARANTINE_DAYS / 30} mois** pour contester. Sans contestation, l'image est supprimée définitivement à l'échéance ; si la contestation aboutit, elle est rétablie. Un contenu manifestement illicite peut être supprimé sans délai : l'équipe ou le joueur en est prévenu de la même façon et peut contester la décision.`,
     ],
   },
   {

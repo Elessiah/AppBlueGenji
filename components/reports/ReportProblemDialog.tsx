@@ -18,11 +18,15 @@ import {
   REPORT_DESCRIPTION_MAX_LENGTH,
   REPORT_DESCRIPTION_MIN_LENGTH,
   REPORT_MAX_TARGETS,
+  NOTIFIER_FOLLOW_UP,
   REPORT_PRIVACY_NOTICE,
   RIGHTS_RELATIONS,
   RIGHTS_RELATION_LABELS,
   reportErrorMessage,
   missingReplyChannel,
+  reportLegalBasisNotice,
+  reportRequiresConsent,
+  reportRightsNotice,
   reportTargetFromPath,
   validateReportSubmission,
   REPORT_STATUS_LABELS,
@@ -460,7 +464,11 @@ export function ReportProblemDialog({
                   <label htmlFor={`${titleId}-email`}>
                     Adresse pour te répondre{" "}
                     <span className={styles.optional}>
-                      {definition.requiresReplyChannel && !authenticated ? "(obligatoire sans compte)" : "(facultatif)"}
+                      {definition.requiresReplyChannel
+                        ? authenticated
+                          ? "(obligatoire sans compte Discord rattaché)"
+                          : "(obligatoire sans compte)"
+                        : "(facultatif)"}
                     </span>
                   </label>
                   <input
@@ -473,7 +481,7 @@ export function ReportProblemDialog({
                   />
                   <p className={styles.hint}>
                     {authenticated
-                      ? "Sans adresse, l'association te répondra par ton compte (Discord si tu l'as rattaché)."
+                      ? "Sans adresse, l'association te répondra sur Discord, si ton compte Discord est rattaché ou ton tag certifié."
                       : definition.requiresReplyChannel
                         ? "Sans compte, c'est la seule façon pour l'association de te répondre."
                         : "Sans adresse, l'association ne pourra pas te tenir au courant."}
@@ -493,9 +501,10 @@ export function ReportProblemDialog({
                       : REPORT_PRIVACY_NOTICE.recipients}
                   </li>
                   <li>{REPORT_PRIVACY_NOTICE.retention}</li>
-                  <li>{REPORT_PRIVACY_NOTICE.legalBasis}</li>
+                  <li>{reportLegalBasisNotice(category)}</li>
+                  {category === "COPYRIGHT" && <li>{NOTIFIER_FOLLOW_UP}</li>}
                   <li>
-                    {REPORT_PRIVACY_NOTICE.rights}{" "}
+                    {reportRightsNotice(category)}{" "}
                     <Link href="/rgpd" target="_blank" rel="noreferrer">
                       Politique de confidentialité
                     </Link>{" "}
@@ -507,13 +516,18 @@ export function ReportProblemDialog({
                 </ul>
               </div>
 
-              <label className={styles.check}>
-                <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-                <span>
-                  J&apos;accepte que l&apos;association Bluegenji Esport traite ces données pour donner suite à mon
-                  signalement, dans les conditions ci-dessus.
-                </span>
-              </label>
+              {/* Pas de case là où l'association est tenue de traiter la
+                  demande (droit, notification, contestation) : un accord
+                  qu'on ne peut pas refuser n'en est pas un. */}
+              {reportRequiresConsent(category) && (
+                <label className={styles.check}>
+                  <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+                  <span>
+                    J&apos;accepte que l&apos;association Bluegenji Esport traite ces données pour donner suite à mon
+                    signalement, dans les conditions ci-dessus.
+                  </span>
+                </label>
+              )}
             </ScrollArea>
 
             <div className={styles.foot}>

@@ -6,7 +6,8 @@ import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import { AUTHORITY_CONTACT_LANGUAGES, LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
@@ -248,17 +249,35 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           <strong>Toute personne</strong>, membre ou non, peut signaler un contenu illicite — une
           atteinte au droit d&apos;auteur notamment — par le bouton <strong>« Signaler un
           problème »</strong> présent en bas de chaque page. Le signalement d&apos;un droit
-          d&apos;auteur indique le nom et l&apos;adresse de son auteur, sa qualité, le contenu visé
-          et la raison de la demande.
+          d&apos;auteur indique {copyrightNoticeElementsText()}. {NOTIFIER_FOLLOW_UP}
         </p>
         <p>
-          Un logo signalé peut être <strong>masqué</strong> sans délai : il cesse d&apos;être en
-          ligne, et l&apos;équipe en est prévenue. Elle dispose alors de{" "}
-          <strong>{LOGO_QUARANTINE_DAYS / 30} mois</strong> pour contester depuis la page du
-          signalement ; sans contestation, le logo est supprimé définitivement, et si la
-          contestation aboutit, il est rétabli. Le détail du traitement de vos données dans ce
-          cadre figure dans la <Link href="/rgpd#signalements">politique de confidentialité</Link>.
+          Un logo d&apos;équipe ou un avatar de joueur signalé peut être <strong>masqué</strong>{" "}
+          sans délai : il cesse d&apos;être en ligne, et l&apos;équipe ou le joueur en est prévenu.
+          Il ou elle dispose alors de <strong>{LOGO_QUARANTINE_DAYS / 30} mois</strong> pour
+          contester depuis la page du signalement ; sans contestation, l&apos;image est supprimée
+          définitivement, et si la contestation aboutit, elle est rétablie. Le détail du traitement
+          de vos données dans ce cadre figure dans la{" "}
+          <Link href="/rgpd#signalements">politique de confidentialité</Link>.
         </p>
+      </>
+    ),
+  },
+  {
+    id: "autorites",
+    title: "Point de contact des autorités",
+    meta: "DSA ART. 11",
+    body: (
+      <>
+        <p>
+          Les autorités des États membres, la Commission européenne et le comité européen des
+          services numériques joignent l&apos;association, en sa qualité d&apos;hébergeur des
+          contenus de ses membres, par un <strong>point de contact unique</strong> : son courriel,{" "}
+          <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
+          , ou le bouton <strong>« {REPORT_FORM_NAME} »</strong> en bas de chaque page, catégorie
+          « Hébergeur ».
+        </p>
+        <p>Langues acceptées : {AUTHORITY_CONTACT_LANGUAGES.join(" et ")}.</p>
       </>
     ),
   },

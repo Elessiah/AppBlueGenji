@@ -8,6 +8,7 @@ import {
   REPORT_RETENTION_DAYS_AFTER_RESOLUTION,
   REPORT_STATUS_LABELS,
   RIGHTS_RELATION_LABELS,
+  reportFollowUpDuty,
   type ReportAction,
   type ReportTargetRef,
   type ReportView,
@@ -50,6 +51,8 @@ export function ReportDetail({
   const titleId = useId();
   const noteId = useId();
   const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
+  // Le site n'envoie aucun courriel : ce retour part de l'association, à la main.
+  const followUp = reportFollowUpDuty(report.category);
   const [resolving, setResolving] = useState(false);
   const [note, setNote] = useState("");
 
@@ -258,6 +261,11 @@ export function ReportDetail({
           <div>
             <dt>Qualité</dt>
             <dd>{RIGHTS_RELATION_LABELS[report.rightsRelation]}</dd>
+          </div>
+        )}        {followUp && (
+          <div>
+            <dt>Retour dû</dt>
+            <dd>{followUp}</dd>
           </div>
         )}
       </dl>
