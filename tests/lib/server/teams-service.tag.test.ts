@@ -36,6 +36,16 @@ async function mockDb() {
   return { poolExecute, connectionExecute, connection };
 }
 
+/**
+ * Les deux premières instructions de la transaction de `createTeam` : verrou de
+ * la ligne du joueur, puis relecture de son appartenance (aucune équipe active).
+ */
+function lockedAndFree(connectionExecute: Exec) {
+  connectionExecute
+    .mockResolvedValueOnce([[{ id: 1 }], []])
+    .mockResolvedValueOnce([[], []]);
+}
+
 /** SQL des appels d'un mock, concaténé — pratique pour affirmer une absence. */
 function sqlOf(execute: Exec): string {
   return execute.mock.calls.map((call) => String(call[0])).join("\n");
@@ -50,8 +60,8 @@ describe("createTeam — sigle", () => {
   });
 
   it("normalise le sigle et l'écrit avec l'équipe", async () => {
-    const { poolExecute, connectionExecute } = await mockDb();
-    poolExecute.mockResolvedValue([[], []]); // aucune équipe active
+    const { connectionExecute } = await mockDb();
+    lockedAndFree(connectionExecute); // compte verrouillé, aucune équipe active
     connectionExecute
       .mockResolvedValueOnce([[], []]) // sigle libre
       .mockResolvedValueOnce([{ insertId: 5 }, []]) // insertion de l'équipe
@@ -59,21 +69,21 @@ describe("createTeam — sigle", () => {
 
     await expect(createTeam(1, "Dragon Squad", null, "  drgn ")).resolves.toBe(5);
 
-    const insert = connectionExecute.mock.calls[1] as [string, unknown[]];
+    const insert = connectionExecute.mock.calls[3] as [string, unknown[]];
     expect(insert[0]).toMatch(/INSERT INTO bg_teams \(name, tag, logo_url, description\)/);
     expect(insert[1]).toEqual(["Dragon Squad", "DRGN", null]);
   });
 
   it("écrit NULL quand aucun sigle n'est demandé", async () => {
-    const { poolExecute, connectionExecute } = await mockDb();
-    poolExecute.mockResolvedValue([[], []]);
+    const { connectionExecute } = await mockDb();
+    lockedAndFree(connectionExecute);
     connectionExecute
       .mockResolvedValueOnce([{ insertId: 5 }, []])
       .mockResolvedValueOnce([{ insertId: 9 }, []]);
 
     await createTeam(1, "Dragon Squad");
 
-    const insert = connectionExecute.mock.calls[0] as [string, unknown[]];
+    const insert = connectionExecute.mock.calls[2] as [string, unknown[]];
     expect(insert[1]).toEqual(["Dragon Squad", null, null]);
     // Aucun contrôle d'unicité : il n'y a pas de sigle à réserver.
     expect(sqlOf(connectionExecute)).not.toMatch(/SELECT id FROM bg_teams WHERE tag/);
@@ -91,8 +101,8 @@ describe("createTeam — sigle", () => {
   });
 
   it("refuse un sigle déjà pris et défait la transaction", async () => {
-    const { poolExecute, connectionExecute, connection } = await mockDb();
-    poolExecute.mockResolvedValue([[], []]);
+    const { connectionExecute, connection } = await mockDb();
+    lockedAndFree(connectionExecute);
     connectionExecute.mockResolvedValueOnce([[{ id: 8 }], []]); // sigle occupé
 
     await expect(createTeam(1, "Dragon Squad", null, "DRGN")).rejects.toThrow(
@@ -104,8 +114,8 @@ describe("createTeam — sigle", () => {
   });
 
   it("traduit la course perdue contre une création simultanée", async () => {
-    const { poolExecute, connectionExecute, connection } = await mockDb();
-    poolExecute.mockResolvedValue([[], []]);
+    const { connectionExecute, connection } = await mockDb();
+    lockedAndFree(connectionExecute);
     connectionExecute
       .mockResolvedValueOnce([[], []]) // libre au moment du contrôle…
       .mockRejectedValueOnce(
@@ -118,6 +128,59 @@ describe("createTeam — sigle", () => {
     await expect(createTeam(1, "Dragon Squad", null, "DRGN")).rejects.toThrow(
       "TEAM_TAG_ALREADY_USED",
     );
+    expect(connection.rollback).toHaveBeenCalled();
+  });
+});
+
+describe("createTeam — une seule équipe active (§3.1)", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("verrouille la ligne du joueur en toute première instruction, puis relit son appartenance", async () => {
+    // Le verrou d'`acceptIntoTeam` : deux créations simultanées, ou une
+    // création et une acceptation, se sérialisent au lieu de passer toutes
+    // deux le contrôle. Sous REPEATABLE READ, rien ne se lit avant lui.
+    const { poolExecute, connectionExecute } = await mockDb();
+    lockedAndFree(connectionExecute);
+    connectionExecute
+      .mockResolvedValueOnce([{ insertId: 5 }, []])
+      .mockResolvedValueOnce([{ insertId: 9 }, []]);
+
+    await createTeam(1, "Dragon Squad");
+
+    const [lockSql, lockParams] = connectionExecute.mock.calls[0] as [string, unknown[]];
+    expect(lockSql).toMatch(/SELECT id FROM bg_users WHERE id = \? FOR UPDATE/);
+    expect(lockParams).toEqual([1]);
+    const [membershipSql, membershipParams] = connectionExecute.mock.calls[1] as [string, unknown[]];
+    expect(membershipSql).toMatch(/FROM bg_team_members[\s\S]*WHERE user_id = \?[\s\S]*left_at IS NULL/);
+    expect(membershipParams).toEqual([1]);
+    // Plus aucune lecture sur le pool, hors de la transaction.
+    expect(poolExecute).not.toHaveBeenCalled();
+  });
+
+  it("refuse un joueur déjà dans une équipe active, sans rien écrire", async () => {
+    const { connectionExecute, connection } = await mockDb();
+    connectionExecute
+      .mockResolvedValueOnce([[{ id: 1 }], []])
+      .mockResolvedValueOnce([[{ id: 40 }], []]); // équipe active (vue sous le verrou)
+
+    await expect(createTeam(1, "Dragon Squad")).rejects.toThrow("USER_ALREADY_IN_TEAM");
+    expect(sqlOf(connectionExecute)).not.toMatch(/INSERT/);
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(connection.release).toHaveBeenCalled();
+  });
+
+  it("refuse un compte introuvable", async () => {
+    const { connectionExecute, connection } = await mockDb();
+    connectionExecute.mockResolvedValueOnce([[], []]);
+
+    await expect(createTeam(1, "Dragon Squad")).rejects.toThrow("PROFILE_NOT_FOUND");
+    expect(connectionExecute).toHaveBeenCalledTimes(1);
     expect(connection.rollback).toHaveBeenCalled();
   });
 });

@@ -13,7 +13,7 @@ import {
   updateTeamMemberRoles,
 } from "@/lib/server/teams-service";
 import type { TeamRole } from "@/lib/shared/types";
-import { fakePool } from "../../helpers/sql-double";
+import { connectionMock, fakePool } from "../../helpers/sql-double";
 
 /**
  * Gestion du roster : qui a la main, et sur qui.
@@ -40,10 +40,13 @@ const ROSTER: Record<number, TeamRole[]> = {
 
 type Execute = (sql: string, params?: unknown[]) => Promise<unknown>;
 let execute: jest.Mock<Execute>;
+let connection: ReturnType<typeof connectionMock>;
 
 /**
  * Base simulée : la lecture des rôles d'un membre répond depuis `roster`, toute
- * écriture rend `affectedRows`.
+ * écriture rend `affectedRows`. Le pool et la connexion de transaction partagent
+ * le même `execute` : les gestes du roster se jouent sous transaction
+ * (`withTeamRosterLock`), `canManageTeam` sur le pool.
  */
 function useDatabase(roster: Record<number, TeamRole[]> = ROSTER, affectedRows = 1) {
   execute = jest.fn<Execute>(async (sql, params = []) => {
@@ -51,9 +54,14 @@ function useDatabase(roster: Record<number, TeamRole[]> = ROSTER, affectedRows =
       const roles = roster[Number(params[1])];
       return [roles ? [{ roles_json: JSON.stringify(roles) }] : [], []];
     }
+    if (/FROM bg_teams WHERE id = \? FOR UPDATE/.test(sql)) return [[{ id: TEAM_ID }], []];
     return [{ affectedRows }, []];
   });
-  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+  connection = connectionMock();
+  connection.execute.mockImplementation((sql, params) => execute(sql, params as unknown[]));
+  jest.mocked(getDatabase).mockResolvedValue(
+    fakePool({ execute, getConnection: jest.fn(async () => connection) }),
+  );
 }
 
 const updates = () =>
@@ -210,5 +218,50 @@ describe("leaveTeam", () => {
     const [sql, params] = updates()[0];
     expect(sql).toMatch(/SET left_at = NOW\(\)/);
     expect(params).toEqual([TEAM_ID, userId]);
+  });
+});
+
+describe("gestes du roster — sous transaction et sous verrou (§3.1)", () => {
+  const sqls = () => connection.execute.mock.calls.map(([sql]) => String(sql));
+  const gestures: [string, () => Promise<void>][] = [
+    ["updateTeamMemberRoles", () => updateTeamMemberRoles(OWNER_ID, TEAM_ID, DPS_ID, ["HEAL"])],
+    ["removeTeamMember", () => removeTeamMember(OWNER_ID, TEAM_ID, DPS_ID)],
+    ["leaveTeam", () => leaveTeam(DPS_ID, TEAM_ID)],
+  ];
+
+  it.each(gestures)(
+    "%s verrouille l'équipe en toute première instruction, puis relit les rôles sous verrou",
+    async (_label, run) => {
+      await run();
+
+      // Sous REPEATABLE READ, une lecture ordinaire placée avant le verrou
+      // figerait un instantané antérieur à l'attente.
+      expect(sqls()[0]).toMatch(/SELECT id FROM bg_teams WHERE id = \? FOR UPDATE/);
+      const roleReads = sqls().filter((sql) => /SELECT roles_json/.test(sql));
+      expect(roleReads.length).toBeGreaterThan(0);
+      for (const sql of roleReads) expect(sql).toMatch(/FOR UPDATE/);
+      // Rien sur le pool : chaque lecture et chaque écriture passent par la
+      // connexion de la transaction (qui délègue au même `execute`).
+      expect(execute.mock.calls.length).toBe(connection.execute.mock.calls.length);
+      expect(connection.commit).toHaveBeenCalled();
+      expect(connection.release).toHaveBeenCalled();
+    },
+  );
+
+  it.each(gestures)("%s défait la transaction si l'écriture n'apparie aucune ligne", async (_label, run) => {
+    useDatabase(ROSTER, 0);
+    await expect(run()).rejects.toThrow("MEMBER_NOT_FOUND");
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("un membre devenu propriétaire sous le verrou n'est plus ni exclu, ni destitué, ni parti", async () => {
+    // Relus sous verrou, les rôles sont ceux d'après le transfert : lus avant,
+    // la gestion excluait — ou réécrivait sans OWNER — le nouveau propriétaire.
+    useDatabase({ ...ROSTER, [OWNER_ID]: ["TANK"], [DPS_ID]: ["OWNER", "DPS"] });
+    await expect(removeTeamMember(MANAGER_ID, TEAM_ID, DPS_ID)).rejects.toThrow("CANNOT_KICK_OWNER");
+    await expect(updateTeamMemberRoles(MANAGER_ID, TEAM_ID, DPS_ID, ["HEAL"])).rejects.toThrow("FORBIDDEN");
+    await expect(leaveTeam(DPS_ID, TEAM_ID)).rejects.toThrow("OWNER_MUST_TRANSFER");
+    expect(updates()).toHaveLength(0);
   });
 });
