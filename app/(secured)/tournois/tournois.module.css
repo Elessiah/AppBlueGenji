@@ -236,9 +236,8 @@ a.sectionNavLink:focus-visible {
 
 .section {
   margin-bottom: 24px;
-  /* Le sommaire y mène par une ancre : l'en-tête collant du site ne doit pas
-     recouvrir le titre de la section d'arrivée. */
-  scroll-margin-top: 96px;
+  /* Le sommaire y mène par une ancre : l'arrivée sous l'en-tête collant est
+     tenue par `html { scroll-padding-top }` (hauteur mesurée). */
 }
 
 /* Le `<h2>` n'est là que pour le niveau de titre : sa mise en forme vient

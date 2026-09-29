@@ -29,7 +29,7 @@ export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: 
   const pathname = usePathname();
 
   return (
-    <nav className={s.nav} aria-label="Navigation principale">
+    <nav className={s.nav} aria-label="Navigation principale" data-sticky-header>
       <div className={`container ${s.navInner}`}>
         <div className={s.navLeft}>
           {links.map((link) => {

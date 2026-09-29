@@ -1802,6 +1802,16 @@ html {
   scroll-padding-bottom: 92px;
 }
 
+html {
+  /* Marge sous l'en-tête collant, dont la hauteur varie (110 à 134 px mesurés
+     selon l'en-tête et la largeur) : elle est **mesurée** et posée sur `<html>`
+     par `StickyHeaderOffset` (`lib/shared/sticky-header.ts`). Une seule règle
+     pour toute ancre, tout `scrollIntoView` et tout défilement de focus —
+     jamais de `scroll-margin-top` en dur sur une cible, qui s'y ajouterait.
+     Le repli couvre l'en-tête le plus haut, le temps de la première mesure. */
+  scroll-padding-top: calc(var(--sticky-header-h, 134px) + 16px);
+}
+
 @media (max-width: 720px) {
   html {
     scroll-padding-bottom: 76px;
@@ -1841,13 +1851,6 @@ html {
    défilante) garde son anneau : elle l'aurait eu au clavier. */
 [data-skip-target][tabindex="-1"]:focus {
   outline: none;
-}
-
-/* Les en-têtes de la vitrine et de l'espace connecté sont collants : une cible
-   ramenée en haut de la vue passerait dessous (WCAG 2.4.11). La marge couvre
-   la hauteur de l'en-tête, bannière de recrutement comprise. */
-[data-skip-target] {
-  scroll-margin-top: 96px;
 }
 
 @media (forced-colors: active) {

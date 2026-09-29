@@ -4,7 +4,6 @@
   width: min(1240px, calc(100vw - 40px));
   margin: 0 auto;
   padding: 48px 0;
-  scroll-margin-top: 96px;
 }
 
 .heroSection {

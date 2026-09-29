@@ -21,8 +21,10 @@
   font-size: 13px;
   /* Marge de sécurité pour le saut natif du navigateur sur `#match-…`
      (rechargement d'une URL ancrée) : le défilement piloté par
-     `useMatchAnchor` centre la carte, celui du navigateur la colle en haut. */
-  scroll-margin: 96px;
+     `useMatchAnchor` centre la carte, celui du navigateur la colle en haut.
+     Horizontale seulement : la marge du haut est celle de `html`, calée sur
+     l'en-tête collant mesuré — une marge ici s'y ajouterait. */
+  scroll-margin-inline: 96px;
 }
 
 /* Carte que le lecteur peut arbitrer : un liseré bleu la distingue des autres. */

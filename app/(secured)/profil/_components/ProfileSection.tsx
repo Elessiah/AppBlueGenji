@@ -28,7 +28,7 @@ export function ProfileSection({
     <section
       id={section.id}
       aria-labelledby={headingId}
-      className={`ds-block ${s.section} ${className ?? ""}`}
+      className={`ds-block ${className ?? ""}`}
     >
       <div className={s.sectionHead}>
         <h2 id={headingId} className={s.sectionTitle}>

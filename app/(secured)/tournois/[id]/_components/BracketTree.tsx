@@ -203,7 +203,7 @@ export function BracketTree({
                     <div
                       key={match.id}
                       ref={setMatchRef(match.id)}
-                      style={{ height: slotH, display: "flex", alignItems: "center", justifyContent: "center", scrollMargin: 80 }}
+                      style={{ height: slotH, display: "flex", alignItems: "center", justifyContent: "center", scrollMarginInline: 80 }}
                     >
                       <div
                         ref={measureSlot(roundNum, match.id)}

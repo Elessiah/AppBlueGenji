@@ -25,7 +25,8 @@ cartes, derrière parfois trois cadres vides.
 - **Le sommaire mène aux sections** (`#tournois-<clé>`) et déplie au passage
   une section repliée (« Terminés ») : l'ouverture des sections est donc tenue
   par la page (`Section` accepte `open` / `onOpenChange`, et garde
-  `defaultOpen` quand personne ne la pilote). `scroll-margin-top` garde le
+  `defaultOpen` quand personne ne la pilote). `html { scroll-padding-top }`, calé
+  sur la hauteur mesurée de l'en-tête, garde le
   titre d'arrivée hors de l'en-tête collant.
 - La numérotation (« 01 », « 02 »…) ne compte que les sections affichées.
 - En-tête un peu resserré (titre, marges) : la première carte remonte d'autant.

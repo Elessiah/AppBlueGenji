@@ -49,7 +49,8 @@ fichier qui l'utilise (`app/association/page.tsx`, `app/mentions-legales/page.ts
 
 Les liens RGPD / Cookies du footer pointent vers les sections ancrées de
 `/mentions-legales` (`id="donnees-personnelles"`, `id="cookies"`), avec un
-`scroll-margin-top` pour dégager le header sticky.
+`html { scroll-padding-top }` calé sur la hauteur mesurée de l'en-tête collant
+(`docs/features/ERROR_PAGES_AND_ANCHORS.md`) pour le dégager.
 
 Les liens vers fichiers statiques et le Google Doc utilisent `<a>` (et non
 `next/link`) : `target="_blank" rel="noreferrer"` pour le PDF et le Google Doc,

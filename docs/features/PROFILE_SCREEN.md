@@ -64,7 +64,7 @@ autour) donne sinon une carte dans une carte et le même titre écrit deux fois.
 
 La navigation est faite de **liens d'ancre**, pas d'onglets : rien à mémoriser,
 rien à hydrater, et une URL comme `/profil#connexions` fonctionne depuis
-n'importe où. `scroll-margin-top` sur la section plutôt qu'un décalage au clic,
+n'importe où. Une marge de défilement plutôt qu'un décalage au clic,
 pour que l'arrivée par une URL collée tombe au bon endroit elle aussi.
 
 Le saut est **rejoué une fois la section montée**. Le navigateur n'honore le
@@ -80,8 +80,9 @@ se joue qu'une fois : `window.location.hash` garde le dernier lien cliqué et
 remonterait le lecteur à la section visitée dix minutes plus tôt au moment où il
 enregistre son profil depuis une autre.
 
-`scroll-margin-top` vaut la hauteur d'`ArenaNav` (52 px de pastille + 2 × 14 px
-de rembourrage) **plus** une respiration : la barre est `position: sticky`, si
+`html { scroll-padding-top }` vaut la hauteur **mesurée** d'`ArenaNav`
+(`docs/features/ERROR_PAGES_AND_ANCHORS.md`)
+**plus** 16 px de respiration : la barre est `position: sticky`, si
 bien qu'une marge plus courte rangeait le titre visé derrière elle — le seul
 élément de la page qu'on ne voyait pas était celui qu'on venait chercher.
 

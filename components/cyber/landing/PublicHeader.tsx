@@ -31,7 +31,7 @@ export async function PublicHeader() {
   const activeTeam = team ? { teamId: team.teamId, teamName: team.teamName } : null;
 
   return (
-    <header className={styles.root}>
+    <header className={styles.root} data-sticky-header>
       <div className={styles.inner}>
         <div className={styles.left}>
           <PublicNavMenu />

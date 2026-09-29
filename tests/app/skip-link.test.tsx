@@ -96,7 +96,10 @@ describe("focusMainContent", () => {
     const css = readSource("app/globals.css");
     expect(css).toContain('[data-skip-target][tabindex="-1"]:focus {\n  outline: none;');
     expect(css).not.toMatch(/\[data-skip-target\]:focus \{/);
-    expect(css).toMatch(/\[data-skip-target\] \{\s*scroll-margin-top:/);
+    // La cible s'arrête sous l'en-tête collant par la marge globale, calée
+    // sur sa hauteur mesurée — pas par une marge en dur qui s'y ajouterait.
+    expect(css).not.toMatch(/\[data-skip-target\] \{\s*scroll-margin-top:/);
+    expect(css).toMatch(/scroll-padding-top:\s*calc\(var\(--sticky-header-h/);
   });
 
   it("défait tout et rend `false` quand la cible refuse le focus", () => {

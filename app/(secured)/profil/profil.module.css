@@ -88,16 +88,10 @@
 
 /* ── Sections ─────────────────────────────────────────────────────────────── */
 
-.section {
-  /* `scroll-margin-top` et non un décalage au clic : l'ancre doit tomber au bon
-     endroit aussi quand on arrive par une URL collée.
-     La marge vaut la hauteur de `ArenaNav` (52 px de pastille + 2 × 14 px de
-     rembourrage, soit 80) **plus** une respiration : la barre est
-     `position: sticky; top: 0`, si bien qu'une marge plus courte faisait
-     atterrir le titre de la section derrière elle — à 24 px, le `<h2>` tombait
-     à y ≈ 52, entièrement masqué. */
-  scroll-margin-top: 96px;
-}
+/* Aucune marge d'ancre sur les sections : l'arrivée sous `ArenaNav` (collante)
+   est tenue par `html { scroll-padding-top }`, calé sur la hauteur **mesurée**
+   de la barre (`lib/shared/sticky-header.ts`) — aussi quand on arrive par une
+   URL collée. Une marge en dur s'y ajouterait. */
 
 .sectionHead {
   margin-bottom: 18px;
