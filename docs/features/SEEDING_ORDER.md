@@ -131,11 +131,14 @@ sous `REPEATABLE READ`, c'est la première qui fige l'instantané. Tournoi
 d'abord, comme les gestes du staff qui écrivent des matchs sous ce verrou
 (avancée, retour en arrière, inscription). Aucun ordre n'exclut l'interblocage
 avec une saisie de score, qui tient son match (voire d'autres, par l'entretien)
-puis le tournoi dans la réconciliation : le réordonnancement **rejoue** alors sa
-transaction, jusqu'à trois fois (`REORDER_DEADLOCK_ATTEMPTS`). Il n'a rien écrit
-quand il pose ses verrous, InnoDB le choisit donc d'ordinaire pour victime ;
-rejoué, il voit la saisie commitée et refuse en `SEEDING_LOCKED`. Si c'est la
-saisie qui est défaite, elle échoue en erreur visible, jamais en silence. Jugée sur des lectures ordinaires, la borne ne tenait que
+puis le tournoi dans la réconciliation. InnoDB défait alors l'une des deux —
+pas forcément le réordonnancement, qui tient les verrous de tous les matchs du
+tournoi. Défait, le réordonnancement **rejoue** sa transaction, jusqu'à trois
+fois (`REORDER_DEADLOCK_ATTEMPTS`) : il voit la saisie commitée et refuse en
+`SEEDING_LOCKED`. Si c'est la saisie qui est défaite, elle échoue en erreur
+visible (ses chemins ne rejouent pas) et le réordonnancement passe — jamais un
+score perdu en silence. Décision requise : traduire cet interblocage en message
+lisible (« réessaie ») côté saisie de score, hors du périmètre de ce correctif. Jugée sur des lectures ordinaires, la borne ne tenait que
 hors concurrence : un premier report validé entre le contrôle et
 `deleteAllMatches` échappait à l'instantané, et le plateau régénéré l'effaçait
 alors que le joueur avait reçu un succès. Toute écriture de score lit son match

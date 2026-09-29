@@ -143,11 +143,13 @@ export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoa
  * arrière, inscription) tiennent le tournoi puis écrivent des matchs, les
  * saisies de score tiennent leur match — voire d'autres, par l'entretien — puis
  * le tournoi dans la réconciliation. Le réordonnancement prend l'ordre des
- * premiers (tournoi, puis matchs) et, quand une saisie le croise, **rejoue** la
- * transaction : InnoDB choisit d'ordinaire pour victime la transaction qui a le
- * moins écrit, et le réordonnancement n'a encore rien écrit quand il pose ses
- * verrous. Rejouée, elle relit les matchs, voit la saisie et refuse en
- * `SEEDING_LOCKED`.
+ * premiers (tournoi, puis matchs). Quand une saisie le croise, InnoDB défait
+ * l'une des deux — et pas forcément le réordonnancement, qui tient les verrous
+ * de tous les matchs du tournoi. Défait, il **rejoue** sa transaction : il
+ * relit les matchs, voit la saisie commitée et refuse en `SEEDING_LOCKED`.
+ * Si c'est la saisie qui est défaite, elle échoue en erreur visible (ses
+ * chemins ne rejouent pas) et le réordonnancement passe : aucun score n'est
+ * perdu en silence.
  */
 const REORDER_DEADLOCK_ATTEMPTS = 3;
 
