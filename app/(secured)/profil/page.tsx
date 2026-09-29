@@ -199,6 +199,10 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(payload.error || "INVITATION_RESPOND_FAILED");
       showSuccess(accept ? "Invitation acceptée." : "Invitation refusée.");
       await loadInvitations();
+      // La barre de navigation vient de la mise en page serveur de l'espace
+      // connecté, que l'App Router ne rejoue pas d'une page à l'autre : sans
+      // ce rafraîchissement, elle garderait l'état d'avant jusqu'au F5.
+      if (accept) router.refresh();
     } catch (e) {
       // Chaque chemin de la page lève un **code** et le traduit ici, dans son
       // `catch` : c'est aussi là qu'arrivent les échecs qui n'en sont pas un
@@ -360,6 +364,8 @@ export default function ProfilePage() {
       // annonce une exposition qui n'existe plus.
       await loadDiscordState();
       showSuccess("Profil mis à jour.");
+      // Le pseudo s'affiche aussi dans la barre de navigation.
+      router.refresh();
     } catch (e) {
       // Le registre du profil, et non celui de la certification : router ces
       // erreurs vers l'autre faisait annoncer « La certification a échoué » à un
@@ -515,6 +521,7 @@ export default function ProfilePage() {
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: payload.avatarUrl ?? null } } : prev,
       );
       showSuccess("Avatar mis à jour.");
+      router.refresh();
     } catch (e) {
       showError(avatarUploadErrorMessage((e as Error).message));
     } finally {
@@ -534,6 +541,7 @@ export default function ProfilePage() {
         prev ? { ...prev, profile: { ...prev.profile, avatarUrl: null } } : prev,
       );
       showSuccess("Avatar supprimé.");
+      router.refresh();
     } catch (e) {
       showError(avatarDeleteErrorMessage((e as Error).message));
     } finally {

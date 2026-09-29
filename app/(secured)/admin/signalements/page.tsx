@@ -123,6 +123,8 @@ function ReportsPanel() {
     try {
       await task();
       showSuccess(success);
+      // Le badge « Signalements » de la barre compte les dossiers ouverts.
+      router.refresh();
     } catch (error) {
       showError(adminReportErrorMessage((error as Error).message));
     } finally {

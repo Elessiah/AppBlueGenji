@@ -30,11 +30,24 @@
  * seeding pour demander sa régénération.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { MIN_ENTRANTS_FOR_MATCHES } from "@/lib/shared/constants";
+import { MIN_ENTRANTS_FOR_MATCHES, SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
 import { RESOLVABLE_BYE_SQL, RESOLVABLE_GHOST_SQL } from "./byes";
+import { STALLED_ALERT_KEY } from "./bot-logs";
 import { computeTournamentState } from "./state";
 import type { TournamentRow } from "./_internal";
+
+/** Le report d'un engagé est complet quand ses deux scores sont posés. */
+const TEAM1_REPORTED_SQL =
+  "(m.team1_report_score IS NOT NULL AND m.team1_report_opponent_score IS NOT NULL)";
+const TEAM2_REPORTED_SQL =
+  "(m.team2_report_score IS NOT NULL AND m.team2_report_opponent_score IS NOT NULL)";
+
+/** Un seul des deux engagés a reporté : le délai expiré fait foi. */
+export const SINGLE_REPORT_SQL = `(${TEAM1_REPORTED_SQL} <> ${TEAM2_REPORTED_SQL})`;
+
+/** Les deux ont reporté (et se contredisent, sans quoi la manche serait close). */
+export const BOTH_REPORTED_SQL = `(${TEAM1_REPORTED_SQL} AND ${TEAM2_REPORTED_SQL})`;
 
 type ScheduleRow = RowDataPacket &
   Pick<
@@ -65,7 +78,12 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  * le même ordre :
  *
  * - plateau d'élimination absent (`createBracketIfMissing`) ;
- * - report de score dont le délai a expiré (`resolveExpiredScoreReports`) ;
+ * - report de score dont le délai a expiré (`resolveExpiredScoreReports`) —
+ *   **seulement ce que la résolution peut faire avancer** : un report unique,
+ *   qu'elle clôt, ou un conflit dont l'escalade à l'arbitrage est due et pas
+ *   encore réservée (`bg_referee_alerts`). Un conflit déjà escaladé attend un
+ *   arbitre, rien d'autre : le retenir faisait entretenir son tournoi à chaque
+ *   balayage, pour rien, jusqu'à l'arbitrage ;
  * - bye ou match fantôme **résolvable** (`tryAutoResolveByes`) — la condition
  *   même de la résolution, et non « une case est vide » : une case qui attend
  *   le vainqueur d'un match non joué est l'état normal de tout arbre en cours,
@@ -81,7 +99,9 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  */
 async function findDueMaintenance(connection: PoolConnection): Promise<number[]> {
   const [rows] = await connection.execute<(RowDataPacket & { id: number })[]>(
-    // `MIN_ENTRANTS_FOR_MATCHES`, `LAUNCH_AUTO_DELAY_MINUTES` et les deux
+    // `MIN_ENTRANTS_FOR_MATCHES`, `LAUNCH_AUTO_DELAY_MINUTES`,
+    // `SCORE_REPORT_TIMEOUT_MINUTES`, `STALLED_ALERT_KEY`, les prédicats de
+    // report et les deux
     // prédicats de `./byes` sont des constantes de module, jamais une entrée : rien d'externe n'atteint ces
     // interpolations.
     `SELECT t.id
@@ -97,7 +117,14 @@ async function findDueMaintenance(connection: PoolConnection): Promise<number[]>
                       AND m.status = 'AWAITING_CONFIRMATION'
                       AND m.score_deadline_at IS NOT NULL
                       AND m.score_deadline_at <= NOW()
-                      AND m.winner_team_id IS NULL)
+                      AND m.winner_team_id IS NULL
+                      AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+                      AND (${SINGLE_REPORT_SQL}
+                           OR (${BOTH_REPORTED_SQL}
+                               AND m.score_deadline_at <= NOW() - INTERVAL ${SCORE_REPORT_TIMEOUT_MINUTES} MINUTE
+                               AND NOT EXISTS (SELECT 1 FROM bg_referee_alerts a
+                                               WHERE a.match_id = m.id
+                                                 AND a.alert_key = '${STALLED_ALERT_KEY}'))))
          OR EXISTS (SELECT 1 FROM bg_matches m
                     WHERE m.tournament_id = t.id
                       AND m.status = 'READY'
