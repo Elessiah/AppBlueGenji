@@ -540,6 +540,25 @@ describe("rollUpExpiredSiteVisits", () => {
     expect(connection.release).toHaveBeenCalledTimes(1);
   });
 
+  // Chaque visite arrivée pendant un repli en relançait un : sur le premier
+  // passage après déploiement, les transactions parallèles s'interbloquaient.
+  it("ne lance qu'un repli à la fois : un appel concurrent attend celui en cours", async () => {
+    const connection = rollUpConnection();
+    const getConnection = jest.fn(async () => fakeConnection(connection));
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>(), getConnection }));
+
+    const [first, second] = await Promise.all([rollUpExpiredSiteVisits(), rollUpExpiredSiteVisits()]);
+
+    expect(first).toBe(12);
+    expect(second).toBe(12);
+    expect(getConnection).toHaveBeenCalledTimes(1);
+
+    // Une fois le repli fini, le suivant repart.
+    await rollUpExpiredSiteVisits();
+    expect(getConnection).toHaveBeenCalledTimes(2);
+  });
+
   it("défait le report si l'effacement échoue : une visite ne compte jamais deux fois", async () => {
     const connection = rollUpConnection();
     connection.execute.mockImplementation(async (sql: string) => {

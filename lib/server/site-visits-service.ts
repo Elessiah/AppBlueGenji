@@ -264,6 +264,9 @@ async function rememberVisitor(visitorKey: string, authenticated: number): Promi
   }
 }
 
+/** Repli en cours, partagé par les appels concurrents. */
+let pendingRollUp: Promise<number> | null = null;
+
 /**
  * Replie les jours révolus du détail en compteurs journaliers, puis les efface.
  *
@@ -273,9 +276,24 @@ async function rememberVisitor(visitorKey: string, authenticated: number): Promi
  * journée n'est partagée entre le compteur et le détail. Les deux écritures
  * sont dans une transaction : un report sans effacement compterait deux fois.
  *
+ * **Un seul repli à la fois** par processus : la cadence de synchronisation
+ * n'est consommée qu'une fois la lecture faite, si bien que chaque visite
+ * arrivée pendant un repli en relançait un — sur le premier passage après le
+ * déploiement, qui replie des mois d'historique, ces transactions parallèles
+ * verrouillaient les mêmes lignes et s'interbloquaient. Un appel concurrent
+ * attend donc le repli en cours au lieu d'en ouvrir un second.
+ *
  * @returns Le nombre de visites repliées.
  */
-export async function rollUpExpiredSiteVisits(): Promise<number> {
+export function rollUpExpiredSiteVisits(): Promise<number> {
+  if (pendingRollUp) return pendingRollUp;
+  pendingRollUp = rollUpExpiredSiteVisitsNow().finally(() => {
+    pendingRollUp = null;
+  });
+  return pendingRollUp;
+}
+
+async function rollUpExpiredSiteVisitsNow(): Promise<number> {
   const db = await getDatabase();
   const connection = await db.getConnection();
   try {
