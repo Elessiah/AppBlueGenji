@@ -78,10 +78,16 @@ export function ConnectedAppsSection({
    * Discord, comme il le fait déjà après chaque sauvegarde.
    */
   onChanged,
+  /**
+   * Appelée avec le pseudo écrit par « Mettre à jour mon pseudo » (ligne du
+   * bot) : le champ « Tag Discord » de la page le reprend sur-le-champ.
+   */
+  onDiscordTagChanged,
 }: {
   connections: AccountConnection[] | null;
   reload: () => Promise<void>;
   onChanged?: () => void;
+  onDiscordTagChanged?: (tag: string) => void;
 }): React.ReactElement {
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
@@ -186,101 +192,101 @@ export function ConnectedAppsSection({
             const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
             return (
               <Fragment key={connection.provider}>
-              <div
-                className="table-row"
-                style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
-              >
-                <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                  <strong style={{ fontSize: 14 }}>{label}</strong>
-                  <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
-                    {connection.linked
-                      ? connection.handle && handleLabel
-                        ? `${handleLabel} : ${connection.handle}`
-                        : "Rattaché"
-                      : discordByCode
-                        ? "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord."
-                        : PROVIDER_NOTES[connection.provider]}
+                <div
+                  className="table-row"
+                  style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
+                >
+                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+                    <strong style={{ fontSize: 14 }}>{label}</strong>
+                    <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
+                      {connection.linked
+                        ? connection.handle && handleLabel
+                          ? `${handleLabel} : ${connection.handle}`
+                          : "Rattaché"
+                        : discordByCode
+                          ? "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord."
+                          : PROVIDER_NOTES[connection.provider]}
+                    </span>
+                    {/*
+                      **Ce que « Rattaché » ne disait pas.** Discord a deux portes
+                      — le bouton, et le code reçu en message privé — et elles ne
+                      laissent pas la même trace : l'une pose une autorisation
+                      d'application chez Discord, que le joueur peut y révoquer,
+                      l'autre non. C'est exactement ce qu'une liste d'applications
+                      connectées doit dire. La phrase vient du module pur, qui
+                      rend `null` quand il n'y a rien à dire — un fournisseur à
+                      porte unique, ou un rattachement antérieur à cette colonne,
+                      qui ne se classe pas après coup.
+                    */}
+                    {methodLabel ? (
+                      <span
+                        id={methodId}
+                        style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}
+                      >
+                        {methodLabel}
+                      </span>
+                    ) : null}
+                    {/*
+                      **Le motif vit dans la colonne de texte, pas à la place du
+                      bouton.** Posé dans la cellule d'actions — large de la
+                      largeur d'un bouton —, il s'y repliait en quatre lignes de
+                      chasse fixe alignées à droite : une phrase qu'on déchiffre au
+                      lieu de la lire, à l'endroit précis où l'œil cherche un
+                      contrôle. Ici elle se lit d'un trait, et la cellule
+                      d'actions reste vide, ce qui est l'information.
+                    */}
+                    {connection.linked && refusal === "LAST_CONNECTION" ? (
+                      <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
+                        {connectionUnlinkRefusalMessage(refusal, connection.provider)}
+                      </span>
+                    ) : null}
                   </span>
-                  {/*
-                    **Ce que « Rattaché » ne disait pas.** Discord a deux portes
-                    — le bouton, et le code reçu en message privé — et elles ne
-                    laissent pas la même trace : l'une pose une autorisation
-                    d'application chez Discord, que le joueur peut y révoquer,
-                    l'autre non. C'est exactement ce qu'une liste d'applications
-                    connectées doit dire. La phrase vient du module pur, qui
-                    rend `null` quand il n'y a rien à dire — un fournisseur à
-                    porte unique, ou un rattachement antérieur à cette colonne,
-                    qui ne se classe pas après coup.
-                  */}
-                  {methodLabel ? (
-                    <span
-                      id={methodId}
-                      style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}
-                    >
-                      {methodLabel}
-                    </span>
-                  ) : null}
-                  {/*
-                    **Le motif vit dans la colonne de texte, pas à la place du
-                    bouton.** Posé dans la cellule d'actions — large de la
-                    largeur d'un bouton —, il s'y repliait en quatre lignes de
-                    chasse fixe alignées à droite : une phrase qu'on déchiffre au
-                    lieu de la lire, à l'endroit précis où l'œil cherche un
-                    contrôle. Ici elle se lit d'un trait, et la cellule
-                    d'actions reste vide, ce qui est l'information.
-                  */}
-                  {connection.linked && refusal === "LAST_CONNECTION" ? (
-                    <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
-                      {connectionUnlinkRefusalMessage(refusal, connection.provider)}
-                    </span>
-                  ) : null}
-                </span>
 
-                <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
-                  {connection.linked ? (
-                    refusal === "LAST_CONNECTION" ? null : (
-                      <button
-                        type="button"
-                        className="btn ghost"
-                        disabled={busy !== null}
-                        onClick={() => unlink(connection.provider)}
-                        aria-label={`Retirer ${label} de mon compte`}
-                        /* La **porte** fait partie de ce qui décrit ce bouton :
-                           laissée hors de la description, elle n'était lue par
-                           personne au clavier — un lecteur d'écran qui parcourt
-                           les contrôles ne rencontre jamais le texte voisin. */
-                        aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
+                  <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+                    {connection.linked ? (
+                      refusal === "LAST_CONNECTION" ? null : (
+                        <button
+                          type="button"
+                          className="btn ghost"
+                          disabled={busy !== null}
+                          onClick={() => unlink(connection.provider)}
+                          aria-label={`Retirer ${label} de mon compte`}
+                          /* La **porte** fait partie de ce qui décrit ce bouton :
+                             laissée hors de la description, elle n'était lue par
+                             personne au clavier — un lecteur d'écran qui parcourt
+                             les contrôles ne rencontre jamais le texte voisin. */
+                          aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
+                          style={{ padding: "4px 12px", fontSize: 12 }}
+                        >
+                          {busy === connection.provider ? "Retrait…" : "Retirer"}
+                        </button>
+                      )
+                    ) : (
+                      <a
+                        className="btn"
+                        href={oauthStartPath(connection.provider, { intent: "LINK" })}
+                        aria-label={`Rattacher ${label} à mon compte`}
+                        /* Ce que le fournisseur apporte tient dans la ligne d'à
+                           côté : `aria-describedby` la rattache au contrôle plutôt
+                           que de la laisser en texte voisin, qu'un lecteur d'écran
+                           parcourant les liens ne rencontre jamais. */
+                        aria-describedby={detailsId}
                         style={{ padding: "4px 12px", fontSize: 12 }}
                       >
-                        {busy === connection.provider ? "Retrait…" : "Retirer"}
-                      </button>
-                    )
-                  ) : (
-                    <a
-                      className="btn"
-                      href={oauthStartPath(connection.provider, { intent: "LINK" })}
-                      aria-label={`Rattacher ${label} à mon compte`}
-                      /* Ce que le fournisseur apporte tient dans la ligne d'à
-                         côté : `aria-describedby` la rattache au contrôle plutôt
-                         que de la laisser en texte voisin, qu'un lecteur d'écran
-                         parcourant les liens ne rencontre jamais. */
-                      aria-describedby={detailsId}
-                      style={{ padding: "4px 12px", fontSize: 12 }}
-                    >
-                      Rattacher
-                    </a>
-                  )}
-                </span>
-              </div>
-              {connection.provider === "DISCORD" ? (
-                <DiscordBotRow
-                  connections={connections}
-                  busy={busy !== null}
-                  disconnecting={busy === "DISCORD"}
-                  onUpdate={setBotDialog}
-                  onDisconnect={() => unlink("DISCORD")}
-                />
-              ) : null}
+                        Rattacher
+                      </a>
+                    )}
+                  </span>
+                </div>
+                {connection.provider === "DISCORD" ? (
+                  <DiscordBotRow
+                    connections={connections}
+                    busy={busy !== null}
+                    disconnecting={busy === "DISCORD"}
+                    onUpdate={setBotDialog}
+                    onDisconnect={() => unlink("DISCORD")}
+                  />
+                ) : null}
               </Fragment>
             );
           })}
@@ -291,8 +297,9 @@ export function ConnectedAppsSection({
         <DiscordBotHandleDialog
           mode={botDialog}
           onClose={() => setBotDialog(null)}
-          onUpdated={() => {
+          onUpdated={(tag) => {
             setBotDialog(null);
+            if (tag) onDiscordTagChanged?.(tag);
             void reload();
             onChanged?.();
           }}
