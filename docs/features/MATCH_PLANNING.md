@@ -35,7 +35,9 @@ quand on peut vouloir la changer, et une seule porte doit l'écrire.
 - **Allumer** : les matchs jouables, **non lancés et sans date**, repassent « À
   planifier » — leur ouverture de lancement et leurs « Prêt » sont effacés dans
   la même transaction (sinon le délai de quinze minutes, déjà écoulé, les ferait
-  partir d'office dès leur planification). Les matchs **lancés** continuent. Les
+  partir d'office dès leur planification). Les matchs **lancés** continuent, et
+  un match en lancement qui porte déjà un score noté par l'arbitrage est tenu
+  pour lancé (la rencontre a eu lieu) plutôt que renvoyé à planifier. Les
   manches suivantes naissent à planifier. En cours de tournoi, la fiche demande
   confirmation en disant combien de matchs sont concernés.
 - **Éteindre** : rien n'est réécrit ; les matchs sans date entrent en lancement.
@@ -47,7 +49,8 @@ ouvert depuis le bouton **« 🗓 Planifier »** de la carte d'un match à plani
 depuis **« Planifier le prochain »** du panneau de la fiche (premier match à
 planifier dans l'ordre du plateau). Déplacer une date dans le futur, ou l'effacer
 option allumée, fait **quitter le lancement** : ouverture et « Prêt » sont
-effacés sous le verrou de la ligne du match. L'arbitrage peut aussi **forcer** le
+effacés sous le verrou de la ligne du match — sauf si un score est déjà noté :
+le match est alors tenu pour lancé. L'arbitrage peut aussi **forcer** le
 lancement d'un match à planifier — forcer vaut planification.
 
 ## Aucun score avant le lancement — dans tous les cas

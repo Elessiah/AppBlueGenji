@@ -31,12 +31,16 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
 
   try {
     const result = await setRefereeScheduling(tournamentId, body.enabled);
-    publishStaffAction(
-      result.enabled
-        ? `🗓 Planification par l'arbitrage activée sur « ${discordInline(result.tournamentName)} » par le staff.`
-        : `🗓 Planification par l'arbitrage désactivée sur « ${discordInline(result.tournamentName)} » par le staff.`,
-      { id: user.id, pseudo: user.pseudo },
-    );
+    // Journal seulement sur un vrai changement : un double clic ou une requête
+    // rejouée laisserait sinon croire, à l'audit, à deux bascules.
+    if (result.changed) {
+      publishStaffAction(
+        result.enabled
+          ? `🗓 Planification par l'arbitrage activée sur « ${discordInline(result.tournamentName)} » par le staff.`
+          : `🗓 Planification par l'arbitrage désactivée sur « ${discordInline(result.tournamentName)} » par le staff.`,
+        { id: user.id, pseudo: user.pseudo },
+      );
+    }
     return ok({ enabled: result.enabled, movedToPlanning: result.movedToPlanning });
   } catch (error) {
     const message = (error as Error).message;

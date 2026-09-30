@@ -35,6 +35,8 @@ type MatchScheduleRow = RowDataPacket & {
   start_at: Date | string | null;
   launched_at: Date | string | null;
   launch_pairing: string | null;
+  team1_score: number | null;
+  team2_score: number | null;
 };
 
 /**
@@ -68,7 +70,8 @@ async function lockScheduleRow(
   // Le verrou tient la ligne contre un « Prêt » concurrent, que la remise à
   // zéro effacerait sinon après coup.
   const [rows] = await connection.execute<MatchScheduleRow[]>(
-    `SELECT id, tournament_id, status, team1_id, team2_id, start_at, launched_at, launch_pairing
+    `SELECT id, tournament_id, status, team1_id, team2_id, start_at, launched_at, launch_pairing,
+            team1_score, team2_score
      FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
     [matchId],
   );
@@ -113,14 +116,26 @@ export async function setMatchStartAt(
       // `DATETIME` n'a pas de fuseau : on écrit une `Date`, que le pilote
       // convertit dans le fuseau de la connexion — exactement comme les autres
       // horodatages du schéma (`live_started_at`, `score_deadline_at`).
-      const resetLaunch = leavesLaunch(row, startAt, refereeScheduling);
+      //
+      // Quitter le lancement défait ouverture et « Prêt » — sauf si l'arbitrage
+      // a déjà noté un score : la rencontre a eu lieu, elle est tenue pour
+      // lancée (un score ne peut rester en base sur un match où plus personne ne
+      // peut le saisir, `MATCH_NOT_IN_LAUNCH`).
+      const leaving = leavesLaunch(row, startAt, refereeScheduling);
+      const scoreNoted = row.team1_score !== null || row.team2_score !== null;
       await connection.execute(
-        resetLaunch
-          ? `UPDATE bg_matches
-             SET start_at = ?, lobby_opened_at = NULL, team1_ready_at = NULL,
-                 team2_ready_at = NULL, caster_ready_at = NULL
-             WHERE id = ?`
-          : `UPDATE bg_matches SET start_at = ? WHERE id = ?`,
+        !leaving
+          ? `UPDATE bg_matches SET start_at = ? WHERE id = ?`
+          : scoreNoted
+            ? `UPDATE bg_matches
+               SET start_at = ?, launched_at = NOW(),
+                   launch_pairing = CONCAT(team1_id, ':', team2_id),
+                   lobby_opened_at = COALESCE(lobby_opened_at, NOW())
+               WHERE id = ?`
+            : `UPDATE bg_matches
+               SET start_at = ?, lobby_opened_at = NULL, team1_ready_at = NULL,
+                   team2_ready_at = NULL, caster_ready_at = NULL
+               WHERE id = ?`,
         [startAt === null ? null : new Date(startAt), matchId],
       );
       await connection.commit();

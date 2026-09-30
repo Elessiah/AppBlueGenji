@@ -17,6 +17,8 @@ type Row = {
   start_at: Date | null;
   launched_at: Date | null;
   launch_pairing: string | null;
+  team1_score: number | null;
+  team2_score: number | null;
 };
 
 function matchRow(overrides: Partial<Row> = {}): Row {
@@ -29,6 +31,8 @@ function matchRow(overrides: Partial<Row> = {}): Row {
     start_at: null,
     launched_at: null,
     launch_pairing: "1:2",
+    team1_score: null,
+    team2_score: null,
     ...overrides,
   };
 }
@@ -208,6 +212,15 @@ describe("setMatchStartAt", () => {
       });
       await setMatchStartAt(42, FUTURE);
       expect(resets(writes)).toBe(true);
+    });
+
+    it("score déjà noté : le match est tenu pour lancé, jamais renvoyé en attente", async () => {
+      const { writes } = world({ row: matchRow({ team1_score: 1, team2_score: 0 }) });
+      await setMatchStartAt(42, FUTURE);
+      const update = writes.find((w) => w.sql.startsWith("UPDATE bg_matches"));
+      expect(update?.sql).toContain("launched_at = NOW()");
+      expect(update?.sql).toContain("launch_pairing = CONCAT(team1_id, ':', team2_id)");
+      expect(resets(writes)).toBe(false);
     });
 
     it("match sans ses deux engagées : rien à défaire", async () => {

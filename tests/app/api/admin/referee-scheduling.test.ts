@@ -32,6 +32,7 @@ beforeEach(() => {
     tournamentId: 7,
     tournamentName: "Coupe <@&1>",
     enabled: true,
+    changed: true,
     movedToPlanning: 3,
   });
 });
@@ -99,6 +100,7 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — corps et refus"
       tournamentId: 7,
       tournamentName: "Coupe",
       enabled: false,
+      changed: true,
       movedToPlanning: 0,
     });
     const res = await PUT(req({ enabled: false }), params("7"));
@@ -132,5 +134,20 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — journal", () =>
     expect(line).not.toContain("<@&1>");
     expect(line).not.toContain("Arbitre");
     expect(actor).toEqual({ id: 3, pseudo: "Arbitre" });
+  });
+});
+
+describe("PUT /api/admin/tournaments/[id]/referee-scheduling — bascule sans effet", () => {
+  it("ne journalise rien quand l'option avait déjà cette valeur", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(setRefereeScheduling).mockResolvedValue({
+      tournamentId: 7,
+      tournamentName: "Coupe",
+      enabled: true,
+      changed: false,
+      movedToPlanning: 0,
+    });
+    expect((await PUT(req({ enabled: true }), params("7"))).status).toBe(200);
+    expect(publishStaffAction).not.toHaveBeenCalled();
   });
 });

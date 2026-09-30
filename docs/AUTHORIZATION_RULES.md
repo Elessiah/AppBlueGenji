@@ -893,7 +893,11 @@ les engagés doivent connaître, comme ses conditions d'inscription.
 **Effets de la bascule, sous verrou de la ligne du tournoi** (première
 instruction) : allumer défait l'état de lancement (ouverture, « Prêt ») des matchs
 jouables, **non lancés et sans date**, qui repassent à planifier ; les matchs déjà
-**lancés** ne sont jamais touchés, et les manches à venir naissent à planifier.
+**lancés** ne sont jamais touchés, et les manches à venir naissent à planifier. Un
+match en lancement qui porte **déjà un score noté** par l'arbitrage s'est joué : il
+est tenu pour lancé, jamais renvoyé à planifier (un score ne reste pas en base sur
+un match où plus personne ne peut le saisir). Même règle pour la date. La bascule
+n'est journalisée que si elle change réellement la valeur.
 Éteindre ne réécrit rien : la phase se dérive, les matchs sans date entrent en
 lancement. Poser une date qui fait **quitter le lancement** (date reportée dans
 le futur, ou effacée option allumée) défait de même l'ouverture et les « Prêt »

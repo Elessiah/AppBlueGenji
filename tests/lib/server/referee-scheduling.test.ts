@@ -42,10 +42,18 @@ describe("setRefereeScheduling", () => {
 
     const result = await setRefereeScheduling(7, true);
 
-    expect(result).toEqual({ tournamentId: 7, tournamentName: "Coupe", enabled: true, movedToPlanning: 3 });
+    expect(result).toEqual({
+      tournamentId: 7,
+      tournamentName: "Coupe",
+      enabled: true,
+      changed: true,
+      movedToPlanning: 3,
+    });
     const flag = statements.find((s) => s.sql.startsWith("UPDATE bg_tournaments"));
     expect(flag?.params).toEqual([1, 7]);
-    const reset = statements.find((s) => s.sql.startsWith("UPDATE bg_matches"));
+    const reset = statements.find(
+      (s) => s.sql.startsWith("UPDATE bg_matches") && s.sql.includes("lobby_opened_at = NULL"),
+    );
     // Mêmes conditions que la phase `TO_PLAN` : jouable, sans date, non lancé
     // (ou lancé pour un autre appariement).
     expect(reset?.sql).toContain("status = 'READY'");
@@ -56,8 +64,34 @@ describe("setRefereeScheduling", () => {
     expect(reset?.sql).toContain("lobby_opened_at = NULL");
     expect(reset?.sql).toContain("team1_ready_at = NULL");
     expect(reset?.params).toEqual([7]);
+    // Une rencontre déjà notée n'est jamais renvoyée à planifier.
+    expect(reset?.sql).toContain("NOT (team1_score IS NOT NULL OR team2_score IS NOT NULL)");
     expect(connection.commit).toHaveBeenCalled();
     expect(publishUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("tient pour lancé un match en lancement dont un score est déjà noté", async () => {
+    const { statements } = world({ state: "RUNNING" });
+    await setRefereeScheduling(7, true);
+    const launch = statements.find(
+      (s) => s.sql.startsWith("UPDATE bg_matches") && s.sql.includes("launched_at = NOW()"),
+    );
+    expect(launch?.sql).toContain("(team1_score IS NOT NULL OR team2_score IS NOT NULL)");
+    expect(launch?.sql).toContain("launch_pairing = CONCAT(team1_id, ':', team2_id)");
+    expect(launch?.sql).toContain("start_at IS NULL");
+    // Ordre : les rencontres notées d'abord, sans quoi le second `UPDATE` les
+    // aurait déjà défaites.
+    const indexOf = (needle: string) => statements.findIndex((s) => s.sql.includes(needle));
+    expect(indexOf("launched_at = NOW()")).toBeLessThan(indexOf("lobby_opened_at = NULL"));
+  });
+
+  it("dit si l'option a réellement changé", async () => {
+    world({ state: "RUNNING", referee_scheduling: 1 });
+    expect((await setRefereeScheduling(7, true)).changed).toBe(false);
+    world({ state: "RUNNING", referee_scheduling: 0 });
+    expect((await setRefereeScheduling(7, false)).changed).toBe(false);
+    world({ state: "RUNNING", referee_scheduling: 1 });
+    expect((await setRefereeScheduling(7, false)).changed).toBe(true);
   });
 
   it("éteint l'option sans rien réécrire des matchs : la phase se dérive", async () => {
