@@ -312,7 +312,9 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           réquisition d&apos;une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Ce
           journal ne consigne que les ouvertures de session — ni le port source, ni la création
           ou la modification d&apos;un contenu —, et les informations fournies à la création
-          d&apos;un compte ne sont pas gardées après sa suppression. Le serveur web tient
+          d&apos;un compte ne sont pas gardées après sa suppression, hors les copies de sauvegarde
+          chiffrées et le journal qui rejoue les suppressions (<Link href="/rgpd#donnees-connexion">détail</Link>).
+          Le serveur web tient
           en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus et pour sa seule sécurité, un
           journal technique de chaque requête ({WEB_ACCESS_LOG_FIELDS}), sans port
           source (<Link href="/rgpd/registre#t17">registre, T17</Link>). Ces données ne sont communiquées
