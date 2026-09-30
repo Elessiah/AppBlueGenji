@@ -691,7 +691,8 @@ d'existence. Même règle, même 404. Le compteur public de la vitrine
   puisqu'il ne vit que du côté de l'arbitrage ;
 - ✅ le match est **lancé** (`MATCH_NOT_LAUNCHED` → 409) : les parties se sont
   déclarées prêtes, l'arbitrage l'a forcé, ou le délai l'a fait partir
-  (`lib/shared/match-launch.ts`, §4.9) ;
+  (`lib/shared/match-launch.ts`, §4.9) — un match **à planifier** ou **en
+  attente de départ** ne l'est jamais (§4.10) ;
 - ✅ le score constitue un **résultat final** au format de la manche
   (`checkMatchScores`).
 
@@ -731,8 +732,13 @@ Réservé à `ADMIN` et `ARBITRE` :
   du tournoi (§4.8) ;
 - enregistrer un score en cours de rencontre
   (`PATCH /api/admin/matches/[id]/scores`) et **valider un résultat**
-  (`POST /api/admin/matches/[id]/resolve`), forfait d'une manche compris ;
-- programmer l'heure d'un match (`PUT /api/admin/matches/[id]/schedule`) ;
+  (`POST /api/admin/matches/[id]/resolve`), forfait d'une manche compris —
+  **jamais un score avant le lancement** (§4.10) ;
+- programmer l'heure d'un match (`PUT /api/admin/matches/[id]/schedule`) — c'est
+  aussi **planifier** un match à planifier (§4.10) ;
+- allumer ou éteindre la **planification des matchs par l'arbitrage**
+  (`PUT /api/admin/tournaments/[id]/referee-scheduling`), à tout moment avant la
+  clôture (§4.10) ;
 - désigner l'équipe hôte d'un match (`PUT /api/admin/matches/[id]/host`), le
   **lancer** sans attendre les « Prêt » (`POST /api/admin/matches/[id]/launch`)
   et retirer le caster inscrit (`DELETE /api/matches/[id]/caster`) — §4.9 ;
@@ -842,7 +848,8 @@ ni l'entrée solo d'un joueur. Voir `docs/features/ENTRANT_REMOVAL.md`.
 ### 4.9 Lancer un match — les trois « Prêt »
 
 Un match jouable entre en **lancement** à son heure de début (dès qu'il est
-jouable s'il n'en a pas) et ne se joue qu'une fois **lancé**
+jouable s'il n'en a pas — sauf si le tournoi fait planifier ses matchs par
+l'arbitrage, §4.10) et ne se joue qu'une fois **lancé**
 (`lib/shared/match-launch.ts`, `docs/features/MATCH_LAUNCH.md`).
 `POST /api/matches/[matchId]/ready` (`{ ready: boolean }`) accepte :
 
@@ -859,6 +866,59 @@ jouable s'il n'en a pas) et ne se joue qu'une fois **lancé**
 Une fantôme est prête d'office. Le match part quand toutes les parties attendues
 sont prêtes (le caster seulement s'il y en a un), quand l'arbitrage le force, ou
 d'office passé quinze minutes.
+
+### 4.10 Planification par l'arbitrage — et aucun score avant le lancement
+
+Option de tournoi `bg_tournaments.referee_scheduling`
+(`lib/shared/match-planning.ts`, `docs/features/MATCH_PLANNING.md`). Allumée, un
+match jouable sans horaire est **à planifier** (`TO_PLAN`) au lieu d'entrer en
+lancement ; une date posée le fait passer **en attente de départ**
+(`SCHEDULED`), puis en **lancement** à l'heure dite.
+
+**Qui écrit quoi.**
+
+| Geste | Route | Garde |
+|---|---|---|
+| Choisir l'option à la création | `POST /api/tournaments` (`refereeScheduling`, booléen strict — `INVALID_REFEREE_SCHEDULING` → 400) | `tournaments` |
+| Allumer / éteindre l'option | `PUT /api/admin/tournaments/[id]/referee-scheduling` (`{ enabled: boolean }`) | `tournaments` ; refusé sur un tournoi `FINISHED` (`TOURNAMENT_FINISHED` → 409), **permis en cours** |
+| Planifier (poser, déplacer, effacer la date) | `PUT /api/admin/matches/[id]/schedule` | `tournaments` — un `CASTER` (`live`) ne planifie **pas** |
+| Lancer un match à planifier sans lui donner d'heure | `POST /api/admin/matches/[id]/launch` | `tournaments` — forcer vaut planification |
+
+L'option **n'est pas** dans la liste blanche de l'édition
+(`PATCH /api/tournaments/[id]/edit`) : une seule porte l'écrit sur un tournoi
+existant, celle qui sait défaire les lancements. Elle se lit par tous sur la carte
+du tournoi (`TournamentCard.refereeScheduling`) — c'est une règle du tournoi que
+les engagés doivent connaître, comme ses conditions d'inscription.
+
+**Effets de la bascule, sous verrou de la ligne du tournoi** (première
+instruction) : allumer défait l'état de lancement (ouverture, « Prêt ») des matchs
+jouables, **non lancés et sans date**, qui repassent à planifier ; les matchs déjà
+**lancés** ne sont jamais touchés, et les manches à venir naissent à planifier.
+Éteindre ne réécrit rien : la phase se dérive, les matchs sans date entrent en
+lancement. Poser une date qui fait **quitter le lancement** (date reportée dans
+le futur, ou effacée option allumée) défait de même l'ouverture et les « Prêt »
+posés pour l'horaire d'avant, sous verrou de la ligne du match — sans quoi le
+délai de quinze minutes, déjà écoulé, lancerait le match d'office à sa nouvelle
+heure.
+
+**Aucun score avant le lancement — pour tout le monde, quelle que soit
+l'option.** `SCORE_ENTRY_CLOSED_PHASES` (`TO_PLAN`, `SCHEDULED`) ferme la saisie
+d'un **score** :
+
+- ❌ joueurs : déjà refusés tant que le match n'est pas **lancé**
+  (`MATCH_NOT_LAUNCHED`, §4.3) ;
+- ❌ arbitrage (`PATCH .../scores`, `POST .../resolve` avec scores) :
+  `MATCH_NOT_IN_LAUNCH` → 409. L'option du tournoi est relue en base par le
+  service, jamais prise dans le corps ;
+- ✅ un **forfait** (simple ou double, par l'arbitrage ; sur la manche, par un
+  engagé qui mène le match) reste possible à toute phase : une équipe qui se sait
+  absente n'a pas à attendre l'heure pour le dire ;
+- ✅ la **correction** d'un match terminé reste possible (sa phase est `NONE`),
+  sous le verrou de manche habituel (`match-lock`).
+
+Côté interface, le dialogue d'arbitrage ferme les champs de score et déplie le
+forfait sur un match qui n'est pas encore en lancement ; le serveur reste le
+juge.
 
 ## 5. Équipes fantômes et entrées solo
 

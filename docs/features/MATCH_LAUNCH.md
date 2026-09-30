@@ -30,14 +30,20 @@ d'une diffusion (`matchLaunchPhase`, `lib/shared/match-launch.ts`) :
 | Phase | Condition |
 |---|---|
 | `NONE` | `PENDING`, `COMPLETED`, ou une case vide (exemption) |
-| `SCHEDULED` | `READY`, heure de début dans le futur |
-| `LOBBY` (« Lancement ») | `READY`, heure atteinte ou absente, `launched_at` vide |
+| `TO_PLAN` (« À planifier ») | `READY`, **aucune** heure, et le tournoi fait planifier ses matchs par l'arbitrage (`referee_scheduling`, voir `MATCH_PLANNING.md`) |
+| `SCHEDULED` (« En attente de départ ») | `READY`, heure de début dans le futur |
+| `LOBBY` (« Lancement ») | `READY`, heure atteinte ou absente (option éteinte), `launched_at` vide |
 | `LAUNCHED` | `launched_at` posé, ou report déjà en attente (`AWAITING_CONFIRMATION`) |
 
 Le passage `SCHEDULED → LOBBY` ne tient qu'à l'horloge : `useMatchLaunchPhase`
 pose un unique `setTimeout` sur l'heure de début, et la modale globale se relit à
 la seconde dite. Toutes les autres bascules sont des écritures, que le flux SSE
-annonce.
+annonce — la sortie de `TO_PLAN` comprise, qui n'arrive que par la date que
+l'arbitrage pose.
+
+**Aucun score avant le lancement**, arbitrage compris : `TO_PLAN` et `SCHEDULED`
+ferment la saisie d'un score (`isScoreEntryOpen`, `MATCH_NOT_IN_LAUNCH` → 409
+côté arbitrage) ; le forfait reste ouvert. Voir `MATCH_PLANNING.md`.
 
 ## Colonnes
 
@@ -85,7 +91,10 @@ cours, et par la lecture de la modale) pose `lobby_opened_at`, lance les matchs
 dont toutes les parties sont prêtes — deux fantômes le sont d'office — et ceux
 dont le délai de 15 minutes (`LAUNCH_AUTO_DELAY_MINUTES`) est écoulé.
 `sync-scope.ts` en fait une tâche due (`EXISTS` sur un lancement non ouvert ou
-échu), si bien que le balayage passif le rattrape même sans lecteur.
+échu), si bien que le balayage passif le rattrape même sans lecteur — jamais un
+match à planifier, qui n'a rien à entretenir. La salle du flux SSE se réveille
+d'elle-même à l'heure de départ d'un match en attente et à son lancement
+d'office (`nextRoomWakeAt`), au lieu d'attendre son filet de cinq minutes.
 
 ## S'inscrire pour caster
 
