@@ -12,6 +12,7 @@ import { accessibilityFooterLabel } from "@/lib/shared/accessibility-statement";
 import { can } from "@/lib/shared/permissions";
 import { toPublicContact } from "@/lib/shared/contact";
 import { SOURCE_CODE_LINK_LABEL, SOURCE_CODE_URL } from "@/lib/shared/source-code";
+import { ASSOCIATION_NAME } from "@/lib/shared/legal-contact";
 
 // Règlement **intérieur** de l'association — un document de l'association,
 // rangé sous LÉGAL. Les règles des tournois, qu'invoquent les conditions
@@ -98,7 +99,7 @@ export async function PublicFooter() {
       </div>
 
       <div className={styles.bottom}>
-        <span>© 2026 BLUEGENJI</span>
+        <span>© 2026 {ASSOCIATION_NAME}</span>
         {/* Sur la ligne du bas, à part des colonnes : c'est le seul geste du
             pied de page, et il doit se trouver sans parcourir les listes. */}
         <ReportProblemButton authenticated={Boolean(user)} className={styles.report} icon />

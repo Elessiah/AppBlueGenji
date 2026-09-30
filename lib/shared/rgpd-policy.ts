@@ -133,7 +133,10 @@ export const DONNEE_TOURNOIS: DonneEntry = {
   donnee: "Résultats de tournois",
   finalite: "Historique compétitif, classements, palmarès",
   base: "Intérêt légitime",
-  duree: "Indéfini (voir §03)",
+  // Décision de l'association : aucune durée de conservation n'est définie.
+  // Les résultats restent tant que le site existe ; à la suppression d'un
+  // compte, ils sont anonymisés (pseudo d'emprunt, `anonymizeAccount`).
+  duree: "Aucune durée définie : tant que le site existe ; anonymisés à la suppression du compte (voir §03)",
 };
 
 /**

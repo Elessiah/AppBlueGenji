@@ -63,9 +63,15 @@ Tout le reste suit seul :
 **Règles du registre** (tenues par `tests/lib/shared/privacy-changes.test.ts`) :
 ajout seul, dans l'ordre des dates ; un identifiant publié ne se renomme ni ne
 se retire (il est en base chez chaque compte qui l'a lu — le renommer ferait
-réapparaître la modale à tous) ; une coquille se corrige sur place, un changement
-de fond est une **nouvelle** entrée. Penser aussi à mettre `/rgpd` à jour : la
-modale résume, la politique fait foi.
+réapparaître la modale à tous) ; son texte ne se modifie plus — qui l'a acceptée
+ne la reverrait jamais. Un changement du traitement est une **nouvelle** entrée ;
+une information inexacte sur un traitement resté le même aussi : une **entrée
+rectificative**, qui dit ce qui était faux et ce qui est vrai, les
+rectifications prêtes ensemble regroupées pour ne montrer qu'une modale
+(`2026-10-rectificatifs-information` : détenteur de la clé des sauvegardes et
+portée du rejeu, lecture du tag certifié par l'arbitrage dès un tournoi non
+terminé, empreinte d'audience pseudonymisée et non anonyme). Penser aussi à
+mettre `/rgpd` à jour : la modale résume, la politique fait foi.
 
 ## Qui voit quoi
 

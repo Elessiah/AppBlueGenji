@@ -170,8 +170,10 @@ describe("DONNEE_TOURNOIS", () => {
     expect(DONNEE_TOURNOIS.base).not.toBe("Consentement");
   });
 
-  it("has an indefinite retention period", () => {
-    expect(DONNEE_TOURNOIS.duree).toMatch(/[Ii]ndéfini/);
+  it("says no retention period is defined: kept while the site exists, anonymised on account deletion", () => {
+    expect(DONNEE_TOURNOIS.duree).toMatch(/^Aucune durée définie/);
+    expect(DONNEE_TOURNOIS.duree).toContain("tant que le site existe");
+    expect(DONNEE_TOURNOIS.duree).toContain("anonymisés à la suppression du compte");
   });
 
   it("has a non-empty finalite", () => {

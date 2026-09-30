@@ -9,6 +9,7 @@ import {
   coversCurrentTerms,
   formatTermsDate,
   isTermsAcceptanceContext,
+  termsRequestFor,
 } from "@/lib/shared/terms-of-use";
 import {
   LOGO_QUARANTINE_MONTHS,
@@ -37,6 +38,21 @@ describe("conditions d'utilisation", () => {
     expect(coversCurrentTerms(TERMS_VERSION - 1)).toBe(false);
     expect(coversCurrentTerms(null)).toBe(false);
     expect(coversCurrentTerms(undefined)).toBe(false);
+  });
+
+  it("distingue une première acceptation d'une nouvelle version à accepter", () => {
+    expect(termsRequestFor(null)).toBe("FIRST");
+    expect(termsRequestFor(undefined)).toBe("FIRST");
+    expect(termsRequestFor(0)).toBe("FIRST");
+    expect(termsRequestFor(TERMS_VERSION - 1)).toBe("UPDATED");
+    expect(termsRequestFor(TERMS_VERSION)).toBeNull();
+    expect(termsRequestFor(TERMS_VERSION + 1)).toBeNull();
+  });
+
+  it("version 2 en vigueur le lendemain de sa mise en ligne : la version 1 est redemandée", () => {
+    expect(TERMS_VERSION).toBe(2);
+    expect(TERMS_UPDATED_AT).toBe("2026-10-01");
+    expect(termsRequestFor(1)).toBe("UPDATED");
   });
 
   it("reconnaît les quatre écrans d'acceptation", () => {

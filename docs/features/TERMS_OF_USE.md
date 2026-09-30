@@ -61,7 +61,23 @@ rôle, et non dans `userCanManageTeam` : ce dernier sert aussi à la **lecture**
 
 La question « ce compte doit-il accepter ? » que pose la mise en page racine
 tient en **une** requête (version acceptée et rôles, par jointure) et sa réponse
-est gardée 30 s par compte, vidée à l'acceptation.
+est gardée 30 s par compte, vidée à l'acceptation. Elle rend **pourquoi** on
+demande (`termsRequestFor`, module pur) : `FIRST` à qui n'a jamais accepté,
+`UPDATED` à qui a accepté une version antérieure — la modale titre alors « Les
+conditions d'utilisation ont changé » et nomme la version et sa date, au lieu du
+« Tu gères désormais une équipe » qui serait faux pour un gérant de longue date.
+Rouverte par un geste refusé (409 `TERMS_ACCEPTANCE_REQUIRED`) sans réponse de
+la mise en page, elle garde le texte d'une première acceptation.
+
+## Versions
+
+| Version | En vigueur depuis | Pourquoi |
+|---|---|---|
+| 1 | 24 septembre 2026 | Première version. |
+| 2 | 1er octobre 2026 | Changements de fond : âge minimum, licence, responsabilité des gérants, juridiction. Tout compte qui avait accepté la version 1 la réaccepte — à la connexion par la case de `/connexion`, ou par la modale s'il gère une équipe ; ses gestes de gestion sont refusés en 409 d'ici là. |
+
+`TERMS_UPDATED_AT` est daté du **lendemain** de la mise en ligne quand l'heure
+du déploiement n'est pas connue, comme `PRIVACY_CHANGES`.
 
 ## Envoi d'un logo
 

@@ -16,6 +16,7 @@ import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
 import { needsTermsForTeamManagement } from "@/lib/server/terms-acceptance";
+import type { TermsRequest } from "@/lib/shared/terms-of-use";
 import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deletion-journal";
 import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
@@ -118,13 +119,13 @@ async function pendingChangesFor(userId: number | undefined): Promise<PrivacyCha
  * ne fait pas tomber la page, la question sera reposée au chargement suivant —
  * et les gestes de gestion restent refusés côté serveur entre-temps.
  */
-async function termsRequiredFor(userId: number | undefined): Promise<boolean> {
-  if (userId === undefined) return false;
+async function termsRequestFor(userId: number | undefined): Promise<TermsRequest | null> {
+  if (userId === undefined) return null;
   try {
     return await needsTermsForTeamManagement(userId);
   } catch (error) {
     console.error("[terms] lecture impossible", error);
-    return false;
+    return null;
   }
 }
 
@@ -206,7 +207,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // Même régime pour le journal des suppressions de compte : une ligne ne doit
   // pas attendre la suppression suivante pour partir à son échéance.
   scheduleAccountDeletionJournalPrune();
-  const termsRequired = await termsRequiredFor(user?.id);
+  const termsRequest = await termsRequestFor(user?.id);
+  const termsRequired = termsRequest !== null;
   // « Plus tard » tient douze heures (cookie) : sans quoi la modale revenait
   // à chaque chargement complet. Un geste de gestion refusé la rouvre malgré lui.
   const termsPostponed = isTermsPostponed(cookieStore.get(TERMS_POSTPONED_COOKIE)?.value);
@@ -257,6 +259,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
           {user && (
             <TermsAcceptanceModal
               initiallyRequired={termsRequired && !termsPostponed}
+              request={termsRequest}
               privacyPending={privacyChanges.length > 0}
             />
           )}

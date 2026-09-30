@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { SOURCE_CODE_LINK_LABEL, SOURCE_CODE_URL } from "@/lib/shared/source-code";
+import { ASSOCIATION_NAME } from "@/lib/shared/legal-contact";
 import styles from "./SiteFooterBar.module.css";
 
 /**
@@ -35,7 +36,7 @@ export function SiteFooterBar({ authenticated }: { authenticated: boolean }) {
             </a>
           </li>
         </ul>
-        <span className={styles.copy}>© 2026 BlueGenji</span>
+        <span className={styles.copy}>© 2026 {ASSOCIATION_NAME}</span>
       </nav>
     </footer>
   );

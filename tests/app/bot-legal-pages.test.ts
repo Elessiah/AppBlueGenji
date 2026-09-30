@@ -73,13 +73,24 @@ describe("bot legal content is fully bilingual", () => {
 });
 
 describe("bot legal content carries the contact details", () => {
-  it.each(DOCS)("%s gives Discord and the report form, never an email, in both languages", (_name, doc) => {
+  it.each(DOCS)("%s gives the report form, never an email, in both languages", (_name, doc) => {
     for (const lang of [doc.fr, doc.en]) {
       const flat = JSON.stringify(lang);
-      expect(flat).toContain(LEGAL_CONTACT_DISCORD);
       expect(flat).toContain(REPORT_FORM_NAME);
       expect(flat).not.toMatch(/[^\s@"*]+@[^\s@"*]+\.[a-z]{2,}/i);
     }
+  });
+
+  it("the terms give the technical host's Discord, the privacy policy never names it as a data contact", () => {
+    for (const lang of [TERMS_OF_SERVICE.fr, TERMS_OF_SERVICE.en]) {
+      expect(JSON.stringify(lang)).toContain(LEGAL_CONTACT_DISCORD);
+    }
+    for (const lang of [PRIVACY_POLICY.fr, PRIVACY_POLICY.en]) {
+      const contact = lang.sections.find((section) => section.meta === "CONTACT");
+      expect(contact).toBeDefined();
+      expect(JSON.stringify(contact)).not.toContain(LEGAL_CONTACT_DISCORD);
+    }
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("ni délégué à la protection des données ni référent");
   });
 });
 

@@ -449,3 +449,45 @@ describe("PRIVACY_CHANGES — comptes Google antérieurs au pseudo neutre", () =
     ).toContain(entry.id);
   });
 });
+
+describe("PRIVACY_CHANGES — rectificatifs d'information", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-rectificatifs-information")!;
+  const text = () => [entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-01");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("dit que le traitement ne change pas", () => {
+    expect(entry.summary).toMatch(/Rien ne change dans le traitement/);
+  });
+
+  it("laisse intactes les entrées qu'elle rectifie", () => {
+    const backups = PRIVACY_CHANGES.find((c) => c.id === "2026-09-sauvegardes-chiffrees")!;
+    expect(backups.details.join(" ")).toContain("une clé que seule l'association détient");
+    const recap = PRIVACY_CHANGES.find((c) => c.id === "2026-09-recapitulatif-rgpd")!;
+    expect(recap.details.join(" ")).toContain("tournoi en cours");
+  });
+
+  it("sauvegardes : nomme le détenteur de la clé et borne le rejeu aux suppressions de compte", () => {
+    expect(text()).toContain("seul responsable technique de l'association, qui est aussi l'hébergeur du site");
+    expect(text()).toContain("seules les suppressions de compte intervenues depuis sont réappliquées");
+    expect(text()).toContain(`${BACKUP_RETENTION_DAYS} jours`);
+  });
+
+  it("arbitrage : tournoi non terminé, pas seulement en cours", () => {
+    expect(text()).toContain("tournoi qui n'est pas terminé");
+  });
+
+  it("mesure d'audience : pseudonymisée, pas anonyme", () => {
+    expect(text()).toContain("pseudonymisée, pas anonyme");
+  });
+
+  it("tient dans un message privé à elle seule, et ne renvoie qu'à des sections de /rgpd", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#audience", "/rgpd#destinataires"]);
+  });
+});

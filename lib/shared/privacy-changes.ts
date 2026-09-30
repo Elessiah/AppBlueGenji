@@ -139,14 +139,13 @@ export const PRIVACY_CHANGE_ID_MAX_LENGTH = 80;
 /**
  * Le registre, **dans l'ordre de publication** et en ajout seul : une entrée
  * publiée ne se retire ni ne se renomme (son identifiant est en base chez
- * chaque compte qui l'a lue). Une erreur de rédaction se corrige sur
- * place ; un changement de fond est une **nouvelle** entrée.
- *
- * « Changement de fond » s'entend du **traitement**, pas de sa description.
- * Deux entrées disaient l'empreinte de mesure d'audience « non réversible » :
- * c'était une description inexacte d'un traitement resté le même (l'association
- * détient le sel), corrigée sur place comme `/rgpd#audience` et la fiche T06 —
- * une entrée ne s'ajoute que lorsque le traitement change.
+ * chaque compte qui l'a lue), et son texte ne se modifie plus : qui l'a
+ * acceptée ne la reverrait jamais, la correction n'atteindrait que ceux qui
+ * ne l'ont pas encore lue. Un changement du traitement est une **nouvelle**
+ * entrée ; une **information inexacte** sur un traitement resté le même
+ * aussi — une entrée rectificative, qui dit ce qui était faux et ce qui est
+ * vrai (`2026-10-rectificatifs-information`). Plusieurs rectifications prêtes
+ * ensemble partent dans une seule entrée, donc une seule modale.
  */
 export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   {
@@ -436,6 +435,31 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Tu les retrouves dans l'export de tes données, depuis « Mon profil », tant que ton compte existe.",
     ],
     links: [{ href: "/rgpd#donnees-connexion", label: "Lire la politique de confidentialité" }],
+  },
+  // Entrée **d'information** : aucun traitement ne change. Trois annonces
+  // publiées disaient inexactement un traitement resté le même — les
+  // sauvegardes (`2026-09-sauvegardes-chiffrees` : détenteur de la clé, portée
+  // du rejeu), la lecture du tag certifié par l'arbitrage
+  // (`2026-09-recapitulatif-rgpd` : « tournoi en cours » là où
+  // `isInActiveTournament` dit « non terminé ») et l'empreinte de mesure
+  // d'audience (pseudonymisée, pas anonyme). Une entrée publiée ne se réécrit
+  // pas : ses lecteurs ne la reverraient jamais. Regroupées ici pour ne
+  // présenter qu'une modale.
+  {
+    id: "2026-10-rectificatifs-information",
+    publishedAt: "2026-10-01",
+    title: "Trois précisions sur nos annonces précédentes",
+    summary:
+      "Trois informations données dans nos annonces précédentes étaient inexactes : les voici corrigées. Rien ne change dans le traitement de tes données.",
+    details: [
+      `Sauvegardes : la clé de chiffrement n'est pas détenue par « l'association » en général, mais par le seul responsable technique de l'association, qui est aussi l'hébergeur du site ; elle n'est jamais transmise à Microsoft. Et si une sauvegarde devait être restaurée, seules les suppressions de compte intervenues depuis sont réappliquées : un autre effacement postérieur à l'archive (tag ou BattleTag retiré, moyen de connexion détaché, réglage de visibilité modifié…) reviendrait avec elle (une archive est gardée ${BACKUP_RETENTION_DAYS} jours au plus).`,
+      "Tag Discord certifié : les arbitres peuvent le lire dès que tu es engagé (seul ou avec ton équipe) dans un tournoi qui n'est pas terminé — y compris pendant les inscriptions —, et non seulement pendant un tournoi en cours.",
+      "Mesure d'audience : l'empreinte enregistrée à chaque visite est une donnée pseudonymisée, pas anonyme. Sans le secret du serveur, elle ne se rattache à personne ; mais l'association, qui le détient, peut recalculer l'empreinte d'un compte, ou d'une adresse IP associée à un navigateur, et retrouver les visites correspondantes.",
+    ],
+    links: [
+      { href: "/rgpd#audience", label: "Lire la section « Mesure d'audience »" },
+      { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
+    ],
   },
 ];
 

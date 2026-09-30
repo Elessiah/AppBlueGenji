@@ -72,6 +72,12 @@ describe("hasAcceptedCurrentTerms / assertTermsAccepted", () => {
     execute.mockResolvedValue([[{ terms_version: TERMS_VERSION }]]);
     await expect(assertTermsAccepted(4)).resolves.toBeUndefined();
   });
+
+  it("refuse aussi le gérant qui n'a accepté que la version 1, en vigueur jusqu'à la version 2", async () => {
+    expect(TERMS_VERSION).toBeGreaterThanOrEqual(2);
+    execute.mockResolvedValue([[{ terms_version: 1 }]]);
+    await expect(assertTermsAccepted(4)).rejects.toThrow("TERMS_ACCEPTANCE_REQUIRED");
+  });
 });
 
 describe("recordTermsAcceptanceIfBehind", () => {
@@ -104,17 +110,17 @@ describe("needsTermsForTeamManagement", () => {
 
   it("ne demande rien à un compte absent ou supprimé", async () => {
     execute.mockResolvedValueOnce([[]]);
-    await expect(needsTermsForTeamManagement(40)).resolves.toBe(false);
+    await expect(needsTermsForTeamManagement(40)).resolves.toBeNull();
   });
 
   it("ne demande rien à qui a déjà accepté", async () => {
     execute.mockResolvedValueOnce([[row(TERMS_VERSION, '["OWNER"]', 3)]]);
-    await expect(needsTermsForTeamManagement(41)).resolves.toBe(false);
+    await expect(needsTermsForTeamManagement(41)).resolves.toBeNull();
   });
 
   it("demande à un gérant qui n'a pas accepté, en une seule requête", async () => {
     execute.mockResolvedValueOnce([[row(null, '["DPS","MANAGER"]', 3)]]);
-    await expect(needsTermsForTeamManagement(42)).resolves.toBe(true);
+    await expect(needsTermsForTeamManagement(42)).resolves.toBe("FIRST");
     expect(execute).toHaveBeenCalledTimes(1);
     const [sql] = execute.mock.calls[0];
     // Équipe vivante, appartenance en cours, jamais une entrée solo.
@@ -123,21 +129,26 @@ describe("needsTermsForTeamManagement", () => {
     expect(sql).toMatch(/t.solo_user_id IS NULL/);
   });
 
+  it("redemande à un gérant qui n'a accepté qu'une version antérieure, en le disant", async () => {
+    execute.mockResolvedValueOnce([[row(TERMS_VERSION - 1, '["OWNER"]', 3)]]);
+    await expect(needsTermsForTeamManagement(45)).resolves.toBe("UPDATED");
+  });
+
   it("ne compte ni un simple joueur, ni le rôle d'une équipe dissoute", async () => {
     execute.mockResolvedValueOnce([[row(null, ["TANK", "CAPITAINE"], 3), row(null, '["OWNER"]', null)]]);
-    await expect(needsTermsForTeamManagement(43)).resolves.toBe(false);
+    await expect(needsTermsForTeamManagement(43)).resolves.toBeNull();
   });
 
   it("garde sa réponse un moment, et l'oublie dès que le compte accepte", async () => {
     execute.mockResolvedValueOnce([[row(null, '["OWNER"]', 3)]]);
-    await expect(needsTermsForTeamManagement(44)).resolves.toBe(true);
-    await expect(needsTermsForTeamManagement(44)).resolves.toBe(true);
+    await expect(needsTermsForTeamManagement(44)).resolves.toBe("FIRST");
+    await expect(needsTermsForTeamManagement(44)).resolves.toBe("FIRST");
     expect(execute).toHaveBeenCalledTimes(1);
 
     execute.mockResolvedValueOnce([{ affectedRows: 1 }]).mockResolvedValueOnce([{}]);
     await recordTermsAcceptance(44, "TEAM_MANAGEMENT");
     execute.mockResolvedValueOnce([[row(TERMS_VERSION, '["OWNER"]', 3)]]);
-    await expect(needsTermsForTeamManagement(44)).resolves.toBe(false);
+    await expect(needsTermsForTeamManagement(44)).resolves.toBeNull();
   });
 });
 

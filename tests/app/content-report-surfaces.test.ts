@@ -61,6 +61,11 @@ describe("conditions d'utilisation à la création du compte", () => {
     const layout = read("app/layout.tsx");
     expect(layout).toContain("<TermsAcceptanceModal");
     expect(layout).toContain("needsTermsForTeamManagement");
+    // Une nouvelle version se présente comme telle au gérant qui avait accepté la précédente.
+    expect(layout).toContain("request={termsRequest}");
+    const modal = read("components/legal/TermsAcceptanceModal.tsx");
+    expect(modal).toContain('request === "UPDATED"');
+    expect(modal).toContain("Les conditions d'utilisation ont changé");
   });
 
   it("la création d'une équipe et l'envoi d'un logo portent leur case", () => {
