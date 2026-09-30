@@ -3,6 +3,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   ASSOCIATION_EMAIL_ENCODED,
   ASSOCIATION_PHONE_ENCODED,
+  DATA_CONTACT_EMAIL_ENCODED,
+  DATA_CONTACT_PHONE_ENCODED,
   SITE_HOST_PHONE_ENCODED,
   contactHref,
   decodeContact,
@@ -14,7 +16,8 @@ import { readSource } from "../../helpers/read-source";
 // Composées plutôt qu'écrites : un test reste un fichier du dépôt public.
 const EMAIL = ["bluegenjiesport", "gmail.com"].join("@");
 const ASSOCIATION_PHONE = ["07", "83", "29", "42", "03"].join(" ");
-const HOST_PHONE = ["06", "02", "22", "49", "56"].join(" ");
+const HOST_PHONE = ["06", "02", "22", "49", "46"].join(" ");
+const DATA_CONTACT_EMAIL = ["keryan.h", "outlook.fr"].join("@");
 
 describe("encodeContact / decodeContact", () => {
   it.each([EMAIL, ASSOCIATION_PHONE, "é@exemple.invalid"])("aller-retour : %s", (plain) => {
@@ -40,6 +43,12 @@ describe("encodeContact / decodeContact", () => {
     expect(decodeContact(ASSOCIATION_EMAIL_ENCODED)).toBe(EMAIL);
     expect(decodeContact(ASSOCIATION_PHONE_ENCODED)).toBe(ASSOCIATION_PHONE);
     expect(decodeContact(SITE_HOST_PHONE_ENCODED)).toBe(HOST_PHONE);
+    expect(decodeContact(DATA_CONTACT_EMAIL_ENCODED)).toBe(DATA_CONTACT_EMAIL);
+  });
+
+  it("le téléphone du contact données est celui de l'hébergeur, encodé une seule fois", () => {
+    expect(DATA_CONTACT_PHONE_ENCODED).toBe(SITE_HOST_PHONE_ENCODED);
+    expect(decodeContact(DATA_CONTACT_PHONE_ENCODED)).toBe(HOST_PHONE);
   });
 });
 

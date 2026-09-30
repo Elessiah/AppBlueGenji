@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE } from "@/lib/shared/legal-contact";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -454,9 +455,8 @@ describe("PRIVACY_CHANGES — rectificatifs d'information", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-rectificatifs-information")!;
   const text = () => [entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+  it("est datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -489,5 +489,33 @@ describe("PRIVACY_CHANGES — rectificatifs d'information", () => {
   it("tient dans un message privé à elle seule, et ne renvoie qu'à des sections de /rgpd", () => {
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#audience", "/rgpd#destinataires"]);
+  });
+});
+
+describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-contact-donnees")!;
+  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-01");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("nomme la personne et sa qualité, sans aucune coordonnée en clair", () => {
+    expect(entry.summary).toContain(`${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}`);
+    expect(text()).not.toMatch(/@|\b0\d([ .-]?\d{2}){4}\b/);
+  });
+
+  it("ne l'appelle jamais DPO, et dit que le traitement ne change pas", () => {
+    expect(text()).not.toMatch(/DPO/);
+    expect(text()).toContain("Ce n'est pas un délégué à la protection des données");
+    expect(entry.summary).toMatch(/Rien ne change dans le traitement/);
+  });
+
+  it("tient dans un message privé à elle seule, et renvoie à la section des droits", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#exercer-vos-droits"]);
   });
 });
