@@ -499,7 +499,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
 
   // Même jour que les rectificatifs : une seule modale pour les deux, et une
   // entrée distincte parce que ceux-ci annoncent un traitement inchangé.
-  it("est la dernière entrée, datée du même jour que les rectificatifs, pour tous les comptes", () => {
+  it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
     // Suivie de l'entrée du contact données, publiée le même jour.
     expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);

@@ -96,11 +96,11 @@ const CONTACT_ITEMS_EN = [
 // il ne sert qu'aux questions techniques (`lib/shared/legal-contact.ts`).
 const SITE_RIGHTS_HREF = `${SITE_PRIVACY_HREF}#exercer-vos-droits`;
 const PRIVACY_CONTACT_ITEMS_FR = [
-  `Personne à contacter pour vos demandes relatives à vos données : **${DATA_CONTACT_NAME}**, hébergeur technique du site — courriel et téléphone dans la [politique de confidentialité du site](${SITE_RIGHTS_HREF}). Ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD : l'association reste responsable du traitement. Ce traitement (base légale, données, durée de conservation) est décrit dans la politique de confidentialité du site ; ses destinataires et transferts figurent aussi aux sections 04 et 05`,
+  `Personne à contacter pour vos demandes relatives à vos données : **${DATA_CONTACT_NAME}**, hébergeur technique du site — courriel et téléphone dans la [politique de confidentialité du site](${SITE_RIGHTS_HREF}). Ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD : l'association reste responsable du traitement. Ce traitement (base légale, données, durée de conservation) est décrit dans la politique de confidentialité du site ; ses destinataires et transferts figurent aussi aux sections 04 et 05 de la présente politique`,
   ...CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**")),
 ];
 const PRIVACY_CONTACT_ITEMS_EN = [
-  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}) (in French). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller. This processing (legal basis, data, retention period) is described in the website's privacy policy; its recipients and transfers are also listed in sections 04 and 05`,
+  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}) (in French). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller. This processing (legal basis, data, retention period) is described in the website's privacy policy; its recipients and transfers are also listed in sections 04 and 05 of this policy`,
   ...CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**")),
 ];
 
