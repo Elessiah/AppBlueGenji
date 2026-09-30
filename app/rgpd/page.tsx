@@ -14,9 +14,17 @@ import {
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
+  DATA_CONTACT_LABEL,
+  DATA_CONTACT_NAME,
+  DATA_CONTACT_ROLE,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
-import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
+import {
+  ASSOCIATION_EMAIL_ENCODED,
+  ASSOCIATION_PHONE_ENCODED,
+  DATA_CONTACT_EMAIL_ENCODED,
+  DATA_CONTACT_PHONE_ENCODED,
+} from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -146,8 +154,16 @@ export default async function RgpdPage() {
             <ProtectedContact encoded={ASSOCIATION_PHONE_ENCODED} kind="phone" owner="de l'association" />
           </p>
           <p>
-            Pour toute question relative à vos données personnelles, contactez-nous
-            par les moyens indiqués en section&nbsp;11.
+            {DATA_CONTACT_LABEL} : <strong>{DATA_CONTACT_NAME}</strong>, {DATA_CONTACT_ROLE}.
+            Courriel :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_EMAIL_ENCODED} kind="email" owner={`de ${DATA_CONTACT_NAME}`} />
+            {" · "}Téléphone :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`de ${DATA_CONTACT_NAME}`} />
+          </p>
+          <p>
+            Il n&apos;est pas délégué à la protection des données au sens de l&apos;article 37 du
+            RGPD : l&apos;association reste responsable du traitement. Vous pouvez aussi faire
+            une demande par les moyens indiqués en section&nbsp;11.
           </p>
         </div>
       </section>
@@ -164,10 +180,12 @@ export default async function RgpdPage() {
         <div className={styles.prose}>
           <p>
             Le compte joueur ne demande aucun nom réel, aucun numéro de téléphone, aucune
-            adresse postale : il repose sur des pseudonymes de jeu. Deux exceptions, hors du
-            compte : un signalement de droit d&apos;auteur indique le nom de son auteur, et les
-            membres du bureau et les bénévoles présentés sur le site y figurent sous leur nom,
-            avec leur accord (registre, T07 et T11).
+            adresse postale : il repose sur des pseudonymes de jeu. Trois exceptions, hors du
+            compte : un signalement de droit d&apos;auteur indique le nom de son auteur ; une
+            demande relative à vos données envoyée par courriel ou par téléphone porte
+            l&apos;adresse ou le numéro de son expéditeur, et souvent son nom ; et les membres
+            du bureau et les bénévoles présentés sur le site y figurent sous leur nom, avec leur
+            accord (registre, T07 et T11).
             Google transmet le nom de votre compte avec votre photo : depuis le 30 septembre
             2026, il n&apos;est ni repris ni conservé, un compte créé par Google reçoit un
             pseudo neutre que vous remplacez dans Mon profil, et la photo copiée depuis
@@ -585,8 +603,8 @@ export default async function RgpdPage() {
             qui n&apos;ajoute que l&apos;en-tête laisse partir le signalement, que le serveur
             écarte alors sans rien calculer). L&apos;opposition vaut
             pour vos visites à venir ; pour les visites déjà enregistrées, le droit
-            s&apos;exerce, comme vos autres droits, par le formulaire « {REPORT_FORM_NAME} »,
-            catégorie RGPD, ou par le courriel de l&apos;association (section&nbsp;01).
+            s&apos;exerce comme vos autres droits, par les moyens indiqués à la section{" "}
+            <a href="#exercer-vos-droits">« Exercer vos droits »</a>.
           </p>
           <AudienceOptOutControl initialReason={audienceOptOut} />
         </div>
@@ -769,7 +787,10 @@ export default async function RgpdPage() {
             <strong>en France</strong>, sur un Raspberry Pi installé à Caen, par un bénévole de
             l&apos;association (voir les{" "}
             <Link href="/mentions-legales#hebergement">mentions légales</Link>). Vos données
-            n&apos;en sortent que vers les destinataires suivants :
+            n&apos;en sortent que vers les destinataires suivants — les deux derniers ne
+            voient passer que ce que vous échangez vous-même, par courriel ou par téléphone, avec
+            la personne à contacter pour vos demandes relatives à vos données, sans passer par le
+            site :
           </p>
           <ul>
             <li>
@@ -791,10 +812,23 @@ export default async function RgpdPage() {
               envoi</strong> avec une clé que Microsoft ne détient pas — Microsoft les
               stocke sans pouvoir les lire.
             </li>
+            <li>
+              <strong>Microsoft</strong> (Outlook.com) : la messagerie personnelle de la personne à
+              contacter pour vos demandes relatives à vos données est hébergée par Microsoft sur un
+              compte personnel, sans contrat de sous-traitance. Un courriel que vous envoyez à{" "}
+              {DATA_CONTACT_NAME}, et la réponse qu&apos;il vous adresse par courriel, y passent sans chiffrement propre
+              à l&apos;association : Microsoft peut donc les lire (durée : section{" "}
+              <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
+            </li>
+            <li>
+              <strong>L&apos;opérateur téléphonique</strong> de cette même personne : seulement si
+              vous l&apos;appelez ou lui laissez un SMS ou un message vocal.
+            </li>
           </ul>
           <p>
-            <strong>Encadrement des transferts.</strong> Ces services peuvent traiter ou héberger
-            des données aux États-Unis. Le transfert y repose, pour chacun, sur :{" "}
+            <strong>Encadrement des transferts.</strong> Parmi ces services, ceux qui peuvent
+            traiter ou héberger des données aux États-Unis — pas l&apos;opérateur téléphonique —
+            le font sur le fondement suivant :{" "}
             {transferBasis(ALL_TRANSFER_RECIPIENTS)}.
           </p>
           <p>
@@ -858,7 +892,7 @@ export default async function RgpdPage() {
       </section>
 
       {/* SECTION 11 — CONTACT */}
-      <section className={styles.section}>
+      <section id="exercer-vos-droits" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 11</span>
@@ -869,22 +903,42 @@ export default async function RgpdPage() {
         <div className={styles.prose}>
           <p>
             Pour exercer l'un de vos droits ou poser une question relative au
-            traitement de vos données, contactez l&apos;association par le
-            formulaire « {REPORT_FORM_NAME} », présent en bas de chaque page,
-            catégorie <strong>RGPD</strong> — ou par son courriel (section&nbsp;01). Nous
-            répondons dans un délai maximum d'<strong>un mois</strong> (art. 12 RGPD).
+            traitement de vos données, écrivez ou téléphonez à la personne que
+            l&apos;association a chargée de ces demandes, <strong>{DATA_CONTACT_NAME}</strong>,{" "}
+            {DATA_CONTACT_ROLE} (coordonnées ci-dessous). Le formulaire
+            « {REPORT_FORM_NAME} », présent en bas de chaque page, catégorie{" "}
+            <strong>RGPD</strong>, et les coordonnées de l&apos;association (section&nbsp;01)
+            restent aussi ouverts. Nous répondons dans un délai maximum
+            d'<strong>un mois</strong> (art. 12 RGPD).
           </p>
           <p>
-            L&apos;association n&apos;a désigné ni délégué à la protection des données ni
-            référent : c&apos;est elle qui reçoit et traite vos demandes.
+            Une demande reçue par courriel ou par téléphone (appel, SMS, messagerie vocale) —
+            son contenu, votre adresse ou votre numéro, et souvent votre nom —, ainsi que la
+            réponse envoyée par courriel ou par SMS, sont conservées le temps de la traiter, puis{" "}
+            {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, avant d&apos;être
+            supprimées de la messagerie ou du téléphone de la personne à contacter (registre,
+            T11). Une demande faite depuis le formulaire suit la règle de la section{" "}
+            <a href="#signalements">« Signalements »</a>.
+          </p>
+          <p>
+            Cette personne n&apos;est pas un délégué à la protection des données au sens de
+            l&apos;article 37 du RGPD : l&apos;association reste responsable du traitement et
+            de la réponse apportée à votre demande.
           </p>
         </div>
         <div className={styles.contactBlock} style={{ marginTop: 24 }}>
-          <span className={styles.contactLabel}>Contact RGPD</span>
-          <span className={styles.contactValue}>Formulaire « {REPORT_FORM_NAME} », catégorie RGPD</span>
+          <span className={styles.contactLabel}>{DATA_CONTACT_LABEL}</span>
+          <span className={styles.contactValue}>
+            {DATA_CONTACT_NAME}, {DATA_CONTACT_ROLE}
+          </span>
           <span className={styles.contactSub}>
-            Ou par courriel :{" "}
-            <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
+            Courriel :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_EMAIL_ENCODED} kind="email" owner={`de ${DATA_CONTACT_NAME}`} />
+            {" · "}Téléphone :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`de ${DATA_CONTACT_NAME}`} />
+          </span>
+          <span className={styles.contactSub}>
+            Ou formulaire « {REPORT_FORM_NAME} », catégorie RGPD :
           </span>
           <div style={{ marginTop: 12 }}>
             <ReportProblemButton

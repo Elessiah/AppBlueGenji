@@ -782,7 +782,8 @@ export function reportLegalBasisNotice(category: ReportCategory): string {
 
 /** Droits annoncés par le formulaire ; le retrait du consentement n'est dit que là où il existe. */
 export function reportRightsNotice(category: ReportCategory): string {
-  const channel = "par ce formulaire (catégorie « RGPD ») ou sur Discord (voir la politique de confidentialité)";
+  const channel =
+    "par ce formulaire (catégorie « RGPD ») ou auprès de la personne à contacter pour tes données (politique de confidentialité, section « Exercer vos droits »)";
   if (reportRequiresConsent(category)) {
     return `Tu peux demander l'accès, la rectification ou l'effacement de ces données, ou retirer ton consentement, ${channel}.`;
   }

@@ -26,7 +26,7 @@ import {
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
+import { DATA_CONTACT_NAME, LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
 const controller = registerController();
 const byRef = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref) as ProcessingActivity;
@@ -175,12 +175,35 @@ describe("T03 — conservation des résultats de tournois", () => {
   });
 });
 
+describe("T11 — demandes reçues par courriel ou téléphone", () => {
+  it("nomme la personne à contacter et Microsoft, qui héberge sa messagerie, sans prétendre à une durée", () => {
+    const t11 = byRef("T11");
+    expect(t11.recipients.join(" ")).toContain(DATA_CONTACT_NAME);
+    expect(t11.recipients.join(" ")).toContain("Microsoft, qui héberge la messagerie");
+    expect(t11.transfers.join(" ")).toMatch(/Microsoft \(messagerie Outlook\.com/);
+    expect(t11.retention.join(" ")).toContain("même règle qu'une demande RGPD faite depuis le formulaire");
+    expect(t11.recipients.join(" ")).toContain("sans contrat de sous-traitance");
+    expect(t11.recipients.join(" ")).toContain("lisibles par Microsoft");
+    expect(t11.dataSubjects.join(" ")).toContain("par courriel ou par téléphone");
+    expect(t11.dataCategories.join(" ")).toContain("reçues par courriel ou par téléphone");
+    // Finalité et base légale du canal, questions simples comprises (art. 13.1.c, 30.1.b).
+    expect(t11.subPurposes.join(" ")).toContain("Recevoir par courriel ou par téléphone");
+    // Même base que la catégorie RGPD du formulaire : un canal ne change pas la base légale.
+    expect(t11.legalBasis).toContain("par courriel ou par téléphone comme par le formulaire (catégorie RGPD)");
+    expect(t11.legalBasis).toContain("repose sur la même obligation légale");
+  });
+});
+
 describe("registerController", () => {
-  it("donne le contact de l'association et le formulaire, sans hébergeur technique ni adresse électronique", () => {
+  it("donne la personne à contacter pour les données, le formulaire et l'association, sans tag Discord ni adresse électronique", () => {
     expect(controller.contact).toBe(RGPD_CONTACT_LINE);
     expect(controller.contact).not.toContain(LEGAL_CONTACT_DISCORD);
-    expect(controller.dpo).toMatch(/ni référent désigné/);
-    expect(controller.dpo).not.toMatch(/non obligatoire/);
+    expect(controller.dataContact).toContain(DATA_CONTACT_NAME);
+    // Jamais présentée comme un délégué (art. 37) : la rubrique le dit.
+    expect(controller.dataContact).toMatch(/n'est pas délégué à la protection des données au sens de l'article 37/);
+    expect(controller.dataContact).toContain("l'association reste responsable du traitement");
+    expect(controller.dataContact).not.toMatch(/non obligatoire/);
+    expect(controller.dataContact).not.toContain("@");
     expect(controller.contact).toContain("RGPD");
     expect(controller.contact).not.toContain("@");
     expect(controller.legalForm).toMatch(/loi 1901/);

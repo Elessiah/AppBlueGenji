@@ -508,6 +508,9 @@ describe("registre des catégories", () => {
   it("dit comment exercer ses droits sans renvoyer à une adresse", () => {
     for (const category of REPORT_CATEGORIES) {
       expect(reportRightsNotice(category)).toContain("catégorie « RGPD »");
+      // Le tag Discord n'est pas un canal des demandes relatives aux données.
+      expect(reportRightsNotice(category)).not.toMatch(/Discord/);
+      expect(reportRightsNotice(category)).toContain("personne à contacter pour tes données");
       expect(reportRightsNotice(category)).not.toMatch(/en écrivant/);
     }
   });

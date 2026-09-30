@@ -1,4 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
+import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE } from "@/lib/shared/legal-contact";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -498,8 +499,9 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
 
   // Même jour que les rectificatifs : une seule modale pour les deux, et une
   // entrée distincte parce que ceux-ci annoncent un traitement inchangé.
-  it("est la dernière entrée, datée du même jour que les rectificatifs, pour tous les comptes", () => {
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+  it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
+    // Suivie de l'entrée du contact données, publiée le même jour.
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -517,5 +519,39 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   it("tient dans un message privé à elle seule, et renvoie à la section de /rgpd", () => {
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#audience"]);
+  });
+});
+
+describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-contact-donnees")!;
+  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-01");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("nomme la personne et sa qualité, sans aucune coordonnée en clair", () => {
+    // Le résumé part sur Discord : il dit la qualité, le nom reste dans le détail.
+    expect(entry.summary).toContain(`l'${DATA_CONTACT_ROLE}`);
+    expect(entry.summary).not.toContain(DATA_CONTACT_NAME);
+    expect(entry.details.join(" ")).toContain(`Cette personne est ${DATA_CONTACT_NAME}.`);
+    expect(text()).not.toMatch(/@|\b0\d([ .-]?\d{2}){4}\b/);
+  });
+
+  it("ne l'appelle jamais DPO, et annonce le nouveau destinataire d'un courriel", () => {
+    expect(text()).not.toMatch(/DPO/);
+    expect(text()).toContain("Ce n'est pas un délégué à la protection des données");
+    // Un canal neuf, donc un destinataire neuf : l'entrée ne dit pas que rien ne change.
+    expect(text()).not.toMatch(/Rien ne change/);
+    expect(text()).toContain("hébergée par Microsoft (Outlook.com, possibles transferts vers les États-Unis)");
+    expect(text()).toContain("passe par son opérateur téléphonique");
+  });
+
+  it("tient dans un message privé à elle seule, et renvoie à la section des droits", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#exercer-vos-droits"]);
   });
 });
