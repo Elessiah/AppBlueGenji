@@ -223,8 +223,8 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("Nothing is erased when the Bot restarts");
   });
 
-  // blueGenjiBot#33 : l'auteur d'un scrim ou d'une recherche est effacé au-delà
-  // de 30 jours (`ACTIVITY_AUTHOR_RETENTION_DAYS`), la ligne restant pour les compteurs.
+  // blueGenjiBot#33 : au-delà de 30 jours (`ACTIVITY_AUTHOR_RETENTION_DAYS`), les
+  // scrims et recherches sont repliés en nombres par jour, sans auteur, puis supprimés.
   it("states the 30-day erasure of scrim and search authors, in both languages and in T08", () => {
     expect(BOT_ACTIVITY_AUTHOR_RETENTION_DAYS).toBe(30);
     for (const lang of LANGS) {

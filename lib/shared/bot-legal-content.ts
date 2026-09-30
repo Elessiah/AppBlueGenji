@@ -440,7 +440,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Annonces relayées" },
           {
             kind: "p",
-            text: `Identifiant du message d'origine et de son auteur, date, identifiants des copies relayées et de leurs salons : ils servent à relayer l'annonce, à répercuter sa modification ou sa suppression, à appliquer le temps de recharge entre deux annonces et au compteur de messages de **/stats**. **Le contenu du message n'est pas enregistré dans la base du Bot** : il est recopié, avec le nom de son auteur, dans les salons des serveurs partenaires, où leurs membres le lisent. Ces copies sont des messages Discord : supprimer l'annonce d'origine dans les ${BOT_RELAY_RETENTION_DAYS} jours supprime aussi ses copies ; passé ce délai, elles restent jusqu'à leur suppression par les administrateurs du serveur qui les porte.`,
+            text: `Identifiant du message d'origine et de son auteur, date, identifiants des copies relayées et de leurs salons : ils servent à relayer l'annonce, à répercuter sa modification ou sa suppression, à appliquer le temps de recharge entre deux annonces, au compteur de messages de **/stats** et aux statistiques du tableau de bord du bot. **Le contenu du message n'est pas enregistré dans la base du Bot** : il est recopié, avec le nom de son auteur, dans les salons des serveurs partenaires, où leurs membres le lisent. Ces copies sont des messages Discord : supprimer l'annonce d'origine dans les ${BOT_RELAY_RETENTION_DAYS} jours supprime aussi ses copies ; passé ce délai, elles restent jusqu'à leur suppression par les administrateurs du serveur qui les porte.`,
           },
           { kind: "subhead", text: "Scrims et recrutement" },
           {
@@ -450,7 +450,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Exclusions du relais" },
           {
             kind: "p",
-            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée par la modération des serveurs partenaires dans les conditions de la section « Modération du relais » des Conditions d'Utilisation. La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff ; le motif part aussi en message privé au titulaire du Bot, où il reste sans limite de durée. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée par la modération des serveurs partenaires dans les conditions de la section « Modération du relais » des Conditions d'Utilisation. La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
           },
           { kind: "subhead", text: "Adhésions et rappels programmés" },
           {
@@ -473,7 +473,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Journaux" },
           {
             kind: "p",
-            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff (dont chaque ligne part aussi en message privé au titulaire du Bot) et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit pas de pseudo de lui-même : le motif d'une exclusion, texte libre du modérateur, peut en citer un, et une erreur de remise d'un message privé peut mentionner le compte visé.",
+            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit pas de pseudo de lui-même : le motif d'une exclusion, texte libre du modérateur, peut en citer un, et une erreur de remise d'un message privé peut mentionner le compte visé.",
           },
           { kind: "subhead", text: "Base légale" },
           {
@@ -643,7 +643,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relayed advertisements" },
           {
             kind: "p",
-            text: `ID of the original message and of its author, date, IDs of the relayed copies and of their channels: they are used to relay the advertisement, to pass on its edits or deletion, to apply the cooldown between two advertisements and for the message count of **/stats**. **Message content is not stored in the Bot's database**: it is copied, with its author's name, into the channels of partner servers, where their members read it. These copies are Discord messages: deleting the original advertisement within ${BOT_RELAY_RETENTION_DAYS} days also deletes its copies; after that, they remain until the administrators of the server holding them delete them.`,
+            text: `ID of the original message and of its author, date, IDs of the relayed copies and of their channels: they are used to relay the advertisement, to pass on its edits or deletion, to apply the cooldown between two advertisements, for the message count of **/stats** and for the bot's dashboard statistics. **Message content is not stored in the Bot's database**: it is copied, with its author's name, into the channels of partner servers, where their members read it. These copies are Discord messages: deleting the original advertisement within ${BOT_RELAY_RETENTION_DAYS} days also deletes its copies; after that, they remain until the administrators of the server holding them delete them.`,
           },
           { kind: "subhead", text: "Scrims and recruitment" },
           {
@@ -653,7 +653,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relay exclusions" },
           {
             kind: "p",
-            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided by the moderators of partner servers under the conditions of the « Relay moderation » section of the Terms of Service. The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel; the reason is also sent by direct message to the Bot's owner, where it stays with no time limit. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided by the moderators of partner servers under the conditions of the « Relay moderation » section of the Terms of Service. The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
           },
           { kind: "subhead", text: "Memberships and scheduled reminders" },
           {
@@ -676,7 +676,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Logs" },
           {
             kind: "p",
-            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel (each line of which is also sent by direct message to the Bot's owner) and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot writes no username there on its own: the reason for an exclusion, free text written by the moderator, may quote one, and a failed direct-message delivery may mention the account concerned.",
+            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot writes no username there on its own: the reason for an exclusion, free text written by the moderator, may quote one, and a failed direct-message delivery may mention the account concerned.",
           },
           { kind: "subhead", text: "Legal basis" },
           {

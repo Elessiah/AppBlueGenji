@@ -70,8 +70,9 @@ export const DISCORD_CODE_VALIDITY_MINUTES = 10;
  *   plus tard par le ménage de la nuit ou du redémarrage
  *   (`blueGenjiBot/src/privacy/dataRetention.ts`).
  * - `BOT_ACTIVITY_AUTHOR_RETENTION_DAYS` : `ACTIVITY_AUTHOR_RETENTION_DAYS` de
- *   `blueGenjiBot/src/privacy/retentionPeriods.ts` — au-delà, l'auteur d'un
- *   `/scrim` ou d'un `/recrute` est effacé, la ligne restant pour les compteurs.
+ *   `blueGenjiBot/src/privacy/retentionPeriods.ts` — au-delà (dans la nuit
+ *   qui suit), les lignes `/scrim` et `/recrute` sont repliées en nombres par
+ *   jour, serveur et niveau ou rôle (`ActivityDaily`), puis supprimées.
  */
 export const BOT_RELAY_RETENTION_DAYS = 7;
 export const BOT_ACTIVITY_AUTHOR_RETENTION_DAYS = 30;
@@ -520,7 +521,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusions : jusqu'à la levée de l'exclusion",
       "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)",
       "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)",
-      "Salon de journal privé du staff (et sa copie en message privé au titulaire du bot) : aucune suppression automatique à ce jour",
+      "Salon de journal privé du staff, et motifs d'exclusion copiés en message privé au titulaire du bot : aucune suppression automatique à ce jour",
       "Journaux du serveur : selon leur rotation automatique",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
