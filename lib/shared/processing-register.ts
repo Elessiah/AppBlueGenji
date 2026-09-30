@@ -471,8 +471,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Scrims et recrutement : aucune suppression automatique à ce jour, jusqu'à une demande d'effacement",
       "Exclusions : jusqu'à la levée de l'exclusion",
       `Commande /link : code valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne n'est pas supprimée automatiquement à ce jour`,
-      "Configuration : salons relayés jusqu'à leur retrait ou au départ du bot du serveur ; invitation et rôle d'arbitrage (avec l'identifiant de qui les a posés) et rôle d'administration du bot, jusqu'à leur retrait par les administrateurs, conservés sans limite si le bot quitte le serveur",
-      "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression",
+      "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un retrait survenu pendant une interruption du bot ne lui est pas signalé : la configuration reste alors jusqu'à une demande d'effacement)",
+      "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (même réserve : un retrait pendant une interruption du bot les laisse jusqu'à une demande d'effacement)",
       "Salon de journal privé du staff : aucune suppression automatique à ce jour",
       "Journaux du serveur : selon leur rotation automatique",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
@@ -557,7 +557,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     legalBasis:
       "Obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres",
     dataSubjects: [
-      "Signalants, membres ou non (titulaires de droits, représentants, visiteurs)",
+      "Signalants, utilisateurs ou non (titulaires de droits, représentants, visiteurs)",
       "Joueurs et membres des équipes visés par un signalement",
     ],
     dataCategories: [

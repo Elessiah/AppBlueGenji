@@ -1,7 +1,7 @@
 .root {
   position: relative;
   z-index: 1;
-  width: min(1240px, calc(100vw - 40px));
+  width: min(1240px, calc(100vw - max(40px, var(--a11y-tab-gutter))));
   margin: 0 auto;
   padding: 28px 0 8px;
 }

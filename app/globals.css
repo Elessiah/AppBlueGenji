@@ -1,5 +1,9 @@
 :root {
   --deco-anim-state: running;
+  /* Gouttière totale (deux côtés) que toute colonne de page doit laisser à
+     l'onglet d'accessibilité : 0 sous 721 px, où l'onglet devient un disque
+     en bas à gauche, 80 px au-delà (voir `.page-shell` plus bas). */
+  --a11y-tab-gutter: 0px;
   --bg-0: #07080a;
   --bg-1: #0d0f13;
   --bg-2: #14161c;
@@ -129,7 +133,7 @@ a {
 }
 
 .page-shell {
-  width: min(1200px, calc(100vw - 40px));
+  width: min(1200px, calc(100vw - max(40px, var(--a11y-tab-gutter))));
   margin: 0 auto;
   padding: 28px 0 56px;
   position: relative;
@@ -1592,7 +1596,7 @@ html {
   }
 
   .page-shell {
-    width: min(1200px, calc(100vw - 24px));
+    width: min(1200px, calc(100vw - max(24px, var(--a11y-tab-gutter))));
     padding-top: 20px;
   }
 
@@ -1615,13 +1619,16 @@ html {
 
 /* Gouttière gauche réservée à l'onglet d'accessibilité (28 px, collé au bord
    gauche à mi-hauteur — `components/accessibility/AccessibilityMenu.module.css`).
-   Au-delà de 720 px, la colonne de l'espace connecté laisse au moins 32 px de
-   chaque côté (40 px moins la moitié d'une barre de défilement de 16 px) :
-   l'onglet ne couvre alors aucun contenu, à aucune position de défilement.
-   Posée après le bloc de 920 px, qu'elle doit emporter entre 721 et 920 px. */
+   Au-delà de 720 px, toute colonne de page — `.page-shell` de l'espace connecté
+   comme les colonnes des pages vitrine — laisse au moins 32 px de chaque côté
+   (80 px moins une barre de défilement de 16 px, partagés en deux) : l'onglet
+   ne couvre alors aucun contenu, à aucune position de défilement. Une colonne
+   s'écrit `calc(100vw - max(<sa gouttière>, var(--a11y-tab-gutter)))` : sous
+   721 px le jeton vaut 0 et la gouttière propre à chaque page reste celle
+   d'avant. `tests/app/a11y-tab-gutter.test.ts` refuse le motif recopié. */
 @media (min-width: 721px) {
-  .page-shell {
-    width: min(1200px, calc(100vw - 80px));
+  :root {
+    --a11y-tab-gutter: 80px;
   }
 }
 

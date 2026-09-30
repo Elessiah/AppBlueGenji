@@ -7,7 +7,9 @@
  * branche `main`) : chaque durée ou comportement cité y a été relu — tables de
  * `src/bdd/Bdd.ts`, purge de `src/messages/manageMsgExpiration.ts`, commandes
  * de `src/config/commands.ts`, routes de `src/internalApi.ts`, sauvegardes de
- * `scripts/backup-onedrive.sh`. Les durées qu'aucune importation ne peut tenir
+ * `scripts/backup-onedrive.sh`, effacement au départ d'un serveur de
+ * `Bdd.forgetGuild` (évènement `guildDelete` de `src/main.ts`), licence de
+ * `LICENSE` et `NOTICE`. Les durées qu'aucune importation ne peut tenir
  * alignées (le bot vit dans un autre dépôt) sont recopiées une fois, avec leur
  * source, dans `lib/shared/processing-register.ts`, que le registre (T08) lit
  * aussi : un changement du bot se reporte là, et les deux pages suivent.
@@ -63,6 +65,10 @@ const TERMS_HREF = "/terms-of-service-bot";
 const LEGAL_NOTICE_HREF = "/mentions-legales";
 const SITE_PRIVACY_HREF = "/rgpd";
 const CNIL_COMPLAINT_URL = "https://www.cnil.fr/fr/plaintes";
+/** Dépôt public du bot (`blueGenjiBot`), sous licence AGPL-3.0-only (fichiers `LICENSE` et `NOTICE`). */
+export const BOT_SOURCE_URL = "https://github.com/Elessiah/blueGenjiBot";
+/** Titulaire des droits d'auteur sur le code du bot, tel que le nomme son fichier `NOTICE`. */
+export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // Aucune adresse électronique ici : le courriel de l'association ne s'écrit
 // jamais en clair, il se révèle au clic sur les mentions légales
 // (`lib/shared/legal-contact.ts`), ce que ces textes ne savent pas faire — ils y
@@ -216,6 +222,21 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
       },
       {
         num: "07",
+        title: "Code source et licence",
+        meta: "LICENCE",
+        blocks: [
+          {
+            kind: "p",
+            text: `Le code source du Bot est publié dans son [dépôt public](${BOT_SOURCE_URL}) sous la licence **GNU Affero General Public License, version 3 uniquement** (AGPL-3.0-only), © 2026 ${BOT_COPYRIGHT_HOLDER}. Chacun peut l'étudier, le réutiliser et le modifier aux conditions de cette licence, qui l'accompagne dans le dépôt.`,
+          },
+          {
+            kind: "p",
+            text: "La licence couvre le code du Bot, et lui seul : ni le nom, le logo ou l'identité visuelle de l'association, ni les annonces relayées, ni les données traitées par le Bot, qui restent régies par ces conditions et par sa Politique de Confidentialité. Les dépendances du Bot gardent leurs propres licences.",
+          },
+        ],
+      },
+      {
+        num: "08",
         title: "Modification des conditions",
         meta: "ÉVOLUTIONS",
         blocks: [
@@ -226,7 +247,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         ],
       },
       {
-        num: "08",
+        num: "09",
         title: "Contact",
         meta: "CONTACT",
         blocks: [
@@ -340,6 +361,21 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
       },
       {
         num: "07",
+        title: "Source code and licence",
+        meta: "LICENCE",
+        blocks: [
+          {
+            kind: "p",
+            text: `The Bot's source code is published in its [public repository](${BOT_SOURCE_URL}) under the **GNU Affero General Public License, version 3 only** (AGPL-3.0-only), © 2026 ${BOT_COPYRIGHT_HOLDER}. Anyone may study, reuse and modify it under the terms of that licence, which is included in the repository.`,
+          },
+          {
+            kind: "p",
+            text: "The licence covers the Bot's code, and only that: not the association's name, logo or visual identity, nor the relayed announcements, nor the data processed by the Bot, which remain governed by these terms and by its Privacy Policy. The Bot's dependencies keep their own licences.",
+          },
+        ],
+      },
+      {
+        num: "08",
         title: "Changes to these terms",
         meta: "UPDATES",
         blocks: [
@@ -350,7 +386,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         ],
       },
       {
-        num: "08",
+        num: "09",
         title: "Contact",
         meta: "CONTACT",
         blocks: [
@@ -457,8 +493,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Scrims et recrutement** : aucune suppression automatique à ce jour ; ces données sont conservées jusqu'à une demande d'effacement.",
               "**Exclusions** : jusqu'à la levée de l'exclusion.",
               `**Commande /link** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
-              "**Configuration des serveurs** : les salons relayés, jusqu'à leur retrait par les administrateurs ou le départ du Bot du serveur ; l'invitation et le rôle d'arbitrage (avec l'identifiant de qui les a posés) et le rôle d'administration du Bot, jusqu'à leur retrait par les administrateurs — ils restent si le Bot quitte le serveur, sans suppression automatique à ce jour.",
-              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression.",
+              "**Configuration des serveurs** (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du Bot, modules activés) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du Bot du serveur, qui l'efface. Un retrait survenu pendant une interruption du Bot ne lui est pas signalé par Discord : cette configuration reste alors jusqu'à une demande d'effacement.",
+              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés, qui les efface ; sous la même réserve qu'au point précédent : si le Bot en est retiré pendant une interruption, ils restent jusqu'à une demande d'effacement.",
               "**Salon de journal privé du staff** : aucune suppression automatique à ce jour.",
               "**Journaux du serveur** : selon leur rotation automatique.",
               // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
@@ -662,8 +698,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Scrims and recruitment**: no automatic deletion at present; this data is kept until an erasure request.",
               "**Exclusions**: until the exclusion is lifted.",
               `**/link command**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
-              "**Server configuration**: relayed channels, until the administrators remove them or the Bot leaves the server; the invite and the referee role (with the ID of whoever set them) and the Bot administration role, until the administrators remove them — they remain if the Bot leaves the server, with no automatic deletion at present.",
-              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion.",
+              "**Server configuration** (relayed channels and their rank filters, the invite and the referee role with the ID of whoever set them, the Bot administration role, enabled modules): until the administrators remove it, and at the latest until the Bot leaves the server, which erases it. If the Bot is removed while it is down, Discord does not notify it: that configuration then remains until an erasure request.",
+              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them; with the same caveat as above: if the Bot is removed from it while it is down, they remain until an erasure request.",
               "**Staff private log channel**: no automatic deletion at present.",
               "**Server logs**: according to their automatic rotation.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,

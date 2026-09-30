@@ -7,12 +7,13 @@
 }
 
 .inner {
-  width: min(1240px, calc(100vw - 32px));
+  width: min(1240px, calc(100vw - max(32px, var(--a11y-tab-gutter))));
   margin: 0 auto;
   /* Le bouton flottant d'accessibilité recouvrait le premier geste de la
      barre : on lui laisse sa place — disque de 48 px à 16 px du bord bas gauche
-     sous 720 px, onglet de 28 px collé au bord gauche à mi-hauteur au-delà (où
-     la barre peut passer en défilant, sa gouttière n'ayant que 16 px). */
+     sous 720 px, où la gouttière n'a que 16 px. Au-delà, l'onglet de 28 px
+     tient dans la gouttière réservée par `--a11y-tab-gutter` ; le retrait,
+     gardé par simplicité, n'y sert plus. */
   padding-inline-start: 72px;
   display: flex;
   flex-wrap: wrap;
