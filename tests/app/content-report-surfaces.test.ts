@@ -95,7 +95,7 @@ describe("mentions légales", () => {
 
   it("ne revendique plus la propriété des contenus des membres ni des marques des jeux", () => {
     expect(legal).not.toMatch(/est la propriété exclusive de l&apos;association Bluegenji Esport, sauf/);
-    expect(legal).toContain("Ne lui appartiennent pas");
+    expect(legal).toContain("N&apos;appartiennent ni à l&apos;association ni à l&apos;auteur du code");
     expect(legal).toMatch(/Overwatch \(Blizzard\s+Entertainment\)/);
   });
 
