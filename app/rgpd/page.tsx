@@ -90,7 +90,9 @@ export default async function RgpdPage() {
   // L'historique des versions : chaque changement publié, présenté aux joueurs
   // à sa date. « Applicable depuis la création de la plateforme » disait le
   // contraire d'une politique qui a changé plusieurs fois.
-  const history = publishedPrivacyChanges(today);
+  // Une entrée à public restreint (`audience`) est un avis personnel, pas une
+  // version de la politique : elle ne paraît pas dans l'historique public.
+  const history = publishedPrivacyChanges(today).filter((change) => !change.audience);
   return (
     <PublicPageShell>
       {/* HERO */}
