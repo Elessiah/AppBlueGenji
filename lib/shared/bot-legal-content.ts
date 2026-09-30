@@ -120,7 +120,7 @@ const HOSTING_FR = {
 const HOSTING_EN = {
   meta: "HOSTING PROVIDER",
   title: "Hosting",
-  text: `The bot and the website run on the same machine, a Raspberry Pi in Caen (France), provided and administered by their technical host, ${SITE_HOST.name}. The host's full details are set out in the website's legal notice.`,
+  text: `The bot and the website run on the same machine, ${SITE_HOST.machineEn}, provided and administered by their technical host, ${SITE_HOST.name}. The host's full details are set out in the website's legal notice.`,
   linkLabel: "See the Hosting section of the legal notice →",
 };
 
@@ -399,7 +399,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé ${ASSOCIATION_SEAT}. Elle n'a pas désigné de délégué à la protection des données (désignation non obligatoire). Les moyens de la joindre figurent à la section Contact.`,
+            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle n'a pas désigné de délégué à la protection des données (désignation non obligatoire). Les moyens de la joindre figurent à la section Contact.`,
           },
           {
             kind: "p",
@@ -415,7 +415,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Annonces relayées" },
           {
             kind: "p",
-            text: "Identifiant du message d'origine et de son auteur, date, identifiants des copies relayées et de leurs salons : ils servent à relayer l'annonce, à répercuter sa modification ou sa suppression et à appliquer le temps de recharge entre deux annonces. **Le contenu du message n'est pas enregistré en base** : il est recopié dans les salons des serveurs partenaires, où leurs membres le lisent.",
+            text: `Identifiant du message d'origine et de son auteur, date, identifiants des copies relayées et de leurs salons : ils servent à relayer l'annonce, à répercuter sa modification ou sa suppression et à appliquer le temps de recharge entre deux annonces. **Le contenu du message n'est pas enregistré dans la base du Bot** : il est recopié, avec le nom de son auteur, dans les salons des serveurs partenaires, où leurs membres le lisent. Ces copies sont des messages Discord : supprimer l'annonce d'origine dans les ${BOT_RELAY_RETENTION_DAYS} jours supprime aussi ses copies ; passé ce délai, elles restent jusqu'à leur suppression par les administrateurs du serveur qui les porte.`,
           },
           { kind: "subhead", text: "Scrims et recrutement" },
           {
@@ -465,7 +465,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           {
             kind: "bullets",
             items: [
-              `**Annonces relayées** : ${BOT_RELAY_RETENTION_DAYS} jours ; elles sont effacées lors du premier relais qui suit cette échéance. Rien n'est effacé au redémarrage du Bot.`,
+              `**Suivi des annonces relayées** (identifiants, date) : ${BOT_RELAY_RETENTION_DAYS} jours ; il est effacé lors du premier relais qui suit cette échéance. Rien n'est effacé au redémarrage du Bot. Les copies publiées dans les salons partenaires restent sur Discord (section 02).`,
               "**Scrims et recrutement** : aucune suppression automatique à ce jour ; ces données sont conservées jusqu'à une demande d'effacement.",
               "**Exclusions** : jusqu'à la levée de l'exclusion.",
               `**Liaison avec le site** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
@@ -612,7 +612,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relayed advertisements" },
           {
             kind: "p",
-            text: "ID of the original message and of its author, date, IDs of the relayed copies and of their channels: they are used to relay the advertisement, to pass on its edits or deletion, and to apply the cooldown between two advertisements. **Message content is not stored in the database**: it is copied into the channels of partner servers, where their members read it.",
+            text: `ID of the original message and of its author, date, IDs of the relayed copies and of their channels: they are used to relay the advertisement, to pass on its edits or deletion, and to apply the cooldown between two advertisements. **Message content is not stored in the Bot's database**: it is copied, with its author's name, into the channels of partner servers, where their members read it. These copies are Discord messages: deleting the original advertisement within ${BOT_RELAY_RETENTION_DAYS} days also deletes its copies; after that, they remain until the administrators of the server holding them delete them.`,
           },
           { kind: "subhead", text: "Scrims and recruitment" },
           {
@@ -662,7 +662,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           {
             kind: "bullets",
             items: [
-              `**Relayed advertisements**: ${BOT_RELAY_RETENTION_DAYS} days; they are erased at the first relay after that deadline. Nothing is erased when the Bot restarts.`,
+              `**Tracking of relayed advertisements** (IDs, date): ${BOT_RELAY_RETENTION_DAYS} days; it is erased at the first relay after that deadline. Nothing is erased when the Bot restarts. The copies posted in partner channels remain on Discord (section 02).`,
               "**Scrims and recruitment**: no automatic deletion at present; this data is kept until an erasure request.",
               "**Exclusions**: until the exclusion is lifted.",
               `**Website link**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
@@ -685,7 +685,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "The association's staff, for moderating and administering the Bot.",
               "Members of partner servers, who read the relayed advertisements.",
               `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages still kept (last ${BOT_RELAY_RETENTION_DAYS} days).`,
-              `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (a Raspberry Pi in Caen, France): processor.`,
+              `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",
               "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold.",
               "No data is sold or transferred for consideration.",

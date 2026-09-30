@@ -224,8 +224,16 @@ describe("bot legal content matches the bot's code and the association", () => {
       expect(doc.fr.hosting.text).toContain(SITE_HOST.name);
       expect(doc.fr.hosting.text).toContain(SITE_HOST.machine);
       expect(doc.en.hosting.text).toContain(SITE_HOST.name);
-      expect(doc.en.hosting.text).toContain("Raspberry Pi");
+      expect(doc.en.hosting.text).toContain(SITE_HOST.machineEn);
     }
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain(SITE_HOST.machineEn);
+  });
+
+  it("says relayed copies stay on Discord once the tracking expires, in the pages and in T08", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("Les copies publiées dans les salons partenaires restent sur Discord");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("The copies posted in partner channels remain on Discord");
+    const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
+    expect((t08?.retention ?? []).join(" ")).toContain("restent sur Discord");
   });
 
   it.each(DOCS)("%s uses no inline code backtick, which the renderer does not support", (_name, doc) => {

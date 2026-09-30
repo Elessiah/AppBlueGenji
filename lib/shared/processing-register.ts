@@ -447,7 +447,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      `Annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacées au relais suivant cette échéance (rien n'est effacé au redémarrage)`,
+      `Suivi des annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacé au relais suivant cette échéance (rien n'est effacé au redémarrage) ; les copies publiées dans les salons partenaires restent sur Discord jusqu'à leur suppression (par l'auteur dans ce délai, ensuite par les administrateurs de chaque serveur)`,
       "Scrims et recrutement : aucune suppression automatique à ce jour, jusqu'à une demande d'effacement",
       "Exclusions : jusqu'à la levée de l'exclusion",
       `Liaison au site : code valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne n'est pas supprimée automatiquement à ce jour`,
