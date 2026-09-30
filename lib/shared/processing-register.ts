@@ -487,7 +487,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusions : jusqu'à la levée de l'exclusion",
       "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)",
       "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)",
-      "Salon de journal privé du staff : aucune suppression automatique à ce jour",
+      "Salon de journal privé du staff (et sa copie en message privé au titulaire du bot) : aucune suppression automatique à ce jour",
       "Journaux du serveur : selon leur rotation automatique",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],

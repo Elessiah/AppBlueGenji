@@ -445,12 +445,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Scrims et recrutement" },
           {
             kind: "p",
-            text: `Pour les commandes **/scrim** et **/recrute** : identifiant de l'auteur, jeu, niveau ou rôle recherché, serveur et date, qui alimentent les statistiques d'activité (commande **/stats**, qui ne montre à chacun que sa propre activité, et tableau de bord du bot). Au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, ces lignes sont repliées en simples nombres par jour, serveur et niveau (ou rôle) : ni auteur, ni heure, ni ordre ne restent, rien qui désigne encore une personne.`,
+            text: `Pour les commandes **/scrim** et **/recrute** : identifiant de l'auteur, jeu, niveau ou rôle recherché, serveur et date, qui alimentent les statistiques d'activité (commande **/stats**, qui ne montre à chacun que sa propre activité, et tableau de bord du bot). Au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, ces lignes sont repliées en simples nombres par jour, serveur et niveau (ou rôle)  : ni auteur, ni heure, ni ordre ne restent.`,
           },
           { kind: "subhead", text: "Exclusions du relais" },
           {
             kind: "p",
-            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, que prononcent les administrateurs des serveurs d'au moins 50 membres. La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée par la modération des serveurs partenaires dans les conditions de la section « Modération du relais » des Conditions d'Utilisation. La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
           },
           { kind: "subhead", text: "Adhésions et rappels programmés" },
           {
@@ -473,7 +473,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Journaux" },
           {
             kind: "p",
-            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit aucun pseudo — seul le motif d'une exclusion, texte libre du modérateur, peut en citer un.",
+            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff (dont chaque ligne part aussi en message privé au titulaire du Bot) et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit aucun pseudo — seul le motif d'une exclusion, texte libre du modérateur, peut en citer un.",
           },
           { kind: "subhead", text: "Base légale" },
           {
@@ -518,7 +518,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
               "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
-                            `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
+              `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
               "Microsoft, qui stocke sur le OneDrive personnel de l'hébergeur technique les sauvegardes, chiffrées avant envoi avec une clé que Microsoft ne détient pas ; et qui héberge la messagerie personnelle (Outlook.com) de l'hébergeur technique, par où passent, non chiffrées par l'association et lisibles par Microsoft, toute demande relative à vos données que vous envoyez par courriel à l'hébergeur technique et la réponse que celui-ci vous adresse par courriel.",
               "L'opérateur téléphonique de l'hébergeur technique, si vous l'appelez ou lui laissez un SMS ou un message vocal au sujet de vos données.",
@@ -648,12 +648,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Scrims and recruitment" },
           {
             kind: "p",
-            text: `For the **/scrim** and **/recrute** commands: author ID, game, level or role sought, server and date, which feed the activity statistics (**/stats** command, which only shows each user their own activity, and the bot's dashboard). After ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days these rows are folded into plain counts per day, server and level (or role): no author, time or order remains, nothing that still identifies a person.`,
+            text: `For the **/scrim** and **/recrute** commands: author ID, game, level or role sought, server and date, which feed the activity statistics (**/stats** command, which only shows each user their own activity, and the bot's dashboard). After ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days these rows are folded into plain counts per day, server and level (or role): no author, time or order remains.`,
           },
           { kind: "subhead", text: "Relay exclusions" },
           {
             kind: "p",
-            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided by the administrators of servers with at least 50 members. The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided by the moderators of partner servers under the conditions of the « Relay moderation » section of the Terms of Service. The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
           },
           { kind: "subhead", text: "Memberships and scheduled reminders" },
           {
@@ -676,7 +676,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Logs" },
           {
             kind: "p",
-            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot writes no username there — only the reason for an exclusion, free text written by the moderator, may quote one.",
+            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel (each line of which is also sent by direct message to the Bot's owner) and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot writes no username there — only the reason for an exclusion, free text written by the moderator, may quote one.",
           },
           { kind: "subhead", text: "Legal basis" },
           {
@@ -717,7 +717,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Members of partner servers, who read the relayed advertisements.",
               "Members of the referee role of every server that has set one, for the website's referee alerts.",
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
-                            `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
+              `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",
               "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold; and which hosts the technical host's personal mailbox (Outlook.com), through which any request about your data that you email to them, and their emailed reply, pass without encryption by the association, readable by Microsoft.",
               "The technical host's phone operator, if you call them or leave them a text or voicemail about your data.",

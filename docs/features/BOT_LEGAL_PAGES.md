@@ -31,7 +31,7 @@ Ce qu'ils réutilisent au lieu de le recopier :
 | Hébergeur technique, machine | `SITE_HOST` (`site-host.ts`) |
 | Durée des sauvegardes | `BACKUP_RETENTION_DAYS` (`account-deletion-journal.ts`) |
 | Transfert vers Discord | `DPF_ADEQUACY_DECISION` (`processing-register.ts`) |
-| Durées propres au bot | `BOT_RELAY_RETENTION_DAYS`, `BOT_LINK_CODE_VALIDITY_MINUTES` (`processing-register.ts`) |
+| Durées propres au bot | `BOT_RELAY_RETENTION_DAYS`, `BOT_ACTIVITY_AUTHOR_RETENTION_DAYS` (`processing-register.ts`) |
 | Âge minimal | `BOT_MINIMUM_AGE` (15 ans, `bot-legal-content.ts`) |
 
 Les durées propres au bot vivent dans un autre dépôt : aucune importation ne peut les
