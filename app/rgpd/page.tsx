@@ -184,9 +184,12 @@ export default async function RgpdPage() {
           </p>
           <p id="age-minimum">
             <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour
-            créer un compte (<Link href={`${TERMS_PATH}#compte`}>conditions d&apos;utilisation</Link>) :
-            en dessous de cet âge, un mineur ne peut consentir seul au traitement de ses données
-            pour un service en ligne (article 45 de la loi Informatique et Libertés). Le site ne
+            créer un compte (<Link href={`${TERMS_PATH}#compte`}>conditions d&apos;utilisation</Link>).
+            C&apos;est un choix de l&apos;association, le même que pour son bot Discord : il reprend
+            le seuil en dessous duquel un mineur ne peut consentir seul à un traitement fondé sur
+            son consentement pour un service en ligne (article 45 de la loi Informatique et
+            Libertés), ce qui est le cas des données de profil facultatives ; le compte
+            lui-même repose sur l&apos;exécution des conditions d&apos;utilisation. Le site ne
             demande pas de date de naissance et ne vérifie pas l&apos;âge ; la majorité,
             facultative, reste une simple déclaration. L&apos;adhésion à l&apos;association, distincte du
             compte, obéit à la condition d&apos;âge de ses statuts.
