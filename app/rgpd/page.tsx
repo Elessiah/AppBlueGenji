@@ -187,9 +187,8 @@ export default async function RgpdPage() {
             créer un compte (<Link href={`${TERMS_PATH}#compte`}>conditions d&apos;utilisation</Link>) :
             en dessous de cet âge, un mineur ne peut consentir seul au traitement de ses données
             pour un service en ligne (article 45 de la loi Informatique et Libertés). Le site ne
-            demande pas de date de naissance et ne vérifie pas l&apos;âge : la condition est
-            déclarée en acceptant les conditions d&apos;utilisation, et la majorité, facultative,
-            reste une simple déclaration. L&apos;adhésion à l&apos;association, distincte du
+            demande pas de date de naissance et ne vérifie pas l&apos;âge ; la majorité,
+            facultative, reste une simple déclaration. L&apos;adhésion à l&apos;association, distincte du
             compte, obéit à la condition d&apos;âge de ses statuts.
           </p>
         </div>
