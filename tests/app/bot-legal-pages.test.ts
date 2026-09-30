@@ -8,7 +8,7 @@ import {
 } from "@/lib/shared/legal-contact";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
-  BOT_LINK_CODE_VALIDITY_MINUTES,
+  BOT_ACTIVITY_AUTHOR_RETENTION_DAYS,
   BOT_RELAY_RETENTION_DAYS,
   DPF_ADEQUACY_DECISION,
   DPF_ADEQUACY_DECISION_EN,
@@ -189,12 +189,41 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(flatOf(TERMS_OF_SERVICE, "en")).toContain("at least 15 years old");
   });
 
-  it("states the relay retention the bot applies (MESSAGE_RETENTION_DAYS = 7) and says restarts erase nothing", () => {
+  // blueGenjiBot#33 : la purge des relais est rattrapée chaque nuit et au
+  // démarrage (`privacy/dataRetention.ts`) — elle n'attend plus un relais.
+  it("states the relay retention the bot applies (MESSAGE_RETENTION_DAYS = 7) and its nightly/restart catch-up", () => {
     expect(BOT_RELAY_RETENTION_DAYS).toBe(7);
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain(`${BOT_RELAY_RETENTION_DAYS} jours`);
-    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("Rien n'est effacé au redémarrage");
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("au plus tard dans la nuit ou au redémarrage du Bot");
+    expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("Rien n'est effacé au redémarrage");
     expect(flatOf(PRIVACY_POLICY, "en")).toContain(`${BOT_RELAY_RETENTION_DAYS} days`);
-    expect(flatOf(PRIVACY_POLICY, "en")).toContain("Nothing is erased when the Bot restarts");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("at the latest during the night or when the Bot restarts");
+    expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("Nothing is erased when the Bot restarts");
+  });
+
+  // blueGenjiBot#33 : l'auteur d'un scrim ou d'une recherche est effacé au-delà
+  // de 30 jours (`ACTIVITY_AUTHOR_RETENTION_DAYS`), la ligne restant pour les compteurs.
+  it("states the 30-day erasure of scrim and search authors, in both languages and in T08", () => {
+    expect(BOT_ACTIVITY_AUTHOR_RETENTION_DAYS).toBe(30);
+    for (const lang of LANGS) {
+      const flat = flatOf(PRIVACY_POLICY, lang);
+      expect(flat).not.toMatch(/Scrims (et recrutement|and recruitment)\*\*\s*:\s*(aucune suppression|no automatic deletion)/);
+    }
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain(`l'identifiant de l'auteur est effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours`);
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain(`the author's ID is erased after ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days`);
+    const t08 = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08")?.retention ?? []).join(" | ");
+    expect(t08).toContain(`identifiant de l'auteur effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours`);
+    expect(t08).not.toContain("Scrims et recrutement : aucune suppression");
+  });
+
+  // blueGenjiBot#33 : `/stats` ne montre plus que sa propre activité.
+  it("no longer says /stats shows another user's activity", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("qui ne montre à chacun que sa propre activité");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("which only shows each user their own activity");
+    expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("un autre utilisateur a publiées");
+    expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("another user has published");
+    const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
+    expect((t08?.recipients ?? []).join(" ")).not.toContain("/stats");
   });
 
   it("does not claim that no personal data is kept permanently", () => {
@@ -257,21 +286,26 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect((t08?.dataSubjects ?? []).join(" ")).toContain("Adhérents");
   });
 
-  it("declares /ban-list readers, bot-admin role holders included, in the pages and in T08", () => {
+  it("declares /ban-list readers, bot-admin role holders included, and its network-wide purpose, in the pages and in T08", () => {
     for (const lang of LANGS) {
       expect(flatOf(PRIVACY_POLICY, lang)).toContain("**/ban-list**");
       expect(flatOf(PRIVACY_POLICY, lang)).toContain("**/set-bot-admin**");
     }
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("modération communautaire");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("community moderation");
     const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
     expect((t08?.recipients ?? []).join(" ")).toContain("/ban-list");
   });
 
-  it("does not promise a /link account link that nothing on the site completes", () => {
-    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("la commande ne relie donc aucun compte");
-    expect(flatOf(PRIVACY_POLICY, "en")).toContain("the command therefore links no account");
-    expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("date de la liaison");
+  // blueGenjiBot#33 : `/link` est retirée, et sa table avec.
+  it("no longer mentions the removed /link command", () => {
+    for (const doc of [PRIVACY_POLICY, TERMS_OF_SERVICE]) {
+      for (const lang of LANGS) {
+        expect(flatOf(doc, lang)).not.toContain("/link");
+      }
+    }
     const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
-    expect((t08?.dataCategories ?? []).join(" ")).not.toContain("date de liaison");
+    expect(JSON.stringify(t08)).not.toContain("/link");
   });
 
   it("says relayed copies stay on Discord once the tracking expires, in the pages and in T08", () => {
@@ -293,9 +327,8 @@ describe("bot legal content matches the bot's code and the association", () => {
     const retention = (t08?.retention ?? []).join(" | ");
     expect(retention).not.toMatch(/72/);
     expect(retention).toContain(`${BOT_RELAY_RETENTION_DAYS} jours`);
-    expect(retention).toContain(`${BOT_LINK_CODE_VALIDITY_MINUTES} minutes`);
+    expect(retention).toContain(`${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours`);
     expect(retention).toContain(`${BACKUP_RETENTION_DAYS} jours`);
-    expect((t08?.recipients ?? []).join(" ")).toContain("/stats");
   });
 
   // blueGenjiBot#31 : `Bdd.forgetGuild`, appelé sur `guildDelete`, efface
@@ -318,21 +351,25 @@ describe("bot legal content matches the bot's code and the association", () => {
     for (const item of ["rank filters", "Bot administration role", "enabled modules"]) {
       expect(en).toContain(item);
     }
-    // Discord ne signale pas un retrait survenu bot arrêté : la réserve est dite.
-    expect(fr).toContain("pendant une interruption du Bot");
-    expect(en).toContain("while it is down");
+    // Discord ne signale pas un retrait survenu bot arrêté : le redémarrage le
+    // rattrape (blueGenjiBot#33), la réserve « jusqu'à une demande » a disparu.
+    expect(fr).toContain("pendant une interruption du Bot, que Discord ne lui signale pas, est rattrapé à son redémarrage");
+    expect(en).toContain("while the Bot is down, which Discord does not notify, is caught up when it restarts");
     // Les rappels d'adhésion partent avec la configuration du serveur.
     expect(fr).toMatch(/\*\*Adhésions et rappels programmés\*\*[^|]*départ du Bot du serveur/);
     expect(en).toMatch(/\*\*Memberships and scheduled reminders\*\*[^|]*the Bot leaves the server/);
-    // La réserve vaut aussi pour eux : `forgetGuild` ne joue que sur `guildDelete`.
-    expect(fr).toMatch(/\*\*Adhésions et rappels programmés\*\*[^|]*pendant une interruption[^|]*demande d'effacement/);
-    expect(en).toMatch(/\*\*Memberships and scheduled reminders\*\*[^|]*while it is down[^|]*erasure request/);
+    // Le rattrapage vaut aussi pour eux.
+    expect(fr).toMatch(/\*\*Adhésions et rappels programmés\*\*[^|]*pendant une interruption[^|]*rattrapé au redémarrage/);
+    expect(en).toMatch(/\*\*Memberships and scheduled reminders\*\*[^|]*while the Bot is down[^|]*caught up when it restarts/);
+    expect(fr).not.toMatch(/(Configuration des serveurs|Adhésions et rappels programmés)\*\*[^|]*demande d'effacement/);
+    expect(en).not.toMatch(/(Server configuration|Memberships and scheduled reminders)\*\*[^|]*erasure request/);
 
     const t08 = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08")?.retention ?? []).join(" | ");
     expect(t08).not.toContain("conservés sans limite si le bot quitte le serveur");
     expect(t08).toContain("au plus tard jusqu'au départ du bot du serveur, qui l'efface");
     expect(t08).toMatch(/Adhésions et rappels programmés[^|]*départ du bot du serveur/);
-    expect(t08).toMatch(/Adhésions et rappels programmés[^|]*interruption du bot[^|]*demande d'effacement/);
+    expect(t08).toMatch(/Adhésions et rappels programmés[^|]*interruption[^|]*rattrapé au redémarrage/);
+    expect(t08).not.toMatch(/(Configuration|Adhésions et rappels programmés)[^|]*demande d'effacement/);
   });
 
   it("cites the Bot's AGPL-3.0 licence and links its public repository, in both languages", () => {
