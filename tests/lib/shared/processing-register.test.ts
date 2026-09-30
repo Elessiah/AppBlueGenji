@@ -167,10 +167,20 @@ describe("durées : le registre cite les constantes que le code applique", () =>
   });
 });
 
+describe("T03 — conservation des résultats de tournois", () => {
+  it("dit qu'aucune durée n'est définie, tant que le site existe, et l'anonymisation à la suppression", () => {
+    const retention = byRef("T03").retention.join(" ");
+    expect(retention).toContain("aucune durée de conservation définie, conservés tant que le site existe");
+    expect(retention).toContain("anonymisés à la suppression du compte");
+  });
+});
+
 describe("registerController", () => {
-  it("donne le contact Discord et le formulaire, sans aucune adresse électronique", () => {
+  it("donne le contact de l'association et le formulaire, sans hébergeur technique ni adresse électronique", () => {
     expect(controller.contact).toBe(RGPD_CONTACT_LINE);
-    expect(controller.contact).toContain(LEGAL_CONTACT_DISCORD);
+    expect(controller.contact).not.toContain(LEGAL_CONTACT_DISCORD);
+    expect(controller.dpo).toMatch(/ni référent désigné/);
+    expect(controller.dpo).not.toMatch(/non obligatoire/);
     expect(controller.contact).toContain("RGPD");
     expect(controller.contact).not.toContain("@");
     expect(controller.legalForm).toMatch(/loi 1901/);
@@ -191,7 +201,10 @@ describe("registerController", () => {
 
   it("ne publie aucun SIREN : l'hébergeur est un particulier bénévole, sans immatriculation", () => {
     const page = readFileSync(join(__dirname, "..", "..", "..", "app", "mentions-legales", "page.tsx"), "utf8");
-    expect(page).not.toMatch(/SIRE[NT]/i);
+    // Le mot n'y figure que pour dire que l'association n'en a pas.
+    expect(page.match(/SIRE[NT]/gi)).toEqual(["SIREN"]);
+    expect(page).toContain("ni d&apos;un numéro RNA ni\n          d&apos;un numéro SIREN");
+    expect(page).not.toMatch(/\b\d{3} ?\d{3} ?\d{3}\b/);
     expect(controller.host).not.toMatch(/SIRE[NT]/i);
     expect(controller.host).toContain("bénévole");
     expect(Object.keys(SITE_HOST)).not.toContain("siren");

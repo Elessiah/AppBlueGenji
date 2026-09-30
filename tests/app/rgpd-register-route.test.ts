@@ -2,7 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GET } from "@/app/rgpd/registre.csv/route";
-import { LEGAL_CONTACT_DISCORD } from "@/lib/shared/legal-contact";
+import { LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 import { registerExportFilename } from "@/lib/shared/processing-register";
 
 describe("GET /rgpd/registre.csv", () => {
@@ -18,9 +18,10 @@ describe("GET /rgpd/registre.csv", () => {
     expect([...bytes.slice(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
   });
 
-  it("porte le contact Discord du responsable, et aucune adresse électronique", async () => {
+  it("porte le contact RGPD de l'association, jamais l'hébergeur technique, et aucune adresse électronique", async () => {
     const text = await GET().text();
-    expect(text).toContain(LEGAL_CONTACT_DISCORD);
+    expect(text).toContain(RGPD_CONTACT_LINE.replace(/"/g, "\"\""));
+    expect(text).not.toContain(LEGAL_CONTACT_DISCORD);
     expect(text).not.toMatch(/[^\s@;"]+@[^\s@;"]+\.[a-z]{2,}/i);
   });
 

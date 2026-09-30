@@ -189,9 +189,9 @@ describe("contact de remplacement", () => {
     expect(button).toContain("label = REPORT_FORM_NAME");
   });
 
-  it("ligne du registre : courriel (par renvoi), formulaire, catégorie RGPD, Discord, sans adresse", () => {
-    expect(RGPD_CONTACT_LINE).toContain("Courriel et téléphone de l'association (mentions légales du site)");
-    expect(RGPD_CONTACT_LINE).toContain(LEGAL_CONTACT_DISCORD);
+  it("ligne du registre : l'association (courriel par renvoi, formulaire RGPD), jamais l'hébergeur, sans adresse", () => {
+    expect(RGPD_CONTACT_LINE).toContain("L'association : courriel et téléphone (mentions légales du site)");
+    expect(RGPD_CONTACT_LINE).not.toContain(LEGAL_CONTACT_DISCORD);
     expect(RGPD_CONTACT_LINE).toContain(REPORT_FORM_NAME);
     expect(RGPD_CONTACT_LINE).toContain("« RGPD »");
     expect(RGPD_CONTACT_LINE).not.toMatch(EMAIL);
@@ -200,7 +200,9 @@ describe("contact de remplacement", () => {
   it("/rgpd ouvre le formulaire directement sur la catégorie RGPD", () => {
     const page = readSource("app/rgpd/page.tsx");
     expect(page).toContain('initialCategory="RGPD"');
-    expect(page).toContain("LEGAL_CONTACT_DISCORD");
+    // Aucun référent désigné : l'hébergeur technique n'est pas un contact RGPD.
+    expect(page).not.toContain("LEGAL_CONTACT_DISCORD");
+    expect(page).toContain("n&apos;a désigné ni délégué à la protection des données ni");
   });
 
   it("le formulaire s'ouvre sur la catégorie demandée, focus dans la description, et reste modifiable", () => {
@@ -217,6 +219,8 @@ describe("contact de remplacement", () => {
     const page = readSource("app/mentions-legales/page.tsx");
     expect(page).toContain("catégorie « Hébergeur »");
     expect(page).toContain("catégorie « RGPD »");
+    expect(page).not.toContain("LEGAL_CONTACT_DISCORD");
+    expect(page).toContain("l&apos;association ne dispose ni d&apos;un numéro RNA");
   });
 
   it("la déclaration d'accessibilité donne Discord et le formulaire", () => {
