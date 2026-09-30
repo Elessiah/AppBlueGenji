@@ -85,6 +85,17 @@ export async function setRefereeScheduling(
            WHERE ${TO_PLAN_CANDIDATES_SQL} AND ${SCORE_NOTED_SQL}`,
           [tournamentId],
         );
+        // La notification « déclare-toi prêt » réservée pour ce lancement
+        // (`./player-pushes`) part avec lui : sans ce ménage, la réservation
+        // (match, appariement, LOBBY) survivrait, et le lancement rouvert à
+        // l'heure planifiée ne préviendrait plus personne. Avant l'`UPDATE`,
+        // qui ne change rien aux conditions mais les rend moins lisibles.
+        await connection.execute(
+          `DELETE FROM bg_match_start_notices
+           WHERE match_id IN (SELECT id FROM bg_matches
+                              WHERE ${TO_PLAN_CANDIDATES_SQL} AND NOT ${SCORE_NOTED_SQL})`,
+          [tournamentId],
+        );
         // Puis le reste — mêmes conditions que la phase `TO_PLAN` : jouable,
         // sans date, jamais lancé. Un lancement posé pour un autre appariement
         // ne lance pas celui-ci (`currentLaunchState`) : il est défait avec le

@@ -50,7 +50,9 @@ depuis **« Planifier le prochain »** du panneau de la fiche (premier match à
 planifier dans l'ordre du plateau). Déplacer une date dans le futur, ou l'effacer
 option allumée, fait **quitter le lancement** : ouverture et « Prêt » sont
 effacés sous le verrou de la ligne du match — sauf si un score est déjà noté :
-le match est alors tenu pour lancé. L'arbitrage peut aussi **forcer** le
+le match est alors tenu pour lancé. Défaire un lancement efface aussi la
+réservation de sa notification de départ (`bg_match_start_notices`), pour que
+la nouvelle heure prévienne de nouveau les joueurs. L'arbitrage peut aussi **forcer** le
 lancement d'un match à planifier — forcer vaut planification.
 
 ## Aucun score avant le lancement — dans tous les cas

@@ -85,6 +85,21 @@ describe("setRefereeScheduling", () => {
     expect(indexOf("launched_at = NOW()")).toBeLessThan(indexOf("lobby_opened_at = NULL"));
   });
 
+  it("réarme la notification de départ des matchs renvoyés à planifier", async () => {
+    const { statements } = world({ state: "RUNNING" });
+    await setRefereeScheduling(7, true);
+    const notices = statements.find((s) => s.sql.startsWith("DELETE FROM bg_match_start_notices"));
+    expect(notices?.sql).toContain("start_at IS NULL");
+    expect(notices?.sql).toContain("NOT (team1_score IS NOT NULL OR team2_score IS NOT NULL)");
+    expect(notices?.params).toEqual([7]);
+  });
+
+  it("ne touche à aucune notification quand on éteint l'option", async () => {
+    const { statements } = world({ state: "RUNNING", referee_scheduling: 1 });
+    await setRefereeScheduling(7, false);
+    expect(statements.some((s) => s.sql.startsWith("DELETE"))).toBe(false);
+  });
+
   it("dit si l'option a réellement changé", async () => {
     world({ state: "RUNNING", referee_scheduling: 1 });
     expect((await setRefereeScheduling(7, true)).changed).toBe(false);

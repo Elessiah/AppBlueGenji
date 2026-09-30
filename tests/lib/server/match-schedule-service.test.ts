@@ -177,6 +177,9 @@ describe("setMatchStartAt", () => {
       expect(update?.sql).toContain("team1_ready_at = NULL");
       expect(update?.sql).toContain("caster_ready_at = NULL");
       expect(resets(writes)).toBe(true);
+      // La notification de départ de ce lancement est réarmée pour la nouvelle heure.
+      const notices = writes.find((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"));
+      expect(notices?.params).toEqual([42]);
     });
 
     it("date effacée, option allumée : le match repasse à planifier, lancement défait", async () => {
@@ -198,6 +201,7 @@ describe("setMatchStartAt", () => {
       const { writes } = world({ refereeScheduling: true });
       await setMatchStartAt(42, "2020-06-01T12:00:00Z");
       expect(resets(writes)).toBe(false);
+      expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
     });
 
     it("match déjà lancé : jamais défait, même reporté", async () => {
@@ -221,6 +225,7 @@ describe("setMatchStartAt", () => {
       expect(update?.sql).toContain("launched_at = NOW()");
       expect(update?.sql).toContain("launch_pairing = CONCAT(team1_id, ':', team2_id)");
       expect(resets(writes)).toBe(false);
+      expect(writes.some((w) => w.sql.startsWith("DELETE FROM bg_match_start_notices"))).toBe(false);
     });
 
     it("match sans ses deux engagées : rien à défaire", async () => {

@@ -138,6 +138,12 @@ export async function setMatchStartAt(
                WHERE id = ?`,
         [startAt === null ? null : new Date(startAt), matchId],
       );
+      // Lancement défait : la notification de départ réservée pour lui
+      // (`./player-pushes`) part avec, pour que la nouvelle heure prévienne de
+      // nouveau les joueurs.
+      if (leaving && !scoreNoted) {
+        await connection.execute(`DELETE FROM bg_match_start_notices WHERE match_id = ?`, [matchId]);
+      }
       await connection.commit();
       written = { tournamentId: Number(row.tournament_id), previousStartAt: toIso(row.start_at) };
     } catch (error) {
