@@ -55,7 +55,9 @@ export function AudienceOptOutControl({ initialReason }: { initialReason: Audien
     }
     const next = browserAudienceOptOut();
     setReason(next);
-    if (optOut && next === null) {
+    // Relu dans les deux sens : un cookie qui ne se pose pas, ou qui ne s'efface
+    // pas (écriture ignorée par le navigateur), ne doit pas être annoncé fait.
+    if ((optOut && next === null) || (!optOut && next === "CHOICE")) {
       showError("Votre navigateur bloque les cookies : le choix n'a pas pu être retenu.");
       return;
     }

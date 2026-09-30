@@ -49,6 +49,8 @@ describe("browserAudienceOptOut", () => {
     expect(source).toContain("if (browser) setReason(browser);");
     // L'écriture du cookie refusée se dit, au lieu d'échouer en silence.
     expect(source).toMatch(/try \{\s+document\.cookie = audienceOptOutCookieString/);
+    // Relu dans les deux sens : un retour dont le cookie survit n'est pas annoncé fait.
+    expect(source).toContain('(optOut && next === null) || (!optOut && next === "CHOICE")');
   });
 
   it("mesure sans signal ni choix", () => {
