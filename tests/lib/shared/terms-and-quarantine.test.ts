@@ -159,7 +159,7 @@ describe("quarantaine des logos", () => {
     expect(notice).toContain("Motif : atteinte présumée au droit d'auteur");
     expect(notice).toContain("Faits retenus : un signalement");
     expect(notice).toContain("sans traitement automatisé");
-    expect(notice).toContain(`Fondement : conditions d'utilisation, « Contenus publiés par les membres »`);
+    expect(notice).toContain(`Fondement : conditions d'utilisation, « Contenus publiés par les utilisateurs »`);
     expect(notice).toContain(TERMS_URL);
     expect(notice).toContain("contestez la décision ici : https://site.test/signalements/4");
     expect(notice).toContain("si vous en détenez les droits");
@@ -190,7 +190,7 @@ describe("quarantaine des logos", () => {
 
   it("cite une clause qui existe dans les conditions d'utilisation", () => {
     const clause = TERMS_SECTIONS.find((section) => section.id === MODERATION_TERMS_ANCHOR);
-    expect(clause?.title).toBe("Contenus publiés par les membres");
+    expect(clause?.title).toBe("Contenus publiés par les utilisateurs");
     expect(TERMS_SECTIONS.some((section) => section.title === "Comportement")).toBe(true);
   });
 

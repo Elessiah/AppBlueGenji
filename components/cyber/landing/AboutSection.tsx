@@ -1,6 +1,7 @@
 import type { AboutPillar } from "@/lib/shared/about-pillars";
 import type { AboutStat } from "@/lib/shared/about-stats";
 import type { SiteCopy } from "@/lib/shared/site-copy";
+import { ORGANIZATION_FOUNDING_YEAR } from "@/lib/shared/structured-data";
 import { AboutPillars } from "./AboutPillars";
 import { AboutStats } from "./AboutStats";
 import { EditableCopy } from "./EditableCopy";
@@ -22,7 +23,7 @@ export function AboutSection({ stats, pillars, isAdmin, copy }: AboutSectionProp
             <h2 className={styles.sectionTitle}>{copy["home.about.title"]}</h2>
           </EditableCopy>
         </div>
-        <div className={styles.meta}>LOI 1901 · JANVILLIERS · 2020</div>
+        <div className={styles.meta}>LOI 1901 · JANVILLIERS · {ORGANIZATION_FOUNDING_YEAR}</div>
       </div>
 
       <div className={styles.grid}>

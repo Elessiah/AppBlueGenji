@@ -33,8 +33,8 @@ export const ORGANIZATION_ADDRESS = {
   addressCountry: "FR",
 } as const;
 
-/** Année de création, telle qu'affichée sur la page association. */
-export const ORGANIZATION_FOUNDING_YEAR = "2020";
+/** Année de création : source unique de la page association, de la vitrine et du JSON-LD. */
+export const ORGANIZATION_FOUNDING_YEAR = "2022";
 
 /**
  * Le seul lien public de l'association, hors site.

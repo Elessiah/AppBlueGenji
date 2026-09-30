@@ -181,7 +181,7 @@ const GROUNDS_TEXT: Record<
   THIRD_PARTY_RIGHTS: {
     reason: "atteinte présumée au droit d'auteur ou aux droits d'un tiers",
     clause:
-      "conditions d'utilisation, « Contenus publiés par les membres » (qui publie une image garantit en détenir les droits)",
+      "conditions d'utilisation, « Contenus publiés par les utilisateurs » (qui publie une image garantit en détenir les droits)",
     answer: {
       you: "si tu en détiens les droits (création, licence, autorisation du titulaire), dis-le",
       yall: "si vous en détenez les droits (création, licence, autorisation du titulaire), dites-le",
@@ -189,7 +189,7 @@ const GROUNDS_TEXT: Record<
   },
   SITE_RULES: {
     reason: "image jugée contraire aux conditions d'utilisation du site",
-    clause: "conditions d'utilisation, « Contenus publiés par les membres » et « Comportement »",
+    clause: "conditions d'utilisation, « Contenus publiés par les utilisateurs » et « Comportement »",
     answer: {
       you: "si tu estimes que l'image respecte les règles, explique pourquoi",
       yall: "si vous estimez que l'image respecte les règles, expliquez pourquoi",
