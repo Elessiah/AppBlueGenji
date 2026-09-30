@@ -782,7 +782,7 @@ export default async function RgpdPage() {
               contacter pour vos demandes relatives à vos données est hébergée par Microsoft sur un
               compte personnel, sans contrat de sous-traitance. Un courriel que vous envoyez à{" "}
               {DATA_CONTACT_NAME}, et la réponse qu&apos;il vous adresse par courriel, y passent sans chiffrement propre
-              à l&apos;association (durée : section{" "}
+              à l&apos;association : Microsoft peut donc les lire (durée : section{" "}
               <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
             </li>
             <li>
