@@ -162,7 +162,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit à la limitation",
-    text: "Vous pouvez demander que vos données soient conservées sans être autrement utilisées le temps que nous vérifiions leur exactitude ou que nous examinions votre opposition, ou lorsque vous en avez besoin pour faire valoir un droit en justice alors que nous n'en aurions plus l'usage (art. 18).",
+    text: "Vous pouvez demander que vos données soient conservées sans être autrement utilisées le temps que nous vérifiions leur exactitude ou que nous examinions votre opposition, lorsque leur traitement est illicite et que vous préférez cette limitation à leur effacement, ou lorsque vous en avez besoin pour faire valoir un droit en justice alors que nous n'en aurions plus l'usage (art. 18).",
   },
   {
     title: "Droit d'opposition",

@@ -256,10 +256,11 @@ export default async function RgpdPage() {
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>
-            <strong>Pourquoi l&apos;intérêt légitime, et ce qui le limite.</strong> L&apos;intérêt
+            <strong>Pourquoi l&apos;intérêt légitime.</strong> L&apos;intérêt
             poursuivi est de garder exacts les résultats, classements et palmarès, qui appartiennent
             aussi aux équipes et aux joueurs qui les ont disputés : effacer les matchs d&apos;un
-            joueur réécrirait le bilan de ses coéquipiers et de ses adversaires. Face à cet intérêt :
+            joueur réécrirait le bilan de ses coéquipiers et de ses adversaires. Ce qu&apos;il faut en
+            savoir :
           </p>
           <ul>
             <li>
