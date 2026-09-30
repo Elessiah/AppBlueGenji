@@ -47,9 +47,16 @@ journal **hors de la base** (`lib/shared/account-deletion-journal.ts` pur,
   l'identifiant d'un compte supprimé entre-temps. Le rejeu ne touche qu'une
   ligne dont la date de création correspond (`replayDecision` → `OTHER_ACCOUNT`
   sinon).
-- **Élagué** à chaque écriture : au-delà de deux fois la rétention des
-  sauvegardes, aucune archive ne contient plus le compte, et garder la ligne
-  reviendrait à tenir la liste des comptes partis.
+- **Élagué** à chaque écriture, **et** au plus une fois par heure sans
+  suppression nouvelle (`scheduleAccountDeletionJournalPrune`, entraîné par le
+  trafic depuis `app/layout.tsx`, comme la purge des signalements) : au-delà de
+  deux fois la rétention des sauvegardes, aucune archive ne contient plus le
+  compte, et garder la ligne reviendrait à tenir la liste des comptes partis.
+  Élaguer à l'écriture seulement laissait une ligne — et sa copie OneDrive —
+  survivre à la durée annoncée tant que personne d'autre ne supprimait son
+  compte. L'élagage passe par la même file que les écritures (une suppression
+  simultanée n'est pas perdue) et ne réécrit le fichier que s'il y a une ligne
+  à retirer.
 - **Écrit par renommage** (fichier temporaire puis `rename`) : la copie horaire
   du bot ne peut pas le surprendre à moitié écrit. Les écritures d'un processus
   sont sérialisées ; le site tourne en un seul processus pm2.

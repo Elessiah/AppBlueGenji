@@ -769,13 +769,14 @@ tournoi désigné, ni plafond de matchs simultanés : `live` est un droit de
 diffusion **confié par le staff** (rôles `ADMIN`, `ARBITRE`, `CASTER`, attribués
 par `roles`), et joindre les équipes du match qu'on diffuse fait partie de ce
 métier. L'exposition est déclarée aux joueurs (`PRIVACY_CHANGES`
-`2026-09-lancement-des-matchs`) et au registre (T04). Retirer `live` à un
-compte l'empêche de s'inscrire sur un nouveau match, mais **ne défait pas** ses
-inscriptions en cours : permission et identité ne sont contrôlées qu'à
-l'inscription (`castBlockReason`), et `GET /api/me/match-launches` sert les
-contacts sur la seule colonne `caster_user_id`. Pour l'écarter d'un match déjà
-pris, l'arbitrage le retire (`DELETE /api/matches/[id]/caster`, §4.9) — écart
-consigné dans `ERREUR.txt`.
+`2026-09-lancement-des-matchs`) et au registre (T04). La condition se
+**rejoue à la lecture** : `GET /api/me/match-launches` relit en base les rôles
+et l'identité de chaque caster inscrit (`castEligibilityBlock`, même règle que
+`castBlockReason`) — un compte privé de `live`, au tag décertifié, sans
+Battle.net ou supprimé ne reçoit plus de contacts, n'est plus présenté aux
+joueurs, et son inscription est retirée (`releaseIneligibleCast`, sous verrou et
+après relecture), ce qui libère le lancement qui attendait son « Prêt ». Le
+retrait volontaire (`DELETE`) et celui de l'arbitrage (§4.9) restent inchangés.
 
 `live` ouvre enfin la **rediff** d'un match terminé
 (`PUT /api/admin/matches/[matchId]/replay`, lien YouTube posé seulement sur une

@@ -107,9 +107,16 @@ Trois conditions de plus que la permission :
 Rien d'autre n'est exigé : tout porteur de `live` peut caster n'importe quel
 match non terminé et en recevoir les contacts — droit de diffusion
 confié par le staff, exposition déclarée (`PRIVACY_CHANGES`
-`2026-09-lancement-des-matchs`, registre T04). Retirer `live` ne défait pas
-les inscriptions déjà prises : c'est l'arbitrage qui retire le caster d'un
-match. Voir `docs/AUTHORIZATION_RULES.md` §4.5.
+`2026-09-lancement-des-matchs`, registre T04). La condition vaut **tant que
+dure l'inscription**, pas seulement à l'inscription : un caster qui perd `live`,
+décertifie son tag, détache Battle.net ou supprime son compte ne reçoit plus
+aucun contact. `GET /api/me/match-launches` la rejoue à chaque lecture
+(`castEligibilityBlock`, sur les rôles et l'identité **relus en base**) — qu'il
+la fasse lui-même ou qu'un joueur du match la fasse : le caster disparaît de la
+réponse, et son inscription est ensuite retirée (`releaseIneligibleCast`, sous
+verrou et après relecture — un compte redevenu éligible entre-temps garde la
+sienne), si bien que le lancement n'attend plus son « Prêt ». Voir
+`docs/AUTHORIZATION_RULES.md` §4.5.
 
 Le motif voyage dans `TournamentViewerContext.castBlock`, par les deux portes
 (flux et lecture REST). L'ancien libellé « ＋ Caster » du bandeau de diffusion,
