@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MatchLaunchStrip } from "@/app/(secured)/tournois/[id]/_components/MatchLaunchStrip";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { ToastProvider } from "@/components/ui/toast";
-import type { CastBlock } from "@/lib/shared/match-launch";
+import { matchLaunchPhase, type CastBlock } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { bracketMatch } from "../helpers/bracket-match";
 
@@ -15,6 +15,7 @@ import { bracketMatch } from "../helpers/bracket-match";
 type Viewer = {
   canManage?: boolean;
   canSchedule?: boolean;
+  refereeScheduling?: boolean;
   viewerUserId?: number | null;
   myTeamId?: number | null;
   castBlock?: CastBlock | null;
@@ -26,6 +27,7 @@ function render(match: BracketMatch, viewer: Viewer = {}) {
       <LiveProvider
         canManage={viewer.canManage ?? false}
         canSchedule={viewer.canSchedule ?? false}
+        refereeScheduling={viewer.refereeScheduling ?? false}
         openConfig={() => undefined}
         openSchedule={() => undefined}
         openReplay={() => undefined}
@@ -33,7 +35,15 @@ function render(match: BracketMatch, viewer: Viewer = {}) {
         myTeamId={viewer.myTeamId ?? null}
         castBlock={viewer.castBlock === undefined ? "NOT_CASTER" : viewer.castBlock}
       >
-        <MatchLaunchStrip match={match} />
+        {/* La phase vient de la carte (`MatchRow`) : le test la dérive de la
+            même règle, à l'instant du rendu. */}
+        <MatchLaunchStrip
+          match={match}
+          phase={matchLaunchPhase(
+            { ...match, refereeScheduling: viewer.refereeScheduling ?? false },
+            Date.now(),
+          )}
+        />
       </LiveProvider>
     </ToastProvider>,
   );
@@ -126,5 +136,45 @@ describe("MatchLaunchStrip — boutons selon le lecteur", () => {
     expect(render(lobby({ launchedAt: "2026-09-24T20:00:00.000Z" }), { canSchedule: true })).not.toContain(
       "▶ Forcer",
     );
+  });
+});
+
+describe("MatchLaunchStrip — planification par l'arbitrage", () => {
+  const future = new Date(Date.now() + 3_600_000).toISOString();
+
+  it("annonce « À planifier » sur un match sans date quand l'option est allumée", () => {
+    const html = render(lobby(), { refereeScheduling: true });
+    expect(html).toContain("À planifier");
+    expect(html).toContain('data-phase="TO_PLAN"');
+    // Ni lancement, ni « Prêt » : le match attend l'arbitrage.
+    expect(html).not.toContain("prêts");
+    expect(html).not.toContain("Ouvrir le lancement");
+  });
+
+  it("n'offre « Planifier » qu'à l'arbitrage", () => {
+    expect(render(lobby(), { refereeScheduling: true, canSchedule: true })).toContain("Planifier Alpha contre Bravo");
+    expect(render(lobby(), { refereeScheduling: true, canManage: true })).not.toContain("🗓 Planifier");
+    expect(render(lobby(), { refereeScheduling: true, myTeamId: 10 })).not.toContain("🗓 Planifier");
+  });
+
+  it("laisse l'arbitrage forcer un match à planifier — forcer vaut planification", () => {
+    expect(render(lobby(), { refereeScheduling: true, canSchedule: true })).toContain("Forcer le lancement");
+  });
+
+  it("dit « En attente de départ » une fois planifié, avec la date pour les lecteurs d'écran", () => {
+    const html = render(lobby({ startAt: future }), { refereeScheduling: true, canSchedule: true });
+    expect(html).toContain("En attente de départ");
+    expect(html).toContain("début le");
+    expect(html).not.toContain("🗓 Planifier");
+  });
+
+  it("dit aussi « En attente de départ » sur un match daté, option éteinte", () => {
+    expect(render(lobby({ startAt: future }))).toContain("En attente de départ");
+  });
+
+  it("garde le lancement ordinaire sans l'option", () => {
+    const html = render(lobby());
+    expect(html).not.toContain("À planifier");
+    expect(html).toContain("Lancement");
   });
 });

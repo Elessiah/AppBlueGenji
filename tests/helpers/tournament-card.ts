@@ -32,6 +32,7 @@ export function tournamentCard(overrides: Partial<TournamentCard> = {}): Tournam
     matchFormat: null,
     endurancePlayoffFormat: null,
     registrationFilters: { ...DEFAULT_REGISTRATION_FILTERS },
+    refereeScheduling: false,
     liveUrl: null,
     image: null,
     finishedAt: null,

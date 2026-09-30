@@ -270,6 +270,31 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     expect(syncTournamentState).toHaveBeenCalled();
   });
 
+  it("entretient un lancement dû : c'est la lecture que la salle fait à l'heure dite", async () => {
+    // Heure de départ atteinte sans ouverture, ou lancement d'office échu : la
+    // salle se réveille à cet instant (`nextRoomWakeAt`) et relit l'instantané,
+    // qui doit donc jouer l'entretien — sinon il rendait un plateau inchangé.
+    const execute = jest.fn(async (sql: string) =>
+      sql.includes("JOIN bg_tournaments t") ? [[{ 1: 1 }]] : [[]],
+    );
+    jest.mocked(getDatabase).mockResolvedValue(
+      fakePool({ getConnection: jest.fn(async () => connection), execute }),
+    );
+
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+
+    expect(syncTournamentState).toHaveBeenCalled();
+    const launchQuery = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("JOIN bg_tournaments t"));
+    // Même condition que le balayage passif, match à planifier exclu.
+    expect(launchQuery).toContain("t.referee_scheduling = 0");
+    expect(launchQuery).toContain("lobby_opened_at IS NULL");
+  });
+
+  it("n'entretient pas quand aucun lancement n'est dû", async () => {
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+    expect(syncTournamentState).not.toHaveBeenCalled();
+  });
+
   it("fait connaître aux listes une bascule déclenchée à la lecture", async () => {
     // La même bascule déclenchée depuis la liste publie un événement ; sans ce
     // pendant, un tournoi démarré parce qu'un spectateur a ouvert sa page

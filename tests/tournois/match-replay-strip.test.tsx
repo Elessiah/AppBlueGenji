@@ -32,6 +32,7 @@ function render(match: BracketMatch, canManage = false): string {
     <LiveProvider
       canManage={canManage}
       canSchedule={false}
+      refereeScheduling={false}
       openConfig={noop}
       openSchedule={noop}
       openReplay={noop}

@@ -122,10 +122,23 @@ function connectionFor(world: World): PoolConnection {
       return [world.candidates.filter((c) => c.id === Number(params[0])), []];
     }
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
-      // Contexte du candidat relu hors verrou (tournoi, statut fantôme).
-      const [tournamentId, team1Id] = params.map(Number);
+      // Contexte du candidat relu hors verrou (tournoi, option de
+      // planification, statut fantôme) : le tournoi est passé deux fois.
+      const [tournamentId, , team1Id] = params.map(Number);
       const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
-      return [c ? [{ tournament_state: c.tournament_state, team1_is_ghost: c.team1_is_ghost, team2_is_ghost: c.team2_is_ghost }] : [], []];
+      return [
+        c
+          ? [
+              {
+                tournament_state: c.tournament_state,
+                referee_scheduling: c.referee_scheduling ?? 0,
+                team1_is_ghost: c.team1_is_ghost,
+                team2_is_ghost: c.team2_is_ghost,
+              },
+            ]
+          : [],
+        [],
+      ];
     }
     if (sql.includes("WHERE m.tournament_id = ?")) {
       // Entretien : candidats au lancement du tournoi.
@@ -506,5 +519,22 @@ describe("listViewerMatchLaunches — lancement d'office", () => {
     await listViewerMatchLaunches(viewer);
     expect(state.writes).toEqual([]);
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+});
+
+describe("listViewerMatchLaunches — planification par l'arbitrage", () => {
+  it("ne présente jamais un match à planifier, et ne l'entretient pas", async () => {
+    state.candidates = [
+      candidate({ referee_scheduling: 1, start_at: null, lobby_opened_at: null }),
+    ];
+    const launches = await listViewerMatchLaunches(viewer);
+    expect(launches).toEqual([]);
+    expect(state.writes).toEqual([]);
+  });
+
+  it("filtre les matchs à planifier dès la requête", async () => {
+    await listViewerMatchLaunches(viewer);
+    const read = state.reads.find((sql) => sql.includes("t.name AS tournament_name"));
+    expect(read).toContain("(m.start_at IS NOT NULL OR t.referee_scheduling = 0)");
   });
 });
