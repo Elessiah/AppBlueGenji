@@ -791,8 +791,9 @@ export default async function RgpdPage() {
             </li>
           </ul>
           <p>
-            <strong>Encadrement des transferts.</strong> Ces services peuvent traiter ou héberger
-            des données aux États-Unis. Le transfert y repose, pour chacun, sur :{" "}
+            <strong>Encadrement des transferts.</strong> Parmi ces services, ceux qui peuvent
+            traiter ou héberger des données aux États-Unis — pas l&apos;opérateur téléphonique —
+            le font sur le fondement suivant :{" "}
             {transferBasis(ALL_TRANSFER_RECIPIENTS)}.
           </p>
           <p>
