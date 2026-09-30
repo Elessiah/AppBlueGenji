@@ -153,6 +153,31 @@ describe("pruneAccountDeletionJournal — élagage sans suppression nouvelle", (
   });
 });
 
+describe("file d'écriture partagée entre copies du module", () => {
+  it("n'efface pas une suppression consignée par une autre copie pendant l'élagage", async () => {
+    // Next peut charger le module deux fois : la mise en page qui élague et la
+    // route qui consigne n'auraient alors pas la même file.
+    let other: typeof import("@/lib/server/account-deletion-journal") | undefined;
+    jest.isolateModules(() => {
+      other = jest.requireActual<typeof import("@/lib/server/account-deletion-journal")>(
+        "@/lib/server/account-deletion-journal",
+      );
+    });
+    const back = new Date("2026-06-01T01:00:00.000Z");
+    await recordAccountDeletion(entry(1, "2026-06-01T00:00:00.000Z"), { filePath: file, now: back });
+    await Promise.all([
+      pruneAccountDeletionJournal({ filePath: file, now }),
+      other!.recordAccountDeletion(entry(2), { filePath: file, now }),
+      pruneAccountDeletionJournal({ filePath: file, now }),
+      other!.recordAccountDeletion(entry(3), { filePath: file, now }),
+    ]);
+    const kept = (await readAccountDeletionJournal(file)).entries.map((e) => e.userId).sort();
+    expect(kept).toEqual([2, 3]);
+    // Aucun fichier temporaire laissé derrière.
+    expect((await readdir(path.dirname(file))).filter((name) => name.endsWith(".tmp"))).toEqual([]);
+  });
+});
+
 describe("scheduleAccountDeletionJournalPrune", () => {
   const saved = process.env.ACCOUNT_DELETION_JOURNAL_PATH;
   afterEach(() => {
