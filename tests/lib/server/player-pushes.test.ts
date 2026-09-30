@@ -38,7 +38,12 @@ type Db = { query: jest.Mock<SqlQuery>; execute: jest.Mock<SqlQuery> };
 /** `query` rend les candidats ; `execute` rejoue les réservations (`claims`) et l'existence d'une annonce. */
 function mockDb(
   candidates: unknown[],
-  options: { claims?: boolean[]; lobbyAnnounced?: boolean; casters?: Record<string, unknown>[] } = {},
+  options: {
+    claims?: boolean[];
+    lobbyAnnounced?: boolean;
+    casters?: Record<string, unknown>[];
+    castersFail?: boolean;
+  } = {},
 ): Db {
   const claims = [...(options.claims ?? [])];
   const query = jest.fn<SqlQuery>().mockResolvedValue([candidates]);
@@ -47,7 +52,10 @@ function mockDb(
       return [{ affectedRows: (claims.length > 0 ? claims.shift() : true) ? 1 : 0 }];
     }
     if (sql.includes("SELECT 1 FROM bg_match_start_notices")) return [options.lobbyAnnounced ? [{}] : []];
-    if (sql.includes("FROM bg_users WHERE id IN")) return [options.casters ?? []];
+    if (sql.includes("FROM bg_users WHERE id IN")) {
+      if (options.castersFail) throw new Error("DB_DOWN");
+      return [options.casters ?? []];
+    }
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -154,6 +162,14 @@ describe("dispatchMatchStartNotices", () => {
     mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { casters: [caster()] });
     await dispatchMatchStartNotices();
     expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20], [99]]);
+  });
+
+  it("prévient les joueurs même si la lecture des casters échoue", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { castersFail: true });
+    await dispatchMatchStartNotices();
+    expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20]]);
+    error.mockRestore();
   });
 
   it("ne prévient pas un caster inscrit qui ne remplit plus la condition", async () => {

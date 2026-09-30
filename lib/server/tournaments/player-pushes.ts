@@ -154,11 +154,15 @@ async function runMatchStartSweep(): Promise<number> {
   );
   // Un caster inscrit qui ne remplit plus la condition du cast n'est plus une
   // partie du lancement : on ne l'appelle pas à un « Prêt » qu'il ne peut plus
-  // déclarer.
+  // déclarer. Les annonces sont déjà réservées : une panne de cette lecture ne
+  // doit pas priver les joueurs de la leur, le caster seul s'en passe.
   const eligibleCasters = await loadEligibleCasterIds(
     db,
     planned.flatMap(({ row }) => (row.caster_user_id === null ? [] : [Number(row.caster_user_id)])),
-  );
+  ).catch((error: unknown) => {
+    console.error("[push] lecture des casters impossible, annonce faite aux seuls joueurs", error);
+    return new Set<number>();
+  });
 
   let pushed = 0;
   for (const { row, phase } of planned) {
