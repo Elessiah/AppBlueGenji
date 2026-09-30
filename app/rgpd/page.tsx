@@ -86,13 +86,14 @@ export default async function RgpdPage() {
   // (`lib/shared/privacy-changes.ts`) : écrite à la main, elle restait en juin
   // pendant que la politique changeait.
   const today = privacyChangeDay(new Date());
-  const updatedLabel = privacyPolicyUpdatedLabel(today) ?? "septembre 2026";
   // L'historique des versions : chaque changement publié, présenté aux joueurs
   // à sa date. « Applicable depuis la création de la plateforme » disait le
   // contraire d'une politique qui a changé plusieurs fois.
   // Une entrée à public restreint (`audience`) est un avis personnel, pas une
-  // version de la politique : elle ne paraît pas dans l'historique public.
+  // version de la politique : elle ne paraît pas dans l'historique public, ni
+  // dans la date qui le coiffe — les deux lisent la même liste.
   const history = publishedPrivacyChanges(today).filter((change) => !change.audience);
+  const updatedLabel = privacyPolicyUpdatedLabel(today, history) ?? "septembre 2026";
   return (
     <PublicPageShell>
       {/* HERO */}

@@ -50,5 +50,7 @@ describe("/rgpd — couverture du registre", () => {
     expect(page).not.toMatch(/· Applicable depuis la création de la plateforme/);
     expect(page).toContain("publishedPrivacyChanges(today).filter((change) => !change.audience)");
     expect(page).toContain("Historique des versions");
+    // La date et l'historique lisent la même liste.
+    expect(page).toContain("privacyPolicyUpdatedLabel(today, history)");
   });
 });
