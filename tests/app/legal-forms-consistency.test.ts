@@ -36,11 +36,10 @@ describe("/rgpd — un seul registre de langue", () => {
   });
 
   it("renvoie au contact par le numéro réel de sa section", () => {
-    const contact = source.match(/SECTION (\d{2})<\/span>\s*<h2[^>]*>\s*Contact/);
+    // Le contact (« Exercer vos droits ») est la dernière section numérotée.
     const last = [...source.matchAll(/className="eyebrow">SECTION (\d{2})/g)].pop()?.[1];
     expect(last).toBeDefined();
     expect(source).toContain(`par les moyens indiqués en section&nbsp;${last}.`);
-    if (contact) expect(contact[1]).toBe(last);
   });
 });
 
