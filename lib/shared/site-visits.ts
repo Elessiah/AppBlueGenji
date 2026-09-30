@@ -95,6 +95,23 @@ export function audienceOptOutReason(signals: {
   return null;
 }
 
+const OPT_OUT_STRENGTH: Record<AudienceOptOutReason, number> = { GPC: 3, DNT: 2, CHOICE: 1 };
+
+/**
+ * La plus forte de deux lectures d'opposition — GPC, puis DNT, puis le choix.
+ * Sert à croiser ce que le serveur a lu dans les en-têtes avec ce que la page
+ * lit dans le navigateur : un signal envoyé en en-tête sans être exposé à la
+ * page (extension) ne doit pas être éclipsé par un simple cookie.
+ */
+export function strongerAudienceOptOut(
+  a: AudienceOptOutReason | null,
+  b: AudienceOptOutReason | null,
+): AudienceOptOutReason | null {
+  if (!a) return b;
+  if (!b) return a;
+  return OPT_OUT_STRENGTH[a] >= OPT_OUT_STRENGTH[b] ? a : b;
+}
+
 /** {@link audienceOptOutReason} lu sur les en-têtes d'une requête (côté serveur). */
 export function audienceOptOutFromHeaders(headers: {
   get(name: string): string | null;

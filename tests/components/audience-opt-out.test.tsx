@@ -46,11 +46,12 @@ describe("browserAudienceOptOut", () => {
 
   it("n'efface pas au montage un refus lu par le serveur", () => {
     const source = readSource("components/privacy/AudienceOptOutControl.tsx");
-    expect(source).toContain("if (browser) setReason(browser);");
+    expect(source).toContain("setReason((current) => strongerAudienceOptOut(current, browserAudienceOptOut()));");
+    expect(source).toContain("setReason(strongerAudienceOptOut(headerSignal, read));");
     // L'écriture du cookie refusée se dit, au lieu d'échouer en silence.
     expect(source).toMatch(/try \{\s+document\.cookie = audienceOptOutCookieString/);
     // Relu dans les deux sens : un retour dont le cookie survit n'est pas annoncé fait.
-    expect(source).toContain('(optOut && next === null) || (!optOut && next === "CHOICE")');
+    expect(source).toContain('(optOut && read === null) || (!optOut && read === "CHOICE")');
   });
 
   it("mesure sans signal ni choix", () => {

@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/toast";
 import { browserAudienceOptOut } from "@/components/visit-tracker";
 import {
   audienceOptOutCookieString,
+  strongerAudienceOptOut,
   type AudienceOptOutReason,
 } from "@/lib/shared/site-visits";
 
@@ -38,12 +39,15 @@ export function AudienceOptOutControl({ initialReason }: { initialReason: Audien
   const { showError, showSuccess } = useToast();
 
   // Le navigateur peut exposer un signal que la requête ne portait pas — mais
-  // ne fait qu'ajouter : un `Sec-GPC` envoyé sans `navigator.globalPrivacyControl`
+  // ne fait que renforcer : un `Sec-GPC` envoyé sans `navigator.globalPrivacyControl`
   // (extension qui ne pose que l'en-tête), ou un cookie illisible d'ici, reste
-  // un refus côté serveur, et la page ne doit pas annoncer une mesure active.
+  // un refus côté serveur, et un simple cookie ne l'éclipse pas.
+  // Un signal lu par le serveur dans les en-têtes, que la page ne voit peut-être
+  // pas : il reste en vigueur quoi que dise le navigateur.
+  const headerSignal = initialReason === "GPC" || initialReason === "DNT" ? initialReason : null;
+
   useEffect(() => {
-    const browser = browserAudienceOptOut();
-    if (browser) setReason(browser);
+    setReason((current) => strongerAudienceOptOut(current, browserAudienceOptOut()));
   }, []);
 
   const toggle = (optOut: boolean) => {
@@ -53,11 +57,11 @@ export function AudienceOptOutControl({ initialReason }: { initialReason: Audien
       showError("Votre navigateur bloque les cookies : le choix n'a pas pu être retenu.");
       return;
     }
-    const next = browserAudienceOptOut();
-    setReason(next);
+    const read = browserAudienceOptOut();
+    setReason(strongerAudienceOptOut(headerSignal, read));
     // Relu dans les deux sens : un cookie qui ne se pose pas, ou qui ne s'efface
     // pas (écriture ignorée par le navigateur), ne doit pas être annoncé fait.
-    if ((optOut && next === null) || (!optOut && next === "CHOICE")) {
+    if ((optOut && read === null) || (!optOut && read === "CHOICE")) {
       showError("Votre navigateur bloque les cookies : le choix n'a pas pu être retenu.");
       return;
     }

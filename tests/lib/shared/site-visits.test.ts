@@ -14,6 +14,7 @@ import {
   audienceOptOutFromHeaders,
   audienceOptOutReason,
   readCookieValue,
+  strongerAudienceOptOut,
 } from "@/lib/shared/site-visits";
 
 describe("opposition à la mesure d'audience", () => {
@@ -52,6 +53,15 @@ describe("opposition à la mesure d'audience", () => {
     );
     expect(AUDIENCE_OPT_OUT_MAX_AGE_DAYS).toBeLessThanOrEqual(395);
     expect(audienceOptOutCookieString(false, false)).toBe("bg_audience_optout=; Path=/; Max-Age=0; SameSite=Lax");
+  });
+
+  it("garde la plus forte de deux lectures : un cookie n'éclipse pas un signal d'en-tête", () => {
+    expect(strongerAudienceOptOut("DNT", "CHOICE")).toBe("DNT");
+    expect(strongerAudienceOptOut("CHOICE", "GPC")).toBe("GPC");
+    expect(strongerAudienceOptOut("GPC", "DNT")).toBe("GPC");
+    expect(strongerAudienceOptOut(null, "CHOICE")).toBe("CHOICE");
+    expect(strongerAudienceOptOut("DNT", null)).toBe("DNT");
+    expect(strongerAudienceOptOut(null, null)).toBeNull();
   });
 
   it("borne l'empreinte à 25 mois", () => {
