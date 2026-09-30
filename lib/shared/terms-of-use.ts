@@ -28,6 +28,22 @@ import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 /** Version en vigueur. L'avancer redemande l'acceptation. */
 export const TERMS_VERSION = 1;
 
+/**
+ * Âge minimum pour créer un compte. Distinct de l'âge d'adhésion à
+ * l'association, que fixent ses statuts : un compte n'est pas une adhésion.
+ * Aucun contrôle technique ne le tient — le site ne recueille pas de date de
+ * naissance, seulement une majorité déclarée (`isAdult`), qui ne dit rien d'un
+ * seuil à 15 ans : la condition est déclarative, acceptée avec ces conditions.
+ */
+export const SITE_MINIMUM_AGE = 15;
+
+/**
+ * Déclaration d'âge jointe à la case d'acceptation de la page de connexion,
+ * seul écran où naît un compte : la clause d'âge des conditions doit se lire
+ * au moment où on la déclare, pas seulement dans le texte lié.
+ */
+export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
+
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
 export const TERMS_UPDATED_AT = "2026-09-24";
 
@@ -111,7 +127,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "Acceptation",
     paragraphs: [
       "Les conditions s'acceptent en **créant un compte**, en **créant une équipe** et en **recevant la gestion d'une équipe** (propriété transférée ou rôle de gérant). Sans cette acceptation, le compte ne peut pas être créé et l'équipe ne peut pas être gérée.",
-      "L'association peut modifier ces conditions. Une modification de fond donne lieu à une **nouvelle version**, présentée à l'acceptation des membres concernés avant qu'ils puissent continuer à gérer une équipe.",
+      "L'association peut modifier ces conditions. Une modification de fond donne lieu à une **nouvelle version**, présentée à l'acceptation des utilisateurs concernés avant qu'ils puissent continuer à gérer une équipe.",
     ],
   },
   {
@@ -119,8 +135,10 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "Compte",
     paragraphs: [
       "Un compte se crée par une connexion Google, Discord ou Battle.net, ou par un code reçu en message privé Discord. Il est **personnel** : il ne se prête pas, ne se partage pas et ne se revend pas.",
+      `Il faut avoir **au moins ${SITE_MINIMUM_AGE} ans** pour créer un compte. En acceptant ces conditions, l'utilisateur déclare avoir atteint cet âge.`,
+      "Un compte ne fait pas de son titulaire un **membre de l'association** : l'adhésion est une démarche distincte, soumise aux conditions de ses statuts, dont un âge minimum qui leur est propre.",
       "Le pseudo choisi ne doit ni usurper l'identité d'une autre personne, ni porter atteinte à ses droits, ni être injurieux, discriminatoire ou à caractère sexuel.",
-      "Chaque membre peut exporter ses données et supprimer son compte à tout moment depuis son profil.",
+      "Chaque utilisateur peut exporter ses données et supprimer son compte à tout moment depuis son profil.",
     ],
   },
   {
@@ -128,25 +146,26 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     title: "Comportement",
     paragraphs: [
       "Sur le site comme sur les serveurs Discord de l'association, chacun s'engage à respecter les autres joueurs, le staff et les arbitres : **aucun harcèlement, propos haineux, triche, usurpation ou tentative de fausser un tournoi**.",
-      "Il est interdit de chercher à contourner les protections du site, d'accéder au compte d'un autre membre ou de perturber le service (envois automatisés, surcharge volontaire).",
+      "Il est interdit de chercher à contourner les protections du site, d'accéder au compte d'un autre utilisateur ou de perturber le service (envois automatisés, surcharge volontaire).",
     ],
   },
   {
     id: "contenus",
-    title: "Contenus publiés par les membres",
+    title: "Contenus publiés par les utilisateurs",
     paragraphs: [
-      "Les membres publient eux-mêmes certains contenus : **avatar, logo d'équipe, nom et sigle d'équipe, description, pseudos de jeu**. Celui qui publie un contenu en est **seul responsable**.",
-      "En publiant un contenu, le membre **garantit qu'il en détient les droits** (création personnelle, licence libre, autorisation écrite du titulaire) et qu'il ne porte atteinte ni au droit d'auteur, ni au droit des marques, ni aux droits d'un tiers. Un logo de club professionnel, d'éditeur de jeu ou de marque ne peut pas être repris sans l'accord de son titulaire.",
-      "Il accorde à l'association, pour la seule durée de sa publication, le droit **gratuit et non exclusif** de reproduire et d'afficher ce contenu sur le site et dans ses communications liées aux tournois (diffusions, annonces, réseaux sociaux). Il peut le retirer à tout moment.",
-      "Pour une équipe, le **propriétaire et les gérants** répondent des contenus de l'équipe, qu'ils sont seuls à pouvoir modifier.",
+      "Les utilisateurs publient eux-mêmes certains contenus : **avatar, logo d'équipe, nom et sigle d'équipe, description, pseudos de jeu**. Celui qui publie un contenu en est **responsable**.",
+      "En publiant un contenu, l'utilisateur **garantit qu'il en détient les droits** (création personnelle, licence libre, autorisation écrite du titulaire) et qu'il ne porte atteinte ni au droit d'auteur, ni au droit des marques, ni aux droits d'un tiers. Un logo de club professionnel, d'éditeur de jeu ou de marque ne peut pas être repris sans l'accord de son titulaire.",
+      "Il accorde à l'association, à titre **gratuit et non exclusif**, le droit de **reproduire et de représenter** ce contenu, et d'en adapter le format (redimensionnement, recadrage, conversion d'image) sans en altérer le sens, **sur le site et dans ses communications liées aux tournois** (diffusions en direct et rediffusions, annonces, réseaux sociaux), **pour le monde entier** — le site et ces communications étant accessibles en ligne —, et **pour la durée de sa publication sur le site** — ainsi que, pour les diffusions, rediffusions et publications faites pendant cette durée, pour la durée de leur mise en ligne. Pour l'**avatar** et les **pseudos de jeu**, qui sont des données personnelles, cette licence ne vaut que **sur le site**, qui ne les affiche que selon les réglages de visibilité du joueur et la politique de confidentialité. Le pseudo que le jeu affiche lui-même pendant un match diffusé n'est pas un contenu publié sur le site.",
+      "Il peut retirer ce contenu à tout moment, par les moyens que le site lui offre (un nom d'équipe se remplace et ne disparaît qu'avec l'équipe ; un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Le retrait vaut pour l'avenir : le contenu cesse d'être affiché sur le site et d'être repris dans de nouvelles communications, mais les diffusions, rediffusions et publications **déjà faites** avant le retrait ne sont pas concernées.",
+      "Pour une équipe, répondent aussi de ses contenus, en plus de leur auteur : le **propriétaire** du nom, du sigle et de la description de l'équipe, qu'il est seul à pouvoir modifier ; le propriétaire et les **gérants** de son logo, qu'ils peuvent l'un et l'autre changer. Une **équipe fantôme**, créée et gérée par le staff de l'association pour un tournoi, n'a pas de propriétaire : l'association répond de ses contenus.",
     ],
   },
   {
     id: "signalement",
     title: "Signalement et modération",
     paragraphs: [
-      `Toute personne, membre ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton **« Signaler un problème »** présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer ${copyrightNoticeElementsText()}. ${NOTIFIER_FOLLOW_UP}`,
-      "L'association agit comme **hébergeur** des contenus de ses membres : elle ne les contrôle pas avant publication, mais **retire promptement** tout contenu manifestement illicite qui lui est signalé.",
+      `Toute personne, titulaire d'un compte ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton **« Signaler un problème »** présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer ${copyrightNoticeElementsText()}. ${NOTIFIER_FOLLOW_UP}`,
+      "L'association agit comme **hébergeur** des contenus de ses utilisateurs : elle ne les contrôle pas avant publication, mais **retire promptement** tout contenu manifestement illicite qui lui est signalé.",
       "Selon la gravité, l'association peut **retirer un contenu** (par exemple un logo ou un avatar), **retirer une équipe d'un tournoi**, ou **suspendre un compte**.",
       "Les joueurs visés par un signalement, et les membres des équipes visées, en sont **prévenus en message privé Discord** (s'ils ont rattaché leur compte Discord ou certifié leur tag). Ils lisent sur la page du signalement ce qui est reproché — jamais qui l'a signalé — et peuvent le **contester** depuis cette page ou par la catégorie « Contestation » du même formulaire ; contester un signalement archivé le rouvre.",
       `Un logo d'équipe ou un avatar de joueur signalé peut être **masqué** plutôt que supprimé : il n'est plus en ligne, et l'équipe ou le joueur dispose de **${LOGO_QUARANTINE_MONTHS} mois** pour contester. Sans contestation, l'image est supprimée définitivement à l'échéance ; si la contestation aboutit, elle est rétablie. Un contenu manifestement illicite peut être supprimé sans délai : l'équipe ou le joueur en est prévenu de la même façon et peut contester la décision.`,
@@ -164,7 +183,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "droit-applicable",
     title: "Droit applicable",
     paragraphs: [
-      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou son courriel (donné dans les mentions légales), en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents.",
+      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou son courriel (donné dans les mentions légales), en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents, sans préjudice des règles qui permettent à un consommateur de saisir la juridiction de son domicile ou de se prévaloir des dispositions impératives du droit de son pays de résidence.",
     ],
   },
 ];
@@ -174,7 +193,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
  *
  * Le logo est le contenu le plus exposé du site (cartes d'annuaire, plateaux,
  * vitrine publique) et le plus souvent emprunté à une marque. La case rappelle
- * la garantie des conditions (section « Contenus publiés par les membres ») au
+ * la garantie des conditions (section « Contenus publiés par les utilisateurs ») au
  * moment précis où elle est donnée ; la route refuse un envoi sans elle.
  */
 export const LOGO_RIGHTS_FIELD = "rightsCertified";

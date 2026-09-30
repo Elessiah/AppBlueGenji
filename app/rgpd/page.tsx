@@ -42,6 +42,7 @@ import {
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { SITE_VISIT_DETAIL_RETENTION_DAYS, SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
 import styles from "./page.module.css";
@@ -180,6 +181,18 @@ export default async function RgpdPage() {
             et le compte fonctionne sans, à deux limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
             compte Battle.net rattaché, et un membre du staff de diffusion ne peut
             s&apos;inscrire comme caster d&apos;un match sans les deux.
+          </p>
+          <p id="age-minimum">
+            <strong>Âge minimum.</strong> Il faut avoir au moins {SITE_MINIMUM_AGE} ans pour
+            créer un compte (<Link href={`${TERMS_PATH}#compte`}>conditions d&apos;utilisation</Link>).
+            C&apos;est un choix de l&apos;association : il reprend
+            le seuil en dessous duquel un mineur ne peut consentir seul à un traitement fondé sur
+            son consentement pour un service en ligne (article 45 de la loi Informatique et
+            Libertés), ce qui est le cas des données de profil facultatives ; le compte
+            lui-même repose sur l&apos;exécution des conditions d&apos;utilisation. Le site ne
+            demande pas de date de naissance et ne vérifie pas l&apos;âge ; la majorité,
+            facultative, reste une simple déclaration. L&apos;adhésion à l&apos;association, distincte du
+            compte, obéit à la condition d&apos;âge de ses statuts.
           </p>
         </div>
         {/* Sous 640 px, chaque ligne devient une fiche : les cellules s'empilent
@@ -847,7 +860,7 @@ export default async function RgpdPage() {
             .
           </p>
           <p>
-            <strong>Quand cette politique change</strong>, chaque membre inscrit
+            <strong>Quand cette politique change</strong>, chaque utilisateur inscrit
             avant le changement en est informé à sa visite suivante, par une
             fenêtre qui résume ce qui change, et, s&apos;il ne revient pas, en message
             privé Discord ou par notification push s&apos;il les a activées. C&apos;est une information : aucun accord n&apos;est demandé, et la

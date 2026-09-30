@@ -13,7 +13,7 @@ import { getSiteCopy } from "@/lib/server/site-copy-service";
 import { EditableCopy } from "@/components/cyber/landing/EditableCopy";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { siteCanonicalBase } from "@/lib/server/site-url";
-import { organizationJsonLd } from "@/lib/shared/structured-data";
+import { ORGANIZATION_FOUNDING_YEAR, organizationJsonLd } from "@/lib/shared/structured-data";
 import { BureauSection } from "./BureauSection";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
@@ -102,7 +102,7 @@ export default async function AssociationPage() {
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
                   FONDÉE EN
                 </span>
-                <span className="num" style={{ fontSize: 28 }}>2020</span>
+                <span className="num" style={{ fontSize: 28 }}>{ORGANIZATION_FOUNDING_YEAR}</span>
               </div>
               <div className={styles.heroFact}>
                 <span className="mono" style={{ color: "var(--ink-mute)", fontSize: 11, letterSpacing: "0.2em" }}>
