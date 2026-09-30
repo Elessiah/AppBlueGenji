@@ -80,3 +80,32 @@
   background: rgba(255, 157, 46, 0.14);
   border-color: rgba(255, 157, 46, 0.45);
 }
+
+/* À planifier : le match attend l'arbitrage. Ambre, comme toute attente d'un
+   geste humain sur la fiche — jamais le rouge, réservé à l'antenne. */
+.strip[data-phase="TO_PLAN"] {
+  background: rgba(255, 157, 46, 0.06);
+}
+
+.toPlan {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 176, 92, 0.98);
+  white-space: nowrap;
+}
+
+/* En attente de départ : planifié, l'horloge fera le reste. Bleu glacier, le
+   ton de ce qui est annoncé. */
+.scheduled {
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(89, 212, 255, 0.95);
+  white-space: nowrap;
+}
+
+.plan {
+  background: rgba(255, 157, 46, 0.16);
+  border-color: rgba(255, 157, 46, 0.5);
+}
