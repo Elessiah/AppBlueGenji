@@ -23,7 +23,7 @@ import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
-import { WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/legal-durations";
+import { WEB_ACCESS_LOG_FIELDS, WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/legal-durations";
 import {
   CODE_COPYRIGHT_HOLDER,
   CODE_LICENSE_NAME,
@@ -314,7 +314,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           ou la modification d&apos;un contenu —, et les informations fournies à la création
           d&apos;un compte ne sont pas gardées après sa suppression. Le serveur web tient
           en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus et pour sa seule sécurité, un
-          journal technique de chaque requête (adresse IP, date, page demandée), sans port
+          journal technique de chaque requête ({WEB_ACCESS_LOG_FIELDS}), sans port
           source (<Link href="/rgpd/registre#t17">registre, T17</Link>). Ces données ne sont communiquées
           qu&apos;aux autorités qui les requièrent ; le détail figure dans la{" "}
           <Link href="/rgpd#donnees-connexion">politique de confidentialité</Link>.

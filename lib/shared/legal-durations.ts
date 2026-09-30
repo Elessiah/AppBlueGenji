@@ -31,3 +31,11 @@ export const SUPPORT_TICKET_RETENTION_MONTHS = 1;
  * versionnée ici : `docs/DEPLOYMENT.md` dit le réglage à poser en production.
  */
 export const WEB_ACCESS_LOG_RETENTION_DAYS = 14;
+
+/**
+ * Ce que note le journal d'accès nginx (format `combined` par défaut), dit une
+ * fois pour le registre (T17), `/rgpd`, les mentions légales et l'annonce du
+ * changement : trois rédactions en avaient donné trois listes différentes.
+ */
+export const WEB_ACCESS_LOG_FIELDS =
+  "adresse IP, date et heure, page demandée, code de réponse, taille de la réponse, page d'origine et navigateur";

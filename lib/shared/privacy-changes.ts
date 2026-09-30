@@ -54,6 +54,7 @@ import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE, REPORT_FORM_NAME } from "@/lib/sh
 import {
   SITE_MINIMUM_AGE,
   SUPPORT_TICKET_RETENTION_MONTHS,
+  WEB_ACCESS_LOG_FIELDS,
   WEB_ACCESS_LOG_RETENTION_DAYS,
 } from "@/lib/shared/legal-durations";
 import {
@@ -544,7 +545,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       `Portail de support (Spiceworks) : un ticket y est gardé le temps de son traitement, puis ${SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture.`,
       "Retransmission des matchs (YouTube, Twitch ou Kick) : ton pseudo et le nom de ton équipe peuvent apparaître à l'écran, et le lien de la rediffusion reste avec le match. Tu peux t'y opposer par « Signaler un problème », catégorie RGPD.",
-      `Serveur web : chaque requête (adresse IP, date, page, navigateur) est notée dans un journal technique gardé ${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, pour la sécurité du site.`,
+      `Serveur web : chaque requête (${WEB_ACCESS_LOG_FIELDS}) est notée dans un journal technique gardé ${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, pour la sécurité du site.`,
       `Courriel de l'association : c'est une messagerie Gmail, que Google héberge et peut lire (possibles transferts vers les États-Unis). Une demande reçue par ce courriel ou par le téléphone de l'association est gardée le temps de la traiter, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture.`,
       `Âge minimum : il faut avoir au moins ${SITE_MINIMUM_AGE} ans pour créer un compte. Le site ne demande pas de date de naissance et ne vérifie pas l'âge.`,
       `Données de connexion : seules les ouvertures de session sont notées (sans port source), et les informations fournies à la création de ton compte partent avec lui (hors les copies de sauvegarde chiffrées, effacées au bout de ${BACKUP_RETENTION_DAYS} jours, et la mention de ta suppression au journal qui la rejoue après une restauration, gardée ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours).`,

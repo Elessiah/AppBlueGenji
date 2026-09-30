@@ -33,7 +33,11 @@ import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
-import { SUPPORT_TICKET_RETENTION_MONTHS, WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/legal-durations";
+import {
+  SUPPORT_TICKET_RETENTION_MONTHS,
+  WEB_ACCESS_LOG_FIELDS,
+  WEB_ACCESS_LOG_RETENTION_DAYS,
+} from "@/lib/shared/legal-durations";
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
@@ -818,7 +822,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     legalBasis: "Intérêt légitime (RGPD, art. 6.1.f) : sécurité du service (art. 32)",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
-      "Adresse IP, date et heure, page demandée, code de réponse, taille, page d'origine et navigateur (format de journal par défaut de nginx)",
+      `${WEB_ACCESS_LOG_FIELDS.charAt(0).toUpperCase()}${WEB_ACCESS_LOG_FIELDS.slice(1)} (format de journal par défaut de nginx)`,
     ],
     sensitiveData: "Aucune",
     retention: [

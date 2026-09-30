@@ -43,6 +43,7 @@ import {
   WEB_ACCESS_LOG_RETENTION_DAYS,
   transferBasis,
 } from "@/lib/shared/processing-register";
+import { WEB_ACCESS_LOG_FIELDS } from "@/lib/shared/legal-durations";
 import {
   privacyChangeDay,
   privacyPolicyUpdatedLabel,
@@ -324,7 +325,7 @@ export default async function RgpdPage() {
           envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
           <a href="#signalements">« Signalements »</a>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
-          chaque requête (adresse IP, date, page demandée, navigateur), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
+          chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
           T17</Link>).
         </p>
       </section>
