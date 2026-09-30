@@ -891,7 +891,7 @@ export default async function RgpdPage() {
             </li>
             <li>
               <strong>Spiceworks</strong> : le portail de support de l&apos;association, seulement si
-              vous y ouvrez un ticket (<Link href="/rgpd/registre#t15">registre, T15</Link>).
+              vous y ouvrez un ticket ou y êtes désigné (<Link href="/rgpd/registre#t15">registre, T15</Link>).
             </li>
             <li>
               <strong>YouTube, Twitch ou Kick</strong> : la retransmission d&apos;un match montre les
