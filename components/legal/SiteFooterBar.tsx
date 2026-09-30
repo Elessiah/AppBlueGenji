@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { SOURCE_CODE_LINK_LABEL, SOURCE_CODE_URL } from "@/lib/shared/source-code";
 import styles from "./SiteFooterBar.module.css";
 
 /**
@@ -26,6 +27,12 @@ export function SiteFooterBar({ authenticated }: { authenticated: boolean }) {
           </li>
           <li>
             <Link className="tap-target" href="/rgpd">Confidentialité</Link>
+          </li>
+          <li>
+            {/* AGPL, art. 13 : le code source s'offre à chaque utilisateur du service. */}
+            <a className="tap-target" href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">
+              {SOURCE_CODE_LINK_LABEL}
+            </a>
           </li>
         </ul>
         <span className={styles.copy}>© 2026 BlueGenji</span>

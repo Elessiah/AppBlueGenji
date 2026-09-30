@@ -90,6 +90,10 @@ Le site est installable (manifeste `/manifest.webmanifest`, voir [`docs/features
 - [`docs/DATABASE_SCHEMA.md`](docs/DATABASE_SCHEMA.md), [`docs/AUTHORIZATION_RULES.md`](docs/AUTHORIZATION_RULES.md)
 - [`ACCESSIBILITE.md`](ACCESSIBILITE.md) et [`ERREUR.txt`](ERREUR.txt) : points d'accessibilité et erreurs connus, à traiter
 
+## Licence
+
+Code source sous licence **GNU Affero General Public License v3.0 seulement** (`AGPL-3.0-only`) — texte intégral dans [`LICENSE`](LICENSE). Droits d'auteur : Copyright (C) 2026 Keryan Houssin ; portée de la licence et composants tiers dans [`NOTICE`](NOTICE). Le site étant un service en ligne, l'article 13 de l'AGPL impose d'offrir le code source à ses utilisateurs : le lien « Code source » du pied de page et des mentions légales y pourvoit (`SOURCE_CODE_URL`, `lib/shared/source-code.ts`) — une instance modifiée doit le faire pointer vers son propre code.
+
 ## Contribuer
 
 Une branche `feature/<nom>` par fonctionnalité, puis une Pull Request vers `main`. Le CI enchaîne lint + typecheck, build et tests ; ne pas fusionner s'il est rouge.

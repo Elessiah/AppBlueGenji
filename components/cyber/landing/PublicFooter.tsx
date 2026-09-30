@@ -11,6 +11,7 @@ import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { accessibilityFooterLabel } from "@/lib/shared/accessibility-statement";
 import { can } from "@/lib/shared/permissions";
 import { toPublicContact } from "@/lib/shared/contact";
+import { SOURCE_CODE_LINK_LABEL, SOURCE_CODE_URL } from "@/lib/shared/source-code";
 
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
@@ -81,6 +82,8 @@ export async function PublicFooter() {
               <li><Link className="tap-target" href="/rgpd">RGPD</Link></li>
               <li><a className="tap-target" href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
               <li><Link className="tap-target" href="/rgpd#cookies">Cookies</Link></li>
+              {/* AGPL, art. 13 : le code source s'offre à chaque utilisateur du service. */}
+              <li><a className="tap-target" href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">{SOURCE_CODE_LINK_LABEL}</a></li>
               <li><AccessibilityFooterLink className={`${styles.linkButton} tap-target`} /></li>
               {/* Mention imposée par le RGAA sur chaque page, dans ses termes
                   exacts : l'état de conformité se lit sans ouvrir la page. */}
@@ -91,7 +94,7 @@ export async function PublicFooter() {
       </div>
 
       <div className={styles.bottom}>
-        <span>© 2026 BLUEGENJI · TOUS DROITS RÉSERVÉS</span>
+        <span>© 2026 BLUEGENJI</span>
         {/* Sur la ligne du bas, à part des colonnes : c'est le seul geste du
             pied de page, et il doit se trouver sans parcourir les listes. */}
         <ReportProblemButton authenticated={Boolean(user)} className={styles.report} icon />
