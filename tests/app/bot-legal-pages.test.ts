@@ -109,6 +109,8 @@ describe("bot legal content carries the contact details", () => {
     // la politique ne peut plus dire que Microsoft ne reçoit que du chiffré.
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("lui parvient en clair");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("reaches it unencrypted");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("L'opérateur téléphonique de l'hébergeur technique");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("The technical host's phone operator");
     // …et renvoie à la politique du site, qui décrit ce traitement (base légale, durée).
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("est décrit dans la politique de confidentialité du site");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("is described in the website's privacy policy");
