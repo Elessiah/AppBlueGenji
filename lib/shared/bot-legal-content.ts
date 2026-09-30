@@ -194,7 +194,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `Les administrateurs des serveurs partenaires d'au moins 50 membres et le staff de l'association peuvent **exclure un utilisateur du relais** en cas de manquement à ces conditions : il ne peut plus utiliser les commandes du Bot, ses annonces ne sont plus relayées et les copies de celles des ${BOT_RELAY_RETENTION_DAYS} derniers jours sont retirées. L'exclusion vaut pour tout le réseau de serveurs partenaires ; son motif est obligatoire et consigné au journal de modération.`,
+            text: `Les administrateurs des serveurs partenaires d'au moins 50 membres (ou les titulaires du rôle d'administration du Bot que ces serveurs désignent) et le staff de l'association peuvent **exclure un utilisateur du relais** en cas de manquement à ces conditions : il ne peut plus utiliser les commandes du Bot, ses annonces ne sont plus relayées et les copies de celles des ${BOT_RELAY_RETENTION_DAYS} derniers jours sont retirées. L'exclusion vaut pour tout le réseau de serveurs partenaires ; son motif est obligatoire et consigné au journal de modération.`,
           },
           {
             kind: "p",
@@ -318,7 +318,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `The administrators of partner servers with at least 50 members and the association's staff may **exclude a user from the relay** for breaching these terms: they can no longer use the Bot's commands, their advertisements are no longer relayed and the copies of those from the last ${BOT_RELAY_RETENTION_DAYS} days are removed. The exclusion applies to the whole network of partner servers; a reason is mandatory and recorded in the moderation log.`,
+            text: `The administrators of partner servers with at least 50 members (or the holders of the Bot administration role those servers designate) and the association's staff may **exclude a user from the relay** for breaching these terms: they can no longer use the Bot's commands, their advertisements are no longer relayed and the copies of those from the last ${BOT_RELAY_RETENTION_DAYS} days are removed. The exclusion applies to the whole network of partner servers; a reason is mandatory and recorded in the moderation log.`,
           },
           {
             kind: "p",
@@ -425,14 +425,15 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Exclusions du relais" },
           {
             kind: "p",
-            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les pseudos de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff, et la commande **/ban-list** affiche la liste complète des exclusions (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé.",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les pseudos de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff, et la commande **/ban-list** affiche la liste complète des exclusions (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé et aux titulaires du rôle d'administration du Bot.",
           },
-          { kind: "subhead", text: "Commande /link et rappels programmés" },
+          { kind: "subhead", text: "Commande /link, adhésions et rappels programmés" },
           {
             kind: "bullets",
             items: [
               `**Commande /link** : identifiant Discord, code à six chiffres valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes et son échéance. Le site ne propose à ce jour aucun endroit où saisir ce code : la commande ne relie donc aucun compte.`,
-              "**Rappels programmés** (commandes réservées au serveur de l'association) : identifiant du membre ou du rôle visé et de l'auteur, message et fréquence.",
+              "**Adhésions à l'association** (commandes réservées aux serveurs de l'association) : quand l'adhésion d'un membre est validée, le Bot lui envoie en message privé la confirmation, et l'attestation d'adhésion si elle est jointe, sans la conserver ; il enregistre alors un rappel pour la date de péremption de l'adhésion — ce qui revient à garder, jusqu'à ce rappel, le fait que ce membre adhère à l'association et jusqu'à quand.",
+              "**Rappels programmés** (mêmes commandes) : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi et fréquence.",
             ],
           },
           { kind: "subhead", text: "Configuration des serveurs" },
@@ -470,7 +471,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Exclusions** : jusqu'à la levée de l'exclusion.",
               `**Commande /link** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
               "**Configuration des serveurs** : jusqu'à son retrait par les administrateurs du serveur.",
-              "**Rappels programmés** : jusqu'à leur dernier envoi ou leur suppression.",
+              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression.",
               "**Journal privé du staff et journaux du serveur** : aucune suppression automatique à ce jour.",
               `**Sauvegardes** : la base du Bot est sauvegardée chaque semaine, chiffrée, et chaque copie est supprimée définitivement au bout de ${BACKUP_RETENTION_DAYS} jours au plus.`,
             ],
@@ -487,7 +488,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "Le staff de l'association, pour la modération et l'administration du Bot.",
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
-              "Les administrateurs de tout serveur où le Bot est installé, qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
+              "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
               `Tout utilisateur du Bot, par la commande **/stats**, peut voir combien d'annonces un autre utilisateur a publiées (messages relayés, scrims, recherches) ; la réponse n'est visible que de celui qui la demande, et le compteur de messages ne porte que sur ceux encore conservés (${BOT_RELAY_RETENTION_DAYS} derniers jours).`,
               `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
@@ -623,14 +624,15 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relay exclusions" },
           {
             kind: "p",
-            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The usernames of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel, and the **/ban-list** command shows the full list of exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed.",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The usernames of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel, and the **/ban-list** command shows the full list of exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed and to the holders of the Bot administration role.",
           },
-          { kind: "subhead", text: "/link command and scheduled reminders" },
+          { kind: "subhead", text: "/link command, memberships and scheduled reminders" },
           {
             kind: "bullets",
             items: [
               `**/link command**: Discord ID, six-digit code valid for ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes and its expiry. The website currently offers nowhere to enter this code: the command therefore links no account.`,
-              "**Scheduled reminders** (commands restricted to the association's server): ID of the targeted member or role and of the author, message and frequency.",
+              "**Association memberships** (commands restricted to the association's servers): when a member's membership is validated, the Bot sends them the confirmation by direct message, with the membership certificate if one is attached, without keeping it; it then records a reminder for the membership's expiry date — which means keeping, until that reminder, the fact that this member belongs to the association and until when.",
+              "**Scheduled reminders** (same commands): ID of the targeted member or role and of the author, message, next sending date and frequency.",
             ],
           },
           { kind: "subhead", text: "Server configuration" },
@@ -668,7 +670,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Exclusions**: until the exclusion is lifted.",
               `**/link command**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
               "**Server configuration**: until the server's administrators remove it.",
-              "**Scheduled reminders**: until their last sending or their deletion.",
+              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion.",
               "**Staff private log channel and server logs**: no automatic deletion at present.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,
             ],
@@ -685,7 +687,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "The association's staff, for moderating and administering the Bot.",
               "Members of partner servers, who read the relayed advertisements.",
-              "The administrators of any server where the Bot is installed, who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
+              "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
               `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages still kept (last ${BOT_RELAY_RETENTION_DAYS} days).`,
               `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",

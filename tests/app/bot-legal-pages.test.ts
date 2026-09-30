@@ -229,9 +229,18 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain(SITE_HOST.machineEn);
   });
 
-  it("declares /ban-list readers, in the pages and in T08", () => {
+  it("declares the membership confirmations and their reminders, in the pages and in T08", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("**Adhésions à l'association**");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("**Association memberships**");
+    const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
+    expect((t08?.dataCategories ?? []).join(" ")).toContain("date de péremption");
+    expect((t08?.dataSubjects ?? []).join(" ")).toContain("Adhérents");
+  });
+
+  it("declares /ban-list readers, bot-admin role holders included, in the pages and in T08", () => {
     for (const lang of LANGS) {
       expect(flatOf(PRIVACY_POLICY, lang)).toContain("**/ban-list**");
+      expect(flatOf(PRIVACY_POLICY, lang)).toContain("**/set-bot-admin**");
     }
     const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
     expect((t08?.recipients ?? []).join(" ")).toContain("/ban-list");
