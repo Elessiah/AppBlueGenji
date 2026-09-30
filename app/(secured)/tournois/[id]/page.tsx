@@ -727,7 +727,9 @@ export default function TournamentDetailPage() {
                 onForfeit={forfeitTeam}
                 emptyLabel={noMatchesLabel}
               />
-              {finishedPhaseStandings}
+              {/* Pas de `finishedPhaseStandings` ici, comme pour la vue suisse :
+                  la phase en cours ne se clôt qu'avec le tournoi, et la vue
+                  porte déjà son classement — il s'afficherait deux fois. */}
             </>
           ) : formatForBracket === "SURVIVAL" && isMulti ? (
             // Phase survie close d'un multi-phases : ses manches, et son
