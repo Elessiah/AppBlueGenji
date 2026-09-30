@@ -18,7 +18,7 @@ describe("/rgpd — droits des personnes", () => {
 
   it("n'annonce plus l'art. 22, qu'aucun droit de la liste ne décrit", () => {
     expect(RGPD).not.toContain("ART. 15–22");
-    expect(RGPD).toContain("RGPD ART. 15–21 · LOI I&amp;L ART. 85");
+    expect(RGPD).toContain("RGPD ART. 7.3, 15–21 · LOI I&amp;L ART. 85");
   });
 
   it("dit quelles données sont obligatoires et ce qu'un refus coûte (art. 13.2.e)", () => {

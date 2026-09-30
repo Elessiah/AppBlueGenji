@@ -294,7 +294,7 @@ export default async function RgpdPage() {
             <span className="eyebrow">SECTION 04</span>
             <h2 className={styles.sectionTitle}>Vos droits</h2>
           </div>
-          <span className={styles.meta}>RGPD ART. 15–21 · LOI I&amp;L ART. 85</span>
+          <span className={styles.meta}>RGPD ART. 7.3, 15–21 · LOI I&amp;L ART. 85</span>
         </header>
         <ul className={styles.rightsList}>
           {DROITS.map((droit, i) => (
