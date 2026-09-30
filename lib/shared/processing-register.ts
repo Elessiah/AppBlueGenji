@@ -405,7 +405,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Mesure d'audience du site",
     purpose: "Connaître la fréquentation du site",
     subPurposes: ["Compter visites et visiteurs uniques (24 h, 7 jours, 30 jours, total)"],
-    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie ni traceur tiers ; droit d'opposition (art. 21) exercé par le formulaire de signalement, catégorie RGPD, ou auprès du contact Discord",
+    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie ni traceur tiers ; droit d'opposition (art. 21) exercé comme les autres droits : auprès de la personne à contacter pour les demandes relatives aux données, par le formulaire de signalement, catégorie RGPD, ou auprès de l'association",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
       "Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : donnée pseudonymisée — sans le secret, elle ne se rattache à personne, mais l'association, qui le détient, peut recalculer l'empreinte d'un compte ou d'un couple IP et navigateur",

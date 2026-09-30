@@ -169,10 +169,12 @@ export default async function RgpdPage() {
         <div className={styles.prose}>
           <p>
             Le compte joueur ne demande aucun nom réel, aucun numéro de téléphone, aucune
-            adresse postale : il repose sur des pseudonymes de jeu. Deux exceptions, hors du
-            compte : un signalement de droit d&apos;auteur indique le nom de son auteur, et les
-            membres du bureau et les bénévoles présentés sur le site y figurent sous leur nom,
-            avec leur accord (registre, T07 et T11).
+            adresse postale : il repose sur des pseudonymes de jeu. Trois exceptions, hors du
+            compte : un signalement de droit d&apos;auteur indique le nom de son auteur ; une
+            demande relative à vos données envoyée par courriel ou par téléphone porte
+            l&apos;adresse ou le numéro de son expéditeur, et souvent son nom ; et les membres
+            du bureau et les bénévoles présentés sur le site y figurent sous leur nom, avec leur
+            accord (registre, T07 et T11).
             Google transmet le nom de votre compte avec votre photo : depuis le 30 septembre
             2026, il n&apos;est ni repris ni conservé, un compte créé par Google reçoit un
             pseudo neutre que vous remplacez dans Mon profil, et la photo copiée depuis
