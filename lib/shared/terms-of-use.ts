@@ -37,6 +37,13 @@ export const TERMS_VERSION = 1;
  */
 export const SITE_MINIMUM_AGE = 15;
 
+/**
+ * Déclaration d'âge jointe à la case d'acceptation de la page de connexion,
+ * seul écran où naît un compte : la clause d'âge des conditions doit se lire
+ * au moment où on la déclare, pas seulement dans le texte lié.
+ */
+export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
+
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
 export const TERMS_UPDATED_AT = "2026-09-24";
 
@@ -149,7 +156,7 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       "Les utilisateurs publient eux-mêmes certains contenus : **avatar, logo d'équipe, nom et sigle d'équipe, description, pseudos de jeu**. Celui qui publie un contenu en est **seul responsable**.",
       "En publiant un contenu, l'utilisateur **garantit qu'il en détient les droits** (création personnelle, licence libre, autorisation écrite du titulaire) et qu'il ne porte atteinte ni au droit d'auteur, ni au droit des marques, ni aux droits d'un tiers. Un logo de club professionnel, d'éditeur de jeu ou de marque ne peut pas être repris sans l'accord de son titulaire.",
       "Il accorde à l'association, à titre **gratuit et non exclusif**, le droit de **reproduire et de représenter** ce contenu, et d'en adapter le format (redimensionnement, recadrage, conversion d'image) sans en altérer le sens, **sur le site et dans ses communications liées aux tournois** (diffusions en direct et rediffusions, annonces, réseaux sociaux), **pour le monde entier** — le site et ces communications étant accessibles en ligne —, et **pour la durée de sa publication sur le site** — ainsi que, pour les diffusions, rediffusions et publications faites pendant cette durée, pour la durée de leur mise en ligne.",
-      "Il peut retirer ce contenu à tout moment. Le retrait vaut pour l'avenir : le contenu cesse d'être affiché sur le site et d'être repris dans de nouvelles communications, mais les diffusions, rediffusions et publications **déjà faites** avant le retrait ne sont pas concernées.",
+      "Il peut retirer ce contenu à tout moment. Le retrait vaut pour l'avenir : le contenu cesse d'être affiché sur le site et d'être repris dans de nouvelles communications, mais les diffusions, rediffusions et publications **déjà faites** avant le retrait ne sont pas concernées. Pour un avatar ou un pseudo, qui sont des données personnelles, ce paragraphe ne limite pas les droits décrits dans la politique de confidentialité (retrait du consentement, effacement).",
       "Pour une équipe, le **propriétaire** répond du nom, du sigle et de la description de l'équipe, qu'il est seul à pouvoir modifier ; le propriétaire et les **gérants** répondent de son logo, qu'ils peuvent l'un et l'autre changer.",
     ],
   },

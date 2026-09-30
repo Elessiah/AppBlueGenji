@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { CyberButton } from "@/components/cyber/CyberButton";
-import { TERMS_CHECKBOX_LABEL, TERMS_PATH } from "@/lib/shared/terms-of-use";
+import { TERMS_AGE_DECLARATION, TERMS_CHECKBOX_LABEL, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 
 interface RgpdConsentModalProps {
@@ -165,7 +165,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
             >
               lire les conditions
             </Link>
-            ).
+            ), et {TERMS_AGE_DECLARATION}.
           </span>
         </label>
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SITE_MINIMUM_AGE, TERMS_PATH, TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
+import { SITE_MINIMUM_AGE, TERMS_AGE_DECLARATION, TERMS_PATH, TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
 import { ORGANIZATION_FOUNDING_YEAR, organizationJsonLd } from "@/lib/shared/structured-data";
 
 const ROOT = join(__dirname, "..", "..", "..");
@@ -38,6 +38,12 @@ describe("conditions d'utilisation — âge minimum", () => {
     expect(rest).not.toMatch(/\bmembres?\b/i);
   });
 
+  it("se déclare sur la case de la page de connexion, là où naît un compte", () => {
+    expect(TERMS_AGE_DECLARATION).toBe("je déclare avoir au moins 15 ans");
+    const modal = read("components/cyber/RgpdConsentModal.tsx");
+    expect(modal).toContain("), et {TERMS_AGE_DECLARATION}.");
+  });
+
   it("est repris par la politique de confidentialité, avec un lien vers la clause", () => {
     const rgpd = read("app/rgpd/page.tsx");
     expect(rgpd).toContain('id="age-minimum"');
@@ -61,6 +67,8 @@ describe("conditions d'utilisation — licence sur les contenus", () => {
   it("dit que le retrait ne vaut que pour l'avenir", () => {
     expect(contenus).toContain("Le retrait vaut pour l'avenir");
     expect(contenus).toContain("faites pendant cette durée, pour la durée de leur mise en ligne");
+    // Une licence d'auteur ne prime pas les droits sur les données personnelles.
+    expect(contenus).toContain("ce paragraphe ne limite pas les droits décrits dans la politique de confidentialité");
     expect(contenus).toContain("**déjà faites** avant le retrait ne sont pas concernées");
   });
 
