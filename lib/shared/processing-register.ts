@@ -581,7 +581,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
-      `Demande reçue par courriel ou par téléphone : même règle qu'une demande RGPD faite depuis le formulaire — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la clôture de la demande (l'équivalent de l'archivage d'un signalement), avant suppression de la messagerie de la personne à contacter`,
+      `Demande reçue par courriel ou par téléphone : même règle qu'une demande RGPD faite depuis le formulaire — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la clôture de la demande (l'équivalent de l'archivage d'un signalement), avant suppression de la messagerie de la personne à contacter (courriel) ou de son téléphone (message, messagerie vocale, journal d'appels)`,
       `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
     ],
     recipients: [

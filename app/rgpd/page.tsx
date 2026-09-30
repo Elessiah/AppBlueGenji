@@ -567,9 +567,9 @@ export default async function RgpdPage() {
           </p>
           <p>
             <strong>Votre droit d&apos;opposition.</strong> Le droit de vous opposer à cette
-            mesure (art. 21 du RGPD) s&apos;exerce, comme vos autres droits, par le formulaire
-            « {REPORT_FORM_NAME} », catégorie RGPD, ou par le courriel de l&apos;association
-            (section&nbsp;01). Le site ne sait pas encore
+            mesure (art. 21 du RGPD) s&apos;exerce comme vos autres droits, par les moyens
+            indiqués à la section{" "}
+            <a href="#exercer-vos-droits">« Exercer vos droits »</a>. Le site ne sait pas encore
             l&apos;appliquer de lui-même : aucun réglage ne permet de désactiver la mesure, ni
             d&apos;en exclure vos visites à venir.
           </p>
