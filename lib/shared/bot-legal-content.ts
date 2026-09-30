@@ -119,7 +119,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, rappels de match, alertes d'arbitrage et informations sur les données. Il est gratuit.",
+            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, rappels de match, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
           },
         ],
       },
@@ -243,7 +243,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
           },
           {
             kind: "p",
-            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match reminders, referee alerts and data-protection notices. It is free of charge.",
+            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match reminders, referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
           },
         ],
       },
@@ -415,7 +415,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages du site BlueGenji" },
           {
             kind: "p",
-            text: `Le site transmet au Bot un identifiant ou un pseudo Discord et le message à remettre (code de connexion, rappel de match, alerte d'arbitrage, signalement, information sur les données) ; le Bot remet les messages personnels (code, rappel, information) en message privé **sans les enregistrer**. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
+            text: `Le site transmet au Bot un identifiant ou un pseudo Discord et le message à remettre (code de connexion, rappel de match, alerte d'arbitrage, signalement ; avis de modération — signalement vous désignant, logo d'équipe masqué, retiré ou supprimé — ; demande d'adhésion à une équipe que vous gérez ; information sur les données) ; le Bot remet les messages personnels (code, rappel, avis de modération, demande d'adhésion, information) en message privé **sans les enregistrer**. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
           },
           { kind: "subhead", text: "Journaux" },
           {
@@ -620,7 +620,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages from the BlueGenji website" },
           {
             kind: "p",
-            text: `The website sends the Bot a Discord ID or username and the message to deliver (login code, match reminder, referee alert, report, data-protection notice); the Bot delivers personal messages (code, reminder, notice) by direct message **without storing them**. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}) (in French).`,
+            text: `The website sends the Bot a Discord ID or username and the message to deliver (login code, match reminder, referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, reminder, moderation notice, join request, data-protection notice) by direct message **without storing them**. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}) (in French).`,
           },
           { kind: "subhead", text: "Logs" },
           {
