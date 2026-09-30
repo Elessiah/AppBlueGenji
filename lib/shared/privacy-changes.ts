@@ -468,8 +468,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // destinataire : un courriel arrive dans une messagerie hébergée par
   // Microsoft (registre, T11) — c'est une information due à chaque compte. Entrée à part plutôt que
   // quatrième point de `2026-10-rectificatifs-information`, qui annonce des
-  // corrections d'annonces passées : même date, donc même modale et même
-  // message privé.
+  // corrections d'annonces passées : même date, donc même modale. Le message
+  // privé, lui, peut la reporter au suivant si les entrées du jour dépassent
+  // ensemble `PRIVACY_DM_MAX_LENGTH` (`privacyChangesForOneMessage`) — c'est
+  // la règle commune de la file, pas une exception à celle-ci.
   {
     id: "2026-10-contact-donnees",
     publishedAt: "2026-10-01",

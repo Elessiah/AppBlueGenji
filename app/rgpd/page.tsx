@@ -780,8 +780,8 @@ export default async function RgpdPage() {
             <li>
               <strong>Microsoft</strong> (Outlook.com) : la messagerie personnelle de la personne à
               contacter pour vos demandes relatives à vos données est hébergée par Microsoft sur un
-              compte personnel, sans contrat de sous-traitance. Un courriel que vous lui envoyez, et
-              la réponse qu&apos;elle vous adresse par courriel, y passent sans chiffrement propre
+              compte personnel, sans contrat de sous-traitance. Un courriel que vous envoyez à{" "}
+              {DATA_CONTACT_NAME}, et la réponse qu&apos;il vous adresse par courriel, y passent sans chiffrement propre
               à l&apos;association (durée : section{" "}
               <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
             </li>
