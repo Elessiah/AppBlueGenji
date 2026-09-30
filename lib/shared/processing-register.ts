@@ -296,7 +296,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait)",
     subPurposes: [
       "Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé (dès la phase d'inscription)",
-      "Ouvrir aux arbitres le BattleTag masqué d'un joueur inscrit à un tournoi qui n'est pas terminé",
+      "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
       "Envoyer des rappels de match en message privé Discord (une semaine, 24 h et 1 h avant)",

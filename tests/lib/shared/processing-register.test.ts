@@ -100,7 +100,7 @@ describe("PROCESSING_ACTIVITIES", () => {
     const subPurposes = byRef("T04").subPurposes.join(" ");
     expect(subPurposes).not.toMatch(/tournoi en cours/);
     expect(subPurposes).toMatch(/aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé/);
-    expect(subPurposes).toMatch(/BattleTag masqué/);
+    expect(subPurposes).toMatch(/aux administrateurs et aux arbitres le BattleTag masqué/);
   });
 
   it("déclare les transferts vers Discord partout où Discord achemine des messages", () => {
