@@ -6,7 +6,7 @@ import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { AUTHORITY_CONTACT_LANGUAGES, LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import { AUTHORITY_CONTACT_LANGUAGES, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
@@ -156,6 +156,10 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         </p>
         <p>
           <strong>Siège social :</strong> 4 impasse des Cyprès, 51210 Janvilliers, France.
+        </p>
+        <p>
+          <strong>Immatriculation :</strong> l&apos;association ne dispose ni d&apos;un numéro RNA ni
+          d&apos;un numéro SIREN.
         </p>
         <p>
           <strong>Objet :</strong> organisation d&apos;événements et de tournois esport en ligne et
@@ -339,8 +343,9 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           de limitation et de portabilité des données vous concernant, ainsi que d&apos;un droit
           d&apos;opposition au traitement, et vous pouvez définir des directives relatives à leur
           sort après votre décès (art. 85 de la loi Informatique et Libertés). Ces droits peuvent être exercés par le bouton « {REPORT_FORM_NAME} » en bas de
-          chaque page, catégorie « RGPD », au courriel de l&apos;association donné plus haut, ou sur
-          Discord auprès de <strong>{LEGAL_CONTACT_DISCORD}</strong>, hébergeur technique. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
+          chaque page, catégorie « RGPD », ou au courriel de l&apos;association donné plus haut :
+          c&apos;est l&apos;association elle-même qui les traite, aucun délégué à la protection des
+          données ni référent n&apos;ayant été désigné. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
           <Link href="/rgpd">politique de confidentialité</Link>.
         </p>
       </>

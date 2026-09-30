@@ -14,6 +14,8 @@ import {
   TERMS_PATH,
   TERMS_REQUIRED_EVENT,
   TERMS_VERSION,
+  formatTermsDate,
+  type TermsRequest,
 } from "@/lib/shared/terms-of-use";
 import {
   TERMS_POSTPONED_COOKIE,
@@ -42,6 +44,14 @@ function writePostponedCookie(postponed: boolean): void {
 interface TermsAcceptanceModalProps {
   /** Le compte gère une équipe sans avoir accepté les conditions en vigueur. */
   initiallyRequired: boolean;
+  /**
+   * Pourquoi la mise en page racine demande l'acceptation : `UPDATED` quand le
+   * compte avait accepté une version antérieure — « tu gères désormais une
+   * équipe » serait faux pour un gérant de longue date. `null` (rien de dû au
+   * chargement, fenêtre rouverte par un geste refusé) : texte d'une première
+   * acceptation.
+   */
+  request?: TermsRequest | null;
   /** Une modale de confidentialité attend une réponse : celle-ci passe après. */
   privacyPending: boolean;
 }
@@ -61,7 +71,8 @@ interface TermsAcceptanceModalProps {
  * Elle se tait sur la page des conditions elle-même, qu'elle invite à lire, et
  * sur la connexion, dont la modale de consentement doit rester seule.
  */
-export function TermsAcceptanceModal({ initiallyRequired, privacyPending }: TermsAcceptanceModalProps) {
+export function TermsAcceptanceModal({ initiallyRequired, request = null, privacyPending }: TermsAcceptanceModalProps) {
+  const updated = request === "UPDATED";
   const { showError, showSuccess } = useToast();
   const titleId = useId();
   const pathname = usePathname();
@@ -129,13 +140,21 @@ export function TermsAcceptanceModal({ initiallyRequired, privacyPending }: Term
       >
         <span className="eyebrow">CONDITIONS D&apos;UTILISATION</span>
         <h2 id={titleId} className={styles.title}>
-          Tu gères désormais une équipe
+          {updated ? "Les conditions d'utilisation ont changé" : "Tu gères désormais une équipe"}
         </h2>
         <ScrollArea orientation="y" className={styles.body} ariaLabel="Présentation des conditions">
-          <p className={styles.text}>
-            Tu es propriétaire ou gérant d&apos;une équipe. Avant de la gérer — logo, membres, invitations —,
-            accepte les conditions d&apos;utilisation du site.
-          </p>
+          {updated ? (
+            <p className={styles.text}>
+              Tu es propriétaire ou gérant d&apos;une équipe. Les conditions d&apos;utilisation du site ont été
+              mises à jour (version {TERMS_VERSION}, en vigueur depuis le {formatTermsDate()}) : accepte-les
+              pour continuer à gérer ton équipe — logo, membres, invitations.
+            </p>
+          ) : (
+            <p className={styles.text}>
+              Tu es propriétaire ou gérant d&apos;une équipe. Avant de la gérer — logo, membres, invitations —,
+              accepte les conditions d&apos;utilisation du site.
+            </p>
+          )}
           <p className={styles.text}>
             Elles rappellent notamment que <strong>tu garantis détenir les droits</strong> sur le logo et les
             contenus que tu publies pour ton équipe : un logo de club, de marque ou d&apos;éditeur de jeu ne se

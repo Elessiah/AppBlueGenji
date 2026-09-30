@@ -14,7 +14,6 @@ import {
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
-  LEGAL_CONTACT_DISCORD,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
 import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
@@ -326,8 +325,9 @@ export default async function RgpdPage() {
               reconnaître.
             </li>
             <li>
-              <strong>Durée :</strong> aucune durée ni aucun critère de fin n&apos;est encore fixé
-              pour ces résultats, conservés à ce jour sans limite de temps.
+              <strong>Durée :</strong> aucune durée de conservation n&apos;est définie pour ces
+              résultats : ils restent tant que le site existe. À la suppression d&apos;un compte,
+              ils sont anonymisés — le pseudo d&apos;emprunt décrit ci-dessus remplace le vôtre.
             </li>
             <li>
               <strong>Information préalable :</strong> la présente politique informe les
@@ -552,8 +552,8 @@ export default async function RgpdPage() {
           <p>
             <strong>Votre droit d&apos;opposition.</strong> Le droit de vous opposer à cette
             mesure (art. 21 du RGPD) s&apos;exerce, comme vos autres droits, par le formulaire
-            « {REPORT_FORM_NAME} », catégorie RGPD, ou auprès de{" "}
-            <strong>{LEGAL_CONTACT_DISCORD}</strong> sur Discord. Le site ne sait pas encore
+            « {REPORT_FORM_NAME} », catégorie RGPD, ou par le courriel de l&apos;association
+            (section&nbsp;01). Le site ne sait pas encore
             l&apos;appliquer de lui-même : aucun réglage ne permet de désactiver la mesure, ni
             d&apos;en exclure vos visites à venir.
           </p>
@@ -839,9 +839,12 @@ export default async function RgpdPage() {
             Pour exercer l'un de vos droits ou poser une question relative au
             traitement de vos données, contactez l&apos;association par le
             formulaire « {REPORT_FORM_NAME} », présent en bas de chaque page,
-            catégorie <strong>RGPD</strong> — ou par son courriel (section&nbsp;01),
-            ou sur Discord. Nous répondons dans un
-            délai maximum d'<strong>un mois</strong> (art. 12 RGPD).
+            catégorie <strong>RGPD</strong> — ou par son courriel (section&nbsp;01). Nous
+            répondons dans un délai maximum d'<strong>un mois</strong> (art. 12 RGPD).
+          </p>
+          <p>
+            L&apos;association n&apos;a désigné ni délégué à la protection des données ni
+            référent : c&apos;est elle qui reçoit et traite vos demandes.
           </p>
         </div>
         <div className={styles.contactBlock} style={{ marginTop: 24 }}>
@@ -850,9 +853,6 @@ export default async function RgpdPage() {
           <span className={styles.contactSub}>
             Ou par courriel :{" "}
             <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
-          </span>
-          <span className={styles.contactSub}>
-            Ou sur Discord : {LEGAL_CONTACT_DISCORD} (hébergeur technique du site)
           </span>
           <div style={{ marginTop: 12 }}>
             <ReportProblemButton

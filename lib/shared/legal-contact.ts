@@ -12,7 +12,10 @@
  * - le formulaire **« Signaler un problème »** (pied de page de toutes les
  *   pages), dont les catégories « RGPD » et « Hébergeur » trient les demandes
  *   (`lib/shared/content-reports.ts`) ;
- * - le **tag Discord** de l'hébergeur technique du site, qu'on ajoute en ami.
+ * - le **tag Discord** de l'hébergeur technique du site, qu'on ajoute en ami,
+ *   pour les questions techniques — **jamais** comme contact RGPD : aucun
+ *   délégué ni référent n'est désigné, les demandes d'exercice des droits vont
+ *   à l'association (courriel, formulaire catégorie « RGPD »).
  *
  * Un test balaie les sources et refuse tout courriel ou numéro en clair.
  */
@@ -25,8 +28,9 @@ export const ASSOCIATION_SEAT = "4 impasse des Cyprès, 51210 Janvilliers, Franc
 
 /**
  * Tag Discord de l'hébergeur technique du site, joignable pour les questions
- * techniques et de données. Il n'est **pas** le responsable du traitement —
- * c'est l'association — ni le directeur de la publication — c'est son président.
+ * techniques. Il n'est **pas** le responsable du traitement — c'est
+ * l'association —, ni le directeur de la publication — c'est son président —,
+ * ni un contact RGPD : l'association n'a désigné ni délégué ni référent.
  */
 export const LEGAL_CONTACT_DISCORD = "elessiah";
 
@@ -38,7 +42,7 @@ export const REPORT_FORM_NAME = "Signaler un problème";
  * CSV — qui ne savent pas révéler une adresse au clic : ils renvoient donc aux
  * pages qui le font plutôt que de l'écrire.
  */
-export const RGPD_CONTACT_LINE = `Courriel et téléphone de l'association (mentions légales du site) — formulaire « ${REPORT_FORM_NAME} » du site (pied de page), catégorie « RGPD » — ou Discord : ${LEGAL_CONTACT_DISCORD} (hébergeur technique)`;
+export const RGPD_CONTACT_LINE = `L'association : courriel et téléphone (mentions légales du site), ou formulaire « ${REPORT_FORM_NAME} » du site (pied de page), catégorie « RGPD »`;
 
 /**
  * Langues dans lesquelles l'association reçoit les demandes des autorités à

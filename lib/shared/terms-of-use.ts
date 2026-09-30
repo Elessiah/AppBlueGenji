@@ -25,8 +25,14 @@
 import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 
-/** Version en vigueur. L'avancer redemande l'acceptation. */
-export const TERMS_VERSION = 1;
+/**
+ * Version en vigueur. L'avancer redemande l'acceptation.
+ *
+ * Version 2 : âge minimum, licence du code, responsabilité des gérants
+ * d'équipe et juridiction — changements de fond, d'où une nouvelle acceptation
+ * (`termsRequestFor` rend alors `UPDATED` à qui avait accepté la version 1).
+ */
+export const TERMS_VERSION = 2;
 
 /**
  * Âge minimum pour créer un compte. Distinct de l'âge d'adhésion à
@@ -45,7 +51,7 @@ export const SITE_MINIMUM_AGE = 15;
 export const TERMS_AGE_DECLARATION = `je déclare avoir au moins ${SITE_MINIMUM_AGE} ans`;
 
 /** Date d'entrée en vigueur de la version courante (AAAA-MM-JJ). */
-export const TERMS_UPDATED_AT = "2026-09-24";
+export const TERMS_UPDATED_AT = "2026-10-01";
 
 /** Adresse de la page publique des conditions. */
 export const TERMS_PATH = "/conditions-utilisation";
@@ -73,6 +79,21 @@ export function isTermsAcceptanceContext(value: unknown): value is TermsAcceptan
  */
 export function coversCurrentTerms(acceptedVersion: number | null | undefined): boolean {
   return typeof acceptedVersion === "number" && acceptedVersion >= TERMS_VERSION;
+}
+
+/**
+ * Pourquoi les conditions sont présentées : jamais acceptées (`FIRST`), ou
+ * acceptées dans une version antérieure à celle en vigueur (`UPDATED`).
+ */
+export type TermsRequest = "FIRST" | "UPDATED";
+
+/**
+ * Ce qu'il faut demander à un compte, d'après la dernière version acceptée —
+ * `null` si elle couvre la version courante (`coversCurrentTerms`).
+ */
+export function termsRequestFor(acceptedVersion: number | null | undefined): TermsRequest | null {
+  if (coversCurrentTerms(acceptedVersion)) return null;
+  return typeof acceptedVersion === "number" && acceptedVersion > 0 ? "UPDATED" : "FIRST";
 }
 
 /**

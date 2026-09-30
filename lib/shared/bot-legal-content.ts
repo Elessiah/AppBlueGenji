@@ -81,6 +81,11 @@ const CONTACT_ITEMS_EN = [
   `**Discord**: ${CONTACT_DISCORD} (the association's technical host)`,
   `The association's email address and phone number: see the [legal notice](${LEGAL_NOTICE_HREF})`,
 ];
+// Contact de la politique de confidentialité : l'exercice des droits va à
+// l'association, qui n'a désigné ni délégué ni référent — l'hébergeur
+// technique n'y figure pas (`lib/shared/legal-contact.ts`).
+const PRIVACY_CONTACT_ITEMS_FR = CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**"));
+const PRIVACY_CONTACT_ITEMS_EN = CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**"));
 
 const HOSTING_FR = {
   meta: "HÉBERGEUR",
@@ -370,7 +375,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle n'a pas désigné de délégué à la protection des données (désignation non obligatoire). Les moyens de la joindre figurent à la section Contact.`,
+            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle n'a désigné ni délégué à la protection des données ni référent. Les moyens de la joindre figurent à la section Contact.`,
           },
           {
             kind: "p",
@@ -554,7 +559,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "p",
             text: "Pour toute question sur vos données ou pour exercer vos droits :",
           },
-          { kind: "bullets", items: CONTACT_ITEMS_FR },
+          { kind: "bullets", items: PRIVACY_CONTACT_ITEMS_FR },
         ],
       },
     ],
@@ -575,7 +580,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `The data controller is the association **${ASSOCIATION_NAME}**, a French non-profit association under the law of 1901 whose registered office is at ${ASSOCIATION_SEAT}. It has not appointed a data protection officer (appointment not mandatory). The means of contacting it are listed in the Contact section.`,
+            text: `The data controller is the association **${ASSOCIATION_NAME}**, a French non-profit association under the law of 1901 whose registered office is at ${ASSOCIATION_SEAT}. It has appointed neither a data protection officer nor a privacy contact person. The means of contacting it are listed in the Contact section.`,
           },
           {
             kind: "p",
@@ -755,7 +760,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "p",
             text: "For any question about your data or to exercise your rights:",
           },
-          { kind: "bullets", items: CONTACT_ITEMS_EN },
+          { kind: "bullets", items: PRIVACY_CONTACT_ITEMS_EN },
         ],
       },
     ],

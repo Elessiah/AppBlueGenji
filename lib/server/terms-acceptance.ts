@@ -16,7 +16,9 @@ import {
   TERMS_ACCEPTANCE_REQUIRED,
   TERMS_VERSION,
   coversCurrentTerms,
+  termsRequestFor,
   type TermsAcceptanceContext,
+  type TermsRequest,
 } from "@/lib/shared/terms-of-use";
 
 type Executor = Pick<Pool | PoolConnection, "execute">;
@@ -100,8 +102,12 @@ export async function assertTermsAccepted(userId: number, executor?: Executor): 
  * modale au plus une demi-minute plus tard, ce qui ne change rien à la règle
  * (les gestes de gestion sont refusés côté serveur dans l'intervalle).
  * L'acceptation vide la réponse gardée.
+ *
+ * @returns `null` si rien n'est à demander, sinon pourquoi on le demande
+ *   (`FIRST` : jamais acceptées ; `UPDATED` : une version antérieure l'a été) —
+ *   la modale ne dit pas la même chose à l'un et à l'autre.
  */
-export async function needsTermsForTeamManagement(userId: number): Promise<boolean> {
+export async function needsTermsForTeamManagement(userId: number): Promise<TermsRequest | null> {
   return cached(termsNeedKey(userId), TERMS_NEED_TTL_MS, async () => {
     const db = await getDatabase();
     const [rows] = await db.execute<
@@ -114,13 +120,16 @@ export async function needsTermsForTeamManagement(userId: number): Promise<boole
        WHERE u.id = ? AND u.is_deleted = 0`,
       [userId],
     );
-    if (rows.length === 0) return false;
+    if (rows.length === 0) return null;
     const version = rows[0].terms_version === null ? null : Number(rows[0].terms_version);
-    if (coversCurrentTerms(version)) return false;
+    const request = termsRequestFor(version);
+    if (request === null) return null;
     // Les rôles sont jugés par `hasTeamManagementRole`, l'unique implémentation
     // de « qui gère une équipe » : réécrite en SQL, la règle aurait une seconde
     // version.
-    return rows.some((row) => row.team_id !== null && hasTeamManagementRole(parseRoles(row.roles_json)));
+    return rows.some((row) => row.team_id !== null && hasTeamManagementRole(parseRoles(row.roles_json)))
+      ? request
+      : null;
   });
 }
 

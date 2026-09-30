@@ -179,7 +179,7 @@ export function registerController(): RegisterController {
     legalForm: "Association loi 1901",
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE,
-    dpo: "Aucun délégué à la protection des données désigné (désignation non obligatoire) — contact RGPD ci-dessus",
+    dpo: "Aucun délégué à la protection des données ni référent désigné : l'association traite elle-même les demandes (contact ci-dessus)",
     host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
@@ -298,7 +298,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Résultats et palmarès : sans limite de durée (mémoire sportive) ; un compte supprimé y apparaît sous un pseudo d'emprunt",
+      "Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)",
       "Droit d'opposition ouvert sur demande",
     ],
     recipients: [
