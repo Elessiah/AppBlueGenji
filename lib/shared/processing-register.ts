@@ -731,7 +731,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiant interne du compte",
       "Adresse IP de connexion, telle que la retient le serveur mandataire du site",
       "Date et heure de la connexion, moyen de connexion (Google, Discord, Blizzard ou code en message privé)",
-      "Ni port source de la connexion, ni journal de la création ou de la modification des contenus (seules les ouvertures de session sont consignées), ni informations fournies à la création du compte : celles-ci partent avec le compte (hors les copies de sauvegarde chiffrées, T09)",
+      "Ni port source de la connexion, ni journal de la création ou de la modification des contenus (seules les ouvertures de session sont consignées), ni informations fournies à la création du compte : celles-ci partent avec le compte (hors les copies de sauvegarde chiffrées et le journal des suppressions, T09)",
     ],
     sensitiveData: "Aucune",
     retention: [

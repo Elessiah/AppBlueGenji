@@ -260,14 +260,16 @@ tient peut-être pas.
 
 **Action requise en production** (non vérifiée depuis ce dépôt) :
 
-1. Vérifier la rotation de `/etc/logrotate.d/nginx`. Le défaut du paquet Debian
-   convient tel quel — quotidienne, quatorze fichiers, puis suppression :
+1. Régler la rotation de `/etc/logrotate.d/nginx`. Le défaut du paquet Debian
+   (`daily`, `rotate 14`) garde le journal courant **plus** quatorze archives,
+   donc jusqu'à quinze jours de requêtes : pour tenir les 14 jours annoncés,
+   passer à `rotate 13` — quotidienne, treize archives, puis suppression :
 
    ```
    /var/log/nginx/*.log {
        daily
        missingok
-       rotate 14
+       rotate 13
        compress
        delaycompress
        notifempty
@@ -279,8 +281,9 @@ tient peut-être pas.
    }
    ```
 
-   `rotate` ne doit **pas** dépasser 14 (et la fréquence rester `daily`) : une
-   valeur plus haute, ou `weekly`, garderait des mois de journaux. Si le site
+   `rotate` ne doit **pas** dépasser 13 (et la fréquence rester `daily`) : une
+   valeur plus haute dépasserait la durée annoncée, `weekly` garderait des mois
+   de journaux. Si le site
    écrit ses journaux ailleurs que dans `/var/log/nginx/` (directive
    `access_log` propre à son bloc `server`), ce chemin doit être couvert par la
    même règle.
@@ -289,7 +292,7 @@ tient peut-être pas.
    l'association, journal `bg_connection_logs` compris), et le journal n'a pas
    à en savoir plus que le format par défaut.
 3. Contrôler après la première nuit : `ls -l /var/log/nginx/` ne doit montrer
-   que quatorze fichiers au plus par journal.
+   que quatorze fichiers au plus par journal (le courant et treize archives).
 
 Si la durée change, `WEB_ACCESS_LOG_RETENTION_DAYS` change avec elle, et le
 registre avance (`REGISTER_UPDATED_AT`).

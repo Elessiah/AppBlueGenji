@@ -28,7 +28,10 @@ import {
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
-import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import {
+  ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+  BACKUP_RETENTION_DAYS,
+} from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
   ALL_TRANSFER_RECIPIENTS,
@@ -315,7 +318,9 @@ export default async function RgpdPage() {
           du compte (pseudo, identifiants de fournisseur) partent avec lui ; hors ce journal, seules
           les statistiques de tournoi anonymisées survivent à la suppression — sous réserve des
           copies de sauvegarde chiffrées (**), qui s&apos;effacent d&apos;elles-mêmes au bout de{" "}
-          {BACKUP_RETENTION_DAYS} jours. Le serveur web
+          {BACKUP_RETENTION_DAYS} jours, et de la mention de la suppression au journal qui la rejoue
+          après une restauration (numéro et date de création du compte,{" "}
+          {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête (adresse IP, date, page demandée, navigateur), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
           T17</Link>).
