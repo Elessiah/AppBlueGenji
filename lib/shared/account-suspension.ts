@@ -303,8 +303,29 @@ export function toSuspensionNotice(suspension: Pick<AccountSuspensionView, "id" 
   };
 }
 
+/**
+ * Encode l'exposé pour le cookie, en **base64url** des octets UTF-8 du JSON.
+ *
+ * Pas en `encodeURIComponent` : Next réencode la valeur d'un cookie, si bien
+ * qu'un octet non ASCII prenait neuf caractères, et un motif de 500 caractères
+ * accentués ou cyrilliques dépassait les 4 096 octets qu'un navigateur accepte —
+ * le cookie était ignoré sans bruit, et le compte sans Discord, pour qui ce
+ * canal existe, ne lisait que la phrase générique. En base64url, qu'aucun
+ * encodage ne touche plus, 500 unités UTF-16 font au plus 1 500 octets, soit
+ * 2 000 caractères.
+ */
 export function encodeSuspensionNotice(notice: SuspensionNotice): string {
-  return encodeURIComponent(JSON.stringify(notice));
+  const bytes = new TextEncoder().encode(JSON.stringify(notice));
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function decodeBase64Url(value: string): string {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const binary = atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
+  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
 /**
@@ -318,7 +339,7 @@ export function parseSuspensionNotice(value: unknown): SuspensionNotice | null {
   let raw: unknown = value;
   if (typeof value === "string") {
     try {
-      raw = JSON.parse(decodeURIComponent(value));
+      raw = JSON.parse(decodeBase64Url(value));
     } catch {
       return null;
     }

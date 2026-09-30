@@ -207,6 +207,7 @@ describe("exposé à la connexion refusée", () => {
   it.each<[string, unknown]>([
     ["absent", undefined],
     ["illisible", "%E0%A4%A"],
+    ["en base64 d'octets invalides", "_w"],
     ["pas du JSON", "abc"],
     ["référence fausse", { ...notice, reference: "42" }],
     ["motif trop long", { ...notice, reason: "x".repeat(SUSPENSION_REASON_MAX_LENGTH + 1) }],
@@ -215,6 +216,18 @@ describe("exposé à la connexion refusée", () => {
     ["échéance d'un autre type", { ...notice, endsAt: 12 }],
   ])("rejette un exposé %s", (_label, value) => {
     expect(parseSuspensionNotice(value)).toBeNull();
+  });
+
+  it("tient sous la limite d'un cookie au motif le plus lourd, même réencodé", () => {
+    for (const char of ["é", "Ж", "’", "😀"]) {
+      const reason = char.repeat(Math.floor(SUSPENSION_REASON_MAX_LENGTH / char.length));
+      const heavy = toSuspensionNotice({ id: 999999, reason, ground: "CONTENT", endsAt: "2026-10-14T22:00:00.000Z" });
+      const encoded = encodeSuspensionNotice(heavy);
+      // base64url : un réencodage d'URL ne le change pas.
+      expect(encodeURIComponent(encoded)).toBe(encoded);
+      expect(`bg_suspension_notice=${encoded}; Path=/connexion; Max-Age=600; HttpOnly; SameSite=lax; Secure`.length).toBeLessThan(4096);
+      expect(parseSuspensionNotice(encoded)).toEqual(heavy);
+    }
   });
 
   it("garde une échéance nulle (durée indéterminée)", () => {
