@@ -68,7 +68,7 @@ describe("conditions d'utilisation — licence sur les contenus", () => {
 
   it("dit que le retrait ne vaut que pour l'avenir", () => {
     expect(contenus).toContain("Le retrait vaut pour l'avenir");
-    // Nom d'équipe obligatoire et BattleTag verrouillé : le retrait passe par ce que le site offre.
+    // Nom d'équipe obligatoire : le retrait passe par ce que le site offre.
     expect(contenus).toContain("par les moyens que le site lui offre");
     expect(contenus).toContain("faites pendant cette durée, pour la durée de leur mise en ligne");
     // Avatar et pseudos sont des données personnelles à finalité étroite : hors licence.
