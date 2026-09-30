@@ -219,7 +219,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
   {
     id: "propriete-intellectuelle",
     title: "Propriété intellectuelle",
-    meta: `CODE SOUS ${CODE_LICENSE_SPDX}`,
+    meta: `CODE SOUS ${CODE_LICENSE_SPDX.toUpperCase()}`,
     body: (
       <>
         <p>
