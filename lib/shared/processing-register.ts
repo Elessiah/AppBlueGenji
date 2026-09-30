@@ -59,12 +59,12 @@ export const DISCORD_CODE_VALIDITY_MINUTES = 10;
  * fausse.
  *
  * - `BOT_RELAY_RETENTION_DAYS` : `MESSAGE_RETENTION_DAYS` de
- *   `blueGenjiBot/src/messages/manageMsgExpiration.ts` — les traces d'une
+ *   `blueGenjiBot/src/privacy/retentionPeriods.ts` — les traces d'une
  *   annonce relayée sont effacées au **relais suivant** cette échéance, et au
  *   plus tard par le ménage de la nuit ou du redémarrage
  *   (`blueGenjiBot/src/privacy/dataRetention.ts`).
  * - `BOT_ACTIVITY_AUTHOR_RETENTION_DAYS` : `ACTIVITY_AUTHOR_RETENTION_DAYS` de
- *   `blueGenjiBot/src/privacy/dataRetention.ts` — au-delà, l'auteur d'un
+ *   `blueGenjiBot/src/privacy/retentionPeriods.ts` — au-delà, l'auteur d'un
  *   `/scrim` ou d'un `/recrute` est effacé, la ligne restant pour les compteurs.
  */
 export const BOT_RELAY_RETENTION_DAYS = 7;
