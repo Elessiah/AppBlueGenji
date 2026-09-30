@@ -25,6 +25,7 @@ import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
+  SITE_VISITOR_RETENTION_MONTHS,
 } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
@@ -383,8 +384,10 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ref: "T06",
     name: "Mesure d'audience du site",
     purpose: "Connaître la fréquentation du site",
-    subPurposes: ["Compter visites et visiteurs uniques (24 h, 7 jours, 30 jours, total)"],
-    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie ni traceur tiers ; droit d'opposition (art. 21) exercé par le formulaire de signalement, catégorie RGPD, ou auprès du contact Discord",
+    subPurposes: [
+      `Compter visites (24 h, 7 jours, 30 jours, total) et visiteurs uniques (24 h, 7 jours, 30 jours, ${SITE_VISITOR_RETENTION_MONTHS} mois)`,
+    ],
+    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie de mesure ni traceur tiers ; droit d'opposition (art. 21) appliqué par le site lui-même — signaux Global Privacy Control et Do Not Track du navigateur, ou bouton d'opposition de /rgpd#audience (cookie bg_audience_optout, sans identifiant) : une visite refusée n'est ni transmise ni enregistrée, le serveur relisant ces signaux. Pour les visites déjà enregistrées, le droit s'exerce par le formulaire de signalement, catégorie RGPD, ou auprès du contact Discord",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
       "Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : donnée pseudonymisée — sans le secret, elle ne se rattache à personne, mais l'association, qui le détient, peut recalculer l'empreinte d'un compte ou d'un couple IP et navigateur",
@@ -395,7 +398,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       `Détail des visites (empreinte, page, date) effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après report dans un compteur par jour qui ne garde que le nombre de visites`,
-      "Une empreinte par visiteur, sans page ni date mais avec l'indicateur « visiteur connecté », conservée sans limite de durée pour le nombre de visiteurs uniques depuis la mise en service, y compris après la suppression du compte",
+      `Une empreinte par visiteur, sans page mais avec l'indicateur « visiteur connecté » et la date de la dernière visite, effacée ${SITE_VISITOR_RETENTION_MONTHS} mois après cette dernière visite (y compris après la suppression du compte, qui ne l'efface pas plus tôt) ; les empreintes antérieures à cette règle sont datées de sa mise en place`,
       "Adresse IP, navigateur et identifiant du compte jamais enregistrés tels quels",
     ],
     recipients: [
@@ -406,6 +409,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY,
       "Aucun cookie de mesure — une seule valeur de stockage de session (bg:last-visit-ping), jamais transmise, évite de signaler deux fois un même chargement ; le secret de salage n'est ni en base ni dans les sauvegardes, et sans lui aucune visite n'est comptée",
+      "Opposition relue côté serveur (en-têtes Sec-GPC et DNT, cookie d'opposition) : une visite refusée n'est ni hachée, ni décomptée du plafond de débit, ni écrite",
     ],
   },
   {

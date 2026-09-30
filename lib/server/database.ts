@@ -1088,7 +1088,9 @@ async function runMigrations(db: Pool): Promise<void> {
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_site_visitors (
       visitor_key CHAR(64) PRIMARY KEY,
-      authenticated TINYINT(1) NOT NULL DEFAULT 0
+      authenticated TINYINT(1) NOT NULL DEFAULT 0,
+      last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_bg_site_visitors_last_seen (last_seen_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
@@ -1400,6 +1402,14 @@ async function runMigrations(db: Pool): Promise<void> {
     // d'une personne visée. Aucun remplissage : avant la colonne, seules les
     // personnes visées pouvaient contester, et `NULL` se lit ainsi.
     `ALTER TABLE bg_reports ADD COLUMN contest_role ENUM('TARGET', 'NOTIFIER') NULL AFTER parent_report_id`,
+    // Empreintes de visiteur bornées à `SITE_VISITOR_RETENTION_MONTHS` depuis la
+    // dernière visite. Aucun remplissage : la dernière visite d'une empreinte
+    // déjà repliée n'est écrite nulle part, et le défaut (l'instant de l'ajout)
+    // fait courir sa durée depuis le déploiement — la lecture prudente, qui
+    // n'efface rien sur une date inventée. Le repli rajeunit ensuite celles
+    // dont le détail est encore là.
+    `ALTER TABLE bg_site_visitors ADD COLUMN last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
+    `ALTER TABLE bg_site_visitors ADD INDEX idx_bg_site_visitors_last_seen (last_seen_at)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {
@@ -1625,10 +1635,11 @@ async function runMigrations(db: Pool): Promise<void> {
     const [seeded] = await db.execute<RowDataPacket[]>(`SELECT 1 FROM bg_site_visitors LIMIT 1`);
     if (seeded.length === 0) {
       await db.execute(
-        `INSERT INTO bg_site_visitors (visitor_key, authenticated)
-         SELECT visitor_key, MAX(authenticated) FROM bg_site_visits GROUP BY visitor_key
+        `INSERT INTO bg_site_visitors (visitor_key, authenticated, last_seen_at)
+         SELECT visitor_key, MAX(authenticated), MAX(created_at) FROM bg_site_visits GROUP BY visitor_key
          ON DUPLICATE KEY UPDATE
-           authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated))`,
+           authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated)),
+           last_seen_at = GREATEST(bg_site_visitors.last_seen_at, VALUES(last_seen_at))`,
       );
     }
   } catch (error) {
