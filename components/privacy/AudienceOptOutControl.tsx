@@ -55,10 +55,17 @@ export function AudienceOptOutControl({ initialReason }: { initialReason: Audien
 
   const browserSignal = reason === "GPC" || reason === "DNT";
   return (
-    <div role="group" aria-label="Mesure d'audience">
-      <p aria-live="polite">{audienceOptOutStatus(reason)}</p>
+    <div role="group" aria-label="Mesure d'audience" style={{ display: "grid", gap: 12, justifyItems: "start" }}>
+      <p id="audience-opt-out-status" aria-live="polite" style={{ margin: 0 }}>
+        {audienceOptOutStatus(reason)}
+      </p>
       {!browserSignal && (
-        <CyberButton type="button" variant="ghost" onClick={() => toggle(reason !== "CHOICE")}>
+        <CyberButton
+          type="button"
+          variant="ghost"
+          aria-describedby="audience-opt-out-status"
+          onClick={() => toggle(reason !== "CHOICE")}
+        >
           {reason === "CHOICE" ? "Réactiver la mesure d'audience" : "M'opposer à la mesure d'audience"}
         </CyberButton>
       )}
