@@ -37,9 +37,7 @@ export async function readAccountDeletionJournal(
 // fork — `docs/DEPLOYMENT.md`).
 let queue: Promise<void> = Promise.resolve();
 
-async function writeEntry(entry: AccountDeletionEntry, filePath: string, now: Date): Promise<void> {
-  const current = await readAccountDeletionJournal(filePath);
-  const kept = pruneJournal([...current.entries, entry], now);
+async function writeJournal(kept: readonly AccountDeletionEntry[], filePath: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   // Écrit à côté puis renommé : la synchronisation horaire du bot copie le
   // fichier sans prévenir, et un renommage est la seule écriture qu'elle ne
@@ -47,6 +45,61 @@ async function writeEntry(entry: AccountDeletionEntry, filePath: string, now: Da
   const temp = `${filePath}.${process.pid}.tmp`;
   await writeFile(temp, kept.map(formatJournalEntry).join(""), { encoding: "utf8", mode: 0o600 });
   await rename(temp, filePath);
+}
+
+async function writeEntry(entry: AccountDeletionEntry, filePath: string, now: Date): Promise<void> {
+  const current = await readAccountDeletionJournal(filePath);
+  await writeJournal(pruneJournal([...current.entries, entry], now), filePath);
+}
+
+/**
+ * Retire du journal les lignes échues, **sans** suppression nouvelle : élaguer
+ * dans `writeEntry` seulement laissait une ligne survivre — et sa copie
+ * OneDrive horaire avec elle — tant que personne d'autre ne supprimait son
+ * compte, au-delà de la durée annoncée par le registre et `/rgpd`.
+ *
+ * Passe par la même file que les écritures (une suppression simultanée ne
+ * peut pas être perdue), et ne réécrit le fichier que s'il y a quelque chose
+ * à retirer : un journal absent reste absent.
+ *
+ * @returns le nombre de lignes retirées.
+ */
+export function pruneAccountDeletionJournal(
+  options: { filePath?: string; now?: Date } = {},
+): Promise<number> {
+  const filePath = options.filePath ?? accountDeletionJournalPath();
+  const now = options.now ?? new Date();
+  const run = queue.then(async () => {
+    const current = await readAccountDeletionJournal(filePath);
+    const kept = pruneJournal(current.entries, now);
+    const removed = current.entries.length - kept.length;
+    if (removed === 0) return 0;
+    await writeJournal(kept, filePath);
+    return removed;
+  });
+  queue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+const pruneState = globalThis as typeof globalThis & { __bgDeletionJournalPrunedAt?: number };
+
+/**
+ * Élagage entraîné par le trafic, au plus une fois par heure et par processus
+ * — même mécanique que la purge des signalements (`schedulePurgeExpiredReports`),
+ * appelée au même endroit (`app/layout.tsx`) : aucun ordonnanceur à tenir.
+ * Jamais attendu, jamais levé.
+ */
+export function scheduleAccountDeletionJournalPrune(now: number = Date.now()): void {
+  const last = pruneState.__bgDeletionJournalPrunedAt;
+  if (last !== undefined && now - last < PRUNE_INTERVAL_MS) return;
+  pruneState.__bgDeletionJournalPrunedAt = now;
+  void pruneAccountDeletionJournal({ now: new Date(now) }).catch((error: unknown) => {
+    console.error("[account-deletion-journal] élagage impossible :", error);
+  });
 }
 
 /**

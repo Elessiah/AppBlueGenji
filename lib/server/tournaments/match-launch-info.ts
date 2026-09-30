@@ -35,7 +35,9 @@ import type { PlatformRole } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import {
+  castEligibilityBlock,
   maintainMatchLaunches,
+  releaseIneligibleCast,
   rowLaunchState,
   rowReadiness,
   toLaunchInput,
@@ -85,6 +87,8 @@ type UserRow = RowDataPacket & {
   blizzard_sub: string | null;
   visible_overwatch: number;
   is_deleted: number;
+  is_admin: number;
+  platform_roles_json: unknown;
 };
 
 type ViewerTeams = Map<number, { roles: TeamRole[]; solo: boolean }>;
@@ -215,6 +219,7 @@ function viewerRole(
   row: CandidateRow,
   userId: number,
   teams: ViewerTeams,
+  castRevoked: boolean,
 ): { role: LaunchViewerRole; canDeclareReady: boolean } | null {
   // Le rôle de joueur prime, comme dans `resolveMatchParty`.
   for (const [role, teamId] of [
@@ -226,7 +231,7 @@ function viewerRole(
       return { role, canDeclareReady: membership.solo || canDeclareTeamReady(membership.roles) };
     }
   }
-  if (row.caster_user_id !== null && Number(row.caster_user_id) === userId) {
+  if (!castRevoked && row.caster_user_id !== null && Number(row.caster_user_id) === userId) {
     return { role: "CASTER", canDeclareReady: true };
   }
   return null;
@@ -265,7 +270,8 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
 export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaunchInfo[]> {
   if (!(await hasRunningTournament())) return [];
 
-  return withConnection(async (connection) => {
+  const revokedCasts: { matchId: number; casterId: number }[] = [];
+  const launches = await withConnection(async (connection) => {
     let rows = await loadCandidates(connection, viewer.id);
     if (rows.length === 0) return [];
     if (await maintainIfDue(connection, rows)) {
@@ -322,16 +328,29 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
       const ids = [...userIds];
       const [found] = await connection.execute<UserRow[]>(
         `SELECT id, pseudo, discord_pseudo, discord_verified_at, overwatch_battletag, blizzard_sub,
-                visible_overwatch, is_deleted
+                visible_overwatch, is_deleted, is_admin, platform_roles_json
          FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
         ids,
       );
       for (const user of found) users.set(Number(user.id), user);
     }
 
+    // Un caster n'est une partie du match que tant qu'il remplit la condition
+    // de son inscription : elle est rejouée ici, à chaque lecture, sans quoi
+    // un compte privé de `live` (ou d'identité) garderait les contacts.
+    for (const { row } of visible) {
+      if (row.caster_user_id === null) continue;
+      const casterId = Number(row.caster_user_id);
+      if (castEligibilityBlock(users.get(casterId)) !== null) {
+        revokedCasts.push({ matchId: Number(row.id), casterId });
+      }
+    }
+    const revoked = new Set(revokedCasts.map((cast) => cast.matchId));
+
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase } of visible) {
-      const party = viewerRole(row, viewer.id, teams);
+      const castRevoked = revoked.has(Number(row.id));
+      const party = viewerRole(row, viewer.id, teams, castRevoked);
       if (!party) continue;
       const readiness = rowReadiness(row);
       const exposes = phase === "LOBBY" || phase === "LAUNCHED";
@@ -371,7 +390,7 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
       };
 
       let caster: LaunchCaster | null = null;
-      if (row.caster_user_id !== null) {
+      if (row.caster_user_id !== null && !castRevoked) {
         const user = users.get(Number(row.caster_user_id));
         if (user && Number(user.is_deleted) === 0) {
           const contact = exposes
@@ -432,4 +451,17 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
     }
     return result;
   });
+
+  // Les contacts sont déjà retirés de la réponse ; l'inscription l'est ensuite,
+  // sous verrou et après relecture, pour que le lancement n'attende plus le
+  // « Prêt » d'un caster qui n'en est plus un. Un échec n'y change rien pour
+  // ce lecteur : la prochaine lecture retentera.
+  for (const cast of revokedCasts) {
+    try {
+      await releaseIneligibleCast(cast.matchId, cast.casterId);
+    } catch (error) {
+      console.error("[match-launch] retrait d'un caster non éligible impossible", error);
+    }
+  }
+  return launches;
 }

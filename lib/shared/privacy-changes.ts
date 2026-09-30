@@ -409,6 +409,19 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     ],
     links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
   },
+  // Ce qu'une suppression emporte change : l'anonymisation effaçait le détail
+  // des acceptations des conditions d'utilisation mais gardait, sans limite,
+  // la dernière version acceptée et sa date sur le compte anonymisé.
+  {
+    id: "2026-10-anonymisation-conditions",
+    publishedAt: "2026-10-01",
+    title: "Suppression du compte : l'acceptation des conditions part aussi",
+    summary:
+      "Quand un compte supprimé est gardé sous un pseudo d'emprunt (parce qu'il a joué des matchs), la dernière version des conditions d'utilisation qu'il avait acceptée et sa date sont désormais effacées, comme le détail de ses acceptations l'était déjà.",
+    details: [
+      "Rien ne change tant que ton compte existe : l'acceptation des conditions reste conservée pour la durée du compte.",
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

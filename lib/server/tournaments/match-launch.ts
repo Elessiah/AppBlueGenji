@@ -26,6 +26,7 @@ import {
   type LaunchViewerRole,
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
+import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import type { MatchStatus, TeamRole } from "@/lib/shared/types";
 import { publishMatchUpdatedEvent } from "./notifications";
 
@@ -370,6 +371,34 @@ type CasterIdentityRow = RowDataPacket & {
   is_deleted: number;
 };
 
+/** Colonnes de `bg_users` que lit `castEligibilityBlock`. */
+export type CastEligibilityRow = CasterIdentityRow & {
+  is_admin: number;
+  platform_roles_json: unknown;
+};
+
+/** Identité d'un caster lue sur sa ligne ; un compte absent ou supprimé n'en a aucune. */
+function casterIdentityOf(row: CasterIdentityRow | undefined): CasterIdentity {
+  if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };
+  return {
+    discordVerified: row.discord_verified_at !== null && Boolean(row.discord_pseudo),
+    blizzardLinked: row.blizzard_sub !== null && Boolean(row.overwatch_battletag),
+  };
+}
+
+/**
+ * La règle de `castBlockReason` rejouée sur la ligne d'un compte **déjà
+ * inscrit** : permission `live` (rôles relus en base, pas ceux d'une session)
+ * et identité exigée. Sert à la lecture des contacts, qui ne peut pas se fier
+ * à une inscription contrôlée une fois pour toutes.
+ */
+export function castEligibilityBlock(row: CastEligibilityRow | undefined): CastBlock | null {
+  const live =
+    row !== undefined &&
+    can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "live");
+  return castBlockReason(live, casterIdentityOf(row));
+}
+
 /** Identité d'un caster telle que la règle de `castBlockReason` la lit. */
 export async function loadCasterIdentity(
   connection: PoolConnection,
@@ -380,12 +409,7 @@ export async function loadCasterIdentity(
      FROM bg_users WHERE id = ? LIMIT 1`,
     [userId],
   );
-  const row = rows[0];
-  if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };
-  return {
-    discordVerified: row.discord_verified_at !== null && Boolean(row.discord_pseudo),
-    blizzardLinked: row.blizzard_sub !== null && Boolean(row.overwatch_battletag),
-  };
+  return casterIdentityOf(rows[0]);
 }
 
 /**
@@ -464,6 +488,41 @@ export async function releaseMatchCast(
     return Number(row.tournament_id);
   });
   publishMatchUpdatedEvent(tournamentId);
+}
+
+/**
+ * Retire l'inscription d'un caster qui ne remplit plus la condition de
+ * `castBlockReason` (permission `live` retirée, tag décertifié, Battle.net
+ * détaché, compte supprimé). Tout est **relu sous verrou** : si l'inscription a
+ * changé de titulaire ou si le compte est redevenu éligible entre la lecture
+ * et l'écriture, rien n'est fait. Comme au retrait volontaire, un match qui
+ * n'attendait plus que ce caster part.
+ *
+ * @returns vrai si l'inscription a été retirée.
+ */
+export async function releaseIneligibleCast(matchId: number, casterId: number): Promise<boolean> {
+  let tournamentId: number | null = null;
+  await inTransaction(async (connection) => {
+    const row = await lockLaunchMatch(connection, matchId);
+    if (!row || row.caster_user_id === null || Number(row.caster_user_id) !== casterId) return;
+    const [users] = await connection.execute<CastEligibilityRow[]>(
+      `SELECT discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag, is_deleted,
+              is_admin, platform_roles_json
+       FROM bg_users WHERE id = ? LIMIT 1`,
+      [casterId],
+    );
+    if (castEligibilityBlock(users[0]) === null) return;
+
+    await connection.execute(
+      `UPDATE bg_matches SET caster_user_id = NULL, caster_ready_at = NULL WHERE id = ? AND caster_user_id = ?`,
+      [matchId, casterId],
+    );
+    if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+    tournamentId = Number(row.tournament_id);
+  });
+  if (tournamentId === null) return false;
+  publishMatchUpdatedEvent(tournamentId);
+  return true;
 }
 
 /**

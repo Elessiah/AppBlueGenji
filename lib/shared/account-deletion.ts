@@ -170,7 +170,7 @@ export function accountDeletionConfirmation(
   const irreversible = "Cette action est irréversible.";
   // Ce qui reste de **toute** suppression, effacement complet compris : la
   // phrase disait « sans laisser de trace », et c'était faux.
-  const residual = `Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (au moins ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.`;
+  const residual = `Comme pour tout compte supprimé, resteront les sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours), la mention de ta suppression dans le journal qui permet de la rejouer après une restauration (${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), l'empreinte de mesure d'audience décrite par la politique de confidentialité et, si tu es membre du staff, la trace de tes gestes dans les journaux du serveur.`;
   switch (reason) {
     case "TOURNAMENTS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${residual} ${irreversible}`;
