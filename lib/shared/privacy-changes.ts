@@ -470,7 +470,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     id: "2026-10-mesure-audience-opposition",
     publishedAt: "2026-10-01",
     title: "Mesure d'audience : opposition et durée limitée",
-    summary: `Tu peux désormais t'opposer à la mesure d'audience depuis la page RGPD, et le site respecte les signaux Global Privacy Control et Do Not Track de ton navigateur : une visite refusée n'est ni transmise ni enregistrée. L'empreinte gardée pour compter les visiteurs uniques est effacée ${SITE_VISITOR_RETENTION_MONTHS} mois après ta dernière visite, au lieu d'être gardée sans limite.`,
+    summary: `Tu peux désormais t'opposer à la mesure d'audience depuis la page RGPD, et le site respecte les signaux Global Privacy Control et Do Not Track de ton navigateur : une visite refusée n'est pas enregistrée (le serveur relit ces signaux lui-même). L'empreinte gardée pour compter les visiteurs uniques est effacée ${SITE_VISITOR_RETENTION_MONTHS} mois après ta dernière visite, au lieu d'être gardée sans limite.`,
     details: [
       "Ton choix est retenu dans ton navigateur par un cookie qui ne contient que la valeur « 1 », jamais d'identifiant ; il se défait par le même bouton. Un signal du navigateur se règle, lui, dans le navigateur.",
       `Les empreintes enregistrées avant ce changement sont datées de sa mise en place : leur dernière visite n'avait pas été conservée. Le détail des visites reste effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, comme avant.`,

@@ -579,8 +579,11 @@ export default async function RgpdPage() {
             mesure (art. 21 du RGPD) sans avoir à le demander. Le site respecte les signaux{" "}
             <strong>Global Privacy Control</strong> et <strong>Do Not Track</strong> de votre
             navigateur, et le bouton ci-dessous retient votre choix dans ce navigateur (cookie{" "}
-            <strong>bg_audience_optout</strong>). Une visite refusée n&apos;est ni signalée au
-            serveur ni enregistrée — le serveur relit lui-même ces signaux. L&apos;opposition vaut
+            <strong>bg_audience_optout</strong>). Une visite refusée n&apos;est pas enregistrée :
+            le serveur relit lui-même ces signaux. Elle n&apos;est même pas signalée au serveur
+            quand votre navigateur les expose à la page, ce que font la plupart (une extension
+            qui n&apos;ajoute que l&apos;en-tête laisse partir le signalement, que le serveur
+            écarte alors sans rien calculer). L&apos;opposition vaut
             pour vos visites à venir ; pour les visites déjà enregistrées, le droit
             s&apos;exerce, comme vos autres droits, par le formulaire « {REPORT_FORM_NAME} »,
             catégorie RGPD, ou par le courriel de l&apos;association (section&nbsp;01).

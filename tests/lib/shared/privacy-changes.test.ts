@@ -510,7 +510,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
     expect(text()).toContain("Global Privacy Control");
     expect(text()).toContain("Do Not Track");
     expect(text()).toContain("25 mois après ta dernière visite");
-    expect(text()).toContain("ni transmise ni enregistrée");
+    expect(text()).toContain("une visite refusée n'est pas enregistrée");
     expect(text()).not.toMatch(/sans limite de durée|non réversible/);
   });
 
