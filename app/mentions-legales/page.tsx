@@ -342,9 +342,10 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           pour gérer votre participation à ses activités. Elles ne sont pas réservées à
           l&apos;association : ce que le site publie se lit des autres joueurs et du public, et
           certaines données sont communiquées à des services tiers — Discord, Google, Blizzard, le
-          service de push de votre navigateur, Microsoft pour les sauvegardes chiffrées et, sans chiffrement propre à l&apos;association,
-          pour la messagerie de la personne à contacter pour vos demandes, et son opérateur
-          téléphonique si vous l&apos;appelez ou lui laissez un SMS ou un message vocal —, dans les
+          service de push de votre navigateur, Microsoft pour les sauvegardes chiffrées et, sans
+          chiffrement propre à l&apos;association, pour la messagerie de la personne à contacter
+          pour vos demandes, ainsi que l&apos;opérateur téléphonique de cette personne si vous
+          l&apos;appelez ou lui laissez un SMS ou un message vocal —, dans les
           limites décrites à la section{" "}
           <Link href="/rgpd#destinataires">« Destinataires et transferts »</Link> de la politique de
           confidentialité et, traitement par traitement, dans son registre.
