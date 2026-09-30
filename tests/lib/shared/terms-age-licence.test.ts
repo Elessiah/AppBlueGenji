@@ -60,6 +60,7 @@ describe("conditions d'utilisation — licence sur les contenus", () => {
 
   it("dit que le retrait ne vaut que pour l'avenir", () => {
     expect(contenus).toContain("Le retrait vaut pour l'avenir");
+    expect(contenus).toContain("faites pendant cette durée, pour la durée de leur mise en ligne");
     expect(contenus).toContain("**déjà faites** avant le retrait ne sont pas concernées");
   });
 
