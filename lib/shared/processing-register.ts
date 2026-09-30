@@ -576,7 +576,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, ${copyrightNoticeElementsText()}`,
       "Contestations : texte, compte de leur auteur et adresse facultative",
       "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
-      "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande, adresse électronique ou numéro de l'expéditeur, et souvent son nom",
+      "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande et de la réponse, adresse électronique ou numéro de l'expéditeur, et souvent son nom",
     ],
     sensitiveData: "Aucune",
     retention: [
@@ -589,11 +589,11 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
       `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
-      `Microsoft, qui héberge la messagerie de cette personne (${OUTLOOK_MAIL_FRAMEWORK}) : demandes reçues par courriel`,
+      `Microsoft, qui héberge la messagerie de cette personne (${OUTLOOK_MAIL_FRAMEWORK}) : demandes reçues et réponses envoyées par courriel`,
     ],
     transfers: [
       `États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`,
-      `Possibles vers les États-Unis : Microsoft (messagerie Outlook.com de la personne à contacter, demandes reçues par courriel) — ${transferBasis(["MICROSOFT"])}`,
+      `Possibles vers les États-Unis : Microsoft (messagerie Outlook.com de la personne à contacter, demandes reçues et réponses envoyées par courriel) — ${transferBasis(["MICROSOFT"])}`,
     ],
     security: [
       ...COMMON_SECURITY,
