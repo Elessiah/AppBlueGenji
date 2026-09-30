@@ -326,9 +326,15 @@ describe("bases légales : le registre et la politique disent la même chose", (
         expect(transfer).not.toMatch(/garanties propres/);
         // Plus de formule conditionnelle : chaque transfert dit sur quoi il repose.
         expect(transfer).not.toMatch(/à défaut|pour un destinataire certifié/);
-        if (transfer !== "Aucun") {
-          expect(transfer).toMatch(/2023\/1795|clauses contractuelles types/);
+        if (transfer === "Aucun") continue;
+        // Un mécanisme inconnu est dit « décision requise », jamais deviné :
+        // l'exception est voulue, et ne vaut que pour la partie qui le dit.
+        const known = transfer.split(/ ; |— décision requise/)[0];
+        if (/décision requise/.test(transfer) && !/2023\/1795|clauses contractuelles types de la Commission/.test(known)) {
+          expect(transfer).toMatch(/décision requise : mécanisme d'encadrement du transfert/);
+          continue;
         }
+        expect(transfer).toMatch(/2023\/1795|clauses contractuelles types de la Commission/);
       }
     }
     expect(DPF_ADEQUACY_DECISION).toMatch(/2023\/1795/);
