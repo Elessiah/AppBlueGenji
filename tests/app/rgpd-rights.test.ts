@@ -39,8 +39,9 @@ describe("/rgpd — palmarès et intérêt légitime", () => {
     expect(RGPD).not.toMatch(/directement identifiable au sens strict/);
   });
 
-  it("dit qu'aucune durée n'est fixée plutôt que de la taire", () => {
-    expect(RGPD).toMatch(/aucune durée ni aucun critère de fin n&apos;est encore fixé/);
+  it("dit qu'aucune durée n'est définie, tant que le site existe, et l'anonymisation à la suppression", () => {
+    expect(RGPD).toMatch(/aucune durée de conservation n&apos;est définie pour ces\s+résultats : ils restent tant que le site existe/);
+    expect(RGPD).toMatch(/À la suppression d&apos;un compte,\s+ils sont anonymisés/);
   });
 });
 
