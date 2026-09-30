@@ -249,9 +249,9 @@ rien de plus au Raspberry Pi : c'est l'application qui ne lit pas au-delà.
 ## Journaux d'accès nginx : 14 jours — action requise en production
 
 Le registre des traitements déclare les journaux d'accès du
-serveur web (fiche **T17**, `WEB_ACCESS_LOG_RETENTION_DAYS` dans
-`lib/shared/legal-durations.ts`) : adresse IP, date, page demandée, code de
-réponse, page d'origine et navigateur — le format `combined` par défaut —,
+serveur web (fiche **T17**, `WEB_ACCESS_LOG_RETENTION_DAYS` et `WEB_ACCESS_LOG_FIELDS` dans
+`lib/shared/legal-durations.ts`) : adresse IP, date et heure, page demandée, code de
+réponse, taille de la réponse, page d'origine et navigateur — le format `combined` par défaut —,
 gardés **14 jours au plus**, pour la sécurité du service. La configuration
 nginx n'étant pas versionnée ici (elle est partagée avec un autre site),
 **rien dans ce dépôt ne tient cette durée** : elle se pose sur le serveur, et
