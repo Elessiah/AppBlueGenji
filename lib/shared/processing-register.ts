@@ -483,7 +483,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       `Suivi des annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacé au relais suivant cette échéance et au plus tard dans la nuit ou au redémarrage du bot ; les copies publiées dans les salons partenaires restent sur Discord jusqu'à leur suppression (par l'auteur dans ce délai, ensuite par les administrateurs de chaque serveur)`,
-      `Scrims et recrutement : identifiant de l'auteur effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, dans la nuit qui suit (ou à un redémarrage) ; le reste de la ligne, qui ne désigne plus personne, est gardé pour les compteurs`,
+      `Scrims et recrutement : identifiant de l'auteur effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, dans la nuit qui suit (ou à un redémarrage) ; le reste de la ligne (jour sans l'heure), qui ne désigne plus personne, est gardé pour les compteurs`,
       "Exclusions : jusqu'à la levée de l'exclusion",
       "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)",
       "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)",
