@@ -101,7 +101,7 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
     const res = await attempt(VICTIM_CHALLENGE, "424242", VICTIM_IP);
 
     expect(res.status).toBe(200);
-    expect(createSessionMock).toHaveBeenCalledWith(42);
+    expect(createSessionMock).toHaveBeenCalledWith(42, "LOGIN_DISCORD_CODE");
   });
 
   it("ne rend pas un essai de plus à l'attaquant qui change de défi", async () => {
@@ -126,7 +126,7 @@ describe("POST /api/auth/discord/verify — plafond d'énumération", () => {
 
     expect(res.status).toBe(200);
     expect(verifyMock).toHaveBeenCalledWith(VICTIM_CHALLENGE, "424242");
-    expect(createSessionMock).toHaveBeenCalledWith(42);
+    expect(createSessionMock).toHaveBeenCalledWith(42, "LOGIN_DISCORD_CODE");
   });
 
   it("ouvre le compte **du défi** et transmet le tag prouvé", async () => {
@@ -214,6 +214,6 @@ describe("POST /api/auth/discord/verify — CSRF de connexion", () => {
     );
 
     expect(res.status).toBe(200);
-    expect(createSessionMock).toHaveBeenCalledWith(42);
+    expect(createSessionMock).toHaveBeenCalledWith(42, "LOGIN_DISCORD_CODE");
   });
 });
