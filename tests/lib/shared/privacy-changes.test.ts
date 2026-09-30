@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE } from "@/lib/shared/legal-contact";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
@@ -616,5 +618,12 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
   it("tient dans un message privé à elle seule, sans nommer personne", () => {
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     expect(entry.summary).not.toContain(DATA_CONTACT_NAME);
+  });
+
+  it("ne charge ni le registre ni les conditions d'utilisation (module lu sur chaque page)", () => {
+    const source = readFileSync(join(process.cwd(), "lib/shared/privacy-changes.ts"), "utf8");
+    expect(source).not.toMatch(/from "@\/lib\/shared\/processing-register"/);
+    expect(source).not.toMatch(/from "@\/lib\/shared\/terms-of-use"/);
+    expect(source).toMatch(/from "@\/lib\/shared\/legal-durations"/);
   });
 });

@@ -33,6 +33,7 @@ import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
+import { SUPPORT_TICKET_RETENTION_MONTHS, WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/legal-durations";
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
@@ -179,19 +180,10 @@ export const ASSOCIATION_GMAIL_FRAMEWORK =
 export const HOST_PROCESSING_AGREEMENT =
   "contrat de sous-traitance (RGPD, art. 28) rédigé, en attente de signature par l'association et l'hébergeur";
 
-/**
- * Tickets du portail de support (Spiceworks) : supprimés un mois après leur
- * clôture, par l'association (décision de l'association, 2026-09-30).
- */
-export const SUPPORT_TICKET_RETENTION_MONTHS = 1;
-
-/**
- * Journaux d'accès du serveur web (nginx) : 14 jours. Le défaut de logrotate
- * sous Debian (`rotate 14`) en garde jusqu'à quinze — le journal courant plus
- * quatorze archives —, d'où `rotate 13`. La configuration du serveur n'est pas
- * versionnée ici : `docs/DEPLOYMENT.md` dit le réglage à poser en production.
- */
-export const WEB_ACCESS_LOG_RETENTION_DAYS = 14;
+// Tickets Spiceworks (T15) et journaux nginx (T17) : définis dans un module de
+// constantes seules, pour que la modale des changements les lise sans charger
+// le registre.
+export { SUPPORT_TICKET_RETENTION_MONTHS, WEB_ACCESS_LOG_RETENTION_DAYS };
 
 export interface RegisterController {
   name: string;
@@ -286,7 +278,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seules les statistiques de tournoi anonymisées restent ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours) ; les signalements envoyés par le compte en sont détachés et suivent leur propre durée (T11)`,
+      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seul le compte anonymisé reste, avec son historique de tournois et d'équipes ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours) ; les signalements envoyés par le compte en sont détachés et suivent leur propre durée (T11)`,
       `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
     recipients: [

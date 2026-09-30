@@ -315,8 +315,8 @@ export default async function RgpdPage() {
           Vous les retrouvez dans l&apos;export de vos données tant que votre compte existe. Seules
           les ouvertures de session sont consignées : ni le port source de la connexion, ni la
           création ou la modification d&apos;un contenu. Les informations fournies à la création
-          du compte (pseudo, identifiants de fournisseur) partent avec lui ; hors ce journal, seules
-          les statistiques de tournoi anonymisées survivent à la suppression — sous réserve des
+          du compte (pseudo, identifiants de fournisseur) partent avec lui ; hors ce journal, seul le compte
+          anonymisé (pseudo d&apos;emprunt) survit, avec son historique de tournois et d&apos;équipes, s&apos;il en a un — sous réserve des
           copies de sauvegarde chiffrées (**), qui s&apos;effacent d&apos;elles-mêmes au bout de{" "}
           {BACKUP_RETENTION_DAYS} jours, et de la mention de la suppression au journal qui la rejoue
           après une restauration (numéro et date de création du compte,{" "}

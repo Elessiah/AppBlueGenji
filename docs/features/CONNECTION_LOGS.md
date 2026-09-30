@@ -75,7 +75,8 @@ tourne, aucune entrée de migration n'est due.
   suppression du compte ; tout le reste part à la suppression (hors les
   copies de sauvegarde chiffrées, 30 jours au plus, et de la mention au
   journal des suppressions, 60 jours ; les signalements envoyés, détachés du
-  compte, suivent leur propre durée), sauf les
-  statistiques de tournoi anonymisées.
+  compte, suivent leur propre durée), sauf le
+  compte anonymisé (pseudo d'emprunt), avec son historique de tournois et
+  d'équipes.
 
 Registre : T01, T02, T14 ; le journal d'accès nginx a sa fiche (T17, 14 jours).

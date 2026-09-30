@@ -49,8 +49,13 @@ import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notification
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
-import { SUPPORT_TICKET_RETENTION_MONTHS, WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/processing-register";
-import { SITE_MINIMUM_AGE } from "@/lib/shared/terms-of-use";
+// Constantes seules : ce module est chargé sur chaque page par la modale des
+// changements, il ne doit tirer ni le registre ni les conditions d'utilisation.
+import {
+  SITE_MINIMUM_AGE,
+  SUPPORT_TICKET_RETENTION_MONTHS,
+  WEB_ACCESS_LOG_RETENTION_DAYS,
+} from "@/lib/shared/legal-durations";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,

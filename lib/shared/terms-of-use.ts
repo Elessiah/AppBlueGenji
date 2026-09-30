@@ -25,6 +25,7 @@
 import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 import { SUSPENSION_MAX_DAYS } from "./account-suspension";
+import { SITE_MINIMUM_AGE } from "./legal-durations";
 
 /**
  * Version en vigueur. L'avancer redemande l'acceptation.
@@ -41,14 +42,8 @@ import { SUSPENSION_MAX_DAYS } from "./account-suspension";
  */
 export const TERMS_VERSION = 3;
 
-/**
- * Âge minimum pour créer un compte. Distinct de l'âge d'adhésion à
- * l'association, que fixent ses statuts : un compte n'est pas une adhésion.
- * Aucun contrôle technique ne le tient — le site ne recueille pas de date de
- * naissance, seulement une majorité déclarée (`isAdult`), qui ne dit rien d'un
- * seuil à 15 ans : la condition est déclarative, acceptée avec ces conditions.
- */
-export const SITE_MINIMUM_AGE = 15;
+/** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
+export { SITE_MINIMUM_AGE };
 
 /**
  * Déclaration d'âge jointe à la case d'acceptation de la page de connexion,
