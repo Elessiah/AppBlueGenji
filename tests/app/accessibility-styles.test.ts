@@ -165,17 +165,17 @@ describe("éléments flottants — pas de chevauchement", () => {
 
   it("sur ordinateur, l'onglet tient dans la gouttière de la colonne : il ne couvre aucun contenu", () => {
     const globals = stripComments(readSource("app/globals.css"));
-    const rule = /@media \(min-width: 721px\) \{\s*\.page-shell \{\s*width: min\(1200px, calc\(100vw - (\d+)px\)\);/.exec(
-      globals,
-    );
+    const rule = /@media \(min-width: 721px\) \{\s*:root \{\s*--a11y-tab-gutter: (\d+)px;/.exec(globals);
     expect(rule).not.toBeNull();
     // Gouttière gauche au plus juste : une barre de défilement de 16 px
     // retranchée de la largeur utile, le reste partagé entre les deux bords.
     const gutter = (Number(rule![1]) - 16) / 2;
     expect(gutter).toBeGreaterThanOrEqual(px(menu, ".fab", "width") + 4);
-    // Après le bloc de 920 px, qui resserre la colonne : il doit l'emporter
-    // entre 721 et 920 px.
-    expect(rule!.index).toBeGreaterThan(globals.indexOf("@media (max-width: 920px)"));
+    // La colonne de l'espace connecté prend le jeton dans chacune de ses
+    // largeurs, bloc de 920 px compris : c'est lui qui la resserre.
+    const shell = globals.match(/\.page-shell \{\s*width: [^;]*;/g) ?? [];
+    expect(shell.length).toBeGreaterThanOrEqual(2);
+    for (const width of shell) expect(width).toContain("var(--a11y-tab-gutter)");
   });
 
   it("sur ordinateur, le panneau s'ouvre à droite de l'onglet", () => {
