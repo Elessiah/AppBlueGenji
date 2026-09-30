@@ -157,10 +157,13 @@ describe("modale de visibilité du BattleTag", () => {
     expect(modal).toContain("J&apos;ai compris");
   });
 
-  it("nomme les deux publics qui continuent de lire le tag", () => {
+  it("nomme les publics qui continuent de lire le tag, comme la politique", () => {
     expect(modal).toContain("de chaque match que tu disputes");
+    expect(modal).toContain("Le caster de ton match");
     expect(modal).toContain("arbitres");
     expect(modal).toContain("administrateurs");
+    // `isInActiveTournament` : dès l'inscription, pas seulement « le temps du tournoi ».
+    expect(modal).toContain("tant que tu es inscrit à un");
   });
 
   it("prend le focus et se ferme par Échap, par la pile commune des modales", () => {
