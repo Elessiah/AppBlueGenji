@@ -165,7 +165,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `Les administrateurs des serveurs partenaires d'au moins 50 membres (ou les titulaires du rôle d'administration du Bot que ces serveurs désignent) et le staff de l'association peuvent **exclure un utilisateur du relais** en cas de manquement à ces conditions : il ne peut plus utiliser les commandes du Bot, ses annonces ne sont plus relayées et les copies de celles des ${BOT_RELAY_RETENTION_DAYS} derniers jours sont retirées. L'exclusion vaut pour tout le réseau de serveurs partenaires ; son motif est obligatoire et consigné au journal de modération.`,
+            text: `Les administrateurs des serveurs partenaires d'au moins 50 membres (ou les titulaires du rôle d'administration du Bot que ces serveurs désignent) et le staff de l'association peuvent **exclure un utilisateur du relais** en cas de manquement à ces conditions : il ne peut plus utiliser les commandes du Bot, ses annonces ne sont plus relayées et les copies de celles que le Bot suit encore (au moins les ${BOT_RELAY_RETENTION_DAYS} derniers jours) sont retirées. L'exclusion vaut pour tout le réseau de serveurs partenaires ; son motif est obligatoire et consigné au journal de modération.`,
           },
           {
             kind: "p",
@@ -289,7 +289,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `The administrators of partner servers with at least 50 members (or the holders of the Bot administration role those servers designate) and the association's staff may **exclude a user from the relay** for breaching these terms: they can no longer use the Bot's commands, their advertisements are no longer relayed and the copies of those from the last ${BOT_RELAY_RETENTION_DAYS} days are removed. The exclusion applies to the whole network of partner servers; a reason is mandatory and recorded in the moderation log.`,
+            text: `The administrators of partner servers with at least 50 members (or the holders of the Bot administration role those servers designate) and the association's staff may **exclude a user from the relay** for breaching these terms: they can no longer use the Bot's commands, their advertisements are no longer relayed and the copies of those the Bot still tracks (at least the last ${BOT_RELAY_RETENTION_DAYS} days) are removed. The exclusion applies to the whole network of partner servers; a reason is mandatory and recorded in the moderation log.`,
           },
           {
             kind: "p",
@@ -466,7 +466,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
               "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
-              `Tout utilisateur du Bot, par la commande **/stats**, peut voir combien d'annonces un autre utilisateur a publiées (messages relayés, scrims, recherches) ; la réponse n'est visible que de celui qui la demande, et le compteur de messages ne porte que sur ceux encore conservés (${BOT_RELAY_RETENTION_DAYS} derniers jours).`,
+              `Tout utilisateur du Bot, par la commande **/stats**, peut voir combien d'annonces un autre utilisateur a publiées (messages relayés, scrims, recherches) ; la réponse n'est visible que de celui qui la demande, et le compteur de messages ne porte que sur ceux dont le suivi est encore conservé (section 03).`,
               `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
               "Microsoft, qui stocke sur le OneDrive personnel de l'hébergeur technique les sauvegardes, chiffrées avant envoi avec une clé que Microsoft ne détient pas.",
@@ -667,7 +667,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Members of partner servers, who read the relayed advertisements.",
               "Members of the referee role of every server that has set one, for the website's referee alerts.",
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
-              `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages still kept (last ${BOT_RELAY_RETENTION_DAYS} days).`,
+              `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages whose tracking is still kept (section 03).`,
               `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",
               "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold.",
