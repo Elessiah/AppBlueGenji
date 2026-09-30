@@ -11,6 +11,7 @@ import {
 } from "@/lib/server/site-visits-service";
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
+  SITE_VISITOR_RETENTION_MONTHS,
   SITE_VISIT_WINDOW_MINUTES,
 } from "@/lib/shared/site-visits";
 import {
@@ -186,6 +187,19 @@ describe("recordSiteVisit", () => {
     expect(remember).toBeDefined();
     expect(String(remember![0])).toContain("GREATEST(bg_site_visitors.authenticated");
     expect(remember![1]).toEqual([(insert[1] as unknown[])[0], 1]);
+  });
+
+  // La durée de conservation court depuis la dernière visite : chaque visite
+  // enregistrée rajeunit l'empreinte, sans jamais la vieillir.
+  it("date l'empreinte de la dernière visite", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+    await mockDb(execute);
+
+    await recordSiteVisit({ userId: 9, path: "/" });
+
+    const remember = execute.mock.calls.find(([sql]) => String(sql).includes("bg_site_visitors"))!;
+    expect(String(remember[0])).toContain("VALUES (?, ?, NOW())");
+    expect(String(remember[0])).toContain("last_seen_at = GREATEST(bg_site_visitors.last_seen_at, VALUES(last_seen_at))");
   });
 
   it("n'écrit aucune empreinte pour une visite absorbée par la fenêtre", async () => {
@@ -524,7 +538,7 @@ describe("rollUpExpiredSiteVisits", () => {
     const calls = connection.execute.mock.calls;
     expect(calls[0][1]).toEqual([SITE_VISIT_DETAIL_RETENTION_DAYS]);
     const insert = calls.find(([sql]) => sql.includes("INSERT INTO bg_site_visit_days"))!;
-    const remove = calls.find(([sql]) => sql.startsWith("DELETE FROM bg_site_visits"))!;
+    const remove = calls.find(([sql]) => sql.startsWith("DELETE FROM bg_site_visits WHERE"))!;
     // La même borne, lue une fois : `NOW()` relu entre les deux effacerait une
     // visite qui n'a pas été reportée.
     expect(insert[1]).toEqual(["2026-07-01"]);
@@ -538,6 +552,28 @@ describe("rollUpExpiredSiteVisits", () => {
     expect(calls.indexOf(insert)).toBeLessThan(calls.indexOf(remove));
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(connection.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("efface les empreintes au-delà de leur durée, après les avoir rajeunies du détail", async () => {
+    const connection = rollUpConnection();
+    await mockDb(jest.fn<SqlQuery>(), connection);
+
+    await rollUpExpiredSiteVisits();
+
+    const calls = connection.execute.mock.calls;
+    const report = calls.find(([sql]) => sql.includes("INSERT INTO bg_site_visitors"))!;
+    const purge = calls.find(([sql]) => sql.startsWith("DELETE FROM bg_site_visitors"))!;
+    expect(report[0]).toContain("MAX(created_at)");
+    expect(report[0]).toContain("last_seen_at = GREATEST(bg_site_visitors.last_seen_at, VALUES(last_seen_at))");
+    expect(purge[0]).toContain("last_seen_at < NOW() - INTERVAL ? MONTH");
+    expect(purge[1]).toEqual([SITE_VISITOR_RETENTION_MONTHS]);
+    // Le report d'abord : une empreinte encore au détail n'est jamais effacée.
+    expect(calls.indexOf(report)).toBeLessThan(calls.indexOf(purge));
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  it("borne l'empreinte à vingt-cinq mois, la durée retenue par la CNIL", () => {
+    expect(SITE_VISITOR_RETENTION_MONTHS).toBe(25);
   });
 
   // Chaque visite arrivée pendant un repli en relançait un : sur le premier

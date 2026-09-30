@@ -7,7 +7,57 @@ import {
   parseTrustedProxyHops,
   SITE_VISIT_WINDOW_MINUTES,
   visitorIdentitySource,
+  AUDIENCE_OPT_OUT_COOKIE,
+  AUDIENCE_OPT_OUT_MAX_AGE_DAYS,
+  SITE_VISITOR_RETENTION_MONTHS,
+  audienceOptOutCookieString,
+  audienceOptOutFromHeaders,
+  audienceOptOutReason,
+  readCookieValue,
 } from "@/lib/shared/site-visits";
+
+describe("opposition à la mesure d'audience", () => {
+  it("lit GPC, puis DNT, puis le choix du cookie", () => {
+    expect(audienceOptOutReason({ gpc: true, dnt: "1", cookie: "bg_audience_optout=1" })).toBe("GPC");
+    expect(audienceOptOutReason({ gpc: "1" })).toBe("GPC");
+    expect(audienceOptOutReason({ dnt: "1", cookie: "bg_audience_optout=1" })).toBe("DNT");
+    expect(audienceOptOutReason({ cookie: "a=b; bg_audience_optout=1" })).toBe("CHOICE");
+  });
+
+  it("ne voit aucune opposition dans un signal absent, à 0 ou « unspecified »", () => {
+    expect(audienceOptOutReason({})).toBeNull();
+    expect(audienceOptOutReason({ gpc: false, dnt: "0" })).toBeNull();
+    expect(audienceOptOutReason({ gpc: null, dnt: "unspecified", cookie: "" })).toBeNull();
+    expect(audienceOptOutReason({ cookie: "bg_audience_optout=0" })).toBeNull();
+    // Un cookie au nom voisin n'est pas le choix.
+    expect(audienceOptOutReason({ cookie: "xbg_audience_optout=1" })).toBeNull();
+  });
+
+  it("se lit sur les en-têtes d'une requête", () => {
+    expect(audienceOptOutFromHeaders(new Headers({ "Sec-GPC": "1" }))).toBe("GPC");
+    expect(audienceOptOutFromHeaders(new Headers({ DNT: "1" }))).toBe("DNT");
+    expect(audienceOptOutFromHeaders(new Headers({ Cookie: `${AUDIENCE_OPT_OUT_COOKIE}=1` }))).toBe("CHOICE");
+    expect(audienceOptOutFromHeaders(new Headers())).toBeNull();
+  });
+
+  it("lit une valeur de cookie sans se tromper de nom", () => {
+    expect(readCookieValue("a=1; b = 2 ;c=3", "b")).toBe("2");
+    expect(readCookieValue("a=1", "b")).toBeNull();
+    expect(readCookieValue(null, "a")).toBeNull();
+  });
+
+  it("pose le cookie treize mois, sans identifiant, et l'efface au retour", () => {
+    expect(audienceOptOutCookieString(true, true)).toBe(
+      `bg_audience_optout=1; Path=/; Max-Age=${395 * 86400}; SameSite=Lax; Secure`,
+    );
+    expect(AUDIENCE_OPT_OUT_MAX_AGE_DAYS).toBeLessThanOrEqual(395);
+    expect(audienceOptOutCookieString(false, false)).toBe("bg_audience_optout=; Path=/; Max-Age=0; SameSite=Lax");
+  });
+
+  it("borne l'empreinte à 25 mois", () => {
+    expect(SITE_VISITOR_RETENTION_MONTHS).toBe(25);
+  });
+});
 
 describe("normalizeVisitPath", () => {
   it("garde un chemin déjà propre", () => {
