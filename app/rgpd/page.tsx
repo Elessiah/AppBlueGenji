@@ -151,8 +151,8 @@ export default async function RgpdPage() {
           </p>
           <p>
             Il n&apos;est pas délégué à la protection des données au sens de l&apos;article 37 du
-            RGPD : l&apos;association reste responsable du traitement. Les autres moyens de
-            faire une demande sont indiqués en section&nbsp;11.
+            RGPD : l&apos;association reste responsable du traitement. Vous pouvez aussi faire
+            une demande par les moyens indiqués en section&nbsp;11.
           </p>
         </div>
       </section>
