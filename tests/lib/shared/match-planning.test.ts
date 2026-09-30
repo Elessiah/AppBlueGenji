@@ -2,8 +2,11 @@ import { describe, expect, it } from "@jest/globals";
 import {
   canToggleRefereeScheduling,
   LAUNCH_PHASE_LABELS,
+  enablePlanningConsequence,
   matchesToPlan,
   playerScoreClosedNotice,
+  refereeSchedulingToggledMessage,
+  refereeSchedulingToggleLabel,
   REFEREE_SCHEDULING_DESCRIPTION,
   refereeSchedulingErrorMessage,
   toPlanCountLabel,
@@ -104,5 +107,23 @@ describe("playerScoreClosedNotice", () => {
 
   it("ne parle jamais de « Prêt » à un match à planifier", () => {
     expect(playerScoreClosedNotice("TO_PLAN", null)).not.toMatch(/prêt/i);
+  });
+});
+
+describe("phrases de la bascule", () => {
+  it("confirme l'allumage avec le nombre de matchs renvoyés, et l'extinction", () => {
+    expect(refereeSchedulingToggledMessage(true, 2)).toBe("Planification activée : 2 matchs à planifier.");
+    expect(refereeSchedulingToggledMessage(true, 0)).toBe("Planification par l'arbitrage activée.");
+    expect(refereeSchedulingToggledMessage(false, 3)).toMatch(/désactivée/);
+  });
+
+  it("accorde la conséquence de l'allumage", () => {
+    expect(enablePlanningConsequence(1)).toMatch(/^1 match, .* quitte le lancement/);
+    expect(enablePlanningConsequence(3)).toMatch(/^3 matchs, .* quittent le lancement/);
+  });
+
+  it("nomme l'action de l'interrupteur", () => {
+    expect(refereeSchedulingToggleLabel(true)).toBe("Désactiver la planification");
+    expect(refereeSchedulingToggleLabel(false)).toBe("Activer la planification");
   });
 });

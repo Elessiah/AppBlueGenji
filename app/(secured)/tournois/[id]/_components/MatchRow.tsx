@@ -25,6 +25,16 @@ import { CyberButton } from "@/components/cyber";
 import styles from "./MatchRow.module.css";
 
 
+/**
+ * Libellé du bouton d'arbitrage : il dit le seul geste possible avant le
+ * lancement (le forfait), et, une fois lancé, s'il reste un score proposé à
+ * valider — une confirmation qui peut ne jamais venir (adversaire fantôme).
+ */
+function adminScoreButtonLabel(scoreEntryClosed: boolean, hasProposal: boolean): string {
+  if (scoreEntryClosed) return "Prononcer un forfait";
+  return hasProposal ? "Valider le score proposé" : "Éditer le score";
+}
+
 interface MatchRowProps {
   match: BracketMatch;
   adminResolvable: boolean;
@@ -124,11 +134,7 @@ export const MatchRow = memo(function MatchRow({
   );
 
   const isBye = match.team1Id === null || match.team2Id === null;
-  const adminScoreLabel = scoreEntryClosed
-    ? "Prononcer un forfait"
-    : pendingScoreProposal(match)
-      ? "Valider le score proposé"
-      : "Éditer le score";
+  const adminScoreLabel = adminScoreButtonLabel(scoreEntryClosed, pendingScoreProposal(match) !== null);
   // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :
   // l'arbitrage peut noter un forfait sans valider le résultat, et le score plein
   // porté en face (3-0 en FT3) se lisait alors comme une rencontre jouée et

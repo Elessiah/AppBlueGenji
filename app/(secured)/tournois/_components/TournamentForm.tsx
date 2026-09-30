@@ -686,9 +686,13 @@ export function TournamentForm({
               formulaire se ferme au coup d'envoi, précisément quand on peut
               vouloir la changer. */}
           {mode === "create" ? (
-            <div
+            // La carte entière est le libellé natif de la case : un clic n'importe
+            // où la coche, au clavier comme à la souris, sans gestionnaire à
+            // écrire (et sans `<div>` cliquable, que ni le clavier ni les
+            // technologies d'assistance n'atteignent).
+            <label
               className="checkbox-card"
-              onClick={() => set("refereeScheduling", !values.refereeScheduling)}
+              htmlFor="referee-scheduling"
               style={{
                 display: "flex",
                 alignItems: "flex-start",
@@ -706,29 +710,31 @@ export function TournamentForm({
                 type="checkbox"
                 checked={values.refereeScheduling}
                 onChange={(e) => set("refereeScheduling", e.target.checked)}
+                // Nom court (le titre) et description à part : la carte-libellé
+                // porte les deux textes, qui formeraient sinon un seul nom.
+                aria-labelledby="referee-scheduling-label"
                 aria-describedby="referee-scheduling-hint"
                 style={{ marginTop: 2 }}
               />
-              <div style={{ flex: 1 }}>
-                <label
-                  htmlFor="referee-scheduling"
+              <span style={{ flex: 1 }}>
+                <span
+                  id="referee-scheduling-label"
                   style={{
                     display: "block",
                     margin: "0 0 4px",
-                    cursor: "pointer",
                     fontSize: 14,
                     fontWeight: 500,
                     color: "var(--ink)",
                   }}
                 >
                   Matchs planifiés par l&apos;arbitrage
-                </label>
-                <p id="referee-scheduling-hint" style={{ ...HINT, margin: 0 }}>
+                </span>
+                <span id="referee-scheduling-hint" style={{ ...HINT, display: "block", margin: 0 }}>
                   {REFEREE_SCHEDULING_DESCRIPTION} Modifiable ensuite depuis la fiche du tournoi,
                   même en cours.
-                </p>
-              </div>
-            </div>
+                </span>
+              </span>
+            </label>
           ) : (
             <p style={{ ...HINT, marginTop: 16 }}>
               La planification des matchs par l&apos;arbitrage se règle depuis la fiche du

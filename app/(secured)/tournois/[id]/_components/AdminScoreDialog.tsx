@@ -22,6 +22,30 @@ import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
 
+/**
+ * Phrase d'aide du forfait, selon ce qui est désigné : les deux engagées, une
+ * seule, ou personne encore — et, dans ce dernier cas, sans parler de scores
+ * « ignorés » quand aucun ne peut être saisi (match pas encore lancé).
+ */
+function forfeitHint(input: {
+  team1: string;
+  team2: string;
+  doubleForfeit: boolean;
+  forfeiting: { out: string; through: string } | null;
+  forfeitMaps: number;
+  scoreEntryClosed: boolean;
+}): string {
+  const { team1, team2, forfeiting, forfeitMaps } = input;
+  if (input.doubleForfeit) {
+    return `${team1} et ${team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.`;
+  }
+  if (forfeiting) {
+    return `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`;
+  }
+  const question = `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0`;
+  return input.scoreEntryClosed ? `${question}.` : `${question}, et les scores saisis sont ignorés.`;
+}
+
 interface AdminScoreDialogProps {
   /** Match **résolu à chaque rendu** depuis la liste rafraîchie par le flux. */
   match: BracketMatch;
@@ -197,12 +221,14 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             </p>
           )}
 
+          {/* `<output>` : une région d'état native, que la phase peut changer
+              sous les yeux du lecteur (l'heure de départ arrive). */}
           {scoreEntryClosed && (
-            <p className={styles.stored} role="status">
+            <output className={`${styles.stored} ${styles.notice}`}>
               {launchPhase === "TO_PLAN"
                 ? "Match à planifier : fixe sa date avant d'en saisir le score. Un forfait peut être prononcé dès maintenant."
                 : "Match en attente de départ : le score se saisit à partir de son lancement. Un forfait peut être prononcé dès maintenant."}
-            </p>
+            </output>
           )}
 
           {proposalNotice && (
@@ -302,13 +328,14 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     fait passer l'adversaire suivant par exemption — un effet
                     qui descend l'arbre, et qu'on ne découvre pas après coup. */}
                 <p id="admin-score-forfeit-hint" className={styles.forfeitHint}>
-                  {doubleForfeit
-                    ? `${team1} et ${team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.`
-                    : forfeiting
-                      ? `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`
-                      : scoreEntryClosed
-                        ? `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0.`
-                        : `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0, et les scores saisis sont ignorés.`}
+                  {forfeitHint({
+                    team1,
+                    team2,
+                    doubleForfeit,
+                    forfeiting,
+                    forfeitMaps,
+                    scoreEntryClosed,
+                  })}
                 </p>
                 <div className={styles.forfeitRow}>
                   <button

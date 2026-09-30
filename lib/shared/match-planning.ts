@@ -96,6 +96,31 @@ export function toPlanCountLabel(count: number): string {
   return count === 1 ? "1 match à planifier" : `${count} matchs à planifier`;
 }
 
+/** Confirmation affichée après une bascule réussie. */
+export function refereeSchedulingToggledMessage(enabled: boolean, movedToPlanning: number): string {
+  if (!enabled) {
+    return "Planification par l'arbitrage désactivée : les matchs sans date entrent en lancement.";
+  }
+  return movedToPlanning > 0
+    ? `Planification activée : ${toPlanCountLabel(movedToPlanning)}.`
+    : "Planification par l'arbitrage activée.";
+}
+
+/**
+ * Ce que la confirmation d'allumage annonce, accordé au nombre de matchs
+ * réellement renvoyés à planifier.
+ */
+export function enablePlanningConsequence(moving: number): string {
+  return moving === 1
+    ? "1 match, sans date et pas encore lancé, quitte le lancement — ses « Prêt » sont effacés — et attend qu'un arbitre fixe son horaire."
+    : `${moving} matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.`;
+}
+
+/** Libellé de l'interrupteur : l'action qu'il déclenche. */
+export function refereeSchedulingToggleLabel(enabled: boolean): string {
+  return enabled ? "Désactiver la planification" : "Activer la planification";
+}
+
 /** Codes de refus de la bascule de l'option. */
 export const REFEREE_SCHEDULING_ERRORS: Readonly<Record<string, string>> = {
   TOURNAMENT_NOT_FOUND: "Tournoi introuvable.",

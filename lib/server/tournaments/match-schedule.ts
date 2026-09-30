@@ -61,6 +61,26 @@ function leavesLaunch(row: MatchScheduleRow, startAt: string | null, refereeSche
   return phase === "TO_PLAN" || phase === "SCHEDULED";
 }
 
+/**
+ * L'écriture de la date, selon ce qu'elle fait au lancement : rien (le match
+ * reste où il est), le tient pour lancé (il quitte le lancement mais porte déjà
+ * un score), ou défait ouverture et « Prêt » (il quitte le lancement).
+ */
+function scheduleUpdateSql(leaving: boolean, scoreNoted: boolean): string {
+  if (!leaving) return `UPDATE bg_matches SET start_at = ? WHERE id = ?`;
+  if (scoreNoted) {
+    return `UPDATE bg_matches
+            SET start_at = ?, launched_at = NOW(),
+                launch_pairing = CONCAT(team1_id, ':', team2_id),
+                lobby_opened_at = COALESCE(lobby_opened_at, NOW())
+            WHERE id = ?`;
+  }
+  return `UPDATE bg_matches
+          SET start_at = ?, lobby_opened_at = NULL, team1_ready_at = NULL,
+              team2_ready_at = NULL, caster_ready_at = NULL
+          WHERE id = ?`;
+}
+
 async function lockScheduleRow(
   connection: PoolConnection,
   matchId: number,
@@ -123,21 +143,10 @@ export async function setMatchStartAt(
       // peut le saisir, `MATCH_NOT_IN_LAUNCH`).
       const leaving = leavesLaunch(row, startAt, refereeScheduling);
       const scoreNoted = row.team1_score !== null || row.team2_score !== null;
-      await connection.execute(
-        !leaving
-          ? `UPDATE bg_matches SET start_at = ? WHERE id = ?`
-          : scoreNoted
-            ? `UPDATE bg_matches
-               SET start_at = ?, launched_at = NOW(),
-                   launch_pairing = CONCAT(team1_id, ':', team2_id),
-                   lobby_opened_at = COALESCE(lobby_opened_at, NOW())
-               WHERE id = ?`
-            : `UPDATE bg_matches
-               SET start_at = ?, lobby_opened_at = NULL, team1_ready_at = NULL,
-                   team2_ready_at = NULL, caster_ready_at = NULL
-               WHERE id = ?`,
-        [startAt === null ? null : new Date(startAt), matchId],
-      );
+      await connection.execute(scheduleUpdateSql(leaving, scoreNoted), [
+        startAt === null ? null : new Date(startAt),
+        matchId,
+      ]);
       // Lancement défait : la notification de départ réservée pour lui
       // (`./player-pushes`) part avec, pour que la nouvelle heure prévienne de
       // nouveau les joueurs.

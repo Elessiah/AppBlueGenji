@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
@@ -13,6 +13,57 @@ import {
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
+
+/** Aide sous le champ : l'erreur de saisie d'abord, sinon ce que la date va produire. */
+function startAtHint(input: {
+  incomplete: boolean;
+  invalid: boolean;
+  refereeScheduling: boolean;
+}): string {
+  if (input.incomplete) {
+    return "Date incomplète : renseigne le jour et l'heure, ou efface tout le champ pour ne pas annoncer d'horaire.";
+  }
+  if (input.invalid) return "Date non reconnue.";
+  if (input.refereeScheduling) {
+    return "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.";
+  }
+  return "Laisser vide pour ne pas annoncer d'horaire. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.";
+}
+
+/** Confirmation après enregistrement. */
+function savedMessage(touched: boolean, planning: boolean): string {
+  if (!touched) return "Date de début effacée.";
+  return planning ? "Match planifié." : "Date de début enregistrée.";
+}
+
+/** Libellé du bouton d'envoi. */
+function submitLabel(busy: boolean, planning: boolean): string {
+  if (busy) return "Enregistrement…";
+  return planning ? "Planifier" : "Enregistrer";
+}
+
+/**
+ * Avertissement avant l'envoi. `<output>` : une région d'état native, qui se
+ * lit quand elle apparaît au fil de la saisie.
+ */
+function ScheduleWarning({ children }: Readonly<{ children: ReactNode }>) {
+  return (
+    <output
+      style={{
+        display: "block",
+        margin: "12px 0 0",
+        padding: "8px 10px",
+        borderRadius: 8,
+        border: "1px solid rgba(255,157,46,0.4)",
+        background: "rgba(255,157,46,0.1)",
+        fontSize: 12,
+        color: "var(--text-1, #c3ccd8)",
+      }}
+    >
+      {children}
+    </output>
+  );
+}
 
 interface MatchScheduleDialogProps {
   match: BracketMatch;
@@ -42,7 +93,7 @@ export function MatchScheduleDialog({
   refereeScheduling,
   onClose,
   onSaved,
-}: MatchScheduleDialogProps) {
+}: Readonly<MatchScheduleDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [startAt, setStartAt] = useState(() => matchStartAtInputValue(match.startAt));
   // Saisie commencée mais incomplète (« 01/09/____ __:__ »). Le champ
@@ -80,7 +131,10 @@ export function MatchScheduleDialog({
     !incomplete &&
     match.startAt !== null &&
     match.launchedAt === null &&
-    match.status === "READY";
+    match.status === "READY" &&
+    // Déjà noté, il est tenu pour lancé par le serveur, pas renvoyé.
+    match.team1Score === null &&
+    match.team2Score === null;
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -95,13 +149,7 @@ export function MatchScheduleDialog({
       });
       const payload = (await response.json()) as { error?: string };
       if (!response.ok) throw new Error(payload.error || "MATCH_SCHEDULE_UPDATE_FAILED");
-      showSuccess(
-        touched
-          ? planning
-            ? "Match planifié."
-            : "Date de début enregistrée."
-          : "Date de début effacée.",
-      );
+      showSuccess(savedMessage(touched, planning));
       onSaved();
       onClose();
     } catch (error) {
@@ -172,50 +220,22 @@ export function MatchScheduleDialog({
                 color: invalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
               }}
             >
-              {incomplete
-                ? "Date incomplète : renseigne le jour et l'heure, ou efface tout le champ pour ne pas annoncer d'horaire."
-                : invalid
-                  ? "Date non reconnue."
-                  : refereeScheduling
-                    ? "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes."
-                    : "Laisser vide pour ne pas annoncer d'horaire. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes."}
+              {startAtHint({ incomplete, invalid, refereeScheduling })}
             </p>
           </div>
 
           {clearsLiveTrigger && (
-            <p
-              role="status"
-              style={{
-                margin: "12px 0 0",
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "1px solid rgba(255,157,46,0.4)",
-                background: "rgba(255,157,46,0.1)",
-                fontSize: 12,
-                color: "var(--text-1, #c3ccd8)",
-              }}
-            >
+            <ScheduleWarning>
               Ce match passe à l&apos;antenne à sa date de début : sans date, il restera
               « programmé » sans jamais démarrer.
-            </p>
+            </ScheduleWarning>
           )}
 
           {returnsToPlanning && (
-            <p
-              role="status"
-              style={{
-                margin: "12px 0 0",
-                padding: "8px 10px",
-                borderRadius: 8,
-                border: "1px solid rgba(255,157,46,0.4)",
-                background: "rgba(255,157,46,0.1)",
-                fontSize: 12,
-                color: "var(--text-1, #c3ccd8)",
-              }}
-            >
+            <ScheduleWarning>
               Sans date, ce match repasse « À planifier » : il ne se lancera pas tant
               qu&apos;une nouvelle heure n&apos;est pas fixée.
-            </p>
+            </ScheduleWarning>
           )}
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
@@ -234,11 +254,7 @@ export function MatchScheduleDialog({
               disabled={busy || invalid}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
-              {busy
-                ? "Enregistrement…"
-                : planning
-                  ? "Planifier"
-                  : "Enregistrer"}
+              {submitLabel(busy, planning)}
             </button>
           </div>
         </form>

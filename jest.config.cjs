@@ -11,6 +11,12 @@ module.exports = {
         '^@/(.*)$': '<rootDir>/$1',
     },
     setupFiles: ['<rootDir>/tests/setup-env.cjs'],
+    // Couverture par V8 et non par l'instrumentation babel : sous Jest 30,
+    // ts-jest 29 rend des cartes de source dont les `sources` sont des URL
+    // `file:`, que l'instrumentation relit comme un chemin relatif
+    // (`lib/shared/file:/C:/…`). L'écriture du rapport échouait alors en entier
+    // — `coverage/lcov.info` vide, couverture comptée à 0 par SonarQube.
+    coverageProvider: 'v8',
     moduleFileExtensions: ['ts', 'tsx', 'js'],
     testMatch: ['**/tests/**/*.test.(ts|tsx|js)'],
     // Ignore les worktrees Claude Code imbriqués (`.claude/worktrees/*`) : sans

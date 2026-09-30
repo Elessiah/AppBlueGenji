@@ -4,7 +4,10 @@ import { useMemo, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   canToggleRefereeScheduling,
+  enablePlanningConsequence,
   matchesToPlan,
+  refereeSchedulingToggledMessage,
+  refereeSchedulingToggleLabel,
   REFEREE_SCHEDULING_DESCRIPTION,
   refereeSchedulingErrorMessage,
   toPlanCountLabel,
@@ -35,7 +38,7 @@ interface MatchPlanningPanelProps {
  * L'allumage en cours de tournoi passe par une confirmation : il défait le
  * lancement des matchs non lancés et sans date, qui repassent à planifier.
  */
-export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPanelProps) {
+export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPlanningPanelProps>) {
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
   const [confirmEnable, setConfirmEnable] = useState(false);
@@ -44,8 +47,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
   const toggleable = canManage && canToggleRefereeScheduling(detail.card.state);
 
   // Ce que l'allumage ferait passer « à planifier », et ce qui l'est déjà :
-  // la même fonction, lue avec l'option allumée.
-  // Rien n'est calculé pour un panneau qui ne rendra rien — le cas de la
+  // la même fonction, lue avec l'option allumée. Rien n'est calculé pour un panneau qui ne rendra rien — le cas de la
   // plupart des lecteurs, sur la plupart des tournois.
   const visible = enabled || toggleable;
   const toPlan = useMemo(
@@ -73,13 +75,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
         movedToPlanning?: number;
       };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      showSuccess(
-        next
-          ? payload.movedToPlanning
-            ? `Planification activée : ${toPlanCountLabel(payload.movedToPlanning)}.`
-            : "Planification par l'arbitrage activée."
-          : "Planification par l'arbitrage désactivée : les matchs sans date entrent en lancement.",
-      );
+      showSuccess(refereeSchedulingToggledMessage(next, payload.movedToPlanning ?? 0));
       return true;
     } catch (error) {
       showError(refereeSchedulingErrorMessage((error as Error).message));
@@ -101,6 +97,8 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
 
   const pending = enabled ? toPlan : [];
   const first = pending[0] ?? null;
+  // Le décompte n'intéresse que ceux qui peuvent le résorber.
+  const showCount = enabled && canManage && detail.card.state === "RUNNING";
 
   return (
     <section
@@ -120,12 +118,11 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
         </p>
         {/* Le décompte n'intéresse que ceux qui peuvent le résorber. Pas de
             région live : il change à chaque instantané du flux. */}
-        {enabled && canManage && detail.card.state === "RUNNING" && (
-          pending.length > 0 ? (
-            <p className={styles.pending}>{toPlanCountLabel(pending.length)}</p>
-          ) : (
-            <p className={styles.done}>Tous les matchs jouables ont une date.</p>
-          )
+        {showCount && pending.length > 0 && (
+          <p className={styles.pending}>{toPlanCountLabel(pending.length)}</p>
+        )}
+        {showCount && pending.length === 0 && (
+          <p className={styles.done}>Tous les matchs jouables ont une date.</p>
         )}
       </div>
 
@@ -148,7 +145,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
               onClick={onToggle}
               disabled={busy}
             >
-              {busy ? "…" : enabled ? "Désactiver la planification" : "Activer la planification"}
+              {busy ? "…" : refereeSchedulingToggleLabel(enabled)}
             </button>
           )}
         </div>
@@ -164,9 +161,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
           onConfirm={() => toggle(true)}
         >
           <p>
-            {moving.length === 1
-              ? "1 match, sans date et pas encore lancé, quitte le lancement — ses « Prêt » sont effacés — et attend qu'un arbitre fixe son horaire."
-              : `${moving.length} matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.`}{" "}
+            {enablePlanningConsequence(moving.length)}{" "}
             Les matchs déjà lancés continuent, et les manches suivantes naîtront à planifier.
           </p>
         </ConfirmActionDialog>

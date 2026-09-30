@@ -198,6 +198,21 @@ export function isRoomOverdue(snapshot: TournamentSnapshot, now: number): boolea
 }
 
 /**
+ * Prochaine échéance de **score** d'un match (ms) : l'expiration de son délai
+ * de report, ou — délai passé sur un conflit — l'escalade à l'arbitrage.
+ * `null` s'il n'en a aucune à venir.
+ */
+function scoreWakeOf(match: DeadlineMatch, now: number): number | null {
+  const deadline = scoreDeadlineOf(match);
+  if (deadline === null) return null;
+  const expiry = deadline + SCORE_DEADLINE_MARGIN_MS;
+  if (expiry > now) return expiry;
+  if (!isScoreConflict(match)) return null;
+  const escalation = deadline + CONFLICT_ESCALATION_MS + SCORE_DEADLINE_MARGIN_MS;
+  return escalation > now ? escalation : null;
+}
+
+/**
  * Prochain instant où la salle doit relire l'instantané d'elle-même, ou `null`
  * s'il n'y en a aucun.
  *
@@ -240,26 +255,14 @@ export function nextRoomWakeAt(
   if (boundary !== null) wakeAt = Math.min(wakeAt, boundary);
   if (isRoomOverdue(snapshot, now)) wakeAt = Math.min(wakeAt, now + catchUpMs);
 
+  // Échéances de lancement : seulement en cours, seul état où l'entretien
+  // lance quoi que ce soit.
+  const running = card.state === "RUNNING";
   const refereeScheduling = card.refereeScheduling === true;
   for (const match of snapshot.matches ?? []) {
-    // Échéances de lancement : seulement en cours, seul état où l'entretien
-    // lance quoi que ce soit.
-    if (card.state === "RUNNING") {
-      for (const launchDeadline of launchDeadlinesOf(match, refereeScheduling, now)) {
-        const at = launchDeadline + SCORE_DEADLINE_MARGIN_MS;
-        if (at > now) wakeAt = Math.min(wakeAt, at);
-      }
-    }
-    const deadline = scoreDeadlineOf(match);
-    if (deadline === null) continue;
-    const expiry = deadline + SCORE_DEADLINE_MARGIN_MS;
-    if (expiry > now) {
-      wakeAt = Math.min(wakeAt, expiry);
-      continue;
-    }
-    if (isScoreConflict(match)) {
-      const escalation = deadline + CONFLICT_ESCALATION_MS + SCORE_DEADLINE_MARGIN_MS;
-      if (escalation > now) wakeAt = Math.min(wakeAt, escalation);
+    const launchDeadlines = running ? launchDeadlinesOf(match, refereeScheduling, now) : [];
+    for (const at of [...launchDeadlines.map((d) => d + SCORE_DEADLINE_MARGIN_MS), scoreWakeOf(match, now)]) {
+      if (at !== null && at > now) wakeAt = Math.min(wakeAt, at);
     }
   }
   return wakeAt;

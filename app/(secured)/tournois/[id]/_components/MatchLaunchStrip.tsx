@@ -14,6 +14,7 @@ import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import { LAUNCH_PHASE_LABELS } from "@/lib/shared/match-planning";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
+import { hasLaunchStripAction, hostTeamName, launchStripControls } from "../_lib/launch-strip";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import styles from "./MatchLaunchStrip.module.css";
 
@@ -44,17 +45,74 @@ async function send(url: string, method: string, body?: unknown): Promise<void> 
  * précèdent le lancement : **À planifier** (avec, pour l'arbitrage, le bouton
  * qui ouvre la date) et **En attente de départ** (avec l'heure dite).
  */
+/**
+ * Pastille de la phase de lancement : à planifier, en attente de départ, en
+ * lancement (avec le décompte des « Prêt »), ou lancé.
+ */
+function LaunchPhaseBadge({ match, phase }: Readonly<{ match: BracketMatch; phase: MatchLaunchPhase }>) {
+  if (phase === "TO_PLAN") {
+    return (
+      <span
+        className={styles.toPlan}
+        title="L'arbitrage doit fixer la date et l'heure de ce match avant son lancement."
+      >
+        <span aria-hidden="true">📅</span> {LAUNCH_PHASE_LABELS.TO_PLAN}
+        <span className="sr-only"> : l&apos;arbitrage doit fixer la date de ce match.</span>
+      </span>
+    );
+  }
+  if (phase === "SCHEDULED") {
+    const startAtTitle = formatMatchStartAtFull(match.startAt);
+    return (
+      <span className={styles.scheduled} title={startAtTitle ?? undefined}>
+        <span aria-hidden="true">⏱</span> {LAUNCH_PHASE_LABELS.SCHEDULED}
+        {/* L'heure est déjà dans le bandeau d'horaire juste au-dessus : on ne
+            la répète que pour les lecteurs d'écran, qui lisent ce libellé
+            seul. */}
+        {startAtTitle && <span className="sr-only"> — début le {startAtTitle}</span>}
+      </span>
+    );
+  }
+  if (phase === "LOBBY") {
+    // Les « Prêt » arrivent déjà résolus dans l'instantané (une fantôme y est
+    // prête d'office) : on ne fait que les compter.
+    const count = readyCount({
+      team1Ready: match.team1Ready,
+      team2Ready: match.team2Ready,
+      casterRequired: match.casterUserId !== null,
+      casterReady: match.casterReady,
+    });
+    return (
+      <span className={styles.lobby}>
+        <span aria-hidden="true">⏳</span> {LAUNCH_PHASE_LABELS.LOBBY} ·{" "}
+        <span className="num">
+          {count.ready}/{count.expected}
+        </span>{" "}
+        prêts
+      </span>
+    );
+  }
+  if (phase === "LAUNCHED" && match.status === "READY") {
+    return (
+      <span className={styles.launched}>
+        <span aria-hidden="true">▶</span> {LAUNCH_PHASE_LABELS.LAUNCHED}
+      </span>
+    );
+  }
+  return null;
+}
+
 export function MatchLaunchStrip({
   match,
   phase,
-}: {
+}: Readonly<{
   match: BracketMatch;
   /**
    * Phase de lancement, calculée **par la carte** (`MatchRow`) et partagée avec
    * le bandeau d'horaire : une seule minuterie par match programmé.
    */
   phase: MatchLaunchPhase;
-}) {
+}>) {
   const { canManage, canSchedule, openSchedule, viewerUserId, myTeamId, castBlock } =
     useLiveControls();
   const { showError, showSuccess } = useToast();
@@ -62,40 +120,10 @@ export function MatchLaunchStrip({
   const [confirmForce, setConfirmForce] = useState(false);
 
   const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
-  const isCaster = viewerUserId !== null && match.casterUserId === viewerUserId;
-  const isPlayer =
-    myTeamId !== null && (match.team1Id === myTeamId || match.team2Id === myTeamId);
-  const isParty = isCaster || isPlayer;
-  const open = match.status !== "COMPLETED";
-  // Inscription comme caster : sur un match à jouer, jamais sur un bye (un
-  // engagé connu en face d'une case vide), et jamais par un joueur du match.
-  const isByeLike = (match.team1Id === null) !== (match.team2Id === null) && match.status !== "PENDING";
-  const castable = open && !isByeLike && !isPlayer;
-  const showClaim = canManage && castable && match.casterUserId === null;
-  const showRelease = open && match.casterUserId !== null && (isCaster || canSchedule);
-  // Forcer vaut planification : l'arbitrage peut lancer un match à planifier
-  // sans lui donner d'heure. « Planifier » passe devant, c'est le geste attendu.
-  const showForce = canSchedule && (phase === "LOBBY" || phase === "SCHEDULED" || phase === "TO_PLAN");
-  const showPlan = canSchedule && phase === "TO_PLAN";
-  const startAtTitle = formatMatchStartAtFull(match.startAt);
-  const showHost = phase !== "NONE";
-  const showOpen = isParty && (phase === "LOBBY" || phase === "LAUNCHED");
-  const showHostSwap = canSchedule && showHost;
-  const hostName =
-    match.hostTeamId === null
-      ? null
-      : match.hostTeamId === match.team1Id
-        ? match.team1Name
-        : match.team2Name;
-  // Les « Prêt » arrivent déjà résolus dans l'instantané (une fantôme y est
-  // prête d'office) : on ne fait que les compter.
-  const readiness = {
-    team1Ready: match.team1Ready,
-    team2Ready: match.team2Ready,
-    casterRequired: match.casterUserId !== null,
-    casterReady: match.casterReady,
-  };
-  const count = readyCount(readiness);
+  const controls = launchStripControls(match, phase, { canManage, canSchedule, viewerUserId, myTeamId });
+  const { isCaster, showOpen, showClaim, showRelease, showPlan, showForce, showHost, showHostSwap } =
+    controls;
+  const hostName = hostTeamName(match);
 
   if (!showHost && match.casterUserId === null && !showClaim) return null;
 
@@ -133,38 +161,7 @@ export function MatchLaunchStrip({
 
   return (
     <div className={styles.strip} data-phase={phase}>
-      {phase === "TO_PLAN" && (
-        <span
-          className={styles.toPlan}
-          title="L'arbitrage doit fixer la date et l'heure de ce match avant son lancement."
-        >
-          <span aria-hidden="true">📅</span> {LAUNCH_PHASE_LABELS.TO_PLAN}
-          <span className="sr-only"> : l&apos;arbitrage doit fixer la date de ce match.</span>
-        </span>
-      )}
-      {phase === "SCHEDULED" && (
-        <span className={styles.scheduled} title={startAtTitle ?? undefined}>
-          <span aria-hidden="true">⏱</span> {LAUNCH_PHASE_LABELS.SCHEDULED}
-          {/* L'heure est déjà dans le bandeau d'horaire juste au-dessus : on ne
-              la répète que pour les lecteurs d'écran, qui lisent ce libellé
-              seul. */}
-          {startAtTitle && <span className="sr-only"> — début le {startAtTitle}</span>}
-        </span>
-      )}
-      {phase === "LOBBY" && (
-        <span className={styles.lobby}>
-          <span aria-hidden="true">⏳</span> {LAUNCH_PHASE_LABELS.LOBBY} ·{" "}
-          <span className="num">
-            {count.ready}/{count.expected}
-          </span>{" "}
-          prêts
-        </span>
-      )}
-      {phase === "LAUNCHED" && match.status === "READY" && (
-        <span className={styles.launched}>
-          <span aria-hidden="true">▶</span> {LAUNCH_PHASE_LABELS.LAUNCHED}
-        </span>
-      )}
+      <LaunchPhaseBadge match={match} phase={phase} />
 
       {showHost && hostName && (
         <span className={styles.fact} title="Équipe qui crée le salon en jeu">
@@ -189,7 +186,7 @@ export function MatchLaunchStrip({
 
       {/* Pas de conteneur vide : il porterait seul le `margin-left: auto` et
           une ligne de hauteur nulle sur les cartes sans aucun bouton. */}
-      {(showPlan || showOpen || showClaim || showRelease || showHostSwap || showForce) && (
+      {hasLaunchStripAction(controls) && (
         <span className={styles.actions}>
           {showPlan && (
             <button
