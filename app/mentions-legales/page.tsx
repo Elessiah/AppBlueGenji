@@ -246,9 +246,9 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           diffusion, totale ou partielle, suppose l&apos;autorisation de leurs titulaires.
         </p>
         <p>
-          <strong>Ne lui appartiennent pas</strong> les contenus publiés par les membres (avatars,
-          logos, noms et descriptions d&apos;équipe, pseudos), qui restent la propriété de leurs
-          auteurs ou de leurs titulaires, ni les marques et visuels des jeux Overwatch (Blizzard
+          <strong>N&apos;appartiennent ni à l&apos;association ni à l&apos;auteur du code</strong>{" "}
+          les contenus publiés par les membres (avatars, logos, noms et descriptions d&apos;équipe,
+          pseudos), qui restent la propriété de leurs auteurs ou de leurs titulaires, ni les marques et visuels des jeux Overwatch (Blizzard
           Entertainment) et Marvel Rivals (NetEase, Marvel), qui appartiennent à leurs titulaires.
           Le site n&apos;est affilié à aucun de ces éditeurs.
         </p>
