@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { TournamentProgress } from "@/app/(secured)/tournois/[id]/_components/TournamentProgress";
+import { SurvivalRounds } from "@/app/(secured)/tournois/[id]/_components/SurvivalView";
+import { bracketMatch } from "../helpers/bracket-match";
 import { tournamentCard } from "../helpers/tournament-card";
 import { tournamentDetail } from "../helpers/tournament-detail";
 
@@ -78,12 +80,107 @@ describe("Classements — action sous le nom sous 720 px", () => {
   });
 });
 
+describe("Phase survie d'un multi-phases", () => {
+  const closedSurvival = () =>
+    page.slice(
+      page.indexOf(') : formatForBracket === "SURVIVAL" && isMulti ? ('),
+      page.indexOf(') : detail.card.format === "BG_SURVIE" && detail.endurance ? ('),
+    );
+
+  it("ne rend la vue survie que si l'instantané décrit la phase affichée", () => {
+    expect(page).toContain(
+      'formatForBracket === "SURVIVAL" && detail.survival && rankingMetaIsSelectedPhase ? (',
+    );
+  });
+
+  it("une phase survie close montre ses manches seules puis son classement de phase", () => {
+    const closed = closedSurvival();
+    expect(closed.length).toBeGreaterThan(0);
+    expect(closed).toContain("<SurvivalRounds");
+    expect(closed).toContain("matches={filteredMatches}");
+    expect(closed).toContain("cutSchedule={null}");
+    expect(closed).toContain("{finishedPhaseStandings}");
+    expect(closed).not.toContain("<SurvivalView");
+    expect(closed).not.toContain("detail.survival");
+    expect(closed).not.toContain("<BracketSections");
+  });
+
+  it("la branche des phases closes précède l'arbre à élimination", () => {
+    const closedAt = page.indexOf(') : formatForBracket === "SURVIVAL" && isMulti ? (');
+    expect(closedAt).toBeGreaterThan(page.indexOf('formatForBracket === "SURVIVAL" && detail.survival'));
+    expect(closedAt).toBeLessThan(page.indexOf("<BracketSections"));
+  });
+
+  it("les manches sont un export du module de la vue survie, chargé à la demande", () => {
+    expect(survival).toMatch(/export function SurvivalRounds\b/);
+    expect(survival).toContain("<SurvivalRounds");
+    expect(page).toContain(
+      'const SurvivalRounds = dynamic(() => orReload(import("./_components/SurvivalView").then((m) => m.SurvivalRounds)), { ssr: false });',
+    );
+  });
+});
+
+describe("SurvivalRounds — marques de coupe", () => {
+  // Exemptions seules : la carte d'une exemption ne demande aucun contexte de
+  // match, le rendu reste isolé.
+  const byes = [1, 2, 3].map((round) =>
+    bracketMatch({ id: round, roundNumber: round, team1Id: 10, team1Name: "Alpha", team2Id: null }),
+  );
+  const noop = () => undefined;
+
+  it("sans cadence connue, les manches s'affichent sans coupe ni barrage", () => {
+    const markup = renderToStaticMarkup(
+      <SurvivalRounds
+        matches={byes}
+        allTournamentMatches={byes}
+        cutSchedule={null}
+        adminResolvable={() => false}
+        onOpenAdminModal={noop}
+        emptyLabel="Rien"
+      />,
+    );
+    expect(markup).toContain("Manche 1");
+    expect(markup).toContain("Manche 3");
+    expect(markup).not.toContain("Coupe");
+    expect(markup).not.toContain("Barrage");
+  });
+
+  it("avec une cadence, marque barrage et coupes", () => {
+    const markup = renderToStaticMarkup(
+      <SurvivalRounds
+        matches={byes}
+        allTournamentMatches={byes}
+        cutSchedule={{ roundsBeforeFirstCut: 1, roundsPerCut: 1, barrageRounds: 1 }}
+        adminResolvable={() => false}
+        onOpenAdminModal={noop}
+        emptyLabel="Rien"
+      />,
+    );
+    expect(markup).toContain("Barrage");
+    expect(markup).toContain("Coupe");
+  });
+
+  it("sans manche, affiche le libellé vide", () => {
+    const markup = renderToStaticMarkup(
+      <SurvivalRounds
+        matches={[]}
+        allTournamentMatches={[]}
+        cutSchedule={null}
+        adminResolvable={() => false}
+        onOpenAdminModal={noop}
+        emptyLabel="Aucune manche"
+      />,
+    );
+    expect(markup).toContain("Aucune manche");
+  });
+});
+
 describe("Phase suisse d'un multi-phases", () => {
   it("rend la vue suisse pour la phase en cours, et ses rondes seules pour une phase close", () => {
     expect(page).toContain(
-      'formatForBracket === "SWISS" && detail.swiss && swissMetaIsSelectedPhase ? (',
+      'formatForBracket === "SWISS" && detail.swiss && rankingMetaIsSelectedPhase ? (',
     );
-    expect(page).toMatch(/swissMetaIsSelectedPhase =\s*!isMulti \|\| \(selectedPhase !== null && selectedPhase\.id === detail\.currentPhaseId\)/);
+    expect(page).toMatch(/rankingMetaIsSelectedPhase =\s*!isMulti \|\| \(selectedPhase !== null && selectedPhase\.id === detail\.currentPhaseId\)/);
     const closed = page.slice(
       page.indexOf(') : formatForBracket === "SWISS" ? ('),
       page.indexOf(") : !filteredMatches.length ? ("),
@@ -104,7 +201,7 @@ describe("Phase suisse d'un multi-phases", () => {
   });
 
   it("remonte les vues à manches à chaque changement de phase", () => {
-    for (const view of ["<SurvivalView", "<SwissView", "<SwissRounds"]) {
+    for (const view of ["<SurvivalView", "<SurvivalRounds", "<SwissView", "<SwissRounds"]) {
       const at = page.search(new RegExp(`${view}\\r?\\n`));
       expect(at).toBeGreaterThan(-1);
       expect(page.slice(at, page.indexOf("/>", at))).toContain("key={phaseViewKey}");
