@@ -12,13 +12,21 @@
  * - le formulaire **« Signaler un problème »** (pied de page de toutes les
  *   pages), dont les catégories « RGPD » et « Hébergeur » trient les demandes
  *   (`lib/shared/content-reports.ts`) ;
- * - le **tag Discord** de l'hébergeur technique du site, qu'on ajoute en ami,
- *   pour les questions techniques — **jamais** comme contact RGPD : aucun
- *   délégué ni référent n'est désigné, les demandes d'exercice des droits vont
- *   à l'association (courriel, formulaire catégorie « RGPD »).
+ * - la **personne à contacter pour les demandes relatives aux données** :
+ *   l'hébergeur du site (`DATA_CONTACT_NAME`), par courriel et téléphone —
+ *   encodés eux aussi, révélés au clic sur `/rgpd` et `/mentions-legales`.
+ *   Ce n'est **pas** un délégué à la protection des données au sens de
+ *   l'article 37 du RGPD, et aucun écran ne doit l'appeler ainsi :
+ *   l'association reste responsable du traitement ;
+ * - le **tag Discord** de ce même hébergeur, qu'on ajoute en ami, pour les
+ *   questions techniques — **pas** comme canal des demandes relatives aux
+ *   données, qui passent par le courriel, le téléphone ou le formulaire
+ *   catégorie « RGPD ».
  *
  * Un test balaie les sources et refuse tout courriel ou numéro en clair.
  */
+
+import { SITE_HOST } from "@/lib/shared/site-host";
 
 /** Dénomination statutaire de l'association (statuts, art. 1er). */
 export const ASSOCIATION_NAME = "Bluegenji Esport";
@@ -30,7 +38,8 @@ export const ASSOCIATION_SEAT = "4 impasse des Cyprès, 51210 Janvilliers, Franc
  * Tag Discord de l'hébergeur technique du site, joignable pour les questions
  * techniques. Il n'est **pas** le responsable du traitement — c'est
  * l'association —, ni le directeur de la publication — c'est son président —,
- * ni un contact RGPD : l'association n'a désigné ni délégué ni référent.
+ * ni le canal des demandes relatives aux données (courriel et téléphone de
+ * `DATA_CONTACT_NAME`, ou formulaire catégorie « RGPD »).
  */
 export const LEGAL_CONTACT_DISCORD = "elessiah";
 
@@ -38,11 +47,27 @@ export const LEGAL_CONTACT_DISCORD = "elessiah";
 export const REPORT_FORM_NAME = "Signaler un problème";
 
 /**
+ * Personne à contacter pour les demandes relatives aux données : l'hébergeur
+ * du site, désigné par l'association **en tant qu'hébergeur** : nom, courriel
+ * et téléphone sont ceux de `SITE_HOST`, qui ne se remplacent qu'ensemble.
+ * Changer d'hébergeur oblige donc à revoir cette désignation — c'est une
+ * décision de l'association, que ce module ne prend pas à sa place. Jamais « DPO » ni « délégué » : ce
+ * titre désigne la fonction de l'article 37 du RGPD, qui n'est pas la sienne.
+ */
+export const DATA_CONTACT_NAME = SITE_HOST.name;
+
+/** Qualité sous laquelle `DATA_CONTACT_NAME` est présenté. */
+export const DATA_CONTACT_ROLE = "hébergeur technique du site";
+
+/** Intitulé du rôle, tel que les pages l'écrivent. */
+export const DATA_CONTACT_LABEL = "Personne à contacter pour vos demandes relatives à vos données";
+
+/**
  * Contact RGPD en une ligne, pour le registre des traitements et son export
  * CSV — qui ne savent pas révéler une adresse au clic : ils renvoient donc aux
  * pages qui le font plutôt que de l'écrire.
  */
-export const RGPD_CONTACT_LINE = `L'association : courriel et téléphone (mentions légales du site), ou formulaire « ${REPORT_FORM_NAME} » du site (pied de page), catégorie « RGPD »`;
+export const RGPD_CONTACT_LINE = `Demandes relatives aux données : ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de les recevoir — courriel et téléphone (politique de confidentialité et mentions légales du site) —, ou formulaire « ${REPORT_FORM_NAME} » du site (pied de page), catégorie « RGPD » ; l'association : courriel et téléphone (mentions légales du site)`;
 
 /**
  * Langues dans lesquelles l'association reçoit les demandes des autorités à

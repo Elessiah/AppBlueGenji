@@ -32,7 +32,13 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } f
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
-import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
+import {
+  ASSOCIATION_NAME,
+  ASSOCIATION_SEAT,
+  DATA_CONTACT_NAME,
+  DATA_CONTACT_ROLE,
+  RGPD_CONTACT_LINE,
+} from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-09-30";
@@ -145,13 +151,28 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
 export const ONEDRIVE_BACKUP_FRAMEWORK =
   "compte Microsoft personnel, régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft";
 
+/**
+ * Messagerie de la personne à contacter pour les demandes relatives aux
+ * données : un compte Outlook.com **personnel**, comme le OneDrive des
+ * sauvegardes (`ONEDRIVE_BACKUP_FRAMEWORK`) — même régime, sans contrat de
+ * sous-traitance —, mais **sans chiffrement** propre à l'association :
+ * Microsoft peut lire ce qu'on y écrit.
+ */
+export const OUTLOOK_MAIL_FRAMEWORK =
+  "compte Microsoft personnel (Outlook.com), régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft ; messages non chiffrés par l'association, lisibles par Microsoft";
+
 export interface RegisterController {
   name: string;
   legalForm: string;
   seat: string;
   /** Moyens de joindre le responsable — aucune adresse en clair (`lib/shared/legal-contact.ts`). */
   contact: string;
-  dpo: string;
+  /**
+   * Personne à contacter pour les demandes relatives aux données. Jamais un
+   * « délégué à la protection des données » : la fonction de l'article 37
+   * n'est pas la sienne, et la rubrique le dit.
+   */
+  dataContact: string;
   /** Hébergeur du site, sous-traitant : il héberge les données de tous les traitements. */
   host: string;
 }
@@ -182,7 +203,7 @@ export function registerController(): RegisterController {
     legalForm: "Association loi 1901",
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE,
-    dpo: "Aucun délégué à la protection des données ni référent désigné : l'association traite elle-même les demandes (contact ci-dessus)",
+    dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées données avec celles du responsable du traitement). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
     host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
@@ -389,7 +410,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     subPurposes: [
       `Compter visites (24 h, 7 jours, 30 jours, total) et visiteurs uniques (24 h, 7 jours, 30 jours, ${SITE_VISITOR_RETENTION_MONTHS} mois)`,
     ],
-    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie de mesure ni traceur tiers ; droit d'opposition (art. 21) appliqué par le site lui-même — signaux Global Privacy Control et Do Not Track du navigateur, ou bouton d'opposition de /rgpd#audience (cookie bg_audience_optout, sans identifiant) : une visite refusée n'est pas enregistrée, le serveur relisant ces signaux, et n'est pas même transmise quand le navigateur les expose à la page. Pour les visites déjà enregistrées, le droit s'exerce par le formulaire de signalement, catégorie RGPD, ou auprès du contact Discord",
+    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie de mesure ni traceur tiers ; droit d'opposition (art. 21) appliqué par le site lui-même — signaux Global Privacy Control et Do Not Track du navigateur, ou bouton d'opposition de /rgpd#audience (cookie bg_audience_optout, sans identifiant) : une visite refusée n'est pas enregistrée, le serveur relisant ces signaux, et n'est pas même transmise quand le navigateur les expose à la page. Pour les visites déjà enregistrées, le droit s'exerce comme les autres droits : auprès de la personne à contacter pour les demandes relatives aux données, par le formulaire de signalement, catégorie RGPD, ou auprès de l'association",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
       "Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : donnée pseudonymisée — sans le secret, elle ne se rattache à personne, mais l'association, qui le détient, peut recalculer l'empreinte d'un compte ou d'un couple IP et navigateur",
@@ -544,36 +565,47 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Masquer un logo d'équipe ou un avatar de joueur signalé, puis le rétablir ou le supprimer définitivement",
       "Accuser réception d'une notification de contenu illicite, puis notifier à son auteur la décision et les voies de recours",
       "Répondre aux demandes d'exercice des droits et aux demandes adressées à l'hébergeur, dont celles des autorités",
+      "Recevoir par courriel ou par téléphone, auprès de la personne à contacter pour les demandes relatives aux données, les demandes d'exercice des droits et les questions sur le traitement des données, et y répondre",
       "Alerter les administrateurs sur Discord, sans donnée nominative",
     ],
     legalBasis:
-      "Obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres",
+      "Obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres ; par courriel ou par téléphone comme par le formulaire (catégorie RGPD), une demande d'exercice des droits ou une question sur le traitement de ses données — qui relève du droit d'accès (RGPD, art. 15) — repose sur la même obligation légale",
     dataSubjects: [
       "Signalants, utilisateurs ou non (titulaires de droits, représentants, visiteurs)",
       "Joueurs et membres des équipes visés par un signalement",
+      "Personnes, membres ou non, qui adressent une demande relative à leurs données par courriel ou par téléphone",
     ],
     dataCategories: [
       "Catégorie, description, éléments désignés et page d'origine du signalement",
       `Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, ${copyrightNoticeElementsText()}`,
       "Contestations : texte, compte de leur auteur et adresse facultative",
       "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
+      "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande et de la réponse, adresse électronique ou numéro de l'expéditeur, et souvent son nom",
     ],
     sensitiveData: "Aucune",
     retention: [
       `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
+      `Demande reçue par courriel ou par téléphone : même règle qu'une demande RGPD faite depuis le formulaire — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la clôture de la demande (l'équivalent de l'archivage d'un signalement), avant suppression de la messagerie de la personne à contacter (courriel) ou de son téléphone (SMS reçus et envoyés, messagerie vocale, journal d'appels)`,
       `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
     ],
     recipients: [
       "Administrateurs de l'association",
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
+      `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
+      "Opérateur téléphonique de cette personne : demandes faites par téléphone (appel, SMS, messagerie vocale)",
+      `Microsoft, qui héberge la messagerie de cette personne (${OUTLOOK_MAIL_FRAMEWORK}) : demandes reçues et réponses envoyées par courriel`,
     ],
-    transfers: [`États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`],
+    transfers: [
+      `États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`,
+      `Possibles vers les États-Unis : Microsoft (messagerie Outlook.com de la personne à contacter, demandes reçues et réponses envoyées par courriel) — ${transferBasis(["MICROSOFT"])}`,
+    ],
     security: [
       ...COMMON_SECURITY,
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
       "Plafonds d'envoi par personne et par heure",
       "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
+      "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft (messagerie), de l'opérateur téléphonique et de l'appareil personnel de la personne à contacter",
     ],
   },
   {
@@ -675,7 +707,7 @@ export const REGISTER_EXPORT_COLUMNS = [
   "Nom du traitement",
   "Date de mise à jour",
   "Responsable du traitement",
-  "Délégué à la protection des données",
+  "Personne à contacter pour les demandes relatives aux données",
   "Hébergeur (sous-traitant)",
   "Finalité principale",
   "Sous-finalités",
@@ -724,7 +756,7 @@ export function registerToCsv(
     a.name,
     REGISTER_UPDATED_AT,
     controllerText,
-    controller.dpo,
+    controller.dataContact,
     controller.host,
     a.purpose,
     listCell(a.subPurposes),

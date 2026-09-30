@@ -60,9 +60,12 @@ art. 16), de les traiter vite, et de laisser les personnes visées répondre
 courriel de l'association est publié (mentions légales, `/rgpd`), mais **jamais en
 clair** : une adresse écrite dans une page, ou dans ce dépôt public, est moissonnée
 par les robots — elle se révèle au clic (`lib/shared/obfuscated-contact.ts`). Une
-demande d'exercice des droits ou un courrier à l'éditeur ou à l'hébergeur passe
-donc par ce courriel, par le formulaire, ou sur Discord auprès du tag
-`LEGAL_CONTACT_DISCORD`. Ni l'une ni l'autre ne
+demande d'exercice des droits passe par la **personne à contacter pour les
+demandes relatives aux données** (l'hébergeur technique, `DATA_CONTACT_NAME`,
+courriel et téléphone révélés au clic), par le formulaire, ou par le courriel de
+l'association ; un courrier à l'éditeur ou à l'hébergeur, par ce courriel ou le
+formulaire. Le tag Discord `LEGAL_CONTACT_DISCORD` ne sert qu'aux questions
+techniques. Ni l'une ni l'autre catégorie ne
 désigne de cible : une demande sur ses propres données n'a personne à prévenir,
 et un contenu illicite d'un membre se signale par « Droit d'auteur » ou
 « Modération », qui savent le masquer et le faire contester. `/rgpd` ouvre le

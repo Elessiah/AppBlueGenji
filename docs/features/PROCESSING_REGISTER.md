@@ -14,7 +14,7 @@ joueur, le staff — sans demande à faire :
 ## Source unique
 
 `lib/shared/processing-register.ts` (pur) porte tout : le responsable
-(`registerController` : l'association sous sa dénomination statutaire et son siège, contact tiré de `lib/shared/legal-contact.ts` — renvoi au courriel des mentions légales, formulaire et tag Discord, **aucune adresse en clair**, un tableur ne sachant pas la révéler au clic),
+(`registerController` : l'association sous sa dénomination statutaire et son siège, contact tiré de `lib/shared/legal-contact.ts` — personne à contacter pour les demandes relatives aux données (l'hébergeur technique, rubrique `dataContact`, qui a remplacé « Délégué à la protection des données » : ce n'en est pas un), renvoi aux coordonnées de la politique de confidentialité et des mentions légales, formulaire, **aucune adresse en clair**, un tableur ne sachant pas la révéler au clic),
 la liste `PROCESSING_ACTIVITIES` et l'export `registerToCsv`. La page et le
 tableur en descendent tous deux : ils ne peuvent pas se contredire.
 

@@ -10,7 +10,7 @@
  * Le téléphone n'y figure qu'**encodé** (`lib/shared/obfuscated-contact.ts`) :
  * les mentions légales le révèlent au clic, jamais dans le HTML.
  */
-import { SITE_HOST_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
+import { SITE_HOST_EMAIL_ENCODED, SITE_HOST_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
 
 export const SITE_HOST = {
   name: "Keryan Houssin",
@@ -22,6 +22,11 @@ export const SITE_HOST = {
   status: "Particulier, bénévole de l'association",
   address: "13 rue du Chemin Fourchue, 14000 Caen, France",
   phoneEncoded: SITE_HOST_PHONE_ENCODED,
+  /**
+   * Courriel, publié seulement là où l'hébergeur est la personne à contacter
+   * pour les demandes relatives aux données (`/rgpd`, mentions légales).
+   */
+  emailEncoded: SITE_HOST_EMAIL_ENCODED,
   /** Machine qui fait tourner le site et le bot Discord. */
   machine: "un Raspberry Pi, à Caen",
   /** La même machine, pour les pages anglaises (pages légales du bot). */

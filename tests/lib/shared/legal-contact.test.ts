@@ -4,11 +4,15 @@ import { describe, expect, it } from "@jest/globals";
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
+  DATA_CONTACT_LABEL,
+  DATA_CONTACT_NAME,
+  DATA_CONTACT_ROLE,
   LEGAL_CONTACT_DISCORD,
   REPORT_FORM_NAME,
   RGPD_CONTACT_LINE,
 } from "@/lib/shared/legal-contact";
 import { registerController } from "@/lib/shared/processing-register";
+import { SITE_HOST } from "@/lib/shared/site-host";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -24,6 +28,8 @@ const ROOT = join(__dirname, "..", "..", "..");
 const SCANNED = ["app", "components", "lib", "docs", "README.md", "CLAUDE.md", ".env.production.example", ".env.example"];
 const TEXT_EXT = /\.(ts|tsx|md|css|json|example)$/;
 // Composées plutôt qu'écrites : ce fichier ne doit pas être celui qui les publie.
+// La première est redevenue un contact (personne à contacter pour les données),
+// mais **encodée** seulement : en clair, elle reste refusée partout.
 const RETIRED_ADDRESSES = [["keryan.h", "outlook.fr"].join("@"), ["presse", "bluegenji-esport.fr"].join("@")];
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 const EMAIL_GLOBAL = new RegExp(EMAIL.source, "g");
@@ -189,8 +195,10 @@ describe("contact de remplacement", () => {
     expect(button).toContain("label = REPORT_FORM_NAME");
   });
 
-  it("ligne du registre : l'association (courriel par renvoi, formulaire RGPD), jamais l'hébergeur, sans adresse", () => {
-    expect(RGPD_CONTACT_LINE).toContain("L'association : courriel et téléphone (mentions légales du site)");
+  it("ligne du registre : la personne à contacter, le formulaire RGPD et l'association, par renvoi, sans adresse", () => {
+    // Le responsable reste l'association : la personne à contacter est présentée comme telle.
+    expect(RGPD_CONTACT_LINE.startsWith(`Demandes relatives aux données : ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association`)).toBe(true);
+    expect(RGPD_CONTACT_LINE).toContain("l'association : courriel et téléphone (mentions légales du site)");
     expect(RGPD_CONTACT_LINE).not.toContain(LEGAL_CONTACT_DISCORD);
     expect(RGPD_CONTACT_LINE).toContain(REPORT_FORM_NAME);
     expect(RGPD_CONTACT_LINE).toContain("« RGPD »");
@@ -200,9 +208,44 @@ describe("contact de remplacement", () => {
   it("/rgpd ouvre le formulaire directement sur la catégorie RGPD", () => {
     const page = readSource("app/rgpd/page.tsx");
     expect(page).toContain('initialCategory="RGPD"');
-    // Aucun référent désigné : l'hébergeur technique n'est pas un contact RGPD.
+    // Le tag Discord de l'hébergeur ne sert qu'aux questions techniques.
     expect(page).not.toContain("LEGAL_CONTACT_DISCORD");
-    expect(page).toContain("n&apos;a désigné ni délégué à la protection des données ni");
+  });
+});
+
+describe("personne à contacter pour les demandes relatives aux données", () => {
+  it("est l'hébergeur technique, jamais appelé délégué ni DPO", () => {
+    // Même personne, même graphie que l'hébergeur des mentions légales.
+    expect(DATA_CONTACT_NAME).toBe(SITE_HOST.name);
+    expect(DATA_CONTACT_ROLE).toBe("hébergeur technique du site");
+    expect(DATA_CONTACT_LABEL).toBe("Personne à contacter pour vos demandes relatives à vos données");
+    for (const text of [DATA_CONTACT_LABEL, DATA_CONTACT_ROLE, RGPD_CONTACT_LINE]) {
+      expect(text).not.toMatch(/DPO|délégué/i);
+    }
+  });
+
+  it.each(["app/rgpd/page.tsx", "app/mentions-legales/page.tsx"])(
+    "%s affiche son courriel et son téléphone, protégés, et dit qu'il n'est pas un délégué",
+    (file) => {
+      const page = readSource(file);
+      expect(page).toContain("encoded={DATA_CONTACT_EMAIL_ENCODED}");
+      expect(page).toContain("encoded={DATA_CONTACT_PHONE_ENCODED}");
+      expect(page).toContain("{DATA_CONTACT_NAME}, {DATA_CONTACT_ROLE}");
+      expect(page).toMatch(/n&apos;est pas (un )?délégué à la protection des données/);
+      expect(page).not.toMatch(/ni délégué à la protection des données ni/);
+      expect(page).not.toMatch(/\bDPO\b/);
+      // Le formulaire reste un canal possible.
+      expect(page).toContain("{REPORT_FORM_NAME}");
+    },
+  );
+
+  it("/rgpd garde les coordonnées de l'association et nomme la section des droits", () => {
+    const page = readSource("app/rgpd/page.tsx");
+    expect(page).toContain("encoded={ASSOCIATION_EMAIL_ENCODED}");
+    expect(page).toContain('id="exercer-vos-droits"');
+    // Durée annoncée pour les demandes reçues par courriel ou téléphone (art. 13.2.a).
+    expect(page).toContain("{REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture");
+    expect(page).toContain("{DATA_CONTACT_LABEL}");
   });
 
   it("le formulaire s'ouvre sur la catégorie demandée, focus dans la description, et reste modifiable", () => {

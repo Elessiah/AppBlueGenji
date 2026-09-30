@@ -3,6 +3,7 @@ import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
+  DATA_CONTACT_NAME,
   LEGAL_CONTACT_DISCORD,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
@@ -92,7 +93,28 @@ describe("bot legal content carries the contact details", () => {
       expect(contact).toBeDefined();
       expect(JSON.stringify(contact)).not.toContain(LEGAL_CONTACT_DISCORD);
     }
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("ni délégué à la protection des données ni référent");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).not.toContain("ni délégué à la protection des données ni référent");
+  });
+
+  it("the privacy policy names the person to contact for data requests, without their details", () => {
+    for (const lang of [PRIVACY_POLICY.fr, PRIVACY_POLICY.en]) {
+      const contact = JSON.stringify(lang.sections.find((section) => section.meta === "CONTACT"));
+      expect(contact).toContain(`**${DATA_CONTACT_NAME}**`);
+      expect(contact).toContain("/rgpd#exercer-vos-droits");
+      expect(contact).toMatch(/Article 37|article 37/);
+    }
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("ce n'est pas un délégué à la protection des données au sens de l'article 37");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("is not a data protection officer within the meaning of Article 37");
+    // Une demande par courriel passe par la messagerie Outlook.com de l'hébergeur :
+    // la politique ne peut plus dire que Microsoft ne reçoit que du chiffré.
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("lui parviennent non chiffrées par l'association, donc lisibles par Microsoft");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("reach it without encryption by the association, and so readable by Microsoft");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("L'opérateur téléphonique de l'hébergeur technique");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("The technical host's phone operator");
+    // …et renvoie à la politique du site, qui décrit ce traitement (base légale, durée).
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("est décrit dans la politique de confidentialité du site");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("is described in the website's privacy policy");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("(/rgpd#exercer-vos-droits) (in French)");
   });
 });
 

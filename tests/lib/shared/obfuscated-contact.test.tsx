@@ -3,18 +3,22 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   ASSOCIATION_EMAIL_ENCODED,
   ASSOCIATION_PHONE_ENCODED,
+  DATA_CONTACT_EMAIL_ENCODED,
+  DATA_CONTACT_PHONE_ENCODED,
   SITE_HOST_PHONE_ENCODED,
   contactHref,
   decodeContact,
   encodeContact,
 } from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
+import { SITE_HOST } from "@/lib/shared/site-host";
 import { readSource } from "../../helpers/read-source";
 
 // Composées plutôt qu'écrites : un test reste un fichier du dépôt public.
 const EMAIL = ["bluegenjiesport", "gmail.com"].join("@");
 const ASSOCIATION_PHONE = ["07", "83", "29", "42", "03"].join(" ");
-const HOST_PHONE = ["06", "02", "22", "49", "56"].join(" ");
+const HOST_PHONE = ["06", "02", "22", "49", "46"].join(" ");
+const DATA_CONTACT_EMAIL = ["keryan.h", "outlook.fr"].join("@");
 
 describe("encodeContact / decodeContact", () => {
   it.each([EMAIL, ASSOCIATION_PHONE, "é@exemple.invalid"])("aller-retour : %s", (plain) => {
@@ -40,6 +44,14 @@ describe("encodeContact / decodeContact", () => {
     expect(decodeContact(ASSOCIATION_EMAIL_ENCODED)).toBe(EMAIL);
     expect(decodeContact(ASSOCIATION_PHONE_ENCODED)).toBe(ASSOCIATION_PHONE);
     expect(decodeContact(SITE_HOST_PHONE_ENCODED)).toBe(HOST_PHONE);
+    expect(decodeContact(DATA_CONTACT_EMAIL_ENCODED)).toBe(DATA_CONTACT_EMAIL);
+  });
+
+  it("les coordonnées du contact données sont celles de l'hébergeur, encodées une seule fois", () => {
+    expect(DATA_CONTACT_PHONE_ENCODED).toBe(SITE_HOST_PHONE_ENCODED);
+    expect(DATA_CONTACT_EMAIL_ENCODED).toBe(SITE_HOST.emailEncoded);
+    expect(DATA_CONTACT_PHONE_ENCODED).toBe(SITE_HOST.phoneEncoded);
+    expect(decodeContact(DATA_CONTACT_PHONE_ENCODED)).toBe(HOST_PHONE);
   });
 });
 

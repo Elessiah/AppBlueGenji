@@ -28,6 +28,7 @@ import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
+  DATA_CONTACT_NAME,
   LEGAL_CONTACT_DISCORD,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
@@ -89,11 +90,21 @@ const CONTACT_ITEMS_EN = [
   `**Discord**: ${CONTACT_DISCORD} (the association's technical host)`,
   `The association's email address and phone number: see the [legal notice](${LEGAL_NOTICE_HREF})`,
 ];
-// Contact de la politique de confidentialité : l'exercice des droits va à
-// l'association, qui n'a désigné ni délégué ni référent — l'hébergeur
-// technique n'y figure pas (`lib/shared/legal-contact.ts`).
-const PRIVACY_CONTACT_ITEMS_FR = CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**"));
-const PRIVACY_CONTACT_ITEMS_EN = CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**"));
+// Contact de la politique de confidentialité : la personne chargée par
+// l'association des demandes relatives aux données (l'hébergeur technique,
+// `DATA_CONTACT_NAME`) vient en tête. Ses coordonnées ne s'écrivent pas ici —
+// une page Markdown ne sait pas les révéler au clic — : on renvoie à la section
+// du site qui le fait. Le tag Discord de l'hébergeur reste hors de cette liste,
+// il ne sert qu'aux questions techniques (`lib/shared/legal-contact.ts`).
+const SITE_RIGHTS_HREF = `${SITE_PRIVACY_HREF}#exercer-vos-droits`;
+const PRIVACY_CONTACT_ITEMS_FR = [
+  `Personne à contacter pour vos demandes relatives à vos données : **${DATA_CONTACT_NAME}**, hébergeur technique du site — courriel et téléphone dans la [politique de confidentialité du site](${SITE_RIGHTS_HREF}). Ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD : l'association reste responsable du traitement. Ce traitement (base légale, données, durée de conservation) est décrit dans la politique de confidentialité du site ; ses destinataires et transferts figurent aussi aux sections 04 et 05 de la présente politique`,
+  ...CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**")),
+];
+const PRIVACY_CONTACT_ITEMS_EN = [
+  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}) (in French). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller. This processing (legal basis, data, retention period) is described in the website's privacy policy; its recipients and transfers are also listed in sections 04 and 05 of this policy`,
+  ...CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**")),
+];
 
 const HOSTING_FR = {
   meta: "HÉBERGEUR",
@@ -413,7 +424,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle n'a désigné ni délégué à la protection des données ni référent. Les moyens de la joindre figurent à la section Contact.`,
+            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle a chargé **${DATA_CONTACT_NAME}**, hébergeur technique du site, de recevoir les demandes relatives à vos données ; ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD. Les moyens de les joindre figurent à la section Contact.`,
           },
           {
             kind: "p",
@@ -509,7 +520,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
                             `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
-              "Microsoft, qui stocke sur le OneDrive personnel de l'hébergeur technique les sauvegardes, chiffrées avant envoi avec une clé que Microsoft ne détient pas.",
+              "Microsoft, qui stocke sur le OneDrive personnel de l'hébergeur technique les sauvegardes, chiffrées avant envoi avec une clé que Microsoft ne détient pas ; et qui héberge la messagerie personnelle (Outlook.com) de l'hébergeur technique, par où passent, non chiffrées par l'association et lisibles par Microsoft, toute demande relative à vos données que vous envoyez par courriel à l'hébergeur technique et la réponse que celui-ci vous adresse par courriel.",
+              "L'opérateur téléphonique de l'hébergeur technique, si vous l'appelez ou lui laissez un SMS ou un message vocal au sujet de vos données.",
               "Aucune donnée n'est vendue, ni cédée à d'autres destinataires que ceux listés ici.",
             ],
           },
@@ -524,7 +536,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Discord** (États-Unis) : ${DPF_ADEQUACY_DECISION}.`,
-              `**Microsoft** : transfert possible vers les États-Unis, Microsoft ne garantissant pas le lieu de stockage d'un compte personnel ; il ne reçoit que des données chiffrées — ${DPF_ADEQUACY_DECISION}.`,
+              `**Microsoft** : transfert possible vers les États-Unis, Microsoft ne garantissant pas le lieu de stockage d'un compte personnel ; il ne reçoit que des données chiffrées pour les sauvegardes, mais une demande envoyée par courriel à l'hébergeur technique, et sa réponse par courriel, lui parviennent non chiffrées par l'association, donc lisibles par Microsoft — ${DPF_ADEQUACY_DECISION}.`,
             ],
           },
         ],
@@ -615,7 +627,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `The data controller is the association **${ASSOCIATION_NAME}**, a French non-profit association under the law of 1901 whose registered office is at ${ASSOCIATION_SEAT}. It has appointed neither a data protection officer nor a privacy contact person. The means of contacting it are listed in the Contact section.`,
+            text: `The data controller is the association **${ASSOCIATION_NAME}**, a French non-profit association under the law of 1901 whose registered office is at ${ASSOCIATION_SEAT}. It has put **${DATA_CONTACT_NAME}**, the website's technical host, in charge of receiving requests about your data; this person is not a data protection officer within the meaning of Article 37 GDPR. The means of contacting them are listed in the Contact section.`,
           },
           {
             kind: "p",
@@ -707,7 +719,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
                             `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",
-              "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold.",
+              "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold; and which hosts the technical host's personal mailbox (Outlook.com), through which any request about your data that you email to them, and their emailed reply, pass without encryption by the association, readable by Microsoft.",
+              "The technical host's phone operator, if you call them or leave them a text or voicemail about your data.",
               "No data is sold, or handed over to any recipient other than those listed here.",
             ],
           },
@@ -722,7 +735,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Discord** (United States): ${DPF_ADEQUACY_DECISION_EN}.`,
-              `**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; it only receives encrypted data — ${DPF_ADEQUACY_DECISION_EN}.`,
+              `**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; it only receives encrypted data for the backups, but a request emailed to the technical host, and their emailed reply, reach it without encryption by the association, and so readable by Microsoft — ${DPF_ADEQUACY_DECISION_EN}.`,
             ],
           },
         ],

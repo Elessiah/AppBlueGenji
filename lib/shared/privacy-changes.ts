@@ -47,6 +47,7 @@ import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
+import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -476,6 +477,31 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       `Les empreintes enregistrées avant ce changement sont datées de sa mise en place : leur dernière visite n'avait pas été conservée. Le détail des visites reste effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, comme avant.`,
     ],
     links: [{ href: "/rgpd#audience", label: "Lire la section « Mesure d'audience »" }],
+  },
+  // Une personne est désormais chargée des demandes relatives aux données :
+  // l'hébergeur technique du site, là où la politique disait qu'aucune n'était
+  // désignée. Le moyen d'exercer ses droits change, et avec lui un
+  // destinataire : un courriel arrive dans une messagerie hébergée par
+  // Microsoft (registre, T11) — c'est une information due à chaque compte. Entrée à part plutôt que
+  // quatrième point de `2026-10-rectificatifs-information`, qui annonce des
+  // corrections d'annonces passées : même date, donc même modale. Le message
+  // privé, lui, peut la reporter au suivant si les entrées du jour dépassent
+  // ensemble `PRIVACY_DM_MAX_LENGTH` (`privacyChangesForOneMessage`) — c'est
+  // la règle commune de la file, pas une exception à celle-ci. Le résumé, seul
+  // champ repris dans le message privé Discord, ne nomme personne
+  // (`lib/shared/log-privacy.ts`) : le nom ne figure que dans le détail,
+  // affiché par la modale du site.
+  {
+    id: "2026-10-contact-donnees",
+    publishedAt: "2026-10-01",
+    title: "Une personne à contacter pour tes données",
+    summary: `Pour exercer tes droits sur tes données ou poser une question à leur sujet, tu peux maintenant t'adresser directement à la personne que l'association a chargée de ces demandes, l'${DATA_CONTACT_ROLE}, par courriel ou par téléphone. Le formulaire du site reste ouvert.`,
+    details: [
+      `Cette personne est ${DATA_CONTACT_NAME}. Ses coordonnées se lisent dans la politique de confidentialité et les mentions légales du site. Le formulaire « ${REPORT_FORM_NAME} », catégorie RGPD, et les coordonnées de l'association restent ouverts.`,
+      `Un courriel que tu lui envoies, et la réponse qu'il t'adresse par courriel, passent par sa messagerie personnelle, hébergée par Microsoft (Outlook.com, possibles transferts vers les États-Unis), qui peut les lire ; un appel, un SMS ou un message vocal passe par son opérateur téléphonique. Ta demande et la réponse — courriel, SMS, message vocal ou trace d'appel — sont gardées le temps de la traiter, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, comme une demande RGPD faite depuis le formulaire.`,
+      "Ce n'est pas un délégué à la protection des données au sens du RGPD : l'association reste responsable du traitement de tes données et de la réponse à tes demandes.",
+    ],
+    links: [{ href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" }],
   },
 ];
 
