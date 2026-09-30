@@ -568,6 +568,9 @@ describe("rollUpExpiredSiteVisits", () => {
     expect(report[0]).toContain("MAX(created_at)");
     expect(report[0]).toContain("last_seen_at = GREATEST(bg_site_visitors.last_seen_at, VALUES(last_seen_at))");
     expect(purge[0]).toContain("last_seen_at < NOW() - INTERVAL ? MONTH");
+    // Une empreinte qui a encore des visites au détail reste, même si son
+    // report a échoué (`rememberVisitor` est en meilleur effort).
+    expect(purge[0]).toMatch(/NOT EXISTS \(\s+SELECT 1 FROM bg_site_visits v WHERE v\.visitor_key = bg_site_visitors\.visitor_key/);
     expect(purge[1]).toEqual([SITE_VISITOR_RETENTION_MONTHS]);
     // Le report d'abord : une empreinte encore au détail n'est jamais effacée.
     expect(calls.indexOf(report)).toBeLessThan(calls.indexOf(purge));

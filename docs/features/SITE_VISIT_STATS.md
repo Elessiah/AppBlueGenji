@@ -132,9 +132,11 @@ pour la mesure d'audience. Le « total » des visiteurs uniques est donc celui d
 vingt-cinq derniers mois. Aucun ordonnanceur : la purge suit le repli, entraîné
 par les signalements de visite — après chaque visite enregistrée (synchronisation
 vers le bot), et au plus une fois par heure par `maintainSiteVisitRetention`,
-appelé par `/api/visits` que la visite soit comptée **ou non** : sans sel secret,
-ou si tous les visiteurs s'opposent, plus rien ne s'enregistre, et les durées
-annoncées ne tiendraient plus. Les empreintes antérieures à la colonne n'ont **pas**
+appelé par `/api/visits` que la visite soit comptée **ou non**, et par
+`listTournamentBuckets` comme les autres purges (un visiteur opposé n'envoie
+aucun signalement) : sans sel secret, ou si tous les visiteurs s'opposent, plus
+rien ne s'enregistre, et les durées annoncées ne tiendraient plus. Une empreinte
+qui a encore des visites au détail n'est jamais purgée. Les empreintes antérieures à la colonne n'ont **pas**
 été rétro-datées — leur dernière visite n'était écrite nulle part — et portent
 la date du déploiement : leur durée court depuis lui, lecture prudente qui
 n'efface rien sur une date inventée. Le détail des visites garde sa durée de 31

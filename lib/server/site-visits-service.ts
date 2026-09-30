@@ -281,7 +281,9 @@ let lastRetentionMaintenanceAt = 0;
  * une visite **enregistrée** : sans sel secret, ou quand tous les visiteurs
  * s'opposent à la mesure, rien ne s'enregistre plus et les durées annoncées
  * cesseraient d'être tenues. `/api/visits` l'appelle donc à chaque signalement,
- * refusé ou non — c'est de l'entretien, rien n'y concerne le visiteur. Jamais
+ * refusé ou non — c'est de l'entretien, rien n'y concerne le visiteur —, et
+ * `listTournamentBuckets` aussi, comme les autres purges : un visiteur opposé
+ * dont le navigateur expose le signal n'envoie aucun signalement. Jamais
  * attendu, jamais levé.
  */
 export function maintainSiteVisitRetention(now: number = Date.now()): void {
@@ -355,10 +357,15 @@ async function rollUpExpiredSiteVisitsNow(): Promise<number> {
         [cutoff],
       );
       // Empreintes au-delà de leur durée de conservation, comptée depuis la
-      // dernière visite. Après le report ci-dessus, qui ne fait que les
-      // rajeunir : une empreinte encore présente au détail n'est jamais effacée.
+      // dernière visite. Une empreinte encore présente au détail n'est jamais
+      // effacée : le report ci-dessus ne rajeunit que les jours repliés, et
+      // `rememberVisitor` (meilleur effort) a pu manquer une visite récente.
       await connection.execute(
-        `DELETE FROM bg_site_visitors WHERE last_seen_at < NOW() - INTERVAL ? MONTH`,
+        `DELETE FROM bg_site_visitors
+         WHERE last_seen_at < NOW() - INTERVAL ? MONTH
+           AND NOT EXISTS (
+             SELECT 1 FROM bg_site_visits v WHERE v.visitor_key = bg_site_visitors.visitor_key
+           )`,
         [SITE_VISITOR_RETENTION_MONTHS],
       );
       await connection.execute(
