@@ -22,6 +22,7 @@ NODE_ENV=production npm run backfill:avatars  # Rapatrie les photos restées che
 NODE_ENV=production npm run replay:deletions  # Après restauration d'une sauvegarde : rejoue les suppressions de compte (--dry-run d'abord)
 NODE_ENV=production npm run rotate:hidden-avatars  # Une fois après déploiement : renomme le fichier des avatars déjà masqués
 npm run push:keys    # Tire une paire de clés VAPID (notifications push) — une fois pour toutes
+npm run sonar        # Analyse SonarQube locale de la branche (Docker, aucun jeton) — voir « Pipeline Git », étape 7
 ./update.sh          # Déploiement (voir docs/DEPLOYMENT.md — et n'effacez jamais les journaux pm2 à la main)
 ```
 
@@ -445,13 +446,19 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <norepl
 6. **Push** : `git push -u origin feature/<short-name>`
 7. **Revue de PR — en boucle jusqu'à zéro finding** : ouvrir la PR (`gh pr create`), puis lancer une revue du diff avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR.
 
-   **SonarQube avant et après les cycles de revue — exigence maximale sur tous les axes** : lancer une analyse SonarQube de la branche **avant** le premier cycle de `/code-review` (pour partir d'un état mesuré et corriger d'emblée ce qu'elle remonte), puis de nouveau **après** le dernier cycle sans finding. L'analyse de clôture doit satisfaire, **sur le nouveau code** de la PR, chacun des critères suivants — aucun n'est négociable contre un autre :
+   **SonarQube avant et après les cycles de revue — exigence maximale sur tous les axes** : lancer `npm run sonar` **avant** le premier cycle de `/code-review` (pour partir d'un état mesuré et corriger d'emblée ce qu'il remonte), puis de nouveau **après** le dernier cycle sans finding.
+
+   **Aucun jeton à demander ni à fournir — ne jamais en réclamer à l'utilisateur.** L'instance est **locale** : conteneur Docker `sonarqube` sur `http://localhost:9000`, que le script démarre lui-même s'il est arrêté (Docker Desktop doit tourner). `scripts/sonar-scan.mjs` s'y authentifie avec le compte d'administration local (`admin`/`admin`), tire un jeton d'analyse **temporaire**, lance le scanner par l'image Docker `sonarsource/sonar-scanner-cli`, puis révoque le jeton. Il fait tout le reste : couverture Jest (`coverage/lcov.info`), analyse, attente du traitement, puis **rapport** des critères ci-dessous — chaque problème avec son fichier, sa ligne et sa règle. Code de sortie : **0** tous les critères tenus, **1** au moins un ne l'est pas (le rapport dit lequel), **2** l'analyse n'a pas pu avoir lieu (message d'échec : Docker arrêté, serveur injoignable…). Options : `npm run sonar -- --skip-coverage` réutilise la couverture déjà produite (itérations rapides — la clôture se fait **sans** cette option) ; `-- --fresh-baseline` rejoue l'analyse de référence.
+
+   **« Nouveau code » = ce que la branche change par rapport à `origin/main`**, et rien d'autre. L'édition Community n'analyse pas de branches : chaque branche a son propre projet (`appbluegenji-<branche>`), dont la première analyse porte sur le merge-base avec `origin/main` — le script s'en charge, et la rejoue seul si la branche est rebasée (le projet est alors recréé : les justifications déjà posées dans SonarQube sont à reposer). Les problèmes du code existant n'y figurent donc pas ; ils relèvent d'`ERREUR.txt`.
+
+   L'analyse de clôture doit satisfaire, **sur le nouveau code** de la PR, chacun des critères suivants — aucun n'est négociable contre un autre :
    - **Quality Gate au vert** ;
    - note **A** en **fiabilité**, en **sécurité** et en **maintenabilité** ;
    - **zéro problème ouvert**, toutes sévérités confondues (bugs, vulnérabilités, *code smells* — y compris mineurs et informatifs) ;
    - **100 % des *security hotspots* examinés**, chacun corrigé ou justifié par écrit dans SonarQube ;
    - **couverture de tests ≥ 80 %** et **duplication ≤ 3 %** ;
-   - aucun problème fermé par « Won't fix » / « False positive » sans justification écrite dans le commentaire du problème — marquer un vrai problème comme faux positif pour passer le seuil est interdit.
+   - aucun problème fermé par « Accepté » / « Faux positif » sans justification écrite dans le commentaire du problème (interface `http://localhost:9000`, compte `admin`/`admin`, projet de la branche) — marquer un vrai problème comme faux positif pour passer le seuil est interdit, et corriger reste toujours le premier geste.
 
    Critère non tenu → corriger, commiter, pousser, **relancer un cycle de revue complet** (une correction peut en appeler d'autres), puis une nouvelle analyse, jusqu'à ce que tous le soient. Un problème qui préexiste à la tâche (hors du nouveau code) suit la règle d'`ERREUR.txt` plutôt que d'élargir la PR, et est mentionné dans le résumé de fin.
 

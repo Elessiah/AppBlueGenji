@@ -13,6 +13,7 @@
     "typecheck:ts5": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.typecheck.json",
     "test": "jest",
     "test:coverage": "jest --coverage",
+    "sonar": "node scripts/sonar-scan.mjs",
     "e2e:install": "playwright install chromium",
     "pretest:e2e": "npm run e2e:install",
     "test:e2e": "playwright test",
