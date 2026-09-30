@@ -115,7 +115,7 @@ contrôle de présence n'en voit qu'une :
 |---|---|---|
 | Colonne **absente** | `bg_matches.phase_id` | « Unknown column » sur la première requête qui la nomme |
 | Colonne présente mais du **mauvais type** | `bg_tournaments.game` doit contenir `'OW'` et **plus** `'OW2'` | Une base restée avant la conversion `ENUM('OW2','MR')` → `ENUM('OW','MR')` porte bien la colonne, et rend « Data truncated for column 'game' » au premier tournoi écrit |
-| Colonne qui devait **partir** | `bg_users.email` (la colonne, pas ses valeurs : le filet ne lit qu'`information_schema`, c'est le repli ci-dessous qui compte les adresses) | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeOwnAccount` a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
+| Colonne qui devait **partir** | `bg_users.email` (la colonne, pas ses valeurs : le filet ne lit qu'`information_schema`, c'est le repli ci-dessous qui compte les adresses) | Le `DROP` est best-effort, jamais rejoué dans le processus (la porte mémorise une passe qui se résout toujours), et `anonymizeAccount` (appelée par `deleteOwnAccount`) a perdu son `email = NULL` dans la même version : les adresses resteraient, sans que rien ne les efface |
 | **Index** absent | `uniq_bg_teams_tag`, `uniq_bg_teams_solo_user` | La plus silencieuse de toutes : un index unique manquant ne fait *rien* tomber, il cesse seulement de trancher la course qu'il existe pour trancher — deux équipes créées au même instant prendraient le même sigle, et `mapTeamTagConflict` traduirait un `ER_DUP_ENTRY` qui n'arrive plus jamais |
 | **Clé primaire** restée trop étroite | `bg_swiss_standings`, `bg_survival_standings` doivent porter 3 colonnes | `phase_id` présent mais la clé restée à `(tournament_id, team_id)` : le classement de la phase 2 d'un tournoi `MULTI` **écrase** la ligne de la phase 1 pour la même équipe au lieu de lever |
 
@@ -177,7 +177,7 @@ Elle **ne répare rien** et ne fait échouer personne. Une base en retard se mig
 
 ### Si le retrait des adresses échoue
 
-Le `DROP COLUMN email` est le **seul effaceur restant** : `anonymizeOwnAccount`
+Le `DROP COLUMN email` est le **seul effaceur restant** : `anonymizeAccount`
 a perdu son `email = NULL` dans la même version, cette ligne n'ayant plus
 d'objet. Un `ALTER` refusé — droit manquant, verrou de métadonnées tenace —
 laisserait donc les adresses en place indéfiniment, y compris pour les comptes
@@ -269,7 +269,7 @@ statut choisi depuis.
 
 La distinction n'est pas de la coquetterie sur le `DROP COLUMN email`, elle y est
 même plus forte : ce `DROP` **est** l'effacement des adresses. Rien ne lit plus la
-colonne, donc la base démarrerait parfaitement sans lui, et `anonymizeOwnAccount`
+colonne, donc la base démarrerait parfaitement sans lui, et `anonymizeAccount`
 ne met plus l'adresse à `NULL` — cette ligne n'ayant plus d'objet. Un `ALTER`
 refusé et avalé garderait donc les adresses **indéfiniment et en silence**, y
 compris sur les comptes qui ont demandé leur suppression.
@@ -314,8 +314,8 @@ seed suisse, `forfeit_team_id` invalides, `visible_pseudo` forcé à 1, conversi
 
 ## Tables des signalements et des conditions d'utilisation
 
-Nouvelles tables, déclarées par `CREATE TABLE` seulement (aucune base ne les
-porte encore) : `bg_reports` (dont `parent_report_id`, contestation rattachée à
+Tables déclarées par `CREATE TABLE` seulement — aucune base ne les portait
+quand elles ont été écrites, la production les porte depuis : `bg_reports` (dont `parent_report_id`, contestation rattachée à
 son signalement, `ON DELETE CASCADE`), `bg_report_targets` (sans clé étrangère
 vers la cible), `bg_logo_quarantines` (logo masqué, `report_id` en
 `SET NULL`), `bg_terms_acceptances`. Les deux colonnes ajoutées à une table

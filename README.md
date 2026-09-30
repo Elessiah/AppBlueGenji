@@ -50,6 +50,7 @@ Les tables `bg_*` sont créées automatiquement au premier accès API.
 | `BOT_DOCS_PATH` | Chemin du dépôt du bot, pour `/bot/docs` (défaut : `../blueGenjiBot`) |
 | `VISIT_HASH_SALT` | Sel des empreintes de visite (recommandé en production) |
 | `TRUSTED_PROXY_HOPS`, `TRUSTED_PROXY_REAL_IP` | Proxys de confiance devant l'application |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | Notifications push (paire tirée une fois par `npm run push:keys` ; absentes = push éteint ; la clé privée ne change plus une fois en production) |
 | `DEV_AUTH_USER_ID` | Développement seulement : connecte d'office ce compte (inactif hors `NODE_ENV=development`) |
 
 Les redirections OAuth ont une valeur par défaut dérivée d'`APP_URL`.
@@ -67,6 +68,7 @@ npm run test:coverage  # Jest avec couverture
 npm run test:e2e       # Playwright
 npm run seed           # jeu de test (écrase les données préfixées Test_, refusé en production)
 npm run seed:view      # inspecte le jeu de test
+npm run push:keys      # tire une paire de clés VAPID (notifications push), une fois pour toutes
 ```
 
 Scripts prévus pour la production (`NODE_ENV=production`) : `npm run backfill:avatars` (rapatrie les photos restées chez leur hébergeur) et `npm run replay:deletions` (rejoue les suppressions de compte après restauration d'une sauvegarde — lancer d'abord avec `--dry-run`).
