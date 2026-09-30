@@ -148,6 +148,16 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
 export const ONEDRIVE_BACKUP_FRAMEWORK =
   "compte Microsoft personnel, régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft";
 
+/**
+ * Messagerie de la personne à contacter pour les demandes relatives aux
+ * données : un compte Outlook.com **personnel**, comme le OneDrive des
+ * sauvegardes (`ONEDRIVE_BACKUP_FRAMEWORK`) — même régime, sans contrat de
+ * sous-traitance —, mais **sans chiffrement** propre à l'association :
+ * Microsoft peut lire ce qu'on y écrit.
+ */
+export const OUTLOOK_MAIL_FRAMEWORK =
+  "compte Microsoft personnel (Outlook.com), régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft ; messages non chiffrés par l'association, lisibles par Microsoft";
+
 export interface RegisterController {
   name: string;
   legalForm: string;
@@ -559,6 +569,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataSubjects: [
       "Signalants, utilisateurs ou non (titulaires de droits, représentants, visiteurs)",
       "Joueurs et membres des équipes visés par un signalement",
+      "Personnes, membres ou non, qui adressent une demande relative à leurs données par courriel ou par téléphone",
     ],
     dataCategories: [
       "Catégorie, description, éléments désignés et page d'origine du signalement",
@@ -570,7 +581,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
-      "Demande reçue par courriel ou par téléphone : durée de conservation dans la messagerie de la personne à contacter non encore fixée par l'association",
+      `Demande reçue par courriel ou par téléphone : même durée qu'une demande faite depuis le formulaire — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la réponse, avant suppression de la messagerie de la personne à contacter`,
       `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
     ],
     recipients: [
@@ -578,7 +589,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
       `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
-      "Microsoft, qui héberge la messagerie de cette personne (Outlook.com, compte personnel) : demandes reçues par courriel",
+      `Microsoft, qui héberge la messagerie de cette personne (${OUTLOOK_MAIL_FRAMEWORK}) : demandes reçues par courriel`,
     ],
     transfers: [
       `États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`,

@@ -48,9 +48,10 @@ export const REPORT_FORM_NAME = "Signaler un problème";
 
 /**
  * Personne à contacter pour les demandes relatives aux données : l'hébergeur
- * du site, désigné par l'association — son nom est **celui de l'hébergeur**
- * (`SITE_HOST`), comme son téléphone : changer d'hébergeur sans désigner une
- * autre personne ferait sinon afficher le numéro du nouveau sous l'ancien nom. Jamais « DPO » ni « délégué » : ce
+ * du site, désigné par l'association **en tant qu'hébergeur** : nom, courriel
+ * et téléphone sont ceux de `SITE_HOST`, qui ne se remplacent qu'ensemble.
+ * Changer d'hébergeur oblige donc à revoir cette désignation — c'est une
+ * décision de l'association, que ce module ne prend pas à sa place. Jamais « DPO » ni « délégué » : ce
  * titre désigne la fonction de l'article 37 du RGPD, qui n'est pas la sienne.
  */
 export const DATA_CONTACT_NAME = SITE_HOST.name;

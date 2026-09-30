@@ -778,8 +778,10 @@ export default async function RgpdPage() {
             <li>
               <strong>Microsoft</strong> (Outlook.com) : seulement si vous écrivez à la personne à
               contacter pour vos demandes relatives à vos données, dont la messagerie personnelle
-              est hébergée par Microsoft. Une demande faite depuis le formulaire du site n&apos;y
-              passe pas.
+              est hébergée par Microsoft sur un compte personnel, sans contrat de sous-traitance :
+              votre message n&apos;y est pas chiffré par l&apos;association, et il est conservé
+              aussi longtemps qu&apos;une demande faite depuis le formulaire du site, qui, elle,
+              n&apos;y passe pas.
             </li>
           </ul>
           <p>

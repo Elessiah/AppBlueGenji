@@ -11,6 +11,7 @@ import {
   encodeContact,
 } from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
+import { SITE_HOST } from "@/lib/shared/site-host";
 import { readSource } from "../../helpers/read-source";
 
 // Composées plutôt qu'écrites : un test reste un fichier du dépôt public.
@@ -46,8 +47,10 @@ describe("encodeContact / decodeContact", () => {
     expect(decodeContact(DATA_CONTACT_EMAIL_ENCODED)).toBe(DATA_CONTACT_EMAIL);
   });
 
-  it("le téléphone du contact données est celui de l'hébergeur, encodé une seule fois", () => {
+  it("les coordonnées du contact données sont celles de l'hébergeur, encodées une seule fois", () => {
     expect(DATA_CONTACT_PHONE_ENCODED).toBe(SITE_HOST_PHONE_ENCODED);
+    expect(DATA_CONTACT_EMAIL_ENCODED).toBe(SITE_HOST.emailEncoded);
+    expect(DATA_CONTACT_PHONE_ENCODED).toBe(SITE_HOST.phoneEncoded);
     expect(decodeContact(DATA_CONTACT_PHONE_ENCODED)).toBe(HOST_PHONE);
   });
 });
