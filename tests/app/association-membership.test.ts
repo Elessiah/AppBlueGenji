@@ -99,6 +99,8 @@ describe("mention d'information du bulletin d'adhésion", () => {
     "Destinataires",
     "membres du Bureau",
     "PayPal",
+    "bot Discord de l’association",
+    "rappel de renouvellement",
     "Durée de conservation",
     "Vos droits",
     "bluegenji-esport.fr/rgpd",
