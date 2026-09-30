@@ -444,10 +444,18 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <norepl
 6. **Push** : `git push -u origin feature/<short-name>`
 7. **Revue de PR — en boucle jusqu'à zéro finding** : ouvrir la PR (`gh pr create`), puis lancer une revue du diff avec `/code-review --comment` pour poster les retours en **commentaires inline** sur la PR.
 
-   **SonarQube avant et après les cycles de revue — score minimum 95** : lancer une analyse SonarQube de la branche **avant** le premier cycle de `/code-review` (pour partir d'un état mesuré et corriger d'emblée ce qu'elle remonte), puis de nouveau **après** le dernier cycle sans finding. Le score de la branche doit être **d'au moins 95** à l'issue de la seconde analyse ; en dessous, corriger les problèmes signalés, commiter, pousser, **relancer un cycle de revue complet** (une correction peut en appeler d'autres) puis une nouvelle analyse, jusqu'à atteindre le seuil. Un problème signalé qui préexiste à la tâche suit la règle d'`ERREUR.txt` plutôt que d'élargir la PR — sans servir d'excuse pour conclure sous 95 : s'il empêche seul d'atteindre le seuil, le dire explicitement dans le résumé de fin.
+   **SonarQube avant et après les cycles de revue — exigence maximale sur tous les axes** : lancer une analyse SonarQube de la branche **avant** le premier cycle de `/code-review` (pour partir d'un état mesuré et corriger d'emblée ce qu'elle remonte), puis de nouveau **après** le dernier cycle sans finding. L'analyse de clôture doit satisfaire, **sur le nouveau code** de la PR, chacun des critères suivants — aucun n'est négociable contre un autre :
+   - **Quality Gate au vert** ;
+   - note **A** en **fiabilité**, en **sécurité** et en **maintenabilité** ;
+   - **zéro problème ouvert**, toutes sévérités confondues (bugs, vulnérabilités, *code smells* — y compris mineurs et informatifs) ;
+   - **100 % des *security hotspots* examinés**, chacun corrigé ou justifié par écrit dans SonarQube ;
+   - **couverture de tests ≥ 80 %** et **duplication ≤ 3 %** ;
+   - aucun problème fermé par « Won't fix » / « False positive » sans justification écrite dans le commentaire du problème — marquer un vrai problème comme faux positif pour passer le seuil est interdit.
+
+   Critère non tenu → corriger, commiter, pousser, **relancer un cycle de revue complet** (une correction peut en appeler d'autres), puis une nouvelle analyse, jusqu'à ce que tous le soient. Un problème qui préexiste à la tâche (hors du nouveau code) suit la règle d'`ERREUR.txt` plutôt que d'élargir la PR, et est mentionné dans le résumé de fin.
 
    **Cycler la revue** : corriger les points remontés, commiter, pousser, puis **relancer une revue complète**. Répéter jusqu'à ce qu'un cycle ne remonte plus aucun finding. Une seule passe ne suffit pas : les corrections d'un cycle en révèlent d'autres, et les zones non couvertes par le premier passage doivent l'être par les suivants.
 
-   Ne rendre la main à l'utilisateur qu'une fois un cycle terminé **sans finding**, un score SonarQube **≥ 95** à l'analyse de clôture, et `npm test`, `npm run lint` et `npm run typecheck` verts.
+   Ne rendre la main à l'utilisateur qu'une fois un cycle terminé **sans finding**, une analyse SonarQube de clôture satisfaisant **tous** les critères ci-dessus, et `npm test`, `npm run lint` et `npm run typecheck` verts.
 
    **Valider aussi en conditions réelles** : les tests simulent MySQL et ne peuvent pas détecter une colonne manquante ou une requête invalide. Lancer `npm run seed` avant de conclure — c'est le seul contrôle qui exerce réellement les migrations et le SQL. (Le worktree a besoin d'une copie du `.env` du dépôt parent ; il est déjà couvert par `.gitignore`.)
