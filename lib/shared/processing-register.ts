@@ -459,7 +459,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Scrims et recrutement : aucune suppression automatique à ce jour, jusqu'à une demande d'effacement",
       "Exclusions : jusqu'à la levée de l'exclusion",
       `Commande /link : code valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne n'est pas supprimée automatiquement à ce jour`,
-      "Configuration : salons relayés jusqu'à leur retrait ou au départ du bot du serveur ; invitation, rôle d'arbitrage et rôle d'administration du bot (avec l'identifiant de qui les a posés) jusqu'à leur retrait par les administrateurs, conservés sans limite si le bot quitte le serveur",
+      "Configuration : salons relayés jusqu'à leur retrait ou au départ du bot du serveur ; invitation et rôle d'arbitrage (avec l'identifiant de qui les a posés) et rôle d'administration du bot, jusqu'à leur retrait par les administrateurs, conservés sans limite si le bot quitte le serveur",
       "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression",
       "Journal technique : aucune suppression automatique à ce jour",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
