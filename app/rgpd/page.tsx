@@ -310,8 +310,8 @@ export default async function RgpdPage() {
           du compte (pseudo, identifiants de fournisseur) partent avec lui ; hors ce journal, seules
           les statistiques de tournoi anonymisées survivent à la suppression. Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
-          chaque requête (adresse IP, date, page demandée, navigateur), pour sa sécurité (registre,
-          T17).
+          chaque requête (adresse IP, date, page demandée, navigateur), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
+          T17</Link>).
         </p>
       </section>
 
@@ -653,7 +653,7 @@ export default async function RgpdPage() {
             </a>{" "}
             (hébergé par Spiceworks) : le site n&apos;y transmet rien, on le rejoint par un simple lien.
             Un ticket y est gardé le temps de son traitement, puis{" "}
-            {SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture (registre, T15).
+            {SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture (<Link href="/rgpd/registre#t15">registre, T15</Link>).
           </p>
           <ul>
             <li>
@@ -876,12 +876,12 @@ export default async function RgpdPage() {
             </li>
             <li>
               <strong>Spiceworks</strong> : le portail de support de l&apos;association, seulement si
-              vous y ouvrez un ticket (registre, T15).
+              vous y ouvrez un ticket (<Link href="/rgpd/registre#t15">registre, T15</Link>).
             </li>
             <li>
               <strong>YouTube, Twitch ou Kick</strong> : la retransmission d&apos;un match montre les
               pseudos et les noms d&apos;équipe de ses joueurs ; vous pouvez vous y opposer
-              (registre, T16).
+              (<Link href="/rgpd/registre#t16">registre, T16</Link>).
             </li>
             <li>
               <strong>Microsoft</strong> (Outlook.com) : la messagerie personnelle de la personne à
@@ -908,7 +908,8 @@ export default async function RgpdPage() {
             traiter ou héberger des données aux États-Unis — pas l&apos;opérateur téléphonique —
             le font sur le fondement suivant :{" "}
             {transferBasis(ALL_TRANSFER_RECIPIENTS)}. L&apos;encadrement des transferts de
-            Spiceworks, de Twitch et de Kick est en cours de vérification (registre, T15 et T16).
+            Spiceworks, de Twitch et de Kick est en cours de vérification (registre, <Link href="/rgpd/registre#t15">T15</Link> et{" "}
+            <Link href="/rgpd/registre#t16">T16</Link>).
           </p>
           <p>
             <strong>Sauvegardes.</strong> Elles sont déposées sur le OneDrive d&apos;un{" "}
