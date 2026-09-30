@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { NextRequest } from "next/server";
 import { LEGACY_GOOGLE_ONE_TAP_COOKIE, middleware } from "@/middleware";
-import { SUSPENSION_NOTICE_COOKIE } from "@/lib/shared/account-suspension";
+import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 
 function request(cookie?: string): NextRequest {
   return new NextRequest("https://bluegenji.test/tournois", {
@@ -35,8 +35,17 @@ describe("middleware — exposé d'une suspension lu une seule fois", () => {
     expect(setCookie).toMatch(new RegExp(`^${SUSPENSION_NOTICE_COOKIE}=;`));
     expect(setCookie).toMatch(/Max-Age=0/i);
     expect(setCookie).toMatch(/Path=\/connexion/i);
-    // La requête transmise à la page garde son en-tête `cookie` d'origine.
-    expect(response.headers.get("x-middleware-request-cookie")).toBe(`${SUSPENSION_NOTICE_COOKIE}=abc`);
+    // La page le reçoit par un en-tête de requête, que l'effacement ne touche pas.
+    expect(response.headers.get(`x-middleware-request-${SUSPENSION_NOTICE_HEADER}`)).toBe("abc");
+  });
+
+  it("retire l'en-tête qu'un client aurait posé lui-même", () => {
+    const response = middleware(
+      new NextRequest("https://bluegenji.test/connexion?error=suspended", {
+        headers: { [SUSPENSION_NOTICE_HEADER]: "contrefait" },
+      }),
+    );
+    expect(response.headers.get(`x-middleware-request-${SUSPENSION_NOTICE_HEADER}`)).toBeNull();
   });
 
   it("ne touche à rien ailleurs, ni sans le cookie", () => {

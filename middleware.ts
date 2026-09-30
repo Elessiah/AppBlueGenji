@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
-import { SUSPENSION_NOTICE_COOKIE } from "@/lib/shared/account-suspension";
+import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
 
 /** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
 export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
@@ -46,6 +46,19 @@ export function middleware(request: NextRequest) {
   // **avant** le rendu : la prendre après l'hydratation ferait clignoter la
   // modale sur la page même où elle n'a rien à faire.
   requestHeaders.set(PATHNAME_HEADER, request.nextUrl.pathname);
+  // L'exposé d'une suspension (`lib/server/oauth-flow.ts`) se lit **une fois** :
+  // il est remis à la page par un en-tête de requête, et la réponse efface le
+  // cookie. Pas par le cookie lui-même : Next fusionne les cookies que pose le
+  // middleware dans la requête que voit la page (`cookies()` comme l'en-tête
+  // `cookie` de `headers()`), qui lirait donc la valeur vide de l'effacement —
+  // vérifié sur `next dev`. Gardé ses dix minutes, le cookie rouvrait la
+  // décision, motif compris, à quiconque rouvrait le lien depuis l'historique
+  // d'un ordinateur partagé. L'en-tête reçu d'un client est toujours retiré :
+  // seul le middleware le pose.
+  const suspensionNotice =
+    request.nextUrl.pathname === "/connexion" ? request.cookies.get(SUSPENSION_NOTICE_COOKIE)?.value : undefined;
+  requestHeaders.delete(SUSPENSION_NOTICE_HEADER);
+  if (suspensionNotice) requestHeaders.set(SUSPENSION_NOTICE_HEADER, suspensionNotice);
 
   const response = NextResponse.next({ request: { headers: requestHeaders } });
   response.headers.set(CSP_HEADER, policy);
@@ -56,11 +69,6 @@ export function middleware(request: NextRequest) {
   if (request.cookies.has(LEGACY_GOOGLE_ONE_TAP_COOKIE)) {
     response.cookies.delete(LEGACY_GOOGLE_ONE_TAP_COOKIE);
   }
-  // L'exposé d'une suspension (`lib/server/oauth-flow.ts`) se lit **une fois** :
-  // la page le relit dans la requête, que ce retrait ne touche pas, et la
-  // réponse l'efface. Gardé ses dix minutes, il rouvrait la décision — motif
-  // compris — à quiconque rouvrait le lien depuis l'historique d'un ordinateur
-  // partagé, ou annonçait encore suspendu un compte levé entre-temps.
   if (request.nextUrl.pathname === "/connexion" && request.cookies.has(SUSPENSION_NOTICE_COOKIE)) {
     response.cookies.set(SUSPENSION_NOTICE_COOKIE, "", { path: "/connexion", maxAge: 0 });
   }

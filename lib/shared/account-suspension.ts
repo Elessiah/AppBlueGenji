@@ -288,6 +288,12 @@ export const SUSPENSION_NOTICE_COOKIE = "bg_suspension_notice";
 /** Durée de vie de ce cookie : le temps d'une redirection et d'une lecture. */
 export const SUSPENSION_NOTICE_COOKIE_MAX_AGE_SECONDS = 10 * 60;
 
+/**
+ * En-tête de **requête** par lequel le middleware remet l'exposé à la page de
+ * connexion, le cookie étant effacé dans la même réponse (`middleware.ts`).
+ */
+export const SUSPENSION_NOTICE_HEADER = "x-bg-suspension-notice";
+
 export function toSuspensionNotice(suspension: Pick<AccountSuspensionView, "id" | "reason" | "ground" | "endsAt">): SuspensionNotice {
   return {
     reference: suspensionReference(suspension.id),
