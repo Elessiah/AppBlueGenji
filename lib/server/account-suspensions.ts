@@ -103,6 +103,38 @@ export async function assertNotSuspended(userId: number): Promise<void> {
   if (active) throw new AccountSuspendedError(toSuspensionNotice(active));
 }
 
+/** La colonne de `bg_users` qui porte l'identité d'une porte d'entrée. */
+const IDENTITY_COLUMNS = {
+  GOOGLE: "google_sub",
+  DISCORD: "discord_id",
+  BLIZZARD: "blizzard_sub",
+} as const;
+
+/**
+ * Refuse une connexion **avant** que la porte n'écrive quoi que ce soit.
+ *
+ * Les portes d'entrée écrivent sur le compte en le retrouvant — BattleTag
+ * réécrit par Blizzard, tag Discord recertifié, avatar Google importé —, et
+ * `createSession` ne vient qu'après : un compte suspendu voyait donc un tag
+ * qu'il avait retiré redevenir certifié, donc lisible de l'arbitrage, à la
+ * seule tentative de connexion qui lui était refusée. Ce contrôle-ci retrouve le
+ * compte par son identité, sans rien écrire ; celui de `createSession` reste le
+ * dernier mot (une suspension prononcée entre les deux).
+ *
+ * @throws AccountSuspendedError
+ */
+export async function assertIdentityNotSuspended(
+  provider: keyof typeof IDENTITY_COLUMNS,
+  subject: string,
+): Promise<void> {
+  const db = await getDatabase();
+  const [rows] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE ${IDENTITY_COLUMNS[provider]} = ? AND is_deleted = 0 LIMIT 1`,
+    [subject],
+  );
+  if (rows[0]) await assertNotSuspended(Number(rows[0].id));
+}
+
 /**
  * Efface les suspensions terminées depuis plus de `SUSPENSION_RETENTION_MONTHS`
  * mois. Ne lève jamais : une purge manquée se refait à la connexion suivante,

@@ -26,8 +26,14 @@ est désormais une décision de modération à part entière.
 
 - Le prononcé écrit la suspension et **efface toutes les sessions** du compte
   dans une seule transaction, ouverte par le verrou de la ligne du compte.
+- Les portes refusent **avant d'écrire** : `assertIdentityNotSuspended`
+  retrouve le compte par son identité (`google_sub`, `discord_id`,
+  `blizzard_sub`) avant `createOrGetOAuthUser` et `createOrGetDiscordUser`,
+  sans quoi une connexion refusée réécrivait le BattleTag, recertifiait un tag
+  Discord retiré ou importait un avatar sur le compte suspendu.
 - `createSession` — point de passage des quatre portes d'entrée — refuse toute
-  ouverture tant que la suspension court (`AccountSuspendedError`).
+  ouverture tant que la suspension court (`AccountSuspendedError`) : dernier mot
+  pour une suspension prononcée entre les deux contrôles.
 - `getCurrentUser` écarte en plus la session d'un compte suspendu : c'est lui qui
   tranche la course d'une connexion ouverte pendant le prononcé, le contrôle de
   `createSession` ne donnant que le refus lisible.

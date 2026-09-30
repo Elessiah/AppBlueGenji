@@ -11,6 +11,7 @@ import { publishStaffAction } from "@/lib/server/staff-audit";
 import {
   AccountSuspendedError,
   activeSuspensionSql,
+  assertIdentityNotSuspended,
   assertNotSuspended,
   getActiveSuspension,
   liftSuspension,
@@ -90,6 +91,34 @@ describe("getActiveSuspension / assertNotSuspended", () => {
   it("laisse passer un compte sans suspension en cours", async () => {
     jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([[]]) }));
     await expect(assertNotSuspended(5)).resolves.toBeUndefined();
+  });
+});
+
+describe("assertIdentityNotSuspended", () => {
+  it.each<["GOOGLE" | "DISCORD" | "BLIZZARD", string]>([
+    ["GOOGLE", "google_sub"],
+    ["DISCORD", "discord_id"],
+    ["BLIZZARD", "blizzard_sub"],
+  ])("retrouve le compte %s par sa colonne, sans rien écrire", async (provider, column) => {
+    const execute = jest
+      .fn<SqlQuery>()
+      .mockResolvedValueOnce([[{ id: 5 }]])
+      .mockResolvedValueOnce([[suspensionRow()]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+
+    await expect(assertIdentityNotSuspended(provider, "abc")).rejects.toBeInstanceOf(AccountSuspendedError);
+
+    const [sql, params] = execute.mock.calls[0] as [string, unknown[]];
+    expect(sql).toBe(`SELECT id FROM bg_users WHERE ${column} = ? AND is_deleted = 0 LIMIT 1`);
+    expect(params).toEqual(["abc"]);
+    expect(execute.mock.calls[1][1]).toEqual([5]);
+  });
+
+  it("laisse passer une identité inconnue (compte neuf)", async () => {
+    const execute = jest.fn<SqlQuery>().mockResolvedValue([[]]);
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute }));
+    await expect(assertIdentityNotSuspended("DISCORD", "1")).resolves.toBeUndefined();
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 });
 

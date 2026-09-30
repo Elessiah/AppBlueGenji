@@ -1,5 +1,5 @@
 import { createSession } from "@/lib/server/auth";
-import { AccountSuspendedError } from "@/lib/server/account-suspensions";
+import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
@@ -75,6 +75,8 @@ export async function POST(req: Request) {
     // Le pseudo saisi n'est lu qu'à la création : un compte existant garde le
     // sien. Le formulaire le propose donc toujours, faute de pouvoir savoir —
     // sans oracle — si le compte existe.
+    // Un compte suspendu est refusé avant que la porte n'écrive son tag.
+    await assertIdentityNotSuspended("DISCORD", proof.discordId);
     const userId = await createOrGetDiscordUser(proof.discordId, body.pseudo, proof.handle, {
       method: "DM_CODE",
       termsAccepted: body.termsAccepted === true,

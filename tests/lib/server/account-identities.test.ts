@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/account-suspensions", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/account-suspensions")>(
+    "@/lib/server/account-suspensions",
+  );
+  return { ...actual, assertIdentityNotSuspended: jest.fn(async () => undefined) };
+});
 jest.mock("@/lib/server/users-service", () => ({
   adoptRemoteAvatar: jest.fn(),
   createOrGetBlizzardUser: jest.fn(),
@@ -19,6 +25,7 @@ jest.mock("@/lib/server/users-service", () => ({
 }));
 
 import { getDatabase } from "@/lib/server/database";
+import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import {
   adoptRemoteAvatar,
   createOrGetBlizzardUser,
@@ -171,6 +178,20 @@ describe("createOrGetOAuthUser", () => {
       createOrGetOAuthUser(identity({ provider: "BLIZZARD", subject: "bz", handle: "Nova#2143" }), CONSENT),
     ).resolves.toBe(3);
     expect(createOrGetBlizzardUser).toHaveBeenCalledWith("bz", "Nova#2143", CONSENT);
+    // Chaque porte demande d'abord si le compte de cette identité est suspendu.
+    expect(assertIdentityNotSuspended).toHaveBeenNthCalledWith(1, "GOOGLE", "sub");
+    expect(assertIdentityNotSuspended).toHaveBeenNthCalledWith(2, "DISCORD", "123456789012345678");
+    expect(assertIdentityNotSuspended).toHaveBeenNthCalledWith(3, "BLIZZARD", "bz");
+  });
+
+  it("refuse un compte suspendu avant que la porte n'écrive quoi que ce soit", async () => {
+    const notice = { reference: "S-2", reason: "Triche avérée en finale", ground: "BEHAVIOR" as const, endsAt: null };
+    jest.mocked(assertIdentityNotSuspended).mockRejectedValueOnce(new AccountSuspendedError(notice));
+    jest.mocked(createOrGetDiscordUser).mockClear();
+
+    await expect(createOrGetOAuthUser(identity(), CONSENT)).rejects.toBeInstanceOf(AccountSuspendedError);
+    // Le tag n'est ni réécrit ni recertifié : la connexion ne lui rend rien.
+    expect(createOrGetDiscordUser).not.toHaveBeenCalled();
   });
 });
 
