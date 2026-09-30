@@ -107,6 +107,10 @@ describe("mention d'information du bulletin d'adhésion", () => {
     expect(text).toContain(fragment);
   });
 
+  it("n'annonce pas de droit d'opposition, inapplicable sur la base du contrat (art. 21)", () => {
+    expect(text).not.toContain("opposition");
+  });
+
   it("ne met ni courriel ni téléphone en clair", () => {
     expect(text).not.toMatch(/[\w.+-]+@[\w-]+\.[\w.]+/);
     expect(text).not.toMatch(/(?:\+33|0)[1-9](?:[ .]?\d{2}){4}/);
