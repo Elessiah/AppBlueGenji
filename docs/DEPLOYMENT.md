@@ -246,6 +246,54 @@ Plus bas, un logo ou un avatar de 5 Mo serait refusé par nginx (413) avant
 d'atteindre l'application, qui l'annonce pourtant accepté. Plus haut ne coûte
 rien de plus au Raspberry Pi : c'est l'application qui ne lit pas au-delà.
 
+## Journaux d'accès nginx : 14 jours — action requise en production
+
+Le registre des traitements déclare les journaux d'accès du
+serveur web (fiche **T17**, `WEB_ACCESS_LOG_RETENTION_DAYS` dans
+`lib/shared/processing-register.ts`) : adresse IP, date, page demandée, code de
+réponse, page d'origine et navigateur — le format `combined` par défaut —,
+gardés **14 jours au plus**, pour la sécurité du service. La configuration
+nginx n'étant pas versionnée ici (elle est partagée avec un autre site),
+**rien dans ce dépôt ne tient cette durée** : elle se pose sur le serveur, et
+tant que ce n'est pas fait, le registre annonce une durée que la production ne
+tient peut-être pas.
+
+**Action requise en production** (non vérifiée depuis ce dépôt) :
+
+1. Vérifier la rotation de `/etc/logrotate.d/nginx`. Le défaut du paquet Debian
+   convient tel quel — quotidienne, quatorze fichiers, puis suppression :
+
+   ```
+   /var/log/nginx/*.log {
+       daily
+       missingok
+       rotate 14
+       compress
+       delaycompress
+       notifempty
+       create 0640 www-data adm
+       sharedscripts
+       postrotate
+           invoke-rc.d nginx rotate >/dev/null 2>&1
+       endscript
+   }
+   ```
+
+   `rotate` ne doit **pas** dépasser 14 (et la fréquence rester `daily`) : une
+   valeur plus haute, ou `weekly`, garderait des mois de journaux. Si le site
+   écrit ses journaux ailleurs que dans `/var/log/nginx/` (directive
+   `access_log` propre à son bloc `server`), ce chemin doit être couvert par la
+   même règle.
+2. Ne rien ajouter au format : pas de `$remote_port`, pas de corps de requête,
+   pas de cookie. Le site ne garde pas le port source (décision de
+   l'association, journal `bg_connection_logs` compris), et le journal n'a pas
+   à en savoir plus que le format par défaut.
+3. Contrôler après la première nuit : `ls -l /var/log/nginx/` ne doit montrer
+   que quatorze fichiers au plus par journal.
+
+Si la durée change, `WEB_ACCESS_LOG_RETENTION_DAYS` change avec elle, et le
+registre avance (`REGISTER_UPDATED_AT`).
+
 ## Base de données
 
 Le seed ne se pose jamais sur la production : `npm run seed` refuse de tourner

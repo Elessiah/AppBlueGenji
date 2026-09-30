@@ -34,8 +34,9 @@ Table `bg_connection_logs` — une ligne par **ouverture de session** :
 - **Contenus publiés** : ils n'ont pas de point de passage unique (logo,
   avatar, nom d'équipe passent par des routes distinctes) et ne sont donc pas
   journalisés à part ; c'est la connexion qui précède la publication qui
-  identifie l'auteur. Décision requise si une journalisation par contenu est
-  exigée (voir `ERREUR.txt`).
+  identifie l'auteur. **Décision de l'association (2026-09-30)** : on ne
+  journalise que les connexions, jamais la création ou la modification d'un
+  contenu.
 
 ## Durée et purge
 
@@ -62,11 +63,16 @@ qui échoue ne l'arrête pas) et n'est notée faite qu'après son succès.
 Table neuve : `CREATE TABLE IF NOT EXISTS` la crée aussi sur une base qui
 tourne, aucune entrée de migration n'est due.
 
-## Ce qui reste hors de ce lot
+## Périmètre retenu (décision de l'association, 2026-09-30)
 
-Le **port source** n'est pas écrit (possiblement exigé avec l'adresse quand
-une IP publique est partagée entre abonnés ; le proxy devrait le transmettre),
-les informations fournies à la création du compte (que le décret vise aussi)
-suivent toujours l'effacement ou l'anonymisation à la suppression, et le
-journal d'accès nginx n'a pas de fiche : décisions requises, consignées dans
-`ERREUR.txt`.
+- Le **port source** n'est pas gardé — ni dans ce journal, ni dans les
+  journaux nginx (pas de `$remote_port`, `docs/DEPLOYMENT.md`).
+- Les **informations fournies à la création du compte** (pseudo, identifiants
+  de fournisseur) ne sont pas gardées après la suppression : elles suivent
+  l'effacement ou l'anonymisation du compte.
+- Seules les **connexions** sont journalisées (pas de journal des contenus).
+- Le journal des connexions est gardé **un an**, y compris après la
+  suppression du compte ; tout le reste part à la suppression, sauf les
+  statistiques de tournoi anonymisées.
+
+Registre : T01, T02, T14 ; le journal d'accès nginx a sa fiche (T17, 14 jours).
