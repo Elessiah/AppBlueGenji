@@ -50,18 +50,17 @@ function pingedRecently(): boolean {
  * envoyée — et le serveur, qui relit les mêmes signaux, ne l'enregistrerait pas.
  */
 export function browserAudienceOptOut(): AudienceOptOutReason | null {
+  const nav = window.navigator as Navigator & { globalPrivacyControl?: unknown };
+  const legacyDnt = (window as Window & { doNotTrack?: unknown }).doNotTrack;
+  // Lu à part : un accès aux cookies refusé (contexte isolé, politique du
+  // navigateur) lève, et ne doit pas emporter les signaux GPC et DNT avec lui.
+  let cookie: string | null = null;
   try {
-    const nav = window.navigator as Navigator & { globalPrivacyControl?: unknown };
-    const legacyDnt = (window as Window & { doNotTrack?: unknown }).doNotTrack;
-    return audienceOptOutReason({
-      gpc: nav.globalPrivacyControl,
-      dnt: nav.doNotTrack ?? legacyDnt,
-      cookie: document.cookie,
-    });
+    cookie = document.cookie;
   } catch {
-    // Cookies bloqués : les signaux du navigateur ont déjà été lus s'ils existent.
-    return null;
+    cookie = null;
   }
+  return audienceOptOutReason({ gpc: nav.globalPrivacyControl, dnt: nav.doNotTrack ?? legacyDnt, cookie });
 }
 
 function rememberPing(): void {

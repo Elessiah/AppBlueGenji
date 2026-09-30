@@ -37,13 +37,22 @@ export function AudienceOptOutControl({ initialReason }: { initialReason: Audien
   const [reason, setReason] = useState<AudienceOptOutReason | null>(initialReason);
   const { showError, showSuccess } = useToast();
 
-  // Le navigateur peut exposer un signal que la requête ne portait pas.
+  // Le navigateur peut exposer un signal que la requête ne portait pas — mais
+  // ne fait qu'ajouter : un `Sec-GPC` envoyé sans `navigator.globalPrivacyControl`
+  // (extension qui ne pose que l'en-tête), ou un cookie illisible d'ici, reste
+  // un refus côté serveur, et la page ne doit pas annoncer une mesure active.
   useEffect(() => {
-    setReason(browserAudienceOptOut());
+    const browser = browserAudienceOptOut();
+    if (browser) setReason(browser);
   }, []);
 
   const toggle = (optOut: boolean) => {
-    document.cookie = audienceOptOutCookieString(optOut, window.location.protocol === "https:");
+    try {
+      document.cookie = audienceOptOutCookieString(optOut, window.location.protocol === "https:");
+    } catch {
+      showError("Votre navigateur bloque les cookies : le choix n'a pas pu être retenu.");
+      return;
+    }
     const next = browserAudienceOptOut();
     setReason(next);
     if (optOut && next === null) {

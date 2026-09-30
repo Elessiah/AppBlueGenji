@@ -34,6 +34,23 @@ describe("browserAudienceOptOut", () => {
     expect(browserAudienceOptOut()).toBe("CHOICE");
   });
 
+  it("garde GPC et DNT quand les cookies sont illisibles", () => {
+    globals.window = { navigator: { globalPrivacyControl: true } };
+    globals.document = {
+      get cookie(): string {
+        throw new Error("SecurityError");
+      },
+    };
+    expect(browserAudienceOptOut()).toBe("GPC");
+  });
+
+  it("n'efface pas au montage un refus lu par le serveur", () => {
+    const source = readSource("components/privacy/AudienceOptOutControl.tsx");
+    expect(source).toContain("if (browser) setReason(browser);");
+    // L'écriture du cookie refusée se dit, au lieu d'échouer en silence.
+    expect(source).toMatch(/try \{\s+document\.cookie = audienceOptOutCookieString/);
+  });
+
   it("mesure sans signal ni choix", () => {
     stubBrowser({ doNotTrack: "unspecified", globalPrivacyControl: false }, "bg_session=x");
     expect(browserAudienceOptOut()).toBeNull();
