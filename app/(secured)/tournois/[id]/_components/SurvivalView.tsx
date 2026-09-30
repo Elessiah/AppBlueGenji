@@ -1,7 +1,12 @@
 "use client";
 
 import type { BracketMatch, SurvivalMeta, SurvivalStandingRow } from "@/lib/shared/types";
-import { isCutRound, nextCutRound, teamsToEliminate } from "@/lib/shared/survival";
+import {
+  isCutRound,
+  nextCutRound,
+  teamsToEliminate,
+  type SurvivalCutSchedule,
+} from "@/lib/shared/survival";
 import { MatchRow } from "./MatchRow";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
@@ -51,8 +56,6 @@ export function SurvivalView({
   onForfeit,
   emptyLabel = "Aucun match pour l'instant.",
 }: SurvivalViewProps) {
-  const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
-  const lastRound = roundNums.length > 0 ? roundNums[roundNums.length - 1] : null;
   const activeCount = survival.standings.filter((s) => s.status === "ACTIVE").length;
   const barrageRounds = survival.barrageRounds ?? 0;
   // Pendant le barrage, le danger porte sur ses deux participants (le perdant
@@ -68,7 +71,7 @@ export function SurvivalView({
     activeSorted.slice(activeSorted.length - atRisk).map((s) => s.teamId),
   );
 
-  const cutSchedule = {
+  const cutSchedule: SurvivalCutSchedule = {
     roundsBeforeFirstCut: survival.roundsBeforeFirstCut,
     roundsPerCut: survival.roundsPerCut,
     barrageRounds,
@@ -250,131 +253,176 @@ export function SurvivalView({
           )}
         </div>
 
-        {/* Rounds en colonnes (même esprit que les arbres d'élimination) */}
-        <ScrollArea
-          ariaLabel="Manches du tournoi — défilement horizontal"
-          style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}
-          // Posés côte à côte, le round qui se joue était hors champ à droite
-          // sur mobile : la zone s'ouvre sur le dernier.
-          revealKey={lastRound}
-        >
-          {roundNums.length === 0 ? (
-            <p style={{ color: "var(--text-2)", fontSize: 14 }}>{emptyLabel}</p>
-          ) : (
-            <div style={{ display: "flex", gap: 16 }}>
-              {roundNums.map((roundNum) => {
-                const roundMatches = matches
-                  .filter((m) => m.roundNumber === roundNum)
-                  .sort((a, b) => a.matchNumber - b.matchNumber);
-                const isBarrageRound = barrageRounds > 0 && roundNum <= barrageRounds;
-                const cut = isCutRound(roundNum, cutSchedule);
-                return (
-                  <div
-                    key={roundNum}
-                    style={{ flexShrink: 0, width: COL_W }}
-                    {...(roundNum === lastRound ? { [SCROLL_REVEAL_ATTRIBUTE]: "" } : {})}
-                  >
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        height: 26,
-                        marginBottom: 8,
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: 11,
-                          textTransform: "uppercase",
-                          letterSpacing: "0.08em",
-                          color: "var(--text-2)",
-                          fontWeight: 600,
-                        }}
-                      >
-                        Manche {roundNum}
-                      </span>
-                      {isBarrageRound && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            color: AMBER,
-                            border: `1px solid ${AMBER}`,
-                            borderRadius: 5,
-                            padding: "1px 6px",
-                          }}
-                        >
-                          ⚖ Barrage
-                        </span>
-                      )}
-                      {cut && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            textTransform: "uppercase",
-                            letterSpacing: "0.05em",
-                            color: AMBER,
-                            border: `1px solid ${AMBER}`,
-                            borderRadius: 5,
-                            padding: "1px 6px",
-                          }}
-                        >
-                          ⚔ Coupe
-                        </span>
-                      )}
-                    </div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {roundMatches.map((match) => {
-                        // L'exempté est la seule équipe posée sur la manche ;
-                        // le lier demande un identifiant non nul.
-                        const byeTeamId = match.team2Id === null ? match.team1Id : null;
-                        if (byeTeamId !== null) {
-                          return (
-                            <div
-                              key={match.id}
-                              style={{
-                                border: `1px dashed ${BORDER}`,
-                                borderRadius: 6,
-                                padding: "8px 10px",
-                                fontSize: 13,
-                                background: "var(--surface-1)",
-                              }}
-                            >
-                              <EntrantName
-                                teamId={byeTeamId}
-                                name={match.team1Name}
-                                title={match.team1Name ?? undefined}
-                                truncate
-                                style={{ display: "flex" }}
-                                textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
-                              />
-                              <span style={{ fontSize: 11, color: ACCENT }}>
-                                ✓ Victoire d&apos;office
-                              </span>
-                            </div>
-                          );
-                        }
-                        return (
-                          <MatchRow
-                            key={match.id}
-                            match={match}
-                            adminResolvable={adminResolvable(match)}
-                            onOpenAdminModal={onOpenAdminModal}
-                            scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, "SURVIVAL")}
-                            roundNumber={match.roundNumber}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </ScrollArea>
+        <SurvivalRounds
+          matches={matches}
+          allTournamentMatches={allTournamentMatches}
+          cutSchedule={cutSchedule}
+          adminResolvable={adminResolvable}
+          onOpenAdminModal={onOpenAdminModal}
+          emptyLabel={emptyLabel}
+        />
       </div>
     </div>
+  );
+}
+
+interface SurvivalRoundsProps {
+  matches: BracketMatch[];
+  allTournamentMatches: BracketMatch[];
+  /**
+   * Cadence des coupes, pour marquer barrage et coupes ; `null` quand on ne la
+   * connaît pas — les manches s'affichent alors sans ces marques.
+   */
+  cutSchedule: SurvivalCutSchedule | null;
+  adminResolvable: (m: BracketMatch) => boolean;
+  onOpenAdminModal: (match: BracketMatch) => void;
+  emptyLabel: string;
+}
+
+/**
+ * Manches d'une survie, en colonnes (même esprit que les arbres
+ * d'élimination). Rendue seule pour une phase survie **close** d'un tournoi
+ * multi-phases : le serveur ne charge les métadonnées survie (classement,
+ * barrage) que de la phase en cours, et le classement d'une phase close
+ * s'affiche dessous (`PhaseStandingsBlock`). Sans ce composant, ses manches
+ * s'affichaient sous le classement de la phase en cours, ou retombaient dans
+ * un arbre à élimination.
+ *
+ * La zone s'ouvre sur la **dernière** manche : posées côte à côte, celle qui
+ * se joue était hors champ à droite sur mobile.
+ */
+export function SurvivalRounds({
+  matches,
+  allTournamentMatches,
+  cutSchedule,
+  adminResolvable,
+  onOpenAdminModal,
+  emptyLabel,
+}: SurvivalRoundsProps) {
+  const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
+  const lastRound = roundNums.length > 0 ? roundNums[roundNums.length - 1] : null;
+  const barrageRounds = cutSchedule?.barrageRounds ?? 0;
+  return (
+    <ScrollArea
+      ariaLabel="Manches du tournoi — défilement horizontal"
+      style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}
+      revealKey={lastRound}
+    >
+      {roundNums.length === 0 ? (
+        <p style={{ color: "var(--text-2)", fontSize: 14 }}>{emptyLabel}</p>
+      ) : (
+        <div style={{ display: "flex", gap: 16 }}>
+          {roundNums.map((roundNum) => {
+            const roundMatches = matches
+              .filter((m) => m.roundNumber === roundNum)
+              .sort((a, b) => a.matchNumber - b.matchNumber);
+            const isBarrageRound = barrageRounds > 0 && roundNum <= barrageRounds;
+            const cut = cutSchedule !== null && isCutRound(roundNum, cutSchedule);
+            return (
+              <div
+                key={roundNum}
+                style={{ flexShrink: 0, width: COL_W }}
+                {...(roundNum === lastRound ? { [SCROLL_REVEAL_ATTRIBUTE]: "" } : {})}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    height: 26,
+                    marginBottom: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 11,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "var(--text-2)",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Manche {roundNum}
+                  </span>
+                  {isBarrageRound && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        color: AMBER,
+                        border: `1px solid ${AMBER}`,
+                        borderRadius: 5,
+                        padding: "1px 6px",
+                      }}
+                    >
+                      ⚖ Barrage
+                    </span>
+                  )}
+                  {cut && (
+                    <span
+                      style={{
+                        fontSize: 11,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.05em",
+                        color: AMBER,
+                        border: `1px solid ${AMBER}`,
+                        borderRadius: 5,
+                        padding: "1px 6px",
+                      }}
+                    >
+                      ⚔ Coupe
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {roundMatches.map((match) => {
+                    // L'exempté est la seule équipe posée sur la manche ;
+                    // le lier demande un identifiant non nul.
+                    const byeTeamId = match.team2Id === null ? match.team1Id : null;
+                    if (byeTeamId !== null) {
+                      return (
+                        <div
+                          key={match.id}
+                          style={{
+                            border: `1px dashed ${BORDER}`,
+                            borderRadius: 6,
+                            padding: "8px 10px",
+                            fontSize: 13,
+                            background: "var(--surface-1)",
+                          }}
+                        >
+                          <EntrantName
+                            teamId={byeTeamId}
+                            name={match.team1Name}
+                            title={match.team1Name ?? undefined}
+                            truncate
+                            style={{ display: "flex" }}
+                            textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
+                          />
+                          <span style={{ fontSize: 11, color: ACCENT }}>
+                            ✓ Victoire d&apos;office
+                          </span>
+                        </div>
+                      );
+                    }
+                    return (
+                      <MatchRow
+                        key={match.id}
+                        match={match}
+                        adminResolvable={adminResolvable(match)}
+                        onOpenAdminModal={onOpenAdminModal}
+                        scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, "SURVIVAL")}
+                        roundNumber={match.roundNumber}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </ScrollArea>
   );
 }
