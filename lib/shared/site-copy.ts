@@ -157,7 +157,7 @@ export const SITE_COPY_FIELDS: readonly SiteCopyField[] = [
     page: "Association",
     label: "Adhérer — accroche",
     defaultValue:
-      "L'adhésion vous ouvre l'accès complet à tous nos tournois, événements et ressources communautaires.",
+      "L'adhésion fait de vous un membre de l'association. Elle se demande par le bulletin d'adhésion, à partir de 16 ans, pour un an, et reste soumise à l'agrément du bureau.",
     multiline: true,
     maxLength: 400,
   },
