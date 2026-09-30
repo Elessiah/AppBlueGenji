@@ -436,12 +436,30 @@ describe("claimMatchCast", () => {
 
   it("refuse un match déjà casté par un autre, accepte de rejouer sa propre inscription", async () => {
     state.users[CASTER] = verified;
+    state.users[901] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: 901 });
     await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("MATCH_ALREADY_CASTED");
     state.match = matchState({ caster_user_id: CASTER, caster_ready_at: STAMP });
     await claimMatchCast(42, CASTER, true);
     // Rejouée, l'inscription ne défait pas un « Prêt » déjà donné.
     expect(state.match?.caster_ready_at).toBe(STAMP);
+  });
+
+  it("reprend la place d'un titulaire qui ne remplit plus la condition", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, caster_ready_at: STAMP });
+    await claimMatchCast(42, CASTER, true);
+    expect(state.match?.caster_user_id).toBe(CASTER);
+    expect(state.match?.caster_ready_at).toBeNull();
+  });
+
+  it("ne remplace jamais le caster d'un match lancé", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = { ...ELIGIBLE_CASTER, discord_verified_at: null };
+    state.match = matchState({ caster_user_id: 901, launched_at: STAMP });
+    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("MATCH_ALREADY_CASTED");
+    expect(state.match?.caster_user_id).toBe(901);
   });
 
   it("refuse un match terminé ou une exemption", async () => {

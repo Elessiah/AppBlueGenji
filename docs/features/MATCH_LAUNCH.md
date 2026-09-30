@@ -102,7 +102,9 @@ Trois conditions de plus que la permission :
   vérifié : quand l'appariement arrive et compte l'équipe du caster, son
   inscription est retirée (`adoptCurrentPairing`), et d'ici là le rôle de joueur
   prime partout (`resolveMatchParty`) ;
-- un seul caster par match (`MATCH_ALREADY_CASTED`).
+- un seul caster par match (`MATCH_ALREADY_CASTED`) — sauf si le titulaire ne
+  remplit plus la condition du cast et que le match n'est pas lancé : sa place
+  est alors reprise par le nouvel inscrit.
 
 Rien d'autre n'est exigé : tout porteur de `live` peut caster n'importe quel
 match non terminé et en recevoir les contacts — droit de diffusion

@@ -415,8 +415,16 @@ export async function claimMatchCast(
     if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
     if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
     if (row.caster_user_id !== null) {
-      if (Number(row.caster_user_id) === userId) return Number(row.tournament_id);
-      throw new Error("MATCH_ALREADY_CASTED");
+      const holder = Number(row.caster_user_id);
+      if (holder === userId) return Number(row.tournament_id);
+      // Une inscription dont le titulaire ne remplit plus la condition du cast
+      // ne retient pas le match : sans quoi elle le bloquerait jusqu'à ce qu'un
+      // joueur ouvre la modale de lancement. Jamais sur un match lancé, où l'on
+      // ne remplace pas un caster en pleine diffusion.
+      const displaceable =
+        matchLaunchPhase(toLaunchInput(row), Date.now()) !== "LAUNCHED" &&
+        (await loadCastEligibility(connection, holder)) !== null;
+      if (!displaceable) throw new Error("MATCH_ALREADY_CASTED");
     }
     const party = await resolveMatchParty(connection, row, userId);
     if (party) throw new Error("CASTER_IS_PLAYER");
