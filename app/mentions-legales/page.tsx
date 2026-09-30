@@ -23,6 +23,7 @@ import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
+import { WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/legal-durations";
 import {
   CODE_COPYRIGHT_HOLDER,
   CODE_LICENSE_NAME,
@@ -308,10 +309,13 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           <strong>{CONNECTION_LOG_RETENTION_DAYS} jours</strong> les données de connexion de ses
           utilisateurs (adresse IP, date et heure, moyen de connexion), y compris après la suppression
           d&apos;un compte, afin de pouvoir identifier l&apos;auteur d&apos;un contenu sur
-          réquisition d&apos;une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Seules
-          les ouvertures de session sont consignées — ni le port source, ni la création ou la
-          modification d&apos;un contenu —, et les informations fournies à la création d&apos;un
-          compte ne sont pas gardées après sa suppression. Ces données ne sont communiquées
+          réquisition d&apos;une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Ce
+          journal ne consigne que les ouvertures de session — ni le port source, ni la création
+          ou la modification d&apos;un contenu —, et les informations fournies à la création
+          d&apos;un compte ne sont pas gardées après sa suppression. Le serveur web tient
+          en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus et pour sa seule sécurité, un
+          journal technique de chaque requête (adresse IP, date, page demandée), sans port
+          source (<Link href="/rgpd/registre#t17">registre, T17</Link>). Ces données ne sont communiquées
           qu&apos;aux autorités qui les requièrent ; le détail figure dans la{" "}
           <Link href="/rgpd#donnees-connexion">politique de confidentialité</Link>.
         </p>
