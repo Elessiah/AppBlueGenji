@@ -7,8 +7,10 @@
  * branche `main`) : chaque durée ou comportement cité y a été relu — tables de
  * `src/bdd/Bdd.ts`, purge de `src/messages/manageMsgExpiration.ts`, commandes
  * de `src/config/commands.ts`, routes de `src/internalApi.ts`, sauvegardes de
- * `scripts/backup-onedrive.sh`, effacement au départ d'un serveur de
- * `Bdd.forgetGuild` (évènement `guildDelete` de `src/main.ts`), licence de
+ * `scripts/backup-onedrive.sh`, effacement au départ d'un serveur par
+ * `eraseGuild` (évènement `guildDelete` de `src/main.ts`, et rattrapage au
+ * démarrage et chaque nuit par `src/privacy/dataRetention.ts`, qui efface aussi
+ * l'auteur des scrims et recherches au-delà de 30 jours), licence de
  * `LICENSE` et `NOTICE`. Les durées qu'aucune importation ne peut tenir
  * alignées (le bot vit dans un autre dépôt) sont recopiées une fois, avec leur
  * source, dans `lib/shared/processing-register.ts`, que le registre (T08) lit
@@ -31,7 +33,7 @@ import {
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
 import {
-  BOT_LINK_CODE_VALIDITY_MINUTES,
+  BOT_ACTIVITY_AUTHOR_RETENTION_DAYS,
   BOT_RELAY_RETENTION_DAYS,
   DPF_ADEQUACY_DECISION,
   DPF_ADEQUACY_DECISION_EN,
@@ -438,23 +440,22 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Annonces relayées" },
           {
             kind: "p",
-            text: `Identifiant du message d'origine et de son auteur, date, identifiants des copies relayées et de leurs salons : ils servent à relayer l'annonce, à répercuter sa modification ou sa suppression et à appliquer le temps de recharge entre deux annonces. **Le contenu du message n'est pas enregistré dans la base du Bot** : il est recopié, avec le nom de son auteur, dans les salons des serveurs partenaires, où leurs membres le lisent. Ces copies sont des messages Discord : supprimer l'annonce d'origine dans les ${BOT_RELAY_RETENTION_DAYS} jours supprime aussi ses copies ; passé ce délai, elles restent jusqu'à leur suppression par les administrateurs du serveur qui les porte.`,
+            text: `Identifiant du message d'origine et de son auteur, date, identifiants des copies relayées et de leurs salons : ils servent à relayer l'annonce, à répercuter sa modification ou sa suppression, à appliquer le temps de recharge entre deux annonces, au compteur de messages de **/stats**, aux statistiques du tableau de bord du bot et, en cas d'exclusion, à retrouver et retirer les copies des annonces de l'exclu. **Le contenu du message n'est pas enregistré dans la base du Bot** : il est recopié, avec le nom de son auteur, dans les salons des serveurs partenaires, où leurs membres le lisent. Ces copies sont des messages Discord : supprimer l'annonce d'origine dans les ${BOT_RELAY_RETENTION_DAYS} jours supprime aussi ses copies ; passé ce délai, elles restent jusqu'à leur suppression par les administrateurs du serveur qui les porte.`,
           },
           { kind: "subhead", text: "Scrims et recrutement" },
           {
             kind: "p",
-            text: "Pour les commandes **/scrim** et **/recrute** : identifiant de l'auteur, jeu, niveau ou rôle recherché, serveur et date, qui alimentent les statistiques d'activité (commande **/stats** et tableau de bord du bot).",
+            text: `Pour les commandes **/scrim** et **/recrute** : identifiant de l'auteur, jeu, niveau ou rôle recherché, serveur et date, qui alimentent les statistiques d'activité (commande **/stats**, qui ne montre à chacun que sa propre activité, et tableau de bord du bot). Au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, ces lignes sont repliées en simples nombres par jour, serveur et niveau (ou rôle), sans l'identifiant de l'auteur ; ces nombres sont conservés sans limite de durée, comme historique de l'activité du Bot. Le niveau et le rôle sont un texte libre, repris tel que l'auteur l'a saisi : n'y écrivez pas le pseudo de quelqu'un.`,
           },
           { kind: "subhead", text: "Exclusions du relais" },
           {
             kind: "p",
-            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les pseudos de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff, et la commande **/ban-list** affiche la liste complète des exclusions (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé et aux titulaires du rôle d'administration du Bot.",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff ; le motif part aussi en message privé au titulaire du Bot, où il reste sans limite de durée. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée (**/ban**) et levée (**/unban**) par les administrateurs de tout serveur d'au moins 50 membres où le Bot est installé, ainsi que par le staff de l'association (section « Modération du relais » des Conditions d'Utilisation). La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé — y compris un serveur que l'on crée soi-même pour l'y inviter — et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
           },
-          { kind: "subhead", text: "Commande /link, adhésions et rappels programmés" },
+          { kind: "subhead", text: "Adhésions et rappels programmés" },
           {
             kind: "bullets",
             items: [
-              `**Commande /link** : identifiant Discord, code à six chiffres valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes et son échéance. Le site ne propose à ce jour aucun endroit où saisir ce code : la commande ne relie donc aucun compte.`,
               "**Adhésions à l'association** (commandes réservées aux serveurs de l'association) : quand l'adhésion d'un membre est validée, le Bot lui envoie en message privé la confirmation, et l'attestation d'adhésion si elle est jointe, sans la conserver ; il enregistre alors un rappel pour la date de péremption de l'adhésion — ce qui revient à garder, jusqu'à ce rappel, le fait que ce membre adhère à l'association et jusqu'à quand.",
               "**Rappels programmés** (mêmes commandes) : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi et fréquence.",
             ],
@@ -472,7 +473,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Journaux" },
           {
             kind: "p",
-            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un pseudo ou un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur.",
+            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant Discord ; il reprend le niveau ou le rôle saisi avec **/scrim** ou **/recrute**. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit plus de pseudo de lui-même (les messages antérieurs à cette règle peuvent en citer) : le motif d'une exclusion, texte libre du modérateur, peut en citer un, et une erreur de remise d'un message privé peut mentionner le compte visé.",
           },
           { kind: "subhead", text: "Base légale" },
           {
@@ -489,12 +490,11 @@ export const PRIVACY_POLICY: BilingualDoc = {
           {
             kind: "bullets",
             items: [
-              `**Suivi des annonces relayées** (identifiants, date) : ${BOT_RELAY_RETENTION_DAYS} jours ; il est effacé lors du premier relais qui suit cette échéance. Rien n'est effacé au redémarrage du Bot. Les copies publiées dans les salons partenaires restent sur Discord (section 02).`,
-              "**Scrims et recrutement** : aucune suppression automatique à ce jour ; ces données sont conservées jusqu'à une demande d'effacement.",
-              "**Exclusions** : jusqu'à la levée de l'exclusion.",
-              `**Commande /link** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
-              "**Configuration des serveurs** (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du Bot, modules activés) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du Bot du serveur, qui l'efface. Un retrait survenu pendant une interruption du Bot ne lui est pas signalé par Discord : cette configuration reste alors jusqu'à une demande d'effacement.",
-              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés, qui les efface ; sous la même réserve qu'au point précédent : si le Bot en est retiré pendant une interruption, ils restent jusqu'à une demande d'effacement.",
+              `**Suivi des annonces relayées** (identifiants, date) : ${BOT_RELAY_RETENTION_DAYS} jours ; il est effacé au premier relais qui suit cette échéance, et au plus tard dans la nuit ou au redémarrage du Bot. Les copies publiées dans les salons partenaires restent sur Discord (section 02).`,
+              `**Scrims et recrutement** : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours avec l'identifiant de l'auteur ; lors du ménage de la nuit qui suit (ou d'un redémarrage du Bot), l'identifiant de l'auteur est effacé et les lignes sont repliées en nombres par jour, serveur et niveau (ou rôle), gardés sans limite de durée comme historique de l'activité du Bot.`,
+              "**Exclusions** : l'enregistrement de l'exclusion, jusqu'à sa levée ; les avis publiés au salon de journal privé du staff et le motif copié en message privé au titulaire du Bot restent après la levée, sans suppression automatique à ce jour.",
+              "**Configuration des serveurs** (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du Bot, modules activés) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du Bot du serveur, qui l'efface. Un départ survenu pendant une interruption du Bot, que Discord ne lui signale pas, est rattrapé à son redémarrage.",
+              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés, qui les efface — départ survenu pendant une interruption compris, rattrapé au redémarrage.",
               "**Salon de journal privé du staff** : aucune suppression automatique à ce jour.",
               "**Journaux du serveur** : selon leur rotation automatique.",
               // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
@@ -515,10 +515,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               "Le staff de l'association, pour la modération et l'administration du Bot.",
+              "Le titulaire du Bot (son hébergeur technique), qui reçoit en message privé les motifs d'exclusion.",
+              "L'utilisateur exclu, à qui le Bot remet le motif de son exclusion en message privé quand il publie une annonce (message portant un service) dans un salon relayé.",
+              "Les membres du salon où **/scrim** ou **/recrute** est utilisée : la commande y répond publiquement, et Discord y affiche qui l'a utilisée.",
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
               "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
-              `Tout utilisateur du Bot, par la commande **/stats**, peut voir combien d'annonces un autre utilisateur a publiées (messages relayés, scrims, recherches) ; la réponse n'est visible que de celui qui la demande, et le compteur de messages ne porte que sur ceux dont le suivi est encore conservé (section 03).`,
               `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
               "Microsoft, qui stocke sur le OneDrive personnel de l'hébergeur technique les sauvegardes, chiffrées avant envoi avec une clé que Microsoft ne détient pas ; et qui héberge la messagerie personnelle (Outlook.com) de l'hébergeur technique, par où passent, non chiffrées par l'association et lisibles par Microsoft, toute demande relative à vos données que vous envoyez par courriel à l'hébergeur technique et la réponse que celui-ci vous adresse par courriel.",
@@ -644,23 +646,22 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relayed advertisements" },
           {
             kind: "p",
-            text: `ID of the original message and of its author, date, IDs of the relayed copies and of their channels: they are used to relay the advertisement, to pass on its edits or deletion, and to apply the cooldown between two advertisements. **Message content is not stored in the Bot's database**: it is copied, with its author's name, into the channels of partner servers, where their members read it. These copies are Discord messages: deleting the original advertisement within ${BOT_RELAY_RETENTION_DAYS} days also deletes its copies; after that, they remain until the administrators of the server holding them delete them.`,
+            text: `ID of the original message and of its author, date, IDs of the relayed copies and of their channels: they are used to relay the advertisement, to pass on its edits or deletion, to apply the cooldown between two advertisements, for the message count of **/stats**, for the bot's dashboard statistics and, on an exclusion, to find and remove the copies of the excluded user's advertisements. **Message content is not stored in the Bot's database**: it is copied, with its author's name, into the channels of partner servers, where their members read it. These copies are Discord messages: deleting the original advertisement within ${BOT_RELAY_RETENTION_DAYS} days also deletes its copies; after that, they remain until the administrators of the server holding them delete them.`,
           },
           { kind: "subhead", text: "Scrims and recruitment" },
           {
             kind: "p",
-            text: "For the **/scrim** and **/recrute** commands: author ID, game, level or role sought, server and date, which feed the activity statistics (**/stats** command and the bot's dashboard).",
+            text: `For the **/scrim** and **/recrute** commands: author ID, game, level or role sought, server and date, which feed the activity statistics (**/stats** command, which only shows each user their own activity, and the bot's dashboard). After ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days these rows are folded into plain counts per day, server and level (or role), without the author's ID; these counts are kept with no time limit, as a history of the Bot's activity. The level and role are free text, kept as the author typed them: do not write someone's username there.`,
           },
           { kind: "subhead", text: "Relay exclusions" },
           {
             kind: "p",
-            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The usernames of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel, and the **/ban-list** command shows the full list of exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed and to the holders of the Bot administration role.",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel; the reason is also sent by direct message to the Bot's owner, where it stays with no time limit. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided and lifted (**/unban**) by the administrators of any server with at least 50 members where the Bot is installed, as well as by the association's staff (« Relay moderation » section of the Terms of Service). The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed — including a server one creates oneself to invite it — and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
           },
-          { kind: "subhead", text: "/link command, memberships and scheduled reminders" },
+          { kind: "subhead", text: "Memberships and scheduled reminders" },
           {
             kind: "bullets",
             items: [
-              `**/link command**: Discord ID, six-digit code valid for ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes and its expiry. The website currently offers nowhere to enter this code: the command therefore links no account.`,
               "**Association memberships** (commands restricted to the association's servers): when a member's membership is validated, the Bot sends them the confirmation by direct message, with the membership certificate if one is attached, without keeping it; it then records a reminder for the membership's expiry date — which means keeping, until that reminder, the fact that this member belongs to the association and until when.",
               "**Scheduled reminders** (same commands): ID of the targeted member or role and of the author, message, next sending date and frequency.",
             ],
@@ -678,7 +679,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Logs" },
           {
             kind: "p",
-            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord username or ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username.",
+            text: "The public activity feed on the bot's page contains no Discord ID; it repeats the level or role typed with **/scrim** or **/recrute**. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot no longer writes usernames there on its own (messages older than this rule may quote some): the reason for an exclusion, free text written by the moderator, may quote one, and a failed direct-message delivery may mention the account concerned.",
           },
           { kind: "subhead", text: "Legal basis" },
           {
@@ -695,12 +696,11 @@ export const PRIVACY_POLICY: BilingualDoc = {
           {
             kind: "bullets",
             items: [
-              `**Tracking of relayed advertisements** (IDs, date): ${BOT_RELAY_RETENTION_DAYS} days; it is erased at the first relay after that deadline. Nothing is erased when the Bot restarts. The copies posted in partner channels remain on Discord (section 02).`,
-              "**Scrims and recruitment**: no automatic deletion at present; this data is kept until an erasure request.",
-              "**Exclusions**: until the exclusion is lifted.",
-              `**/link command**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
-              "**Server configuration** (relayed channels and their rank filters, the invite and the referee role with the ID of whoever set them, the Bot administration role, enabled modules): until the administrators remove it, and at the latest until the Bot leaves the server, which erases it. If the Bot is removed while it is down, Discord does not notify it: that configuration then remains until an erasure request.",
-              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them; with the same caveat as above: if the Bot is removed from it while it is down, they remain until an erasure request.",
+              `**Tracking of relayed advertisements** (IDs, date): ${BOT_RELAY_RETENTION_DAYS} days; it is erased at the first relay after that deadline, and at the latest during the night or when the Bot restarts. The copies posted in partner channels remain on Discord (section 02).`,
+              `**Scrims and recruitment**: ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days with the author's ID; at the clean-up of the following night (or a restart of the Bot), the author's ID is erased and the rows are folded into counts per day, server and level (or role), kept with no time limit as a history of the Bot's activity.`,
+              "**Exclusions**: the exclusion record, until it is lifted; the notices posted in the staff's private log channel and the reason copied by direct message to the Bot's owner remain after it is lifted, with no automatic deletion at present.",
+              "**Server configuration** (relayed channels and their rank filters, the invite and the referee role with the ID of whoever set them, the Bot administration role, enabled modules): until the administrators remove it, and at the latest until the Bot leaves the server, which erases it. A departure while the Bot is down, which Discord does not notify, is caught up when it restarts.",
+              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them — including a departure while the Bot is down, caught up when it restarts.",
               "**Staff private log channel**: no automatic deletion at present.",
               "**Server logs**: according to their automatic rotation.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,
@@ -717,10 +717,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               "The association's staff, for moderating and administering the Bot.",
+              "The Bot's owner (its technical host), who receives exclusion reasons by direct message.",
+              "The excluded user, to whom the Bot sends the reason for their exclusion by direct message when they post an advertisement (a message naming a service) in a relayed channel.",
+              "The members of the channel where **/scrim** or **/recrute** is used: the command replies publicly there, and Discord shows who used it.",
               "Members of partner servers, who read the relayed advertisements.",
               "Members of the referee role of every server that has set one, for the website's referee alerts.",
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
-              `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages whose tracking is still kept (section 03).`,
               `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",
               "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold; and which hosts the technical host's personal mailbox (Outlook.com), through which any request about your data that you email to them, and their emailed reply, pass without encryption by the association, readable by Microsoft.",

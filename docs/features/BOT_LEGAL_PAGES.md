@@ -13,12 +13,12 @@ immédiat.
 
 Le module [`lib/shared/bot-legal-content.ts`](../../lib/shared/bot-legal-content.ts)
 est la **source unique** des deux textes. Ils venaient de `blueGenjiBot/LegalTerms`,
-dont les fichiers ont divergé et ne font plus foi (13 ans, « 72 heures ou au
-redémarrage », aucun responsable du traitement — voir `ERREUR.txt`, lot bot).
+qui en est désormais une **copie générée** (`scripts/generate-legal-terms.py` du
+bot, à relancer après chaque changement de ce module).
 
 Ils décrivent le bot **d'après son code** (`blueGenjiBot`, branche `main`), relu
-table par table : relais d'annonces, scrims et recrutement, exclusions, liaison
-`/link`, configuration des serveurs, rappels programmés, messages remis pour le site,
+table par table : relais d'annonces, scrims et recrutement (auteur effacé à 30 jours), exclusions (valables pour tout le réseau),
+configuration des serveurs (rattrapée au redémarrage quand le bot a été retiré pendant un arrêt), rappels programmés, messages remis pour le site,
 journaux, sauvegardes. Une durée que le code du bot n'applique pas ne s'écrit pas :
 là où aucune purge n'existe, le texte dit « aucune suppression automatique à ce
 jour » plutôt qu'une durée inventée.
@@ -31,7 +31,7 @@ Ce qu'ils réutilisent au lieu de le recopier :
 | Hébergeur technique, machine | `SITE_HOST` (`site-host.ts`) |
 | Durée des sauvegardes | `BACKUP_RETENTION_DAYS` (`account-deletion-journal.ts`) |
 | Transfert vers Discord | `DPF_ADEQUACY_DECISION` (`processing-register.ts`) |
-| Durées propres au bot | `BOT_RELAY_RETENTION_DAYS`, `BOT_LINK_CODE_VALIDITY_MINUTES` (`processing-register.ts`) |
+| Durées propres au bot | `BOT_RELAY_RETENTION_DAYS`, `BOT_ACTIVITY_AUTHOR_RETENTION_DAYS` (`processing-register.ts`) |
 | Âge minimal | `BOT_MINIMUM_AGE` (15 ans, `bot-legal-content.ts`) |
 
 Les durées propres au bot vivent dans un autre dépôt : aucune importation ne peut les
