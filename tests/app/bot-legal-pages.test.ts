@@ -229,6 +229,14 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain(SITE_HOST.machineEn);
   });
 
+  it("does not promise a /link account link that nothing on the site completes", () => {
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("la commande ne relie donc aucun compte");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("the command therefore links no account");
+    expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("date de la liaison");
+    const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
+    expect((t08?.dataCategories ?? []).join(" ")).not.toContain("date de liaison");
+  });
+
   it("says relayed copies stay on Discord once the tracking expires, in the pages and in T08", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain("Les copies publiées dans les salons partenaires restent sur Discord");
     expect(flatOf(PRIVACY_POLICY, "en")).toContain("The copies posted in partner channels remain on Discord");
