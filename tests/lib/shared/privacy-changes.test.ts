@@ -492,6 +492,36 @@ describe("PRIVACY_CHANGES — rectificatifs d'information", () => {
   });
 });
 
+describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-mesure-audience-opposition")!;
+  const rectificatifs = PRIVACY_CHANGES.find((c) => c.id === "2026-10-rectificatifs-information")!;
+  const text = () => [entry.summary, ...entry.details].join(" ");
+
+  // Même jour que les rectificatifs : une seule modale pour les deux, et une
+  // entrée distincte parce que ceux-ci annoncent un traitement inchangé.
+  it("est la dernière entrée, datée du même jour que les rectificatifs, pour tous les comptes", () => {
+    // Suivie de l'entrée du contact données, publiée le même jour.
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
+    expect(entry.publishedAt).toBe("2026-10-01");
+    expect(entry.audience).toBeUndefined();
+    expect(rectificatifs.summary).toMatch(/Rien ne change dans le traitement/);
+  });
+
+  it("annonce l'opposition (GPC, DNT, bouton) et la durée de 25 mois", () => {
+    expect(text()).toContain("Global Privacy Control");
+    expect(text()).toContain("Do Not Track");
+    expect(text()).toContain("25 mois après ta dernière visite");
+    expect(text()).toContain("une visite refusée n'est pas enregistrée");
+    expect(text()).not.toMatch(/sans limite de durée|non réversible/);
+  });
+
+  it("tient dans un message privé à elle seule, et renvoie à la section de /rgpd", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#audience"]);
+  });
+});
+
 describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-contact-donnees")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");

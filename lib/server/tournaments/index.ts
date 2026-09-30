@@ -183,6 +183,7 @@ import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
 import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
+import { maintainSiteVisitRetention } from "@/lib/server/site-visits-service";
 import { findTournamentsNeedingSync } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
 import { loadViewerCastBlock } from "./match-launch";
@@ -610,6 +611,11 @@ export async function listTournamentBuckets(
   // connexions : une période sans connexion (sessions de 30 jours) garderait
   // sinon des lignes au-delà de la durée légale annoncée. Étranglée à l'heure.
   void purgeExpiredConnectionLogs().catch(() => undefined);
+  // Même raison pour la mesure d'audience : son entretien suit aussi les
+  // signalements de visite, qu'un visiteur opposé n'envoie pas. Sans cette
+  // seconde entrée, un site où tout le monde s'oppose ne tiendrait plus les
+  // durées annoncées. Étranglé à l'heure, jamais levé.
+  maintainSiteVisitRetention();
 
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.

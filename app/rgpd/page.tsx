@@ -53,7 +53,15 @@ import {
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
-import { SITE_VISIT_DETAIL_RETENTION_DAYS, SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
+import {
+  AUDIENCE_OPT_OUT_MAX_AGE_DAYS,
+  SITE_VISITOR_RETENTION_MONTHS,
+  SITE_VISIT_DETAIL_RETENTION_DAYS,
+  SITE_VISIT_WINDOW_MINUTES,
+  audienceOptOutFromHeaders,
+} from "@/lib/shared/site-visits";
+import { headers } from "next/headers";
+import { AudienceOptOutControl } from "@/components/privacy/AudienceOptOutControl";
 import styles from "./page.module.css";
 
 export const metadata: Metadata = pageMetadata({
@@ -92,6 +100,9 @@ export default async function RgpdPage() {
   // Le formulaire laisse un membre connecté désigner son compte ; un visiteur
   // l'ouvre aussi, sans cela.
   const user = await getCurrentUser().catch(() => null);
+  // État de l'opposition à la mesure d'audience, lu sur la requête (GPC, DNT,
+  // cookie du choix) pour que la phrase soit juste dès le premier affichage.
+  const audienceOptOut = audienceOptOutFromHeaders(await headers());
   // La date suit le dernier changement présenté aux joueurs
   // (`lib/shared/privacy-changes.ts`) : écrite à la main, elle restait en juin
   // pendant que la politique changeait.
@@ -396,7 +407,8 @@ export default async function RgpdPage() {
           <p>
             BlueGenji n'utilise <strong>aucun cookie publicitaire, aucun traceur
             analytique tiers</strong> (Google Analytics, Meta Pixel, etc.). La mesure
-            d&apos;audience du site n&apos;emploie aucun cookie : elle est décrite{" "}
+            d&apos;audience du site ne dépose aucun cookie de mesure (seule votre éventuelle
+            opposition est retenue par un cookie) : elle est décrite{" "}
             <Link href="#audience">plus bas</Link>.
           </p>
           <p>
@@ -459,6 +471,14 @@ export default async function RgpdPage() {
               décrit sous <Link href="#audience">Mesure d&apos;audience</Link>.
             </li>
             <li>
+              <strong>bg_audience_optout</strong> — déposé uniquement <strong>si vous vous
+              opposez à la mesure d&apos;audience</strong> (bouton de la section{" "}
+              <Link href="#audience">Mesure d&apos;audience</Link>), pour ne plus signaler ni
+              enregistrer vos visites. Il ne contient que la valeur « 1 », jamais
+              d&apos;identifiant de personne, dure {AUDIENCE_OPT_OUT_MAX_AGE_DAYS} jours (treize
+              mois) et disparaît si vous réactivez la mesure.
+            </li>
+            <li>
               <strong>bg_match_launch_dismissed</strong> — une valeur du stockage de session,
               effacée à la fermeture de l&apos;onglet, posée <strong>si vous fermez la fenêtre de
               lancement d&apos;un match</strong> : le numéro du match et l&apos;étape de son
@@ -494,7 +514,10 @@ export default async function RgpdPage() {
           </ul>
           <p>
             <strong>bg:last-visit-ping</strong> relève de la mesure d&apos;audience, dont les
-            conditions sont décrites ci-dessous. Les autres éléments ne demandent pas votre
+            conditions sont décrites ci-dessous : il entre dans la dispense prévue par la
+            CNIL pour les traceurs de mesure d&apos;audience (lignes directrices du 17 septembre
+            2020), qui suppose un moyen de s&apos;y opposer et des durées de conservation
+            limitées — les deux sont décrits ci-dessous. Les autres éléments ne demandent pas votre
             consentement : l&apos;article 82 de la loi
             Informatique et Libertés en dispense les traceurs qui sont strictement nécessaires
             au service que vous demandez, ou qui ont pour seule finalité de le permettre. Aucun
@@ -521,8 +544,8 @@ export default async function RgpdPage() {
         <div className={styles.prose}>
           <p>
             <strong>Finalité.</strong> Connaître la fréquentation du site : nombre de visites
-            et de visiteurs uniques sur 24 heures, 7 jours, 30 jours et depuis la mise en
-            service. Aucun outil tiers n&apos;est employé, et rien n&apos;en sert à la publicité.
+            sur 24 heures, 7 jours, 30 jours et depuis la mise en service, et de visiteurs
+            uniques sur 24 heures, 7 jours, 30 jours et {SITE_VISITOR_RETENTION_MONTHS} mois. Aucun outil tiers n&apos;est employé, et rien n&apos;en sert à la publicité.
           </p>
           <p>
             <strong>Ce qui est transmis.</strong> Quand vous arrivez sur le site, par
@@ -556,11 +579,13 @@ export default async function RgpdPage() {
             <strong>Durée de conservation.</strong> Le détail des visites (empreinte, page,
             date) est effacé au bout de {SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après avoir
             été reporté dans un compteur par jour qui ne garde que le nombre de visites. Pour
-            compter les visiteurs uniques depuis la mise en service, le site garde en outre
-            une empreinte par visiteur, sans page ni date mais avec l&apos;indicateur
-            « visiteur connecté »,{" "}
-            <strong>sans limite de durée</strong> — y compris après la suppression d&apos;un
-            compte.
+            compter les visiteurs uniques, le site garde en outre une empreinte par visiteur,
+            sans page mais avec l&apos;indicateur « visiteur connecté » et la date de la
+            dernière visite : elle est effacée{" "}
+            <strong>{SITE_VISITOR_RETENTION_MONTHS} mois après cette dernière visite</strong>{" "}
+            — y compris après la suppression d&apos;un compte, qui ne l&apos;efface pas plus
+            tôt. Les empreintes enregistrées avant cette règle sont datées de sa mise en
+            place, leur dernière visite n&apos;ayant pas été conservée.
           </p>
           <p>
             <strong>Destinataires.</strong> Le staff de l&apos;association. Les totaux
@@ -568,13 +593,20 @@ export default async function RgpdPage() {
             par la commande <code>/stats-site</code> du bot Discord, ouverte à tout membre d&apos;un serveur où le bot est installé.
           </p>
           <p>
-            <strong>Votre droit d&apos;opposition.</strong> Le droit de vous opposer à cette
-            mesure (art. 21 du RGPD) s&apos;exerce comme vos autres droits, par les moyens
-            indiqués à la section{" "}
-            <a href="#exercer-vos-droits">« Exercer vos droits »</a>. Le site ne sait pas encore
-            l&apos;appliquer de lui-même : aucun réglage ne permet de désactiver la mesure, ni
-            d&apos;en exclure vos visites à venir.
+            <strong>Votre droit d&apos;opposition.</strong> Vous pouvez vous opposer à cette
+            mesure (art. 21 du RGPD) sans avoir à le demander. Le site respecte les signaux{" "}
+            <strong>Global Privacy Control</strong> et <strong>Do Not Track</strong> de votre
+            navigateur, et le bouton ci-dessous retient votre choix dans ce navigateur (cookie{" "}
+            <strong>bg_audience_optout</strong>). Une visite refusée n&apos;est pas enregistrée :
+            le serveur relit lui-même ces signaux. Elle n&apos;est même pas signalée au serveur
+            quand votre navigateur les expose à la page, ce que font la plupart (une extension
+            qui n&apos;ajoute que l&apos;en-tête laisse partir le signalement, que le serveur
+            écarte alors sans rien calculer). L&apos;opposition vaut
+            pour vos visites à venir ; pour les visites déjà enregistrées, le droit
+            s&apos;exerce comme vos autres droits, par les moyens indiqués à la section{" "}
+            <a href="#exercer-vos-droits">« Exercer vos droits »</a>.
           </p>
+          <AudienceOptOutControl initialReason={audienceOptOut} />
         </div>
       </section>
 

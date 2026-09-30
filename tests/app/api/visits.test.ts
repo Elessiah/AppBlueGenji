@@ -5,7 +5,11 @@ jest.mock("@/lib/server/site-visits-service");
 
 import { POST } from "@/app/api/visits/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
+import {
+  maintainSiteVisitRetention,
+  recordSiteVisit,
+  syncSiteVisitStatsToBot,
+} from "@/lib/server/site-visits-service";
 import { authUser } from "../../helpers/auth-user";
 
 const member = authUser({ id: 42, isAdmin: false, roles: [] });
@@ -137,5 +141,39 @@ describe("POST /api/visits", () => {
 
     expect(res.status).toBe(200);
     expect(await res.json()).toEqual({ recorded: true });
+  });
+});
+
+describe("POST /api/visits — opposition à la mesure", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.mocked(getCurrentUser).mockResolvedValue(member);
+    jest.mocked(recordSiteVisit).mockResolvedValue({ recorded: true });
+    jest.mocked(syncSiteVisitStatsToBot).mockResolvedValue(true);
+  });
+
+  // Le serveur ne se fie pas au seul navigateur : un signal ou un choix
+  // d'opposition arrivé jusqu'ici n'est ni haché ni écrit.
+  it.each<[string, Record<string, string>]>([
+    ["Global Privacy Control", { "sec-gpc": "1" }],
+    ["Do Not Track", { dnt: "1" }],
+    ["le choix fait sur /rgpd", { cookie: "bg_session=abc; bg_audience_optout=1" }],
+  ])("n'enregistre rien sous %s", async (_label, headers) => {
+    const res = await POST(visitReq({ path: "/tournois" }, headers));
+
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ recorded: false });
+    expect(recordSiteVisit).not.toHaveBeenCalled();
+    expect(getCurrentUser).not.toHaveBeenCalled();
+    expect(syncSiteVisitStatsToBot).not.toHaveBeenCalled();
+    // L'entretien des durées, lui, ne dépend pas d'une visite comptée.
+    expect(maintainSiteVisitRetention).toHaveBeenCalledTimes(1);
+  });
+
+  it("mesure quand les signaux sont absents ou à 0", async () => {
+    const res = await POST(visitReq({ path: "/" }, { dnt: "0", "sec-gpc": "0", cookie: "bg_audience_optout=" }));
+
+    expect(await res.json()).toEqual({ recorded: true });
+    expect(recordSiteVisit).toHaveBeenCalledTimes(1);
   });
 });
