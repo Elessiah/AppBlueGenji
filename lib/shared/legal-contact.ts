@@ -67,7 +67,7 @@ export const DATA_CONTACT_LABEL = "Personne à contacter pour vos demandes relat
  * CSV — qui ne savent pas révéler une adresse au clic : ils renvoient donc aux
  * pages qui le font plutôt que de l'écrire.
  */
-export const RGPD_CONTACT_LINE = `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE} : courriel et téléphone (politique de confidentialité et mentions légales du site) ; ou formulaire « ${REPORT_FORM_NAME} » du site (pied de page), catégorie « RGPD » ; ou l'association : courriel et téléphone (mentions légales du site)`;
+export const RGPD_CONTACT_LINE = `Demandes relatives aux données : ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de les recevoir — courriel et téléphone (politique de confidentialité et mentions légales du site) —, ou formulaire « ${REPORT_FORM_NAME} » du site (pied de page), catégorie « RGPD » ; l'association : courriel et téléphone (mentions légales du site)`;
 
 /**
  * Langues dans lesquelles l'association reçoit les demandes des autorités à

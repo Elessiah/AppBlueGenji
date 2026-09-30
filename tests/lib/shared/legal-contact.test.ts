@@ -196,7 +196,8 @@ describe("contact de remplacement", () => {
   });
 
   it("ligne du registre : la personne à contacter, le formulaire RGPD et l'association, par renvoi, sans adresse", () => {
-    expect(RGPD_CONTACT_LINE.startsWith(`${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE} : courriel et téléphone`)).toBe(true);
+    // Le responsable reste l'association : la personne à contacter est présentée comme telle.
+    expect(RGPD_CONTACT_LINE.startsWith(`Demandes relatives aux données : ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association`)).toBe(true);
     expect(RGPD_CONTACT_LINE).toContain("l'association : courriel et téléphone (mentions légales du site)");
     expect(RGPD_CONTACT_LINE).not.toContain(LEGAL_CONTACT_DISCORD);
     expect(RGPD_CONTACT_LINE).toContain(REPORT_FORM_NAME);

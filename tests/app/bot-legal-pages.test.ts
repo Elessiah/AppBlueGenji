@@ -110,8 +110,9 @@ describe("bot legal content carries the contact details", () => {
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("lui parvient en clair");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("reaches it unencrypted");
     // …et renvoie à la politique du site, qui décrit ce traitement (base légale, durée).
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("relève de la politique de confidentialité du site, et non de celle-ci");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("falls under the website's privacy policy, not this one");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("est décrit dans la politique de confidentialité du site");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("is described in the website's privacy policy");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("(/rgpd#exercer-vos-droits) (in French)");
   });
 });
 
