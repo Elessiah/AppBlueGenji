@@ -872,6 +872,14 @@ export default async function RgpdPage() {
             d'<strong>un mois</strong> (art. 12 RGPD).
           </p>
           <p>
+            Une demande reçue par courriel ou par téléphone — son contenu, votre adresse ou
+            votre numéro, et souvent votre nom — est conservée le temps de la traiter, puis{" "}
+            {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, avant d&apos;être
+            supprimée de la messagerie ou du téléphone de la personne à contacter (registre,
+            T11). Une demande faite depuis le formulaire suit la règle de la section{" "}
+            <a href="#signalements">« Signalements »</a>.
+          </p>
+          <p>
             Cette personne n&apos;est pas un délégué à la protection des données au sens de
             l&apos;article 37 du RGPD : l&apos;association reste responsable du traitement et
             de la réponse apportée à votre demande.

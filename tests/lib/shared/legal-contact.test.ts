@@ -242,6 +242,8 @@ describe("personne à contacter pour les demandes relatives aux données", () =>
     const page = readSource("app/rgpd/page.tsx");
     expect(page).toContain("encoded={ASSOCIATION_EMAIL_ENCODED}");
     expect(page).toContain('id="exercer-vos-droits"');
+    // Durée annoncée pour les demandes reçues par courriel ou téléphone (art. 13.2.a).
+    expect(page).toContain("{REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture");
     expect(page).toContain("{DATA_CONTACT_LABEL}");
   });
 

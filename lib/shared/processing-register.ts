@@ -200,7 +200,7 @@ export function registerController(): RegisterController {
     legalForm: "Association loi 1901",
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE,
-    dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées : rubrique « Contact » du responsable). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
+    dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées données avec celles du responsable du traitement). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
     host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
