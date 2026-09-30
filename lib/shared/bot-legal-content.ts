@@ -7,7 +7,9 @@
  * branche `main`) : chaque durée ou comportement cité y a été relu — tables de
  * `src/bdd/Bdd.ts`, purge de `src/messages/manageMsgExpiration.ts`, commandes
  * de `src/config/commands.ts`, routes de `src/internalApi.ts`, sauvegardes de
- * `scripts/backup-onedrive.sh`. Les durées qu'aucune importation ne peut tenir
+ * `scripts/backup-onedrive.sh`, effacement au départ d'un serveur de
+ * `Bdd.forgetGuild` (évènement `guildDelete` de `src/main.ts`), licence de
+ * `LICENSE` et `NOTICE`. Les durées qu'aucune importation ne peut tenir
  * alignées (le bot vit dans un autre dépôt) sont recopiées une fois, avec leur
  * source, dans `lib/shared/processing-register.ts`, que le registre (T08) lit
  * aussi : un changement du bot se reporte là, et les deux pages suivent.
