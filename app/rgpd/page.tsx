@@ -25,9 +25,15 @@ import {
   ALL_TRANSFER_RECIPIENTS,
   ONEDRIVE_BACKUP_FRAMEWORK,
   PROCESSING_ACTIVITIES,
+  REGISTER_NOT_YET_COVERED,
+  REGISTER_SCOPE,
   transferBasis,
 } from "@/lib/shared/processing-register";
-import { privacyChangeDay, privacyPolicyUpdatedLabel } from "@/lib/shared/privacy-changes";
+import {
+  privacyChangeDay,
+  privacyPolicyUpdatedLabel,
+  publishedPrivacyChanges,
+} from "@/lib/shared/privacy-changes";
 import {
   MODERATION_SUPPORT_PORTAL_URL,
   NOTIFIER_FOLLOW_UP,
@@ -66,6 +72,12 @@ function DataCell({ column, children }: { column: 0 | 1 | 2 | 3; children: React
   );
 }
 
+/** `2026-09-23` → `23/09/2026`. */
+function frenchDay(iso: string): string {
+  const [y, m, d] = iso.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 export default async function RgpdPage() {
   // Le formulaire laisse un membre connecté désigner son compte ; un visiteur
   // l'ouvre aussi, sans cela.
@@ -73,7 +85,12 @@ export default async function RgpdPage() {
   // La date suit le dernier changement présenté aux joueurs
   // (`lib/shared/privacy-changes.ts`) : écrite à la main, elle restait en juin
   // pendant que la politique changeait.
-  const updatedLabel = privacyPolicyUpdatedLabel(privacyChangeDay(new Date())) ?? "septembre 2026";
+  const today = privacyChangeDay(new Date());
+  const updatedLabel = privacyPolicyUpdatedLabel(today) ?? "septembre 2026";
+  // L'historique des versions : chaque changement publié, présenté aux joueurs
+  // à sa date. « Applicable depuis la création de la plateforme » disait le
+  // contraire d'une politique qui a changé plusieurs fois.
+  const history = publishedPrivacyChanges(today);
   return (
     <PublicPageShell>
       {/* HERO */}
@@ -130,8 +147,11 @@ export default async function RgpdPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            BlueGenji ne demande aucun nom réel, aucun numéro de téléphone, aucune
-            adresse postale. L'ensemble des données repose sur des pseudonymes de jeu.
+            Le compte joueur ne demande aucun nom réel, aucun numéro de téléphone, aucune
+            adresse postale : il repose sur des pseudonymes de jeu. Deux exceptions, hors du
+            compte : un signalement de droit d&apos;auteur indique le nom de son auteur, et les
+            membres du bureau et les bénévoles présentés sur le site y figurent sous leur nom,
+            avec leur accord (registre, T07 et T11).
             Google transmet le nom de ton compte avec ta photo : depuis le 30 septembre
             2026, il n&apos;est ni repris ni conservé, un compte créé par Google reçoit un
             pseudo neutre que tu remplaces dans Mon profil, et la photo copiée depuis
@@ -528,8 +548,7 @@ export default async function RgpdPage() {
             <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
               portail de support de l&apos;association
             </a>{" "}
-            (Spiceworks), qui a ses propres conditions : le site n&apos;y transmet rien, on le rejoint par
-            un simple lien.
+            (hébergé par Spiceworks) : le site n&apos;y transmet rien, on le rejoint par un simple lien.
           </p>
           <ul>
             <li>
@@ -738,11 +757,26 @@ export default async function RgpdPage() {
         </header>
         <div className={styles.prose}>
           <p>
-            Le registre recense tout ce que BlueGenji fait de données personnelles :
-            finalités, données, durées de conservation, destinataires, transferts et
-            mesures de sécurité. Il est <strong>public</strong> — consultable et
-            téléchargeable par tous, sans compte ni demande.
+            {REGISTER_SCOPE} : finalités, données, durées de conservation, destinataires,
+            transferts et mesures de sécurité. Il est <strong>public</strong> — consultable et
+            téléchargeable par tous, sans compte ni demande. Voici chacun de ses traitements,
+            avec sa base légale et sa durée de conservation ; le détail est au registre.
           </p>
+          <p>{REGISTER_NOT_YET_COVERED}</p>
+          {/* Lu du registre, jamais recopié : une fiche ajoutée y paraît d'elle-même. */}
+          <ul className={styles.registerSummary}>
+            {PROCESSING_ACTIVITIES.map((activity) => (
+              <li key={activity.ref}>
+                <Link href={`/rgpd/registre#${activity.ref.toLowerCase()}`}>
+                  <strong>
+                    {activity.ref} — {activity.name}
+                  </strong>
+                </Link>{" "}
+                : {activity.purpose}. <em>Base légale</em> : {activity.legalBasis}.{" "}
+                <em>Conservation</em> : {activity.retention.join(" ; ")}.
+              </li>
+            ))}
+          </ul>
         </div>
         <div className={styles.registerActions}>
           <CyberButton asChild variant="primary">
@@ -819,8 +853,21 @@ export default async function RgpdPage() {
           </p>
         </div>
         <div className={styles.updateLine}>
-          Dernière mise à jour : {updatedLabel} · Applicable depuis la création de la plateforme
+          Dernière mise à jour : {updatedLabel}
         </div>
+        {history.length > 0 && (
+          <details className={styles.history}>
+            <summary>Historique des versions ({history.length} changements)</summary>
+            <ul>
+              {history.map((change) => (
+                <li key={change.id}>
+                  <time dateTime={change.publishedAt}>{frenchDay(change.publishedAt)}</time> —{" "}
+                  {change.title}
+                </li>
+              ))}
+            </ul>
+          </details>
+        )}
       </section>
     </PublicPageShell>
   );
