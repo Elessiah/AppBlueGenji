@@ -17,8 +17,8 @@ dont les fichiers ont divergé et ne font plus foi (13 ans, « 72 heures ou au
 redémarrage », aucun responsable du traitement — voir `ERREUR.txt`, lot bot).
 
 Ils décrivent le bot **d'après son code** (`blueGenjiBot`, branche `main`), relu
-table par table : relais d'annonces, scrims et recrutement, exclusions, liaison
-`/link`, configuration des serveurs, rappels programmés, messages remis pour le site,
+table par table : relais d'annonces, scrims et recrutement (auteur effacé à 30 jours), exclusions (valables pour tout le réseau),
+configuration des serveurs (rattrapée au redémarrage quand le bot a été retiré pendant un arrêt), rappels programmés, messages remis pour le site,
 journaux, sauvegardes. Une durée que le code du bot n'applique pas ne s'écrit pas :
 là où aucune purge n'existe, le texte dit « aucune suppression automatique à ce
 jour » plutôt qu'une durée inventée.
