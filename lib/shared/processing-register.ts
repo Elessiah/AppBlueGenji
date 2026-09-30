@@ -589,6 +589,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
       `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
+      "Opérateur téléphonique de cette personne : demandes faites par téléphone (appel, SMS, messagerie vocale)",
       `Microsoft, qui héberge la messagerie de cette personne (${OUTLOOK_MAIL_FRAMEWORK}) : demandes reçues et réponses envoyées par courriel`,
     ],
     transfers: [
@@ -600,7 +601,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
       "Plafonds d'envoi par personne et par heure",
       "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
-      "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft (messagerie) et de l'appareil personnel de la personne à contacter",
+      "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft (messagerie), de l'opérateur téléphonique et de l'appareil personnel de la personne à contacter",
     ],
   },
   {

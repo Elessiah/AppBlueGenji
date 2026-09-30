@@ -785,6 +785,10 @@ export default async function RgpdPage() {
               à l&apos;association (durée : section{" "}
               <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
             </li>
+            <li>
+              <strong>L&apos;opérateur téléphonique</strong> de cette même personne : seulement si
+              vous l&apos;appelez ou lui laissez un SMS ou un message vocal.
+            </li>
           </ul>
           <p>
             <strong>Encadrement des transferts.</strong> Ces services peuvent traiter ou héberger
@@ -872,8 +876,9 @@ export default async function RgpdPage() {
             d'<strong>un mois</strong> (art. 12 RGPD).
           </p>
           <p>
-            Une demande reçue par courriel ou par téléphone — son contenu, votre adresse ou
-            votre numéro, et souvent votre nom — est conservée le temps de la traiter, puis{" "}
+            Une demande reçue par courriel ou par téléphone (appel, SMS, messagerie vocale) —
+            son contenu, votre adresse ou votre numéro, et souvent votre nom —, ainsi que la
+            réponse envoyée par courriel, sont conservées le temps de la traiter, puis{" "}
             {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, avant d&apos;être
             supprimée de la messagerie ou du téléphone de la personne à contacter (registre,
             T11). Une demande faite depuis le formulaire suit la règle de la section{" "}
