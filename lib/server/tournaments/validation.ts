@@ -173,6 +173,8 @@ export type TournamentInputBody = {
   registrationDiscordRequirement?: string | null;
   registrationBlizzardRequirement?: string | null;
   registrationMinPlayers?: number | null;
+  /** Matchs planifiés par l'arbitrage ; absent = option éteinte. */
+  refereeScheduling?: boolean | null;
 };
 
 export type ValidatedTournamentInput = {
@@ -217,6 +219,8 @@ export type ValidatedTournamentInput = {
    * rien (`NONE` + un joueur), pas un tournoi dont on ignore les conditions.
    */
   registrationFilters: RegistrationFilters;
+  /** Matchs planifiés par l'arbitrage (`lib/shared/match-planning.ts`). */
+  refereeScheduling: boolean;
 };
 
 export function validateTournamentInput(
@@ -348,6 +352,15 @@ export function validateTournamentInput(
     body.registrationBlizzardRequirement,
   );
   if (filterError) return { error: filterError };
+  // Un booléen strict : « "false" » ou « 0 » venus d'un client mal écrit ne
+  // doivent pas allumer une option qui change tout le déroulement des matchs.
+  if (
+    body.refereeScheduling !== undefined &&
+    body.refereeScheduling !== null &&
+    typeof body.refereeScheduling !== "boolean"
+  ) {
+    return { error: "INVALID_REFEREE_SCHEDULING" };
+  }
   const registrationFilters: RegistrationFilters = {
     discordRequirement: isPlayerRequirement(body.registrationDiscordRequirement)
       ? body.registrationDiscordRequirement
@@ -490,6 +503,7 @@ export function validateTournamentInput(
       matchFormat,
       endurancePlayoffFormat,
       registrationFilters,
+      refereeScheduling: body.refereeScheduling === true,
       // Les phases ne concernent que le format MULTI : on ne les transmet pas
       // aux autres formats, même si le client en a envoyé. Voir le
       // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :

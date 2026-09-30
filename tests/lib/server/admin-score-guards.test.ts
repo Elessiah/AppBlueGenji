@@ -26,6 +26,11 @@ function fakeConnection(
     lockStatus?: "READY" | "COMPLETED";
     /** Manche suivante, telle que la rend la seconde requête du verrou. */
     dependents?: Record<string, unknown>[];
+    /** Horaire et lancement du match édité ; absents = sans date, non lancé. */
+    startAt?: Date | null;
+    launchedAt?: Date | null;
+    /** Option du tournoi « matchs planifiés par l'arbitrage ». */
+    refereeScheduling?: boolean;
   } = {},
 ): {
   conn: PoolConnection;
@@ -80,6 +85,10 @@ function fakeConnection(
         ];
       }
 
+      if (q.startsWith("SELECT referee_scheduling FROM bg_tournaments")) {
+        return [[{ referee_scheduling: options.refereeScheduling ? 1 : 0 }], []];
+      }
+
       if (q.includes("match_format_type")) {
         return [[{ match_format_type: null, match_format_value: null }], []];
       }
@@ -101,6 +110,9 @@ function fakeConnection(
               // terminé sans avoir de vainqueur. Le fake dérive donc l'un de
               // l'autre pour que les cas écrits avant disent la même chose.
               status: options.winnerTeamId != null ? "COMPLETED" : "READY",
+              start_at: options.startAt ?? null,
+              launched_at: options.launchedAt ?? null,
+              launch_pairing: "100:200",
             },
           ],
           [],
@@ -308,5 +320,51 @@ describe("lecture verrouillante du match — course avec le réordonnancement du
 
     await expect(run(conn)).rejects.toThrow("MATCH_NOT_FOUND");
     expect(writes).toHaveLength(0);
+  });
+});
+
+describe("aucun score avant le lancement — arbitrage compris", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  const FUTURE = new Date(Date.now() + 3_600_000);
+
+  it("refuse d'enregistrer un score sur un match à planifier", async () => {
+    const { conn, writes } = fakeConnection({ refereeScheduling: true });
+    await expect(adminSaveMatchScores(conn, 10, 1, 0)).rejects.toThrow("MATCH_NOT_IN_LAUNCH");
+    expect(writes).toHaveLength(0);
+  });
+
+  it("refuse de valider un score sur un match en attente de départ, option éteinte", async () => {
+    const { conn, writes } = fakeConnection({ startAt: FUTURE });
+    await expect(adminResolveMatch(conn, 10, 2, 0)).rejects.toThrow("MATCH_NOT_IN_LAUNCH");
+    expect(writes).toHaveLength(0);
+  });
+
+  it("laisse prononcer un forfait avant le lancement (enregistrement et validation)", async () => {
+    const save = fakeConnection({ refereeScheduling: true });
+    await expect(adminSaveMatchScores(save.conn, 10, undefined, undefined, 200)).resolves.toBeUndefined();
+
+    const resolve = fakeConnection({ startAt: FUTURE });
+    await expect(adminResolveMatch(resolve.conn, 10, undefined, undefined, 200)).resolves.toBeUndefined();
+  });
+
+  it("laisse prononcer un double forfait avant le lancement", async () => {
+    const { conn } = fakeConnection({ refereeScheduling: true });
+    await expect(adminResolveMatch(conn, 10, undefined, undefined, undefined, true)).resolves.toBeUndefined();
+  });
+
+  it("laisse saisir dès le lancement, et sur un match lancé avant son heure", async () => {
+    const lobby = fakeConnection({ startAt: new Date(Date.now() - 60_000), refereeScheduling: true });
+    await expect(adminSaveMatchScores(lobby.conn, 10, 1, 0)).resolves.toBeUndefined();
+
+    const forced = fakeConnection({ startAt: FUTURE, launchedAt: new Date() });
+    await expect(adminSaveMatchScores(forced.conn, 10, 1, 0)).resolves.toBeUndefined();
+  });
+
+  it("laisse corriger un match terminé, même à planifier ou daté dans le futur", async () => {
+    const { conn } = fakeConnection({ winnerTeamId: 100, refereeScheduling: true, startAt: FUTURE });
+    await expect(adminResolveMatch(conn, 10, 2, 1)).resolves.toBeUndefined();
   });
 });

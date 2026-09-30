@@ -10,6 +10,8 @@ import {
   playerReportView,
   playerScoreButtonLabel,
 } from "@/lib/shared/player-score-report";
+import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
+import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
@@ -22,6 +24,16 @@ import { EntrantName } from "./EntrantName";
 import { CyberButton } from "@/components/cyber";
 import styles from "./MatchRow.module.css";
 
+
+/**
+ * Libellé du bouton d'arbitrage : il dit le seul geste possible avant le
+ * lancement (le forfait), et, une fois lancé, s'il reste un score proposé à
+ * valider — une confirmation qui peut ne jamais venir (adversaire fantôme).
+ */
+function adminScoreButtonLabel(scoreEntryClosed: boolean, hasProposal: boolean): string {
+  if (scoreEntryClosed) return "Prononcer un forfait";
+  return hasProposal ? "Valider le score proposé" : "Éditer le score";
+}
 
 interface MatchRowProps {
   match: BracketMatch;
@@ -62,7 +74,16 @@ export const MatchRow = memo(function MatchRow({
   // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
   // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
   // signalement, qui décrirait la même donnée depuis deux sources.
-  const { myTeamId } = useLiveControls();
+  const { myTeamId, refereeScheduling } = useLiveControls();
+  // Phase de lancement, calculée **une fois par carte** et transmise aux deux
+  // bandeaux : chacun posait sinon sa propre minuterie sur l'heure de départ —
+  // trois `setTimeout` par match programmé, sur un plateau qui en compte 254.
+  // Une chaîne : la prop reste stable, la mémorisation des bandeaux tient.
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
+  // Avant le lancement (à planifier, en attente de départ), l'arbitrage ne
+  // saisit aucun score : le seul geste du dialogue est le forfait, et le bouton
+  // le dit plutôt que d'annoncer une édition refusée.
+  const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
   const canReportMatch = canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id);
   // Saisie du score par un engagé : un bouton qui ouvre la modale joueur, et
   // non plus un formulaire en ligne — deux champs de 52 px sans libellé visible
@@ -113,6 +134,7 @@ export const MatchRow = memo(function MatchRow({
   );
 
   const isBye = match.team1Id === null || match.team2Id === null;
+  const adminScoreLabel = adminScoreButtonLabel(scoreEntryClosed, pendingScoreProposal(match) !== null);
   // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :
   // l'arbitrage peut noter un forfait sans valider le résultat, et le score plein
   // porté en face (3-0 en FT3) se lisait alors comme une rencontre jouée et
@@ -172,8 +194,8 @@ export const MatchRow = memo(function MatchRow({
         </p>
       )}
 
-      <MatchLiveStrip match={match} />
-      <MatchLaunchStrip match={match} />
+      <MatchLiveStrip match={match} launchPhase={launchPhase} />
+      <MatchLaunchStrip match={match} phase={launchPhase} />
 
       <MatchReplayStrip match={match} />
 
@@ -202,12 +224,14 @@ export const MatchRow = memo(function MatchRow({
             variant="ghost"
             onClick={() => onOpenAdminModal(match)}
             className={`${styles.action} ${styles.actionAccent}`}
+            // Le libellé visible ouvre le nom (WCAG 2.5.3), le match le complète :
+            // huit boutons identiques sur une ronde ne se distinguaient pas.
+            aria-label={`${adminScoreLabel} : ${team1Display} contre ${team2Display}`}
           >
             {/* Un score proposé attend une confirmation qui peut ne jamais
                 venir (adversaire fantôme) : le dialogue s'ouvre dessus, et le
                 bouton dit le geste qui reste à faire. */}
-            <span aria-hidden="true">✎</span>{" "}
-            {pendingScoreProposal(match) ? "Valider le score proposé" : "Éditer le score"}
+            <span aria-hidden="true">✎</span> {adminScoreLabel}
           </CyberButton>
         </div>
       )}

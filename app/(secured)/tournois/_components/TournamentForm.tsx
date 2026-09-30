@@ -35,6 +35,7 @@ import { FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
+  checkboxCardChrome,
   EYEBROW,
   FULL_WIDTH,
   GRID,
@@ -62,6 +63,7 @@ import {
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { NumberInput } from "@/components/ui/number-input";
+import { REFEREE_SCHEDULING_DESCRIPTION } from "@/lib/shared/match-planning";
 
 /** Contrôles que peut désigner un refus de l'envoi. */
 const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
@@ -678,6 +680,67 @@ export function TournamentForm({
               <FieldErrorText fieldId={FIELD_IDS.startAt} message={fieldErrors.message("startAt")} />
             </div>
           </div>
+
+          {/* Réglée ici à la création seulement : sur un tournoi existant,
+              l'option se bascule depuis sa fiche, jusqu'à la clôture — ce
+              formulaire se ferme au coup d'envoi, précisément quand on peut
+              vouloir la changer. */}
+          {mode === "create" ? (
+            // La carte entière est le libellé natif de la case : un clic n'importe
+            // où la coche, au clavier comme à la souris, sans gestionnaire à
+            // écrire (et sans `<div>` cliquable, que ni le clavier ni les
+            // technologies d'assistance n'atteignent).
+            <label
+              className="checkbox-card"
+              htmlFor="referee-scheduling"
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 12,
+                marginTop: 16,
+                padding: "14px 16px",
+                ...checkboxCardChrome(values.refereeScheduling, false),
+                borderRadius: 10,
+                cursor: "pointer",
+                transition: "border-color 0.2s ease, background-color 0.2s ease",
+              }}
+            >
+              <input
+                id="referee-scheduling"
+                type="checkbox"
+                checked={values.refereeScheduling}
+                onChange={(e) => set("refereeScheduling", e.target.checked)}
+                // Nom court (le titre) et description à part : la carte-libellé
+                // porte les deux textes, qui formeraient sinon un seul nom.
+                aria-labelledby="referee-scheduling-label"
+                aria-describedby="referee-scheduling-hint"
+                style={{ marginTop: 2 }}
+              />
+              <span style={{ flex: 1 }}>
+                <span
+                  id="referee-scheduling-label"
+                  style={{
+                    display: "block",
+                    margin: "0 0 4px",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--ink)",
+                  }}
+                >
+                  Matchs planifiés par l&apos;arbitrage
+                </span>
+                <span id="referee-scheduling-hint" style={{ ...HINT, display: "block", margin: 0 }}>
+                  {REFEREE_SCHEDULING_DESCRIPTION} Modifiable ensuite depuis la fiche du tournoi,
+                  même en cours.
+                </span>
+              </span>
+            </label>
+          ) : (
+            <p style={{ ...HINT, marginTop: 16 }}>
+              La planification des matchs par l&apos;arbitrage se règle depuis la fiche du
+              tournoi, jusqu&apos;à sa clôture.
+            </p>
+          )}
         </section>
 
         <div

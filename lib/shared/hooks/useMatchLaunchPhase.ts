@@ -17,20 +17,26 @@ import {
 export function useMatchLaunchPhase(match: MatchLaunchInput): MatchLaunchPhase {
   const [now, setNow] = useState(() => Date.now());
   // Dépendances réduites à des primitives (voir `useMatchLiveState`).
-  const { status, team1Id, team2Id, startAt, launchedAt } = match;
+  const { status, team1Id, team2Id, startAt, launchedAt, refereeScheduling } = match;
 
   useEffect(() => {
     setNow(Date.now());
-  }, [status, team1Id, team2Id, startAt, launchedAt]);
+  }, [status, team1Id, team2Id, startAt, launchedAt, refereeScheduling]);
 
   useEffect(() => {
-    const at = nextLaunchPhaseChangeAt({ status, team1Id, team2Id, startAt, launchedAt }, now);
+    const at = nextLaunchPhaseChangeAt(
+      { status, team1Id, team2Id, startAt, launchedAt, refereeScheduling },
+      now,
+    );
     if (at === null) return;
     const delay = Math.min(Math.max(0, at - Date.now()), 2_147_483_647);
     // `Math.max(at, …)` : franchir la frontière même sur un réveil précoce.
     const timer = setTimeout(() => setNow(Math.max(at, Date.now())), delay);
     return () => clearTimeout(timer);
-  }, [status, team1Id, team2Id, startAt, launchedAt, now]);
+  }, [status, team1Id, team2Id, startAt, launchedAt, refereeScheduling, now]);
 
-  return matchLaunchPhase({ status, team1Id, team2Id, startAt, launchedAt }, now);
+  return matchLaunchPhase(
+    { status, team1Id, team2Id, startAt, launchedAt, refereeScheduling },
+    now,
+  );
 }

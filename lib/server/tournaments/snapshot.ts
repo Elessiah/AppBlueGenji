@@ -47,6 +47,7 @@ import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { DUE_LAUNCH_SQL } from "./sync-scope";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
@@ -104,15 +105,33 @@ export function invalidateTournamentSnapshot(tournamentId: number): void {
   invalidateCached(cacheKey(tournamentId));
 }
 
-async function hasExpiredScoreReports(
+/**
+ * Un entretien de tournoi en cours est-il dû ? Deux questions, **une requête** :
+ *
+ * - un report de score dont le délai est expiré ;
+ * - un lancement dû (`DUE_LAUNCH_SQL`) : heure de départ atteinte sans
+ *   ouverture, ou lancement d'office échu. Sans elle, la relecture que la salle
+ *   du flux fait **à l'heure dite** (`nextRoomWakeAt`) rendait un plateau
+ *   inchangé : l'ouverture et le départ d'office attendaient qu'un lecteur
+ *   passe par la liste des tournois ou par sa modale de lancement.
+ *
+ * Posées sur la seule ligne du tournoi (clé primaire), les deux sous-requêtes
+ * n'ont aucune jointure par match à payer.
+ */
+async function hasDueRunningMaintenance(
   db: Awaited<ReturnType<typeof getDatabase>>,
   tournamentId: number,
 ): Promise<boolean> {
-  const [rows] = await db.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_matches WHERE tournament_id = ? AND status = 'AWAITING_CONFIRMATION' AND score_deadline_at <= NOW() LIMIT 1`,
+  const [rows] = await db.execute<(RowDataPacket & { due: number | null })[]>(
+    `SELECT (EXISTS (SELECT 1 FROM bg_matches m
+                     WHERE m.tournament_id = t.id AND m.status = 'AWAITING_CONFIRMATION'
+                       AND m.score_deadline_at <= NOW())
+             OR EXISTS (SELECT 1 FROM bg_matches m
+                        WHERE m.tournament_id = t.id AND ${DUE_LAUNCH_SQL})) AS due
+     FROM bg_tournaments t WHERE t.id = ? LIMIT 1`,
     [tournamentId],
   );
-  return rows.length > 0;
+  return Number(rows[0]?.due ?? 0) === 1;
 }
 
 /**
@@ -156,7 +175,7 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
   const needsSync =
     (await hasPendingStateTransition(tournamentRow)) ||
     (tournamentRow.state === "RUNNING" &&
-      (missingBracket || (await hasExpiredScoreReports(db, tournamentId))));
+      (missingBracket || (await hasDueRunningMaintenance(db, tournamentId))));
 
   if (!needsSync) return tournamentRow;
 
@@ -186,6 +205,17 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
     // l'ancien résultat jusqu'à leur expiration, selon le chemin qui avait
     // entretenu le tournoi. (L'appel direct plutôt que `publishUpdatedEvent` :
     // ce dernier jetterait l'instantané en cours et importe ce module.)
+    // Un lancement ouvert ou parti ici n'a traversé aucune publication : c'est
+    // pourtant d'elles que part le balayage des notifications de départ
+    // (`./player-pushes`, étranglé et jamais attendu). Sans ce rappel, la push
+    // « déclare-toi prêt » attendait le prochain passage par la liste. Import
+    // dynamique, comme dans `./notifications`, qui importe ce module.
+    if (syncResult.launchesChanged) {
+      void import("./player-pushes")
+        .then(({ dispatchMatchStartNotices }) => dispatchMatchStartNotices())
+        .catch(() => undefined);
+    }
+
     if (syncResult.stateChanged || syncResult.contentChanged) {
       invalidateTournamentLists();
       invalidateLandingAggregates();
