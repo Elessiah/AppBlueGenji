@@ -54,13 +54,15 @@ export const DISCORD_CODE_VALIDITY_MINUTES = 10;
  *
  * - `BOT_RELAY_RETENTION_DAYS` : `MESSAGE_RETENTION_DAYS` de
  *   `blueGenjiBot/src/messages/manageMsgExpiration.ts` — les traces d'une
- *   annonce relayée sont effacées au **relais suivant** cette échéance, jamais
- *   au redémarrage.
- * - `BOT_LINK_CODE_VALIDITY_MINUTES` : validité du code de `/link`
- *   (`blueGenjiBot/src/commandsHandlers/link.ts`).
+ *   annonce relayée sont effacées au **relais suivant** cette échéance, et au
+ *   plus tard par le ménage de la nuit ou du redémarrage
+ *   (`blueGenjiBot/src/privacy/dataRetention.ts`).
+ * - `BOT_ACTIVITY_AUTHOR_RETENTION_DAYS` : `ACTIVITY_AUTHOR_RETENTION_DAYS` de
+ *   `blueGenjiBot/src/privacy/dataRetention.ts` — au-delà, l'auteur d'un
+ *   `/scrim` ou d'un `/recrute` est effacé, la ligne restant pour les compteurs.
  */
 export const BOT_RELAY_RETENTION_DAYS = 7;
-export const BOT_LINK_CODE_VALIDITY_MINUTES = 10;
+export const BOT_ACTIVITY_AUTHOR_RETENTION_DAYS = 30;
 
 /**
  * Encadrement des transferts hors de l'Union européenne (RGPD art. 45 et 46),
@@ -438,9 +440,9 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     purpose: "Fournir les services du bot sur les serveurs Discord partenaires",
     subPurposes: [
       "Relais des annonces entre les salons des serveurs partenaires, répercussion des modifications et suppressions, temps de recharge",
-      "Exclusion d'un utilisateur du relais par la modération",
-      "Statistiques d'activité (commande /stats, tableau de bord du bot)",
-      "Commande /link (code à usage unique, qu'aucune page du site ne permet encore de saisir) ; confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
+      "Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur",
+      "Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
+      "Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
       "Remise des messages rédigés par le site : codes, rappels, avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un",
     ],
     legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
@@ -451,21 +453,19 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     dataCategories: [
       "Annonces relayées : identifiants du message d'origine et de son auteur, date, identifiants des copies et de leurs salons (contenu recopié dans les salons partenaires, jamais enregistré en base)",
-      "Scrims et recrutement : identifiant de l'auteur, jeu, niveau ou rôle, serveur, date",
-      "Exclusions : identifiants de l'exclu et du modérateur, date ; pseudos et motif publiés au salon de journal privé du staff et affichés par /ban-list",
-      "Commande /link : identifiant Discord, code à usage unique et son échéance",
+      `Scrims et recrutement : identifiant de l'auteur (effacé au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours), jeu, niveau ou rôle, serveur, date`,
+      "Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, pseudos et motif affichés par /ban-list",
       "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
       "Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée",
-      "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un pseudo ou un identifiant",
+      "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit aucun pseudo (seul le motif d'une exclusion, texte libre du modérateur, peut en citer un)",
     ],
     sensitiveData: "Aucune",
     retention: [
-      `Suivi des annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacé au relais suivant cette échéance (rien n'est effacé au redémarrage) ; les copies publiées dans les salons partenaires restent sur Discord jusqu'à leur suppression (par l'auteur dans ce délai, ensuite par les administrateurs de chaque serveur)`,
-      "Scrims et recrutement : aucune suppression automatique à ce jour, jusqu'à une demande d'effacement",
+      `Suivi des annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacé au relais suivant cette échéance et au plus tard dans la nuit ou au redémarrage du bot ; les copies publiées dans les salons partenaires restent sur Discord jusqu'à leur suppression (par l'auteur dans ce délai, ensuite par les administrateurs de chaque serveur)`,
+      `Scrims et recrutement : identifiant de l'auteur effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours (chaque nuit et au redémarrage) ; le reste de la ligne, qui ne désigne plus personne, est gardé pour les compteurs`,
       "Exclusions : jusqu'à la levée de l'exclusion",
-      `Commande /link : code valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne n'est pas supprimée automatiquement à ce jour`,
-      "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un retrait survenu pendant une interruption du bot ne lui est pas signalé : la configuration reste alors jusqu'à une demande d'effacement)",
-      "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (même réserve : un retrait pendant une interruption du bot les laisse jusqu'à une demande d'effacement)",
+      "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)",
+      "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)",
       "Salon de journal privé du staff : aucune suppression automatique à ce jour",
       "Journaux du serveur : selon leur rotation automatique",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
@@ -474,8 +474,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Staff de l'association (modération, administration)",
       "Membres du rôle d'arbitrage de chaque serveur qui en a défini un (/set-referee-role), pour les alertes d'arbitrage du site",
       "Membres des serveurs partenaires, qui lisent les annonces relayées",
-      "Administrateurs de tout serveur où le bot est installé et titulaires du rôle d'administration du bot (/set-bot-admin), pour la liste des exclusions (/ban-list, réponse visible du seul demandeur)",
-      "Tout utilisateur du bot, pour les compteurs d'activité d'un autre utilisateur (/stats, réponse visible du seul demandeur)",
+      "Administrateurs de tout serveur où le bot est installé et titulaires du rôle d'administration du bot (/set-bot-admin), pour la liste des exclusions du réseau (/ban-list, réponse visible du seul demandeur) — l'exclusion vaut pour tout le réseau, chaque serveur doit savoir qui ne peut plus y publier",
       "Discord (plateforme d'exécution)",
     ],
     transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
