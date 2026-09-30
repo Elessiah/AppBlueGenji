@@ -19,7 +19,7 @@ hero avec faits clés et sections numérotées (`SECTION 0X`).
 | Hébergement technique | `lib/shared/site-host.ts` : Keryan Houssin, particulier bénévole de l'association, site et bot sur un Raspberry Pi à Caen — aucun SIREN : la LCEN ne demande à l'hébergeur que nom, adresse et téléphone ; le téléphone se révèle au clic. Distinct de l'association, « hébergeur des contenus de ses membres » au sens du DSA |
 | Propriété intellectuelle (`#propriete-intellectuelle`) | `lib/shared/source-code.ts` : code sous AGPL-3.0 seulement (`LICENSE`, `NOTICE`), droits d'auteur de Keryan Houssin, lien vers le dépôt public. Les autres éléments (textes, nom, logo, identité visuelle, documents officiels) sont **hors licence**, sans titulaire nommé : leur titularité n'est pas documentée (`ERREUR.txt`, décision requise) — le site n'affirme pas ce qu'il ne sait pas |
 | Données personnelles (RGPD) | Responsable du traitement, droits, et **renvoi aux destinataires** de `/rgpd#destinataires` et du registre — jamais « exclusivement à l'association » : les joueurs, le public et des services tiers (Discord, Google, Blizzard, services de push, Microsoft) en reçoivent |
-| Cookies | Cookie de session `bg_session` uniquement, aucun traceur tiers |
+| Cookies (`#cookies`) | Cookies **techniques** seulement — session, connexion en cours (état OAuth), réglages d'accessibilité, annonces de recrutement déjà vues —, aucun traceur publicitaire ni cookie tiers ; la liste complète et les durées vivent sur `/rgpd#cookies`, vers laquelle la section renvoie |
 | Documents officiels | Liens téléchargeables / consultables |
 
 ## Documents et liens
@@ -33,16 +33,20 @@ Les fichiers statiques sont servis depuis `public/` :
 | Règlement intérieur | Google Docs `…/preview` | nouvel onglet, vue lecture seule |
 
 Le règlement pointe vers l'URL `…/preview` (vue embarquée en lecture seule) et non
-`…/edit`, pour ne pas exposer la surface d'édition du document au public. L'URL est
-centralisée dans une constante `REGLEMENT_URL` dans chaque
-fichier qui l'utilise (`app/association/page.tsx`, `app/mentions-legales/page.tsx`,
-`components/cyber/landing/PublicFooter.tsx`).
+`…/edit`, pour ne pas exposer la surface d'édition du document au public. L'URL
+n'est **pas** centralisée : la constante `REGLEMENT_URL` est recopiée dans les
+trois fichiers qui l'utilisent (`app/association/page.tsx`,
+`app/mentions-legales/page.tsx`, `components/cyber/landing/PublicFooter.tsx`) —
+un changement d'adresse se fait aux trois endroits.
 
 ## Boutons connectés
 
 - **Footer** (`PublicFooter`) — colonne LÉGAL : « Mentions légales »,
-  « RGPD » (→ `#donnees-personnelles`), « Statuts », « Cookies » (→ `#cookies`) ;
-  colonne COMPÉTITIONS : « Règlement ».
+  « Conditions d'utilisation » (→ `/conditions-utilisation`), « RGPD » (→ `/rgpd`),
+  « Statuts », « Règlement intérieur », « Cookies » (→ `/rgpd#cookies`), le lien du
+  code source, « Réglages d'accessibilité » (ouvre le menu d'accessibilité) et la
+  mention « Accessibilité : non conforme » (→ `/accessibilite`). La colonne
+  COMPÉTITIONS porte « Règles des tournois » (→ `/regles`).
 - **Code source** — lien vers le dépôt (`SOURCE_CODE_URL`) dans la colonne LÉGAL de
   `PublicFooter` **et** dans `SiteFooterBar` (espace connecté, `/connexion`) : l'article 13
   de l'AGPL oblige à offrir le code source à tout utilisateur du service en ligne, donc sur
@@ -52,10 +56,11 @@ fichier qui l'utilise (`app/association/page.tsx`, `app/mentions-legales/page.ts
 - **`/mentions-legales`** — section Documents officiels : Statuts, Règlement
   intérieur, Bulletin d'adhésion.
 
-Les liens RGPD / Cookies du footer pointent vers les sections ancrées de
-`/mentions-legales` (`id="donnees-personnelles"`, `id="cookies"`), avec un
-`html { scroll-padding-top }` calé sur la hauteur mesurée de l'en-tête collant
-(`docs/features/ERROR_PAGES_AND_ANCHORS.md`) pour le dégager.
+Les liens RGPD / Cookies du footer mènent à la politique de confidentialité
+(`/rgpd`, `/rgpd#cookies`) ; les sections ancrées de `/mentions-legales`
+(`id="donnees-personnelles"`, `id="cookies"`) résument et y renvoient. Une ancre
+est dégagée de l'en-tête collant par un `html { scroll-padding-top }` calé sur
+sa hauteur mesurée (`docs/features/ERROR_PAGES_AND_ANCHORS.md`).
 
 Les liens vers fichiers statiques et le Google Doc utilisent `<a>` (et non
 `next/link`) : `target="_blank" rel="noreferrer"` pour le PDF et le Google Doc,

@@ -122,11 +122,10 @@ neuve échapperait à la fenêtre et insérerait une ligne. Deux garde-fous :
   mobile) s'épuiseraient mutuellement leur quota et seraient sous-comptés. Le
   client qui fabrique une empreinte neuve à chaque requête, lui, insère à chaque
   fois et atteint le plafond immédiatement. C'est le seul rempart contre une
-  croissance illimitée de la table — aucune déduplication par empreinte ne peut
-  jouer ce rôle, l'empreinte venant du client.
-
-Les lignes ne sont **pas** purgées : « visites totales » est un total depuis la
-mise en service, qu'une rétention tronquerait.
+  croissance débridée de la table **entre deux replis** — aucune déduplication
+  par empreinte ne peut jouer ce rôle, l'empreinte venant du client. Au-delà de
+  31 jours, le repli décrit plus haut (`rollUpExpiredSiteVisits`) efface le
+  détail sans rien retirer aux totaux depuis la mise en service.
 
 ### Concurrence
 

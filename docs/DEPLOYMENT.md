@@ -1,7 +1,11 @@
 # Déploiement
 
 La production sert le site avec `next start` derrière nginx, sous pm2. Le bot
-vit dans son propre dépôt et son propre processus pm2.
+vit dans son propre dépôt et son propre processus pm2 — sur **la même
+machine** : un Raspberry Pi, à Caen. C'est ce qu'annoncent les mentions
+légales et le registre des traitements, qui le lisent tous deux dans
+`lib/shared/site-host.ts` : changer d'hébergement, c'est d'abord mettre ce
+module à jour.
 
 ```bash
 ./update.sh          # git pull --ff-only → npm ci → build → restart → contrôle HTTP
