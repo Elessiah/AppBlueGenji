@@ -23,6 +23,7 @@ import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
+import { WEB_ACCESS_LOG_FIELDS, WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/legal-durations";
 import {
   CODE_COPYRIGHT_HOLDER,
   CODE_LICENSE_NAME,
@@ -155,6 +156,9 @@ export default function MentionsLegalesPage() {
 
 const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: string }[] = [
   {
+    // Ancre visée par les conditions d'utilisation (`ASSOCIATION_CONTACT_PATH`) :
+    // c'est ici que se lit, au clic, l'adresse électronique de l'association.
+    id: "editeur",
     title: "Éditeur du site",
     meta: "RESPONSABLE DE LA PUBLICATION",
     body: (
@@ -305,9 +309,17 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           <strong>{CONNECTION_LOG_RETENTION_DAYS} jours</strong> les données de connexion de ses
           utilisateurs (adresse IP, date et heure, moyen de connexion), y compris après la suppression
           d&apos;un compte, afin de pouvoir identifier l&apos;auteur d&apos;un contenu sur
-          réquisition d&apos;une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Ces
-          données ne sont communiquées qu&apos;aux autorités qui les requièrent ; le détail figure
-          dans la <Link href="/rgpd#donnees-connexion">politique de confidentialité</Link>.
+          réquisition d&apos;une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Ce
+          journal ne consigne que les ouvertures de session — ni le port source, ni la création
+          ou la modification d&apos;un contenu —, et les informations fournies à la création
+          d&apos;un compte ne sont pas gardées après sa suppression, hors les copies de sauvegarde
+          chiffrées et le journal qui rejoue les suppressions (<Link href="/rgpd#donnees-connexion">détail</Link>).
+          Le serveur web tient
+          en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus et pour sa seule sécurité, un
+          journal technique de chaque requête ({WEB_ACCESS_LOG_FIELDS}), sans port
+          source (<Link href="/rgpd/registre#t17">registre, T17</Link>). Ces données ne sont communiquées
+          qu&apos;aux autorités qui les requièrent ; le détail figure dans la{" "}
+          <Link href="/rgpd#donnees-connexion">politique de confidentialité</Link>.
         </p>
       </>
     ),
@@ -344,8 +356,10 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           certaines données sont communiquées à des services tiers — Discord, Google, Blizzard, le
           service de push de votre navigateur, Microsoft pour les sauvegardes chiffrées et, sans
           chiffrement propre à l&apos;association, pour la messagerie de la personne à contacter
-          pour vos demandes, ainsi que l&apos;opérateur téléphonique de cette personne si vous
-          l&apos;appelez ou lui laissez un SMS ou un message vocal —, dans les
+          pour vos demandes, Google (Gmail) pour le courriel de l&apos;association, ainsi que les
+          opérateurs téléphoniques de cette personne et de l&apos;association si vous les appelez
+          ou leur laissez un SMS ou un message vocal, Spiceworks pour le portail de support et les
+          plateformes de diffusion des matchs —, dans les
           limites décrites à la section{" "}
           <Link href="/rgpd#destinataires">« Destinataires et transferts »</Link> de la politique de
           confidentialité et, traitement par traitement, dans son registre.

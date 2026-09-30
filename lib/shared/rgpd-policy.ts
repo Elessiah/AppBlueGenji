@@ -3,7 +3,10 @@ import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 
 /**
  * Bases légales citées par la politique — les mêmes que le registre
- * (`processing-register.ts`) : une donnée n'a qu'une base.
+ * (`processing-register.ts`). Une donnée a une base principale ; quand une
+ * partie de sa finalité repose sur une autre (le tag certifié et le BattleTag,
+ * exposés sur consentement mais présentés au lancement d'un match en exécution
+ * des conditions d'utilisation), `extraBases` la nomme avec sa portée.
  *
  * **Le compte et l'authentification reposent sur le contrat** (art. 6.1.b) : un
  * consentement demandé pour des données sans lesquelles le compte n'existe pas
@@ -17,6 +20,13 @@ export interface DonneEntry {
   donnee: string;
   finalite: string;
   base: LegalBase;
+  /**
+   * Autres bases, chacune bornée à une partie de la finalité : une même donnée
+   * peut être exposée sur consentement et présentée, ailleurs, en exécution
+   * des conditions d'utilisation. Affichées à côté de la base principale,
+   * jamais contredites par la finalité.
+   */
+  extraBases?: readonly { base: LegalBase; scope: string }[];
   duree: string;
 }
 
@@ -45,6 +55,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match de son lancement à sa fin si tu fais partie des contacts présentés, et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé",
     base: "Consentement",
+    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
     duree: "Durée du compte",
   },
   {
@@ -74,6 +85,7 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     finalite:
       "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
+    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },
   {

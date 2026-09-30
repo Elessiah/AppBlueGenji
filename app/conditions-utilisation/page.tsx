@@ -72,6 +72,11 @@ export default function TermsOfUsePage() {
                     <EmphasisText text={paragraph} />
                   </p>
                 ))}
+                {section.links?.map((link) => (
+                  <p key={link.href}>
+                    <Link href={link.href}>{link.label}</Link>
+                  </p>
+                ))}
               </section>
             ))}
           </div>

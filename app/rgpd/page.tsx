@@ -28,16 +28,22 @@ import {
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
-import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import {
+  ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
+  BACKUP_RETENTION_DAYS,
+} from "@/lib/shared/account-deletion-journal";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
   ALL_TRANSFER_RECIPIENTS,
   ONEDRIVE_BACKUP_FRAMEWORK,
   PROCESSING_ACTIVITIES,
-  REGISTER_NOT_YET_COVERED,
+  REGISTER_SCOPE_DETAIL,
   REGISTER_SCOPE,
+  SUPPORT_TICKET_RETENTION_MONTHS,
+  WEB_ACCESS_LOG_RETENTION_DAYS,
   transferBasis,
 } from "@/lib/shared/processing-register";
+import { WEB_ACCESS_LOG_FIELDS } from "@/lib/shared/legal-durations";
 import {
   privacyChangeDay,
   privacyPolicyUpdatedLabel,
@@ -247,6 +253,11 @@ export default async function RgpdPage() {
                 <DataCell column={1}>{d.finalite}</DataCell>
                 <DataCell column={2}>
                   <span className={styles.badge}>{d.base}</span>
+                  {d.extraBases?.map((extra) => (
+                    <span key={extra.base} className={styles.extraBase}>
+                      <span className={styles.badge}>{extra.base}</span> {extra.scope}
+                    </span>
+                  ))}
                 </DataCell>
                 <DataCell column={3}>{d.duree}</DataCell>
               </tr>
@@ -302,7 +313,22 @@ export default async function RgpdPage() {
           puis effacées : l&apos;association les conserve en tant qu&apos;hébergeur des contenus que
           ses membres publient (logos, avatars, noms d&apos;équipe). Aucun écran du site ne les
           affiche ; elles ne sont communiquées qu&apos;à une autorité judiciaire qui les requiert.
-          Vous les retrouvez dans l&apos;export de vos données tant que votre compte existe.
+          Vous les retrouvez dans l&apos;export de vos données tant que votre compte existe. Seules
+          les ouvertures de session sont consignées : ni le port source de la connexion, ni la
+          création ou la modification d&apos;un contenu. Les informations fournies à la création
+          du compte (pseudo, identifiants de fournisseur) partent avec lui ; hors ce journal, seul le compte
+          anonymisé (pseudo d&apos;emprunt) survit, avec son historique de tournois et d&apos;équipes, s&apos;il en a un — sous réserve des
+          copies de sauvegarde chiffrées (**), qui s&apos;effacent d&apos;elles-mêmes au bout de{" "}
+          {BACKUP_RETENTION_DAYS} jours, et de la mention de la suppression au journal qui la rejoue
+          après une restauration (numéro et date de création du compte,{" "}
+          {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), et des signalements que vous avez
+          envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
+          <a href="#signalements">« Signalements »</a>) ; pour un membre du staff, ses gestes
+          d&apos;arbitrage restent nommés dans les journaux du serveur, selon leur rotation
+          (<Link href="/rgpd/registre#t05">registre, T05</Link>). Le serveur web
+          garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
+          chaque requête ({WEB_ACCESS_LOG_FIELDS}), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
+          T17</Link>).
         </p>
       </section>
 
@@ -643,6 +669,8 @@ export default async function RgpdPage() {
               portail de support de l&apos;association
             </a>{" "}
             (hébergé par Spiceworks) : le site n&apos;y transmet rien, on le rejoint par un simple lien.
+            Un ticket y est gardé le temps de son traitement, puis{" "}
+            {SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture (<Link href="/rgpd/registre#t15">registre, T15</Link>).
           </p>
           <ul>
             <li>
@@ -838,10 +866,10 @@ export default async function RgpdPage() {
             <strong>en France</strong>, sur un Raspberry Pi installé à Caen, par un bénévole de
             l&apos;association (voir les{" "}
             <Link href="/mentions-legales#hebergement">mentions légales</Link>). Vos données
-            n&apos;en sortent que vers les destinataires suivants — les deux derniers ne
+            n&apos;en sortent que vers les destinataires suivants — les trois derniers ne
             voient passer que ce que vous échangez vous-même, par courriel ou par téléphone, avec
-            la personne à contacter pour vos demandes relatives à vos données, sans passer par le
-            site :
+            l&apos;association ou avec la personne à contacter pour vos demandes relatives à vos
+            données, sans passer par le site :
           </p>
           <ul>
             <li>
@@ -864,6 +892,15 @@ export default async function RgpdPage() {
               stocke sans pouvoir les lire.
             </li>
             <li>
+              <strong>Spiceworks</strong> : le portail de support de l&apos;association, seulement si
+              vous y ouvrez un ticket ou y êtes désigné (<Link href="/rgpd/registre#t15">registre, T15</Link>).
+            </li>
+            <li>
+              <strong>YouTube, Twitch ou Kick</strong> : la retransmission d&apos;un match montre les
+              pseudos et les noms d&apos;équipe de ses joueurs ; vous pouvez vous y opposer
+              (<Link href="/rgpd/registre#t16">registre, T16</Link>).
+            </li>
+            <li>
               <strong>Microsoft</strong> (Outlook.com) : la messagerie personnelle de la personne à
               contacter pour vos demandes relatives à vos données est hébergée par Microsoft sur un
               compte personnel, sans contrat de sous-traitance. Un courriel que vous envoyez à{" "}
@@ -872,15 +909,24 @@ export default async function RgpdPage() {
               <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
             </li>
             <li>
-              <strong>L&apos;opérateur téléphonique</strong> de cette même personne : seulement si
-              vous l&apos;appelez ou lui laissez un SMS ou un message vocal.
+              <strong>Google</strong> (Gmail) : le courriel de l&apos;association est une messagerie
+              Gmail. Un courriel que vous lui envoyez, et sa réponse, y passent sans chiffrement
+              propre à l&apos;association : Google peut donc les lire (durée : section{" "}
+              <a href="#exercer-vos-droits">« Exercer vos droits »</a>).
+            </li>
+            <li>
+              <strong>Les opérateurs téléphoniques</strong> de la personne à contacter et de
+              l&apos;association : seulement si vous les appelez ou leur laissez un SMS ou un
+              message vocal.
             </li>
           </ul>
           <p>
             <strong>Encadrement des transferts.</strong> Parmi ces services, ceux qui peuvent
-            traiter ou héberger des données aux États-Unis — pas l&apos;opérateur téléphonique —
+            traiter ou héberger des données aux États-Unis — pas les opérateurs téléphoniques —
             le font sur le fondement suivant :{" "}
-            {transferBasis(ALL_TRANSFER_RECIPIENTS)}.
+            {transferBasis(ALL_TRANSFER_RECIPIENTS)}. L&apos;encadrement des transferts de
+            Spiceworks, de Twitch et de Kick est en cours de vérification (registre, <Link href="/rgpd/registre#t15">T15</Link> et{" "}
+            <Link href="/rgpd/registre#t16">T16</Link>).
           </p>
           <p>
             <strong>Sauvegardes.</strong> Elles sont déposées sur le OneDrive d&apos;un{" "}
@@ -914,7 +960,7 @@ export default async function RgpdPage() {
             téléchargeable par tous, sans compte ni demande. Voici chacun de ses traitements,
             avec sa base légale et sa durée de conservation ; le détail est au registre.
           </p>
-          <p>{REGISTER_NOT_YET_COVERED}</p>
+          <p>{REGISTER_SCOPE_DETAIL}</p>
           {/* Lu du registre, jamais recopié : une fiche ajoutée y paraît d'elle-même. */}
           <ul className={styles.registerSummary}>
             {PROCESSING_ACTIVITIES.map((activity) => (
@@ -968,7 +1014,10 @@ export default async function RgpdPage() {
             réponse envoyée par courriel ou par SMS, sont conservées le temps de la traiter, puis{" "}
             {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, avant d&apos;être
             supprimées de la messagerie ou du téléphone de la personne à contacter (registre,
-            T11). Une demande faite depuis le formulaire suit la règle de la section{" "}
+            T11). Il en va de même d&apos;une demande adressée au courriel (Gmail) ou au téléphone
+            de l&apos;association : conservée le temps de la traiter, puis{" "}
+            {REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture. Une demande faite
+            depuis le formulaire suit la règle de la section{" "}
             <a href="#signalements">« Signalements »</a>.
           </p>
           <p>

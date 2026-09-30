@@ -25,6 +25,7 @@
 import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 import { SUSPENSION_MAX_DAYS } from "./account-suspension";
+import { SITE_MINIMUM_AGE } from "./legal-durations";
 
 /**
  * Version en vigueur. L'avancer redemande l'acceptation.
@@ -41,14 +42,8 @@ import { SUSPENSION_MAX_DAYS } from "./account-suspension";
  */
 export const TERMS_VERSION = 3;
 
-/**
- * Âge minimum pour créer un compte. Distinct de l'âge d'adhésion à
- * l'association, que fixent ses statuts : un compte n'est pas une adhésion.
- * Aucun contrôle technique ne le tient — le site ne recueille pas de date de
- * naissance, seulement une majorité déclarée (`isAdult`), qui ne dit rien d'un
- * seuil à 15 ans : la condition est déclarative, acceptée avec ces conditions.
- */
-export const SITE_MINIMUM_AGE = 15;
+/** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
+export { SITE_MINIMUM_AGE };
 
 /**
  * Déclaration d'âge jointe à la case d'acceptation de la page de connexion,
@@ -134,7 +129,19 @@ export interface TermsSection {
   title: string;
   /** Paragraphes ; `**gras**` est la seule marque reconnue (`lib/shared/inline-emphasis.ts`). */
   paragraphs: readonly string[];
+  /**
+   * Liens rendus après les paragraphes : un paragraphe n'est qu'une chaîne,
+   * il ne sait pas porter de lien. Chemins du site seulement.
+   */
+  links?: readonly { href: string; label: string }[];
 }
+
+/**
+ * Où se lit l'adresse électronique de l'association : ses mentions légales,
+ * qui la révèlent au clic (`ProtectedContact`). Les conditions y renvoient
+ * plutôt que de l'écrire — une adresse écrite dans une page est moissonnée.
+ */
+export const ASSOCIATION_CONTACT_PATH = "/mentions-legales#editeur";
 
 /**
  * Le texte des conditions. Chaque section porte un identifiant d'ancre stable :
@@ -214,9 +221,10 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "droit-applicable",
     title: "Droit applicable",
     paragraphs: [
-      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou son courriel (donné dans les mentions légales), en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents, sans préjudice des règles qui permettent à un consommateur de saisir la juridiction de son domicile ou de se prévaloir des dispositions impératives du droit de son pays de résidence.",
+      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou par l'adresse électronique de l'association indiquée dans les mentions légales, en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents, sans préjudice des règles qui permettent à un consommateur de saisir la juridiction de son domicile ou de se prévaloir des dispositions impératives du droit de son pays de résidence.",
       "Le service est **gratuit** et l'association ne vend rien sur le site : aucun contrat de vente ni de prestation de services n'y est conclu avec un consommateur, si bien qu'aucun **médiateur de la consommation** n'est désigné.",
     ],
+    links: [{ href: ASSOCIATION_CONTACT_PATH, label: "Coordonnées de l'association (mentions légales)" }],
   },
 ];
 

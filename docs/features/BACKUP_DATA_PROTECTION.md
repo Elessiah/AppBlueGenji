@@ -103,8 +103,9 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
 - **Données** : l'ensemble des données de la plateforme (profils pseudonymes,
   identifiants de connexion, résultats de tournois, avatars et logos).
 - **Destinataires** : le responsable technique de l'association — qui est aussi
-  l'hébergeur du site, donc son sous-traitant —, seul détenteur des clés de
-  déchiffrement. `/rgpd` le dit ainsi plutôt que « une clé que seule
+  l'hébergeur du site, donc son sous-traitant (contrat de l'article 28 rédigé
+  dans `docs/legal/contrat-sous-traitance-hebergement.md`, **non signé** à ce
+  jour) —, seul détenteur des clés de déchiffrement, côté association. `/rgpd` le dit ainsi plutôt que « une clé que seule
   l'association détient », formule qui masquait que le détenteur est aussi
   l'hébergeur.
 - **Hébergement** : Microsoft (OneDrive, compte **personnel**). Le cadre est
@@ -121,14 +122,17 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   journal (mot de passe dans la configuration rclone du serveur, copie de
   secours hors du serveur). Aucune clé ne part chez Microsoft, qui stocke sans
   pouvoir lire. Le script des images **refuse** un remote qui n'est pas de type
-  `crypt`, sans exception : aucun réglage ne permet d'envoyer en clair.
+  `crypt`, sans exception : aucun réglage ne permet d'envoyer en clair (remote
+  `crypt` vérifié en production le 30 septembre 2026).
   Le chiffrement au repos de Microsoft et le transport HTTPS/TLS de l'API
   OneDrive ne sont que des **mesures complémentaires**. Le chiffrement est une
   mesure de sécurité (art. 32), au mieux une mesure supplémentaire à un outil de
   transfert (recommandations CEPD 01/2020) : il ne tient lieu **ni** de contrat
   de sous-traitance (art. 28) **ni** de mécanisme de transfert (art. 44 et s.).
-  Décision requise : stockage sous contrat de sous-traitance (dans l'UE de
-  préférence) et contrat avec l'hébergeur — voir `ERREUR.txt`.
+  Aucun contrat de sous-traitance n'est affirmé avec Microsoft. Décision
+  requise : maintien de ce stockage ou passage à un stockage sous contrat (dans
+  l'UE de préférence), signature du contrat avec l'hébergeur — voir
+  `ERREUR.txt`.
 - **Durée** : archives 30 jours ; images le temps de leur présence sur le site ;
   journal des suppressions 60 jours par entrée.
 - **Mesures** : chiffrement, suppression définitive (sans corbeille), clé privée
