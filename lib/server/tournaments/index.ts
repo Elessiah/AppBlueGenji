@@ -182,6 +182,7 @@ import { cachedTournamentList, invalidateTournamentLists } from "./list-cache";
 import { getTournamentPreview } from "./preview-cache";
 import { dispatchDueMatchReminders } from "./match-reminders";
 import { dispatchMatchStartNotices, notifyScoreToConfirm } from "./player-pushes";
+import { purgeExpiredConnectionLogs } from "@/lib/server/connection-logs";
 import { findTournamentsNeedingSync } from "./sync-scope";
 import { FINISHED_TOURNAMENTS_LIST_LIMIT } from "@/lib/shared/constants";
 import { loadViewerCastBlock } from "./match-launch";
@@ -605,6 +606,10 @@ export async function listTournamentBuckets(
   // Même raison pour les départs de match : un lancement ouvert par l'horloge
   // n'a pas toujours d'écriture derrière lui pour déclencher son annonce.
   void dispatchMatchStartNotices().catch(() => undefined);
+  // Le journal des connexions se purge aussi sur ce trafic, pas seulement aux
+  // connexions : une période sans connexion (sessions de 30 jours) garderait
+  // sinon des lignes au-delà de la durée légale annoncée. Étranglée à l'heure.
+  void purgeExpiredConnectionLogs().catch(() => undefined);
 
   // Seule la liste publique est mutualisée : celle des tournois pas encore
   // visibles est réservée au staff, elle est courte et bien plus rarement lue.

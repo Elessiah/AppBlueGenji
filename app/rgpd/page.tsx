@@ -6,6 +6,7 @@ import { pageMetadata } from "@/lib/shared/page-metadata";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import {
   DONNEES_PROFIL,
+  DONNEE_CONNEXIONS,
   DONNEE_SAUVEGARDES,
   DONNEE_TOURNOIS,
   DROITS,
@@ -21,6 +22,7 @@ import { ProtectedContact } from "@/components/ui/protected-contact";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
   ALL_TRANSFER_RECIPIENTS,
   ONEDRIVE_BACKUP_FRAMEWORK,
@@ -236,12 +238,20 @@ export default async function RgpdPage() {
               </DataCell>
               <DataCell column={3}>{DONNEE_SAUVEGARDES.duree} **</DataCell>
             </tr>
+            <tr role="row">
+              <DataCell column={0}>{DONNEE_CONNEXIONS.donnee}</DataCell>
+              <DataCell column={1}>{DONNEE_CONNEXIONS.finalite}</DataCell>
+              <DataCell column={2}>
+                <span className={styles.badgeAmber}>{DONNEE_CONNEXIONS.base}</span>
+              </DataCell>
+              <DataCell column={3}>{DONNEE_CONNEXIONS.duree} ***</DataCell>
+            </tr>
           </tbody>
         </table>
         <p style={{ marginTop: 16, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           * Un compte qui n'a joué aucun match, n'a organisé aucun tournoi, n'est
           propriétaire d'aucune équipe et n'est inscrit à aucun tournoi individuel est{" "}
-          <strong>entièrement effacé</strong> à sa suppression.
+          <strong>entièrement effacé</strong> à sa suppression, hors données de connexion (***).
           Sinon, ses données de profil sont effacées immédiatement et son pseudo remplacé par un
           pseudo d'emprunt. Les sessions
           (cookie <code>bg_session</code>) expirent 30 jours après la connexion.
@@ -255,6 +265,15 @@ export default async function RgpdPage() {
           visibilité ou de notification modifié, un signalement purgé…) ne le sont pas, et
           reviendraient avec elle. Les images téléversées (avatar, logo) sont retirées de la sauvegarde dans
           l'heure.
+        </p>
+        <p id="donnees-connexion" style={{ marginTop: 8, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
+          *** À chaque connexion, le site note l&apos;adresse IP retenue par son serveur mandataire, la
+          date et l&apos;heure, et le moyen de connexion utilisé. Ces données sont gardées{" "}
+          {CONNECTION_LOG_RETENTION_DAYS} jours, <strong>même après la suppression du compte</strong>,
+          puis effacées : l&apos;association les conserve en tant qu&apos;hébergeur des contenus que
+          ses membres publient (logos, avatars, noms d&apos;équipe). Aucun écran du site ne les
+          affiche ; elles ne sont communiquées qu&apos;à une autorité judiciaire qui les requiert.
+          Vous les retrouvez dans l&apos;export de vos données tant que votre compte existe.
         </p>
       </section>
 

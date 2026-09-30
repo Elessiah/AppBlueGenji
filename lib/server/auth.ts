@@ -8,6 +8,8 @@ import { localAvatarUrl } from "@/lib/shared/avatar";
 import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
+import { recordConnection } from "@/lib/server/connection-logs";
+import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 
 export type AuthUser = {
   id: number;
@@ -81,7 +83,13 @@ function fromRow(row: UserRow): AuthUser {
   };
 }
 
-export async function createSession(userId: number): Promise<void> {
+/**
+ * Ouvre une session — point de passage unique des quatre portes d'entrée.
+ * `event` nomme la porte : l'ouverture est consignée au journal des données
+ * de connexion (`lib/shared/connection-logs.ts`, obligation légale de
+ * l'hébergeur), sans jamais pouvoir faire échouer la connexion.
+ */
+export async function createSession(userId: number, event: ConnectionLogEvent): Promise<void> {
   const db = await getDatabase();
   const token = randomToken(48);
   const tokenHash = hashToken(token);
@@ -99,6 +107,7 @@ export async function createSession(userId: number): Promise<void> {
     maxAge: SESSION_TTL_DAYS * 24 * 60 * 60,
   });
   forgetTermsPostponement(cookieStore);
+  await recordConnection(userId, event);
 }
 
 /**

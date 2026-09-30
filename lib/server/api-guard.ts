@@ -58,12 +58,21 @@ function trustsRealIpHeader(): boolean {
  * ailleurs : on préfère ne pas compter que compter faux.
  */
 export function requestClientIp(req: Request): string | null {
+  return clientIpFromHeaders(req.headers);
+}
+
+/**
+ * Même lecture que {@link requestClientIp}, sur des en-têtes seuls — ceux que
+ * `headers()` de Next rend à un code serveur qui n'a pas la requête en main
+ * (l'ouverture de session, qui journalise l'adresse de connexion).
+ */
+export function clientIpFromHeaders(headers: Pick<Headers, "get">): string | null {
   const forwarded = clientIpFromForwardedFor(
-    req.headers.get("x-forwarded-for"),
+    headers.get("x-forwarded-for"),
     parseTrustedProxyHops(process.env.TRUSTED_PROXY_HOPS),
   );
   if (forwarded !== null) return forwarded;
-  return trustsRealIpHeader() ? req.headers.get("x-real-ip") : null;
+  return trustsRealIpHeader() ? headers.get("x-real-ip") : null;
 }
 
 /**

@@ -20,6 +20,7 @@ import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-loc
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { listPrivacyAcknowledgments } from "@/lib/server/privacy-consent";
+import { listOwnConnectionLogs } from "@/lib/server/connection-logs";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentity, syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";
@@ -2479,6 +2480,7 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     termsAcceptances: await listTermsAcceptances(userId),
     reports: await listReportsByAuthor(userId),
     pushNotifications: await exportPushData(userId),
+    connectionLogs: await listOwnConnectionLogs(userId),
   };
 }
 

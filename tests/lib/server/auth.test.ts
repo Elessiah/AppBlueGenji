@@ -15,6 +15,7 @@ const originalEnv = { ...process.env };
 
 // Mock database
 jest.mock("@/lib/server/database");
+jest.mock("@/lib/server/connection-logs");
 
 // Mock next/headers
 jest.mock("next/headers", () => ({
@@ -56,7 +57,7 @@ describe("auth", () => {
       const { getDatabase } = await import("@/lib/server/database");
       jest.mocked(getDatabase).mockRejectedValue(new Error("DB connection failed"));
 
-      await expect(createSession(1)).rejects.toThrow("DB connection failed");
+      await expect(createSession(1, "LOGIN_GOOGLE")).rejects.toThrow("DB connection failed");
     });
 
     it("throws when setting cookie fails", async () => {
@@ -67,7 +68,30 @@ describe("auth", () => {
       jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
       jest.mocked(cookies).mockRejectedValue(new Error("Cookie error"));
 
-      await expect(createSession(1)).rejects.toThrow("Cookie error");
+      await expect(createSession(1, "LOGIN_GOOGLE")).rejects.toThrow("Cookie error");
+    });
+
+    it("consigne l'ouverture au journal des connexions, avec sa porte", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      const { recordConnection } = await import("@/lib/server/connection-logs");
+
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ set: jest.fn() }));
+
+      await createSession(9, "LOGIN_DISCORD_CODE");
+
+      expect(recordConnection).toHaveBeenCalledWith(9, "LOGIN_DISCORD_CODE");
+    });
+
+    it("ne consigne rien quand la session n'a pas pu s'ouvrir", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { recordConnection } = await import("@/lib/server/connection-logs");
+      jest.mocked(getDatabase).mockRejectedValue(new Error("DB connection failed"));
+
+      await expect(createSession(1, "LOGIN_GOOGLE")).rejects.toThrow();
+      expect(recordConnection).not.toHaveBeenCalled();
     });
   });
 

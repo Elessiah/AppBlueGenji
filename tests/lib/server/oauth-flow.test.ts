@@ -291,7 +291,7 @@ describe("completeOAuth — connexion", () => {
       },
       { termsAccepted: true },
     );
-    expect(createSession).toHaveBeenCalledWith(7);
+    expect(createSession).toHaveBeenCalledWith(7, "LOGIN_GOOGLE");
     expect(response.headers.get("location")).toBe("http://localhost:3000/tournois");
   });
 

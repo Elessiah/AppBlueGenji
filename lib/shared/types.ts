@@ -916,6 +916,12 @@ export type PersonalDataExport = {
     }[];
     disabledTopics: string[];
   };
+  /**
+   * Journal des données de connexion (`lib/shared/connection-logs.ts`) : une
+   * ligne par ouverture de session, gardée un an au titre de l'obligation
+   * légale de l'hébergeur — porte, adresse IP et date.
+   */
+  connectionLogs: { event: string; ip: string | null; createdAt: string }[];
 };
 
 export type TeamDetailResponse = {

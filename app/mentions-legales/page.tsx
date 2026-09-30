@@ -12,6 +12,7 @@ import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shar
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
   CODE_COPYRIGHT_HOLDER,
   CODE_LICENSE_NAME,
@@ -284,6 +285,15 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           définitivement, et si la contestation aboutit, elle est rétablie. Le détail du traitement
           de vos données dans ce cadre figure dans la{" "}
           <Link href="/rgpd#signalements">politique de confidentialité</Link>.
+        </p>
+        <p>
+          En sa qualité d&apos;hébergeur de ces contenus, l&apos;association conserve{" "}
+          <strong>{CONNECTION_LOG_RETENTION_DAYS} jours</strong> les données de connexion de ses
+          membres (adresse IP, date et heure, moyen de connexion), y compris après la suppression
+          d&apos;un compte, afin de pouvoir identifier l&apos;auteur d&apos;un contenu sur
+          réquisition d&apos;une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Ces
+          données ne sont communiquées qu&apos;aux autorités qui les requièrent ; le détail figure
+          dans la <Link href="/rgpd#donnees-connexion">politique de confidentialité</Link>.
         </p>
       </>
     ),

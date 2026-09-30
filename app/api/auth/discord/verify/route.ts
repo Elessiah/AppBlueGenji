@@ -77,7 +77,7 @@ export async function POST(req: Request) {
       method: "DM_CODE",
       termsAccepted: body.termsAccepted === true,
     });
-    await createSession(userId);
+    await createSession(userId, "LOGIN_DISCORD_CODE");
 
     return ok({ success: true });
   } catch (error) {
