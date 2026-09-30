@@ -43,7 +43,7 @@ test.describe("Consentement RGPD", () => {
       window.localStorage.getItem("bg_rgpd_consent"),
       window.localStorage.getItem("bg_terms_consent"),
     ]);
-    expect(stored).toEqual(["2", String(TERMS_VERSION)]);
+    expect(stored).toEqual(["3", String(TERMS_VERSION)]);
   });
 
   test("le refus ramène à l'accueil sans enregistrer de consentement", async ({ page }) => {
@@ -81,7 +81,7 @@ test.describe("Connexion", () => {
   // ci-dessus.
   test.beforeEach(async ({ page }) => {
     await page.addInitScript((termsVersion) => {
-      window.localStorage.setItem("bg_rgpd_consent", "2");
+      window.localStorage.setItem("bg_rgpd_consent", "3");
       window.localStorage.setItem("bg_terms_consent", termsVersion);
     }, String(TERMS_VERSION));
   });
