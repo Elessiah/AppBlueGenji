@@ -26,6 +26,7 @@ import { loadEntrantMatchLeaderIds, loadEntrantPlayerIds, notifyUsers } from "@/
 import { purgeStaleSubscriptions } from "@/lib/server/push-subscriptions";
 import { webPushConfig } from "@/lib/server/web-push";
 import { LAUNCH_AUTO_DELAY_MINUTES } from "@/lib/shared/match-launch";
+import { loadEligibleCasterIds } from "./cast-eligibility";
 import {
   matchStartPush,
   scoreToConfirmPush,
@@ -151,6 +152,13 @@ async function runMatchStartSweep(): Promise<number> {
   const players = await loadEntrantPlayerIds(
     planned.flatMap(({ row }) => [Number(row.team1_id), Number(row.team2_id)]),
   );
+  // Un caster inscrit qui ne remplit plus la condition du cast n'est plus une
+  // partie du lancement : on ne l'appelle pas à un « Prêt » qu'il ne peut plus
+  // déclarer.
+  const eligibleCasters = await loadEligibleCasterIds(
+    db,
+    planned.flatMap(({ row }) => (row.caster_user_id === null ? [] : [Number(row.caster_user_id)])),
+  );
 
   let pushed = 0;
   for (const { row, phase } of planned) {
@@ -174,7 +182,7 @@ async function runMatchStartSweep(): Promise<number> {
       );
     }
     // Le caster est une partie du lancement : son « Prêt » est attendu aussi.
-    if (row.caster_user_id !== null) {
+    if (row.caster_user_id !== null && eligibleCasters.has(Number(row.caster_user_id))) {
       pushed += await pushTo(
         [Number(row.caster_user_id)],
         "MATCH_START",

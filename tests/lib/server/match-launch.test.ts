@@ -54,7 +54,7 @@ type World = {
   match: MatchState | null;
   memberships: Membership[];
   soloEntries: { userId: number; teamId: number }[];
-  users: Record<number, { discord_verified_at: string | null; discord_pseudo: string | null; blizzard_sub: string | null; overwatch_battletag: string | null; is_deleted: number }>;
+  users: Record<number, { discord_verified_at: string | null; discord_pseudo: string | null; blizzard_sub: string | null; overwatch_battletag: string | null; is_deleted: number; is_admin?: number; platform_roles_json?: string | null }>;
   writes: string[];
 };
 
@@ -223,9 +223,21 @@ describe("setMatchReady", () => {
 
   it("attend le caster inscrit avant de lancer", async () => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.users[CASTER] = ELIGIBLE_CASTER;
     await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
     await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: true });
     expect(state.match?.caster_ready_at).toBe(STAMP);
+  });
+
+  it.each<[string, Partial<typeof ELIGIBLE_CASTER>]>([
+    ["sans la permission `live`", { platform_roles_json: JSON.stringify(["RECRUTEUR"]) }],
+    ["au tag décertifié", { discord_verified_at: null }],
+    ["sans Battle.net", { blizzard_sub: null }],
+  ])("refuse le « Prêt » d'un caster inscrit %s", async (_label, overrides) => {
+    state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.users[CASTER] = { ...ELIGIBLE_CASTER, ...overrides };
+    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    expect(state.match?.caster_ready_at).toBeNull();
   });
 
   it("compte une fantôme prête d'office : l'équipe réelle suffit", async () => {
@@ -368,6 +380,17 @@ describe("forceLaunchMatch", () => {
     await expect(forceLaunchMatch(42)).rejects.toThrow("MATCH_NOT_FOUND");
   });
 });
+
+/** Un caster qui remplit toujours la condition : permission `live` et identité. */
+const ELIGIBLE_CASTER = {
+  discord_verified_at: STAMP as string | null,
+  discord_pseudo: "caster" as string | null,
+  blizzard_sub: "sub" as string | null,
+  overwatch_battletag: "Caster#1" as string | null,
+  is_deleted: 0,
+  is_admin: 0,
+  platform_roles_json: JSON.stringify(["CASTER"]) as string | null,
+};
 
 describe("claimMatchCast", () => {
   const verified = {

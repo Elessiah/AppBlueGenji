@@ -115,7 +115,10 @@ aucun contact. `GET /api/me/match-launches` la rejoue à chaque lecture
 la fasse lui-même ou qu'un joueur du match la fasse : le caster disparaît de la
 réponse, et son inscription est ensuite retirée (`releaseIneligibleCast`, sous
 verrou et après relecture — un compte redevenu éligible entre-temps garde la
-sienne), si bien que le lancement n'attend plus son « Prêt ». Voir
+sienne), si bien que le lancement n'attend plus son « Prêt ». Les deux autres
+chemins d'un caster suivent la même règle (`lib/server/tournaments/cast-eligibility.ts`) :
+son « Prêt » est refusé (`resolveMatchParty` → `NOT_MATCH_PARTY`) et le
+balayage des notifications ne l'appelle plus au départ du match. Voir
 `docs/AUTHORIZATION_RULES.md` §4.5.
 
 Le motif voyage dans `TournamentViewerContext.castBlock`, par les deux portes

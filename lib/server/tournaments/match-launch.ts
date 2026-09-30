@@ -26,8 +26,8 @@ import {
   type LaunchViewerRole,
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
-import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import type { MatchStatus, TeamRole } from "@/lib/shared/types";
+import { casterIdentityOf, loadCastEligibility, type CasterIdentityRow } from "./cast-eligibility";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 export type LaunchMatchRow = RowDataPacket & {
@@ -235,6 +235,9 @@ export async function resolveMatchParty(
   const team = await resolveTeamParty(connection, match, userId);
   if (team) return team;
   if (match.caster_user_id !== null && Number(match.caster_user_id) === userId) {
+    // Une inscription ne vaut que tant que son titulaire remplit la condition
+    // du cast : un compte privé de `live` ou d'identité ne déclare plus rien.
+    if ((await loadCastEligibility(connection, userId)) !== null) return null;
     return { role: "CASTER", canDeclareReady: true };
   }
   return null;
@@ -363,42 +366,6 @@ export async function forceLaunchMatch(matchId: number): Promise<void> {
   publishMatchUpdatedEvent(tournamentId);
 }
 
-type CasterIdentityRow = RowDataPacket & {
-  discord_verified_at: Date | string | null;
-  discord_pseudo: string | null;
-  blizzard_sub: string | null;
-  overwatch_battletag: string | null;
-  is_deleted: number;
-};
-
-/** Colonnes de `bg_users` que lit `castEligibilityBlock`. */
-export type CastEligibilityRow = CasterIdentityRow & {
-  is_admin: number;
-  platform_roles_json: unknown;
-};
-
-/** Identité d'un caster lue sur sa ligne ; un compte absent ou supprimé n'en a aucune. */
-function casterIdentityOf(row: CasterIdentityRow | undefined): CasterIdentity {
-  if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };
-  return {
-    discordVerified: row.discord_verified_at !== null && Boolean(row.discord_pseudo),
-    blizzardLinked: row.blizzard_sub !== null && Boolean(row.overwatch_battletag),
-  };
-}
-
-/**
- * La règle de `castBlockReason` rejouée sur la ligne d'un compte **déjà
- * inscrit** : permission `live` (rôles relus en base, pas ceux d'une session)
- * et identité exigée. Sert à la lecture des contacts, qui ne peut pas se fier
- * à une inscription contrôlée une fois pour toutes.
- */
-export function castEligibilityBlock(row: CastEligibilityRow | undefined): CastBlock | null {
-  const live =
-    row !== undefined &&
-    can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "live");
-  return castBlockReason(live, casterIdentityOf(row));
-}
-
 /** Identité d'un caster telle que la règle de `castBlockReason` la lit. */
 export async function loadCasterIdentity(
   connection: PoolConnection,
@@ -505,13 +472,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
   await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row || row.caster_user_id === null || Number(row.caster_user_id) !== casterId) return;
-    const [users] = await connection.execute<CastEligibilityRow[]>(
-      `SELECT discord_verified_at, discord_pseudo, blizzard_sub, overwatch_battletag, is_deleted,
-              is_admin, platform_roles_json
-       FROM bg_users WHERE id = ? LIMIT 1`,
-      [casterId],
-    );
-    if (castEligibilityBlock(users[0]) === null) return;
+    if ((await loadCastEligibility(connection, casterId)) === null) return;
 
     await connection.execute(
       `UPDATE bg_matches SET caster_user_id = NULL, caster_ready_at = NULL WHERE id = ? AND caster_user_id = ?`,

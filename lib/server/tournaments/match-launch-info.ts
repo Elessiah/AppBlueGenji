@@ -35,7 +35,6 @@ import type { PlatformRole } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import {
-  castEligibilityBlock,
   maintainMatchLaunches,
   releaseIneligibleCast,
   rowLaunchState,
@@ -43,6 +42,7 @@ import {
   toLaunchInput,
   type LaunchMatchRow,
 } from "./match-launch";
+import { castEligibilityBlock } from "./cast-eligibility";
 import { cachedTournamentList } from "./list-cache";
 import { publishMatchUpdatedEvent } from "./notifications";
 

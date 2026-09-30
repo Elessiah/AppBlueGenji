@@ -775,8 +775,10 @@ et l'identité de chaque caster inscrit (`castEligibilityBlock`, même règle qu
 `castBlockReason`) — un compte privé de `live`, au tag décertifié, sans
 Battle.net ou supprimé ne reçoit plus de contacts, n'est plus présenté aux
 joueurs, et son inscription est retirée (`releaseIneligibleCast`, sous verrou et
-après relecture), ce qui libère le lancement qui attendait son « Prêt ». Le
-retrait volontaire (`DELETE`) et celui de l'arbitrage (§4.9) restent inchangés.
+après relecture), ce qui libère le lancement qui attendait son « Prêt ». La
+même règle refuse son « Prêt » (`NOT_MATCH_PARTY`) et le tient hors de la
+notification de départ. Le retrait volontaire (`DELETE`) et celui de
+l'arbitrage (§4.9) restent inchangés.
 
 `live` ouvre enfin la **rediff** d'un match terminé
 (`PUT /api/admin/matches/[matchId]/replay`, lien YouTube posé seulement sur une
