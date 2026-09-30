@@ -163,9 +163,19 @@ diverger.
   Une phase **suisse** n'est jamais dessinée en arbre à élimination (qui nommait
   ses rondes « Quart de finale 1…12 ») : en cours, elle a la vue suisse complète
   (classement, départages, abandon), l'instantané ne portant le classement suisse
-  que de la **phase en cours** (`swissMetaIsSelectedPhase`) ; close, elle montre
-  ses rondes seules (`SwissRounds`) puis son classement de phase
+  que de la **phase en cours** (`rankingMetaIsSelectedPhase`) ; close, elle
+  montre ses rondes seules (`SwissRounds`) puis son classement de phase
   (`PhaseStandingsBlock`).
+  Une phase **survie** suit la même règle, pour la même raison (l'instantané ne
+  porte `detail.survival` que de la phase en cours) : en cours, la vue survie
+  complète ; close, ses manches seules (`SurvivalRounds`) puis son classement de
+  phase. Sans cette garde, une phase survie close s'affichait sous le classement
+  de la phase survie en cours, ou retombait dans un arbre à élimination. Les
+  manches d'une phase close n'ont pas de marques de coupe ni de barrage : le
+  nombre de manches de barrage n'est connu que de la phase en cours, et une
+  cadence décalée d'une manche marquerait la mauvaise. Aucune extension de
+  l'instantané n'a été nécessaire : le classement d'une phase close y voyage
+  déjà (`phaseStandings`).
 - **Règles publiques** — `/regles/multi-phases`.
 
 ## Cas limites gérés
