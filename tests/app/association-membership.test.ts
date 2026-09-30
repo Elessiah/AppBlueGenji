@@ -111,6 +111,13 @@ describe("mention d'information du bulletin d'adhésion", () => {
     expect(text).toContain(fragment);
   });
 
+  it("rappelle l'information dans la partie que garde l'adhérent", () => {
+    const memberPart = text.slice(text.indexOf("2ème partie"));
+    expect(memberPart).toContain("Vos données personnelles");
+    expect(memberPart).toContain("bluegenji-esport.fr/rgpd");
+    expect(memberPart).toContain("CNIL");
+  });
+
   it("n'annonce pas de droit d'opposition, inapplicable sur la base du contrat (art. 21)", () => {
     expect(text).not.toContain("opposition");
   });
