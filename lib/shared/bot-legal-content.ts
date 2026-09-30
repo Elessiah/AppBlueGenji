@@ -425,7 +425,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Exclusions du relais" },
           {
             kind: "p",
-            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les pseudos de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff.",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les pseudos de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff, et la commande **/ban-list** affiche la liste complète des exclusions (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé.",
           },
           { kind: "subhead", text: "Commande /link et rappels programmés" },
           {
@@ -487,6 +487,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "Le staff de l'association, pour la modération et l'administration du Bot.",
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
+              "Les administrateurs de tout serveur où le Bot est installé, qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
               `Tout utilisateur du Bot, par la commande **/stats**, peut voir combien d'annonces un autre utilisateur a publiées (messages relayés, scrims, recherches) ; la réponse n'est visible que de celui qui la demande, et le compteur de messages ne porte que sur ceux encore conservés (${BOT_RELAY_RETENTION_DAYS} derniers jours).`,
               `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
@@ -622,7 +623,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relay exclusions" },
           {
             kind: "p",
-            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The usernames of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel.",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The usernames of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel, and the **/ban-list** command shows the full list of exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed.",
           },
           { kind: "subhead", text: "/link command and scheduled reminders" },
           {
@@ -684,6 +685,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "The association's staff, for moderating and administering the Bot.",
               "Members of partner servers, who read the relayed advertisements.",
+              "The administrators of any server where the Bot is installed, who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
               `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages still kept (last ${BOT_RELAY_RETENTION_DAYS} days).`,
               `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",

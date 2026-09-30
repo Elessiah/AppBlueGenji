@@ -229,6 +229,14 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain(SITE_HOST.machineEn);
   });
 
+  it("declares /ban-list readers, in the pages and in T08", () => {
+    for (const lang of LANGS) {
+      expect(flatOf(PRIVACY_POLICY, lang)).toContain("**/ban-list**");
+    }
+    const t08 = PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08");
+    expect((t08?.recipients ?? []).join(" ")).toContain("/ban-list");
+  });
+
   it("does not promise a /link account link that nothing on the site completes", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain("la commande ne relie donc aucun compte");
     expect(flatOf(PRIVACY_POLICY, "en")).toContain("the command therefore links no account");

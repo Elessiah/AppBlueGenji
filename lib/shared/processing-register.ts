@@ -439,7 +439,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataCategories: [
       "Annonces relayées : identifiants du message d'origine et de son auteur, date, identifiants des copies et de leurs salons (contenu recopié dans les salons partenaires, jamais enregistré en base)",
       "Scrims et recrutement : identifiant de l'auteur, jeu, niveau ou rôle, serveur, date",
-      "Exclusions : identifiants de l'exclu et du modérateur, date ; pseudos et motif publiés au salon de journal privé du staff",
+      "Exclusions : identifiants de l'exclu et du modérateur, date ; pseudos et motif publiés au salon de journal privé du staff et affichés par /ban-list",
       "Commande /link : identifiant Discord, code à usage unique et son échéance",
       "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
       "Rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, fréquence",
@@ -459,6 +459,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     recipients: [
       "Staff de l'association (modération, administration)",
       "Membres des serveurs partenaires, qui lisent les annonces relayées",
+      "Administrateurs de tout serveur où le bot est installé, pour la liste des exclusions (/ban-list, réponse visible du seul demandeur)",
       "Tout utilisateur du bot, pour les compteurs d'activité d'un autre utilisateur (/stats, réponse visible du seul demandeur)",
       "Discord (plateforme d'exécution)",
     ],
