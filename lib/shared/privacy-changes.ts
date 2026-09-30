@@ -487,14 +487,17 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   // corrections d'annonces passées : même date, donc même modale. Le message
   // privé, lui, peut la reporter au suivant si les entrées du jour dépassent
   // ensemble `PRIVACY_DM_MAX_LENGTH` (`privacyChangesForOneMessage`) — c'est
-  // la règle commune de la file, pas une exception à celle-ci.
+  // la règle commune de la file, pas une exception à celle-ci. Le résumé, seul
+  // champ repris dans le message privé Discord, ne nomme personne
+  // (`lib/shared/log-privacy.ts`) : le nom ne figure que dans le détail,
+  // affiché par la modale du site.
   {
     id: "2026-10-contact-donnees",
     publishedAt: "2026-10-01",
     title: "Une personne à contacter pour tes données",
-    summary: `Pour exercer tes droits sur tes données ou poser une question à leur sujet, tu peux maintenant t'adresser directement à ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, par courriel ou par téléphone. Le formulaire du site reste ouvert.`,
+    summary: `Pour exercer tes droits sur tes données ou poser une question à leur sujet, tu peux maintenant t'adresser directement à la personne que l'association a chargée de ces demandes, l'${DATA_CONTACT_ROLE}, par courriel ou par téléphone. Le formulaire du site reste ouvert.`,
     details: [
-      `Ses coordonnées se lisent dans la politique de confidentialité et les mentions légales du site. Le formulaire « ${REPORT_FORM_NAME} », catégorie RGPD, et les coordonnées de l'association restent ouverts.`,
+      `Cette personne est ${DATA_CONTACT_NAME}. Ses coordonnées se lisent dans la politique de confidentialité et les mentions légales du site. Le formulaire « ${REPORT_FORM_NAME} », catégorie RGPD, et les coordonnées de l'association restent ouverts.`,
       "Un courriel que tu lui envoies, et la réponse qu'il t'adresse par courriel, passent par sa messagerie personnelle, hébergée par Microsoft (Outlook.com, possibles transferts vers les États-Unis), qui peut les lire ; un appel, un SMS ou un message vocal passe par son opérateur téléphonique. Ta demande est gardée aussi longtemps qu'une demande faite depuis le formulaire.",
       "Ce n'est pas un délégué à la protection des données au sens du RGPD : l'association reste responsable du traitement de tes données et de la réponse à tes demandes.",
     ],

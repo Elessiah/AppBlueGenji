@@ -534,7 +534,10 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
   });
 
   it("nomme la personne et sa qualité, sans aucune coordonnée en clair", () => {
-    expect(entry.summary).toContain(`${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}`);
+    // Le résumé part sur Discord : il dit la qualité, le nom reste dans le détail.
+    expect(entry.summary).toContain(`l'${DATA_CONTACT_ROLE}`);
+    expect(entry.summary).not.toContain(DATA_CONTACT_NAME);
+    expect(entry.details.join(" ")).toContain(`Cette personne est ${DATA_CONTACT_NAME}.`);
     expect(text()).not.toMatch(/@|\b0\d([ .-]?\d{2}){4}\b/);
   });
 

@@ -787,7 +787,10 @@ export default async function RgpdPage() {
             <strong>en France</strong>, sur un Raspberry Pi installé à Caen, par un bénévole de
             l&apos;association (voir les{" "}
             <Link href="/mentions-legales#hebergement">mentions légales</Link>). Vos données
-            n&apos;en sortent que vers les destinataires suivants :
+            n&apos;en sortent que vers les destinataires suivants — les deux derniers ne
+            voient passer que ce que vous échangez vous-même, par courriel ou par téléphone, avec
+            la personne à contacter pour vos demandes relatives à vos données, sans passer par le
+            site :
           </p>
           <ul>
             <li>
