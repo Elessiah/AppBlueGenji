@@ -1,4 +1,6 @@
 import { createSession } from "@/lib/server/auth";
+import { AccountSuspendedError } from "@/lib/server/account-suspensions";
+import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
@@ -85,6 +87,12 @@ export async function POST(req: Request) {
     // acceptées devra en redemander un. Le cas ne se présente qu'à un client qui
     // contourne la case de `/connexion`.
     if ((error as Error).message === TERMS_REQUIRED) return fail(TERMS_REQUIRED, 400);
+    // Compte suspendu : l'exposé de la décision part dans le corps, que la page
+    // de connexion affiche — c'est le seul canal qui joigne un compte sans
+    // Discord rattaché, et le lecteur vient de prouver en être le titulaire.
+    if (error instanceof AccountSuspendedError) {
+      return fail(ACCOUNT_SUSPENDED, 403, { suspension: error.notice });
+    }
     return fail((error as Error).message || "DISCORD_AUTH_FAILED", 500);
   }
 }

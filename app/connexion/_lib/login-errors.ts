@@ -12,6 +12,7 @@
  */
 
 import { loginEnvironmentAdvice, type LoginEnvironment } from "@/lib/shared/login-environment";
+import { suspendedLoginMessage } from "@/lib/shared/account-suspension";
 
 const LOGIN_ERRORS: Record<string, string> = {
   // Bot injoignable ou mal configuré : la panne est de notre côté, le joueur n'a
@@ -75,6 +76,9 @@ const LOGIN_ERRORS: Record<string, string> = {
   // la règle). Recharger la page la représente.
   TERMS_REQUIRED:
     "Pour créer ton compte, accepte les conditions d'utilisation. Recharge la page pour les afficher.",
+  // Compte suspendu par la modération, sans exposé lisible dans la réponse : la
+  // phrase générique (la page montre l'exposé complet quand il a voyagé).
+  ACCOUNT_SUSPENDED: suspendedLoginMessage(null),
 };
 
 /**
@@ -118,6 +122,9 @@ const OAUTH_ERRORS: Record<string, (provider: string) => string> = {
   session: () => "Tu dois être connecté pour rattacher une application. Connecte-toi, puis réessaie.",
   // Compte neuf sans les conditions d'utilisation acceptées.
   terms: () => "Pour créer ton compte, accepte les conditions d'utilisation, puis relance la connexion.",
+  // Compte suspendu, l'exposé n'ayant pas voyagé (cookie expiré, page
+  // rechargée plus tard) : la phrase générique, qui dit comment contester.
+  suspended: () => suspendedLoginMessage(null),
 };
 
 /**

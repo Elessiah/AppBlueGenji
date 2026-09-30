@@ -9,6 +9,7 @@ import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { recordConnection } from "@/lib/server/connection-logs";
+import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 
 export type AuthUser = {
@@ -90,11 +91,18 @@ function fromRow(row: UserRow): AuthUser {
  * l'hébergeur), sans jamais pouvoir faire échouer la connexion.
  */
 export async function createSession(userId: number, event: ConnectionLogEvent): Promise<void> {
+  // Un compte suspendu n'ouvre pas de session, quelle que soit la porte :
+  // `AccountSuspendedError` porte l'exposé de la décision, que la porte rend
+  // lisible (`lib/shared/account-suspension.ts`). Contrôle *avant* toute
+  // écriture ; la course avec un prononcé concurrent est tranchée par
+  // `getCurrentUser`, qui écarte la session d'un compte suspendu.
+  await assertNotSuspended(userId);
   const db = await getDatabase();
   const token = randomToken(48);
   const tokenHash = hashToken(token);
 
   await db.execute(`DELETE FROM bg_user_sessions WHERE expires_at < NOW()`);
+  await purgeEndedSuspensions();
   await db.execute(
     `INSERT INTO bg_user_sessions (token_hash, user_id, expires_at)
      VALUES (?, ?, DATE_ADD(NOW(), INTERVAL ? DAY))`,
@@ -282,6 +290,10 @@ export const getCurrentUser = requestCache(async (): Promise<AuthUser | null> =>
      WHERE s.token_hash = ?
        AND s.expires_at > NOW()
        AND u.is_deleted = 0
+       AND NOT EXISTS (
+         SELECT 1 FROM bg_account_suspensions sus
+         WHERE sus.user_id = u.id AND ${activeSuspensionSql("sus")}
+       )
      LIMIT 1`,
     [hashToken(token)],
   );

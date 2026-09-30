@@ -1,4 +1,5 @@
 ﻿import type { EnduranceRoundCell, EnduranceStatus } from "./bg-survie";
+import type { AccountSuspensionView } from "./account-suspension";
 import type { ConnectionMethod } from "./account-connections";
 import type { MatchFormat } from "./match-format";
 import type { MatchLiveTrigger } from "./live-streams";
@@ -839,6 +840,16 @@ export type FullProfileResponse = {
    * déjà déduire.
    */
   moderationAvatarPresent: boolean;
+  /**
+   * Suspension en cours du compte (`lib/shared/account-suspension.ts`) —
+   * toujours `null` hors modération (`canModerate`) et pour un compte supprimé.
+   */
+  moderationSuspension: AccountSuspensionView | null;
+  /**
+   * La modération peut suspendre ce compte : ni le sien, ni un administrateur,
+   * ni un compte supprimé. Toujours `false` hors modération.
+   */
+  moderationSuspendable: boolean;
 };
 
 /**
@@ -928,6 +939,17 @@ export type PersonalDataExport = {
    * légale de l'hébergeur — porte, adresse IP et date.
    */
   connectionLogs: { event: string; ip: string | null; createdAt: string }[];
+  /**
+   * Suspensions du compte encore conservées (`lib/shared/account-suspension.ts`) :
+   * faits retenus, clause invoquée et dates — jamais qui les a prononcées.
+   */
+  suspensions: {
+    reason: string;
+    ground: string;
+    startsAt: string;
+    endsAt: string | null;
+    liftedAt: string | null;
+  }[];
 };
 
 export type TeamDetailResponse = {

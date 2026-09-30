@@ -70,7 +70,7 @@ export const PUSH_TOPICS = {
   },
   MODERATION: {
     label: "Décisions de modération",
-    description: "Ton avatar ou le logo de ton équipe a été masqué, supprimé ou rétabli.",
+    description: "Ton avatar ou le logo de ton équipe a été masqué, supprimé ou rétabli, ou ton compte suspendu.",
     audience: null,
   },
   PRIVACY_CHANGE: {

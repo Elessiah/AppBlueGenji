@@ -43,6 +43,7 @@
 
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
@@ -502,6 +503,23 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce n'est pas un délégué à la protection des données au sens du RGPD : l'association reste responsable du traitement de tes données et de la réponse à tes demandes.",
     ],
     links: [{ href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" }],
+  },
+  // Un traitement nouveau : la suspension d'un compte, qui garde une décision
+  // (faits retenus, clause, dates) sur le compte visé. Et une base légale
+  // désormais dite pour toute la modération des contenus contraires aux
+  // règles — l'intérêt légitime, contre lequel s'exerce le droit d'opposition.
+  // Le résumé, repris en message privé Discord, ne nomme personne.
+  {
+    id: "2026-10-suspension-comptes",
+    publishedAt: "2026-10-01",
+    title: "Suspension d'un compte par la modération",
+    summary: `La modération peut désormais suspendre un compte contraire aux conditions d'utilisation : ses sessions sont fermées et la connexion refusée tant que la suspension court. La décision (faits retenus, clause invoquée, dates) est gardée le temps de la suspension, puis ${SUSPENSION_RETENTION_MONTHS} mois pour pouvoir la contester.`,
+    details: [
+      "Le titulaire reçoit la décision et ses motifs en message privé Discord si son compte y est rattaché, et à chaque tentative de connexion pendant la suspension. Il la conteste sans se connecter, par « Signaler un problème » (catégorie « Autre »), puis, le cas échéant, devant le juge.",
+      "La modération des contenus et des comptes contraires aux conditions d'utilisation — masquage ou retrait d'une image, suspension — repose sur l'intérêt légitime de l'association à faire respecter ses règles. Une image retirée hors de tout signalement l'est désormais sur un motif écrit, envoyé avec la décision.",
+      "Une suspension figure dans l'export de tes données, et disparaît avec ton compte ou à son anonymisation.",
+    ],
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
   },
 ];
 

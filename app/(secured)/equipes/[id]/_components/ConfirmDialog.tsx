@@ -14,6 +14,8 @@ interface ConfirmDialogProps {
    * (dissoudre une équipe), comme la suppression d'un tournoi.
    */
   requireText?: string;
+  /** Désarme le bouton tant qu'un champ requis du contenu n'est pas rempli. */
+  disabled?: boolean;
   onClose: () => void;
   /** Rend `true` si le geste a abouti — la modale ne se ferme qu'alors. */
   onConfirm: () => Promise<boolean>;
@@ -32,13 +34,14 @@ export function ConfirmDialog({
   confirmLabel,
   pendingLabel,
   requireText,
+  disabled = false,
   onClose,
   onConfirm,
 }: ConfirmDialogProps) {
   const inputId = useId();
   const [typed, setTyped] = useState("");
   const [pending, setPending] = useState(false);
-  const armed = requireText === undefined || typed.trim() === requireText.trim();
+  const armed = !disabled && (requireText === undefined || typed.trim() === requireText.trim());
 
   const confirm = async () => {
     if (!armed || pending) return;

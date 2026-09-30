@@ -240,14 +240,19 @@ async function reportGrounds(reportId: number | null): Promise<ModerationGrounds
  * délai — depuis un signalement (`reportId`, le message porte le lien de
  * contestation) ou depuis la fiche de l'équipe (`null`). Jamais attendu.
  */
-export function notifyTeamLogoRemoved(teamId: number, teamName: string, reportId: number | null): void {
+export function notifyTeamLogoRemoved(
+  teamId: number,
+  teamName: string,
+  reportId: number | null,
+  staffReason: string | null = null,
+): void {
   const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void Promise.all([reportGrounds(reportId), teamMemberRecipients(teamId)])
     .then(([grounds, recipients]) =>
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: {
-          message: formatLogoRemovedNotice({ teamName, url, grounds, termsUrl: moderationTermsUrl() }),
+          message: formatLogoRemovedNotice({ teamName, url, grounds, termsUrl: moderationTermsUrl(), staffReason }),
           context: "logo-removed",
         },
         push: moderationPush({ kind: "REMOVED", teamName, teamId, reportId }),
@@ -261,14 +266,14 @@ export function notifyTeamLogoRemoved(teamId: number, teamName: string, reportId
  * signalement (`reportId`, le message porte le lien de contestation) ou depuis
  * sa fiche (`null`). Même rôle que `notifyTeamLogoRemoved`. Jamais attendu.
  */
-export function notifyUserAvatarRemoved(userId: number, reportId: number | null): void {
+export function notifyUserAvatarRemoved(userId: number, reportId: number | null, staffReason: string | null = null): void {
   const url = reportId === null ? null : `${siteCanonicalBase()}${reportConcernedHref(reportId)}`;
   void Promise.all([reportGrounds(reportId), userRecipient(userId)])
     .then(([grounds, recipients]) =>
       notifyUsers(recipients, {
         topic: "MODERATION",
         discord: {
-          message: formatAvatarRemovedNotice({ url, grounds, termsUrl: moderationTermsUrl() }),
+          message: formatAvatarRemovedNotice({ url, grounds, termsUrl: moderationTermsUrl(), staffReason }),
           context: "avatar-removed",
         },
         push: moderationPush({ kind: "REMOVED", reportId }),

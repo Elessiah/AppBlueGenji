@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { SUSPENSION_NOTICE_COOKIE, parseSuspensionNotice } from "@/lib/shared/account-suspension";
 import { getCurrentUser } from "@/lib/server/auth";
 import { signedInLoginRedirect } from "@/lib/shared/safe-redirect";
 import { LoginForm } from "./_components/LoginForm";
@@ -22,5 +24,12 @@ export default async function LoginPage({
   // rediriger ferait disparaître le message sans rien dire.
   if (user && params.error === undefined) redirect(signedInLoginRedirect(params.redirect));
 
-  return <LoginForm />;
+  // Exposé d'une suspension laissé par un retour OAuth refusé : lu seulement
+  // quand la page annonce ce refus, et jamais depuis l'URL.
+  const suspensionNotice =
+    params.error === "suspended"
+      ? parseSuspensionNotice((await cookies()).get(SUSPENSION_NOTICE_COOKIE)?.value)
+      : null;
+
+  return <LoginForm suspensionNotice={suspensionNotice} />;
 }
