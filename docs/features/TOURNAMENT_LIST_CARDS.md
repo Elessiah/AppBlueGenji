@@ -110,7 +110,7 @@ plateformes acceptées (`lib/shared/live-streams.ts`). Le dernier chiffre
 affichait « — / Prizepool · à venir » à tout visiteur non-staff — un
 emplacement réservé pour une fonctionnalité qui n'existe pas. Le bandeau se
 construit désormais par `tournamentsPageMetrics`
-(`app/(secured)/tournois/_lib/metrics.ts`) : le premier chiffre dit « Tournois
+(`app/(secured)/tournois/_lib/metrics.ts`, retiré depuis avec le bandeau) : le premier chiffre dit « Tournois
 en cours », sans rien affirmer sur une diffusion, et la case « Invisibles ·
 staff » n'apparaît que pour le staff — trois cases pour tout le monde, quatre
 pour le staff, jamais un repli inventé.

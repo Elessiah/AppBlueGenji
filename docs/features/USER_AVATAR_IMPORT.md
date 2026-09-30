@@ -49,7 +49,7 @@ redimensionnement et même cache qu'un avatar téléversé depuis `/profil`.
 |---|---|
 | `lib/shared/remote-image.ts` | Ce qu'une URL étrangère doit franchir : `https` seul, filtre d'hôte (bouclage, réseaux privés, CGNAT, lien-local, `169.254.169.254`), liste blanche de types d'image (**pas de SVG** : c'est un document scriptable). |
 | `lib/server/remote-image-fetch.ts` | Le téléchargement durci : redirections suivies **à la main** avec revalidation de l'hôte à chaque saut, délai couvrant aussi la lecture du corps, plafond de taille avant et après lecture. |
-| `lib/server/user-avatar-import.ts` | `shouldImportGoogleAvatar` (faut-il copier ?) et `importRemoteAvatar` (copier, sans jamais lever). |
+| `lib/server/user-avatar-import.ts` | `shouldImportRemoteAvatar` (faut-il copier ?) et `importRemoteAvatar` (copier, sans jamais lever). |
 | `lib/shared/avatar.ts` | `isLocalAvatarUrl` et `visibleAvatarUrl` : la garantie, posée à la sortie. |
 | `lib/server/backfill-avatars.ts` | `npm run backfill:avatars`, pour les comptes d'avant. |
 
@@ -101,7 +101,12 @@ couvre.
 
 ## Ce qui déclenche une copie
 
-`shouldImportGoogleAvatar` répond oui quand l'avatar en place **n'est pas** un
+La copie vaut pour toute photo de fournisseur : Google (`picture`) et Discord
+(avatar du CDN, `lib/server/discord-oauth.ts`), à la création du compte comme au
+rattachement d'une identité (`adoptRemoteAvatar`). La fonction portait
+d'ailleurs le nom de Google (`shouldImportGoogleAvatar`) avant d'être renommée.
+
+`shouldImportRemoteAvatar` répond oui quand l'avatar en place **n'est pas** un
 fichier à nous :
 
 - compte sans avatar → copie ;
@@ -145,7 +150,7 @@ qui les envoie changer, supprimer ou masquer leur photo.
 hôte injoignable, format refusé (`fetchRemoteImage` admet GIF et AVIF, que
 `storeImageBuffer` refuse), disque plein. Le compte est alors simplement sans
 avatar — pastille à initiale — et la tentative sera refaite au prochain passage,
-`shouldImportGoogleAvatar` n'ayant toujours rien de local à constater.
+`shouldImportRemoteAvatar` n'ayant toujours rien de local à constater.
 
 À la création d'un compte, la ligne est insérée avec `avatar_url` à `NULL` puis
 mise à jour : le nom du fichier porte l'identifiant du compte, qui n'existe

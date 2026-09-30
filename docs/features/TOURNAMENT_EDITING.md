@@ -135,7 +135,7 @@ réduit d'autant la surface de cette dépendance.
 | Orchestration (verrou, validation, écriture) | `lib/server/tournaments/edit.ts` |
 | Validation (partagée) | `lib/server/tournaments/validation.ts` |
 | API | `PATCH /api/tournaments/[id]/edit` (`app/api/tournaments/[id]/edit/route.ts`) |
-| Page du tournoi (bouton) | `app/(secured)/tournois/[id]/_components/TournamentDetail.tsx` |
+| Page du tournoi (bouton) | `app/(secured)/tournois/[id]/_components/TournamentHeader.tsx` |
 | Formule du bouton et notice | `app/(secured)/tournois/[id]/_lib/edit-entry.ts` |
 | Interface | `app/(secured)/tournois/[id]/modifier/page.tsx` |
 | Formulaire (partagé avec la création) | `app/(secured)/tournois/_components/TournamentForm.tsx` |

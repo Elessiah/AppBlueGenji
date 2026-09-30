@@ -80,8 +80,11 @@ dépendance, et que la CNIL n'impose aucun format — seulement les rubriques :
   un tableur l'exécuterait sinon comme une formule (injection CSV) ;
 - nom de fichier daté par `REGISTER_UPDATED_AT`.
 
-La route est rendue à la demande (`force-dynamic`) pour que l'adresse de contact
-suive la configuration du serveur et non celle de la machine qui a compilé.
+Rien dans l'export ne dépend de l'environnement du serveur : le contact est une
+constante du code (`lib/shared/legal-contact.ts`), si bien que la route
+(`app/rgpd/registre.csv/route.ts`) peut être rendue à la compilation. Elle ne
+porte donc plus de `force-dynamic`, qui n'existait que pour une adresse de
+contact lue dans la configuration.
 
 ## Entretien
 
@@ -94,7 +97,14 @@ le publier ne pose aucun problème, c'est même ce qui le rend vérifiable.
 
 Ce que le registre dit honnêtement et qui mériterait une décision :
 
-- **Mesure d'audience (T06)** : les visites ne sont jamais purgées, et une visite
-  garde l'identifiant du compte connecté tant que celui-ci existe. La CNIL
-  recommande 13 mois au plus pour ce type de statistiques.
+- **Mesure d'audience (T06)** : le détail des visites est effacé au bout de
+  `SITE_VISIT_DETAIL_RETENTION_DAYS` jours (31), après report dans un compteur
+  par jour, et aucune visite ne garde l'identifiant d'un compte (seul un
+  indicateur « visiteur connecté »). Reste une empreinte par visiteur, sans page
+  ni date, gardée **sans limite** pour le compte des visiteurs uniques depuis la
+  mise en service. Pour la mesure d'audience, la CNIL recommande une
+  conservation des données collectées de **25 mois** au plus — les 13 mois
+  qu'on cite souvent sont la durée de vie des **traceurs** (le site n'en pose
+  qu'un pour compter les visites, une marque `sessionStorage` qui meurt avec
+  l'onglet). L'empreinte illimitée est ce qui mériterait une décision.
 - **Journal Discord du staff (T05)** : aucune purge automatique du salon.
