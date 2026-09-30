@@ -124,6 +124,11 @@ export const MatchRow = memo(function MatchRow({
   );
 
   const isBye = match.team1Id === null || match.team2Id === null;
+  const adminScoreLabel = scoreEntryClosed
+    ? "Prononcer un forfait"
+    : pendingScoreProposal(match)
+      ? "Valider le score proposé"
+      : "Éditer le score";
   // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :
   // l'arbitrage peut noter un forfait sans valider le résultat, et le score plein
   // porté en face (3-0 en FT3) se lisait alors comme une rencontre jouée et
@@ -213,16 +218,14 @@ export const MatchRow = memo(function MatchRow({
             variant="ghost"
             onClick={() => onOpenAdminModal(match)}
             className={`${styles.action} ${styles.actionAccent}`}
+            // Le libellé visible ouvre le nom (WCAG 2.5.3), le match le complète :
+            // huit boutons identiques sur une ronde ne se distinguaient pas.
+            aria-label={`${adminScoreLabel} : ${team1Display} contre ${team2Display}`}
           >
             {/* Un score proposé attend une confirmation qui peut ne jamais
                 venir (adversaire fantôme) : le dialogue s'ouvre dessus, et le
                 bouton dit le geste qui reste à faire. */}
-            <span aria-hidden="true">✎</span>{" "}
-            {scoreEntryClosed
-              ? "Prononcer un forfait"
-              : pendingScoreProposal(match)
-                ? "Valider le score proposé"
-                : "Éditer le score"}
+            <span aria-hidden="true">✎</span> {adminScoreLabel}
           </CyberButton>
         </div>
       )}

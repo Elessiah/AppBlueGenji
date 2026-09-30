@@ -11,6 +11,7 @@ import {
   type MatchLaunchPhase,
 } from "@/lib/shared/match-launch";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
+import { LAUNCH_PHASE_LABELS } from "@/lib/shared/match-planning";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
@@ -137,13 +138,13 @@ export function MatchLaunchStrip({
           className={styles.toPlan}
           title="L'arbitrage doit fixer la date et l'heure de ce match avant son lancement."
         >
-          <span aria-hidden="true">📅</span> À planifier
+          <span aria-hidden="true">📅</span> {LAUNCH_PHASE_LABELS.TO_PLAN}
           <span className="sr-only"> : l&apos;arbitrage doit fixer la date de ce match.</span>
         </span>
       )}
       {phase === "SCHEDULED" && (
         <span className={styles.scheduled} title={startAtTitle ?? undefined}>
-          <span aria-hidden="true">⏱</span> En attente de départ
+          <span aria-hidden="true">⏱</span> {LAUNCH_PHASE_LABELS.SCHEDULED}
           {/* L'heure est déjà dans le bandeau d'horaire juste au-dessus : on ne
               la répète que pour les lecteurs d'écran, qui lisent ce libellé
               seul. */}
@@ -152,7 +153,7 @@ export function MatchLaunchStrip({
       )}
       {phase === "LOBBY" && (
         <span className={styles.lobby}>
-          <span aria-hidden="true">⏳</span> Lancement ·{" "}
+          <span aria-hidden="true">⏳</span> {LAUNCH_PHASE_LABELS.LOBBY} ·{" "}
           <span className="num">
             {count.ready}/{count.expected}
           </span>{" "}
@@ -161,7 +162,7 @@ export function MatchLaunchStrip({
       )}
       {phase === "LAUNCHED" && match.status === "READY" && (
         <span className={styles.launched}>
-          <span aria-hidden="true">▶</span> Lancé
+          <span aria-hidden="true">▶</span> {LAUNCH_PHASE_LABELS.LAUNCHED}
         </span>
       )}
 
@@ -285,6 +286,12 @@ export function MatchLaunchStrip({
             Le match démarre sans attendre les « Prêt » manquants : les engagés peuvent
             reporter leur score dès maintenant.
           </p>
+          {phase === "TO_PLAN" && (
+            <p>
+              Ce match n&apos;est pas encore planifié : il démarre maintenant, sans heure
+              annoncée aux engagés.
+            </p>
+          )}
         </ConfirmActionDialog>
       )}
     </div>

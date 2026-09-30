@@ -74,6 +74,23 @@ export function matchesToPlan<T extends PlanningMatch>(
   );
 }
 
+/**
+ * Pourquoi un engagé ne peut pas encore saisir de score, selon la phase : la
+ * modale joueur disait toujours « toutes les parties doivent se déclarer
+ * prêtes », faux tant que le match attend l'arbitrage ou son heure.
+ */
+export function playerScoreClosedNotice(phase: MatchLaunchPhase, startAtFull: string | null): string {
+  if (phase === "TO_PLAN") {
+    return "Ce match attend que l'arbitrage fixe sa date : le score se saisira une fois le match lancé.";
+  }
+  if (phase === "SCHEDULED") {
+    return startAtFull
+      ? `Ce match démarre le ${startAtFull} : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.`
+      : "Ce match n'a pas encore démarré : le score se saisit une fois lancé, quand les parties se sont déclarées prêtes.";
+  }
+  return "Le score se saisit une fois le match lancé : toutes les parties doivent s'être déclarées prêtes.";
+}
+
 /** « 3 matchs à planifier » — accord du nom sur le nombre. */
 export function toPlanCountLabel(count: number): string {
   return count === 1 ? "1 match à planifier" : `${count} matchs à planifier`;

@@ -3,6 +3,7 @@ import {
   canToggleRefereeScheduling,
   LAUNCH_PHASE_LABELS,
   matchesToPlan,
+  playerScoreClosedNotice,
   REFEREE_SCHEDULING_DESCRIPTION,
   refereeSchedulingErrorMessage,
   toPlanCountLabel,
@@ -88,5 +89,20 @@ describe("refereeSchedulingErrorMessage", () => {
     expect(refereeSchedulingErrorMessage("ER_LOCK_DEADLOCK")).not.toMatch(/ER_/);
     expect(refereeSchedulingErrorMessage(null)).toMatch(/Réessaie/);
     expect(refereeSchedulingErrorMessage("constructor")).toMatch(/Réessaie/);
+  });
+});
+
+describe("playerScoreClosedNotice", () => {
+  it("dit au joueur ce qu'attend le match, phase par phase", () => {
+    expect(playerScoreClosedNotice("TO_PLAN", null)).toMatch(/l'arbitrage fixe sa date/);
+    expect(playerScoreClosedNotice("SCHEDULED", "mardi 1 octobre 2026 à 20:30")).toContain(
+      "mardi 1 octobre 2026 à 20:30",
+    );
+    expect(playerScoreClosedNotice("SCHEDULED", null)).toMatch(/pas encore démarré/);
+    expect(playerScoreClosedNotice("LOBBY", null)).toMatch(/déclarées prêtes/);
+  });
+
+  it("ne parle jamais de « Prêt » à un match à planifier", () => {
+    expect(playerScoreClosedNotice("TO_PLAN", null)).not.toMatch(/prêt/i);
   });
 });

@@ -22,6 +22,10 @@ import {
 } from "@/lib/shared/player-score-report";
 import { decideScoreForm, parseScoreInput, scoreBlockerMessage } from "../_lib/score-form";
 import { useMatchFormat } from "../_lib/match-format-context";
+import { useLiveControls } from "../_lib/live-context";
+import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
+import { playerScoreClosedNotice } from "@/lib/shared/match-planning";
+import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import { mapError } from "../_lib/error-map";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
@@ -86,6 +90,10 @@ export function PlayerScoreDialog({
 }: PlayerScoreDialogProps) {
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
+  // Phase de lancement, pour dire **pourquoi** le score n'est pas encore
+  // saisissable (à planifier, en attente de départ, en lancement).
+  const { refereeScheduling } = useLiveControls();
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
   const [submitting, setSubmitting] = useState(false);
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: submitting });
   const backdrop = useBackdropDismiss(onClose, submitting);
@@ -287,8 +295,7 @@ export function PlayerScoreDialog({
             </>
           ) : (
             <p className={styles.formatHint}>
-              Le score se saisit une fois le match lancé : toutes les parties doivent
-              s&apos;être déclarées prêtes.
+              {playerScoreClosedNotice(launchPhase, formatMatchStartAtFull(match.startAt))}
             </p>
           )}
 

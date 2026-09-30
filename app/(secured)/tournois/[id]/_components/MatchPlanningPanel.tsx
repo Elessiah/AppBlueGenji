@@ -136,7 +136,6 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
               className={`btn ghost tap-target ${styles.toggle}`}
               onClick={onToggle}
               disabled={busy}
-              aria-pressed={enabled}
             >
               {busy ? "…" : enabled ? "Désactiver la planification" : "Activer la planification"}
             </button>

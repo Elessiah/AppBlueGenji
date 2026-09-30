@@ -10,6 +10,7 @@ import {
   isValidMatchStartAt,
   matchStartAtInputValue,
 } from "@/lib/shared/match-schedule";
+import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
 
@@ -55,6 +56,12 @@ export function MatchScheduleDialog({
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
 
+  // « Planifier » seulement pour un match réellement **à planifier**, figé à
+  // l'ouverture : sur un match terminé ou sans ses deux engagés, poser une date
+  // n'en lance aucun.
+  const [planning] = useState(
+    () => matchLaunchPhase({ ...match, refereeScheduling }, Date.now()) === "TO_PLAN",
+  );
   const touched = startAt.trim().length > 0;
   const invalid = incomplete || (touched && !isValidMatchStartAt(startAt));
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
@@ -90,7 +97,7 @@ export function MatchScheduleDialog({
       if (!response.ok) throw new Error(payload.error || "MATCH_SCHEDULE_UPDATE_FAILED");
       showSuccess(
         touched
-          ? refereeScheduling && match.startAt === null
+          ? planning
             ? "Match planifié."
             : "Date de début enregistrée."
           : "Date de début effacée.",
@@ -138,7 +145,7 @@ export function MatchScheduleDialog({
       >
         <form onSubmit={submit}>
           <h3 id="match-schedule-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-            {refereeScheduling && match.startAt === null ? "Planifier le match" : "Date de début du match"}
+            {planning ? "Planifier le match" : "Date de début du match"}
           </h3>
           <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
@@ -229,7 +236,7 @@ export function MatchScheduleDialog({
             >
               {busy
                 ? "Enregistrement…"
-                : refereeScheduling && match.startAt === null
+                : planning
                   ? "Planifier"
                   : "Enregistrer"}
             </button>

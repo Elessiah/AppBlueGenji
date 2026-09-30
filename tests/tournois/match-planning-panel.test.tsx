@@ -51,7 +51,8 @@ describe("MatchPlanningPanel — arbitrage", () => {
     expect(html).toContain("1 match à planifier");
     expect(html).toContain("Planifier le prochain match : Alpha contre Bravo");
     expect(html).toContain("Désactiver la planification");
-    expect(html).toContain('aria-pressed="true"');
+    // Libellé d'action qui change : pas d'`aria-pressed`, qui dirait l'inverse.
+    expect(html).not.toContain("aria-pressed");
   });
 
   it("dit quand tout est planifié", () => {
@@ -64,7 +65,6 @@ describe("MatchPlanningPanel — arbitrage", () => {
     for (const state of ["UPCOMING", "REGISTRATION", "RUNNING"] as const) {
       const html = render(detailOf({ enabled: false, isAdmin: true, state }));
       expect(html).toContain("Activer la planification");
-      expect(html).toContain('aria-pressed="false"');
     }
   });
 
