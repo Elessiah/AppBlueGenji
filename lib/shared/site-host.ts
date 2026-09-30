@@ -24,6 +24,8 @@ export const SITE_HOST = {
   phoneEncoded: SITE_HOST_PHONE_ENCODED,
   /** Machine qui fait tourner le site et le bot Discord. */
   machine: "un Raspberry Pi, à Caen",
+  /** La même machine, pour les pages anglaises (pages légales du bot). */
+  machineEn: "a Raspberry Pi in Caen, France",
   /** Pays où les données sont hébergées — c'est ce qui décide d'un transfert hors UE. */
   country: "France",
 } as const;

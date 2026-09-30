@@ -7,7 +7,7 @@ import {
   type BilingualDoc,
   type Lang,
   type LegalBlock,
-} from "@/lib/shared/bot-legal-content";
+} from "@/lib/shared/bot-legal-types";
 import styles from "./BotLegalDoc.module.css";
 
 /**

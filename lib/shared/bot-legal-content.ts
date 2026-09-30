@@ -1,8 +1,16 @@
 /**
  * Contenu bilingue (FR / EN) des documents légaux du bot Discord *BlueGenji Bot*.
  *
- * Source : `blueGenjiBot/LegalTerms` (ConditionsUtilisation.md / TermsOfServices.md,
- * Politique de confidentialité.md / PolicyPrivacy.md).
+ * **Source unique** de ces deux textes : ils étaient repris de
+ * `blueGenjiBot/LegalTerms`, dont les fichiers ont depuis divergé et ne font
+ * plus foi. Ils décrivent le bot **d'après son code** (`blueGenjiBot`,
+ * branche `main`) : chaque durée ou comportement cité y a été relu — tables de
+ * `src/bdd/Bdd.ts`, purge de `src/messages/manageMsgExpiration.ts`, commandes
+ * de `src/config/commands.ts`, routes de `src/internalApi.ts`, sauvegardes de
+ * `scripts/backup-onedrive.sh`. Les durées qu'aucune importation ne peut tenir
+ * alignées (le bot vit dans un autre dépôt) sont recopiées une fois, avec leur
+ * source, dans `lib/shared/processing-register.ts`, que le registre (T08) lit
+ * aussi : un changement du bot se reporte là, et les deux pages suivent.
  *
  * Les paragraphes et puces acceptent une syntaxe inline minimale :
  *   - `**gras**`            → <strong>
@@ -11,62 +19,81 @@
  * La partie « hébergeur » n'est pas dupliquée ici : chaque document renvoie vers la
  * section Hébergement des mentions légales du site (`/mentions-legales#hebergement`).
  */
+import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
-import { LEGAL_CONTACT_DISCORD, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import {
+  ASSOCIATION_NAME,
+  ASSOCIATION_SEAT,
+  LEGAL_CONTACT_DISCORD,
+  REPORT_FORM_NAME,
+} from "@/lib/shared/legal-contact";
+import {
+  BOT_LINK_CODE_VALIDITY_MINUTES,
+  BOT_RELAY_RETENTION_DAYS,
+  DPF_ADEQUACY_DECISION,
+  DPF_ADEQUACY_DECISION_EN,
+} from "@/lib/shared/processing-register";
+import { SITE_HOST } from "@/lib/shared/site-host";
 
+import type { BilingualDoc } from "@/lib/shared/bot-legal-types";
 
-export type Lang = "fr" | "en";
+export {
+  HEBERGEUR_HREF,
+  type BilingualDoc,
+  type Lang,
+  type LegalBlock,
+  type LegalDoc,
+  type LegalSection,
+} from "@/lib/shared/bot-legal-types";
 
-export const HEBERGEUR_HREF = "/mentions-legales#hebergement";
-
-export interface LegalBlock {
-  kind: "p" | "subhead" | "bullets";
-  /** Pour `p` et `subhead`. Supporte la syntaxe inline. */
-  text?: string;
-  /** Pour `bullets`. Chaque entrée supporte la syntaxe inline. */
-  items?: string[];
-}
-
-export interface LegalSection {
-  num: string;
-  title: string;
-  meta: string;
-  blocks: LegalBlock[];
-}
-
-export interface LegalDoc {
-  eyebrow: string;
-  /** Titre d'affichage (peut contenir un saut de ligne `\n`). */
-  title: string;
-  lastUpdatedLabel: string;
-  lastUpdated: string;
-  intro: string;
-  sections: LegalSection[];
-  /** Bloc « hébergeur » renvoyant vers les mentions légales. */
-  hosting: {
-    meta: string;
-    title: string;
-    text: string;
-    linkLabel: string;
-  };
-}
-
-export interface BilingualDoc {
-  fr: LegalDoc;
-  en: LegalDoc;
-}
+/**
+ * Âge minimal pour utiliser le bot : 15 ans, seuil à partir duquel un mineur
+ * consent seul à un traitement lié à un service en ligne (art. 45 de la loi
+ * Informatique et Libertés, art. 8 RGPD).
+ */
+export const BOT_MINIMUM_AGE = 15;
 
 /** Même serveur que le reste du site : voir `lib/shared/discord.ts`. */
 const DISCORD_INVITE = DISCORD_INVITE_URL;
 const DISCORD_TERMS = "https://discord.com/terms";
-const FORM_FR = `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site`;
-const FORM_EN = `The **“${REPORT_FORM_NAME}”** form at the bottom of every page of the site`;
 const DISCORD_GUIDELINES = "https://discord.com/guidelines";
 const PRIVACY_HREF = "/privacy-policy-bot";
+const TERMS_HREF = "/terms-of-service-bot";
+const LEGAL_NOTICE_HREF = "/mentions-legales";
+const SITE_PRIVACY_HREF = "/rgpd";
+const CNIL_COMPLAINT_URL = "https://www.cnil.fr/fr/plaintes";
 // Aucune adresse électronique ici : le courriel de l'association ne s'écrit
-// jamais en clair, il se révèle au clic sur les pages du site
-// (`lib/shared/legal-contact.ts`), ce que ces textes ne savent pas faire.
+// jamais en clair, il se révèle au clic sur les mentions légales
+// (`lib/shared/legal-contact.ts`), ce que ces textes ne savent pas faire — ils y
+// renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
+
+const LAST_UPDATED_FR = "30 septembre 2026";
+const LAST_UPDATED_EN = "30 September 2026";
+
+const CONTACT_ITEMS_FR = [
+  `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
+  `**Discord** : ${CONTACT_DISCORD} (hébergeur technique de l'association)`,
+  `Courriel et téléphone de l'association : voir les [mentions légales](${LEGAL_NOTICE_HREF})`,
+];
+const CONTACT_ITEMS_EN = [
+  `The **“${REPORT_FORM_NAME}”** form at the bottom of every page of the site (“RGPD” category for your data)`,
+  `**Discord**: ${CONTACT_DISCORD} (the association's technical host)`,
+  `The association's email address and phone number: see the [legal notice](${LEGAL_NOTICE_HREF})`,
+];
+
+const HOSTING_FR = {
+  meta: "HÉBERGEUR",
+  title: "Hébergement",
+  text: `Le bot et le site tournent sur la même machine, ${SITE_HOST.machine}, fournie et administrée par leur hébergeur technique, ${SITE_HOST.name}. Ses coordonnées complètes figurent dans les mentions légales du site.`,
+  linkLabel: "Voir la section Hébergement des mentions légales →",
+};
+const HOSTING_EN = {
+  meta: "HOSTING PROVIDER",
+  title: "Hosting",
+  text: `The bot and the website run on the same machine, ${SITE_HOST.machineEn}, provided and administered by their technical host, ${SITE_HOST.name}. The host's full details are set out in the website's legal notice.`,
+  linkLabel: "See the Hosting section of the legal notice →",
+};
 
 /* -------------------------------------------------------------------------- */
 /*  Terms of Service / Conditions d'Utilisation                               */
@@ -77,321 +104,249 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
     eyebrow: "BLUEGENJI BOT · LÉGAL",
     title: "Conditions\nd'Utilisation",
     lastUpdatedLabel: "Dernière mise à jour",
-    lastUpdated: "6 janvier 2024",
+    lastUpdated: LAST_UPDATED_FR,
     intro:
-      "En utilisant le bot Discord **BlueGenji Bot**, vous acceptez de respecter ces Conditions d'Utilisation. Si vous n'acceptez pas ces Conditions, veuillez ne pas utiliser le Bot.",
+      "Ces conditions encadrent l'utilisation du bot Discord **BlueGenji Bot** : ses commandes et le relais d'annonces entre serveurs partenaires. Si vous ne les acceptez pas, n'utilisez pas le Bot.",
     sections: [
       {
         num: "01",
-        title: "Introduction",
+        title: "Éditeur et objet",
         meta: "PRÉSENTATION",
         blocks: [
           {
             kind: "p",
-            text: "**BlueGenji Bot** est un bot Discord développé par Keryan HOUSSIN pour synchroniser les annonces et autres contenus liés à la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre des serveurs affiliés. Ces Conditions régissent votre utilisation du Bot et de ses services.",
+            text: `**BlueGenji Bot** est édité par l'association **${ASSOCIATION_NAME}** (association loi 1901, siège : ${ASSOCIATION_SEAT}). Il est développé et administré bénévolement par ${SITE_HOST.name}, hébergeur technique de l'association.`,
+          },
+          {
+            kind: "p",
+            text: "Le Bot relaie les annonces de la communauté esport BlueGenji — Overwatch et Marvel Rivals — entre les salons des serveurs partenaires (recherches de scrims, recrutements et autres services). Il remet aussi en message privé les messages du site BlueGenji : codes de connexion, rappels de match, alertes d'arbitrage, avis de modération, demandes d'adhésion à une équipe et informations sur les données. Il est gratuit.",
           },
         ],
       },
       {
         num: "02",
-        title: "Éligibilité",
+        title: "Accès",
         meta: "CONDITIONS D'ACCÈS",
         blocks: [
           {
             kind: "bullets",
             items: [
-              "Vous devez avoir au moins 13 ans pour utiliser le Bot.",
-              `Vous devez respecter les [Conditions d'Utilisation de Discord](${DISCORD_TERMS}) et les [Règles Communautaires](${DISCORD_GUIDELINES}).`,
-              "En utilisant le Bot, vous confirmez que vous remplissez ces critères.",
+              `Vous devez avoir au moins ${BOT_MINIMUM_AGE} ans pour utiliser le Bot.`,
+              `Vous devez respecter les [Conditions d'Utilisation de Discord](${DISCORD_TERMS}) et ses [Règles Communautaires](${DISCORD_GUIDELINES}).`,
             ],
           },
         ],
       },
       {
         num: "03",
-        title: "Règles d'Utilisation",
+        title: "Règles d'utilisation",
         meta: "USAGE ACCEPTABLE",
         blocks: [
-          { kind: "p", text: "En utilisant **BlueGenji Bot**, vous acceptez de :" },
+          { kind: "p", text: "En utilisant **BlueGenji Bot**, vous vous engagez à :" },
           {
             kind: "bullets",
             items: [
-              "Ne pas utiliser le Bot à des fins illégales, nuisibles ou perturbatrices.",
-              "Ne pas exploiter ou abuser des fonctionnalités du Bot ou tenter de contourner ses limitations.",
-              "Ne pas utiliser le Bot pour harceler, spammer ou usurper l'identité d'autres utilisateurs.",
-              "Signaler tout bug, vulnérabilité ou utilisation abusive de manière responsable.",
+              "ne pas l'utiliser à des fins illégales, nuisibles ou perturbatrices ;",
+              "ne pas exploiter ses fonctionnalités de façon abusive ni tenter de contourner ses limites (temps de recharge, exclusions) ;",
+              "ne pas l'utiliser pour harceler, spammer ou usurper l'identité d'autrui ;",
+              "signaler de façon responsable tout bug, faille ou usage abusif.",
             ],
           },
           {
             kind: "p",
-            text: "Nous nous réservons le droit de restreindre, suspendre ou résilier votre accès au Bot en cas de violation de ces règles ou pour toute autre raison à notre discrétion.",
+            text: "Chacun reste responsable des annonces qu'il publie : le Bot les recopie telles quelles dans les salons des serveurs partenaires.",
           },
         ],
       },
       {
         num: "04",
-        title: "Collecte de Données et Confidentialité",
-        meta: "DONNÉES",
+        title: "Modération du relais",
+        meta: "EXCLUSIONS",
         blocks: [
-          { kind: "p", text: "**BlueGenji Bot** peut collecter et traiter les types de données suivants :" },
-          { kind: "subhead", text: "Données Collectées" },
           {
-            kind: "bullets",
-            items: [
-              "**Données Utilisateur** : Identifiants d'utilisateur (User IDs), identifiants et contenu des messages (utilisés pour la modération et les fonctionnalités de cooldown).",
-              "**Données Serveur** : Identifiants des canaux (utilisés pour synchroniser et lier les canaux entre les serveurs).",
-              "**Paramètres Serveur** : Vérifiés pour contrôler les permissions des utilisateurs (par exemple, statut d'administrateur).",
-            ],
-          },
-          { kind: "subhead", text: "Utilisation de vos Données" },
-          {
-            kind: "bullets",
-            items: [
-              "**User IDs** : Stockés et utilisés pour les cooldowns et la modération.",
-              "**Contenu et Identifiants des Messages** : Les contenus des messages sont traités mais non stockés. Les identifiants des messages sont stockés pour les cooldowns et le suivi des modifications. Les messages supprimés ne peuvent pas être récupérés.",
-              "**Identifiants des Canaux** : Stockés pour permettre la liaison et la synchronisation des canaux entre serveurs.",
-              "**Paramètres Serveur** : Traités pour vérifier les rôles et permissions des utilisateurs.",
-            ],
-          },
-          { kind: "subhead", text: "Durée de Conservation des Données" },
-          {
-            kind: "bullets",
-            items: [
-              "Les identifiants des canaux sont conservés tant qu'ils restent utilisés pour la synchronisation.",
-              "Les identifiants des messages sont supprimés après 72 heures ou au redémarrage du bot.",
-              "Aucune donnée personnelle n'est stockée de manière permanente, sauf si nécessaire pour les fonctionnalités essentielles.",
-            ],
+            kind: "p",
+            text: `Les administrateurs des serveurs partenaires d'au moins 50 membres (ou les titulaires du rôle d'administration du Bot que ces serveurs désignent) et le staff de l'association peuvent **exclure un utilisateur du relais** en cas de manquement à ces conditions : il ne peut plus utiliser les commandes du Bot, ses annonces ne sont plus relayées et les copies de celles que le Bot suit encore (au moins les ${BOT_RELAY_RETENTION_DAYS} derniers jours) sont retirées. L'exclusion vaut pour tout le réseau de serveurs partenaires ; son motif est obligatoire et consigné au journal de modération.`,
           },
           {
             kind: "p",
-            text: `Pour plus de détails, veuillez consulter notre [Politique de Confidentialité](${PRIVACY_HREF}).`,
+            text: "L'association peut aussi restreindre ou suspendre l'accès au Bot en cas de manquement. Une exclusion se conteste par les moyens indiqués à la section Contact.",
           },
         ],
       },
       {
         num: "05",
-        title: "Responsabilité et Exclusions de Garantie",
+        title: "Données personnelles",
+        meta: "DONNÉES",
+        blocks: [
+          {
+            kind: "p",
+            text: `Les données traitées par le Bot, leurs durées de conservation et vos droits sont décrits dans sa [Politique de Confidentialité](${PRIVACY_HREF}).`,
+          },
+        ],
+      },
+      {
+        num: "06",
+        title: "Responsabilité",
         meta: "GARANTIES",
         blocks: [
           {
             kind: "bullets",
             items: [
-              'Le Bot est fourni "tel quel", sans aucune garantie ou promesse de fonctionnement.',
-              "Nous ne garantissons pas une performance ininterrompue ou exempte d'erreurs.",
-              "Nous ne sommes pas responsables des dommages, pertes ou problèmes découlant de l'utilisation du Bot, y compris les interruptions de serveur ou la perte de données.",
-              "Nous ne sommes pas responsables des abus commis par les utilisateurs du Bot, même si des outils de modération sont fournis.",
+              "Le Bot est un service gratuit, maintenu par des bénévoles : il est fourni sans garantie de disponibilité continue ni d'absence d'erreur.",
+              "Dans les limites permises par la loi, l'association n'est pas responsable des interruptions du service, ni des contenus publiés par les utilisateurs et relayés par le Bot.",
             ],
           },
         ],
       },
       {
-        num: "06",
-        title: "Modifications des Conditions",
+        num: "07",
+        title: "Modification des conditions",
         meta: "ÉVOLUTIONS",
         blocks: [
           {
             kind: "p",
-            text: `Nous nous réservons le droit de modifier ces Conditions à tout moment. Les mises à jour seront annoncées sur notre [Serveur Discord](${DISCORD_INVITE}). La poursuite de l'utilisation du Bot après les modifications constitue une acceptation des nouvelles Conditions.`,
-          },
-        ],
-      },
-      {
-        num: "07",
-        title: "Résiliation",
-        meta: "FIN D'ACCÈS",
-        blocks: [
-          {
-            kind: "p",
-            text: "Nous, ainsi que les modérateurs des serveurs affiliés, nous réservons le droit de résilier votre accès à **BlueGenji Bot** à tout moment, avec ou sans préavis, en cas de violation de ces Conditions ou pour d'autres raisons. Pour toute contestation ou demande, contactez-nous :",
-          },
-          {
-            kind: "bullets",
-            items: [`Discord : **${CONTACT_DISCORD}**`, FORM_FR],
+            text: `L'association peut modifier ces conditions. La version en vigueur est celle publiée sur cette page, avec sa date de mise à jour ; les changements importants sont annoncés sur le [serveur Discord de l'association](${DISCORD_INVITE}).`,
           },
         ],
       },
       {
         num: "08",
-        title: "Nous Contacter",
+        title: "Contact",
         meta: "CONTACT",
         blocks: [
           {
             kind: "p",
-            text: "Si vous avez des questions ou des préoccupations concernant ces Conditions, veuillez nous contacter :",
+            text: "Pour toute question, contestation ou demande concernant ces conditions :",
           },
-          {
-            kind: "bullets",
-            items: [`**Discord** : ${CONTACT_DISCORD}`, FORM_FR],
-          },
+          { kind: "bullets", items: CONTACT_ITEMS_FR },
         ],
       },
     ],
-    hosting: {
-      meta: "HÉBERGEUR",
-      title: "Hébergement",
-      text: "Le bot et le site sont hébergés par le même prestataire. Les coordonnées complètes de l'hébergeur sont détaillées dans les mentions légales du site.",
-      linkLabel: "Voir la section Hébergement des mentions légales →",
-    },
+    hosting: HOSTING_FR,
   },
   en: {
     eyebrow: "BLUEGENJI BOT · LEGAL",
     title: "Terms of\nService",
     lastUpdatedLabel: "Last updated",
-    lastUpdated: "6 January 2024",
+    lastUpdated: LAST_UPDATED_EN,
     intro:
-      "By using the Discord bot **BlueGenji Bot**, you agree to comply with these Terms of Service. If you do not agree with these Terms, please refrain from using the Bot.",
+      "These terms govern the use of the Discord bot **BlueGenji Bot**: its commands and the relay of advertisements between partner servers. If you do not accept them, do not use the Bot.",
     sections: [
       {
         num: "01",
-        title: "Introduction",
+        title: "Publisher and purpose",
         meta: "OVERVIEW",
         blocks: [
           {
             kind: "p",
-            text: "**BlueGenji Bot** is a Discord bot developed by Keryan HOUSSIN to synchronize advertisements and other related content across affiliated servers for the BlueGenji esport community (Overwatch and Marvel Rivals). These Terms govern your use of the Bot and its services.",
+            text: `**BlueGenji Bot** is published by the association **${ASSOCIATION_NAME}** (a French non-profit association under the law of 1901, registered office: ${ASSOCIATION_SEAT}). It is developed and administered on a voluntary basis by ${SITE_HOST.name}, the association's technical host.`,
+          },
+          {
+            kind: "p",
+            text: "The Bot relays the advertisements of the BlueGenji esport community — Overwatch and Marvel Rivals — between the channels of partner servers (scrim searches, recruitment and other services). It also delivers by direct message the messages of the BlueGenji website: login codes, match reminders, referee alerts, moderation notices, team join requests and data-protection notices. It is free of charge.",
           },
         ],
       },
       {
         num: "02",
-        title: "Eligibility",
+        title: "Access",
         meta: "ACCESS REQUIREMENTS",
         blocks: [
           {
             kind: "bullets",
             items: [
-              "You must be at least 13 years old to use the Bot.",
+              `You must be at least ${BOT_MINIMUM_AGE} years old to use the Bot.`,
               `You must comply with Discord's [Terms of Service](${DISCORD_TERMS}) and [Community Guidelines](${DISCORD_GUIDELINES}).`,
-              "By using the Bot, you confirm that you meet these requirements.",
             ],
           },
         ],
       },
       {
         num: "03",
-        title: "Usage Rules",
+        title: "Usage rules",
         meta: "ACCEPTABLE USE",
         blocks: [
-          { kind: "p", text: "By using **BlueGenji Bot**, you agree to the following:" },
+          { kind: "p", text: "By using **BlueGenji Bot**, you undertake:" },
           {
             kind: "bullets",
             items: [
-              "Not to use the Bot for illegal, harmful, or disruptive activities.",
-              "Not to exploit or abuse the Bot's features or attempt to bypass its limitations.",
-              "Not to use the Bot to harass, spam, or impersonate others.",
-              "To report any bugs, vulnerabilities, or misuse responsibly.",
+              "not to use it for illegal, harmful or disruptive purposes;",
+              "not to abuse its features or attempt to bypass its limits (cooldowns, exclusions);",
+              "not to use it to harass, spam or impersonate others;",
+              "to report any bug, vulnerability or misuse responsibly.",
             ],
           },
           {
             kind: "p",
-            text: "We reserve the right to restrict, suspend, or terminate your access to the Bot for violating these rules or for other reasons at our discretion.",
+            text: "Everyone remains responsible for the advertisements they publish: the Bot copies them as they are into the channels of partner servers.",
           },
         ],
       },
       {
         num: "04",
-        title: "Data Collection and Privacy",
-        meta: "DATA",
+        title: "Relay moderation",
+        meta: "EXCLUSIONS",
         blocks: [
-          { kind: "p", text: "**BlueGenji Bot** may collect and process the following types of data:" },
-          { kind: "subhead", text: "Data Collected" },
           {
-            kind: "bullets",
-            items: [
-              "**User Data**: User IDs, message IDs, and message content (used for moderation and cooldown functionalities).",
-              "**Server Data**: Channel IDs (used to synchronize and link channels across servers).",
-              "**Server Settings**: Verified to check user permissions (e.g., administrator status).",
-            ],
-          },
-          { kind: "subhead", text: "How We Use Your Data" },
-          {
-            kind: "bullets",
-            items: [
-              "**User IDs**: Stored and used for cooldowns and moderation.",
-              "**Message Content and IDs**: Message content is processed but not stored. Message IDs are stored for cooldowns and edit tracking. Deleted messages cannot be retrieved.",
-              "**Channel IDs**: Stored to enable channel linking and synchronization between servers.",
-              "**Server Settings**: Processed to verify user roles and permissions.",
-            ],
-          },
-          { kind: "subhead", text: "Data Retention" },
-          {
-            kind: "bullets",
-            items: [
-              "Channel IDs are stored as long as they remain in use for synchronization.",
-              "Message IDs are deleted after 72 hours or upon bot restart.",
-              "No personal data is permanently stored unless required for core functionality.",
-            ],
+            kind: "p",
+            text: `The administrators of partner servers with at least 50 members (or the holders of the Bot administration role those servers designate) and the association's staff may **exclude a user from the relay** for breaching these terms: they can no longer use the Bot's commands, their advertisements are no longer relayed and the copies of those the Bot still tracks (at least the last ${BOT_RELAY_RETENTION_DAYS} days) are removed. The exclusion applies to the whole network of partner servers; a reason is mandatory and recorded in the moderation log.`,
           },
           {
             kind: "p",
-            text: `For more details, please refer to our [Privacy Policy](${PRIVACY_HREF}).`,
+            text: "The association may also restrict or suspend access to the Bot in the event of a breach. An exclusion can be contested through the means listed in the Contact section.",
           },
         ],
       },
       {
         num: "05",
-        title: "Liability and Disclaimers",
-        meta: "WARRANTIES",
+        title: "Personal data",
+        meta: "DATA",
         blocks: [
           {
-            kind: "bullets",
-            items: [
-              'The Bot is provided "as is" without any guarantees or warranties.',
-              "We do not guarantee uninterrupted or error-free performance.",
-              "We are not responsible for damages, losses, or issues arising from your use of the Bot, including server disruptions or data loss.",
-              "We are not liable for any misconduct by users of the Bot, even if moderation tools are provided.",
-            ],
+            kind: "p",
+            text: `The data processed by the Bot, how long it is kept and your rights are described in its [Privacy Policy](${PRIVACY_HREF}).`,
           },
         ],
       },
       {
         num: "06",
-        title: "Changes to the Terms",
-        meta: "UPDATES",
+        title: "Liability",
+        meta: "WARRANTIES",
         blocks: [
           {
-            kind: "p",
-            text: `We reserve the right to update these Terms at any time. Updates will be announced on our [Discord Server](${DISCORD_INVITE}). Continued use of the Bot after changes are made constitutes acceptance of the updated Terms.`,
+            kind: "bullets",
+            items: [
+              "The Bot is a free service maintained by volunteers: it is provided without any guarantee of continuous availability or error-free operation.",
+              "To the extent permitted by law, the association is not liable for service interruptions, nor for content published by users and relayed by the Bot.",
+            ],
           },
         ],
       },
       {
         num: "07",
-        title: "Termination",
-        meta: "END OF ACCESS",
+        title: "Changes to these terms",
+        meta: "UPDATES",
         blocks: [
           {
             kind: "p",
-            text: "We, alongside moderators of affiliated servers, reserve the right to terminate your access to **BlueGenji Bot** at any time, with or without notice, for violations of these Terms or other reasons. For any disputes or inquiries, contact:",
-          },
-          {
-            kind: "bullets",
-            items: [`Discord: **${CONTACT_DISCORD}**`, FORM_EN],
+            text: `The association may amend these terms. The version in force is the one published on this page, with its update date; significant changes are announced on the [association's Discord server](${DISCORD_INVITE}).`,
           },
         ],
       },
       {
         num: "08",
-        title: "Contact Us",
+        title: "Contact",
         meta: "CONTACT",
         blocks: [
           {
             kind: "p",
-            text: "If you have any questions or concerns about these Terms, feel free to reach out:",
+            text: "For any question, dispute or request about these terms:",
           },
-          {
-            kind: "bullets",
-            items: [`**Discord**: ${CONTACT_DISCORD}`, FORM_EN],
-          },
+          { kind: "bullets", items: CONTACT_ITEMS_EN },
         ],
       },
     ],
-    hosting: {
-      meta: "HOSTING PROVIDER",
-      title: "Hosting",
-      text: "The bot and the website are hosted by the same provider. The full hosting-provider details are set out in the website's legal notice.",
-      linkLabel: "See the Hosting section of the legal notice →",
-    },
+    hosting: HOSTING_EN,
   },
 };
 
@@ -404,318 +359,406 @@ export const PRIVACY_POLICY: BilingualDoc = {
     eyebrow: "BLUEGENJI BOT · CONFIDENTIALITÉ",
     title: "Politique de\nConfidentialité",
     lastUpdatedLabel: "Dernière mise à jour",
-    lastUpdated: "8 janvier 2025",
+    lastUpdated: LAST_UPDATED_FR,
     intro:
-      "Votre vie privée nous importe. Cette Politique de Confidentialité explique comment **BlueGenji Bot** collecte, utilise et protège vos informations lorsque vous utilisez les services du Bot.",
+      "Cette politique vous informe des données que traite le bot Discord **BlueGenji Bot**, de leurs finalités, de leurs durées de conservation, de leurs destinataires et de vos droits (articles 13 et 14 du RGPD).",
     sections: [
       {
         num: "01",
-        title: "Données que nous collectons",
-        meta: "COLLECTE",
+        title: "Responsable du traitement",
+        meta: "QUI",
         blocks: [
-          { kind: "subhead", text: "Données utilisateur" },
           {
-            kind: "bullets",
-            items: [
-              "**ID utilisateur** : Utilisés pour gérer les temps de recharge, les fonctionnalités de modération et pour la fonctionnalité du bot.",
-              "**Contenu des messages** : Traités temporairement pour exécuter des commandes spécifiques et **ne sont pas stockés dans la base de données**.",
-              "**ID des messages** : Stockés temporairement pour les temps de recharge et le suivi des modifications de messages.",
-            ],
+            kind: "p",
+            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle n'a pas désigné de délégué à la protection des données (désignation non obligatoire). Les moyens de la joindre figurent à la section Contact.`,
           },
-          { kind: "subhead", text: "Données du serveur" },
           {
-            kind: "bullets",
-            items: [
-              "**ID des canaux** : Stockés pour permettre la liaison et la synchronisation de contenu entre les serveurs.",
-              "**Paramètres du serveur** : Traités pour vérifier les autorisations (par exemple, vérifier si un utilisateur est administrateur).",
-              "**Nom du serveur et utilisation du bot** : Nous enregistrons l'ajout/la suppression du service et le nom du serveur qui invite ou expulse le bot.",
-            ],
+            kind: "p",
+            text: `Le Bot est réservé aux personnes d'au moins ${BOT_MINIMUM_AGE} ans ([Conditions d'Utilisation](${TERMS_HREF})).`,
           },
         ],
       },
       {
         num: "02",
-        title: "Comment nous utilisons vos données",
-        meta: "FINALITÉS",
+        title: "Données traitées et finalités",
+        meta: "COLLECTE",
         blocks: [
-          { kind: "p", text: "Les données collectées par **BlueGenji Bot** sont utilisées aux fins suivantes :" },
+          { kind: "subhead", text: "Annonces relayées" },
+          {
+            kind: "p",
+            text: `Identifiant du message d'origine et de son auteur, date, identifiants des copies relayées et de leurs salons : ils servent à relayer l'annonce, à répercuter sa modification ou sa suppression et à appliquer le temps de recharge entre deux annonces. **Le contenu du message n'est pas enregistré dans la base du Bot** : il est recopié, avec le nom de son auteur, dans les salons des serveurs partenaires, où leurs membres le lisent. Ces copies sont des messages Discord : supprimer l'annonce d'origine dans les ${BOT_RELAY_RETENTION_DAYS} jours supprime aussi ses copies ; passé ce délai, elles restent jusqu'à leur suppression par les administrateurs du serveur qui les porte.`,
+          },
+          { kind: "subhead", text: "Scrims et recrutement" },
+          {
+            kind: "p",
+            text: "Pour les commandes **/scrim** et **/recrute** : identifiant de l'auteur, jeu, niveau ou rôle recherché, serveur et date, qui alimentent les statistiques d'activité (commande **/stats** et tableau de bord du bot).",
+          },
+          { kind: "subhead", text: "Exclusions du relais" },
+          {
+            kind: "p",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les pseudos de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff, et la commande **/ban-list** affiche la liste complète des exclusions (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé et aux titulaires du rôle d'administration du Bot.",
+          },
+          { kind: "subhead", text: "Commande /link, adhésions et rappels programmés" },
           {
             kind: "bullets",
             items: [
-              "Fournir les fonctionnalités principales du Bot, telles que la synchronisation de contenu, la modération et les temps de recharge.",
-              "Garantir un contrôle d'accès et une validation des autorisations appropriés.",
-              "Identifier et corriger les bugs, améliorer les fonctionnalités du Bot et assurer une expérience utilisateur fluide.",
+              `**Commande /link** : identifiant Discord, code à six chiffres valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes et son échéance. Le site ne propose à ce jour aucun endroit où saisir ce code : la commande ne relie donc aucun compte.`,
+              "**Adhésions à l'association** (commandes réservées aux serveurs de l'association) : quand l'adhésion d'un membre est validée, le Bot lui envoie en message privé la confirmation, et l'attestation d'adhésion si elle est jointe, sans la conserver ; il enregistre alors un rappel pour la date de péremption de l'adhésion — ce qui revient à garder, jusqu'à ce rappel, le fait que ce membre adhère à l'association et jusqu'à quand.",
+              "**Rappels programmés** (mêmes commandes) : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi et fréquence.",
             ],
           },
+          { kind: "subhead", text: "Configuration des serveurs" },
           {
             kind: "p",
-            text: "**Le contenu des messages est uniquement utilisé pour remplir la fonctionnalité de la commande spécifique pour laquelle il a été fourni et n'est pas stocké à d'autres fins.**",
+            text: "Identifiants des serveurs, salons et rôles configurés, invitation du serveur, et identifiant de l'administrateur qui a posé l'invitation ou le rôle d'arbitrage.",
+          },
+          { kind: "subhead", text: "Messages du site BlueGenji" },
+          {
+            kind: "p",
+            text: `Le site transmet au Bot un identifiant ou un pseudo Discord et le message à remettre (code de connexion, rappel de match, alerte d'arbitrage, signalement ; avis de modération — signalement vous désignant, logo d'équipe masqué, retiré ou supprimé — ; demande d'adhésion à une équipe que vous gérez ; information sur les données) ; le Bot remet les messages personnels (code, rappel, avis de modération, demande d'adhésion, information) en message privé **sans les enregistrer**. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
+          },
+          { kind: "subhead", text: "Journaux" },
+          {
+            kind: "p",
+            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un pseudo ou un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur.",
+          },
+          { kind: "subhead", text: "Base légale" },
+          {
+            kind: "p",
+            text: "Ces traitements reposent sur l'**intérêt légitime** de l'association (article 6.1.f du RGPD) : faire fonctionner le relais entre serveurs partenaires, le modérer et en mesurer l'activité. Les messages du site reposent sur la base légale de leur traitement d'origine, indiquée dans le registre du site.",
           },
         ],
       },
       {
         num: "03",
-        title: "Conservation des données",
+        title: "Durées de conservation",
         meta: "DURÉES",
         blocks: [
           {
             kind: "bullets",
             items: [
-              "**ID utilisateur** : Stockés aussi longtemps que nécessaire pour les temps de recharge et les fonctionnalités de modération.",
-              "**ID des messages** : Supprimés automatiquement après 72 heures ou au redémarrage du Bot.",
-              "**ID des canaux** : Stockés jusqu'à ce que la synchronisation liée soit supprimée par les administrateurs du serveur.",
-              "**Aucune donnée personnelle n'est conservée de manière permanente, sauf si cela est explicitement nécessaire pour le fonctionnement du Bot.**",
+              `**Suivi des annonces relayées** (identifiants, date) : ${BOT_RELAY_RETENTION_DAYS} jours ; il est effacé lors du premier relais qui suit cette échéance. Rien n'est effacé au redémarrage du Bot. Les copies publiées dans les salons partenaires restent sur Discord (section 02).`,
+              "**Scrims et recrutement** : aucune suppression automatique à ce jour ; ces données sont conservées jusqu'à une demande d'effacement.",
+              "**Exclusions** : jusqu'à la levée de l'exclusion.",
+              `**Commande /link** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
+              "**Configuration des serveurs** : les salons relayés, jusqu'à leur retrait par les administrateurs ou le départ du Bot du serveur ; l'invitation et le rôle d'arbitrage (avec l'identifiant de qui les a posés) et le rôle d'administration du Bot, jusqu'à leur retrait par les administrateurs — ils restent si le Bot quitte le serveur, sans suppression automatique à ce jour.",
+              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression.",
+              "**Salon de journal privé du staff** : aucune suppression automatique à ce jour.",
+              "**Journaux du serveur** : selon leur rotation automatique.",
+              // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
+              // (`rclone delete --min-age`) est refaite **chaque heure** par
+              // `blueGenjiBot/scripts/sync-uploads-onedrive.sh`, et pas seulement
+              // par la sauvegarde du lundi — même promesse que T09 et `/rgpd`.
+              `**Sauvegardes** : la base du Bot est sauvegardée chaque semaine, chiffrée, et chaque copie est supprimée définitivement au bout de ${BACKUP_RETENTION_DAYS} jours au plus.`,
             ],
           },
         ],
       },
       {
         num: "04",
-        title: "Partage des données",
-        meta: "TIERS",
+        title: "Destinataires",
+        meta: "QUI Y ACCÈDE",
         blocks: [
           {
             kind: "bullets",
             items: [
-              "Nous ne partageons pas vos données avec des sociétés tierces, sauf si la loi l'exige ou en réponse à une demande juridique valide.",
+              "Le staff de l'association, pour la modération et l'administration du Bot.",
+              "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
+              "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
+              "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
+              `Tout utilisateur du Bot, par la commande **/stats**, peut voir combien d'annonces un autre utilisateur a publiées (messages relayés, scrims, recherches) ; la réponse n'est visible que de celui qui la demande, et le compteur de messages ne porte que sur ceux dont le suivi est encore conservé (section 03).`,
+              `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
+              "Discord, plateforme sur laquelle le Bot fonctionne.",
+              "Microsoft, qui stocke sur le OneDrive personnel de l'hébergeur technique les sauvegardes, chiffrées avant envoi avec une clé que Microsoft ne détient pas.",
+              "Aucune donnée n'est vendue, ni cédée à d'autres destinataires que ceux listés ici.",
             ],
           },
         ],
       },
       {
         num: "05",
-        title: "Vos droits",
-        meta: "RGPD",
+        title: "Transferts hors de l'Union européenne",
+        meta: "TRANSFERTS",
         blocks: [
-          { kind: "p", text: "Vous disposez des droits suivants concernant vos données :" },
           {
             kind: "bullets",
             items: [
-              "**Accès** : Vous pouvez demander des détails sur les données que **BlueGenji Bot** a collectées à votre sujet.",
-              "**Correction** : Vous pouvez demander la correction de toute donnée inexacte.",
-              "**Suppression** : Vous pouvez demander la suppression de vos données de nos systèmes. Notez que certaines fonctionnalités du Bot peuvent ne plus fonctionner si des données essentielles à son fonctionnement sont supprimées.",
+              `**Discord** (États-Unis) : ${DPF_ADEQUACY_DECISION}.`,
+              `**Microsoft** : transfert possible vers les États-Unis, Microsoft ne garantissant pas le lieu de stockage d'un compte personnel ; il ne reçoit que des données chiffrées — ${DPF_ADEQUACY_DECISION}.`,
             ],
-          },
-          {
-            kind: "p",
-            text: 'Pour exercer ces droits, veuillez nous contacter en utilisant les informations de la section "Contactez-nous".',
           },
         ],
       },
       {
         num: "06",
-        title: "Sécurité des données",
-        meta: "PROTECTION",
+        title: "Vos droits",
+        meta: "RGPD",
         blocks: [
-          { kind: "p", text: "Nous prenons des précautions raisonnables pour protéger vos données, notamment :" },
+          { kind: "p", text: "Vous disposez sur vos données des droits suivants :" },
           {
             kind: "bullets",
             items: [
-              "Nous nous assurons que les données stockées sont sécurisées et accessibles uniquement au personnel autorisé.",
-              "Nous examinons régulièrement nos pratiques de gestion et de stockage des données.",
+              "**Accès** : savoir quelles données le Bot conserve sur vous et en obtenir une copie.",
+              "**Rectification** : faire corriger une donnée inexacte.",
+              "**Effacement** : faire supprimer vos données ; certaines fonctions du Bot peuvent alors ne plus vous être rendues.",
+              "**Limitation** : faire geler l'utilisation d'une donnée le temps d'examiner une contestation.",
+              "**Opposition** : vous opposer, pour des raisons tenant à votre situation particulière, à un traitement fondé sur l'intérêt légitime.",
             ],
           },
           {
             kind: "p",
-            text: "Cependant, aucune méthode de stockage ou de transmission électronique sur Internet n'est 100 % sécurisée, et nous ne pouvons garantir une sécurité absolue.",
+            text: "Le droit à la portabilité ne s'applique pas : ces traitements reposent sur l'intérêt légitime, non sur un consentement ou un contrat. Pour exercer vos droits, utilisez les moyens de la section Contact ; une réponse vous est apportée dans un délai d'un mois.",
+          },
+          {
+            kind: "p",
+            text: `Si vous estimez que vos droits ne sont pas respectés, vous pouvez adresser une réclamation à la [CNIL](${CNIL_COMPLAINT_URL}).`,
           },
         ],
       },
       {
         num: "07",
-        title: "Modifications de cette Politique de Confidentialité",
-        meta: "ÉVOLUTIONS",
+        title: "Sécurité",
+        meta: "PROTECTION",
         blocks: [
           {
+            kind: "bullets",
+            items: [
+              "La base du Bot vit sur la machine de l'hébergeur technique, dont l'accès est réservé au responsable technique (authentification par clé SSH).",
+              "Les échanges entre le site et le Bot restent sur cette machine et sont protégés par un jeton.",
+              "Les sauvegardes sont chiffrées sur cette machine avant tout envoi.",
+            ],
+          },
+          {
             kind: "p",
-            text: `Nous pouvons mettre à jour cette Politique de Confidentialité de temps à autre. Toute modification sera publiée [sur notre serveur Discord](${DISCORD_INVITE}) et entrera en vigueur immédiatement après sa publication. Votre utilisation continue de **BlueGenji Bot** après toute modification constitue votre acceptation de la Politique de Confidentialité mise à jour.`,
+            text: "Aucune mesure ne rend un système infaillible : en cas de violation de données présentant un risque pour vous, l'association est tenue de la notifier à la CNIL et, si le risque est élevé, aux personnes concernées (articles 33 et 34 du RGPD).",
           },
         ],
       },
       {
         num: "08",
-        title: "Contactez-nous",
+        title: "Modifications de cette politique",
+        meta: "ÉVOLUTIONS",
+        blocks: [
+          {
+            kind: "p",
+            text: `Cette politique peut évoluer avec le Bot. La version en vigueur est celle publiée sur cette page, avec sa date de mise à jour ; les changements importants sont annoncés sur le [serveur Discord de l'association](${DISCORD_INVITE}).`,
+          },
+        ],
+      },
+      {
+        num: "09",
+        title: "Contact",
         meta: "CONTACT",
         blocks: [
           {
             kind: "p",
-            text: "Si vous avez des questions ou des préoccupations concernant cette Politique de Confidentialité ou la manière dont nous traitons vos données, veuillez nous contacter à :",
+            text: "Pour toute question sur vos données ou pour exercer vos droits :",
           },
-          {
-            kind: "bullets",
-            items: [`**Discord** : ${CONTACT_DISCORD}`, FORM_FR],
-          },
-          {
-            kind: "p",
-            text: "En utilisant **BlueGenji Bot**, vous acceptez les termes énoncés dans cette Politique de Confidentialité.",
-          },
+          { kind: "bullets", items: CONTACT_ITEMS_FR },
         ],
       },
     ],
-    hosting: {
-      meta: "HÉBERGEUR",
-      title: "Hébergement",
-      text: "Le bot et le site sont hébergés par le même prestataire. Les coordonnées complètes de l'hébergeur sont détaillées dans les mentions légales du site.",
-      linkLabel: "Voir la section Hébergement des mentions légales →",
-    },
+    hosting: HOSTING_FR,
   },
   en: {
     eyebrow: "BLUEGENJI BOT · PRIVACY",
     title: "Privacy\nPolicy",
     lastUpdatedLabel: "Last updated",
-    lastUpdated: "8 January 2025",
+    lastUpdated: LAST_UPDATED_EN,
     intro:
-      "Your privacy is important to us. This Privacy Policy explains how **BlueGenji Bot** collects, uses, and protects your information when you use the Bot's services.",
+      "This policy informs you of the data processed by the Discord bot **BlueGenji Bot**, why it is processed, how long it is kept, who receives it and what your rights are (Articles 13 and 14 GDPR).",
     sections: [
       {
         num: "01",
-        title: "Data We Collect",
-        meta: "COLLECTION",
+        title: "Data controller",
+        meta: "WHO",
         blocks: [
-          { kind: "subhead", text: "User Data" },
           {
-            kind: "bullets",
-            items: [
-              "**User IDs**: Used to manage cooldowns, moderation features, and for bot functionality.",
-              "**Message Content**: Processed temporarily to fulfill specific commands and **is not stored in the database**.",
-              "**Message IDs**: Stored temporarily for cooldowns and message edit tracking.",
-            ],
+            kind: "p",
+            text: `The data controller is the association **${ASSOCIATION_NAME}**, a French non-profit association under the law of 1901 whose registered office is at ${ASSOCIATION_SEAT}. It has not appointed a data protection officer (appointment not mandatory). The means of contacting it are listed in the Contact section.`,
           },
-          { kind: "subhead", text: "Server Data" },
           {
-            kind: "bullets",
-            items: [
-              "**Channel IDs**: Stored to enable linking and synchronization of content across servers.",
-              "**Server Settings**: Processed to verify permissions (e.g., checking if a user is an administrator).",
-              "**Server Name and bot utilization**: We are logging the add/deletion of service and the server name of the server which invite the bot or kick it.",
-            ],
+            kind: "p",
+            text: `The Bot is intended for people aged ${BOT_MINIMUM_AGE} or over ([Terms of Service](${TERMS_HREF})).`,
           },
         ],
       },
       {
         num: "02",
-        title: "How We Use Your Data",
-        meta: "PURPOSES",
+        title: "Data processed and purposes",
+        meta: "COLLECTION",
         blocks: [
-          { kind: "p", text: "The data collected by **BlueGenji Bot** is used for the following purposes:" },
+          { kind: "subhead", text: "Relayed advertisements" },
+          {
+            kind: "p",
+            text: `ID of the original message and of its author, date, IDs of the relayed copies and of their channels: they are used to relay the advertisement, to pass on its edits or deletion, and to apply the cooldown between two advertisements. **Message content is not stored in the Bot's database**: it is copied, with its author's name, into the channels of partner servers, where their members read it. These copies are Discord messages: deleting the original advertisement within ${BOT_RELAY_RETENTION_DAYS} days also deletes its copies; after that, they remain until the administrators of the server holding them delete them.`,
+          },
+          { kind: "subhead", text: "Scrims and recruitment" },
+          {
+            kind: "p",
+            text: "For the **/scrim** and **/recrute** commands: author ID, game, level or role sought, server and date, which feed the activity statistics (**/stats** command and the bot's dashboard).",
+          },
+          { kind: "subhead", text: "Relay exclusions" },
+          {
+            kind: "p",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The usernames of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel, and the **/ban-list** command shows the full list of exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed and to the holders of the Bot administration role.",
+          },
+          { kind: "subhead", text: "/link command, memberships and scheduled reminders" },
           {
             kind: "bullets",
             items: [
-              "To provide the core functionalities of the Bot, such as content synchronization, moderation, and cooldowns.",
-              "To ensure proper access control and permission validation.",
-              "To identify and fix bugs, improve the Bot's features, and ensure a smooth user experience.",
+              `**/link command**: Discord ID, six-digit code valid for ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes and its expiry. The website currently offers nowhere to enter this code: the command therefore links no account.`,
+              "**Association memberships** (commands restricted to the association's servers): when a member's membership is validated, the Bot sends them the confirmation by direct message, with the membership certificate if one is attached, without keeping it; it then records a reminder for the membership's expiry date — which means keeping, until that reminder, the fact that this member belongs to the association and until when.",
+              "**Scheduled reminders** (same commands): ID of the targeted member or role and of the author, message, next sending date and frequency.",
             ],
           },
+          { kind: "subhead", text: "Server configuration" },
           {
             kind: "p",
-            text: "**Message content is only used to fulfill the functionality of the specific command it was provided for and is not stored for any other purpose.**",
+            text: "IDs of the configured servers, channels and roles, the server's invite, and the ID of the administrator who set the invite or the referee role.",
+          },
+          { kind: "subhead", text: "Messages from the BlueGenji website" },
+          {
+            kind: "p",
+            text: `The website sends the Bot a Discord ID or username and the message to deliver (login code, match reminder, referee alert, report; moderation notice — a report naming you, a team logo masked, removed or deleted —; join request for a team you manage; data-protection notice); the Bot delivers personal messages (code, reminder, moderation notice, join request, data-protection notice) by direct message **without storing them**. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}) (in French).`,
+          },
+          { kind: "subhead", text: "Logs" },
+          {
+            kind: "p",
+            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord username or ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username.",
+          },
+          { kind: "subhead", text: "Legal basis" },
+          {
+            kind: "p",
+            text: "This processing is based on the association's **legitimate interest** (Article 6(1)(f) GDPR): running the relay between partner servers, moderating it and measuring its activity. Messages from the website rely on the legal basis of their original processing, set out in the website's register.",
           },
         ],
       },
       {
         num: "03",
-        title: "Data Retention",
+        title: "Retention periods",
         meta: "RETENTION",
         blocks: [
           {
             kind: "bullets",
             items: [
-              "**User IDs**: Stored as long as necessary for cooldown and moderation purposes.",
-              "**Message IDs**: Automatically deleted after 72 hours or when the Bot restarts.",
-              "**Channel IDs**: Stored until the linked synchronization is removed by the server administrators.",
-              "**No personal data is permanently retained unless explicitly required for the Bot's functionality.**",
+              `**Tracking of relayed advertisements** (IDs, date): ${BOT_RELAY_RETENTION_DAYS} days; it is erased at the first relay after that deadline. Nothing is erased when the Bot restarts. The copies posted in partner channels remain on Discord (section 02).`,
+              "**Scrims and recruitment**: no automatic deletion at present; this data is kept until an erasure request.",
+              "**Exclusions**: until the exclusion is lifted.",
+              `**/link command**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
+              "**Server configuration**: relayed channels, until the administrators remove them or the Bot leaves the server; the invite and the referee role (with the ID of whoever set them) and the Bot administration role, until the administrators remove them — they remain if the Bot leaves the server, with no automatic deletion at present.",
+              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion.",
+              "**Staff private log channel**: no automatic deletion at present.",
+              "**Server logs**: according to their automatic rotation.",
+              `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,
             ],
           },
         ],
       },
       {
         num: "04",
-        title: "Data Sharing",
-        meta: "THIRD PARTIES",
+        title: "Recipients",
+        meta: "WHO HAS ACCESS",
         blocks: [
           {
             kind: "bullets",
             items: [
-              "We do not share your data with third-party companies except as required by law or in response to a valid legal request.",
+              "The association's staff, for moderating and administering the Bot.",
+              "Members of partner servers, who read the relayed advertisements.",
+              "Members of the referee role of every server that has set one, for the website's referee alerts.",
+              "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
+              `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages whose tracking is still kept (section 03).`,
+              `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
+              "Discord, the platform the Bot runs on.",
+              "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold.",
+              "No data is sold, or handed over to any recipient other than those listed here.",
             ],
           },
         ],
       },
       {
         num: "05",
-        title: "Your Rights",
-        meta: "GDPR",
+        title: "Transfers outside the European Union",
+        meta: "TRANSFERS",
         blocks: [
-          { kind: "p", text: "You have the following rights regarding your data:" },
           {
             kind: "bullets",
             items: [
-              "**Access**: You can request details of the data **BlueGenji Bot** has collected about you.",
-              "**Correction**: You can request corrections to any inaccurate data.",
-              "**Deletion**: You can request that your data be deleted from our systems. Note that some functionality of the Bot may no longer work if data essential for its operation is removed.",
+              `**Discord** (United States): ${DPF_ADEQUACY_DECISION_EN}.`,
+              `**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; it only receives encrypted data — ${DPF_ADEQUACY_DECISION_EN}.`,
             ],
-          },
-          {
-            kind: "p",
-            text: 'To exercise these rights, please contact us using the information in the "Contact Us" section.',
           },
         ],
       },
       {
         num: "06",
-        title: "Data Security",
-        meta: "PROTECTION",
+        title: "Your rights",
+        meta: "GDPR",
         blocks: [
-          { kind: "p", text: "We take reasonable precautions to protect your data, including:" },
+          { kind: "p", text: "You have the following rights over your data:" },
           {
             kind: "bullets",
             items: [
-              "Ensuring that stored data is secured and accessible only to authorized personnel.",
-              "Regularly reviewing our data handling and storage practices.",
+              "**Access**: find out what data the Bot keeps about you and obtain a copy.",
+              "**Rectification**: have inaccurate data corrected.",
+              "**Erasure**: have your data deleted; some Bot features may then no longer be available to you.",
+              "**Restriction**: have the use of data frozen while a dispute is examined.",
+              "**Objection**: object, on grounds relating to your particular situation, to processing based on legitimate interest.",
             ],
           },
           {
             kind: "p",
-            text: "However, no method of electronic storage or transmission over the Internet is 100% secure, and we cannot guarantee absolute security.",
+            text: "The right to data portability does not apply: this processing is based on legitimate interest, not on consent or a contract. To exercise your rights, use the means listed in the Contact section; you will receive a reply within one month.",
+          },
+          {
+            kind: "p",
+            text: `If you consider that your rights are not respected, you may lodge a complaint with the [CNIL](${CNIL_COMPLAINT_URL}), the French data protection authority.`,
           },
         ],
       },
       {
         num: "07",
-        title: "Changes to This Privacy Policy",
-        meta: "UPDATES",
+        title: "Security",
+        meta: "PROTECTION",
         blocks: [
           {
+            kind: "bullets",
+            items: [
+              "The Bot's database lives on the technical host's machine, access to which is restricted to the technical manager (SSH key authentication).",
+              "Exchanges between the website and the Bot stay on that machine and are protected by a token.",
+              "Backups are encrypted on that machine before any upload.",
+            ],
+          },
+          {
             kind: "p",
-            text: `We may update this Privacy Policy from time to time. Any changes will be posted [on our Discord server](${DISCORD_INVITE}) and take effect immediately upon posting. Your continued use of **BlueGenji Bot** after any changes constitutes your acceptance of the updated Privacy Policy.`,
+            text: "No measure makes a system infallible: in the event of a data breach likely to put you at risk, the association is required to notify the CNIL and, if the risk is high, the people concerned (Articles 33 and 34 GDPR).",
           },
         ],
       },
       {
         num: "08",
-        title: "Contact Us",
+        title: "Changes to this policy",
+        meta: "UPDATES",
+        blocks: [
+          {
+            kind: "p",
+            text: `This policy may change along with the Bot. The version in force is the one published on this page, with its update date; significant changes are announced on the [association's Discord server](${DISCORD_INVITE}).`,
+          },
+        ],
+      },
+      {
+        num: "09",
+        title: "Contact",
         meta: "CONTACT",
         blocks: [
           {
             kind: "p",
-            text: "If you have any questions or concerns about this Privacy Policy or how we handle your data, please contact us at:",
+            text: "For any question about your data or to exercise your rights:",
           },
-          {
-            kind: "bullets",
-            items: [`**Discord**: ${CONTACT_DISCORD}`, FORM_EN],
-          },
-          {
-            kind: "p",
-            text: "By using **BlueGenji Bot**, you agree to the terms outlined in this Privacy Policy.",
-          },
+          { kind: "bullets", items: CONTACT_ITEMS_EN },
         ],
       },
     ],
-    hosting: {
-      meta: "HOSTING PROVIDER",
-      title: "Hosting",
-      text: "The bot and the website are hosted by the same provider. The full hosting-provider details are set out in the website's legal notice.",
-      linkLabel: "See the Hosting section of the legal notice →",
-    },
+    hosting: HOSTING_EN,
   },
 };
