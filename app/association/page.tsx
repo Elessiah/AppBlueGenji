@@ -181,8 +181,8 @@ export default async function AssociationPage() {
                   que de promettre qu'un compte fait un adhérent. */}
               <p className={styles.adhererBody}>
                 {user
-                  ? "Ton compte joueur te permet déjà de t'inscrire aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau, joignable sur le serveur Discord de l'association ; il statue sur la demande."
-                  : "Un compte joueur, gratuit, suffit pour participer aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau, joignable sur le serveur Discord de l'association ; il statue sur la demande."}
+                  ? "Ton compte joueur te permet déjà de t'inscrire aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande."
+                  : "Un compte joueur, gratuit, suffit pour participer aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande."}
               </p>
             </div>
             <div className={styles.adhererSide}>
