@@ -142,6 +142,22 @@ export default async function RgpdPage() {
             en est informé une fois à sa prochaine visite, et peut changer son pseudo et
             sa photo, ou masquer celle-ci, dans Mon profil.
           </p>
+          <p>
+            <strong>Données obligatoires et facultatives.</strong> Un compte n&apos;a besoin,
+            pour exister, que d&apos;un moyen de connexion — l&apos;identifiant Google, Discord
+            ou Blizzard du fournisseur choisi — et d&apos;un pseudo site, attribué d&apos;office à
+            la création. Sans moyen de connexion, aucun compte ne peut être créé : les pages
+            publiques restent lisibles, mais on ne peut ni rejoindre une équipe ni
+            s&apos;inscrire à un tournoi. Le fournisseur transmet en outre ce que le tableau
+            décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
+            BattleTag par Blizzard (tenu à jour à chaque connexion tant que le compte
+            Battle.net est rattaché), la photo par Google ou Discord (copiée, et masquée
+            tant que tu ne l&apos;affiches pas). Ce que tu renseignes toi-même (pseudos de jeu
+            saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
+            et le compte fonctionne sans, à deux limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
+            compte Battle.net rattaché, et un membre du staff de diffusion ne peut
+            s&apos;inscrire comme caster d&apos;un match sans les deux.
+          </p>
         </div>
         {/* Sous 640 px, chaque ligne devient une fiche : les cellules s'empilent
             et portent leur intitulé (`DataCell`), rien n'est masqué et la page
@@ -196,9 +212,12 @@ export default async function RgpdPage() {
         </p>
         <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-dim)", fontFamily: "var(--font-mono)", letterSpacing: "0.03em" }}>
           ** Une donnée supprimée subsiste jusqu'à {BACKUP_RETENTION_DAYS} jours dans les copies
-          de sauvegarde chiffrées, qu'on ne peut pas modifier une à une ; si l'une d'elles devait
-          être restaurée, les suppressions intervenues depuis sont réappliquées avant la remise en
-          service. Les images téléversées (avatar, logo) sont retirées de la sauvegarde dans
+          de sauvegarde chiffrées, qu'on ne peut pas modifier une à une. Si l'une d'elles devait
+          être restaurée, les <strong>suppressions de compte</strong> intervenues depuis sont
+          réappliquées avant la remise en service ; les autres effacements postérieurs à
+          l'archive (un tag ou un BattleTag retiré, un moyen de connexion détaché, un réglage de
+          visibilité ou de notification modifié, un signalement purgé…) ne le sont pas, et
+          reviendraient avec elle. Les images téléversées (avatar, logo) sont retirées de la sauvegarde dans
           l'heure.
         </p>
       </section>
@@ -210,7 +229,7 @@ export default async function RgpdPage() {
             <span className="eyebrow">SECTION 03</span>
             <h2 className={styles.sectionTitle}>Historique de tournois & palmarès</h2>
           </div>
-          <span className={styles.meta}>CONFORMITÉ RGPD</span>
+          <span className={styles.meta}>INTÉRÊT LÉGITIME</span>
         </header>
         <div className={styles.prose}>
           <p>
@@ -237,22 +256,33 @@ export default async function RgpdPage() {
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>
-            Cette approche est conforme au RGPD sous trois conditions que nous respectons :
+            <strong>Pourquoi l&apos;intérêt légitime.</strong> L&apos;intérêt
+            poursuivi est de garder exacts les résultats, classements et palmarès, qui appartiennent
+            aussi aux équipes et aux joueurs qui les ont disputés : effacer les matchs d&apos;un
+            joueur réécrirait le bilan de ses coéquipiers et de ses adversaires. Ce qu&apos;il faut en
+            savoir :
           </p>
           <ul>
             <li>
-              <strong>Pseudonymisation :</strong> aucune donnée d'identité réelle n'est
-              attachée aux résultats (les pseudos de jeu ne constituent pas une identité
-              directement identifiable au sens strict).
+              <strong>Pseudonymisation, pas anonymisation :</strong> un pseudo, un BattleTag ou un
+              tag Discord sont des données personnelles (des identifiants en ligne). Le pseudo
+              d&apos;emprunt remplace le vôtre, mais le palmarès conservé reste rattaché à des
+              rosters et à un historique d&apos;équipe par lesquels on peut, parfois, encore vous
+              reconnaître.
+            </li>
+            <li>
+              <strong>Durée :</strong> aucune durée ni aucun critère de fin n&apos;est encore fixé
+              pour ces résultats, conservés à ce jour sans limite de temps.
             </li>
             <li>
               <strong>Information préalable :</strong> la présente politique informe les
               utilisateurs avant toute inscription.
             </li>
             <li>
-              <strong>Droit d'opposition :</strong> vous pouvez vous opposer à cette
-              conservation en nous contactant — nous examinerons chaque demande au cas
-              par cas conformément à l'article 21 du RGPD.
+              <strong>Droit d&apos;opposition :</strong> vous pouvez vous opposer à cette
+              conservation en nous contactant. Chaque demande est examinée au regard de
+              l&apos;article 21 du RGPD : la conservation cesse, sauf motifs légitimes et
+              impérieux qui prévaudraient sur vos intérêts, droits et libertés.
             </li>
           </ul>
         </div>
@@ -265,7 +295,7 @@ export default async function RgpdPage() {
             <span className="eyebrow">SECTION 04</span>
             <h2 className={styles.sectionTitle}>Vos droits</h2>
           </div>
-          <span className={styles.meta}>RGPD ART. 15–22</span>
+          <span className={styles.meta}>RGPD ART. 7.3, 15–21 · LOI I&amp;L ART. 85</span>
         </header>
         <ul className={styles.rightsList}>
           {DROITS.map((droit, i) => (
@@ -672,7 +702,7 @@ export default async function RgpdPage() {
             </li>
             <li>
               <strong>Microsoft</strong> (OneDrive) : les sauvegardes, <strong>chiffrées avant
-              envoi</strong> avec une clé que seule l&apos;association détient — Microsoft les
+              envoi</strong> avec une clé que Microsoft ne détient pas — Microsoft les
               stocke sans pouvoir les lire.
             </li>
           </ul>
@@ -685,11 +715,12 @@ export default async function RgpdPage() {
             <strong>Sauvegardes.</strong> Elles sont déposées sur le OneDrive d&apos;un{" "}
             {ONEDRIVE_BACKUP_FRAMEWORK} : le site n&apos;affirme donc aucun lieu de stockage, et un
             transfert vers les États-Unis repose sur le mécanisme de Microsoft Corporation (
-            {transferBasis(["MICROSOFT"])}). La garantie que tient
-            l&apos;association est ailleurs : archives de la base, images, logos masqués et journal
+            {transferBasis(["MICROSOFT"])}). Le chiffrement est une
+            mesure de sécurité, qui ne tient lieu ni de contrat ni de mécanisme de transfert :
+            archives de la base, images, logos masqués et journal
             des suppressions sont <strong>chiffrés sur le Raspberry Pi avant tout envoi</strong>,
-            avec une clé que seule l&apos;association détient et qui n&apos;est jamais transmise à
-            Microsoft. Le chiffrement au repos de ses serveurs par Microsoft et le chiffrement en
+            avec une clé que détient le seul responsable technique de l&apos;association — qui est
+            aussi l&apos;hébergeur du site — et qui n&apos;est jamais transmise à Microsoft. Le chiffrement au repos de ses serveurs par Microsoft et le chiffrement en
             transit (HTTPS/TLS) s&apos;y ajoutent comme mesures complémentaires.
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
@@ -765,8 +796,8 @@ export default async function RgpdPage() {
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>
-            En cas de réponse insatisfaisante, vous disposez du droit d'introduire
-            une réclamation auprès de la <strong>CNIL</strong> (Commission Nationale
+            Vous pouvez à tout moment, sans démarche préalable auprès de nous,
+            introduire une réclamation auprès de la <strong>CNIL</strong> (Commission Nationale
             de l'Informatique et des Libertés) sur{" "}
             <a
               href="https://www.cnil.fr"

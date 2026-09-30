@@ -112,9 +112,10 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
  * relève du Contrat de services Microsoft et de sa déclaration de
  * confidentialité, sans contrat de sous-traitance (le DPA de Microsoft ne vaut
  * que pour ses offres professionnelles), et Microsoft n'y garantit aucun lieu de
- * stockage — d'où aucune localisation affirmée. La garantie que tient
- * l'association est le chiffrement avant envoi, sur sa propre machine ; le
- * chiffrement au repos de Microsoft et le TLS en transit ne font que s'y ajouter.
+ * stockage — d'où aucune localisation affirmée. Le chiffrement avant envoi, sur
+ * le serveur du site, est une mesure de sécurité (art. 32) : il ne tient lieu ni
+ * de contrat de sous-traitance (art. 28) ni de mécanisme de transfert (art. 44
+ * et s.). Le chiffrement au repos de Microsoft et le TLS en transit s'y ajoutent.
  */
 export const ONEDRIVE_BACKUP_FRAMEWORK =
   "compte Microsoft personnel, régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft";
@@ -434,14 +435,14 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Journal des suppressions : ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours par entrée`,
     ],
     recipients: [
-      "Responsable technique de l'association, seul détenteur des clés de déchiffrement",
+      "Responsable technique de l'association, qui est aussi l'hébergeur du site, seul détenteur des clés de déchiffrement",
       `Microsoft (OneDrive de l'hébergeur du site — ${ONEDRIVE_BACKUP_FRAMEWORK}), qui stocke les copies chiffrées sans pouvoir les lire`,
     ],
     transfers: [
-      `Possibles vers les États-Unis (lieu de stockage non garanti par Microsoft) : Microsoft, qui ne reçoit que des données chiffrées avant envoi avec une clé que seule l'association détient — ${transferBasis(["MICROSOFT"])}`,
+      `Possibles vers les États-Unis (lieu de stockage non garanti par Microsoft) : Microsoft, qui ne reçoit que des données chiffrées avant envoi avec une clé que Microsoft ne détient pas — ${transferBasis(["MICROSOFT"])}`,
     ],
     security: [
-      "Chiffrement sur le serveur de l'association avant tout envoi (age pour les archives, rclone crypt pour les images, les logos masqués et le journal) : aucune clé n'est transmise à Microsoft",
+      "Chiffrement sur le serveur du site avant tout envoi (age pour les archives, rclone crypt pour les images, les logos masqués et le journal) : aucune clé n'est transmise à Microsoft",
       "Mesures complémentaires de Microsoft : chiffrement au repos de ses serveurs, envoi chiffré en transit (HTTPS/TLS)",
       "Suppression définitive, sans corbeille ni historique de versions",
       "Clé privée des archives conservée hors du serveur ; clé des images et du journal sur le seul serveur, avec une copie de secours hors du serveur",

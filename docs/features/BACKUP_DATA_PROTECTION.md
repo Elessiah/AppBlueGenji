@@ -95,8 +95,11 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
 - **Base légale** : intérêt légitime (continuité du service).
 - **Données** : l'ensemble des données de la plateforme (profils pseudonymes,
   identifiants de connexion, résultats de tournois, avatars et logos).
-- **Destinataires** : le responsable technique de l'association, seul détenteur
-  des clés de déchiffrement.
+- **Destinataires** : le responsable technique de l'association — qui est aussi
+  l'hébergeur du site, donc son sous-traitant —, seul détenteur des clés de
+  déchiffrement. `/rgpd` le dit ainsi plutôt que « une clé que seule
+  l'association détient », formule qui masquait que le détenteur est aussi
+  l'hébergeur.
 - **Hébergement** : Microsoft (OneDrive, compte **personnel**). Le cadre est
   celui d'un particulier : Contrat de services Microsoft et déclaration de
   confidentialité de Microsoft, **aucun contrat de sous-traitance** (le DPA de
@@ -105,7 +108,7 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   Irlande, ni Pays-Bas), et un transfert éventuel vers les États-Unis repose sur
   la certification EU-U.S. Data Privacy Framework de Microsoft Corporation
   (décision d'adéquation (UE) 2023/1795).
-- **Garantie** : les données sont **chiffrées sur le Raspberry Pi avant tout
+- **Sécurité** : les données sont **chiffrées sur le Raspberry Pi avant tout
   envoi** — `age` pour les archives (clé publique sur le serveur, clé privée
   hors du serveur), `rclone crypt` pour les images, les logos masqués et le
   journal (mot de passe dans la configuration rclone du serveur, copie de
@@ -113,11 +116,19 @@ Le registre est désormais **publié par le site** (`/rgpd/registre`, fiche
   pouvoir lire. Le script des images **refuse** un remote qui n'est pas de type
   `crypt`, sans exception : aucun réglage ne permet d'envoyer en clair.
   Le chiffrement au repos de Microsoft et le transport HTTPS/TLS de l'API
-  OneDrive ne sont que des **mesures complémentaires**.
+  OneDrive ne sont que des **mesures complémentaires**. Le chiffrement est une
+  mesure de sécurité (art. 32), au mieux une mesure supplémentaire à un outil de
+  transfert (recommandations CEPD 01/2020) : il ne tient lieu **ni** de contrat
+  de sous-traitance (art. 28) **ni** de mécanisme de transfert (art. 44 et s.).
+  Décision requise : stockage sous contrat de sous-traitance (dans l'UE de
+  préférence) et contrat avec l'hébergeur — voir `ERREUR.txt`.
 - **Durée** : archives 30 jours ; images le temps de leur présence sur le site ;
   journal des suppressions 60 jours par entrée.
 - **Mesures** : chiffrement, suppression définitive (sans corbeille), clé privée
-  conservée hors du serveur, rejeu des suppressions à toute restauration.
+  conservée hors du serveur, rejeu des **suppressions de compte** à toute
+  restauration. Le journal ne porte que celles-là : tout autre effacement
+  postérieur à l'archive (tag ou BattleTag retiré, moyen de connexion détaché,
+  réglage modifié, signalement purgé…) reviendrait avec elle, et `/rgpd` le dit.
 
 ## Ce que dit `/rgpd`
 
