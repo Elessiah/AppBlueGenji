@@ -283,10 +283,13 @@ tient peut-être pas.
 
    `rotate` ne doit **pas** dépasser 13 (et la fréquence rester `daily`) : une
    valeur plus haute dépasserait la durée annoncée, `weekly` garderait des mois
-   de journaux. Si le site
-   écrit ses journaux ailleurs que dans `/var/log/nginx/` (directive
-   `access_log` propre à son bloc `server`), ce chemin doit être couvert par la
-   même règle.
+   de journaux. **La configuration nginx est partagée avec un autre site** :
+   la règle `/var/log/nginx/*.log` ci-dessus vaut pour les journaux des deux.
+   Pour ne régler que BlueGenji, lui donner ses propres fichiers (directives
+   `access_log /var/log/nginx/bluegenji.access.log;` et `error_log` dans son
+   bloc `server`), puis limiter la règle à `/var/log/nginx/bluegenji.*.log`
+   et retirer ces fichiers du motif général — sinon, la durée de l'autre site
+   est réduite aussi, ce qui se décide avec lui.
 2. Ne rien ajouter au format : pas de `$remote_port`, pas de corps de requête,
    pas de cookie. Le site ne garde pas le port source (décision de
    l'association, journal `bg_connection_logs` compris), et le journal n'a pas
