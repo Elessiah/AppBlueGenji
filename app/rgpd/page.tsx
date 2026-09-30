@@ -320,7 +320,9 @@ export default async function RgpdPage() {
           copies de sauvegarde chiffrées (**), qui s&apos;effacent d&apos;elles-mêmes au bout de{" "}
           {BACKUP_RETENTION_DAYS} jours, et de la mention de la suppression au journal qui la rejoue
           après une restauration (numéro et date de création du compte,{" "}
-          {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours). Le serveur web
+          {ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours), et des signalements que vous avez
+          envoyés, détachés de votre compte mais gardés jusqu&apos;à leur propre échéance (section{" "}
+          <a href="#signalements">« Signalements »</a>). Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête (adresse IP, date, page demandée, navigateur), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
           T17</Link>).
@@ -917,7 +919,7 @@ export default async function RgpdPage() {
           </ul>
           <p>
             <strong>Encadrement des transferts.</strong> Parmi ces services, ceux qui peuvent
-            traiter ou héberger des données aux États-Unis — pas l&apos;opérateur téléphonique —
+            traiter ou héberger des données aux États-Unis — pas les opérateurs téléphoniques —
             le font sur le fondement suivant :{" "}
             {transferBasis(ALL_TRANSFER_RECIPIENTS)}. L&apos;encadrement des transferts de
             Spiceworks, de Twitch et de Kick est en cours de vérification (registre, <Link href="/rgpd/registre#t15">T15</Link> et{" "}

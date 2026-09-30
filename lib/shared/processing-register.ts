@@ -186,10 +186,10 @@ export const HOST_PROCESSING_AGREEMENT =
 export const SUPPORT_TICKET_RETENTION_MONTHS = 1;
 
 /**
- * Journaux d'accès du serveur web (nginx) : 14 jours, la rotation par défaut
- * de logrotate sous Debian (quotidienne, 14 fichiers). La configuration du
- * serveur n'est pas versionnée ici : `docs/DEPLOYMENT.md` dit le réglage à
- * poser en production.
+ * Journaux d'accès du serveur web (nginx) : 14 jours. Le défaut de logrotate
+ * sous Debian (`rotate 14`) en garde jusqu'à quinze — le journal courant plus
+ * quatorze archives —, d'où `rotate 13`. La configuration du serveur n'est pas
+ * versionnée ici : `docs/DEPLOYMENT.md` dit le réglage à poser en production.
  */
 export const WEB_ACCESS_LOG_RETENTION_DAYS = 14;
 
@@ -286,7 +286,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seules les statistiques de tournoi anonymisées restent ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours)`,
+      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seules les statistiques de tournoi anonymisées restent ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours) ; les signalements envoyés par le compte en sont détachés et suivent leur propre durée (T11)`,
       `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
     recipients: [
