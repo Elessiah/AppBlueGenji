@@ -56,7 +56,9 @@ invoquée avec son lien, puis les recours : **réexamen par l'association**, pui
   cookie `httpOnly` de dix minutes (`bg_suspension_notice`, chemin
   `/connexion`). **Jamais dans l'URL** : l'exposé porte un motif, que
   l'historique et les journaux des relais n'ont pas à garder. La page le rend
-  dans `SuspensionNoticeDialog`.
+  dans `SuspensionNoticeDialog`, et le middleware efface le cookie dans la
+  réponse de cette même page : **lu une fois**, il ne rouvre pas la décision à
+  qui rouvrirait le lien depuis l'historique d'un ordinateur partagé.
 - Le journal du staff sur Discord ne porte ni le pseudo du joueur ni le motif ;
   l'auteur est nommé dans pm2 (`publishStaffAction`).
 

@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER, contentSecurityPolicy } from "@/lib/shared/csp";
 import { apiWriteNeedsProvenance } from "@/lib/shared/request-origin";
+import { SUSPENSION_NOTICE_COOKIE } from "@/lib/shared/account-suspension";
 
 /** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
 export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
@@ -54,6 +55,14 @@ export function middleware(request: NextRequest) {
   // — un compte connecté ne repasse jamais par `/connexion`.
   if (request.cookies.has(LEGACY_GOOGLE_ONE_TAP_COOKIE)) {
     response.cookies.delete(LEGACY_GOOGLE_ONE_TAP_COOKIE);
+  }
+  // L'exposé d'une suspension (`lib/server/oauth-flow.ts`) se lit **une fois** :
+  // la page le relit dans la requête, que ce retrait ne touche pas, et la
+  // réponse l'efface. Gardé ses dix minutes, il rouvrait la décision — motif
+  // compris — à quiconque rouvrait le lien depuis l'historique d'un ordinateur
+  // partagé, ou annonçait encore suspendu un compte levé entre-temps.
+  if (request.nextUrl.pathname === "/connexion" && request.cookies.has(SUSPENSION_NOTICE_COOKIE)) {
+    response.cookies.set(SUSPENSION_NOTICE_COOKIE, "", { path: "/connexion", maxAge: 0 });
   }
   return response;
 }

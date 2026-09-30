@@ -436,7 +436,8 @@ export default async function RgpdPage() {
             <li>
               <strong>bg_suspension_notice</strong> — déposé uniquement <strong>si une connexion
               est refusée parce que votre compte est suspendu</strong>, pour afficher la décision
-              sur la page de connexion. Il dure dix minutes au plus et ne contient que la
+              sur la page de connexion, qui l&apos;efface dès sa première lecture (dix minutes au
+              plus s&apos;il n&apos;est jamais lu). Il ne contient que la
               référence de la décision, les faits retenus, la clause invoquée et l&apos;échéance ;
               il n&apos;est lisible que du serveur (httpOnly).
             </li>
