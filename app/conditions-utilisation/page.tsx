@@ -35,7 +35,9 @@ export default function TermsOfUsePage() {
         <p className={styles.heroLead}>
           Ce que chacun s&apos;engage à respecter en utilisant le site, en y créant une équipe et en y
           publiant un logo ou un avatar. Le traitement des données personnelles est décrit dans la{" "}
-          <Link href="/rgpd">politique de confidentialité</Link>.
+          <Link href="/rgpd">politique de confidentialité</Link>. Les règles des tournois, que ces
+          conditions complètent, sont publiées sur la page{" "}
+          <Link href="/regles">Règles des tournois</Link>.
         </p>
         <p className={styles.version}>
           <span>VERSION {TERMS_VERSION}</span>

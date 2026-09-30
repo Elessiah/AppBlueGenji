@@ -31,17 +31,18 @@ import {
 /**
  * Ce qu'un compte laisse derrière lui.
  *
- * Trois traces, et aucune n'est décorative :
+ * Quatre traces, et aucune n'est décorative :
  *
  * - `playedMatches` — il a **joué** : un match compté (`playedMatchSql`) de son
  *   entrée solo, ou d'une équipe dont il était membre pendant le tournoi (la
  *   fenêtre d'appartenance des statistiques, `stats-service`). C'est la trace
- *   qui porte des statistiques, donc la seule qui justifie un faux nom : un
- *   joueur dont l'équipe a été engagée mais qui n'a jamais disputé une
- *   rencontre n'a rien à préserver. Seule exception, l'**entrée solo
- *   inscrite** à un tournoi, jouée ou non : elle porte le pseudo du joueur comme
- *   nom d'engagé, et l'effacement la laisserait nommer quelqu'un qui n'existe
- *   plus.
+ *   qui porte des statistiques : un joueur dont l'équipe a été engagée mais
+ *   qui n'a jamais disputé une rencontre n'a rien à préserver.
+ * - `soloRegistrations` — son **entrée solo est inscrite** à un tournoi, jouée
+ *   ou non : elle porte le pseudo du joueur comme nom d'engagé, et l'effacement
+ *   la laisserait nommer quelqu'un qui n'existe plus. Trace distincte de la
+ *   précédente parce que sa phrase l'est : une inscription jamais jouée ne
+ *   laisse **aucune** statistique, et la confirmation ne doit pas en promettre.
  * - `organizedTournaments` — il a **créé** un tournoi. `bg_tournaments`
  *   .`organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT` : la base
  *   refuserait l'effacement, et un tournoi sans organisateur n'aurait de toute
@@ -56,6 +57,7 @@ import {
  */
 export type AccountTrace = {
   playedMatches: boolean;
+  soloRegistrations: boolean;
   organizedTournaments: boolean;
   ownedTeams: boolean;
 };
@@ -76,6 +78,7 @@ export type AccountDeletionMode = "ERASE" | "ANONYMIZE";
  */
 export type AccountRetentionReason =
   | "TOURNAMENTS"
+  | "SOLO_REGISTRATIONS"
   | "ORGANIZED_TOURNAMENTS"
   | "OWNED_TEAMS";
 
@@ -94,12 +97,14 @@ export type AccountDeletionPlan = {
  * La trace qui retient la ligne, ou `null` si aucune.
  *
  * L'ordre **est** la règle : une trace de tournoi joué explique la conservation
- * mieux que les deux autres — c'est elle qui appartient aussi à d'autres —,
- * puis l'organisation, puis la propriété d'une équipe, qui est la seule que le
+ * mieux que les autres — c'est elle qui appartient aussi à d'autres —, puis
+ * l'inscription solo (le pseudo nomme un engagé, sans statistique), puis
+ * l'organisation, puis la propriété d'une équipe, qui est la seule que le
  * joueur puisse lever lui-même.
  */
 export function accountRetentionReason(trace: AccountTrace): AccountRetentionReason | null {
   if (trace.playedMatches) return "TOURNAMENTS";
+  if (trace.soloRegistrations) return "SOLO_REGISTRATIONS";
   if (trace.organizedTournaments) return "ORGANIZED_TOURNAMENTS";
   if (trace.ownedTeams) return "OWNED_TEAMS";
   return null;
@@ -169,6 +174,8 @@ export function accountDeletionConfirmation(
   switch (reason) {
     case "TOURNAMENTS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais tes statistiques de tournoi resteront conservées — elles appartiennent aussi aux équipes que tu as affrontées. ${residual} ${irreversible}`;
+    case "SOLO_REGISTRATIONS":
+      return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es inscrit à un tournoi individuel, où ton pseudo sert de nom d'engagé et sera remplacé par ce pseudo d'emprunt. ${residual} ${irreversible}`;
     case "ORGANIZED_TOURNAMENTS":
       return `Supprimer définitivement ton compte ? Tes informations personnelles seront effacées et ton pseudo remplacé par un pseudo d'emprunt, mais ta ligne restera : tu es l'organisateur de tournois qui doivent garder un titulaire. ${residual} ${irreversible}`;
     case "OWNED_TEAMS":
@@ -176,7 +183,7 @@ export function accountDeletionConfirmation(
     case null:
       return `Supprimer définitivement ton compte ? Tu n'as joué aucun match et ne gères ni équipe ni tournoi : ton compte et ton profil seront effacés entièrement. ${residual} ${irreversible}`;
     default:
-      return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${residual} ${irreversible}`;
+      return `Supprimer définitivement ton compte ? Le site n'a pas pu dire ce qu'il en restera : selon ce que tu as laissé (match joué, inscription à un tournoi individuel, équipe possédée, tournoi organisé), il sera rendu anonyme ou effacé entièrement. ${residual} ${irreversible}`;
   }
 }
 
@@ -196,6 +203,8 @@ export function accountDeletionOutcome(
   switch (reason) {
     case "TOURNAMENTS":
       return "Compte supprimé. Tes statistiques restent conservées sous un pseudo d'emprunt.";
+    case "SOLO_REGISTRATIONS":
+      return "Compte supprimé. Tes inscriptions en tournoi individuel portent désormais un pseudo d'emprunt.";
     case "ORGANIZED_TOURNAMENTS":
       return "Compte supprimé. Tes tournois gardent un organisateur anonyme.";
     case "OWNED_TEAMS":

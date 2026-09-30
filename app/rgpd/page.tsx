@@ -135,7 +135,7 @@ export default async function RgpdPage() {
           </p>
           <p>
             Pour toute question relative à vos données personnelles, contactez-nous
-            par les moyens indiqués en section&nbsp;06.
+            par les moyens indiqués en section&nbsp;11.
           </p>
         </div>
       </section>
@@ -156,10 +156,10 @@ export default async function RgpdPage() {
             compte : un signalement de droit d&apos;auteur indique le nom de son auteur, et les
             membres du bureau et les bénévoles présentés sur le site y figurent sous leur nom,
             avec leur accord (registre, T07 et T11).
-            Google transmet le nom de ton compte avec ta photo : depuis le 30 septembre
+            Google transmet le nom de votre compte avec votre photo : depuis le 30 septembre
             2026, il n&apos;est ni repris ni conservé, un compte créé par Google reçoit un
-            pseudo neutre que tu remplaces dans Mon profil, et la photo copiée depuis
-            Google ou Discord reste masquée tant que tu ne choisis pas de l&apos;afficher.
+            pseudo neutre que vous remplacez dans Mon profil, et la photo copiée depuis
+            Google ou Discord reste masquée tant que vous ne choisissez pas de l&apos;afficher.
             Un compte créé par Google avant cette date a pu recevoir le nom de ce compte
             pour pseudo, et sa photo Google a pu être copiée et affichée : rien n&apos;y a
             été changé d&apos;office. Chaque compte relié à Google et créé avant cette date
@@ -176,7 +176,7 @@ export default async function RgpdPage() {
             décrit pour lui, qui vient avec la connexion : le pseudo Discord par Discord, le
             BattleTag par Blizzard (tenu à jour à chaque connexion tant que le compte
             Battle.net est rattaché), la photo par Google ou Discord (copiée, et masquée
-            tant que tu ne l&apos;affiches pas). Ce que tu renseignes toi-même (pseudos de jeu
+            tant que vous ne l&apos;affichez pas). Ce que vous renseignez vous-même (pseudos de jeu
             saisis, certification du tag Discord, avatar téléversé, majorité) est facultatif,
             et le compte fonctionne sans, à deux limites près : un tournoi peut exiger, pour s&apos;y inscrire, un tag Discord certifié ou un
             compte Battle.net rattaché, et un membre du staff de diffusion ne peut
@@ -379,8 +379,8 @@ export default async function RgpdPage() {
               <strong>bg_oauth</strong> — déposé <strong>le temps d&apos;une connexion</strong>{" "}
               par Google, Discord ou Blizzard, et supprimé dès le retour. Il dure dix minutes
               au plus et ne contient qu&apos;un jeton aléatoire à usage unique (protection
-              anti-CSRF), le nom du fournisseur, la page où te ramener, l&apos;objet de la
-              connexion (se connecter ou rattacher un compte) et si tu as accepté les conditions
+              anti-CSRF), le nom du fournisseur, la page où vous ramener, l&apos;objet de la
+              connexion (se connecter ou rattacher un compte) et si vous avez accepté les conditions
               d&apos;utilisation. Aucun identifiant de personne.
             </li>
             <li>
@@ -476,7 +476,7 @@ export default async function RgpdPage() {
       <section id="audience" className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">MESURE D&apos;AUDIENCE</span>
+            <span className="eyebrow">SECTION 06 · MESURE D&apos;AUDIENCE</span>
             <h2 className={styles.sectionTitle}>Mesure d&apos;audience</h2>
           </div>
           <span className={styles.meta}>REGISTRE T06</span>
@@ -545,7 +545,7 @@ export default async function RgpdPage() {
       <section id="signalements" className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">SIGNALEMENTS</span>
+            <span className="eyebrow">SECTION 07 · SIGNALEMENTS</span>
             <h2 className={styles.sectionTitle}>Signalements, droit d&apos;auteur et contestation</h2>
           </div>
           <span className={styles.meta}>DSA ART. 16 ET 20</span>
@@ -671,33 +671,33 @@ export default async function RgpdPage() {
       <section id="notifications" className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">SUR TON ACCORD</span>
+            <span className="eyebrow">SECTION 08 · SUR VOTRE ACCORD</span>
             <h2 className={styles.sectionTitle}>Notifications push</h2>
           </div>
         </header>
         <div className={styles.prose}>
           <p>
-            Tu peux être prévenu sur ton téléphone ou ton ordinateur du départ de tes matchs, d&apos;un
+            Vous pouvez être prévenu sur votre téléphone ou votre ordinateur du départ de vos matchs, d&apos;un
             score à confirmer, du coup d&apos;envoi d&apos;un tournoi, des rappels de match et de ce
-            qui concerne ton compte ou ton équipe. <strong>Rien ne part sans ton geste</strong> :
+            qui concerne votre compte ou votre équipe. <strong>Rien ne part sans votre geste</strong> :
             les notifications s&apos;activent appareil par appareil, depuis{" "}
-            <Link href="/profil#notifications">Mon profil</Link>, où tu choisis aussi les sujets.
+            <Link href="/profil#notifications">Mon profil</Link>, où vous choisissez aussi les sujets.
           </p>
           <ul>
             <li>
-              <strong>Ce que le site garde</strong> : l&apos;adresse d&apos;abonnement que ton
+              <strong>Ce que le site garde</strong> : l&apos;adresse d&apos;abonnement que votre
               navigateur lui donne, ses clés de chiffrement, la date d&apos;abonnement et de la
-              dernière notification remise, et les sujets que tu as coupés.
+              dernière notification remise, et les sujets que vous avez coupés.
             </li>
             <li>
-              <strong>Par où passe le message</strong> : le service de push de ton navigateur
+              <strong>Par où passe le message</strong> : le service de push de votre navigateur
               (Google, Mozilla, Apple ou Microsoft), qui le reçoit{" "}
-              <strong>chiffré pour ton seul appareil</strong> et ne peut pas le lire. Aucune
+              <strong>chiffré pour votre seul appareil</strong> et ne peut pas le lire. Aucune
               notification ne porte le pseudo d&apos;un joueur.
             </li>
             <li>
-              <strong>Combien de temps</strong> : jusqu&apos;à ce que tu les désactives, que ton
-              navigateur révoque l&apos;abonnement ou que tu supprimes ton compte — et au plus{" "}
+              <strong>Combien de temps</strong> : jusqu&apos;à ce que vous les désactiviez, que votre
+              navigateur révoque l&apos;abonnement ou que vous supprimiez votre compte — et au plus{" "}
               {PUSH_SUBSCRIPTION_RETENTION_DAYS} jours sans notification remise.
             </li>
           </ul>
@@ -708,7 +708,7 @@ export default async function RgpdPage() {
       <section id="destinataires" className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">RGPD · ARTICLES 13 ET 44 À 46</span>
+            <span className="eyebrow">SECTION 09 · RGPD · ARTICLES 13 ET 44 À 46</span>
             <h2 className={styles.sectionTitle}>Destinataires et transferts</h2>
           </div>
         </header>
@@ -766,7 +766,7 @@ export default async function RgpdPage() {
       <section className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">RGPD · ARTICLE 30</span>
+            <span className="eyebrow">SECTION 10 · RGPD · ARTICLE 30</span>
             <h2 className={styles.sectionTitle}>Registre des traitements</h2>
           </div>
           <span className={styles.meta}>{PROCESSING_ACTIVITIES.length} TRAITEMENTS</span>
@@ -806,11 +806,11 @@ export default async function RgpdPage() {
         </div>
       </section>
 
-      {/* SECTION 06 — CONTACT */}
+      {/* SECTION 11 — CONTACT */}
       <section className={styles.section}>
         <header className={styles.head}>
           <div>
-            <span className="eyebrow">SECTION 06</span>
+            <span className="eyebrow">SECTION 11</span>
             <h2 className={styles.sectionTitle}>Exercer vos droits</h2>
           </div>
           <span className={styles.meta}>DÉLAI LÉGAL : 1 MOIS</span>
