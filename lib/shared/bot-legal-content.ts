@@ -444,6 +444,10 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Configuration des serveurs** : jusqu'à son retrait par les administrateurs du serveur.",
               "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression.",
               "**Journal privé du staff et journaux du serveur** : aucune suppression automatique à ce jour.",
+              // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
+              // (`rclone delete --min-age`) est refaite **chaque heure** par
+              // `blueGenjiBot/scripts/sync-uploads-onedrive.sh`, et pas seulement
+              // par la sauvegarde du lundi — même promesse que T09 et `/rgpd`.
               `**Sauvegardes** : la base du Bot est sauvegardée chaque semaine, chiffrée, et chaque copie est supprimée définitivement au bout de ${BACKUP_RETENTION_DAYS} jours au plus.`,
             ],
           },
