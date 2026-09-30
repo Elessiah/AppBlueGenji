@@ -17,7 +17,7 @@
 }
 
 .inner {
-  width: min(1240px, calc(100vw - 40px));
+  width: min(1240px, calc(100vw - max(40px, var(--a11y-tab-gutter))));
   margin: 0 auto;
   display: grid;
   grid-template-columns: 320px 1fr;
@@ -123,7 +123,7 @@
 }
 
 .bottom {
-  width: min(1240px, calc(100vw - 40px));
+  width: min(1240px, calc(100vw - max(40px, var(--a11y-tab-gutter))));
   margin: 24px auto 0;
   padding-top: 16px;
   border-top: 1px solid var(--line-soft);

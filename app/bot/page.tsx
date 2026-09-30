@@ -49,7 +49,7 @@ export default async function BotPage() {
       <PublicHeader />
 
       <main>
-        <div className="container">
+        <div className="container bot-container">
           <BotCrumb />
           <BotHero status={status} />
           <BotStatusStrip status={status} />

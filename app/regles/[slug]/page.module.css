@@ -2,7 +2,7 @@
 .shell {
   position: relative;
   z-index: 1;
-  width: min(1120px, calc(100vw - 32px));
+  width: min(1120px, calc(100vw - max(32px, var(--a11y-tab-gutter))));
   margin: 0 auto;
 }
 

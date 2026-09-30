@@ -59,7 +59,7 @@ export default async function BotDocsPage({ params }: PageProps) {
       <PublicHeader />
 
       <main className="bot-main">
-        <div className="container">
+        <div className="container bot-container">
           <div className="bot-crumb">
             <span>BLUEGENJI</span>
             <span className="sep">/</span>

@@ -7,7 +7,7 @@
 }
 
 .inner {
-  width: min(1240px, calc(100vw - 32px));
+  width: min(1240px, calc(100vw - max(32px, var(--a11y-tab-gutter))));
   margin: 0 auto;
   /* Le bouton flottant d'accessibilité recouvrait le premier geste de la
      barre : on lui laisse sa place — disque de 48 px à 16 px du bord bas gauche

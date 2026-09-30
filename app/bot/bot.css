@@ -9,6 +9,14 @@
 .bot-main .fabric { z-index: 0; }
 .bot-main > .container { position: relative; z-index: 1; }
 
+/* La colonne réserve la gouttière de l'onglet d'accessibilité (jeton
+   `--a11y-tab-gutter`, `app/globals.css`) : le `.container` global ne laisse
+   que 24 px de chaque côté, l'onglet en mesure 28. `100%` et non `100vw` :
+   la colonne se mesure sur `<main>`, barre de défilement déjà retirée. */
+.container.bot-container {
+  width: min(1280px, calc(100% - max(48px, var(--a11y-tab-gutter))));
+}
+
 /* ---------- Crumb ---------- */
 .bot-crumb {
   display: flex; align-items: center; gap: 12px;
