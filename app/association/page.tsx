@@ -28,7 +28,7 @@ const REGLEMENT_URL =
  * moteur et bornée en longueur, celui-là est ce que l'association dit d'elle.
  */
 const ASSOCIATION_DESCRIPTION =
-  "Association loi 1901 fondée en 2020, BlueGenji Esport organise des événements et tournois esport en ligne et en LAN, fédère les équipes participantes, et forme les acteurs de la scène amateur francophone pour les mettre en avant.";
+  "Association loi 1901, BlueGenji Esport organise des événements et tournois esport en ligne et en LAN, fédère les équipes participantes, et forme les acteurs de la scène amateur francophone pour les mettre en avant.";
 
 /**
  * La description était écrite en dur alors que la page, elle, se rédige depuis
@@ -41,7 +41,7 @@ const ASSOCIATION_DESCRIPTION =
 export const metadata: Metadata = pageMetadata({
   title: "L'Association Esport",
   description:
-    "Association loi 1901 fondée en 2020, BlueGenji organise des tournois esport en ligne et en LAN, fédère les équipes et met en avant la scène amateur française.",
+    "Association loi 1901, BlueGenji organise des tournois esport en ligne et en LAN, fédère les équipes et met en avant la scène amateur française.",
   shareDescription:
     "Structure associative compétitive et inclusive pour la scène esport francophone.",
   path: "/association",
@@ -164,7 +164,7 @@ export default async function AssociationPage() {
               <span className="eyebrow">SECTION 06</span>
               <h2 className={styles.sectionTitle}>Adhérer</h2>
             </div>
-            <span className={styles.meta}>GRATUIT · SANS ENGAGEMENT</span>
+            <span className={styles.meta}>BULLETIN · AGRÉMENT DU BUREAU</span>
           </header>
           <div className={styles.adhererGrid}>
             <div className={styles.adhererText}>
@@ -175,18 +175,22 @@ export default async function AssociationPage() {
               >
                 <p className={styles.lede}>{copy["association.membership.lede"]}</p>
               </EditableCopy>
+              {/* Un compte joueur n'est pas une adhésion : les statuts
+                  subordonnent la qualité de membre au bulletin, à l'agrément du
+                  bureau et à l'âge de 16 ans. La section les distingue plutôt
+                  que de promettre qu'un compte fait un adhérent. */}
               <p className={styles.adhererBody}>
                 {user
-                  ? "Gratuit, sans engagement, sans limite de durée. Ton compte est déjà actif : il ne reste qu'à inscrire ton équipe."
-                  : "Gratuit, sans engagement, sans limite de durée. Il suffit de créer un compte pour commencer."}
+                  ? "Ton compte joueur te permet déjà de t'inscrire aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande."
+                  : "Un compte joueur, gratuit, suffit pour participer aux tournois ; il ne fait pas de toi un membre de l'association. Pour adhérer, remplis le bulletin d'adhésion et transmets-le au bureau (ses coordonnées figurent sur la page Mentions légales), qui statue sur la demande."}
               </p>
             </div>
             <div className={styles.adhererSide}>
               <div className={styles.adhererPerks}>
                 {[
-                  ["00 €", "Cotisation"],
-                  ["48 h", "Validation moyenne"],
-                  ["∞", "Tournois inclus"],
+                  ["16 ans", "Âge minimum"],
+                  ["1 an", "Durée de l'adhésion"],
+                  ["Bureau", "Agrément"],
                 ].map(([value, label]) => (
                   <div key={label} className={styles.adhererPerk}>
                     <span className={`num ${styles.adhererPerkValue}`}>{value}</span>
@@ -195,13 +199,18 @@ export default async function AssociationPage() {
                 ))}
               </div>
               <div className={styles.ctaRow}>
-                {/* Déjà connecté = déjà adhérent : on envoie vers les tournois
-                    plutôt que de reboucler sur la page de connexion. */}
                 <CyberButton variant="primary" asChild>
+                  <a href="/bulletin_adhesion.docx" download>
+                    Télécharger le bulletin →
+                  </a>
+                </CyberButton>
+                {/* Le compte joueur reste proposé à côté, sous son nom : il
+                    ouvre les tournois, pas l'adhésion. */}
+                <CyberButton variant="ghost" asChild>
                   {user ? (
-                    <Link href="/tournois">Voir les tournois →</Link>
+                    <Link href="/tournois">Voir les tournois</Link>
                   ) : (
-                    <Link href="/connexion">Créer un compte →</Link>
+                    <Link href="/connexion">Créer un compte joueur</Link>
                   )}
                 </CyberButton>
                 <CyberButton variant="ghost" asChild>
