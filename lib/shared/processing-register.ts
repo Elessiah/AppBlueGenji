@@ -575,7 +575,10 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: ["Version acceptée, contexte de l'acceptation (création du compte, connexion, création ou gestion d'une équipe), date"],
     sensitiveData: "Aucune",
-    retention: ["Durée du compte (effacées à sa suppression, anonymisation comprise)"],
+    retention: [
+      "Durée du compte",
+      "À la suppression : effacement complet si le compte est effacé ; s'il est anonymisé, le détail des acceptations est effacé, mais la dernière version acceptée et sa date restent attachées au compte anonymisé",
+    ],
     recipients: ["Le joueur lui-même, par l'export de ses données", "Responsable technique de l'association, qui administre la base"],
     transfers: ["Aucun"],
     security: COMMON_SECURITY,
