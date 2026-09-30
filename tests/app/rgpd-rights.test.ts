@@ -13,7 +13,7 @@ const MENTIONS = readFileSync(join(ROOT, "app", "mentions-legales", "page.tsx"),
 describe("/rgpd — droits des personnes", () => {
   it("ouvre la réclamation auprès de la CNIL à tout moment (art. 77), sans démarche préalable", () => {
     expect(RGPD).not.toMatch(/réponse insatisfaisante/);
-    expect(RGPD).toMatch(/à tout moment introduire une réclamation, sans démarche\s+préalable/);
+    expect(RGPD).toMatch(/à tout moment, sans démarche préalable auprès de nous,\s+introduire une réclamation/);
   });
 
   it("n'annonce plus l'art. 22, qu'aucun droit de la liste ne décrit", () => {

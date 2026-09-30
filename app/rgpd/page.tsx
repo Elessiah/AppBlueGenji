@@ -795,8 +795,8 @@ export default async function RgpdPage() {
         </div>
         <div className={styles.prose} style={{ marginTop: 20 }}>
           <p>
-            Vous pouvez à tout moment introduire une réclamation, sans démarche
-            préalable auprès de nous, auprès de la <strong>CNIL</strong> (Commission Nationale
+            Vous pouvez à tout moment, sans démarche préalable auprès de nous,
+            introduire une réclamation auprès de la <strong>CNIL</strong> (Commission Nationale
             de l'Informatique et des Libertés) sur{" "}
             <a
               href="https://www.cnil.fr"
