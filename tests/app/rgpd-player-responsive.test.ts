@@ -53,7 +53,7 @@ describe("/rgpd — tableau des données sur mobile", () => {
   it("n'écrit chaque cellule qu'à travers `DataCell`", () => {
     const table = RGPD.slice(RGPD.indexOf("<table"), RGPD.indexOf("</table>"));
     expect(table).not.toMatch(/<td[\s>]/);
-    expect(table.match(/<DataCell column=\{0\}>/g)).toHaveLength(3);
+    expect(table.match(/<DataCell column=\{0\}>/g)).toHaveLength(4);
   });
 });
 
