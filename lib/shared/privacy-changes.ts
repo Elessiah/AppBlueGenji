@@ -548,7 +548,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       `Serveur web : chaque requête (${WEB_ACCESS_LOG_FIELDS}) est notée dans un journal technique gardé ${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, pour la sécurité du site.`,
       `Courriel de l'association : c'est une messagerie Gmail, que Google héberge et peut lire (possibles transferts vers les États-Unis). Une demande reçue par ce courriel ou par le téléphone de l'association est gardée le temps de la traiter, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture.`,
       `Âge minimum : il faut avoir au moins ${SITE_MINIMUM_AGE} ans pour créer un compte. Le site ne demande pas de date de naissance et ne vérifie pas l'âge.`,
-      `Données de connexion : le journal légal des connexions ne note que les ouvertures de session (sans port source), et les informations fournies à la création de ton compte partent avec lui (hors les copies de sauvegarde chiffrées, effacées au bout de ${BACKUP_RETENTION_DAYS} jours, et la mention de ta suppression au journal qui la rejoue après une restauration, gardée ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours).`,
+      `Données de connexion : le journal légal des connexions ne note que les ouvertures de session (sans port source), et les informations fournies à la création de ton compte partent avec lui (hors les copies de sauvegarde chiffrées, effacées au bout de ${BACKUP_RETENTION_DAYS} jours, et la mention de ta suppression au journal qui la rejoue après une restauration, gardée ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours ; le reste de ce qui subsiste est détaillé au registre).`,
     ],
     links: [
       { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
