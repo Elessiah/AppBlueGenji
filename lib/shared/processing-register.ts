@@ -29,6 +29,7 @@ import {
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
 
@@ -226,7 +227,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      "À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt",
+      "À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale",
       `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
     recipients: [
@@ -258,7 +259,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiant Discord et pseudo Discord (connexion par code ou par bouton), enregistré sans être certifié — la certification, qui l'expose, est un geste distinct (T04)",
       "Porte de rattachement du compte Discord (bouton OAuth ou code en message privé)",
       "Code de connexion (conservé uniquement sous forme d'empreinte), nombre d'essais",
-      "Adresse IP (en mémoire uniquement, pour limiter les essais — jamais écrite)",
+      "Adresse IP, en mémoire pour limiter les essais ; celle d'une connexion réussie est écrite au journal des données de connexion (T14), pour la seule obligation légale de l'hébergeur",
     ],
     sensitiveData: "Aucune",
     retention: [
@@ -627,6 +628,39 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     recipients: ["Le joueur lui-même, par l'export de ses données", "Responsable technique de l'association, qui administre la base"],
     transfers: ["Aucun"],
     security: COMMON_SECURITY,
+  },
+  {
+    ref: "T14",
+    name: "Journal des données de connexion",
+    purpose:
+      "Conserver les données permettant d'identifier l'auteur d'un contenu publié par un membre (logo, avatar, nom d'équipe), que l'association héberge",
+    subPurposes: [
+      "Consigner chaque ouverture de session (adresse IP, date et heure, moyen de connexion)",
+      "Communiquer ces données à une autorité judiciaire qui les requiert, et à elle seule",
+    ],
+    legalBasis:
+      "Obligation légale (RGPD, art. 6.1.c) de l'hébergeur de contenus : LCEN, art. 6 ; décret n° 2021-1362",
+    dataSubjects: ["Joueurs inscrits sur le site"],
+    dataCategories: [
+      "Identifiant interne du compte",
+      "Adresse IP de connexion, telle que la retient le serveur mandataire du site",
+      "Date et heure de la connexion, moyen de connexion (Google, Discord, Blizzard ou code en message privé)",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      `${CONNECTION_LOG_RETENTION_DAYS} jours (un an) après chaque connexion, puis effacement automatique`,
+      "Gardé jusqu'à cette échéance même après la suppression du compte (RGPD, art. 17.3.b)",
+    ],
+    recipients: [
+      "Autorités judiciaires, sur réquisition",
+      "Le joueur lui-même, par l'export de ses données, tant que son compte existe",
+      "Responsable technique de l'association, qui administre la base et répond aux réquisitions",
+    ],
+    transfers: ["Aucun"],
+    security: [
+      ...COMMON_SECURITY,
+      "Aucun écran ni aucune route du site ne consulte ce journal ; il ne sert à aucune autre finalité",
+    ],
   },
 ];
 

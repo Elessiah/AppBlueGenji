@@ -257,7 +257,7 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
     // l'intention : lue dans l'URL du rappel, elle serait choisie par
     // l'appelant.
     const userId = await createOrGetOAuthUser(identity, { termsAccepted: saved.termsAccepted });
-    await createSession(userId);
+    await createSession(userId, `LOGIN_${provider}`);
   } catch (error) {
     // Un compte neuf sans les conditions acceptées : la page de connexion le
     // dit, plutôt qu'un « échec de connexion » qui ferait réessayer pour rien.

@@ -45,6 +45,7 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
+import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
@@ -421,6 +422,20 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       "Rien ne change tant que ton compte existe : l'acceptation des conditions reste conservée pour la durée du compte.",
     ],
+  },
+  // Une collecte nouvelle, et une durée qui survit à la suppression du compte :
+  // l'adresse IP de chaque connexion, gardée un an au titre de l'obligation
+  // légale de l'hébergeur (LCEN art. 6) — le registre disait « jamais écrite ».
+  {
+    id: "2026-10-journal-connexions",
+    publishedAt: "2026-10-01",
+    title: `Connexions : adresse IP gardée ${CONNECTION_LOG_RETENTION_DAYS} jours`,
+    summary: `À chaque connexion, le site note désormais ton adresse IP, la date et l'heure, et le moyen de connexion utilisé. Ces données sont gardées ${CONNECTION_LOG_RETENTION_DAYS} jours (un an), même si tu supprimes ton compte : la loi l'impose à l'association, qui héberge les contenus publiés par ses membres.`,
+    details: [
+      "Elles ne servent à rien d'autre : aucun écran du site ne les affiche, et elles ne sont communiquées qu'à une autorité judiciaire qui les requiert (loi pour la confiance dans l'économie numérique, art. 6).",
+      "Tu les retrouves dans l'export de tes données, depuis « Mon profil », tant que ton compte existe.",
+    ],
+    links: [{ href: "/rgpd#donnees-connexion", label: "Lire la politique de confidentialité" }],
   },
 ];
 

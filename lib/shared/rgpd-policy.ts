@@ -1,4 +1,5 @@
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
+import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 
 /**
  * Bases légales citées par la politique — les mêmes que le registre
@@ -10,7 +11,7 @@ import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
  * joueur choisit en plus — une certification qui l'expose, une donnée
  * facultative qu'il renseigne et publie.
  */
-export type LegalBase = "Exécution du contrat" | "Consentement" | "Intérêt légitime";
+export type LegalBase = "Exécution du contrat" | "Consentement" | "Intérêt légitime" | "Obligation légale";
 
 export interface DonneEntry {
   donnee: string;
@@ -154,6 +155,19 @@ export const DONNEE_SAUVEGARDES: DonneEntry = {
   duree: `${BACKUP_RETENTION_DAYS} jours au plus`,
 };
 
+/**
+ * Journal des données de connexion (`lib/shared/connection-logs.ts`) : la
+ * seule donnée que le site garde **au-delà** de la suppression du compte, au
+ * titre d'une obligation légale — d'où sa ligne à part.
+ */
+export const DONNEE_CONNEXIONS: DonneEntry = {
+  donnee: "Données de connexion (adresse IP, date et heure, moyen de connexion)",
+  finalite:
+    "Obligation de l'hébergeur des contenus publiés par les membres (LCEN, art. 6 ; décret n° 2021-1362) : permettre d'identifier l'auteur d'un contenu, sur réquisition d'une autorité judiciaire. Aucune autre utilisation",
+  base: "Obligation légale",
+  duree: `${CONNECTION_LOG_RETENTION_DAYS} jours (un an) après chaque connexion, y compris après la suppression du compte`,
+};
+
 export const DROITS: DroitEntry[] = [
   {
     title: "Droit d'accès",
@@ -165,7 +179,7 @@ export const DROITS: DroitEntry[] = [
   },
   {
     title: "Droit à l'effacement",
-    text: "Vous pouvez demander la suppression de votre compte et de vos données de profil. Voir ci-dessus pour les données de palmarès.",
+    text: "Vous pouvez demander la suppression de votre compte et de vos données de profil. Voir ci-dessus pour les données de palmarès, et pour les données de connexion, que la loi impose de garder un an (RGPD, art. 17.3.b).",
   },
   {
     title: "Droit à la limitation",

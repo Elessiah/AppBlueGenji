@@ -1038,6 +1038,24 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Journal des données de connexion (obligation légale de l'hébergeur, LCEN
+  // art. 6 — `lib/shared/connection-logs.ts`) : une ligne par ouverture de
+  // session, gardée un an. **Pas de clé étrangère sur `user_id`**, et c'est la
+  // règle : la ligne doit survivre à la suppression du compte jusqu'à son
+  // échéance (RGPD art. 17.3.b). Table neuve, donc créée telle quelle sur une
+  // base qui tourne — aucune entrée de migration n'est due.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_connection_logs (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      event_type VARCHAR(32) NOT NULL,
+      ip VARCHAR(45) NULL,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_bg_connection_logs_created_at (created_at),
+      INDEX idx_bg_connection_logs_user (user_id, created_at)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // Une ligne = une visite. `visitor_key` est un SHA-256 salé : ni IP ni
   // user-agent ne sont stockés en clair. Pas de clé étrangère sur `user_id` —
   // une suppression de compte ne doit pas réécrire l'historique de
