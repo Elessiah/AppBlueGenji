@@ -71,8 +71,8 @@ describe("conditions d'utilisation — licence sur les contenus", () => {
     // Nom d'équipe obligatoire et BattleTag verrouillé : le retrait passe par ce que le site offre.
     expect(contenus).toContain("par les moyens que le site lui offre");
     expect(contenus).toContain("faites pendant cette durée, pour la durée de leur mise en ligne");
-    // Une licence d'auteur ne prime pas les droits sur les données personnelles.
-    expect(contenus).toContain("ce paragraphe ne limite pas les droits décrits dans la politique de confidentialité");
+    // Avatar et pseudos sont des données personnelles à finalité étroite : hors licence.
+    expect(contenus).toContain("L'**avatar** et les **pseudos de jeu**, qui sont des données personnelles, en sont exclus");
     expect(contenus).toContain("**déjà faites** avant le retrait ne sont pas concernées");
   });
 
