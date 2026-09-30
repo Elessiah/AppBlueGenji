@@ -188,7 +188,9 @@ describe("T11 — demandes reçues par courriel ou téléphone", () => {
     expect(t11.dataCategories.join(" ")).toContain("reçues par courriel ou par téléphone");
     // Finalité et base légale du canal, questions simples comprises (art. 13.1.c, 30.1.b).
     expect(t11.subPurposes.join(" ")).toContain("Recevoir par courriel ou par téléphone");
-    expect(t11.legalBasis).toContain("une simple question sur le traitement des données de l'intérêt légitime");
+    // Même base que la catégorie RGPD du formulaire : un canal ne change pas la base légale.
+    expect(t11.legalBasis).toContain("par courriel ou par téléphone comme par le formulaire (catégorie RGPD)");
+    expect(t11.legalBasis).toContain("repose sur la même obligation légale");
   });
 });
 
