@@ -441,7 +441,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Scrims et recrutement** : aucune suppression automatique à ce jour ; ces données sont conservées jusqu'à une demande d'effacement.",
               "**Exclusions** : jusqu'à la levée de l'exclusion.",
               `**Commande /link** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
-              "**Configuration des serveurs** : jusqu'à son retrait par les administrateurs du serveur.",
+              "**Configuration des serveurs** : les salons relayés, jusqu'à leur retrait par les administrateurs ou le départ du Bot du serveur ; l'invitation, le rôle d'arbitrage et le rôle d'administration du Bot, avec l'identifiant de qui les a posés, jusqu'à leur retrait par les administrateurs — ils restent si le Bot quitte le serveur, sans suppression automatique à ce jour.",
               "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression.",
               "**Journal privé du staff et journaux du serveur** : aucune suppression automatique à ce jour.",
               // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
@@ -644,7 +644,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Scrims and recruitment**: no automatic deletion at present; this data is kept until an erasure request.",
               "**Exclusions**: until the exclusion is lifted.",
               `**/link command**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
-              "**Server configuration**: until the server's administrators remove it.",
+              "**Server configuration**: relayed channels, until the administrators remove them or the Bot leaves the server; the invite, the referee role and the Bot administration role, with the ID of whoever set them, until the administrators remove them — they remain if the Bot leaves the server, with no automatic deletion at present.",
               "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion.",
               "**Staff private log channel and server logs**: no automatic deletion at present.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,
