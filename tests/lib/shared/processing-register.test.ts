@@ -181,7 +181,7 @@ describe("T11 — demandes reçues par courriel ou téléphone", () => {
     expect(t11.recipients.join(" ")).toContain(DATA_CONTACT_NAME);
     expect(t11.recipients.join(" ")).toContain("Microsoft, qui héberge la messagerie");
     expect(t11.transfers.join(" ")).toMatch(/Microsoft \(messagerie Outlook\.com/);
-    expect(t11.retention.join(" ")).toContain("même durée qu'une demande faite depuis le formulaire");
+    expect(t11.retention.join(" ")).toContain("même règle qu'une demande RGPD faite depuis le formulaire");
     expect(t11.recipients.join(" ")).toContain("sans contrat de sous-traitance");
     expect(t11.recipients.join(" ")).toContain("lisibles par Microsoft");
     expect(t11.dataSubjects.join(" ")).toContain("par courriel ou par téléphone");
