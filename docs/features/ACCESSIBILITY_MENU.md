@@ -58,11 +58,19 @@ Deux pièges de spécificité, tenus dans la feuille :
   sur la fiche d'un tournoi (1280 × 720, vue staff) à certaines positions de
   défilement : un coin est là où le contenu d'une colonne finit par passer en
   défilant, et aucune position fixe posée *sur* la colonne n'y échappe. Le bord
-  gauche est **hors** de la colonne : `.page-shell` y réserve une gouttière
-  d'au moins 32 px (`@media (min-width: 721px)`, `calc(100vw - 80px)`, placée
-  après le bloc de 920 px qu'elle doit emporter), où l'onglet tient avec 4 px
-  d'écart — il ne couvre donc aucun contenu de l'espace connecté, à aucune
-  position de défilement. Mi-hauteur plutôt que haut ou bas : le haut est à
+  gauche est **hors** de la colonne : toute colonne de page y réserve une
+  gouttière d'au moins 32 px, où l'onglet tient avec 4 px d'écart — il ne
+  couvre donc aucun contenu, à aucune position de défilement. La gouttière est
+  un **jeton**, `--a11y-tab-gutter` (`app/globals.css` : 0 sous 721 px, 80 px
+  au-delà, soit 32 px par côté une barre de défilement de 16 px déduite), et
+  une colonne l'écrit `calc(100vw - max(<sa gouttière>, var(--a11y-tab-gutter)))`
+  — `.page-shell` de l'espace connecté comme les colonnes des pages vitrine
+  (accueil, association, bénévoles, recrutement, règles, pages légales, en-tête
+  et pieds de page, `/bot` et `/bot/docs` par `.bot-container`). Sous 721 px le
+  `max()` rend la gouttière propre à chaque page, inchangée.
+  `tests/app/a11y-tab-gutter.test.ts` refuse toute colonne (au moins 720 px de
+  large) à gouttière littérale hors d'une requête `max-width` de 720 px au
+  plus : c'est ce motif recopié qui avait laissé les pages vitrine à 20 px. Mi-hauteur plutôt que haut ou bas : le haut est à
   l'en-tête collant, le bas aux notifications. Les coins droits restent au
   bouton « ? » des règles (`.cta-float-help`) et au témoin du régime de charge.
   Le panneau s'ouvre à droite de l'onglet, centré sur la hauteur de l'écran
@@ -77,10 +85,6 @@ Deux pièges de spécificité, tenus dans la feuille :
 - **Modale ouverte** : le bouton reste offert, au-dessus de tous les voiles,
   réduit à un disque de 36 px en haut à gauche, panneau ouvert vers le bas ;
   il se retire seulement sous le recadrage d'image.
-- **Limite connue** : les pages vitrine (colonnes de 1240 px en
-  `calc(100vw - 40px)`) ne réservent pas cette gouttière ; l'onglet peut y
-  mordre de quelques pixels le bord de la colonne à mi-hauteur
-  (`ACCESSIBILITE.md`).
 - Bleu glacier plein, logo en bleu nuit découpé par un **masque CSS**
   (`public/accessibility-icon.webp`, dérivé du logo fourni) : le fichier
   n'apporte que la forme, la couleur est celle de la feuille — y compris en
