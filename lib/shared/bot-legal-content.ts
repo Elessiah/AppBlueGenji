@@ -450,7 +450,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Exclusions du relais" },
           {
             kind: "p",
-            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff ; le motif part aussi en message privé au titulaire du Bot, où il reste sans limite de durée. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée — et levée — par la modération des serveurs où le Bot est installé, dans les conditions de la section « Modération du relais » des Conditions d'Utilisation. La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé — y compris un serveur que l'on crée soi-même pour l'y inviter — et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff ; le motif part aussi en message privé au titulaire du Bot, où il reste sans limite de durée. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée par la modération des serveurs où le Bot est installé, dans les conditions de la section « Modération du relais » des Conditions d'Utilisation, et levée (**/unban**) par la modération de tout serveur d'au moins 50 membres où il est installé. La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé — y compris un serveur que l'on crée soi-même pour l'y inviter — et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
           },
           { kind: "subhead", text: "Adhésions et rappels programmés" },
           {
@@ -515,6 +515,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               "Le staff de l'association, pour la modération et l'administration du Bot.",
+              "Le titulaire du Bot (son hébergeur technique), qui reçoit en message privé les motifs d'exclusion.",
+              "Les membres du salon où **/scrim** ou **/recrute** est utilisée : la commande y répond publiquement, et Discord y affiche qui l'a utilisée.",
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
               "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
@@ -653,7 +655,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relay exclusions" },
           {
             kind: "p",
-            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel; the reason is also sent by direct message to the Bot's owner, where it stays with no time limit. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided — and lifted — by the moderators of the servers where the Bot is installed, under the conditions of the « Relay moderation » section of the Terms of Service. The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed — including a server one creates oneself to invite it — and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel; the reason is also sent by direct message to the Bot's owner, where it stays with no time limit. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided by the moderators of the servers where the Bot is installed, under the conditions of the « Relay moderation » section of the Terms of Service, and lifted (**/unban**) by the moderators of any server with at least 50 members where it is installed. The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed — including a server one creates oneself to invite it — and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
           },
           { kind: "subhead", text: "Memberships and scheduled reminders" },
           {
@@ -714,6 +716,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               "The association's staff, for moderating and administering the Bot.",
+              "The Bot's owner (its technical host), who receives exclusion reasons by direct message.",
+              "The members of the channel where **/scrim** or **/recrute** is used: the command replies publicly there, and Discord shows who used it.",
               "Members of partner servers, who read the relayed advertisements.",
               "Members of the referee role of every server that has set one, for the website's referee alerts.",
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",

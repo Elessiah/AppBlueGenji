@@ -13,8 +13,8 @@ immédiat.
 
 Le module [`lib/shared/bot-legal-content.ts`](../../lib/shared/bot-legal-content.ts)
 est la **source unique** des deux textes. Ils venaient de `blueGenjiBot/LegalTerms`,
-dont les fichiers ont divergé et ne font plus foi (13 ans, « 72 heures ou au
-redémarrage », aucun responsable du traitement — voir `ERREUR.txt`, lot bot).
+qui en est désormais une **copie générée** (`scripts/generate-legal-terms.py` du
+bot, à relancer après chaque changement de ce module).
 
 Ils décrivent le bot **d'après son code** (`blueGenjiBot`, branche `main`), relu
 table par table : relais d'annonces, scrims et recrutement (auteur effacé à 30 jours), exclusions (valables pour tout le réseau),
