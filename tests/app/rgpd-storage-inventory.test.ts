@@ -3,6 +3,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { PROCESSING_ACTIVITIES, REGISTER_UPDATED_AT } from "@/lib/shared/processing-register";
 import { PRIVACY_CHANGES } from "@/lib/shared/privacy-changes";
+import { SITE_VISITOR_RETENTION_MONTHS } from "@/lib/shared/site-visits";
 
 /**
  * `/rgpd#cookies` se dit la liste **complète** de ce que le site dépose ou lit
@@ -95,8 +96,17 @@ describe("/rgpd — mesure d'audience", () => {
 
   it("présente l'empreinte comme pseudonymisée, pas anonyme", () => {
     expect(audience).toContain("pseudonymisée, pas anonyme");
-    expect(audience).toContain("sans limite de durée");
+    expect(audience).not.toContain("sans limite de durée");
     expect(audience).not.toMatch(/non réversible|remonter à (toi|vous)/);
+  });
+
+  it("applique l'opposition : GPC, DNT et un bouton, sur la section même", () => {
+    expect(audience).toContain("Global Privacy Control");
+    expect(audience).toContain("Do Not Track");
+    expect(audience).toContain("<AudienceOptOutControl initialReason={audienceOptOut} />");
+    expect(audience).not.toMatch(/ne sait pas encore|aucun réglage ne permet/);
+    // Le traceur de mesure entre dans la dispense une fois l'opposition et la durée posées.
+    expect(cookies).toMatch(/dispense prévue par la\s+CNIL pour les traceurs de mesure d&apos;audience/);
   });
 
   it("ne dit plus « aucun traceur analytique » en tête de page", () => {
@@ -108,13 +118,15 @@ describe("/rgpd — mesure d'audience", () => {
     const text = JSON.stringify(t06);
     expect(text).toContain("pseudonymisée");
     expect(text).toContain("/stats-site");
-    expect(text).toContain("y compris après la suppression du compte");
+    expect(text).toContain("y compris après la suppression du compte, qui ne l'efface pas plus tôt");
     expect(text).not.toContain("ne désigne aucune personne");
     // La date ne fait qu'avancer : une PR suivante qui touche le registre la repousse.
     expect(REGISTER_UPDATED_AT >= "2026-09-30").toBe(true);
-    // Chaque empreinte gardée sans limite porte aussi l'indicateur de connexion.
-    expect(text).toContain("avec l'indicateur « visiteur connecté », conservée sans limite");
+    // L'empreinte n'est plus gardée sans limite : elle part 25 mois après la dernière visite.
+    expect(text).not.toContain("sans limite");
+    expect(text).toContain(`${SITE_VISITOR_RETENTION_MONTHS} mois après cette dernière visite`);
     expect(audience).toMatch(/avec l&apos;indicateur\s+« visiteur connecté »/);
+    expect(audience).toContain("{SITE_VISITOR_RETENTION_MONTHS} mois après cette dernière visite");
   });
 
   it("ne laisse aucune entrée des changements affirmer une empreinte irréversible", () => {

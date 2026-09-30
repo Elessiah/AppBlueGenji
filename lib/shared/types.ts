@@ -706,6 +706,12 @@ export type TournamentDetail = TournamentSnapshot & TournamentViewerContext;
  * 30 min) ; `uniqueVisitors*` compte les empreintes de visiteur distinctes.
  * `identifiedVisitors` isole les comptes connectés — le sous-ensemble sûrement
  * dédoublonné « par utilisateur ».
+ *
+ * `uniqueVisitors` et `identifiedVisitors` ne sont **pas** des totaux depuis la
+ * mise en service : une empreinte est effacée `SITE_VISITOR_RETENTION_MONTHS`
+ * (25) mois après sa dernière visite, si bien qu'ils comptent les visiteurs des
+ * vingt-cinq derniers mois — et peuvent baisser. `totalVisits` et
+ * `firstVisitAt`, eux, remontent à la mise en service.
  */
 export type SiteVisitStats = {
   totalVisits: number;

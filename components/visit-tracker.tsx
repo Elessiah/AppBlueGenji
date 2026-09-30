@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect } from "react";
-import { SITE_VISIT_WINDOW_MINUTES } from "@/lib/shared/site-visits";
+import {
+  SITE_VISIT_WINDOW_MINUTES,
+  audienceOptOutReason,
+  type AudienceOptOutReason,
+} from "@/lib/shared/site-visits";
 
 /**
  * Signale une visite du site au serveur, une fois par chargement de page.
@@ -40,6 +44,25 @@ function pingedRecently(): boolean {
   }
 }
 
+/**
+ * Opposition à la mesure lue dans le navigateur : Global Privacy Control, Do Not
+ * Track, ou le choix fait sur `/rgpd#audience`. Une visite refusée n'est pas
+ * envoyée — et le serveur, qui relit les mêmes signaux, ne l'enregistrerait pas.
+ */
+export function browserAudienceOptOut(): AudienceOptOutReason | null {
+  const nav = window.navigator as Navigator & { globalPrivacyControl?: unknown };
+  const legacyDnt = (window as Window & { doNotTrack?: unknown }).doNotTrack;
+  // Lu à part : un accès aux cookies refusé (contexte isolé, politique du
+  // navigateur) lève, et ne doit pas emporter les signaux GPC et DNT avec lui.
+  let cookie: string | null = null;
+  try {
+    cookie = document.cookie;
+  } catch {
+    cookie = null;
+  }
+  return audienceOptOutReason({ gpc: nav.globalPrivacyControl, dnt: nav.doNotTrack ?? legacyDnt, cookie });
+}
+
 function rememberPing(): void {
   try {
     window.sessionStorage.setItem(VISIT_SENT_KEY, String(Date.now()));
@@ -52,7 +75,7 @@ export function VisitTracker() {
     const controller = new AbortController();
 
     const send = () => {
-      if (pingedRecently()) return;
+      if (browserAudienceOptOut() || pingedRecently()) return;
 
       fetch("/api/visits", {
         method: "POST",

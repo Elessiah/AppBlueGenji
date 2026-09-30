@@ -6,7 +6,10 @@
  * {@link SITE_VISIT_WINDOW_MINUTES} minutes sont regroupés). Ce détail n'est
  * gardé que {@link SITE_VISIT_DETAIL_RETENTION_DAYS} jours : les jours révolus
  * sont **repliés** en un compteur par jour (`bg_site_visit_days`) puis effacés,
- * et chaque visiteur laisse une seule empreinte dans `bg_site_visitors`. Les
+ * et chaque visiteur laisse une seule empreinte dans `bg_site_visitors`, datée
+ * de sa dernière visite et effacée {@link SITE_VISITOR_RETENTION_MONTHS} mois
+ * plus tard par le même repli. Une visite refusée (opposition, GPC, DNT) n'arrive
+ * jamais jusqu'ici : la route l'écarte avant tout calcul. Les
  * fenêtres glissantes se lisent sur le détail, les totaux « depuis toujours »
  * sur ces deux tables — si bien que la lecture ne grandit plus avec
  * l'historique : elle relisait toute la table, sept `COUNT(DISTINCT …)` à
@@ -39,6 +42,7 @@ import {
   normalizeVisitPath,
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
+  SITE_VISITOR_RETENTION_MONTHS,
   visitorIdentitySource,
 } from "@/lib/shared/site-visits";
 import type { SiteVisitStats } from "@/lib/shared/types";
@@ -253,15 +257,46 @@ async function rememberVisitor(visitorKey: string, authenticated: number): Promi
   try {
     const db = await getDatabase();
     await db.execute(
-      `INSERT INTO bg_site_visitors (visitor_key, authenticated)
-       VALUES (?, ?)
+      `INSERT INTO bg_site_visitors (visitor_key, authenticated, last_seen_at)
+       VALUES (?, ?, NOW())
        ON DUPLICATE KEY UPDATE
-         authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated))`,
+         authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated)),
+         last_seen_at = GREATEST(bg_site_visitors.last_seen_at, VALUES(last_seen_at))`,
       [visitorKey, authenticated],
     );
   } catch (error) {
     console.error("[site-visits] Empreinte du visiteur non retenue pour le total.", error);
   }
+}
+
+/** Cadence de l'entretien des durées, indépendant de l'enregistrement d'une visite. */
+const RETENTION_MAINTENANCE_INTERVAL_MS = 60 * 60 * 1000;
+let lastRetentionMaintenanceAt = 0;
+
+/**
+ * Entretien des durées de conservation (détail à 31 jours, empreintes à
+ * {@link SITE_VISITOR_RETENTION_MONTHS} mois), au plus une fois par heure.
+ *
+ * Le repli suit d'ordinaire la synchronisation vers le bot, qui ne part qu'après
+ * une visite **enregistrée** : sans sel secret, ou quand tous les visiteurs
+ * s'opposent à la mesure, rien ne s'enregistre plus et les durées annoncées
+ * cesseraient d'être tenues. `/api/visits` l'appelle donc à chaque signalement,
+ * refusé ou non — c'est de l'entretien, rien n'y concerne le visiteur —, et
+ * `listTournamentBuckets` aussi, comme les autres purges : un visiteur opposé
+ * dont le navigateur expose le signal n'envoie aucun signalement. Jamais
+ * attendu, jamais levé.
+ */
+export function maintainSiteVisitRetention(now: number = Date.now()): void {
+  if (now - lastRetentionMaintenanceAt < RETENTION_MAINTENANCE_INTERVAL_MS) return;
+  lastRetentionMaintenanceAt = now;
+  void rollUpExpiredSiteVisits().catch((error: unknown) => {
+    console.error("[site-visits] Entretien des durées de conservation impossible.", error);
+  });
+}
+
+/** Réinitialise la cadence de l'entretien des durées (tests). */
+export function resetSiteVisitRetentionThrottle(): void {
+  lastRetentionMaintenanceAt = 0;
 }
 
 /** Repli en cours, partagé par les appels concurrents. */
@@ -311,14 +346,27 @@ async function rollUpExpiredSiteVisitsNow(): Promise<number> {
       // démarrage (`database.ts`) ne pas avoir abouti — sans ce report, ces
       // visiteurs disparaîtraient du total avec leur détail, pour toujours.
       await connection.execute(
-        `INSERT INTO bg_site_visitors (visitor_key, authenticated)
-         SELECT visitor_key, MAX(authenticated)
+        `INSERT INTO bg_site_visitors (visitor_key, authenticated, last_seen_at)
+         SELECT visitor_key, MAX(authenticated), MAX(created_at)
          FROM bg_site_visits
          WHERE created_at < ?
          GROUP BY visitor_key
          ON DUPLICATE KEY UPDATE
-           authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated))`,
+           authenticated = GREATEST(bg_site_visitors.authenticated, VALUES(authenticated)),
+           last_seen_at = GREATEST(bg_site_visitors.last_seen_at, VALUES(last_seen_at))`,
         [cutoff],
+      );
+      // Empreintes au-delà de leur durée de conservation, comptée depuis la
+      // dernière visite. Une empreinte encore présente au détail n'est jamais
+      // effacée : le report ci-dessus ne rajeunit que les jours repliés, et
+      // `rememberVisitor` (meilleur effort) a pu manquer une visite récente.
+      await connection.execute(
+        `DELETE FROM bg_site_visitors
+         WHERE last_seen_at < NOW() - INTERVAL ? MONTH
+           AND NOT EXISTS (
+             SELECT 1 FROM bg_site_visits v WHERE v.visitor_key = bg_site_visitors.visitor_key
+           )`,
+        [SITE_VISITOR_RETENTION_MONTHS],
       );
       await connection.execute(
         `INSERT INTO bg_site_visit_days (day, visits, first_visit_at)

@@ -31,6 +31,108 @@ export const SITE_VISIT_WINDOW_MINUTES = 30;
  */
 export const SITE_VISIT_DETAIL_RETENTION_DAYS = 31;
 
+/**
+ * Durée de conservation d'une **empreinte de visiteur** (`bg_site_visitors`),
+ * comptée depuis sa **dernière visite**, en mois.
+ *
+ * Vingt-cinq mois : la durée que la CNIL retient pour les données de mesure
+ * d'audience (lignes directrices du 17 septembre 2020). Au-delà, l'empreinte est
+ * effacée par le repli du détail (`rollUpExpiredSiteVisits`) : le total des
+ * visiteurs uniques est donc celui des vingt-cinq derniers mois, et non plus
+ * « depuis la mise en service ». Le registre des traitements et `/rgpd` citent
+ * cette constante.
+ */
+export const SITE_VISITOR_RETENTION_MONTHS = 25;
+
+/**
+ * Cookie qui retient l'**opposition** à la mesure d'audience, posé par le bouton
+ * de `/rgpd#audience`. Il ne contient que la valeur `1` — aucun identifiant —, et
+ * le serveur le relit lui-même : une visite refusée n'est ni envoyée par le
+ * navigateur, ni enregistrée si elle arrive quand même.
+ */
+export const AUDIENCE_OPT_OUT_COOKIE = "bg_audience_optout";
+
+/** Durée de vie du cookie d'opposition : treize mois, plafond CNIL d'un traceur. */
+export const AUDIENCE_OPT_OUT_MAX_AGE_DAYS = 395;
+
+/** Pourquoi une visite n'est pas mesurée : signal du navigateur, ou choix fait sur le site. */
+export type AudienceOptOutReason = "GPC" | "DNT" | "CHOICE";
+
+/** Un en-tête ou une propriété de signal vaut « oui » seulement pour `1` (ou `true`). */
+function signalOn(value: unknown): boolean {
+  if (value === true) return true;
+  return typeof value === "string" && value.trim() === "1";
+}
+
+/** Valeur d'un cookie dans une chaîne `Cookie` / `document.cookie`, ou `null`. */
+export function readCookieValue(header: string | null | undefined, name: string): string | null {
+  if (typeof header !== "string" || !header) return null;
+  for (const part of header.split(";")) {
+    const index = part.indexOf("=");
+    if (index === -1) continue;
+    if (part.slice(0, index).trim() === name) return part.slice(index + 1).trim();
+  }
+  return null;
+}
+
+/**
+ * La visite doit-elle échapper à la mesure, et pourquoi ?
+ *
+ * Trois sources, dans l'ordre : **Global Privacy Control** (`Sec-GPC: 1`,
+ * `navigator.globalPrivacyControl`), **Do Not Track** (`DNT: 1`,
+ * `navigator.doNotTrack`), puis le **choix** fait sur `/rgpd#audience` (cookie
+ * {@link AUDIENCE_OPT_OUT_COOKIE} à `1`). Un signal du navigateur l'emporte : il
+ * ne se lève que depuis le navigateur, jamais depuis le site.
+ */
+export function audienceOptOutReason(signals: {
+  gpc?: unknown;
+  dnt?: unknown;
+  cookie?: string | null;
+}): AudienceOptOutReason | null {
+  if (signalOn(signals.gpc)) return "GPC";
+  if (signalOn(signals.dnt)) return "DNT";
+  if (readCookieValue(signals.cookie, AUDIENCE_OPT_OUT_COOKIE) === "1") return "CHOICE";
+  return null;
+}
+
+const OPT_OUT_STRENGTH: Record<AudienceOptOutReason, number> = { GPC: 3, DNT: 2, CHOICE: 1 };
+
+/**
+ * La plus forte de deux lectures d'opposition — GPC, puis DNT, puis le choix.
+ * Sert à croiser ce que le serveur a lu dans les en-têtes avec ce que la page
+ * lit dans le navigateur : un signal envoyé en en-tête sans être exposé à la
+ * page (extension) ne doit pas être éclipsé par un simple cookie.
+ */
+export function strongerAudienceOptOut(
+  a: AudienceOptOutReason | null,
+  b: AudienceOptOutReason | null,
+): AudienceOptOutReason | null {
+  if (!a) return b;
+  if (!b) return a;
+  return OPT_OUT_STRENGTH[a] >= OPT_OUT_STRENGTH[b] ? a : b;
+}
+
+/** {@link audienceOptOutReason} lu sur les en-têtes d'une requête (côté serveur). */
+export function audienceOptOutFromHeaders(headers: {
+  get(name: string): string | null;
+}): AudienceOptOutReason | null {
+  return audienceOptOutReason({
+    gpc: headers.get("sec-gpc"),
+    dnt: headers.get("dnt"),
+    cookie: headers.get("cookie"),
+  });
+}
+
+/**
+ * Chaîne `document.cookie` qui pose l'opposition — ou l'efface (`Max-Age=0`)
+ * quand le visiteur revient sur son choix, pour ne pas garder un cookie qui ne
+ * dit plus rien.
+ */
+export function audienceOptOutCookieString(optOut: boolean, secure: boolean): string {
+  const maxAge = optOut ? AUDIENCE_OPT_OUT_MAX_AGE_DAYS * 24 * 60 * 60 : 0;
+  return `${AUDIENCE_OPT_OUT_COOKIE}=${optOut ? "1" : ""}; Path=/; Max-Age=${maxAge}; SameSite=Lax${secure ? "; Secure" : ""}`;
+}
+
 /** Longueur maximale d'un chemin stocké (aligné sur la colonne SQL). */
 export const MAX_VISIT_PATH_LENGTH = 191;
 
