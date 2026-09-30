@@ -115,7 +115,9 @@ aucun contact. `GET /api/me/match-launches` la rejoue à chaque lecture
 la fasse lui-même ou qu'un joueur du match la fasse : le caster disparaît de la
 réponse, et son inscription est ensuite retirée (`releaseIneligibleCast`, sous
 verrou et après relecture — un compte redevenu éligible entre-temps garde la
-sienne), si bien que le lancement n'attend plus son « Prêt ». Les deux autres
+sienne), si bien que le lancement n'attend plus son « Prêt ». Sur un match
+**déjà lancé**, rien n'attend plus : l'inscription reste (on ne retire pas un
+caster en pleine diffusion pour un tag retouché), seuls ses contacts sont tus. Les deux autres
 chemins d'un caster suivent la même règle (`lib/server/tournaments/cast-eligibility.ts`) :
 son « Prêt » est refusé (`resolveMatchParty` → `NOT_MATCH_PARTY`) et le
 balayage des notifications ne l'appelle plus au départ du match. Voir

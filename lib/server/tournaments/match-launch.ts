@@ -461,8 +461,8 @@ export async function releaseMatchCast(
  * Retire l'inscription d'un caster qui ne remplit plus la condition de
  * `castBlockReason` (permission `live` retirée, tag décertifié, Battle.net
  * détaché, compte supprimé). Tout est **relu sous verrou** : si l'inscription a
- * changé de titulaire ou si le compte est redevenu éligible entre la lecture
- * et l'écriture, rien n'est fait. Comme au retrait volontaire, un match qui
+ * changé de titulaire, si le match a été lancé ou si le compte est redevenu
+ * éligible entre la lecture et l'écriture, rien n'est fait. Comme au retrait volontaire, un match qui
  * n'attendait plus que ce caster part.
  *
  * @returns vrai si l'inscription a été retirée.
@@ -472,6 +472,9 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
   await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
     if (!row || row.caster_user_id === null || Number(row.caster_user_id) !== casterId) return;
+    // Un match lancé n'attend plus aucun « Prêt » : l'inscription y reste, la
+    // lecture des contacts se contente de la taire.
+    if (matchLaunchPhase(toLaunchInput(row), Date.now()) === "LAUNCHED") return;
     if ((await loadCastEligibility(connection, casterId)) === null) return;
 
     await connection.execute(

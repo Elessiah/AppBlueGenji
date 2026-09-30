@@ -774,7 +774,7 @@ métier. L'exposition est déclarée aux joueurs (`PRIVACY_CHANGES`
 et l'identité de chaque caster inscrit (`castEligibilityBlock`, même règle que
 `castBlockReason`) — un compte privé de `live`, au tag décertifié, sans
 Battle.net ou supprimé ne reçoit plus de contacts, n'est plus présenté aux
-joueurs, et son inscription est retirée (`releaseIneligibleCast`, sous verrou et
+joueurs, et, tant que le match n'est pas lancé, son inscription est retirée (`releaseIneligibleCast`, sous verrou et
 après relecture), ce qui libère le lancement qui attendait son « Prêt ». La
 même règle refuse son « Prêt » (`NOT_MATCH_PARTY`) et le tient hors de la
 notification de départ. Le retrait volontaire (`DELETE`) et celui de

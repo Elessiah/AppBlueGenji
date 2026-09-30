@@ -463,6 +463,19 @@ describe("listViewerMatchLaunches — caster qui ne remplit plus la condition", 
     expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
   });
 
+  it("tait sans le retirer le caster d'un match déjà lancé", async () => {
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ caster_user_id: VIEWER, launched_at: OPENED })];
+    state.users = [casterUser(VIEWER, { discord_verified_at: null })];
+    expect(await listViewerMatchLaunches(viewer)).toEqual([]);
+    expect(castRelease(state)).toEqual([]);
+
+    state.viewerMemberships = [{ team_id: TEAM1, roles_json: JSON.stringify(["CAPITAINE"]) }];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.caster).toBeNull();
+    expect(castRelease(state)).toEqual([]);
+  });
+
   it("n'échoue pas quand le retrait est impossible", async () => {
     const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
     state.viewerMemberships = [];

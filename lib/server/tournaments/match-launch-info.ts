@@ -338,14 +338,17 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
     // Un caster n'est une partie du match que tant qu'il remplit la condition
     // de son inscription : elle est rejouée ici, à chaque lecture, sans quoi
     // un compte privé de `live` (ou d'identité) garderait les contacts.
-    for (const { row } of visible) {
+    // L'inscription n'est retirée qu'avant le lancement, là où elle retient
+    // un « Prêt » ; un match lancé garde son caster, seulement tu.
+    const revoked = new Set<number>();
+    for (const { row, phase } of visible) {
       if (row.caster_user_id === null) continue;
       const casterId = Number(row.caster_user_id);
       if (castEligibilityBlock(users.get(casterId)) !== null) {
-        revokedCasts.push({ matchId: Number(row.id), casterId });
+        revoked.add(Number(row.id));
+        if (phase !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
       }
     }
-    const revoked = new Set(revokedCasts.map((cast) => cast.matchId));
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase } of visible) {
