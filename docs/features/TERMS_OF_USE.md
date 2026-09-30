@@ -79,3 +79,23 @@ révocable sans l'être. Chaque nouveau fichier redemande la garantie.
 `bg_users.terms_version` / `terms_accepted_at` (dernière acceptation, consultée
 avant un geste) et `bg_terms_acceptances` (la preuve : version, contexte, date).
 Rendues par l'export RGPD, effacées à l'anonymisation.
+
+## Âge minimum et vocabulaire
+
+Un compte exige **15 ans** (`SITE_MINIMUM_AGE`, repris par `/rgpd#age-minimum`).
+La condition est **déclarative** : le site ne recueille pas de date de
+naissance, et la majorité déclarée (`isAdult`) ne dit rien d'un seuil à 15 ans —
+aucun contrôle technique ne la tient. L'âge d'**adhésion** à l'association
+(16 ans, art. 6 des statuts) est distinct : un compte n'est pas une adhésion, et
+les conditions disent « utilisateur », jamais « membre », pour un titulaire de
+compte.
+
+## Licence sur les contenus
+
+La section « Contenus publiés par les utilisateurs » nomme les quatre éléments
+qu'exige le CPI (L131-3) : étendue (reproduire, représenter, adapter le format),
+destination (site et communications liées aux tournois), lieu (monde entier) et
+durée (celle de la publication sur le site). Le retrait vaut pour l'avenir : les
+diffusions et publications déjà faites ne sont pas reprises. Le titre de cette
+section est cité par `lib/shared/logo-quarantine.ts` : le renommer, c'est
+renommer ces citations dans le même changement.
