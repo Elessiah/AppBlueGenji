@@ -445,7 +445,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Scrims et recrutement" },
           {
             kind: "p",
-            text: `Pour les commandes **/scrim** et **/recrute** : identifiant de l'auteur, jeu, niveau ou rôle recherché, serveur et date, qui alimentent les statistiques d'activité (commande **/stats**, qui ne montre à chacun que sa propre activité, et tableau de bord du bot). Au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, l'identifiant de l'auteur est effacé : il ne reste que le jeu, le niveau ou le rôle, le serveur et le jour (l'heure est effacée avec lui), qui ne désignent plus personne.`,
+            text: `Pour les commandes **/scrim** et **/recrute** : identifiant de l'auteur, jeu, niveau ou rôle recherché, serveur et date, qui alimentent les statistiques d'activité (commande **/stats**, qui ne montre à chacun que sa propre activité, et tableau de bord du bot). Au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, ces lignes sont repliées en simples nombres par jour, serveur et niveau (ou rôle) : ni auteur, ni heure, ni ordre ne restent, rien qui désigne encore une personne.`,
           },
           { kind: "subhead", text: "Exclusions du relais" },
           {
@@ -491,7 +491,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Suivi des annonces relayées** (identifiants, date) : ${BOT_RELAY_RETENTION_DAYS} jours ; il est effacé au premier relais qui suit cette échéance, et au plus tard dans la nuit ou au redémarrage du Bot. Les copies publiées dans les salons partenaires restent sur Discord (section 02).`,
-              `**Scrims et recrutement** : l'identifiant de l'auteur est effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, lors du ménage de la nuit qui suit (ou d'un redémarrage du Bot) ; le reste de la ligne (jeu, niveau ou rôle, serveur, jour sans l'heure), qui ne désigne plus personne, est gardé pour les compteurs d'activité.`,
+              `**Scrims et recrutement** : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours avec l'identifiant de l'auteur ; lors du ménage de la nuit qui suit (ou d'un redémarrage du Bot), l'identifiant de l'auteur est effacé et les lignes sont repliées en nombres par jour, serveur et niveau (ou rôle), gardés pour les compteurs d'activité.`,
               "**Exclusions** : jusqu'à la levée de l'exclusion.",
               "**Configuration des serveurs** (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du Bot, modules activés) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du Bot du serveur, qui l'efface. Un départ survenu pendant une interruption du Bot, que Discord ne lui signale pas, est rattrapé à son redémarrage.",
               "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés, qui les efface — départ survenu pendant une interruption compris, rattrapé au redémarrage.",
@@ -648,7 +648,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Scrims and recruitment" },
           {
             kind: "p",
-            text: `For the **/scrim** and **/recrute** commands: author ID, game, level or role sought, server and date, which feed the activity statistics (**/stats** command, which only shows each user their own activity, and the bot's dashboard). After ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days the author's ID is erased: only the game, level or role, server and day remain (the time is erased with it), which no longer identify anyone.`,
+            text: `For the **/scrim** and **/recrute** commands: author ID, game, level or role sought, server and date, which feed the activity statistics (**/stats** command, which only shows each user their own activity, and the bot's dashboard). After ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days these rows are folded into plain counts per day, server and level (or role): no author, time or order remains, nothing that still identifies a person.`,
           },
           { kind: "subhead", text: "Relay exclusions" },
           {
@@ -694,7 +694,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Tracking of relayed advertisements** (IDs, date): ${BOT_RELAY_RETENTION_DAYS} days; it is erased at the first relay after that deadline, and at the latest during the night or when the Bot restarts. The copies posted in partner channels remain on Discord (section 02).`,
-              `**Scrims and recruitment**: the author's ID is erased after ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days, by the clean-up of the following night (or a restart of the Bot); the rest of the row (game, level or role, server, day without the time), which no longer identifies anyone, is kept for the activity counters.`,
+              `**Scrims and recruitment**: ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days with the author's ID; at the clean-up of the following night (or a restart of the Bot), the author's ID is erased and the rows are folded into counts per day, server and level (or role), kept for the activity counters.`,
               "**Exclusions**: until the exclusion is lifted.",
               "**Server configuration** (relayed channels and their rank filters, the invite and the referee role with the ID of whoever set them, the Bot administration role, enabled modules): until the administrators remove it, and at the latest until the Bot leaves the server, which erases it. A departure while the Bot is down, which Discord does not notify, is caught up when it restarts.",
               "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them — including a departure while the Bot is down, caught up when it restarts.",

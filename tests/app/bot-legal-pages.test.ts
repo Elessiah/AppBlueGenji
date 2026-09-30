@@ -231,10 +231,11 @@ describe("bot legal content matches the bot's code and the association", () => {
       const flat = flatOf(PRIVACY_POLICY, lang);
       expect(flat).not.toMatch(/Scrims (et recrutement|and recruitment)\*\*\s*:\s*(aucune suppression|no automatic deletion)/);
     }
-    expect(flatOf(PRIVACY_POLICY, "fr")).toContain(`l'identifiant de l'auteur est effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours`);
-    expect(flatOf(PRIVACY_POLICY, "en")).toContain(`the author's ID is erased after ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days`);
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("l'identifiant de l'auteur est effacé et les lignes sont repliées en nombres par jour");
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain("the author's ID is erased and the rows are folded into counts per day");
     const t08 = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08")?.retention ?? []).join(" | ");
-    expect(t08).toContain(`identifiant de l'auteur effacé au bout de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours`);
+    expect(t08).toContain(`Scrims et recrutement : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours ; ensuite`);
+    expect(t08).toContain("identifiant de l'auteur effacé et lignes repliées en nombres par jour");
     expect(t08).not.toContain("Scrims et recrutement : aucune suppression");
   });
 
