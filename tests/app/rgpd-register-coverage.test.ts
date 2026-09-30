@@ -30,7 +30,7 @@ describe("/rgpd — couverture du registre", () => {
 
   it("nomme les activités de l'association qui n'ont pas encore de fiche", () => {
     expect(REGISTER_SCOPE).toMatch(/site et du bot Discord/);
-    for (const activity of ["adhésions", "Spiceworks", "retransmission des matchs"]) {
+    for (const activity of ["journaux techniques du serveur", "adhésions", "Spiceworks", "retransmission des matchs"]) {
       expect(REGISTER_NOT_YET_COVERED).toContain(activity);
     }
   });

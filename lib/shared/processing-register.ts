@@ -180,7 +180,7 @@ export const REGISTER_SCOPE =
   "Le registre décrit les traitements de données personnelles du site et du bot Discord de l'association";
 
 export const REGISTER_NOT_YET_COVERED =
-  "Les activités que l'association mène hors du site — gestion des adhésions, portail de support (Spiceworks), retransmission des matchs — n'y ont pas encore de fiche : pour toute question à leur sujet, utilisez les moyens de contact de la politique de confidentialité.";
+  "Les journaux techniques du serveur web, et les activités que l'association mène hors du site — gestion des adhésions, portail de support (Spiceworks), retransmission des matchs —, n'y ont pas encore de fiche : pour toute question à leur sujet, utilisez les moyens de contact de la politique de confidentialité.";
 
 export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   {
