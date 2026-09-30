@@ -26,6 +26,7 @@ jest.mock("@/lib/server/tournaments/bg-survie");
 // Le classement du site rejoue tout `bg_matches` : bouchonné, seul compte ici
 // l'ordre qu'il rend.
 jest.mock("@/lib/server/ranking-service");
+jest.mock("@/lib/server/tournaments/player-pushes");
 
 import {
   getTournamentSnapshot,
@@ -52,6 +53,7 @@ import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
 import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie";
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { clearCache } from "@/lib/server/cache";
+import { dispatchMatchStartNotices } from "@/lib/server/tournaments/player-pushes";
 import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
 import { fakePool } from "../../helpers/sql-double";
 import type { RowOverrides } from "../../helpers/row-overrides";
@@ -263,7 +265,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
   );
 
   it("arbitre un report de score expiré", async () => {
-    expiredRows = [{ 1: 1 }];
+    expiredRows = [{ due: 1 }];
 
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
@@ -275,7 +277,7 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     // salle se réveille à cet instant (`nextRoomWakeAt`) et relit l'instantané,
     // qui doit donc jouer l'entretien — sinon il rendait un plateau inchangé.
     const execute = jest.fn(async (sql: string) =>
-      sql.includes("JOIN bg_tournaments t") ? [[{ 1: 1 }]] : [[]],
+      sql.includes("AS due") ? [[{ due: 1 }]] : [[]],
     );
     jest.mocked(getDatabase).mockResolvedValue(
       fakePool({ getConnection: jest.fn(async () => connection), execute }),
@@ -284,10 +286,38 @@ describe("getTournamentSnapshotFrame — entretien à la lecture", () => {
     await getTournamentSnapshotFrame(TOURNAMENT_ID);
 
     expect(syncTournamentState).toHaveBeenCalled();
-    const launchQuery = execute.mock.calls.map(([sql]) => sql).find((sql) => sql.includes("JOIN bg_tournaments t"));
-    // Même condition que le balayage passif, match à planifier exclu.
-    expect(launchQuery).toContain("t.referee_scheduling = 0");
-    expect(launchQuery).toContain("lobby_opened_at IS NULL");
+    const dueQueries = execute.mock.calls.map(([sql]) => sql).filter((sql) => sql.includes("AS due"));
+    // Une seule requête pour les deux entretiens, posée sur la ligne du
+    // tournoi ; même condition de lancement que le balayage passif.
+    expect(dueQueries).toHaveLength(1);
+    expect(dueQueries[0]).toContain("score_deadline_at <= NOW()");
+    expect(dueQueries[0]).toContain("t.referee_scheduling = 0");
+    expect(dueQueries[0]).toContain("lobby_opened_at IS NULL");
+    expect(dueQueries[0]).not.toContain("JOIN");
+  });
+
+  it("déclenche les notifications de départ quand la lecture ouvre un lancement", async () => {
+    jest.mocked(dispatchMatchStartNotices).mockResolvedValue(0);
+    expiredRows = [{ due: 1 }];
+    jest.mocked(syncTournamentState).mockResolvedValue({
+      row: runningRow(),
+      stateChanged: false,
+      contentChanged: false,
+      launchesChanged: true,
+    });
+
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+    // Import dynamique, jamais attendu : on laisse la promesse se résoudre.
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(dispatchMatchStartNotices).toHaveBeenCalledTimes(1);
+  });
+
+  it("ne relance pas les notifications quand aucun lancement n'a bougé", async () => {
+    expiredRows = [{ due: 1 }];
+    await getTournamentSnapshotFrame(TOURNAMENT_ID);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(dispatchMatchStartNotices).not.toHaveBeenCalled();
   });
 
   it("n'entretient pas quand aucun lancement n'est dû", async () => {

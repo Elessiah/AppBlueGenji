@@ -45,9 +45,15 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
 
   // Ce que l'allumage ferait passer « à planifier », et ce qui l'est déjà :
   // la même fonction, lue avec l'option allumée.
-  const toPlan = useMemo(() => matchesToPlan(detail.matches ?? [], true), [detail.matches]);
+  // Rien n'est calculé pour un panneau qui ne rendra rien — le cas de la
+  // plupart des lecteurs, sur la plupart des tournois.
+  const visible = enabled || toggleable;
+  const toPlan = useMemo(
+    () => (visible ? matchesToPlan(detail.matches ?? [], true) : []),
+    [visible, detail.matches],
+  );
 
-  if (!enabled && !toggleable) return null;
+  if (!visible) return null;
 
   const toggle = async (next: boolean): Promise<boolean> => {
     setBusy(true);

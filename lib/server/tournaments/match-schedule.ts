@@ -102,7 +102,8 @@ export async function setMatchStartAt(
   const startAt = blank ? null : normalizeMatchStartAt(rawStartAt);
   if (!blank && startAt === null) throw new Error("INVALID_MATCH_START_AT");
 
-  const { tournamentId, previousStartAt } = await withConnection(async (connection) => {
+  const tournamentId = await withConnection(async (connection) => {
+    let written: { tournamentId: number; previousStartAt: string | null };
     await connection.beginTransaction();
     try {
       const locked = await lockScheduleRow(connection, matchId);
@@ -123,28 +124,27 @@ export async function setMatchStartAt(
         [startAt === null ? null : new Date(startAt), matchId],
       );
       await connection.commit();
-      return { tournamentId: Number(row.tournament_id), previousStartAt: toIso(row.start_at) };
+      written = { tournamentId: Number(row.tournament_id), previousStartAt: toIso(row.start_at) };
     } catch (error) {
       await connection.rollback().catch(() => undefined);
       throw error;
     }
-  });
 
-  // Les rappels déjà envoyés portaient l'ancienne date : ils ne valent plus
-  // rien. Les effacer fait repartir le cycle à zéro
-  // (`lib/server/tournaments/match-reminders.ts`), donc réannoncer la nouvelle
-  // date — c'est précisément ce qu'un déplacement de manche doit produire.
-  // Meilleur effort, hors transaction : une manche reprogrammée ne doit pas
-  // échouer parce que le ménage des rappels a échoué.
-  if (previousStartAt !== startAt) {
-    try {
-      await withConnection((connection) =>
-        connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [matchId]),
-      );
-    } catch {
-      // Meilleur effort : au pire, le cycle des rappels garde son ancien état.
+    // Les rappels déjà envoyés portaient l'ancienne date : ils ne valent plus
+    // rien. Les effacer fait repartir le cycle à zéro
+    // (`lib/server/tournaments/match-reminders.ts`), donc réannoncer la
+    // nouvelle date — c'est précisément ce qu'un déplacement de manche doit
+    // produire. Après le commit, sur la même connexion, et au meilleur effort :
+    // une manche reprogrammée ne doit pas échouer parce que le ménage a échoué.
+    if (written.previousStartAt !== startAt) {
+      try {
+        await connection.execute(`DELETE FROM bg_match_reminders WHERE match_id = ?`, [matchId]);
+      } catch {
+        // Meilleur effort : au pire, le cycle des rappels garde son ancien état.
+      }
     }
-  }
+    return written.tournamentId;
+  });
 
   publishMatchUpdatedEvent(tournamentId, { onAir: true });
   return startAt;
