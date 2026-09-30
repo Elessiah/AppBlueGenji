@@ -8,7 +8,7 @@
 }
 
 .inner {
-  width: min(1240px, calc(100vw - 40px));
+  width: min(1240px, calc(100vw - max(40px, var(--a11y-tab-gutter))));
   margin: 0 auto;
   display: grid;
   grid-template-columns: 1.1fr 1fr;
