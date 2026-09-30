@@ -11,6 +11,7 @@ import {
   forceLaunchMatch,
   loadViewerCastBlock,
   maintainMatchLaunches,
+  releaseIneligibleCast,
   releaseMatchCast,
   setMatchHost,
   setMatchReady,
@@ -642,5 +643,38 @@ describe("loadViewerCastBlock", () => {
       is_deleted: 0,
     };
     await expect(loadViewerCastBlock(CASTER, true)).resolves.toBeNull();
+  });
+});
+
+describe("releaseIneligibleCast", () => {
+  const ineligible = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+
+  it("retire un caster qui ne remplit plus la condition, et lance ce qui n'attendait que lui", async () => {
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+    expect(state.match?.caster_user_id).toBeNull();
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it.each<[string, Partial<MatchState>]>([
+    ["un match lancé", { launched_at: STAMP }],
+    ["un match joué entre-temps", { status: "COMPLETED" }],
+    ["un match repris par un autre caster", { caster_user_id: 901 }],
+  ])("ne touche pas à %s", async (_label, overrides) => {
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, ...overrides });
+    const before = state.match.caster_user_id;
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
+    expect(state.match?.caster_user_id).toBe(before);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("garde un compte redevenu éligible", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
+    expect(state.match?.caster_user_id).toBe(CASTER);
   });
 });
