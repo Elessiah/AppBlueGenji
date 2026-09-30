@@ -103,6 +103,16 @@ describe("journal des données de connexion (serveur)", () => {
     expect(execute).toHaveBeenCalledTimes(2);
   });
 
+  it("retente une purge échouée à la connexion suivante", async () => {
+    const start = 1_000_000_000_000;
+    execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+    await expect(purgeExpiredConnectionLogs(start)).rejects.toThrow("ER_LOCK_WAIT_TIMEOUT");
+
+    await purgeExpiredConnectionLogs(start + 1_000);
+
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it("rend au titulaire ses lignes pour l'export", async () => {
     execute.mockResolvedValue([
       [{ event_type: "LOGIN_GOOGLE", ip: "203.0.113.7", created_at: new Date("2026-07-01T10:00:00.000Z") }],

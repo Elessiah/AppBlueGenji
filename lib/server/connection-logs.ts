@@ -63,12 +63,15 @@ export async function recordConnection(userId: number, event: ConnectionLogEvent
  */
 export async function purgeExpiredConnectionLogs(now: number = Date.now()): Promise<number> {
   if (now - lastPurgeAt < PURGE_INTERVAL_MS) return 0;
-  lastPurgeAt = now;
   const db = await getDatabase();
   const [result] = await db.execute(
     `DELETE FROM bg_connection_logs WHERE created_at < NOW() - INTERVAL ? DAY`,
     [CONNECTION_LOG_RETENTION_DAYS],
   );
+  // Noté **après** le succès seulement : une purge échouée se retente à la
+  // connexion suivante, sans quoi une panne passagère laisserait des lignes
+  // au-delà de la durée annoncée pendant une heure de plus à chaque fois.
+  lastPurgeAt = now;
   return Number((result as { affectedRows?: number }).affectedRows ?? 0);
 }
 
