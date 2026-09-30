@@ -96,6 +96,8 @@ describe("mention d'information du bulletin d'adhésion", () => {
     "Finalité",
     "Base légale",
     "article 6.1.b du RGPD",
+    "repose sur votre consentement (article 6.1.a)",
+    "retirer à tout moment",
     "Destinataires",
     "membres du Bureau",
     "PayPal",
