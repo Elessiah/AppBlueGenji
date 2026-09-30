@@ -62,6 +62,7 @@ import { orReload } from "./_lib/lazy-component";
 // `orReload` : un fichier disparu (déploiement survenu depuis l'ouverture)
 // recharge la page au lieu de la faire tomber.
 const SurvivalView = dynamic(() => orReload(import("./_components/SurvivalView").then((m) => m.SurvivalView)), { ssr: false });
+const SurvivalRounds = dynamic(() => orReload(import("./_components/SurvivalView").then((m) => m.SurvivalRounds)), { ssr: false });
 const SwissView = dynamic(() => orReload(import("./_components/SwissView").then((m) => m.SwissView)), { ssr: false });
 const SwissRounds = dynamic(() => orReload(import("./_components/SwissView").then((m) => m.SwissRounds)), { ssr: false });
 const EnduranceView = dynamic(() => orReload(import("./_components/EnduranceView").then((m) => m.EnduranceView)), { ssr: false });
@@ -530,10 +531,11 @@ export default function TournamentDetailPage() {
     : detail.matches;
 
   const formatForBracket = isMulti && selectedPhase ? selectedPhase.format : detail.card.format;
-  // Le classement suisse de l'instantané est celui du tournoi, ou — en
-  // multi-phases — de la seule phase **en cours** (`snapshot.ts`). Il ne décrit
-  // donc la phase affichée que si c'est elle.
-  const swissMetaIsSelectedPhase =
+  // Les classements suisse et survie de l'instantané sont ceux du tournoi, ou —
+  // en multi-phases — de la seule phase **en cours** (`snapshot.ts`). Ils ne
+  // décrivent donc la phase affichée que si c'est elle ; une phase close montre
+  // ses manches seules, et son classement de phase dessous.
+  const rankingMetaIsSelectedPhase =
     !isMulti || (selectedPhase !== null && selectedPhase.id === detail.currentPhaseId);
   // Clé des vues à manches : changer de phase les remonte, et leur zone de
   // manches se rouvre sur la dernière (`revealKey` ne suffit pas quand deux
@@ -708,7 +710,7 @@ export default function TournamentDetailPage() {
               </p>
               {previewBlock}
             </>
-          ) : formatForBracket === "SURVIVAL" && detail.survival ? (
+          ) : formatForBracket === "SURVIVAL" && detail.survival && rankingMetaIsSelectedPhase ? (
             <>
               <SurvivalView
                 // Une vue par phase : la rangée de manches se rouvre sur la
@@ -723,6 +725,25 @@ export default function TournamentDetailPage() {
                 onOpenAdminModal={openAdminScore}
                 canForfeit={canForfeit}
                 onForfeit={forfeitTeam}
+                emptyLabel={noMatchesLabel}
+              />
+              {/* Pas de `finishedPhaseStandings` ici, comme pour la vue suisse :
+                  la phase en cours ne se clôt qu'avec le tournoi, et la vue
+                  porte déjà son classement — il s'afficherait deux fois. */}
+            </>
+          ) : formatForBracket === "SURVIVAL" && isMulti ? (
+            // Phase survie close d'un multi-phases : ses manches, et son
+            // classement de phase dessous — jamais le classement de la phase en
+            // cours, ni un arbre à élimination. Le barrage n'est connu que de la
+            // phase en cours : les manches s'affichent sans marques de coupe.
+            <>
+              <SurvivalRounds
+                key={phaseViewKey}
+                matches={filteredMatches}
+                allTournamentMatches={detail.matches}
+                cutSchedule={null}
+                adminResolvable={canAdminResolve}
+                onOpenAdminModal={openAdminScore}
                 emptyLabel={noMatchesLabel}
               />
               {finishedPhaseStandings}
@@ -755,7 +776,7 @@ export default function TournamentDetailPage() {
               showNextRound={detail.isAdmin && detail.card.state === "RUNNING" && !frozen}
               qualificationFormat={detail.card.matchFormat}
             />
-          ) : formatForBracket === "SWISS" && detail.swiss && swissMetaIsSelectedPhase ? (
+          ) : formatForBracket === "SWISS" && detail.swiss && rankingMetaIsSelectedPhase ? (
             // Tournoi suisse, ou phase suisse **en cours** d'un multi-phases :
             // le serveur ne charge le classement suisse que de celle-ci.
             <>

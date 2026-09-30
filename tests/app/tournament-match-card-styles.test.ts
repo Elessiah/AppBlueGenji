@@ -102,8 +102,9 @@ describe("classement d'une phase terminée — un seul bloc, un vrai titre", () 
     expect(PAGE).toContain('import("./_components/PhaseStandingsBlock").then((m) => m.PhaseStandingsBlock)');
     expect(PAGE.match(/<PhaseStandingsBlock /g)).toHaveLength(1);
     expect(PAGE).not.toContain("<PhaseStandingsTable");
-    // Rendu sous les vues qui en ont un : survie, rondes seules d'une phase
-    // suisse close, élimination (la vue suisse complète porte le sien).
+    // Rendu sous les vues qui n'en portent pas : manches seules d'une phase
+    // survie close, rondes seules d'une phase suisse close, élimination (les
+    // vues survie et suisse complètes portent le leur).
     expect(PAGE.match(/\{finishedPhaseStandings\}/g)).toHaveLength(3);
   });
 
