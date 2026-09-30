@@ -12,6 +12,13 @@ import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shar
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import {
+  CODE_COPYRIGHT_HOLDER,
+  CODE_LICENSE_NAME,
+  CODE_LICENSE_SPDX,
+  CODE_LICENSE_URL,
+  SOURCE_CODE_URL,
+} from "@/lib/shared/source-code";
 
 /**
  * Lien externe vers le règlement intérieur (Google Docs).
@@ -210,15 +217,33 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
     ),
   },
   {
+    id: "propriete-intellectuelle",
     title: "Propriété intellectuelle",
-    meta: "DROITS RÉSERVÉS",
+    meta: `CODE SOUS ${CODE_LICENSE_SPDX}`,
     body: (
       <>
         <p>
-          Les éléments propres au site — textes éditoriaux, logo et identité visuelle de
-          l&apos;association, mise en page, code — sont la propriété de l&apos;association Bluegenji
-          Esport. Leur reproduction, représentation, modification ou diffusion, totale ou partielle,
-          est interdite sans son autorisation écrite préalable.
+          <strong>Code source.</strong> Le code du site est publié sous la licence libre{" "}
+          <a href={CODE_LICENSE_URL} target="_blank" rel="noreferrer">
+            {CODE_LICENSE_NAME} (nouvel onglet)
+          </a>{" "}
+          ({CODE_LICENSE_SPDX}). Les droits d&apos;auteur sur ce code appartiennent à{" "}
+          <strong>{CODE_COPYRIGHT_HOLDER}</strong>. Chacun peut le consulter, le copier, le
+          modifier et le redistribuer aux conditions de cette licence, qui imposent notamment, pour une
+          version modifiée offerte en ligne, d&apos;en proposer le code source à ses utilisateurs
+          sous la même licence. Le code
+          source est disponible sur{" "}
+          <a href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">
+            GitHub (nouvel onglet)
+          </a>
+          . Il embarque des composants tiers — bibliothèques, polices — qui restent sous leurs
+          propres licences.
+        </p>
+        <p>
+          <strong>Autres éléments.</strong> Les textes éditoriaux, le nom, le logo et
+          l&apos;identité visuelle de l&apos;association, ainsi que ses documents officiels, ne sont
+          pas couverts par cette licence : leur reproduction, représentation, modification ou
+          diffusion, totale ou partielle, suppose l&apos;autorisation de leurs titulaires.
         </p>
         <p>
           <strong>Ne lui appartiennent pas</strong> les contenus publiés par les membres (avatars,
@@ -288,10 +313,15 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
     body: (
       <>
         <p>
-          Les informations recueillies lors de la création d&apos;un compte ou d&apos;une adhésion
-          sont nécessaires à la gestion de votre participation aux activités de l&apos;association.
-          Elles sont destinées exclusivement à l&apos;association Bluegenji Esport et ne sont en
-          aucun cas cédées à des tiers.
+          Les informations recueillies lors de la création d&apos;un compte et de l&apos;utilisation
+          du site sont traitées par l&apos;association Bluegenji Esport, responsable du traitement,
+          pour gérer votre participation à ses activités. Elles ne sont pas réservées à
+          l&apos;association : ce que le site publie se lit des autres joueurs et du public, et
+          certaines données sont communiquées à des services tiers — Discord, Google, Blizzard, le
+          service de push de votre navigateur, Microsoft pour les sauvegardes chiffrées —, dans les
+          limites décrites à la section{" "}
+          <Link href="/rgpd#destinataires">« Destinataires et transferts »</Link> de la politique de
+          confidentialité et, traitement par traitement, dans son registre.
         </p>
         <p>
           Conformément au Règlement Général sur la Protection des Données (RGPD — Règlement UE
