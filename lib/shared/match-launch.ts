@@ -33,11 +33,16 @@ export const LAUNCH_AUTO_DELAY_MINUTES = 15;
 /**
  * - `NONE` : rien à lancer (match à venir sans ses deux engagées, exemption,
  *   match terminé) ;
- * - `SCHEDULED` : jouable, mais son heure de début n'est pas atteinte ;
+ * - `TO_PLAN` : **à planifier** — jouable, mais le tournoi exige que
+ *   l'arbitrage fixe chaque horaire (`bg_tournaments.referee_scheduling`) et
+ *   celui-ci n'en a pas encore ; rien ne se passe tant qu'une date n'est pas
+ *   posée (`lib/shared/match-planning.ts`) ;
+ * - `SCHEDULED` : **en attente de départ** — jouable, mais son heure de début
+ *   n'est pas atteinte ;
  * - `LOBBY` : **en lancement**, on attend les « Prêt » ;
  * - `LAUNCHED` : lancé, les scores peuvent être reportés.
  */
-export type MatchLaunchPhase = "NONE" | "SCHEDULED" | "LOBBY" | "LAUNCHED";
+export type MatchLaunchPhase = "NONE" | "TO_PLAN" | "SCHEDULED" | "LOBBY" | "LAUNCHED";
 
 /** Ce que la règle a besoin de savoir d'un match. */
 export type MatchLaunchInput = {
@@ -48,6 +53,14 @@ export type MatchLaunchInput = {
   startAt: string | null;
   /** ISO ; `null` = pas encore lancé. */
   launchedAt: string | null;
+  /**
+   * Option du tournoi « matchs planifiés par l'arbitrage »
+   * (`bg_tournaments.referee_scheduling`) : un match sans horaire est alors
+   * **à planifier** au lieu d'entrer en lancement. Obligatoire, et non
+   * facultatif à `false` : un appelant qui l'oublierait ouvrirait le lancement
+   * d'un match que l'arbitrage n'a pas encore planifié.
+   */
+  refereeScheduling: boolean;
 };
 
 function isoTime(iso: string | null | undefined): number | null {
@@ -69,6 +82,7 @@ export function matchLaunchPhase(match: MatchLaunchInput, now: number): MatchLau
   if (match.status === "AWAITING_CONFIRMATION") return "LAUNCHED";
   if (match.launchedAt !== null) return "LAUNCHED";
   const start = isoTime(match.startAt);
+  if (start === null && match.refereeScheduling) return "TO_PLAN";
   if (start !== null && start > now) return "SCHEDULED";
   return "LOBBY";
 }
@@ -76,7 +90,8 @@ export function matchLaunchPhase(match: MatchLaunchInput, now: number): MatchLau
 /**
  * Instant (ms) où la phase changera **sans écriture** — seule l'horloge fait
  * passer un match de `SCHEDULED` à `LOBBY`. `null` ailleurs : les autres
- * bascules sont des écritures, que le flux annonce.
+ * bascules sont des écritures, que le flux annonce — y compris la sortie de
+ * `TO_PLAN`, qui n'arrive que par la date que l'arbitrage pose.
  */
 export function nextLaunchPhaseChangeAt(match: MatchLaunchInput, now: number): number | null {
   return matchLaunchPhase(match, now) === "SCHEDULED" ? isoTime(match.startAt) : null;
@@ -84,11 +99,33 @@ export function nextLaunchPhaseChangeAt(match: MatchLaunchInput, now: number): n
 
 /**
  * Les engagés peuvent-ils reporter un score sur ce match ? Seulement lancé.
- * L'arbitrage n'est pas soumis à cette règle (forfait d'une équipe absente,
- * correction) : elle ne concerne que le report des joueurs.
+ *
+ * L'option de planification n'y change rien — `LAUNCHED` ne dépend que de
+ * `launched_at` et du statut —, d'où une entrée qui ne la demande pas : le
+ * report d'un joueur ne lit pas le tournoi pour une réponse qu'elle ne peut
+ * pas modifier.
  */
-export function canPlayersReportScore(match: MatchLaunchInput, now: number): boolean {
-  return matchLaunchPhase(match, now) === "LAUNCHED";
+export function canPlayersReportScore(
+  match: Omit<MatchLaunchInput, "refereeScheduling">,
+  now: number,
+): boolean {
+  return matchLaunchPhase({ ...match, refereeScheduling: false }, now) === "LAUNCHED";
+}
+
+/**
+ * Phases où **personne**, arbitrage compris, ne saisit de score : le match
+ * n'est pas encore entré en lancement — à planifier, ou en attente de son
+ * heure. Un score noté là serait celui d'une rencontre qui n'a pas pu avoir
+ * lieu, et poserait une saisie qui verrouille la manche précédente
+ * (`match-lock`). Le **forfait** reste possible (une équipe qui se sait absente
+ * n'a pas à attendre l'heure pour le dire), et la correction d'un match
+ * terminé (`NONE`) aussi.
+ */
+export const SCORE_ENTRY_CLOSED_PHASES: readonly MatchLaunchPhase[] = ["TO_PLAN", "SCHEDULED"];
+
+/** Un score peut-il être saisi sur ce match (arbitrage comme joueurs) ? */
+export function isScoreEntryOpen(match: MatchLaunchInput, now: number): boolean {
+  return !SCORE_ENTRY_CLOSED_PHASES.includes(matchLaunchPhase(match, now));
 }
 
 /** Instant (ISO) du lancement d'office, depuis l'ouverture du lancement. */
@@ -421,6 +458,8 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
   MATCH_NOT_LAUNCHABLE: "Ce match ne peut pas être lancé : ses deux engagées ne sont pas connues ou il est terminé.",
   MATCH_ALREADY_LAUNCHED: "Ce match est déjà lancé.",
   MATCH_NOT_LAUNCHED: "Le match n'est pas encore lancé : toutes les parties doivent se déclarer prêtes.",
+  MATCH_NOT_IN_LAUNCH:
+    "Le score ne se saisit qu'à partir du lancement du match : planifie-le ou attends son heure de début. Un forfait reste possible.",
   NOT_MATCH_PARTY: "Tu ne joues ni ne castes ce match.",
   NOT_TEAM_READY_ROLE: "Seul le capitaine, un manager ou le propriétaire peut déclarer l'équipe prête.",
   NOT_CASTER: "Caster un match demande le rôle caster.",

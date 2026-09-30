@@ -560,3 +560,72 @@ describe("roomBudgetDelayMs", () => {
     expect(roomBudgetDelayMs(150 * 1024 * 128)).toBe(budgetDelayMs(150 * 1024, 128));
   });
 });
+
+describe("nextRoomWakeAt / isRoomOverdue — échéances de lancement", () => {
+  const NOW = Date.parse("2030-01-01T12:00:00.000Z");
+  const snapshotOf = (card: Partial<TournamentSnapshot["card"]>, matches: unknown[] = []) =>
+    frameOf("v", card, matches).snapshot;
+  const playable = (overrides: Record<string, unknown> = {}) => ({
+    status: "READY",
+    team1Id: 1,
+    team2Id: 2,
+    startAt: null,
+    launchedAt: null,
+    lobbyOpenedAt: null,
+    ...overrides,
+  });
+
+  it("se réveille à l'heure de départ d'un match en attente", () => {
+    const snapshot = snapshotOf({ state: "RUNNING" }, [playable({ startAt: iso(NOW + 90_000) })]);
+    expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + 90_000 + SCORE_DEADLINE_MARGIN_MS);
+  });
+
+  it("se réveille au lancement d'office d'un match en lancement", () => {
+    // Ouvert il y a douze minutes : départ d'office dans trois, avant le filet.
+    const snapshot = snapshotOf({ state: "RUNNING" }, [
+      playable({ startAt: iso(NOW - 720_000), lobbyOpenedAt: iso(NOW - 720_000) }),
+    ]);
+    expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + 180_000 + SCORE_DEADLINE_MARGIN_MS);
+  });
+
+  it("n'a aucune échéance pour un match à planifier, lancé, ou hors d'un tournoi en cours", () => {
+    const toPlan = snapshotOf({ state: "RUNNING", refereeScheduling: true }, [playable()]);
+    expect(nextRoomWakeAt(toPlan, NOW)).toBe(NOW + ROOM_SAFETY_NET_MS);
+
+    const launched = snapshotOf({ state: "RUNNING" }, [
+      playable({ startAt: iso(NOW + 60_000), launchedAt: iso(NOW - 1_000) }),
+    ]);
+    expect(nextRoomWakeAt(launched, NOW)).toBe(NOW + ROOM_SAFETY_NET_MS);
+
+    const notRunning = snapshotOf(
+      {
+        state: "UPCOMING",
+        registrationOpenAt: iso(NOW - 3_600_000),
+        registrationCloseAt: iso(NOW - 1_800_000),
+        startAt: iso(NOW + 3_600_000),
+      },
+      [playable({ startAt: iso(NOW + 60_000) })],
+    );
+    expect(nextRoomWakeAt(notRunning, NOW)).toBe(NOW + ROOM_SAFETY_NET_MS);
+  });
+
+  it("rattrape une fois une heure de départ dont l'ouverture n'a pas été lue, sans boucler", () => {
+    const start = NOW - 2_000;
+    const snapshot = snapshotOf({ state: "RUNNING" }, [playable({ startAt: iso(start) })]);
+    // Juste après l'échéance : l'entretien n'a pas encore posé l'ouverture.
+    expect(isRoomOverdue(snapshot, NOW)).toBe(true);
+    expect(nextRoomWakeAt(snapshot, NOW)).toBe(NOW + STATE_CATCH_UP_MS);
+    // Hors de la fenêtre : plus de rattrapage, la salle retombe sur le filet.
+    const later = start + SCORE_DEADLINE_MARGIN_MS + STATE_CATCH_UP_MS + 1;
+    expect(isRoomOverdue(snapshot, later)).toBe(false);
+  });
+
+  it("rattrape une fois un lancement d'office échu", () => {
+    const opened = NOW - 15 * 60_000 - 2_000;
+    const snapshot = snapshotOf({ state: "RUNNING" }, [
+      playable({ startAt: iso(opened), lobbyOpenedAt: iso(opened) }),
+    ]);
+    expect(isRoomOverdue(snapshot, NOW)).toBe(true);
+    expect(isRoomOverdue(snapshot, NOW + 60_000)).toBe(false);
+  });
+});

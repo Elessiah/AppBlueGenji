@@ -497,3 +497,21 @@ describe("validateTournamentInput — conditions d'inscription", () => {
     expect(v.registrationFilters.minPlayers).toBe(7);
   });
 });
+
+describe("validateTournamentInput — planification par l'arbitrage", () => {
+  it("éteint l'option par défaut", () => {
+    expect(value(base).refereeScheduling).toBe(false);
+    expect(value({ ...base, refereeScheduling: null }).refereeScheduling).toBe(false);
+  });
+
+  it("l'allume sur un vrai booléen", () => {
+    expect(value({ ...base, refereeScheduling: true }).refereeScheduling).toBe(true);
+    expect(value({ ...base, refereeScheduling: false }).refereeScheduling).toBe(false);
+  });
+
+  it.each(["true", 1, "1", {}])("refuse une valeur qui n'est pas un booléen (%j)", (raw) => {
+    expect(validateTournamentInput({ ...base, refereeScheduling: raw as never })).toEqual({
+      error: "INVALID_REFEREE_SCHEDULING",
+    });
+  });
+});

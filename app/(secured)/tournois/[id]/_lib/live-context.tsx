@@ -13,6 +13,12 @@ type LiveControls = {
    * chaîne d'un match, il ne décide pas de son horaire.
    */
   canSchedule: boolean;
+  /**
+   * Option du tournoi « matchs planifiés par l'arbitrage »
+   * (`lib/shared/match-planning.ts`) : la phase de lancement d'un match en
+   * dépend (`TO_PLAN`), et chaque carte la lit ici plutôt qu'en prop.
+   */
+  refereeScheduling: boolean;
   /** Ouvre la configuration de diffusion d'un match. */
   openConfig: (match: BracketMatch) => void;
   /** Ouvre la date de début d'un match. */
@@ -33,6 +39,7 @@ type LiveControls = {
 const LiveContext = createContext<LiveControls>({
   canManage: false,
   canSchedule: false,
+  refereeScheduling: false,
   openConfig: () => undefined,
   openSchedule: () => undefined,
   viewerUserId: null,
@@ -54,6 +61,7 @@ const LiveContext = createContext<LiveControls>({
 export function LiveProvider({
   canManage,
   canSchedule,
+  refereeScheduling,
   openConfig,
   openSchedule,
   viewerUserId,
@@ -66,6 +74,7 @@ export function LiveProvider({
     () => ({
       canManage,
       canSchedule,
+      refereeScheduling,
       openConfig,
       openSchedule,
       viewerUserId,
@@ -73,7 +82,17 @@ export function LiveProvider({
       castBlock,
       openReplay,
     }),
-    [canManage, canSchedule, openConfig, openSchedule, viewerUserId, myTeamId, castBlock, openReplay],
+    [
+      canManage,
+      canSchedule,
+      refereeScheduling,
+      openConfig,
+      openSchedule,
+      viewerUserId,
+      myTeamId,
+      castBlock,
+      openReplay,
+    ],
   );
   return <LiveContext.Provider value={value}>{children}</LiveContext.Provider>;
 }

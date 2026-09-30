@@ -13,11 +13,38 @@ import {
   matchFormatLabel,
   matchWinsRequired,
 } from "@/lib/shared/match-format";
+import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
+import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
+import { useLiveControls } from "../_lib/live-context";
 import { pendingScoreProposal, scoreBlockerMessage } from "../_lib/score-form";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
+
+/**
+ * Phrase d'aide du forfait, selon ce qui est désigné : les deux engagées, une
+ * seule, ou personne encore — et, dans ce dernier cas, sans parler de scores
+ * « ignorés » quand aucun ne peut être saisi (match pas encore lancé).
+ */
+function forfeitHint(input: {
+  team1: string;
+  team2: string;
+  doubleForfeit: boolean;
+  forfeiting: { out: string; through: string } | null;
+  forfeitMaps: number;
+  scoreEntryClosed: boolean;
+}): string {
+  const { team1, team2, forfeiting, forfeitMaps } = input;
+  if (input.doubleForfeit) {
+    return `${team1} et ${team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.`;
+  }
+  if (forfeiting) {
+    return `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`;
+  }
+  const question = `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0`;
+  return input.scoreEntryClosed ? `${question}.` : `${question}, et les scores saisis sont ignorés.`;
+}
 
 interface AdminScoreDialogProps {
   /** Match **résolu à chaque rendu** depuis la liste rafraîchie par le flux. */
@@ -70,7 +97,13 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
 export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDialogProps) {
-  const form = useScoreForm(match);
+  // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
+  // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
+  // attente de départ » s'ouvre de lui-même à l'heure dite.
+  const { refereeScheduling } = useLiveControls();
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
+  const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
+  const form = useScoreForm(match, { scoreEntryClosed });
   const matchFormat = useMatchFormat(match);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
@@ -98,7 +131,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
         : { out: team2, through: team1 };
   // Un forfait déjà posé ne se cache pas derrière un lien : il commande la
   // rencontre, et le replier laisserait croire à un match encore à jouer.
-  const showForfeit = forfeitOpen || anyForfeit;
+  // Avant le lancement, le forfait est le seul geste possible : il s'offre
+  // déplié plutôt que derrière un lien.
+  const showForfeit = forfeitOpen || anyForfeit || scoreEntryClosed;
 
   // Ce qui est en base ne se rappelle que s'il ne se lit pas déjà dans les
   // champs : un match tranché (les champs ne disent pas qui a gagné), ou une
@@ -110,7 +145,10 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
     form.dirty
       ? storedResultLabel(match, team1, team2)
       : null;
-  const blocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
+  // Avant le lancement, la raison est déjà dite en tête du dialogue : la
+  // répéter sous les boutons doublerait la même phrase.
+  const rawBlocker = form.decision.resolveBlocker ?? form.decision.saveBlocker;
+  const blocker = rawBlocker === "NOT_IN_LAUNCH" ? null : rawBlocker;
   // Score proposé par une engagée et jamais confirmé par l'autre — une équipe
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
   // vérifier puis à le valider, sans le recopier.
@@ -183,6 +221,16 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             </p>
           )}
 
+          {/* `<output>` : une région d'état native, que la phase peut changer
+              sous les yeux du lecteur (l'heure de départ arrive). */}
+          {scoreEntryClosed && (
+            <output className={`${styles.stored} ${styles.notice}`}>
+              {launchPhase === "TO_PLAN"
+                ? "Match à planifier : fixe sa date avant d'en saisir le score. Un forfait peut être prononcé dès maintenant."
+                : "Match en attente de départ : le score se saisit à partir de son lancement. Un forfait peut être prononcé dès maintenant."}
+            </output>
+          )}
+
           {proposalNotice && (
             <p className={styles.stored} role="status">
               {proposalNotice}
@@ -211,7 +259,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               teamName={team1}
               value={form.score1}
               max={maxScore}
-              disabled={form.submitting || anyForfeit}
+              disabled={form.submitting || anyForfeit || scoreEntryClosed}
               onChange={form.setScore1}
             />
             <span className={styles.versus} aria-hidden="true">
@@ -223,7 +271,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               teamName={team2}
               value={form.score2}
               max={maxScore}
-              disabled={form.submitting || anyForfeit}
+              disabled={form.submitting || anyForfeit || scoreEntryClosed}
               onChange={form.setScore2}
             />
           </div>
@@ -240,7 +288,10 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                 porte `aria-expanded`. Un bouton qui s'efface au profit du
                 panneau annonçait « replié » puis disparaissait, sans jamais
                 signaler l'ouverture. Il sert aussi d'annulation, ce qui évite un
-                troisième bouton dans la rangée. */}
+                troisième bouton dans la rangée. Avant le lancement, le
+                panneau est toujours ouvert : seul « Annuler le forfait » garde
+                un sens. */}
+            {(!scoreEntryClosed || anyForfeit) && (
             <button
               type="button"
               className={styles.link}
@@ -261,6 +312,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                   ? "Annuler"
                   : "Déclarer un forfait sur cette manche"}
             </button>
+            )}
 
             {showForfeit && (
               <div id="admin-score-forfeit" className={styles.forfeitPanel}>
@@ -276,11 +328,14 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
                     fait passer l'adversaire suivant par exemption — un effet
                     qui descend l'arbre, et qu'on ne découvre pas après coup. */}
                 <p id="admin-score-forfeit-hint" className={styles.forfeitHint}>
-                  {doubleForfeit
-                    ? `${team1} et ${team2} déclarent toutes les deux forfait : le match est perdu pour les deux, personne ne se qualifie, et dans un tableau leur prochain adversaire passe le tour par exemption.`
-                    : forfeiting
-                      ? `${forfeiting.out} déclare forfait sur cette manche : ${forfeiting.through} l'emporte ${forfeitMaps}-0, sans manche jouée.`
-                      : `Qui déclare forfait sur cette manche ? Son adversaire l'emporte ${forfeitMaps}-0, et les scores saisis sont ignorés.`}
+                  {forfeitHint({
+                    team1,
+                    team2,
+                    doubleForfeit,
+                    forfeiting,
+                    forfeitMaps,
+                    scoreEntryClosed,
+                  })}
                 </p>
                 <div className={styles.forfeitRow}>
                   <button

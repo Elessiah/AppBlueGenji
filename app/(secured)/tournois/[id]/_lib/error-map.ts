@@ -1,5 +1,6 @@
 import { CONCURRENT_UPDATE_RETRY, CONCURRENT_UPDATE_RETRY_MESSAGE } from "@/lib/shared/api-error-code";
 import { LAUNCH_ERROR_MESSAGES } from "@/lib/shared/match-launch";
+import { REFEREE_SCHEDULING_ERRORS } from "@/lib/shared/match-planning";
 import { endurancePenaltyMessage } from "@/lib/shared/endurance-penalty";
 import { ENTRANT_REMOVAL_BLOCK_MESSAGES } from "@/lib/shared/entrant-removal";
 import { PHASE_ERROR_MESSAGES } from "@/lib/shared/tournament-phases";
@@ -8,6 +9,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Lancement des matchs : en tête, pour que les formulations propres à cette
   // page l'emportent sur les codes communs (match introuvable, tournoi arrêté).
   ...LAUNCH_ERROR_MESSAGES,
+  ...REFEREE_SCHEDULING_ERRORS,
   // Écriture défaite par un interblocage (`fail()`, `lib/server/http.ts`) :
   // saisie de score, arbitrage ou forfait contre un réordonnancement du seeding.
   [CONCURRENT_UPDATE_RETRY]: CONCURRENT_UPDATE_RETRY_MESSAGE,

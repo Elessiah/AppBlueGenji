@@ -34,6 +34,8 @@ export type LaunchMatchRow = RowDataPacket & {
   id: number;
   tournament_id: number;
   tournament_state: string;
+  /** Option du tournoi : matchs planifiés par l'arbitrage (1). */
+  referee_scheduling: number | null;
   status: MatchStatus;
   is_bye: number;
   team1_id: number | null;
@@ -52,7 +54,7 @@ export type LaunchMatchRow = RowDataPacket & {
 };
 
 const LAUNCH_MATCH_COLUMNS = `
-  m.id, m.tournament_id, t.state AS tournament_state, m.status, m.is_bye,
+  m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, m.status, m.is_bye,
   m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
   m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at,
   m.team2_ready_at, m.caster_user_id, m.caster_ready_at, m.host_team_id`;
@@ -94,6 +96,7 @@ export function toLaunchInput(row: LaunchMatchRow): MatchLaunchInput {
     team2Id: nullableId(row.team2_id),
     startAt: toIso(row.start_at),
     launchedAt: rowLaunchState(row).launchedAt,
+    refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
   };
 }
 
@@ -184,21 +187,24 @@ async function lockLaunchMatch(
   const [context] = await connection.execute<
     (RowDataPacket & {
       tournament_state: string | null;
+      referee_scheduling: number | null;
       team1_is_ghost: number | null;
       team2_is_ghost: number | null;
     })[]
   >(
     `SELECT
        (SELECT state FROM bg_tournaments WHERE id = ?) AS tournament_state,
+       (SELECT referee_scheduling FROM bg_tournaments WHERE id = ?) AS referee_scheduling,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team1_is_ghost,
        (SELECT is_ghost FROM bg_teams WHERE id = ?) AS team2_is_ghost`,
-    [row.tournament_id, nullableId(row.team1_id), nullableId(row.team2_id)],
+    [row.tournament_id, row.tournament_id, nullableId(row.team1_id), nullableId(row.team2_id)],
   );
   // Même effet que l'ancienne jointure interne : un match dont le tournoi a
   // disparu n'est pas un match à lancer.
   const tournamentState = context[0]?.tournament_state ?? null;
   if (tournamentState === null) return null;
   row.tournament_state = tournamentState;
+  row.referee_scheduling = context[0]?.referee_scheduling ?? 0;
   row.team1_is_ghost = context[0]?.team1_is_ghost ?? null;
   row.team2_is_ghost = context[0]?.team2_is_ghost ?? null;
   return row;
@@ -341,7 +347,8 @@ export async function setMatchReady(
 
 /**
  * Lance le match sans attendre les « Prêt » manquants (arbitrage). Possible
- * dès que le match est jouable, heure de début atteinte ou non.
+ * dès que le match est jouable, heure de début atteinte ou non — et même **à
+ * planifier** : forcer est un geste d'arbitrage, il vaut planification.
  *
  * @throws `MATCH_NOT_FOUND` | `TOURNAMENT_NOT_RUNNING` | `MATCH_ALREADY_LAUNCHED`
  *   | `MATCH_NOT_LAUNCHABLE`
@@ -486,7 +493,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
     // de l'histoire, qu'on ne réécrit pas.
     if (row.status === "COMPLETED") return;
     const phase = matchLaunchPhase(toLaunchInput(row), Date.now());
-    if (phase !== "SCHEDULED" && phase !== "LOBBY") return;
+    if (phase !== "TO_PLAN" && phase !== "SCHEDULED" && phase !== "LOBBY") return;
     if ((await loadCastEligibility(connection, casterId)) === null) return;
 
     await connection.execute(
@@ -550,6 +557,9 @@ export async function maintainMatchLaunches(
     `SELECT ${LAUNCH_MATCH_COLUMNS} ${LAUNCH_MATCH_FROM}
      WHERE m.tournament_id = ? AND m.status = 'READY'
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+       -- Un match à planifier n'a rien à entretenir (\`TO_PLAN\`) : l'écarter ici
+       -- évite de le relire, puis de l'écarter en mémoire, à chaque passe.
+       AND (m.start_at IS NOT NULL OR t.referee_scheduling = 0)
        AND (m.launched_at IS NULL
             OR NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id)))
      ORDER BY m.id`,

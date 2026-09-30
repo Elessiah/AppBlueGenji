@@ -221,13 +221,15 @@ describe("registerController", () => {
   });
 
   it("les mentions légales affichent le même hébergeur, sans copie", () => {
-    const page = readFileSync(join(__dirname, "..", "..", "..", "app", "mentions-legales", "page.tsx"), "utf8");
+    // Fins de ligne normalisées : un checkout Windows lit la page en CRLF, et
+    // l'attendu code le retour à la ligne en LF.
+    const page = readFileSync(join(__dirname, "..", "..", "..", "app", "mentions-legales", "page.tsx"), "utf8").replaceAll("\r\n", "\n");
     expect(page).toContain("{SITE_HOST.address}");
     expect(page).not.toContain("Chemin Fourchue");
   });
 
   it("ne publie aucun SIREN : l'hébergeur est un particulier bénévole, sans immatriculation", () => {
-    const page = readFileSync(join(__dirname, "..", "..", "..", "app", "mentions-legales", "page.tsx"), "utf8");
+    const page = readFileSync(join(__dirname, "..", "..", "..", "app", "mentions-legales", "page.tsx"), "utf8").replaceAll("\r\n", "\n");
     // Le mot n'y figure que pour dire que l'association n'en a pas.
     expect(page.match(/SIRE[NT]/gi)).toEqual(["SIREN"]);
     expect(page).toContain("ni d&apos;un numéro RNA ni\n          d&apos;un numéro SIREN");

@@ -17,6 +17,8 @@ import {
   matchLaunchPhase,
   nextLaunchMatchId,
   nextLaunchPhaseChangeAt,
+  isScoreEntryOpen,
+  SCORE_ENTRY_CLOSED_PHASES,
   pickLaunchContacts,
   readyCount,
   resolveHostTeamId,
@@ -34,6 +36,7 @@ function input(overrides: Partial<MatchLaunchInput> = {}): MatchLaunchInput {
     team2Id: 2,
     startAt: null,
     launchedAt: null,
+    refereeScheduling: false,
     ...overrides,
   };
 }
@@ -91,6 +94,69 @@ describe("matchLaunchPhase", () => {
 
   it("traite une heure illisible comme absente", () => {
     expect(matchLaunchPhase(input({ startAt: "pas une date" }), NOW)).toBe("LOBBY");
+  });
+});
+
+describe("matchLaunchPhase — planification par l'arbitrage", () => {
+  const planned = (overrides: Partial<MatchLaunchInput> = {}) =>
+    input({ refereeScheduling: true, ...overrides });
+
+  it("met « à planifier » un match jouable sans horaire, au lieu de le lancer", () => {
+    expect(matchLaunchPhase(planned(), NOW)).toBe("TO_PLAN");
+  });
+
+  it("traite une heure illisible comme absente : à planifier", () => {
+    expect(matchLaunchPhase(planned({ startAt: "pas une date" }), NOW)).toBe("TO_PLAN");
+  });
+
+  it("passe « en attente de départ » une fois planifié, puis en lancement à l'heure", () => {
+    expect(matchLaunchPhase(planned({ startAt: new Date(NOW + HOUR).toISOString() }), NOW)).toBe(
+      "SCHEDULED",
+    );
+    expect(matchLaunchPhase(planned({ startAt: new Date(NOW).toISOString() }), NOW)).toBe("LOBBY");
+  });
+
+  it("ne touche ni un match lancé, ni un report en attente, ni un match sans engagées", () => {
+    expect(matchLaunchPhase(planned({ launchedAt: new Date(NOW).toISOString() }), NOW)).toBe(
+      "LAUNCHED",
+    );
+    expect(matchLaunchPhase(planned({ status: "AWAITING_CONFIRMATION" }), NOW)).toBe("LAUNCHED");
+    expect(matchLaunchPhase(planned({ team2Id: null }), NOW)).toBe("NONE");
+    expect(matchLaunchPhase(planned({ status: "COMPLETED" }), NOW)).toBe("NONE");
+  });
+
+  it("ne pose aucune minuterie sur un match à planifier : seule une écriture l'en sort", () => {
+    expect(nextLaunchPhaseChangeAt(planned(), NOW)).toBeNull();
+  });
+});
+
+describe("isScoreEntryOpen — aucun score avant le lancement", () => {
+  it("ferme la saisie à planifier et en attente de départ, quelle que soit l'option", () => {
+    expect(SCORE_ENTRY_CLOSED_PHASES).toEqual(["TO_PLAN", "SCHEDULED"]);
+    expect(isScoreEntryOpen(input({ refereeScheduling: true }), NOW)).toBe(false);
+    expect(isScoreEntryOpen(input({ startAt: new Date(NOW + HOUR).toISOString() }), NOW)).toBe(false);
+    expect(
+      isScoreEntryOpen(input({ refereeScheduling: true, startAt: new Date(NOW + HOUR).toISOString() }), NOW),
+    ).toBe(false);
+  });
+
+  it("l'ouvre dès le lancement, une fois lancé, et sur un match terminé (correction)", () => {
+    expect(isScoreEntryOpen(input(), NOW)).toBe(true);
+    expect(isScoreEntryOpen(input({ launchedAt: new Date(NOW).toISOString() }), NOW)).toBe(true);
+    expect(isScoreEntryOpen(input({ status: "COMPLETED", refereeScheduling: true }), NOW)).toBe(true);
+  });
+
+  it("nomme le refus en français", () => {
+    expect(launchErrorMessage("MATCH_NOT_IN_LAUNCH")).toMatch(/lancement/);
+    expect(launchErrorMessage("MATCH_NOT_IN_LAUNCH")).toMatch(/forfait/);
+  });
+});
+
+describe("canPlayersReportScore", () => {
+  it("n'a pas besoin de l'option : seul un match lancé s'ouvre aux joueurs", () => {
+    const base = { status: "READY" as const, team1Id: 1, team2Id: 2, startAt: null };
+    expect(canPlayersReportScore({ ...base, launchedAt: null }, NOW)).toBe(false);
+    expect(canPlayersReportScore({ ...base, launchedAt: new Date(NOW).toISOString() }, NOW)).toBe(true);
   });
 });
 

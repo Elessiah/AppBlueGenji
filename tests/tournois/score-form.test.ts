@@ -282,3 +282,49 @@ describe("decideScoreForm — égalités autorisées", () => {
     expect(decision.canResolve).toBe(true);
   });
 });
+
+describe("decideScoreForm — aucun score avant le lancement", () => {
+  const scores = (score1: string, score2: string): ScoreFormState => ({
+    score1,
+    score2,
+    forfeitTeamId: undefined,
+    doubleForfeit: false,
+  });
+
+  it("ferme l'enregistrement et la validation d'un score, même complet", () => {
+    const decision = decideScoreForm(scores("3", "1"), {
+      format: BO5,
+      decided: false,
+      scoreEntryClosed: true,
+    });
+    expect(decision.canSave).toBe(false);
+    expect(decision.canResolve).toBe(false);
+    expect(decision.saveBlocker).toBe("NOT_IN_LAUNCH");
+    expect(decision.resolveBlocker).toBe("NOT_IN_LAUNCH");
+    expect(decision.scores).toBeNull();
+  });
+
+  it("laisse prononcer un forfait, simple ou double", () => {
+    const forfeit = decideScoreForm(
+      { ...scores("", ""), forfeitTeamId: 10 },
+      { format: BO5, decided: false, scoreEntryClosed: true },
+    );
+    expect(forfeit.canResolve).toBe(true);
+    const both = decideScoreForm(
+      { ...scores("", ""), doubleForfeit: true },
+      { format: BO5, decided: false, scoreEntryClosed: true },
+    );
+    expect(both.canResolve).toBe(true);
+  });
+
+  it("explique le refus et nomme le forfait comme seul geste", () => {
+    const message = scoreBlockerMessage("NOT_IN_LAUNCH", BO5);
+    expect(message).toMatch(/lancement/);
+    expect(message).toMatch(/forfait/);
+  });
+
+  it("ne change rien quand la saisie est ouverte", () => {
+    const decision = decideScoreForm(scores("3", "1"), { format: BO5, decided: false, scoreEntryClosed: false });
+    expect(decision.canResolve).toBe(true);
+  });
+});

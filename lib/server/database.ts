@@ -509,6 +509,8 @@ async function runMigrations(db: Pool): Promise<void> {
       registration_blizzard_requirement
         ENUM('NONE', 'ANY_PLAYER', 'ALL_PLAYERS') NOT NULL DEFAULT 'NONE',
       registration_min_players INT NOT NULL DEFAULT 5,
+      -- Matchs planifiés par l'arbitrage (\`lib/shared/match-planning.ts\`).
+      referee_scheduling TINYINT(1) NOT NULL DEFAULT 0,
       match_format_type ENUM('BO', 'FT') NULL,
       match_format_value INT NULL,
       match_format_max_maps INT NULL,
@@ -1445,6 +1447,10 @@ async function runMigrations(db: Pool): Promise<void> {
     // endroits pour l'index que lisent la session et la connexion : sans effet
     // (erreur tolérée) quand la table vient d'être créée avec lui.
     `ALTER TABLE bg_account_suspensions ADD INDEX idx_bg_account_suspensions_user (user_id, lifted_at)`,
+    // Matchs planifiés par l'arbitrage : option éteinte par défaut, donc aucun
+    // tournoi existant ne change de comportement.
+    `ALTER TABLE bg_tournaments ADD COLUMN referee_scheduling TINYINT(1) NOT NULL DEFAULT 0
+       AFTER registration_min_players`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

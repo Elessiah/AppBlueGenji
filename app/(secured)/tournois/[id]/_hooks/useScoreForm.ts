@@ -18,7 +18,14 @@ import { useMatchFormat } from "../_lib/match-format-context";
 // d'enregistrement en réécrivait les scores sans toucher au vainqueur.
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 
-export function useScoreForm(match: BracketMatch | null) {
+/**
+ * @param options.scoreEntryClosed match à planifier ou en attente de son heure
+ *   (`isScoreEntryOpen`) : les scores sont refusés, le forfait reste ouvert.
+ */
+export function useScoreForm(
+  match: BracketMatch | null,
+  options: { scoreEntryClosed?: boolean } = {},
+) {
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
@@ -78,6 +85,7 @@ export function useScoreForm(match: BracketMatch | null) {
   const decision = decideScoreForm(state, {
     format: matchFormat,
     decided: match !== null && isMatchPlayed(match),
+    scoreEntryClosed: options.scoreEntryClosed === true,
   });
 
   const submit = async (action: "save" | "resolve") => {

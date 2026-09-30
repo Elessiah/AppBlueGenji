@@ -145,7 +145,7 @@ async function loadCandidates(connection: PoolConnection, userId: number): Promi
                         UNION SELECT st.id FROM bg_teams st WHERE st.solo_user_id = ?)`;
   const [rows] = await connection.execute<CandidateRow[]>(
     `SELECT
-       m.id, m.tournament_id, t.state AS tournament_state, m.status, m.is_bye,
+       m.id, m.tournament_id, t.state AS tournament_state, t.referee_scheduling, m.status, m.is_bye,
        m.team1_id, m.team2_id, t1.is_ghost AS team1_is_ghost, t2.is_ghost AS team2_is_ghost,
        m.start_at, m.lobby_opened_at, m.launch_pairing, m.launched_at, m.team1_ready_at, m.team2_ready_at,
        m.caster_user_id, m.caster_ready_at, m.host_team_id,
@@ -161,6 +161,9 @@ async function loadCandidates(connection: PoolConnection, userId: number): Promi
        AND m.status IN ('READY', 'AWAITING_CONFIRMATION')
        AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
        AND (m.start_at IS NULL OR m.start_at <= NOW() + INTERVAL ${LAUNCH_LOOKAHEAD_MINUTES} MINUTE)
+       -- Un match à planifier n'a rien à présenter : ni heure à guetter, ni
+       -- « Prêt » à donner, ni contacts à exposer.
+       AND (m.start_at IS NOT NULL OR t.referee_scheduling = 0)
        AND (m.caster_user_id = ?
             OR m.team1_id IN ${viewerTeams}
             OR m.team2_id IN ${viewerTeams})
@@ -283,7 +286,7 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
     const now = Date.now();
     const visible = rows
       .map((row) => ({ row, phase: matchLaunchPhase(toLaunchInput(row), now) }))
-      .filter(({ phase }) => phase !== "NONE");
+      .filter(({ phase }) => phase !== "NONE" && phase !== "TO_PLAN");
     if (visible.length === 0) return [];
 
     // Contacts : seulement pour les matchs en lancement ou lancés.

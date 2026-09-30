@@ -36,6 +36,7 @@ import { LiveProvider } from "./_lib/live-context";
 import { canPlayersReportScore } from "@/lib/shared/match-launch";
 import { IssueReportProvider } from "./_lib/issue-report-context";
 import { RegistrationsPanel } from "./_components/RegistrationsPanel";
+import { MatchPlanningPanel } from "./_components/MatchPlanningPanel";
 import { tournamentGrantsContactAccess } from "@/lib/shared/discord-identity";
 import { BracketSections } from "./_components/BracketSections";
 import { PhaseTimeline } from "./_components/PhaseTimeline";
@@ -633,6 +634,7 @@ export default function TournamentDetailPage() {
       <LiveProvider
         canManage={detail.canManageLive}
         canSchedule={detail.isAdmin}
+        refereeScheduling={detail.card.refereeScheduling}
         openConfig={openMatchLive}
         openSchedule={openMatchSchedule}
         viewerUserId={detail.viewerUserId}
@@ -674,6 +676,11 @@ export default function TournamentDetailPage() {
             vie, ce qu'on cherche en arrivant — pas sous les inscrites et les
             contacts, où elle attendait en bas de page. */}
         <TournamentProgress detail={detail} />
+
+        {/* Sous la frise et avant le plateau : c'est là que l'arbitrage lit
+            ce qui attend une date, et qu'un engagé apprend pourquoi son match
+            est « À planifier ». */}
+        <MatchPlanningPanel detail={detail} onPlan={openMatchSchedule} frozen={frozen} />
 
         <div className={`ds-block ${styles.board}`}>
           {isMulti && detail.phases && (
@@ -965,6 +972,7 @@ export default function TournamentDetailPage() {
         <MatchScheduleDialog
           key={matchForSchedule.id}
           match={matchForSchedule}
+          refereeScheduling={detail.card.refereeScheduling}
           onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}
         />

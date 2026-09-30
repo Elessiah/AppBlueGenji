@@ -71,6 +71,12 @@
   color: var(--blue-300, #8ad9ff);
 }
 
+/* Un `<output>` est en ligne par défaut : l'annonce occupe sa propre ligne,
+   comme ses voisines en `<p>`. */
+.notice {
+  display: block;
+}
+
 /* ---------- Désaccord ---------- */
 
 .conflict {

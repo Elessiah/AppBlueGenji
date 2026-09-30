@@ -2,6 +2,8 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { MatchStatus, PhaseFormat, TournamentFormat } from "@/lib/shared/types";
 import { dependentMatches, hasScoreInput, type MatchScoreState } from "@/lib/shared/match-lock";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import { isScoreEntryOpen, launchPairingKey } from "@/lib/shared/match-launch";
+import { toIso } from "@/lib/server/serialization";
 import {
   checkMatchScores,
   matchWinnerSide,
@@ -301,6 +303,52 @@ async function forfeitScores(
  * base, et `adminResolveMatch` en déduisait un vainqueur par défaut — l'équipe 1
  * gagnait parce qu'aucune des deux n'était celle qui « déclarait forfait ».
  */
+/**
+ * Refuse de noter un **score** sur un match qui n'est pas encore entré en
+ * lancement — à planifier, ou en attente de son heure
+ * (`SCORE_ENTRY_CLOSED_PHASES`, `lib/shared/match-launch.ts`). La règle vaut
+ * pour l'arbitrage comme pour les joueurs, quelle que soit l'option du tournoi :
+ * un score posé là décrirait une rencontre qui n'a pas pu avoir lieu, et
+ * verrouillerait la manche précédente (`match-lock`).
+ *
+ * Seuls les **scores** sont concernés : un forfait se prononce à tout moment
+ * (l'équipe absente n'a pas à attendre l'heure pour être constatée absente), et
+ * un match terminé reste corrigible — sa phase est `NONE`.
+ *
+ * L'option du tournoi est relue ici, par une lecture à part : la ligne du
+ * match est déjà verrouillée seule (MariaDB, pas de `FOR UPDATE` sur jointure),
+ * et une option basculée entre-temps n'ouvre au pire que ce qu'elle ouvrait
+ * juste avant.
+ *
+ * @throws `MATCH_NOT_IN_LAUNCH`
+ */
+async function assertScoreEntryOpen(connection: PoolConnection, match: MatchRow): Promise<void> {
+  const [rows] = await connection.execute<(RowDataPacket & { referee_scheduling: number | null })[]>(
+    `SELECT referee_scheduling FROM bg_tournaments WHERE id = ? LIMIT 1`,
+    [Number(match.tournament_id)],
+  );
+  const team1Id = match.team1_id === null ? null : Number(match.team1_id);
+  const team2Id = match.team2_id === null ? null : Number(match.team2_id);
+  // Un lancement posé pour un autre appariement ne lance pas celui-ci
+  // (`currentLaunchState`) : même lecture que le report d'un joueur.
+  const launchedAt =
+    launchPairingKey(team1Id, team2Id) === (match.launch_pairing ?? null)
+      ? toIso(match.launched_at ?? null)
+      : null;
+  const open = isScoreEntryOpen(
+    {
+      status: match.status,
+      team1Id,
+      team2Id,
+      startAt: toIso(match.start_at ?? null),
+      launchedAt,
+      refereeScheduling: Number(rows[0]?.referee_scheduling ?? 0) === 1,
+    },
+    Date.now(),
+  );
+  if (!open) throw new Error("MATCH_NOT_IN_LAUNCH");
+}
+
 function assertForfeitBelongsToMatch(match: MatchRow, forfeitTeamId: number): void {
   if (forfeitTeamId !== Number(match.team1_id) && forfeitTeamId !== Number(match.team2_id)) {
     throw new Error("INVALID_FORFEIT_TEAM_ID");
@@ -324,7 +372,10 @@ export async function adminSaveMatchScores(
       next_winner_match_id,
       next_loser_match_id,
       status,
-      winner_team_id
+      winner_team_id,
+      start_at,
+      launched_at,
+      launch_pairing
      FROM bg_matches
      WHERE id = ?
      LIMIT 1
@@ -378,6 +429,7 @@ export async function adminSaveMatchScores(
       [scores.team1Score, scores.team2Score, forfeitTeamId, matchId],
     );
   } else if (team1Score !== undefined && team2Score !== undefined) {
+    await assertScoreEntryOpen(connection, match);
     await checkScoresAgainstMatchFormat(
       connection,
       Number(match.tournament_id),
@@ -430,7 +482,11 @@ export async function adminResolveMatch(
       next_loser_match_id,
       next_loser_slot,
       winner_team_id,
-      phase_id
+      phase_id,
+      status,
+      start_at,
+      launched_at,
+      launch_pairing
      FROM bg_matches
      WHERE id = ?
      LIMIT 1
@@ -482,6 +538,7 @@ export async function adminResolveMatch(
     resultTeam1Score = scores.team1Score;
     resultTeam2Score = scores.team2Score;
   } else if (team1Score !== undefined && team2Score !== undefined) {
+    await assertScoreEntryOpen(connection, match);
     // Le format de la manche sert deux fois : à refuser la saisie, puis à en
     // déduire l'issue. Une seule lecture, passée aux deux.
     const format = await loadTournamentMatchFormat(
