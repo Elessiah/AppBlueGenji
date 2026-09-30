@@ -55,6 +55,11 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
 
   if (!visible) return null;
 
+  // Ce que l'allumage renverra **réellement** à planifier : un match déjà noté
+  // par l'arbitrage est tenu pour lancé par le serveur (`setRefereeScheduling`),
+  // il n'a pas sa place dans la confirmation.
+  const moving = toPlan.filter((match) => match.team1Score === null && match.team2Score === null);
+
   const toggle = async (next: boolean): Promise<boolean> => {
     setBusy(true);
     try {
@@ -87,7 +92,7 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
   const onToggle = () => {
     // En cours, l'allumage défait des lancements : il se confirme. Avant le
     // coup d'envoi il n'y a aucun match, rien à défaire.
-    if (!enabled && detail.card.state === "RUNNING" && toPlan.length > 0) {
+    if (!enabled && detail.card.state === "RUNNING" && moving.length > 0) {
       setConfirmEnable(true);
       return;
     }
@@ -159,9 +164,9 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: MatchPlanningPane
           onConfirm={() => toggle(true)}
         >
           <p>
-            {toPlan.length === 1
+            {moving.length === 1
               ? "1 match, sans date et pas encore lancé, quitte le lancement — ses « Prêt » sont effacés — et attend qu'un arbitre fixe son horaire."
-              : `${toPlan.length} matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.`}{" "}
+              : `${moving.length} matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.`}{" "}
             Les matchs déjà lancés continuent, et les manches suivantes naîtront à planifier.
           </p>
         </ConfirmActionDialog>
