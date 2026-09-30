@@ -160,6 +160,39 @@ export const ONEDRIVE_BACKUP_FRAMEWORK =
 export const OUTLOOK_MAIL_FRAMEWORK =
   "compte Microsoft personnel (Outlook.com), régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft ; messages non chiffrés par l'association, lisibles par Microsoft";
 
+/**
+ * Messagerie de l'**association** elle-même (courriel publié, protégé, sur les
+ * mentions légales et `/rgpd`) : une adresse Gmail. Google n'était nommé
+ * nulle part comme destinataire de ce qu'on y écrit. La nature du compte
+ * (personnel ou Google Workspace, donc avec ou sans contrat de
+ * sous-traitance) n'est pas établie : on ne l'affirme pas.
+ */
+export const ASSOCIATION_GMAIL_FRAMEWORK =
+  "messagerie Gmail de l'association, hébergée par Google ; messages non chiffrés par l'association, lisibles par Google";
+
+/**
+ * Contrat de sous-traitance (RGPD, art. 28) entre l'association et
+ * l'hébergeur technique du site : rédigé dans le dépôt
+ * (`docs/legal/contrat-sous-traitance-hebergement.md`), **pas encore signé**.
+ * Le registre le cite tel qu'il est, jamais comme un contrat en vigueur.
+ */
+export const HOST_PROCESSING_AGREEMENT =
+  "contrat de sous-traitance (RGPD, art. 28) rédigé, en attente de signature par l'association et l'hébergeur";
+
+/**
+ * Tickets du portail de support (Spiceworks) : supprimés un mois après leur
+ * clôture, par l'association (décision de l'association, 2026-09-30).
+ */
+export const SUPPORT_TICKET_RETENTION_MONTHS = 1;
+
+/**
+ * Journaux d'accès du serveur web (nginx) : 14 jours, la rotation par défaut
+ * de logrotate sous Debian (quotidienne, 14 fichiers). La configuration du
+ * serveur n'est pas versionnée ici : `docs/DEPLOYMENT.md` dit le réglage à
+ * poser en production.
+ */
+export const WEB_ACCESS_LOG_RETENTION_DAYS = 14;
+
 export interface RegisterController {
   name: string;
   legalForm: string;
@@ -203,7 +236,7 @@ export function registerController(): RegisterController {
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE,
     dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées données avec celles du responsable du traitement). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
-    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
+    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant (${HOST_PROCESSING_AGREEMENT}), données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
 
@@ -217,15 +250,18 @@ const COMMON_SECURITY = [
  * Ce que le registre couvre, dit une fois pour `/rgpd` et `/rgpd/registre`.
  *
  * Il se disait exhaustif (« tout ce que BlueGenji fait de données
- * personnelles ») alors qu'il ne décrit que le site et son bot : les activités
- * que l'association mène ailleurs n'y ont pas encore de fiche. Les nommer vaut
- * mieux qu'une promesse que le document ne tient pas.
+ * personnelles ») alors qu'il ne décrit que le site et son bot. Les activités
+ * attenantes décidées par l'association y ont désormais une fiche (support
+ * Spiceworks T15, retransmission T16, journaux du serveur web T17) ; la
+ * gestion des adhésions, elle, ne relève pas du site (décision de
+ * l'association) : `REGISTER_SCOPE_DETAIL` le dit plutôt que de promettre une
+ * fiche qui ne viendra pas.
  */
 export const REGISTER_SCOPE =
   "Le registre décrit les traitements de données personnelles du site et du bot Discord de l'association";
 
-export const REGISTER_NOT_YET_COVERED =
-  "Les journaux techniques du serveur web, et les activités que l'association mène hors du site — gestion des adhésions, portail de support (Spiceworks), retransmission des matchs —, n'y ont pas encore de fiche : pour toute question à leur sujet, utilisez les moyens de contact de la politique de confidentialité.";
+export const REGISTER_SCOPE_DETAIL =
+  "Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.";
 
 export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   {
@@ -250,7 +286,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      "À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale",
+      "À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seules les statistiques de tournoi anonymisées restent ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale, et rien d'autre : les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression",
       `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
     recipients: [
@@ -286,7 +322,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Identifiants de connexion : durée du compte, ou jusqu'au détachement du fournisseur",
+      "Identifiants de connexion : durée du compte, ou jusqu'au détachement du fournisseur ; effacés à la suppression du compte (seul le journal des données de connexion, T14, lui survit)",
       `Codes de connexion : valables ${DISCORD_CODE_VALIDITY_MINUTES} minutes, purgés un jour après expiration, effacés à la suppression du compte`,
     ],
     recipients: [
@@ -348,7 +384,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Alerter le rôle arbitre (conflit de score, report expiré, signalement d'un joueur)",
     ],
     legalBasis:
-      "Consentement (certification du pseudo Discord, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) et intérêt légitime (bon déroulement des tournois)",
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour les rappels de match et les alertes d'arbitrage",
     dataSubjects: ["Joueurs engagés dans un tournoi", "Arbitres", "Casters inscrits sur un match"],
     dataCategories: [
       "Pseudo et identifiant Discord",
@@ -522,14 +558,14 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Journal des suppressions : ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours par entrée`,
     ],
     recipients: [
-      "Responsable technique de l'association, qui est aussi l'hébergeur du site, seul détenteur des clés de déchiffrement",
+      `Responsable technique de l'association, qui est aussi l'hébergeur du site (sous-traitant — ${HOST_PROCESSING_AGREEMENT}), seul détenteur des clés de déchiffrement, côté association`,
       `Microsoft (OneDrive de l'hébergeur du site — ${ONEDRIVE_BACKUP_FRAMEWORK}), qui stocke les copies chiffrées sans pouvoir les lire`,
     ],
     transfers: [
       `Possibles vers les États-Unis (lieu de stockage non garanti par Microsoft) : Microsoft, qui ne reçoit que des données chiffrées avant envoi avec une clé que Microsoft ne détient pas — ${transferBasis(["MICROSOFT"])}`,
     ],
     security: [
-      "Chiffrement sur le serveur du site avant tout envoi (age pour les archives, rclone crypt pour les images, les logos masqués et le journal) : aucune clé n'est transmise à Microsoft",
+      "Chiffrement sur le serveur du site avant tout envoi (age pour les archives, remote rclone de type crypt pour les images, les logos masqués et le journal — vérifié en production le 30 septembre 2026) : aucune clé n'est transmise à Microsoft",
       "Mesures complémentaires de Microsoft : chiffrement au repos de ses serveurs, envoi chiffré en transit (HTTPS/TLS)",
       "Suppression définitive, sans corbeille ni historique de versions",
       "Clé privée des archives conservée hors du serveur ; clé des images et du journal sur le seul serveur, avec une copie de secours hors du serveur",
@@ -569,6 +605,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Accuser réception d'une notification de contenu illicite, puis notifier à son auteur la décision et les voies de recours",
       "Répondre aux demandes d'exercice des droits et aux demandes adressées à l'hébergeur, dont celles des autorités",
       "Recevoir par courriel ou par téléphone, auprès de la personne à contacter pour les demandes relatives aux données, les demandes d'exercice des droits et les questions sur le traitement des données, et y répondre",
+      "Recevoir les demandes adressées au courriel ou au téléphone de l'association elle-même (publiés, protégés, sur les mentions légales), et y répondre",
       "Alerter les administrateurs sur Discord, sans donnée nominative",
     ],
     legalBasis:
@@ -577,6 +614,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Signalants, utilisateurs ou non (titulaires de droits, représentants, visiteurs)",
       "Joueurs et membres des équipes visés par un signalement",
       "Personnes, membres ou non, qui adressent une demande relative à leurs données par courriel ou par téléphone",
+      "Personnes qui écrivent ou téléphonent à l'association",
     ],
     dataCategories: [
       "Catégorie, description, éléments désignés et page d'origine du signalement",
@@ -585,11 +623,13 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance ; motif d'un retrait décidé hors signalement (transmis à l'équipe ou au joueur, non conservé par le site)",
       "Suspensions de compte : compte visé, faits retenus, clause invoquée, dates de début, d'échéance et de levée, membre de la modération qui l'a prononcée ou levée",
       "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande et de la réponse, adresse électronique ou numéro de l'expéditeur, et souvent son nom",
+      "Demandes reçues au courriel ou au téléphone de l'association : mêmes données",
     ],
     sensitiveData: "Aucune",
     retention: [
       `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
       `Demande reçue par courriel ou par téléphone : même règle qu'une demande RGPD faite depuis le formulaire — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la clôture de la demande (l'équivalent de l'archivage d'un signalement), avant suppression de la messagerie de la personne à contacter (courriel) ou de son téléphone (SMS reçus et envoyés, messagerie vocale, journal d'appels)`,
+      `Demande reçue au courriel ou au téléphone de l'association : même règle — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, avant suppression de la messagerie ou du téléphone de l'association`,
       `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
       `Suspension de compte : tant qu'elle court, puis ${SUSPENSION_RETENTION_MONTHS} mois après sa levée ou son échéance (même délai de contestation), effacée lors de la première connexion au site qui suit ce délai ; effacée avec le compte, ou à son anonymisation`,
     ],
@@ -601,10 +641,14 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
       "Opérateur téléphonique de cette personne : demandes faites par téléphone (appel, SMS, messagerie vocale)",
       `Microsoft, qui héberge la messagerie de cette personne (${OUTLOOK_MAIL_FRAMEWORK}) : demandes reçues et réponses envoyées par courriel`,
+      "Membres du bureau de l'association qui relèvent son courriel et son téléphone",
+      `Google (${ASSOCIATION_GMAIL_FRAMEWORK}) : demandes reçues et réponses envoyées par le courriel de l'association`,
+      "Opérateur téléphonique de la ligne de l'association : demandes faites à son téléphone",
     ],
     transfers: [
       `États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`,
       `Possibles vers les États-Unis : Microsoft (messagerie Outlook.com de la personne à contacter, demandes reçues et réponses envoyées par courriel) — ${transferBasis(["MICROSOFT"])}`,
+      `Possibles vers les États-Unis : Google (messagerie Gmail de l'association) — ${transferBasis(["GOOGLE"])}`,
     ],
     security: [
       ...COMMON_SECURITY,
@@ -612,7 +656,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Plafonds d'envoi par personne et par heure",
       "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
       "Suspension réservée à la permission de modération, impossible sur son propre compte ou sur celui d'un administrateur ; le journal Discord du staff n'en porte ni le pseudo du joueur ni le motif",
-      "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft (messagerie), de l'opérateur téléphonique et de l'appareil personnel de la personne à contacter",
+      "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft ou de Google (messageries), des opérateurs téléphoniques et des appareils qui les reçoivent",
     ],
   },
   {
@@ -687,6 +731,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiant interne du compte",
       "Adresse IP de connexion, telle que la retient le serveur mandataire du site",
       "Date et heure de la connexion, moyen de connexion (Google, Discord, Blizzard ou code en message privé)",
+      "Ni port source de la connexion, ni journal de la création ou de la modification des contenus (seules les ouvertures de session sont consignées), ni informations fournies à la création du compte : celles-ci partent avec le compte",
     ],
     sensitiveData: "Aucune",
     retention: [
@@ -702,6 +747,96 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     security: [
       ...COMMON_SECURITY,
       "Aucun écran ni aucune route du site ne consulte ce journal ; il ne sert à aucune autre finalité",
+    ],
+  },
+  {
+    ref: "T15",
+    name: "Portail de support (Spiceworks)",
+    purpose:
+      "Recevoir et traiter les demandes de support et de modération qui ne portent pas sur un contenu du site (comportement en match, insulte, triche, litige sur Discord)",
+    subPurposes: [
+      "Recevoir un ticket sur le portail de support de l'association, que le site ne fait que lier (aucune donnée n'y est transmise par le site)",
+      "Échanger avec le demandeur, instruire la demande et la clore",
+    ],
+    legalBasis:
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire respecter les règles de ses tournois et de sa communauté, et à répondre aux demandes qu'on lui adresse",
+    dataSubjects: ["Demandeurs (joueurs ou non)", "Personnes désignées dans un ticket"],
+    dataCategories: [
+      "Contenu du ticket et des échanges, pièces jointes éventuelles",
+      "Coordonnées que le demandeur indique pour recevoir la réponse, pseudos cités",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      `Ticket : durée de son traitement, puis ${SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture, puis suppression par l'association`,
+    ],
+    recipients: [
+      "Membres du staff de l'association chargés du support et de la modération",
+      "Spiceworks, qui héberge le portail (décision requise : qualification — sous-traitant — et contrat au sens de l'article 28 non établis)",
+    ],
+    transfers: [
+      "Possibles vers les États-Unis : Spiceworks — décision requise : mécanisme d'encadrement du transfert (certification ou clauses contractuelles types) à vérifier",
+    ],
+    security: [
+      "Accès au portail réservé aux membres du staff chargés du support",
+      "Suppression des tickets clos au terme de la durée de conservation",
+    ],
+  },
+  {
+    ref: "T16",
+    name: "Retransmission des matchs",
+    purpose: "Diffuser en direct les matchs des tournois et en garder la rediffusion",
+    subPurposes: [
+      "Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)",
+      "Publier sur la fiche du match le lien de sa rediffusion YouTube",
+    ],
+    legalBasis:
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",
+    dataSubjects: ["Joueurs des matchs diffusés", "Casters"],
+    dataCategories: [
+      "Pseudos en jeu et du site, noms d'équipe, images de la partie et scores, tels qu'ils apparaissent à l'écran",
+      "Voix et pseudo des casters",
+      "Lien de la diffusion et de la rediffusion d'un match",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      "Direct : aucune conservation par le site, qui ne garde que le lien de la chaîne",
+      "Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée",
+      "Droit d'opposition : sur demande, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée",
+    ],
+    recipients: [
+      "Public des plateformes de diffusion et du site",
+      "Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement",
+    ],
+    transfers: [
+      `Possibles vers les États-Unis : YouTube (Google) — ${transferBasis(["GOOGLE"])} ; Twitch et Kick — décision requise : mécanisme d'encadrement du transfert à vérifier`,
+    ],
+    security: [
+      ...COMMON_SECURITY,
+      "Liens de diffusion limités à une liste de plateformes ; aucune donnée de contact affichée à l'écran par le site",
+    ],
+  },
+  {
+    ref: "T17",
+    name: "Journaux d'accès du serveur web",
+    purpose: "Assurer la sécurité du serveur et diagnostiquer les pannes",
+    subPurposes: [
+      "Consigner chaque requête reçue par le serveur mandataire (nginx) du site",
+      "Détecter les attaques et les abus, comprendre une panne",
+    ],
+    legalBasis: "Intérêt légitime (RGPD, art. 6.1.f) : sécurité du service (art. 32)",
+    dataSubjects: ["Visiteurs du site"],
+    dataCategories: [
+      "Adresse IP, date et heure, page demandée, code de réponse, taille, page d'origine et navigateur (format de journal par défaut de nginx)",
+    ],
+    sensitiveData: "Aucune",
+    retention: [
+      `${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, par rotation automatique, puis suppression`,
+    ],
+    recipients: ["Responsable technique de l'association, qui est aussi l'hébergeur du site"],
+    transfers: ["Aucun"],
+    security: [
+      ...COMMON_SECURITY,
+      "Journaux lisibles du seul administrateur du serveur, jamais exposés par le site",
     ],
   },
 ];

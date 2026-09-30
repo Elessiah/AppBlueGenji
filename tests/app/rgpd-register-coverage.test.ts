@@ -1,7 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { REGISTER_NOT_YET_COVERED, REGISTER_SCOPE } from "@/lib/shared/processing-register";
+import { REGISTER_SCOPE_DETAIL, REGISTER_SCOPE } from "@/lib/shared/processing-register";
 
 /**
  * `/rgpd` ne couvrait qu'une partie du registre (journal Discord, bénévoles,
@@ -24,14 +24,14 @@ describe("/rgpd — couverture du registre", () => {
     for (const source of [page, registerPage]) {
       expect(source).not.toMatch(/tout ce que BlueGenji fait de données personnelles/);
       expect(source).toContain("{REGISTER_SCOPE}");
-      expect(source).toContain("{REGISTER_NOT_YET_COVERED}");
+      expect(source).toContain("{REGISTER_SCOPE_DETAIL}");
     }
   });
 
   it("nomme les activités de l'association qui n'ont pas encore de fiche", () => {
     expect(REGISTER_SCOPE).toMatch(/site et du bot Discord/);
     for (const activity of ["journaux techniques du serveur", "adhésions", "Spiceworks", "retransmission des matchs"]) {
-      expect(REGISTER_NOT_YET_COVERED).toContain(activity);
+      expect(REGISTER_SCOPE_DETAIL).toContain(activity);
     }
   });
 
