@@ -415,12 +415,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages du site BlueGenji" },
           {
             kind: "p",
-            text: `Le site transmet au Bot un identifiant ou un pseudo Discord et le message à remettre (code de connexion, rappel de match, alerte d'arbitrage, signalement, information sur les données) ; le Bot le remet en message privé ou dans le salon d'arbitrage **sans l'enregistrer**. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
+            text: `Le site transmet au Bot un identifiant ou un pseudo Discord et le message à remettre (code de connexion, rappel de match, alerte d'arbitrage, signalement, information sur les données) ; le Bot remet les messages personnels (code, rappel, information) en message privé **sans les enregistrer**. Les alertes d'arbitrage et les signalements, qui ne nomment aucun joueur (noms d'équipe et liens de tournoi seulement), sont en outre publiés dans le salon de journal privé du staff ; les alertes d'arbitrage partent aussi en message privé aux membres du rôle d'arbitrage de chaque serveur qui en a défini un (**/set-referee-role**), les signalements à la direction de l'association. Ces traitements relèvent de la [politique de confidentialité du site](${SITE_PRIVACY_HREF}).`,
           },
           { kind: "subhead", text: "Journaux" },
           {
             kind: "p",
-            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot et les erreurs de fonctionnement, qui peuvent citer un pseudo ou un identifiant Discord.",
+            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un pseudo ou un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur.",
           },
           { kind: "subhead", text: "Base légale" },
           {
@@ -463,6 +463,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "Le staff de l'association, pour la modération et l'administration du Bot.",
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
+              "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
               `Tout utilisateur du Bot, par la commande **/stats**, peut voir combien d'annonces un autre utilisateur a publiées (messages relayés, scrims, recherches) ; la réponse n'est visible que de celui qui la demande, et le compteur de messages ne porte que sur ceux encore conservés (${BOT_RELAY_RETENTION_DAYS} derniers jours).`,
               `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
@@ -618,12 +619,12 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Messages from the BlueGenji website" },
           {
             kind: "p",
-            text: `The website sends the Bot a Discord ID or username and the message to deliver (login code, match reminder, referee alert, report, data-protection notice); the Bot delivers it by direct message or in the referee channel **without storing it**. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}) (in French).`,
+            text: `The website sends the Bot a Discord ID or username and the message to deliver (login code, match reminder, referee alert, report, data-protection notice); the Bot delivers personal messages (code, reminder, notice) by direct message **without storing them**. Referee alerts and reports, which name no player (team names and tournament links only), are also posted in the staff's private log channel; referee alerts are also sent by direct message to the members of the referee role of every server that has set one (**/set-referee-role**), reports to the association's management. This processing falls under the [website's privacy policy](${SITE_PRIVACY_HREF}) (in French).`,
           },
           { kind: "subhead", text: "Logs" },
           {
             kind: "p",
-            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot and operating errors, which may mention a Discord username or ID.",
+            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord username or ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username.",
           },
           { kind: "subhead", text: "Legal basis" },
           {
@@ -662,6 +663,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "The association's staff, for moderating and administering the Bot.",
               "Members of partner servers, who read the relayed advertisements.",
+              "Members of the referee role of every server that has set one, for the website's referee alerts.",
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
               `Any user of the Bot can, with the **/stats** command, see how many advertisements another user has published (relayed messages, scrims, searches); the reply is visible only to the person who asked, and the message count only covers messages still kept (last ${BOT_RELAY_RETENTION_DAYS} days).`,
               `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,

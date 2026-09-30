@@ -436,7 +436,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusion d'un utilisateur du relais par la modération",
       "Statistiques d'activité (commande /stats, tableau de bord du bot)",
       "Commande /link (code à usage unique, qu'aucune page du site ne permet encore de saisir) ; confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
-      "Remise en message privé ou au salon d'arbitrage des messages rédigés par le site (codes de connexion, rappels, alertes), sans conservation par le bot",
+      "Remise des messages rédigés par le site : codes, rappels et informations en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un",
     ],
     legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
     dataSubjects: [
@@ -466,6 +466,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "Staff de l'association (modération, administration)",
+      "Membres du rôle d'arbitrage de chaque serveur qui en a défini un (/set-referee-role), pour les alertes d'arbitrage du site",
       "Membres des serveurs partenaires, qui lisent les annonces relayées",
       "Administrateurs de tout serveur où le bot est installé et titulaires du rôle d'administration du bot (/set-bot-admin), pour la liste des exclusions (/ban-list, réponse visible du seul demandeur)",
       "Tout utilisateur du bot, pour les compteurs d'activité d'un autre utilisateur (/stats, réponse visible du seul demandeur)",
