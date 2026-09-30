@@ -145,9 +145,14 @@ est gardé jusque-là.
 
 Hors de tout signalement, `DELETE /api/admin/teams/[id]/logo` (fiche
 d'équipe, `ModerationLogoBar`) et `DELETE /api/admin/users/[id]/avatar` (fiche
-joueur, `ModerationAvatarBar`) — toutes deux réservées à la permission
+joueur, `PlayerModerationBar`) — toutes deux réservées à la permission
 `moderation` — suppriment une image sans quarantaine, pour un contenu
-manifestement illicite ; la personne concernée est prévenue aussi, le message
+manifestement illicite. Elles **exigent un motif** (`{ reason }`, 10 à 500
+caractères, `validateModerationReason` ; 400 `MODERATION_REASON_REQUIRED` /
+`MODERATION_REASON_TOO_LONG` avant toute écriture) : faute de signalement, il
+est le seul fait que l'exposé des motifs puisse citer (DSA art. 17.3.b), et il
+remplace « constat de la modération » dans le message privé. Il n'est pas
+conservé par le site. La personne concernée est prévenue aussi, le message
 la renvoyant vers l'association faute de signalement à contester ; un logo que
 d'autres équipes désignent encore n'est pas effacé (même règle que le
 masquage). Trace dans les journaux du staff (`publishStaffAction`), sans nom de

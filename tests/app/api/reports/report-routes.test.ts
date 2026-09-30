@@ -395,6 +395,10 @@ describe("routes du panneau — permission `moderation`", () => {
   });
 });
 
+/** Retrait d'une image hors signalement : le motif est exigé. */
+const REASON = "Logo reprenant une marque déposée sans autorisation";
+const withReason = (reason: unknown = REASON) => json("http://localhost", "DELETE", { reason });
+
 describe("DELETE /api/admin/teams/[id]/logo", () => {
   it("retire le logo, efface le fichier après l'écriture et trace le geste", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
@@ -405,12 +409,14 @@ describe("DELETE /api/admin/teams/[id]/logo", () => {
     });
     jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
 
-    const res = await removeTeamLogo(new Request("http://localhost"), params("4"));
+    const res = await removeTeamLogo(withReason(), params("4"));
     expect(res.status).toBe(200);
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/teams/4-a.webp");
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("« Alpha »"), { id: 1, pseudo: "Admin" });
     // Hors de tout signalement : l'équipe est prévenue, sans lien de contestation.
-    expect(notifyTeamLogoRemoved).toHaveBeenCalledWith(4, "Alpha", null);
+    // Le motif saisi part avec lui, comme faits retenus ; jamais au journal Discord.
+    expect(notifyTeamLogoRemoved).toHaveBeenCalledWith(4, "Alpha", null, REASON);
+    expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining(REASON), expect.anything());
   });
 
   it("garde le fichier que d'autres équipes désignent encore", async () => {
@@ -422,7 +428,7 @@ describe("DELETE /api/admin/teams/[id]/logo", () => {
     });
     jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
 
-    expect((await removeTeamLogo(new Request("http://localhost"), params("4"))).status).toBe(200);
+    expect((await removeTeamLogo(withReason(), params("4"))).status).toBe(200);
     expect(deleteStoredImage).not.toHaveBeenCalledWith("/uploads/teams/4-a.webp");
   });
 
@@ -432,7 +438,23 @@ describe("DELETE /api/admin/teams/[id]/logo", () => {
   ])("traduit %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(removeTeamLogoAsModerator).mockRejectedValue(new Error(code));
-    expect((await removeTeamLogo(new Request("http://localhost"), params("4"))).status).toBe(status);
+    expect((await removeTeamLogo(withReason(), params("4"))).status).toBe(status);
+  });
+
+  it.each<[string, Request, string]>([
+    ["sans corps", new Request("http://localhost", { method: "DELETE" }), "MODERATION_REASON_REQUIRED"],
+    ["motif trop court", withReason("abus"), "MODERATION_REASON_REQUIRED"],
+    ["motif non textuel", withReason(42), "MODERATION_REASON_REQUIRED"],
+    ["au corps JSON nul", json("http://localhost", "DELETE", null), "MODERATION_REASON_REQUIRED"],
+    ["au corps JSON en liste", json("http://localhost", "DELETE", [REASON]), "MODERATION_REASON_REQUIRED"],
+    ["motif trop long", withReason("x".repeat(501)), "MODERATION_REASON_TOO_LONG"],
+  ])("refuse en 400 un retrait %s, avant toute écriture", async (_label, request, code) => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    const res = await removeTeamLogo(request, params("4"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: code });
+    expect(removeTeamLogoAsModerator).not.toHaveBeenCalled();
+    expect(notifyTeamLogoRemoved).not.toHaveBeenCalled();
   });
 });
 
@@ -445,14 +467,15 @@ describe("DELETE /api/admin/users/[id]/avatar", () => {
     });
     jest.mocked(deleteStoredImage).mockResolvedValue(undefined);
 
-    const res = await removeUserAvatar(new Request("http://localhost"), params("9"));
+    const res = await removeUserAvatar(withReason(), params("9"));
     expect(res.status).toBe(200);
     expect(deleteStoredImage).toHaveBeenCalledWith("/uploads/avatars/9-a.webp");
     // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts).
     expect(publishStaffAction).toHaveBeenCalledWith(expect.stringContaining("un joueur"), { id: 1, pseudo: "Admin" });
     expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining("Nova"), expect.anything());
     // Hors de tout signalement : le joueur est prévenu, sans lien de contestation.
-    expect(notifyUserAvatarRemoved).toHaveBeenCalledWith(9, null);
+    expect(notifyUserAvatarRemoved).toHaveBeenCalledWith(9, null, REASON);
+    expect(publishStaffAction).not.toHaveBeenCalledWith(expect.stringContaining(REASON), expect.anything());
   });
 
   it.each<[string, number]>([
@@ -461,7 +484,15 @@ describe("DELETE /api/admin/users/[id]/avatar", () => {
   ])("traduit %s en %i", async (code, status) => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
     jest.mocked(removeUserAvatarAsModerator).mockRejectedValue(new Error(code));
-    expect((await removeUserAvatar(new Request("http://localhost"), params("9"))).status).toBe(status);
+    expect((await removeUserAvatar(withReason(), params("9"))).status).toBe(status);
+  });
+
+  it("refuse en 400 un retrait sans motif, avant toute écriture", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(admin);
+    const res = await removeUserAvatar(json("http://localhost", "DELETE", null), params("9"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "MODERATION_REASON_REQUIRED" });
+    expect(removeUserAvatarAsModerator).not.toHaveBeenCalled();
   });
 });
 

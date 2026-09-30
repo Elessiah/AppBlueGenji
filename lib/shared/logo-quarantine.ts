@@ -31,6 +31,7 @@
  */
 import { ANONYMOUS_PLAYER_LABEL } from "./log-privacy";
 import { discordInline } from "./discord-text";
+import { SUSPENSION_REASON_MAX_LENGTH, SUSPENSION_REASON_MIN_LENGTH, cleanModerationReason } from "./account-suspension";
 // Type seul : `content-reports.ts` importe les valeurs de ce module.
 import type { ReportCategory } from "./content-reports";
 
@@ -198,14 +199,57 @@ const GROUNDS_TEXT: Record<
 };
 
 /**
+ * Motif exigé quand la modération retire une image **hors de tout
+ * signalement** (depuis la fiche d'une équipe ou d'un joueur) : sans lui, le
+ * message n'avait aucun fait propre à exposer (DSA, art. 17.3.b). Mêmes bornes
+ * que le motif d'une suspension, même nettoyage.
+ */
+export type ModerationReasonValidation =
+  | { ok: true; reason: string }
+  | { ok: false; error: "MODERATION_REASON_REQUIRED" | "MODERATION_REASON_TOO_LONG" };
+
+export function validateModerationReason(value: unknown): ModerationReasonValidation {
+  const reason = cleanModerationReason(value);
+  if (reason.length < SUSPENSION_REASON_MIN_LENGTH) return { ok: false, error: "MODERATION_REASON_REQUIRED" };
+  if (reason.length > SUSPENSION_REASON_MAX_LENGTH) return { ok: false, error: "MODERATION_REASON_TOO_LONG" };
+  return { ok: true, reason };
+}
+
+/**
+ * Le motif lu dans un corps de requête reçu tel quel : un corps absent,
+ * illisible ou qui n'est pas un objet (`null`, un nombre, une liste) vaut un
+ * motif manquant — jamais une exception, que la route laisserait sortir en 500.
+ */
+export function validateModerationReasonBody(body: unknown): ModerationReasonValidation {
+  const reason = typeof body === "object" && body !== null && !Array.isArray(body) ? (body as { reason?: unknown }).reason : undefined;
+  return validateModerationReason(reason);
+}
+
+/** Les refus du motif, dits en français (toasts des fiches d'équipe et de joueur). */
+export function moderationReasonErrorMessage(code: string): string {
+  return code === "MODERATION_REASON_TOO_LONG"
+    ? `Le motif ne peut pas dépasser ${SUSPENSION_REASON_MAX_LENGTH} caractères.`
+    : `Décris les faits retenus (${SUSPENSION_REASON_MIN_LENGTH} caractères au moins) : ils sont envoyés avec la décision.`;
+}
+
+/**
  * Motif, faits, mode de décision et fondement — les éléments de l'exposé des
  * motifs communs à tous les messages. `termsUrl` mène à la clause invoquée.
+ * Hors signalement, les faits sont le motif saisi par la modération
+ * (`staffReason`).
  */
-function decisionGroundsText(input: { grounds: ModerationGrounds; fromReport: boolean; termsUrl: string }): string {
+function decisionGroundsText(input: {
+  grounds: ModerationGrounds;
+  fromReport: boolean;
+  termsUrl: string;
+  staffReason?: string | null;
+}): string {
   const text = GROUNDS_TEXT[input.grounds];
   const facts = input.fromReport
     ? "un signalement visant cette image, consultable avec ce qu'il reproche sur la page indiquée plus bas"
-    : "constat de la modération, sans signalement préalable";
+    : input.staffReason
+      ? `${discordInline(input.staffReason)} (constat de la modération, sans signalement préalable)`
+      : "constat de la modération, sans signalement préalable";
   return (
     `Motif : ${text.reason}. Faits retenus : ${facts}. ` +
     `Décision prise par un membre de la modération, sans traitement automatisé. ` +
@@ -277,11 +321,13 @@ export function formatLogoRemovedNotice(input: {
   url: string | null;
   grounds: ModerationGrounds;
   termsUrl: string;
+  /** Motif saisi par la modération, pour un retrait hors signalement. */
+  staffReason?: string | null;
 }): string {
   return (
     `🗑️ BlueGenji — Le logo de ton équipe « ${discordInline(input.teamName)} » a été supprimé par la modération du site` +
     `${input.url ? " à la suite d'un signalement" : ""}. ` +
-    `${decisionGroundsText({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl })} ` +
+    `${decisionGroundsText({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl, staffReason: input.staffReason })} ` +
     redressText({ grounds: input.grounds, url: input.url, plural: true })
   );
 }
@@ -334,11 +380,13 @@ export function formatAvatarRemovedNotice(input: {
   url: string | null;
   grounds: ModerationGrounds;
   termsUrl: string;
+  /** Motif saisi par la modération, pour un retrait hors signalement. */
+  staffReason?: string | null;
 }): string {
   return (
     `🗑️ BlueGenji — Ton avatar a été supprimé par la modération du site` +
     `${input.url ? " à la suite d'un signalement" : ""}. ` +
-    `${decisionGroundsText({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl })} ` +
+    `${decisionGroundsText({ grounds: input.grounds, fromReport: input.url !== null, termsUrl: input.termsUrl, staffReason: input.staffReason })} ` +
     redressText({ grounds: input.grounds, url: input.url, plural: false })
   );
 }

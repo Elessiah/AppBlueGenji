@@ -16,6 +16,18 @@ const originalEnv = { ...process.env };
 // Mock database
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/connection-logs");
+// La condition SQL d'une suspension reste la vraie : `getCurrentUser` la
+// recopie dans sa requête, c'est elle que les tests relisent.
+jest.mock("@/lib/server/account-suspensions", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/account-suspensions")>(
+    "@/lib/server/account-suspensions",
+  );
+  return {
+    ...actual,
+    assertNotSuspended: jest.fn(async () => undefined),
+    purgeEndedSuspensions: jest.fn(async () => undefined),
+  };
+});
 
 // Mock next/headers
 jest.mock("next/headers", () => ({
@@ -83,6 +95,40 @@ describe("auth", () => {
       await createSession(9, "LOGIN_DISCORD_CODE");
 
       expect(recordConnection).toHaveBeenCalledWith(9, "LOGIN_DISCORD_CODE");
+    });
+
+    it("refuse d'ouvrir la session d'un compte suspendu, avant toute écriture", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      const { recordConnection } = await import("@/lib/server/connection-logs");
+      const { AccountSuspendedError, assertNotSuspended } = await import("@/lib/server/account-suspensions");
+      const notice = { reference: "S-4", reason: "Triche avérée en finale", ground: "BEHAVIOR" as const, endsAt: null };
+      jest.mocked(assertNotSuspended).mockRejectedValueOnce(new AccountSuspendedError(notice));
+      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([]);
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+      const set = jest.fn();
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ set }));
+
+      const error = await createSession(12, "LOGIN_GOOGLE").catch((caught: unknown) => caught);
+
+      expect(error).toBeInstanceOf(AccountSuspendedError);
+      expect((error as InstanceType<typeof AccountSuspendedError>).notice).toEqual(notice);
+      expect(assertNotSuspended).toHaveBeenCalledWith(12);
+      expect(mockExecute).not.toHaveBeenCalled();
+      expect(set).not.toHaveBeenCalled();
+      expect(recordConnection).not.toHaveBeenCalled();
+    });
+
+    it("purge les suspensions terminées au passage", async () => {
+      const { getDatabase } = await import("@/lib/server/database");
+      const { cookies } = await import("next/headers");
+      const { purgeEndedSuspensions } = await import("@/lib/server/account-suspensions");
+      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>().mockResolvedValue([]) }));
+      jest.mocked(cookies).mockResolvedValue(fakeCookieStore({ set: jest.fn() }));
+
+      await createSession(3, "LOGIN_DISCORD");
+
+      expect(purgeEndedSuspensions).toHaveBeenCalledTimes(1);
     });
 
     it("ne consigne rien quand la session n'a pas pu s'ouvrir", async () => {

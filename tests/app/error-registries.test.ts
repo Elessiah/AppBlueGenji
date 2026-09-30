@@ -22,6 +22,7 @@ import { LINK_REFUSALS } from "@/lib/shared/account-connections";
 
 /** Tout ce que `/api/auth/discord/{request,verify}` peut rendre. */
 const LOGIN_CODES = [
+  "ACCOUNT_SUSPENDED",
   "BOT_INTERNAL_UNREACHABLE",
   "BOT_RESOLVE_TIMEOUT",
   "BOT_INTERNAL_UNAUTHORIZED",
@@ -64,6 +65,8 @@ const MEMBERSHIP_CODES = [
  * que pose le client quand la requête n'aboutit pas.
  */
 const TEAM_CODES = [
+  "MODERATION_REASON_REQUIRED",
+  "MODERATION_REASON_TOO_LONG",
   ...MEMBERSHIP_CODES,
   "NETWORK_ERROR",
   "TEAM_ALREADY_DELETED",
@@ -126,7 +129,7 @@ const CONNECTION_CODES = [
 ];
 
 /** Tous les motifs de refus que `lib/server/oauth-flow.ts` met dans `?error=`. */
-const OAUTH_ERROR_KINDS = ["not_configured", "unavailable", "params", "state", "oauth", "session"];
+const OAUTH_ERROR_KINDS = ["not_configured", "unavailable", "params", "state", "oauth", "session", "terms", "suspended"];
 
 /** Un jeton se reconnaît à sa forme : capitales, chiffres et tirets bas. */
 const looksLikeToken = (message: string) => /^[A-Z][A-Z0-9_]*$/.test(message.trim());

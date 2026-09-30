@@ -110,7 +110,7 @@
   color: var(--text-1);
 }
 
-/* Bandeau de modération (retrait d'avatar) : même gabarit que `.moderationBar`
+/* Bandeau de modération (retrait d'avatar, suspension du compte) : même gabarit que `.moderationBar`
    de la fiche d'équipe (`app/(secured)/equipes/[id]/team.module.css`) — les
    deux fiches partagent le même geste, elles partagent son habillage. */
 .moderationBar {
@@ -130,4 +130,12 @@
   font-size: 11px;
   letter-spacing: 0.16em;
   color: var(--amber, #f5a524);
+}
+
+/* État de la suspension en cours : le fait que les deux boutons voisins
+   commandent, lisible avant eux dans l'ordre du bandeau. */
+.moderationStatus {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
 }

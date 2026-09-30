@@ -43,6 +43,7 @@ import { isDiscordNumericId, visibleDiscordTag } from "@/lib/shared/discord-iden
 import { battletagNeedsTournamentContext, visibleBattletag } from "@/lib/shared/battletag-visibility";
 import { can, sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { getPlayerEntityStats, loadAllPlayerRecords } from "@/lib/server/stats-service";
+import { getActiveSuspension, listOwnSuspensions } from "@/lib/server/account-suspensions";
 import { cachedStats } from "@/lib/server/stats-cache";
 import { DISCORD_NAMED_PSEUDO_SQL } from "@/lib/server/discord-pseudo-sql";
 import { playedMatchSql } from "@/lib/shared/ranking";
@@ -1996,6 +1997,13 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
   // signalements qu'il a envoyés restent à traiter — l'association en a
   // besoin —, mais ne pointent plus vers lui.
   await connection.execute(`DELETE FROM bg_terms_acceptances WHERE user_id = ?`, [userId]);
+  // Les suspensions du compte : elles décrivent une personne que le compte ne
+  // désigne plus, et un compte anonymisé ne peut plus se connecter — il n'y a
+  // plus rien à suspendre ni à contester. Les décisions **prononcées** par ce
+  // compte (staff) restent dues à leurs titulaires et ne sont pas touchées
+  // (`created_by` ne se lit nulle part). Table tolérée : une base qui en
+  // manque n'a rien à effacer.
+  await ignoreMissingTable(connection.execute(`DELETE FROM bg_account_suspensions WHERE user_id = ?`, [userId]));
   await connection.execute(`UPDATE bg_reports SET reporter_user_id = NULL WHERE reporter_user_id = ?`, [userId]);
   // Les invitations et demandes **en attente** sont annulées, et c'est le seul
   // chemin par lequel un compte supprimé rejoignait encore une équipe vivante.
@@ -2384,6 +2392,10 @@ export async function getFullProfile(
     // filtre selon `visible_avatar` — sans quoi un avatar masqué au lecteur
     // masquerait aussi le bouton qui permet de le retirer.
     moderationAvatarPresent: canModerate && Boolean(userRows[0].avatar_url),
+    // Réservés à la modération, comme le bouton qu'ils commandent : qu'un
+    // compte soit suspendu, et pourquoi, ne regarde que lui et elle.
+    moderationSuspension: canModerate && !isDeleted ? await getActiveSuspension(targetUserId) : null,
+    moderationSuspendable: canModerate && !isDeleted && !isSelf && !targetIsAdmin,
   };
 }
 
@@ -2481,6 +2493,13 @@ export async function exportOwnData(userId: number): Promise<PersonalDataExport>
     reports: await listReportsByAuthor(userId),
     pushNotifications: await exportPushData(userId),
     connectionLogs: await listOwnConnectionLogs(userId),
+    suspensions: (await listOwnSuspensions(userId)).map((suspension) => ({
+      reason: suspension.reason,
+      ground: suspension.ground,
+      startsAt: suspension.startsAt,
+      endsAt: suspension.endsAt,
+      liftedAt: suspension.liftedAt,
+    })),
   };
 }
 

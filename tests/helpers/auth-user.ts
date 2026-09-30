@@ -64,6 +64,8 @@ export function fullProfileResponse(
     viewerIsAdmin: false,
     canModerate: false,
     moderationAvatarPresent: false,
+    moderationSuspension: null,
+    moderationSuspendable: false,
     ...rest,
   };
 }

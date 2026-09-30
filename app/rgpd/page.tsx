@@ -51,6 +51,7 @@ import {
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import {
@@ -433,6 +434,14 @@ export default async function RgpdPage() {
               d&apos;utilisation. Aucun identifiant de personne.
             </li>
             <li>
+              <strong>bg_suspension_notice</strong> — déposé uniquement <strong>si une connexion
+              est refusée parce que votre compte est suspendu</strong>, pour afficher la décision
+              sur la page de connexion, qui l&apos;efface dès sa première lecture (dix minutes au
+              plus s&apos;il n&apos;est jamais lu). Il ne contient que la
+              référence de la décision, les faits retenus, la clause invoquée et l&apos;échéance ;
+              il n&apos;est lisible que du serveur (httpOnly).
+            </li>
+            <li>
               <strong>bg_recr_modal</strong> et <strong>bg_recr_banner</strong> — déposés
               uniquement <strong>quand la fenêtre des annonces de recrutement urgentes vous
               est montrée</strong> (le premier) ou <strong>si vous fermez la banderole de
@@ -648,7 +657,11 @@ export default async function RgpdPage() {
               européen sur les services numériques, art. 16), une demande adressée à l&apos;hébergeur (art. 11 et 16) et une contestation
               (art. 20) : aucune case d&apos;accord n&apos;y est demandée, la demande est traitée. Pour
               les autres catégories (bug, autre), le <strong>consentement</strong>,
-              recueilli par une case à l&apos;envoi et retirable par la catégorie RGPD.
+              recueilli par une case à l&apos;envoi et retirable par la catégorie RGPD. Les
+              décisions de modération qui en découlent sur un contenu ou un compte contraire aux
+              conditions d&apos;utilisation (masquage, retrait, suspension) reposent, elles, sur
+              l&apos;<strong>intérêt légitime</strong> de l&apos;association à faire respecter ses
+              règles.
             </li>
             <li>
               <strong>Réponse</strong> : une demande RGPD, adressée à l&apos;hébergeur, ou une contestation exige une
@@ -727,6 +740,44 @@ export default async function RgpdPage() {
               Un contenu <strong>manifestement illicite</strong> peut être supprimé sans délai de
               masquage. L&apos;équipe ou le joueur en est prévenu de la même façon et peut contester la
               décision pendant le même délai ; si elle aboutit, l&apos;image peut être renvoyée.
+            </li>
+          </ul>
+          <p>
+            Retirée depuis la fiche d&apos;une équipe ou d&apos;un joueur, hors de tout signalement,
+            une image l&apos;est sur un <strong>motif saisi</strong> par la modération : il est envoyé à
+            l&apos;équipe ou au joueur avec la décision, et le site ne le conserve pas.
+          </p>
+
+          <h3>5. La suspension d&apos;un compte</h3>
+          <p>
+            Un membre de la modération peut <strong>suspendre un compte</strong> contraire aux
+            conditions d&apos;utilisation, pour une durée déterminée ou indéterminée : toutes ses
+            sessions sont fermées et aucune connexion n&apos;est possible tant que la suspension court.
+          </p>
+          <ul>
+            <li>
+              <strong>Données</strong> : le compte visé, les faits retenus, la clause invoquée, les
+              dates de début, d&apos;échéance et de levée, et le membre de la modération qui l&apos;a
+              prononcée ou levée.
+            </li>
+            <li>
+              <strong>Base légale</strong> : l&apos;<strong>intérêt légitime</strong> de
+              l&apos;association à faire respecter ses conditions d&apos;utilisation.
+            </li>
+            <li>
+              <strong>Information</strong> : le titulaire reçoit la décision, les faits retenus, la clause
+              invoquée et le moyen de la contester, en message privé Discord si son compte y est
+              rattaché, et à chaque tentative de connexion pendant la suspension. Il la conteste sans se
+              connecter, par « Signaler un problème » (catégorie « Autre »), en citant la référence de la
+              décision ; l&apos;association la réexamine, et le juge compétent peut ensuite être saisi. Le
+              journal du staff sur Discord ne porte ni son pseudo ni le motif.
+            </li>
+            <li>
+              <strong>Durée</strong> : tant qu&apos;elle court, puis {SUSPENSION_RETENTION_MONTHS} mois
+              après sa levée ou son échéance — le délai de contestation —, avant effacement lors de la
+              première connexion au site qui suit ce délai ; effacée aussi avec le compte, ou à son
+              anonymisation. Elle figure dans l&apos;export de vos données, sans le nom de qui l&apos;a
+              prononcée.
             </li>
           </ul>
           <p>

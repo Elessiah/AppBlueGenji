@@ -30,6 +30,7 @@ import {
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import {
@@ -558,19 +559,20 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   },
   {
     ref: "T11",
-    name: "Signalements, contestations et modération des contenus",
+    name: "Signalements, contestations et modération des contenus et des comptes",
     purpose: "Recevoir et traiter les signalements adressés à l'association, dont les notifications de contenu illicite",
     subPurposes: [
       "Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, RGPD, hébergeur, autre)",
       "Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester ; permettre à l'auteur d'un signalement de contester la décision prise",
-      "Masquer un logo d'équipe ou un avatar de joueur signalé, puis le rétablir ou le supprimer définitivement",
+      "Masquer un logo d'équipe ou un avatar de joueur signalé, puis le rétablir ou le supprimer définitivement ; retirer une image hors de tout signalement, sur un motif saisi par la modération",
+      "Suspendre un compte contraire aux conditions d'utilisation (sessions fermées, connexion refusée pendant la suspension), en exposer les motifs à son titulaire, puis la lever ou la laisser échoir",
       "Accuser réception d'une notification de contenu illicite, puis notifier à son auteur la décision et les voies de recours",
       "Répondre aux demandes d'exercice des droits et aux demandes adressées à l'hébergeur, dont celles des autorités",
       "Recevoir par courriel ou par téléphone, auprès de la personne à contacter pour les demandes relatives aux données, les demandes d'exercice des droits et les questions sur le traitement des données, et y répondre",
       "Alerter les administrateurs sur Discord, sans donnée nominative",
     ],
     legalBasis:
-      "Obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres ; par courriel ou par téléphone comme par le formulaire (catégorie RGPD), une demande d'exercice des droits ou une question sur le traitement de ses données — qui relève du droit d'accès (RGPD, art. 15) — repose sur la même obligation légale",
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire respecter ses conditions d'utilisation pour la modération des contenus et des comptes qui y sont contraires — examen, masquage, retrait d'une image, suspension d'un compte, et conservation de la décision le temps de sa contestation ; obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres ; par courriel ou par téléphone comme par le formulaire (catégorie RGPD), une demande d'exercice des droits ou une question sur le traitement de ses données — qui relève du droit d'accès (RGPD, art. 15) — repose sur la même obligation légale",
     dataSubjects: [
       "Signalants, utilisateurs ou non (titulaires de droits, représentants, visiteurs)",
       "Joueurs et membres des équipes visés par un signalement",
@@ -580,7 +582,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Catégorie, description, éléments désignés et page d'origine du signalement",
       `Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, ${copyrightNoticeElementsText()}`,
       "Contestations : texte, compte de leur auteur et adresse facultative",
-      "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
+      "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance ; motif d'un retrait décidé hors signalement (transmis à l'équipe ou au joueur, non conservé par le site)",
+      "Suspensions de compte : compte visé, faits retenus, clause invoquée, dates de début, d'échéance et de levée, membre de la modération qui l'a prononcée ou levée",
       "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande et de la réponse, adresse électronique ou numéro de l'expéditeur, et souvent son nom",
     ],
     sensitiveData: "Aucune",
@@ -588,10 +591,12 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
       `Demande reçue par courriel ou par téléphone : même règle qu'une demande RGPD faite depuis le formulaire — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la clôture de la demande (l'équivalent de l'archivage d'un signalement), avant suppression de la messagerie de la personne à contacter (courriel) ou de son téléphone (SMS reçus et envoyés, messagerie vocale, journal d'appels)`,
       `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
+      `Suspension de compte : tant qu'elle court, puis ${SUSPENSION_RETENTION_MONTHS} mois après sa levée ou son échéance (même délai de contestation), effacée lors de la première connexion au site qui suit ce délai ; effacée avec le compte, ou à son anonymisation`,
     ],
     recipients: [
       "Administrateurs de l'association",
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
+      "Titulaire d'un compte suspendu : la décision, les faits retenus et la clause invoquée, jamais le nom du membre de la modération qui l'a prononcée",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
       `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
       "Opérateur téléphonique de cette personne : demandes faites par téléphone (appel, SMS, messagerie vocale)",
@@ -606,6 +611,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
       "Plafonds d'envoi par personne et par heure",
       "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
+      "Suspension réservée à la permission de modération, impossible sur son propre compte ou sur celui d'un administrateur ; le journal Discord du staff n'en porte ni le pseudo du joueur ni le motif",
       "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft (messagerie), de l'opérateur téléphonique et de l'appareil personnel de la personne à contacter",
     ],
   },

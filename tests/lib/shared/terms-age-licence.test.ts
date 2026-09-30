@@ -117,3 +117,31 @@ describe("année de fondation", () => {
     },
   );
 });
+
+describe("conditions d'utilisation — suspension, recours et médiation", () => {
+  it("décrit la procédure de suspension : effets, durée, exposé des motifs, contestation sans compte", () => {
+    const text = section("signalement");
+    expect(text).toContain("**suspension d'un compte** ferme aussitôt toutes ses sessions");
+    expect(text).toContain("**durée déterminée** (365 jours au plus) ou **indéterminée**");
+    expect(text).toContain("à chaque tentative de connexion pendant la suspension");
+    expect(text).toContain("sans avoir à se connecter");
+    expect(text).toContain("**jamais par un traitement automatisé**");
+  });
+
+  it("ouvre le réexamen par l'association avant le juge", () => {
+    const text = section("signalement");
+    expect(text).toContain("la **réexamine**");
+    expect(text).toContain("**juge compétent**");
+    expect(text.indexOf("**réexamine**")).toBeLessThan(text.indexOf("**juge compétent**"));
+  });
+
+  it("nomme l'intérêt légitime comme base de la modération", () => {
+    expect(section("signalement")).toContain("**intérêt légitime** de l'association à faire respecter ses règles");
+  });
+
+  it("dit pourquoi aucun médiateur de la consommation n'est désigné", () => {
+    const text = section("droit-applicable");
+    expect(text).toContain("**gratuit**");
+    expect(text).toContain("aucun **médiateur de la consommation** n'est désigné");
+  });
+});
