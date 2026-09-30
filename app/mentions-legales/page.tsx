@@ -212,7 +212,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         <p>
           L&apos;hébergeur technique fournit la machine. Il ne faut pas le confondre avec
           l&apos;association, qui est l&apos;<a href="#contenus-membres">hébergeur des contenus de
-          ses membres</a> au sens du règlement européen sur les services numériques.
+          ses utilisateurs</a> au sens du règlement européen sur les services numériques.
         </p>
         <p>
           Pour écrire à l&apos;hébergeur ou à l&apos;éditeur : bouton <strong>« {REPORT_FORM_NAME} »</strong>{" "}
@@ -252,7 +252,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         </p>
         <p>
           <strong>N&apos;appartiennent ni à l&apos;association ni à l&apos;auteur du code</strong>{" "}
-          les contenus publiés par les membres (avatars, logos, noms et descriptions d&apos;équipe,
+          les contenus publiés par les utilisateurs (avatars, logos, noms et descriptions d&apos;équipe,
           pseudos), qui restent la propriété de leurs auteurs ou de leurs titulaires, ni les marques et visuels des jeux Overwatch (Blizzard
           Entertainment) et Marvel Rivals (NetEase, Marvel), qui appartiennent à leurs titulaires.
           Le site n&apos;est affilié à aucun de ces éditeurs.
@@ -262,21 +262,21 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
   },
   {
     id: "contenus-membres",
-    title: "Contenus des membres et signalement",
+    title: "Contenus des utilisateurs et signalement",
     meta: "HÉBERGEUR DES CONTENUS · DSA ART. 16",
     body: (
       <>
         <p>
-          Pour les contenus que publient ses membres, l&apos;association agit en qualité
+          Pour les contenus que publient ses utilisateurs, l&apos;association agit en qualité
           d&apos;<strong>hébergeur de ces contenus</strong> — distinct de l&apos;hébergeur
           technique, qui fournit la machine (loi pour la confiance dans l&apos;économie numérique,
           art. 6 ; règlement européen sur les services numériques, art. 6) : elle ne les contrôle pas
-          avant publication, et chaque membre garantit détenir les droits sur ce qu&apos;il publie,
+          avant publication, et chaque utilisateur garantit détenir les droits sur ce qu&apos;il publie,
           comme le prévoient les{" "}
           <Link href={TERMS_PATH}>conditions d&apos;utilisation</Link>.
         </p>
         <p>
-          <strong>Toute personne</strong>, membre ou non, peut signaler un contenu illicite — une
+          <strong>Toute personne</strong>, utilisateur ou non, peut signaler un contenu illicite — une
           atteinte au droit d&apos;auteur notamment — par le bouton <strong>« Signaler un
           problème »</strong> présent en bas de chaque page. Le signalement d&apos;un droit
           d&apos;auteur indique {copyrightNoticeElementsText()}. {NOTIFIER_FOLLOW_UP}
@@ -293,7 +293,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         <p>
           En sa qualité d&apos;hébergeur de ces contenus, l&apos;association conserve{" "}
           <strong>{CONNECTION_LOG_RETENTION_DAYS} jours</strong> les données de connexion de ses
-          membres (adresse IP, date et heure, moyen de connexion), y compris après la suppression
+          utilisateurs (adresse IP, date et heure, moyen de connexion), y compris après la suppression
           d&apos;un compte, afin de pouvoir identifier l&apos;auteur d&apos;un contenu sur
           réquisition d&apos;une autorité judiciaire (LCEN, art. 6 ; décret n° 2021-1362). Ces
           données ne sont communiquées qu&apos;aux autorités qui les requièrent ; le détail figure
@@ -311,7 +311,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
         <p>
           Les autorités des États membres, la Commission européenne et le comité européen des
           services numériques joignent l&apos;association, en sa qualité d&apos;hébergeur des
-          contenus de ses membres, par un <strong>point de contact unique</strong> : son courriel,{" "}
+          contenus de ses utilisateurs, par un <strong>point de contact unique</strong> : son courriel,{" "}
           <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
           , ou le bouton <strong>« {REPORT_FORM_NAME} »</strong> en bas de chaque page, catégorie
           « Hébergeur ».
@@ -359,7 +359,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
       <>
         <p>
           Le site n&apos;utilise que des cookies <strong>techniques</strong> : la session d&apos;un
-          membre connecté, l&apos;état d&apos;une connexion en cours, vos réglages
+          utilisateur connecté, l&apos;état d&apos;une connexion en cours, vos réglages
           d&apos;accessibilité et le souvenir des annonces de recrutement déjà vues. Aucun ne permet
           de suivi publicitaire. Leur liste complète, avec celle des autres données que le site
           garde dans votre navigateur (stockage local, stockage de session, cache de la page
