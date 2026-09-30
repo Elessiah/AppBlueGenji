@@ -81,7 +81,9 @@ export function SuspensionNoticeDialog({ notice, onClose }: { notice: Suspension
           </dd>
         </dl>
         <div style={{ display: "flex", justifyContent: "flex-end" }}>
-          <button type="button" className="btn ghost" onClick={onClose}>
+          {/* Focus sur la sortie : l'exposé se lit par la description du dialogue,
+              et le premier arrêt ne doit pas être le lien vers les conditions. */}
+          <button type="button" className="btn ghost" onClick={onClose} data-autofocus>
             Fermer
           </button>
         </div>

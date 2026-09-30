@@ -55,7 +55,7 @@ export function PlayerModerationBar({
     <div className={styles.moderationBar} role="group" aria-label="Modération">
       <span className={styles.moderationLabel}>MODÉRATION</span>
       {suspension && (
-        <span style={{ fontSize: 13, color: "var(--ink)" }}>
+        <span className={styles.moderationStatus}>
           Compte suspendu {suspensionSpan(suspension.endsAt)} ({suspensionReference(suspension.id)})
         </span>
       )}
