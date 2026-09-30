@@ -11,6 +11,7 @@ import {
   BOT_LINK_CODE_VALIDITY_MINUTES,
   BOT_RELAY_RETENTION_DAYS,
   DPF_ADEQUACY_DECISION,
+  DPF_ADEQUACY_DECISION_EN,
   PROCESSING_ACTIVITIES,
 } from "@/lib/shared/processing-register";
 import { SITE_HOST } from "@/lib/shared/site-host";
@@ -143,6 +144,10 @@ describe("route pages wire the right documents", () => {
     expect(source).toContain("useState");
     expect(source).toContain("aria-pressed");
     expect(source).toContain("HEBERGEUR_HREF");
+    // Le composant client ne lit que les types : importer le contenu tirerait
+    // le registre des traitements dans le paquet du navigateur.
+    expect(source).toContain('from "@/lib/shared/bot-legal-types"');
+    expect(source).not.toContain("bot-legal-content");
   });
 });
 
@@ -189,11 +194,13 @@ describe("bot legal content matches the bot's code and the association", () => {
     for (const lang of LANGS) {
       const flat = flatOf(PRIVACY_POLICY, lang);
       expect(flat).toContain("**/stats**");
-      expect(flat).toContain(`${BACKUP_RETENTION_DAYS}`);
       expect(flat).toContain("Microsoft");
       expect(flat).toContain("2023/1795");
     }
     expect(flatOf(PRIVACY_POLICY, "fr")).toContain(DPF_ADEQUACY_DECISION);
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain(DPF_ADEQUACY_DECISION_EN);
+    expect(flatOf(PRIVACY_POLICY, "fr")).toContain(`${BACKUP_RETENTION_DAYS} jours au plus`);
+    expect(flatOf(PRIVACY_POLICY, "en")).toContain(`${BACKUP_RETENTION_DAYS} days at most`);
   });
 
   it("lists the legal basis, objection, restriction and the CNIL complaint", () => {

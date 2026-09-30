@@ -31,12 +31,20 @@ import {
   BOT_LINK_CODE_VALIDITY_MINUTES,
   BOT_RELAY_RETENTION_DAYS,
   DPF_ADEQUACY_DECISION,
+  DPF_ADEQUACY_DECISION_EN,
 } from "@/lib/shared/processing-register";
 import { SITE_HOST } from "@/lib/shared/site-host";
 
-export type Lang = "fr" | "en";
+import type { BilingualDoc } from "@/lib/shared/bot-legal-types";
 
-export const HEBERGEUR_HREF = "/mentions-legales#hebergement";
+export {
+  HEBERGEUR_HREF,
+  type BilingualDoc,
+  type Lang,
+  type LegalBlock,
+  type LegalDoc,
+  type LegalSection,
+} from "@/lib/shared/bot-legal-types";
 
 /**
  * Âge minimal pour utiliser le bot : 15 ans, seuil à partir duquel un mineur
@@ -44,43 +52,6 @@ export const HEBERGEUR_HREF = "/mentions-legales#hebergement";
  * Informatique et Libertés, art. 8 RGPD).
  */
 export const BOT_MINIMUM_AGE = 15;
-
-export interface LegalBlock {
-  kind: "p" | "subhead" | "bullets";
-  /** Pour `p` et `subhead`. Supporte la syntaxe inline. */
-  text?: string;
-  /** Pour `bullets`. Chaque entrée supporte la syntaxe inline. */
-  items?: string[];
-}
-
-export interface LegalSection {
-  num: string;
-  title: string;
-  meta: string;
-  blocks: LegalBlock[];
-}
-
-export interface LegalDoc {
-  eyebrow: string;
-  /** Titre d'affichage (peut contenir un saut de ligne `\n`). */
-  title: string;
-  lastUpdatedLabel: string;
-  lastUpdated: string;
-  intro: string;
-  sections: LegalSection[];
-  /** Bloc « hébergeur » renvoyant vers les mentions légales. */
-  hosting: {
-    meta: string;
-    title: string;
-    text: string;
-    linkLabel: string;
-  };
-}
-
-export interface BilingualDoc {
-  fr: LegalDoc;
-  en: LegalDoc;
-}
 
 /** Même serveur que le reste du site : voir `lib/shared/discord.ts`. */
 const DISCORD_INVITE = DISCORD_INVITE_URL;
@@ -705,8 +676,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
           {
             kind: "bullets",
             items: [
-              "**Discord** (United States): European Commission adequacy decision (EU) 2023/1795 of 10 July 2023 (EU-U.S. Data Privacy Framework).",
-              "**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; it only receives encrypted data — European Commission adequacy decision (EU) 2023/1795 of 10 July 2023 (EU-U.S. Data Privacy Framework).",
+              `**Discord** (United States): ${DPF_ADEQUACY_DECISION_EN}.`,
+              `**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; it only receives encrypted data — ${DPF_ADEQUACY_DECISION_EN}.`,
             ],
           },
         ],

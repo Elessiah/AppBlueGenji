@@ -73,6 +73,10 @@ export type TransferRecipient = "DISCORD" | "GOOGLE" | "MICROSOFT" | "APPLE" | "
 export const DPF_ADEQUACY_DECISION =
   "décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)";
 
+/** La même décision, pour les pages anglaises (politique de confidentialité du bot). */
+export const DPF_ADEQUACY_DECISION_EN =
+  "European Commission adequacy decision (EU) 2023/1795 of 10 July 2023 (EU-U.S. Data Privacy Framework)";
+
 /** Clauses contractuelles types, pour un destinataire dont le transfert ne repose pas sur le DPF. */
 export const STANDARD_CONTRACTUAL_CLAUSES =
   "clauses contractuelles types de la Commission européenne (art. 46 RGPD), intégrées à ses conditions d'utilisation";
