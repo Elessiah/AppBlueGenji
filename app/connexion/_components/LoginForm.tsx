@@ -31,7 +31,8 @@ import { LOGIN_HELP_TEXT_STYLE } from "../_lib/login-styles";
  * nom historique.
  */
 const CONSENT_STORAGE_KEY = "bg_rgpd_consent";
-const NOTICE_VERSION = "2";
+/** « 3 » : la case porte la déclaration d'âge (`TERMS_AGE_DECLARATION`), qu'un navigateur à « 2 » n'a jamais vue. */
+const NOTICE_VERSION = "3";
 /**
  * Accord à l'invite Google One Tap, retirée depuis : la valeur restée dans un
  * navigateur est effacée au passage, rien ne la relit plus (le cookie `g_state`

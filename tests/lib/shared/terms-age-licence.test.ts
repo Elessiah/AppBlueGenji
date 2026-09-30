@@ -42,6 +42,8 @@ describe("conditions d'utilisation — âge minimum", () => {
     expect(TERMS_AGE_DECLARATION).toBe("je déclare avoir au moins 15 ans");
     const modal = read("components/cyber/RgpdConsentModal.tsx");
     expect(modal).toContain("), et {TERMS_AGE_DECLARATION}.");
+    // Un navigateur qui a coché l'ancienne case, sans l'âge, doit la revoir.
+    expect(read("app/connexion/_components/LoginForm.tsx")).toContain('const NOTICE_VERSION = "3";');
   });
 
   it("est repris par la politique de confidentialité, avec un lien vers la clause", () => {
