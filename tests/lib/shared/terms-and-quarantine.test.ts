@@ -26,6 +26,8 @@ import {
   formatLogoRestoredNotice,
   isImmediateLogoRemoval,
   formatQuarantineDate,
+  moderationReasonErrorMessage,
+  validateModerationReason,
   logoQuarantinePurgeDate,
 } from "@/lib/shared/logo-quarantine";
 
@@ -49,10 +51,12 @@ describe("conditions d'utilisation", () => {
     expect(termsRequestFor(TERMS_VERSION + 1)).toBeNull();
   });
 
-  it("version 2 en vigueur le lendemain de sa mise en ligne : la version 1 est redemandée", () => {
-    expect(TERMS_VERSION).toBe(2);
+  it("version 3 en vigueur le lendemain de sa mise en ligne : les versions 1 et 2 sont redemandées", () => {
+    expect(TERMS_VERSION).toBe(3);
     expect(TERMS_UPDATED_AT).toBe("2026-10-01");
     expect(termsRequestFor(1)).toBe("UPDATED");
+    expect(termsRequestFor(2)).toBe("UPDATED");
+    expect(termsRequestFor(3)).toBeNull();
   });
 
   it("reconnaît les quatre écrans d'acceptation", () => {
@@ -248,6 +252,34 @@ describe("suppression sans délai d'un logo", () => {
     expect(standalone).toContain(TERMS_URL);
     expect(standalone).not.toContain("/signalements/");
     expect(standalone).toContain("devant le juge compétent");
+  });
+
+  it("expose le motif saisi comme faits retenus d'un retrait hors signalement", () => {
+    const reason = "Logo reprenant une marque déposée @everyone";
+    const logo = formatLogoRemovedNotice({ teamName: "Alpha", url: null, grounds: "SITE_RULES", termsUrl: TERMS_URL, staffReason: reason });
+    expect(logo).toContain("Faits retenus : Logo reprenant une marque déposée");
+    expect(logo).toContain("(constat de la modération, sans signalement préalable)");
+    expect(logo).not.toContain("@everyone");
+    const avatar = formatAvatarRemovedNotice({ url: null, grounds: "SITE_RULES", termsUrl: TERMS_URL, staffReason: "Avatar à caractère sexuel" });
+    expect(avatar).toContain("Faits retenus : Avatar à caractère sexuel (constat de la modération");
+    // Depuis un signalement, les faits sont le signalement, jamais un motif.
+    const linked = formatAvatarRemovedNotice({ url: "https://site.test/signalements/4", grounds: "SITE_RULES", termsUrl: TERMS_URL, staffReason: "ignoré" });
+    expect(linked).not.toContain("ignoré");
+  });
+});
+
+describe("validateModerationReason", () => {
+  it("exige un motif de 10 à 500 caractères, mis sur une ligne", () => {
+    expect(validateModerationReason("  Marque\n déposée sans accord ")).toEqual({ ok: true, reason: "Marque déposée sans accord" });
+    expect(validateModerationReason(undefined)).toEqual({ ok: false, error: "MODERATION_REASON_REQUIRED" });
+    expect(validateModerationReason("court")).toEqual({ ok: false, error: "MODERATION_REASON_REQUIRED" });
+    expect(validateModerationReason("x".repeat(501))).toEqual({ ok: false, error: "MODERATION_REASON_TOO_LONG" });
+    expect(validateModerationReason("x".repeat(500)).ok).toBe(true);
+  });
+
+  it("dit ses refus en français", () => {
+    expect(moderationReasonErrorMessage("MODERATION_REASON_REQUIRED")).toContain("10 caractères");
+    expect(moderationReasonErrorMessage("MODERATION_REASON_TOO_LONG")).toContain("500 caractères");
   });
 });
 

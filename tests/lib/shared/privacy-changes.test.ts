@@ -1,5 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE } from "@/lib/shared/legal-contact";
+import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -500,8 +501,9 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   // Même jour que les rectificatifs : une seule modale pour les deux, et une
   // entrée distincte parce que ceux-ci annoncent un traitement inchangé.
   it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
-    // Suivie de l'entrée du contact données, publiée le même jour.
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
+    // Suivie de l'entrée du contact données, puis de celle des suspensions,
+    // publiées le même jour.
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -526,9 +528,9 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-contact-donnees")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
+  it("précède l'entrée des suspensions, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -553,5 +555,30 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
   it("tient dans un message privé à elle seule, et renvoie à la section des droits", () => {
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#exercer-vos-droits"]);
+  });
+});
+
+describe("PRIVACY_CHANGES — suspension d'un compte", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-suspension-comptes")!;
+  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, publiée le lendemain de sa mise en ligne, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-01");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("annonce le traitement, sa base légale, sa durée et la voie de contestation", () => {
+    expect(text()).toContain("suspendre un compte");
+    expect(text()).toContain("intérêt légitime");
+    expect(text()).toContain(`${SUSPENSION_RETENTION_MONTHS} mois`);
+    expect(text()).toContain("« Signaler un problème » (catégorie « Autre »)");
+    expect(text()).toContain("motif écrit");
+  });
+
+  it("tient dans un message privé à elle seule, et renvoie à la section de /rgpd", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#signalements"]);
   });
 });

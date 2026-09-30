@@ -18,6 +18,7 @@ import { createSession } from "@/lib/server/auth";
 import { consumeDiscordLoginChallenge, createOrGetDiscordUser } from "@/lib/server/users-service";
 import { DISCORD_CODE_VERIFY_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
+import { AccountSuspendedError } from "@/lib/server/account-suspensions";
 
 /**
  * Le plafond de vérification, et **l'axe sur lequel il est posé**.
@@ -215,5 +216,26 @@ describe("POST /api/auth/discord/verify — CSRF de connexion", () => {
 
     expect(res.status).toBe(200);
     expect(createSessionMock).toHaveBeenCalledWith(42, "LOGIN_DISCORD_CODE");
+  });
+});
+
+describe("POST /api/auth/discord/verify — compte suspendu", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    resetRateLimit(DISCORD_CODE_VERIFY_RULE.name);
+    verifyMock.mockResolvedValue({ discordId: VICTIM_DISCORD, handle: "keryan" });
+    createUserMock.mockResolvedValue(42);
+  });
+
+  it("refuse en 403 et rend l'exposé de la décision dans le corps", async () => {
+    // Le lecteur vient de prouver être le titulaire : l'exposé complet lui est
+    // dû, seul canal qui joigne un compte sans Discord rattaché.
+    const notice = { reference: "S-3", reason: "Propos haineux en match", ground: "BEHAVIOR" as const, endsAt: null };
+    createSessionMock.mockRejectedValueOnce(new AccountSuspendedError(notice));
+
+    const res = await attempt(VICTIM_CHALLENGE, "424242");
+
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "ACCOUNT_SUSPENDED", suspension: notice });
   });
 });

@@ -21,6 +21,8 @@ import {
 } from "@/lib/server/discord-oauth";
 import { buildBlizzardAuthorizationUrl, fetchBlizzardUser } from "@/lib/server/blizzard-oauth";
 import type { OAuthProvider } from "@/lib/shared/oauth-providers";
+import { AccountSuspendedError } from "@/lib/server/account-suspensions";
+import { SUSPENSION_NOTICE_COOKIE, parseSuspensionNotice } from "@/lib/shared/account-suspension";
 import { authUser } from "../../helpers/auth-user";
 
 /**
@@ -338,6 +340,40 @@ describe("completeOAuth — connexion", () => {
       "http://localhost:3000/connexion?error=terms&provider=google",
     );
     expect(createSession).not.toHaveBeenCalled();
+  });
+
+  it("renvoie un compte suspendu sur la connexion, l'exposé dans un cookie httpOnly et jamais dans l'URL", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    const notice = {
+      reference: "S-12",
+      reason: "Triche avérée pendant la finale",
+      ground: "BEHAVIOR" as const,
+      endsAt: "2026-10-15T08:00:00.000Z",
+    };
+    jest.mocked(createSession).mockRejectedValueOnce(new AccountSuspendedError(notice));
+
+    const response = await login("GOOGLE");
+
+    const location = response.headers.get("location") ?? "";
+    expect(location).toBe("http://localhost:3000/connexion?error=suspended&provider=google");
+    expect(location).not.toContain("Triche");
+    const cookie = response.cookies.get(SUSPENSION_NOTICE_COOKIE);
+    expect(cookie).toBeDefined();
+    expect(cookie?.httpOnly).toBe(true);
+    expect(cookie?.path).toBe("/connexion");
+    expect(cookie?.maxAge).toBe(600);
+    expect(parseSuspensionNotice(cookie?.value)).toEqual(notice);
+  });
+
+  it("n'écrit aucun cookie d'exposé pour un autre refus", async () => {
+    jest.mocked(fetchGoogleUser).mockResolvedValue({ sub: "sub-1" });
+    jest.mocked(createSession).mockRejectedValueOnce(new Error("ACCOUNT_SUSPENDED"));
+
+    const response = await login("GOOGLE");
+
+    // Seule l'erreur typée porte un exposé : un message homonyme n'en invente pas.
+    expect(response.headers.get("location")).toBe("http://localhost:3000/connexion?error=oauth&provider=google");
+    expect(response.cookies.get(SUSPENSION_NOTICE_COOKIE)).toBeUndefined();
   });
 
   it("refiltre la destination à la sortie du cookie, qui n'est pas signé", async () => {
