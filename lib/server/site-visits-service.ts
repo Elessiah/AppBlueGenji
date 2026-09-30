@@ -269,6 +269,34 @@ async function rememberVisitor(visitorKey: string, authenticated: number): Promi
   }
 }
 
+/** Cadence de l'entretien des durées, indépendant de l'enregistrement d'une visite. */
+const RETENTION_MAINTENANCE_INTERVAL_MS = 60 * 60 * 1000;
+let lastRetentionMaintenanceAt = 0;
+
+/**
+ * Entretien des durées de conservation (détail à 31 jours, empreintes à
+ * {@link SITE_VISITOR_RETENTION_MONTHS} mois), au plus une fois par heure.
+ *
+ * Le repli suit d'ordinaire la synchronisation vers le bot, qui ne part qu'après
+ * une visite **enregistrée** : sans sel secret, ou quand tous les visiteurs
+ * s'opposent à la mesure, rien ne s'enregistre plus et les durées annoncées
+ * cesseraient d'être tenues. `/api/visits` l'appelle donc à chaque signalement,
+ * refusé ou non — c'est de l'entretien, rien n'y concerne le visiteur. Jamais
+ * attendu, jamais levé.
+ */
+export function maintainSiteVisitRetention(now: number = Date.now()): void {
+  if (now - lastRetentionMaintenanceAt < RETENTION_MAINTENANCE_INTERVAL_MS) return;
+  lastRetentionMaintenanceAt = now;
+  void rollUpExpiredSiteVisits().catch((error: unknown) => {
+    console.error("[site-visits] Entretien des durées de conservation impossible.", error);
+  });
+}
+
+/** Réinitialise la cadence de l'entretien des durées (tests). */
+export function resetSiteVisitRetentionThrottle(): void {
+  lastRetentionMaintenanceAt = 0;
+}
+
 /** Repli en cours, partagé par les appels concurrents. */
 let pendingRollUp: Promise<number> | null = null;
 

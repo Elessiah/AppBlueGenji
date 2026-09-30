@@ -3,7 +3,9 @@ import {
   emptySiteVisitStats,
   visitHashSalt,
   getSiteVisitStats,
+  maintainSiteVisitRetention,
   recordSiteVisit,
+  resetSiteVisitRetentionThrottle,
   resetSiteVisitSyncThrottle,
   resetVisitRateLimit,
   rollUpExpiredSiteVisits,
@@ -570,6 +572,25 @@ describe("rollUpExpiredSiteVisits", () => {
     // Le report d'abord : une empreinte encore au détail n'est jamais effacée.
     expect(calls.indexOf(report)).toBeLessThan(calls.indexOf(purge));
     expect(connection.commit).toHaveBeenCalledTimes(1);
+  });
+
+  // Sans visite enregistrée (sel absent, tout le monde opposé), la
+  // synchronisation ne part plus : l'entretien ne doit pas en dépendre.
+  it("entretient les durées au plus une fois par heure, sans visite enregistrée", async () => {
+    const connection = rollUpConnection();
+    const getConnection = jest.fn(async () => fakeConnection(connection));
+    const { getDatabase } = await import("@/lib/server/database");
+    jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: jest.fn<SqlQuery>(), getConnection }));
+    resetSiteVisitRetentionThrottle();
+
+    maintainSiteVisitRetention(100_000_000);
+    maintainSiteVisitRetention(100_000_000 + 30 * 60 * 1000);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(getConnection).toHaveBeenCalledTimes(1);
+
+    maintainSiteVisitRetention(100_000_000 + 61 * 60 * 1000);
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(getConnection).toHaveBeenCalledTimes(2);
   });
 
   it("borne l'empreinte à vingt-cinq mois, la durée retenue par la CNIL", () => {

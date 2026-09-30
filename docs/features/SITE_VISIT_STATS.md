@@ -129,8 +129,12 @@ règle le signal. Aucun réglage d'apparence n'est en jeu, d'où un bouton sur
 efface dans la même transaction les empreintes vues pour la dernière fois il y a
 plus de `SITE_VISITOR_RETENTION_MONTHS` (25) mois — la durée retenue par la CNIL
 pour la mesure d'audience. Le « total » des visiteurs uniques est donc celui des
-vingt-cinq derniers mois. Aucun ordonnanceur : la purge suit le repli, lui-même
-entraîné par les visites. Les empreintes antérieures à la colonne n'ont **pas**
+vingt-cinq derniers mois. Aucun ordonnanceur : la purge suit le repli, entraîné
+par les signalements de visite — après chaque visite enregistrée (synchronisation
+vers le bot), et au plus une fois par heure par `maintainSiteVisitRetention`,
+appelé par `/api/visits` que la visite soit comptée **ou non** : sans sel secret,
+ou si tous les visiteurs s'opposent, plus rien ne s'enregistre, et les durées
+annoncées ne tiendraient plus. Les empreintes antérieures à la colonne n'ont **pas**
 été rétro-datées — leur dernière visite n'était écrite nulle part — et portent
 la date du déploiement : leur durée court depuis lui, lecture prudente qui
 n'efface rien sur une date inventée. Le détail des visites garde sa durée de 31

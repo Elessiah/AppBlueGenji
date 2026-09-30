@@ -1,7 +1,11 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { enforceRateLimit, requestClientIp, VISIT_REQUEST_RULE } from "@/lib/server/api-guard";
 import { ok } from "@/lib/server/http";
-import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
+import {
+  maintainSiteVisitRetention,
+  recordSiteVisit,
+  syncSiteVisitStatsToBot,
+} from "@/lib/server/site-visits-service";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 import { audienceOptOutFromHeaders } from "@/lib/shared/site-visits";
 
@@ -18,6 +22,10 @@ export const dynamic = "force-dynamic";
  * d'un visiteur.
  */
 export async function POST(req: Request) {
+  // Entretien des durées de conservation, que la visite soit enregistrée ou
+  // non : sinon les durées annoncées ne tiendraient plus sans visite comptée.
+  maintainSiteVisitRetention();
+
   // Opposition (GPC, DNT ou choix fait sur `/rgpd#audience`) : relue ici, le
   // serveur ne se fiant pas au seul navigateur. Rien n'est calculé ni écrit —
   // pas même un décompte du plafond de débit, qui garde l'IP en mémoire.

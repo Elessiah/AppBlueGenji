@@ -5,7 +5,11 @@ jest.mock("@/lib/server/site-visits-service");
 
 import { POST } from "@/app/api/visits/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { recordSiteVisit, syncSiteVisitStatsToBot } from "@/lib/server/site-visits-service";
+import {
+  maintainSiteVisitRetention,
+  recordSiteVisit,
+  syncSiteVisitStatsToBot,
+} from "@/lib/server/site-visits-service";
 import { authUser } from "../../helpers/auth-user";
 
 const member = authUser({ id: 42, isAdmin: false, roles: [] });
@@ -162,6 +166,8 @@ describe("POST /api/visits — opposition à la mesure", () => {
     expect(recordSiteVisit).not.toHaveBeenCalled();
     expect(getCurrentUser).not.toHaveBeenCalled();
     expect(syncSiteVisitStatsToBot).not.toHaveBeenCalled();
+    // L'entretien des durées, lui, ne dépend pas d'une visite comptée.
+    expect(maintainSiteVisitRetention).toHaveBeenCalledTimes(1);
   });
 
   it("mesure quand les signaux sont absents ou à 0", async () => {
