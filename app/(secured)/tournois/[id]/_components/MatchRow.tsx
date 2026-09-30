@@ -10,6 +10,8 @@ import {
   playerReportView,
   playerScoreButtonLabel,
 } from "@/lib/shared/player-score-report";
+import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
+import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
@@ -62,7 +64,16 @@ export const MatchRow = memo(function MatchRow({
   // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
   // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
   // signalement, qui décrirait la même donnée depuis deux sources.
-  const { myTeamId } = useLiveControls();
+  const { myTeamId, refereeScheduling } = useLiveControls();
+  // Phase de lancement, calculée **une fois par carte** et transmise aux deux
+  // bandeaux : chacun posait sinon sa propre minuterie sur l'heure de départ —
+  // trois `setTimeout` par match programmé, sur un plateau qui en compte 254.
+  // Une chaîne : la prop reste stable, la mémorisation des bandeaux tient.
+  const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
+  // Avant le lancement (à planifier, en attente de départ), l'arbitrage ne
+  // saisit aucun score : le seul geste du dialogue est le forfait, et le bouton
+  // le dit plutôt que d'annoncer une édition refusée.
+  const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
   const canReportMatch = canReportOwnMatch(canReport, myTeamId, match.team1Id, match.team2Id);
   // Saisie du score par un engagé : un bouton qui ouvre la modale joueur, et
   // non plus un formulaire en ligne — deux champs de 52 px sans libellé visible
@@ -172,8 +183,8 @@ export const MatchRow = memo(function MatchRow({
         </p>
       )}
 
-      <MatchLiveStrip match={match} />
-      <MatchLaunchStrip match={match} />
+      <MatchLiveStrip match={match} launchPhase={launchPhase} />
+      <MatchLaunchStrip match={match} phase={launchPhase} />
 
       <MatchReplayStrip match={match} />
 
@@ -207,7 +218,11 @@ export const MatchRow = memo(function MatchRow({
                 venir (adversaire fantôme) : le dialogue s'ouvre dessus, et le
                 bouton dit le geste qui reste à faire. */}
             <span aria-hidden="true">✎</span>{" "}
-            {pendingScoreProposal(match) ? "Valider le score proposé" : "Éditer le score"}
+            {scoreEntryClosed
+              ? "Prononcer un forfait"
+              : pendingScoreProposal(match)
+                ? "Valider le score proposé"
+                : "Éditer le score"}
           </CyberButton>
         </div>
       )}

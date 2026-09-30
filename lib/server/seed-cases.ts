@@ -89,6 +89,12 @@ export interface TournamentDef extends ReportStateCounts {
   matchSchedule?: SeedMatchSchedule; // dates de début des manches ; absent = aucun horaire
   image?: SeedImage; // illustration ou logo ; absent = aucune image (cas majoritaire)
   replays?: boolean; // rediff YouTube sur un match joué sur deux ; absent = aucune rediff
+  /**
+   * Matchs planifiés par l'arbitrage (`lib/shared/match-planning.ts`) ;
+   * absent = option éteinte. Combinée à `matchSchedule`, elle couvre « en
+   * attente de départ » ; sans, « à planifier ».
+   */
+  refereeScheduling?: boolean;
 }
 
 /**
@@ -206,6 +212,10 @@ export const TOURNAMENTS: TournamentDef[] = [
   { name: "Live Horaire (heure à venir)", game: "OW", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 92, matchSchedule: { firstRoundHours: 3, hoursPerRound: 1 }, live: { url: "https://www.youtube.com/@bluegenji", trigger: "START_TIME" } },
   // Calendrier seul, sans diffusion : le cas le plus courant — l'arbitre
   // annonce les horaires d'un plateau étalé sur la journée.
+  // Planification par l'arbitrage : un plateau entier à planifier (aucune
+  // date), et un second planifié dans le futur (en attente de départ).
+  { name: "Planification Arbitre (à planifier)", game: "OW", state: "RUNNING", format: "SWISS", teamCount: 8, maxTeams: 8, daysOffset: -1, swissTotalRounds: 3, playWaves: 0, teamOffset: 108, refereeScheduling: true },
+  { name: "Planification Arbitre (en attente)", game: "MR", state: "RUNNING", format: "SINGLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 0, teamOffset: 116, refereeScheduling: true, matchSchedule: { firstRoundHours: 2, hoursPerRound: 1 } },
   { name: "Plateau Horaires (sans live)", game: "MR", state: "RUNNING", format: "DOUBLE", teamCount: 8, maxTeams: 8, daysOffset: -1, playWaves: 1, teamOffset: 100, matchSchedule: { firstRoundHours: -1, hoursPerRound: 2 } },
 
   // ---- RUNNING · BlueGenji Survie (endurance puis play-offs) ---------------

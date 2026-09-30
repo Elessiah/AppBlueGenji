@@ -35,6 +35,7 @@ import { FormatSettings } from "./FormatSettings";
 import { TournamentImagePicker } from "./TournamentImagePicker";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
+  checkboxCardChrome,
   EYEBROW,
   FULL_WIDTH,
   GRID,
@@ -62,6 +63,7 @@ import {
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { NumberInput } from "@/components/ui/number-input";
+import { REFEREE_SCHEDULING_DESCRIPTION } from "@/lib/shared/match-planning";
 
 /** Contrôles que peut désigner un refus de l'envoi. */
 const FIELD_IDS: Readonly<Record<TournamentFormField, string>> = {
@@ -678,6 +680,61 @@ export function TournamentForm({
               <FieldErrorText fieldId={FIELD_IDS.startAt} message={fieldErrors.message("startAt")} />
             </div>
           </div>
+
+          {/* Réglée ici à la création seulement : sur un tournoi existant,
+              l'option se bascule depuis sa fiche, jusqu'à la clôture — ce
+              formulaire se ferme au coup d'envoi, précisément quand on peut
+              vouloir la changer. */}
+          {mode === "create" ? (
+            <div
+              className="checkbox-card"
+              onClick={() => set("refereeScheduling", !values.refereeScheduling)}
+              style={{
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 12,
+                marginTop: 16,
+                padding: "14px 16px",
+                ...checkboxCardChrome(values.refereeScheduling, false),
+                borderRadius: 10,
+                cursor: "pointer",
+                transition: "border-color 0.2s ease, background-color 0.2s ease",
+              }}
+            >
+              <input
+                id="referee-scheduling"
+                type="checkbox"
+                checked={values.refereeScheduling}
+                onChange={(e) => set("refereeScheduling", e.target.checked)}
+                aria-describedby="referee-scheduling-hint"
+                style={{ marginTop: 2 }}
+              />
+              <div style={{ flex: 1 }}>
+                <label
+                  htmlFor="referee-scheduling"
+                  style={{
+                    display: "block",
+                    margin: "0 0 4px",
+                    cursor: "pointer",
+                    fontSize: 14,
+                    fontWeight: 500,
+                    color: "var(--ink)",
+                  }}
+                >
+                  Matchs planifiés par l&apos;arbitrage
+                </label>
+                <p id="referee-scheduling-hint" style={{ ...HINT, margin: 0 }}>
+                  {REFEREE_SCHEDULING_DESCRIPTION} Modifiable ensuite depuis la fiche du tournoi,
+                  même en cours.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <p style={{ ...HINT, marginTop: 16 }}>
+              La planification des matchs par l&apos;arbitrage se règle depuis la fiche du
+              tournoi, jusqu&apos;à sa clôture.
+            </p>
+          )}
         </section>
 
         <div

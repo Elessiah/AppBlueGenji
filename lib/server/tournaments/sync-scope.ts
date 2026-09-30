@@ -49,6 +49,23 @@ export const SINGLE_REPORT_SQL = `(${TEAM1_REPORTED_SQL} <> ${TEAM2_REPORTED_SQL
 /** Les deux ont reporté (et se contredisent, sans quoi la manche serait close). */
 export const BOTH_REPORTED_SQL = `(${TEAM1_REPORTED_SQL} AND ${TEAM2_REPORTED_SQL})`;
 
+/**
+ * Un lancement est **dû** sur ce match (alias `m`, tournoi `t`) : jouable,
+ * heure atteinte ou absente — jamais un match **à planifier** —, et soit son
+ * appariement a changé, soit son lancement n'est pas ouvert, soit le délai du
+ * lancement d'office est écoulé (`maintainMatchLaunches`). Partagé par le
+ * balayage passif et par la lecture de l'instantané (`./snapshot`) : deux
+ * copies auraient divergé au premier cas ajouté.
+ */
+export const DUE_LAUNCH_SQL = `(m.status = 'READY'
+  AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
+  AND (m.start_at IS NULL OR m.start_at <= NOW())
+  AND (m.start_at IS NOT NULL OR t.referee_scheduling = 0)
+  AND (NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id))
+       OR (m.launched_at IS NULL
+           AND (m.lobby_opened_at IS NULL
+                OR m.lobby_opened_at <= NOW() - INTERVAL ${LAUNCH_AUTO_DELAY_MINUTES} MINUTE))))`;
+
 type ScheduleRow = RowDataPacket &
   Pick<
     TournamentRow,
@@ -90,7 +107,10 @@ async function findCrossedMilestones(connection: PoolConnection): Promise<number
  *   et la retenir faisait entretenir à chaque balayage des tournois où la
  *   résolution n'avait rien à faire ;
  * - match entré en lancement sans que son délai ait été ouvert, ou dont le
- *   délai de lancement d'office est écoulé (`maintainMatchLaunches`) ;
+ *   délai de lancement d'office est écoulé (`maintainMatchLaunches`) — jamais
+ *   un match **à planifier** (option `referee_scheduling`, sans date) : rien ne
+ *   s'y entretient avant que l'arbitrage pose l'horaire, et le retenir ferait
+ *   entretenir son tournoi à chaque balayage jusqu'à la planification ;
  * - élimination dont toutes les rencontres sont jouées : la clôture reste à
  *   prononcer (`finalizeTournamentIfDone`) — un double forfait est joué sans
  *   vainqueur, même exception que `isEliminationPhaseComplete` ;
@@ -126,14 +146,7 @@ async function findDueMaintenance(connection: PoolConnection): Promise<number[]>
                                                WHERE a.match_id = m.id
                                                  AND a.alert_key = '${STALLED_ALERT_KEY}'))))
          OR EXISTS (SELECT 1 FROM bg_matches m
-                    WHERE m.tournament_id = t.id
-                      AND m.status = 'READY'
-                      AND m.team1_id IS NOT NULL AND m.team2_id IS NOT NULL
-                      AND (m.start_at IS NULL OR m.start_at <= NOW())
-                      AND (NOT (m.launch_pairing <=> CONCAT(m.team1_id, ':', m.team2_id))
-                           OR (m.launched_at IS NULL
-                               AND (m.lobby_opened_at IS NULL
-                                    OR m.lobby_opened_at <= NOW() - INTERVAL ${LAUNCH_AUTO_DELAY_MINUTES} MINUTE))))
+                    WHERE m.tournament_id = t.id AND ${DUE_LAUNCH_SQL})
          OR EXISTS (SELECT 1 FROM bg_matches m
                     WHERE m.tournament_id = t.id AND m.phase_id = 0
                       AND (${RESOLVABLE_BYE_SQL} OR ${RESOLVABLE_GHOST_SQL}))

@@ -416,6 +416,13 @@ export type TournamentCard = {
    */
   registrationFilters: RegistrationFilters;
   /**
+   * Matchs planifiés par l'arbitrage (`lib/shared/match-planning.ts`) : un
+   * match sans horaire est « à planifier » plutôt qu'en lancement. Public,
+   * comme les conditions d'inscription : c'est une règle du tournoi que les
+   * engagés doivent connaître.
+   */
+  refereeScheduling: boolean;
+  /**
    * Chaîne officielle du tournoi (Twitch, YouTube, Kick). `null` = pas de
    * diffusion annoncée. Les matchs n'en héritent jamais (`lib/shared/live-streams.ts`).
    */

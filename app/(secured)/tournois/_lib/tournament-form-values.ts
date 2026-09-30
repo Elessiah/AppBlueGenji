@@ -103,6 +103,12 @@ export type TournamentFormValues = {
   registrationDiscordRequirement: PlayerRequirement;
   registrationBlizzardRequirement: PlayerRequirement;
   registrationMinPlayers: number;
+  /**
+   * Matchs planifiés par l'arbitrage (`lib/shared/match-planning.ts`). Réglé à
+   * la **création** ; un tournoi existant le bascule depuis sa fiche, dans tous
+   * les états sauf « terminé » — ce formulaire se fermant au coup d'envoi.
+   */
+  refereeScheduling: boolean;
   phases: PhaseConfig[];
 };
 
@@ -185,6 +191,8 @@ export function defaultTournamentFormValues(): TournamentFormValues {
     registrationDiscordRequirement: DEFAULT_REGISTRATION_FILTERS.discordRequirement,
     registrationBlizzardRequirement: DEFAULT_REGISTRATION_FILTERS.blizzardRequirement,
     registrationMinPlayers: DEFAULT_REGISTRATION_FILTERS.minPlayers,
+    // Éteinte : un match entre en lancement dès que ses deux engagés sont connus.
+    refereeScheduling: false,
     phases: [createDefaultPhase(1, "SWISS"), createDefaultPhase(2, "DOUBLE")],
   };
 }
@@ -279,6 +287,9 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     registrationDiscordRequirement: values.registrationDiscordRequirement,
     registrationBlizzardRequirement: values.registrationBlizzardRequirement,
     registrationMinPlayers: values.registrationMinPlayers,
+    // Lu par la création seulement : la liste blanche de l'édition ne connaît
+    // pas ce champ (il se règle depuis la fiche, `referee-scheduling`).
+    refereeScheduling: values.refereeScheduling,
   };
 }
 
@@ -337,6 +348,9 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     registrationDiscordRequirement: apiValues.registrationDiscordRequirement,
     registrationBlizzardRequirement: apiValues.registrationBlizzardRequirement,
     registrationMinPlayers: apiValues.registrationMinPlayers,
+    // Non rendu par la lecture d'édition, et sans objet pour elle : le
+    // formulaire d'édition ne montre pas la case.
+    refereeScheduling: false,
     phases: apiValues.phases ?? defaults.phases,
   };
 }

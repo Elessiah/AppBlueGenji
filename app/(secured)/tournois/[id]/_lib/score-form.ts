@@ -169,7 +169,8 @@ export type ScoreFormBlocker =
   | "BELOW_FORMAT"
   | "DRAW"
   | "ALREADY_DECIDED"
-  | "DOUBLE_FORFEIT";
+  | "DOUBLE_FORFEIT"
+  | "NOT_IN_LAUNCH";
 
 export interface ScoreFormDecision {
   /** Scores prêts à envoyer, ou `null` quand la saisie n'est pas exploitable. */
@@ -199,10 +200,15 @@ export interface ScoreFormDecision {
  *   perd. La correction d'un résultat acquis passe donc par « Valider le
  *   résultat », qui recalcule le vainqueur et repropage. Même refus côté
  *   serveur (`MATCH_ALREADY_COMPLETED`).
+ *
+ * · **Aucun score avant le lancement.** `scoreEntryClosed` (match à planifier
+ *   ou en attente de son heure, `isScoreEntryOpen`) ferme les deux actions sur
+ *   un score, arbitrage compris — même refus côté serveur
+ *   (`MATCH_NOT_IN_LAUNCH`). Le forfait, simple ou double, reste ouvert.
  */
 export function decideScoreForm(
   state: ScoreFormState,
-  options: { format: MatchFormat | null; decided: boolean },
+  options: { format: MatchFormat | null; decided: boolean; scoreEntryClosed?: boolean },
 ): ScoreFormDecision {
   const { format, decided } = options;
 
@@ -228,6 +234,16 @@ export function decideScoreForm(
       canResolve: true,
       saveBlocker: decided ? "ALREADY_DECIDED" : null,
       resolveBlocker: null,
+    };
+  }
+
+  if (options.scoreEntryClosed === true) {
+    return {
+      scores: null,
+      canSave: false,
+      canResolve: false,
+      saveBlocker: "NOT_IN_LAUNCH",
+      resolveBlocker: "NOT_IN_LAUNCH",
     };
   }
 
@@ -300,6 +316,8 @@ export function scoreBlockerMessage(
       return "Les scores ne peuvent pas être égaux : il faut un vainqueur.";
     case "DOUBLE_FORFEIT":
       return "Un double forfait tranche le match : il s'écrit avec « Valider le résultat ».";
+    case "NOT_IN_LAUNCH":
+      return "Le score se saisit à partir du lancement du match. Avant, seul un forfait peut être prononcé.";
     case "ALREADY_DECIDED":
       return "Ce match est déjà tranché. Corrige-le avec « Valider le résultat » pour que le vainqueur et la suite du plateau suivent.";
   }

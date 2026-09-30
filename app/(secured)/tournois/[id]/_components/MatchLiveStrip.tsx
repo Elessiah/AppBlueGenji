@@ -11,6 +11,7 @@ import {
   streamPlatform,
 } from "@/lib/shared/live-streams";
 import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
+import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatMatchStartAt, formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
@@ -32,7 +33,14 @@ const BORDER = "var(--border, #444)";
  * l'accès à la configuration ; la permission `tournaments` y ajoute l'édition de
  * l'horaire.
  */
-export function MatchLiveStrip({ match }: { match: BracketMatch }) {
+export function MatchLiveStrip({
+  match,
+  launchPhase,
+}: {
+  match: BracketMatch;
+  /** Phase de lancement, calculée par la carte (`MatchRow`). */
+  launchPhase: MatchLaunchPhase;
+}) {
   const { canManage, canSchedule, openConfig, openSchedule } = useLiveControls();
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
@@ -55,6 +63,10 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
     isMatchCastable(match) &&
     (canManage || canSchedule);
   const showToggle = canManage && canToggleOnAir(match);
+  // Un match **à planifier** porte déjà son bouton « Planifier », mis en avant
+  // dans le bandeau de lancement : « ＋ Date » en serait le doublon, sur une
+  // carte de 210 px. Il revient dès que la date est posée (« 🗓 Date »).
+  const showScheduleButton = canSchedule && launchPhase !== "TO_PLAN";
   // Les libellés visibles sont ultra-courts (la carte fait 210 px) : sortis de
   // leur contexte visuel, « ⚙ Live » ou « Twitch » ne disent pas de quel match
   // il s'agit. Chaque contrôle porte donc le nom du match.
@@ -65,7 +77,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
   const showConfig = canManage && canConfigureLive(match);
 
   // Rien à montrer : ni horaire, ni état de diffusion, ni contrôle à offrir.
-  if (state === "OFF" && !showConfig && !canSchedule && startAtLabel === null) return null;
+  if (state === "OFF" && !showConfig && !showScheduleButton && startAtLabel === null) return null;
 
   const toggleOnAir = async (onAir: boolean) => {
     setBusy(true);
@@ -167,7 +179,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
           Les répartir bouton par bouton obligeait chacun à savoir lesquels de
           ses voisins étaient rendus — trois conditions à retenir d'accord entre
           elles pour un seul effet visuel. */}
-      {(showToggle || canSchedule || showConfig) && (
+      {(showToggle || showScheduleButton || showConfig) && (
         <span
           style={{
             display: "inline-flex",
@@ -199,7 +211,7 @@ export function MatchLiveStrip({ match }: { match: BracketMatch }) {
           </button>
         )}
 
-        {canSchedule && (
+        {showScheduleButton && (
           <button
             type="button"
             className="btn ghost tap-target"

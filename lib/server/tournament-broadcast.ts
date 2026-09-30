@@ -46,6 +46,7 @@ import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import { computeTournamentState, nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
 import type { TournamentSnapshot } from "@/lib/shared/types";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
+import { autoLaunchAt, matchLaunchPhase } from "@/lib/shared/match-launch";
 
 /**
  * Filet de sécurité d'une salle occupée : au plus tard, elle relit l'instantané
@@ -118,11 +119,70 @@ function isScoreConflict(match: DeadlineMatch): boolean {
 }
 
 /**
+ * Échéances **de lancement** d'un match (ms), que seule l'horloge atteint et
+ * que l'entretien à la lecture joue (`maintainMatchLaunches`) :
+ *
+ * - l'heure de début d'un match **en attente de départ** — le lancement s'y
+ *   ouvre (`lobby_opened_at`), point de départ du lancement d'office ;
+ * - le lancement d'office d'un match **en lancement**, quinze minutes après
+ *   son ouverture.
+ *
+ * Sans elles, la salle attendait son filet de cinq minutes : le client voyait
+ * bien le match passer « en lancement » à la seconde dite (il dérive la phase
+ * de l'horaire), mais le lancement d'office — écriture du serveur — arrivait
+ * jusqu'à cinq minutes en retard, et le décompte de la modale mentait d'autant.
+ * Un match **à planifier** n'en a aucune : il attend une date, que l'arbitrage
+ * pose par une écriture, publiée.
+ */
+function launchDeadlinesOf(match: DeadlineMatch, refereeScheduling: boolean, now: number): number[] {
+  const phase = matchLaunchPhase(
+    {
+      status: match.status,
+      team1Id: match.team1Id,
+      team2Id: match.team2Id,
+      startAt: match.startAt,
+      launchedAt: match.launchedAt,
+      refereeScheduling,
+    },
+    now,
+  );
+  if (phase === "SCHEDULED") {
+    const start = Date.parse(String(match.startAt));
+    return Number.isFinite(start) ? [start] : [];
+  }
+  if (phase === "LOBBY") {
+    const deadlines: number[] = [];
+    // L'ouverture n'est posée qu'à la première observation : tant qu'elle
+    // manque, l'heure de début est l'échéance qui vient de passer.
+    const start = Date.parse(String(match.startAt));
+    if (match.lobbyOpenedAt === null && Number.isFinite(start)) deadlines.push(start);
+    const auto = Date.parse(String(autoLaunchAt(match.lobbyOpenedAt)));
+    if (Number.isFinite(auto)) deadlines.push(auto);
+    return deadlines;
+  }
+  return [];
+}
+
+/**
  * L'instantané retarde-t-il sur une échéance déjà passée que l'entretien à la
  * lecture aurait dû jouer — bascule d'état, ou report **unique** expiré ?
  */
 export function isRoomOverdue(snapshot: TournamentSnapshot, now: number): boolean {
   if (isStateOverdue(snapshot.card, now)) return true;
+  // Une échéance de lancement passée se rattrape **une fois**, dans la fenêtre
+  // qui la suit (même garde que l'escalade d'un conflit) : un lancement que
+  // l'entretien n'a pas pu jouer — tournoi pas encore « en cours » en base,
+  // match relu sans changement — ne doit pas faire relire la salle en boucle.
+  if (snapshot.card.state === "RUNNING") {
+    const refereeScheduling = snapshot.card.refereeScheduling === true;
+    const late = (snapshot.matches ?? []).some((match) =>
+      launchDeadlinesOf(match, refereeScheduling, now).some((deadline) => {
+        const since = now - (deadline + SCORE_DEADLINE_MARGIN_MS);
+        return since >= 0 && since < STATE_CATCH_UP_MS;
+      }),
+    );
+    if (late) return true;
+  }
   return (snapshot.matches ?? []).some((match) => {
     const deadline = scoreDeadlineOf(match);
     if (deadline === null) return false;
@@ -146,7 +206,9 @@ export function isRoomOverdue(snapshot: TournamentSnapshot, now: number): boolea
  * - Sinon, la plus proche de : la prochaine bascule d'état (ouverture ou
  *   clôture des inscriptions, coup d'envoi), le délai de report de score le
  *   plus proche (`score_deadline_at`, que l'entretien à la lecture tranche),
- *   l'escalade d'un conflit de score à l'arbitrage, et le filet de sécurité.
+ *   l'escalade d'un conflit de score à l'arbitrage, l'heure de départ et le
+ *   lancement d'office d'un match (`launchDeadlinesOf`), et le filet de
+ *   sécurité.
  * - Une échéance **déjà passée** que l'instantané ne reflète pas encore
  *   ({@link isRoomOverdue}) se rattrape après `catchUpMs` : les échéances
  *   passées n'étant plus des instants futurs, elle tomberait sinon jusqu'au
@@ -178,7 +240,16 @@ export function nextRoomWakeAt(
   if (boundary !== null) wakeAt = Math.min(wakeAt, boundary);
   if (isRoomOverdue(snapshot, now)) wakeAt = Math.min(wakeAt, now + catchUpMs);
 
+  const refereeScheduling = card.refereeScheduling === true;
   for (const match of snapshot.matches ?? []) {
+    // Échéances de lancement : seulement en cours, seul état où l'entretien
+    // lance quoi que ce soit.
+    if (card.state === "RUNNING") {
+      for (const launchDeadline of launchDeadlinesOf(match, refereeScheduling, now)) {
+        const at = launchDeadline + SCORE_DEADLINE_MARGIN_MS;
+        if (at > now) wakeAt = Math.min(wakeAt, at);
+      }
+    }
     const deadline = scoreDeadlineOf(match);
     if (deadline === null) continue;
     const expiry = deadline + SCORE_DEADLINE_MARGIN_MS;

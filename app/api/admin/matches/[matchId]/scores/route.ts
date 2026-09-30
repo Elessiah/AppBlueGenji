@@ -61,7 +61,10 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
     const msg = (e as Error).message;
     const status =
       msg === "MATCH_NOT_FOUND" ? 404
-      : msg === "MATCH_ALREADY_COMPLETED" || msg === "MATCH_NOT_READY" || msg === "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES" ? 409
+      : msg === "MATCH_ALREADY_COMPLETED" ||
+        msg === "MATCH_NOT_READY" ||
+        msg === "MATCH_NOT_IN_LAUNCH" ||
+        msg === "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES" ? 409
       : msg === "SCORE_EXCEEDS_MATCH_FORMAT" || msg === "SCORE_BELOW_MATCH_FORMAT" ? 400
       // Forfait déclaré pour une équipe qui ne joue pas ce match : corps
       // invalide, pas une panne — le contrôle n'est possible qu'une fois le

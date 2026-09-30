@@ -47,6 +47,7 @@ import { invalidateTeamRanking } from "@/lib/server/ranking-cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { hasPendingStateTransition, syncTournamentState } from "./state";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { DUE_LAUNCH_SQL } from "./sync-scope";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { pickChampion } from "@/lib/shared/tournament-card-summary";
 import { computeRunningRatio } from "@/lib/shared/tournament-progress";
@@ -104,6 +105,26 @@ export function invalidateTournamentSnapshot(tournamentId: number): void {
   invalidateCached(cacheKey(tournamentId));
 }
 
+/**
+ * Un lancement est-il dû (`DUE_LAUNCH_SQL`) : heure de départ atteinte sans
+ * ouverture, ou lancement d'office échu ? Sans cette question, la relecture de
+ * l'instantané — celle que la salle du flux fait **à l'heure dite**
+ * (`nextRoomWakeAt`) — rendait un plateau inchangé : l'ouverture et le départ
+ * d'office attendaient qu'un lecteur passe par la liste des tournois ou par sa
+ * modale de lancement, jusqu'à plusieurs minutes plus tard.
+ */
+async function hasDueMatchLaunches(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  tournamentId: number,
+): Promise<boolean> {
+  const [rows] = await db.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_matches m JOIN bg_tournaments t ON t.id = m.tournament_id
+     WHERE m.tournament_id = ? AND ${DUE_LAUNCH_SQL} LIMIT 1`,
+    [tournamentId],
+  );
+  return rows.length > 0;
+}
+
 async function hasExpiredScoreReports(
   db: Awaited<ReturnType<typeof getDatabase>>,
   tournamentId: number,
@@ -156,7 +177,9 @@ async function loadMaintainedRow(tournamentId: number): Promise<TournamentRow | 
   const needsSync =
     (await hasPendingStateTransition(tournamentRow)) ||
     (tournamentRow.state === "RUNNING" &&
-      (missingBracket || (await hasExpiredScoreReports(db, tournamentId))));
+      (missingBracket ||
+        (await hasExpiredScoreReports(db, tournamentId)) ||
+        (await hasDueMatchLaunches(db, tournamentId))));
 
   if (!needsSync) return tournamentRow;
 

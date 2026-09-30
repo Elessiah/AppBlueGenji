@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import {
   CAST_IDENTITY_NOTICE,
   launchErrorMessage,
   MATCH_LAUNCH_OPEN_EVENT,
   MATCH_LAUNCH_REFRESH_EVENT,
   readyCount,
+  type MatchLaunchPhase,
 } from "@/lib/shared/match-launch";
+import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
@@ -36,13 +37,28 @@ async function send(url: string, method: string, body?: unknown): Promise<void> 
  * lecteur : aux parties du match, d'ouvrir la modale de lancement (le « Prêt »
  * se donne là, avec sa confirmation) ; à un caster, de s'inscrire ou de se
  * retirer ; à l'arbitrage, de changer d'hôte et de forcer le lancement.
+ *
+ * Quand le tournoi fait planifier ses matchs par l'arbitrage
+ * (`lib/shared/match-planning.ts`), le bandeau dit aussi les deux étapes qui
+ * précèdent le lancement : **À planifier** (avec, pour l'arbitrage, le bouton
+ * qui ouvre la date) et **En attente de départ** (avec l'heure dite).
  */
-export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
-  const { canManage, canSchedule, viewerUserId, myTeamId, castBlock } = useLiveControls();
+export function MatchLaunchStrip({
+  match,
+  phase,
+}: {
+  match: BracketMatch;
+  /**
+   * Phase de lancement, calculée **par la carte** (`MatchRow`) et partagée avec
+   * le bandeau d'horaire : une seule minuterie par match programmé.
+   */
+  phase: MatchLaunchPhase;
+}) {
+  const { canManage, canSchedule, openSchedule, viewerUserId, myTeamId, castBlock } =
+    useLiveControls();
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
   const [confirmForce, setConfirmForce] = useState(false);
-  const phase = useMatchLaunchPhase(match);
 
   const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
   const isCaster = viewerUserId !== null && match.casterUserId === viewerUserId;
@@ -56,7 +72,11 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
   const castable = open && !isByeLike && !isPlayer;
   const showClaim = canManage && castable && match.casterUserId === null;
   const showRelease = open && match.casterUserId !== null && (isCaster || canSchedule);
-  const showForce = canSchedule && (phase === "LOBBY" || phase === "SCHEDULED");
+  // Forcer vaut planification : l'arbitrage peut lancer un match à planifier
+  // sans lui donner d'heure. « Planifier » passe devant, c'est le geste attendu.
+  const showForce = canSchedule && (phase === "LOBBY" || phase === "SCHEDULED" || phase === "TO_PLAN");
+  const showPlan = canSchedule && phase === "TO_PLAN";
+  const startAtTitle = formatMatchStartAtFull(match.startAt);
   const showHost = phase !== "NONE";
   const showOpen = isParty && (phase === "LOBBY" || phase === "LAUNCHED");
   const showHostSwap = canSchedule && showHost;
@@ -112,6 +132,24 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
 
   return (
     <div className={styles.strip} data-phase={phase}>
+      {phase === "TO_PLAN" && (
+        <span
+          className={styles.toPlan}
+          title="L'arbitrage doit fixer la date et l'heure de ce match avant son lancement."
+        >
+          <span aria-hidden="true">📅</span> À planifier
+          <span className="sr-only"> : l&apos;arbitrage doit fixer la date de ce match.</span>
+        </span>
+      )}
+      {phase === "SCHEDULED" && (
+        <span className={styles.scheduled} title={startAtTitle ?? undefined}>
+          <span aria-hidden="true">⏱</span> En attente de départ
+          {/* L'heure est déjà dans le bandeau d'horaire juste au-dessus : on ne
+              la répète que pour les lecteurs d'écran, qui lisent ce libellé
+              seul. */}
+          {startAtTitle && <span className="sr-only"> — début le {startAtTitle}</span>}
+        </span>
+      )}
       {phase === "LOBBY" && (
         <span className={styles.lobby}>
           <span aria-hidden="true">⏳</span> Lancement ·{" "}
@@ -150,8 +188,18 @@ export function MatchLaunchStrip({ match }: { match: BracketMatch }) {
 
       {/* Pas de conteneur vide : il porterait seul le `margin-left: auto` et
           une ligne de hauteur nulle sur les cartes sans aucun bouton. */}
-      {(showOpen || showClaim || showRelease || showHostSwap || showForce) && (
+      {(showPlan || showOpen || showClaim || showRelease || showHostSwap || showForce) && (
         <span className={styles.actions}>
+          {showPlan && (
+            <button
+              type="button"
+              className={`btn tap-target ${styles.small} ${styles.plan}`}
+              onClick={() => openSchedule(match)}
+              aria-label={`Planifier ${matchLabel}`}
+            >
+              🗓 Planifier
+            </button>
+          )}
           {showOpen && (
             <button
               type="button"
