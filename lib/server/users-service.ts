@@ -1466,7 +1466,7 @@ export async function updateOwnProfile(
 type SqlRunner = Pick<PoolConnection, "execute">;
 
 /**
- * Les trois questions qui décident du sort d'un compte, en fragments SQL
+ * Les quatre questions qui décident du sort d'un compte, en fragments SQL
  * portant sur une colonne `u.id`.
  *
  * « A joué » se lit comme les statistiques le lisent : un match **compté**
@@ -1480,11 +1480,16 @@ type SqlRunner = Pick<PoolConnection, "execute">;
  * Les deux côtés d'un match sont lus en deux branches : une jointure
  * `team1_id = … OR team2_id = …` n'utilise aucun des deux index.
  *
- * Les trois questions sont écrites **une fois**, sur une colonne `u.id` : la
+ * Les quatre questions sont écrites **une fois**, sur une colonne `u.id` : la
  * suppression les pose pour un compte (`FROM (SELECT ? AS id) u`), le
  * rattrapage des comptes supprimés pour tous d'un coup (`FROM bg_users u`).
  */
-function accountTraceSql(): { played: string; organized: string; owned: string } {
+function accountTraceSql(): {
+  played: string;
+  soloRegistered: string;
+  organized: string;
+  owned: string;
+} {
   const played = playedMatchSql("m");
   const teamSide = (column: "team1_id" | "team2_id") => `EXISTS (
            SELECT 1
@@ -1496,24 +1501,32 @@ function accountTraceSql(): { played: string; organized: string; owned: string }
              AND (tm.left_at IS NULL OR tm.left_at >= t.start_at)
              AND ${played}
          )`;
+  const soloSide = (column: "team1_id" | "team2_id") => `EXISTS (
+           SELECT 1
+           FROM bg_teams s
+           JOIN bg_matches m ON m.${column} = s.id
+           WHERE s.solo_user_id = u.id
+             AND ${played}
+         )`;
   return {
     played: `(
          ${teamSide("team1_id")}
          OR ${teamSide("team2_id")}
-         -- L'entrée solo compte dès qu'elle est **inscrite**, jouée ou non : son
-         -- nom d'engagé est le pseudo du joueur, et elle n'a pas de clé
-         -- étrangère (une cascade effacerait l'engagé, et avec lui l'historique
-         -- des matchs) — effacer le compte la laisserait nommer quelqu'un qui
-         -- n'existe plus. Ses matchs n'ont pas à être relus : une entrée solo
-         -- n'en a qu'inscrite, et une inscription ne se retire plus après le
-         -- coup d'envoi. Une entrée jamais inscrite part avec le compte
-         -- (eraseAccount).
-         OR EXISTS (
-           SELECT 1
-           FROM bg_teams s
-           JOIN bg_tournament_registrations r ON r.team_id = s.id
-           WHERE s.solo_user_id = u.id
-         )
+         OR ${soloSide("team1_id")}
+         OR ${soloSide("team2_id")}
+       )`,
+    // L'entrée solo compte dès qu'elle est **inscrite**, jouée ou non : son nom
+    // d'engagé est le pseudo du joueur, et elle n'a pas de clé étrangère (une
+    // cascade effacerait l'engagé, et avec lui l'historique des matchs) —
+    // effacer le compte la laisserait nommer quelqu'un qui n'existe plus. Une
+    // entrée jamais inscrite part avec le compte (eraseAccount). Question à
+    // part de `played` parce que sa phrase l'est : une inscription jamais
+    // jouée ne laisse aucune statistique à conserver.
+    soloRegistered: `EXISTS (
+         SELECT 1
+         FROM bg_teams s
+         JOIN bg_tournament_registrations r ON r.team_id = s.id
+         WHERE s.solo_user_id = u.id
        )`,
     organized: `EXISTS (
          SELECT 1 FROM bg_tournaments WHERE organizer_user_id = u.id
@@ -1531,8 +1544,8 @@ function accountTraceSql(): { played: string; organized: string; owned: string }
 /**
  * Ce que ce compte laisse derrière lui, en **une** requête.
  *
- * Trois `EXISTS` indexés plutôt que trois allers-retours : la suppression est
- * un geste unique, ses trois questions se posent au même instant et sur le même
+ * Quatre `EXISTS` indexés plutôt que quatre allers-retours : la suppression est
+ * un geste unique, ses quatre questions se posent au même instant et sur le même
  * instantané. Les poser séparément laisserait un `await` entre elles — un
  * tournoi créé entre la deuxième et la troisième et la ligne partirait quand
  * même, sur une base qui la refuse.
@@ -1544,11 +1557,13 @@ async function loadAccountTrace(
   const trace = accountTraceSql();
   const [rows] = await runner.execute<(RowDataPacket & {
     played: number;
+    solo_registered: number;
     organized: number;
     owned: number;
   })[]>(
     `SELECT
        ${trace.played} AS played,
+       ${trace.soloRegistered} AS solo_registered,
        ${trace.organized} AS organized,
        ${trace.owned} AS owned
      FROM (SELECT ? AS id) u`,
@@ -1564,6 +1579,7 @@ async function loadAccountTrace(
   if (!row) throw new Error("ACCOUNT_TRACE_UNAVAILABLE");
   return {
     playedMatches: Boolean(row.played),
+    soloRegistrations: Boolean(row.solo_registered),
     organizedTournaments: Boolean(row.organized),
     ownedTeams: Boolean(row.owned),
   };
@@ -1785,7 +1801,7 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
           u.pseudo LIKE 'compte\\_supprime\\_%'
           OR u.is_admin = 1
           OR u.platform_roles_json IS NOT NULL
-          OR NOT (${trace.played} OR ${trace.organized} OR ${trace.owned})
+          OR NOT (${trace.played} OR ${trace.soloRegistered} OR ${trace.organized} OR ${trace.owned})
         )
       ORDER BY u.id`,
   );

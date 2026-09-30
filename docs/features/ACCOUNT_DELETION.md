@@ -27,11 +27,12 @@ et comptaient dans « Profils référencés ».
 ## La règle
 
 Un seul critère : **reste-t-il quelque chose qui référence ce compte et qui doit
-survivre ?** Trois traces le disent, et aucune n'est décorative.
+survivre ?** Quatre traces le disent, et aucune n'est décorative.
 
 | Trace | Pourquoi elle retient la ligne |
 | --- | --- |
-| `playedMatches` | Il a **joué** : un match compté (`playedMatchSql` — ni exemption, ni match fantôme, ni double forfait) d'une équipe dont il était membre pendant le tournoi (la fenêtre d'appartenance des statistiques), ou de son entrée solo. C'est la trace qui porte des statistiques, donc la seule qui justifie de garder la ligne sous un faux nom. Être au roster d'une équipe engagée ne suffit plus. Exception : une **entrée solo inscrite**, jouée ou non, retient la ligne — son nom d'engagé est le pseudo du joueur. |
+| `playedMatches` | Il a **joué** : un match compté (`playedMatchSql` — ni exemption, ni match fantôme, ni double forfait) d'une équipe dont il était membre pendant le tournoi (la fenêtre d'appartenance des statistiques), ou de son entrée solo. C'est la trace qui porte des statistiques, donc la seule qui justifie de garder la ligne sous un faux nom. Être au roster d'une équipe engagée ne suffit plus. |
+| `soloRegistrations` | Son **entrée solo est inscrite** à un tournoi, jouée ou non : son nom d'engagé est le pseudo du joueur, l'effacement la laisserait nommer quelqu'un qui n'existe plus. Trace à part de `playedMatches` parce que sa phrase l'est : une inscription jamais jouée ne laisse aucune statistique, la confirmation (motif `SOLO_REGISTRATIONS`) n'en promet donc pas. |
 | `organizedTournaments` | Il a **créé** un tournoi. `bg_tournaments.organizer_user_id` est `NOT NULL` en `ON DELETE RESTRICT` : la base refuserait l'effacement, et un tournoi sans organisateur n'aurait plus de titulaire. |
 | `ownedTeams` | Il est `OWNER` d'une équipe vivante. `bg_team_members` s'efface en cascade : l'effacer laisserait une équipe que personne ne peut plus renommer, dissoudre ni engager. |
 
@@ -137,7 +138,7 @@ politique de confidentialité et à son registre.
 Le **mode ne suffit pas** à la rédiger. « Tes statistiques de tournoi resteront
 conservées — elles appartiennent aussi aux équipes que tu as affrontées » est
 vrai d'un joueur qui a joué, et faux de celui dont la ligne n'est retenue que par
-une équipe qu'il possède ou par un tournoi qu'il a organisé : il n'a aucune
+une inscription solo jamais jouée, une équipe qu'il possède ou un tournoi qu'il a organisé : il n'a aucune
 statistique et n'a affronté personne. Le plan porte donc le **motif**
 (`AccountRetentionReason`), une phrase par motif, et celle du propriétaire
 d'équipe nomme **le geste qui lèverait la conservation** — transférer ou

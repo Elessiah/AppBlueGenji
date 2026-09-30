@@ -13,6 +13,9 @@ import { can } from "@/lib/shared/permissions";
 import { toPublicContact } from "@/lib/shared/contact";
 import { SOURCE_CODE_LINK_LABEL, SOURCE_CODE_URL } from "@/lib/shared/source-code";
 
+// Règlement **intérieur** de l'association — un document de l'association,
+// rangé sous LÉGAL. Les règles des tournois, qu'invoquent les conditions
+// d'utilisation, vivent sur `/regles` (colonne COMPÉTITIONS).
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
@@ -50,7 +53,7 @@ export async function PublicFooter() {
               <li><Link className="tap-target" href="/tournois">Tournois actifs</Link></li>
               <li><Link className="tap-target" href="/tournois">Archives</Link></li>
               <li><Link className="tap-target" href="/joueurs">Classement</Link></li>
-              <li><a className="tap-target" href={REGLEMENT_URL} target="_blank" rel="noreferrer">Règlement</a></li>
+              <li><Link className="tap-target" href="/regles">Règles des tournois</Link></li>
             </ul>
           </div>
           <div>
@@ -81,6 +84,7 @@ export async function PublicFooter() {
               <li><Link className="tap-target" href={TERMS_PATH}>Conditions d&apos;utilisation</Link></li>
               <li><Link className="tap-target" href="/rgpd">RGPD</Link></li>
               <li><a className="tap-target" href="/statuts.pdf" target="_blank" rel="noreferrer">Statuts</a></li>
+              <li><a className="tap-target" href={REGLEMENT_URL} target="_blank" rel="noreferrer">Règlement intérieur</a></li>
               <li><Link className="tap-target" href="/rgpd#cookies">Cookies</Link></li>
               {/* AGPL, art. 13 : le code source s'offre à chaque utilisateur du service. */}
               <li><a className="tap-target" href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">{SOURCE_CODE_LINK_LABEL}</a></li>

@@ -18,6 +18,7 @@ import {
 
 const nothing: AccountTrace = {
   playedMatches: false,
+  soloRegistrations: false,
   organizedTournaments: false,
   ownedTeams: false,
 };
@@ -44,9 +45,10 @@ describe("accountDeletionMode", () => {
 
   it("suffit d'une seule trace", () => {
     const traces: AccountTrace[] = [
-      { playedMatches: true, organizedTournaments: true, ownedTeams: true },
-      { playedMatches: false, organizedTournaments: true, ownedTeams: true },
-      { playedMatches: true, organizedTournaments: false, ownedTeams: false },
+      { ...nothing, playedMatches: true, organizedTournaments: true, ownedTeams: true },
+      { ...nothing, organizedTournaments: true, ownedTeams: true },
+      { ...nothing, playedMatches: true },
+      { ...nothing, soloRegistrations: true },
     ];
     for (const trace of traces) expect(accountDeletionMode(trace)).toBe("ANONYMIZE");
   });
@@ -66,12 +68,13 @@ describe("accountRetentionReason", () => {
 
   it("préfère le tournoi joué : c'est la trace qui appartient aussi aux autres", () => {
     expect(accountRetentionReason({
+      ...nothing,
       playedMatches: true,
       organizedTournaments: true,
       ownedTeams: true,
     })).toBe("TOURNAMENTS");
     expect(accountRetentionReason({
-      playedMatches: false,
+      ...nothing,
       organizedTournaments: true,
       ownedTeams: true,
     })).toBe("ORGANIZED_TOURNAMENTS");
@@ -168,7 +171,7 @@ describe("accountDeletionConfirmation", () => {
   });
 
   it("nomme ces mêmes restes pour une anonymisation et pour l'inconnu", () => {
-    for (const reason of ["TOURNAMENTS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS", RETENTION_UNKNOWN] as const) {
+    for (const reason of ["TOURNAMENTS", "SOLO_REGISTRATIONS", "ORGANIZED_TOURNAMENTS", "OWNED_TEAMS", RETENTION_UNKNOWN] as const) {
       const text = accountDeletionConfirmation(reason);
       expect(text).toContain(`sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours)`);
       expect(text).toContain("mesure d'audience");
@@ -234,5 +237,35 @@ describe("ACCOUNT_DELETED_WRITE_MESSAGE", () => {
     // Le joueur doit savoir que **rien** n'a été écrit : sans cette moitié, il
     // quitte la page en croyant sa photo posée.
     expect(ACCOUNT_DELETED_WRITE_MESSAGE).toMatch(/pas été enregistrée/);
+  });
+});
+
+describe("inscription solo jamais jouée", () => {
+  const solo: AccountTrace = { ...nothing, soloRegistrations: true };
+
+  it("retient la ligne sous son propre motif", () => {
+    expect(accountDeletionMode(solo)).toBe("ANONYMIZE");
+    expect(accountRetentionReason(solo)).toBe("SOLO_REGISTRATIONS");
+    expect(accountDeletionPlan(solo)).toEqual({ mode: "ANONYMIZE", reason: "SOLO_REGISTRATIONS" });
+  });
+
+  it("cède au tournoi joué, passe devant l'organisation et l'équipe possédée", () => {
+    expect(accountRetentionReason({ ...solo, playedMatches: true })).toBe("TOURNAMENTS");
+    expect(accountRetentionReason({ ...solo, organizedTournaments: true, ownedTeams: true }))
+      .toBe("SOLO_REGISTRATIONS");
+  });
+
+  it("ne promet aucune statistique, et dit pourquoi la ligne reste", () => {
+    const confirmation = accountDeletionConfirmation("SOLO_REGISTRATIONS");
+    expect(confirmation).not.toContain("statistiques");
+    expect(confirmation).not.toContain("affrontées");
+    expect(confirmation).toContain("tournoi individuel");
+    expect(confirmation).toContain("pseudo d'emprunt");
+    expect(accountDeletionOutcome("SOLO_REGISTRATIONS")).not.toContain("statistiques");
+    expect(accountDeletionOutcome("SOLO_REGISTRATIONS")).toContain("pseudo d'emprunt");
+  });
+
+  it("figure dans la phrase prudente de l'aperçu injoignable", () => {
+    expect(accountDeletionConfirmation(RETENTION_UNKNOWN)).toContain("inscription à un tournoi individuel");
   });
 });

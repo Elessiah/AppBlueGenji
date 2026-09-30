@@ -24,7 +24,7 @@ import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
  */
 type Query = { sql: string; params: unknown[] };
 
-type Trace = { played: number; organized: number; owned: number };
+type Trace = { played: number; solo_registered: number; organized: number; owned: number };
 
 /**
  * La base, et la transaction qui la porte.
@@ -87,7 +87,7 @@ function fakeDb(
 
 const has = (queries: Query[], needle: string) => queries.some((q) => q.sql.includes(needle));
 
-const EMPTY = { played: 0, organized: 0, owned: 0 };
+const EMPTY = { played: 0, solo_registered: 0, organized: 0, owned: 0 };
 
 beforeEach(() => {
   jest.clearAllMocks();
@@ -135,6 +135,7 @@ describe("deleteOwnAccount — effacement complet", () => {
 describe("deleteOwnAccount — traces qui retiennent la ligne", () => {
   it.each([
     ["un tournoi joué", { ...EMPTY, played: 1 }, "TOURNAMENTS"],
+    ["une inscription solo jamais jouée", { ...EMPTY, solo_registered: 1 }, "SOLO_REGISTRATIONS"],
     ["un tournoi organisé", { ...EMPTY, organized: 1 }, "ORGANIZED_TOURNAMENTS"],
     ["une équipe possédée", { ...EMPTY, owned: 1 }, "OWNED_TEAMS"],
   ])("anonymise sur %s, et le dit", async (_label, trace, reason) => {
@@ -592,5 +593,20 @@ describe("deleteOwnAccount — un refus de la base ne part pas tel quel", () => 
 
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.commit).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteOwnAccount — l'inscription solo est une question à part", () => {
+  it("pose la question de l'inscription séparément de celle des matchs joués", async () => {
+    const { queries } = fakeDb(EMPTY);
+    await deleteOwnAccount(7);
+    const trace = queries.find((q) => q.sql.includes("AS played"));
+    expect(trace?.sql).toContain("AS solo_registered");
+    // Les matchs d'une entrée solo restent des matchs joués ; son inscription,
+    // jouée ou non, est l'autre trace.
+    const [played, rest] = trace!.sql.split("AS played");
+    expect(played).toContain("s.solo_user_id = u.id");
+    expect(played).not.toContain("bg_tournament_registrations");
+    expect(rest.split("AS solo_registered")[0]).toContain("bg_tournament_registrations");
   });
 });

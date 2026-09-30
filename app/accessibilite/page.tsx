@@ -11,7 +11,9 @@ import {
   AUDIT_CONFORMITY_RATE,
   CONFORMITY_LABELS,
   CONFORMITY_STATUS,
+  EVALUATION_ENVIRONMENT,
   EVALUATION_METHODS,
+  EVALUATION_SAMPLE,
   KNOWN_ISSUES,
   TECHNOLOGIES,
   accessibilityFeatures,
@@ -54,7 +56,7 @@ function ContactList() {
 }
 
 /**
- * Déclaration d'accessibilité, au modèle RGAA 4.1. Le contenu vit dans
+ * Déclaration d'accessibilité, au modèle RGAA 4.1.2. Le contenu vit dans
  * `lib/shared/accessibility-statement.ts` : la page ne décide de rien, elle met
  * en forme — le statut se déduit d'un taux d'audit, la liste des limites se
  * tient là-bas.
@@ -67,7 +69,7 @@ export default function AccessibilityStatementPage() {
     <PublicPageShell>
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
-        <span className="eyebrow">ACCESSIBILITÉ · RGAA 4.1</span>
+        <span className="eyebrow">ACCESSIBILITÉ · RGAA 4.1.2</span>
         <h1 className={`display ${styles.heroTitle}`}>Déclaration d&apos;accessibilité</h1>
         <p className={styles.lede}>
           L&apos;association BlueGenji Esport veut que chacun puisse s&apos;inscrire, suivre un
@@ -182,6 +184,12 @@ export default function AccessibilityStatementPage() {
               <li key={method}>{method}</li>
             ))}
           </ul>
+          <p>
+            <strong>Environnement de test :</strong> {EVALUATION_ENVIRONMENT}
+          </p>
+          <p>
+            <strong>Pages vérifiées :</strong> {EVALUATION_SAMPLE}
+          </p>
         </div>
       </section>
 

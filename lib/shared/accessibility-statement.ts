@@ -4,7 +4,7 @@
  * L'association n'est, à notre connaissance, pas tenue de la publier
  * (article 47 de la loi n° 2005-102 : services publics et grandes
  * entreprises) : elle le fait **de sa propre initiative**, sur le modèle
- * RGAA 4.1, parce qu'un joueur qui bute sur le site doit savoir ce qui est
+ * RGAA 4.1.2, parce qu'un joueur qui bute sur le site doit savoir ce qui est
  * connu, ce qui le contourne, et à qui écrire.
  *
  * **Une déclaration ne promet que ce qu'on sait.** Aucun audit RGAA complet
@@ -24,10 +24,10 @@
 import { A11Y_SETTINGS } from "@/lib/shared/accessibility-settings";
 
 /** Date d'établissement (ou de dernière mise à jour) de la déclaration. */
-export const ACCESSIBILITY_STATEMENT_DATE = "2026-09-28";
+export const ACCESSIBILITY_STATEMENT_DATE = "2026-09-30";
 
 /** Référentiel suivi. */
-export const ACCESSIBILITY_STANDARD = "RGAA 4.1 (critères WCAG 2.1 niveau AA)";
+export const ACCESSIBILITY_STANDARD = "RGAA 4.1.2 (critères WCAG 2.1 niveau AA)";
 
 /**
  * Taux de conformité mesuré par un audit RGAA, en pourcentage — `null` tant
@@ -117,10 +117,12 @@ export const KNOWN_ISSUES: readonly KnownIssue[] = [
     workaround: null,
   },
   {
-    title: "Statuts de l'association",
+    title: "Documents de l'association",
     criterion: "RGAA 13.3",
-    detail: "Les statuts sont publiés en PDF, sans contrôle d'accessibilité du document.",
-    workaround: "Une version accessible des statuts peut être demandée :",
+    detail:
+      "Les statuts (PDF), le bulletin d'adhésion (DOCX) et le règlement intérieur (Google Docs) " +
+      "sont publiés sans contrôle d'accessibilité du document.",
+    workaround: "Une version accessible de ces documents peut être demandée :",
     requestByContact: true,
   },
 ];
@@ -138,6 +140,23 @@ export const EVALUATION_METHODS: readonly string[] = [
   "Audit interne du 24 septembre 2026, outil axe et navigation au clavier",
   "Contrôles automatisés du dépôt à chaque modification (contrastes, focus, repères, modales, noms accessibles)",
 ];
+
+/**
+ * Échantillon de pages vérifiées, rubrique du modèle RGAA. Il n'en existe
+ * **pas** : un échantillon se constitue pour un audit complet, et il n'y en a
+ * pas eu. La déclaration le dit plutôt que de présenter les pages vues par
+ * l'audit interne comme un échantillon qu'elles ne sont pas.
+ */
+export const EVALUATION_SAMPLE =
+  "Aucun échantillon de pages au sens du RGAA n'a été constitué, faute d'audit complet.";
+
+/**
+ * Environnement de test, rubrique du modèle RGAA. Rien n'est documenté pour
+ * l'audit interne : on ne nomme pas de navigateur qu'on n'a pas consigné.
+ */
+export const EVALUATION_ENVIRONMENT =
+  "Aucun environnement de test (navigateurs et versions) n'est documenté pour l'audit interne, " +
+  "et aucune technologie d'assistance n'a été employée (voir « Parcours au lecteur d'écran »).";
 
 /** Technologies sur lesquelles repose le site. */
 export const TECHNOLOGIES: readonly string[] = ["HTML5", "CSS", "JavaScript", "WAI-ARIA"];

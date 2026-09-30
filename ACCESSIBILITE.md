@@ -1,4 +1,4 @@
-# Accessibilité — tâches restantes (RGAA 4.1 / WCAG 2.2 AA)
+# Accessibilité — tâches restantes (RGAA 4.1.2 / WCAG 2.1 AA, plus quelques critères WCAG 2.2)
 
 Issu de l'audit du 2026-09-24. Déjà traité par la PR du menu d'accessibilité
 (`docs/features/ACCESSIBILITY_MENU.md`) :
