@@ -12,6 +12,7 @@ import { normalizeReplayUrl } from "@/lib/shared/match-replay";
 import { parseTournamentImage } from "@/lib/shared/tournament-image";
 import { currentLaunchState, launchReadiness, resolveHostTeamId } from "@/lib/shared/match-launch";
 import { localizeBracketPlaceholder } from "@/lib/shared/bracket-placeholders";
+import { castEligibilityBlock } from "./cast-eligibility";
 
 export type TournamentRow = RowDataPacket & {
   id: number;
@@ -124,6 +125,18 @@ export type MatchRow = RowDataPacket & {
   team1_ready_at?: Date | null;
   team2_ready_at?: Date | null;
   caster_ready_at?: Date | null;
+  /**
+   * Condition du cast du titulaire (`cast-eligibility.ts`), relue par la
+   * lecture du plateau — absente des lectures partielles, qui gardent alors
+   * l'inscription telle qu'elle est stockée.
+   */
+  caster_discord_verified_at?: Date | string | null;
+  caster_discord_pseudo?: string | null;
+  caster_blizzard_sub?: string | null;
+  caster_overwatch_battletag?: string | null;
+  caster_is_deleted?: number | null;
+  caster_is_admin?: number | null;
+  caster_platform_roles_json?: unknown;
   team1_is_ghost?: number | null;
   team2_is_ghost?: number | null;
   /** NULL = aucune rediff (cf. `lib/shared/match-replay.ts`). */
@@ -322,10 +335,34 @@ function nullableId(value: number | null | undefined): number | null {
 }
 
 /** Champs du lancement d'un match (`lib/shared/match-launch.ts`). */
+/**
+ * Le titulaire du cast ne remplit plus la condition (`live` + identité) et le
+ * match attend encore son lancement : l'instantané le tait, si bien que la
+ * carte rouvre l'inscription — `claimMatchCast` accepte de le remplacer. Un
+ * match lancé ou joué garde son caster : on ne réécrit ni une diffusion en
+ * cours ni l'histoire.
+ */
+function casterWithdrawn(row: MatchRow): boolean {
+  if (row.caster_user_id === null || row.caster_user_id === undefined) return false;
+  if (row.caster_is_deleted === undefined) return false;
+  if (row.status === "COMPLETED" || (row.launched_at ?? null) !== null) return false;
+  return (
+    castEligibilityBlock({
+      discord_verified_at: row.caster_discord_verified_at ?? null,
+      discord_pseudo: row.caster_discord_pseudo ?? null,
+      blizzard_sub: row.caster_blizzard_sub ?? null,
+      overwatch_battletag: row.caster_overwatch_battletag ?? null,
+      is_deleted: Number(row.caster_is_deleted ?? 1),
+      is_admin: Number(row.caster_is_admin ?? 0),
+      platform_roles_json: row.caster_platform_roles_json ?? null,
+    }) !== null
+  );
+}
+
 function mapMatchLaunch(row: MatchRow) {
   const team1Id = nullableId(row.team1_id);
   const team2Id = nullableId(row.team2_id);
-  const casterUserId = nullableId(row.caster_user_id);
+  const casterUserId = casterWithdrawn(row) ? null : nullableId(row.caster_user_id);
   // Un état posé pour un autre appariement ne vaut rien pour celui-ci.
   const launch = currentLaunchState(
     {

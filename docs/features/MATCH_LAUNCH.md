@@ -104,7 +104,10 @@ Trois conditions de plus que la permission :
   prime partout (`resolveMatchParty`) ;
 - un seul caster par match (`MATCH_ALREADY_CASTED`) — sauf si le titulaire ne
   remplit plus la condition du cast et que le match n'est pas lancé : sa place
-  est alors reprise par le nouvel inscrit.
+  est alors reprise par le nouvel inscrit. L'instantané du plateau le tait
+  déjà (`casterWithdrawn`, sur la condition relue par la même jointure que son
+  pseudo), si bien que la carte rouvre « 🎙 Caster » — au prochain instantané :
+  retirer un rôle ne publie aucun évènement de tournoi.
 
 Rien d'autre n'est exigé : tout porteur de `live` peut caster n'importe quel
 match non terminé et en recevoir les contacts — droit de diffusion

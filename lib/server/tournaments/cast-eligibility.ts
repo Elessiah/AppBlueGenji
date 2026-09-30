@@ -16,7 +16,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { castBlockReason, type CastBlock, type CasterIdentity } from "@/lib/shared/match-launch";
 import { can, sanitizePlatformRoles } from "@/lib/shared/permissions";
 
-export type CasterIdentityRow = RowDataPacket & {
+type CasterIdentityFields = {
   discord_verified_at: Date | string | null;
   discord_pseudo: string | null;
   blizzard_sub: string | null;
@@ -24,11 +24,15 @@ export type CasterIdentityRow = RowDataPacket & {
   is_deleted: number;
 };
 
+export type CasterIdentityRow = RowDataPacket & CasterIdentityFields;
+
 /** Colonnes de `bg_users` que lit `castEligibilityBlock`. */
-export type CastEligibilityRow = CasterIdentityRow & {
+export type CastEligibilityFields = CasterIdentityFields & {
   is_admin: number;
   platform_roles_json: unknown;
 };
+
+export type CastEligibilityRow = RowDataPacket & CastEligibilityFields;
 
 /** Ce qui s'exécute : une connexion ou le pool. */
 type Executor = Pick<PoolConnection, "execute">;
@@ -37,7 +41,7 @@ const CAST_ELIGIBILITY_COLUMNS = `discord_verified_at, discord_pseudo, blizzard_
         is_deleted, is_admin, platform_roles_json`;
 
 /** Identité d'un caster lue sur sa ligne ; un compte absent ou supprimé n'en a aucune. */
-export function casterIdentityOf(row: CasterIdentityRow | undefined): CasterIdentity {
+export function casterIdentityOf(row: CasterIdentityFields | undefined): CasterIdentity {
   if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };
   return {
     discordVerified: row.discord_verified_at !== null && Boolean(row.discord_pseudo),
@@ -46,7 +50,7 @@ export function casterIdentityOf(row: CasterIdentityRow | undefined): CasterIden
 }
 
 /** `castBlockReason` sur la ligne d'un compte ; `null` s'il peut caster. */
-export function castEligibilityBlock(row: CastEligibilityRow | undefined): CastBlock | null {
+export function castEligibilityBlock(row: CastEligibilityFields | undefined): CastBlock | null {
   const live =
     row !== undefined &&
     can({ isAdmin: Boolean(Number(row.is_admin)), roles: sanitizePlatformRoles(row.platform_roles_json) }, "live");
