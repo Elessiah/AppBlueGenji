@@ -77,8 +77,10 @@ describe("conditions d'utilisation — licence sur les contenus", () => {
   });
 
   it("répartit la responsabilité comme les droits d'édition de l'équipe", () => {
-    expect(contenus).toContain("le **propriétaire** répond du nom, du sigle et de la description");
-    expect(contenus).toContain("les **gérants** répondent de son logo");
+    expect(contenus).toContain("en plus de leur auteur : le **propriétaire** du nom, du sigle et de la description");
+    expect(contenus).toContain("les **gérants** de son logo");
+    // L'auteur reste responsable : la règle d'équipe s'ajoute, elle ne le remplace pas.
+    expect(contenus).not.toContain("seul responsable");
     expect(contenus).not.toContain("qu'ils sont seuls à pouvoir modifier");
     // Une fantôme n'a pas de propriétaire : c'est le staff qui l'édite.
     expect(contenus).toContain("n'a pas de propriétaire : l'association répond de ses contenus");
