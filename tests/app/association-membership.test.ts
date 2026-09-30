@@ -103,6 +103,8 @@ describe("mention d'information du bulletin d'adhésion", () => {
     "PayPal",
     "bot Discord de l’association",
     "rappel de renouvellement",
+    "Discord Inc., aux États-Unis",
+    "(UE) 2023/1795",
     "Durée de conservation",
     "Vos droits",
     "bluegenji-esport.fr/rgpd",
