@@ -1,7 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { SITE_MINIMUM_AGE, TERMS_AGE_DECLARATION, TERMS_PATH, TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
+import {
+  ASSOCIATION_CONTACT_PATH,
+  SITE_MINIMUM_AGE,
+  TERMS_AGE_DECLARATION,
+  TERMS_PATH,
+  TERMS_SECTIONS,
+} from "@/lib/shared/terms-of-use";
 import { ORGANIZATION_FOUNDING_YEAR, organizationJsonLd } from "@/lib/shared/structured-data";
 import { BOT_MINIMUM_AGE } from "@/lib/shared/bot-legal-content";
 
@@ -100,6 +106,20 @@ describe("conditions d'utilisation — droit applicable", () => {
     expect(droit).toContain("tribunaux français sont compétents, sans préjudice");
     expect(droit).toContain("saisir la juridiction de son domicile");
   });
+
+  it("renvoie à l'adresse électronique publiée aux mentions légales, jamais écrite en clair", () => {
+    const droit = section("droit-applicable");
+    expect(droit).toContain("l'adresse électronique de l'association indiquée dans les mentions légales");
+    expect(droit).not.toMatch(/@/);
+    const links = TERMS_SECTIONS.find((s) => s.id === "droit-applicable")?.links ?? [];
+    expect(links.map((link) => link.href)).toEqual([ASSOCIATION_CONTACT_PATH]);
+    expect(ASSOCIATION_CONTACT_PATH).toBe("/mentions-legales#editeur");
+    // L'ancre existe bien sur les mentions légales.
+    const mentions = readFileSync(join(process.cwd(), "app/mentions-legales/page.tsx"), "utf8");
+    expect(mentions).toContain('id: "editeur"');
+    const page = readFileSync(join(process.cwd(), "app/conditions-utilisation/page.tsx"), "utf8");
+    expect(page).toContain("section.links?.map");
+  });
 });
 
 describe("année de fondation", () => {
@@ -116,4 +136,32 @@ describe("année de fondation", () => {
       expect(source).not.toMatch(/\b2020\b/);
     },
   );
+});
+
+describe("conditions d'utilisation — suspension, recours et médiation", () => {
+  it("décrit la procédure de suspension : effets, durée, exposé des motifs, contestation sans compte", () => {
+    const text = section("signalement");
+    expect(text).toContain("**suspension d'un compte** ferme aussitôt toutes ses sessions");
+    expect(text).toContain("**durée déterminée** (365 jours au plus) ou **indéterminée**");
+    expect(text).toContain("à chaque tentative de connexion pendant la suspension");
+    expect(text).toContain("sans avoir à se connecter");
+    expect(text).toContain("**jamais par un traitement automatisé**");
+  });
+
+  it("ouvre le réexamen par l'association avant le juge", () => {
+    const text = section("signalement");
+    expect(text).toContain("la **réexamine**");
+    expect(text).toContain("**juge compétent**");
+    expect(text.indexOf("**réexamine**")).toBeLessThan(text.indexOf("**juge compétent**"));
+  });
+
+  it("nomme l'intérêt légitime comme base de la modération", () => {
+    expect(section("signalement")).toContain("**intérêt légitime** de l'association à faire respecter ses règles");
+  });
+
+  it("dit pourquoi aucun médiateur de la consommation n'est désigné", () => {
+    const text = section("droit-applicable");
+    expect(text).toContain("**gratuit**");
+    expect(text).toContain("aucun **médiateur de la consommation** n'est désigné");
+  });
 });

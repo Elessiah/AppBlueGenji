@@ -24,6 +24,12 @@
 import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createSession, getCurrentUser } from "@/lib/server/auth";
+import { AccountSuspendedError } from "@/lib/server/account-suspensions";
+import {
+  SUSPENSION_NOTICE_COOKIE,
+  SUSPENSION_NOTICE_COOKIE_MAX_AGE_SECONDS,
+  encodeSuspensionNotice,
+} from "@/lib/shared/account-suspension";
 import {
   buildBlizzardAuthorizationUrl,
   fetchBlizzardUser,
@@ -262,6 +268,20 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
     // Un compte neuf sans les conditions acceptées : la page de connexion le
     // dit, plutôt qu'un « échec de connexion » qui ferait réessayer pour rien.
     if ((error as Error).message === TERMS_REQUIRED) return loginFailure(base, provider, "terms");
+    // Compte suspendu : l'exposé de la décision voyage dans un cookie
+    // `httpOnly` de courte durée, jamais dans l'URL — il porte un motif, que
+    // l'historique du navigateur et les journaux des relais n'ont pas à garder.
+    if (error instanceof AccountSuspendedError) {
+      const response = loginFailure(base, provider, "suspended");
+      response.cookies.set(SUSPENSION_NOTICE_COOKIE, encodeSuspensionNotice(error.notice), {
+        httpOnly: true,
+        sameSite: "lax",
+        secure: process.env.NODE_ENV === "production",
+        path: "/connexion",
+        maxAge: SUSPENSION_NOTICE_COOKIE_MAX_AGE_SECONDS,
+      });
+      return response;
+    }
     return loginFailure(base, provider, "oauth");
   }
 

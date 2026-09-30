@@ -16,6 +16,13 @@ import {
   type LoginEnvironment,
 } from "@/lib/shared/login-environment";
 import { OAuthButtons } from "./OAuthButtons";
+import { SuspensionNoticeDialog } from "./SuspensionNoticeDialog";
+import {
+  ACCOUNT_SUSPENDED,
+  parseSuspensionNotice,
+  suspendedLoginMessage,
+  type SuspensionNotice,
+} from "@/lib/shared/account-suspension";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_VERSION } from "@/lib/shared/terms-of-use";
 import { isCertifiableDiscordHandle } from "@/lib/shared/discord-identity";
@@ -54,8 +61,13 @@ const TERMS_STORAGE_KEY = "bg_terms_consent";
  */
 const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-code" } as const;
 
-/** Formulaire de connexion. */
-export function LoginForm() {
+/**
+ * Formulaire de connexion.
+ *
+ * `suspensionNotice` : l'exposé d'une suspension, relu par la page dans le
+ * cookie que pose un retour OAuth refusé (`lib/server/oauth-flow.ts`).
+ */
+export function LoginForm({ suspensionNotice = null }: { suspensionNotice?: SuspensionNotice | null } = {}) {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(LOGIN_FIELD_ERRORS, LOGIN_FIELD_IDS);
@@ -74,6 +86,9 @@ export function LoginForm() {
   const [code, setCode] = useState("");
   const [requested, setRequested] = useState(false);
   const [loading, setLoading] = useState(false);
+  // Exposé d'une suspension à afficher : retour OAuth (cookie relu par la
+  // page) ou refus du code Discord (corps de la réponse).
+  const [suspension, setSuspension] = useState<SuspensionNotice | null>(null);
   // Information RGPD et conditions d'utilisation, avant toute création de
   // compte. Tant qu'elles ne sont pas lues et acceptées, la carte de connexion
   // est masquée derrière la popup et aucune requête d'authentification n'est
@@ -131,9 +146,15 @@ export function LoginForm() {
     const signals = readLoginEnvironmentSignals();
     const environment = signals ? detectLoginEnvironment(signals) : "BROWSER";
     setEnvironment(environment);
+    // Compte suspendu : l'exposé complet s'il a voyagé jusqu'ici, sinon (cookie
+    // expiré, page rechargée plus tard) la phrase générique.
+    if (params.get("error") === "suspended" && suspensionNotice) {
+      setSuspension(suspensionNotice);
+      return;
+    }
     const message = oauthErrorMessage(params.get("error"), params.get("provider"), environment);
     if (message) showError(message);
-  }, [showError]);
+  }, [showError, suspensionNotice]);
 
   const requestCode = async (event: FormEvent) => {
     event.preventDefault();
@@ -180,10 +201,15 @@ export function LoginForm() {
           termsAccepted,
         }),
       });
-      const payload = (await response.json()) as { error?: string };
+      const payload = (await response.json()) as { error?: string; suspension?: unknown };
       if (!response.ok) {
         const code = payload.error || "FAILED";
-        throw new CodedError(code, loginErrorMessage(code));
+        const notice = code === ACCOUNT_SUSPENDED ? parseSuspensionNotice(payload.suspension) : null;
+        if (notice) {
+          setSuspension(notice);
+          return;
+        }
+        throw new CodedError(code, code === ACCOUNT_SUSPENDED ? suspendedLoginMessage(null) : loginErrorMessage(code));
       }
       router.push(redirect);
       router.refresh();
@@ -432,6 +458,7 @@ export function LoginForm() {
           onRefuse={refuseConsent}
         />
       )}
+      {suspension && <SuspensionNoticeDialog notice={suspension} onClose={() => setSuspension(null)} />}
     </main>
   );
 }

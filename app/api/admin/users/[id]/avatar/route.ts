@@ -2,6 +2,8 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { notifyUserAvatarRemoved } from "@/lib/server/logo-quarantine";
+import { readJsonBody } from "@/lib/server/request-body";
+import { validateModerationReasonBody } from "@/lib/shared/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
 import { removeUserAvatarAsModerator } from "@/lib/server/users-service";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
@@ -22,7 +24,7 @@ import { toDiskUploadPath } from "@/lib/shared/uploads";
  * Le fichier est effacé du disque, donc du miroir des images au passage
  * suivant de sa synchronisation (`rclone sync`, suppression définitive).
  */
-export async function DELETE(_: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
   if (!can(user, "moderation")) return fail("FORBIDDEN", 403);
@@ -30,6 +32,11 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   const { id } = await context.params;
   const userId = Number(id);
   if (!Number.isSafeInteger(userId) || userId <= 0) return fail("INVALID_USER_ID", 400);
+
+  // Hors signalement, le motif saisi est le seul fait que le message puisse
+  // exposer au joueur (DSA, art. 17.3.b) : il est exigé, avant toute écriture.
+  const reason = validateModerationReasonBody(await readJsonBody(req).catch(() => null));
+  if (!reason.ok) return fail(reason.error, 400);
 
   try {
     const { removedAvatarUrl } = await removeUserAvatarAsModerator(userId);
@@ -47,7 +54,7 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     });
     // Le joueur apprend la décision et le moyen d'y répondre (DSA art. 17) ;
     // hors de tout signalement, le message renvoie vers l'association.
-    notifyUserAvatarRemoved(userId, null);
+    notifyUserAvatarRemoved(userId, null, reason.reason);
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;

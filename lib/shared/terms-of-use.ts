@@ -24,6 +24,8 @@
 
 import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
+import { SUSPENSION_MAX_DAYS } from "./account-suspension";
+import { SITE_MINIMUM_AGE } from "./legal-durations";
 
 /**
  * Version en vigueur. L'avancer redemande l'acceptation.
@@ -31,17 +33,17 @@ import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
  * Version 2 : âge minimum, licence du code, responsabilité des gérants
  * d'équipe et juridiction — changements de fond, d'où une nouvelle acceptation
  * (`termsRequestFor` rend alors `UPDATED` à qui avait accepté la version 1).
+ *
+ * Version 3 : procédure de suspension d'un compte (effets, durée, exposé des
+ * motifs, contestation), voies de recours contre toute décision de modération
+ * (réexamen par l'association, puis le juge), base légale de la modération
+ * et absence de médiateur de la consommation — la suspension et le recours
+ * sont des règles de fond pour qui les subit, d'où une nouvelle acceptation.
  */
-export const TERMS_VERSION = 2;
+export const TERMS_VERSION = 3;
 
-/**
- * Âge minimum pour créer un compte. Distinct de l'âge d'adhésion à
- * l'association, que fixent ses statuts : un compte n'est pas une adhésion.
- * Aucun contrôle technique ne le tient — le site ne recueille pas de date de
- * naissance, seulement une majorité déclarée (`isAdult`), qui ne dit rien d'un
- * seuil à 15 ans : la condition est déclarative, acceptée avec ces conditions.
- */
-export const SITE_MINIMUM_AGE = 15;
+/** Âge minimum pour créer un compte (défini dans `lib/shared/legal-durations.ts`). */
+export { SITE_MINIMUM_AGE };
 
 /**
  * Déclaration d'âge jointe à la case d'acceptation de la page de connexion,
@@ -127,7 +129,19 @@ export interface TermsSection {
   title: string;
   /** Paragraphes ; `**gras**` est la seule marque reconnue (`lib/shared/inline-emphasis.ts`). */
   paragraphs: readonly string[];
+  /**
+   * Liens rendus après les paragraphes : un paragraphe n'est qu'une chaîne,
+   * il ne sait pas porter de lien. Chemins du site seulement.
+   */
+  links?: readonly { href: string; label: string }[];
 }
+
+/**
+ * Où se lit l'adresse électronique de l'association : ses mentions légales,
+ * qui la révèlent au clic (`ProtectedContact`). Les conditions y renvoient
+ * plutôt que de l'écrire — une adresse écrite dans une page est moissonnée.
+ */
+export const ASSOCIATION_CONTACT_PATH = "/mentions-legales#editeur";
 
 /**
  * Le texte des conditions. Chaque section porte un identifiant d'ancre stable :
@@ -187,7 +201,10 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     paragraphs: [
       `Toute personne, titulaire d'un compte ou non, peut signaler un contenu illicite ou contraire à ces conditions par le bouton **« Signaler un problème »** présent en bas de chaque page. Un signalement de droit d'auteur doit indiquer ${copyrightNoticeElementsText()}. ${NOTIFIER_FOLLOW_UP}`,
       "L'association agit comme **hébergeur** des contenus de ses utilisateurs : elle ne les contrôle pas avant publication, mais **retire promptement** tout contenu manifestement illicite qui lui est signalé.",
-      "Selon la gravité, l'association peut **retirer un contenu** (par exemple un logo ou un avatar), **retirer une équipe d'un tournoi**, ou **suspendre un compte**.",
+      "Selon la gravité, l'association peut **retirer un contenu** (par exemple un logo ou un avatar), **retirer une équipe d'un tournoi**, ou **suspendre un compte**. Chaque décision est prise par une personne chargée de la modération, **jamais par un traitement automatisé**, et **motivée** à la personne concernée : ce qui est décidé, les faits retenus, la clause des présentes conditions sur laquelle elle repose, et les voies de recours.",
+      `La **suspension d'un compte** ferme aussitôt toutes ses sessions et empêche de s'y connecter tant qu'elle court, par tous les moyens de connexion. Elle est prononcée pour une **durée déterminée** (${SUSPENSION_MAX_DAYS} jours au plus) ou **indéterminée**, jusqu'à ce que l'association la lève. Le titulaire en reçoit l'exposé des motifs en message privé Discord si son compte y est rattaché, et, dans tous les cas, à chaque tentative de connexion pendant la suspension. Il la conteste sans avoir à se connecter, par le bouton « Signaler un problème » (catégorie « Autre »), en citant la référence de la décision.`,
+      "**Recours** : toute décision de modération peut d'abord être contestée auprès de l'association, qui la **réexamine** — depuis la page du signalement ou la catégorie « Contestation » du formulaire pour une décision prise sur un signalement, par la catégorie « Autre » pour une suspension ou une décision prise sans signalement. La personne concernée peut ensuite, ou à tout moment, porter la décision devant le **juge compétent**.",
+      "Le traitement des données qu'exige la modération des contenus et des comptes contraires à ces conditions (examen d'un contenu, masquage, retrait, suspension, conservation de la décision le temps de sa contestation) repose sur l'**intérêt légitime** de l'association à faire respecter ses règles ; la politique de confidentialité en détaille les durées.",
       "Les joueurs visés par un signalement, et les membres des équipes visées, en sont **prévenus en message privé Discord** (s'ils ont rattaché leur compte Discord ou certifié leur tag). Ils lisent sur la page du signalement ce qui est reproché — jamais qui l'a signalé — et peuvent le **contester** depuis cette page ou par la catégorie « Contestation » du même formulaire ; contester un signalement archivé le rouvre.",
       `Un logo d'équipe ou un avatar de joueur signalé peut être **masqué** plutôt que supprimé : il n'est plus en ligne, et l'équipe ou le joueur dispose de **${LOGO_QUARANTINE_MONTHS} mois** pour contester. Sans contestation, l'image est supprimée définitivement à l'échéance ; si la contestation aboutit, elle est rétablie. Un contenu manifestement illicite peut être supprimé sans délai : l'équipe ou le joueur en est prévenu de la même façon et peut contester la décision.`,
     ],
@@ -204,8 +221,10 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
     id: "droit-applicable",
     title: "Droit applicable",
     paragraphs: [
-      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou son courriel (donné dans les mentions légales), en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents, sans préjudice des règles qui permettent à un consommateur de saisir la juridiction de son domicile ou de se prévaloir des dispositions impératives du droit de son pays de résidence.",
+      "Ces conditions sont soumises au **droit français**. Un différend est d'abord porté devant l'association, par son serveur Discord ou par l'adresse électronique de l'association indiquée dans les mentions légales, en vue d'une solution amiable ; à défaut, les tribunaux français sont compétents, sans préjudice des règles qui permettent à un consommateur de saisir la juridiction de son domicile ou de se prévaloir des dispositions impératives du droit de son pays de résidence.",
+      "Le service est **gratuit** et l'association ne vend rien sur le site : aucun contrat de vente ni de prestation de services n'y est conclu avec un consommateur, si bien qu'aucun **médiateur de la consommation** n'est désigné.",
     ],
+    links: [{ href: ASSOCIATION_CONTACT_PATH, label: "Coordonnées de l'association (mentions légales)" }],
   },
 ];
 

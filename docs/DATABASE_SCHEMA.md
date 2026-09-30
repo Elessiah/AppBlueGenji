@@ -323,6 +323,16 @@ existante, `bg_users.terms_version` et `terms_accepted_at`, sont écrites aux
 **deux** endroits (`CREATE TABLE` et `RECENT_SCHEMA_CHANGES`), sans remplissage :
 on n'attribue pas une acceptation que personne n'a donnée.
 
+`bg_account_suspensions` (suspension d'un compte par la modération,
+`lib/shared/account-suspension.ts`) : `ends_at` à `NULL` = durée
+indéterminée, `lifted_at` = levée avant terme ; `user_id` en `CASCADE`,
+`created_by` / `lifted_by` en `SET NULL`. Table neuve, donc déclarée par son
+seul `CREATE TABLE IF NOT EXISTS` — c'est sa migration sur une base qui tourne ;
+`RECENT_SCHEMA_CHANGES` ne porte que son index `(user_id, lifted_at)`, que lisent
+la session de chaque requête et le refus d'une connexion. Effacée à
+l'anonymisation d'un compte, et six mois après sa fin (purge entraînée par
+`createSession`).
+
 `bg_report_targets.notified_at` (instant où la cible a été prévenue, `NULL` si
 rien ne lui a été envoyé) est venue ensuite, aux deux endroits elle aussi, sans
 remplissage : on ne sait pas quelles lignes antérieures ont reçu un message.

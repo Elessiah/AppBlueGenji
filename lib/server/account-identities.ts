@@ -36,6 +36,7 @@
  */
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
+import { assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { DISCORD_NAMED_PSEUDO_SQL } from "@/lib/server/discord-pseudo-sql";
 import { isDuplicateEntryError } from "@/lib/server/mysql-errors";
 import {
@@ -141,6 +142,9 @@ export async function listAccountConnections(userId: number): Promise<AccountCon
  * d'aiguillage qu'on oublie de compléter en ajoutant un fournisseur.
  */
 export async function createOrGetOAuthUser(identity: OAuthIdentity, consent: TermsConsent): Promise<number> {
+  // Un compte suspendu est refusé **avant** toute écriture de la porte
+  // (BattleTag, tag certifié, avatar) : la connexion ne doit rien lui rendre.
+  await assertIdentityNotSuspended(identity.provider, identity.subject);
   switch (identity.provider) {
     case "GOOGLE":
       return createOrGetGoogleUser(

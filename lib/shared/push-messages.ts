@@ -142,6 +142,28 @@ export function moderationPush(input: {
   };
 }
 
+/**
+ * Suspension du compte du destinataire, ou sa levée. Ni motif ni clause : la
+ * notification s'affiche sur un écran que d'autres peuvent voir, et l'exposé
+ * complet est donné en message privé Discord et à la tentative de connexion
+ * suivante — seul endroit où le lecteur a prouvé être le titulaire.
+ */
+export function suspensionPush(kind: "SUSPENDED" | "LIFTED"): PushContent {
+  return kind === "SUSPENDED"
+    ? {
+        title: "Décision de modération",
+        body: "Ton compte a été suspendu. La décision, ses motifs et le moyen de la contester s'affichent à ta prochaine tentative de connexion.",
+        url: "/connexion",
+        tag: "moderation-suspension",
+      }
+    : {
+        title: "Décision de modération",
+        body: "La suspension de ton compte a été levée : tu peux de nouveau te connecter.",
+        url: "/connexion",
+        tag: "moderation-suspension",
+      };
+}
+
 /** Des changements du traitement des données sont à lire — une information, aucun accord n'est demandé. */
 export function privacyChangePush(titles: readonly string[]): PushContent {
   const first = titles[0] ?? "Traitement de tes données";

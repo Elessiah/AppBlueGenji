@@ -1242,6 +1242,35 @@ async function runMigrations(db: Pool): Promise<void> {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
 
+  // Suspensions de compte prononcées par la modération
+  // (`lib/shared/account-suspension.ts`). `ends_at` à `NULL` = durée
+  // indéterminée ; `lifted_at` posé = levée avant terme. L'auteur et celui qui
+  // lève sont **détachés** si leur compte disparaît : la décision reste due à
+  // son titulaire, comme une pénalité d'endurance. Le compte suspendu, lui,
+  // emporte ses suspensions (`ON DELETE CASCADE`). L'index sert les deux
+  // lectures chaudes — la session de chaque requête et le refus d'une connexion
+  // —, qui cherchent une ligne non levée d'un compte.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_account_suspensions (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      reason VARCHAR(500) NOT NULL,
+      ground ENUM('ACCOUNT', 'BEHAVIOR', 'CONTENT') NOT NULL,
+      starts_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      ends_at DATETIME NULL,
+      created_by BIGINT NULL,
+      lifted_at DATETIME NULL,
+      lifted_by BIGINT NULL,
+      INDEX idx_bg_account_suspensions_user (user_id, lifted_at),
+      CONSTRAINT fk_bg_account_suspensions_user FOREIGN KEY (user_id)
+        REFERENCES bg_users(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_account_suspensions_created_by FOREIGN KEY (created_by)
+        REFERENCES bg_users(id) ON DELETE SET NULL,
+      CONSTRAINT fk_bg_account_suspensions_lifted_by FOREIGN KEY (lifted_by)
+        REFERENCES bg_users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
+
   // ───────────────────────────────────────────────────────────────────────────
   // Migrations
   // ───────────────────────────────────────────────────────────────────────────
@@ -1410,6 +1439,12 @@ async function runMigrations(db: Pool): Promise<void> {
     // dont le détail est encore là.
     `ALTER TABLE bg_site_visitors ADD COLUMN last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP`,
     `ALTER TABLE bg_site_visitors ADD INDEX idx_bg_site_visitors_last_seen (last_seen_at)`,
+    // Suspensions de compte : une **table neuve** n'a pas d'`ALTER` à jouer — son
+    // `CREATE TABLE IF NOT EXISTS`, plus haut, *est* sa migration sur une base
+    // qui tourne. L'entrée ci-dessous ne fait que tenir la règle des deux
+    // endroits pour l'index que lisent la session et la connexion : sans effet
+    // (erreur tolérée) quand la table vient d'être créée avec lui.
+    `ALTER TABLE bg_account_suspensions ADD INDEX idx_bg_account_suspensions_user (user_id, lifted_at)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

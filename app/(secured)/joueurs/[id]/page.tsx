@@ -18,7 +18,7 @@ import {
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 import { StatsPanel } from "@/components/stats/StatsPanel";
-import { ModerationAvatarBar } from "./_components/ModerationAvatarBar";
+import { PlayerModerationBar } from "./_components/PlayerModerationBar";
 import styles from "./player.module.css";
 
 export default function PlayerDetailPage() {
@@ -205,7 +205,7 @@ export default function PlayerDetailPage() {
         </div>
       </div>
 
-      <ModerationAvatarBar profile={data} deleted={deleted} onChanged={refresh} />
+      <PlayerModerationBar profile={data} deleted={deleted} onChanged={refresh} />
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
         <div className="ds-section-title blue">

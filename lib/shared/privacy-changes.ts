@@ -43,11 +43,20 @@
 
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-request-notice";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISITOR_RETENTION_MONTHS, SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
 import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+// Constantes seules : ce module est chargé sur chaque page par la modale des
+// changements, il ne doit tirer ni le registre ni les conditions d'utilisation.
+import {
+  SITE_MINIMUM_AGE,
+  SUPPORT_TICKET_RETENTION_MONTHS,
+  WEB_ACCESS_LOG_FIELDS,
+  WEB_ACCESS_LOG_RETENTION_DAYS,
+} from "@/lib/shared/legal-durations";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -502,6 +511,49 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       "Ce n'est pas un délégué à la protection des données au sens du RGPD : l'association reste responsable du traitement de tes données et de la réponse à tes demandes.",
     ],
     links: [{ href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" }],
+  },
+  // Un traitement nouveau : la suspension d'un compte, qui garde une décision
+  // (faits retenus, clause, dates) sur le compte visé. Et une base légale
+  // désormais dite pour toute la modération des contenus contraires aux
+  // règles — l'intérêt légitime, contre lequel s'exerce le droit d'opposition.
+  // Le résumé, repris en message privé Discord, ne nomme personne.
+  {
+    id: "2026-10-suspension-comptes",
+    publishedAt: "2026-10-01",
+    title: "Suspension d'un compte par la modération",
+    summary: `La modération peut désormais suspendre un compte contraire aux conditions d'utilisation : ses sessions sont fermées et la connexion refusée tant que la suspension court. La décision (faits retenus, clause invoquée, dates) est gardée le temps de la suspension, puis ${SUSPENSION_RETENTION_MONTHS} mois pour pouvoir la contester.`,
+    details: [
+      "Le titulaire reçoit la décision et ses motifs en message privé Discord si son compte y est rattaché, et à chaque tentative de connexion pendant la suspension. Il la conteste sans se connecter, par « Signaler un problème » (catégorie « Autre »), puis, le cas échéant, devant le juge.",
+      "La modération des contenus et des comptes contraires aux conditions d'utilisation — masquage ou retrait d'une image, suspension — repose sur l'intérêt légitime de l'association à faire respecter ses règles. Une image retirée hors de tout signalement l'est désormais sur un motif écrit, envoyé avec la décision.",
+      "Une suspension figure dans l'export de tes données, et disparaît avec ton compte ou à son anonymisation.",
+    ],
+    links: [{ href: "/rgpd#signalements", label: "Lire la section « Signalements »" }],
+  },
+  // Le registre couvre désormais ce que l'association faisait déjà sans le
+  // déclarer : portail de support, retransmission des matchs, journaux du
+  // serveur web, courriel Gmail de l'association (Google, destinataire jamais
+  // nommé) ; et l'âge minimum, annoncé sur `/rgpd` sans entrée jusqu'ici.
+  // Mêmes date et modale que les entrées du 1er octobre, pas encore publiées
+  // au moment de l'écrire. Le résumé, repris en message privé Discord, reste
+  // court et ne nomme personne.
+  {
+    id: "2026-10-registre-complete",
+    publishedAt: "2026-10-01",
+    title: "Support, retransmissions et courriel de l'association",
+    summary:
+      "La politique de confidentialité décrit désormais le portail de support, la retransmission des matchs, les journaux techniques du serveur web et le courriel de l'association. Elle précise aussi l'âge minimum pour créer un compte.",
+    details: [
+      `Portail de support (Spiceworks) : un ticket y est gardé le temps de son traitement, puis ${SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture.`,
+      "Retransmission des matchs (YouTube, Twitch ou Kick) : ton pseudo et le nom de ton équipe peuvent apparaître à l'écran, et le lien de la rediffusion reste avec le match. Tu peux t'y opposer par « Signaler un problème », catégorie RGPD.",
+      `Serveur web : chaque requête (${WEB_ACCESS_LOG_FIELDS}) est notée dans un journal technique gardé ${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, pour la sécurité du site.`,
+      `Courriel de l'association : c'est une messagerie Gmail, que Google héberge et peut lire (possibles transferts vers les États-Unis). Une demande reçue par ce courriel ou par le téléphone de l'association est gardée le temps de la traiter, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture.`,
+      `Âge minimum : il faut avoir au moins ${SITE_MINIMUM_AGE} ans pour créer un compte. Le site ne demande pas de date de naissance et ne vérifie pas l'âge.`,
+      `Données de connexion : le journal légal des connexions ne note que les ouvertures de session (sans port source), et les informations fournies à la création de ton compte partent avec lui (hors les copies de sauvegarde chiffrées, effacées au bout de ${BACKUP_RETENTION_DAYS} jours, et la mention de ta suppression au journal qui la rejoue après une restauration, gardée ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours ; le reste de ce qui subsiste est détaillé au registre).`,
+    ],
+    links: [
+      { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
+      { href: "/rgpd#age-minimum", label: "Lire le paragraphe « Âge minimum »" },
+    ],
   },
 ];
 

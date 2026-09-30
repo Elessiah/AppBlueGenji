@@ -14,6 +14,19 @@ jest.mock("@/lib/server/connection-logs", () => ({
     { event: "LOGIN_DISCORD", ip: "203.0.113.7", createdAt: "2026-09-01T00:00:00.000Z" },
   ]),
 }));
+jest.mock("@/lib/server/account-suspensions", () => ({
+  getActiveSuspension: jest.fn(async () => null),
+  listOwnSuspensions: jest.fn(async () => [
+    {
+      id: 7,
+      reason: "Propos haineux répétés en match",
+      ground: "BEHAVIOR",
+      startsAt: "2026-09-01T10:00:00.000Z",
+      endsAt: "2026-09-08T10:00:00.000Z",
+      liftedAt: null,
+    },
+  ]),
+}));
 jest.mock("@/lib/server/push-subscriptions", () => ({
   exportPushData: jest.fn(async () => ({
     devices: [{ endpoint: "https://fcm.googleapis.com/fcm/send/abc", p256dh: "k", auth: "a", createdAt: "2026-09-01T00:00:00.000Z", lastSuccessAt: null }],
@@ -95,6 +108,18 @@ describe("exportOwnData", () => {
     // site détient : ils sont rendus, clés comprises, avec les sujets coupés.
     expect(data.pushNotifications.devices).toHaveLength(1);
     expect(data.pushNotifications.disabledTopics).toEqual(["MATCH_REMINDER"]);
+
+    // Les suspensions conservées font partie du droit d'accès — sans leur
+    // identifiant interne ni qui les a prononcées.
+    expect(data.suspensions).toEqual([
+      {
+        reason: "Propos haineux répétés en match",
+        ground: "BEHAVIOR",
+        startsAt: "2026-09-01T10:00:00.000Z",
+        endsAt: "2026-09-08T10:00:00.000Z",
+        liftedAt: null,
+      },
+    ]);
 
     // Le journal des connexions (obligation légale) fait partie du droit d'accès.
     expect(data.connectionLogs).toEqual([

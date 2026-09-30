@@ -18,6 +18,7 @@
  */
 
 import { imageUploadErrorMessage } from "@/lib/shared/image-upload-errors";
+import { moderationReasonErrorMessage } from "@/lib/shared/logo-quarantine";
 import { teamTagErrorMessage } from "@/lib/shared/team-tag";
 import { TEAM_NAME_MAX_LENGTH, TEAM_NAME_MIN_LENGTH } from "@/lib/shared/team-name";
 
@@ -107,6 +108,8 @@ const TEAM_ERRORS: Record<string, string> = {
   LOGO_RIGHTS_NOT_CERTIFIED: "Certifie détenir les droits sur ce logo pour l'envoyer.",
   TEAM_HAS_NO_LOGO: "Cette équipe n'a déjà plus de logo.",
   TEAM_LOGO_REMOVE_FAILED: "Le logo n'a pas pu être retiré.",
+  MODERATION_REASON_REQUIRED: moderationReasonErrorMessage("MODERATION_REASON_REQUIRED"),
+  MODERATION_REASON_TOO_LONG: moderationReasonErrorMessage("MODERATION_REASON_TOO_LONG"),
 };
 
 const FALLBACK = "L'opération a échoué.";
