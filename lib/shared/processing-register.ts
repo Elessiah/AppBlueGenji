@@ -600,6 +600,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
       "Plafonds d'envoi par personne et par heure",
       "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
+      "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft (messagerie) et de l'appareil personnel de la personne à contacter",
     ],
   },
   {
