@@ -443,7 +443,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               `**Commande /link** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
               "**Configuration des serveurs** : les salons relayés, jusqu'à leur retrait par les administrateurs ou le départ du Bot du serveur ; l'invitation et le rôle d'arbitrage (avec l'identifiant de qui les a posés) et le rôle d'administration du Bot, jusqu'à leur retrait par les administrateurs — ils restent si le Bot quitte le serveur, sans suppression automatique à ce jour.",
               "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression.",
-              "**Journal privé du staff et journaux du serveur** : aucune suppression automatique à ce jour.",
+              "**Salon de journal privé du staff** : aucune suppression automatique à ce jour.",
+              "**Journaux du serveur** : selon leur rotation automatique.",
               // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
               // (`rclone delete --min-age`) est refaite **chaque heure** par
               // `blueGenjiBot/scripts/sync-uploads-onedrive.sh`, et pas seulement
@@ -647,7 +648,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               `**/link command**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
               "**Server configuration**: relayed channels, until the administrators remove them or the Bot leaves the server; the invite and the referee role (with the ID of whoever set them) and the Bot administration role, until the administrators remove them — they remain if the Bot leaves the server, with no automatic deletion at present.",
               "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion.",
-              "**Staff private log channel and server logs**: no automatic deletion at present.",
+              "**Staff private log channel**: no automatic deletion at present.",
+              "**Server logs**: according to their automatic rotation.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,
             ],
           },
