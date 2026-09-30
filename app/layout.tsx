@@ -16,6 +16,7 @@ import { SkipLink } from "@/components/accessibility/SkipLink";
 import { MatchLaunchCenter } from "@/components/match-launch/MatchLaunchCenter";
 import { TermsAcceptanceModal } from "@/components/legal/TermsAcceptanceModal";
 import { needsTermsForTeamManagement } from "@/lib/server/terms-acceptance";
+import { scheduleAccountDeletionJournalPrune } from "@/lib/server/account-deletion-journal";
 import { schedulePurgeExpiredReports } from "@/lib/server/content-reports";
 import { getRecruitmentSpotlight } from "@/lib/server/recruitment-service";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -202,6 +203,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // par le trafic (au plus une fois par heure) : la durée annoncée au
   // signalant doit tenir même quand personne n'ouvre le panneau.
   schedulePurgeExpiredReports();
+  // Même régime pour le journal des suppressions de compte : une ligne ne doit
+  // pas attendre la suppression suivante pour partir à son échéance.
+  scheduleAccountDeletionJournalPrune();
   const termsRequired = await termsRequiredFor(user?.id);
   // « Plus tard » tient douze heures (cookie) : sans quoi la modale revenait
   // à chaque chargement complet. Un geste de gestion refusé la rouvre malgré lui.

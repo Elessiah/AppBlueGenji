@@ -11,6 +11,7 @@ import {
   forceLaunchMatch,
   loadViewerCastBlock,
   maintainMatchLaunches,
+  releaseIneligibleCast,
   releaseMatchCast,
   setMatchHost,
   setMatchReady,
@@ -54,7 +55,7 @@ type World = {
   match: MatchState | null;
   memberships: Membership[];
   soloEntries: { userId: number; teamId: number }[];
-  users: Record<number, { discord_verified_at: string | null; discord_pseudo: string | null; blizzard_sub: string | null; overwatch_battletag: string | null; is_deleted: number }>;
+  users: Record<number, { discord_verified_at: string | null; discord_pseudo: string | null; blizzard_sub: string | null; overwatch_battletag: string | null; is_deleted: number; is_admin?: number; platform_roles_json?: string | null }>;
   writes: string[];
 };
 
@@ -223,9 +224,21 @@ describe("setMatchReady", () => {
 
   it("attend le caster inscrit avant de lancer", async () => {
     state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.users[CASTER] = ELIGIBLE_CASTER;
     await expect(setMatchReady(42, 1, true)).resolves.toEqual({ launched: false });
     await expect(setMatchReady(42, CASTER, true)).resolves.toEqual({ launched: true });
     expect(state.match?.caster_ready_at).toBe(STAMP);
+  });
+
+  it.each<[string, Partial<typeof ELIGIBLE_CASTER>]>([
+    ["sans la permission `live`", { platform_roles_json: JSON.stringify(["RECRUTEUR"]) }],
+    ["au tag décertifié", { discord_verified_at: null }],
+    ["sans Battle.net", { blizzard_sub: null }],
+  ])("refuse le « Prêt » d'un caster inscrit %s", async (_label, overrides) => {
+    state.match = matchState({ team2_ready_at: STAMP, caster_user_id: CASTER });
+    state.users[CASTER] = { ...ELIGIBLE_CASTER, ...overrides };
+    await expect(setMatchReady(42, CASTER, true)).rejects.toThrow("NOT_MATCH_PARTY");
+    expect(state.match?.caster_ready_at).toBeNull();
   });
 
   it("compte une fantôme prête d'office : l'équipe réelle suffit", async () => {
@@ -369,6 +382,17 @@ describe("forceLaunchMatch", () => {
   });
 });
 
+/** Un caster qui remplit toujours la condition : permission `live` et identité. */
+const ELIGIBLE_CASTER = {
+  discord_verified_at: STAMP as string | null,
+  discord_pseudo: "caster" as string | null,
+  blizzard_sub: "sub" as string | null,
+  overwatch_battletag: "Caster#1" as string | null,
+  is_deleted: 0,
+  is_admin: 0,
+  platform_roles_json: JSON.stringify(["CASTER"]) as string | null,
+};
+
 describe("claimMatchCast", () => {
   const verified = {
     discord_verified_at: STAMP,
@@ -413,12 +437,30 @@ describe("claimMatchCast", () => {
 
   it("refuse un match déjà casté par un autre, accepte de rejouer sa propre inscription", async () => {
     state.users[CASTER] = verified;
+    state.users[901] = ELIGIBLE_CASTER;
     state.match = matchState({ caster_user_id: 901 });
     await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("MATCH_ALREADY_CASTED");
     state.match = matchState({ caster_user_id: CASTER, caster_ready_at: STAMP });
     await claimMatchCast(42, CASTER, true);
     // Rejouée, l'inscription ne défait pas un « Prêt » déjà donné.
     expect(state.match?.caster_ready_at).toBe(STAMP);
+  });
+
+  it("reprend la place d'un titulaire qui ne remplit plus la condition", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+    state.match = matchState({ caster_user_id: 901, caster_ready_at: STAMP });
+    await claimMatchCast(42, CASTER, true);
+    expect(state.match?.caster_user_id).toBe(CASTER);
+    expect(state.match?.caster_ready_at).toBeNull();
+  });
+
+  it("ne remplace jamais le caster d'un match lancé", async () => {
+    state.users[CASTER] = verified;
+    state.users[901] = { ...ELIGIBLE_CASTER, discord_verified_at: null };
+    state.match = matchState({ caster_user_id: 901, launched_at: STAMP });
+    await expect(claimMatchCast(42, CASTER, true)).rejects.toThrow("MATCH_ALREADY_CASTED");
+    expect(state.match?.caster_user_id).toBe(901);
   });
 
   it("refuse un match terminé ou une exemption", async () => {
@@ -601,5 +643,38 @@ describe("loadViewerCastBlock", () => {
       is_deleted: 0,
     };
     await expect(loadViewerCastBlock(CASTER, true)).resolves.toBeNull();
+  });
+});
+
+describe("releaseIneligibleCast", () => {
+  const ineligible = { ...ELIGIBLE_CASTER, platform_roles_json: null };
+
+  it("retire un caster qui ne remplit plus la condition, et lance ce qui n'attendait que lui", async () => {
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, team1_ready_at: STAMP, team2_ready_at: STAMP });
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(true);
+    expect(state.match?.caster_user_id).toBeNull();
+    expect(state.match?.launched_at).toBe(STAMP);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it.each<[string, Partial<MatchState>]>([
+    ["un match lancé", { launched_at: STAMP }],
+    ["un match joué entre-temps", { status: "COMPLETED" }],
+    ["un match repris par un autre caster", { caster_user_id: 901 }],
+  ])("ne touche pas à %s", async (_label, overrides) => {
+    state.users[CASTER] = ineligible;
+    state.match = matchState({ caster_user_id: CASTER, ...overrides });
+    const before = state.match.caster_user_id;
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
+    expect(state.match?.caster_user_id).toBe(before);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("garde un compte redevenu éligible", async () => {
+    state.users[CASTER] = ELIGIBLE_CASTER;
+    state.match = matchState({ caster_user_id: CASTER });
+    await expect(releaseIneligibleCast(42, CASTER)).resolves.toBe(false);
+    expect(state.match?.caster_user_id).toBe(CASTER);
   });
 });

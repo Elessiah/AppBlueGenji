@@ -215,7 +215,11 @@ migrations (`getDatabase` → `scheduleDeletedAccountsReconciliation`) :
 - un compte conservé qui porte encore `compte_supprime_<id>` ou des rôles de
   plateforme est **ré-anonymisé** sous un pseudo d'emprunt ;
 - les autres ne sont pas touchés — c'est le cas nominal, une suppression faite
-  sous la règle actuelle ne laisse rien à rattraper.
+  sous la règle actuelle ne laisse rien à rattraper — à une exception près :
+  la dernière acceptation des conditions d'utilisation (`terms_version`,
+  `terms_accepted_at`), que l'anonymisation efface désormais, est effacée sur
+  tous les comptes supprimés par **une** instruction, sans ré-anonymisation (qui
+  leur tirerait un autre pseudo d'emprunt).
 
 Chaque compte a sa transaction, sous le verrou de sa ligne et après relecture de
 `is_deleted` : deux processus qui démarrent ensemble ne se marchent pas dessus,

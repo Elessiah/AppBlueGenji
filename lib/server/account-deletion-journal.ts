@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import path from "node:path";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import {
@@ -34,19 +35,82 @@ export async function readAccountDeletionJournal(
 // Les écritures d'un même processus passent l'une après l'autre : chacune relit
 // puis réécrit le fichier entier, et deux suppressions simultanées perdraient
 // sinon l'une des deux lignes. Le site tourne en un seul processus (pm2, mode
-// fork — `docs/DEPLOYMENT.md`).
-let queue: Promise<void> = Promise.resolve();
+// fork — `docs/DEPLOYMENT.md`). La file vit sur `globalThis` et non dans le
+// module : Next peut charger ce fichier en plusieurs copies dans un même
+// processus (la mise en page qui élague, la route qui consigne), et deux files
+// laisseraient un élagage réécrire le fichier par-dessus une suppression
+// consignée entre sa lecture et son écriture.
+const journalState = globalThis as typeof globalThis & { __bgDeletionJournalQueue?: Promise<void> };
 
-async function writeEntry(entry: AccountDeletionEntry, filePath: string, now: Date): Promise<void> {
-  const current = await readAccountDeletionJournal(filePath);
-  const kept = pruneJournal([...current.entries, entry], now);
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = (journalState.__bgDeletionJournalQueue ?? Promise.resolve()).then(task);
+  journalState.__bgDeletionJournalQueue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+async function writeJournal(kept: readonly AccountDeletionEntry[], filePath: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
   // Écrit à côté puis renommé : la synchronisation horaire du bot copie le
   // fichier sans prévenir, et un renommage est la seule écriture qu'elle ne
   // puisse pas surprendre à moitié.
-  const temp = `${filePath}.${process.pid}.tmp`;
+  // Nom unique par écriture : même sérialisées, deux écritures ne doivent
+  // jamais partager un fichier temporaire.
+  const temp = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
   await writeFile(temp, kept.map(formatJournalEntry).join(""), { encoding: "utf8", mode: 0o600 });
   await rename(temp, filePath);
+}
+
+async function writeEntry(entry: AccountDeletionEntry, filePath: string, now: Date): Promise<void> {
+  const current = await readAccountDeletionJournal(filePath);
+  await writeJournal(pruneJournal([...current.entries, entry], now), filePath);
+}
+
+/**
+ * Retire du journal les lignes échues, **sans** suppression nouvelle : élaguer
+ * dans `writeEntry` seulement laissait une ligne survivre — et sa copie
+ * OneDrive horaire avec elle — tant que personne d'autre ne supprimait son
+ * compte, au-delà de la durée annoncée par le registre et `/rgpd`.
+ *
+ * Passe par la même file que les écritures (une suppression simultanée ne
+ * peut pas être perdue), et ne réécrit le fichier que s'il y a quelque chose
+ * à retirer : un journal absent reste absent.
+ *
+ * @returns le nombre de lignes retirées.
+ */
+export function pruneAccountDeletionJournal(
+  options: { filePath?: string; now?: Date } = {},
+): Promise<number> {
+  const filePath = options.filePath ?? accountDeletionJournalPath();
+  const now = options.now ?? new Date();
+  return enqueue(async () => {
+    const current = await readAccountDeletionJournal(filePath);
+    const kept = pruneJournal(current.entries, now);
+    const removed = current.entries.length - kept.length;
+    if (removed === 0) return 0;
+    await writeJournal(kept, filePath);
+    return removed;
+  });
+}
+
+const PRUNE_INTERVAL_MS = 60 * 60 * 1000;
+const pruneState = globalThis as typeof globalThis & { __bgDeletionJournalPrunedAt?: number };
+
+/**
+ * Élagage entraîné par le trafic, au plus une fois par heure et par processus
+ * — même mécanique que la purge des signalements (`schedulePurgeExpiredReports`),
+ * appelée au même endroit (`app/layout.tsx`) : aucun ordonnanceur à tenir.
+ * Jamais attendu, jamais levé.
+ */
+export function scheduleAccountDeletionJournalPrune(now: number = Date.now()): void {
+  const last = pruneState.__bgDeletionJournalPrunedAt;
+  if (last !== undefined && now - last < PRUNE_INTERVAL_MS) return;
+  pruneState.__bgDeletionJournalPrunedAt = now;
+  void pruneAccountDeletionJournal({ now: new Date(now) }).catch((error: unknown) => {
+    console.error("[account-deletion-journal] élagage impossible :", error);
+  });
 }
 
 /**
@@ -66,9 +130,7 @@ export function recordAccountDeletion(
 ): Promise<void> {
   const filePath = options.filePath ?? accountDeletionJournalPath();
   const now = options.now ?? new Date();
-  const run = queue.then(() => writeEntry(entry, filePath, now));
-  queue = run.catch(() => {});
-  return run.catch((error: unknown) => {
+  return enqueue(() => writeEntry(entry, filePath, now)).catch((error: unknown) => {
     console.error(
       `[account-deletion-journal] suppression du compte #${entry.userId} non consignée (${filePath}) — ` +
         "elle ne serait pas rejouée après restauration d'une sauvegarde antérieure :",

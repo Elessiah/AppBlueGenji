@@ -622,7 +622,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      "À la suppression : effacement complet si le compte est effacé ; s'il est anonymisé, le détail des acceptations est effacé, mais la dernière version acceptée et sa date restent attachées au compte anonymisé",
+      "À la suppression : effacement complet, que le compte soit effacé ou anonymisé — le détail des acceptations comme la dernière version acceptée et sa date",
     ],
     recipients: ["Le joueur lui-même, par l'export de ses données", "Responsable technique de l'association, qui administre la base"],
     transfers: ["Aucun"],

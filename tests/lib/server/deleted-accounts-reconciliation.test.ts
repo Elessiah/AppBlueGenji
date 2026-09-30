@@ -48,7 +48,7 @@ function needsWork(account: Account): boolean {
 
 function fakeDb(
   accounts: Record<number, Account>,
-  options: { failFor?: number; rollbackFails?: boolean } = {},
+  options: { failFor?: number; rollbackFails?: boolean; failTermsCleanup?: boolean } = {},
 ) {
   const queries: Query[] = [];
   const connections: {
@@ -60,6 +60,7 @@ function fakeDb(
   const poolExecute = jest.fn(async (sql: string) => {
     const q = sql.replace(/\s+/g, " ").trim();
     queries.push({ userId: null, sql: q, params: [] });
+    if (options.failTermsCleanup && q.includes("SET terms_version = NULL")) throw new Error("DB_DOWN");
     if (q.startsWith("SELECT u.id FROM bg_users u WHERE u.is_deleted = 1")) {
       return [
         Object.entries(accounts)
@@ -274,6 +275,27 @@ describe("reconcileDeletedAccounts", () => {
 
     expect(await reconcileDeletedAccounts()).toEqual({ erased: 0, renamed: 0, failed: 0 });
     expect(connections).toHaveLength(0);
+  });
+  it("efface l'acceptation des conditions des comptes déjà anonymisés, sans les renommer", async () => {
+    const { queries, connections } = fakeDb({ 11: { pseudo: "AlphaGod", played: true } });
+
+    await reconcileDeletedAccounts();
+
+    const cleanup = queries.filter((q) => q.sql.includes("SET terms_version = NULL"));
+    expect(cleanup).toHaveLength(1);
+    expect(cleanup[0].sql).toContain("terms_accepted_at = NULL");
+    expect(cleanup[0].sql).toContain("WHERE is_deleted = 1");
+    // Une instruction du pool, pas une nouvelle anonymisation : aucun pseudo retiré.
+    expect(cleanup[0].userId).toBeNull();
+    expect(connections).toHaveLength(0);
+  });
+
+  it("poursuit le rattrapage quand cet effacement échoue", async () => {
+    const { queries } = fakeDb({ 5122: { pseudo: "compte_supprime_5122" } }, { failTermsCleanup: true });
+
+    expect(await reconcileDeletedAccounts()).toEqual({ erased: 1, renamed: 0, failed: 0 });
+    expect(queries.some((q) => q.sql.startsWith("SELECT u.id FROM bg_users u"))).toBe(true);
+    expect(console.error).toHaveBeenCalled();
   });
 });
 

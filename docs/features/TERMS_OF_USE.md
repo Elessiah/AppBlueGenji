@@ -78,7 +78,12 @@ révocable sans l'être. Chaque nouveau fichier redemande la garantie.
 
 `bg_users.terms_version` / `terms_accepted_at` (dernière acceptation, consultée
 avant un geste) et `bg_terms_acceptances` (la preuve : version, contexte, date).
-Rendues par l'export RGPD, effacées à l'anonymisation.
+Rendues par l'export RGPD, effacées à l'anonymisation — **les deux** : la
+table *et* les deux colonnes du compte (elles restaient sur la ligne anonymisée,
+sans limite de durée, alors que la preuve dont elles résument la dernière ligne
+était effacée). Les comptes anonymisés avant cette règle sont rattrapés par
+`reconcileDeletedAccounts`, d'une instruction qui ne leur tire pas de nouveau
+pseudo d'emprunt.
 
 ## Âge minimum et vocabulaire
 

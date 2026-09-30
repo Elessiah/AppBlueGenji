@@ -102,14 +102,31 @@ Trois conditions de plus que la permission :
   vérifié : quand l'appariement arrive et compte l'équipe du caster, son
   inscription est retirée (`adoptCurrentPairing`), et d'ici là le rôle de joueur
   prime partout (`resolveMatchParty`) ;
-- un seul caster par match (`MATCH_ALREADY_CASTED`).
+- un seul caster par match (`MATCH_ALREADY_CASTED`) — sauf si le titulaire ne
+  remplit plus la condition du cast et que le match n'est pas lancé : sa place
+  est alors reprise par le nouvel inscrit. L'instantané du plateau le tait
+  déjà (`casterWithdrawn`, sur la condition relue par la même jointure que son
+  pseudo), si bien que la carte rouvre « 🎙 Caster » — au prochain instantané :
+  retirer un rôle ne publie aucun évènement de tournoi.
 
 Rien d'autre n'est exigé : tout porteur de `live` peut caster n'importe quel
 match non terminé et en recevoir les contacts — droit de diffusion
 confié par le staff, exposition déclarée (`PRIVACY_CHANGES`
-`2026-09-lancement-des-matchs`, registre T04). Retirer `live` ne défait pas
-les inscriptions déjà prises : c'est l'arbitrage qui retire le caster d'un
-match. Voir `docs/AUTHORIZATION_RULES.md` §4.5.
+`2026-09-lancement-des-matchs`, registre T04). La condition vaut **tant que
+dure l'inscription**, pas seulement à l'inscription : un caster qui perd `live`,
+décertifie son tag, détache Battle.net ou supprime son compte ne reçoit plus
+aucun contact. `GET /api/me/match-launches` la rejoue à chaque lecture
+(`castEligibilityBlock`, sur les rôles et l'identité **relus en base**) — qu'il
+la fasse lui-même ou qu'un joueur du match la fasse : le caster disparaît de la
+réponse, et son inscription est ensuite retirée (`releaseIneligibleCast`, sous
+verrou et après relecture — un compte redevenu éligible entre-temps garde la
+sienne), si bien que le lancement n'attend plus son « Prêt ». Sur un match
+**déjà lancé**, rien n'attend plus : l'inscription reste (on ne retire pas un
+caster en pleine diffusion pour un tag retouché), seuls ses contacts sont tus. Les deux autres
+chemins d'un caster suivent la même règle (`lib/server/tournaments/cast-eligibility.ts`) :
+son « Prêt » est refusé (`resolveMatchParty` → `NOT_MATCH_PARTY`) et le
+balayage des notifications ne l'appelle plus au départ du match. Voir
+`docs/AUTHORIZATION_RULES.md` §4.5.
 
 Le motif voyage dans `TournamentViewerContext.castBlock`, par les deux portes
 (flux et lecture REST). L'ancien libellé « ＋ Caster » du bandeau de diffusion,

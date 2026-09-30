@@ -27,6 +27,7 @@ import {
   type MatchLaunchInput,
 } from "@/lib/shared/match-launch";
 import type { MatchStatus, TeamRole } from "@/lib/shared/types";
+import { casterIdentityOf, loadCastEligibility, type CasterIdentityRow } from "./cast-eligibility";
 import { publishMatchUpdatedEvent } from "./notifications";
 
 export type LaunchMatchRow = RowDataPacket & {
@@ -234,6 +235,9 @@ export async function resolveMatchParty(
   const team = await resolveTeamParty(connection, match, userId);
   if (team) return team;
   if (match.caster_user_id !== null && Number(match.caster_user_id) === userId) {
+    // Une inscription ne vaut que tant que son titulaire remplit la condition
+    // du cast : un compte privé de `live` ou d'identité ne déclare plus rien.
+    if ((await loadCastEligibility(connection, userId)) !== null) return null;
     return { role: "CASTER", canDeclareReady: true };
   }
   return null;
@@ -362,14 +366,6 @@ export async function forceLaunchMatch(matchId: number): Promise<void> {
   publishMatchUpdatedEvent(tournamentId);
 }
 
-type CasterIdentityRow = RowDataPacket & {
-  discord_verified_at: Date | string | null;
-  discord_pseudo: string | null;
-  blizzard_sub: string | null;
-  overwatch_battletag: string | null;
-  is_deleted: number;
-};
-
 /** Identité d'un caster telle que la règle de `castBlockReason` la lit. */
 export async function loadCasterIdentity(
   connection: PoolConnection,
@@ -380,12 +376,7 @@ export async function loadCasterIdentity(
      FROM bg_users WHERE id = ? LIMIT 1`,
     [userId],
   );
-  const row = rows[0];
-  if (!row || Number(row.is_deleted) === 1) return { discordVerified: false, blizzardLinked: false };
-  return {
-    discordVerified: row.discord_verified_at !== null && Boolean(row.discord_pseudo),
-    blizzardLinked: row.blizzard_sub !== null && Boolean(row.overwatch_battletag),
-  };
+  return casterIdentityOf(rows[0]);
 }
 
 /**
@@ -424,8 +415,16 @@ export async function claimMatchCast(
     if (row.status === "COMPLETED") throw new Error("MATCH_ALREADY_COMPLETED");
     if (Number(row.is_bye) === 1) throw new Error("MATCH_NOT_LAUNCHABLE");
     if (row.caster_user_id !== null) {
-      if (Number(row.caster_user_id) === userId) return Number(row.tournament_id);
-      throw new Error("MATCH_ALREADY_CASTED");
+      const holder = Number(row.caster_user_id);
+      if (holder === userId) return Number(row.tournament_id);
+      // Une inscription dont le titulaire ne remplit plus la condition du cast
+      // ne retient pas le match : sans quoi elle le bloquerait jusqu'à ce qu'un
+      // joueur ouvre la modale de lancement. Jamais sur un match lancé, où l'on
+      // ne remplace pas un caster en pleine diffusion.
+      const displaceable =
+        matchLaunchPhase(toLaunchInput(row), Date.now()) !== "LAUNCHED" &&
+        (await loadCastEligibility(connection, holder)) !== null;
+      if (!displaceable) throw new Error("MATCH_ALREADY_CASTED");
     }
     const party = await resolveMatchParty(connection, row, userId);
     if (party) throw new Error("CASTER_IS_PLAYER");
@@ -464,6 +463,42 @@ export async function releaseMatchCast(
     return Number(row.tournament_id);
   });
   publishMatchUpdatedEvent(tournamentId);
+}
+
+/**
+ * Retire l'inscription d'un caster qui ne remplit plus la condition de
+ * `castBlockReason` (permission `live` retirée, tag décertifié, Battle.net
+ * détaché, compte supprimé). Tout est **relu sous verrou** : si l'inscription a
+ * changé de titulaire, si le match a été lancé ou joué, ou si le compte est redevenu
+ * éligible entre la lecture et l'écriture, rien n'est fait. Comme au retrait volontaire, un match qui
+ * n'attendait plus que ce caster part.
+ *
+ * @returns vrai si l'inscription a été retirée.
+ */
+export async function releaseIneligibleCast(matchId: number, casterId: number): Promise<boolean> {
+  let tournamentId: number | null = null;
+  await inTransaction(async (connection) => {
+    const row = await lockLaunchMatch(connection, matchId);
+    if (!row || row.caster_user_id === null || Number(row.caster_user_id) !== casterId) return;
+    // Seul un match qui attend encore son lancement est concerné. Un match
+    // lancé n'attend plus aucun « Prêt » (l'inscription y reste, la lecture
+    // des contacts la tait) ; un match joué entre la lecture et ce verrou est
+    // de l'histoire, qu'on ne réécrit pas.
+    if (row.status === "COMPLETED") return;
+    const phase = matchLaunchPhase(toLaunchInput(row), Date.now());
+    if (phase !== "SCHEDULED" && phase !== "LOBBY") return;
+    if ((await loadCastEligibility(connection, casterId)) === null) return;
+
+    await connection.execute(
+      `UPDATE bg_matches SET caster_user_id = NULL, caster_ready_at = NULL WHERE id = ? AND caster_user_id = ?`,
+      [matchId, casterId],
+    );
+    if (row.tournament_state === "RUNNING") await launchIfAllReady(connection, matchId);
+    tournamentId = Number(row.tournament_id);
+  });
+  if (tournamentId === null) return false;
+  publishMatchUpdatedEvent(tournamentId);
+  return true;
 }
 
 /**

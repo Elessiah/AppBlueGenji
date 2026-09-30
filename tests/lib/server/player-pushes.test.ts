@@ -36,7 +36,15 @@ const LOBBY_MATCH = {
 type Db = { query: jest.Mock<SqlQuery>; execute: jest.Mock<SqlQuery> };
 
 /** `query` rend les candidats ; `execute` rejoue les réservations (`claims`) et l'existence d'une annonce. */
-function mockDb(candidates: unknown[], options: { claims?: boolean[]; lobbyAnnounced?: boolean } = {}): Db {
+function mockDb(
+  candidates: unknown[],
+  options: {
+    claims?: boolean[];
+    lobbyAnnounced?: boolean;
+    casters?: Record<string, unknown>[];
+    castersFail?: boolean;
+  } = {},
+): Db {
   const claims = [...(options.claims ?? [])];
   const query = jest.fn<SqlQuery>().mockResolvedValue([candidates]);
   const execute = jest.fn<SqlQuery>(async (sql) => {
@@ -44,6 +52,10 @@ function mockDb(candidates: unknown[], options: { claims?: boolean[]; lobbyAnnou
       return [{ affectedRows: (claims.length > 0 ? claims.shift() : true) ? 1 : 0 }];
     }
     if (sql.includes("SELECT 1 FROM bg_match_start_notices")) return [options.lobbyAnnounced ? [{}] : []];
+    if (sql.includes("FROM bg_users WHERE id IN")) {
+      if (options.castersFail) throw new Error("DB_DOWN");
+      return [options.casters ?? []];
+    }
     throw new Error(`requête inattendue : ${sql}`);
   });
   jest.mocked(getDatabase).mockResolvedValue(fakePool({ query, execute }));
@@ -134,10 +146,36 @@ describe("dispatchMatchStartNotices", () => {
     expect(execute.mock.calls.some(([sql]) => sql.startsWith("INSERT"))).toBe(false);
   });
 
+  const caster = (overrides: Record<string, unknown> = {}) => ({
+    id: 99,
+    discord_verified_at: new Date(),
+    discord_pseudo: "caster",
+    blizzard_sub: "sub",
+    overwatch_battletag: "Caster#1",
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["CASTER"]),
+    ...overrides,
+  });
+
   it("prévient aussi le caster inscrit", async () => {
-    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }]);
+    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { casters: [caster()] });
     await dispatchMatchStartNotices();
     expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20], [99]]);
+  });
+
+  it("prévient les joueurs même si la lecture des casters échoue", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { castersFail: true });
+    await dispatchMatchStartNotices();
+    expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20]]);
+    error.mockRestore();
+  });
+
+  it("ne prévient pas un caster inscrit qui ne remplit plus la condition", async () => {
+    mockDb([{ ...LOBBY_MATCH, caster_user_id: 99 }], { casters: [caster({ platform_roles_json: null })] });
+    await dispatchMatchStartNotices();
+    expect(pushes().map((p) => p.userIds)).toEqual([[10, 11], [20]]);
   });
 
   it("ne nomme aucun joueur en tournoi individuel", async () => {

@@ -1807,6 +1807,25 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   );
   const outcome: DeletedAccountsReconciliation = { erased: 0, renamed: 0, failed: 0 };
 
+  // L'anonymisation efface désormais la dernière acceptation des conditions
+  // d'utilisation ; les comptes anonymisés avant la règle la gardent encore.
+  // Une instruction idempotente et non un nouveau passage d'`anonymizeAccount`,
+  // qui leur tirerait un autre pseudo d'emprunt — le seul nom sous lequel
+  // leurs anciens adversaires les retrouvent. Un échec ne bloque pas le reste.
+  try {
+    await db.execute(
+      `UPDATE bg_users
+          SET terms_version = NULL, terms_accepted_at = NULL
+        WHERE is_deleted = 1
+          AND (terms_version IS NOT NULL OR terms_accepted_at IS NOT NULL)`,
+    );
+  } catch (error) {
+    console.error(
+      "[deleted-accounts] Effacement des acceptations des conditions reporté au prochain démarrage :",
+      error instanceof Error ? error.message : error,
+    );
+  }
+
   for (const candidate of candidates) {
     const userId = Number(candidate.id);
     const connection = await db.getConnection();
@@ -1891,7 +1910,8 @@ const ANONYMOUS_PSEUDO_ATTEMPTS = 5;
  * L'anonymisation : la ligne reste — ses matchs et son palmarès en dépendent —,
  * sous un **pseudo d'emprunt** (`lib/shared/anonymous-pseudos.ts`), et tout ce
  * qui désigne une personne part : tags de jeu et Discord, identités de
- * connexion, avatar, majorité, rôles de plateforme, consentements. Rien ne
+ * connexion, avatar, majorité, rôles de plateforme, consentements et
+ * acceptation des conditions d'utilisation. Rien ne
  * relie plus la ligne à quelqu'un ; c'est la fiche du joueur qui annonce le
  * compte supprimé, jamais le nom, qu'un plateau affiche sans contexte.
  *
@@ -1942,6 +1962,12 @@ async function anonymizeAccount(connection: PoolConnection, userId: number): Pro
              -- personne derrière le pseudo d'emprunt aussi sûrement que son nom.
              is_admin = 0,
              platform_roles_json = NULL,
+             -- La dernière acceptation des conditions part avec leur détail
+             -- (bg_terms_acceptances, effacé plus bas) : un compte qui ne peut
+             -- plus rien faire n'a plus d'acceptation à prouver, et une version
+             -- datée restée seule serait une trace de plus sans objet.
+             terms_version = NULL,
+             terms_accepted_at = NULL,
              is_deleted = 1
          WHERE id = ?`,
         [pseudo, userId],
