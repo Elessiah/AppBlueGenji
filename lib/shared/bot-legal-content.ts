@@ -473,7 +473,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Journaux" },
           {
             kind: "p",
-            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit pas de pseudo de lui-même : le motif d'une exclusion, texte libre du modérateur, peut en citer un, et une erreur de remise d'un message privé peut mentionner le compte visé.",
+            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant de personne. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit plus de pseudo de lui-même (les messages antérieurs au 30 septembre 2026 peuvent en citer) : le motif d'une exclusion, texte libre du modérateur, peut en citer un, et une erreur de remise d'un message privé peut mentionner le compte visé.",
           },
           { kind: "subhead", text: "Base légale" },
           {
@@ -491,7 +491,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Suivi des annonces relayées** (identifiants, date) : ${BOT_RELAY_RETENTION_DAYS} jours ; il est effacé au premier relais qui suit cette échéance, et au plus tard dans la nuit ou au redémarrage du Bot. Les copies publiées dans les salons partenaires restent sur Discord (section 02).`,
-              `**Scrims et recrutement** : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours avec l'identifiant de l'auteur ; lors du ménage de la nuit qui suit (ou d'un redémarrage du Bot), l'identifiant de l'auteur est effacé et les lignes sont repliées en nombres par jour, serveur et niveau (ou rôle), gardés pour les compteurs d'activité.`,
+              `**Scrims et recrutement** : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours avec l'identifiant de l'auteur ; lors du ménage de la nuit qui suit (ou d'un redémarrage du Bot), l'identifiant de l'auteur est effacé et les lignes sont repliées en nombres par jour, serveur et niveau (ou rôle), gardés sans limite de durée comme historique de l'activité du Bot.`,
               "**Exclusions** : l'enregistrement de l'exclusion, jusqu'à sa levée ; les avis publiés au salon de journal privé du staff et le motif copié en message privé au titulaire du Bot restent après la levée, sans suppression automatique à ce jour.",
               "**Configuration des serveurs** (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du Bot, modules activés) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du Bot du serveur, qui l'efface. Un départ survenu pendant une interruption du Bot, que Discord ne lui signale pas, est rattrapé à son redémarrage.",
               "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés, qui les efface — départ survenu pendant une interruption compris, rattrapé au redémarrage.",
@@ -676,7 +676,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Logs" },
           {
             kind: "p",
-            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot writes no username there on its own: the reason for an exclusion, free text written by the moderator, may quote one, and a failed direct-message delivery may mention the account concerned.",
+            text: "The public activity feed on the bot's page contains no personal identifier. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot no longer writes usernames there on its own (messages from before 30 September 2026 may quote some): the reason for an exclusion, free text written by the moderator, may quote one, and a failed direct-message delivery may mention the account concerned.",
           },
           { kind: "subhead", text: "Legal basis" },
           {
@@ -694,7 +694,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Tracking of relayed advertisements** (IDs, date): ${BOT_RELAY_RETENTION_DAYS} days; it is erased at the first relay after that deadline, and at the latest during the night or when the Bot restarts. The copies posted in partner channels remain on Discord (section 02).`,
-              `**Scrims and recruitment**: ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days with the author's ID; at the clean-up of the following night (or a restart of the Bot), the author's ID is erased and the rows are folded into counts per day, server and level (or role), kept for the activity counters.`,
+              `**Scrims and recruitment**: ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} days with the author's ID; at the clean-up of the following night (or a restart of the Bot), the author's ID is erased and the rows are folded into counts per day, server and level (or role), kept with no time limit as a history of the Bot's activity.`,
               "**Exclusions**: the exclusion record, until it is lifted; the notices posted in the staff's private log channel and the reason copied by direct message to the Bot's owner remain after it is lifted, with no automatic deletion at present.",
               "**Server configuration** (relayed channels and their rank filters, the invite and the referee role with the ID of whoever set them, the Bot administration role, enabled modules): until the administrators remove it, and at the latest until the Bot leaves the server, which erases it. A departure while the Bot is down, which Discord does not notify, is caught up when it restarts.",
               "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them — including a departure while the Bot is down, caught up when it restarts.",
