@@ -5,8 +5,8 @@
  * `lib/shared/privacy-changes.ts` est chargé par la modale des changements,
  * rendue sur chaque page : importer le registre (`processing-register.ts`) ou
  * les conditions d'utilisation (`terms-of-use.ts`) pour y lire un nombre ferait
- * télécharger tout leur texte à chaque visiteur. Les deux modules réexportent
- * ces constantes : on peut les importer de l'un ou de l'autre.
+ * télécharger tout leur texte à chaque visiteur. `terms-of-use.ts` réexporte
+ * `SITE_MINIMUM_AGE`, `processing-register.ts` les deux durées du registre.
  */
 
 /**
