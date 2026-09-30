@@ -18,7 +18,9 @@ import { SITE_HOST } from "@/lib/shared/site-host";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  BOT_COPYRIGHT_HOLDER,
   BOT_MINIMUM_AGE,
+  BOT_SOURCE_URL,
   HEBERGEUR_HREF,
   PRIVACY_POLICY,
   TERMS_OF_SERVICE,
@@ -294,5 +296,61 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(retention).toContain(`${BOT_LINK_CODE_VALIDITY_MINUTES} minutes`);
     expect(retention).toContain(`${BACKUP_RETENTION_DAYS} jours`);
     expect((t08?.recipients ?? []).join(" ")).toContain("/stats");
+  });
+
+  // blueGenjiBot#31 : `Bdd.forgetGuild`, appelé sur `guildDelete`, efface
+  // invitation, rôles d'arbitrage et d'administration, modules, rappels
+  // d'adhésion et filtres de rang — les textes ne peuvent plus dire « ils restent ».
+  it("says the server configuration is erased when the Bot leaves, in both languages and in T08", () => {
+    const retentionOf = (lang: "fr" | "en") =>
+      PRIVACY_POLICY[lang].sections
+        .flatMap((section) => section.blocks)
+        .flatMap((block) => (block.kind === "bullets" ? block.items : []));
+    const fr = retentionOf("fr").join(" | ");
+    const en = retentionOf("en").join(" | ");
+    expect(fr).not.toContain("ils restent si le Bot quitte le serveur");
+    expect(en).not.toContain("they remain if the Bot leaves the server");
+    expect(fr).toContain("au plus tard jusqu'au départ du Bot du serveur, qui l'efface");
+    expect(en).toContain("at the latest until the Bot leaves the server, which erases it");
+    for (const item of ["filtres de rang", "rôle d'administration du Bot", "modules activés"]) {
+      expect(fr).toContain(item);
+    }
+    for (const item of ["rank filters", "Bot administration role", "enabled modules"]) {
+      expect(en).toContain(item);
+    }
+    // Discord ne signale pas un retrait survenu bot arrêté : la réserve est dite.
+    expect(fr).toContain("pendant une interruption du Bot");
+    expect(en).toContain("while it is down");
+    // Les rappels d'adhésion partent avec la configuration du serveur.
+    expect(fr).toMatch(/\*\*Adhésions et rappels programmés\*\*[^|]*départ du Bot du serveur/);
+    expect(en).toMatch(/\*\*Memberships and scheduled reminders\*\*[^|]*the Bot leaves the server/);
+
+    const t08 = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08")?.retention ?? []).join(" | ");
+    expect(t08).not.toContain("conservés sans limite si le bot quitte le serveur");
+    expect(t08).toContain("au plus tard jusqu'au départ du bot du serveur, qui l'efface");
+    expect(t08).toMatch(/Adhésions et rappels programmés[^|]*départ du bot du serveur/);
+  });
+
+  it("cites the Bot's AGPL-3.0 licence and links its public repository, in both languages", () => {
+    expect(BOT_SOURCE_URL).toBe("https://github.com/Elessiah/blueGenjiBot");
+    expect(BOT_COPYRIGHT_HOLDER).toBe("Keryan Houssin");
+    const frSection = TERMS_OF_SERVICE.fr.sections.find((section) => section.meta === "LICENCE");
+    const enSection = TERMS_OF_SERVICE.en.sections.find((section) => section.meta === "LICENCE");
+    expect(frSection?.title).toBe("Code source et licence");
+    expect(enSection?.title).toBe("Source code and licence");
+    expect(frSection?.num).toBe(enSection?.num);
+    for (const section of [frSection, enSection]) {
+      const flat = JSON.stringify(section);
+      expect(flat).toContain("AGPL-3.0-only");
+      expect(flat).toContain("GNU Affero General Public License");
+      expect(flat).toContain(`](${BOT_SOURCE_URL})`);
+      expect(flat).toContain(`© 2026 ${BOT_COPYRIGHT_HOLDER}`);
+    }
+    // La licence ne couvre ni l'identité de l'association ni les données.
+    expect(JSON.stringify(frSection)).toContain("l'identité visuelle de l'association");
+    expect(JSON.stringify(enSection)).toContain("the association's name, logo or visual identity");
+    // Section placée avant « Contact », qui reste la dernière.
+    expect(TERMS_OF_SERVICE.fr.sections.at(-1)?.meta).toBe("CONTACT");
+    expect(TERMS_OF_SERVICE.en.sections.at(-1)?.meta).toBe("CONTACT");
   });
 });
