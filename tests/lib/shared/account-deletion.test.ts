@@ -68,12 +68,13 @@ describe("accountRetentionReason", () => {
 
   it("préfère le tournoi joué : c'est la trace qui appartient aussi aux autres", () => {
     expect(accountRetentionReason({
+      ...nothing,
       playedMatches: true,
       organizedTournaments: true,
       ownedTeams: true,
     })).toBe("TOURNAMENTS");
     expect(accountRetentionReason({
-      playedMatches: false,
+      ...nothing,
       organizedTournaments: true,
       ownedTeams: true,
     })).toBe("ORGANIZED_TOURNAMENTS");
