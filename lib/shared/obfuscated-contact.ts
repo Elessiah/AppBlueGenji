@@ -75,4 +75,14 @@ export function contactHref(kind: ContactKind, plain: string): string {
  */
 export const ASSOCIATION_EMAIL_ENCODED = "==QbvNmLslWYtdGQ0J3bwNXZppmbldWZ1xmY";
 export const ASSOCIATION_PHONE_ENCODED = "=MDMgIDNgkjMgMDOgcDM";
-export const SITE_HOST_PHONE_ENCODED = "=YTNgkDNgIjMgIDMgYDM";
+export const SITE_HOST_PHONE_ENCODED = "=YDNgkDNgIjMgIDMgYDM";
+
+/**
+ * Courriel de la **personne à contacter pour les demandes relatives aux
+ * données** — l'hébergeur (`DATA_CONTACT_NAME`, `lib/shared/legal-contact.ts`).
+ * Son téléphone est celui de l'hébergeur : il n'a qu'une valeur, donc qu'un
+ * encodage (`DATA_CONTACT_PHONE_ENCODED`), sans quoi une correction du numéro
+ * n'en réparerait qu'une copie.
+ */
+export const DATA_CONTACT_EMAIL_ENCODED = "==gcm5yav9Gb0V3bAhmLuFWeyV2a";
+export const DATA_CONTACT_PHONE_ENCODED = SITE_HOST_PHONE_ENCODED;

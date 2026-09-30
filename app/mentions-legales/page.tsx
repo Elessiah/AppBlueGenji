@@ -6,9 +6,19 @@ import { CyberButton } from "@/components/cyber";
 import styles from "./page.module.css";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { AUTHORITY_CONTACT_LANGUAGES, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
+import {
+  AUTHORITY_CONTACT_LANGUAGES,
+  DATA_CONTACT_NAME,
+  DATA_CONTACT_ROLE,
+  REPORT_FORM_NAME,
+} from "@/lib/shared/legal-contact";
 import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
-import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
+import {
+  ASSOCIATION_EMAIL_ENCODED,
+  ASSOCIATION_PHONE_ENCODED,
+  DATA_CONTACT_EMAIL_ENCODED,
+  DATA_CONTACT_PHONE_ENCODED,
+} from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
@@ -342,10 +352,19 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           2016/679), vous disposez d&apos;un droit d&apos;accès, de rectification, d&apos;effacement,
           de limitation et de portabilité des données vous concernant, ainsi que d&apos;un droit
           d&apos;opposition au traitement, et vous pouvez définir des directives relatives à leur
-          sort après votre décès (art. 85 de la loi Informatique et Libertés). Ces droits peuvent être exercés par le bouton « {REPORT_FORM_NAME} » en bas de
-          chaque page, catégorie « RGPD », ou au courriel de l&apos;association donné plus haut :
-          c&apos;est l&apos;association elle-même qui les traite, aucun délégué à la protection des
-          données ni référent n&apos;ayant été désigné. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
+          sort après votre décès (art. 85 de la loi Informatique et Libertés).
+        </p>
+        <p>
+          <strong>Personne à contacter pour vos demandes relatives à vos données :</strong>{" "}
+          {DATA_CONTACT_NAME}, {DATA_CONTACT_ROLE} — courriel :{" "}
+          <ProtectedContact encoded={DATA_CONTACT_EMAIL_ENCODED} kind="email" owner={`de ${DATA_CONTACT_NAME}`} />
+          , téléphone :{" "}
+          <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`de ${DATA_CONTACT_NAME}`} />
+          . Vos droits peuvent aussi être exercés par le bouton « {REPORT_FORM_NAME} » en bas de
+          chaque page, catégorie « RGPD », ou auprès de l&apos;association, par les coordonnées
+          données plus haut. Cette personne n&apos;est pas un délégué à la protection des données
+          au sens de l&apos;article 37 du RGPD : l&apos;association reste responsable du
+          traitement. Le détail des traitements, leurs durées et leur registre figurent dans la{" "}
           <Link href="/rgpd">politique de confidentialité</Link>.
         </p>
       </>

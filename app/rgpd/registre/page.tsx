@@ -113,7 +113,7 @@ export default function RegistrePage() {
           <tbody>
             <Field label="Responsable du traitement" items={`${controller.name} — ${controller.legalForm}, ${controller.seat}`} />
             <Field label="Contact" items={controller.contact} />
-            <Field label="Délégué à la protection des données" items={controller.dpo} />
+            <Field label="Personne à contacter pour les demandes relatives aux données" items={controller.dataContact} />
             <Field label="Hébergeur (sous-traitant)" items={controller.host} />
           </tbody>
         </table>

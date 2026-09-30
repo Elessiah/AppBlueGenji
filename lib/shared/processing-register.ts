@@ -31,7 +31,13 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } f
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
-import { ASSOCIATION_NAME, ASSOCIATION_SEAT, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
+import {
+  ASSOCIATION_NAME,
+  ASSOCIATION_SEAT,
+  DATA_CONTACT_NAME,
+  DATA_CONTACT_ROLE,
+  RGPD_CONTACT_LINE,
+} from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
 export const REGISTER_UPDATED_AT = "2026-09-30";
@@ -148,7 +154,12 @@ export interface RegisterController {
   seat: string;
   /** Moyens de joindre le responsable — aucune adresse en clair (`lib/shared/legal-contact.ts`). */
   contact: string;
-  dpo: string;
+  /**
+   * Personne à contacter pour les demandes relatives aux données. Jamais un
+   * « délégué à la protection des données » : la fonction de l'article 37
+   * n'est pas la sienne, et la rubrique le dit.
+   */
+  dataContact: string;
   /** Hébergeur du site, sous-traitant : il héberge les données de tous les traitements. */
   host: string;
 }
@@ -179,7 +190,7 @@ export function registerController(): RegisterController {
     legalForm: "Association loi 1901",
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE,
-    dpo: "Aucun délégué à la protection des données ni référent désigné : l'association traite elle-même les demandes (contact ci-dessus)",
+    dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées : contact ci-dessus). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
     host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
@@ -672,7 +683,7 @@ export const REGISTER_EXPORT_COLUMNS = [
   "Nom du traitement",
   "Date de mise à jour",
   "Responsable du traitement",
-  "Délégué à la protection des données",
+  "Personne à contacter pour les demandes relatives aux données",
   "Hébergeur (sous-traitant)",
   "Finalité principale",
   "Sous-finalités",
@@ -721,7 +732,7 @@ export function registerToCsv(
     a.name,
     REGISTER_UPDATED_AT,
     controllerText,
-    controller.dpo,
+    controller.dataContact,
     controller.host,
     a.purpose,
     listCell(a.subPurposes),

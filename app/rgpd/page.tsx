@@ -14,9 +14,17 @@ import {
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
+  DATA_CONTACT_LABEL,
+  DATA_CONTACT_NAME,
+  DATA_CONTACT_ROLE,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
-import { ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED } from "@/lib/shared/obfuscated-contact";
+import {
+  ASSOCIATION_EMAIL_ENCODED,
+  ASSOCIATION_PHONE_ENCODED,
+  DATA_CONTACT_EMAIL_ENCODED,
+  DATA_CONTACT_PHONE_ENCODED,
+} from "@/lib/shared/obfuscated-contact";
 import { ProtectedContact } from "@/components/ui/protected-contact";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { getCurrentUser } from "@/lib/server/auth";
@@ -135,8 +143,16 @@ export default async function RgpdPage() {
             <ProtectedContact encoded={ASSOCIATION_PHONE_ENCODED} kind="phone" owner="de l'association" />
           </p>
           <p>
-            Pour toute question relative à vos données personnelles, contactez-nous
-            par les moyens indiqués en section&nbsp;11.
+            {DATA_CONTACT_LABEL} : <strong>{DATA_CONTACT_NAME}</strong>, {DATA_CONTACT_ROLE}.
+            Courriel :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_EMAIL_ENCODED} kind="email" owner={`de ${DATA_CONTACT_NAME}`} />
+            {" · "}Téléphone :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`de ${DATA_CONTACT_NAME}`} />
+          </p>
+          <p>
+            Il n&apos;est pas délégué à la protection des données au sens de l&apos;article 37 du
+            RGPD : l&apos;association reste responsable du traitement. Les autres moyens de
+            faire une demande sont indiqués en section&nbsp;11.
           </p>
         </div>
       </section>
@@ -826,7 +842,7 @@ export default async function RgpdPage() {
       </section>
 
       {/* SECTION 11 — CONTACT */}
-      <section className={styles.section}>
+      <section id="exercer-vos-droits" className={styles.section}>
         <header className={styles.head}>
           <div>
             <span className="eyebrow">SECTION 11</span>
@@ -837,22 +853,33 @@ export default async function RgpdPage() {
         <div className={styles.prose}>
           <p>
             Pour exercer l'un de vos droits ou poser une question relative au
-            traitement de vos données, contactez l&apos;association par le
-            formulaire « {REPORT_FORM_NAME} », présent en bas de chaque page,
-            catégorie <strong>RGPD</strong> — ou par son courriel (section&nbsp;01). Nous
-            répondons dans un délai maximum d'<strong>un mois</strong> (art. 12 RGPD).
+            traitement de vos données, écrivez ou téléphonez à la personne que
+            l&apos;association a chargée de ces demandes, <strong>{DATA_CONTACT_NAME}</strong>,{" "}
+            {DATA_CONTACT_ROLE} (coordonnées ci-dessous). Le formulaire
+            « {REPORT_FORM_NAME} », présent en bas de chaque page, catégorie{" "}
+            <strong>RGPD</strong>, et les coordonnées de l&apos;association (section&nbsp;01)
+            restent aussi ouverts. Nous répondons dans un délai maximum
+            d'<strong>un mois</strong> (art. 12 RGPD).
           </p>
           <p>
-            L&apos;association n&apos;a désigné ni délégué à la protection des données ni
-            référent : c&apos;est elle qui reçoit et traite vos demandes.
+            Cette personne n&apos;est pas un délégué à la protection des données au sens de
+            l&apos;article 37 du RGPD : l&apos;association reste responsable du traitement et
+            de la réponse apportée à votre demande.
           </p>
         </div>
         <div className={styles.contactBlock} style={{ marginTop: 24 }}>
-          <span className={styles.contactLabel}>Contact RGPD</span>
-          <span className={styles.contactValue}>Formulaire « {REPORT_FORM_NAME} », catégorie RGPD</span>
+          <span className={styles.contactLabel}>{DATA_CONTACT_LABEL}</span>
+          <span className={styles.contactValue}>
+            {DATA_CONTACT_NAME}, {DATA_CONTACT_ROLE}
+          </span>
           <span className={styles.contactSub}>
-            Ou par courriel :{" "}
-            <ProtectedContact encoded={ASSOCIATION_EMAIL_ENCODED} kind="email" owner="de l'association" />
+            Courriel :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_EMAIL_ENCODED} kind="email" owner={`de ${DATA_CONTACT_NAME}`} />
+            {" · "}Téléphone :{" "}
+            <ProtectedContact encoded={DATA_CONTACT_PHONE_ENCODED} kind="phone" owner={`de ${DATA_CONTACT_NAME}`} />
+          </span>
+          <span className={styles.contactSub}>
+            Ou formulaire « {REPORT_FORM_NAME} », catégorie RGPD :
           </span>
           <div style={{ marginTop: 12 }}>
             <ReportProblemButton

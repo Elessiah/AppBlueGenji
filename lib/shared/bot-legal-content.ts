@@ -24,6 +24,7 @@ import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
+  DATA_CONTACT_NAME,
   LEGAL_CONTACT_DISCORD,
   REPORT_FORM_NAME,
 } from "@/lib/shared/legal-contact";
@@ -81,11 +82,21 @@ const CONTACT_ITEMS_EN = [
   `**Discord**: ${CONTACT_DISCORD} (the association's technical host)`,
   `The association's email address and phone number: see the [legal notice](${LEGAL_NOTICE_HREF})`,
 ];
-// Contact de la politique de confidentialité : l'exercice des droits va à
-// l'association, qui n'a désigné ni délégué ni référent — l'hébergeur
-// technique n'y figure pas (`lib/shared/legal-contact.ts`).
-const PRIVACY_CONTACT_ITEMS_FR = CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**"));
-const PRIVACY_CONTACT_ITEMS_EN = CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**"));
+// Contact de la politique de confidentialité : la personne chargée par
+// l'association des demandes relatives aux données (l'hébergeur technique,
+// `DATA_CONTACT_NAME`) vient en tête. Ses coordonnées ne s'écrivent pas ici —
+// une page Markdown ne sait pas les révéler au clic — : on renvoie à la section
+// du site qui le fait. Le tag Discord de l'hébergeur reste hors de cette liste,
+// il ne sert qu'aux questions techniques (`lib/shared/legal-contact.ts`).
+const SITE_RIGHTS_HREF = `${SITE_PRIVACY_HREF}#exercer-vos-droits`;
+const PRIVACY_CONTACT_ITEMS_FR = [
+  `Personne à contacter pour vos demandes relatives à vos données : **${DATA_CONTACT_NAME}**, hébergeur technique du site — courriel et téléphone dans la [politique de confidentialité du site](${SITE_RIGHTS_HREF}). Ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD : l'association reste responsable du traitement`,
+  ...CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**")),
+];
+const PRIVACY_CONTACT_ITEMS_EN = [
+  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller`,
+  ...CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**")),
+];
 
 const HOSTING_FR = {
   meta: "HÉBERGEUR",
@@ -375,7 +386,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle n'a désigné ni délégué à la protection des données ni référent. Les moyens de la joindre figurent à la section Contact.`,
+            text: `Le responsable du traitement est l'association **${ASSOCIATION_NAME}**, association loi 1901 dont le siège est situé au ${ASSOCIATION_SEAT}. Elle a chargé **${DATA_CONTACT_NAME}**, hébergeur technique du site, de recevoir les demandes relatives à vos données ; ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD. Les moyens de les joindre figurent à la section Contact.`,
           },
           {
             kind: "p",
@@ -580,7 +591,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `The data controller is the association **${ASSOCIATION_NAME}**, a French non-profit association under the law of 1901 whose registered office is at ${ASSOCIATION_SEAT}. It has appointed neither a data protection officer nor a privacy contact person. The means of contacting it are listed in the Contact section.`,
+            text: `The data controller is the association **${ASSOCIATION_NAME}**, a French non-profit association under the law of 1901 whose registered office is at ${ASSOCIATION_SEAT}. It has put **${DATA_CONTACT_NAME}**, the website's technical host, in charge of receiving requests about your data; this person is not a data protection officer within the meaning of Article 37 GDPR. The means of contacting them are listed in the Contact section.`,
           },
           {
             kind: "p",

@@ -47,6 +47,7 @@ import { TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS } from "@/lib/shared/team-join-
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { SITE_VISIT_DETAIL_RETENTION_DAYS } from "@/lib/shared/site-visits";
+import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE, REPORT_FORM_NAME } from "@/lib/shared/legal-contact";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
   BACKUP_RETENTION_DAYS,
@@ -460,6 +461,24 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#audience", label: "Lire la section « Mesure d'audience »" },
       { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
     ],
+  },
+  // Une personne est désormais chargée des demandes relatives aux données :
+  // l'hébergeur technique du site, là où la politique disait qu'aucune n'était
+  // désignée. Le traitement ne change pas, mais le moyen d'exercer ses droits,
+  // si — c'est une information due à chaque compte. Entrée à part plutôt que
+  // quatrième point de `2026-10-rectificatifs-information`, qui annonce des
+  // corrections d'annonces passées : même date, donc même modale et même
+  // message privé.
+  {
+    id: "2026-10-contact-donnees",
+    publishedAt: "2026-10-01",
+    title: "Une personne à contacter pour tes données",
+    summary: `Pour exercer tes droits sur tes données ou poser une question à leur sujet, tu peux maintenant t'adresser directement à ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, par courriel ou par téléphone. Rien ne change dans le traitement de tes données.`,
+    details: [
+      `Ses coordonnées se lisent dans la politique de confidentialité et les mentions légales du site. Le formulaire « ${REPORT_FORM_NAME} », catégorie RGPD, et les coordonnées de l'association restent ouverts.`,
+      "Ce n'est pas un délégué à la protection des données au sens du RGPD : l'association reste responsable du traitement de tes données et de la réponse à tes demandes.",
+    ],
+    links: [{ href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" }],
   },
 ];
 
