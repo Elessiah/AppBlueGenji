@@ -514,6 +514,7 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
     // Un canal neuf, donc un destinataire neuf : l'entrée ne dit pas que rien ne change.
     expect(text()).not.toMatch(/Rien ne change/);
     expect(text()).toContain("hébergée par Microsoft (Outlook.com, possibles transferts vers les États-Unis)");
+    expect(text()).toContain("passe par son opérateur téléphonique");
   });
 
   it("tient dans un message privé à elle seule, et renvoie à la section des droits", () => {

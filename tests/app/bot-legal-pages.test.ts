@@ -107,8 +107,8 @@ describe("bot legal content carries the contact details", () => {
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("is not a data protection officer within the meaning of Article 37");
     // Une demande par courriel passe par la messagerie Outlook.com de l'hébergeur :
     // la politique ne peut plus dire que Microsoft ne reçoit que du chiffré.
-    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("lui parvient en clair");
-    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("reaches it unencrypted");
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("lui parviennent en clair");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("reach it unencrypted");
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("L'opérateur téléphonique de l'hébergeur technique");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("The technical host's phone operator");
     // …et renvoie à la politique du site, qui décrit ce traitement (base légale, durée).
