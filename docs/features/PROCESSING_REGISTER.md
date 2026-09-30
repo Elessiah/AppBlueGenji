@@ -9,7 +9,7 @@ joueur, le staff — sans demande à faire :
 | --- | --- |
 | `/rgpd/registre` | Le registre en page : acteurs, puis une fiche par traitement |
 | `/rgpd/registre.csv` | Le même en tableur (une ligne par traitement) |
-| `/rgpd`, section « Registre des traitements » | Bouton de téléchargement et lien vers la page |
+| `/rgpd`, section « Registre des traitements » | Une ligne par fiche (finalité, base légale, conservation, lien vers la fiche), bouton de téléchargement et lien vers la page |
 
 ## Source unique
 
@@ -24,6 +24,23 @@ durées de conservation, destinataires, transferts hors UE, mesures de sécurit�
 plus la **base légale**, que le modèle ne demande pas mais qu'on attend de
 retrouver en cas de contrôle. Chaque traitement a une référence stable (`T01`…),
 qui sert d'ancre (`/rgpd/registre#t09`) et de repère dans une réponse à la CNIL.
+
+## Ce que le registre couvre — et ce qu'il ne couvre pas encore
+
+`/rgpd` ne recopie pas le registre : sa section « Registre des traitements »
+**le lit** (`PROCESSING_ACTIVITIES.map`), si bien qu'une fiche ajoutée paraît
+d'elle-même dans la politique. Elle ne couvrait qu'une partie des traitements
+tant qu'elle les résumait à la main.
+
+Le registre ne se dit plus exhaustif. `REGISTER_SCOPE` le borne au site et au
+bot Discord, et `REGISTER_NOT_YET_COVERED` nomme les activités que
+l'association mène hors du site sans fiche à ce jour (adhésions, portail de
+support Spiceworks, retransmission des matchs) : leurs bases légales, durées et
+transferts sont une **décision de l'association**, pas une déduction du code
+(voir `ERREUR.txt`). Les deux constantes servent `/rgpd` et `/rgpd/registre`.
+
+`T13` décrit la preuve d'acceptation des conditions d'utilisation
+(`bg_terms_acceptances`), table qui gardait une donnée personnelle sans fiche.
 
 ## Transferts : un mécanisme par destinataire
 

@@ -24,7 +24,7 @@ describe("DISCORD_TAG_AUDIENCE", () => {
   });
 
   it("borne l'arbitrage au tournoi — le besoin naît du tournoi et s'éteint avec lui", () => {
-    expect(DISCORD_TAG_AUDIENCE).toMatch(/tant que tu es engagé/i);
+    expect(DISCORD_TAG_AUDIENCE).toMatch(/tant que tu es inscrit à un tournoi qui n'est pas terminé/i);
   });
 
   it("ferme la liste : le tag n'est jamais public", () => {
@@ -42,6 +42,11 @@ describe("DISCORD_PLAYER_VISIBILITY_NOTICE", () => {
     // réglages », comme si la certification décidait aussi pour les joueurs.
     expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toMatch(/à l'organisation/i);
     expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toMatch(/pas aux autres joueurs/i);
+  });
+
+  it("borne l'arbitrage à l'inscription dans un tournoi non terminé, pas au seul tournoi en cours", () => {
+    expect(DISCORD_PLAYER_VISIBILITY_NOTICE).toMatch(/arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé/);
+    expect(DISCORD_TAG_AUDIENCE).toMatch(/dès l'ouverture des inscriptions/);
   });
 
   it("nomme la case qui ouvre le tag aux joueurs", () => {

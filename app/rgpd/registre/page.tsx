@@ -5,6 +5,8 @@ import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberButton } from "@/components/cyber";
 import {
   PROCESSING_ACTIVITIES,
+  REGISTER_NOT_YET_COVERED,
+  REGISTER_SCOPE,
   REGISTER_UPDATED_AT,
   registerController,
   type ProcessingActivity,
@@ -81,9 +83,11 @@ export default function RegistrePage() {
           Registre des<br />traitements
         </h1>
         <p style={{ marginTop: 20, fontSize: 15, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 580 }}>
-          La liste de tout ce que BlueGenji fait de données personnelles, rubrique par rubrique
-          selon le modèle de la CNIL. Elle est publique : chacun peut la consulter ou la
-          télécharger, sans compte et sans demande.
+          {REGISTER_SCOPE}, rubrique par rubrique selon le modèle de la CNIL. Il est public :
+          chacun peut le consulter ou le télécharger, sans compte et sans demande.
+        </p>
+        <p style={{ marginTop: 12, fontSize: 14, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 580 }}>
+          {REGISTER_NOT_YET_COVERED}
         </p>
         <div className={styles.registerActions}>
           <CyberButton asChild variant="primary">

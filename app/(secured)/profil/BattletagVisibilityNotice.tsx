@@ -97,8 +97,12 @@ export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) 
               lancer la partie.
             </li>
             <li>
-              <strong>Les arbitres et les administrateurs</strong> des tournois où tu es
-              engagé, le temps du tournoi.
+              <strong>Le caster de ton match</strong>, de son lancement à sa fin, si tu fais
+              partie des contacts présentés.
+            </li>
+            <li>
+              <strong>Les arbitres et les administrateurs</strong>, tant que tu es inscrit à un
+              tournoi qui n&apos;est pas terminé — dès l&apos;ouverture des inscriptions.
             </li>
           </ul>
 

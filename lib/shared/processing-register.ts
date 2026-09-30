@@ -168,6 +168,20 @@ const COMMON_SECURITY = [
   "Droits d'administration par rôle, limités à ce que chaque mission exige",
 ];
 
+/**
+ * Ce que le registre couvre, dit une fois pour `/rgpd` et `/rgpd/registre`.
+ *
+ * Il se disait exhaustif (« tout ce que BlueGenji fait de données
+ * personnelles ») alors qu'il ne décrit que le site et son bot : les activités
+ * que l'association mène ailleurs n'y ont pas encore de fiche. Les nommer vaut
+ * mieux qu'une promesse que le document ne tient pas.
+ */
+export const REGISTER_SCOPE =
+  "Le registre décrit les traitements de données personnelles du site et du bot Discord de l'association";
+
+export const REGISTER_NOT_YET_COVERED =
+  "Les journaux techniques du serveur web, et les activités que l'association mène hors du site — gestion des adhésions, portail de support (Spiceworks), retransmission des matchs —, n'y ont pas encore de fiche : pour toute question à leur sujet, utilisez les moyens de contact de la politique de confidentialité.";
+
 export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   {
     ref: "T01",
@@ -281,7 +295,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Contact des joueurs pendant un tournoi",
     purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait)",
     subPurposes: [
-      "Exposer le pseudo Discord certifié aux administrateurs, et aux arbitres tant que le joueur est engagé dans un tournoi en cours",
+      "Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé (dès la phase d'inscription)",
+      "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
       "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
       "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
       "Envoyer des rappels de match en message privé Discord (une semaine, 24 h et 1 h avant)",
@@ -547,6 +562,26 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Aucun pseudo de joueur dans une notification",
       "Services de push acceptés limités à ceux des navigateurs du marché",
     ],
+  },
+  {
+    ref: "T13",
+    name: "Acceptation des conditions d'utilisation",
+    purpose: "Garder la preuve que les conditions d'utilisation du site ont été acceptées, et laquelle de leurs versions",
+    subPurposes: [
+      "Recueillir l'acceptation à la création du compte, à la création d'une équipe et en recevant la gestion d'une équipe",
+      "Redemander l'acceptation quand les conditions changent de version",
+    ],
+    legalBasis: "Exécution du service demandé par le joueur (contrat)",
+    dataSubjects: ["Joueurs inscrits sur le site"],
+    dataCategories: ["Version acceptée, contexte de l'acceptation (création du compte, connexion, création ou gestion d'une équipe), date"],
+    sensitiveData: "Aucune",
+    retention: [
+      "Durée du compte",
+      "À la suppression : effacement complet si le compte est effacé ; s'il est anonymisé, le détail des acceptations est effacé, mais la dernière version acceptée et sa date restent attachées au compte anonymisé",
+    ],
+    recipients: ["Le joueur lui-même, par l'export de ses données", "Responsable technique de l'association, qui administre la base"],
+    transfers: ["Aucun"],
+    security: COMMON_SECURITY,
   },
 ];
 

@@ -254,6 +254,32 @@
   color: var(--ink-dim);
 }
 
+.registerSummary {
+  margin: 16px 0 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.history {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--ink-mute);
+}
+
+.history summary {
+  cursor: pointer;
+}
+
+.history ul {
+  margin: 8px 0 0;
+  padding: 0 0 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 @media (max-width: 680px) {
   .head {
     flex-direction: column;

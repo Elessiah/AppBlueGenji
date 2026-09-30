@@ -85,6 +85,24 @@ describe("PROCESSING_ACTIVITIES", () => {
     }
   });
 
+  it("déclare la preuve d'acceptation des conditions d'utilisation (bg_terms_acceptances)", () => {
+    const terms = byRef("T13");
+    expect(terms.name).toMatch(/conditions d'utilisation/);
+    expect(terms.dataCategories.join(" ")).toMatch(/Version acceptée/);
+    expect(terms.retention.join(" ")).toMatch(/Durée du compte/);
+    // `anonymizeAccount` efface `bg_terms_acceptances` mais pas
+    // `bg_users.terms_version` / `terms_accepted_at` : le registre le dit.
+    expect(terms.retention.join(" ")).toMatch(/dernière version acceptée et sa date restent attachées au compte anonymisé/);
+    expect(terms.transfers).toEqual(["Aucun"]);
+  });
+
+  it("ouvre le tag certifié et le BattleTag masqué aux arbitres dès l'inscription, pas au seul tournoi en cours", () => {
+    const subPurposes = byRef("T04").subPurposes.join(" ");
+    expect(subPurposes).not.toMatch(/tournoi en cours/);
+    expect(subPurposes).toMatch(/aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé/);
+    expect(subPurposes).toMatch(/aux administrateurs et aux arbitres le BattleTag masqué/);
+  });
+
   it("déclare les transferts vers Discord partout où Discord achemine des messages", () => {
     for (const ref of ["T02", "T04", "T05", "T08", "T10"]) {
       expect(byRef(ref).transfers.join(" ")).toMatch(/Discord/);
