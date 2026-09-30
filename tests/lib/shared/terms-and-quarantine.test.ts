@@ -28,6 +28,7 @@ import {
   formatQuarantineDate,
   moderationReasonErrorMessage,
   validateModerationReason,
+  validateModerationReasonBody,
   logoQuarantinePurgeDate,
 } from "@/lib/shared/logo-quarantine";
 
@@ -275,6 +276,13 @@ describe("validateModerationReason", () => {
     expect(validateModerationReason("court")).toEqual({ ok: false, error: "MODERATION_REASON_REQUIRED" });
     expect(validateModerationReason("x".repeat(501))).toEqual({ ok: false, error: "MODERATION_REASON_TOO_LONG" });
     expect(validateModerationReason("x".repeat(500)).ok).toBe(true);
+  });
+
+  it("lit le motif d'un corps quelconque sans jamais lever", () => {
+    expect(validateModerationReasonBody({ reason: "Marque déposée sans accord" })).toEqual({ ok: true, reason: "Marque déposée sans accord" });
+    for (const body of [null, undefined, 42, "texte", ["Marque déposée sans accord"], {}]) {
+      expect(validateModerationReasonBody(body)).toEqual({ ok: false, error: "MODERATION_REASON_REQUIRED" });
+    }
   });
 
   it("dit ses refus en français", () => {

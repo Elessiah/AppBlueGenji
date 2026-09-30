@@ -215,6 +215,16 @@ export function validateModerationReason(value: unknown): ModerationReasonValida
   return { ok: true, reason };
 }
 
+/**
+ * Le motif lu dans un corps de requête reçu tel quel : un corps absent,
+ * illisible ou qui n'est pas un objet (`null`, un nombre, une liste) vaut un
+ * motif manquant — jamais une exception, que la route laisserait sortir en 500.
+ */
+export function validateModerationReasonBody(body: unknown): ModerationReasonValidation {
+  const reason = typeof body === "object" && body !== null && !Array.isArray(body) ? (body as { reason?: unknown }).reason : undefined;
+  return validateModerationReason(reason);
+}
+
 /** Les refus du motif, dits en français (toasts des fiches d'équipe et de joueur). */
 export function moderationReasonErrorMessage(code: string): string {
   return code === "MODERATION_REASON_TOO_LONG"

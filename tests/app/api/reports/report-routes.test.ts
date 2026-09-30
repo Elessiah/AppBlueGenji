@@ -445,6 +445,8 @@ describe("DELETE /api/admin/teams/[id]/logo", () => {
     ["sans corps", new Request("http://localhost", { method: "DELETE" }), "MODERATION_REASON_REQUIRED"],
     ["motif trop court", withReason("abus"), "MODERATION_REASON_REQUIRED"],
     ["motif non textuel", withReason(42), "MODERATION_REASON_REQUIRED"],
+    ["au corps JSON nul", json("http://localhost", "DELETE", null), "MODERATION_REASON_REQUIRED"],
+    ["au corps JSON en liste", json("http://localhost", "DELETE", [REASON]), "MODERATION_REASON_REQUIRED"],
     ["motif trop long", withReason("x".repeat(501)), "MODERATION_REASON_TOO_LONG"],
   ])("refuse en 400 un retrait %s, avant toute écriture", async (_label, request, code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
@@ -487,7 +489,7 @@ describe("DELETE /api/admin/users/[id]/avatar", () => {
 
   it("refuse en 400 un retrait sans motif, avant toute écriture", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(admin);
-    const res = await removeUserAvatar(withReason("   "), params("9"));
+    const res = await removeUserAvatar(json("http://localhost", "DELETE", null), params("9"));
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "MODERATION_REASON_REQUIRED" });
     expect(removeUserAvatarAsModerator).not.toHaveBeenCalled();
