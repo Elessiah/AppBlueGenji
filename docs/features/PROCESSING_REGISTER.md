@@ -33,11 +33,26 @@ d'elle-même dans la politique. Elle ne couvrait qu'une partie des traitements
 tant qu'elle les résumait à la main.
 
 Le registre ne se dit plus exhaustif. `REGISTER_SCOPE` le borne au site et au
-bot Discord, et `REGISTER_NOT_YET_COVERED` nomme les activités que
-l'association mène hors du site sans fiche à ce jour (adhésions, portail de
-support Spiceworks, retransmission des matchs) : leurs bases légales, durées et
-transferts sont une **décision de l'association**, pas une déduction du code
-(voir `ERREUR.txt`). Les deux constantes servent `/rgpd` et `/rgpd/registre`.
+bot Discord, et `REGISTER_SCOPE_DETAIL` dit ce qui l'entoure : le portail de
+support Spiceworks (`T15`, tickets supprimés un mois après leur clôture —
+`SUPPORT_TICKET_RETENTION_MONTHS`), la retransmission des matchs (`T16`) et les
+journaux d'accès nginx (`T17`, 14 jours — `WEB_ACCESS_LOG_RETENTION_DAYS`, à
+poser en production : `docs/DEPLOYMENT.md`) y ont une fiche ; la gestion des
+adhésions **ne relève pas du site** (décision de l'association) et n'y figure
+pas. Ce qui reste inconnu (qualification et transferts de Spiceworks, de Twitch
+et de Kick) est écrit « décision requise », jamais deviné (voir `ERREUR.txt`).
+Les deux constantes servent `/rgpd` et `/rgpd/registre`.
+
+L'hébergeur technique est sous-traitant : son contrat au sens de l'article 28
+est rédigé dans `docs/legal/contrat-sous-traitance-hebergement.md`, **non
+signé** — `HOST_PROCESSING_AGREEMENT` le dit ainsi dans la rubrique de
+l'hébergeur et dans `T09`. Le courriel de l'association est une messagerie
+Gmail : Google en est destinataire (`T11`, `ASSOCIATION_GMAIL_FRAMEWORK`), et
+une demande reçue par ce courriel ou par le téléphone de l'association suit la
+règle des demandes RGPD (durée du traitement, puis 30 jours après la clôture).
+Les contacts présentés au lancement d'un match reposent sur l'exécution des
+conditions d'utilisation (`T04`), l'exposition du tag certifié à
+l'organisation restant fondée sur le consentement.
 
 `T13` décrit la preuve d'acceptation des conditions d'utilisation
 (`bg_terms_acceptances`), table qui gardait une donnée personnelle sans fiche.

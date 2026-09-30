@@ -7,6 +7,19 @@ import {
   DROITS,
 } from "@/lib/shared/rgpd-policy";
 
+describe("contacts du lancement d'un match — base légale", () => {
+  it("affiche l'exécution du contrat à côté du consentement, sans que la finalité les oppose", () => {
+    for (const donnee of ["Certification du pseudo Discord", "Pseudo Overwatch"]) {
+      const entry = DONNEES_PROFIL.find((d) => d.donnee === donnee);
+      expect(entry?.base).toBe("Consentement");
+      expect(entry?.extraBases).toEqual([
+        { base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" },
+      ]);
+      expect(entry?.finalite).not.toMatch(/non sur ce consentement/);
+    }
+  });
+});
+
 describe("DONNEES_PROFIL", () => {
   it("covers all profile data types", () => {
     const names = DONNEES_PROFIL.map((d) => d.donnee);

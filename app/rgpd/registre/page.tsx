@@ -5,7 +5,7 @@ import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
 import { CyberButton } from "@/components/cyber";
 import {
   PROCESSING_ACTIVITIES,
-  REGISTER_NOT_YET_COVERED,
+  REGISTER_SCOPE_DETAIL,
   REGISTER_SCOPE,
   REGISTER_UPDATED_AT,
   registerController,
@@ -87,7 +87,7 @@ export default function RegistrePage() {
           chacun peut le consulter ou le télécharger, sans compte et sans demande.
         </p>
         <p style={{ marginTop: 12, fontSize: 14, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 580 }}>
-          {REGISTER_NOT_YET_COVERED}
+          {REGISTER_SCOPE_DETAIL}
         </p>
         <div className={styles.registerActions}>
           <CyberButton asChild variant="primary">

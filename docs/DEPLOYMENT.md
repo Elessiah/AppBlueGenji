@@ -246,6 +246,60 @@ Plus bas, un logo ou un avatar de 5 Mo serait refusé par nginx (413) avant
 d'atteindre l'application, qui l'annonce pourtant accepté. Plus haut ne coûte
 rien de plus au Raspberry Pi : c'est l'application qui ne lit pas au-delà.
 
+## Journaux d'accès nginx : 14 jours — action requise en production
+
+Le registre des traitements déclare les journaux d'accès du
+serveur web (fiche **T17**, `WEB_ACCESS_LOG_RETENTION_DAYS` et `WEB_ACCESS_LOG_FIELDS` dans
+`lib/shared/legal-durations.ts`) : adresse IP, date et heure, page demandée, code de
+réponse, taille de la réponse, page d'origine et navigateur — le format `combined` par défaut —,
+gardés **14 jours au plus**, pour la sécurité du service. La configuration
+nginx n'étant pas versionnée ici (elle est partagée avec un autre site),
+**rien dans ce dépôt ne tient cette durée** : elle se pose sur le serveur, et
+tant que ce n'est pas fait, le registre annonce une durée que la production ne
+tient peut-être pas.
+
+**Action requise en production** (non vérifiée depuis ce dépôt) :
+
+1. Régler la rotation de `/etc/logrotate.d/nginx`. Le défaut du paquet Debian
+   (`daily`, `rotate 14`) garde le journal courant **plus** quatorze archives,
+   donc jusqu'à quinze jours de requêtes : pour tenir les 14 jours annoncés,
+   passer à `rotate 13` — quotidienne, treize archives, puis suppression :
+
+   ```
+   /var/log/nginx/*.log {
+       daily
+       missingok
+       rotate 13
+       compress
+       delaycompress
+       notifempty
+       create 0640 www-data adm
+       sharedscripts
+       postrotate
+           invoke-rc.d nginx rotate >/dev/null 2>&1
+       endscript
+   }
+   ```
+
+   `rotate` ne doit **pas** dépasser 13 (et la fréquence rester `daily`) : une
+   valeur plus haute dépasserait la durée annoncée, `weekly` garderait des mois
+   de journaux. **La configuration nginx est partagée avec un autre site** :
+   la règle `/var/log/nginx/*.log` ci-dessus vaut pour les journaux des deux.
+   Pour ne régler que BlueGenji, lui donner ses propres fichiers (directives
+   `access_log /var/log/nginx/bluegenji.access.log;` et `error_log` dans son
+   bloc `server`), puis limiter la règle à `/var/log/nginx/bluegenji.*.log`
+   et retirer ces fichiers du motif général — sinon, la durée de l'autre site
+   est réduite aussi, ce qui se décide avec lui.
+2. Ne rien ajouter au format : pas de `$remote_port`, pas de corps de requête,
+   pas de cookie. Le site ne garde pas le port source (décision de
+   l'association, journal `bg_connection_logs` compris), et le journal n'a pas
+   à en savoir plus que le format par défaut.
+3. Contrôler après la première nuit : `ls -l /var/log/nginx/` ne doit montrer
+   que quatorze fichiers au plus par journal (le courant et treize archives).
+
+Si la durée change, `WEB_ACCESS_LOG_RETENTION_DAYS` change avec elle, et le
+registre avance (`REGISTER_UPDATED_AT`).
+
 ## Base de données
 
 Le seed ne se pose jamais sur la production : `npm run seed` refuse de tourner
