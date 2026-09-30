@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SITE_MINIMUM_AGE, TERMS_AGE_DECLARATION, TERMS_PATH, TERMS_SECTIONS } from "@/lib/shared/terms-of-use";
 import { ORGANIZATION_FOUNDING_YEAR, organizationJsonLd } from "@/lib/shared/structured-data";
+import { BOT_MINIMUM_AGE } from "@/lib/shared/bot-legal-content";
 
 const ROOT = join(__dirname, "..", "..", "..");
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -18,6 +19,10 @@ const ALL_TEXT = TERMS_SECTIONS.flatMap((entry) => [entry.title, ...entry.paragr
 describe("conditions d'utilisation — âge minimum", () => {
   it("fixe l'âge minimum d'un compte à 15 ans", () => {
     expect(SITE_MINIMUM_AGE).toBe(15);
+  });
+
+  it("reste celui du bot, qui cite la même base légale", () => {
+    expect(SITE_MINIMUM_AGE).toBe(BOT_MINIMUM_AGE);
   });
 
   it("l'écrit dans la section « Compte », comme une déclaration", () => {
@@ -72,7 +77,7 @@ describe("conditions d'utilisation — licence sur les contenus", () => {
     expect(contenus).toContain("par les moyens que le site lui offre");
     expect(contenus).toContain("faites pendant cette durée, pour la durée de leur mise en ligne");
     // Avatar et pseudos sont des données personnelles à finalité étroite : hors licence.
-    expect(contenus).toContain("L'**avatar** et les **pseudos de jeu**, qui sont des données personnelles, en sont exclus");
+    expect(contenus).toContain("Pour l'**avatar** et les **pseudos de jeu**, qui sont des données personnelles, cette licence ne vaut que **sur le site**");
     expect(contenus).toContain("**déjà faites** avant le retrait ne sont pas concernées");
   });
 

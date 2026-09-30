@@ -98,7 +98,7 @@ destination (site et communications liées aux tournois), lieu (monde entier) et
 durée (celle de la publication sur le site, et, pour une diffusion faite pendant
 celle-ci, celle de sa mise en ligne). Le retrait vaut pour l'avenir : les
 diffusions et publications déjà faites ne sont pas reprises. Avatar et pseudos de
-jeu, données personnelles à finalité étroite (`rgpd-policy.ts`), sont hors
-licence : affichage sur le site seulement. Le titre de cette
+jeu, données personnelles à finalité étroite (`rgpd-policy.ts`), ne sont sous
+licence que sur le site. Le titre de cette
 section est cité par `lib/shared/logo-quarantine.ts` : le renommer, c'est
 renommer ces citations dans le même changement.
