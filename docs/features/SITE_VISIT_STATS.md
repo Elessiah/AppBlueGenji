@@ -55,7 +55,7 @@ injoignable, en indiquant l'ancienneté de la mesure.
 | `lib/server/site-visits-service.ts` | Enregistrement, agrégation, poussée vers le bot. |
 | `bg_site_visits` | Une ligne par visite : empreinte, drapeau « connecté », chemin, date. **Gardée `SITE_VISIT_DETAIL_RETENTION_DAYS` (31) jours.** |
 | `bg_site_visit_days` | Une ligne par jour révolu : nombre de visites, heure de la première. |
-| `bg_site_visitors` | Une empreinte par visiteur, et s'il a été vu connecté — rien d'autre. |
+| `bg_site_visitors` | Une empreinte par visiteur, s'il a été vu connecté et la date de sa dernière visite — rien d'autre. **Effacée `SITE_VISITOR_RETENTION_MONTHS` (25) mois après cette dernière visite.** |
 
 ### Repli du détail
 
@@ -97,9 +97,44 @@ l'association détient le sel et peut recalculer l'empreinte d'un compte (`u:<id
 ou d'un couple IP + navigateur. C'est ainsi que `/rgpd#audience` la présente
 (finalité, intérêt légitime, durées, destinataires — dont la commande publique
 `/stats-site`, qui ne sert que des totaux —, droit d'opposition), en accord avec
-la fiche T06 du registre. Deux points restent à trancher et sont consignés dans
-`ERREUR.txt` : un moyen technique de s'opposer, et une durée pour l'empreinte de
-`bg_site_visitors`, aujourd'hui gardée sans limite.
+la fiche T06 du registre.
+
+### Opposition (GPC, DNT, bouton)
+
+Le droit d'opposition (art. 21 RGPD) s'applique **sans demande** : une visite est
+refusée dès que le navigateur envoie **Global Privacy Control**
+(`navigator.globalPrivacyControl`, en-tête `Sec-GPC: 1`), **Do Not Track**
+(`navigator.doNotTrack`, en-tête `DNT: 1`), ou porte le cookie
+`bg_audience_optout=1`, posé par le bouton de `/rgpd#audience`
+(`components/privacy/AudienceOptOutControl.tsx`, qui l'efface aussi : c'est le
+geste de retour). Une règle, écrite une fois dans `lib/shared/site-visits.ts`
+(`audienceOptOutReason`) et lue **des deux côtés** :
+
+- `VisitTracker` ne signale rien (`browserAudienceOptOut`), et ne pose donc pas
+  `bg:last-visit-ping` ;
+- `/api/visits` relit les en-têtes (`audienceOptOutFromHeaders`) **avant tout
+  calcul** — ni session lue, ni empreinte, ni décompte du plafond de débit, ni
+  écriture —, sans quoi un navigateur ancien ou un appel direct passerait outre.
+
+Le cookie ne contient que `1`, aucun identifiant, et dure treize mois
+(`AUDIENCE_OPT_OUT_MAX_AGE_DAYS`). Un signal du navigateur l'emporte et ne se
+lève que dans le navigateur : le bouton disparaît alors, la phrase dit où se
+règle le signal. Aucun réglage d'apparence n'est en jeu, d'où un bouton sur
+`/rgpd` seulement, et non dans le menu d'accessibilité.
+
+### Durée des empreintes
+
+`bg_site_visitors.last_seen_at` date la **dernière visite** de chaque empreinte
+(rajeunie à chaque visite enregistrée, et par le report du repli), et le repli
+efface dans la même transaction les empreintes vues pour la dernière fois il y a
+plus de `SITE_VISITOR_RETENTION_MONTHS` (25) mois — la durée retenue par la CNIL
+pour la mesure d'audience. Le « total » des visiteurs uniques est donc celui des
+vingt-cinq derniers mois. Aucun ordonnanceur : la purge suit le repli, lui-même
+entraîné par les visites. Les empreintes antérieures à la colonne n'ont **pas**
+été rétro-datées — leur dernière visite n'était écrite nulle part — et portent
+la date du déploiement : leur durée court depuis lui, lecture prudente qui
+n'efface rien sur une date inventée. Le détail des visites garde sa durée de 31
+jours.
 
 ### Identité du visiteur et abus
 
