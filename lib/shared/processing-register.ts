@@ -44,6 +44,23 @@ export const SESSION_RETENTION_DAYS = 30;
 export const DISCORD_CODE_VALIDITY_MINUTES = 10;
 
 /**
+ * Durées appliquées par le **bot**, qui vit dans un autre dépôt : aucune
+ * importation ne peut les tenir alignées, elles sont donc recopiées ici avec
+ * leur source, pour le registre (T08) et les pages légales du bot
+ * (`lib/shared/bot-legal-content.ts`). Changer l'une sans l'autre rend une page
+ * fausse.
+ *
+ * - `BOT_RELAY_RETENTION_DAYS` : `MESSAGE_RETENTION_DAYS` de
+ *   `blueGenjiBot/src/messages/manageMsgExpiration.ts` — les traces d'une
+ *   annonce relayée sont effacées au **relais suivant** cette échéance, jamais
+ *   au redémarrage.
+ * - `BOT_LINK_CODE_VALIDITY_MINUTES` : validité du code de `/link`
+ *   (`blueGenjiBot/src/commandsHandlers/link.ts`).
+ */
+export const BOT_RELAY_RETENTION_DAYS = 7;
+export const BOT_LINK_CODE_VALIDITY_MINUTES = 10;
+
+/**
  * Encadrement des transferts hors de l'Union européenne (RGPD art. 45 et 46),
  * **destinataire par destinataire** : la formule conditionnelle d'avant
  * (« adéquation pour un destinataire certifié, à défaut clauses contractuelles
@@ -411,23 +428,40 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     name: "Bot Discord BlueGenji",
     purpose: "Fournir les services du bot sur les serveurs Discord partenaires",
     subPurposes: [
-      "Synchronisation de contenu entre serveurs, modération, temps de recharge",
-      "Envoi des codes de connexion et des rappels de match du site",
+      "Relais des annonces entre les salons des serveurs partenaires, répercussion des modifications et suppressions, temps de recharge",
+      "Exclusion d'un utilisateur du relais par la modération",
+      "Statistiques d'activité (commande /stats, tableau de bord du bot)",
+      "Liaison d'un compte Discord au compte du site (/link) et rappels programmés sur le serveur de l'association",
+      "Remise en message privé ou au salon d'arbitrage des messages rédigés par le site (codes de connexion, rappels, alertes), sans conservation par le bot",
     ],
-    legalBasis: "Intérêt légitime (service rendu aux serveurs qui installent le bot)",
-    dataSubjects: ["Utilisateurs Discord des serveurs où le bot est installé"],
+    legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
+    dataSubjects: ["Utilisateurs Discord des serveurs où le bot est installé", "Administrateurs et modérateurs de ces serveurs"],
     dataCategories: [
-      "Identifiants d'utilisateurs, de messages et de salons",
-      "Nom des serveurs qui ajoutent ou retirent le bot",
-      "Contenu des messages traité à la volée, jamais stocké",
+      "Annonces relayées : identifiants du message d'origine et de son auteur, date, identifiants des copies et de leurs salons (contenu recopié dans les salons partenaires, jamais enregistré en base)",
+      "Scrims et recrutement : identifiant de l'auteur, jeu, niveau ou rôle, serveur, date",
+      "Exclusions : identifiants de l'exclu et du modérateur, date ; pseudos et motif publiés au salon de journal privé du staff",
+      "Liaison au site : identifiant Discord, code à usage unique, date de liaison",
+      "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
+      "Rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, fréquence",
+      "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un pseudo ou un identifiant",
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Identifiants de messages : 72 heures",
-      "Identifiants de salons : jusqu'à la suppression de la liaison par le serveur",
-      "Identifiants d'utilisateurs : le temps nécessaire aux temps de recharge et à la modération",
+      `Annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacées au relais suivant cette échéance (rien n'est effacé au redémarrage)`,
+      "Scrims et recrutement : aucune suppression automatique à ce jour, jusqu'à une demande d'effacement",
+      "Exclusions : jusqu'à la levée de l'exclusion",
+      `Liaison au site : code valable ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne n'est pas supprimée automatiquement à ce jour`,
+      "Configuration : jusqu'à son retrait par les administrateurs du serveur",
+      "Rappels programmés : jusqu'à leur dernier envoi ou leur suppression",
+      "Journal technique : aucune suppression automatique à ce jour",
+      `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
-    recipients: ["Staff de l'association", "Discord (plateforme d'exécution)"],
+    recipients: [
+      "Staff de l'association (modération, administration)",
+      "Membres des serveurs partenaires, qui lisent les annonces relayées",
+      "Tout utilisateur du bot, pour les compteurs d'activité d'un autre utilisateur (/stats, réponse visible du seul demandeur)",
+      "Discord (plateforme d'exécution)",
+    ],
     transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
     security: COMMON_SECURITY,
   },
