@@ -78,6 +78,8 @@ describe("conditions d'utilisation — licence sur les contenus", () => {
     expect(contenus).toContain("le **propriétaire** répond du nom, du sigle et de la description");
     expect(contenus).toContain("les **gérants** répondent de son logo");
     expect(contenus).not.toContain("qu'ils sont seuls à pouvoir modifier");
+    // Une fantôme n'a pas de propriétaire : c'est le staff qui l'édite.
+    expect(contenus).toContain("n'a pas de propriétaire : l'association répond de ses contenus");
   });
 });
 
