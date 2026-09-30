@@ -48,6 +48,10 @@ describe("/rgpd — couverture du registre", () => {
     expect(page).toMatch(/adressée au courriel \(Gmail\) ou au téléphone\s+de l&apos;association/);
   });
 
+  it("rend les bases supplémentaires d'une donnée à côté de sa base principale", () => {
+    expect(page).toContain("d.extraBases?.map((extra) =>");
+  });
+
   it("dit ce que le journal des connexions ne garde pas", () => {
     const connexions = page.slice(page.indexOf('id="donnees-connexion"'));
     expect(connexions).toMatch(/ni le port source de la connexion/);

@@ -286,7 +286,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     sensitiveData: "Aucune",
     retention: [
       "Durée du compte",
-      "À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seules les statistiques de tournoi anonymisées restent ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale, et rien d'autre : les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression",
+      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seules les statistiques de tournoi anonymisées restent ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours)`,
       `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
     recipients: [
@@ -322,7 +322,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Identifiants de connexion : durée du compte, ou jusqu'au détachement du fournisseur ; effacés à la suppression du compte (seul le journal des données de connexion, T14, lui survit)",
+      `Identifiants de connexion : durée du compte, ou jusqu'au détachement du fournisseur ; effacés à la suppression du compte (seul le journal des données de connexion, T14, lui survit, hors les copies de sauvegarde chiffrées, T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
       `Codes de connexion : valables ${DISCORD_CODE_VALIDITY_MINUTES} minutes, purgés un jour après expiration, effacés à la suppression du compte`,
     ],
     recipients: [
@@ -731,7 +731,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Identifiant interne du compte",
       "Adresse IP de connexion, telle que la retient le serveur mandataire du site",
       "Date et heure de la connexion, moyen de connexion (Google, Discord, Blizzard ou code en message privé)",
-      "Ni port source de la connexion, ni journal de la création ou de la modification des contenus (seules les ouvertures de session sont consignées), ni informations fournies à la création du compte : celles-ci partent avec le compte",
+      "Ni port source de la connexion, ni journal de la création ou de la modification des contenus (seules les ouvertures de session sont consignées), ni informations fournies à la création du compte : celles-ci partent avec le compte (hors les copies de sauvegarde chiffrées, T09)",
     ],
     sensitiveData: "Aucune",
     retention: [

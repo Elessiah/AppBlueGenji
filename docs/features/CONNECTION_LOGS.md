@@ -72,7 +72,8 @@ tourne, aucune entrée de migration n'est due.
   l'effacement ou l'anonymisation du compte.
 - Seules les **connexions** sont journalisées (pas de journal des contenus).
 - Le journal des connexions est gardé **un an**, y compris après la
-  suppression du compte ; tout le reste part à la suppression, sauf les
+  suppression du compte ; tout le reste part à la suppression (hors les
+  copies de sauvegarde chiffrées, 30 jours au plus), sauf les
   statistiques de tournoi anonymisées.
 
 Registre : T01, T02, T14 ; le journal d'accès nginx a sa fiche (T17, 14 jours).

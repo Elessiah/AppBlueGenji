@@ -249,6 +249,11 @@ export default async function RgpdPage() {
                 <DataCell column={1}>{d.finalite}</DataCell>
                 <DataCell column={2}>
                   <span className={styles.badge}>{d.base}</span>
+                  {d.extraBases?.map((extra) => (
+                    <span key={extra.base} className={styles.extraBase}>
+                      <span className={styles.badge}>{extra.base}</span> {extra.scope}
+                    </span>
+                  ))}
                 </DataCell>
                 <DataCell column={3}>{d.duree}</DataCell>
               </tr>
@@ -308,7 +313,9 @@ export default async function RgpdPage() {
           les ouvertures de session sont consignées : ni le port source de la connexion, ni la
           création ou la modification d&apos;un contenu. Les informations fournies à la création
           du compte (pseudo, identifiants de fournisseur) partent avec lui ; hors ce journal, seules
-          les statistiques de tournoi anonymisées survivent à la suppression. Le serveur web
+          les statistiques de tournoi anonymisées survivent à la suppression — sous réserve des
+          copies de sauvegarde chiffrées (**), qui s&apos;effacent d&apos;elles-mêmes au bout de{" "}
+          {BACKUP_RETENTION_DAYS} jours. Le serveur web
           garde en outre, {WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, un journal technique de
           chaque requête (adresse IP, date, page demandée, navigateur), pour sa sécurité (<Link href="/rgpd/registre#t17">registre,
           T17</Link>).

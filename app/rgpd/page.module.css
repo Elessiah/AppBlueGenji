@@ -166,6 +166,14 @@
   background: rgba(90, 200, 255, 0.06);
 }
 
+/* Base supplémentaire d'une donnée, bornée à une partie de sa finalité. */
+.extraBase {
+  display: block;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--ink-mute);
+}
+
 .badgeAmber {
   text-transform: uppercase;
   border-color: rgba(245, 185, 80, 0.3);

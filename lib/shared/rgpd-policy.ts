@@ -17,6 +17,13 @@ export interface DonneEntry {
   donnee: string;
   finalite: string;
   base: LegalBase;
+  /**
+   * Autres bases, chacune bornée à une partie de la finalité : une même donnée
+   * peut être exposée sur consentement et présentée, ailleurs, en exécution
+   * des conditions d'utilisation. Affichées à côté de la base principale,
+   * jamais contredites par la finalité.
+   */
+  extraBases?: readonly { base: LegalBase; scope: string }[];
   duree: string;
 }
 
@@ -43,8 +50,9 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // seconde écrase la première à chaque connexion : le dire est la condition
     // pour que le joueur comprenne pourquoi sa saisie a changé.
     finalite:
-      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match de son lancement à sa fin si tu fais partie des contacts présentés (exécution des conditions d'utilisation), et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé",
+      "Mise en relation entre joueurs (s'ajouter en jeu) — aucune statistique. Saisi par toi, ou renseigné par Blizzard à chaque connexion si tu as rattaché ton compte Battle.net. Masqué, il reste lisible des joueurs de tes matchs tant que le tournoi n'est pas terminé, du caster de ton match de son lancement à sa fin si tu fais partie des contacts présentés, et de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé",
     base: "Consentement",
+    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
     duree: "Durée du compte",
   },
   {
@@ -72,8 +80,9 @@ export const DONNEES_PROFIL: DonneEntry[] = [
     // ne doit pas coûter la porte Discord. D'où une base « Consentement » qui
     // tient — le geste est libre, spécifique, et se retire.
     finalite:
-      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Sa présentation aux joueurs et au caster de ton match, au lancement, repose sur l'exécution des conditions d'utilisation, et non sur ce consentement. Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
+      "Ouvre ton tag Discord à l'organisation pour te joindre : administrateurs à tout moment, arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé (dès l'ouverture des inscriptions), joueurs et caster de ton match de son lancement à sa fin ; les autres joueurs connectés seulement si tu coches « Tag Discord ». Donnée seulement par toi, depuis Mon profil (un clic si ton Discord est rattaché, un code en message privé sinon) — se connecter par Discord ne la donne pas. Retirée en retirant ton tag ; perdue si ton pseudo change",
     base: "Consentement",
+    extraBases: [{ base: "Exécution du contrat", scope: "présentation aux joueurs et au caster de ton match, à son lancement" }],
     duree: "Jusqu'au retrait ou au changement du tag, ou durée du compte",
   },
   {
