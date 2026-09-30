@@ -25,8 +25,14 @@ describe("DONNEES_PROFIL", () => {
     expect(names).toContain("Identifiant Blizzard");
   });
 
-  it("has exactly 9 entries", () => {
-    expect(DONNEES_PROFIL).toHaveLength(9);
+  it("has exactly 10 entries", () => {
+    expect(DONNEES_PROFIL).toHaveLength(10);
+  });
+
+  it("déclare la majorité, facultative et affichée seulement sur choix du joueur", () => {
+    const majority = DONNEES_PROFIL.find((d) => d.donnee === "Majorité déclarée");
+    expect(majority?.base).toBe("Consentement");
+    expect(majority?.finalite).toContain("« Majorité »");
   });
 
   it("déclare chaque identité OAuth comme un moyen de connexion retirable", () => {
@@ -56,8 +62,11 @@ describe("DONNEES_PROFIL", () => {
 
   it("dit qui lit encore un BattleTag masqué, et jusqu'à quand", () => {
     const overwatch = DONNEES_PROFIL.find((d) => d.donnee === "Pseudo Overwatch");
-    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des joueurs de tes matchs, de leur caster et de l'arbitrage/);
+    expect(overwatch?.finalite).toMatch(/Masqué, il reste lisible des joueurs de tes matchs et de leur caster/);
     expect(overwatch?.finalite).toMatch(/tant que le tournoi n'est pas terminé/);
+    // L'arbitrage le lit dès l'inscription (`isInActiveTournament` : tout état
+    // sauf `FINISHED`), pas seulement pendant le tournoi.
+    expect(overwatch?.finalite).toMatch(/de l'arbitrage tant que tu es inscrit à un tournoi qui n'est pas terminé/);
   });
 
   it("dit que le tag Discord enregistré à la connexion n'est pas certifié, donc privé", () => {
@@ -70,8 +79,9 @@ describe("DONNEES_PROFIL", () => {
     const certification = DONNEES_PROFIL.find(
       (d) => d.donnee === "Certification du pseudo Discord",
     );
-    expect(certification?.finalite).toMatch(/administrateurs en permanence/i);
-    expect(certification?.finalite).toMatch(/arbitres/i);
+    expect(certification?.finalite).toMatch(/administrateurs à tout moment/i);
+    expect(certification?.finalite).toMatch(/arbitres tant que tu es inscrit à un tournoi qui n'est pas terminé/i);
+    expect(certification?.finalite).not.toMatch(/tournoi en cours/i);
     expect(certification?.finalite).toMatch(/caster de ton match/i);
     expect(certification?.finalite).toMatch(/autres joueurs connectés/i);
     expect(certification?.finalite).toContain("« Tag Discord »");
