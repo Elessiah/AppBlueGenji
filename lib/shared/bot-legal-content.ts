@@ -483,7 +483,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Exclusions** : jusqu'à la levée de l'exclusion.",
               `**Commande /link** : le code expire au bout de ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes ; la ligne qui le porte n'est pas supprimée automatiquement à ce jour.`,
               "**Configuration des serveurs** (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du Bot, modules activés) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du Bot du serveur, qui l'efface. Un retrait survenu pendant une interruption du Bot ne lui est pas signalé par Discord : cette configuration reste alors jusqu'à une demande d'effacement.",
-              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés.",
+              "**Adhésions et rappels programmés** : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du Bot du serveur où ils ont été enregistrés, qui les efface ; sous la même réserve qu'au point précédent : si le Bot en est retiré pendant une interruption, ils restent jusqu'à une demande d'effacement.",
               "**Salon de journal privé du staff** : aucune suppression automatique à ce jour.",
               "**Journaux du serveur** : selon leur rotation automatique.",
               // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
@@ -688,7 +688,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Exclusions**: until the exclusion is lifted.",
               `**/link command**: the code expires after ${BOT_LINK_CODE_VALIDITY_MINUTES} minutes; the row holding it is not deleted automatically at present.`,
               "**Server configuration** (relayed channels and their rank filters, the invite and the referee role with the ID of whoever set them, the Bot administration role, enabled modules): until the administrators remove it, and at the latest until the Bot leaves the server, which erases it. If the Bot is removed while it is down, Discord does not notify it: that configuration then remains until an erasure request.",
-              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded.",
+              "**Memberships and scheduled reminders**: until the reminder's last sending (for a membership, its expiry date) or its deletion, and at the latest until the Bot leaves the server where they were recorded, which erases them; with the same caveat as above: if the Bot is removed from it while it is down, they remain until an erasure request.",
               "**Staff private log channel**: no automatic deletion at present.",
               "**Server logs**: according to their automatic rotation.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,

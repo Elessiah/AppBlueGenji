@@ -324,11 +324,15 @@ describe("bot legal content matches the bot's code and the association", () => {
     // Les rappels d'adhésion partent avec la configuration du serveur.
     expect(fr).toMatch(/\*\*Adhésions et rappels programmés\*\*[^|]*départ du Bot du serveur/);
     expect(en).toMatch(/\*\*Memberships and scheduled reminders\*\*[^|]*the Bot leaves the server/);
+    // La réserve vaut aussi pour eux : `forgetGuild` ne joue que sur `guildDelete`.
+    expect(fr).toMatch(/\*\*Adhésions et rappels programmés\*\*[^|]*pendant une interruption[^|]*demande d'effacement/);
+    expect(en).toMatch(/\*\*Memberships and scheduled reminders\*\*[^|]*while it is down[^|]*erasure request/);
 
     const t08 = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08")?.retention ?? []).join(" | ");
     expect(t08).not.toContain("conservés sans limite si le bot quitte le serveur");
     expect(t08).toContain("au plus tard jusqu'au départ du bot du serveur, qui l'efface");
     expect(t08).toMatch(/Adhésions et rappels programmés[^|]*départ du bot du serveur/);
+    expect(t08).toMatch(/Adhésions et rappels programmés[^|]*interruption du bot[^|]*demande d'effacement/);
   });
 
   it("cites the Bot's AGPL-3.0 licence and links its public repository, in both languages", () => {
