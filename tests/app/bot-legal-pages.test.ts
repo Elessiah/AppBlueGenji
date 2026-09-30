@@ -109,6 +109,9 @@ describe("bot legal content carries the contact details", () => {
     // la politique ne peut plus dire que Microsoft ne reçoit que du chiffré.
     expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("lui parvient en clair");
     expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("reaches it unencrypted");
+    // …et elle dit combien de temps ces demandes sont gardées (art. 13.2.a).
+    expect(JSON.stringify(PRIVACY_POLICY.fr)).toContain("Demandes relatives à vos données envoyées par courriel ou par téléphone");
+    expect(JSON.stringify(PRIVACY_POLICY.en)).toContain("Requests about your data sent by email or phone");
   });
 });
 

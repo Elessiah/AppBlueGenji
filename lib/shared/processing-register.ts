@@ -200,7 +200,7 @@ export function registerController(): RegisterController {
     legalForm: "Association loi 1901",
     seat: ASSOCIATION_SEAT,
     contact: RGPD_CONTACT_LINE,
-    dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées : contact ci-dessus). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
+    dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées : rubrique « Contact » du responsable). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
     host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant, données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
@@ -576,7 +576,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, ${copyrightNoticeElementsText()}`,
       "Contestations : texte, compte de leur auteur et adresse facultative",
       "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
-      "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande, adresse électronique ou numéro de l'expéditeur",
+      "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande, adresse électronique ou numéro de l'expéditeur, et souvent son nom",
     ],
     sensitiveData: "Aucune",
     retention: [
