@@ -51,9 +51,16 @@ export async function recordConnection(userId: number, event: ConnectionLogEvent
       `INSERT INTO bg_connection_logs (user_id, event_type, ip) VALUES (?, ?, ?)`,
       [userId, event, ip],
     );
-    await purgeExpiredConnectionLogs();
   } catch (error) {
     console.error(`[connection-logs] écriture impossible (compte #${userId}) :`, (error as Error).message);
+  }
+  // À part de l'écriture : une insertion qui échoue ne doit pas arrêter la
+  // purge. Elle suit aussi le trafic de la liste des tournois
+  // (`listTournamentBuckets`), pour les périodes sans connexion.
+  try {
+    await purgeExpiredConnectionLogs();
+  } catch (error) {
+    console.error("[connection-logs] purge impossible :", (error as Error).message);
   }
 }
 

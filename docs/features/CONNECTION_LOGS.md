@@ -42,8 +42,10 @@ Table `bg_connection_logs` — une ligne par **ouverture de session** :
 `CONNECTION_LOG_RETENTION_DAYS = 365` (`lib/shared/connection-logs.ts`),
 constante citée par le registre, `/rgpd`, les mentions légales et l'entrée
 `PRIVACY_CHANGES`. La purge (`DELETE … WHERE created_at < NOW() - INTERVAL 365
-DAY`) suit les connexions elles-mêmes, au plus une fois par heure et par
-processus — aucun ordonnanceur.
+DAY`) est entraînée par les connexions **et** par le trafic de la liste des
+tournois (`listTournamentBuckets`), au plus une fois par heure et par
+processus — aucun ordonnanceur. Elle est séparée de l'écriture (une insertion
+qui échoue ne l'arrête pas) et n'est notée faite qu'après son succès.
 
 ## Suppression de compte, accès, export
 
@@ -62,7 +64,9 @@ tourne, aucune entrée de migration n'est due.
 
 ## Ce qui reste hors de ce lot
 
-Les informations fournies à la création du compte (que le décret vise aussi)
+Le **port source** n'est pas écrit (possiblement exigé avec l'adresse quand
+une IP publique est partagée entre abonnés ; le proxy devrait le transmettre),
+les informations fournies à la création du compte (que le décret vise aussi)
 suivent toujours l'effacement ou l'anonymisation à la suppression, et le
 journal d'accès nginx n'a pas de fiche : décisions requises, consignées dans
 `ERREUR.txt`.

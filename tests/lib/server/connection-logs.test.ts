@@ -83,6 +83,15 @@ describe("journal des données de connexion (serveur)", () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
+  it("purge même quand l'écriture de la ligne échoue", async () => {
+    withHeaders({ "x-forwarded-for": "203.0.113.7" });
+    execute.mockRejectedValueOnce(new Error("ER_LOCK_WAIT_TIMEOUT"));
+
+    await recordConnection(42, "LOGIN_GOOGLE");
+
+    expect(execute.mock.calls.some(([sql]) => sql.includes("DELETE FROM bg_connection_logs"))).toBe(true);
+  });
+
   it("purge ce qui dépasse un an, au plus une fois par heure", async () => {
     withHeaders({ "x-forwarded-for": "203.0.113.7" });
 
