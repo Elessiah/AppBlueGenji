@@ -28,11 +28,30 @@ describe("/rgpd — couverture du registre", () => {
     }
   });
 
-  it("nomme les activités de l'association qui n'ont pas encore de fiche", () => {
+  it("nomme ce qui entoure le site, et dit les adhésions hors de son registre", () => {
     expect(REGISTER_SCOPE).toMatch(/site et du bot Discord/);
-    for (const activity of ["journaux techniques du serveur", "adhésions", "Spiceworks", "retransmission des matchs"]) {
+    for (const activity of ["journaux techniques du serveur web", "Spiceworks", "retransmission des matchs"]) {
       expect(REGISTER_SCOPE_DETAIL).toContain(activity);
     }
+    expect(REGISTER_SCOPE_DETAIL).toMatch(/adhésions à l'association ne relève pas du site/);
+  });
+
+  it("nomme Google (Gmail), Spiceworks et les plateformes de diffusion parmi les destinataires", () => {
+    const destinataires = page.slice(page.indexOf('id="destinataires"'), page.indexOf('id="exercer-vos-droits"'));
+    expect(destinataires).toMatch(/<strong>Google<\/strong> \(Gmail\)/);
+    expect(destinataires).toMatch(/<strong>Spiceworks<\/strong>/);
+    expect(destinataires).toMatch(/<strong>YouTube, Twitch ou Kick<\/strong>/);
+    expect(destinataires).toMatch(/en cours de vérification/);
+  });
+
+  it("applique aux demandes adressées à l'association la durée des demandes RGPD", () => {
+    expect(page).toMatch(/adressée au courriel \(Gmail\) ou au téléphone\s+de l&apos;association/);
+  });
+
+  it("dit ce que le journal des connexions ne garde pas", () => {
+    const connexions = page.slice(page.indexOf('id="donnees-connexion"'));
+    expect(connexions).toMatch(/ni le port source de la connexion/);
+    expect(connexions).toMatch(/ni la\s+création ou la modification d&apos;un contenu/);
   });
 
   it("ne réserve plus le « aucun nom réel » qu'au compte joueur, exceptions nommées", () => {

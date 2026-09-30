@@ -21,6 +21,10 @@ import {
   registerController,
   registerExportFilename,
   registerToCsv,
+  HOST_PROCESSING_AGREEMENT,
+  REGISTER_SCOPE_DETAIL,
+  SUPPORT_TICKET_RETENTION_MONTHS,
+  WEB_ACCESS_LOG_RETENTION_DAYS,
   type ProcessingActivity,
 } from "@/lib/shared/processing-register";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
@@ -301,8 +305,14 @@ describe("bases légales : le registre et la politique disent la même chose", (
   });
 
   it("fonde l'exposition du tag (T04) sur une certification distincte de la connexion", () => {
-    expect(byRef("T04").legalBasis).toMatch(/Consentement \(certification du pseudo Discord/);
+    expect(byRef("T04").legalBasis).toMatch(/Consentement pour l'exposition du pseudo Discord certifié/);
     expect(byRef("T04").legalBasis).toMatch(/jamais acquise par la seule connexion/);
+  });
+
+  it("fonde les contacts du lancement d'un match sur l'exécution des conditions d'utilisation", () => {
+    expect(byRef("T04").legalBasis).toMatch(
+      /exécution du service demandé par le joueur \(contrat — conditions d'utilisation\) pour la présentation des contacts aux parties d'un match à son lancement/,
+    );
   });
 
   it("ne mentionne plus l'invite Google One Tap, retirée du site", () => {
@@ -386,5 +396,71 @@ describe("bases légales : le registre et la politique disent la même chose", (
 
   it("dit où le site et le bot sont hébergés", () => {
     expect(registerController().host).toMatch(/Raspberry Pi, à Caen/);
+  });
+});
+
+describe("décisions de l'association du 2026-09-30", () => {
+  const text = (activity: ProcessingActivity) => JSON.stringify(activity);
+
+  it("sort les adhésions du registre du site, sans promettre de fiche", () => {
+    expect(REGISTER_SCOPE_DETAIL).toMatch(/adhésions à l'association ne relève pas du site/);
+    expect(REGISTER_SCOPE_DETAIL).not.toMatch(/pas encore de fiche/);
+    expect(JSON.stringify(PROCESSING_ACTIVITIES)).not.toMatch(/Gestion des adhésions/);
+  });
+
+  it("donne une fiche au portail Spiceworks, supprimé un mois après la clôture", () => {
+    const sheet = byRef("T15");
+    expect(sheet.name).toMatch(/Spiceworks/);
+    expect(SUPPORT_TICKET_RETENTION_MONTHS).toBe(1);
+    expect(sheet.retention.join(" ")).toContain(`${SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture`);
+    // Qualification et transfert inconnus : dits, jamais devinés.
+    expect(sheet.recipients.join(" ")).toMatch(/décision requise/);
+    expect(sheet.transfers.join(" ")).toMatch(/décision requise/);
+    expect(text(sheet)).not.toMatch(/Data Privacy Framework/);
+  });
+
+  it("donne une fiche à la retransmission, avec un droit d'opposition", () => {
+    const sheet = byRef("T16");
+    expect(sheet.legalBasis).toMatch(/Intérêt légitime/);
+    expect(sheet.legalBasis).toMatch(/droit d'opposition/);
+    expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
+    expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
+    expect(sheet.transfers.join(" ")).toMatch(/YouTube \(Google\)/);
+    expect(sheet.transfers.join(" ")).toMatch(/Twitch et Kick — décision requise/);
+  });
+
+  it("donne une fiche aux journaux nginx, 14 jours", () => {
+    const sheet = byRef("T17");
+    expect(WEB_ACCESS_LOG_RETENTION_DAYS).toBe(14);
+    expect(sheet.retention.join(" ")).toContain(`${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus`);
+    expect(sheet.transfers).toEqual(["Aucun"]);
+  });
+
+  it("dit le contrat de l'article 28 avec l'hébergeur rédigé, pas signé", () => {
+    expect(HOST_PROCESSING_AGREEMENT).toMatch(/art\. 28/);
+    expect(HOST_PROCESSING_AGREEMENT).toMatch(/en attente de signature/);
+    expect(controller.host).toContain(HOST_PROCESSING_AGREEMENT);
+    expect(byRef("T09").recipients.join(" ")).toContain(HOST_PROCESSING_AGREEMENT);
+    // Aucun contrat de sous-traitance prétendu avec Microsoft.
+    expect(byRef("T09").recipients.join(" ")).toContain("sans contrat de sous-traitance");
+    expect(byRef("T09").security.join(" ")).toMatch(/remote rclone de type crypt .* vérifié en production le 30 septembre 2026/);
+  });
+
+  it("nomme Google destinataire du courriel de l'association, avec la même durée que les demandes RGPD", () => {
+    const sheet = byRef("T11");
+    expect(sheet.recipients.join(" ")).toMatch(/Google \(messagerie Gmail de l'association/);
+    expect(sheet.transfers.join(" ")).toMatch(/Google \(messagerie Gmail de l'association\) — Google, certifié/);
+    expect(sheet.retention.join(" ")).toContain(
+      `Demande reçue au courriel ou au téléphone de l'association : même règle — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture`,
+    );
+  });
+
+  it("ne garde ni le port source, ni les contenus, ni les données de création au-delà du compte", () => {
+    const categories = byRef("T14").dataCategories.join(" ");
+    expect(categories).toMatch(/Ni port source/);
+    expect(categories).toMatch(/seules les ouvertures de session sont consignées/);
+    expect(byRef("T01").retention.join(" ")).toMatch(
+      /les informations fournies à la création du compte \(pseudo, identifiants de fournisseur\) ne sont pas gardées après la suppression/,
+    );
   });
 });
