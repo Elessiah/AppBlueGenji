@@ -22,7 +22,6 @@
  * section Hébergement des mentions légales du site (`/mentions-legales#hebergement`).
  */
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
-import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
 import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import {
   ASSOCIATION_NAME,
@@ -97,11 +96,11 @@ const CONTACT_ITEMS_EN = [
 // il ne sert qu'aux questions techniques (`lib/shared/legal-contact.ts`).
 const SITE_RIGHTS_HREF = `${SITE_PRIVACY_HREF}#exercer-vos-droits`;
 const PRIVACY_CONTACT_ITEMS_FR = [
-  `Personne à contacter pour vos demandes relatives à vos données : **${DATA_CONTACT_NAME}**, hébergeur technique du site — courriel et téléphone dans la [politique de confidentialité du site](${SITE_RIGHTS_HREF}). Ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD : l'association reste responsable du traitement`,
+  `Personne à contacter pour vos demandes relatives à vos données : **${DATA_CONTACT_NAME}**, hébergeur technique du site — courriel et téléphone dans la [politique de confidentialité du site](${SITE_RIGHTS_HREF}). Ce n'est pas un délégué à la protection des données au sens de l'article 37 du RGPD : l'association reste responsable du traitement. Le traitement de ces demandes (base légale, données, durée de conservation) relève de la politique de confidentialité du site, et non de celle-ci`,
   ...CONTACT_ITEMS_FR.filter((item) => !item.startsWith("**Discord**")),
 ];
 const PRIVACY_CONTACT_ITEMS_EN = [
-  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller`,
+  `Person to contact for requests about your data: **${DATA_CONTACT_NAME}**, the website's technical host — email address and phone number in the [website's privacy policy](${SITE_RIGHTS_HREF}). This person is not a data protection officer within the meaning of Article 37 GDPR: the association remains the data controller. The processing of these requests (legal basis, data, retention period) falls under the website's privacy policy, not this one`,
   ...CONTACT_ITEMS_EN.filter((item) => !item.startsWith("**Discord**")),
 ];
 
@@ -503,7 +502,6 @@ export const PRIVACY_POLICY: BilingualDoc = {
               // `blueGenjiBot/scripts/sync-uploads-onedrive.sh`, et pas seulement
               // par la sauvegarde du lundi — même promesse que T09 et `/rgpd`.
               `**Sauvegardes** : la base du Bot est sauvegardée chaque semaine, chiffrée, et chaque copie est supprimée définitivement au bout de ${BACKUP_RETENTION_DAYS} jours au plus.`,
-              `**Demandes relatives à vos données envoyées par courriel ou par téléphone** à la personne à contacter (section Contact) — contenu, adresse ou numéro, et souvent votre nom : le temps de les traiter, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après leur clôture, avant suppression de sa messagerie ou de son téléphone.`,
             ],
           },
         ],
@@ -705,7 +703,6 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Staff private log channel**: no automatic deletion at present.",
               "**Server logs**: according to their automatic rotation.",
               `**Backups**: the Bot's database is backed up weekly, encrypted, and each copy is permanently deleted after ${BACKUP_RETENTION_DAYS} days at most.`,
-              `**Requests about your data sent by email or phone** to the contact person (Contact section) — content, address or number, and often your name: as long as needed to handle them, then ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} days after they are closed, before deletion from their mailbox or phone.`,
             ],
           },
         ],
