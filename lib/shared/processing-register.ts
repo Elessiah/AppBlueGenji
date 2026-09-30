@@ -512,7 +512,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list",
       "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
       "Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée",
-      "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs au 30 septembre 2026 exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)",
+      "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)",
     ],
     sensitiveData: "Aucune",
     retention: [
@@ -528,7 +528,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     recipients: [
       "Staff de l'association (modération, administration)",
       "Titulaire du bot (son hébergeur technique), pour les motifs d'exclusion reçus en message privé",
-      "Utilisateur exclu, qui reçoit le motif de son exclusion en message privé",
+      "Utilisateur exclu, qui reçoit le motif de son exclusion en message privé quand il publie dans un salon relayé",
       "Membres du salon où /scrim ou /recrute est utilisée (réponse publique de la commande)",
       "Membres du rôle d'arbitrage de chaque serveur qui en a défini un (/set-referee-role), pour les alertes d'arbitrage du site",
       "Membres des serveurs partenaires, qui lisent les annonces relayées",

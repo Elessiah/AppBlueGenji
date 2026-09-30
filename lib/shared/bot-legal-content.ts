@@ -450,7 +450,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Exclusions du relais" },
           {
             kind: "p",
-            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff ; le motif part aussi en message privé au titulaire du Bot, où il reste sans limite de durée. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée par la modération des serveurs où le Bot est installé, dans les conditions de la section « Modération du relais » des Conditions d'Utilisation, et levée (**/unban**) par la modération de tout serveur d'au moins 50 membres où il est installé, ainsi que par le staff de l'association. La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé — y compris un serveur que l'on crée soi-même pour l'y inviter — et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
+            text: "Identifiants de l'utilisateur exclu et du modérateur, date, et référence du message de journal qui porte le motif. Les identifiants de l'exclu et du modérateur et le motif sont publiés dans le salon de journal privé du staff ; le motif part aussi en message privé au titulaire du Bot, où il reste sans limite de durée. Une exclusion vaut pour **tout le réseau** de serveurs partenaires : c'est une modération communautaire, prononcée (**/ban**) et levée (**/unban**) par la modération de tout serveur d'au moins 50 membres où le Bot est installé, ainsi que par le staff de l'association (section « Modération du relais » des Conditions d'Utilisation). La commande **/ban-list** affiche donc la liste complète des exclusions du réseau (pseudos, motif, date, identifiant) aux administrateurs de tout serveur où le Bot est installé — y compris un serveur que l'on crée soi-même pour l'y inviter — et aux titulaires du rôle d'administration du Bot, pour qu'ils sachent qui ne peut plus publier par le Bot et pourquoi.",
           },
           { kind: "subhead", text: "Adhésions et rappels programmés" },
           {
@@ -473,7 +473,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Journaux" },
           {
             kind: "p",
-            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant Discord ; il reprend le niveau ou le rôle saisi avec **/scrim** ou **/recrute**. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit plus de pseudo de lui-même (les messages antérieurs au 30 septembre 2026 peuvent en citer) : le motif d'une exclusion, texte libre du modérateur, peut en citer un, et une erreur de remise d'un message privé peut mentionner le compte visé.",
+            text: "Le fil d'activité public de la page du bot ne contient aucun identifiant Discord ; il reprend le niveau ou le rôle saisi avec **/scrim** ou **/recrute**. Le salon de journal privé du staff et les journaux du serveur reçoivent le nom des serveurs qui ajoutent ou retirent le Bot, les erreurs de fonctionnement, qui peuvent citer un identifiant Discord, et le journal d'activité du site (inscriptions, matchs, tournois), rédigé par le site sans pseudo de joueur. Le Bot n'y écrit plus de pseudo de lui-même (les messages antérieurs à cette règle peuvent en citer) : le motif d'une exclusion, texte libre du modérateur, peut en citer un, et une erreur de remise d'un message privé peut mentionner le compte visé.",
           },
           { kind: "subhead", text: "Base légale" },
           {
@@ -516,7 +516,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "Le staff de l'association, pour la modération et l'administration du Bot.",
               "Le titulaire du Bot (son hébergeur technique), qui reçoit en message privé les motifs d'exclusion.",
-              "L'utilisateur exclu, à qui le Bot remet le motif de son exclusion en message privé quand il tente de l'utiliser.",
+              "L'utilisateur exclu, à qui le Bot remet le motif de son exclusion en message privé quand il publie dans un salon relayé.",
               "Les membres du salon où **/scrim** ou **/recrute** est utilisée : la commande y répond publiquement, et Discord y affiche qui l'a utilisée.",
               "Les membres des serveurs partenaires, qui lisent les annonces relayées.",
               "Les membres du rôle d'arbitrage de chaque serveur qui en a défini un, pour les alertes d'arbitrage du site.",
@@ -656,7 +656,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Relay exclusions" },
           {
             kind: "p",
-            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel; the reason is also sent by direct message to the Bot's owner, where it stays with no time limit. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided by the moderators of the servers where the Bot is installed, under the conditions of the « Relay moderation » section of the Terms of Service, and lifted (**/unban**) by the moderators of any server with at least 50 members where it is installed, as well as by the association's staff. The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed — including a server one creates oneself to invite it — and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
+            text: "IDs of the excluded user and of the moderator, date, and a reference to the log message holding the reason. The IDs of the excluded user and of the moderator, and the reason, are posted in the staff's private log channel; the reason is also sent by direct message to the Bot's owner, where it stays with no time limit. An exclusion applies to the **whole network** of partner servers: this is community moderation, decided and lifted (**/unban**) by the moderators of any server with at least 50 members where the Bot is installed, as well as by the association's staff (« Relay moderation » section of the Terms of Service). The **/ban-list** command therefore shows the full list of network exclusions (usernames, reason, date, ID) to the administrators of any server where the Bot is installed — including a server one creates oneself to invite it — and to the holders of the Bot administration role, so that they know who can no longer post through the Bot and why.",
           },
           { kind: "subhead", text: "Memberships and scheduled reminders" },
           {
@@ -679,7 +679,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
           { kind: "subhead", text: "Logs" },
           {
             kind: "p",
-            text: "The public activity feed on the bot's page contains no Discord ID; it repeats the level or role typed with **/scrim** or **/recrute**. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot no longer writes usernames there on its own (messages from before 30 September 2026 may quote some): the reason for an exclusion, free text written by the moderator, may quote one, and a failed direct-message delivery may mention the account concerned.",
+            text: "The public activity feed on the bot's page contains no Discord ID; it repeats the level or role typed with **/scrim** or **/recrute**. The staff's private log channel and the server logs receive the names of servers that add or remove the Bot, operating errors, which may mention a Discord ID, and the website's activity journal (sign-ups, matches, tournaments), written by the website without any player's username. The Bot no longer writes usernames there on its own (messages older than this rule may quote some): the reason for an exclusion, free text written by the moderator, may quote one, and a failed direct-message delivery may mention the account concerned.",
           },
           { kind: "subhead", text: "Legal basis" },
           {
@@ -718,7 +718,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               "The association's staff, for moderating and administering the Bot.",
               "The Bot's owner (its technical host), who receives exclusion reasons by direct message.",
-              "The excluded user, to whom the Bot sends the reason for their exclusion by direct message when they try to use it.",
+              "The excluded user, to whom the Bot sends the reason for their exclusion by direct message when they post in a relayed channel.",
               "The members of the channel where **/scrim** or **/recrute** is used: the command replies publicly there, and Discord shows who used it.",
               "Members of partner servers, who read the relayed advertisements.",
               "Members of the referee role of every server that has set one, for the website's referee alerts.",
