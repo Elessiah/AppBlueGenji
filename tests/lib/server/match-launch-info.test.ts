@@ -70,6 +70,23 @@ function member(teamId: number, userId: number, overrides: Record<string, unknow
   };
 }
 
+/** Compte d'un caster **éligible** : permission `live` et identité exigée. */
+function casterUser(id: number, overrides: Record<string, unknown> = {}) {
+  return {
+    id,
+    pseudo: "Caster",
+    discord_pseudo: "caster",
+    discord_verified_at: OPENED,
+    overwatch_battletag: "Caster#1",
+    blizzard_sub: "sub",
+    visible_overwatch: 0,
+    is_deleted: 0,
+    is_admin: 0,
+    platform_roles_json: JSON.stringify(["CASTER"]),
+    ...overrides,
+  };
+}
+
 type World = {
   /** Un tournoi est-il en cours sur le site ? */
   running: boolean;
@@ -81,6 +98,8 @@ type World = {
   members: ReturnType<typeof member>[];
   users: Record<string, unknown>[];
   writes: string[];
+  /** La relecture sous verrou du retrait d'un caster échoue. */
+  failRelease?: boolean;
 };
 
 let state: World;
@@ -115,6 +134,11 @@ function connectionFor(world: World): PoolConnection {
     if (sql.includes("t.name AS tournament_name")) return [world.candidates, []];
     if (sql.includes("FROM bg_team_members tm")) return [world.members, []];
     if (sql.includes("FROM bg_users WHERE id IN")) return [world.users, []];
+    if (sql.includes("FROM bg_users WHERE id = ?")) {
+      // Relecture sous verrou par le retrait d'un caster non éligible.
+      if (world.failRelease) throw new Error("base injoignable");
+      return [world.users.filter((u) => u.id === Number(params[0])), []];
+    }
     throw new Error(`requête inattendue : ${sql}`);
   };
   return fakeConnection({
@@ -182,18 +206,7 @@ describe("listViewerMatchLaunches — le match et la place du lecteur", () => {
   it("reconnaît le caster et son « Prêt »", async () => {
     state.viewerMemberships = [];
     state.candidates = [candidate({ caster_user_id: VIEWER, caster_ready_at: OPENED })];
-    state.users = [
-      {
-        id: VIEWER,
-        pseudo: "Caster",
-        discord_pseudo: "caster",
-        discord_verified_at: OPENED,
-        overwatch_battletag: "Caster#1",
-        blizzard_sub: "sub",
-        visible_overwatch: 0,
-        is_deleted: 0,
-      },
-    ];
+    state.users = [casterUser(VIEWER)];
     const [info] = await listViewerMatchLaunches(viewer);
     expect(info.viewer).toEqual({ role: "CASTER", canDeclareReady: true, ready: true });
     expect(info.caster).toMatchObject({
@@ -333,18 +346,7 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
   it("n'expose aucun contact avant l'heure de début", async () => {
     state.candidates = [candidate({ start_at: new Date(Date.now() + 30 * 60_000).toISOString(), caster_user_id: CASTER })];
     state.members = [member(TEAM2, 5, { discord_pseudo: "own", discord_verified_at: OPENED })];
-    state.users = [
-      {
-        id: CASTER,
-        pseudo: "Caster",
-        discord_pseudo: "caster",
-        discord_verified_at: OPENED,
-        overwatch_battletag: "Caster#1",
-        blizzard_sub: "sub",
-        visible_overwatch: 0,
-        is_deleted: 0,
-      },
-    ];
+    state.users = [casterUser(CASTER)];
     const [info] = await listViewerMatchLaunches(viewer);
     expect(info.phase).toBe("SCHEDULED");
     expect(info.team1.contacts).toEqual([]);
@@ -374,9 +376,7 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
         blizzard_sub: "s2",
       }),
     ];
-    state.users = [
-      { id: VIEWER, pseudo: "Caster", discord_pseudo: null, discord_verified_at: null, overwatch_battletag: null, blizzard_sub: null, visible_overwatch: 0, is_deleted: 0 },
-    ];
+    state.users = [casterUser(VIEWER)];
     const [info] = await listViewerMatchLaunches(viewer);
     expect(info.viewer.role).toBe("CASTER");
     expect(info.team1.contacts).toEqual([
@@ -386,9 +386,7 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
 
   it("montre aux joueurs le BattleTag masqué du caster inscrit", async () => {
     state.candidates = [candidate({ caster_user_id: CASTER })];
-    state.users = [
-      { id: CASTER, pseudo: "Caster", discord_pseudo: "caster", discord_verified_at: OPENED, overwatch_battletag: "Caster#1", blizzard_sub: "sub", visible_overwatch: 0, is_deleted: 0 },
-    ];
+    state.users = [casterUser(CASTER)];
     const [info] = await listViewerMatchLaunches(viewer);
     expect(info.viewer.role).toBe("TEAM1");
     expect(info.caster).toMatchObject({ pseudo: "Caster", discordTag: "caster", battletag: "Caster#1" });
@@ -396,9 +394,84 @@ describe("listViewerMatchLaunches — exposition des contacts", () => {
 
   it("tait le caster d'un compte supprimé", async () => {
     state.candidates = [candidate({ caster_user_id: CASTER })];
-    state.users = [{ id: CASTER, pseudo: "compte_supprime_1", discord_pseudo: null, discord_verified_at: null, overwatch_battletag: null, blizzard_sub: null, visible_overwatch: 0, is_deleted: 1 }];
+    state.users = [{ id: CASTER, pseudo: "compte_supprime_1", discord_pseudo: null, discord_verified_at: null, overwatch_battletag: null, blizzard_sub: null, visible_overwatch: 0, is_deleted: 1, is_admin: 0, platform_roles_json: null }];
     const [info] = await listViewerMatchLaunches(viewer);
     expect(info.caster).toBeNull();
+  });
+});
+
+describe("listViewerMatchLaunches — caster qui ne remplit plus la condition", () => {
+  const castRelease = (world: World) =>
+    world.writes.filter((sql) => sql.includes("SET caster_user_id = NULL"));
+
+  beforeEach(() => {
+    state.members = [
+      member(TEAM1, 2, {
+        roles_json: JSON.stringify(["CAPITAINE"]),
+        discord_pseudo: "cap",
+        discord_verified_at: OPENED,
+        overwatch_battletag: "Masque#1",
+        blizzard_sub: "s2",
+      }),
+    ];
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ["permission `live` retirée", { platform_roles_json: JSON.stringify(["RECRUTEUR"]) }],
+    ["tag Discord décertifié", { discord_verified_at: null }],
+    ["Battle.net détaché", { blizzard_sub: null }],
+    ["compte supprimé", { is_deleted: 1 }],
+  ])("%s : plus aucun contact, et l'inscription est retirée", async (_label, overrides) => {
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ caster_user_id: VIEWER })];
+    state.users = [casterUser(VIEWER, overrides)];
+    expect(await listViewerMatchLaunches(viewer)).toEqual([]);
+    expect(castRelease(state)).toHaveLength(1);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+  });
+
+  it("tait aux joueurs un caster devenu inéligible et libère le match", async () => {
+    state.candidates = [candidate({ caster_user_id: CASTER })];
+    state.users = [casterUser(CASTER, { platform_roles_json: null })];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.viewer.role).toBe("TEAM1");
+    expect(info.caster).toBeNull();
+    expect(castRelease(state)).toHaveLength(1);
+  });
+
+  it("garde un administrateur, qui détient `live` sans rôle stocké", async () => {
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ caster_user_id: VIEWER })];
+    state.users = [casterUser(VIEWER, { is_admin: 1, platform_roles_json: null })];
+    const [info] = await listViewerMatchLaunches(viewer);
+    expect(info.viewer.role).toBe("CASTER");
+    expect(castRelease(state)).toEqual([]);
+  });
+
+  it("ne retire rien si le compte est redevenu éligible avant l'écriture", async () => {
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ caster_user_id: VIEWER })];
+    let lookups = 0;
+    const eligible = casterUser(VIEWER);
+    const revoked = casterUser(VIEWER, { platform_roles_json: null });
+    Object.defineProperty(state, "users", {
+      configurable: true,
+      get: () => (lookups++ === 0 ? [revoked] : [eligible]),
+    });
+    expect(await listViewerMatchLaunches(viewer)).toEqual([]);
+    expect(castRelease(state)).toEqual([]);
+    expect(publishMatchUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("n'échoue pas quand le retrait est impossible", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    state.viewerMemberships = [];
+    state.candidates = [candidate({ caster_user_id: VIEWER })];
+    state.users = [casterUser(VIEWER, { blizzard_sub: null })];
+    state.failRelease = true;
+    expect(await listViewerMatchLaunches(viewer)).toEqual([]);
+    expect(error).toHaveBeenCalled();
+    error.mockRestore();
   });
 });
 

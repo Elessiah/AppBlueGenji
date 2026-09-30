@@ -352,6 +352,17 @@ describe("deleteOwnAccount — l'anonymisation sous un pseudo d'emprunt", () => 
     }
   });
 
+  it("efface l'acceptation des conditions : le détail et la dernière version datée", async () => {
+    const { queries } = fakeDb({ ...EMPTY, played: 1 });
+
+    await deleteOwnAccount(7);
+
+    const sql = anonymization(queries).sql;
+    expect(sql).toContain("terms_version = NULL");
+    expect(sql).toContain("terms_accepted_at = NULL");
+    expect(has(queries, "DELETE FROM bg_terms_acceptances WHERE user_id = ?")).toBe(true);
+  });
+
   it("efface les consentements et la trace des messages privés", async () => {
     const { queries } = fakeDb({ ...EMPTY, played: 1 });
 

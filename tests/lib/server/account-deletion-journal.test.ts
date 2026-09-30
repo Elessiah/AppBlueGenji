@@ -4,8 +4,10 @@ import os from "node:os";
 import path from "node:path";
 import {
   accountDeletionJournalPath,
+  pruneAccountDeletionJournal,
   readAccountDeletionJournal,
   recordAccountDeletion,
+  scheduleAccountDeletionJournalPrune,
 } from "@/lib/server/account-deletion-journal";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
 
@@ -114,5 +116,77 @@ describe("recordAccountDeletion", () => {
     const other = path.join(dir, "other.jsonl");
     await recordAccountDeletion(entry(2), { filePath: other, now });
     expect((await readAccountDeletionJournal(other)).entries).toEqual([entry(2)]);
+  });
+});
+
+describe("pruneAccountDeletionJournal — élagage sans suppression nouvelle", () => {
+  const oldEntry = entry(1, "2026-06-01T00:00:00.000Z");
+  const freshEntry = entry(2, "2026-09-20T00:00:00.000Z");
+  const back = new Date("2026-06-01T01:00:00.000Z");
+
+  it("retire les lignes échues et garde les autres", async () => {
+    await recordAccountDeletion(oldEntry, { filePath: file, now: back });
+    await recordAccountDeletion(freshEntry, { filePath: file, now: back });
+    expect(await pruneAccountDeletionJournal({ filePath: file, now })).toBe(1);
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([freshEntry]);
+  });
+
+  it("ne réécrit rien quand rien n'est échu", async () => {
+    await recordAccountDeletion(freshEntry, { filePath: file, now });
+    const before = await readFile(file, "utf8");
+    expect(await pruneAccountDeletionJournal({ filePath: file, now })).toBe(0);
+    expect(await readFile(file, "utf8")).toBe(before);
+  });
+
+  it("ne crée pas un journal absent", async () => {
+    expect(await pruneAccountDeletionJournal({ filePath: file, now })).toBe(0);
+    await expect(readFile(file, "utf8")).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("ne perd pas une suppression consignée pendant l'élagage", async () => {
+    await recordAccountDeletion(oldEntry, { filePath: file, now: back });
+    await Promise.all([
+      pruneAccountDeletionJournal({ filePath: file, now }),
+      recordAccountDeletion(freshEntry, { filePath: file, now }),
+    ]);
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([freshEntry]);
+  });
+});
+
+describe("scheduleAccountDeletionJournalPrune", () => {
+  const saved = process.env.ACCOUNT_DELETION_JOURNAL_PATH;
+  afterEach(() => {
+    process.env.ACCOUNT_DELETION_JOURNAL_PATH = saved;
+  });
+
+  // Une file d'écriture unique : un élagage lancé après celui qu'on attend
+  // ne se termine qu'une fois le premier écrit.
+  const drain = () => pruneAccountDeletionJournal({ filePath: path.join(dir, "vide.jsonl") });
+
+  it("élague au plus une fois par heure, sans être attendu", async () => {
+    process.env.ACCOUNT_DELETION_JOURNAL_PATH = file;
+    const t0 = Date.parse("2030-01-01T00:00:00.000Z");
+    await recordAccountDeletion(entry(1, "2026-06-01T00:00:00.000Z"), { now: new Date("2026-06-01T01:00:00.000Z") });
+    expect(scheduleAccountDeletionJournalPrune(t0)).toBeUndefined();
+    await drain();
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([]);
+
+    await recordAccountDeletion(entry(3, "2020-01-01T00:00:00.000Z"), { now: new Date("2020-01-01T01:00:00.000Z") });
+    scheduleAccountDeletionJournalPrune(t0 + 30 * 60 * 1000);
+    await drain();
+    expect((await readAccountDeletionJournal(file)).entries).toHaveLength(1);
+
+    scheduleAccountDeletionJournalPrune(t0 + 61 * 60 * 1000);
+    await drain();
+    expect((await readAccountDeletionJournal(file)).entries).toEqual([]);
+  });
+
+  it("journalise un échec sans lever", async () => {
+    const error = jest.spyOn(console, "error").mockImplementation(() => undefined);
+    // Un dossier à la place du fichier : la lecture échoue autrement que par ENOENT.
+    process.env.ACCOUNT_DELETION_JOURNAL_PATH = dir;
+    expect(() => scheduleAccountDeletionJournalPrune(Date.parse("2031-01-01T00:00:00.000Z"))).not.toThrow();
+    await drain();
+    expect(error).toHaveBeenCalledWith(expect.stringContaining("élagage impossible"), expect.anything());
   });
 });

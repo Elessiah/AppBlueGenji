@@ -165,7 +165,7 @@ describe("accountDeletionConfirmation", () => {
     const erase = accountDeletionConfirmation(null);
     expect(erase).not.toMatch(/sans laisser de trace|aucune trace/);
     expect(erase).toContain(`sauvegardes chiffrées du site (${BACKUP_RETENTION_DAYS} jours)`);
-    expect(erase).toContain(`(au moins ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours)`);
+    expect(erase).toContain(`(${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours)`);
     expect(erase).toContain("mesure d'audience");
     expect(erase).toContain("journaux du serveur");
   });

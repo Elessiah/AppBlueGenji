@@ -90,9 +90,10 @@ describe("PROCESSING_ACTIVITIES", () => {
     expect(terms.name).toMatch(/conditions d'utilisation/);
     expect(terms.dataCategories.join(" ")).toMatch(/Version acceptée/);
     expect(terms.retention.join(" ")).toMatch(/Durée du compte/);
-    // `anonymizeAccount` efface `bg_terms_acceptances` mais pas
+    // `anonymizeAccount` efface `bg_terms_acceptances` **et**
     // `bg_users.terms_version` / `terms_accepted_at` : le registre le dit.
-    expect(terms.retention.join(" ")).toMatch(/dernière version acceptée et sa date restent attachées au compte anonymisé/);
+    expect(terms.retention.join(" ")).toMatch(/effacé ou anonymisé — le détail des acceptations comme la dernière version acceptée et sa date/);
+    expect(terms.retention.join(" ")).not.toMatch(/restent attachées/);
     expect(terms.transfers).toEqual(["Aucun"]);
   });
 
