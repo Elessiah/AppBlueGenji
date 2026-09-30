@@ -175,6 +175,17 @@ describe("T03 — conservation des résultats de tournois", () => {
   });
 });
 
+describe("T11 — demandes reçues par courriel ou téléphone", () => {
+  it("nomme la personne à contacter et Microsoft, qui héberge sa messagerie, sans prétendre à une durée", () => {
+    const t11 = byRef("T11");
+    expect(t11.recipients.join(" ")).toContain(DATA_CONTACT_NAME);
+    expect(t11.recipients.join(" ")).toContain("Microsoft, qui héberge la messagerie");
+    expect(t11.transfers.join(" ")).toMatch(/Microsoft \(messagerie Outlook\.com/);
+    expect(t11.retention.join(" ")).toContain("non encore fixée par l'association");
+    expect(t11.dataCategories.join(" ")).toContain("reçues par courriel ou par téléphone");
+  });
+});
+
 describe("registerController", () => {
   it("donne la personne à contacter pour les données, le formulaire et l'association, sans tag Discord ni adresse électronique", () => {
     expect(controller.contact).toBe(RGPD_CONTACT_LINE);

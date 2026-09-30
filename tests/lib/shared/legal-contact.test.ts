@@ -12,6 +12,7 @@ import {
   RGPD_CONTACT_LINE,
 } from "@/lib/shared/legal-contact";
 import { registerController } from "@/lib/shared/processing-register";
+import { SITE_HOST } from "@/lib/shared/site-host";
 import { readSource } from "../../helpers/read-source";
 
 /**
@@ -213,7 +214,8 @@ describe("contact de remplacement", () => {
 
 describe("personne à contacter pour les demandes relatives aux données", () => {
   it("est l'hébergeur technique, jamais appelé délégué ni DPO", () => {
-    expect(DATA_CONTACT_NAME).toBe("Keryan HOUSSIN");
+    // Même personne, même graphie que l'hébergeur des mentions légales.
+    expect(DATA_CONTACT_NAME).toBe(SITE_HOST.name);
     expect(DATA_CONTACT_ROLE).toBe("hébergeur technique du site");
     expect(DATA_CONTACT_LABEL).toBe("Personne à contacter pour vos demandes relatives à vos données");
     for (const text of [DATA_CONTACT_LABEL, DATA_CONTACT_ROLE, RGPD_CONTACT_LINE]) {

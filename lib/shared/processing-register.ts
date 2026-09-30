@@ -565,18 +565,25 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, ${copyrightNoticeElementsText()}`,
       "Contestations : texte, compte de leur auteur et adresse facultative",
       "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance",
+      "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande, adresse électronique ou numéro de l'expéditeur",
     ],
     sensitiveData: "Aucune",
     retention: [
       `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
+      "Demande reçue par courriel ou par téléphone : durée de conservation dans la messagerie de la personne à contacter non encore fixée par l'association",
       `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
     ],
     recipients: [
       "Administrateurs de l'association",
       "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
       "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
+      `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
+      "Microsoft, qui héberge la messagerie de cette personne (Outlook.com, compte personnel) : demandes reçues par courriel",
     ],
-    transfers: [`États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`],
+    transfers: [
+      `États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`,
+      `Possibles vers les États-Unis : Microsoft (messagerie Outlook.com de la personne à contacter, demandes reçues par courriel) — ${transferBasis(["MICROSOFT"])}`,
+    ],
     security: [
       ...COMMON_SECURITY,
       "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",

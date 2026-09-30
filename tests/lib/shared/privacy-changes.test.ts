@@ -508,10 +508,12 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
     expect(text()).not.toMatch(/@|\b0\d([ .-]?\d{2}){4}\b/);
   });
 
-  it("ne l'appelle jamais DPO, et dit que le traitement ne change pas", () => {
+  it("ne l'appelle jamais DPO, et annonce le nouveau destinataire d'un courriel", () => {
     expect(text()).not.toMatch(/DPO/);
     expect(text()).toContain("Ce n'est pas un délégué à la protection des données");
-    expect(entry.summary).toMatch(/Rien ne change dans le traitement/);
+    // Un canal neuf, donc un destinataire neuf : l'entrée ne dit pas que rien ne change.
+    expect(text()).not.toMatch(/Rien ne change/);
+    expect(text()).toContain("hébergée par Microsoft (Outlook.com, possibles transferts vers les États-Unis)");
   });
 
   it("tient dans un message privé à elle seule, et renvoie à la section des droits", () => {

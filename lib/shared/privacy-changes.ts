@@ -464,8 +464,9 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
   },
   // Une personne est désormais chargée des demandes relatives aux données :
   // l'hébergeur technique du site, là où la politique disait qu'aucune n'était
-  // désignée. Le traitement ne change pas, mais le moyen d'exercer ses droits,
-  // si — c'est une information due à chaque compte. Entrée à part plutôt que
+  // désignée. Le moyen d'exercer ses droits change, et avec lui un
+  // destinataire : un courriel arrive dans une messagerie hébergée par
+  // Microsoft (registre, T11) — c'est une information due à chaque compte. Entrée à part plutôt que
   // quatrième point de `2026-10-rectificatifs-information`, qui annonce des
   // corrections d'annonces passées : même date, donc même modale et même
   // message privé.
@@ -473,9 +474,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     id: "2026-10-contact-donnees",
     publishedAt: "2026-10-01",
     title: "Une personne à contacter pour tes données",
-    summary: `Pour exercer tes droits sur tes données ou poser une question à leur sujet, tu peux maintenant t'adresser directement à ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, par courriel ou par téléphone. Rien ne change dans le traitement de tes données.`,
+    summary: `Pour exercer tes droits sur tes données ou poser une question à leur sujet, tu peux maintenant t'adresser directement à ${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, par courriel ou par téléphone. Le formulaire du site reste ouvert.`,
     details: [
       `Ses coordonnées se lisent dans la politique de confidentialité et les mentions légales du site. Le formulaire « ${REPORT_FORM_NAME} », catégorie RGPD, et les coordonnées de l'association restent ouverts.`,
+      "Une demande envoyée par courriel est reçue dans sa messagerie personnelle, hébergée par Microsoft (Outlook.com, possibles transferts vers les États-Unis) ; une demande faite depuis le formulaire suit le même chemin qu'avant.",
       "Ce n'est pas un délégué à la protection des données au sens du RGPD : l'association reste responsable du traitement de tes données et de la réponse à tes demandes.",
     ],
     links: [{ href: "/rgpd#exercer-vos-droits", label: "Lire la section « Exercer vos droits »" }],

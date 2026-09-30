@@ -26,6 +26,8 @@
  * Un test balaie les sources et refuse tout courriel ou numéro en clair.
  */
 
+import { SITE_HOST } from "@/lib/shared/site-host";
+
 /** Dénomination statutaire de l'association (statuts, art. 1er). */
 export const ASSOCIATION_NAME = "Bluegenji Esport";
 
@@ -46,10 +48,12 @@ export const REPORT_FORM_NAME = "Signaler un problème";
 
 /**
  * Personne à contacter pour les demandes relatives aux données : l'hébergeur
- * du site, désigné par l'association. Jamais « DPO » ni « délégué » : ce
+ * du site, désigné par l'association — son nom est **celui de l'hébergeur**
+ * (`SITE_HOST`), comme son téléphone : changer d'hébergeur sans désigner une
+ * autre personne ferait sinon afficher le numéro du nouveau sous l'ancien nom. Jamais « DPO » ni « délégué » : ce
  * titre désigne la fonction de l'article 37 du RGPD, qui n'est pas la sienne.
  */
-export const DATA_CONTACT_NAME = "Keryan HOUSSIN";
+export const DATA_CONTACT_NAME = SITE_HOST.name;
 
 /** Qualité sous laquelle `DATA_CONTACT_NAME` est présenté. */
 export const DATA_CONTACT_ROLE = "hébergeur technique du site";

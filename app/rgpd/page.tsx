@@ -775,6 +775,12 @@ export default async function RgpdPage() {
               envoi</strong> avec une clé que Microsoft ne détient pas — Microsoft les
               stocke sans pouvoir les lire.
             </li>
+            <li>
+              <strong>Microsoft</strong> (Outlook.com) : seulement si vous écrivez à la personne à
+              contacter pour vos demandes relatives à vos données, dont la messagerie personnelle
+              est hébergée par Microsoft. Une demande faite depuis le formulaire du site n&apos;y
+              passe pas.
+            </li>
           </ul>
           <p>
             <strong>Encadrement des transferts.</strong> Ces services peuvent traiter ou héberger
