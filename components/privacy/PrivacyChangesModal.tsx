@@ -47,7 +47,7 @@ const REPLAY_NOTICE = "Ta lecture n'a pas pu être enregistrée : ces informatio
  * Rendue par la mise en page racine, côté serveur : la liste est dans le HTML
  * initial, sans aller-retour ni clignotement.
  */
-export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
+export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChange[] }>) {
   const { showError, showSuccess } = useToast();
   const [answered, setAnswered] = useState(false);
   const [busy, setBusy] = useState(false);

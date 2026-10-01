@@ -29,7 +29,7 @@ type LiveCardProps = {
  * n'a pas à savoir si le tournoi oppose des équipes ou des joueurs. Une place
  * vide — bye, adversaire encore à désigner — ne mène nulle part.
  */
-function EntrantName({ href, name }: { href: string | null; name: string }) {
+function EntrantName({ href, name }: Readonly<{ href: string | null; name: string }>) {
   if (!href) return <>{name}</>;
   return (
     <EntityLink href={href} className={`${styles.nested} ${styles.entrantLink}`} title={`Voir la fiche de ${name}`}>
@@ -70,7 +70,7 @@ function noLiveTournamentMessage(iso: string | null | undefined): string {
  * tournoi s'ouvre défilée sur ce match précis, et le surligne à l'arrivée. Sans
  * match à montrer, elle se réduit au tournoi.
  */
-export function LiveCard({ live, nextUpcomingISO }: LiveCardProps) {
+export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   if (!live) {
     return (
       <CyberCard ticks className={styles.root}>

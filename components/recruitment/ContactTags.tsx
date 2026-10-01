@@ -29,7 +29,7 @@ function toHref(value: string): string {
  *
  * Ne rend rien si l'annonce n'expose aucun contact Discord.
  */
-export function ContactTags({ ad }: ContactTagsProps) {
+export function ContactTags({ ad }: Readonly<ContactTagsProps>) {
   const { showError, showSuccess } = useToast();
 
   if (!ad.contactDiscord && !ad.contactDiscordId) return null;

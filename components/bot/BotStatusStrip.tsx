@@ -12,7 +12,7 @@ import {
 import { botPayloadNumber, botPayloadText } from "@/lib/shared/bot-payload";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
 
-export function BotStatusStrip({ status }: { status: BotStatus | null }) {
+export function BotStatusStrip({ status }: Readonly<{ status: BotStatus | null }>) {
   const [uptime, setUptime] = useState("—");
   // Onglet caché : l'horloge s'arrête, et la relecture au retour la recale.
   const { clocks } = useClientPower();

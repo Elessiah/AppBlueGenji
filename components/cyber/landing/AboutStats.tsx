@@ -23,7 +23,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { value: "", label: "" };
 
-export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
+export function AboutStats({ initialStats, isAdmin }: Readonly<AboutStatsProps>) {
   const { showError, showSuccess } = useToast();
   const [stats, setStats] = useState<AboutStat[]>(initialStats);
   const [editing, setEditing] = useState<AboutStat | null>(null);

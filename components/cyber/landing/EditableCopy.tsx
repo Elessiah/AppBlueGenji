@@ -26,7 +26,7 @@ interface EditableCopyProps {
  * zone de saisie ; l'enregistrement rafraîchit la page serveur pour que tout
  * autre endroit affichant ce texte suive.
  */
-export function EditableCopy({ copyKey, value, canEdit, children }: EditableCopyProps) {
+export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<EditableCopyProps>) {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
   const [editing, setEditing] = useState(false);

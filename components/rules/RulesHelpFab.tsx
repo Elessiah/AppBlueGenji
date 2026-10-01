@@ -13,11 +13,11 @@ export function RulesHelpFab({
   format,
   contextLabel,
   tournamentId,
-}: {
+}: Readonly<{
   format?: TournamentFormat;
   contextLabel?: string;
   tournamentId?: number;
-}) {
+}>) {
   const baseHref = format ? rulesHrefForFormat(format) : "/regles";
   const href = format && tournamentId ? rulesHrefWithTournament(baseHref, tournamentId) : baseHref;
   const mode = format ? ruleModeForFormat(format) : null;

@@ -104,7 +104,7 @@ export function RecruitmentHighlight({
   bannerAds,
   bannerDismissed,
   onAdPage,
-}: {
+}: Readonly<{
   /** Prioritaires publiées : les pages de la modale d'arrivée. */
   modalAds: readonly RecruitmentAd[];
   /** La modale doit se taire quoi qu'il arrive (choix de confidentialité dû). */
@@ -117,7 +117,7 @@ export function RecruitmentHighlight({
   bannerDismissed: boolean;
   /** On est sur `/recrutement`, où la modale se tait (le visiteur y lit déjà les annonces). */
   onAdPage: boolean;
-}) {
+}>) {
   // Ouverte sur la première prioritaire jamais vue ; toutes vues, elle se tait.
   const modalStart = recruitmentModalStart(modalAds.map((ad) => ad.id), modalSeen);
   const showModal = modalStart !== null && !modalSilenced && !onAdPage;
@@ -157,10 +157,10 @@ export function RecruitmentHighlight({
 function RecruitmentBanner({
   ads,
   onAdPage,
-}: {
+}: Readonly<{
   ads: readonly RecruitmentAd[];
   onAdPage: boolean;
-}) {
+}>) {
   const [dismissed, setDismissed] = useState(false);
   const [index, setIndex] = useState(0);
   const [override, setOverride] = useState<CountdownOverride>(null);
@@ -318,11 +318,11 @@ function RecruitmentArrivalModal({
   ads,
   seenIds,
   startIndex,
-}: {
+}: Readonly<{
   ads: readonly RecruitmentAd[];
   seenIds: readonly number[];
   startIndex: number;
-}) {
+}>) {
   const [open, setOpen] = useState(true);
   const [index, setIndex] = useState(startIndex);
   // Pages **réellement affichées**, plus celles que le cookie tenait déjà. Tout

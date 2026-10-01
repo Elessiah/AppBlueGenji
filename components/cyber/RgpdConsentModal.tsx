@@ -26,7 +26,7 @@ interface RgpdConsentModalProps {
  * Revenir en arrière (`onRefuse`) ne déclenche aucune requête
  * d'authentification : rien n'est enregistré.
  */
-export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) {
+export function RgpdConsentModal({ onAccept, onRefuse }: Readonly<RgpdConsentModalProps>) {
   // Les conditions d'utilisation s'acceptent **ici**, avec le traitement des
   // données : le site n'a pas de formulaire d'inscription, un compte naît à la
   // première connexion — l'entrée de cette page est donc le seul endroit où les

@@ -25,7 +25,7 @@ const links = [
   { href: "/tournois", label: "Tournois", rgb: "79, 224, 162" },
 ];
 
-export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: ArenaNavProps) {
+export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: Readonly<ArenaNavProps>) {
   const pathname = usePathname();
 
   return (

@@ -23,7 +23,7 @@ import styles from "./BotLegalDoc.module.css";
  * avec la prononciation française. Posée sur les sections et non sur un
  * conteneur ajouté, pour ne rien changer à la mise en page de la page hôte.
  */
-export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
+export function BotLegalDoc({ doc }: Readonly<{ doc: BilingualDoc }>) {
   const [lang, setLang] = useState<Lang>("fr");
   const content = doc[lang];
   const [titleLine1, titleLine2] = content.title.split("\n");
@@ -92,7 +92,7 @@ export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
   );
 }
 
-function LangSwitch({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
+function LangSwitch({ lang, onChange }: Readonly<{ lang: Lang; onChange: (l: Lang) => void }>) {
   return (
     <fieldset className={`native-group ${styles.langSwitch}`} aria-label="Language / Langue">
       {(["fr", "en"] as const).map((code) => {
@@ -116,7 +116,7 @@ function LangSwitch({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => voi
   );
 }
 
-function Block({ block }: { block: LegalBlock }) {
+function Block({ block }: Readonly<{ block: LegalBlock }>) {
   if (block.kind === "subhead") {
     return <h3 className={styles.subhead}>{block.text}</h3>;
   }

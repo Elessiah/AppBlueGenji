@@ -62,11 +62,11 @@ export function PublicNavPanel({
   id,
   pathname,
   onNavigate,
-}: {
+}: Readonly<{
   id: string;
   pathname: string | null;
   onNavigate: () => void;
-}) {
+}>) {
   return (
     <nav id={id} className={styles.panel} aria-label="Navigation principale">
       {LINKS.map((link) => {

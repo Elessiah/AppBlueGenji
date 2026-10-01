@@ -7,7 +7,7 @@ function measure(value: unknown): number | null {
   return n !== null && n >= 0 ? n : null;
 }
 
-export function BotLatencyCard({ status }: { status: BotStatus | null }) {
+export function BotLatencyCard({ status }: Readonly<{ status: BotStatus | null }>) {
   // La carte reçoit **la même charge** que la bande d'état juste au-dessus, et
   // `fetchBotStatus` la rend par un simple `as BotStatus` sur du JSON reçu : un
   // `?? 0` ne rattrape que `null` et `undefined`, si bien qu'un `cpuUsage`

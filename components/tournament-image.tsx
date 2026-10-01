@@ -40,7 +40,7 @@ type BannerProps = {
 };
 
 /** Bandeau d'une **illustration** ; rien pour un logo ou sans image. */
-export function TournamentImageBanner({ image, sizes, className, fade = true, priority }: BannerProps) {
+export function TournamentImageBanner({ image, sizes, className, fade = true, priority }: Readonly<BannerProps>) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   if (!image || tournamentImageSlot(image) !== "BANNER" || image.url === failedUrl) return null;
   return (
@@ -71,7 +71,7 @@ type EmblemProps = {
 };
 
 /** Pastille d'un **logo** ; rien pour une illustration ou sans image. */
-export function TournamentImageEmblem({ image, size, className, priority }: EmblemProps) {
+export function TournamentImageEmblem({ image, size, className, priority }: Readonly<EmblemProps>) {
   const [failedUrl, setFailedUrl] = useState<string | null>(null);
   if (!image || tournamentImageSlot(image) !== "EMBLEM" || image.url === failedUrl) return null;
   return (

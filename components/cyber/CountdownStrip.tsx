@@ -18,7 +18,7 @@ const PLACEHOLDER_UNITS = [
 
 const pad = (n: number) => String(n).padStart(2, "0");
 
-export function CountdownStrip({ targetISO, label }: CountdownStripProps) {
+export function CountdownStrip({ targetISO, label }: Readonly<CountdownStripProps>) {
   // Horloge soumise au régime de charge : arrêtée onglet caché, recalée au retour.
   const now = useClock(1000);
 

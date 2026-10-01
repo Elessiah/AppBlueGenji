@@ -12,7 +12,7 @@ import { fieldErrorId } from "@/lib/shared/field-errors";
  * Rien n'est rendu sans message : l'`id` n'existe que tant que le champ est
  * signalé, comme la référence qui le vise.
  */
-export function FieldErrorText({ fieldId, message }: { fieldId: string; message: string | null }) {
+export function FieldErrorText({ fieldId, message }: Readonly<{ fieldId: string; message: string | null }>) {
   if (!message) return null;
   return (
     <span id={fieldErrorId(fieldId)} className="sr-only">

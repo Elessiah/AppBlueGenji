@@ -34,7 +34,7 @@ export function LogoWithGlow({
   borderRadius = 12,
   borderColor = "rgba(89,212,255,0.3)",
   onError,
-}: LogoWithGlowProps) {
+}: Readonly<LogoWithGlowProps>) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const target = useRef({ x: 0, y: 0 });
   const current = useRef({ x: 0, y: 0 });

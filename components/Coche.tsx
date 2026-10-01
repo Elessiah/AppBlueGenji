@@ -42,7 +42,7 @@ export function Coche({
   onChange,
   theme = "joueur",
   ...props
-}: CocheProps) {
+}: Readonly<CocheProps>) {
   // Le thème donne **deux** valeurs, et il le faut : la couleur pleine de la
   // pastille et le triplet `r,g,b` de ses voiles. Un réglage unique servait les
   // deux, si bien qu'une couleur passée par un appelant sortait en

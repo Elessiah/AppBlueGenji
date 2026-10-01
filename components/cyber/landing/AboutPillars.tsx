@@ -23,7 +23,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { title: "", text: "" };
 
-export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
+export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsProps>) {
   const { showError, showSuccess } = useToast();
   const [pillars, setPillars] = useState<AboutPillar[]>(initialPillars);
   const [editing, setEditing] = useState<AboutPillar | null>(null);

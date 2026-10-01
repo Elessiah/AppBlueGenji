@@ -11,12 +11,12 @@ export function ErrorPanel({
   copy,
   children,
   reference,
-}: {
+}: Readonly<{
   copy: ErrorPageCopy;
   /** Actions proposées (liens, bouton « Réessayer »). */
   children: ReactNode;
   reference?: string | null;
-}) {
+}>) {
   return (
     <section className={styles.wrap} aria-labelledby="error-page-title">
       <div className={styles.card}>

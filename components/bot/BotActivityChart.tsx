@@ -77,7 +77,7 @@ export function loadActivityRange(
  * 2.5.3) : le groupe dit de quoi elles sont la plage, `aria-pressed` laquelle
  * est affichée.
  */
-function RangeChips({ range, onChange }: { range: ActivityRange; onChange: (range: ActivityRange) => void }) {
+function RangeChips({ range, onChange }: Readonly<{ range: ActivityRange; onChange: (range: ActivityRange) => void }>) {
   return (
     <fieldset className="chart-tools native-group" aria-label="Plage d'activité affichée">
       {RANGES.map((r) => (
@@ -95,7 +95,7 @@ function RangeChips({ range, onChange }: { range: ActivityRange; onChange: (rang
   );
 }
 
-export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
+export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | null }>) {
   const [range, setRange] = useState<ActivityRange>("30j");
   const [shown, setShown] = useState<ShownActivity>({ range: "30j", data: initial });
 
