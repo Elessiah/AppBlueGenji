@@ -324,11 +324,11 @@ export function MatchScheduleDialog({
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
           </p>
 
-          {/* L'aide se lit une fois, en entrant dans le groupe, pas à chacun des trois champs. */}
-          <fieldset
-            aria-describedby={HINT_ID}
-            style={{ margin: "18px 0 0", padding: 0, border: 0, minWidth: 0 }}
-          >
+          {/* L'aide est rattachée au premier champ (lue une fois, et non à
+              chacun des trois) ; l'aperçu au dernier, pour qu'on entende la
+              date retenue en finissant la saisie. La description d'un
+              `fieldset` n'est pas lue par tous les lecteurs d'écran. */}
+          <fieldset style={{ margin: "18px 0 0", padding: 0, border: 0, minWidth: 0 }}>
             <legend style={{ padding: 0, marginBottom: 8, fontSize: 13, color: "var(--ink)" }}>
               Début programmé (heure de Paris)
             </legend>
@@ -344,7 +344,7 @@ export function MatchScheduleDialog({
                     setYearShift(0);
                     fieldErrors.clear();
                   }}
-                  {...fieldErrors.aria("day")}
+                  {...fieldErrors.aria("day", HINT_ID)}
                 >
                   <option value="">—</option>
                   {DAYS.map((value) => (
@@ -396,7 +396,7 @@ export function MatchScheduleDialog({
                   // chaque touche et à la sortie.
                   onKeyUp={(e) => setTimeBadInput(e.currentTarget.validity.badInput)}
                   onBlur={(e) => setTimeBadInput(e.target.validity.badInput)}
-                  {...fieldErrors.aria("time")}
+                  {...fieldErrors.aria("time", PREVIEW_ID)}
                 />
                 <FieldErrorText fieldId={FIELD_IDS.time} message={fieldErrors.message("time")} />
               </div>
