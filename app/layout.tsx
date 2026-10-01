@@ -153,7 +153,7 @@ async function termsRequestFor(userId: number | undefined): Promise<TermsRequest
  * rien ne l'aurait signalé — la page qui s'y ajoute demain hérite au contraire
  * de cette ligne sans qu'on ait à y penser. Voir `lib/shared/csp.ts`.
  */
-export default async function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const requestHeaders = await headers();
 
   // L'annonce est résolue **ici**, côté serveur, et non plus par un `fetch`

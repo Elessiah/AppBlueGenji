@@ -82,7 +82,7 @@ const PRIORITY_BADGE_CLASS: Record<RecruitmentPriority, string> = {
   OPTIONAL: "",
 };
 
-export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: RecruitmentSectionProps) {
+export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
   const { showError, showSuccess } = useToast();
   // Toujours rangée par statut : les flèches de réordonnancement ne se lisent
   // que sur cet ordre-là (voir `canMoveRecruitmentAd`).

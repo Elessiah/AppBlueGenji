@@ -32,7 +32,7 @@ export const metadata: Metadata = {
  * et les conditions d'utilisation doivent s'y trouver comme partout — ce sont
  * d'ailleurs ces conditions qu'on accepte en créant un compte ici.
  */
-export default async function ConnexionLayout({ children }: { children: React.ReactNode }) {
+export default async function ConnexionLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser().catch(() => null);
   return (
     <>

@@ -28,7 +28,7 @@ export const metadata: Metadata = pageMetadata({
   path: "/regles",
 });
 
-function ModeCard({ mode }: { mode: TournamentRuleMode }) {
+function ModeCard({ mode }: Readonly<{ mode: TournamentRuleMode }>) {
   const soon = mode.status === "SOON";
   return (
     <CyberCard lift ticks style={{ height: "100%" }}>
