@@ -125,7 +125,7 @@ async function createTable(db: Pool, ddl: string): Promise<void> {
 }
 
 /** Premiers mots d'une clause de clé : elle décrit la table, pas une colonne. */
-const KEY_CLAUSE_WORDS = ["PRIMARY", "UNIQUE", "KEY", "INDEX", "CONSTRAINT", "FOREIGN", "FULLTEXT", "SPATIAL"];
+const KEY_CLAUSE_WORDS = new Set(["PRIMARY", "UNIQUE", "KEY", "INDEX", "CONSTRAINT", "FOREIGN", "FULLTEXT", "SPATIAL"]);
 
 /**
  * Les colonnes déclarées par un `CREATE TABLE`, et le nom de sa table.
@@ -161,7 +161,7 @@ export function declaredColumns(ddl: string): { table: string; columns: string[]
   for (const definition of splitTopLevelDefinitions(body)) {
     const word = /^`?(\w+)`?\s+\S/.exec(definition.trim().replace(/\s+/g, " "));
     if (!word) continue;
-    if (KEY_CLAUSE_WORDS.includes(word[1].toUpperCase())) continue;
+    if (KEY_CLAUSE_WORDS.has(word[1].toUpperCase())) continue;
     columns.push(word[1]);
   }
   return { table: named[1], columns };

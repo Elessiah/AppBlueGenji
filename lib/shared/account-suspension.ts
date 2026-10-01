@@ -185,8 +185,11 @@ export function formatSuspensionEnd(endsAt: Date | string): string {
   return `${day} à ${time} (heure de Paris)`;
 }
 
+/** Échéance d'une suspension : `null` pour une durée indéterminée. */
+export type SuspensionEndsAt = Date | string | null;
+
 /** « jusqu'au … » ou « pour une durée indéterminée ». */
-export function suspensionSpan(endsAt: Date | string | null): string {
+export function suspensionSpan(endsAt: SuspensionEndsAt): string {
   return endsAt === null ? "pour une durée indéterminée" : `jusqu'au ${formatSuspensionEnd(endsAt)}`;
 }
 
@@ -211,7 +214,7 @@ export function formatSuspensionNotice(input: {
   id: number;
   reason: string;
   ground: SuspensionGround;
-  endsAt: Date | string | null;
+  endsAt: SuspensionEndsAt;
   termsUrl: string;
 }): string {
   const reference = suspensionReference(input.id);
@@ -235,7 +238,7 @@ export function formatSuspensionLiftedNotice(id: number): string {
  * Ligne du journal du staff sur Discord — **jamais** le pseudo du joueur
  * (`lib/shared/log-privacy.ts`), ni le motif, qui en nommerait peut-être un.
  */
-export function formatSuspensionLog(input: { id: number; ground: SuspensionGround; endsAt: Date | string | null }): string {
+export function formatSuspensionLog(input: { id: number; ground: SuspensionGround; endsAt: SuspensionEndsAt }): string {
   return (
     `⛔ Compte d'${ANONYMOUS_PLAYER_LABEL} suspendu par le staff ${suspensionSpan(input.endsAt)} ` +
     `(décision ${suspensionReference(input.id)}, clause « ${SUSPENSION_GROUND_DEFINITIONS[input.ground].clause} »).`
@@ -317,14 +320,18 @@ export function toSuspensionNotice(suspension: Pick<AccountSuspensionView, "id" 
 export function encodeSuspensionNotice(notice: SuspensionNotice): string {
   const bytes = new TextEncoder().encode(JSON.stringify(notice));
   let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  for (const byte of bytes) binary += String.fromCodePoint(byte);
+  const base64 = btoa(binary);
+  // Le bourrage « = » n'apparaît qu'en fin de chaîne : on coupe au premier.
+  const padding = base64.indexOf("=");
+  const unpadded = padding === -1 ? base64 : base64.slice(0, padding);
+  return unpadded.replace(/\+/g, "-").replace(/\//g, "_");
 }
 
 function decodeBase64Url(value: string): string {
   const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
   const binary = atob(base64 + "=".repeat((4 - (base64.length % 4)) % 4));
-  const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
+  const bytes = Uint8Array.from(binary, (char) => char.codePointAt(0) ?? 0);
   return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 

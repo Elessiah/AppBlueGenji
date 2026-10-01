@@ -24,6 +24,6 @@ module.exports = {
     // tests une fois par worktree (comptage multiplié, exécutions en double).
     // Ancré sur <rootDir> pour ne viser que le `.claude` directement sous la
     // racine du projet — sans exclure un worktree lancé depuis son propre dossier.
-    testPathIgnorePatterns: ['/node_modules/', '<rootDir>[/\\\\]\\.claude[/\\\\]'],
-    modulePathIgnorePatterns: ['<rootDir>[/\\\\]\\.claude[/\\\\]'],
+    testPathIgnorePatterns: ['/node_modules/', String.raw`<rootDir>[/\\]\.claude[/\\]`],
+    modulePathIgnorePatterns: [String.raw`<rootDir>[/\\]\.claude[/\\]`],
 };

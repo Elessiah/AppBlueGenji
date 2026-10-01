@@ -19,7 +19,8 @@ const short = (name: string | null): string =>
 /** Rôles de plateforme : le pilote MySQL peut rendre la colonne JSON déjà décodée. */
 function rolesBadge(roles: unknown): string | null {
   if (!roles) return null;
-  return Array.isArray(roles) ? roles.join("+") : String(roles);
+  if (Array.isArray(roles)) return roles.join("+");
+  return typeof roles === "string" ? roles : JSON.stringify(roles);
 }
 
 async function overview(db: Awaited<ReturnType<typeof getDatabase>>): Promise<void> {

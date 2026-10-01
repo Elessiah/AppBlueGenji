@@ -21,7 +21,7 @@ export default function TeamDetailPage() {
 
   // Une fantôme n'a ni membre ni demande, une équipe dissoute plus rien à
   // gérer : la route refuserait (403), autant ne pas l'appeler.
-  const managesRoster = Boolean(team && team.canManage && !team.team.isGhost && !team.team.deletedAt);
+  const managesRoster = Boolean(team?.canManage && !team.team.isGhost && !team.team.deletedAt);
   const pending = useTeamPendingInvitations(teamId, managesRoster);
   const reloadPending = pending.reload;
   const onPendingChanged = useCallback(() => void reloadPending(), [reloadPending]);

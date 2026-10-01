@@ -291,9 +291,9 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
             <div className={s.formRow}>
               {/* `role="list"` n'est pas redondant : Safari retire le rôle d'une
                   liste dont on a ôté les puces (`list-style: none`). */}
-              <ul
+              <ul // NOSONAR S6822 — Safari retire le rôle d'une liste sans puces
                 className={`native-list ${s.form}`}
-                role="list" // NOSONAR S6822 — Safari retire le rôle d'une liste sans puces
+                role="list"
                 aria-label={`${stats.form.length} derniers résultats, du plus récent au plus ancien`}
               >
                 {stats.form.map((result, index) => {

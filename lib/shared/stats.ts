@@ -373,7 +373,7 @@ export function computeDeepStats(
     const lost = match.outcome === "LOSS";
 
     tallyMatchTotals(stats, match, won, lost);
-    advanceStreaks(stats, streaks, won, lost);
+    advanceStreaks(stats, streaks, match.outcome);
     bumpSplit(byGame, match.game, won, lost);
     bumpSplit(byFormat, match.format, won, lost);
     if (match.opponentTeamId !== null) bumpOpponent(opponents, match.opponentTeamId, match.opponentName, won, lost);
@@ -427,19 +427,11 @@ function tallyMatchTotals(stats: DeepStats, match: StatsMatch, won: boolean, los
  * deux** — il n'est ni l'une ni l'autre, et le laisser passer ferait annoncer
  * une série de victoires qu'un 2-2 a pourtant interrompue.
  */
-function advanceStreaks(stats: DeepStats, streaks: RunningStreaks, won: boolean, lost: boolean): void {
-  if (won) {
-    streaks.wins += 1;
-    streaks.losses = 0;
-    if (streaks.wins > stats.bestWinStreak) stats.bestWinStreak = streaks.wins;
-  } else if (lost) {
-    streaks.losses += 1;
-    streaks.wins = 0;
-    if (streaks.losses > stats.worstLossStreak) stats.worstLossStreak = streaks.losses;
-  } else {
-    streaks.wins = 0;
-    streaks.losses = 0;
-  }
+function advanceStreaks(stats: DeepStats, streaks: RunningStreaks, outcome: StatsOutcome): void {
+  streaks.wins = outcome === "WIN" ? streaks.wins + 1 : 0;
+  streaks.losses = outcome === "LOSS" ? streaks.losses + 1 : 0;
+  stats.bestWinStreak = Math.max(stats.bestWinStreak, streaks.wins);
+  stats.worstLossStreak = Math.max(stats.worstLossStreak, streaks.losses);
 }
 
 function bumpSplit<K>(buckets: Map<K, SplitBucket>, key: K, won: boolean, lost: boolean): void {

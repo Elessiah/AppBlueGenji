@@ -115,11 +115,17 @@ describe("réglages d'accessibilité — feuille globale", () => {
     }
   });
 
-  it("police simplifiée + espacement : l'espacement est reposé après la remise à zéro", () => {
-    const reset = sheet.indexOf(':root[data-a11y~="font"] body *');
-    const both = sheet.indexOf(':root[data-a11y~="font"][data-a11y~="spacing"] body *');
-    expect(reset).toBeGreaterThan(0);
-    expect(both).toBeGreaterThan(reset);
+  it("police simplifiée + espacement : la remise à zéro reprend l'écart de l'espacement", () => {
+    // Un seul jeton pour l'écart entre les lettres : l'espacement le pose,
+    // le body le lit, et la police simplifiée le reprend élément par élément
+    // au lieu de le remettre à `normal`.
+    expect(declarations(':root[data-a11y~="spacing"]')).toMatch(/--a11y-letter-spacing:\s*0\.04em;/);
+    expect(declarations(':root[data-a11y~="spacing"] body')).toMatch(/letter-spacing:\s*var\(--a11y-letter-spacing\);/);
+    expect(declarations(':root[data-a11y~="font"] body *')).toMatch(
+      /letter-spacing:\s*var\(--a11y-letter-spacing, normal\) !important;/,
+    );
+    // Plus de règle combinée qui reposerait une valeur en dur.
+    expect(sheet).not.toContain(':root[data-a11y~="font"][data-a11y~="spacing"]');
   });
 
   it("réduire les animations fige les animations décoratives", () => {
@@ -231,7 +237,7 @@ describe("éléments flottants — pas de chevauchement", () => {
 
   it("la marge de défilement tient l'élément focalisé au-dessus du bouton", () => {
     // Deux déclarations : la première vaut partout, la seconde sous 720 px.
-    const [desktop, phone] = [...sheet.matchAll(/html \{\s*scroll-padding-bottom: (\d+)px;\s*\}/g)].map((m) =>
+    const [desktop, phone] = [...sheet.matchAll(/html \{[^}]*?scroll-padding-bottom: (\d+)px;/g)].map((m) =>
       Number(m[1]),
     );
     expect(sheet).toMatch(/@media \(max-width: 720px\) \{\s*html \{\s*scroll-padding-bottom: \d+px;/);

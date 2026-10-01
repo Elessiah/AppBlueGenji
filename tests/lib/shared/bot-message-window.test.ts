@@ -62,7 +62,9 @@ describe("normalizeBotServerEntry", () => {
   });
 
   it("laisse une valeur illisible au tableau, qui rend un tiret", () => {
-    expect(normalizeBotServerEntry({ relays7j: "beaucoup" }).relays7j).toBe("beaucoup");
+    // Le type annonce un nombre : la valeur brute est relue comme propriété,
+    // pour vérifier qu'elle traverse intacte au lieu d'être convertie.
+    expect(normalizeBotServerEntry({ relays7j: "beaucoup" })).toHaveProperty("relays7j", "beaucoup");
   });
 });
 
