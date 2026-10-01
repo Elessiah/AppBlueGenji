@@ -91,7 +91,7 @@ async function loadEditRow(
       match_format_max_maps, match_format_draws,
       endurance_playoff_format_type, endurance_playoff_format_value,
       registration_discord_requirement, registration_blizzard_requirement,
-      registration_min_players
+      registration_min_players, referee_scheduling
      FROM bg_tournaments
      WHERE id = ?
      LIMIT 1${forUpdate ? " FOR UPDATE" : ""}`,
@@ -184,9 +184,24 @@ async function loadPhaseConfigs(
   }));
 }
 
+/**
+ * Lecture d'édition : fenêtre, valeurs du formulaire, et l'option de
+ * planification par l'arbitrage — à part des valeurs éditables, parce qu'elle
+ * ne passe **pas** par `PATCH .../edit` : elle se bascule par sa route dédiée
+ * (`PUT /api/admin/tournaments/[id]/referee-scheduling`) jusqu'à la clôture,
+ * bien après que la fenêtre d'édition s'est fermée. `state` dit au formulaire
+ * si elle est encore modifiable, et si l'allumer défera des lancements.
+ */
+export type EditableTournamentLoad = {
+  window: EditWindow;
+  values: EditableTournamentValues;
+  state: TournamentState;
+  refereeScheduling: boolean;
+};
+
 export async function loadEditableTournament(
   tournamentId: number,
-): Promise<{ window: EditWindow; values: EditableTournamentValues } | null> {
+): Promise<EditableTournamentLoad | null> {
   const db = await getDatabase();
   const connection = await db.getConnection();
 
@@ -205,6 +220,8 @@ export async function loadEditableTournament(
         maxTeams: values.maxTeams,
       }),
       values,
+      state: row.state as TournamentState,
+      refereeScheduling: Boolean(row.referee_scheduling),
     };
   } finally {
     connection.release();

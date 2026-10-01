@@ -64,7 +64,7 @@ describe("PUT /api/admin/tournaments/[id]/referee-scheduling — permissions", (
     jest.mocked(getCurrentUser).mockResolvedValue(user);
     const res = await PUT(req({ enabled: true }), params("7"));
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ enabled: true, movedToPlanning: 3 });
+    expect(await res.json()).toEqual({ enabled: true, changed: true, movedToPlanning: 3 });
     expect(setRefereeScheduling).toHaveBeenCalledWith(7, true);
   });
 });

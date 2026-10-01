@@ -116,6 +116,14 @@ export function enablePlanningConsequence(moving: number): string {
     : `${moving} matchs, sans date et pas encore lancés, quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire.`;
 }
 
+/**
+ * Avertissement du formulaire d'édition quand on coche l'option sur un tournoi
+ * **en cours** : l'enregistrement défait des lancements, ce que la fiche fait
+ * confirmer par une modale. Le formulaire le dit avant le clic.
+ */
+export const ENABLE_PLANNING_WHILE_RUNNING_WARNING =
+  "À l'enregistrement, les matchs sans date et pas encore lancés quittent le lancement — leurs « Prêt » sont effacés — et attendent qu'un arbitre fixe leur horaire. Les matchs déjà lancés continuent.";
+
 /** Libellé de l'interrupteur : l'action qu'il déclenche. */
 export function refereeSchedulingToggleLabel(enabled: boolean): string {
   return enabled ? "Désactiver la planification" : "Activer la planification";

@@ -27,10 +27,25 @@ que personne n'a planifié.
 ## Modifier l'option en cours de tournoi
 
 Réglée à la création (case « Matchs planifiés par l'arbitrage » du formulaire),
-elle se bascule ensuite **depuis la fiche du tournoi**, dans tous les états sauf
-`FINISHED` — y compris `RUNNING` (`PUT /api/admin/tournaments/[id]/referee-scheduling`).
-Le formulaire d'édition ne la porte pas : il se ferme au coup d'envoi, justement
-quand on peut vouloir la changer, et une seule porte doit l'écrire.
+elle se bascule ensuite dans tous les états sauf `FINISHED` — y compris
+`RUNNING` —, par une seule route (`PUT /api/admin/tournaments/[id]/referee-scheduling`)
+et depuis deux endroits :
+
+- le **panneau de la fiche** (« Activer / Désactiver la planification ») ;
+- le formulaire **« Modifier le tournoi »**, qui porte la même case
+  (`RefereeSchedulingField`). La case survit à la fenêtre d'édition : le bouton
+  « Modifier » reste affiché sur un tournoi lancé (`canShowEditButton`), le
+  formulaire y est rendu grisé **sauf** cette case, et la page n'envoie alors
+  que la bascule — jamais `PATCH .../edit`, que la fenêtre fermée refuserait.
+  La case part **à chaque** enregistrement, pas seulement quand elle diffère de
+  la lecture d'ouverture (qu'un arbitre a pu changer depuis la fiche entre-temps) :
+  la route est donc **idempotente** — sans changement, elle n'écrit, ne journalise
+  ni ne publie rien, et rend `changed: false`, que la confirmation lit pour ne
+  pas annoncer « modifié » quand rien ne l'a été (`editSavedMessage`).
+  Cochée sur un tournoi en cours, la case annonce avant l'enregistrement les
+  lancements qu'elle défera (`ENABLE_PLANNING_WHILE_RUNNING_WARNING`). La
+  lecture d'édition (`loadEditableTournament`) rend l'option et l'état **à côté**
+  des valeurs éditables, dont elle ne fait pas partie.
 
 - **Allumer** : les matchs jouables, **non lancés et sans date**, repassent « À
   planifier » — leur ouverture de lancement et leurs « Prêt » sont effacés dans

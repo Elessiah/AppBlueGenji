@@ -83,6 +83,22 @@ describe("loadEditableTournament", () => {
     expect(typeof loaded?.values.startAt).toBe("string");
   });
 
+  // L'option ne fait pas partie des valeurs éditables (route dédiée), mais le
+  // formulaire doit la préremplir — et savoir si elle est encore réglable.
+  it("rend l'état et l'option de planification à côté des valeurs", async () => {
+    rowToReturn = hiddenRow({ state: "RUNNING", referee_scheduling: 1 });
+    const loaded = await loadEditableTournament(1);
+    expect(loaded?.state).toBe("RUNNING");
+    expect(loaded?.refereeScheduling).toBe(true);
+    expect(loaded?.window).toBe("LOCKED");
+    expect(executed.some((q) => /referee_scheduling/.test(q.sql))).toBe(true);
+  });
+
+  it("lit l'option éteinte par défaut", async () => {
+    rowToReturn = hiddenRow({ referee_scheduling: 0 });
+    expect((await loadEditableTournament(1))?.refereeScheduling).toBe(false);
+  });
+
   it("rend RESTRICTED sur un tournoi visible", async () => {
     rowToReturn = hiddenRow({ start_visibility_at: past });
     expect((await loadEditableTournament(1))?.window).toBe("RESTRICTED");

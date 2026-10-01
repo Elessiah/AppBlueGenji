@@ -6,7 +6,7 @@ jest.mock("@/lib/server/tournaments-service");
 import { GET, PATCH } from "@/app/api/tournaments/[id]/edit/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import * as service from "@/lib/server/tournaments-service";
-import type { EditableTournamentValues } from "@/lib/server/tournaments/edit";
+import type { EditableTournamentLoad, EditableTournamentValues } from "@/lib/server/tournaments/edit";
 import type { EditWindow } from "@/lib/shared/tournament-edit";
 import { authUser } from "../../../helpers/auth-user";
 
@@ -53,7 +53,12 @@ const values: EditableTournamentValues = {
   registrationMinPlayers: 5,
   phases: null,
 };
-const loaded: { window: EditWindow; values: EditableTournamentValues } = { window: "FULL", values };
+const loaded: EditableTournamentLoad = {
+  window: "FULL" satisfies EditWindow,
+  values,
+  state: "UPCOMING",
+  refereeScheduling: false,
+};
 
 beforeEach(() => {
   jest.clearAllMocks();

@@ -348,8 +348,8 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     registrationDiscordRequirement: apiValues.registrationDiscordRequirement,
     registrationBlizzardRequirement: apiValues.registrationBlizzardRequirement,
     registrationMinPlayers: apiValues.registrationMinPlayers,
-    // Non rendu par la lecture d'édition, et sans objet pour elle : le
-    // formulaire d'édition ne montre pas la case.
+    // Hors des valeurs éditables (elle se bascule par sa propre route) : la
+    // page d'édition la repose depuis la lecture, `refereeScheduling`.
     refereeScheduling: false,
     phases: apiValues.phases ?? defaults.phases,
   };
