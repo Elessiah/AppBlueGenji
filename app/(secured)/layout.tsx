@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function SecuredLayout({ children }: { children: React.ReactNode }) {
+export default async function SecuredLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser();
 
   // Les enfants ne sont pas rendus : rien du contenu protégé n'atteint la

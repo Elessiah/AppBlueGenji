@@ -30,7 +30,7 @@ type GhostTeamDialogProps = {
  * joueur : seuls un nom et une description facultative sont demandés. Le logo
  * se règle ensuite depuis la fiche de l'équipe, comme pour une équipe réelle.
  */
-export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
+export function GhostTeamDialog({ onClose, onCreated }: Readonly<GhostTeamDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [name, setName] = useState("");
   const [tag, setTag] = useState("");

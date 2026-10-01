@@ -22,7 +22,7 @@ interface MatchReplayDialogProps {
  * vidéo YouTube passe, et seulement sur une rencontre réellement disputée. Le
  * retrait reste toujours possible, y compris sur un match rouvert.
  */
-export function MatchReplayDialog({ match, onClose, onSaved }: MatchReplayDialogProps) {
+export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchReplayDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [replayUrl, setReplayUrl] = useState(match.replayUrl ?? "");
   const [busy, setBusy] = useState(false);

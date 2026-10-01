@@ -26,7 +26,7 @@ interface FormState {
 
 const EMPTY_FORM: FormState = { name: "", role: "", initials: "", color: "" };
 
-export function BureauSection({ initialMembers, isAdmin }: BureauSectionProps) {
+export function BureauSection({ initialMembers, isAdmin }: Readonly<BureauSectionProps>) {
   const { showError, showSuccess } = useToast();
   const [members, setMembers] = useState<BureauMember[]>(initialMembers);
   const [editing, setEditing] = useState<BureauMember | null>(null);

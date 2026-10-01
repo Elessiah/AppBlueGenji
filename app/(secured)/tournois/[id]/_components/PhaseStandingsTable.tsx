@@ -9,7 +9,7 @@ interface PhaseStandingsTableProps {
   standings: TournamentPhaseStanding[];
 }
 
-export function PhaseStandingsTable({ standings }: PhaseStandingsTableProps) {
+export function PhaseStandingsTable({ standings }: Readonly<PhaseStandingsTableProps>) {
   const wording = useParticipantWording();
 
   return (

@@ -30,7 +30,7 @@ function trendLabel(row: Pick<LandingLeaderboardRow, "trend" | "trendValue">): s
   return row.trend === "up" ? `+${row.trendValue}` : `-${row.trendValue}`;
 }
 
-export function Leaderboard({ initialRows }: LeaderboardProps) {
+export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
   const [game, setGame] = useState<GameFilter>("all");
   const [rows, setRows] = useState(initialRows);
   const [loading, setLoading] = useState(false);

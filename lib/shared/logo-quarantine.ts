@@ -406,8 +406,8 @@ export function formatAvatarRestoredNotice(): string {
 
 /**
  * Ligne du journal (canal de logs) d'un avatar masqué — **jamais** le pseudo du
- * joueur : ce canal est un tiers hébergé hors de l'Union européenne, sans purge
- * automatique (`lib/shared/log-privacy.ts`). Un nom d'équipe peut y partir, un
+ * joueur : ce canal est un tiers hébergé hors de l'Union européenne, purgé par
+ * le bot au bout d'un an seulement (`lib/shared/log-privacy.ts`). Un nom d'équipe peut y partir, un
  * joueur jamais.
  */
 export function formatAvatarHiddenLog(input: { reportId: number; purgeAfter: Date }): string {

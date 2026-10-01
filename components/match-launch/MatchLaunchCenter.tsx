@@ -96,7 +96,7 @@ function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
  * relire dès que son flux apprend un changement d'une rencontre du lecteur
  * (`viewerLaunchChanged`, `lib/shared/viewer-alerts.ts`).
  */
-export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?: boolean }) {
+export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacyPending?: boolean }>) {
   const { showError, showSuccess } = useToast();
   const { clocks } = useClientPower();
   // Un choix de confidentialité dû passe d'abord (`launchModalWaits`).
@@ -527,7 +527,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
 
 type CopyFn = (value: string, label: string) => Promise<void>;
 
-function ReadyChip({ ready, phase }: { ready: boolean; phase: MatchLaunchInfo["phase"] }) {
+function ReadyChip({ ready, phase }: Readonly<{ ready: boolean; phase: MatchLaunchInfo["phase"] }>) {
   if (phase !== "LOBBY") return null;
   return (
     <span className={ready ? styles.chipReady : styles.chipWaiting}>
@@ -541,12 +541,12 @@ function IdentityLine({
   value,
   verified,
   onCopy,
-}: {
+}: Readonly<{
   kind: "Discord" | "BattleTag";
   value: string | null;
   verified: boolean;
   onCopy: CopyFn;
-}) {
+}>) {
   return (
     <div className={styles.identity}>
       <span className={styles.identityKind}>{kind}</span>
@@ -576,7 +576,7 @@ function IdentityLine({
   );
 }
 
-function ContactRow({ contact, onCopy }: { contact: LaunchContact; onCopy: CopyFn }) {
+function ContactRow({ contact, onCopy }: Readonly<{ contact: LaunchContact; onCopy: CopyFn }>) {
   // Dans l'ordre de la priorité de choix (capitaine, manager, propriétaire),
   // pas dans l'ordre de saisie : la pastille la plus parlante vient en tête.
   const roles = (Object.keys(ROLE_LABELS) as TeamRole[])
@@ -603,12 +603,12 @@ function SideCard({
   isHost,
   phase,
   onCopy,
-}: {
+}: Readonly<{
   side: LaunchSide;
   isHost: boolean;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-}) {
+}>) {
   return (
     <section className={styles.side} data-host={isHost ? "true" : undefined} aria-label={side.name}>
       <div className={styles.sideHead}>
@@ -637,11 +637,11 @@ function SideContacts({
   side,
   phase,
   onCopy,
-}: {
+}: Readonly<{
   side: LaunchSide;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-}) {
+}>) {
   if (side.isGhost) return <p className={styles.note}>Équipe invitée : pas de contact.</p>;
   if (phase === "SCHEDULED") return <p className={styles.note}>Les contacts s&apos;affichent au lancement.</p>;
   if (side.contacts.length === 0) return <p className={styles.note}>Aucun contact disponible.</p>;
@@ -658,11 +658,11 @@ function CasterCard({
   caster,
   phase,
   onCopy,
-}: {
+}: Readonly<{
   caster: LaunchCaster | null;
   phase: MatchLaunchInfo["phase"];
   onCopy: CopyFn;
-}) {
+}>) {
   if (!caster) {
     return (
       <section className={styles.caster} aria-label="Caster">

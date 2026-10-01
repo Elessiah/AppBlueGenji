@@ -33,6 +33,6 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
   return { title: teamPageTitle(team) };
 }
 
-export default function TeamDetailLayout({ children }: { children: React.ReactNode }) {
+export default function TeamDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }

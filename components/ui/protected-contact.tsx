@@ -40,7 +40,7 @@ const ACCESSIBLE_NOUN: Record<ContactKind, string> = {
  * commande vocale « Afficher l'adresse » atteint le bouton, et la suite dit
  * laquelle.
  */
-export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkClassName }: ProtectedContactProps) {
+export function ProtectedContact({ encoded, kind, owner, buttonClassName, linkClassName }: Readonly<ProtectedContactProps>) {
   const [plain, setPlain] = useState<string | null>(null);
   const linkRef = useRef<HTMLAnchorElement>(null);
   const focusOnReveal = useRef(false);

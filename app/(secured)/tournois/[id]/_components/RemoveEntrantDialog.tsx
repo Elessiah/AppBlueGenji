@@ -52,7 +52,7 @@ export function RemoveEntrantDialog({
   entrantName,
   onClose,
   onRemoved,
-}: RemoveEntrantDialogProps) {
+}: Readonly<RemoveEntrantDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
   const [mounted, setMounted] = useState(false);

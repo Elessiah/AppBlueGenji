@@ -34,12 +34,12 @@ export function DiscordBotHandleDialog({
   mode,
   onClose,
   onUpdated,
-}: {
+}: Readonly<{
   /** `UPDATE` : compte déjà rattaché ; `LINK` : rattacher Discord par code. */
   mode: "UPDATE" | "LINK";
   onClose: () => void;
   onUpdated: (tag: string) => void;
-}) {
+}>) {
   const { showError, showSuccess } = useToast();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);

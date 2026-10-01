@@ -16,7 +16,7 @@ export function PhaseTimeline({
   selectedPhaseId,
   currentPhaseId,
   onSelect,
-}: PhaseTimelineProps) {
+}: Readonly<PhaseTimelineProps>) {
   return (
     <ScrollArea
       orientation="x"

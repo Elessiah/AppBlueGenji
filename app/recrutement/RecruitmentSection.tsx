@@ -90,7 +90,7 @@ function reorderErrorMessage(code: string | undefined): string {
   return code ? `Échec : ${code}` : "Échec du réordonnancement.";
 }
 
-export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: RecruitmentSectionProps) {
+export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
   const { showError, showSuccess } = useToast();
   // Toujours rangée par statut : les flèches de réordonnancement ne se lisent
   // que sur cet ordre-là (voir `canMoveRecruitmentAd`).

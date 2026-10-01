@@ -14,7 +14,7 @@ interface AccessibilityFooterLinkProps {
  * voisine, « Accessibilité : non conforme » : deux liens presque homonymes
  * l'un sous l'autre ne disaient pas lequel des deux ouvre quoi.
  */
-export function AccessibilityFooterLink({ className }: AccessibilityFooterLinkProps) {
+export function AccessibilityFooterLink({ className }: Readonly<AccessibilityFooterLinkProps>) {
   return (
     <button type="button" className={className} onClick={(event) => requestAccessibilityMenu(event.currentTarget)}>
       Réglages d&apos;accessibilité

@@ -69,7 +69,7 @@ export function LiveProvider({
   castBlock,
   openReplay,
   children,
-}: LiveControls & { children: ReactNode }) {
+}: Readonly<LiveControls & { children: ReactNode }>) {
   const value = useMemo(
     () => ({
       canManage,

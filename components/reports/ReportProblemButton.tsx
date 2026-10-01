@@ -36,7 +36,7 @@ export function ReportProblemButton({
   initialCategory,
   label = REPORT_FORM_NAME,
   cyber = false,
-}: ReportProblemButtonProps) {
+}: Readonly<ReportProblemButtonProps>) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname() ?? "/";
 

@@ -25,7 +25,7 @@ interface UpcomingCardProps {
  * `Date.now()` au rendu suffit : une carte ne change de visage qu'en changeant
  * de section, bascule que `useScheduledBuckets` fait déjà à la seconde dite.
  */
-export function UpcomingCard({ t, priority }: UpcomingCardProps) {
+export function UpcomingCard({ t, priority }: Readonly<UpcomingCardProps>) {
   const wording = participantWording(t.participantType);
   const fill = registrationFill(t);
   const locked = upcomingCardFace(t, Date.now()) === "LOCKED";

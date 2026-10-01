@@ -24,7 +24,7 @@ interface FinishedCardProps {
  * La carte se ternit par ses **couleurs** (`data-state="done"`), jamais par une
  * opacité : celle-ci faisait passer les textes atténués sous 4,5:1.
  */
-export function FinishedCard({ t, priority }: FinishedCardProps) {
+export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
   const wording = participantWording(t.participantType);
   const finishDate = formatCardDate(t.finishedAt ?? t.startAt, false);
 

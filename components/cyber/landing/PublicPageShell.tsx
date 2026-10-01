@@ -18,7 +18,7 @@ import { PublicFooter } from "./PublicFooter";
  * (`z-index: 30`), sorti de ce contexte, reste au-dessus du contenu — son menu
  * burger compris, qui ne dépend que de lui.
  */
-export function PublicPageShell({ children }: { children: ReactNode }) {
+export function PublicPageShell({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <>
       <PublicHeader />

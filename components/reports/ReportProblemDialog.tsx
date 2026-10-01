@@ -103,7 +103,7 @@ export function ReportProblemDialog({
   contestOf,
   initialCategory,
   onSubmitted,
-}: ReportProblemDialogProps) {
+}: Readonly<ReportProblemDialogProps>) {
   const { showError, showSuccess } = useToast();
   const titleId = useId();
   const [category, setCategory] = useState<ReportCategory | null>(

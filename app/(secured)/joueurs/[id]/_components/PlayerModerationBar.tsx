@@ -33,11 +33,11 @@ export function PlayerModerationBar({
   profile,
   deleted,
   onChanged,
-}: {
+}: Readonly<{
   profile: FullProfileResponse;
   deleted: boolean;
   onChanged: () => void;
-}) {
+}>) {
   const [dialog, setDialog] = useState<"avatar" | "suspend" | "lift" | null>(null);
   const suspension = profile.moderationSuspension;
   const showAvatar = profile.moderationAvatarPresent;
@@ -118,11 +118,11 @@ function AvatarRemovalDialog({
   profile,
   onClose,
   onDone,
-}: {
+}: Readonly<{
   profile: FullProfileResponse;
   onClose: () => void;
   onDone: () => void;
-}) {
+}>) {
   const { showError, showSuccess } = useToast();
   const [reason, setReason] = useState("");
   const pseudo = profile.profile.pseudo;
@@ -157,11 +157,11 @@ function SuspendDialog({
   profile,
   onClose,
   onDone,
-}: {
+}: Readonly<{
   profile: FullProfileResponse;
   onClose: () => void;
   onDone: () => void;
-}) {
+}>) {
   const { showError, showSuccess } = useToast();
   const groundId = useId();
   const durationId = useId();
@@ -241,12 +241,12 @@ function LiftDialog({
   reference,
   onClose,
   onDone,
-}: {
+}: Readonly<{
   profile: FullProfileResponse;
   reference: string;
   onClose: () => void;
   onDone: () => void;
-}) {
+}>) {
   const { showError, showSuccess } = useToast();
   return (
     <ModerationDialog
@@ -287,7 +287,7 @@ function ModerationDialog({
   onClose,
   onConfirm,
   children,
-}: {
+}: Readonly<{
   title: string;
   confirmLabel: string;
   pendingLabel: string;
@@ -295,7 +295,7 @@ function ModerationDialog({
   onClose: () => void;
   onConfirm: () => Promise<boolean>;
   children: ReactNode;
-}) {
+}>) {
   const titleId = useId();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);

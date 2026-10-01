@@ -14,7 +14,7 @@ interface AboutSectionProps {
   copy: SiteCopy;
 }
 
-export function AboutSection({ stats, pillars, isAdmin, copy }: AboutSectionProps) {
+export function AboutSection({ stats, pillars, isAdmin, copy }: Readonly<AboutSectionProps>) {
   return (
     <section id="assoc" className={styles.root}>
       <div className={styles.head}>

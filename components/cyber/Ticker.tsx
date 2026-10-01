@@ -22,7 +22,7 @@ interface TickerProps {
  * est masquée aux technologies d'assistance, sans quoi chaque élément serait lu
  * deux fois.
  */
-export function Ticker({ items }: TickerProps) {
+export function Ticker({ items }: Readonly<TickerProps>) {
   const [paused, setPaused] = useState(false);
 
   return (

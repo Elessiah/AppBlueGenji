@@ -30,6 +30,6 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
   return { title: playerPageTitle(player) };
 }
 
-export default function PlayerDetailLayout({ children }: { children: React.ReactNode }) {
+export default function PlayerDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }

@@ -42,7 +42,7 @@ export function OAuthButtons({
   redirect,
   termsAccepted,
   environmentNotice = null,
-}: {
+}: Readonly<{
   redirect: string;
   /** Conditions d'utilisation acceptées dans la modale d'entrée de la page. */
   termsAccepted: boolean;
@@ -52,7 +52,7 @@ export function OAuthButtons({
    * Ce n'est pas une erreur, rien n'a échoué : une note, pas un toast.
    */
   environmentNotice?: string | null;
-}): React.ReactElement {
+}>): React.ReactElement {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
       {environmentNotice ? (

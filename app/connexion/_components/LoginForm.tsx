@@ -67,7 +67,7 @@ const LOGIN_FIELD_IDS = { handle: "login-discord-handle", code: "login-discord-c
  * `suspensionNotice` : l'exposé d'une suspension, relu par la page dans le
  * cookie que pose un retour OAuth refusé (`lib/server/oauth-flow.ts`).
  */
-export function LoginForm({ suspensionNotice = null }: { suspensionNotice?: SuspensionNotice | null } = {}) {
+export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNotice?: SuspensionNotice | null }> = {}) {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
   const fieldErrors = useFieldErrors(LOGIN_FIELD_ERRORS, LOGIN_FIELD_IDS);

@@ -42,7 +42,7 @@ const ToastContext = createContext<ToastContextValue | null>(null);
  * *dans* une zone déjà présente, jamais une zone qui vient d'apparaître — d'où
  * des zones montées une fois, que chaque notification remplit d'une ligne.
  */
-export function ToastProvider({ children }: { children: ReactNode }) {
+export function ToastProvider({ children }: Readonly<{ children: ReactNode }>) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(0);
 
@@ -114,7 +114,7 @@ function isKeyboardFocus(element: Element): boolean {
  * souris laisse le focus sur le bouton cliqué, et le décompte ne reprendrait
  * jamais. La barre de progression lit le même état par `data-paused`.
  */
-function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: number) => void }) {
+function ToastItem({ toast, onDismiss }: Readonly<{ toast: Toast; onDismiss: (id: number) => void }>) {
   const [override, setOverride] = useState<CountdownOverride>(null);
   const [hovered, setHovered] = useState(false);
   const [focused, setFocused] = useState(false);

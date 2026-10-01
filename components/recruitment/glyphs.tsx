@@ -8,7 +8,7 @@ interface GlyphProps {
   className?: string;
 }
 
-export function DiscordGlyph({ className }: GlyphProps) {
+export function DiscordGlyph({ className }: Readonly<GlyphProps>) {
   return (
     <svg
       className={className}
@@ -42,7 +42,7 @@ function strokeIcon(children: ReactNode, className?: string) {
   );
 }
 
-export function CopyGlyph({ className }: GlyphProps) {
+export function CopyGlyph({ className }: Readonly<GlyphProps>) {
   return strokeIcon(
     <>
       <rect x="9" y="9" width="13" height="13" rx="2" />
@@ -52,7 +52,7 @@ export function CopyGlyph({ className }: GlyphProps) {
   );
 }
 
-export function OpenGlyph({ className }: GlyphProps) {
+export function OpenGlyph({ className }: Readonly<GlyphProps>) {
   return strokeIcon(
     <>
       <path d="M15 3h6v6" />

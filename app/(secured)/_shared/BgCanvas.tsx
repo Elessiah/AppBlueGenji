@@ -51,7 +51,7 @@ function createNodes(): Node[] {
  *   sur sa dernière image quand elle ne l'est plus, et **libérée** (tampon rendu
  *   au navigateur) quand l'onglet est caché ou que le lecteur est en match.
  */
-export function BgCanvas({ rgb, mode = "radial" }: BgCanvasProps) {
+export function BgCanvas({ rgb, mode = "radial" }: Readonly<BgCanvasProps>) {
   if (mode === "radial") {
     const color = rgb || DEFAULT_RADIAL_RGB;
     // Même géométrie que l'ancien dessin : centre à 70 % / 30 %, rayon égal à
@@ -64,7 +64,7 @@ export function BgCanvas({ rgb, mode = "radial" }: BgCanvasProps) {
   return <NetworkCanvas rgb={rgb || DEFAULT_NETWORK_RGB} />;
 }
 
-function NetworkCanvas({ rgb }: { rgb: string }) {
+function NetworkCanvas({ rgb }: Readonly<{ rgb: string }>) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   // Les nœuds survivent aux changements de régime : reprendre l'animation ne
   // doit pas faire sauter le réseau à une autre configuration.

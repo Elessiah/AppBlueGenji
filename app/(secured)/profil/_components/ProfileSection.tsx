@@ -18,11 +18,11 @@ export function ProfileSection({
   section,
   className,
   children,
-}: {
+}: Readonly<{
   section: Section;
   className?: string;
   children: React.ReactNode;
-}): React.ReactElement {
+}>): React.ReactElement {
   const headingId = `${section.id}-title`;
   return (
     <section

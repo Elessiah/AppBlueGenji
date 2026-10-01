@@ -43,7 +43,7 @@ export function PushNotificationsPanel({
   variant = "full",
   topics,
   lead,
-}: PushNotificationsPanelProps): React.ReactElement | null {
+}: Readonly<PushNotificationsPanelProps>): React.ReactElement | null {
   const { showError, showSuccess } = useToast();
   const onError = useCallback((code: string) => showError(pushErrorMessage(code)), [showError]);
   const push = usePushNotifications(onError, {

@@ -21,7 +21,7 @@ interface ScoreStepperProps {
  * balises identiques recopiés l'un sous l'autre — une correction sur l'un se
  * perdait sur l'autre.
  */
-export function ScoreStepper({ id, teamId, teamName, value, max, disabled, onChange }: ScoreStepperProps) {
+export function ScoreStepper({ id, teamId, teamName, value, max, disabled, onChange }: Readonly<ScoreStepperProps>) {
   const parsed = parseScoreInput(value);
   // Un champ vide n'est pas une erreur : c'est un score pas encore saisi. Seule
   // une valeur illisible ou hors plage se signale en rouge.

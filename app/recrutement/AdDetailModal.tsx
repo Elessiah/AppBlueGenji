@@ -29,7 +29,7 @@ interface AdDetailModalProps {
  * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
-export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
+export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
   const dialogRef = useDialogBehavior({ open: true, onClose });
   const backdrop = useBackdropDismiss(onClose);
   const titleId = `annonce-titre-${ad.id}`;

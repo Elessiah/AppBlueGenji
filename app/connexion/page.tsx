@@ -15,9 +15,9 @@ import { LoginForm } from "./_components/LoginForm";
  */
 export default async function LoginPage({
   searchParams,
-}: {
+}: Readonly<{
   searchParams: Promise<{ redirect?: string | string[]; error?: string | string[] }>;
-}) {
+}>) {
   const [user, params] = await Promise.all([getCurrentUser(), searchParams]);
   // Sauf s'il arrive avec un refus à lire (`?error=`) : un rattachement OAuth
   // raté avant la lecture de l'intention (`params`, `state`) retombe ici, et le

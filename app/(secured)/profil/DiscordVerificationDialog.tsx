@@ -61,7 +61,7 @@ export function DiscordVerificationDialog({
   attested,
   onClose,
   onVerified,
-}: DiscordVerificationDialogProps) {
+}: Readonly<DiscordVerificationDialogProps>) {
   const { showError, showSuccess } = useToast();
   // Monté après l'hydratation : le portail vise `document.body`, qui n'existe
   // pas au rendu serveur.

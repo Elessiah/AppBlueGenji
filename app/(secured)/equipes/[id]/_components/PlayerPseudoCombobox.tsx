@@ -72,7 +72,7 @@ export function PlayerPseudoCombobox({
   autoFocus,
   aria,
   excludeUserIds = [],
-}: PlayerPseudoComboboxProps) {
+}: Readonly<PlayerPseudoComboboxProps>) {
   const listId = useId();
   const [players, setPlayers] = useState<PublicUserProfile[]>([]);
   const [open, setOpen] = useState(false);

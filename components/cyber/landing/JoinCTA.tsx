@@ -17,7 +17,7 @@ type JoinCTAProps = {
   canEditCopy?: boolean;
 };
 
-export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false }: JoinCTAProps) {
+export function JoinCTA({ isAuthenticated = false, copy, canEditCopy = false }: Readonly<JoinCTAProps>) {
   return (
     <section className={styles.root}>
       <CyberCard ticks className={styles.card}>

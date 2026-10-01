@@ -47,7 +47,7 @@ const MAX_SPARKLINE_POINTS = 10;
  * différence. `fetchBotServers` est la seule source de `null` ici — coupe-
  * circuit ouvert, appel échoué, réponse non `ok`.
  */
-export function BotServersTable({ payload }: { payload: BotServersPayload | null }) {
+export function BotServersTable({ payload }: Readonly<{ payload: BotServersPayload | null }>) {
   // Même précaution que sur `sparkline` plus bas, et pour la même raison :
   // `fetchBotServers` fait un simple `as BotServersPayload` sur du JSON reçu.
   // Un `?? []` ne rattrape que `null` — une charge qui rangerait les serveurs

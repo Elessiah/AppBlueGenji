@@ -60,7 +60,7 @@ export function AdvanceTournamentDialog({
   card,
   onClose,
   onAdvanced,
-}: AdvanceTournamentDialogProps) {
+}: Readonly<AdvanceTournamentDialogProps>) {
   const { showError } = useToast();
   const [busy, setBusy] = useState(false);
   const [mounted, setMounted] = useState(false);

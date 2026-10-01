@@ -66,7 +66,7 @@ async function readImageSize(file: File): Promise<{ width: number; height: numbe
  *
  * Le composant est contrôlé : il ne fait qu'un brouillon, que la page enregistre.
  */
-export function TournamentImagePicker({ existing, value, onChange, disabled }: TournamentImagePickerProps) {
+export function TournamentImagePicker({ existing, value, onChange, disabled }: Readonly<TournamentImagePickerProps>) {
   const { showError } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const draggingRef = useRef(false);

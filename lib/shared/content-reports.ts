@@ -15,8 +15,8 @@
  * d'un signalement, sa durée de conservation, et la ligne envoyée sur Discord.
  *
  * **La ligne Discord ne nomme aucun joueur**, ni le signalant ni les joueurs
- * visés : le canal de logs est un tiers qui n'est pas purgé
- * (`lib/shared/log-privacy.ts`). Elle dit la catégorie, compte les joueurs,
+ * visés : le canal de logs est un tiers, purgé seulement au bout d'un an
+ * (`BOT_STAFF_LOG_RETENTION_DAYS`, `lib/shared/log-privacy.ts`). Elle dit la catégorie, compte les joueurs,
  * nomme les équipes et les tournois, et renvoie au panneau — c'est là, derrière
  * une connexion, que se lit le détail. La description, texte libre qui peut
  * contenir n'importe quoi, ne part jamais.

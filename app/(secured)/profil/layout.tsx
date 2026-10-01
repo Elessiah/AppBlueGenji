@@ -7,6 +7,6 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
  */
 export const metadata: Metadata = { title: segmentTitle("Mon profil") };
 
-export default function ProfileLayout({ children }: { children: React.ReactNode }) {
+export default function ProfileLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }

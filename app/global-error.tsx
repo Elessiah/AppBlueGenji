@@ -21,10 +21,10 @@ import {
  */
 export default function GlobalError({
   error,
-}: {
+}: Readonly<{
   error: Error & { digest?: string };
   // Next passe aussi `reset`, volontairement ignoré : voir `retry` plus bas.
-}) {
+}>) {
   const reference = errorReference(error.digest);
   const copy = runtimeErrorCopy(reference);
 

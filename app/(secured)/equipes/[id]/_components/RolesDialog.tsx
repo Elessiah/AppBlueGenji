@@ -25,7 +25,7 @@ interface RolesDialogProps {
   onSave: (selected: TeamRole[]) => Promise<boolean>;
 }
 
-export function RolesDialog({ target, onClose, onSave }: RolesDialogProps) {
+export function RolesDialog({ target, onClose, onSave }: Readonly<RolesDialogProps>) {
   const [selected, setSelected] = useState(target.selected);
   const [pending, setPending] = useState(false);
   const { showError } = useToast();

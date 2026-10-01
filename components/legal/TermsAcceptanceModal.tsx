@@ -71,7 +71,7 @@ interface TermsAcceptanceModalProps {
  * Elle se tait sur la page des conditions elle-même, qu'elle invite à lire, et
  * sur la connexion, dont la modale de consentement doit rester seule.
  */
-export function TermsAcceptanceModal({ initiallyRequired, request = null, privacyPending }: TermsAcceptanceModalProps) {
+export function TermsAcceptanceModal({ initiallyRequired, request = null, privacyPending }: Readonly<TermsAcceptanceModalProps>) {
   const updated = request === "UPDATED";
   const { showError, showSuccess } = useToast();
   const titleId = useId();

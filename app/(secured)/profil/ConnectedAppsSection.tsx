@@ -83,12 +83,12 @@ export function ConnectedAppsSection({
    * bot) : le champ « Tag Discord » de la page le reprend sur-le-champ.
    */
   onDiscordTagChanged,
-}: {
+}: Readonly<{
   connections: AccountConnection[] | null;
   reload: () => Promise<void>;
   onChanged?: () => void;
   onDiscordTagChanged?: (tag: string) => void;
-}): React.ReactElement {
+}>): React.ReactElement {
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState<OAuthProvider | null>(null);
   // Le dialogue « Mettre à jour mon pseudo » de la ligne du bot, s'il est ouvert.
@@ -327,13 +327,13 @@ function DiscordBotRow({
   disconnecting,
   onUpdate,
   onDisconnect,
-}: {
+}: Readonly<{
   connections: AccountConnection[];
   busy: boolean;
   disconnecting: boolean;
   onUpdate: (mode: "UPDATE" | "LINK") => void;
   onDisconnect: () => void;
-}): React.ReactElement {
+}>): React.ReactElement {
   const row = discordBotRowState(connections);
   const detailsId = "connection-details-discord-bot";
   return (

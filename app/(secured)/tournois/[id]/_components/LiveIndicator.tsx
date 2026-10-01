@@ -53,7 +53,7 @@ function cadenceLabel(tier: RefreshTier): string {
  * `aria-label` portant toute l'explication ferait réciter une phrase entière à
  * la moindre coupure réseau. L'explication vit dans `title`.
  */
-export function LiveIndicator({ isLive, tier, fatal = null }: LiveIndicatorProps) {
+export function LiveIndicator({ isLive, tier, fatal = null }: Readonly<LiveIndicatorProps>) {
   let label = "Reconnexion…";
   let title =
     "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.";

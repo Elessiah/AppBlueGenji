@@ -5,7 +5,7 @@ import { botInviteScopesLabel, botInviteUrl } from "@/lib/server/bot-invite";
 import { botStatusOf, isBotOnline } from "@/lib/shared/bot-status-summary";
 import type { BotStatus } from "@/lib/shared/types";
 
-export function BotHero({ status }: { status: BotStatus | null }) {
+export function BotHero({ status }: Readonly<{ status: BotStatus | null }>) {
   const inviteUrl = botInviteUrl();
   // La pastille verte de l'avatar suit la case « État » : allumée sur un bot
   // opérationnel, absente sinon (injoignable, dégradé, état illisible).

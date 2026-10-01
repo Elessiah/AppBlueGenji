@@ -81,7 +81,7 @@ function sortByTier(list: Sponsor[]): Sponsor[] {
   return [...list].sort((a, b) => SPONSOR_TIERS.indexOf(a.tier) - SPONSOR_TIERS.indexOf(b.tier));
 }
 
-export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridProps) {
+export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<SponsorsGridProps>) {
   const { showError, showSuccess } = useToast();
   const { cropImage, cropDialog } = useImageCropper();
   const [items, setItems] = useState<Sponsor[]>(sponsors);

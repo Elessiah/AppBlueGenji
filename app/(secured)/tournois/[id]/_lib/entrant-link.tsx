@@ -35,7 +35,7 @@ export function EntrantProvider({
   soloUserIds,
   logos,
   children,
-}: EntrantContextValue & { children: ReactNode }) {
+}: Readonly<EntrantContextValue & { children: ReactNode }>) {
   const value = useMemo(
     () => ({ participantType, soloUserIds, logos }),
     [participantType, soloUserIds, logos],
@@ -72,7 +72,7 @@ export function useParticipantWording() {
 export function EntrantLink({
   teamId,
   ...rest
-}: EntityLinkProps & { teamId: number }) {
+}: Readonly<EntityLinkProps & { teamId: number }>) {
   const entrantLink = useEntrantLink();
   return <EntityLink href={entrantLink(teamId)} {...rest} />;
 }

@@ -71,7 +71,7 @@ function ShowMoreRow({
   total,
   expanded,
   onToggle,
-}: {
+}: Readonly<{
   /** Nomme la section dans le bouton : jusqu'à quatre « Voir moins »
    * identiques cohabitent sur la page, indistinguables dans une liste de
    * contrôles hors contexte (lecteur d'écran, navigation par éléments). */
@@ -79,7 +79,7 @@ function ShowMoreRow({
   total: number;
   expanded: boolean;
   onToggle: () => void;
-}) {
+}>) {
   if (total <= SECTION_DISPLAY_LIMIT) return null;
   return (
     <div className={s.showMoreRow}>

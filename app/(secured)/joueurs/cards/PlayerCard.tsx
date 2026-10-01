@@ -42,7 +42,7 @@ const ROLE_LABEL: Record<string, string> = {
  * transparente posée par-dessus (`.cardOverlay`), que le lien d'équipe traverse
  * en repassant au-dessus d'elle (`.aboveOverlay`).
  */
-export function PlayerCard({ player }: { player: PublicUserProfile }) {
+export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) {
   // Le statut d'un compte sans équipe est une **invitation à recruter** —
   // « FREE AGENT » ouvertement, « SANS ÉQUIPE » par défaut —, et un compte
   // supprimé est justement celui qu'on ne peut plus rattacher :

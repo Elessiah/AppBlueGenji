@@ -26,7 +26,7 @@ function frenchDate(iso: string): string {
   return `${d}/${m}/${y}`;
 }
 
-function Field({ label, items }: { label: string; items: readonly string[] | string }) {
+function Field({ label, items }: Readonly<{ label: string; items: readonly string[] | string }>) {
   const list = typeof items === "string" ? [items] : items;
   return (
     <tr>
@@ -48,7 +48,7 @@ function Field({ label, items }: { label: string; items: readonly string[] | str
   );
 }
 
-function ActivityCard({ activity }: { activity: ProcessingActivity }) {
+function ActivityCard({ activity }: Readonly<{ activity: ProcessingActivity }>) {
   return (
     <article className={styles.registerCard} id={activity.ref.toLowerCase()} aria-labelledby={`${activity.ref}-title`}>
       <h3 className={styles.registerTitle} id={`${activity.ref}-title`}>

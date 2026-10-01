@@ -47,7 +47,7 @@ export function PhaseBuilder({
   disabled = false,
   focusRequest = 0,
   onChange,
-}: PhaseBuilderProps) {
+}: Readonly<PhaseBuilderProps>) {
   const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
   const [pendingFocusId, setPendingFocusId] = useState<string | null>(null);
 

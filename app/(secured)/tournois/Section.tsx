@@ -43,7 +43,7 @@ export function Section({
   dataCols,
   tone = "default",
   children,
-}: SectionProps) {
+}: Readonly<SectionProps>) {
   const [ownExpanded, setOwnExpanded] = useState(defaultOpen);
   const expanded = open ?? ownExpanded;
   const bodyId = useId();

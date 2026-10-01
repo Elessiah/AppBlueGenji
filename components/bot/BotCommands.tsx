@@ -34,7 +34,7 @@ interface BotCommandsProps {
  * `loadBotDoc`. L'intitulé de la section dit « contenu relu » et non « liste
  * tenue à jour » : elle n'annonce que ce qu'elle tient.
  */
-export function BotCommands({ isStaff }: BotCommandsProps) {
+export function BotCommands({ isStaff }: Readonly<BotCommandsProps>) {
   const sections = visibleBotDocSections(isStaff);
   // Les pages légales du bot vivent à leur propre adresse (pas sous
   // `/bot/docs`) : elles occupent la place laissée par les pages techniques

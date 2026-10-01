@@ -17,7 +17,7 @@ import s from "./HighlightStrip.module.css";
  * tout le texte de la carte mis bout à bout. Le bloc des points repasse
  * au-dessus d'elle pour garder son `title`, seule explication visible de la cote.
  */
-export function HighlightStrip({ teams }: { teams: TeamListItem[] }) {
+export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
   const top = teams.slice(0, 3);
   if (top.length < 3) return null;
 

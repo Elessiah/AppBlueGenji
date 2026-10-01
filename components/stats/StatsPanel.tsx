@@ -46,7 +46,7 @@ function monthLabel(month: string): string {
 }
 
 /** Groupe titré : le sous-titre visible sert d'étiquette accessible au bloc. */
-function Group({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+function Group({ id, title, children }: Readonly<{ id: string; title: string; children: ReactNode }>) {
   return (
     <section aria-labelledby={id}>
       <h3 className={s.subhead} id={id}>
@@ -57,7 +57,7 @@ function Group({ id, title, children }: { id: string; title: string; children: R
   );
 }
 
-function Tile({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function Tile({ label, value, hint }: Readonly<{ label: string; value: string | number; hint?: string }>) {
   return (
     <div className={s.tile}>
       <div className={s.tileLabel}>{label}</div>
@@ -67,7 +67,7 @@ function Tile({ label, value, hint }: { label: string; value: string | number; h
   );
 }
 
-function SplitBars({ splits, emptyLabel }: { splits: StatsSplit[]; emptyLabel: string }) {
+function SplitBars({ splits, emptyLabel }: Readonly<{ splits: StatsSplit[]; emptyLabel: string }>) {
   if (splits.length === 0) return <p className={s.empty}>{emptyLabel}</p>;
 
   return (
@@ -99,11 +99,11 @@ function OpponentCard({
   title,
   opponent,
   emptyLabel,
-}: {
+}: Readonly<{
   title: string;
   opponent: StatsOpponent | null;
   emptyLabel: string;
-}) {
+}>) {
   return (
     <div className={s.opponentCard}>
       <div className={s.tileLabel}>{title}</div>
@@ -126,7 +126,7 @@ function OpponentCard({
   );
 }
 
-function ActivityChart({ stats }: { stats: DeepStats }) {
+function ActivityChart({ stats }: Readonly<{ stats: DeepStats }>) {
   const points = stats.activity;
   const max = Math.max(1, ...points.map((point) => point.played));
   const width = 640;
@@ -204,7 +204,7 @@ function ActivityChart({ stats }: { stats: DeepStats }) {
  * Bloc de statistiques approfondies, partagé par la fiche équipe et la fiche
  * joueur : les deux exposent le même `DeepStats`, donc la même lecture.
  */
-export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPanelProps) {
+export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<StatsPanelProps>) {
   const hasPlayed = stats.matchesPlayed > 0;
 
   return (

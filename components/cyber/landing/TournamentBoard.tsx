@@ -18,7 +18,7 @@ function makeTitle(tournament: TournamentCard | null): string {
   return tournament.name;
 }
 
-export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBoardProps) {
+export function TournamentBoard({ buckets, featured, miniBracket }: Readonly<TournamentBoardProps>) {
   // Une seule horloge pour toute la section : deux cartes lues à deux instants
   // pourraient se contredire sur une échéance qui tombe pendant le rendu.
   const now = Date.now();

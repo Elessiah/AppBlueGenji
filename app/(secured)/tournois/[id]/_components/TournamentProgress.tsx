@@ -39,7 +39,7 @@ function shortDateTime(iso: string): string {
  * fait que peindre, et redémarrer une horloge pour que la barre avance sans
  * qu'on recharge la page.
  */
-export function TournamentProgress({ detail }: TournamentProgressProps) {
+export function TournamentProgress({ detail }: Readonly<TournamentProgressProps>) {
   // Un tournoi terminé ne bouge plus : ni jalon à franchir, ni compte à rebours,
   // ni matchs à rejouer. Laisser battre l'horloge y ferait re-parcourir tous les
   // matchs du plateau toutes les 30 s, indéfiniment, pour un affichage figé.
