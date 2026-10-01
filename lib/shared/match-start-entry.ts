@@ -182,6 +182,37 @@ export function formatMatchStartEntryPreview(instant: number): string {
   return PARIS_FULL.format(new Date(instant));
 }
 
+/**
+ * Heure du même instant dans le fuseau `timeZone` (par défaut celui du
+ * navigateur), **seulement** si elle diffère de l'heure de Paris — `null`
+ * sinon, et pour un fuseau inconnu.
+ *
+ * Les cartes de match (`formatMatchStartAt`) affichent l'heure du navigateur ;
+ * la saisie, elle, est à l'heure de Paris. Hors de France, l'aperçu donne les
+ * deux pour que l'organisateur reconnaisse l'horaire qu'il voit sur la carte.
+ */
+export function localMatchTimeIfDifferent(instant: number, timeZone?: string): string | null {
+  let local: string;
+  try {
+    const formatter =
+      timeZone === undefined
+        ? LOCAL_SHORT
+        : new Intl.DateTimeFormat("fr-FR", { timeZone, dateStyle: "short", timeStyle: "short" });
+    local = formatter.format(new Date(instant));
+  } catch {
+    return null;
+  }
+  return local === PARIS_SHORT.format(new Date(instant)) ? null : local;
+}
+
+// Construits une fois : l'aperçu se recalcule à chaque frappe.
+const LOCAL_SHORT = new Intl.DateTimeFormat("fr-FR", { dateStyle: "short", timeStyle: "short" });
+const PARIS_SHORT = new Intl.DateTimeFormat("fr-FR", {
+  timeZone: MATCH_ENTRY_TIME_ZONE,
+  dateStyle: "short",
+  timeStyle: "short",
+});
+
 /** Noms des mois, pour la liste du dialogue (index 0 = janvier). */
 export const MATCH_ENTRY_MONTHS: readonly string[] = [
   "janvier",

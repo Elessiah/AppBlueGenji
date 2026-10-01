@@ -12,6 +12,7 @@ import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import {
   MATCH_ENTRY_MONTHS,
   formatMatchStartEntryPreview,
+  localMatchTimeIfDifferent,
   matchEntryReference,
   matchEntryTimeValue,
   matchStartEntryOf,
@@ -66,11 +67,11 @@ function pendingPreview(state: MatchStartEntryState): string | null {
 
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé) ; un jour et un mois inchangés gardent leur année. Si l'aperçu montre la mauvaise, « Mauvaise année ? » permet de la décaler.";
+  const year = "L'année se déduit du tournoi.";
   if (refereeScheduling) {
     return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
-  return `${year} Laisser vide pour ne pas annoncer d'horaire. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.`;
+  return `${year} Vide = aucun horaire annoncé. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.`;
 }
 
 /** Confirmation après enregistrement. */
@@ -203,6 +204,9 @@ export function MatchScheduleDialog({
   const previousYear = shiftTarget(-1);
   const nextYear = shiftTarget(1);
   const cleared = entry.kind === "empty";
+  // Les cartes de match affichent l'heure du navigateur : hors du fuseau de
+  // Paris, l'aperçu donne aussi celle-là, pour que les deux se recoupent.
+  const localTime = entry.kind === "ready" ? localMatchTimeIfDifferent(entry.instant) : null;
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
   // le laisse programmé sans jamais passer à l'antenne : on le dit plutôt que
   // de refuser l'effacement — le calendrier ne dépend pas de la diffusion.
@@ -321,7 +325,11 @@ export function MatchScheduleDialog({
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
           </p>
 
-          <fieldset style={{ margin: "18px 0 0", padding: 0, border: 0, minWidth: 0 }}>
+          {/* L'aide se lit une fois, en entrant dans le groupe, pas à chacun des trois champs. */}
+          <fieldset
+            aria-describedby={HINT_ID}
+            style={{ margin: "18px 0 0", padding: 0, border: 0, minWidth: 0 }}
+          >
             <legend style={{ padding: 0, marginBottom: 8, fontSize: 13, color: "var(--ink)" }}>
               Début programmé (heure de Paris)
             </legend>
@@ -337,7 +345,7 @@ export function MatchScheduleDialog({
                     setYearShift(0);
                     fieldErrors.clear();
                   }}
-                  {...fieldErrors.aria("day", HINT_ID)}
+                  {...fieldErrors.aria("day")}
                 >
                   <option value="">—</option>
                   {DAYS.map((value) => (
@@ -359,7 +367,7 @@ export function MatchScheduleDialog({
                     setYearShift(0);
                     fieldErrors.clear();
                   }}
-                  {...fieldErrors.aria("month", HINT_ID)}
+                  {...fieldErrors.aria("month")}
                 >
                   <option value="">—</option>
                   {MATCH_ENTRY_MONTHS.map((name, index) => (
@@ -389,7 +397,7 @@ export function MatchScheduleDialog({
                   // chaque touche et à la sortie.
                   onKeyUp={(e) => setTimeBadInput(e.currentTarget.validity.badInput)}
                   onBlur={(e) => setTimeBadInput(e.target.validity.badInput)}
-                  {...fieldErrors.aria("time", HINT_ID)}
+                  {...fieldErrors.aria("time")}
                 />
                 <FieldErrorText fieldId={FIELD_IDS.time} message={fieldErrors.message("time")} />
               </div>
@@ -403,6 +411,7 @@ export function MatchScheduleDialog({
             {entry.kind === "ready" && (
               <>
                 Date retenue : <strong>{formatMatchStartEntryPreview(entry.instant)}</strong>
+                {localTime && ` (${localTime} à ton heure locale)`}
               </>
             )}
             {cleared && "Aucun horaire annoncé."}
