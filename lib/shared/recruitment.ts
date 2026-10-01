@@ -296,6 +296,33 @@ export type RecruitmentAdInput = {
   active?: boolean;
 };
 
+function stringOr<T>(value: unknown, fallback: T): string | T {
+  return typeof value === "string" ? value : fallback;
+}
+
+/**
+ * Lit un corps JSON reçu par les routes de création et de mise à jour : chaque
+ * champ de type inattendu est remplacé par son défaut (texte vide pour le
+ * titre, `null` pour les champs facultatifs, `undefined` pour les énumérations
+ * et l'activation), la validation de fond restant celle de
+ * `validateRecruitmentAdInput`.
+ */
+export function recruitmentAdInputFromBody(body: Record<string, unknown>): RecruitmentAdInput {
+  return {
+    title: stringOr(body.title, ""),
+    teamName: stringOr(body.teamName, null),
+    domain: stringOr(body.domain, undefined),
+    roles: stringOr(body.roles, null),
+    body: stringOr(body.body, null),
+    contactUrl: stringOr(body.contactUrl, null),
+    contactDiscord: stringOr(body.contactDiscord, null),
+    contactDiscordId: stringOr(body.contactDiscordId, null),
+    contactPreferred: stringOr(body.contactPreferred, undefined),
+    priority: stringOr(body.priority, undefined),
+    active: typeof body.active === "boolean" ? body.active : undefined,
+  };
+}
+
 export const RECRUITMENT_TITLE_MAX = 140;
 export const RECRUITMENT_TEAM_MAX = 120;
 export const RECRUITMENT_ROLES_MAX = 200;

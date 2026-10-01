@@ -2,12 +2,17 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteRecruitmentAd, updateRecruitmentAd } from "@/lib/server/recruitment-service";
 import { can } from "@/lib/shared/permissions";
+import { recruitmentAdInputFromBody } from "@/lib/shared/recruitment";
 import { readJsonBody } from "@/lib/server/request-body";
 
 function parseId(raw: string): number | null {
   const id = Number(raw);
   if (!Number.isInteger(id) || id <= 0) return null;
   return id;
+}
+
+function recruitmentErrorStatus(message: string): number {
+  return message === "RECRUITMENT_NOT_FOUND" ? 404 : 400;
 }
 
 export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
@@ -27,23 +32,11 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
   }
 
   try {
-    const ad = await updateRecruitmentAd(id, {
-      title: typeof body.title === "string" ? body.title : "",
-      teamName: typeof body.teamName === "string" ? body.teamName : null,
-      domain: typeof body.domain === "string" ? body.domain : undefined,
-      roles: typeof body.roles === "string" ? body.roles : null,
-      body: typeof body.body === "string" ? body.body : null,
-      contactUrl: typeof body.contactUrl === "string" ? body.contactUrl : null,
-      contactDiscord: typeof body.contactDiscord === "string" ? body.contactDiscord : null,
-      contactDiscordId: typeof body.contactDiscordId === "string" ? body.contactDiscordId : null,
-      contactPreferred: typeof body.contactPreferred === "string" ? body.contactPreferred : undefined,
-      priority: typeof body.priority === "string" ? body.priority : undefined,
-      active: typeof body.active === "boolean" ? body.active : undefined,
-    });
+    const ad = await updateRecruitmentAd(id, recruitmentAdInputFromBody(body));
     return ok({ ad });
   } catch (e) {
     const msg = (e as Error).message;
-    return fail(msg || "RECRUITMENT_UPDATE_FAILED", msg === "RECRUITMENT_NOT_FOUND" ? 404 : 400);
+    return fail(msg || "RECRUITMENT_UPDATE_FAILED", recruitmentErrorStatus(msg));
   }
 }
 
@@ -61,6 +54,6 @@ export async function DELETE(_req: Request, context: { params: Promise<{ id: str
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;
-    return fail(msg || "RECRUITMENT_DELETE_FAILED", msg === "RECRUITMENT_NOT_FOUND" ? 404 : 400);
+    return fail(msg || "RECRUITMENT_DELETE_FAILED", recruitmentErrorStatus(msg));
   }
 }

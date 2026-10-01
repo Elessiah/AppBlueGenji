@@ -1,8 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
+import { TEAM_INVITE_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
 import { getTeamDetail, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams-service";
-import { JOIN_CONFLICTS, inviteRolesFromBody } from "@/lib/server/team-invite-roles";
+import { inviteRolesFromBody } from "@/lib/server/team-invite-roles";
 import { readJsonBody } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";
 
@@ -15,8 +15,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const { id } = await context.params;
-  const teamId = Number(id);
-  if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
+  const teamId = parseTeamId(id);
+  if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   try {
     return ok(await listTeamPendingInvitations(teamId, user.id, can(user, "tournaments")));
@@ -33,8 +33,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const { id } = await context.params;
-  const teamId = Number(id);
-  if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM_ID", 400);
+  const teamId = parseTeamId(id);
+  if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   try {
     const body = (await readJsonBody(req)) as { pseudo?: string; roles?: unknown };
@@ -45,13 +45,6 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return ok({ result, ...detail });
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "FORBIDDEN") return fail(message, 403);
-    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
-    if (message === "USER_NOT_FOUND") return fail(message, 404);
-    if (message === "USER_ALREADY_IN_TEAM") return fail(message, 409);
-    if (message === "ALREADY_INVITED") return fail(message, 409);
-    if (message === "MISSING_ROLE") return fail(message, 400);
-    if (JOIN_CONFLICTS.has(message)) return fail(message, 409);
-    return fail(message || "TEAM_INVITE_FAILED", 400);
+    return fail(message || "TEAM_INVITE_FAILED", teamErrorStatus(TEAM_INVITE_ERROR_STATUS, message));
   }
 }
