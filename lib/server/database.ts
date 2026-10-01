@@ -2134,20 +2134,18 @@ export async function withConnection<T>(
 }
 
 export async function getDatabase(): Promise<Pool> {
-  if (!pool) {
-    pool = mysql.createPool({
-      host: requireEnv("DB_HOST"),
-      user: requireEnv("DB_USER"),
-      password: requireEnv("DB_PASSWORD"),
-      database: requireEnv("DB_DATABASE"),
-      waitForConnections: true,
-      connectionLimit: 25,
-      connectTimeout: 10000,
-      namedPlaceholders: true,
-      charset: "utf8mb4",
-      dateStrings: true,
-    });
-  }
+  pool ??= mysql.createPool({
+    host: requireEnv("DB_HOST"),
+    user: requireEnv("DB_USER"),
+    password: requireEnv("DB_PASSWORD"),
+    database: requireEnv("DB_DATABASE"),
+    waitForConnections: true,
+    connectionLimit: 25,
+    connectTimeout: 10000,
+    namedPlaceholders: true,
+    charset: "utf8mb4",
+    dateStrings: true,
+  });
 
   await ensureMigrations(pool);
   scheduleDeletedAccountsReconciliation();
