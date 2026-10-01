@@ -362,71 +362,21 @@ export function computeDeepStats(
   const stats = emptyDeepStats(now);
   const ordered = chronological(matches);
 
-  const byGame = new Map<TournamentGame, { played: number; won: number; lost: number }>();
-  const byFormat = new Map<TournamentFormat, { played: number; won: number; lost: number }>();
+  const byGame = new Map<TournamentGame, SplitBucket>();
+  const byFormat = new Map<TournamentFormat, SplitBucket>();
   const opponents = new Map<number, StatsOpponent>();
   const activityIndex = new Map(stats.activity.map((point, index) => [point.month, index]));
-
-  let runningWins = 0;
-  let runningLosses = 0;
+  const streaks: RunningStreaks = { wins: 0, losses: 0 };
 
   for (const match of ordered) {
     const won = match.outcome === "WIN";
     const lost = match.outcome === "LOSS";
 
-    stats.matchesPlayed += 1;
-    if (won) stats.matchesWon += 1;
-    else if (lost) stats.matchesLost += 1;
-    else stats.matchesDrawn += 1;
-
-    stats.mapsWon += match.scoreFor;
-    stats.mapsLost += match.scoreAgainst;
-
-    if (match.forfeit === "GIVEN") stats.forfeitsGiven += 1;
-    if (match.forfeit === "RECEIVED") stats.forfeitsReceived += 1;
-
-    // Séries : les deux compteurs avancent en parallèle, une victoire remettant
-    // à zéro la série de défaites et inversement. Un **nul les rompt toutes les
-    // deux** — il n'est ni l'une ni l'autre, et le laisser passer ferait
-    // annoncer une série de victoires qu'un 2-2 a pourtant interrompue.
-    if (won) {
-      runningWins += 1;
-      runningLosses = 0;
-      if (runningWins > stats.bestWinStreak) stats.bestWinStreak = runningWins;
-    } else if (lost) {
-      runningLosses += 1;
-      runningWins = 0;
-      if (runningLosses > stats.worstLossStreak) stats.worstLossStreak = runningLosses;
-    } else {
-      runningWins = 0;
-      runningLosses = 0;
-    }
-
-    const gameBucket = byGame.get(match.game) ?? { played: 0, won: 0, lost: 0 };
-    gameBucket.played += 1;
-    if (won) gameBucket.won += 1;
-    else if (lost) gameBucket.lost += 1;
-    byGame.set(match.game, gameBucket);
-
-    const formatBucket = byFormat.get(match.format) ?? { played: 0, won: 0, lost: 0 };
-    formatBucket.played += 1;
-    if (won) formatBucket.won += 1;
-    else if (lost) formatBucket.lost += 1;
-    byFormat.set(match.format, formatBucket);
-
-    if (match.opponentTeamId !== null) {
-      const entry = opponents.get(match.opponentTeamId) ?? {
-        teamId: match.opponentTeamId,
-        teamName: match.opponentName ?? "Équipe inconnue",
-        played: 0,
-        won: 0,
-        lost: 0,
-      };
-      entry.played += 1;
-      if (won) entry.won += 1;
-      else if (lost) entry.lost += 1;
-      opponents.set(match.opponentTeamId, entry);
-    }
+    tallyMatchTotals(stats, match, won, lost);
+    advanceStreaks(stats, streaks, won, lost);
+    bumpSplit(byGame, match.game, won, lost);
+    bumpSplit(byFormat, match.format, won, lost);
+    if (match.opponentTeamId !== null) bumpOpponent(opponents, match.opponentTeamId, match.opponentName, won, lost);
 
     const bucketIndex = activityIndex.get(monthKey(match.playedAt));
     if (bucketIndex !== undefined) {
@@ -435,23 +385,7 @@ export function computeDeepStats(
     }
   }
 
-  if (ordered.length > 0) {
-    stats.firstMatchAt = ordered[0].playedAt;
-    stats.lastMatchAt = ordered.at(-1)!.playedAt;
-
-    const last = ordered.at(-1)!.outcome;
-    stats.currentStreak = {
-      kind: last,
-      // Un nul remet les deux compteurs à zéro : la série en cours vaut donc 1,
-      // le nul lui-même.
-      length: { WIN: runningWins, LOSS: runningLosses, DRAW: 1 }[last],
-    };
-
-    stats.form = ordered
-      .slice(-FORM_LENGTH)
-      .reverse()
-      .map((match) => FORM_LETTERS[match.outcome]);
-  }
+  if (ordered.length > 0) applyRecentForm(stats, ordered, streaks);
 
   stats.winRate = ratio(stats.matchesWon, stats.matchesPlayed);
   stats.mapDiff = stats.mapsWon - stats.mapsLost;
@@ -463,6 +397,100 @@ export function computeDeepStats(
   stats.favouriteOpponent = pickOpponent(opponentList, "won");
   stats.nemesis = pickOpponent(opponentList, "lost");
 
+  tallyTournaments(stats, tournaments);
+
+  return stats;
+}
+
+type SplitBucket = { played: number; won: number; lost: number };
+
+/** Séries en cours pendant le parcours chronologique des matchs. */
+type RunningStreaks = { wins: number; losses: number };
+
+/** Bilan de matchs, de maps et de forfaits. */
+function tallyMatchTotals(stats: DeepStats, match: StatsMatch, won: boolean, lost: boolean): void {
+  stats.matchesPlayed += 1;
+  if (won) stats.matchesWon += 1;
+  else if (lost) stats.matchesLost += 1;
+  else stats.matchesDrawn += 1;
+
+  stats.mapsWon += match.scoreFor;
+  stats.mapsLost += match.scoreAgainst;
+
+  if (match.forfeit === "GIVEN") stats.forfeitsGiven += 1;
+  if (match.forfeit === "RECEIVED") stats.forfeitsReceived += 1;
+}
+
+/**
+ * Séries : les deux compteurs avancent en parallèle, une victoire remettant à
+ * zéro la série de défaites et inversement. Un **nul les rompt toutes les
+ * deux** — il n'est ni l'une ni l'autre, et le laisser passer ferait annoncer
+ * une série de victoires qu'un 2-2 a pourtant interrompue.
+ */
+function advanceStreaks(stats: DeepStats, streaks: RunningStreaks, won: boolean, lost: boolean): void {
+  if (won) {
+    streaks.wins += 1;
+    streaks.losses = 0;
+    if (streaks.wins > stats.bestWinStreak) stats.bestWinStreak = streaks.wins;
+  } else if (lost) {
+    streaks.losses += 1;
+    streaks.wins = 0;
+    if (streaks.losses > stats.worstLossStreak) stats.worstLossStreak = streaks.losses;
+  } else {
+    streaks.wins = 0;
+    streaks.losses = 0;
+  }
+}
+
+function bumpSplit<K>(buckets: Map<K, SplitBucket>, key: K, won: boolean, lost: boolean): void {
+  const bucket = buckets.get(key) ?? { played: 0, won: 0, lost: 0 };
+  bucket.played += 1;
+  if (won) bucket.won += 1;
+  else if (lost) bucket.lost += 1;
+  buckets.set(key, bucket);
+}
+
+function bumpOpponent(
+  opponents: Map<number, StatsOpponent>,
+  opponentTeamId: number,
+  opponentName: string | null,
+  won: boolean,
+  lost: boolean,
+): void {
+  const entry = opponents.get(opponentTeamId) ?? {
+    teamId: opponentTeamId,
+    teamName: opponentName ?? "Équipe inconnue",
+    played: 0,
+    won: 0,
+    lost: 0,
+  };
+  entry.played += 1;
+  if (won) entry.won += 1;
+  else if (lost) entry.lost += 1;
+  opponents.set(opponentTeamId, entry);
+}
+
+/** Bornes, série en cours et forme récente — `ordered` n'est jamais vide. */
+function applyRecentForm(stats: DeepStats, ordered: StatsMatch[], streaks: RunningStreaks): void {
+  stats.firstMatchAt = ordered[0].playedAt;
+  stats.lastMatchAt = ordered.at(-1)!.playedAt;
+
+  const last = ordered.at(-1)!.outcome;
+  stats.currentStreak = {
+    kind: last,
+    // Un nul remet les deux compteurs à zéro : la série en cours vaut donc 1,
+    // le nul lui-même.
+    length: { WIN: streaks.wins, LOSS: streaks.losses, DRAW: 1 }[last],
+  };
+
+  stats.form = ordered
+    .slice(-FORM_LENGTH)
+    .reverse()
+    .map((match) => FORM_LETTERS[match.outcome]);
+}
+
+/** Palmarès : tournois disputés, à venir, titres, podiums et rangs. */
+function tallyTournaments(stats: DeepStats, tournaments: StatsTournament[]): void {
   const ranks: number[] = [];
   for (const tournament of tournaments) {
     // Une inscription à un tournoi qui n'a pas commencé n'est pas un tournoi
@@ -484,8 +512,6 @@ export function computeDeepStats(
       (ranks.reduce((sum, rank) => sum + rank, 0) / ranks.length).toFixed(2),
     );
   }
-
-  return stats;
 }
 
 /** Bilan résumé : les trois nombres d'une carte d'annuaire. */

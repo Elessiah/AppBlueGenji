@@ -159,64 +159,51 @@ export function resolvePhasePlan(
 
   for (let i = 0; i < phases.length; i++) {
     const phase = phases[i];
-    const isLast = i === phases.length - 1;
+    const outcome = resolvePhaseOutcome(currentEntrants, phase, i === phases.length - 1);
 
-    let skipped = false;
-    let skipReason: "TOO_FEW_TEAMS" | "NO_CUT" | null = null;
-    let qualifiers: number;
-    let maxRounds: number | null = null;
-
-    // Pas assez d'équipes.
-    if (currentEntrants <= 1) {
-      skipped = true;
-      skipReason = "TOO_FEW_TEAMS";
-      qualifiers = currentEntrants;
-    } else if (!isLast) {
-      // Phase non-finale. Le saut se décide sur la cible **demandée**, avant tout
-      // ajustement puissance de deux (cf. rawQualifierTarget).
-      const requested = rawQualifierTarget(currentEntrants, phase);
-
-      if (requested >= currentEntrants) {
-        // La phase n'éliminerait personne.
-        //
-        // En mode COUNT, c'est le comportement attendu par l'organisateur : la
-        // cible fixe est un seuil, et un tournoi sous-rempli saute purement et
-        // simplement le mode. En mode PERCENT au contraire, la cible s'adapte
-        // toujours à l'effectif réel — on ne saute pas, on laisse passer tout le
-        // monde (cas limite : 100 %, que `validatePhases` refuse déjà à la
-        // création).
-        qualifiers = currentEntrants;
-        if (phase.qualifierMode === "COUNT") {
-          skipped = true;
-          skipReason = "NO_CUT";
-        }
-      } else {
-        qualifiers = resolvePhaseQualifiers(currentEntrants, phase, false);
-        // maxRounds n'a de sens que pour un bracket tronqué d'élimination simple.
-        if (phase.format === "SINGLE") {
-          const entrantsPow = nextPowerOfTwo(currentEntrants);
-          maxRounds = Math.round(Math.log2(entrantsPow / qualifiers));
-        }
-      }
-    } else {
-      // Phase finale : qualifiants = 1.
-      qualifiers = 1;
-    }
-
-    resolved.push({
-      ...phase,
-      entrants: currentEntrants,
-      qualifiers,
-      skipped,
-      skipReason,
-      maxRounds,
-    });
+    resolved.push({ ...phase, entrants: currentEntrants, ...outcome });
 
     // Préparer l'effectif de la phase suivante.
-    currentEntrants = qualifiers;
+    currentEntrants = outcome.qualifiers;
   }
 
   return resolved;
+}
+
+type PhaseOutcome = Pick<ResolvedPhase, "qualifiers" | "skipped" | "skipReason" | "maxRounds">;
+
+/** Qualifiées, saut et profondeur d'une phase, pour l'effectif qui l'aborde. */
+function resolvePhaseOutcome(currentEntrants: number, phase: PhaseConfig, isLast: boolean): PhaseOutcome {
+  // Pas assez d'équipes.
+  if (currentEntrants <= 1) {
+    return { qualifiers: currentEntrants, skipped: true, skipReason: "TOO_FEW_TEAMS", maxRounds: null };
+  }
+
+  // Phase finale : qualifiants = 1.
+  if (isLast) return { qualifiers: 1, skipped: false, skipReason: null, maxRounds: null };
+
+  // Phase non-finale. Le saut se décide sur la cible **demandée**, avant tout
+  // ajustement puissance de deux (cf. rawQualifierTarget).
+  const requested = rawQualifierTarget(currentEntrants, phase);
+
+  if (requested >= currentEntrants) {
+    // La phase n'éliminerait personne.
+    //
+    // En mode COUNT, c'est le comportement attendu par l'organisateur : la
+    // cible fixe est un seuil, et un tournoi sous-rempli saute purement et
+    // simplement le mode. En mode PERCENT au contraire, la cible s'adapte
+    // toujours à l'effectif réel — on ne saute pas, on laisse passer tout le
+    // monde (cas limite : 100 %, que `validatePhases` refuse déjà à la
+    // création).
+    const skipped = phase.qualifierMode === "COUNT";
+    return { qualifiers: currentEntrants, skipped, skipReason: skipped ? "NO_CUT" : null, maxRounds: null };
+  }
+
+  const qualifiers = resolvePhaseQualifiers(currentEntrants, phase, false);
+  // maxRounds n'a de sens que pour un bracket tronqué d'élimination simple.
+  const maxRounds =
+    phase.format === "SINGLE" ? Math.round(Math.log2(nextPowerOfTwo(currentEntrants) / qualifiers)) : null;
+  return { qualifiers, skipped: false, skipReason: null, maxRounds };
 }
 
 /**
@@ -333,75 +320,76 @@ export function findPhaseIssue(phases: PhaseConfig[]): PhaseIssue | null {
   // l'ordre du tableau porte déjà le déroulé du tournoi (c'est lui qui décide
   // quelle phase est la dernière) : accepter un tableau désordonné laisserait
   // deux sources de vérité contradictoires.
-  for (let i = 0; i < phases.length; i++) {
-    if (phases[i].position !== i + 1) {
-      return issue("INVALID_PHASE_POSITIONS");
-    }
+  if (phases.some((phase, i) => phase.position !== i + 1)) {
+    return issue("INVALID_PHASE_POSITIONS");
   }
 
   // Valider chaque phase.
   for (let i = 0; i < phases.length; i++) {
-    const phase = phases[i];
-    const isLast = i === phases.length - 1;
+    const found = findSinglePhaseIssue(phases[i], i, i === phases.length - 1);
+    if (found) return found;
+  }
 
-    // Format.
-    if (!["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"].includes(phase.format)) {
-      return issue("INVALID_PHASE_FORMAT", i, "format");
+  return findNonDecreasingQualifiers(phases);
+}
+
+const PHASE_FORMATS: readonly string[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
+
+/** Premier défaut d'une phase prise isolément (format, qualification, cadences). */
+function findSinglePhaseIssue(phase: PhaseConfig, i: number, isLast: boolean): PhaseIssue | null {
+  // Format.
+  if (!PHASE_FORMATS.includes(phase.format)) {
+    return issue("INVALID_PHASE_FORMAT", i, "format");
+  }
+
+  // DOUBLE doit être la dernière phase.
+  if (phase.format === "DOUBLE" && !isLast) {
+    return issue("DOUBLE_MUST_BE_LAST_PHASE", i, "format");
+  }
+
+  // Qualifiants.
+  if (!isLast && !qualifierInBounds(phase)) {
+    return issue("INVALID_PHASE_QUALIFIER", i, "qualifierValue");
+  }
+
+  // Manches SWISS.
+  if (phase.format === "SWISS" && !optionalRoundsInRange(phase.swissTotalRounds, 20)) {
+    return issue("INVALID_PHASE_SWISS_ROUNDS", i, "swissTotalRounds");
+  }
+
+  // Cadences SURVIE.
+  if (phase.format === "SURVIVAL") {
+    if (!optionalRoundsInRange(phase.survivalRoundsBeforeFirstCut, 50)) {
+      return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsBeforeFirstCut");
     }
-
-    // DOUBLE doit être la dernière phase.
-    if (phase.format === "DOUBLE" && !isLast) {
-      return issue("DOUBLE_MUST_BE_LAST_PHASE", i, "format");
-    }
-
-    // Qualifiants.
-    if (!isLast) {
-      if (phase.qualifierMode === "COUNT") {
-        if (phase.qualifierValue < 1) {
-          return issue("INVALID_PHASE_QUALIFIER", i, "qualifierValue");
-        }
-      } else if (phase.qualifierMode === "PERCENT") {
-        if (phase.qualifierValue < 1 || phase.qualifierValue > 99) {
-          return issue("INVALID_PHASE_QUALIFIER", i, "qualifierValue");
-        }
-      }
-    }
-
-    // Manches SWISS.
-    if (phase.format === "SWISS") {
-      if (
-        phase.swissTotalRounds !== null &&
-        (typeof phase.swissTotalRounds !== "number" || phase.swissTotalRounds < 1 || phase.swissTotalRounds > 20)
-      ) {
-        return issue("INVALID_PHASE_SWISS_ROUNDS", i, "swissTotalRounds");
-      }
-    }
-
-    // Cadences SURVIE.
-    if (phase.format === "SURVIVAL") {
-      if (
-        phase.survivalRoundsBeforeFirstCut !== null &&
-        (typeof phase.survivalRoundsBeforeFirstCut !== "number" ||
-          phase.survivalRoundsBeforeFirstCut < 1 ||
-          phase.survivalRoundsBeforeFirstCut > 50)
-      ) {
-        return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsBeforeFirstCut");
-      }
-      if (
-        phase.survivalRoundsPerCut !== null &&
-        (typeof phase.survivalRoundsPerCut !== "number" ||
-          phase.survivalRoundsPerCut < 1 ||
-          phase.survivalRoundsPerCut > 50)
-      ) {
-        return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsPerCut");
-      }
+    if (!optionalRoundsInRange(phase.survivalRoundsPerCut, 50)) {
+      return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsPerCut");
     }
   }
 
-  // Décroissance stricte des COUNT consécutifs. La **dernière** phase est exclue :
-  // sa valeur de qualification n'est jamais lue (elle couronne toujours une seule
-  // championne), donc la comparer produirait un refus sur un plan parfaitement
-  // valide comme « 64 qualifiées puis finale ».
+  return null;
+}
+
+/** COUNT ≥ 1, PERCENT dans 1..99 ; un autre mode n'est pas contrôlé ici. */
+function qualifierInBounds(phase: PhaseConfig): boolean {
+  if (phase.qualifierMode === "COUNT") return phase.qualifierValue >= 1;
+  if (phase.qualifierMode === "PERCENT") return phase.qualifierValue >= 1 && phase.qualifierValue <= 99;
+  return true;
+}
+
+/** `null` (non renseigné) ou un nombre dans 1..max. */
+function optionalRoundsInRange(value: number | null, max: number): boolean {
+  if (value === null) return true;
+  return typeof value === "number" && value >= 1 && value <= max;
+}
+
+/**
+ * Décroissance stricte des COUNT consécutifs. La **dernière** phase est exclue :
+ * sa valeur de qualification n'est jamais lue (elle couronne toujours une seule
+ * championne), donc la comparer produirait un refus sur un plan parfaitement
+ * valide comme « 64 qualifiées puis finale ».
+ */
+function findNonDecreasingQualifiers(phases: PhaseConfig[]): PhaseIssue | null {
   for (let i = 0; i + 2 < phases.length; i++) {
     const current = phases[i];
     const next = phases[i + 1];
@@ -413,7 +401,6 @@ export function findPhaseIssue(phases: PhaseConfig[]): PhaseIssue | null {
       return issue("NON_DECREASING_PHASE_QUALIFIERS", i + 1, "qualifierValue");
     }
   }
-
   return null;
 }
 
