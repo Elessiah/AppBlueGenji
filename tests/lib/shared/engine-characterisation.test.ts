@@ -473,6 +473,52 @@ describe("caractérisation du moteur pur", () => {
     expect(runCases(CASES * 2, (r, i) => randomPhases(r, i % 3 === 0), findPhaseIssue)).toMatchSnapshot();
   });
 
+  it("findPhaseIssue — valeurs non numériques reçues telles quelles", () => {
+    // Le contrôle porte sur « hors bornes » : une valeur qui n'est hors
+    // d'aucune borne (`NaN`, une chaîne, `undefined`) passe, `null` (qui vaut 0
+    // dans une comparaison) est refusé. Comportement d'origine, à garder.
+    const plan = (first: Partial<PhaseConfig>): PhaseConfig[] => [
+      {
+        position: 1,
+        format: "SWISS",
+        name: null,
+        qualifierMode: "COUNT",
+        qualifierValue: 4,
+        hasThirdPlaceMatch: false,
+        swissTotalRounds: 5,
+        survivalRoundsBeforeFirstCut: null,
+        survivalRoundsPerCut: null,
+        ...first,
+      },
+      {
+        position: 2,
+        format: "SINGLE",
+        name: null,
+        qualifierMode: "COUNT",
+        qualifierValue: 1,
+        hasThirdPlaceMatch: false,
+        swissTotalRounds: null,
+        survivalRoundsBeforeFirstCut: null,
+        survivalRoundsPerCut: null,
+      },
+    ];
+    const odd = (value: unknown): number => value as number;
+    const code = (first: Partial<PhaseConfig>): string | null => findPhaseIssue(plan(first))?.code ?? null;
+
+    expect(code({ qualifierValue: Number.NaN })).toBeNull();
+    expect(code({ qualifierValue: odd("abc") })).toBeNull();
+    expect(code({ qualifierValue: odd(undefined) })).toBeNull();
+    expect(code({ qualifierValue: odd(null) })).toBe("INVALID_PHASE_QUALIFIER");
+    expect(code({ qualifierMode: "PERCENT", qualifierValue: Number.NaN })).toBeNull();
+    expect(code({ qualifierMode: "PERCENT", qualifierValue: odd("abc") })).toBeNull();
+    expect(code({ swissTotalRounds: Number.NaN })).toBeNull();
+    expect(code({ swissTotalRounds: odd(undefined) })).toBe("INVALID_PHASE_SWISS_ROUNDS");
+    expect(code({ format: "SURVIVAL", survivalRoundsPerCut: Number.NaN })).toBeNull();
+    expect(code({ format: "SURVIVAL", survivalRoundsBeforeFirstCut: odd("2") })).toBe(
+      "INVALID_PHASE_SURVIVAL_ROUNDS",
+    );
+  });
+
   it("les générateurs couvrent les cas visés", () => {
     // Garde-fou : une empreinte n'a de valeur que si les cas exercent bien les
     // branches — ces compteurs le vérifient sans figer de valeur.
