@@ -120,7 +120,8 @@ describe("page", () => {
   it("ne montre le formulaire d'identité qu'à qui peut l'enregistrer", () => {
     const settings = stripComments(read("_components", "TeamSettings.tsx"));
     expect(settings).toContain('team.viewerMembership === "OWNER" || managedAsGhost');
-    expect(settings).toMatch(/\{ownsIdentity \? \(\s*<form onSubmit=\{saveMeta\}/);
+    expect(settings).toMatch(/\{ownsIdentity \? \(\s*<TeamIdentityForm /);
+    expect(settings).toMatch(/function TeamIdentityForm\([\s\S]*<form onSubmit=\{saveMeta\}/);
   });
 
   it("relit la fiche sans repasser par « Chargement… »", () => {
