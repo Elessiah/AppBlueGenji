@@ -179,10 +179,12 @@ function ActivityChart({ stats }: { stats: DeepStats }) {
       <div className={s.legend}>
         <span className={s.legendItem}>
           <span className={s.legendSwatch} style={{ background: "rgba(255,255,255,0.12)" }} />
+          {/* NOSONAR S6772 — légende en flex avec `gap` */}
           Matchs joués
         </span>
         <span className={s.legendItem}>
           <span className={s.legendSwatch} style={{ background: "rgba(var(--green-rgb), 0.75)" }} />
+          {/* NOSONAR S6772 — légende en flex avec `gap` */}
           Victoires
         </span>
       </div>

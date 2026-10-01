@@ -167,7 +167,7 @@ export function FormatSettings({
                   });
                 }}
                 {...lockedAttr("matchFormat")}
-              />
+              />{/* NOSONAR S6772 — label en flex avec `gap` : l'espace est posé par la mise en page */}
               Égalités autorisées en qualification
             </label>
             <p style={HINT}>
@@ -362,7 +362,7 @@ export function FormatSettings({
           <label htmlFor="third-place" style={{ marginBottom: 6 }}>
             Options supplémentaires
           </label>
-          <div
+          <div // NOSONAR S1082 — raccourci souris ; le clavier passe par la case native qu'elle contient
             className="checkbox-card"
             // Verrouillée, la carte n'a plus de geste — et rien à déclarer pour
             // le dire : `globals.css` retire le halo et le balayage du survol

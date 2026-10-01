@@ -241,6 +241,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             <div className={styles.conflict} role="alert">
               Ce match a été modifié pendant ta saisie — quelqu&apos;un d&apos;autre a
               enregistré un résultat. Envoyer maintenant écraserait le sien.
+              {/* NOSONAR S6772 — le bouton est en `display: block`, il passe à la ligne */}
               <button
                 type="button"
                 className={styles.conflictAction}

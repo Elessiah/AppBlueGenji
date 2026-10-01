@@ -65,6 +65,7 @@ export function DiscordCommunity({ stats }: DiscordCommunityProps) {
 
       <span className={styles.cta}>
         Rejoindre le Discord
+        {/* NOSONAR S6772 — bouton en flex avec `gap` */}
         <span aria-hidden="true">→</span>
         <span className="sr-only"> (nouvel onglet)</span>
       </span>

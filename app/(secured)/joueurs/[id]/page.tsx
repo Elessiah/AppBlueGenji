@@ -242,8 +242,8 @@ export default function PlayerDetailPage() {
               )}
             </div>
             <div className="field">
-              <label>Tag Marvel Rivals</label>
-              <input value={data.profile.marvelRivalsTag || "Masqué"} readOnly />
+              <label htmlFor="player-marvel-rivals-tag">Tag Marvel Rivals</label>
+              <input id="player-marvel-rivals-tag" value={data.profile.marvelRivalsTag || "Masqué"} readOnly />
             </div>
             {/*
               Même convention que ses deux voisins : « Masqué » couvre aussi bien
@@ -257,7 +257,7 @@ export default function PlayerDetailPage() {
               « tous les Discord vérifiés » d'un tournoi.
             */}
             <div className="field">
-              <label>Discord</label>
+              <span className="field-label">Discord</span>
               <div
                 style={{
                   display: "flex",
@@ -274,8 +274,9 @@ export default function PlayerDetailPage() {
               </div>
             </div>
             <div className="field">
-              <label>Majorité</label>
+              <label htmlFor="player-adult">Majorité</label>
               <input
+                id="player-adult"
                 value={
                   data.profile.isAdult === null ? "Masqué" : data.profile.isAdult ? "Oui (18+)" : "Non (mineur)"
                 }
@@ -299,7 +300,7 @@ export default function PlayerDetailPage() {
             {PLATFORM_ROLES.map((role) => {
               const checked = selectedRoles.includes(role);
               return (
-                <label
+                <label // NOSONAR S6853 — label englobant : la case et le texte (ROLE_LABELS) sont à l'intérieur
                   key={role}
                   style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: rolesBusy ? "default" : "pointer" }}
                 >

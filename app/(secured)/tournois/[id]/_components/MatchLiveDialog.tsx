@@ -147,6 +147,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProp
               checked={streamed}
               onChange={(e) => setStreamed(e.target.checked)}
             />
+            {/* NOSONAR S6772 — label en flex avec `gap` */}
             Ce match est casté
           </label>
 

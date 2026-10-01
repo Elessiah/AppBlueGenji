@@ -160,6 +160,7 @@ export function AdvanceTournamentDialog({
               <strong style={{ color: "var(--ink)" }}>
                 {formatLocalDateTime(card.registrationOpenAt)}
               </strong>
+              {/* NOSONAR S6772 — le point suit la date sans espace */}
               . Leur clôture et le coup d&apos;envoi restent prévus aux dates annoncées.
             </>
           )}

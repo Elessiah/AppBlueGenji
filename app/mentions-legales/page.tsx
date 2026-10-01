@@ -255,6 +255,7 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           <a href={SOURCE_CODE_URL} target="_blank" rel="noreferrer">
             GitHub (nouvel onglet)
           </a>
+          {/* NOSONAR S6772 — le point suit le lien sans espace */}
           . Il embarque des composants tiers — bibliothèques, polices — qui restent sous leurs
           propres licences.
         </p>

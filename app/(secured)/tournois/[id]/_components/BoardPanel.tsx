@@ -79,9 +79,9 @@ export function BoardPanel({
       </button>
 
       {open && (
-        <div id={panelId} role="region" aria-label={ariaLabel ?? title} className={styles.body}>
+        <section id={panelId} aria-label={ariaLabel ?? title} className={styles.body}>
           {children}
-        </div>
+        </section>
       )}
     </div>
   );

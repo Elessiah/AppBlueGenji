@@ -77,7 +77,7 @@ function NetworkCanvas({ rgb }: { rgb: string }) {
     return runNetwork(canvas, rgb, policy, (nodesRef.current ??= createNodes()));
   }, [rgb, policy]);
 
-  return <canvas ref={canvasRef} aria-hidden className={s.bgCanvas} />;
+  return <canvas ref={canvasRef} aria-hidden className={s.bgCanvas} />; // NOSONAR S6825 — un <canvas> sans tabIndex n'est pas focalisable : fond décoratif
 }
 
 /** Fait vivre le canevas selon `policy` ; rend la fonction de nettoyage. */

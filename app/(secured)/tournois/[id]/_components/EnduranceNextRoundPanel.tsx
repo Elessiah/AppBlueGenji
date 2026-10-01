@@ -112,6 +112,7 @@ export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Endur
                   {!match.sidesKnown && (
                     <span className={styles.tag} title={SIDES_HINT}>
                       Côtés à confirmer
+                      {/* NOSONAR S6772 — texte réservé aux lecteurs d'écran, qui commence par « . » */}
                       <span className="sr-only">{`. ${SIDES_HINT}`}</span>
                     </span>
                   )}

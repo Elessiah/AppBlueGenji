@@ -82,6 +82,7 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
                   } (nouvel onglet)`}
                 >
                   <span aria-hidden="true">▶</span>
+                  {/* NOSONAR S6772 — CyberButton en flex avec `gap` */}
                   Regarder le live
                 </a>
               </CyberButton>

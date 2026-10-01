@@ -126,7 +126,7 @@ describe("AccessibilityMenu — ouverture à la demande", () => {
         onClose={noop}
       />,
     );
-    expect(html).toMatch(/^<div id="p"[^>]*tabindex="-1"/);
+    expect(html).toMatch(/^<section id="p"[^>]*tabindex="-1"/);
   });
 });
 

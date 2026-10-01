@@ -229,6 +229,7 @@ export default function AccessibilityStatementPage() {
               <a href="https://formulaire.defenseurdesdroits.fr/" target="_blank" rel="noreferrer">
                 formulaire en ligne du Défenseur des droits (nouvel onglet)
               </a>
+              {/* NOSONAR S6772 — ponctuation accolée au lien */}
               ;
             </li>
             <li>
@@ -236,6 +237,7 @@ export default function AccessibilityStatementPage() {
               <a href="https://www.defenseurdesdroits.fr/carte-des-delegues" target="_blank" rel="noreferrer">
                 le délégué de votre région (nouvel onglet)
               </a>
+              {/* NOSONAR S6772 — ponctuation accolée au lien */}
               ;
             </li>
             <li>

@@ -41,6 +41,7 @@ export function RunningCard({ t, priority }: RunningCardProps) {
       />
       <div className={`${s.cardRibbon} ${s.cardRibbonRunning}`}>
         <span className={s.dot} />
+        {/* NOSONAR S6772 — ruban en flex avec `gap` */}
         En cours
       </div>
 
