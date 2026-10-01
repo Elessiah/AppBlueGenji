@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Chargé à chaque session : règles transverses et pointeurs seulement. Le détail vit dans `docs/features/*.md` — lire la doc pointée avant de toucher une fonctionnalité (les noms `X.md` seuls désignent `docs/features/X.md`).
+Chargé à chaque session : règles transverses seulement. Chaque fonctionnalité a son document dans `docs/features/`, listé par domaine dans **`docs/features/INDEX.md`** — le lire avant de toucher une fonctionnalité (`X.md` seul = `docs/features/X.md`).
 
 ## Project Overview
 
@@ -41,81 +41,25 @@ npx jest tests/path/to/file.test.ts  # un seul fichier
 - `/(secured)/*` : `tournois`, `equipes`, `joueurs`, `profil`, `signalements` — sans session : carte « Connexion requise » en 200.
 - `/api/*` : REST uniquement (ni tRPC ni server actions).
 
-### Auth (`lib/server/auth.ts`) → `docs/features/AUTH_SYSTEM.md`
-Sessions `bg_user_sessions` (30 j, cookie `bg_session`), révocables (`SESSION_REVOCATION.md`). **Aucun mot de passe** : OAuth Google/Discord/Blizzard (`lib/server/oauth-flow.ts`, `OAUTH_PROVIDERS.md`), code Discord par message privé, Google One Tap. Aucun compte ne se revendique par e-mail ; on ne déplace jamais une porte, on ne mure jamais la dernière. Certifier son tag Discord est volontaire (`DISCORD_VERIFICATION.md`). Un quota (essais du code Discord…) se **réserve en une instruction** (`UPDATE … WHERE attempts < ?` + `affectedRows`), jamais lu puis écrit après un `await`. Écritures `/api/` : provenance vérifiée (403 `CROSS_SITE_REQUEST`). Une réponse d'erreur ne porte **qu'un code** (`fail`) — jamais une phrase. CSP en application → `SECURITY_HEADERS_CSP.md` (page cassée : lire `/api/csp-report`). Un geste qui change la barre de navigation appelle `router.refresh()`.
+### Auth (`lib/server/auth.ts`) → `AUTH_SYSTEM.md`
+Sessions `bg_user_sessions` (30 j, cookie `bg_session`). **Aucun mot de passe** : OAuth Google/Discord/Blizzard, code Discord par message privé, Google One Tap. Un quota se **réserve en une instruction** (`UPDATE … WHERE attempts < ?` + `affectedRows`), jamais lu puis écrit après un `await`. Écritures `/api/` : provenance vérifiée (403 `CROSS_SITE_REQUEST`). Une réponse d'erreur ne porte **qu'un code** (`fail`), jamais une phrase. Un geste qui change la barre de navigation appelle `router.refresh()`.
 
 ### Database (`lib/server/database.ts`) → `docs/DATABASE_SCHEMA.md`
 **Un changement de schéma s'écrit à deux endroits** : dans le `CREATE TABLE` (bases neuves) **et** en `ALTER TABLE` tolérant dans la section « Migrations » (bases existantes, où `CREATE TABLE IF NOT EXISTS` ne fait rien) — la seconde entrée se retire une fois jouée partout.
 
-### Tournament Engine (`lib/server/tournaments-service.ts`)
-Formats `SINGLE`, `DOUBLE`, `SWISS`, `SURVIVAL`, `MULTI`, `BG_SURVIE`. États `UPCOMING → REGISTRATION → RUNNING → FINISHED` ; matchs `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED` ; positions `UPPER`/`LOWER`/`GRAND`. Les modes à classement **rejouent** tout depuis l'historique des matchs (rien n'est accumulé). Une transaction qui lit puis écrit les inscrites (inscription, lot de fantômes, retrait, seeding) prend `lockTournamentRow` **en toute première instruction** : sous `REPEATABLE READ`, une lecture avant le verrou fige un état périmé. Byes → `BYE_FUNCTIONALITY.md`, `VARIABLE_SIZE_TOURNAMENTS.md`.
-- **Survie** (`SURVIVAL`) → `SURVIVAL_MODE.md`
-- **Ronde suisse** → `SWISS_MODE.md`
-- **Multi-phases** → `MULTI_PHASE_TOURNAMENTS.md`
-- **BlueGenji Survie** (`BG_SURVIE`) → `BG_SURVIE_MODE.md`
-- **BG Survie, compléments** : aperçu de la manche suivante `ENDURANCE_NEXT_ROUND_PREVIEW.md` · pénalités (entrée du rejeu, se retirent) `ENDURANCE_PENALTIES.md` · volets et arbre `ENDURANCE_ROUND_PANELS.md`
-- **Tournoi individuel** (`SOLO`) → `SOLO_TOURNAMENTS.md`
-- **Format de match** (BO/FT, `checkMatchScores`) → `MATCH_FORMAT.md`
-- **Matchs nuls et plafond de maps** (`isMatchPlayed`, `matchWinnerSide`) → `MATCH_DRAWS.md`
-- **Conditions d'inscription** (effectif, Discord, Blizzard) → `REGISTRATION_FILTERS.md`
-- **Tournoi sans adversaires** (0-1 engagée → clos) → `UNDERFILLED_TOURNAMENTS.md`
-- **Lancement d'un match** (« Prêt », lobby, contacts) → `MATCH_LAUNCH.md`
-- **Planification par l'arbitrage** (`TO_PLAN`) → `MATCH_PLANNING.md`
-- **Verrouillage d'un score** (`match-lock`, y compris admin) → `SCORE_EDIT_LOCK.md`
-- **Double forfait** et cascades → `DOUBLE_FORFEIT.md`
-- **Correction d'un tournoi terminé** → `FINISHED_TOURNAMENT_RECONCILIATION.md`
-- **Dialogue d'édition d'un score** (Enregistrer vs Valider) → `SCORE_EDIT_DIALOG.md`
-- **Saisie du score par un joueur** → `PLAYER_SCORE_ENTRY.md`
-- **Aperçu du plateau pendant les inscriptions** → `TOURNAMENT_PREVIEW.md`
-- **Ordre de seeding** (glisser-déposer) → `SEEDING_ORDER.md`
-- **Retrait d'un engagé** (avant le coup d'envoi) → `ENTRANT_REMOVAL.md`
-- **Édition d'un tournoi** (`FULL`/`RESTRICTED`/`LOCKED`) → `TOURNAMENT_EDITING.md`
-- **Avancer le tournoi** (jamais avancer une date, seulement la reculer) → `EARLY_TOURNAMENT_LAUNCH.md`
-- **Retour en arrière** d'un stade → `ROUND_ROLLBACK.md`
-- **Suppression d'un tournoi** (`user.isAdmin`) → `TOURNAMENT_DELETION.md`
-- **Visibilité** : section des invisibles → `HIDDEN_TOURNAMENTS_SECTION.md` ; fiche non publiée = 404 hors `tournaments` → `TOURNAMENT_VISIBILITY_ACCESS.md`
+### Tournament Engine (`lib/server/tournaments-service.ts`) → `INDEX.md` § Moteur
+Formats `SINGLE`, `DOUBLE`, `SWISS`, `SURVIVAL`, `MULTI`, `BG_SURVIE`. États `UPCOMING → REGISTRATION → RUNNING → FINISHED` ; matchs `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED` ; positions `UPPER`/`LOWER`/`GRAND`. Les modes à classement **rejouent** tout depuis l'historique des matchs (rien n'est accumulé). Une transaction qui lit puis écrit les inscrites prend `lockTournamentRow` **en toute première instruction** (sous `REPEATABLE READ`, une lecture avant le verrou fige un état périmé).
 
-### Live Updates → `docs/features/REALTIME_REFRESH.md`
-SSE `/api/tournaments/[id]/stream` : `TournamentSnapshot` (commun) + `TournamentViewerContext` (lecteur). **Tout droit du lecteur se câble sur les deux portes** (flux et REST de secours). `MatchRow` est mémorisée : ce qui lui descend reste stable d'un instantané à l'autre. Caches invalidés dans `tournaments/notifications.ts` ; entretien → `TOURNAMENT_SYNC_SCOPE.md`. Régime de charge du navigateur → `CLIENT_POWER_MODES.md` : **toute animation infinie lit `var(--deco-anim-state)`**, toute boucle JS lit `useClientPower()`/`useClock()`.
+### Live Updates → `REALTIME_REFRESH.md`
+SSE : `TournamentSnapshot` (commun) + `TournamentViewerContext` (lecteur) — **tout droit du lecteur se câble sur les deux portes** (flux et REST de secours). **Toute animation infinie lit `var(--deco-anim-state)`**, toute boucle JS lit `useClientPower()`/`useClock()` (`CLIENT_POWER_MODES.md`).
 
-### Bot
-Appels toujours app → bot (`lib/server/bot-integration.ts`, dégradation si injoignable) → `BOT_INTEGRATION.md`. Page `/bot` et `/bot/docs` (doc du bot relue à chaud, registre `BOT_DOC_SECTIONS`) → `BOT_PAGE.md`.
+### Bot → `BOT_INTEGRATION.md`
+Appels toujours app → bot, dégradation si injoignable.
 
-## Environment Variables → `docs/ENVIRONMENT.md` (commentée)
-
-```env
-DB_HOST=
-DB_USER=
-DB_PASSWORD=
-DB_DATABASE=
-APP_URL=http://localhost:3000
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
-DISCORD_AUTH_CLIENT_ID=
-DISCORD_CLIENT_SECRET=
-DISCORD_REDIRECT_URI=
-BLIZZARD_CLIENT_ID=
-BLIZZARD_CLIENT_SECRET=
-BLIZZARD_REDIRECT_URI=
-BLIZZARD_REGION=
-BOT_INTERNAL_URL=http://127.0.0.1:4400
-BOT_INTERNAL_TOKEN=  # = INTERNAL_API_TOKEN du bot
-DEV_AUTH_USER_ID=  # bypass en dev seulement (voir plus bas)
-BOT_DOCS_PATH=
-VISIT_HASH_SALT=
-TRUSTED_PROXY_HOPS=1
-TRUSTED_PROXY_REAL_IP=false
-VAPID_PUBLIC_KEY=
-VAPID_PRIVATE_KEY=  # ne jamais la changer en production
-VAPID_SUBJECT=
-```
-
-## Preview / dev auth bypass → `docs/features/DEV_AUTH_BYPASS.md`
-`DEV_AUTH_USER_ID=<id>` dans `.env` (ex. l'admin du seed) : `getCurrentUser()` renvoie ce compte **seulement si `NODE_ENV === "development"`** et l'ID est un entier valide. Redémarrer le dev server après modification. **Ne JAMAIS définir cette variable en prod.**
-
-## Jeu de test (`npm run seed`) → `docs/seed/SEED_RULES.md`
-Refuse `NODE_ENV=production` ; verrou nommé `bg_seed` (les worktrees partagent la base). Écrase les données `Test_` / `Test - ` puis régénère une matrice reproductible. Ajouter un cas = une entrée à `TOURNAMENTS` (`lib/server/seed-cases.ts`). L'id admin s'affiche à la fin.
+## Environnement, dev, seed
+- Variables → `docs/ENVIRONMENT.md`.
+- `DEV_AUTH_USER_ID` court-circuite la session en `NODE_ENV=development` seulement — **ne JAMAIS la définir en prod** → `DEV_AUTH_BYPASS.md`.
+- `npm run seed` écrase les données `Test_` et régénère la matrice ; refuse la production → `docs/seed/SEED_RULES.md`.
 
 ## Key Conventions (règles transverses)
 
@@ -142,15 +86,6 @@ Refuse `NODE_ENV=production` ; verrou nommé `bg_seed` (les worktrees partagent 
 - **« Live » / « Direct »** : « En cours » = état d'un tournoi ; « En direct » / « le live » = vraie diffusion ; « À jour » / « Reconnexion… » / « Hors ligne » = témoin de flux. Le rouge (`pill-live`) ne sert qu'à ce qui est réellement à l'antenne → `LIVE_STREAMS.md`.
 - Coordonnées (courriel, téléphone) jamais en clair : encodées, révélées au clic par `ProtectedContact` (`legal-contact.test.ts`) → `LEGAL_PAGE.md`.
 
-### Pointeurs par domaine
-- **Équipes** : gestion `TEAM_MANAGEMENT_PAGE.md` · sigle `TEAM_TAG.md` · logos d'annuaire `TEAM_DIRECTORY_LOGOS.md` · demande d'adhésion `TEAM_JOIN_REQUEST_NOTIFICATION.md`
-- **Pages tournoi** : en-tête `TOURNAMENT_HEADER.md` · frise `TOURNAMENT_PROGRESS.md` · cartes `TOURNAMENT_LIST_CARDS.md` · barre `TOURNAMENT_LIST_TOOLBAR.md` · « Mes tournois » `MY_TOURNAMENTS_SECTION.md` · image `TOURNAMENT_IMAGE.md` · lien profond vers un match `FEATURED_MATCH_LINK.md`
-- **Comptes** : profil `PROFILE_SCREEN.md` · suppression `ACCOUNT_DELETION.md` · suspension `ACCOUNT_SUSPENSION.md` · statut d'appartenance `PLAYER_ROSTER_STATUS.md` · menu du compte `ACCOUNT_MENU.md` · import d'avatar `USER_AVATAR_IMPORT.md` · redirection sûre `SAFE_LOGIN_REDIRECT.md`
-- **Données et conformité** : journal de connexion `CONNECTION_LOGS.md` · sauvegardes `BACKUP_DATA_PROTECTION.md` · visites `SITE_VISIT_STATS.md` · signalements `CONTENT_REPORTS.md` / `LOGO_QUARANTINE.md`
-- **Classements et stats** : stats approfondies `DEEP_STATS.md` · points d'équipe `TEAM_RANKING_POINTS.md` · cote Elo `ELO_RANKING.md` · points de parcours `TOURNAMENT_PLACEMENT_POINTS.md`
-- **Vitrine** : textes éditables `EDITABLE_SITE_COPY.md` · partenaires `SPONSOR_LOGO_PROXY.md` / `SPONSOR_CARDS.md` · Discord `DISCORD_COMMUNITY.md` · SEO `SEO.md` · manifeste `WEB_APP_MANIFEST.md` · aperçus de liens `SHARE_METADATA.md` · recrutement `RECRUITMENT.md` · menus `PUBLIC_NAVIGATION.md` · pages d'erreur `ERROR_PAGES_AND_ANCHORS.md` · lien d'évitement `ACCESSIBILITY_QUICK_WINS.md`
-- **Discord et diffusion** : messages automatisés `DISCORD_NOTIFICATIONS.md` · journal `BOT_ACTIVITY_LOG.md` · alertes arbitre `REFEREE_ALERTS.md` · dates des matchs `MATCH_START_DATES.md` · rediffs `MATCH_REPLAYS.md`
-
 ## Design System — « Cyber minimal » → `docs/features/DESIGN_SYSTEM.md`
 Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`, primitives `components/cyber/`.
 
@@ -162,7 +97,7 @@ Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`
 
 ## Règles de travail → détail dans `docs/WORKFLOW.md`
 
-- **Documentation** : le détail d'une fonctionnalité va dans `docs/features/<NOM>.md` (créé ou complété dans la PR). `CLAUDE.md` ne reçoit qu'**un pointeur d'une ligne** (`- **<Fonctionnalité>** — <quoi/où> → docs/features/<X>.md`) et les règles transverses, et **doit rester sous 20 Kio (20 480 octets, `wc -c CLAUDE.md`)**.
+- **Documentation** : le détail d'une fonctionnalité va dans `docs/features/<NOM>.md` (créé ou complété dans la PR), avec **une ligne dans `docs/features/INDEX.md`** sous son domaine. `CLAUDE.md` ne reçoit **que** les règles transverses (à appliquer partout) — un lien vers une doc n'y accompagne qu'une telle règle, jamais une ligne qui ne serait qu'un pointeur — et reste **aussi léger que possible** (plafond dur : 20 480 octets, `wc -c CLAUDE.md`).
 - **Tests** : toute feature a ses tests (nominal, limites, erreurs), sinon elle n'est pas terminée.
 - **Deux TypeScript** : `typescript` 5.x (Next, ts-jest, ESLint) et `typescript-native` (7, pour `npm run typecheck`) — les scripts désignent leur `tsc` **par chemin**, jamais `npx tsc`.
 - **Les tests sont type-vérifiés** : fabriques complètes de `tests/helpers/`, `jest.mocked(fn)`, doubles SQL `jest.fn<SqlQuery>()` ; jamais `x as never` sur une valeur simulée ni `it.each([...] as const)`.
@@ -184,4 +119,4 @@ Enchaîner sans s'arrêter :
 4. Commit tests (`jest`)
 5. Commit polish UI/UX (aucune logique) — les problèmes d'accessibilité non réglés vont dans `ACCESSIBILITE.md` par un commit direct sur `main`
 6. `git push -u origin feature/<short-name>`
-7. `gh pr create`, puis revue `/code-review --comment` **en boucle** jusqu'à un cycle sans finding (corriger, commiter, pousser, relancer une revue complète). **SonarQube** (`npm run sonar`, local, aucun jeton à demander) avant le premier cycle et après le dernier ; nouveau code : Quality Gate vert, notes A, zéro problème, hotspots 100 % examinés, couverture ≥ 80 %, duplication ≤ 3 %, aucun « Accepté »/« Faux positif » non justifié. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL ; `.env` parent copié).
+7. `gh pr create`, revue `/code-review --comment` **en boucle** jusqu'à un cycle sans finding (deux consécutifs pour un changement critique : légal, auth, RGPD, sauvegardes, CSS globale), puis cycles **thématiques** UI/UX, sécurité, performance (doc/légal seul : un cycle juridique ; renommage : aucun) → `docs/REVIEW_CYCLES.md`. **SonarQube** (`npm run sonar`, sans jeton) avant le premier cycle et après le dernier, tous critères tenus (`docs/WORKFLOW.md`). Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL).
