@@ -229,29 +229,38 @@ async function runSweep(now: Date): Promise<number> {
 
   let sent = 0;
   for (const group of groups.values()) {
-    const report = await notifyUsers(group.recipients, {
-      topic: "PRIVACY_CHANGE",
-      discord: { message: buildPrivacyChangesMessage(group.changes, siteUrl), context: "privacy-changes" },
-      push: privacyChangePush(group.changes.map((change) => change.title)),
-    });
-    sent += report.pushed;
-    if (report.discord === null) {
-      // Bot injoignable : seuls les comptes qu'il devait joindre sont rendus au
-      // balayage suivant — ceux qui n'avaient que le push l'ont reçu.
-      const viaDiscord = group.recipients
-        .filter((recipient) => recipient.discord !== null)
-        .map((recipient) => recipient.userId);
-      if (viaDiscord.length > 0) {
-        await release(
-          viaDiscord,
-          group.changes.map((change) => change.id),
-        );
-      }
-      continue;
-    }
-    sent += report.discord.sent;
+    sent += await sendPrivacyGroup(group, siteUrl);
   }
   return sent;
+}
+
+/**
+ * Envoie l'annonce d'un ensemble de changements à ses destinataires.
+ *
+ * @returns Le nombre de messages remis (push et Discord confondus).
+ */
+async function sendPrivacyGroup(
+  group: { changes: PrivacyChange[]; recipients: NotificationRecipient[] },
+  siteUrl: string | null,
+): Promise<number> {
+  const report = await notifyUsers(group.recipients, {
+    topic: "PRIVACY_CHANGE",
+    discord: { message: buildPrivacyChangesMessage(group.changes, siteUrl), context: "privacy-changes" },
+    push: privacyChangePush(group.changes.map((change) => change.title)),
+  });
+  if (report.discord !== null) return report.pushed + report.discord.sent;
+  // Bot injoignable : seuls les comptes qu'il devait joindre sont rendus au
+  // balayage suivant — ceux qui n'avaient que le push l'ont reçu.
+  const viaDiscord = group.recipients
+    .filter((recipient) => recipient.discord !== null)
+    .map((recipient) => recipient.userId);
+  if (viaDiscord.length > 0) {
+    await release(
+      viaDiscord,
+      group.changes.map((change) => change.id),
+    );
+  }
+  return report.pushed;
 }
 
 /**

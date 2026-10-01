@@ -113,6 +113,16 @@ describe("updateOwnProfile — la course sur l'index unique du pseudo", () => {
     await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("PSEUDO_ALREADY_USED");
   });
 
+  it("refuse lisiblement un pseudo déjà pris, avant toute écriture", async () => {
+    const execute = await mockDb();
+    execute.mockImplementation(async (sql: string) =>
+      /SELECT id FROM bg_users WHERE pseudo = \?/.test(sql) ? [[{ id: 7 }]] : [{ affectedRows: 1 }],
+    );
+    await expect(updateOwnProfile(42, { pseudo: "Nova" })).rejects.toThrow("PSEUDO_ALREADY_USED");
+    expect(execute.mock.calls[0]?.[1]).toEqual(["Nova", 42]);
+    expect(writtenPseudo(execute)).toBeUndefined();
+  });
+
   it("laisse passer toute autre panne telle quelle", async () => {
     const execute = await mockDb();
     execute.mockImplementation(async (sql: string) => {
