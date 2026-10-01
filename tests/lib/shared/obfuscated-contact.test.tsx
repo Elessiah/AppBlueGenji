@@ -27,6 +27,18 @@ describe("encodeContact / decodeContact", () => {
     expect(decodeContact(encoded)).toBe(plain);
   });
 
+  it("l'encodage reste celui des valeurs déjà stockées (octets UTF-8, caractères accentués compris)", () => {
+    // Valeur figée : un changement de la conversion octets ↔ caractères
+    // (`fromCodePoint` / `codePointAt`) ne doit ni changer l'encodé ni
+    // empêcher de relire une coordonnée déjà publiée.
+    const pinned = "klGbhZnbp5SZsBXblhXZAx7wuk6w";
+    expect(encodeContact("é.ü@exemple.invalid")).toBe(pinned);
+    expect(decodeContact(pinned)).toBe("é.ü@exemple.invalid");
+    for (const encoded of [ASSOCIATION_EMAIL_ENCODED, ASSOCIATION_PHONE_ENCODED, SITE_HOST_PHONE_ENCODED]) {
+      expect(encodeContact(decodeContact(encoded))).toBe(encoded);
+    }
+  });
+
   it("l'encodé ne se lit ni comme un courriel ni comme un base64 direct", () => {
     const encoded = encodeContact(EMAIL);
     expect(encoded).not.toContain("@");

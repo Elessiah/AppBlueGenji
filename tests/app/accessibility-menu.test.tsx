@@ -134,8 +134,8 @@ describe("AccessibilityMenu — comportement (source)", () => {
   const source = readSource("components/accessibility/AccessibilityMenu.tsx");
 
   it("applique un choix à la page ouverte et le garde dans le cookie", () => {
-    expect(source).toMatch(/root\.setAttribute\("data-a11y", attribute\)/);
-    expect(source).toMatch(/root\.removeAttribute\("data-a11y"\)/);
+    expect(source).toMatch(/root\.dataset\.a11y = attribute/);
+    expect(source).toMatch(/delete root\.dataset\.a11y/);
     expect(source).toMatch(/document\.cookie = a11yCookieString\(keys, window\.location\.protocol === "https:"\)/);
   });
 
@@ -169,7 +169,7 @@ describe("régime de charge — le réglage « Réduire les animations »", () =
   const store = readSource("lib/shared/hooks/useClientPower.ts");
 
   it("est lu sur l'attribut de <html> et observé, pour les boucles JS", () => {
-    expect(store).toContain('hasA11ySetting(document.documentElement.getAttribute("data-a11y"), "motion")');
+    expect(store).toContain('hasA11ySetting(document.documentElement.dataset.a11y, "motion")');
     expect(store).toContain(
       'settings.observe(document.documentElement, { attributes: true, attributeFilter: ["data-a11y"] })',
     );

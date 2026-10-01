@@ -3,12 +3,30 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { SkipLink, focusMainContent } from "@/components/accessibility/SkipLink";
 import { readSource } from "../helpers/read-source";
 
+/** `skipTarget` → `data-skip-target`. */
+const dataAttr = (key: string) => `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+
 /**
  * Un élément du DOM réduit à ce que le lien d'évitement touche : attributs,
  * écouteur `blur`, focus. Assez pour rejouer le parcours sans navigateur.
  */
 class FakeElement {
   readonly attrs = new Map<string, string>();
+  /** `dataset` adossé aux attributs `data-*`, comme dans un vrai DOM. */
+  readonly dataset: Record<string, string | undefined> = new Proxy(
+    {},
+    {
+      get: (_, key) => (typeof key === "string" ? this.attrs.get(dataAttr(key)) : undefined),
+      set: (_, key, value) => {
+        this.attrs.set(dataAttr(String(key)), String(value));
+        return true;
+      },
+      deleteProperty: (_, key) => {
+        this.attrs.delete(dataAttr(String(key)));
+        return true;
+      },
+    },
+  );
   readonly listeners = new Map<string, () => void>();
   focused = false;
   textContent = "contenu";
