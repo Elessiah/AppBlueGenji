@@ -36,7 +36,7 @@ export function DeleteTournamentDialog({
   tournamentName,
   onClose,
   onDeleted,
-}: DeleteTournamentDialogProps) {
+}: Readonly<DeleteTournamentDialogProps>) {
   const { showError } = useToast();
   const [confirmation, setConfirmation] = useState("");
   const [busy, setBusy] = useState(false);

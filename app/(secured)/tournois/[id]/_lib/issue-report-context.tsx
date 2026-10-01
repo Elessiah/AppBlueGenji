@@ -31,7 +31,7 @@ export function IssueReportProvider({
   canReport,
   openReport,
   children,
-}: IssueReportControls & { children: ReactNode }) {
+}: Readonly<IssueReportControls & { children: ReactNode }>) {
   const value = useMemo(() => ({ canReport, openReport }), [canReport, openReport]);
   return <IssueReportContext.Provider value={value}>{children}</IssueReportContext.Provider>;
 }

@@ -29,7 +29,7 @@ type NumberInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type" | "va
  * « 16 » au Retour arrière passe par « 1 », que personne n'a voulu garder
  * (voir `lib/shared/number-draft.ts`).
  */
-export function NumberInput({ value, onValueChange, onEdit, onFocus, onBlur, ...rest }: NumberInputProps) {
+export function NumberInput({ value, onValueChange, onEdit, onFocus, onBlur, ...rest }: Readonly<NumberInputProps>) {
   const [draft, setDraft] = useState<string | null>(null);
   const valueBeforeEdit = useRef(value);
 

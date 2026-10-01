@@ -50,7 +50,7 @@ export function ConfirmActionDialog({
   tone = "danger",
   onClose,
   onConfirm,
-}: ConfirmActionDialogProps) {
+}: Readonly<ConfirmActionDialogProps>) {
   const titleId = useId();
   const bodyId = useId();
   const [busy, setBusy] = useState(false);

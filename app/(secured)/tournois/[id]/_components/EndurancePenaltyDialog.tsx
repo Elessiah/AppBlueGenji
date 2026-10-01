@@ -43,7 +43,7 @@ export function EndurancePenaltyDialog({
   round,
   onClose,
   onApplied,
-}: EndurancePenaltyDialogProps) {
+}: Readonly<EndurancePenaltyDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [points, setPoints] = useState("1");
   const [reason, setReason] = useState("");

@@ -46,7 +46,7 @@ export function TeamDialog({
   tone = "default",
   children,
   footer,
-}: TeamDialogProps) {
+}: Readonly<TeamDialogProps>) {
   const titleId = useId();
   const [mounted, setMounted] = useState(false);
   // Ouverte **une fois montée** : au premier rendu le portail n'existe pas

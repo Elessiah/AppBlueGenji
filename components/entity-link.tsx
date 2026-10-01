@@ -32,7 +32,7 @@ export function EntityLink({
   children,
   className,
   ...rest
-}: EntityLinkProps & { href: string }) {
+}: Readonly<EntityLinkProps & { href: string }>) {
   return (
     <Link href={href} className={className ? `entity-link ${className}` : "entity-link"} {...rest}>
       {children}
@@ -41,11 +41,11 @@ export function EntityLink({
 }
 
 /** Nom d'équipe cliquable → `/equipes/[id]`. */
-export function TeamLink({ teamId, ...rest }: EntityLinkProps & { teamId: number }) {
+export function TeamLink({ teamId, ...rest }: Readonly<EntityLinkProps & { teamId: number }>) {
   return <EntityLink href={`/equipes/${teamId}`} {...rest} />;
 }
 
 /** Pseudo cliquable → `/joueurs/[id]`. */
-export function PlayerLink({ userId, ...rest }: EntityLinkProps & { userId: number }) {
+export function PlayerLink({ userId, ...rest }: Readonly<EntityLinkProps & { userId: number }>) {
   return <EntityLink href={`/joueurs/${userId}`} {...rest} />;
 }

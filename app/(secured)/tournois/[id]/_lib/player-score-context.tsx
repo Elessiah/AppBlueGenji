@@ -28,7 +28,7 @@ export function PlayerScoreProvider({
   canReportScore,
   open,
   children,
-}: PlayerScoreControls & { children: ReactNode }) {
+}: Readonly<PlayerScoreControls & { children: ReactNode }>) {
   const value = useMemo(
     () => ({ canOpen, canReportScore, open }),
     [canOpen, canReportScore, open],

@@ -61,7 +61,7 @@ export function GhostRegistrationDialog({
   remainingSlots,
   onClose,
   onRegistered,
-}: GhostRegistrationDialogProps) {
+}: Readonly<GhostRegistrationDialogProps>) {
   const { showError, showSuccess } = useToast();
   const wording = useParticipantWording();
   const [teams, setTeams] = useState<GhostTeamOption[]>([]);

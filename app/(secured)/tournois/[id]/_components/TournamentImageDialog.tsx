@@ -40,7 +40,7 @@ interface TournamentImageDialogProps {
  * (`resyncImageDraft`) : il suit s'il est intact, et un brouillon entamé est
  * gardé avec un bandeau qui dit le désaccord.
  */
-export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: TournamentImageDialogProps) {
+export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }: Readonly<TournamentImageDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [value, setValue] = useState<ImagePickerValue>(() => initialImagePickerValue(image));
   // Image sur laquelle le brouillon a été posé ; réalignée au rendu, sans effet,
