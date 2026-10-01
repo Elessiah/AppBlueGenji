@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TeamLink } from "@/components/entity-link";
 import { DiscordTag } from "@/components/discord-tag";
@@ -9,22 +8,24 @@ import { UserX } from "lucide-react";
 import { UserAvatar } from "@/components/user-avatar";
 import { formatLocalDate } from "@/lib/shared/dates";
 import type { FullProfileResponse } from "@/lib/shared/types";
-import {
-  PLATFORM_ROLES,
-  ROLE_DESCRIPTIONS,
-  ROLE_LABELS,
-  type PlatformRole,
-} from "@/lib/shared/permissions";
+import { ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/shared/permissions";
 import { useToast } from "@/components/ui/toast";
 import { useResourceLoader } from "@/lib/shared/hooks/useResourceLoader";
 import { StatsPanel } from "@/components/stats/StatsPanel";
 import { PlayerModerationBar } from "./_components/PlayerModerationBar";
+import { PlayerRolesPanel } from "./_components/PlayerRolesPanel";
 import styles from "./player.module.css";
+
+/** Majorité telle que la fiche l'affiche : `null` est une donnée masquée (ou absente). */
+function adultLabel(isAdult: boolean | null): string {
+  if (isAdult === null) return "Masqué";
+  return isAdult ? "Oui (18+)" : "Non (mineur)";
+}
 
 export default function PlayerDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
-  const { showError, showSuccess } = useToast();
+  const { showError } = useToast();
   const { status, data, error, refresh } = useResourceLoader<FullProfileResponse>(
     `/api/players/${params.id}`,
     {
@@ -34,39 +35,6 @@ export default function PlayerDetailPage() {
       },
     },
   );
-  const [rolesBusy, setRolesBusy] = useState(false);
-  const [selectedRoles, setSelectedRoles] = useState<PlatformRole[]>([]);
-
-  // Resynchronise la sélection locale à chaque (re)chargement du profil.
-  useEffect(() => {
-    if (data?.roles) setSelectedRoles(data.roles);
-  }, [data?.roles]);
-
-  const toggleRole = (role: PlatformRole) => {
-    setSelectedRoles((prev) =>
-      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
-    );
-  };
-
-  const saveRoles = async () => {
-    setRolesBusy(true);
-    try {
-      const res = await fetch(`/api/admin/users/${params.id}/roles`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ roles: selectedRoles }),
-      });
-      const payload = (await res.json()) as { error?: string };
-      if (!res.ok) throw new Error(payload.error || "ROLES_UPDATE_FAILED");
-      showSuccess("Rôles mis à jour.");
-      await refresh();
-    } catch (e) {
-      showError((e as Error).message);
-    } finally {
-      setRolesBusy(false);
-    }
-  };
-
   if (status === "loading")
     return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil joueur...</section>;
 
@@ -277,9 +245,7 @@ export default function PlayerDetailPage() {
               <label htmlFor="player-adult">Majorité</label>
               <input
                 id="player-adult"
-                value={
-                  data.profile.isAdult === null ? "Masqué" : data.profile.isAdult ? "Oui (18+)" : "Non (mineur)"
-                }
+                value={adultLabel(data.profile.isAdult)}
                 readOnly
               />
             </div>
@@ -289,50 +255,7 @@ export default function PlayerDetailPage() {
 
       {/* Aucun rôle ne s'attribue à un compte supprimé : la route le refuse. */}
       {data.viewerIsAdmin && !data.isSelf && !deleted && (
-        <div className="ds-block" style={{ marginBottom: 20 }}>
-          <div className="ds-section-title blue">
-            <h2>Rôles &amp; permissions</h2>
-          </div>
-          <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 16 }}>
-            Les rôles sont cumulables. Un administrateur dispose de tous les droits, dont l&apos;attribution des rôles.
-          </p>
-          <fieldset className="native-group" aria-label="Rôles de permission" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {PLATFORM_ROLES.map((role) => {
-              const checked = selectedRoles.includes(role);
-              return (
-                <label // NOSONAR S6853 — label englobant : la case et le texte (ROLE_LABELS) sont à l'intérieur
-                  key={role}
-                  style={{ display: "flex", alignItems: "flex-start", gap: 12, cursor: rolesBusy ? "default" : "pointer" }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={checked}
-                    disabled={rolesBusy}
-                    onChange={() => toggleRole(role)}
-                    style={{ marginTop: 3 }}
-                  />
-                  <span>
-                    <span style={{ display: "block", fontSize: 14, color: "var(--text-0)" }}>{ROLE_LABELS[role]}</span>
-                    <span style={{ display: "block", fontSize: 12, color: "var(--text-2)" }}>{ROLE_DESCRIPTIONS[role]}</span>
-                  </span>
-                </label>
-              );
-            })}
-          </fieldset>
-          <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-            <button
-              type="button"
-              className="btn"
-              style={{ padding: "9px 18px", fontSize: 13 }}
-              disabled={rolesBusy}
-              aria-busy={rolesBusy}
-              aria-label={`Enregistrer les rôles de ${data.profile.pseudo}`}
-              onClick={saveRoles}
-            >
-              {rolesBusy ? "Enregistrement…" : "Enregistrer les rôles"}
-            </button>
-          </div>
-        </div>
+        <PlayerRolesPanel userId={params.id} pseudo={data.profile.pseudo} roles={data.roles} onSaved={refresh} />
       )}
 
       <div className="ds-block" style={{ marginBottom: 20 }}>
