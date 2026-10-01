@@ -925,7 +925,7 @@ export default async function RgpdPage() {
             traiter ou héberger des données aux États-Unis — pas les opérateurs téléphoniques —
             le font sur le fondement suivant :{" "}
             {transferBasis(ALL_TRANSFER_RECIPIENTS)} ; pour Spiceworks, {SPICEWORKS_SCC_FALLBACK}.
-            Les plateformes de diffusion ne sont pas des destinataires du site : il ne leur
+            Quant aux plateformes de diffusion, le site ne fait que lier leurs chaînes : il ne leur
             transmet rien et n&apos;intègre aucun de leurs lecteurs (paragraphe « Retransmission
             des matchs » ci-dessous).
           </p>
