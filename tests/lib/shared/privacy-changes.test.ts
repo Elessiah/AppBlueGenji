@@ -4,7 +4,12 @@ import { join } from "node:path";
 import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE } from "@/lib/shared/legal-contact";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-reports";
-import { SUPPORT_TICKET_RETENTION_MONTHS, WEB_ACCESS_LOG_RETENTION_DAYS } from "@/lib/shared/processing-register";
+import {
+  BOT_FEED_EVENT_RETENTION_DAYS,
+  BOT_STAFF_LOG_RETENTION_DAYS,
+  SUPPORT_TICKET_RETENTION_MONTHS,
+  WEB_ACCESS_LOG_RETENTION_DAYS,
+} from "@/lib/shared/processing-register";
 import { SITE_MINIMUM_AGE } from "@/lib/shared/terms-of-use";
 import {
   ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS,
@@ -508,7 +513,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
     // Suivie de l'entrée du contact données, de celle des suspensions puis de
     // celle du registre complété, publiées le même jour.
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -535,7 +540,7 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
 
   it("précède l'entrée des suspensions, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -569,7 +574,7 @@ describe("PRIVACY_CHANGES — suspension d'un compte", () => {
 
   it("précède l'entrée du registre complété, publiée le lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -594,7 +599,7 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
 
   it("précède l'entrée des sauvegardes chez Hetzner, datée du 1er octobre 2026, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -632,9 +637,9 @@ describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-trait
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-sauvegardes-hetzner")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+  it("précède l'entrée des durées du bot, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -654,6 +659,32 @@ describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-trait
     expect(text()).toMatch(/jamais de webcam ni de chat vocal/);
     expect(text()).toMatch(/nom neutre/);
     expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#destinataires", "/rgpd#retransmission"]);
+  });
+
+  it("tient dans un message privé à elle seule, sans nommer personne", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(text()).not.toContain(DATA_CONTACT_NAME);
+  });
+});
+
+describe("PRIVACY_CHANGES — durées du bot (fil d'activité, journal du staff, exclusions, restauration)", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-bot-durees-journaux")!;
+  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-02");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("annonce les durées tenues par le bot, tirées des constantes", () => {
+    expect(text()).toContain(`${BOT_FEED_EVENT_RETENTION_DAYS} jours, puis supprimé`);
+    expect(text()).toContain(`(${BOT_STAFF_LOG_RETENTION_DAYS} jours)`);
+    expect(text()).toMatch(/dès qu'elle est levée/);
+    expect(text()).toMatch(/ne transite plus par Discord/);
+    expect(text()).toContain(`${BACKUP_RETENTION_DAYS} jours`);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/privacy-policy-bot"]);
   });
 
   it("tient dans un message privé à elle seule, sans nommer personne", () => {

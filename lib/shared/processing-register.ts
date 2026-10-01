@@ -34,6 +34,8 @@ import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import {
+  BOT_FEED_EVENT_RETENTION_DAYS,
+  BOT_STAFF_LOG_RETENTION_DAYS,
   SUPPORT_TICKET_RETENTION_MONTHS,
   WEB_ACCESS_LOG_FIELDS,
   WEB_ACCESS_LOG_RETENTION_DAYS,
@@ -73,9 +75,20 @@ export const DISCORD_CODE_VALIDITY_MINUTES = 10;
  *   `blueGenjiBot/src/privacy/retentionPeriods.ts` — au-delà (dans la nuit
  *   qui suit), les lignes `/scrim` et `/recrute` sont repliées en nombres par
  *   jour, serveur et niveau ou rôle (`ActivityDaily`), puis supprimées.
+ * - `BOT_FEED_EVENT_RETENTION_DAYS` : `FEED_EVENT_RETENTION_DAYS` — lignes du
+ *   fil d'activité (`FeedEvent`), supprimées dans la nuit qui suit.
+ * - `BOT_STAFF_LOG_RETENTION_DAYS` : `STAFF_LOG_RETENTION_DAYS` — messages du
+ *   bot au salon de journal privé du staff et en message privé au titulaire,
+ *   sauf ceux d'une exclusion en cours, supprimés à sa levée
+ *   (`blueGenjiBot/src/privacy/staffLogRetention.ts`).
+ * - La copie de la base écrite avant une restauration suit
+ *   `ROLLBACK_RETENTION_DAYS`, égal à `BACKUP_RETENTION_DAYS` (T09).
  */
 export const BOT_RELAY_RETENTION_DAYS = 7;
 export const BOT_ACTIVITY_AUTHOR_RETENTION_DAYS = 30;
+// Les deux dernières vivent dans `legal-durations.ts`, que la modale des
+// changements peut importer sans tirer le registre.
+export { BOT_FEED_EVENT_RETENTION_DAYS, BOT_STAFF_LOG_RETENTION_DAYS };
 
 /**
  * Encadrement des transferts hors de l'Union européenne (RGPD art. 45 et 46),
@@ -451,7 +464,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Messages Discord : conservés dans un salon réservé au staff, purgé à la main par l'association",
+      `Messages Discord : conservés dans un salon réservé au staff, purgé à la main par l'association et par le bot au bout de ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), par lots — plusieurs nuits pour un arriéré important (traitement T08)`,
       "Journaux du serveur : selon leur rotation automatique",
     ],
     recipients: [
@@ -533,7 +546,8 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     dataCategories: [
       "Annonces relayées : identifiants du message d'origine et de son auteur, date, identifiants des copies et de leurs salons (contenu recopié dans les salons partenaires, jamais enregistré en base)",
-      `Scrims et recrutement : identifiant de l'auteur, jeu, niveau ou rôle, serveur, date ; au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, seulement des nombres par jour, serveur et niveau ou rôle`,
+      `Scrims et recrutement : identifiant de l'auteur, jeu, niveau ou rôle (choisi dans une liste fermée ; texte libre pour les annonces antérieures à cette règle, gardé aussi dans les nombres par jour), serveur, date ; au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, seulement des nombres par jour, serveur et niveau ou rôle`,
+      "Fil d'activité public de la page du bot : heure, type d'évènement (relais, scrim, recrutement, connexion), nom du serveur, niveau ou rôle — sans identifiant Discord",
       "Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list",
       "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
       "Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée",
@@ -543,10 +557,11 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     retention: [
       `Suivi des annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacé au relais suivant cette échéance et au plus tard dans la nuit ou au redémarrage du bot ; les copies publiées dans les salons partenaires restent sur Discord jusqu'à leur suppression (par l'auteur dans ce délai, ensuite par les administrateurs de chaque serveur)`,
       `Scrims et recrutement : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours ; ensuite, dans la nuit qui suit (ou à un redémarrage), identifiant de l'auteur effacé et lignes repliées en nombres par jour, serveur et niveau ou rôle, gardés sans limite de durée comme historique de l'activité du bot`,
-      "Exclusions : enregistrement jusqu'à la levée de l'exclusion (avis et motif : voir le salon de journal ci-dessous, qui les garde après la levée)",
+      "Exclusions : enregistrement jusqu'à la levée de l'exclusion ; son avis et son motif (salon de journal privé du staff, et motif copié en message privé au titulaire du bot) sont supprimés à la levée — pour une exclusion antérieure à cette règle, seul le motif publié au salon, le reste suivant la durée du salon de journal",
       "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)",
       "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)",
-      "Salon de journal privé du staff, et motifs d'exclusion copiés en message privé au titulaire du bot : aucune suppression automatique à ce jour",
+      `Fil d'activité : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, supprimé dans la nuit qui suit`,
+      `Salon de journal privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), puis supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important), sauf le motif publié au salon d'une exclusion en cours — et, pour une exclusion prononcée à partir de cette règle, son avis et la copie de son motif en message privé —, supprimés à sa levée`,
       "Journaux du serveur : selon leur rotation automatique",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
@@ -580,6 +595,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Archives : ${BACKUP_RETENTION_DAYS} jours au plus, puis suppression définitive`,
       "Images : le temps de leur présence sur le site (retirées dans l'heure qui suit leur suppression)",
       `Journal des suppressions : ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours par entrée`,
+      `Copie de la base du bot écrite à côté d'elle avant une restauration (non chiffrée, sur la machine du bot) : supprimée à la restauration réussie suivante, au plus tard dans la nuit qui suit ses ${BACKUP_RETENTION_DAYS} jours`,
     ],
     recipients: [
       `${SITE_HOST.name}, responsable technique de l'association et hébergeur du site (sous-traitant — ${HOST_PROCESSING_AGREEMENT}), seul détenteur des clés de déchiffrement`,

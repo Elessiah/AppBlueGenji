@@ -52,6 +52,8 @@ import { DATA_CONTACT_NAME, DATA_CONTACT_ROLE, REPORT_FORM_NAME } from "@/lib/sh
 // Constantes seules : ce module est chargé sur chaque page par la modale des
 // changements, il ne doit tirer ni le registre ni les conditions d'utilisation.
 import {
+  BOT_FEED_EVENT_RETENTION_DAYS,
+  BOT_STAFF_LOG_RETENTION_DAYS,
   SITE_MINIMUM_AGE,
   SUPPORT_TICKET_RETENTION_MONTHS,
   WEB_ACCESS_LOG_FIELDS,
@@ -577,6 +579,25 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
       { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
     ],
+  },
+  // Durées nouvelles côté bot (blueGenjiBot, ménage de nuit) : fil d'activité,
+  // journal privé du staff, messages d'une exclusion levée, copie laissée par
+  // une restauration, désormais faite sans passer par Discord. Daté du
+  // lendemain de la mise en ligne, comme les précédentes.
+  {
+    id: "2026-10-bot-durees-journaux",
+    publishedAt: "2026-10-02",
+    title: "Bot Discord : journaux et fil d'activité limités dans le temps",
+    summary:
+      "Le bot Discord BlueGenji efface désormais son fil d'activité et son journal du staff au bout d'une durée fixe, et les messages d'une exclusion prononcée désormais dès qu'elle est levée.",
+    details: [
+      `Fil d'activité public de la page du bot (heure, serveur, niveau ou rôle de chaque annonce) : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, puis supprimé.`,
+      `Journal privé du staff, et messages privés du bot à son titulaire : un an (${BOT_STAFF_LOG_RETENTION_DAYS} jours), puis supprimés.`,
+      "Exclusion du relais prononcée à partir de maintenant : son avis et son motif sont supprimés, du journal comme des messages privés, dès qu'elle est levée.",
+      "Commandes /scrim et /recrute : le niveau et le rôle se choisissent maintenant dans une liste, plus de texte libre pour les nouvelles annonces.",
+      `Restauration d'une sauvegarde du bot : elle se fait sur la machine du bot, la base ne transite plus par Discord ; la copie de la base précédente est supprimée au plus tard après ${BACKUP_RETENTION_DAYS} jours.`,
+    ],
+    links: [{ href: "/privacy-policy-bot", label: "Lire la politique de confidentialité du bot" }],
   },
 ];
 

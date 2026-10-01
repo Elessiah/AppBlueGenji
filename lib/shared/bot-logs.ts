@@ -23,7 +23,8 @@
  * `lib/shared/referee-alerts.ts`, qui rédige aussi ces alertes.
  *
  * **Troisième règle, de confidentialité** : le canal est un salon Discord — un
- * tiers, hébergé hors de l'Union européenne, et sans purge automatique. Il ne
+ * tiers, hébergé hors de l'Union européenne, purgé par le bot au bout d'un an
+ * seulement (`BOT_STAFF_LOG_RETENTION_DAYS`). Il ne
  * reçoit donc **aucun pseudo de joueur** : les noms d'équipe y figurent, un
  * joueur s'y écrit « un joueur ». Un engagé n'arrive jamais ici par son nom brut
  * mais par un `LogEntrant` (`lib/shared/log-privacy.ts`), qui sait s'il

@@ -39,3 +39,16 @@ export const WEB_ACCESS_LOG_RETENTION_DAYS = 14;
  */
 export const WEB_ACCESS_LOG_FIELDS =
   "adresse IP, date et heure, page demandée, code de réponse, taille de la réponse, page d'origine et navigateur";
+
+/**
+ * Durées appliquées par le **bot** (autre dépôt), recopiées ici pour la modale
+ * des changements ; `processing-register.ts` les réexporte avec les autres
+ * durées du bot, dont il dit la source.
+ *
+ * - fil d'activité (`FeedEvent`) : `FEED_EVENT_RETENTION_DAYS` de
+ *   `blueGenjiBot/src/privacy/retentionPeriods.ts` ;
+ * - salon de journal privé du staff et messages privés du bot au titulaire :
+ *   `STAFF_LOG_RETENTION_DAYS` (un an), même fichier.
+ */
+export const BOT_FEED_EVENT_RETENTION_DAYS = 30;
+export const BOT_STAFF_LOG_RETENTION_DAYS = 365;

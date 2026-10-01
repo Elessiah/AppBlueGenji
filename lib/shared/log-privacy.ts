@@ -4,7 +4,8 @@
  * Tout ce que le site poste sur Discord — journal d'activité, alertes arbitre,
  * signalements — passe par ce module pour nommer un engagé ou un membre du
  * staff. La règle tient au salon lui-même : un tiers, hébergé hors de l'Union
- * européenne, sans purge automatique.
+ * européenne, dont le bot ne purge ses messages qu'au bout d'un an
+ * (`BOT_STAFF_LOG_RETENTION_DAYS`).
  *
  * - un **nom d'équipe** peut partir ;
  * - un **joueur** jamais — ni pseudo, ni identifiant qui mène à sa fiche ; en

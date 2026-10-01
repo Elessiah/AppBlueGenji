@@ -35,8 +35,8 @@ tout comptage d'uniques déterministe ; le secret ne quitte pas le serveur.
 ## Journaux Discord — aucun joueur, aucun membre du staff nommé
 
 Le canal de logs, les alertes arbitre et les signalements partent dans un salon
-Discord : un tiers, hébergé hors de l'Union européenne, et sans purge
-automatique. Règle, écrite une fois dans `lib/shared/log-privacy.ts` :
+Discord : un tiers, hébergé hors de l'Union européenne, dont le bot ne purge
+ses messages qu'au bout d'un an (`BOT_STAFF_LOG_RETENTION_DAYS`). Règle, écrite une fois dans `lib/shared/log-privacy.ts` :
 
 | Qui | Sur Discord | Dans pm2 |
 | --- | --- | --- |
