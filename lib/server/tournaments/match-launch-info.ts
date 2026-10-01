@@ -269,6 +269,230 @@ async function maintainIfDue(connection: PoolConnection, rows: CandidateRow[]): 
   return due.size > 0;
 }
 
+type LaunchPhase = ReturnType<typeof matchLaunchPhase>;
+type VisibleLaunch = { row: CandidateRow; phase: LaunchPhase };
+
+/** Ce qu'il faut pour rédiger la présentation d'un match au lecteur. */
+type LaunchContext = {
+  viewer: LaunchViewer;
+  users: Map<number, UserRow>;
+  rosters: Map<number, MemberRow[]>;
+  castRevoked: boolean;
+  readiness: ReturnType<typeof rowReadiness>;
+  /** Contacts : seulement pour les matchs en lancement ou lancés. */
+  exposes: boolean;
+};
+
+function exposesContacts(phase: LaunchPhase): boolean {
+  return phase === "LOBBY" || phase === "LAUNCHED";
+}
+
+/** Un côté du match tel que la ligne le décrit. */
+function rowSide(row: CandidateRow, index: 1 | 2) {
+  const first = index === 1;
+  return {
+    teamId: first ? row.team1_id : row.team2_id,
+    isGhost: Number((first ? row.team1_is_ghost : row.team2_is_ghost) ?? 0) === 1,
+    soloUserId: first ? row.team1_solo_user_id : row.team2_solo_user_id,
+    name: first ? row.team1_name : row.team2_name,
+    logoUrl: first ? row.team1_logo_url : row.team2_logo_url,
+  };
+}
+
+/**
+ * Comptes et rosters à lire : le caster de tout match présenté, et les joueurs
+ * des seuls matchs dont les contacts sont exposés.
+ */
+function collectContactIds(visible: readonly VisibleLaunch[]): {
+  rosterTeamIds: Set<number>;
+  userIds: Set<number>;
+} {
+  const exposed = visible.filter(({ phase }) => exposesContacts(phase));
+  const rosterTeamIds = new Set<number>();
+  const userIds = new Set<number>();
+  for (const { row } of visible) {
+    if (row.caster_user_id !== null) userIds.add(Number(row.caster_user_id));
+  }
+  for (const { row } of exposed) {
+    for (const index of [1, 2] as const) {
+      const { teamId, isGhost, soloUserId } = rowSide(row, index);
+      if (teamId === null || isGhost) continue;
+      if (soloUserId !== null) userIds.add(Number(soloUserId));
+      else rosterTeamIds.add(Number(teamId));
+    }
+  }
+  return { rosterTeamIds, userIds };
+}
+
+async function loadRosters(
+  connection: PoolConnection,
+  rosterTeamIds: Set<number>,
+): Promise<Map<number, MemberRow[]>> {
+  const rosters = new Map<number, MemberRow[]>();
+  if (rosterTeamIds.size === 0) return rosters;
+  const ids = [...rosterTeamIds];
+  const [members] = await connection.execute<MemberRow[]>(
+    `SELECT tm.team_id, u.id AS user_id, u.pseudo, tm.roles_json, u.discord_pseudo,
+            u.discord_verified_at, u.overwatch_battletag, u.blizzard_sub, u.visible_overwatch
+     FROM bg_team_members tm
+     JOIN bg_users u ON u.id = tm.user_id
+     WHERE tm.team_id IN (${ids.map(() => "?").join(", ")})
+       AND tm.left_at IS NULL AND u.is_deleted = 0`,
+    ids,
+  );
+  for (const member of members) {
+    const list = rosters.get(Number(member.team_id)) ?? [];
+    list.push(member);
+    rosters.set(Number(member.team_id), list);
+  }
+  return rosters;
+}
+
+async function loadUsers(connection: PoolConnection, userIds: Set<number>): Promise<Map<number, UserRow>> {
+  const users = new Map<number, UserRow>();
+  if (userIds.size === 0) return users;
+  const ids = [...userIds];
+  const [found] = await connection.execute<UserRow[]>(
+    `SELECT id, pseudo, discord_pseudo, discord_verified_at, overwatch_battletag, blizzard_sub,
+            visible_overwatch, is_deleted, is_admin, platform_roles_json
+     FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
+    ids,
+  );
+  for (const user of found) users.set(Number(user.id), user);
+  return users;
+}
+
+/**
+ * Un caster n'est une partie du match que tant qu'il remplit la condition
+ * de son inscription : elle est rejouée ici, à chaque lecture, sans quoi
+ * un compte privé de `live` (ou d'identité) garderait les contacts.
+ * L'inscription n'est retirée qu'avant le lancement, là où elle retient
+ * un « Prêt » ; un match lancé garde son caster, seulement tu.
+ *
+ * Rend les matchs dont le caster est tu, et range dans `revokedCasts` les
+ * inscriptions à retirer.
+ */
+function revokeIneligibleCasters(
+  visible: readonly VisibleLaunch[],
+  users: Map<number, UserRow>,
+  revokedCasts: { matchId: number; casterId: number }[],
+): Set<number> {
+  const revoked = new Set<number>();
+  for (const { row, phase } of visible) {
+    if (row.caster_user_id === null) continue;
+    const casterId = Number(row.caster_user_id);
+    if (castEligibilityBlock(users.get(casterId)) !== null) {
+      revoked.add(Number(row.id));
+      if (phase !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
+    }
+  }
+  return revoked;
+}
+
+/** Contacts d'une entrée solo : le joueur lui-même, s'il existe encore. */
+function soloContacts(soloUserId: number, ctx: LaunchContext): LaunchContact[] {
+  const user = ctx.users.get(Number(soloUserId));
+  if (!user || Number(user.is_deleted) !== 0) return [];
+  return pickLaunchContacts([toCandidate({ ...user, user_id: user.id, roles: [] })]).map((contact) =>
+    filterContact(contact, ctx.viewer, Number(user.visible_overwatch) === 1),
+  );
+}
+
+/** Contacts d'une équipe : choisis dans son roster en cours. */
+function rosterContacts(teamId: number, ctx: LaunchContext): LaunchContact[] {
+  const members = ctx.rosters.get(teamId) ?? [];
+  const visibility = new Map(members.map((m) => [Number(m.user_id), Number(m.visible_overwatch) === 1]));
+  return pickLaunchContacts(members.map((m) => toCandidate({ ...m, roles: parseRoles(m.roles_json) }))).map(
+    (contact) => filterContact(contact, ctx.viewer, visibility.get(contact.userId) ?? false),
+  );
+}
+
+function buildLaunchSide(row: CandidateRow, index: 1 | 2, ctx: LaunchContext): LaunchSide {
+  const side = rowSide(row, index);
+  const teamId = Number(side.teamId);
+  let contacts: LaunchContact[] = [];
+  if (ctx.exposes && !side.isGhost) {
+    contacts = side.soloUserId === null ? rosterContacts(teamId, ctx) : soloContacts(side.soloUserId, ctx);
+  }
+  return {
+    teamId,
+    name: side.name ?? "—",
+    logoUrl: localUploadUrl(side.logoUrl),
+    isGhost: side.isGhost,
+    isSolo: side.soloUserId !== null,
+    ready: index === 1 ? ctx.readiness.team1Ready : ctx.readiness.team2Ready,
+    contacts,
+  };
+}
+
+function buildLaunchCaster(row: CandidateRow, ctx: LaunchContext): LaunchCaster | null {
+  if (row.caster_user_id === null || ctx.castRevoked) return null;
+  const user = ctx.users.get(Number(row.caster_user_id));
+  if (!user || Number(user.is_deleted) !== 0) return null;
+  const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
+  const contact = ctx.exposes
+    ? filterContact(
+        {
+          userId: Number(user.id),
+          pseudo: user.pseudo,
+          roles: [],
+          discordTag,
+          battletag: user.overwatch_battletag,
+          battletagVerified: user.blizzard_sub !== null,
+        },
+        ctx.viewer,
+        Number(user.visible_overwatch) === 1,
+      )
+    : null;
+  return {
+    userId: Number(user.id),
+    pseudo: user.pseudo,
+    discordTag: contact?.discordTag ?? null,
+    battletag: contact?.battletag ?? null,
+    battletagVerified: contact?.battletagVerified ?? false,
+    ready: ctx.readiness.casterReady,
+  };
+}
+
+function buildLaunchInfo(
+  row: CandidateRow,
+  phase: LaunchPhase,
+  party: { role: LaunchViewerRole; canDeclareReady: boolean },
+  ctx: LaunchContext,
+): MatchLaunchInfo {
+  const { readiness } = ctx;
+  const caster = buildLaunchCaster(row, ctx);
+  const launch = rowLaunchState(row);
+  const lobbyOpenedAt = launch.lobbyOpenedAt;
+  return {
+    matchId: Number(row.id),
+    tournamentId: Number(row.tournament_id),
+    tournamentName: row.tournament_name,
+    phase,
+    startAt: toIso(row.start_at),
+    lobbyOpenedAt,
+    autoLaunchAt: phase === "LOBBY" ? autoLaunchAt(lobbyOpenedAt) : null,
+    launchedAt: launch.launchedAt,
+    hostTeamId: resolveHostTeamId(
+      row.host_team_id === null ? null : Number(row.host_team_id),
+      Number(row.team1_id),
+      Number(row.team2_id),
+    ),
+    team1: buildLaunchSide(row, 1, ctx),
+    team2: buildLaunchSide(row, 2, ctx),
+    caster,
+    viewer: {
+      role: party.role,
+      canDeclareReady: party.canDeclareReady,
+      ready: {
+        CASTER: readiness.casterReady,
+        TEAM1: readiness.team1Ready,
+        TEAM2: readiness.team2Ready,
+      }[party.role],
+    },
+  };
+}
+
 /** Matchs du lecteur à présenter dans la modale de lancement. */
 export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<MatchLaunchInfo[]> {
   if (!(await hasRunningTournament())) return [];
@@ -289,171 +513,26 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
       .filter(({ phase }) => phase !== "NONE" && phase !== "TO_PLAN");
     if (visible.length === 0) return [];
 
-    // Contacts : seulement pour les matchs en lancement ou lancés.
-    const exposed = visible.filter(({ phase }) => phase === "LOBBY" || phase === "LAUNCHED");
-    const rosterTeamIds = new Set<number>();
-    const userIds = new Set<number>();
-    for (const { row } of visible) {
-      if (row.caster_user_id !== null) userIds.add(Number(row.caster_user_id));
-    }
-    for (const { row } of exposed) {
-      for (const side of [1, 2] as const) {
-        const teamId = side === 1 ? row.team1_id : row.team2_id;
-        const ghost = Number((side === 1 ? row.team1_is_ghost : row.team2_is_ghost) ?? 0) === 1;
-        const solo = side === 1 ? row.team1_solo_user_id : row.team2_solo_user_id;
-        if (teamId === null || ghost) continue;
-        if (solo !== null) userIds.add(Number(solo));
-        else rosterTeamIds.add(Number(teamId));
-      }
-    }
-
-    const rosters = new Map<number, MemberRow[]>();
-    if (rosterTeamIds.size > 0) {
-      const ids = [...rosterTeamIds];
-      const [members] = await connection.execute<MemberRow[]>(
-        `SELECT tm.team_id, u.id AS user_id, u.pseudo, tm.roles_json, u.discord_pseudo,
-                u.discord_verified_at, u.overwatch_battletag, u.blizzard_sub, u.visible_overwatch
-         FROM bg_team_members tm
-         JOIN bg_users u ON u.id = tm.user_id
-         WHERE tm.team_id IN (${ids.map(() => "?").join(", ")})
-           AND tm.left_at IS NULL AND u.is_deleted = 0`,
-        ids,
-      );
-      for (const member of members) {
-        const list = rosters.get(Number(member.team_id)) ?? [];
-        list.push(member);
-        rosters.set(Number(member.team_id), list);
-      }
-    }
-
-    const users = new Map<number, UserRow>();
-    if (userIds.size > 0) {
-      const ids = [...userIds];
-      const [found] = await connection.execute<UserRow[]>(
-        `SELECT id, pseudo, discord_pseudo, discord_verified_at, overwatch_battletag, blizzard_sub,
-                visible_overwatch, is_deleted, is_admin, platform_roles_json
-         FROM bg_users WHERE id IN (${ids.map(() => "?").join(", ")})`,
-        ids,
-      );
-      for (const user of found) users.set(Number(user.id), user);
-    }
-
-    // Un caster n'est une partie du match que tant qu'il remplit la condition
-    // de son inscription : elle est rejouée ici, à chaque lecture, sans quoi
-    // un compte privé de `live` (ou d'identité) garderait les contacts.
-    // L'inscription n'est retirée qu'avant le lancement, là où elle retient
-    // un « Prêt » ; un match lancé garde son caster, seulement tu.
-    const revoked = new Set<number>();
-    for (const { row, phase } of visible) {
-      if (row.caster_user_id === null) continue;
-      const casterId = Number(row.caster_user_id);
-      if (castEligibilityBlock(users.get(casterId)) !== null) {
-        revoked.add(Number(row.id));
-        if (phase !== "LAUNCHED") revokedCasts.push({ matchId: Number(row.id), casterId });
-      }
-    }
+    const { rosterTeamIds, userIds } = collectContactIds(visible);
+    const rosters = await loadRosters(connection, rosterTeamIds);
+    const users = await loadUsers(connection, userIds);
+    const revoked = revokeIneligibleCasters(visible, users, revokedCasts);
 
     const result: MatchLaunchInfo[] = [];
     for (const { row, phase } of visible) {
       const castRevoked = revoked.has(Number(row.id));
       const party = viewerRole(row, viewer.id, teams, castRevoked);
       if (!party) continue;
-      const readiness = rowReadiness(row);
-      const exposes = phase === "LOBBY" || phase === "LAUNCHED";
-
-      const side = (index: 1 | 2): LaunchSide => {
-        const teamId = Number(index === 1 ? row.team1_id : row.team2_id);
-        const isGhost = Number((index === 1 ? row.team1_is_ghost : row.team2_is_ghost) ?? 0) === 1;
-        const soloUserId = index === 1 ? row.team1_solo_user_id : row.team2_solo_user_id;
-        let contacts: LaunchContact[] = [];
-        if (exposes && !isGhost) {
-          if (soloUserId !== null) {
-            const user = users.get(Number(soloUserId));
-            if (user && Number(user.is_deleted) === 0) {
-              contacts = pickLaunchContacts([toCandidate({ ...user, user_id: user.id, roles: [] })]).map(
-                (contact) => filterContact(contact, viewer, Number(user.visible_overwatch) === 1),
-              );
-            }
-          } else {
-            const members = rosters.get(teamId) ?? [];
-            const visibility = new Map(
-              members.map((m) => [Number(m.user_id), Number(m.visible_overwatch) === 1]),
-            );
-            contacts = pickLaunchContacts(
-              members.map((m) => toCandidate({ ...m, roles: parseRoles(m.roles_json) })),
-            ).map((contact) => filterContact(contact, viewer, visibility.get(contact.userId) ?? false));
-          }
-        }
-        return {
-          teamId,
-          name: (index === 1 ? row.team1_name : row.team2_name) ?? "—",
-          logoUrl: localUploadUrl(index === 1 ? row.team1_logo_url : row.team2_logo_url),
-          isGhost,
-          isSolo: soloUserId !== null,
-          ready: index === 1 ? readiness.team1Ready : readiness.team2Ready,
-          contacts,
-        };
-      };
-
-      let caster: LaunchCaster | null = null;
-      if (row.caster_user_id !== null && !castRevoked) {
-        const user = users.get(Number(row.caster_user_id));
-        if (user && Number(user.is_deleted) === 0) {
-          const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
-          const contact = exposes
-            ? filterContact(
-                {
-                  userId: Number(user.id),
-                  pseudo: user.pseudo,
-                  roles: [],
-                  discordTag,
-                  battletag: user.overwatch_battletag,
-                  battletagVerified: user.blizzard_sub !== null,
-                },
-                viewer,
-                Number(user.visible_overwatch) === 1,
-              )
-            : null;
-          caster = {
-            userId: Number(user.id),
-            pseudo: user.pseudo,
-            discordTag: contact?.discordTag ?? null,
-            battletag: contact?.battletag ?? null,
-            battletagVerified: contact?.battletagVerified ?? false,
-            ready: readiness.casterReady,
-          };
-        }
-      }
-
-      const launch = rowLaunchState(row);
-      const lobbyOpenedAt = launch.lobbyOpenedAt;
-      result.push({
-        matchId: Number(row.id),
-        tournamentId: Number(row.tournament_id),
-        tournamentName: row.tournament_name,
-        phase,
-        startAt: toIso(row.start_at),
-        lobbyOpenedAt,
-        autoLaunchAt: phase === "LOBBY" ? autoLaunchAt(lobbyOpenedAt) : null,
-        launchedAt: launch.launchedAt,
-        hostTeamId: resolveHostTeamId(
-          row.host_team_id === null ? null : Number(row.host_team_id),
-          Number(row.team1_id),
-          Number(row.team2_id),
-        ),
-        team1: side(1),
-        team2: side(2),
-        caster,
-        viewer: {
-          role: party.role,
-          canDeclareReady: party.canDeclareReady,
-          ready: {
-            CASTER: readiness.casterReady,
-            TEAM1: readiness.team1Ready,
-            TEAM2: readiness.team2Ready,
-          }[party.role],
-        },
-      });
+      result.push(
+        buildLaunchInfo(row, phase, party, {
+          viewer,
+          users,
+          rosters,
+          castRevoked,
+          readiness: rowReadiness(row),
+          exposes: exposesContacts(phase),
+        }),
+      );
     }
     return result;
   });

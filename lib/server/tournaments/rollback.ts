@@ -318,29 +318,32 @@ async function repopulateDetachedMatches(
 
     const detached = new Set(ids);
     for (const feeder of feeders) {
-      const winnerTarget =
-        feeder.next_winner_match_id === null ? null : Number(feeder.next_winner_match_id);
+      const winnerTarget = nullableNumber(feeder.next_winner_match_id);
       if (winnerTarget !== null && detached.has(winnerTarget)) {
         await pushTeamToTarget(
           connection,
           winnerTarget,
-          feeder.next_winner_slot === null ? null : Number(feeder.next_winner_slot),
-          feeder.winner_team_id === null ? null : Number(feeder.winner_team_id),
+          nullableNumber(feeder.next_winner_slot),
+          nullableNumber(feeder.winner_team_id),
         );
       }
 
-      const loserTarget =
-        feeder.next_loser_match_id === null ? null : Number(feeder.next_loser_match_id);
+      const loserTarget = nullableNumber(feeder.next_loser_match_id);
       if (loserTarget !== null && detached.has(loserTarget)) {
         await pushTeamToTarget(
           connection,
           loserTarget,
-          feeder.next_loser_slot === null ? null : Number(feeder.next_loser_slot),
-          feeder.loser_team_id === null ? null : Number(feeder.loser_team_id),
+          nullableNumber(feeder.next_loser_slot),
+          nullableNumber(feeder.loser_team_id),
         );
       }
     }
   }
+}
+
+/** Colonne numérique facultative d'une ligne : `NULL` reste `null`. */
+function nullableNumber(value: number | null): number | null {
+  return value === null ? null : Number(value);
 }
 
 /**
