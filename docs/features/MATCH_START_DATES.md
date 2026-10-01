@@ -115,12 +115,13 @@ champs (`matchStartEntryOf`).
 Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
 (`resolveMatchStartEntry`, `lib/shared/match-start-entry.ts`, pur) :
 
-- référence (`matchEntryReference`, figée à l'ouverture du dialogue) : la date
-  **déjà posée** sur le match (la modifier ne change jamais son année en
-  silence) ; sinon le début du tournoi s'il est **terminé** (correction
-  d'archive) ; sinon le plus tardif du début du tournoi et de maintenant — un
-  tournoi à venir se programme autour de son début, une ligue en cours depuis
-  des mois autour d'aujourd'hui ; maintenant si rien n'est lisible ;
+- référence (`matchEntryReference`, figée à l'ouverture du dialogue) : le début
+  du tournoi s'il est **terminé** (correction d'archive) ; sinon le plus tardif
+  du début du tournoi et de maintenant — un tournoi à venir se programme autour
+  de son début, une ligue en cours depuis des mois autour d'aujourd'hui ;
+  maintenant si le début est illisible. La date déjà posée sur le match n'y
+  entre pas : elle ancrerait l'année sur une erreur ou un report, sans champ
+  année pour en sortir ;
 - `Y` = année **à Paris** de la référence ; parmi `Y − 1`, `Y`, `Y + 1`, on garde
   la date la plus proche de la référence. Toute date à moins de six mois de la
   référence tombe donc sur la bonne année — dans les deux sens : « 3 janvier »
