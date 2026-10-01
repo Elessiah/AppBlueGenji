@@ -13,7 +13,7 @@ Règle posée le 2026-10-01, une fois les deux projets arrivés à une version s
 Une fois la boucle standard propre, trois cycles thématiques, **chacun relancé jusqu'à revenir sans finding** (corriger, commiter, pousser, relancer le même thème) :
 
 1. **UI/UX** — états (chargement, vide, erreur, désactivé), accessibilité, textes en français, messages par toast (`useToast()`), rendu mobile/responsive, aucune régression visuelle.
-2. **Sécurité** — autorisations et permissions (`can(user, …)`), validation des entrées, injections (SQL, HTML, Markdown Discord), secrets, exposition de données (ce qui part dans une réponse, un instantané ou un message Discord), plafonds de débit, CSRF et redirections.
+2. **Sécurité** — autorisations et permissions (`can(user, …)`), validation des entrées, injections (SQL, HTML, Markdown Discord), secrets, exposition de données (ce qui part dans une réponse, un instantané ou un message Discord), plafonds de débit, CSRF et redirections. Une PR qui change ce que le site collecte, qui le lit, combien de temps il le garde ou ce qu'une suppression emporte y est aussi relue pour ses **déclarations** : entrée `PRIVACY_CHANGES`, fiche du registre des traitements, mise à jour de `/rgpd`.
 3. **Performance** — requêtes et N+1, cache et invalidation, rendus React inutiles, taille du paquet client, poids des réponses et des instantanés, chemins chauds.
 
 Un cycle thématique se lance avec le skill `code-review` et des arguments qui **nomment le thème**, par exemple :
