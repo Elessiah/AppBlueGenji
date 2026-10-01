@@ -6,10 +6,13 @@ import {
   matchEntryReference,
   matchEntryTimeValue,
   matchStartEntryOf,
+  matchStartParisYear,
   parisInstant,
   parseMatchEntryTime,
   readMatchStartEntry,
   resolveMatchStartEntry,
+  shiftMatchStartYear,
+  withYearShift,
 } from "@/lib/shared/match-start-entry";
 
 // Instants absolus partout : le résultat ne doit pas dépendre du fuseau de la
@@ -211,6 +214,53 @@ describe("heure du champ", () => {
     expect(isMatchStartEntryInRange({ day: 31, month: 12, hour: 23, minute: 59 })).toBe(true);
     expect(isMatchStartEntryInRange({ day: 1, month: 0, hour: 0, minute: 0 })).toBe(false);
     expect(MATCH_ENTRY_MONTHS).toHaveLength(12);
+  });
+});
+
+describe("décalage d'année", () => {
+  it("garde le jour et l'heure de Paris, été comme hiver", () => {
+    expect(iso(shiftMatchStartYear(at("2026-08-20T18:00:00Z"), 1))).toBe("2027-08-20T18:00:00.000Z");
+    expect(iso(shiftMatchStartYear(at("2027-01-03T19:00:00Z"), -1))).toBe("2026-01-03T19:00:00.000Z");
+    expect(iso(shiftMatchStartYear(at("2027-01-03T19:00:00Z"), -2))).toBe("2025-01-03T19:00:00.000Z");
+    expect(matchStartParisYear(at("2026-12-31T23:30:00Z"))).toBe(2027);
+  });
+
+  it("refuse un 29 février hors bissextile et les bornes du serveur", () => {
+    expect(shiftMatchStartYear(at("2028-02-29T19:00:00Z"), 1)).toBeNull();
+    expect(iso(shiftMatchStartYear(at("2028-02-29T19:00:00Z"), 4))).toBe("2032-02-29T19:00:00.000Z");
+    expect(shiftMatchStartYear(at("2100-06-01T18:00:00Z"), 1)).toBeNull();
+    expect(shiftMatchStartYear(at("2026-06-01T18:00:00Z"), 0.5)).toBeNull();
+  });
+
+  it("corrige l'archive d'un match joué il y a plus de six mois", () => {
+    // Ligue en cours, aujourd'hui octobre 2026 : « 15 février » se déduit en
+    // 2027 ; un cran en arrière ramène le match joué en février 2026.
+    const reference = matchEntryReference(
+      { tournamentStartAt: "2025-09-01T18:00:00.000Z", tournamentFinished: false },
+      at("2026-10-01T10:00:00Z"),
+    );
+    const deduced = readMatchStartEntry({ day: "15", month: "2", time: "20:00", timeBadInput: false }, reference);
+    expect(deduced).toEqual({ kind: "ready", instant: at("2027-02-15T19:00:00Z") });
+    expect(withYearShift(deduced, -1)).toEqual({ kind: "ready", instant: at("2026-02-15T19:00:00Z") });
+  });
+
+  it("corrige une année déjà fausse sur le match", () => {
+    const current = "2026-01-12T19:00:00.000Z";
+    const kept = readMatchStartEntry(
+      { day: "12", month: "1", time: "21:00", timeBadInput: false },
+      at("2026-12-20T10:00:00Z"),
+      current,
+    );
+    expect(kept).toEqual({ kind: "ready", instant: at("2026-01-12T20:00:00Z") });
+    expect(withYearShift(kept, 1)).toEqual({ kind: "ready", instant: at("2027-01-12T20:00:00Z") });
+  });
+
+  it("laisse passer les autres états, et signale une année impossible", () => {
+    expect(withYearShift({ kind: "empty" }, 1)).toEqual({ kind: "empty" });
+    expect(withYearShift({ kind: "incomplete", field: "time" }, -1)).toEqual({ kind: "incomplete", field: "time" });
+    const ready = { kind: "ready" as const, instant: at("2028-02-29T19:00:00Z") };
+    expect(withYearShift(ready, 0)).toBe(ready);
+    expect(withYearShift(ready, 1)).toEqual({ kind: "invalid", field: "day" });
   });
 });
 
