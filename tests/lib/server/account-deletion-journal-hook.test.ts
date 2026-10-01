@@ -10,6 +10,7 @@ import { deleteOwnAccount } from "@/lib/server/users-service";
 import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { fakePool } from "../../helpers/sql-double";
+import { registerSessionStream, resetSessionStreams } from "@/lib/server/session-streams";
 
 /**
  * `deleteOwnAccount` consigne la suppression au journal — **après** le commit,
@@ -86,5 +87,34 @@ describe("deleteOwnAccount — journal des suppressions", () => {
     }));
     await expect(deleteOwnAccount(7)).rejects.toThrow("USER_NOT_FOUND");
     expect(recordAccountDeletion).not.toHaveBeenCalled();
+  });
+});
+
+describe("deleteOwnAccount — flux SSE ouverts", () => {
+  beforeEach(() => resetSessionStreams());
+
+  it("ferme les flux du compte après le commit, quel que soit le mode", async () => {
+    fakeDb();
+    const close = jest.fn(() => {
+      order.push("streams");
+    });
+    const otherAccount = jest.fn();
+    registerSessionStream(7, "h", close);
+    registerSessionStream(8, "h2", otherAccount);
+
+    await deleteOwnAccount(7);
+
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(otherAccount).not.toHaveBeenCalled();
+    expect(order.indexOf("commit")).toBeLessThan(order.indexOf("streams"));
+  });
+
+  it("laisse les flux ouverts quand la suppression est annulée", async () => {
+    fakeDb({ failOn: "DELETE FROM bg_users" });
+    const close = jest.fn();
+    registerSessionStream(7, "h", close);
+
+    await expect(deleteOwnAccount(7)).rejects.toThrow("DB_DOWN");
+    expect(close).not.toHaveBeenCalled();
   });
 });

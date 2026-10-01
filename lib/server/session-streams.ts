@@ -91,6 +91,11 @@ export function closeSessionStreams(tokenHash: string): number {
   return closeMatching((entry) => entry.tokenHash === tokenHash);
 }
 
+/** Oublie tous les flux inscrits, sans les fermer. Réservé aux tests. */
+export function resetSessionStreams(): void {
+  registry().clear();
+}
+
 /** Pour les tests : nombre de flux inscrits. */
 export function registeredStreamCount(): number {
   return registry().size;

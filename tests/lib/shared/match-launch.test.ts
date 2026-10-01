@@ -529,4 +529,13 @@ describe("launchErrorMessage", () => {
     expect(launchErrorMessage("QUELQUE_CHOSE")).toMatch(/Réessaie/);
     expect(launchErrorMessage(null)).toMatch(/Réessaie/);
   });
+
+  it.each(["constructor", "toString", "__proto__", "hasOwnProperty", "valueOf"])(
+    "ne rend jamais un membre du prototype (%s)",
+    (code) => {
+      const message = launchErrorMessage(code);
+      expect(typeof message).toBe("string");
+      expect(message).toMatch(/Réessaie/);
+    },
+  );
 });

@@ -12,7 +12,13 @@ jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/tournaments-service");
 
 import { GET } from "@/app/api/tournaments/[id]/stream/route";
-import { getCurrentUser } from "@/lib/server/auth";
+import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
+import {
+  closeSessionStreams,
+  closeUserStreams,
+  registeredStreamCount,
+  resetSessionStreams,
+} from "@/lib/server/session-streams";
 import {
   getVisibleTournamentSnapshot,
   getTournamentViewerContext,
@@ -93,6 +99,7 @@ beforeEach(() => {
   jest.clearAllMocks();
   resetRateLimit();
   resetTournamentBroadcast();
+  resetSessionStreams();
   jest.mocked(getCurrentUser).mockResolvedValue(authUser({ id: 1, isAdmin: false, roles: [] }));
   jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(snapshotWith([]));
   jest.mocked(getTournamentViewerContext).mockResolvedValue(viewerWith());
@@ -267,6 +274,91 @@ describe("GET /api/tournaments/[id]/stream — droit de suppression", () => {
     await GET(new Request("http://t/"), params("5"));
 
     expect(rightsPassedToViewerContext().canDelete).toBe(false);
+  });
+});
+
+describe("GET /api/tournaments/[id]/stream — révocation de la session", () => {
+  beforeEach(() => {
+    jest.mocked(currentTokenHash).mockResolvedValue("empreinte-A");
+  });
+
+  /** Lit jusqu'à la fin du flux ; rend `true` s'il s'est terminé. */
+  async function drainsToEnd(response: Response): Promise<boolean> {
+    const reader = response.body!.getReader();
+    for (let i = 0; i < 10; i += 1) {
+      const { done } = await reader.read();
+      if (done) return true;
+    }
+    return false;
+  }
+
+  it("ferme un flux ouvert quand les sessions du compte sont révoquées", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(200);
+    expect(registeredStreamCount()).toBe(1);
+
+    expect(closeUserStreams(1)).toBe(1);
+
+    expect(await drainsToEnd(response)).toBe(true);
+    expect(registeredStreamCount()).toBe(0);
+    // La place de flux est rendue avec lui.
+    expect(tournamentAudience(5)).toBe(0);
+  });
+
+  it("ferme le flux de la session qui se déconnecte", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(closeSessionStreams("empreinte-A")).toBe(1);
+    expect(await drainsToEnd(response)).toBe(true);
+  });
+
+  it("laisse ouvert le flux de la session gardée", async () => {
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(closeUserStreams(1, { keepTokenHash: "empreinte-A" })).toBe(0);
+    expect(registeredStreamCount()).toBe(1);
+    await response.body!.cancel();
+    expect(registeredStreamCount()).toBe(0);
+  });
+
+  it("répond 401 quand la session tombe pendant les lectures d'ouverture", async () => {
+    jest.mocked(getVisibleTournamentSnapshot).mockImplementation(async () => {
+      closeUserStreams(1);
+      return snapshotWith([]);
+    });
+
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(401);
+    expect(registeredStreamCount()).toBe(0);
+    expect(tournamentAudience(5)).toBe(0);
+  });
+
+  it.each<[string, () => void]>([
+    ["404", () => jest.mocked(getVisibleTournamentSnapshot).mockResolvedValue(null)],
+    ["400", () => undefined],
+  ])("ne laisse aucune inscription derrière un refus %s", async (status, arrange) => {
+    arrange();
+    const id = status === "400" ? "abc" : "5";
+    const response = await GET(new Request("http://t/"), params(id));
+    expect(String(response.status)).toBe(status);
+    expect(registeredStreamCount()).toBe(0);
+  });
+
+  it("ne laisse aucune inscription derrière une requête déjà abandonnée", async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const response = await GET(new Request("http://t/", { signal: controller.signal }), params("5"));
+    expect(response.status).toBe(204);
+    expect(registeredStreamCount()).toBe(0);
+  });
+
+  it("ne laisse aucune inscription derrière le plafond de flux simultanés", async () => {
+    const opened: Response[] = [];
+    for (let i = 0; i < MAX_STREAMS_PER_USER; i += 1) {
+      opened.push(await GET(new Request("http://t/"), params("5")));
+    }
+    expect((await GET(new Request("http://t/"), params("5"))).status).toBe(429);
+    expect(registeredStreamCount()).toBe(MAX_STREAMS_PER_USER);
+    expect(closeUserStreams(1)).toBe(MAX_STREAMS_PER_USER);
+    expect(opened).toHaveLength(MAX_STREAMS_PER_USER);
   });
 });
 
