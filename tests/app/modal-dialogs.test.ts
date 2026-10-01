@@ -203,7 +203,7 @@ describe("modales de gestion des pages publiques", () => {
     "components/cyber/landing/FooterContact.tsx",
     "app/association/BureauSection.tsx",
     "app/benevoles/BenevolesSection.tsx",
-    "app/recrutement/RecruitmentSection.tsx",
+    "app/recrutement/RecruitmentAdEditor.tsx",
   ])("%s passe par LandingDialog sans recopier de cadre", (file) => {
     const src = sources.find((s) => s.file === file)?.src ?? "";
     expect(src).toContain("<LandingDialog");

@@ -15,6 +15,7 @@ import { cachedStats } from "@/lib/server/stats-cache";
 import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { compareRankedTeams, rankingMatchJoinSql } from "@/lib/shared/ranking";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";
+import { arrivalRoles, teamJoinRefusal } from "@/lib/shared/team-join";
 import { visibleAvatarUrl } from "@/lib/shared/avatar";
 import {
   assertTeamNameAvailable,
@@ -1191,9 +1192,7 @@ async function acceptIntoTeam(
   roles: TeamRole[],
 ): Promise<void> {
   const claim = isGhostClaimRoles(roles);
-  const filtered = sanitizeRoles(roles).filter((r) => r !== "OWNER");
-  let payload: string[] = ["OWNER"];
-  if (!claim) payload = filtered.length === 0 ? ["DPS"] : filtered;
+  const payload = arrivalRoles(claim, sanitizeRoles(roles));
 
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1221,14 +1220,8 @@ async function acceptIntoTeam(
       }`,
       [teamId],
     );
-    if (teams.length === 0) throw new Error("TEAM_NOT_FOUND");
-    if (teams[0].deleted_at !== null) throw new Error("TEAM_DELETED");
-    if (teams[0].solo_user_id !== null) throw new Error("TEAM_NOT_JOINABLE");
-    if (claim) {
-      if (teams[0].is_ghost !== 1) throw new Error("NOT_A_GHOST_TEAM");
-    } else if (teams[0].is_ghost === 1) {
-      throw new Error("TEAM_NOT_JOINABLE");
-    }
+    const refusal = teamJoinRefusal(teams[0], claim);
+    if (refusal) throw new Error(refusal);
 
     const [claimed] = await connection.execute<ResultSetHeader>(
       `UPDATE bg_team_invitations

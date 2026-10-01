@@ -17,6 +17,7 @@ import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { pendingScoreProposal } from "../_lib/score-form";
+import { matchSideViews } from "../_lib/match-row-sides";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
 import { MatchReplayStrip } from "./MatchReplayStrip";
@@ -102,8 +103,6 @@ export const MatchRow = memo(function MatchRow({
   // lecteur ne sait pas laquelle des cartes visibles il venait voir.
   const isAnchorTarget = useHighlightedMatch() === match.id;
 
-  const team1Win = match.winnerTeamId !== null && match.winnerTeamId === match.team1Id;
-  const team2Win = match.winnerTeamId !== null && match.winnerTeamId === match.team2Id;
   const hasWinner = match.winnerTeamId !== null;
 
   // Match **nul** : clos, sans vainqueur, et pas par forfait. Une rencontre
@@ -123,27 +122,13 @@ export const MatchRow = memo(function MatchRow({
   const scoreClass = (forfeits: boolean): string =>
     forfeits ? `${styles.score} ${styles.forfeitScore}` : styles.score;
 
-  const team1Display = teamLabel(
-    match.team1Name,
-    match.team1Placeholder,
-    roundNumber === 1 && match.team1Id === null && match.team2Id !== null ? "BYE" : "TBD",
-  );
-  const team2Display = teamLabel(
-    match.team2Name,
-    match.team2Placeholder,
-    roundNumber === 1 && match.team2Id === null && match.team1Id !== null ? "BYE" : "TBD",
-  );
+  const [side1, side2] = matchSideViews(match, roundNumber, isDoubleForfeit);
+  const { win: team1Win, forfeits: team1Forfeits, score: team1Score } = side1;
+  const { win: team2Win, forfeits: team2Forfeits, score: team2Score } = side2;
+  const team1Display = teamLabel(match.team1Name, match.team1Placeholder, side1.emptyLabel);
+  const team2Display = teamLabel(match.team2Name, match.team2Placeholder, side2.emptyLabel);
 
-  const isBye = match.team1Id === null || match.team2Id === null;
   const adminScoreLabel = adminScoreButtonLabel(scoreEntryClosed, pendingScoreProposal(match) !== null);
-  // « FF » dès que le forfait est *enregistré*, sans attendre qu'il soit tranché :
-  // l'arbitrage peut noter un forfait sans valider le résultat, et le score plein
-  // porté en face (3-0 en FT3) se lisait alors comme une rencontre jouée et
-  // gagnée, sur un match que personne n'a encore remporté.
-  const team1Forfeits = !isBye && (isDoubleForfeit || match.forfeitTeamId === match.team1Id);
-  const team2Forfeits = !isBye && (isDoubleForfeit || match.forfeitTeamId === match.team2Id);
-  const team1Score = team1Forfeits ? "FF" : (match.team1Score ?? "-");
-  const team2Score = team2Forfeits ? "FF" : (match.team2Score ?? "-");
 
   return (
     <div

@@ -1,17 +1,11 @@
 ﻿import { getCurrentUser } from "@/lib/server/auth";
 import { DIRECTORY_READ_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
-import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
+import { TEAM_DELETE_ERROR_STATUS, TEAM_META_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
 import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
-import { TEAM_TAG_ALREADY_USED, isTeamTagRejection } from "@/lib/shared/team-tag";
-import {
-  INVALID_TEAM_FIELDS,
-  INVALID_TEAM_NAME,
-  TEAM_NAME_ALREADY_USED,
-  teamFieldsAreText,
-} from "@/lib/shared/team-name";
+import { INVALID_TEAM_FIELDS, teamFieldsAreText } from "@/lib/shared/team-name";
 import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET(_: Request, context: { params: Promise<{ id: string }> }) {
@@ -22,10 +16,8 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
   if (throttled) return throttled;
 
   const { id } = await context.params;
-  const teamId = Number(id);
-  if (!Number.isInteger(teamId) || teamId <= 0) {
-    return fail("INVALID_TEAM_ID", 400);
-  }
+  const teamId = parseTeamId(id);
+  if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   // Consultation de la fiche : seul appel qui calcule la place au classement.
   const detail = await getTeamDetail(teamId, user.id, can(user, "tournaments"), true);
@@ -48,10 +40,8 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const { id } = await context.params;
-  const teamId = Number(id);
-  if (!Number.isInteger(teamId) || teamId <= 0) {
-    return fail("INVALID_TEAM_ID", 400);
-  }
+  const teamId = parseTeamId(id);
+  if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   try {
     const body = (await readJsonBody(req)) as { name?: string; description?: string | null; tag?: string | null };
@@ -68,13 +58,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
     return ok(detail);
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "FORBIDDEN") return fail(message, 403);
-    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
-    if (message === TEAM_TAG_ALREADY_USED) return fail(message, 409);
-    if (message === TEAM_NAME_ALREADY_USED) return fail(message, 409);
-    if (message === INVALID_TEAM_NAME) return fail(message, 400);
-    if (isTeamTagRejection(message)) return fail(message, 400);
-    return fail(message || "TEAM_UPDATE_FAILED", 400);
+    return fail(message || "TEAM_UPDATE_FAILED", teamErrorStatus(TEAM_META_ERROR_STATUS, message));
   }
 }
 
@@ -83,18 +67,14 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const { id } = await context.params;
-  const teamId = Number(id);
-  if (!Number.isInteger(teamId) || teamId <= 0) {
-    return fail("INVALID_TEAM_ID", 400);
-  }
+  const teamId = parseTeamId(id);
+  if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   try {
     await softDeleteTeam(user.id, teamId, can(user, "tournaments"));
     return ok({ deleted: true });
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "FORBIDDEN") return fail(message, 403);
-    if (message === "TEAM_ALREADY_DELETED") return fail(message, 409);
-    return fail(message || "TEAM_DELETE_FAILED", 400);
+    return fail(message || "TEAM_DELETE_FAILED", teamErrorStatus(TEAM_DELETE_ERROR_STATUS, message));
   }
 }

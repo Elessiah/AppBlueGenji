@@ -335,21 +335,16 @@ function pickOpponent(list: StatsOpponent[], criterion: "won" | "lost"): StatsOp
   let best: StatsOpponent | null = null;
   for (const candidate of list) {
     if (candidate[criterion] === 0) continue;
-    if (best === null) {
-      best = candidate;
-      continue;
-    }
-    if (candidate[criterion] !== best[criterion]) {
-      if (candidate[criterion] > best[criterion]) best = candidate;
-      continue;
-    }
-    if (candidate.played !== best.played) {
-      if (candidate.played > best.played) best = candidate;
-      continue;
-    }
-    if (candidate.teamName.localeCompare(best.teamName, "fr") < 0) best = candidate;
+    if (best === null || opponentOutranks(candidate, best, criterion)) best = candidate;
   }
   return best === null ? null : { ...best };
+}
+
+/** `candidate` passe-t-il devant `best` selon l'ordre de `pickOpponent` ? */
+function opponentOutranks(candidate: StatsOpponent, best: StatsOpponent, criterion: "won" | "lost"): boolean {
+  if (candidate[criterion] !== best[criterion]) return candidate[criterion] > best[criterion];
+  if (candidate.played !== best.played) return candidate.played > best.played;
+  return candidate.teamName.localeCompare(best.teamName, "fr") < 0;
 }
 
 /**

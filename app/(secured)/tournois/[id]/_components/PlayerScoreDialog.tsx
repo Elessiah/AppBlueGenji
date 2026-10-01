@@ -16,8 +16,8 @@ import {
 import { isMyTeamTeam1, scoreSubmittedMessage, teamLabel } from "@/lib/shared/match-card-viewer";
 import {
   playerReportInitialScores,
+  enteredScoreRelation,
   playerReportView,
-  sameReportedScore,
   toReporterScores,
 } from "@/lib/shared/player-score-report";
 import { decideScoreForm, parseScoreInput, scoreBlockerMessage } from "../_lib/score-form";
@@ -103,8 +103,7 @@ export function PlayerScoreDialog({
   const myTeamIsTeam1 = isMyTeamTeam1(myTeamId, match.team1Id);
   const team1 = teamLabel(match.team1Name, match.team1Placeholder, "Équipe 1");
   const team2 = teamLabel(match.team2Name, match.team2Placeholder, "Équipe 2");
-  const myName = myTeamIsTeam1 ? team1 : team2;
-  const opponentName = myTeamIsTeam1 ? team2 : team1;
+  const [myName, opponentName] = myTeamIsTeam1 ? [team1, team2] : [team2, team1];
 
   const [scores, setScores] = useState(() => playerReportInitialScores(view));
   // Réalignement sur le flux : tant que le lecteur n'a rien touché, une
@@ -131,13 +130,7 @@ export function PlayerScoreDialog({
       : { team1Score: decision.scores.team1, team2Score: decision.scores.team2 };
   // Renvoyer à l'identique la proposition déjà envoyée ne change rien : le
   // bouton le dit plutôt que de réécrire la même ligne.
-  const unchangedMine =
-    entered !== null && view?.mine != null && sameReportedScore(entered, view.mine);
-  const confirmsTheirs =
-    entered !== null &&
-    view?.theirs != null &&
-    view.mine === null &&
-    sameReportedScore(entered, view.theirs);
+  const { unchangedMine, confirmsTheirs } = enteredScoreRelation(entered, view);
 
   const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
   const forfeitMaps = forfeitMapCount(matchFormat);

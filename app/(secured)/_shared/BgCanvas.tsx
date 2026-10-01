@@ -81,6 +81,43 @@ function NetworkCanvas({ rgb }: Readonly<{ rgb: string }>) {
   return <canvas ref={canvasRef} aria-hidden className={s.bgCanvas} />; // NOSONAR S6825 — un <canvas> sans tabIndex n'est pas focalisable : fond décoratif
 }
 
+/** Trame de points fixe, une maille toutes les 60 unités de l'espace logique. */
+function drawGrid(ctx: CanvasRenderingContext2D, sx: number, sy: number): void {
+  ctx.fillStyle = "rgba(180,210,230,0.08)";
+  for (let gx = 0; gx < SPACE_W; gx += 60) {
+    for (let gy = 0; gy < SPACE_H; gy += 60) {
+      ctx.fillRect(gx * sx, gy * sy, 1, 1);
+    }
+  }
+}
+
+/** Avance chaque nœud d'un pas, en le faisant rebondir sur les bords de l'espace. */
+function advanceNodes(nodes: Node[]): void {
+  for (const node of nodes) {
+    node.x += node.vx;
+    node.y += node.vy;
+    if (node.x < 0 || node.x > SPACE_W) node.vx *= -1;
+    if (node.y < 0 || node.y > SPACE_H) node.vy *= -1;
+  }
+}
+
+/** Relie les nœuds proches (moins de 180 unités), d'autant plus nettement qu'ils le sont. */
+function drawLinks(ctx: CanvasRenderingContext2D, nodes: Node[], rgb: string, sx: number, sy: number): void {
+  ctx.strokeStyle = `rgba(${rgb},0.10)`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < nodes.length; i += 1) {
+    for (let j = i + 1; j < nodes.length; j += 1) {
+      const distance = Math.hypot(nodes[i].x - nodes[j].x, nodes[i].y - nodes[j].y);
+      if (distance >= 180) continue;
+      ctx.globalAlpha = (1 - distance / 180) * 0.6;
+      ctx.beginPath();
+      ctx.moveTo(nodes[i].x * sx, nodes[i].y * sy);
+      ctx.lineTo(nodes[j].x * sx, nodes[j].y * sy);
+      ctx.stroke();
+    }
+  }
+}
+
 /** Fait vivre le canevas selon `policy` ; rend la fonction de nettoyage. */
 function runNetwork(
   canvas: HTMLCanvasElement,
@@ -108,38 +145,9 @@ function runNetwork(
     const sx = width / SPACE_W;
     const sy = height / SPACE_H;
 
-    ctx.fillStyle = "rgba(180,210,230,0.08)";
-    for (let gx = 0; gx < SPACE_W; gx += 60) {
-      for (let gy = 0; gy < SPACE_H; gy += 60) {
-        ctx.fillRect(gx * sx, gy * sy, 1, 1);
-      }
-    }
-
-    if (advance) {
-      for (const node of nodes) {
-        node.x += node.vx;
-        node.y += node.vy;
-        if (node.x < 0 || node.x > SPACE_W) node.vx *= -1;
-        if (node.y < 0 || node.y > SPACE_H) node.vy *= -1;
-      }
-    }
-
-    ctx.strokeStyle = `rgba(${rgb},0.10)`;
-    ctx.lineWidth = 1;
-    for (let i = 0; i < nodes.length; i += 1) {
-      for (let j = i + 1; j < nodes.length; j += 1) {
-        const dx = nodes[i].x - nodes[j].x;
-        const dy = nodes[i].y - nodes[j].y;
-        const distance = Math.hypot(dx, dy);
-        if (distance < 180) {
-          ctx.globalAlpha = (1 - distance / 180) * 0.6;
-          ctx.beginPath();
-          ctx.moveTo(nodes[i].x * sx, nodes[i].y * sy);
-          ctx.lineTo(nodes[j].x * sx, nodes[j].y * sy);
-          ctx.stroke();
-        }
-      }
-    }
+    drawGrid(ctx, sx, sy);
+    if (advance) advanceNodes(nodes);
+    drawLinks(ctx, nodes, rgb, sx, sy);
 
     ctx.globalAlpha = 1;
     ctx.fillStyle = `rgba(${rgb},0.5)`;

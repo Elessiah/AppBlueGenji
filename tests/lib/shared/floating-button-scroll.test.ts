@@ -141,23 +141,27 @@ describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", ()
   const escape = hook.slice(hook.indexOf('if (event.key === "Escape") {'), hook.indexOf('if (event.key !== "Tab") return;'));
   const tab = hook.slice(hook.indexOf('if (event.key !== "Tab") return;'), hook.indexOf('window.addEventListener("keydown"'));
 
+  const focusRules = readSource("lib/shared/dialog-focus.ts");
+
   it("Échap referme le panneau ouvert, pas la modale — quelle que soit la cible", () => {
     // Safari ne focalise pas un bouton cliqué : la question porte sur le panneau.
-    expect(escape).toMatch(
-      /if \(layers\.some\(\(layer\) => layer\.querySelector\('\[aria-expanded="true"\]'\)\)\) return;/,
+    // La décision est pure (`escapeBelongsElsewhere`, tests/lib/shared/dialog-focus.test.ts).
+    expect(focusRules).toMatch(
+      /if \(layers\.some\(\(layer\) => layer\.querySelector\('\[aria-expanded="true"\]'\)\)\) return true;/,
     );
     expect(escape).not.toContain("event.target as HTMLElement | null)?.closest");
-    expect(escape.indexOf("layers.some(")).toBeLessThan(escape.indexOf("closeRef.current()"));
+    expect(escape.indexOf("escapeBelongsElsewhere(layers")).toBeLessThan(escape.indexOf("closeRef.current()"));
   });
 
   it("le bouton entre dans le cycle de tabulation, après la modale", () => {
     expect(hook).toContain('document.querySelectorAll("[data-dialog-exempt]")');
     expect(tab).toContain("const extra = layers.flatMap((layer) => focusablesIn(layer));");
+    expect(tab).toContain("focusTrapTarget({ items, extra, active, inModal, inLayer, shiftKey: event.shiftKey })");
     // Bords de la modale → la couche ; bords de la couche → la modale.
-    expect(tab).toMatch(/if \(event\.shiftKey && active === start\) go\(extra\.at\(-1\) \?\? end\);/);
-    expect(tab).toMatch(/else if \(!event\.shiftKey && active === end\) go\(extra\[0\] \?\? start\);/);
-    expect(tab).toMatch(/if \(!event\.shiftKey && active === extra\.at\(-1\)\) go\(start\);/);
-    expect(tab).toMatch(/else if \(event\.shiftKey && active === extra\[0\]\) go\(end\);/);
+    expect(focusRules).toMatch(/if \(shiftKey && active === start\) return extra\.at\(-1\) \?\? end;/);
+    expect(focusRules).toMatch(/if \(!shiftKey && active === end\) return extra\[0\] \?\? start;/);
+    expect(focusRules).toMatch(/if \(!shiftKey && active === extra\.at\(-1\)\) return start;/);
+    expect(focusRules).toMatch(/if \(shiftKey && active === extra\[0\]\) return end;/);
   });
 
   it("le menu, lui, prend Échap quand le focus est resté dans la modale", () => {

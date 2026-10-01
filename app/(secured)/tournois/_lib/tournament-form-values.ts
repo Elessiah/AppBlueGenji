@@ -9,7 +9,14 @@ import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
-import { DEFAULT_MATCH_FORMAT, type MatchFormat } from "@/lib/shared/match-format";
+import {
+  DEFAULT_MATCH_FORMAT,
+  matchFormatDescription,
+  matchFormatLabel,
+  type MatchFormat,
+  type MatchFormatType,
+} from "@/lib/shared/match-format";
+import { DATE_ORDER_CODES, firstMisplacedDate, type TournamentFormField } from "@/lib/shared/field-errors";
 import {
   DEFAULT_REGISTRATION_FILTERS,
   type PlayerRequirement,
@@ -216,6 +223,11 @@ function isoToLocalInput(iso: string): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+/** `value` si le réglage concerne le format choisi, `undefined` (champ non envoyé) sinon. */
+function onlyFor<T>(applies: boolean, value: T): T | undefined {
+  return applies ? value : undefined;
+}
+
 /**
  * Corps de requête attendu par `POST /api/tournaments` et
  * `PATCH /api/tournaments/[id]/edit`.
@@ -244,19 +256,18 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     registrationOpenAt: new Date(values.registrationOpenAt).toISOString(),
     registrationCloseAt: new Date(values.registrationCloseAt).toISOString(),
     startAt: new Date(values.startAt).toISOString(),
-    hasThirdPlaceMatch: format === "SINGLE" ? values.hasThirdPlaceMatch : false,
-    survivalRoundsPerCut: format === "SURVIVAL" ? values.survivalRoundsPerCut : undefined,
-    survivalRoundsBeforeFirstCut:
-      format === "SURVIVAL" ? values.survivalRoundsBeforeFirstCut : undefined,
-    phases: format === "MULTI" ? values.phases : undefined,
-    swissTotalRounds: format === "SWISS" ? values.swissTotalRounds : undefined,
-    swissPointsWin: format === "SWISS" ? values.swissPointsWin : undefined,
-    swissPointsDraw: format === "SWISS" ? values.swissPointsDraw : undefined,
-    swissPointsLoss: format === "SWISS" ? values.swissPointsLoss : undefined,
-    endurancePoints: format === "BG_SURVIE" ? values.endurancePoints : undefined,
-    enduranceWinDelta: format === "BG_SURVIE" ? values.enduranceWinDelta : undefined,
-    enduranceLossDelta: format === "BG_SURVIE" ? values.enduranceLossDelta : undefined,
-    endurancePlayoffSize: format === "BG_SURVIE" ? values.endurancePlayoffSize : undefined,
+    hasThirdPlaceMatch: format === "SINGLE" && values.hasThirdPlaceMatch,
+    survivalRoundsPerCut: onlyFor(format === "SURVIVAL", values.survivalRoundsPerCut),
+    survivalRoundsBeforeFirstCut: onlyFor(format === "SURVIVAL", values.survivalRoundsBeforeFirstCut),
+    phases: onlyFor(format === "MULTI", values.phases),
+    swissTotalRounds: onlyFor(format === "SWISS", values.swissTotalRounds),
+    swissPointsWin: onlyFor(format === "SWISS", values.swissPointsWin),
+    swissPointsDraw: onlyFor(format === "SWISS", values.swissPointsDraw),
+    swissPointsLoss: onlyFor(format === "SWISS", values.swissPointsLoss),
+    endurancePoints: onlyFor(format === "BG_SURVIE", values.endurancePoints),
+    enduranceWinDelta: onlyFor(format === "BG_SURVIE", values.enduranceWinDelta),
+    enduranceLossDelta: onlyFor(format === "BG_SURVIE", values.enduranceLossDelta),
+    endurancePlayoffSize: onlyFor(format === "BG_SURVIE", values.endurancePlayoffSize),
     // 0 n'est pas une valeur à enregistrer, c'est l'absence de plafond — et
     // c'est `null` qui le dit, jamais `undefined` : la liste blanche de
     // `PATCH .../edit` ne recopie que les champs dont `body[field] !==
@@ -265,7 +276,7 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // plafond une fois posé ne pourrait plus jamais être retiré. Hors du mode,
     // en revanche, on ne touche effectivement à rien (comme le reste du barème
     // d'endurance).
-    enduranceMaxRounds: format === "BG_SURVIE" ? enduranceMaxRounds : undefined,
+    enduranceMaxRounds: onlyFor(format === "BG_SURVIE", enduranceMaxRounds),
     matchFormatType: values.matchFormat?.type ?? null,
     matchFormatValue: values.matchFormat?.value ?? null,
     // Le plafond de maps et les égalités voyagent **aplatis** eux aussi, comme
@@ -277,10 +288,8 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // en est la fenêtre, suit (`effectiveMatchFormat`).
     matchFormatMaxMaps: matchFormat?.maxMaps ?? null,
     matchFormatDraws: matchFormat?.drawsAllowed ?? false,
-    endurancePlayoffFormatType:
-      format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.type ?? null) : null,
-    endurancePlayoffFormatValue:
-      format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.value ?? null) : null,
+    endurancePlayoffFormatType: onlyFor(format === "BG_SURVIE", values.endurancePlayoffFormat?.type) ?? null,
+    endurancePlayoffFormatValue: onlyFor(format === "BG_SURVIE", values.endurancePlayoffFormat?.value) ?? null,
     // Les conditions partent pour **tous** les formats : elles ne portent pas
     // sur le déroulé du tournoi mais sur qui a le droit d'y entrer, question
     // que les six formats posent à l'identique.
@@ -353,4 +362,44 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     refereeScheduling: false,
     phases: apiValues.phases ?? defaults.phases,
   };
+}
+
+/**
+ * Aide affichée sous le format de match : sans contrainte en saisie libre, la
+ * description du format quand il est valide, sinon ce qui manque.
+ */
+export function matchFormatHint(
+  type: MatchFormatType | "LIBRE",
+  valid: boolean,
+  format: MatchFormat | null,
+): string {
+  if (type === "LIBRE") return "Les scores sont saisis sans contrainte.";
+  if (valid) return `${matchFormatLabel(format)} — ${matchFormatDescription(format)}`;
+  if (type === "BO") return "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…).";
+  return "Saisis le nombre de manches à gagner.";
+}
+
+/** Refus d'un format de match invalide à l'envoi du formulaire. */
+export function invalidMatchFormatMessage(type: MatchFormatType | "LIBRE"): string {
+  return type === "BO"
+    ? "Un Best of doit se jouer en nombre impair de manches (BO1, BO3, BO5…)."
+    : "Nombre de manches du format de match invalide.";
+}
+
+/**
+ * Champ de date à signaler sur un refus d'ordre des dates : les deux codes ne
+ * disent pas **laquelle**, le premier jalon mal placé se relit sur les valeurs
+ * envoyées. `null` pour tout autre refus.
+ */
+export function misplacedDateField(
+  code: string | null,
+  values: Pick<TournamentFormValues, "startVisibilityAt" | "registrationOpenAt" | "registrationCloseAt" | "startAt">,
+): TournamentFormField | null {
+  if (!code || !DATE_ORDER_CODES.has(code)) return null;
+  return firstMisplacedDate<TournamentFormField>([
+    ["startVisibilityAt", values.startVisibilityAt],
+    ["registrationOpenAt", values.registrationOpenAt],
+    ["registrationCloseAt", values.registrationCloseAt],
+    ["startAt", values.startAt],
+  ]);
 }

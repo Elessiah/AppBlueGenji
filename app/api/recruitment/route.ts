@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { createRecruitmentAd, listRecruitmentAds } from "@/lib/server/recruitment-service";
 import { can } from "@/lib/shared/permissions";
+import { recruitmentAdInputFromBody } from "@/lib/shared/recruitment";
 import { readJsonBody } from "@/lib/server/request-body";
 
 export async function GET() {
@@ -29,19 +30,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const ad = await createRecruitmentAd({
-      title: typeof body.title === "string" ? body.title : "",
-      teamName: typeof body.teamName === "string" ? body.teamName : null,
-      domain: typeof body.domain === "string" ? body.domain : undefined,
-      roles: typeof body.roles === "string" ? body.roles : null,
-      body: typeof body.body === "string" ? body.body : null,
-      contactUrl: typeof body.contactUrl === "string" ? body.contactUrl : null,
-      contactDiscord: typeof body.contactDiscord === "string" ? body.contactDiscord : null,
-      contactDiscordId: typeof body.contactDiscordId === "string" ? body.contactDiscordId : null,
-      contactPreferred: typeof body.contactPreferred === "string" ? body.contactPreferred : undefined,
-      priority: typeof body.priority === "string" ? body.priority : undefined,
-      active: typeof body.active === "boolean" ? body.active : undefined,
-    });
+    const ad = await createRecruitmentAd(recruitmentAdInputFromBody(body));
     return ok({ ad }, 201);
   } catch (e) {
     return fail((e as Error).message || "RECRUITMENT_CREATE_FAILED", 400);

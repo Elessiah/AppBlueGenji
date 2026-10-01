@@ -17,7 +17,12 @@ import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
 import { useLiveControls } from "../_lib/live-context";
-import { pendingScoreProposal, scoreBlockerMessage } from "../_lib/score-form";
+import {
+  adminProposalNotice,
+  forfeitParties,
+  pendingScoreProposal,
+  scoreBlockerMessage,
+} from "../_lib/score-form";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
@@ -75,18 +80,6 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
   return `Tranché : ${score}, ${winner} l'emporte.`;
 }
 
-/** Score proposé par une engagée, en attente de la confirmation de l'autre. */
-function proposalNoticeText(
-  proposal: NonNullable<ReturnType<typeof pendingScoreProposal>>,
-  team1: string,
-  team2: string,
-  dirty: boolean,
-): string {
-  const [proposer, confirmer] = proposal.proposedBy === "team1" ? [team1, team2] : [team2, team1];
-  const next = dirty ? "Ta saisie le remplace." : "Vérifie-le puis valide le résultat pour le confirmer.";
-  return `Score proposé par ${proposer} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${confirmer}. ${next}`;
-}
-
 /**
  * Édition d'un score par l'arbitrage (permission `tournaments`).
  *
@@ -135,9 +128,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const doubleForfeit = form.doubleForfeit;
   // Un forfait, simple ou double, remplace le score saisi.
   const anyForfeit = forfeitTeamId !== undefined || doubleForfeit;
-  const forfeitingSides =
-    forfeitTeamId === match.team1Id ? { out: team1, through: team2 } : { out: team2, through: team1 };
-  const forfeiting = forfeitTeamId === undefined ? null : forfeitingSides;
+  const forfeiting = forfeitParties(forfeitTeamId, match.team1Id, team1, team2);
   // Un forfait déjà posé ne se cache pas derrière un lien : il commande la
   // rencontre, et le replier laisserait croire à un match encore à jouer.
   // Avant le lancement, le forfait est le seul geste possible : il s'offre
@@ -162,7 +153,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
   // vérifier puis à le valider, sans le recopier.
   const proposal = pendingScoreProposal(match);
-  const proposalNotice = proposal ? proposalNoticeText(proposal, team1, team2, form.dirty) : null;
+  const proposalNotice = adminProposalNotice(proposal, team1, team2, form.dirty);
   const forfeitToggleLabel = showForfeit ? "Annuler" : "Déclarer un forfait sur cette manche";
 
   const run = async (action: "save" | "resolve") => {

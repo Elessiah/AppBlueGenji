@@ -42,6 +42,26 @@ export function sameReportedScore(a: ReportedScore, b: ReportedScore): boolean {
 }
 
 /**
+ * Ce que dit, au regard des propositions déjà envoyées, le score saisi
+ * (`entered`, orientation du plateau ; `null` tant qu'il n'est pas complet) :
+ * - `unchangedMine` — il répète la proposition du lecteur, l'envoyer ne
+ *   changerait rien ;
+ * - `confirmsTheirs` — le lecteur n'a rien proposé et il reprend celle de
+ *   l'adversaire : l'envoyer la confirme.
+ */
+export function enteredScoreRelation(
+  entered: ReportedScore | null,
+  view: Pick<PlayerReportView, "mine" | "theirs"> | null,
+): { unchangedMine: boolean; confirmsTheirs: boolean } {
+  if (entered === null || view === null) return { unchangedMine: false, confirmsTheirs: false };
+  const { mine, theirs } = view;
+  return {
+    unchangedMine: mine != null && sameReportedScore(entered, mine),
+    confirmsTheirs: theirs != null && mine === null && sameReportedScore(entered, theirs),
+  };
+}
+
+/**
  * État du report pour le lecteur. `null` quand il n'est pas engagé dans ce
  * match : un spectateur n'a rien à confirmer.
  */

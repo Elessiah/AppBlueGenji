@@ -1,5 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
+import { TEAM_LOGO_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
 import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";
@@ -8,7 +9,6 @@ import { IMAGE_CROP_FIELD, IMAGE_CROP_INVALID, parseImageCropField } from "@/lib
 import {
   LOGO_RIGHTS_FIELD,
   LOGO_RIGHTS_NOT_CERTIFIED,
-  TERMS_ACCEPTANCE_REQUIRED,
 } from "@/lib/shared/terms-of-use";
 import { readImageUploadForm } from "@/lib/server/request-body";
 
@@ -17,10 +17,8 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const { id } = await context.params;
-  const teamId = Number(id);
-  if (!Number.isInteger(teamId) || teamId <= 0) {
-    return fail("INVALID_TEAM_ID", 400);
-  }
+  const teamId = parseTeamId(id);
+  if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   const managesGhostTeams = can(user, "tournaments");
   if (!(await canManageTeam(teamId, user.id)) && !(managesGhostTeams && (await isGhostTeam(teamId)))) {
@@ -63,9 +61,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return ok({ logoUrl: servedUrl });
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "FORBIDDEN") return fail(message, 403);
-    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
-    return fail(message || "LOGO_UPLOAD_FAILED", 400);
+    return fail(message || "LOGO_UPLOAD_FAILED", teamErrorStatus(TEAM_LOGO_ERROR_STATUS, message));
   }
 }
 
@@ -74,10 +70,8 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
   if (!user) return fail("UNAUTHORIZED", 401);
 
   const { id } = await context.params;
-  const teamId = Number(id);
-  if (!Number.isInteger(teamId) || teamId <= 0) {
-    return fail("INVALID_TEAM_ID", 400);
-  }
+  const teamId = parseTeamId(id);
+  if (teamId === null) return fail("INVALID_TEAM_ID", 400);
 
   try {
     const currentLogo = await getTeamLogoUrl(teamId);
@@ -86,8 +80,6 @@ export async function DELETE(_: Request, context: { params: Promise<{ id: string
     return ok({ logoUrl: null });
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "FORBIDDEN") return fail(message, 403);
-    if (message === TERMS_ACCEPTANCE_REQUIRED) return fail(message, 409);
-    return fail(message || "LOGO_DELETE_FAILED", 400);
+    return fail(message || "LOGO_DELETE_FAILED", teamErrorStatus(TEAM_LOGO_ERROR_STATUS, message));
   }
 }

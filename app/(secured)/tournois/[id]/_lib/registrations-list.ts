@@ -1,3 +1,6 @@
+import type { SeedingLockReason } from "@/lib/shared/seeding";
+import type { EntrantRemovalBlockReason } from "@/lib/shared/entrant-removal";
+
 /**
  * Repli de la liste des inscrites (`RegistrationsPanel`).
  *
@@ -40,4 +43,31 @@ export function mustExpandToShow(
   limit: number = REGISTRATIONS_DISPLAY_LIMIT,
 ): boolean {
   return !expanded && index >= limit;
+}
+
+/**
+ * Phrase du retrait à afficher, ou `null`. Sur un tournoi terminé, « l'ordre
+ * n'a plus d'effet » et « la liste est un palmarès » disent le même fait : le
+ * verrou de l'ordre garde alors seul la parole.
+ */
+export function removalNotice(
+  removalBlock: EntrantRemovalBlockReason | null,
+  lockReason: SeedingLockReason,
+): EntrantRemovalBlockReason | null {
+  if (removalBlock === null) return null;
+  if (lockReason === "FINISHED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_FINISHED") return null;
+  return removalBlock;
+}
+
+/**
+ * Colonne d'actions de la liste : gabarit de grille (poignée de glissement
+ * seulement avec le réordonnancement, cellule d'actions dès qu'une commande
+ * est là) et intitulé qui nomme ce qu'elle contient réellement.
+ */
+export function registrationActionsColumn(
+  reorderable: boolean,
+  removable: boolean,
+): { grid: "reorderable" | "withActions" | null; label: "Actions" | "Ordre" | "Retrait" } {
+  if (reorderable) return { grid: "reorderable", label: removable ? "Actions" : "Ordre" };
+  return { grid: removable ? "withActions" : null, label: "Retrait" };
 }

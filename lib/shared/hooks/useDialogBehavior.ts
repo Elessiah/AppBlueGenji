@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createDialogStack, type ScrollLockTarget } from "@/lib/shared/dialog-stack";
+import { escapeBelongsElsewhere, focusTrapTarget } from "@/lib/shared/dialog-focus";
 
 interface DialogBehaviorOptions {
   /** La boîte de dialogue est-elle montée / visible ? */
@@ -99,25 +100,11 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       const layers = Array.from(document.querySelectorAll("[data-dialog-exempt]"));
 
       if (event.key === "Escape") {
-        // Panneau d'une couche ouvert : Échap le referme lui (son écouteur est
-        // sur `document`), pas la modale — qui perdrait sa saisie. La question
-        // porte sur le panneau et non sur la cible : Safari ne focalise pas un
-        // bouton cliqué, le focus peut être resté dans la modale.
-        if (layers.some((layer) => layer.querySelector('[aria-expanded="true"]'))) return;
+        // Panneau d'une couche ouvert, ou liste d'un `combobox` ouverte : Échap
+        // leur revient (l'écouteur est posé en capture sur `window`, il
+        // passerait avant eux et fermerait la modale entière — saisie comprise).
         if (lockedRef.current) return;
-        // Un champ `combobox` dont la liste est ouverte répond d'abord à Échap
-        // (il la referme) : l'écouteur est posé en capture sur `window`, il
-        // passerait avant lui et fermerait la modale entière — saisie comprise.
-        // Le rôle est exigé, et pas seulement `aria-expanded` : un bouton de
-        // dépliage porte lui aussi `aria-expanded="true"`, mais n'écoute pas
-        // Échap — la modale ne se fermerait alors plus du tout.
-        const target = event.target as HTMLElement | null;
-        if (
-          target?.getAttribute?.("role") === "combobox" &&
-          target.getAttribute("aria-expanded") === "true"
-        ) {
-          return;
-        }
+        if (escapeBelongsElsewhere(layers, event.target as HTMLElement | null)) return;
         event.stopPropagation();
         closeRef.current();
         return;
@@ -135,27 +122,15 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
         return;
       }
       const extra = layers.flatMap((layer) => focusablesIn(layer));
-      const start = items[0];
-      const end = items.at(-1)!;
       const active = document.activeElement;
       const inModal = containerRef.current?.contains(active as Node) ?? false;
       const inLayer = !inModal && extra.length > 0 && layers.some((layer) => layer.contains(active as Node));
 
-      const go = (el: HTMLElement) => {
+      const next = focusTrapTarget({ items, extra, active, inModal, inLayer, shiftKey: event.shiftKey });
+      if (next) {
         event.preventDefault();
-        el.focus();
-      };
-      if (inLayer) {
-        if (!event.shiftKey && active === extra.at(-1)) go(start);
-        else if (event.shiftKey && active === extra[0]) go(end);
-        return;
+        next.focus();
       }
-      if (!inModal) {
-        go(event.shiftKey ? end : start);
-        return;
-      }
-      if (event.shiftKey && active === start) go(extra.at(-1) ?? end);
-      else if (!event.shiftKey && active === end) go(extra[0] ?? start);
     };
 
     window.addEventListener("keydown", onKeyDown, true);
