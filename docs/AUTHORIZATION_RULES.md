@@ -886,7 +886,8 @@ lancement ; une date posée le fait passer **en attente de départ**
 
 L'option **n'est pas** dans la liste blanche de l'édition
 (`PATCH /api/tournaments/[id]/edit`) : une seule porte l'écrit sur un tournoi
-existant, celle qui sait défaire les lancements. Elle se lit par tous sur la carte
+existant, celle qui sait défaire les lancements — le formulaire « Modifier le
+tournoi » qui porte la case l'appelle, sous la même permission. Elle se lit par tous sur la carte
 du tournoi (`TournamentCard.refereeScheduling`) — c'est une règle du tournoi que
 les engagés doivent connaître, comme ses conditions d'inscription.
 
