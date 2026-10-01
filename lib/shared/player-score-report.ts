@@ -61,16 +61,11 @@ export function playerReportView(
   // transaction : on ne les voit donc jamais ensemble sur un match ouvert.
   // Les lire comme un conflit serait pourtant faux si la course survenait —
   // elles s'accordent, le flux apportera le résultat.
-  const phase: PlayerReportPhase =
-    mine && theirs
-      ? sameReportedScore(mine, theirs)
-        ? "MINE_PENDING"
-        : "CONFLICT"
-      : mine
-        ? "MINE_PENDING"
-        : theirs
-          ? "THEIRS_PENDING"
-          : "NONE";
+  let phase: PlayerReportPhase;
+  if (mine && theirs) phase = sameReportedScore(mine, theirs) ? "MINE_PENDING" : "CONFLICT";
+  else if (mine) phase = "MINE_PENDING";
+  else if (theirs) phase = "THEIRS_PENDING";
+  else phase = "NONE";
 
   return { phase, mine, theirs };
 }

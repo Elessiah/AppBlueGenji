@@ -77,9 +77,10 @@ export function connectedFrameBytes(
   encoding: StreamEncoding,
 ): Uint8Array {
   const envelopeJson = JSON.stringify(envelope);
-  const head = encoder.encode(
-    `data: ${envelopeJson.length > 2 ? `${envelopeJson.slice(0, -1)},` : "{"}"snapshot":`,
-  );
+  // L'enveloppe est rouverte pour y glisser `snapshot` : on retire son `}`
+  // final, et une enveloppe vide (`{}`) ne garde que son `{`.
+  const opening = envelopeJson.length > 2 ? `${envelopeJson.slice(0, -1)},` : "{";
+  const head = encoder.encode(`data: ${opening}"snapshot":`);
   const tail = encoder.encode("}\n\n");
 
   if (frame === null) {

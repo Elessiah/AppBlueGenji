@@ -203,7 +203,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
               const relay = point(relays[i]);
               const scrim = point(scrims[i]);
               return (
-                <div key={i} style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1.5, height: "100%" }}>
+                <div key={i} /* NOSONAR S6479 — élément du i-ème intervalle de la plage, dessin sans état */ style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1.5, height: "100%" }}>
                   <div className="bar" style={{ height: `${(relay / max) * 100}%`, flex: 1 }} title={`${relay} relais`} />
                   <div
                     className="bar relais"
@@ -222,7 +222,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
               Et un libellé arrivé en objet tombait en enfant de React, qui
               lève — toute la page en 500. */}
           {labels.map((d, i) => (
-            <span key={i}>{botPayloadLabel(d)}</span>
+            <span key={i} /* NOSONAR S6479 — élément du i-ème intervalle de la plage, dessin sans état */>{botPayloadLabel(d)}</span>
           ))}
         </div>
         <div className="chart-legend">

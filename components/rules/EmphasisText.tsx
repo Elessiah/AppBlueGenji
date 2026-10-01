@@ -12,7 +12,7 @@ export function EmphasisText({ text }: { text: string }) {
   return (
     <>
       {parseEmphasis(text).map((segment, index) => (
-        <Fragment key={index}>
+        <Fragment key={index} /* NOSONAR S6479 — segments dérivés d'un texte immuable */>
           {segment.bold ? <strong>{segment.text}</strong> : segment.text}
         </Fragment>
       ))}

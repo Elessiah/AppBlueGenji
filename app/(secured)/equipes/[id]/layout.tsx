@@ -3,8 +3,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getTeamPageIdentity } from "@/lib/server/teams-service";
 import { parseEntityPageId, teamPageTitle } from "@/lib/shared/entity-page-titles";
 
-type LayoutProps = {
-  children: React.ReactNode;
+type MetadataProps = {
   params: Promise<{ id: string }>;
 };
 
@@ -22,7 +21,7 @@ type LayoutProps = {
  * injoignable retombe sur le titre générique plutôt que de faire échouer la
  * page, qui affiche alors sa propre erreur.
  */
-export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
+export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const { id } = await params;
   const teamId = parseEntityPageId(id);
   if (teamId === null) return { title: teamPageTitle(null) };
@@ -34,6 +33,6 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
   return { title: teamPageTitle(team) };
 }
 
-export default function TeamDetailLayout({ children }: LayoutProps) {
+export default function TeamDetailLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

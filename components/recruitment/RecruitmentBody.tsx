@@ -26,22 +26,22 @@ export function RecruitmentBody({ body, className }: RecruitmentBodyProps) {
           // Index en clé : les blocs sont dérivés d'un texte immuable, jamais
           // réordonnés ni insérés au milieu.
           return (
-            <h4 key={index} className={styles.heading}>
+            <h4 key={index} /* NOSONAR S6479 — blocs dérivés d'un texte immuable */ className={styles.heading}>
               {block.text}
             </h4>
           );
         }
         if (block.kind === "list") {
           return (
-            <ul key={index} className={styles.list}>
+            <ul key={index} /* NOSONAR S6479 — blocs dérivés d'un texte immuable */ className={styles.list}>
               {block.items.map((item, itemIndex) => (
-                <li key={itemIndex}>{item}</li>
+                <li key={itemIndex} /* NOSONAR S6479 — éléments dérivés d'un texte immuable */>{item}</li>
               ))}
             </ul>
           );
         }
         return (
-          <p key={index} className={styles.paragraph}>
+          <p key={index} /* NOSONAR S6479 — blocs dérivés d'un texte immuable */ className={styles.paragraph}>
             {block.text}
           </p>
         );

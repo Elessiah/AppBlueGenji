@@ -19,7 +19,7 @@
  * bloquée) est dit **à la place** du bouton — un bouton qui mène à un refus est
  * un bouton qui ment.
  */
-import { useCallback, useId } from "react";
+import { useCallback, useId, type ReactNode } from "react";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -79,47 +79,54 @@ export function PushNotificationsPanel({
   // elle se tait plutôt que d'occuper la place d'un écran qui a autre chose à dire.
   if (variant === "compact" && (!push.checked || push.subscribed || !configured || blocked)) return null;
 
-  const deviceControl = !configured ? (
-    <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>
-  ) : !push.checked ? (
+  let deviceControl: ReactNode;
+  if (!configured) {
+    deviceControl = <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>;
+  } else if (!push.checked) {
     // L'abonnement du navigateur n'est pas encore relu : proposer d'activer
     // maintenant, ce serait le proposer un instant à qui l'est déjà.
-    <p className={s.muted} role="status">
-      Vérification de cet appareil…
-    </p>
-  ) : blocked && !push.subscribed ? (
-    <p className={s.notice}>{blocked}</p>
-  ) : push.subscribed ? (
-    <div className={s.deviceRow}>
-      {/* Annoncé aux lecteurs d'écran : c'est l'issue du geste qu'on vient de faire. */}
-      <span className={s.status} role="status">
-        <span className={s.dot} aria-hidden="true" /> Activées sur cet appareil
-      </span>
-      <CyberButton
-        type="button"
-        variant="ghost"
-        disabled={push.busy}
-        onClick={async () => {
-          if (await push.disable()) showSuccess("Notifications désactivées sur cet appareil.");
-        }}
-      >
-        Désactiver sur cet appareil
-      </CyberButton>
-    </div>
-  ) : (
-    <div className={s.deviceRow}>
-      <CyberButton
-        type="button"
-        aria-busy={push.busy}
-        disabled={push.busy}
-        onClick={async () => {
-          if (await push.enable()) showSuccess("Notifications activées sur cet appareil.");
-        }}
-      >
-        {push.busy ? "Activation…" : "Activer les notifications sur cet appareil"}
-      </CyberButton>
-    </div>
-  );
+    deviceControl = (
+      <p className={s.muted} role="status">
+        Vérification de cet appareil…
+      </p>
+    );
+  } else if (blocked && !push.subscribed) {
+    deviceControl = <p className={s.notice}>{blocked}</p>;
+  } else if (push.subscribed) {
+    deviceControl = (
+      <div className={s.deviceRow}>
+        {/* Annoncé aux lecteurs d'écran : c'est l'issue du geste qu'on vient de faire. */}
+        <span className={s.status} role="status">
+          <span className={s.dot} aria-hidden="true" /> Activées sur cet appareil
+        </span>
+        <CyberButton
+          type="button"
+          variant="ghost"
+          disabled={push.busy}
+          onClick={async () => {
+            if (await push.disable()) showSuccess("Notifications désactivées sur cet appareil.");
+          }}
+        >
+          Désactiver sur cet appareil
+        </CyberButton>
+      </div>
+    );
+  } else {
+    deviceControl = (
+      <div className={s.deviceRow}>
+        <CyberButton
+          type="button"
+          aria-busy={push.busy}
+          disabled={push.busy}
+          onClick={async () => {
+            if (await push.enable()) showSuccess("Notifications activées sur cet appareil.");
+          }}
+        >
+          {push.busy ? "Activation…" : "Activer les notifications sur cet appareil"}
+        </CyberButton>
+      </div>
+    );
+  }
 
   if (variant === "compact") {
     return (

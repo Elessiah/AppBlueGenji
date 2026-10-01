@@ -332,13 +332,18 @@ function reporterLabel(entrant: LogEntrant): string {
  * @param context Le tournoi, l'auteur et, le cas échéant, la manche visée.
  * @returns Le message à poster dans les logs et à envoyer aux arbitres.
  */
+function issueReportScope(match: IssueReportContext["match"]): string {
+  if (!match) return "Portée : tournoi entier";
+  const team1 = match.team1 ? entrantLabel(match.team1) : "TBD";
+  const team2 = match.team2 ? entrantLabel(match.team2) : "TBD";
+  return `Match : ${match.round} — ${team1} vs ${team2} (#${match.id})`;
+}
+
 export function buildIssueReportMessage(context: IssueReportContext): string {
   const lines = [
     "**Signalement de problème**",
     `Tournoi : ${discordInline(context.tournamentName)}`,
-    context.match
-      ? `Match : ${context.match.round} — ${context.match.team1 ? entrantLabel(context.match.team1) : "TBD"} vs ${context.match.team2 ? entrantLabel(context.match.team2) : "TBD"} (#${context.match.id})`
-      : "Portée : tournoi entier",
+    issueReportScope(context.match),
     `Auteur : ${reporterLabel(context.entrant)}`,
     "",
     // Texte libre de l'auteur : cité ligne à ligne, balisage et mentions

@@ -108,5 +108,6 @@ export function oauthStartPath(
   // elles, la porte refuse de **créer** un compte (`TERMS_REQUIRED`).
   if (options.termsAccepted) params.set("terms", "1");
   const query = params.toString();
-  return `/api/auth/${OAUTH_PROVIDER_SLUGS[provider]}/start${query ? `?${query}` : ""}`;
+  const search = query ? `?${query}` : "";
+  return `/api/auth/${OAUTH_PROVIDER_SLUGS[provider]}/start${search}`;
 }

@@ -120,7 +120,8 @@ export function ConnectedAppsSection({
     params.delete("provider");
     params.delete("refreshed");
     const query = params.toString();
-    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+    const search = query ? `?${query}` : "";
+    window.history.replaceState(null, "", `${window.location.pathname}${search}`);
     // `onChanged` est volontairement hors des dépendances : la fonction vient du
     // parent et change à chaque rendu, ce qui rejouerait ce message à l'infini.
     // Le nettoyage de l'URL, lui, garantit qu'il ne part qu'une fois.
@@ -190,6 +191,15 @@ export function ConnectedAppsSection({
             // chose, et le module est la seule autorité sur « y a-t-il quelque
             // chose à dire ? ».
             const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
+            let details: string;
+            if (connection.linked) {
+              details = connection.handle && handleLabel ? `${handleLabel} : ${connection.handle}` : "Rattaché";
+            } else if (discordByCode) {
+              details =
+                "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord.";
+            } else {
+              details = PROVIDER_NOTES[connection.provider];
+            }
             return (
               <Fragment key={connection.provider}>
                 <div
@@ -199,13 +209,7 @@ export function ConnectedAppsSection({
                   <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
                     <strong style={{ fontSize: 14 }}>{label}</strong>
                     <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
-                      {connection.linked
-                        ? connection.handle && handleLabel
-                          ? `${handleLabel} : ${connection.handle}`
-                          : "Rattaché"
-                        : discordByCode
-                          ? "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord."
-                          : PROVIDER_NOTES[connection.provider]}
+                      {details}
                     </span>
                     {/*
                       **Ce que « Rattaché » ne disait pas.** Discord a deux portes

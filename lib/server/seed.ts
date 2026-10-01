@@ -1251,7 +1251,8 @@ async function generateMultiPhaseTournament(
 
       if (!currentPhase) break;
 
-      const signature = `${totalPlayed}|${loadedPhases.map((p) => `${p.id}:${p.state}`).join(",")}`;
+      const phaseStates = loadedPhases.map((p) => `${p.id}:${p.state}`).join(",");
+      const signature = `${totalPlayed}|${phaseStates}`;
       if (signature === lastSignature) {
         console.warn(
           `    ⚠ multi-phase : phase ${currentPhase.position} (${currentPhase.format}) bloquée, ` +

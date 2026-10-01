@@ -149,7 +149,7 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
                 {change.details.length > 0 && (
                   <ul className={styles.changeDetails}>
                     {change.details.map((detail, index) => (
-                      <li key={index}>{detail}</li>
+                      <li key={index} /* NOSONAR S6479 — détails d'une entrée publiée, immuables */>{detail}</li>
                     ))}
                   </ul>
                 )}

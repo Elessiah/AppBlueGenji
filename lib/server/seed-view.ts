@@ -32,7 +32,8 @@ async function overview(db: Awaited<ReturnType<typeof getDatabase>>): Promise<vo
     ]
       .filter(Boolean)
       .join(" · ");
-    console.log(`   #${u.id} ${short(u.pseudo)}${badges ? `  [${badges}]` : ""}`);
+    const badgeSuffix = badges ? `  [${badges}]` : "";
+    console.log(`   #${u.id} ${short(u.pseudo)}${badgeSuffix}`);
   }
 
   const [teams] = await db.execute<(RowDataPacket & { total: number; bulk: number })[]>(
