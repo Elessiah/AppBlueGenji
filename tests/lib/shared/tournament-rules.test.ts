@@ -141,10 +141,9 @@ describe("tournament-rules — règles communes", () => {
 describe("tournament-rules — câblage des pages", () => {
   const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
-  it("expose l'onglet « Règles des tournois » dans le menu burger", () => {
+  it("garde les règles hors du menu burger : on y entre par le tournoi", () => {
     const nav = read("components/cyber/landing/PublicNavMenu.tsx");
-    expect(nav).toContain('href: "/regles"');
-    expect(nav).toContain("Règles des tournois");
+    expect(nav).not.toContain('href: "/regles"');
   });
 
   it("pré-génère une page par mode et renvoie 404 sur un slug inconnu", () => {
