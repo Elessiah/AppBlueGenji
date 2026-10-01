@@ -66,7 +66,9 @@ test.describe("Parcours joueur dans un tournoi", () => {
       const overlay = page.getByRole("dialog").filter({ hasNotText: "Score de mon match" }).first();
       if (!(await overlay.isVisible().catch(() => false))) return;
       await page.keyboard.press("Escape");
-      await page.waitForTimeout(200);
+      // Attente sur la fermeture effective de la modale plutôt qu'un délai fixe ;
+      // si elle reste ouverte, la boucle réessaie Échap.
+      await overlay.waitFor({ state: "hidden", timeout: 1_000 }).catch(() => undefined);
     }
   }
 

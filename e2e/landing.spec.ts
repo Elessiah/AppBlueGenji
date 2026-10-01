@@ -11,7 +11,7 @@ const authConfigured = !!process.env.E2E_AUTH_USER;
 
 test.describe("Header landing", () => {
   test("visiteur non connecté : bouton Rejoindre unique", async ({ page }) => {
-    test.skip(authConfigured, "Bypass actif : l'utilisateur est connecté, header différent.");
+    test.skip(authConfigured, "Bypass actif : l'utilisateur est connecté, header différent.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     await page.goto("/");
     const header = page.locator("header").first();
     await expect(header.getByRole("link", { name: /Rejoindre/ })).toBeVisible();
@@ -19,7 +19,7 @@ test.describe("Header landing", () => {
   });
 
   test("utilisateur connecté : avatar + pseudo, plus de Rejoindre", async ({ page }) => {
-    test.skip(!authConfigured, "Définir E2E_AUTH_USER pour le header connecté.");
+    test.skip(!authConfigured, "Définir E2E_AUTH_USER pour le header connecté.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     await page.goto("/");
     const header = page.locator("header").first();
     // Le nom du lien commence par le pseudo affiché (WCAG 2.5.3) : « <pseudo>, mon profil ».

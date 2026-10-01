@@ -18,7 +18,7 @@ import { TERMS_VERSION } from "../lib/shared/terms-of-use";
 const SIGNED_IN_SKIP = "Bypass DEV_AUTH actif : /connexion redirige le visiteur connecté.";
 
 test.describe("Consentement RGPD", () => {
-  test.skip(!!process.env.E2E_AUTH_USER, SIGNED_IN_SKIP);
+  test.skip(!!process.env.E2E_AUTH_USER, SIGNED_IN_SKIP);  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
   test("affiche la popup à la première visite et débloque la connexion après acceptation", async ({
     page,
@@ -60,7 +60,7 @@ test.describe("Consentement RGPD", () => {
 });
 
 test.describe("Connexion déjà ouverte", () => {
-  test.skip(!process.env.E2E_AUTH_USER, "Sans bypass DEV_AUTH, aucune session à rediriger.");
+  test.skip(!process.env.E2E_AUTH_USER, "Sans bypass DEV_AUTH, aucune session à rediriger.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
   test("renvoie le visiteur connecté vers sa destination, jamais vers le formulaire", async ({
     page,
@@ -73,7 +73,7 @@ test.describe("Connexion déjà ouverte", () => {
 });
 
 test.describe("Connexion", () => {
-  test.skip(!!process.env.E2E_AUTH_USER, SIGNED_IN_SKIP);
+  test.skip(!!process.env.E2E_AUTH_USER, SIGNED_IN_SKIP);  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
   // L'utilisateur a déjà consenti (RGPD et conditions d'utilisation en
   // vigueur) : la popup ne s'affiche pas et les voies d'authentification sont

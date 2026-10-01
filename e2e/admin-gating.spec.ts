@@ -10,7 +10,7 @@ import { test, expect } from "./helpers/test";
 const isFresh = process.env.E2E_AUTH_USER === "fresh";
 
 test.describe("Création de tournoi réservée aux admins", () => {
-  test.skip(!isFresh, "Définir E2E_AUTH_USER=fresh (utilisateur non-admin) pour ce test.");
+  test.skip(!isFresh, "Définir E2E_AUTH_USER=fresh (utilisateur non-admin) pour ce test.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
   test("le bouton « Créer un tournoi » est masqué pour un non-admin", async ({ page }) => {
     await page.goto("/tournois");

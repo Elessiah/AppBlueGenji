@@ -22,7 +22,7 @@ async function isReferee(page: Page): Promise<boolean> {
 }
 
 test.describe("Tournoi mode Survie (authentifié)", () => {
-  test.skip(
+  test.skip(  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     !authConfigured,
     "Définir E2E_AUTH_USER (+ DEV_AUTH_USER_ID admin/arbitre et DB) pour activer ce parcours.",
   );
@@ -32,7 +32,7 @@ test.describe("Tournoi mode Survie (authentifié)", () => {
   }) => {
     await page.goto("/tournois/creer");
     if (!(await isReferee(page))) {
-      test.skip(true, "L'utilisateur bypass courant n'a pas la permission tournois.");
+      test.skip(true, "L'utilisateur bypass courant n'a pas la permission tournois.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     }
     await expect(page).toHaveURL(/\/tournois\/creer/);
 
@@ -55,7 +55,7 @@ test.describe("Tournoi mode Survie (authentifié)", () => {
   test("crée un tournoi Survie et affiche la vue dédiée", async ({ page }) => {
     await page.goto("/tournois/creer");
     if (!(await isReferee(page))) {
-      test.skip(true, "L'utilisateur bypass courant n'a pas la permission tournois.");
+      test.skip(true, "L'utilisateur bypass courant n'a pas la permission tournois.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     }
 
     const name = `E2E Survie ${Date.now()}`;
@@ -80,7 +80,7 @@ test.describe("Tournoi mode Survie (authentifié)", () => {
 
 test.describe("Formulaire de création — mode Survie (public gating)", () => {
   test("la permission tournois est requise pour accéder au formulaire", async ({ page }) => {
-    test.skip(
+    test.skip(  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
       !authConfigured,
       "Nécessite E2E_AUTH_USER pour vérifier le gating de permission.",
     );

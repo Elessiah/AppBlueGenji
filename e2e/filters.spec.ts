@@ -7,7 +7,7 @@ import { test, expect } from "./helpers/test";
 const authConfigured = !!process.env.E2E_AUTH_USER;
 
 test.describe("Filtres des annuaires (authentifié)", () => {
-  test.skip(!authConfigured, "Définir E2E_AUTH_USER pour activer les parcours authentifiés.");
+  test.skip(!authConfigured, "Définir E2E_AUTH_USER pour activer les parcours authentifiés.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
   test("/joueurs : recherche + filtres de rôle/statut + tri", async ({ page }) => {
     await page.goto("/joueurs");
