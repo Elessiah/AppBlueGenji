@@ -76,6 +76,12 @@ la base, le journal local est intact et rien ne manque.
 
 ## Restaurer une sauvegarde
 
+**Machine perdue** (bot et site à reconstruire ensemble) : suivre
+`blueGenjiBot/doc/disaster-recovery.md` (publié pour le staff sur
+`/bot/docs/reprise-apres-sinistre`), résumé côté site dans `docs/DEPLOYMENT.md`
+(« Reprise après perte de la machine »). Les étapes ci-dessous en sont la partie
+« suppressions de compte ».
+
 1. Restaurer le dump (`blueGenjiBot/doc/backup-onedrive.md`) **sans** remettre le
    site en service.
 2. Si la machine a été perdue, récupérer le journal sur le stockage distant,
@@ -86,9 +92,15 @@ la base, le journal local est intact et rien ne manque.
    serveur n'exporte pas `NODE_ENV`, seul pm2 le pose) :
 
    ```bash
-   NODE_ENV=production npm run replay:deletions -- --dry-run
-   NODE_ENV=production npm run replay:deletions
+   NODE_ENV=production npm run replay:deletions -- --dry-run data/account-deletions.jsonl
+   NODE_ENV=production npm run replay:deletions -- data/account-deletions.jsonl
    ```
+
+   Le chemin en argument n'est pas décoratif quand `ACCOUNT_DELETION_JOURNAL_PATH`
+   est défini : le script lirait ce chemin-là, un fichier absent y vaut un journal
+   vide, et le rejeu annoncerait `0 suppression(s)` sans erreur. Recopier alors
+   aussi le journal à ce chemin, où le site écrira et où la synchronisation
+   horaire le cherche.
 
 4. Redémarrer le site.
 
