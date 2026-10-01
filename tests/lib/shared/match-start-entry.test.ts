@@ -237,6 +237,41 @@ describe("readMatchStartEntry", () => {
     expect(readMatchStartEntry(raw("31", "4", "20:00"), reference)).toEqual({ kind: "invalid", field: "day" });
   });
 
+  it("jour et mois inchangés : l'année de la date posée est gardée", () => {
+    // Ligue terminée commencée le 10 janvier 2026, match au 20 août 2026 : la
+    // déduction seule le ramènerait en 2025 (plus proche du début).
+    const tournamentStart = at("2026-01-10T19:00:00Z");
+    const current = "2026-08-20T18:00:00.000Z";
+    expect(readMatchStartEntry(raw("20", "8", "20:00"), tournamentStart)).toEqual({
+      kind: "ready",
+      instant: at("2025-08-20T18:00:00Z"),
+    });
+    expect(readMatchStartEntry(raw("20", "8", "20:00"), tournamentStart, current)).toEqual({
+      kind: "ready",
+      instant: at(current),
+    });
+    // Seule l'heure change : même jour, même année.
+    expect(readMatchStartEntry(raw("20", "8", "21:15"), tournamentStart, current)).toEqual({
+      kind: "ready",
+      instant: at("2026-08-20T19:15:00Z"),
+    });
+  });
+
+  it("jour ou mois changé : la déduction reprend", () => {
+    const current = "2026-03-10T19:00:00.000Z";
+    expect(readMatchStartEntry(raw("5", "1", "20:00"), at("2026-12-15T10:00:00Z"), current)).toEqual({
+      kind: "ready",
+      instant: at("2027-01-05T19:00:00Z"),
+    });
+  });
+
+  it("l'année gardée est celle de Paris", () => {
+    // 31 décembre 2026 23 h 30 UTC = 1er janvier 2027 0 h 30 à Paris.
+    expect(
+      readMatchStartEntry(raw("1", "1", "00:30"), at("2026-06-01T00:00:00Z"), "2026-12-31T23:30:00.000Z"),
+    ).toEqual({ kind: "ready", instant: at("2026-12-31T23:30:00Z") });
+  });
+
   it("rend l'instant déduit", () => {
     expect(readMatchStartEntry(raw("3", "1", "20:00"), reference)).toEqual({
       kind: "ready",
