@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, ReactNode, useState } from "react";
+import { FormEvent, ReactNode, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
@@ -134,8 +134,14 @@ export function MatchScheduleDialog({
   const [month, setMonth] = useState(initial ? String(initial.month) : "");
   const [time, setTime] = useState(initial ? matchEntryTimeValue(initial) : "");
   // Saisie d'heure commencée mais incomplète (« 20:__ ») : le champ rend alors
-  // `value === ""`, indiscernable d'un champ vidé.
+  // `value === ""`, indiscernable d'un champ vidé. Le navigateur n'émet pas
+  // toujours d'événement pendant cette saisie (Chrome, champ parti de vide) :
+  // l'état sert à l'affichage, et l'envoi relit le champ lui-même (`timeRef`).
   const [timeBadInput, setTimeBadInput] = useState(false);
+  const timeRef = useRef<HTMLInputElement>(null);
+  // Changer la clé remonte le champ : seul moyen d'effacer une saisie partielle,
+  // que `value=""` ne touche pas (la valeur est déjà vide).
+  const [timeKey, setTimeKey] = useState(0);
   // Figée à l'ouverture : l'année déduite ne doit pas changer pendant la saisie.
   const [reference] = useState(() =>
     matchEntryReference(
@@ -182,14 +188,21 @@ export function MatchScheduleDialog({
     setMonth("");
     setTime("");
     setTimeBadInput(false);
+    setTimeKey((key) => key + 1);
     fieldErrors.clear();
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (entry.kind === "incomplete" || entry.kind === "invalid") {
-      const message = refusal ?? "Date non reconnue.";
-      fieldErrors.flag(entry.field, message);
+    const badInputNow = timeRef.current?.validity.badInput ?? timeBadInput;
+    const sent =
+      badInputNow === timeBadInput
+        ? entry
+        : readMatchStartEntry({ day, month, time, timeBadInput: badInputNow }, reference);
+    if (badInputNow !== timeBadInput) setTimeBadInput(badInputNow);
+    if (sent.kind === "incomplete" || sent.kind === "invalid") {
+      const message = entryRefusal(sent) ?? "Date non reconnue.";
+      fieldErrors.flag(sent.field, message);
       showError(message);
       return;
     }
@@ -200,7 +213,7 @@ export function MatchScheduleDialog({
         method: "PUT",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          startAt: entry.kind === "ready" ? new Date(entry.instant).toISOString() : null,
+          startAt: sent.kind === "ready" ? new Date(sent.instant).toISOString() : null,
         }),
       });
       const payload = (await response.json()) as { error?: string };
@@ -208,7 +221,7 @@ export function MatchScheduleDialog({
         const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
         throw new CodedError(code, mapError(code));
       }
-      showSuccess(savedMessage(!cleared, planning));
+      showSuccess(savedMessage(sent.kind === "ready", planning));
       onSaved();
       onClose();
     } catch (error) {
@@ -312,6 +325,8 @@ export function MatchScheduleDialog({
               <div className="field" style={fieldStyle}>
                 <label htmlFor={FIELD_IDS.time}>Heure</label>
                 <input
+                  key={timeKey}
+                  ref={timeRef}
                   id={FIELD_IDS.time}
                   type="time"
                   value={time}
@@ -321,6 +336,7 @@ export function MatchScheduleDialog({
                     setTimeBadInput(e.target.validity.badInput);
                     fieldErrors.clear();
                   }}
+                  onBlur={(e) => setTimeBadInput(e.target.validity.badInput)}
                   {...fieldErrors.aria("time", HINT_ID)}
                 />
                 <FieldErrorText fieldId={FIELD_IDS.time} message={fieldErrors.message("time")} />
