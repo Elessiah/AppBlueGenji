@@ -83,10 +83,10 @@ describe("carte d'un compte anonymisé", () => {
     // `USER_NOT_FOUND`. Sous « Compte supprimé », la mention menait le
     // recruteur droit à ce refus — et la case « Comptes supprimés » qu'ajoute
     // la même branche est ce qui l'expose.
+    expect(CARD).toContain("FREE AGENT");
+    expect(CARD).toMatch(/const noTeamStatus = player\.isDeleted \? null :/);
     const branch = CARD.slice(CARD.indexOf("<div className={s.plTeam}>"));
-    const freeAgent = branch.indexOf("FREE AGENT");
-    expect(freeAgent).toBeGreaterThan(-1);
-    expect(branch.slice(0, freeAgent)).toMatch(/player\.isDeleted \? null :/);
+    expect(branch).toContain("noTeamStatus");
   });
 
   it("laisse la mention à son plein contraste", () => {

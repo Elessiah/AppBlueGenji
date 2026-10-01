@@ -30,12 +30,12 @@ describe("page d'un tournoi — avant le coup d'envoi", () => {
   const page = stripComments(read(PAGE));
 
   it("aiguille tout l'avant-course, clôture comprise, vers l'aperçu", () => {
-    expect(page).toContain("isPreLaunchState(detail.card.state) ? (");
+    expect(page).toContain("if (isPreLaunchState(detail.card.state)) {");
     expect(page).not.toMatch(/detail\.card\.state === "REGISTRATION" \? \(/);
   });
 
   it("teste l'avant-course avant les vues des formats à classement", () => {
-    const branch = page.indexOf("isPreLaunchState(detail.card.state) ? (");
+    const branch = page.indexOf("if (isPreLaunchState(detail.card.state)) {");
     for (const view of ["<SurvivalView", "<EnduranceView", "<SwissView"]) {
       expect(page.indexOf(view)).toBeGreaterThan(branch);
     }

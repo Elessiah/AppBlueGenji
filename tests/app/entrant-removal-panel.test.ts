@@ -133,10 +133,10 @@ describe("Cellule d'actions partagée", () => {
 
   it("choisit un gabarit de grille exclusif", () => {
     // Deux classes de même poids posant `grid-template-columns` se
-    // départageraient par l'ordre de la feuille : le ternaire garantit qu'une
-    // seule s'applique.
+    // départageraient par l'ordre de la feuille : la chaîne `if / else if`
+    // garantit qu'une seule s'applique.
     expect(panel).toMatch(
-      /const gridClass = reorderable \? styles\.reorderable : removable \? styles\.withActions : "";/,
+      /let gridClass = "";\s*if \(reorderable\) gridClass = styles\.reorderable;\s*else if \(removable\) gridClass = styles\.withActions;/,
     );
     // Et le même gabarit coiffe l'en-tête et les lignes, sinon les colonnes
     // seraient décalées de l'un à l'autre.
@@ -152,7 +152,7 @@ describe("Cellule d'actions partagée", () => {
 
   it("nomme la colonne d'après ce qu'elle contient", () => {
     expect(panel).toMatch(
-      /const actionsLabel = reorderable && removable \? "Actions" : reorderable \? "Ordre" : "Retrait";/,
+      /let actionsLabel = "Retrait";\s*if \(reorderable\) actionsLabel = removable \? "Actions" : "Ordre";/,
     );
   });
 

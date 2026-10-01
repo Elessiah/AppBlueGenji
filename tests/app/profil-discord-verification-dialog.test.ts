@@ -28,9 +28,9 @@ function slice(from: string, to: string): string {
 }
 
 /** Compte relié dont Discord a nommé le pseudo : un clic. */
-const oneClickBranch = () => slice("{linked && attested && initialTag ? (", ") : linked ? (");
+const oneClickBranch = () => slice("if (linked && attested && initialTag) {", "if (linked) {");
 /** Compte relié sans pseudo nommé par Discord : retour chez Discord. */
-const relinkBranch = () => slice(") : linked ? (", ") : !awaitingCode ? (");
+const relinkBranch = () => slice("if (linked) {", "if (!awaitingCode) {");
 
 describe("certification d'un compte relié dont Discord a nommé le pseudo", () => {
   it("certifie d'un clic, par la route de certification, sans quitter la page", () => {
