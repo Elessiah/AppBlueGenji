@@ -11,8 +11,6 @@ import {
   isValidMatchFormat,
   isValidMatchMaxMaps,
   matchAllowsDraw,
-  matchFormatDescription,
-  matchFormatLabel,
   matchMaxMaps,
   matchWinsRequired,
   naturalMaxMaps,
@@ -46,14 +44,15 @@ import {
 import {
   DEFAULT_QUALIFICATION_DRAWS,
   effectiveMatchFormat,
+  invalidMatchFormatMessage,
+  matchFormatHint,
+  misplacedDateField,
   type TournamentFormValues,
 } from "../_lib/tournament-form-values";
 import {
-  DATE_ORDER_CODES,
   TOURNAMENT_FIELD_ERRORS,
   describedBy,
   errorCode,
-  firstMisplacedDate,
   type TournamentFormField,
 } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -184,11 +183,7 @@ export function TournamentForm({
         drawsAllowed: values.matchFormat?.drawsAllowed ?? false,
       });
   const matchFormatValid = isLibre || isValidMatchFormat(matchFormatType, matchFormatValue);
-  let matchFormatHint: string;
-  if (isLibre) matchFormatHint = "Les scores sont saisis sans contrainte.";
-  else if (matchFormatValid) matchFormatHint = `${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`;
-  else if (matchFormatType === "BO") matchFormatHint = "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…).";
-  else matchFormatHint = "Saisis le nombre de manches à gagner.";
+  const formatHint = matchFormatHint(matchFormatType, matchFormatValid, matchFormat);
 
   /**
    * Modifie le format de match **sans perdre ses réglages voisins**.
@@ -239,10 +234,7 @@ export function TournamentForm({
     setLoading(true);
     try {
       if (!matchFormatValid) {
-        const message =
-          matchFormatType === "BO"
-            ? "Un Best of doit se jouer en nombre impair de manches (BO1, BO3, BO5…)."
-            : "Nombre de manches du format de match invalide.";
+        const message = invalidMatchFormatMessage(matchFormatType);
         fieldErrors.flag("matchFormatValue", message);
         showError(message);
         setLoading(false);
@@ -250,18 +242,16 @@ export function TournamentForm({
       }
 
       // Validate phases for MULTI format
-      if (format === "MULTI") {
-        const issue = findPhaseIssue(phases);
-        if (issue) {
-          showError(phaseIssueMessage(issue));
-          // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
-          // la phase et y porte le focus — sauf plan figé par la fenêtre
-          // d'édition, dont les champs désactivés ne prennent pas le focus :
-          // la notification reste alors seule à parler.
-          if (!locked("phases")) setPhaseFocusRequest((n) => n + 1);
-          setLoading(false);
-          return;
-        }
+      const phaseIssue = format === "MULTI" ? findPhaseIssue(phases) : null;
+      if (phaseIssue) {
+        showError(phaseIssueMessage(phaseIssue));
+        // Le plan désigne lui-même le réglage fautif : `PhaseBuilder` déplie
+        // la phase et y porte le focus — sauf plan figé par la fenêtre
+        // d'édition, dont les champs désactivés ne prennent pas le focus :
+        // la notification reste alors seule à parler.
+        if (!locked("phases")) setPhaseFocusRequest((n) => n + 1);
+        setLoading(false);
+        return;
       }
 
       await onSubmit(values, image);
@@ -270,15 +260,7 @@ export function TournamentForm({
       const code = errorCode(e);
       // Les deux refus de date ne disent pas **laquelle** : le premier jalon
       // mal placé se relit sur les valeurs qui viennent de partir.
-      const dateField =
-        code && DATE_ORDER_CODES.has(code)
-          ? firstMisplacedDate<TournamentFormField>([
-              ["startVisibilityAt", values.startVisibilityAt],
-              ["registrationOpenAt", values.registrationOpenAt],
-              ["registrationCloseAt", values.registrationCloseAt],
-              ["startAt", values.startAt],
-            ])
-          : null;
+      const dateField = misplacedDateField(code, values);
       if (dateField) fieldErrors.flag(dateField, message);
       else fieldErrors.report(code, message);
       showError(message);
@@ -433,7 +415,7 @@ export function TournamentForm({
                 <option value="LIBRE">Libre (aucune limite)</option>
               </select>
               <p style={HINT}>
-                {matchFormatHint}
+                {formatHint}
               </p>
             </div>
 

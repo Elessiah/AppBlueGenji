@@ -9,7 +9,14 @@ import { localDateTimeInput } from "@/lib/shared/dates";
 import type { TournamentFormat, TournamentGame } from "@/lib/shared/types";
 import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { computeRecommendedRounds } from "@/lib/shared/swiss";
-import { DEFAULT_MATCH_FORMAT, type MatchFormat } from "@/lib/shared/match-format";
+import {
+  DEFAULT_MATCH_FORMAT,
+  matchFormatDescription,
+  matchFormatLabel,
+  type MatchFormat,
+  type MatchFormatType,
+} from "@/lib/shared/match-format";
+import { DATE_ORDER_CODES, firstMisplacedDate, type TournamentFormField } from "@/lib/shared/field-errors";
 import {
   DEFAULT_REGISTRATION_FILTERS,
   type PlayerRequirement,
@@ -354,4 +361,44 @@ export function toFormValues(apiValues: TournamentApiValues): TournamentFormValu
     refereeScheduling: false,
     phases: apiValues.phases ?? defaults.phases,
   };
+}
+
+/**
+ * Aide affichée sous le format de match : sans contrainte en saisie libre, la
+ * description du format quand il est valide, sinon ce qui manque.
+ */
+export function matchFormatHint(
+  type: MatchFormatType | "LIBRE",
+  valid: boolean,
+  format: MatchFormat | null,
+): string {
+  if (type === "LIBRE") return "Les scores sont saisis sans contrainte.";
+  if (valid) return `${matchFormatLabel(format)} — ${matchFormatDescription(format)}`;
+  if (type === "BO") return "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…).";
+  return "Saisis le nombre de manches à gagner.";
+}
+
+/** Refus d'un format de match invalide à l'envoi du formulaire. */
+export function invalidMatchFormatMessage(type: MatchFormatType | "LIBRE"): string {
+  return type === "BO"
+    ? "Un Best of doit se jouer en nombre impair de manches (BO1, BO3, BO5…)."
+    : "Nombre de manches du format de match invalide.";
+}
+
+/**
+ * Champ de date à signaler sur un refus d'ordre des dates : les deux codes ne
+ * disent pas **laquelle**, le premier jalon mal placé se relit sur les valeurs
+ * envoyées. `null` pour tout autre refus.
+ */
+export function misplacedDateField(
+  code: string | null,
+  values: Pick<TournamentFormValues, "startVisibilityAt" | "registrationOpenAt" | "registrationCloseAt" | "startAt">,
+): TournamentFormField | null {
+  if (!code || !DATE_ORDER_CODES.has(code)) return null;
+  return firstMisplacedDate<TournamentFormField>([
+    ["startVisibilityAt", values.startVisibilityAt],
+    ["registrationOpenAt", values.registrationOpenAt],
+    ["registrationCloseAt", values.registrationCloseAt],
+    ["startAt", values.startAt],
+  ]);
 }
