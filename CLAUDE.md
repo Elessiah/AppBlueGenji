@@ -42,13 +42,13 @@ npx jest tests/path/to/file.test.ts  # un seul fichier
 - `/api/*` : routes REST uniquement (ni tRPC ni server actions).
 
 ### Auth (`lib/server/auth.ts`) → `docs/features/AUTH_SYSTEM.md`
-Sessions `bg_user_sessions` (SHA-256, 30 j, cookie `bg_session`), révocables (`SESSION_REVOCATION.md`). **Aucun mot de passe** : OAuth Google/Discord/Blizzard (`lib/server/oauth-flow.ts`, `OAUTH_PROVIDERS.md`), code Discord par message privé, Google One Tap. Aucun compte ne se revendique par e-mail ; on ne déplace jamais une porte, on ne mure jamais la dernière. Certifier son tag Discord est volontaire (`DISCORD_VERIFICATION.md`). Écritures `/api/` : provenance vérifiée (403 `CROSS_SITE_REQUEST`). Une réponse d'erreur ne porte **qu'un code** (`fail`) — jamais une phrase. CSP en application → `SECURITY_HEADERS_CSP.md` (page cassée : lire `/api/csp-report`). Un geste qui change la barre de navigation appelle `router.refresh()`.
+Sessions `bg_user_sessions` (30 j, cookie `bg_session`), révocables (`SESSION_REVOCATION.md`). **Aucun mot de passe** : OAuth Google/Discord/Blizzard (`lib/server/oauth-flow.ts`, `OAUTH_PROVIDERS.md`), code Discord par message privé, Google One Tap. Aucun compte ne se revendique par e-mail ; on ne déplace jamais une porte, on ne mure jamais la dernière. Certifier son tag Discord est volontaire (`DISCORD_VERIFICATION.md`). Écritures `/api/` : provenance vérifiée (403 `CROSS_SITE_REQUEST`). Une réponse d'erreur ne porte **qu'un code** (`fail`) — jamais une phrase. CSP en application → `SECURITY_HEADERS_CSP.md` (page cassée : lire `/api/csp-report`). Un geste qui change la barre de navigation appelle `router.refresh()`.
 
 ### Database (`lib/server/database.ts`) → `docs/DATABASE_SCHEMA.md`
 **Un changement de schéma s'écrit à deux endroits** : dans le `CREATE TABLE` (bases neuves) **et** en `ALTER TABLE` tolérant dans la section « Migrations » (bases existantes, où `CREATE TABLE IF NOT EXISTS` ne fait rien) — la seconde entrée se retire une fois jouée partout.
 
 ### Tournament Engine (`lib/server/tournaments-service.ts`)
-États `UPCOMING → REGISTRATION → RUNNING → FINISHED` ; matchs `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED` ; positions `UPPER`/`LOWER`/`GRAND`. Les modes à classement **rejouent** tout depuis l'historique des matchs (rien n'est accumulé). Toute transaction qui compte ou écrit sur un tournoi prend `lockTournamentRow` (`SELECT … FOR UPDATE`) **en toute première instruction** : sous `REPEATABLE READ`, une lecture ordinaire avant le verrou fige un instantané périmé. Byes → `BYE_FUNCTIONALITY.md`, `VARIABLE_SIZE_TOURNAMENTS.md`.
+États `UPCOMING → REGISTRATION → RUNNING → FINISHED` ; matchs `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED` ; positions `UPPER`/`LOWER`/`GRAND`. Les modes à classement **rejouent** tout depuis l'historique des matchs (rien n'est accumulé). Une transaction qui compte les inscrites contre un plafond (inscription, lot de fantômes, retrait) prend `lockTournamentRow` **en toute première instruction** : sous `REPEATABLE READ`, une lecture avant le verrou fige un effectif périmé. Byes → `BYE_FUNCTIONALITY.md`, `VARIABLE_SIZE_TOURNAMENTS.md`.
 - **Survie** (`SURVIVAL`) — coupes des 2 derniers, barrage si impair → `SURVIVAL_MODE.md`
 - **Ronde suisse** → `SWISS_MODE.md`
 - **Multi-phases** (`MULTI`, 2 à 8 phases) → `MULTI_PHASE_TOURNAMENTS.md`
@@ -76,7 +76,7 @@ Sessions `bg_user_sessions` (SHA-256, 30 j, cookie `bg_session`), révocables (`
 - **Visibilité** : section des invisibles → `HIDDEN_TOURNAMENTS_SECTION.md` ; fiche non publiée = 404 hors `tournaments` → `TOURNAMENT_VISIBILITY_ACCESS.md`
 
 ### Live Updates → `docs/features/REALTIME_REFRESH.md`
-SSE `/api/tournaments/[id]/stream` : `TournamentSnapshot` (commun) + `TournamentViewerContext` (lecteur). **Tout droit du lecteur se câble sur les deux portes** (flux et REST de secours). Caches invalidés dans `tournaments/notifications.ts` ; entretien → `TOURNAMENT_SYNC_SCOPE.md`. Régime de charge du navigateur → `CLIENT_POWER_MODES.md` : **toute animation infinie lit `var(--deco-anim-state)`**, toute boucle JS lit `useClientPower()`/`useClock()`.
+SSE `/api/tournaments/[id]/stream` : `TournamentSnapshot` (commun) + `TournamentViewerContext` (lecteur). **Tout droit du lecteur se câble sur les deux portes** (flux et REST de secours). `MatchRow` est mémorisée : ce qui lui descend reste stable d'un instantané à l'autre. Caches invalidés dans `tournaments/notifications.ts` ; entretien → `TOURNAMENT_SYNC_SCOPE.md`. Régime de charge du navigateur → `CLIENT_POWER_MODES.md` : **toute animation infinie lit `var(--deco-anim-state)`**, toute boucle JS lit `useClientPower()`/`useClock()`.
 
 ### Bot
 Appels toujours app → bot (`lib/server/bot-integration.ts`, dégradation si injoignable) → `BOT_INTEGRATION.md`. Page `/bot` et `/bot/docs` (doc du bot relue à chaud, registre `BOT_DOC_SECTIONS`) → `BOT_PAGE.md`.
@@ -108,7 +108,7 @@ Refuse `NODE_ENV=production` ; verrou nommé `bg_seed` (les worktrees partagent 
 - `lib/server/*` : serveur seulement, jamais importé côté client. `lib/shared/*` : importable partout (logique pure).
 - Helpers obligatoires : `normalizePseudo()` / `slugifyPseudo()`, `toIso()`, `parseRoles()`. Noms saisis via `visibleText` → `UNTRUSTED_NAMES.md`.
 - **Permissions de plateforme** : protéger une route par `can(user, "<permission>")` / `canAny` (`@/lib/shared/permissions` : `tournaments`, `casting`, `live`, `showcase`, `recruitment`, `roles`, `moderation`), jamais `user.isAdmin` pour un domaine scopé (seule exception : suppression d'un tournoi) → `PERMISSION_ROLES.md`. Routes admin sous `app/api/admin/`.
-- **Rôles d'équipe** (JSON cumulatif `OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`) : seuls `OWNER` et `MANAGER` gèrent (inscription, abandon compris) via `hasTeamManagementRole` → `docs/AUTHORIZATION_RULES.md`.
+- **Rôles d'équipe** (JSON cumulatif : `OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`) : seuls `OWNER`/`MANAGER` gèrent (inscription, abandon) via `hasTeamManagementRole` → `docs/AUTHORIZATION_RULES.md`.
 - **Entrées solo** (`bg_teams.solo_user_id`) : ne jamais compter `bg_teams` sans filtrer `solo_user_id IS NULL`. Équipes fantômes (`is_ghost`) → `GHOST_TEAMS.md`.
 - **Noms cliquables** : un nom d'équipe/joueur passe par `TeamLink` / `PlayerLink` / `EntrantLink` (jamais un chemin écrit à la main — une entrée solo n'a pas de fiche d'équipe) ; un écran de tournoi rend un engagé par `EntrantName` → `ENTITY_LINKS.md`, `TOURNAMENT_ENTRANT_LOGOS.md`.
 - **Modales** : portées dans `document.body`, `useDialogBehavior`, `useBackdropDismiss` → `MODAL_DIALOGS.md`. Gestes sans retour par `ConfirmActionDialog`, jamais `window.confirm`.
@@ -124,9 +124,9 @@ Refuse `NODE_ENV=production` ; verrou nommé `bg_seed` (les worktrees partagent 
 - **Notifications** : toute notification future = un sujet de `PUSH_TOPICS` + un rédacteur dans `push-messages.ts` + `notifyUsers` / `notifyStaff` (`lib/server/notify.ts`) → `PUSH_NOTIFICATIONS.md`.
 - **Conditions d'utilisation** : avancer `TERMS_VERSION` redemande l'acceptation → `TERMS_OF_USE.md`.
 - **« Live » / « Direct »** : « En cours » = état d'un tournoi ; « En direct » / « le live » = vraie diffusion ; « À jour » / « Reconnexion… » / « Hors ligne » = témoin de flux. Le rouge (`pill-live`) ne sert qu'à ce qui est réellement à l'antenne → `LIVE_STREAMS.md`.
-- Coordonnées de l'association jamais en clair → `LEGAL_PAGE.md` ; aucune adresse e-mail de contact publiée (`tests/lib/shared/legal-contact.test.ts`).
+- Coordonnées (courriel, téléphone) jamais en clair : encodées, révélées au clic par `ProtectedContact` (`legal-contact.test.ts`) → `LEGAL_PAGE.md`.
 
-### Pointeurs par domaine (`docs/features/`)
+### Pointeurs par domaine
 - **Équipes** : gestion `TEAM_MANAGEMENT_PAGE.md` · sigle `TEAM_TAG.md` · logos d'annuaire `TEAM_DIRECTORY_LOGOS.md` · demande d'adhésion `TEAM_JOIN_REQUEST_NOTIFICATION.md`
 - **Pages tournoi** : en-tête `TOURNAMENT_HEADER.md` · frise `TOURNAMENT_PROGRESS.md` · cartes `TOURNAMENT_LIST_CARDS.md` · barre `TOURNAMENT_LIST_TOOLBAR.md` · « Mes tournois » `MY_TOURNAMENTS_SECTION.md` · image `TOURNAMENT_IMAGE.md` · lien profond vers un match `FEATURED_MATCH_LINK.md`
 - **Comptes** : profil `PROFILE_SCREEN.md` · suppression `ACCOUNT_DELETION.md` · suspension `ACCOUNT_SUSPENSION.md` · statut d'appartenance `PLAYER_ROSTER_STATUS.md` · menu du compte `ACCOUNT_MENU.md` · import d'avatar `USER_AVATAR_IMPORT.md` · redirection sûre `SAFE_LOGIN_REDIRECT.md`
@@ -152,7 +152,7 @@ Noir profond, bleu glacier `#5ac8ff`. Jetons `--cyber-bg*`, `--ink*`, `--blue-10
 - **Les tests sont type-vérifiés** : fabriques complètes de `tests/helpers/`, `jest.mocked(fn)`, doubles SQL `jest.fn<SqlQuery>()` ; jamais `x as never` sur une valeur simulée ni `it.each([...] as const)`.
 - **Branches** : `feature/<nom-kebab>`. **PR** vers `main` ; CI (lint + typecheck → build → tests) : corriger dans cet ordre, ne jamais merger rouge.
 - **`ERREUR.txt`** : toute erreur **préexistante** rencontrée et non réglée s'y consigne (une entrée, à la fin : `- [AAAA-MM-JJ] <zone> — <symptôme> — <piste> — (rencontré sur : <branche>)`), sans élargir la tâche ; vérifier les doublons ; retirer l'entrée dans le commit qui la règle.
-- **`ACCESSIBILITE.md`** : tout problème d'accessibilité non réglé s'y consigne (titre, Critère, Constat, À faire). **Choisir ou ajouter une tâche se pousse sur `main` sur-le-champ**, par un commit qui ne touche que ce fichier, **avant** tout code (sélection = retirer la section ; ajout = numéro suivant le « dernier numéro attribué », avancé dans le même commit ; push refusé → relire et rejouer).
+- **`ACCESSIBILITE.md`** : tout problème d'accessibilité non réglé s'y consigne (titre, Critère, Constat, À faire). **Choisir ou ajouter une tâche se pousse sur `main` sur-le-champ**, par un commit qui ne touche que ce fichier, **avant** tout code (sélection = retirer la section, recopiée dans la description de la PR ; tâche abandonnée = remise sous son numéro ; ajout = numéro suivant le « dernier numéro attribué », avancé dans le même commit).
 - **Complexité** : demande importante → plan écrit puis exécution dans la session, sans `/OpusLocalManager` ni `/opus-haiku-pipeline`.
 - **Dépôt voisin `blueGenjiBot`** : sa doc Markdown (`doc/*.md`, `help.md`, `helpfr.md`) est servie à chaud sur `/bot/docs` — la corriger avec toute commande touchée ; la référence JSDoc (`docs/`) se régénère (vider puis `npm run docs`) dans la même PR que le code, commitée à part.
 
