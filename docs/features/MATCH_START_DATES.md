@@ -133,6 +133,12 @@ Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
   `withYearShift` ; quatre ans pour un 29 février, `nextValidYearShift`). Ce n'est pas un champ année : rien n'est demandé, et la
   correction reste repliée tant qu'on ne la demande pas. Le décalage repart de
   zéro quand le jour ou le mois change ;
+- les cartes de match affichent l'heure **du navigateur** : hors du fuseau de
+  Paris, l'aperçu ajoute « (… à ton heure locale) »
+  (`localMatchTimeIfDifferent`), pour que l'organisateur reconnaisse l'horaire
+  de la carte ;
+- l'aide se lit une fois, rattachée au groupe des trois champs
+  (`aria-describedby` du `fieldset`), pas à chacun ;
 - une saisie inachevée affiche une consigne neutre dans l'aperçu (« À
   compléter… », « Aucune date possible… ») ; le refus lui-même part en
   notification à l'envoi et se rattache au champ ;
