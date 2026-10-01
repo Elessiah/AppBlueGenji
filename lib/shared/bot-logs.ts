@@ -272,12 +272,13 @@ export function formatMatchResultLog(context: {
     context.team1Score === null || context.team2Score === null
       ? `${team1} vs ${team2}`
       : `${team1} ${context.team1Score}–${context.team2Score} ${team2}`;
-  const forfeit = context.doubleForfeit
-    ? " (double forfait, aucune qualifiée)"
-    : context.forfeit
-      ? " (forfait)"
-      : "";
-  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeit}.`;
+  return `${lead("🏁", "Match terminé", context.tournament)} · ${round} : ${score}${forfeitNote(context)}.`;
+}
+
+/** Mention de forfait accolée au score d'une fin de match, vide sans forfait. */
+function forfeitNote(context: { forfeit?: boolean; doubleForfeit?: boolean }): string {
+  if (context.doubleForfeit) return " (double forfait, aucune qualifiée)";
+  return context.forfeit ? " (forfait)" : "";
 }
 
 /** Coup d'envoi : le tournoi passe « en cours ». */
@@ -313,10 +314,8 @@ export function formatUnderfilledTournamentLog(context: {
   participantType: ParticipantType;
 }): string {
   const wording = participantWording(context.participantType);
-  const field =
-    context.registeredTeams === 0
-      ? "aucun engagement"
-      : `1 seul${wording.one === "équipe" ? "e équipe engagée" : " joueur engagé"}`;
+  const loneEntrant = wording.one === "équipe" ? "1 seule équipe engagée" : "1 seul joueur engagé";
+  const field = context.registeredTeams === 0 ? "aucun engagement" : loneEntrant;
   return `${lead("🚫", "Tournoi clos faute d'adversaires", context.tournament)} : ${field}.`;
 }
 

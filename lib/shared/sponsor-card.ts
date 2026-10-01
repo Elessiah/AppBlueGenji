@@ -47,8 +47,13 @@ export function sponsorBannerSrc(sponsor: Pick<Sponsor, "bannerUrl">): string | 
 export function sponsorCardMedia(sponsor: Pick<Sponsor, "id" | "logoUrl" | "bannerUrl">): SponsorCardMedia {
   const bannerSrc = sponsorBannerSrc(sponsor);
   const logoSrc = sponsorLogoSrc(sponsor);
-  const layout: SponsorMediaLayout = bannerSrc ? "BANNER" : logoSrc ? "LOGO" : "PLACEHOLDER";
-  return { layout, bannerSrc, logoSrc };
+  return { layout: mediaLayout(bannerSrc, logoSrc), bannerSrc, logoSrc };
+}
+
+/** Le bandeau prime, puis le logo seul, puis la carte sans image. */
+function mediaLayout(bannerSrc: string | null, logoSrc: string | null): SponsorMediaLayout {
+  if (bannerSrc) return "BANNER";
+  return logoSrc ? "LOGO" : "PLACEHOLDER";
 }
 
 /**

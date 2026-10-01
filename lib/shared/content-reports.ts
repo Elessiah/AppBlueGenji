@@ -567,6 +567,13 @@ export function reportRetainedUntil(
   return until;
 }
 
+/** Type de cible de chaque fiche publique reconnue par {@link reportTargetFromPath}. */
+const TARGET_TYPE_BY_SEGMENT: Record<"equipes" | "joueurs" | "tournois", ReportTargetType> = {
+  equipes: "TEAM",
+  joueurs: "USER",
+  tournois: "TOURNAMENT",
+};
+
 /**
  * Cible déduite de la page d'où l'on signale : ouvert depuis la fiche d'une
  * équipe, le formulaire la propose déjà. Seules les trois fiches publiques d'une
@@ -578,7 +585,7 @@ export function reportTargetFromPath(pathname: string | null | undefined): Repor
   if (!match) return null;
   const id = Number(match[2]);
   if (!Number.isSafeInteger(id) || id <= 0) return null;
-  const type: ReportTargetType = match[1] === "equipes" ? "TEAM" : match[1] === "joueurs" ? "USER" : "TOURNAMENT";
+  const type = TARGET_TYPE_BY_SEGMENT[match[1] as keyof typeof TARGET_TYPE_BY_SEGMENT];
   return { type, id };
 }
 

@@ -1013,12 +1013,10 @@ export async function getTournamentViewerContext(
     canRegisterEntrant &&
     (isSolo || myTeamId !== null);
 
+  const entrant = { teamId: myTeamId, soloUserId: isSolo ? userId : null };
   const registrationBlock = mayStillRegister
     ? await withConnection((connection) =>
-        checkEntrantEligibility(connection, snapshot.card.registrationFilters, {
-          teamId: myTeamId,
-          soloUserId: isSolo ? userId : null,
-        }),
+        checkEntrantEligibility(connection, snapshot.card.registrationFilters, entrant),
       )
     : null;
 

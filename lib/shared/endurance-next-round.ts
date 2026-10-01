@@ -518,11 +518,10 @@ function withEliminationCut(
     let outcomes = unit.outcomes;
     unit.teamIds.forEach((teamId, index) => {
       if (!mayBeCut.has(teamId)) return;
-      outcomes = outcomes.flatMap((outcome) =>
-        outcome[index] === null
-          ? [outcome]
-          : [outcome, outcome.map((points, i) => (i === index ? null : points))],
-      );
+      outcomes = outcomes.flatMap((outcome) => {
+        if (outcome[index] === null) return [outcome];
+        return [outcome, outcome.map((points, i) => (i === index ? null : points))];
+      });
     });
     return { teamIds: unit.teamIds, outcomes: uniqueOutcomes(outcomes) };
   });
@@ -623,12 +622,12 @@ function firstPlayoffMatches(
   expectedMatches: number | null;
   decisiveSlots: number | null;
 } {
-  const qualified =
-    analysis.minActive >= config.playoffSize
-      ? config.playoffSize
-      : analysis.minActive === analysis.maxActive
-        ? analysis.minActive
-        : null;
+  let qualified: number | null = null;
+  if (analysis.minActive >= config.playoffSize) {
+    qualified = config.playoffSize;
+  } else if (analysis.minActive === analysis.maxActive) {
+    qualified = analysis.minActive;
+  }
 
   if (qualified === null) return { matches: [], expectedMatches: null, decisiveSlots: null };
   // Une qualifiée ou moins : le tournoi se clôt sans arbre.

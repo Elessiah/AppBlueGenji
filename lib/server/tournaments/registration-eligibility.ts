@@ -132,11 +132,12 @@ export async function checkEntrantEligibility(
   entrant: EligibilityTarget,
 ): Promise<RegistrationFilterError | null> {
   const solo = entrant.soloUserId !== null;
-  const roster = solo
-    ? await loadSoloEligibility(connection, entrant.soloUserId!)
-    : entrant.teamId === null
-      ? []
-      : await loadTeamRosterEligibility(connection, entrant.teamId);
+  let roster: Parameters<typeof checkRegistrationFilters>[1] = [];
+  if (solo) {
+    roster = await loadSoloEligibility(connection, entrant.soloUserId!);
+  } else if (entrant.teamId !== null) {
+    roster = await loadTeamRosterEligibility(connection, entrant.teamId);
+  }
 
   return checkRegistrationFilters(filters, roster, solo);
 }

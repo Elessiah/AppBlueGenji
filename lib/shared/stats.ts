@@ -15,10 +15,14 @@
  */
 
 import { forfeitMapCount, type MatchFormat } from "./match-format";
+import { plural } from "./plural";
 import type { BracketType, TournamentFormat, TournamentGame, TournamentState } from "./types";
 
 /** Nombre de résultats retenus pour la « forme récente ». */
 export const FORM_LENGTH = 5;
+
+/** Lettre de chaque issue dans `form` (codes internes, traduits à l'affichage). */
+const FORM_LETTERS: Record<StatsOutcome, "W" | "L" | "D"> = { WIN: "W", LOSS: "L", DRAW: "D" };
 
 /** Nombre de mois couverts par la courbe d'activité. */
 export const ACTIVITY_MONTHS = 12;
@@ -445,13 +449,13 @@ export function computeDeepStats(
       kind: last,
       // Un nul remet les deux compteurs à zéro : la série en cours vaut donc 1,
       // le nul lui-même.
-      length: last === "WIN" ? runningWins : last === "LOSS" ? runningLosses : 1,
+      length: { WIN: runningWins, LOSS: runningLosses, DRAW: 1 }[last],
     };
 
     stats.form = ordered
       .slice(-FORM_LENGTH)
       .reverse()
-      .map((match) => (match.outcome === "WIN" ? "W" : match.outcome === "LOSS" ? "L" : "D"));
+      .map((match) => FORM_LETTERS[match.outcome]);
   }
 
   stats.winRate = ratio(stats.matchesWon, stats.matchesPlayed);
@@ -567,8 +571,5 @@ export function formatStreak(streak: StatsStreak): string {
   // phrase dit donc simplement que la série précédente s'est arrêtée là.
   if (streak.kind === "DRAW") return "Série interrompue par un nul";
 
-  const noun = streak.kind === "WIN"
-    ? `victoire${streak.length > 1 ? "s" : ""}`
-    : `défaite${streak.length > 1 ? "s" : ""}`;
-  return `${streak.length} ${noun} d'affilée`;
+  return `${plural(streak.length, streak.kind === "WIN" ? "victoire" : "défaite")} d'affilée`;
 }
