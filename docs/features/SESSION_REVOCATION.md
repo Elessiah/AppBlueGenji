@@ -35,6 +35,43 @@ ouvertes. La victime n'avait aucun recours pendant trente jours.
   `connection-errors.ts` (`otherSessionsSummary`, `sessionsRevokedMessage`,
   `unlinkSuccessMessage`).
 
+## Les flux déjà ouverts
+
+Effacer une ligne de `bg_user_sessions` ne ferme que les **requêtes à venir**.
+Le flux SSE d'un tournoi ne lit la session qu'à son ouverture, puis garde le
+contexte du lecteur (palier prioritaire, aperçu du plateau d'un arbitre,
+tournoi non publié) tant que la connexion tient : un onglet déjà ouvert
+continuait donc de recevoir les instantanés après une déconnexion, une
+révocation, une suspension ou une suppression de compte.
+
+`lib/server/session-streams.ts` range chaque flux ouvert par compte et par
+empreinte de session. Quatre gestes le ferment :
+
+| Geste | Appel | Flux fermés |
+| --- | --- | --- |
+| Déconnexion (`clearSession`) | `closeSessionStreams(empreinte)` | ceux de cette session |
+| « Déconnecter mes autres sessions », détachement d'une porte (`revokeOtherSessions`) | `closeUserStreams(id, { keepTokenHash })` | tous sauf ceux de la session courante |
+| Suspension (`suspendAccount`) | `closeUserStreams(id)`, **après le commit** | tous |
+| Suppression du compte (`deleteOwnAccount`, deux modes) | `closeUserStreams(id)`, **après le commit** | tous |
+
+Le flux s'inscrit **dès la session lue**, avant les lectures de l'instantané et
+du contexte : une révocation qui tombe pendant celles-ci le fait répondre 401
+au lieu d'ouvrir. Fermé, le client se reconnecte et la route le refuse — c'est
+la porte ordinaire qui décide, pas une seconde règle. Relire la session au
+battement de cœur (25 s) aurait coûté une requête par flux et laissé encore
+jusqu'à 25 s de lecture.
+
+Le registre vit en mémoire du processus, comme les salles de diffusion qu'il
+accompagne : il suppose l'instance unique que le flux suppose déjà.
+
+Une révocation commitée **pendant la lecture de la session** ne trouve pas
+encore le flux à fermer. Elle laisse donc une trace datée (`revocationMark` /
+`revokedSince`, gardée une minute) : la route prend un repère avant de lire la
+session et, une fois le flux inscrit, refuse en 401 si une révocation
+postérieure vise son compte ou sa session. Enfin, une lecture d'ouverture qui
+lève désinscrit le flux — le registre est global, et une reconnexion en boucle
+pendant une panne de base le ferait sinon grossir sans fin.
+
 ## Hors champ
 
 - La liste détaillée des sessions (appareil, date, lieu) : la table ne garde ni

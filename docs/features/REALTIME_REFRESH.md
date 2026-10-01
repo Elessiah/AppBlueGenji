@@ -549,6 +549,7 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 | `stream-backpressure.ts` | Contre-pression d'un flux SSE : écrire, sauter ou fermer (pur). |
 | `rate-limit.ts` | Seaux à fenêtre fixe (contrôle et débit séparés). |
 | `api-guard.ts` | Plafonds des routes + IP client. |
+| `session-streams.ts` | Flux ouverts par session : fermés à la déconnexion, la révocation, la suspension ou la suppression du compte (`SESSION_REVOCATION.md`). |
 | `tournament-broadcast.ts` | Salles SSE : un calcul par tournoi, regroupement par palier, budget de sortie, réveil à la prochaine échéance, abonné laissé en retard quand sa file est pleine. |
 | `sse-gzip.ts` | Compression du flux sans tampon : morceaux *deflate* autonomes, partagés par tous les abonnés. |
 | `tournament-stream-frames.ts` | Trames du flux (instantané, connexion, battement) en clair ou compressées, l'instantané comprimé une fois par version. |

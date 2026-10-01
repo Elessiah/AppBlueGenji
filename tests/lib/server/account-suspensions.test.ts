@@ -20,6 +20,7 @@ import {
   suspendAccount,
 } from "@/lib/server/account-suspensions";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
+import { registerSessionStream, resetSessionStreams } from "@/lib/server/session-streams";
 
 const actor = { id: 1, pseudo: "Modo" };
 const input = { reason: "Propos haineux répétés pendant un match", ground: "BEHAVIOR" as const, durationDays: 7 };
@@ -149,6 +150,38 @@ describe("suspendAccount", () => {
     expect(connection.commit).toHaveBeenCalledTimes(1);
     expect(connection.rollback).not.toHaveBeenCalled();
     expect(connection.release).toHaveBeenCalledTimes(1);
+  });
+
+  it("ferme les flux SSE du compte suspendu après le commit, et ceux-là seulement", async () => {
+    resetSessionStreams();
+    const connection = transaction();
+    const order: string[] = [];
+    connection.commit.mockImplementation(async () => {
+      order.push("commit");
+    });
+    const suspended = jest.fn(() => {
+      order.push("streams");
+    });
+    const bystander = jest.fn();
+    registerSessionStream(5, "h", suspended);
+    registerSessionStream(6, "h2", bystander);
+
+    await suspendAccount(5, input, actor);
+
+    expect(order).toEqual(["commit", "streams"]);
+    expect(bystander).not.toHaveBeenCalled();
+    resetSessionStreams();
+  });
+
+  it("ne ferme aucun flux quand la suspension est refusée", async () => {
+    resetSessionStreams();
+    transaction([{ is_admin: 1 }]);
+    const close = jest.fn();
+    registerSessionStream(5, "h", close);
+
+    await expect(suspendAccount(5, input, actor)).rejects.toThrow("CANNOT_SUSPEND_ADMIN");
+    expect(close).not.toHaveBeenCalled();
+    resetSessionStreams();
   });
 
   it("écrit une échéance nulle pour une durée indéterminée", async () => {

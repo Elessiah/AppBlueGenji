@@ -10,6 +10,7 @@ import {
 } from "@/lib/server/auth";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
 import { fakeCookieStore } from "../../helpers/cookie-store";
+import { registerSessionStream, registeredStreamCount } from "@/lib/server/session-streams";
 
 const originalEnv = { ...process.env };
 
@@ -328,6 +329,67 @@ describe("auth", () => {
       expect(execute.mock.calls[0][0]).toMatch(/expires_at <= NOW\(\)/);
       expect(execute.mock.calls[1][0]).toMatch(/DELETE FROM bg_user_sessions WHERE user_id = \? AND token_hash <> \?$/);
       for (const call of execute.mock.calls) expect(call[1]).toEqual([7, hashOf("courant")]);
+    });
+
+    it("ferme les flux SSE des sessions révoquées, pas ceux de la session courante", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([{ affectedRows: 1 }]);
+      await withCookie("courant", execute);
+      const kept = jest.fn();
+      const stolen = jest.fn();
+      const otherAccount = jest.fn();
+      const unregister = [
+        registerSessionStream(7, hashOf("courant"), kept),
+        registerSessionStream(7, hashOf("vole"), stolen),
+        registerSessionStream(8, hashOf("autre"), otherAccount),
+      ];
+
+      await revokeOtherSessions(7);
+
+      expect(stolen).toHaveBeenCalledTimes(1);
+      expect(kept).not.toHaveBeenCalled();
+      expect(otherAccount).not.toHaveBeenCalled();
+      unregister.forEach((fn) => fn());
+      expect(registeredStreamCount()).toBe(0);
+    });
+
+    it("ne ferme aucun flux quand l'effacement échoue", async () => {
+      const execute = jest.fn<SqlQuery>().mockRejectedValue(new Error("db down"));
+      await withCookie("courant", execute);
+      const stolen = jest.fn();
+      const unregister = registerSessionStream(7, hashOf("vole"), stolen);
+
+      await expect(revokeOtherSessions(7)).rejects.toThrow("db down");
+      expect(stolen).not.toHaveBeenCalled();
+      unregister();
+    });
+
+    it("à la déconnexion, ferme les flux de cette session seulement", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([]);
+      await withCookie("courant", execute);
+      const mine = jest.fn();
+      const otherDevice = jest.fn();
+      const unregister = [
+        registerSessionStream(7, hashOf("courant"), mine),
+        registerSessionStream(7, hashOf("tablette"), otherDevice),
+      ];
+
+      await clearSession();
+
+      expect(mine).toHaveBeenCalledTimes(1);
+      expect(otherDevice).not.toHaveBeenCalled();
+      unregister.forEach((fn) => fn());
+    });
+
+    it("sans cookie, la déconnexion ne ferme aucun flux", async () => {
+      const execute = jest.fn<SqlQuery>().mockResolvedValue([]);
+      await withCookie(undefined, execute);
+      const devStream = jest.fn();
+      const unregister = registerSessionStream(7, "", devStream);
+
+      await clearSession();
+
+      expect(devStream).not.toHaveBeenCalled();
+      unregister();
     });
 
     it("sans cookie, ne garde aucune session (le contournement de développement n'en a pas)", async () => {

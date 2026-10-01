@@ -9,6 +9,7 @@ import { TERMS_POSTPONED_COOKIE } from "@/lib/shared/global-modals";
 import { normalizePseudo, slugifyPseudo } from "@/lib/server/serialization";
 import { sanitizePlatformRoles, type PlatformRole } from "@/lib/shared/permissions";
 import { recordConnection } from "@/lib/server/connection-logs";
+import { closeSessionStreams, closeUserStreams } from "@/lib/server/session-streams";
 import { activeSuspensionSql, assertNotSuspended, purgeEndedSuspensions } from "@/lib/server/account-suspensions";
 import type { ConnectionLogEvent } from "@/lib/shared/connection-logs";
 
@@ -132,7 +133,11 @@ export async function clearSession(): Promise<void> {
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   if (token) {
     const db = await getDatabase();
-    await db.execute(`DELETE FROM bg_user_sessions WHERE token_hash = ?`, [hashToken(token)]);
+    const tokenHash = hashToken(token);
+    await db.execute(`DELETE FROM bg_user_sessions WHERE token_hash = ?`, [tokenHash]);
+    // Les onglets de cette session gardaient sinon leurs flux de tournoi
+    // ouverts, avec le contexte d'un lecteur qui vient de se déconnecter.
+    closeSessionStreams(tokenHash);
   }
   cookieStore.set(SESSION_COOKIE, "", {
     ...baseCookieOptions(),
@@ -147,7 +152,7 @@ export async function clearSession(): Promise<void> {
  * alors **toutes** les sessions du compte (le contournement de développement
  * n'en porte aucune).
  */
-async function currentTokenHash(): Promise<string> {
+export async function currentTokenHash(): Promise<string> {
   const cookieStore = await cookies();
   const token = cookieStore.get(SESSION_COOKIE)?.value;
   return token ? hashToken(token) : "";
@@ -191,6 +196,9 @@ export async function revokeOtherSessions(userId: number): Promise<number> {
     `DELETE FROM bg_user_sessions WHERE user_id = ? AND token_hash <> ?`,
     [userId, current],
   );
+  // Les flux SSE ouverts par les sessions fermées : ils ne relisent pas la
+  // session, et un appareil volé continuerait sinon de lire les tournois.
+  closeUserStreams(userId, { keepTokenHash: current });
   return Number(result.affectedRows ?? 0);
 }
 

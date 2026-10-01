@@ -474,7 +474,11 @@ export const LAUNCH_ERROR_MESSAGES: Readonly<Record<string, string>> = {
 
 /** Message français d'un refus du lancement. */
 export function launchErrorMessage(code: string | null | undefined): string {
-  return (code && LAUNCH_ERROR_MESSAGES[code]) || "L'action n'a pas pu aboutir. Réessaie dans un instant.";
+  // `Object.hasOwn` et non une lecture nue : le code vient du réseau, et
+  // `"constructor"` ou `"toString"` rendraient un membre du prototype — une
+  // fonction là où l'appelant attend une phrase.
+  if (code && Object.hasOwn(LAUNCH_ERROR_MESSAGES, code)) return LAUNCH_ERROR_MESSAGES[code];
+  return "L'action n'a pas pu aboutir. Réessaie dans un instant.";
 }
 
 /**
