@@ -96,6 +96,8 @@ Ajouter le trailer avec `git commit --trailer 'Co-authored-by: <modèle> <norepl
 
    **Cycler la revue** : corriger les points remontés, commiter, pousser, puis **relancer une revue complète**. Répéter jusqu'à ce qu'un cycle ne remonte plus aucun finding. Une seule passe ne suffit pas : les corrections d'un cycle en révèlent d'autres, et les zones non couvertes par le premier passage doivent l'être par les suivants.
 
+   **Cycles thématiques** : une fois la boucle propre, une PR qui ajoute ou modifie une fonctionnalité passe trois cycles UI/UX, sécurité et performance, chacun relancé jusqu'à revenir propre ; documentation ou texte légal seul → un cycle juridique à la place ; renommage seul → aucun ; changements critiques → deux cycles standard consécutifs propres. Détail : `docs/REVIEW_CYCLES.md`.
+
    Ne rendre la main à l'utilisateur qu'une fois un cycle terminé **sans finding**, une analyse SonarQube de clôture satisfaisant **tous** les critères ci-dessus, et `npm test`, `npm run lint` et `npm run typecheck` verts.
 
    **Valider aussi en conditions réelles** : les tests simulent MySQL et ne peuvent pas détecter une colonne manquante ou une requête invalide. Lancer `npm run seed` avant de conclure — c'est le seul contrôle qui exerce réellement les migrations et le SQL. (Le worktree a besoin d'une copie du `.env` du dépôt parent ; il est déjà couvert par `.gitignore`.)
