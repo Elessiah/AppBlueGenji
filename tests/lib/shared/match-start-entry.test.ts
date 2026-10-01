@@ -113,11 +113,8 @@ describe("resolveMatchStartEntry", () => {
 
 describe("matchEntryReference", () => {
   const now = at("2026-10-01T10:00:00Z");
-  const ref = (
-    tournamentStartAt: string | null,
-    tournamentFinished = false,
-    matchStartAt: string | null = null,
-  ) => matchEntryReference({ matchStartAt, tournamentStartAt, tournamentFinished }, now);
+  const ref = (tournamentStartAt: string | null, tournamentFinished = false) =>
+    matchEntryReference({ tournamentStartAt, tournamentFinished }, now);
 
   it("tournoi à venir : son début", () => {
     expect(ref("2026-12-05T19:00:00.000Z")).toBe(at("2026-12-05T19:00:00Z"));
@@ -131,12 +128,6 @@ describe("matchEntryReference", () => {
     expect(ref("2025-12-28T19:00:00.000Z", true)).toBe(at("2025-12-28T19:00:00Z"));
   });
 
-  it("la date déjà posée sur le match l'emporte", () => {
-    expect(ref("2026-01-10T19:00:00.000Z", false, "2025-12-30T19:00:00.000Z")).toBe(
-      at("2025-12-30T19:00:00Z"),
-    );
-  });
-
   it("se rabat sur maintenant sans début lisible", () => {
     expect(ref(null)).toBe(now);
     expect(ref("n'importe quoi", true)).toBe(now);
@@ -147,7 +138,7 @@ describe("matchEntryReference", () => {
     // 2025 (179 jours) plutôt qu'en 2026 (186 jours).
     const july = { day: 15, month: 7, hour: 20, minute: 0 };
     const reference = matchEntryReference(
-      { matchStartAt: null, tournamentStartAt: "2026-01-10T19:00:00.000Z", tournamentFinished: false },
+      { tournamentStartAt: "2026-01-10T19:00:00.000Z", tournamentFinished: false },
       at("2026-07-01T10:00:00Z"),
     );
     expect(iso(resolveMatchStartEntry(july, reference))).toBe("2026-07-15T18:00:00.000Z");
@@ -163,13 +154,16 @@ describe("matchEntryReference", () => {
     );
   });
 
-  it("modifier une date posée ne change pas son année", () => {
-    const startAt = "2025-07-15T18:00:00.000Z";
-    const entry = matchStartEntryOf(startAt);
-    expect(entry).not.toBeNull();
-    if (entry) {
-      expect(iso(resolveMatchStartEntry(entry, ref("2025-01-10T19:00:00.000Z", true, startAt)))).toBe(startAt);
-    }
+  it("un match reporté de mars à janvier suivant passe bien à l'année suivante", () => {
+    // Tournoi en cours, date posée en mars 2026 jamais jouée : reprogrammé le
+    // 15 décembre 2026 au « 5 janvier », il tombe en 2027, pas en 2026.
+    const reference = matchEntryReference(
+      { tournamentStartAt: "2026-02-01T19:00:00.000Z", tournamentFinished: false },
+      at("2026-12-15T10:00:00Z"),
+    );
+    expect(iso(resolveMatchStartEntry({ day: 5, month: 1, hour: 20, minute: 0 }, reference))).toBe(
+      "2027-01-05T19:00:00.000Z",
+    );
   });
 });
 
