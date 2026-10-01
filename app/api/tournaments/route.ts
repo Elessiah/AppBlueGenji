@@ -32,10 +32,8 @@ export async function GET(req: Request) {
   // `/tournois` ne la demande qu'une fois le lecteur allé la chercher.
   const allFinished = url.searchParams.get("finished") === "all";
 
-  const buckets = await listTournamentBuckets(
-    search,
-    hiddenOnly ? { hiddenOnly: true } : allFinished ? { allFinished: true } : {},
-  );
+  const finishedScope = allFinished ? { allFinished: true } : {};
+  const buckets = await listTournamentBuckets(search, hiddenOnly ? { hiddenOnly: true } : finishedScope);
   return ok({ buckets });
 }
 

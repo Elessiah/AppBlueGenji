@@ -306,6 +306,21 @@ export function matchWinnerSide(
 }
 
 /**
+ * Vainqueur et perdant désignés par le side que rend {@link matchWinnerSide} —
+ * tous deux `null` sur un match nul.
+ */
+export function sideTeamIds(
+  side: 1 | 2 | null,
+  team1Id: number | null,
+  team2Id: number | null,
+): { winnerTeamId: number | null; loserTeamId: number | null } {
+  if (side === null) return { winnerTeamId: null, loserTeamId: null };
+  return side === 1
+    ? { winnerTeamId: Number(team1Id), loserTeamId: Number(team2Id) }
+    : { winnerTeamId: Number(team2Id), loserTeamId: Number(team1Id) };
+}
+
+/**
  * Le même format, égalités fermées **et plafond rendu à son maximum naturel**.
  *
  * Sert au repli de l'arbre final de « BlueGenji Survie » : faute de format de
@@ -400,7 +415,8 @@ export function matchScoreViolationMessage(
   const wins = matchWinsRequired(format);
   const label = matchFormatLabel(format);
 
-  return violation === "SCORE_EXCEEDS_MATCH_FORMAT"
-    ? `Score impossible en ${label} : ${matchMaxMaps(format)} manches au maximum, et jamais plus de ${wins} par équipe.`
-    : `Score incomplet en ${label} : le vainqueur doit atteindre ${wins} manche${wins > 1 ? "s" : ""}.`;
+  if (violation === "SCORE_EXCEEDS_MATCH_FORMAT") {
+    return `Score impossible en ${label} : ${matchMaxMaps(format)} manches au maximum, et jamais plus de ${wins} par équipe.`;
+  }
+  return `Score incomplet en ${label} : le vainqueur doit atteindre ${wins} manche${wins > 1 ? "s" : ""}.`;
 }

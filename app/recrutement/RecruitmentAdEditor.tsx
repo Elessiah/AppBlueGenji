@@ -44,6 +44,7 @@ export function RecruitmentAdEditor({
   onClose: () => void;
   onSubmit: () => void;
 }>) {
+  const submitLabel = editing ? "Enregistrer" : "Publier";
   return (
     <LandingDialog
       onClose={onClose}
@@ -211,7 +212,7 @@ export function RecruitmentAdEditor({
           Annuler
         </CyberButton>
         <CyberButton variant="primary" onClick={onSubmit} disabled={busy}>
-          {busy ? "…" : editing ? "Enregistrer" : "Publier"}
+          {busy ? "…" : submitLabel}
         </CyberButton>
       </div>
     </LandingDialog>

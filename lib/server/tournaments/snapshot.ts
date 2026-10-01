@@ -326,16 +326,16 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
         (phase) => phase.id === phasesDetail.currentPhaseId && phase.format === "SURVIVAL",
       )?.id ?? null;
 
-    const survival =
-      card.format === "SURVIVAL"
-        ? await (await import("./survival")).loadSurvivalMeta(connection, tournamentId)
-        : survivalPhaseId !== null
-          ? await (await import("./survival")).loadSurvivalMeta(
-              connection,
-              tournamentId,
-              survivalPhaseId,
-            )
-          : null;
+    const loadSurvival = async () => {
+      if (card.format === "SURVIVAL") {
+        return (await import("./survival")).loadSurvivalMeta(connection, tournamentId);
+      }
+      if (survivalPhaseId !== null) {
+        return (await import("./survival")).loadSurvivalMeta(connection, tournamentId, survivalPhaseId);
+      }
+      return null;
+    };
+    const survival = await loadSurvival();
 
     // Même raison que pour la survie ci-dessus : la vue Suisse sert aussi à
     // l'intérieur d'une phase, sinon une ronde suisse en `MULTI` n'afficherait
@@ -350,12 +350,16 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
         ? await (await import("./bg-survie")).loadEnduranceMeta(connection, tournamentId)
         : null;
 
-    const swiss =
-      card.format === "SWISS"
-        ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId)
-        : swissPhaseId !== null
-          ? await (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId)
-          : null;
+    const loadSwiss = async () => {
+      if (card.format === "SWISS") {
+        return (await import("./swiss")).loadSwissMeta(connection, tournamentId);
+      }
+      if (swissPhaseId !== null) {
+        return (await import("./swiss")).loadSwissMeta(connection, tournamentId, swissPhaseId);
+      }
+      return null;
+    };
+    const swiss = await loadSwiss();
 
     const source = seedingSource(card.format, Number(tournament.manual_seeding ?? 0) === 1);
     const registrationRows: TournamentSnapshot["registrations"] = registrations.map((row) => ({

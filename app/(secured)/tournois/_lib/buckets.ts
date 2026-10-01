@@ -93,8 +93,8 @@ export function sectionEmptyMessage(whenUnfiltered: string, query: string, gameF
 export function finishedBeyondList(buckets: TournamentBuckets, gameFilter: GameFilter): number {
   const totals = buckets.finishedTotals;
   if (!totals) return 0;
-  const total =
-    gameFilter === "all" ? totals.all : totals.byGame[gameFilter === "ow" ? "OW" : "MR"] ?? 0;
+  const game = gameFilter === "ow" ? "OW" : "MR";
+  const total = gameFilter === "all" ? totals.all : totals.byGame[game] ?? 0;
   return Math.max(0, total - filterTournamentsByGame(buckets.finished, gameFilter).length);
 }
 

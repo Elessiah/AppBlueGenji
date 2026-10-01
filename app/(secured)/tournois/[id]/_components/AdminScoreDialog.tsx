@@ -154,6 +154,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   // vérifier puis à le valider, sans le recopier.
   const proposal = pendingScoreProposal(match);
   const proposalNotice = adminProposalNotice(proposal, team1, team2, form.dirty);
+  const forfeitToggleLabel = showForfeit ? "Annuler" : "Déclarer un forfait sur cette manche";
 
   const run = async (action: "save" | "resolve") => {
     const ok = await form.submit(action);
@@ -305,11 +306,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
               {/* « Annuler le forfait » n'a de sens qu'une fois une équipe
                   désignée : panneau ouvert et vide, il n'y a que le panneau à
                   refermer. */}
-              {anyForfeit
-                ? "Annuler le forfait"
-                : showForfeit
-                  ? "Annuler"
-                  : "Déclarer un forfait sur cette manche"}
+              {anyForfeit ? "Annuler le forfait" : forfeitToggleLabel}
             </button>
             )}
 

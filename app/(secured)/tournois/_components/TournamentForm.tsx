@@ -269,6 +269,8 @@ export function TournamentForm({
     }
   };
 
+  const loadingLabel = mode === "create" ? "Création..." : "Enregistrement...";
+
   return (
     <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
       <form onSubmit={handleSubmit} style={SECTION_STACK}>
@@ -696,7 +698,7 @@ export function TournamentForm({
             disabled={loading}
             style={{ opacity: loading ? 0.6 : 1, cursor: loading ? "not-allowed" : "pointer" }}
           >
-            {loading ? (mode === "create" ? "Création..." : "Enregistrement...") : submitLabel}
+            {loading ? loadingLabel : submitLabel}
           </CyberButton>
         </div>
       </form>

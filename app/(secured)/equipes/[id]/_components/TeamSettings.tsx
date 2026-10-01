@@ -224,6 +224,13 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
     }
   };
 
+  const savedLogo = team.team.logoUrl ? (
+    <LogoWithGlow src={team.team.logoUrl} alt="" width={64} height={64} size="sm" borderRadius={12} />
+  ) : (
+    "🛡"
+  );
+  const savedLogoLabel = team.team.logoUrl ? "Changer le logo" : "Ajouter un logo";
+
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby="team-settings-title">
       {cropDialog}
@@ -330,10 +337,8 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
                 // `next/image` ne sait pas servir.
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={pendingPreviewUrl} alt="" className={styles.logoPendingImage} />
-              ) : team.team.logoUrl ? (
-                <LogoWithGlow src={team.team.logoUrl} alt="" width={64} height={64} size="sm" borderRadius={12} />
               ) : (
-                "🛡"
+                savedLogo
               )}
             </div>
             <input
@@ -352,7 +357,7 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
                 disabled={logoBusy}
                 onClick={() => logoFileRef.current?.click()}
               >
-                {pendingLogo ? "Choisir un autre fichier" : team.team.logoUrl ? "Changer le logo" : "Ajouter un logo"}
+                {pendingLogo ? "Choisir un autre fichier" : savedLogoLabel}
               </button>
               {team.team.logoUrl && !pendingLogo ? (
                 <button type="button" className="btn ghost" disabled={logoBusy} onClick={onLogoDelete}>

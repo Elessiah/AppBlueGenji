@@ -20,22 +20,20 @@ interface TeamHeaderProps {
  * désormais dans `TeamSettings`, sous le roster.
  */
 export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
-  const stats = [
+  const stats: { label: string; value: string | number }[] = [
     { label: "Tournois joués", value: team.stats.tournamentsPlayed },
     { label: "Podiums", value: team.stats.podiums },
     { label: "Victoires", value: team.stats.matchesWon },
     { label: "Défaites", value: team.stats.matchesLost },
     { label: "Ratio de victoires", value: formatRate(team.stats.winRate) },
-    // Absent des réponses de mutation, qui ne calculent pas le classement.
-    ...(team.ranking
-      ? [
-          {
-            label: "Classement du site",
-            value: team.ranking.position ? `#${team.ranking.position}` : "—",
-          },
-        ]
-      : []),
   ];
+  // Absent des réponses de mutation, qui ne calculent pas le classement.
+  if (team.ranking) {
+    stats.push({
+      label: "Classement du site",
+      value: team.ranking.position ? `#${team.ranking.position}` : "—",
+    });
+  }
 
   return (
     <div className="ds-header orange">

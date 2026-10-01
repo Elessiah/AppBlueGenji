@@ -278,14 +278,10 @@ export function decideScoreForm(
   // 2-2, et un second test `team1 === team2` posé ici aurait rouvert le refus
   // que le format vient d'ouvrir — l'interface et le serveur auraient divergé.
   const decisive = checkMatchScores(format, team1, team2, { decisive: true });
-  const resolveBlocker: ScoreFormBlocker | null =
-    decisive === "DRAW_NOT_ALLOWED"
-      ? "DRAW"
-      : decisive === "SCORE_BELOW_MATCH_FORMAT"
-        ? "BELOW_FORMAT"
-        : decisive
-          ? "EXCEEDS_FORMAT"
-          : null;
+  let resolveBlocker: ScoreFormBlocker | null = null;
+  if (decisive === "DRAW_NOT_ALLOWED") resolveBlocker = "DRAW";
+  else if (decisive === "SCORE_BELOW_MATCH_FORMAT") resolveBlocker = "BELOW_FORMAT";
+  else if (decisive) resolveBlocker = "EXCEEDS_FORMAT";
 
   return {
     scores,

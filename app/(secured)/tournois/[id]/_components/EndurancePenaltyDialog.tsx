@@ -66,12 +66,9 @@ export function EndurancePenaltyDialog({
   // en cours d'abord — le bouton étant désactivé tant qu'il y en a un, sans
   // cette phrase l'arbitre n'aurait rien à corriger et rien à lire —, puis la
   // conséquence quand elle surprend, puis le rappel de forme.
-  const hint =
-    violation !== null
-      ? endurancePenaltyMessage(violation)
-      : eliminates
-        ? `Capital ramené à 0 : ${teamName} sera éliminée du tournoi.`
-        : `Motif obligatoire, visible par tous. Capital restant : ${remaining}.`;
+  let hint = `Motif obligatoire, visible par tous. Capital restant : ${remaining}.`;
+  if (violation !== null) hint = endurancePenaltyMessage(violation);
+  else if (eliminates) hint = `Capital ramené à 0 : ${teamName} sera éliminée du tournoi.`;
   const hintIsWarning = violation !== null || eliminates;
 
   const submit = async (event: FormEvent) => {

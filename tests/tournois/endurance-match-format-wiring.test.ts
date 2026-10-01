@@ -24,12 +24,12 @@ const PAGE = readFileSync(
 
 /**
  * Le bloc JSX d'`EnduranceView`, de sa balise ouvrante à la branche suivante de
- * la chaîne ternaire qui choisit la vue du plateau.
+ * la chaîne de `if` qui choisit la vue du plateau.
  */
 function enduranceRenderMatch(): string {
   const start = PAGE.indexOf("<EnduranceView");
   expect(start).toBeGreaterThan(-1);
-  const end = PAGE.indexOf(") : formatForBracket", start);
+  const end = PAGE.indexOf("if (formatForBracket", start);
   expect(end).toBeGreaterThan(start);
   return PAGE.slice(start, end);
 }

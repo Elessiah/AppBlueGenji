@@ -245,16 +245,22 @@ function decisionGroundsText(input: {
   staffReason?: string | null;
 }): string {
   const text = GROUNDS_TEXT[input.grounds];
-  const facts = input.fromReport
-    ? "un signalement visant cette image, consultable avec ce qu'il reproche sur la page indiquée plus bas"
-    : input.staffReason
-      ? `${discordInline(input.staffReason)} (constat de la modération, sans signalement préalable)`
-      : "constat de la modération, sans signalement préalable";
   return (
-    `Motif : ${text.reason}. Faits retenus : ${facts}. ` +
+    `Motif : ${text.reason}. Faits retenus : ${decisionFacts(input)}. ` +
     `Décision prise par un membre de la modération, sans traitement automatisé. ` +
     `Fondement : ${text.clause} — ${input.termsUrl}.`
   );
+}
+
+/** Faits retenus : le signalement, sinon le constat de la modération (motivé s'il l'est). */
+function decisionFacts(input: { fromReport: boolean; staffReason?: string | null }): string {
+  if (input.fromReport) {
+    return "un signalement visant cette image, consultable avec ce qu'il reproche sur la page indiquée plus bas";
+  }
+  if (input.staffReason) {
+    return `${discordInline(input.staffReason)} (constat de la modération, sans signalement préalable)`;
+  }
+  return "constat de la modération, sans signalement préalable";
 }
 
 /**
@@ -263,9 +269,11 @@ function decisionGroundsText(input: {
  */
 function redressText(input: { grounds: ModerationGrounds; url: string | null; plural: boolean }): string {
   const answer = GROUNDS_TEXT[input.grounds].answer[input.plural ? "yall" : "you"];
+  const contest = input.plural ? "contestez" : "conteste";
+  const write = input.plural ? "écrivez" : "écris";
   const internal = input.url
-    ? `${input.plural ? "contestez" : "conteste"} la décision ici : ${input.url} — ${answer}`
-    : `${input.plural ? "écrivez" : "écris"} à l'association (« Signaler un problème », en bas de chaque page) — ${answer}`;
+    ? `${contest} la décision ici : ${input.url} — ${answer}`
+    : `${write} à l'association (« Signaler un problème », en bas de chaque page) — ${answer}`;
   const judicial = input.plural
     ? "Vous pouvez aussi porter la décision devant le juge compétent."
     : "Tu peux aussi porter la décision devant le juge compétent.";

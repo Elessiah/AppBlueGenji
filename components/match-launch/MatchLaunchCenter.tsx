@@ -140,7 +140,9 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
 
   const hasLobby = launches.some((info) => info.phase === "LOBBY");
   const hasActive = launches.some((info) => info.phase !== "SCHEDULED");
-  const pollMs = hasLobby ? POLL_LOBBY_MS : hasActive ? POLL_ACTIVE_MS : POLL_IDLE_MS;
+  let pollMs = POLL_IDLE_MS;
+  if (hasLobby) pollMs = POLL_LOBBY_MS;
+  else if (hasActive) pollMs = POLL_ACTIVE_MS;
 
   // Lecture au montage et au retour sur l'onglet — et **seulement** là : posée
   // dans l'effet de relève, qui dépend de `pollMs`, elle repartait à chaque
@@ -268,13 +270,8 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
         launched?: boolean;
       };
       if (!response.ok) throw new Error(payload.error || "UNKNOWN");
-      showSuccess(
-        payload.launched
-          ? "Toutes les parties sont prêtes : le match est lancé !"
-          : ready
-            ? "C'est noté, tu es prêt."
-            : "« Prêt » annulé.",
-      );
+      const readyMessage = ready ? "C'est noté, tu es prêt." : "« Prêt » annulé.";
+      showSuccess(payload.launched ? "Toutes les parties sont prêtes : le match est lancé !" : readyMessage);
       setConfirming(false);
       pendingFocusRef.current = "ready";
       await refresh();

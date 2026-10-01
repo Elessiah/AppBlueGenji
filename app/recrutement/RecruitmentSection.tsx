@@ -59,6 +59,14 @@ const PRIORITY_BADGE_CLASS: Record<RecruitmentPriority, string> = {
   OPTIONAL: "",
 };
 
+/** Refus du réordonnancement, traduit quand il a un sens pour le lecteur. */
+function reorderErrorMessage(code: string | undefined): string {
+  if (code === "RECRUITMENT_ORDER_MIXES_PRIORITIES") {
+    return "Le statut d'une annonce a changé entre-temps : recharge la page pour réordonner.";
+  }
+  return code ? `Échec : ${code}` : "Échec du réordonnancement.";
+}
+
 export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Readonly<RecruitmentSectionProps>) {
   const { showError, showSuccess } = useToast();
   // Toujours rangée par statut : les flèches de réordonnancement ne se lisent
@@ -229,13 +237,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
       });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
-        showError(
-          data.error === "RECRUITMENT_ORDER_MIXES_PRIORITIES"
-            ? "Le statut d'une annonce a changé entre-temps : recharge la page pour réordonner."
-            : data.error
-              ? `Échec : ${data.error}`
-              : "Échec du réordonnancement.",
-        );
+        showError(reorderErrorMessage(data.error));
         setAds(previous);
         return;
       }
@@ -283,12 +285,10 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
     const canUp = canMoveRecruitmentAd(ads, index, -1);
     const canDown = canMoveRecruitmentAd(ads, index, 1);
     // Pourquoi une flèche est grisée : le filtre, ou la limite de son statut.
-    const moveTitle = (can: boolean, label: string) =>
-      filterActive
-        ? "Retire le filtre pour réordonner"
-        : can
-          ? label
-          : `L'ordre se règle parmi les annonces « ${RECRUITMENT_PRIORITY_LABELS[ad.priority]} »`;
+    const moveTitle = (can: boolean, label: string) => {
+      if (filterActive) return "Retire le filtre pour réordonner";
+      return can ? label : `L'ordre se règle parmi les annonces « ${RECRUITMENT_PRIORITY_LABELS[ad.priority]} »`;
+    };
     return (
       <CyberCard
         key={ad.id}

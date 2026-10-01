@@ -190,10 +190,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     const preferred = buttons.current.get(key(refocus.direction));
     // Arrivé en tête ou en queue, le bouton actionné n'existe plus comme cible :
     // on rend la main à celui qui ramène la ligne d'où elle vient.
-    const target =
-      preferred && !preferred.disabled
-        ? preferred
-        : buttons.current.get(key(refocus.direction === "up" ? "down" : "up"));
+    const opposite = refocus.direction === "up" ? "down" : "up";
+    const target = preferred && !preferred.disabled ? preferred : buttons.current.get(key(opposite));
     target?.focus();
     setRefocus(null);
   }, [refocus]);
@@ -222,6 +220,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // toujours les deux : « Ordre » seul sur un tournoi lancé sans score,
   // « Retrait » seul sur un plateau d'un unique engagé.
   const actionsLabel = actionsColumn.label;
+  const seedingHint = reorderable
+    ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
+    : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`;
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
@@ -251,11 +252,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
       {staff && (
         <>
           <p className={styles.hint}>
-            {lockReason !== null
-              ? LOCK_MESSAGES[lockReason]
-              : reorderable
-                ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
-                : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`}
+            {lockReason !== null ? LOCK_MESSAGES[lockReason] : seedingHint}
           </p>
           {removalNoticeReason !== null && rows.length > 0 && (
             /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit

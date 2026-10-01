@@ -54,6 +54,8 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
     }
   };
 
+  const submitLabel = confirmStep ? "Confirmer définitivement" : "Transférer";
+
   return (
     <TeamDialog
       title="Transférer la propriété"
@@ -71,7 +73,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
             className={`btn ${confirmStep ? "danger" : styles.primaryButton}`}
             disabled={!target || pending}
           >
-            {pending ? "Transfert…" : confirmStep ? "Confirmer définitivement" : "Transférer"}
+            {pending ? "Transfert…" : submitLabel}
           </button>
         </>
       }

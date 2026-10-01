@@ -1,6 +1,7 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+import { pluralSuffix } from "@/lib/shared/plural";
 
 /**
  * Découpe du plateau « BlueGenji Survie » en volets, et reconstitution de
@@ -148,7 +149,7 @@ export function enduranceProgressLabel(section: EnduranceRoundSection): string {
 export function enduranceRoundRegionLabel(section: EnduranceRoundSection): string {
   const progress = section.isComplete
     ? "terminée"
-    : `${section.playedCount} sur ${section.totalCount} jouée${section.totalCount > 1 ? "s" : ""}`;
+    : `${section.playedCount} sur ${section.totalCount} jouée${pluralSuffix(section.totalCount)}`;
   return `${section.title}, ${enduranceMatchCountLabel(section.totalCount)}, ${progress}`;
 }
 

@@ -100,6 +100,13 @@ export function toLaunchInput(row: LaunchMatchRow): MatchLaunchInput {
   };
 }
 
+/** Colonne « prêt » de chaque partie d'un lancement. */
+const READY_AT_COLUMNS: Record<LaunchViewerRole, string> = {
+  CASTER: "caster_ready_at",
+  TEAM1: "team1_ready_at",
+  TEAM2: "team2_ready_at",
+};
+
 export function rowReadiness(row: LaunchMatchRow) {
   const launch = rowLaunchState(row);
   return launchReadiness({
@@ -325,12 +332,7 @@ export async function setMatchReady(
     if (!party.canDeclareReady) throw new Error("NOT_TEAM_READY_ROLE");
 
     // Nom de colonne tiré d'une table fermée, jamais de l'entrée.
-    const column =
-      party.role === "CASTER"
-        ? "caster_ready_at"
-        : party.role === "TEAM1"
-          ? "team1_ready_at"
-          : "team2_ready_at";
+    const column = READY_AT_COLUMNS[party.role];
     await connection.execute(
       `UPDATE bg_matches
        SET ${column} = ${ready ? "NOW()" : "NULL"},

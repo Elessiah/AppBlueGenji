@@ -134,6 +134,10 @@ export function GhostRegistrationDialog({
 
   const capacity = batchCapacity(remainingSlots);
   const overCapacity = selected.length > capacity;
+  let countClass = "";
+  if (overCapacity) countClass = styles.countOver;
+  else if (selected.length > 0) countClass = styles.countActive;
+  const submitLabel = mode === "existing" && selected.length > 1 ? `Inscrire (${selected.length})` : "Inscrire";
 
   // Trois vides bien distincts : on ne sait pas encore, il n'y a plus rien à
   // inscrire, ou la recherche ne trouve rien. « Aucun résultat » sur une liste
@@ -273,9 +277,7 @@ export function GhostRegistrationDialog({
                   aussi s'entendre. */}
               <span
                 aria-live="polite"
-                className={`${styles.count} ${
-                  overCapacity ? styles.countOver : selected.length > 0 ? styles.countActive : ""
-                }`}
+                className={`${styles.count} ${countClass}`}
               >
                 {batchCounterLabel(selected.length, remainingSlots)}
               </span>
@@ -381,11 +383,7 @@ export function GhostRegistrationDialog({
             // encore faut-il faire le lien.
             title={capacityBlockTitle(noSlot, overCapacity, remainingSlots)}
           >
-            {busy
-              ? "Inscription…"
-              : mode === "existing" && selected.length > 1
-                ? `Inscrire (${selected.length})`
-                : "Inscrire"}
+            {busy ? "Inscription…" : submitLabel}
           </button>
         </div>
       </form>

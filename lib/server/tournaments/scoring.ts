@@ -1,6 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
-import { checkMatchScores, matchWinnerSide } from "@/lib/shared/match-format";
+import { checkMatchScores, matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
@@ -451,10 +451,7 @@ export async function reportMatchScore(
       // Les deux engagés s'accordent, y compris sur un nul : `matchWinnerSide`
       // est la seule règle, partagée avec l'arbitrage et l'expiration du délai.
       const side = matchWinnerSide(matchFormat, team1Score, team2Score);
-      const winnerTeamId =
-        side === null ? null : Number(side === 1 ? updated.team1_id : updated.team2_id);
-      const loserTeamId =
-        side === null ? null : Number(side === 1 ? updated.team2_id : updated.team1_id);
+      const { winnerTeamId, loserTeamId } = sideTeamIds(side, updated.team1_id, updated.team2_id);
 
       await finalizeMatch(connection, tournamentId, updated, {
         team1Score,

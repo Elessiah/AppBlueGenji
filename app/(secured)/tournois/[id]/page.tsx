@@ -106,6 +106,22 @@ const BOARD_TITLES: Record<TournamentFormat, string> = {
   BG_SURVIE: "Endurance et manches",
 };
 
+/** Ce que le plateau deviendra au coup d'envoi, dit avant qu'il n'existe. */
+function preLaunchBoardText(formatForBracket: string, format: TournamentFormat, seedingSource: string): string {
+  if (formatForBracket === "SURVIVAL") {
+    return "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi.";
+  }
+  if (format === "BG_SURVIE") {
+    return seedingSource === "MANUAL"
+      ? "Le classement de départ est l'ordre fixé par le staff ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
+      : "Le classement de départ est celui du site, dans l'ordre des inscriptions ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi.";
+  }
+  if (format === "SWISS") {
+    return "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi.";
+  }
+  return "Le bracket sera généré automatiquement au démarrage du tournoi.";
+}
+
 export default function TournamentDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -520,12 +536,9 @@ export default function TournamentDetailPage() {
       : null;
 
   const visibleFormat = visibleRulesFormat(detail.card, selectedPhase);
+  const phaseNameSuffix = selectedPhase?.name ? ` — ${selectedPhase.name}` : "";
   const contextLabel =
-    isMulti && selectedPhase
-      ? `Phase ${selectedPhase.position}${
-          selectedPhase.name ? ` — ${selectedPhase.name}` : ""
-        }`
-      : undefined;
+    isMulti && selectedPhase ? `Phase ${selectedPhase.position}${phaseNameSuffix}` : undefined;
 
   const filteredMatches = isMulti && selectedPhase
     ? detail.matches.filter((m) => m.phaseId === selectedPhase.id)
@@ -544,10 +557,9 @@ export default function TournamentDetailPage() {
   const phaseViewKey = selectedPhase ? `phase-${selectedPhase.id}` : "tournament";
   const hasThirdPlaceForPhase = isMulti && selectedPhase ? selectedPhase.hasThirdPlaceMatch : detail.card.hasThirdPlaceMatch;
 
+  const singleBracketOrder: BracketType[] = hasThirdPlaceForPhase ? ["UPPER", "THIRD_PLACE"] : ["UPPER"];
   const bracketOrder: BracketType[] =
-    formatForBracket === "SINGLE"
-      ? hasThirdPlaceForPhase ? ["UPPER", "THIRD_PLACE"] : ["UPPER"]
-      : ["UPPER", "LOWER", "GRAND"];
+    formatForBracket === "SINGLE" ? singleBracketOrder : ["UPPER", "LOWER", "GRAND"];
   const bracketLabels: Record<BracketType, string> = {
     UPPER: "Tableau principal",
     LOWER: "Tableau perdants",
@@ -615,6 +627,168 @@ export default function TournamentDetailPage() {
   const finishedPhaseStandings = selectedPhaseStandings ? (
     <PhaseStandingsBlock standings={selectedPhaseStandings} />
   ) : null;
+
+  const rollbackReopenNote =
+    detail.card.state === "FINISHED" ? " Le tournoi étant terminé, il sera rouvert et son classement final effacé." : "";
+
+  // Plateau affiché : aperçu avant le coup d'envoi, vue du format, puis arbre.
+  const renderBoard = () => {
+    if (isPreLaunchState(detail.card.state)) {
+      return (
+        <>
+          <p className={styles.empty}>
+            {preLaunchBoardText(formatForBracket, detail.card.format, detail.seedingSource)}
+          </p>
+          {previewBlock}
+        </>
+      );
+    }
+    if (formatForBracket === "SURVIVAL" && detail.survival && rankingMetaIsSelectedPhase) {
+      return (
+        <>
+          <SurvivalView
+            // Une vue par phase : la rangée de manches se rouvre sur la
+            // dernière de la phase choisie, même à nombre de manches égal.
+            key={phaseViewKey}
+            survival={detail.survival}
+            matches={filteredMatches}
+            allTournamentMatches={detail.matches}
+            myTeamId={detail.myTeamId}
+            isFinished={detail.card.state === "FINISHED"}
+            adminResolvable={canAdminResolve}
+            onOpenAdminModal={openAdminScore}
+            canForfeit={canForfeit}
+            onForfeit={forfeitTeam}
+            emptyLabel={noMatchesLabel}
+          />
+          {/* Pas de `finishedPhaseStandings` ici, comme pour la vue suisse :
+              la phase en cours ne se clôt qu'avec le tournoi, et la vue
+              porte déjà son classement — il s'afficherait deux fois. */}
+        </>
+      );
+    }
+    if (formatForBracket === "SURVIVAL" && isMulti) {
+      return (
+        // Phase survie close d'un multi-phases : ses manches, et son
+        // classement de phase dessous — jamais le classement de la phase en
+        // cours, ni un arbre à élimination. Le barrage n'est connu que de la
+        // phase en cours : les manches s'affichent sans marques de coupe.
+        <>
+          <SurvivalRounds
+            key={phaseViewKey}
+            matches={filteredMatches}
+            allTournamentMatches={detail.matches}
+            cutSchedule={null}
+            adminResolvable={canAdminResolve}
+            onOpenAdminModal={openAdminScore}
+            emptyLabel={noMatchesLabel}
+          />
+          {finishedPhaseStandings}
+        </>
+      );
+    }
+    if (detail.card.format === "BG_SURVIE" && detail.endurance) {
+      return (
+        <EnduranceView
+          endurance={detail.endurance}
+          matches={detail.matches}
+          isFinished={detail.card.state === "FINISHED"}
+          myTeamId={detail.myTeamId}
+          canForfeit={canForfeit}
+          onForfeit={forfeitTeam}
+          // La sanction est un geste d'**arbitrage** : elle ne suit pas
+          // `canForfeit`, qu'un capitaine porte aussi pour son propre
+          // engagé. On ne se pénalise pas soi-même.
+          canPenalize={!frozen && detail.isAdmin}
+          onPenalize={(teamId) => setPenaltyTeamId(teamId)}
+          onLiftPenalty={liftPenalty}
+          adminResolvable={canAdminResolve}
+          onOpenAdminModal={openAdminScore}
+          emptyLabel={noMatchesLabel}
+          // Le format du tournoi, pas « SURVIVAL » en dur : les deux modes
+          // tombent aujourd'hui dans la même branche de `dependentMatches`,
+          // mais un verrou de score se lirait faux le jour où ils
+          // divergeraient.
+          format={detail.card.format}
+          // Aperçu de la manche suivante : un outil d'arbitrage, pour un
+          // tournoi qui se joue. `isAdmin` vaut la permission
+          // `tournaments` (administrateurs et arbitres).
+          showNextRound={detail.isAdmin && detail.card.state === "RUNNING" && !frozen}
+          qualificationFormat={detail.card.matchFormat}
+        />
+      );
+    }
+    if (formatForBracket === "SWISS" && detail.swiss && rankingMetaIsSelectedPhase) {
+      return (
+        // Tournoi suisse, ou phase suisse **en cours** d'un multi-phases :
+        // le serveur ne charge le classement suisse que de celle-ci.
+        <>
+          <SwissView
+            key={phaseViewKey}
+            swiss={detail.swiss}
+            matches={filteredMatches}
+            allTournamentMatches={detail.matches}
+            myTeamId={detail.myTeamId}
+            isFinished={detail.card.state === "FINISHED"}
+            adminResolvable={canAdminResolve}
+            onOpenAdminModal={openAdminScore}
+            canForfeit={canForfeit}
+            onForfeit={forfeitTeam}
+            emptyLabel={noMatchesLabel}
+          />
+          {/* Pas de `finishedPhaseStandings` ici : la phase en cours ne
+              se clôt qu'avec le tournoi (dernière phase), et la vue porte
+              déjà son classement — il s'afficherait deux fois. */}
+        </>
+      );
+    }
+    if (formatForBracket === "SWISS") {
+      return (
+        // Phase suisse close d'un multi-phases : ses rondes, et son
+        // classement de phase dessous. Jamais un arbre à élimination, qui
+        // nommait ses rondes « Quart de finale 1…12 ».
+        <>
+          <SwissRounds
+            key={phaseViewKey}
+            matches={filteredMatches}
+            allTournamentMatches={detail.matches}
+            totalRounds={null}
+            adminResolvable={canAdminResolve}
+            onOpenAdminModal={openAdminScore}
+            emptyLabel={noMatchesLabel}
+          />
+          {finishedPhaseStandings}
+        </>
+      );
+    }
+    if (!filteredMatches.length) {
+      return (
+        <p className={styles.empty}>
+          {noMatchesLabel}
+        </p>
+      );
+    }
+    return (
+      <>
+        {brackets.map(({ type, matches }) => (
+          <div key={type} className={styles.bracket}>
+            <BracketSections
+              bracketType={type}
+              bracketLabel={bracketLabels[type]}
+              showBracketLabel={brackets.length > 1}
+              matches={matches}
+              allTournamentMatches={detail.matches}
+              myTeamId={detail.myTeamId}
+              adminResolvable={canAdminResolve}
+              onOpenAdminModal={openAdminScore}
+              format={formatForBracket}
+            />
+          </div>
+        ))}
+        {finishedPhaseStandings}
+      </>
+    );
+  };
 
   return (
     <EntrantProvider
@@ -702,148 +876,7 @@ export default function TournamentDetailPage() {
               formats à classement chargent leurs métadonnées dès la création
               (vides), si bien qu'une condition sur `REGISTRATION` seul faisait
               tomber la clôture dans leur vue — sans match ni aperçu. */}
-          {isPreLaunchState(detail.card.state) ? (
-            <>
-              <p className={styles.empty}>
-                {formatForBracket === "SURVIVAL"
-                  ? "Le classement de départ (seeding) et les rounds seront générés au démarrage du tournoi."
-                  : detail.card.format === "BG_SURVIE"
-                    ? detail.seedingSource === "MANUAL"
-                      ? "Le classement de départ est l'ordre fixé par le staff ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
-                      : "Le classement de départ est celui du site, dans l'ordre des inscriptions ci-dessous ; les manches d'endurance seront générées au démarrage du tournoi."
-                  : detail.card.format === "SWISS"
-                    ? "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi."
-                    : "Le bracket sera généré automatiquement au démarrage du tournoi."}
-              </p>
-              {previewBlock}
-            </>
-          ) : formatForBracket === "SURVIVAL" && detail.survival && rankingMetaIsSelectedPhase ? (
-            <>
-              <SurvivalView
-                // Une vue par phase : la rangée de manches se rouvre sur la
-                // dernière de la phase choisie, même à nombre de manches égal.
-                key={phaseViewKey}
-                survival={detail.survival}
-                matches={filteredMatches}
-                allTournamentMatches={detail.matches}
-                myTeamId={detail.myTeamId}
-                isFinished={detail.card.state === "FINISHED"}
-                adminResolvable={canAdminResolve}
-                onOpenAdminModal={openAdminScore}
-                canForfeit={canForfeit}
-                onForfeit={forfeitTeam}
-                emptyLabel={noMatchesLabel}
-              />
-              {/* Pas de `finishedPhaseStandings` ici, comme pour la vue suisse :
-                  la phase en cours ne se clôt qu'avec le tournoi, et la vue
-                  porte déjà son classement — il s'afficherait deux fois. */}
-            </>
-          ) : formatForBracket === "SURVIVAL" && isMulti ? (
-            // Phase survie close d'un multi-phases : ses manches, et son
-            // classement de phase dessous — jamais le classement de la phase en
-            // cours, ni un arbre à élimination. Le barrage n'est connu que de la
-            // phase en cours : les manches s'affichent sans marques de coupe.
-            <>
-              <SurvivalRounds
-                key={phaseViewKey}
-                matches={filteredMatches}
-                allTournamentMatches={detail.matches}
-                cutSchedule={null}
-                adminResolvable={canAdminResolve}
-                onOpenAdminModal={openAdminScore}
-                emptyLabel={noMatchesLabel}
-              />
-              {finishedPhaseStandings}
-            </>
-          ) : detail.card.format === "BG_SURVIE" && detail.endurance ? (
-            <EnduranceView
-              endurance={detail.endurance}
-              matches={detail.matches}
-              isFinished={detail.card.state === "FINISHED"}
-              myTeamId={detail.myTeamId}
-              canForfeit={canForfeit}
-              onForfeit={forfeitTeam}
-              // La sanction est un geste d'**arbitrage** : elle ne suit pas
-              // `canForfeit`, qu'un capitaine porte aussi pour son propre
-              // engagé. On ne se pénalise pas soi-même.
-              canPenalize={!frozen && detail.isAdmin}
-              onPenalize={(teamId) => setPenaltyTeamId(teamId)}
-              onLiftPenalty={liftPenalty}
-              adminResolvable={canAdminResolve}
-              onOpenAdminModal={openAdminScore}
-              emptyLabel={noMatchesLabel}
-              // Le format du tournoi, pas « SURVIVAL » en dur : les deux modes
-              // tombent aujourd'hui dans la même branche de `dependentMatches`,
-              // mais un verrou de score se lirait faux le jour où ils
-              // divergeraient.
-              format={detail.card.format}
-              // Aperçu de la manche suivante : un outil d'arbitrage, pour un
-              // tournoi qui se joue. `isAdmin` vaut la permission
-              // `tournaments` (administrateurs et arbitres).
-              showNextRound={detail.isAdmin && detail.card.state === "RUNNING" && !frozen}
-              qualificationFormat={detail.card.matchFormat}
-            />
-          ) : formatForBracket === "SWISS" && detail.swiss && rankingMetaIsSelectedPhase ? (
-            // Tournoi suisse, ou phase suisse **en cours** d'un multi-phases :
-            // le serveur ne charge le classement suisse que de celle-ci.
-            <>
-              <SwissView
-                key={phaseViewKey}
-                swiss={detail.swiss}
-                matches={filteredMatches}
-                allTournamentMatches={detail.matches}
-                myTeamId={detail.myTeamId}
-                isFinished={detail.card.state === "FINISHED"}
-                adminResolvable={canAdminResolve}
-                onOpenAdminModal={openAdminScore}
-                canForfeit={canForfeit}
-                onForfeit={forfeitTeam}
-                emptyLabel={noMatchesLabel}
-              />
-              {/* Pas de `finishedPhaseStandings` ici : la phase en cours ne
-                  se clôt qu'avec le tournoi (dernière phase), et la vue porte
-                  déjà son classement — il s'afficherait deux fois. */}
-            </>
-          ) : formatForBracket === "SWISS" ? (
-            // Phase suisse close d'un multi-phases : ses rondes, et son
-            // classement de phase dessous. Jamais un arbre à élimination, qui
-            // nommait ses rondes « Quart de finale 1…12 ».
-            <>
-              <SwissRounds
-                key={phaseViewKey}
-                matches={filteredMatches}
-                allTournamentMatches={detail.matches}
-                totalRounds={null}
-                adminResolvable={canAdminResolve}
-                onOpenAdminModal={openAdminScore}
-                emptyLabel={noMatchesLabel}
-              />
-              {finishedPhaseStandings}
-            </>
-          ) : !filteredMatches.length ? (
-            <p className={styles.empty}>
-              {noMatchesLabel}
-            </p>
-          ) : (
-            <>
-              {brackets.map(({ type, matches }) => (
-                <div key={type} className={styles.bracket}>
-                  <BracketSections
-                    bracketType={type}
-                    bracketLabel={bracketLabels[type]}
-                    showBracketLabel={brackets.length > 1}
-                    matches={matches}
-                    allTournamentMatches={detail.matches}
-                    myTeamId={detail.myTeamId}
-                    adminResolvable={canAdminResolve}
-                    onOpenAdminModal={openAdminScore}
-                    format={formatForBracket}
-                  />
-                </div>
-              ))}
-              {finishedPhaseStandings}
-            </>
-          )}
+          {renderBoard()}
         </div>
 
         <RegistrationsPanel
@@ -889,7 +922,7 @@ export default function TournamentDetailPage() {
               <div className={styles.dangerRow}>
                 <p id="rollback-hint" className={styles.dangerText}>
                   {rollbackReady
-                    ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${detail.card.state === "FINISHED" ? " Le tournoi étant terminé, il sera rouvert et son classement final effacé." : ""} Pense à noter les scores avant : rien n'est archivé.`
+                    ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${rollbackReopenNote} Pense à noter les scores avant : rien n'est archivé.`
                     : mapError(rollbackRefusal ?? "")}
                 </p>
                 <CyberButton

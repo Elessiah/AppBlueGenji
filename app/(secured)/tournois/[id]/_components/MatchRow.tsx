@@ -116,8 +116,9 @@ export const MatchRow = memo(function MatchRow({
   // nul » y annoncerait une rencontre disputée et partagée.
   const isDoubleForfeit = isMatchDoubleForfeit(match);
 
+  const loserClass = hasWinner ? styles.decided : "";
   const rowClass = (win: boolean): string =>
-    [styles.row, win ? styles.winner : hasWinner ? styles.decided : ""].filter(Boolean).join(" ");
+    [styles.row, win ? styles.winner : loserClass].filter(Boolean).join(" ");
   const scoreClass = (forfeits: boolean): string =>
     forfeits ? `${styles.score} ${styles.forfeitScore}` : styles.score;
 

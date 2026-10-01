@@ -132,9 +132,8 @@ describe("Cellule d'actions partagée", () => {
 
   it("choisit un gabarit de grille exclusif", () => {
     // Deux classes de même poids posant `grid-template-columns` se
-    // départageraient par l'ordre de la feuille : le ternaire garantit qu'une
-    // seule s'applique.
-    // Le choix est pur (`registrationActionsColumn`) : un seul gabarit à la fois.
+    // départageraient par l'ordre de la feuille. Le choix est pur
+    // (`registrationActionsColumn`) : un seul gabarit à la fois.
     expect(panel).toMatch(/const actionsColumn = registrationActionsColumn\(reorderable, removable\);/);
     expect(panel).toMatch(/const gridClass = actionsColumn\.grid \? styles\[actionsColumn\.grid\] : "";/);
     // Et le même gabarit coiffe l'en-tête et les lignes, sinon les colonnes
