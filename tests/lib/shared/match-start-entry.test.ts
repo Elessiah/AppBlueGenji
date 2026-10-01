@@ -113,23 +113,63 @@ describe("resolveMatchStartEntry", () => {
 
 describe("matchEntryReference", () => {
   const now = at("2026-10-01T10:00:00Z");
+  const ref = (
+    tournamentStartAt: string | null,
+    tournamentFinished = false,
+    matchStartAt: string | null = null,
+  ) => matchEntryReference({ matchStartAt, tournamentStartAt, tournamentFinished }, now);
 
-  it("préfère le début du tournoi à l'instant présent", () => {
-    expect(matchEntryReference("2025-12-28T19:00:00.000Z", now)).toBe(at("2025-12-28T19:00:00Z"));
+  it("tournoi à venir : son début", () => {
+    expect(ref("2026-12-05T19:00:00.000Z")).toBe(at("2026-12-05T19:00:00Z"));
+  });
+
+  it("tournoi en cours depuis des mois : aujourd'hui", () => {
+    expect(ref("2026-01-10T19:00:00.000Z")).toBe(now);
+  });
+
+  it("tournoi terminé : son début (correction d'archive)", () => {
+    expect(ref("2025-12-28T19:00:00.000Z", true)).toBe(at("2025-12-28T19:00:00Z"));
+  });
+
+  it("la date déjà posée sur le match l'emporte", () => {
+    expect(ref("2026-01-10T19:00:00.000Z", false, "2025-12-30T19:00:00.000Z")).toBe(
+      at("2025-12-30T19:00:00Z"),
+    );
   });
 
   it("se rabat sur maintenant sans début lisible", () => {
-    expect(matchEntryReference(null, now)).toBe(now);
-    expect(matchEntryReference("n'importe quoi", now)).toBe(now);
+    expect(ref(null)).toBe(now);
+    expect(ref("n'importe quoi", true)).toBe(now);
   });
 
-  it("change l'année déduite : tournoi passé contre maintenant", () => {
+  it("ligue commencée en janvier, match saisi en juillet : l'année en cours", () => {
+    // Avec le seul début du tournoi comme référence, le 15 juillet tombait en
+    // 2025 (179 jours) plutôt qu'en 2026 (186 jours).
+    const july = { day: 15, month: 7, hour: 20, minute: 0 };
+    const reference = matchEntryReference(
+      { matchStartAt: null, tournamentStartAt: "2026-01-10T19:00:00.000Z", tournamentFinished: false },
+      at("2026-07-01T10:00:00Z"),
+    );
+    expect(iso(resolveMatchStartEntry(july, reference))).toBe("2026-07-15T18:00:00.000Z");
+  });
+
+  it("change l'année déduite : tournoi terminé contre tournoi en cours", () => {
     const fifthOfJanuary = { day: 5, month: 1, hour: 20, minute: 0 };
-    const tournament = matchEntryReference("2025-12-28T19:00:00.000Z", now);
-    expect(iso(resolveMatchStartEntry(fifthOfJanuary, tournament))).toBe("2026-01-05T19:00:00.000Z");
-    expect(iso(resolveMatchStartEntry(fifthOfJanuary, matchEntryReference(null, now)))).toBe(
+    expect(iso(resolveMatchStartEntry(fifthOfJanuary, ref("2025-12-28T19:00:00.000Z", true)))).toBe(
+      "2026-01-05T19:00:00.000Z",
+    );
+    expect(iso(resolveMatchStartEntry(fifthOfJanuary, ref("2025-12-28T19:00:00.000Z")))).toBe(
       "2027-01-05T19:00:00.000Z",
     );
+  });
+
+  it("modifier une date posée ne change pas son année", () => {
+    const startAt = "2025-07-15T18:00:00.000Z";
+    const entry = matchStartEntryOf(startAt);
+    expect(entry).not.toBeNull();
+    if (entry) {
+      expect(iso(resolveMatchStartEntry(entry, ref("2025-01-10T19:00:00.000Z", true, startAt)))).toBe(startAt);
+    }
   });
 });
 
