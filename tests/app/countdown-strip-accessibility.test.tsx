@@ -19,7 +19,7 @@ describe("CountdownStrip avant hydratation", () => {
 
   it("distingue le repli par une classe de couleur dédiée, posée sur les « -- »", () => {
     const matches = html.match(/class="[^"]*valPending[^"]*">--<\/div>/g) ?? [];
-    expect(matches.length).toBe(4);
+    expect(matches).toHaveLength(4);
   });
 
   it("porte la phrase en contenu réel, jamais en `aria-label` (rôle `time` = Name Prohibited)", () => {
@@ -30,6 +30,6 @@ describe("CountdownStrip avant hydratation", () => {
 
   it("cache le bloc visuel aux technologies d'assistance, en une seule fois", () => {
     const matches = html.match(/aria-hidden="true"/g) ?? [];
-    expect(matches.length).toBe(1);
+    expect(matches).toHaveLength(1);
   });
 });

@@ -8,7 +8,7 @@ import { test, expect } from "./helpers/test";
 const isFresh = process.env.E2E_AUTH_USER === "fresh";
 
 test.describe("Gestion d'équipe (authentifié)", () => {
-  test.skip(!isFresh, "Définir E2E_AUTH_USER=fresh (utilisateur sans équipe) pour ce test.");
+  test.skip(!isFresh, "Définir E2E_AUTH_USER=fresh (utilisateur sans équipe) pour ce test.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
   test("le formulaire de création expose un champ description", async ({ page }) => {
     await page.goto("/equipes/creer");

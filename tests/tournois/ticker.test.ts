@@ -250,7 +250,7 @@ describe("ticker", () => {
         ],
       });
       const result = buildTickerItems(buckets);
-      expect(result.length).toBe(3);
+      expect(result).toHaveLength(3);
       expect(result[0]).toContain("EN COURS");
       expect(result[1]).toContain("INSCRIPTIONS");
       expect(result[2]).toContain("À VENIR");

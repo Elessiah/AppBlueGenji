@@ -85,7 +85,7 @@ describe("champ Discord — la référence suit toute écriture du tag", () => {
     // est en lecture seule.
     const field = [...page.matchAll(/setDiscordPseudo\(payload\.profile\.discordPseudo/g)];
     const ref = [...page.matchAll(/setSavedDiscordPseudo\(payload\.profile\.discordPseudo/g)];
-    expect(field.length).toBe(ref.length);
+    expect(field).toHaveLength(ref.length);
     expect(field.length).toBeGreaterThanOrEqual(2);
   });
 });

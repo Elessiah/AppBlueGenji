@@ -91,8 +91,12 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
     expect((await call()).status).toBe(404);
   });
 
-  it("returns 404 for a logo we host ourselves — /api/uploads serves it", async () => {
-    jest.mocked(getSponsorLogoUrl).mockResolvedValue("/uploads/sponsors/1-abc.webp");
+  it.each<[string, string]>([
+    ["a logo we host ourselves — /api/uploads serves it", "/uploads/sponsors/1-abc.webp"],
+    ["a host on the machine's own network", "https://169.254.169.254/latest/meta-data"],
+    ["a logo served in clear text", "http://cdn.example.com/logo.png"],
+  ])("returns 404 without fetching for %s", async (_case, logoUrl) => {
+    jest.mocked(getSponsorLogoUrl).mockResolvedValue(logoUrl);
     const fetchMock = mockFetch();
     expect((await call()).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -102,20 +106,6 @@ describe("GET /api/landing/sponsors/[id]/logo", () => {
     const fetchMock = mockFetch();
     expect((await call(id)).status).toBe(404);
     expect(getSponsorLogoUrl).not.toHaveBeenCalled();
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("never reaches a host on the machine's own network", async () => {
-    jest.mocked(getSponsorLogoUrl).mockResolvedValue("https://169.254.169.254/latest/meta-data");
-    const fetchMock = mockFetch();
-    expect((await call()).status).toBe(404);
-    expect(fetchMock).not.toHaveBeenCalled();
-  });
-
-  it("refuses a logo served in clear text", async () => {
-    jest.mocked(getSponsorLogoUrl).mockResolvedValue("http://cdn.example.com/logo.png");
-    const fetchMock = mockFetch();
-    expect((await call()).status).toBe(404);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

@@ -381,7 +381,7 @@ describe("tournament-broadcast — cycle de vie", () => {
     // vide pour un client qui ne lit plus.
     const callsWhileBackedUp = getFrame.mock.calls.length;
     await advance(REFRESH_CADENCE.PRIORITY.pushCoalesceMs);
-    expect(getFrame.mock.calls.length).toBe(callsWhileBackedUp);
+    expect(getFrame.mock.calls).toHaveLength(callsWhileBackedUp);
 
     // La file se dégage : le nouvel essai programmé sert la dernière version,
     // sans attendre le battement d'entretien.

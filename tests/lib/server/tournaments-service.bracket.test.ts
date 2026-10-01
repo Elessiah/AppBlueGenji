@@ -11,28 +11,14 @@ describe("tournaments-service: bracket generation", () => {
   });
 
   describe("bracket sizing", () => {
-    it("single elim with 2 teams requires 1 match", () => {
-      const teams = 2;
+    it.each<[number, number]>([
+      [2, 1],
+      [4, 3],
+      [8, 7],
+      [16, 15],
+    ])("single elim with %i teams requires %i matches", (teams, expected) => {
       const matches = teams - 1;
-      expect(matches).toBe(1);
-    });
-
-    it("single elim with 4 teams requires 3 matches", () => {
-      const teams = 4;
-      const matches = teams - 1;
-      expect(matches).toBe(3);
-    });
-
-    it("single elim with 8 teams requires 7 matches", () => {
-      const teams = 8;
-      const matches = teams - 1;
-      expect(matches).toBe(7);
-    });
-
-    it("single elim with 16 teams requires 15 matches", () => {
-      const teams = 16;
-      const matches = teams - 1;
-      expect(matches).toBe(15);
+      expect(matches).toBe(expected);
     });
 
     it("double elim with 4 teams requires specific match count", () => {
@@ -50,131 +36,47 @@ describe("tournaments-service: bracket generation", () => {
   });
 
   describe("bye calculation", () => {
-    it("calculates byes for 3 teams", () => {
-      const teams = 3;
+    // [équipes, byes, taille du tableau] — 8 équipes : puissance de 2, aucun bye.
+    it.each<[number, number, number]>([
+      [3, 1, 4],
+      [5, 3, 8],
+      [6, 2, 8],
+      [7, 1, 8],
+      [12, 4, 16],
+      [28, 4, 32],
+      [8, 0, 8],
+    ])("calculates byes for %i teams", (teams, expectedByes, expectedPower) => {
       const nextPower = Math.pow(2, Math.ceil(Math.log2(teams)));
       const byes = nextPower - teams;
-      expect(byes).toBe(1);
-      expect(nextPower).toBe(4);
-    });
-
-    it("calculates byes for 5 teams", () => {
-      const teams = 5;
-      const nextPower = Math.pow(2, Math.ceil(Math.log2(teams)));
-      const byes = nextPower - teams;
-      expect(byes).toBe(3);
-      expect(nextPower).toBe(8);
-    });
-
-    it("calculates byes for 6 teams", () => {
-      const teams = 6;
-      const nextPower = Math.pow(2, Math.ceil(Math.log2(teams)));
-      const byes = nextPower - teams;
-      expect(byes).toBe(2);
-      expect(nextPower).toBe(8);
-    });
-
-    it("calculates byes for 7 teams", () => {
-      const teams = 7;
-      const nextPower = Math.pow(2, Math.ceil(Math.log2(teams)));
-      const byes = nextPower - teams;
-      expect(byes).toBe(1);
-      expect(nextPower).toBe(8);
-    });
-
-    it("calculates byes for 12 teams", () => {
-      const teams = 12;
-      const nextPower = Math.pow(2, Math.ceil(Math.log2(teams)));
-      const byes = nextPower - teams;
-      expect(byes).toBe(4);
-      expect(nextPower).toBe(16);
-    });
-
-    it("calculates byes for 28 teams", () => {
-      const teams = 28;
-      const nextPower = Math.pow(2, Math.ceil(Math.log2(teams)));
-      const byes = nextPower - teams;
-      expect(byes).toBe(4);
-      expect(nextPower).toBe(32);
-    });
-
-    it("no byes for power of 2 teams (8)", () => {
-      const teams = 8;
-      const nextPower = Math.pow(2, Math.ceil(Math.log2(teams)));
-      const byes = nextPower - teams;
-      expect(byes).toBe(0);
-      expect(nextPower).toBe(8);
+      expect(byes).toBe(expectedByes);
+      expect(nextPower).toBe(expectedPower);
     });
   });
 
   describe("first round match count", () => {
-    it("3 teams = 4-bracket with 1 bye, 1 first round match", () => {
-      const teams = 3;
-      const nextPower = 4;
-      const byes = nextPower - teams;
-      const playingTeams = teams - byes; // 3 - 1 = 2 teams play in R1
-      const r1Matches = playingTeams / 2;
-      expect(r1Matches).toBe(1); // Only 1 match (2 playing teams)
-    });
-
-    it("5 teams = 8-bracket with 3 byes, 1 first round match", () => {
-      const teams = 5;
-      const byes = 3;
+    // [équipes, byes, matchs du premier tour] : seules les équipes sans bye jouent le premier tour.
+    it.each<[number, number, number]>([
+      [3, 1, 1],
+      [5, 3, 1],
+      [6, 2, 2],
+      [7, 1, 3],
+      [12, 4, 4],
+      [28, 4, 12],
+    ])("%i teams with %i byes play %i first round matches", (teams, byes, expected) => {
       const playingTeams = teams - byes;
       const r1Matches = playingTeams / 2;
-      expect(r1Matches).toBe(1);
-    });
-
-    it("6 teams = 8-bracket with 2 byes, 2 first round matches", () => {
-      const teams = 6;
-      const byes = 2;
-      const playingTeams = teams - byes;
-      const r1Matches = playingTeams / 2;
-      expect(r1Matches).toBe(2);
-    });
-
-    it("7 teams = 8-bracket with 1 bye, 3 first round matches", () => {
-      const teams = 7;
-      const byes = 1;
-      const playingTeams = teams - byes;
-      const r1Matches = playingTeams / 2;
-      expect(r1Matches).toBe(3);
-    });
-
-    it("12 teams = 16-bracket with 4 byes, 4 first round matches", () => {
-      const teams = 12;
-      const byes = 4;
-      const playingTeams = teams - byes;
-      const r1Matches = playingTeams / 2;
-      expect(r1Matches).toBe(4);
-    });
-
-    it("28 teams = 32-bracket with 4 byes, 12 first round matches", () => {
-      const teams = 28;
-      const byes = 4;
-      const playingTeams = teams - byes;
-      const r1Matches = playingTeams / 2;
-      expect(r1Matches).toBe(12);
+      expect(r1Matches).toBe(expected);
     });
   });
 
   describe("round count calculation", () => {
-    it("2 teams needs 1 round", () => {
-      const teams = 2;
+    it.each<[number, number]>([
+      [2, 1],
+      [3, 2],
+      [4, 2],
+    ])("%i teams need %i rounds", (teams, expected) => {
       const rounds = Math.ceil(Math.log2(teams));
-      expect(rounds).toBe(1);
-    });
-
-    it("3 teams needs 2 rounds", () => {
-      const teams = 3;
-      const rounds = Math.ceil(Math.log2(teams));
-      expect(rounds).toBe(2);
-    });
-
-    it("4 teams need 2 rounds", () => {
-      const teams = 4;
-      const rounds = Math.ceil(Math.log2(teams));
-      expect(rounds).toBe(2);
+      expect(rounds).toBe(expected);
     });
 
     it("5-8 teams need 3 rounds", () => {

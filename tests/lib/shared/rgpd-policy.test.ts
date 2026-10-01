@@ -209,24 +209,8 @@ describe("DROITS", () => {
     expect(directives?.text).toMatch(/art\. 85 de la loi Informatique et Libertés/);
   });
 
-  it("covers the right to erasure (effacement)", () => {
-    const found = DROITS.some((d) =>
-      d.title.toLowerCase().includes("effacement")
-    );
-    expect(found).toBe(true);
-  });
-
-  it("covers the right to access (accès)", () => {
-    const found = DROITS.some((d) =>
-      d.title.toLowerCase().includes("accès")
-    );
-    expect(found).toBe(true);
-  });
-
-  it("covers the right to opposition", () => {
-    const found = DROITS.some((d) =>
-      d.title.toLowerCase().includes("opposition")
-    );
+  it.each<[string]>([["effacement"], ["accès"], ["opposition"]])("covers the right to %s", (keyword) => {
+    const found = DROITS.some((d) => d.title.toLowerCase().includes(keyword));
     expect(found).toBe(true);
   });
 

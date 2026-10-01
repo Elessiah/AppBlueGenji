@@ -44,7 +44,7 @@ describe("champ BattleTag — ce que le formulaire soumet", () => {
     // est en lecture seule.
     const field = [...page.matchAll(/setOverwatchBattletag\(payload\.profile\.overwatchBattletag/g)];
     const ref = [...page.matchAll(/setSavedOverwatchBattletag\(payload\.profile\.overwatchBattletag/g)];
-    expect(field.length).toBe(ref.length);
+    expect(field).toHaveLength(ref.length);
     // **Deux, et exactement deux** : le chargement et la sauvegarde. Compter
     // « au moins deux » laissait le doublon d'un seul chemin tenir lieu des
     // deux, si bien que perdre le réalignement de la sauvegarde — le seul qui

@@ -10,7 +10,7 @@ import { test, expect } from "./helpers/test";
 const isFresh = process.env.E2E_AUTH_USER === "fresh";
 
 test.describe("Compte vierge (authentifié, DEV_AUTH=fresh)", () => {
-  test.skip(!isFresh, "Définir E2E_AUTH_USER=fresh pour activer le parcours nouveau compte.");
+  test.skip(!isFresh, "Définir E2E_AUTH_USER=fresh pour activer le parcours nouveau compte.");  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
 
   test("le profil neuf affiche des statistiques à 0", async ({ page }) => {
     await page.goto("/profil");

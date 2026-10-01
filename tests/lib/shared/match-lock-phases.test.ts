@@ -214,6 +214,6 @@ describe("dependentMatches — cross-phase logic", () => {
 
     // Phase 1 ne dépend pas de phase 2.
     const depsRev = dependentMatches(phase2, allMatches, "SINGLE");
-    expect(depsRev.length).toBe(0);
+    expect(depsRev).toHaveLength(0);
   });
 });

@@ -17,6 +17,6 @@ describe("useMatchLiveState", () => {
 
   it("prend le match en unique argument", () => {
     const { useMatchLiveState } = require("@/lib/shared/hooks/useMatchLiveState");
-    expect(useMatchLiveState.length).toBe(1);
+    expect(useMatchLiveState).toHaveLength(1);
   });
 });

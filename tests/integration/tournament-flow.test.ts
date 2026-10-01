@@ -27,7 +27,7 @@ describe("Tournament Flow - Integration", () => {
       ];
 
       expect(tournament.state).toBe("REGISTRATION");
-      expect(teams.length).toBe(4);
+      expect(teams).toHaveLength(4);
     });
 
     it("transitions to RUNNING and generates bracket", async () => {
@@ -91,7 +91,7 @@ describe("Tournament Flow - Integration", () => {
       };
 
       expect(tournament.state).toBe("FINISHED");
-      expect(tournament.rankings.length).toBe(4);
+      expect(tournament.rankings).toHaveLength(4);
       expect(tournament.rankings[0].team_id).toBe(1);
       expect(tournament.rankings[0].rank).toBe(1);
     });
@@ -131,7 +131,7 @@ describe("Tournament Flow - Integration", () => {
       const rankings = Array.from({ length: 8 }, (_, i) => ({
         rank: i + 1,
       }));
-      expect(rankings.length).toBe(8);
+      expect(rankings).toHaveLength(8);
       expect(rankings[0].rank).toBe(1);
       expect(rankings[7].rank).toBe(8);
     });

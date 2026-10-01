@@ -205,7 +205,7 @@ describe("tournaments-service: ranking", () => {
     it("total of 8 teams ranked 1-8", () => {
       const teams = 8;
       const ranks = Array.from({ length: teams }, (_, i) => i + 1);
-      expect(ranks.length).toBe(teams);
+      expect(ranks).toHaveLength(teams);
       expect(ranks[0]).toBe(1);
       expect(ranks[ranks.length - 1]).toBe(8);
     });
@@ -252,7 +252,7 @@ describe("tournaments-service: ranking", () => {
         { rank: 3, team: "Third" },
       ];
       const top3 = leaderboard.slice(0, 3);
-      expect(top3.length).toBe(3);
+      expect(top3).toHaveLength(3);
       expect(top3[0].rank).toBe(1);
     });
 
@@ -262,7 +262,7 @@ describe("tournaments-service: ranking", () => {
         rank: i + 1,
         team: `Team ${i + 1}`,
       }));
-      expect(leaderboard.length).toBe(teams);
+      expect(leaderboard).toHaveLength(teams);
       expect(leaderboard[0].rank).toBe(1);
       expect(leaderboard[leaderboard.length - 1].rank).toBe(teams);
     });

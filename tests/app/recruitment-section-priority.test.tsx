@@ -57,7 +57,7 @@ describe("RecruitmentSection — groupes par statut", () => {
 
   it("ne donne la pastille « Urgente » qu'aux prioritaires", () => {
     const markup = render(ads);
-    expect((markup.match(/pill-urgent/g) ?? []).length).toBe(1);
+    expect(markup.match(/pill-urgent/g) ?? []).toHaveLength(1);
   });
 
   it("n'ouvre pas « Autres recrutements » sans facultative", () => {

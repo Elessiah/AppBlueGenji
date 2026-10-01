@@ -126,7 +126,7 @@ describe("phase-form — removePhase", () => {
   it("supprime une phase et renumérote les survivantes", () => {
     const phases = [phase({ position: 1 }), phase({ position: 2 }), phase({ position: 3 })];
     const removed = removePhase(phases, 1);
-    expect(removed.length).toBe(2);
+    expect(removed).toHaveLength(2);
     expect(removed[0].position).toBe(1);
     expect(removed[1].position).toBe(2);
   });
@@ -137,7 +137,7 @@ describe("phase-form — removePhase", () => {
       phase({ position: 2, format: "SINGLE" }),
     ];
     const removed = removePhase(phases, 0);
-    expect(removed.length).toBe(1);
+    expect(removed).toHaveLength(1);
     expect(removed[0].format).toBe("SINGLE");
     expect(removed[0].position).toBe(1);
   });
@@ -148,7 +148,7 @@ describe("phase-form — removePhase", () => {
       phase({ position: 2, format: "SINGLE" }),
     ];
     const removed = removePhase(phases, 1);
-    expect(removed.length).toBe(1);
+    expect(removed).toHaveLength(1);
     expect(removed[0].format).toBe("SWISS");
     expect(removed[0].position).toBe(1);
   });
@@ -158,7 +158,7 @@ describe("phase-form — addPhase", () => {
   it("ajoute une phase avec une position cohérente", () => {
     const phases = [phase({ position: 1 }), phase({ position: 2 })];
     const added = addPhase(phases, "SURVIVAL");
-    expect(added.length).toBe(3);
+    expect(added).toHaveLength(3);
     expect(added[2].position).toBe(3);
     expect(added[2].format).toBe("SURVIVAL");
   });
@@ -171,7 +171,7 @@ describe("phase-form — addPhase", () => {
 
   it("peut ajouter à une liste vide", () => {
     const added = addPhase([], "SINGLE");
-    expect(added.length).toBe(1);
+    expect(added).toHaveLength(1);
     expect(added[0].position).toBe(1);
   });
 });

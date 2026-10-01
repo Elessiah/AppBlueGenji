@@ -28,7 +28,7 @@ describe("useTournamentNow", () => {
 
   it("prend le tournoi en unique argument", () => {
     const { useTournamentNow } = require("@/lib/shared/hooks/useTournamentNow");
-    expect(useTournamentNow.length).toBe(1);
+    expect(useTournamentNow).toHaveLength(1);
   });
 
   it("ne met jamais l'objet du tournoi en dépendance d'effet", () => {

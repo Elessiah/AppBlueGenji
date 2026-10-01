@@ -153,8 +153,8 @@ describe("replaySurvival — phases qualificatives (targetTeams > 1)", () => {
     // pas directement au seuil : 12 → 10 au round 1, 10 → 8 au round 2. Le seuil
     // de 4 n'est qu'un plancher, atteint plus tard.
     const active = standings.filter((s) => s.status === "ACTIVE");
-    expect(active.length).toBe(8);
-    expect(standings.filter((s) => s.status === "ELIMINATED").length).toBe(4);
+    expect(active).toHaveLength(8);
+    expect(standings.filter((s) => s.status === "ELIMINATED")).toHaveLength(4);
   });
 
   it("gère les abandons en maintenant le seuil", () => {

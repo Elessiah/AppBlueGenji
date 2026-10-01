@@ -231,6 +231,9 @@ describe("DELETE /api/landing/sponsors/[id]", () => {
       fakePool({ execute: jest.fn<SqlQuery>(async () => [referenced ? [{ 1: 1 }] : [], []]) }),
     );
   });
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   // Le logo accepte une adresse collée : celle de l'avatar d'un joueur partait
   // du disque avec le partenaire.
@@ -254,9 +257,6 @@ describe("DELETE /api/landing/sponsors/[id]", () => {
 
     await DELETE(jsonReq("DELETE", {}), params("4"));
     expect(deleteStoredImage).not.toHaveBeenCalled();
-  });
-  afterEach(() => {
-    jest.restoreAllMocks();
   });
 
   it("rejects anonymous users with 401", async () => {

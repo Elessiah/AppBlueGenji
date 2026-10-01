@@ -14,7 +14,7 @@ import { test, expect } from "./helpers/test";
 const authConfigured = !!process.env.E2E_AUTH_USER;
 
 test.describe("Dashboard tournois (authentifié)", () => {
-  test.skip(
+  test.skip(  // NOSONAR typescript:S1607 — skip conditionnel, sa raison est le second argument
     !authConfigured,
     "Définir E2E_AUTH_USER (+ DEV_AUTH_USER_ID et DB) pour activer le parcours authentifié.",
   );
