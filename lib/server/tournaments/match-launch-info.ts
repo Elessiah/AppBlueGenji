@@ -399,13 +399,14 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
       if (row.caster_user_id !== null && !castRevoked) {
         const user = users.get(Number(row.caster_user_id));
         if (user && Number(user.is_deleted) === 0) {
+          const discordTag = user.discord_verified_at !== null ? user.discord_pseudo : null;
           const contact = exposes
             ? filterContact(
                 {
                   userId: Number(user.id),
                   pseudo: user.pseudo,
                   roles: [],
-                  discordTag: user.discord_verified_at !== null ? user.discord_pseudo : null,
+                  discordTag,
                   battletag: user.overwatch_battletag,
                   battletagVerified: user.blizzard_sub !== null,
                 },
@@ -446,12 +447,11 @@ export async function listViewerMatchLaunches(viewer: LaunchViewer): Promise<Mat
         viewer: {
           role: party.role,
           canDeclareReady: party.canDeclareReady,
-          ready:
-            party.role === "CASTER"
-              ? readiness.casterReady
-              : party.role === "TEAM1"
-                ? readiness.team1Ready
-                : readiness.team2Ready,
+          ready: {
+            CASTER: readiness.casterReady,
+            TEAM1: readiness.team1Ready,
+            TEAM2: readiness.team2Ready,
+          }[party.role],
         },
       });
     }

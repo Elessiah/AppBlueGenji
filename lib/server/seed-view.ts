@@ -16,6 +16,12 @@ import type { RowDataPacket } from "mysql2/promise";
 const short = (name: string | null): string =>
   (name ?? "TBD").replace("Test - ", "").replace("Test_", "");
 
+/** Rôles de plateforme : le pilote MySQL peut rendre la colonne JSON déjà décodée. */
+function rolesBadge(roles: unknown): string | null {
+  if (!roles) return null;
+  return Array.isArray(roles) ? roles.join("+") : String(roles);
+}
+
 async function overview(db: Awaited<ReturnType<typeof getDatabase>>): Promise<void> {
   const [users] = await db.execute<(RowDataPacket & { pseudo: string; id: number; roles: string | null; is_admin: number })[]>(
     `SELECT id, pseudo, platform_roles_json AS roles, is_admin
@@ -28,7 +34,7 @@ async function overview(db: Awaited<ReturnType<typeof getDatabase>>): Promise<vo
   for (const u of users) {
     const badges = [
       u.is_admin ? "ADMIN" : null,
-      u.roles ? (Array.isArray(u.roles) ? u.roles.join("+") : String(u.roles)) : null,
+      rolesBadge(u.roles),
     ]
       .filter(Boolean)
       .join(" · ");

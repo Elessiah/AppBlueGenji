@@ -21,6 +21,7 @@
  * les rangs de départ à un préfixe arbitraire de la sélection.
  */
 import type { ParticipantWording } from "./participants";
+import { pluralSuffix } from "./plural";
 
 /**
  * Plafond de taille d'un lot. Sans rapport avec l'effectif du tournoi (borné,
@@ -134,7 +135,7 @@ export function batchCapacity(remaining: number): number {
  */
 export function batchCounterLabel(selectedCount: number, remaining: number): string {
   const capacity = batchCapacity(remaining);
-  const unit = remaining <= GHOST_BATCH_MAX ? `place${capacity > 1 ? "s" : ""}` : "par lot";
+  const unit = remaining <= GHOST_BATCH_MAX ? `place${pluralSuffix(capacity)}` : "par lot";
   return `${selectedCount} / ${capacity} ${unit}`;
 }
 

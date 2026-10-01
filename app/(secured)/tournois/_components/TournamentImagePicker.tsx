@@ -87,7 +87,8 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: R
   // peut-être), qui se serait montrée un instant sous les réglages du nouveau
   // fichier. Pas d'écran « vide » pour autant : `hasImage` tient compte du
   // fichier.
-  const displayUrl = value.file !== null ? objectUrl : value.removed ? null : existing?.url ?? null;
+  const savedUrl = value.removed ? null : existing?.url ?? null;
+  const displayUrl = value.file !== null ? objectUrl : savedUrl;
   const hasImage = value.file !== null || displayUrl !== null;
   const { settings } = value;
   const isCover = settings.fit === "COVER";

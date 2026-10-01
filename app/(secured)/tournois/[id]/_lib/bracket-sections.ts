@@ -117,12 +117,9 @@ export function buildSections(
   const singleEarly = earlyChunks.length === 1;
   let base = 0;
   earlyChunks.forEach((chunk) => {
-    const title =
-      chunk.length === 1
-        ? stageName(base, stageTotal, bracketType)
-        : singleEarly
-          ? "Premiers tours"
-          : `Tours ${chunk[0]} à ${chunk.at(-1)}`;
+    let title = `Tours ${chunk[0]} à ${chunk.at(-1)}`;
+    if (chunk.length === 1) title = stageName(base, stageTotal, bracketType);
+    else if (singleEarly) title = "Premiers tours";
     sections.push({
       key: String(chunk[0]),
       title,

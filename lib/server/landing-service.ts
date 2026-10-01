@@ -254,6 +254,9 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       isSeedOrderEffective(
         seedingSource(tournament.format, Number(currentRow.manual_seeding ?? 0) === 1),
       );
+    const scoreOf = (value: number | null): number | null => (value === null ? null : Number(value));
+    const drawSeedOf = (value: number | null): number | null =>
+      seedOrderIsTheDraw ? toSeed(value) : null;
 
     const currentMatch: LandingLiveMatch | null = currentRow
       ? {
@@ -266,10 +269,10 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           // et `next/image` lèverait sur une origine étrangère.
           team1LogoUrl: localUploadUrl(currentRow.team1_logo_url),
           team2LogoUrl: localUploadUrl(currentRow.team2_logo_url),
-          team1Score: currentRow.team1_score === null ? null : Number(currentRow.team1_score),
-          team2Score: currentRow.team2_score === null ? null : Number(currentRow.team2_score),
-          team1Seed: seedOrderIsTheDraw ? toSeed(currentRow.team1_seed) : null,
-          team2Seed: seedOrderIsTheDraw ? toSeed(currentRow.team2_seed) : null,
+          team1Score: scoreOf(currentRow.team1_score),
+          team2Score: scoreOf(currentRow.team2_score),
+          team1Seed: drawSeedOf(currentRow.team1_seed),
+          team2Seed: drawSeedOf(currentRow.team2_seed),
           bracket: currentRow.bracket,
           roundLabel: roundLabelFor(
             currentRow.bracket,

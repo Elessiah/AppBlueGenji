@@ -109,10 +109,10 @@ export async function createBracketIfMissing(
   // et ne décrit aucun bracket. Sans cela, une phase finale en double élimination
   // serait silencieusement générée en élimination simple.
   const effectiveFormat = options?.format ?? tournament.format;
-  const bracketTournament =
-    options?.hasThirdPlaceMatch === undefined
-      ? tournament
-      : { ...tournament, has_third_place_match: options.hasThirdPlaceMatch ? 1 : 0 };
+  let bracketTournament = tournament;
+  if (options?.hasThirdPlaceMatch !== undefined) {
+    bracketTournament = { ...tournament, has_third_place_match: options.hasThirdPlaceMatch ? 1 : 0 };
+  }
 
   if (effectiveFormat === "DOUBLE") {
     await createDoubleEliminationBracket(connection, bracketTournament, registeredTeamIds, options);

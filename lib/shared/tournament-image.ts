@@ -135,8 +135,9 @@ export function checkTournamentImageSettings(raw: {
 
 function readFocus(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return DEFAULT_IMAGE_FOCUS;
-  const number =
-    typeof value === "number" ? value : typeof value === "string" && /^\d{1,3}$/.test(value.trim()) ? Number(value) : Number.NaN;
+  let number = Number.NaN;
+  if (typeof value === "number") number = value;
+  else if (typeof value === "string" && /^\d{1,3}$/.test(value.trim())) number = Number(value);
   if (!Number.isInteger(number) || number < 0 || number > 100) return null;
   return number;
 }

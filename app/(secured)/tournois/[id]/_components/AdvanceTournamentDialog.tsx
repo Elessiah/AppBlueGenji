@@ -85,6 +85,8 @@ export function AdvanceTournamentDialog({
   const copy = TARGET_COPY[target];
   const passage = `${TOURNAMENT_STAGE_META[plan.from].label} › ${TOURNAMENT_STAGE_META[target].label}`;
   const empty = target === "RUNNING" && willCloseWithoutMatches(entrantCount);
+  const confirmLabel = empty ? "Clore le tournoi" : copy.confirm;
+  const entrantNoun = entrantCount > 1 ? wording.manyCapitalized : wording.oneCapitalized;
   // Ouvrir les inscriptions d'un tournoi masqué le publie au passage : c'est
   // une conséquence visible de tous, elle ne doit pas se cacher dans le
   // passage d'étape (voir `lib/shared/tournament-launch.ts`).
@@ -214,7 +216,7 @@ export function AdvanceTournamentDialog({
             <>
               <dt style={{ color: "var(--text-2, #9aa4b2)" }}>
                 {target === "RUNNING"
-                  ? `${entrantCount > 1 ? wording.manyCapitalized : wording.oneCapitalized} au départ`
+                  ? `${entrantNoun} au départ`
                   : "Effectif final"}
               </dt>
               <dd className="num" style={{ margin: 0, fontWeight: 600, textAlign: "right" }}>
@@ -268,7 +270,7 @@ export function AdvanceTournamentDialog({
               disabled={busy}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
-              {busy ? copy.busy : empty ? "Clore le tournoi" : copy.confirm}
+              {busy ? copy.busy : confirmLabel}
             </button>
           </div>
         </form>

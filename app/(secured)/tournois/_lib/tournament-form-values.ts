@@ -232,6 +232,7 @@ function isoToLocalInput(iso: string): string {
 export function toApiPayload(values: TournamentFormValues): Record<string, unknown> {
   const { format } = values;
   const matchFormat = effectiveMatchFormat(format, values.matchFormat);
+  const enduranceMaxRounds = values.enduranceMaxRounds > 0 ? values.enduranceMaxRounds : null;
   return {
     name: values.name,
     description: values.description,
@@ -264,8 +265,7 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // plafond une fois posé ne pourrait plus jamais être retiré. Hors du mode,
     // en revanche, on ne touche effectivement à rien (comme le reste du barème
     // d'endurance).
-    enduranceMaxRounds:
-      format === "BG_SURVIE" ? (values.enduranceMaxRounds > 0 ? values.enduranceMaxRounds : null) : undefined,
+    enduranceMaxRounds: format === "BG_SURVIE" ? enduranceMaxRounds : undefined,
     matchFormatType: values.matchFormat?.type ?? null,
     matchFormatValue: values.matchFormat?.value ?? null,
     // Le plafond de maps et les égalités voyagent **aplatis** eux aussi, comme

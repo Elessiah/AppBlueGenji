@@ -42,14 +42,16 @@ function matchesStatus(status: ReportStatus, view: StatusView): boolean {
   return view === "ARCHIVED" ? status === "RESOLVED" : status !== "RESOLVED";
 }
 
+/** Rang de chaque état, espacé de deux pour laisser la place au départage des contestés. */
+const STATUS_URGENCY: Record<ReportStatus, number> = { OPEN: 0, IN_PROGRESS: 2, RESOLVED: 4 };
+
 /**
  * Rang d'urgence : à traiter d'abord, puis en cours, puis archivé ; et, à
  * état égal, un signalement contesté passe devant — quelqu'un attend une
  * réponse de l'association.
  */
 function urgency(report: ReportView): number {
-  const byStatus = report.status === "OPEN" ? 0 : report.status === "IN_PROGRESS" ? 2 : 4;
-  return byStatus + (report.contests.length > 0 ? 0 : 1);
+  return STATUS_URGENCY[report.status] + (report.contests.length > 0 ? 0 : 1);
 }
 
 /**

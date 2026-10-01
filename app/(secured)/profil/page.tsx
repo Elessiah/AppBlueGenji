@@ -73,6 +73,18 @@ const VISIBILITY_LABELS: Record<string, string> = {
   major: "Majorité",
 };
 
+/** Choix du champ « Majorité » d'après la valeur enregistrée. */
+function adultChoice(isAdult: boolean | null): string {
+  if (isAdult === null) return "unknown";
+  return isAdult ? "yes" : "no";
+}
+
+/** Saisie rognée, ou `null` si elle est vide — un champ vidé efface la valeur. */
+function trimmedOrNull(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const { showError, showSuccess } = useToast();
@@ -244,7 +256,7 @@ export default function ProfilePage() {
       setMarvelRivalsTag(payload.profile.marvelRivalsTag || "");
       setDiscordPseudo(payload.profile.discordPseudo || "");
       setSavedDiscordPseudo(payload.profile.discordPseudo || "");
-      setIsAdult(payload.profile.isAdult === null ? "unknown" : payload.profile.isAdult ? "yes" : "no");
+      setIsAdult(adultChoice(payload.profile.isAdult));
       const v = payload.profile.visibility;
       setOpenToRecruitment(payload.profile.openToRecruitment === true);
       setVisibility({
@@ -337,17 +349,9 @@ export default function ProfilePage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           pseudo,
-          ...(touchesBattletag
-            ? {
-                overwatchBattletag: overwatchBattletag.trim()
-                  ? overwatchBattletag.trim()
-                  : null,
-              }
-            : {}),
-          marvelRivalsTag: marvelRivalsTag.trim() ? marvelRivalsTag.trim() : null,
-          ...(touchesDiscordTag
-            ? { discordPseudo: discordPseudo.trim() ? discordPseudo.trim() : null }
-            : {}),
+          ...(touchesBattletag ? { overwatchBattletag: trimmedOrNull(overwatchBattletag) } : {}),
+          marvelRivalsTag: trimmedOrNull(marvelRivalsTag),
+          ...(touchesDiscordTag ? { discordPseudo: trimmedOrNull(discordPseudo) } : {}),
           isAdult: isAdult === "unknown" ? null : isAdult === "yes",
           visibility,
           openToRecruitment,
@@ -610,6 +614,69 @@ export default function ProfilePage() {
   // le typage le voie.
   const sections = visibleProfileSections({ invitations: invitations.length });
   const sectionById = PROFILE_SECTION_BY_ID;
+  const discordVisibilityWarning = discordState.tag
+    ? DISCORD_PLAYER_VISIBILITY_PENDING
+    : DISCORD_PLAYER_VISIBILITY_NO_TAG;
+
+  // Le verrou interdit de **changer** le tag, pas de le prouver ni
+  // de le retirer — et ces deux gestes doivent exister à l'écran.
+  // La condition porte sur le **rattachement**, pas sur le tag :
+  // posée sur le tag, elle ne rendait aucun bouton à l'état que le
+  // retrait vient justement de produire (rattaché, sans tag). Sur un
+  // état **inconnu**, le verrou porte sa propre sortie : faire
+  // disparaître tous les gestes ferait disparaître « Retirer mon
+  // tag », la seule annulation d'exposition que le site offre, et
+  // une panne de lecture ne doit pas coûter cela.
+  const discordLockedActions =
+    discordState.linked !== true ? (
+      <div className={s.actionsRow}>
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={() => void loadDiscordState()}
+          disabled={discordStateBusy}
+          aria-label="Réessayer la lecture de l'état Discord"
+          style={{ padding: "7px 14px", fontSize: 12 }}
+        >
+          {discordStateBusy ? "Lecture…" : "Réessayer"}
+        </button>
+      </div>
+    ) : (
+      <div className={s.actionsRow}>
+        {discordState.verified ? null : (
+          <button
+            type="button"
+            className="btn"
+            onClick={() => setVerifyOpen(true)}
+            /* Sans tag enregistré il n'y a rien à *certifier* : le
+               geste est d'en poser un — le dialogue renvoie alors
+               chez Discord, qui nomme le pseudo, que le joueur
+               certifie ensuite d'un clic. Avec un tag nommé par
+               Discord, le dialogue certifie d'un clic. */
+            aria-label={
+              discordState.tag
+                ? "Certifier mon tag Discord"
+                : "Enregistrer mon tag Discord"
+            }
+            style={{ padding: "7px 14px", fontSize: 12 }}
+          >
+            {discordState.tag ? "Certifier mon tag" : "Enregistrer mon tag"}
+          </button>
+        )}
+        {discordState.tag ? (
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={onDiscordTagRemove}
+            disabled={discordTagBusy}
+            aria-label="Retirer mon tag Discord"
+            style={{ padding: "7px 14px", fontSize: 12 }}
+          >
+            {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
+          </button>
+        ) : null}
+      </div>
+    );
 
   return (
     <section className={`fade-in ${s.page}`}>
@@ -831,64 +898,7 @@ export default function ProfilePage() {
             />
             <FieldErrorText fieldId={PROFILE_FIELD_IDS.discord} message={fieldErrors.message("discord")} />
             {discordLocked ? (
-              // Le verrou interdit de **changer** le tag, pas de le prouver ni
-              // de le retirer — et ces deux gestes doivent exister à l'écran.
-              // La condition porte sur le **rattachement**, pas sur le tag :
-              // posée sur le tag, elle ne rendait aucun bouton à l'état que le
-              // retrait vient justement de produire (rattaché, sans tag). Sur un
-              // état **inconnu**, le verrou porte sa propre sortie : faire
-              // disparaître tous les gestes ferait disparaître « Retirer mon
-              // tag », la seule annulation d'exposition que le site offre, et
-              // une panne de lecture ne doit pas coûter cela.
-              discordState.linked !== true ? (
-                <div className={s.actionsRow}>
-                  <button
-                    type="button"
-                    className="btn ghost"
-                    onClick={() => void loadDiscordState()}
-                    disabled={discordStateBusy}
-                    aria-label="Réessayer la lecture de l'état Discord"
-                    style={{ padding: "7px 14px", fontSize: 12 }}
-                  >
-                    {discordStateBusy ? "Lecture…" : "Réessayer"}
-                  </button>
-                </div>
-              ) : (
-                <div className={s.actionsRow}>
-                  {discordState.verified ? null : (
-                    <button
-                      type="button"
-                      className="btn"
-                      onClick={() => setVerifyOpen(true)}
-                      /* Sans tag enregistré il n'y a rien à *certifier* : le
-                         geste est d'en poser un — le dialogue renvoie alors
-                         chez Discord, qui nomme le pseudo, que le joueur
-                         certifie ensuite d'un clic. Avec un tag nommé par
-                         Discord, le dialogue certifie d'un clic. */
-                      aria-label={
-                        discordState.tag
-                          ? "Certifier mon tag Discord"
-                          : "Enregistrer mon tag Discord"
-                      }
-                      style={{ padding: "7px 14px", fontSize: 12 }}
-                    >
-                      {discordState.tag ? "Certifier mon tag" : "Enregistrer mon tag"}
-                    </button>
-                  )}
-                  {discordState.tag ? (
-                    <button
-                      type="button"
-                      className="btn ghost"
-                      onClick={onDiscordTagRemove}
-                      disabled={discordTagBusy}
-                      aria-label="Retirer mon tag Discord"
-                      style={{ padding: "7px 14px", fontSize: 12 }}
-                    >
-                      {discordTagBusy ? "Retrait…" : "Retirer mon tag"}
-                    </button>
-                  ) : null}
-                </div>
-              )
+              discordLockedActions
             ) : (
               <div className={s.actionsRow}>
                 <button
@@ -955,7 +965,7 @@ export default function ProfilePage() {
                   `false` par défaut et l'avertissement accuserait à tort un
                   joueur certifié. */}
               {visibility.discord && discordState.linked !== null && !discordState.verified
-                ? ` ${discordState.tag ? DISCORD_PLAYER_VISIBILITY_PENDING : DISCORD_PLAYER_VISIBILITY_NO_TAG}`
+                ? ` ${discordVisibilityWarning}`
                 : null}
             </p>
           </div>

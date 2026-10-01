@@ -197,6 +197,45 @@ function ReportsPanel() {
     );
   };
 
+  const reportList =
+    visible.length === 0 ? (
+      <p className={styles.empty}>
+        {filters.status === "ACTIVE" ? "Rien à traiter ici. 🎉" : "Aucun signalement archivé."}
+      </p>
+    ) : (
+      <ul className={styles.list} aria-label="Signalements">
+        {visible.map((report) => {
+          const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
+          const summaryLine = targetSummary(report);
+          return (
+            <li key={report.id}>
+              <button
+                type="button"
+                className={styles.item}
+                aria-current={report.id === selectedId ? "true" : undefined}
+                onClick={() => select(report.id)}
+              >
+                <span className={styles.itemIcon} aria-hidden="true">
+                  {definition.icon}
+                </span>
+                <span className={styles.itemTop}>
+                  <span>
+                    n° {report.id} · {definition.label}
+                  </span>
+                  <StatusPill status={report.status} contested={report.contests.length > 0} />
+                </span>
+                <span className={styles.itemMeta}>
+                  {relativeAge(report.createdAt)}
+                  {report.assignee ? ` · ${report.assignee.pseudo}` : ""}
+                </span>
+                <span className={styles.itemTargets}>{summaryLine || report.pagePath || "—"}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    );
+
   return (
     <section className={`container ${styles.page}`}>
       <header className={styles.head}>
@@ -282,42 +321,8 @@ function ReportsPanel() {
             <p className={styles.empty} aria-busy="true">
               Chargement des signalements…
             </p>
-          ) : visible.length === 0 ? (
-            <p className={styles.empty}>
-              {filters.status === "ACTIVE" ? "Rien à traiter ici. 🎉" : "Aucun signalement archivé."}
-            </p>
           ) : (
-            <ul className={styles.list} aria-label="Signalements">
-              {visible.map((report) => {
-                const definition = REPORT_CATEGORY_DEFINITIONS[report.category];
-                const summaryLine = targetSummary(report);
-                return (
-                  <li key={report.id}>
-                    <button
-                      type="button"
-                      className={styles.item}
-                      aria-current={report.id === selectedId ? "true" : undefined}
-                      onClick={() => select(report.id)}
-                    >
-                      <span className={styles.itemIcon} aria-hidden="true">
-                        {definition.icon}
-                      </span>
-                      <span className={styles.itemTop}>
-                        <span>
-                          n° {report.id} · {definition.label}
-                        </span>
-                        <StatusPill status={report.status} contested={report.contests.length > 0} />
-                      </span>
-                      <span className={styles.itemMeta}>
-                        {relativeAge(report.createdAt)}
-                        {report.assignee ? ` · ${report.assignee.pseudo}` : ""}
-                      </span>
-                      <span className={styles.itemTargets}>{summaryLine || report.pagePath || "—"}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+            reportList
           )}
         </div>
 

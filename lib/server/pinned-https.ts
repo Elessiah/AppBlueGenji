@@ -41,6 +41,13 @@ export type PinnedRequestInit = {
 /** Statuts qui n'ont jamais de corps : `Response` refuse d'en recevoir un. */
 const NULL_BODY_STATUSES = new Set([101, 103, 204, 205, 304]);
 
+/** Famille d'adresses demandée par le socket ; `0` = indifférente. */
+function requestedFamily(family: number | string | undefined): 0 | 4 | 6 {
+  if (family === 4 || family === "IPv4") return 4;
+  if (family === 6 || family === "IPv6") return 6;
+  return 0;
+}
+
 /**
  * La fonction `lookup` confiée au socket : résolution, jugement, puis
  * l'adresse (ou toutes, quand le socket tente plusieurs familles).
@@ -59,7 +66,7 @@ export function pinnedLookup(
           callback(refused, options.all ? [] : "", 4);
           return;
         }
-        const family = options.family === 4 || options.family === "IPv4" ? 4 : options.family === 6 || options.family === "IPv6" ? 6 : 0;
+        const family = requestedFamily(options.family);
         const entries = addresses
           .map((address) => ({ address, family: isIP(address) === 6 ? 6 : 4 }))
           .filter((entry) => family === 0 || entry.family === family);

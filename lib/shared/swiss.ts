@@ -177,12 +177,8 @@ export function replaySwiss(input: ReplaySwissInput): SwissStanding[] {
     }
 
     const winner = state.get(match.winnerTeamId);
-    const loser =
-      match.loserTeamId === null
-        ? match.winnerTeamId === team1.teamId
-          ? team2
-          : team1
-        : state.get(match.loserTeamId);
+    const otherTeam = match.winnerTeamId === team1.teamId ? team2 : team1;
+    const loser = match.loserTeamId === null ? otherTeam : state.get(match.loserTeamId);
 
     if (winner) {
       winner.wins += 1;

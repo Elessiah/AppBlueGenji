@@ -214,11 +214,16 @@ export function computeTournamentProgress(
     FINISHED: null,
   };
 
+  const stageStatus = (index: number, current: number): TournamentStage["status"] => {
+    if (index < current) return "DONE";
+    return index === current ? "CURRENT" : "TODO";
+  };
+
   const stages: TournamentStage[] = TOURNAMENT_STAGE_ORDER.map((key, index) => ({
     key,
     label: TOURNAMENT_STAGE_META[key].label,
     hint: TOURNAMENT_STAGE_META[key].hint,
-    status: index < currentIndex ? "DONE" : index === currentIndex ? "CURRENT" : "TODO",
+    status: stageStatus(index, currentIndex),
     at: enteredAt[key],
   }));
 

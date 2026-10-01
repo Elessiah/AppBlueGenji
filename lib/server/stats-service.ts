@@ -26,6 +26,7 @@ import {
   type DeepStats,
   type RecordSummary,
   type StatsMatch,
+  type StatsOutcome,
   type StatsTournament,
 } from "@/lib/shared/stats";
 import type {
@@ -155,6 +156,12 @@ function timestamp(value: Date | string | null | undefined): number | null {
   return Number.isNaN(parsed) ? null : parsed;
 }
 
+/** Issue d'un match vue de `teamId` : sans vainqueur, c'est un nul. */
+function matchOutcomeFor(winnerTeamId: number | null, teamId: number): StatsOutcome {
+  if (winnerTeamId === null) return "DRAW";
+  return Number(winnerTeamId) === teamId ? "WIN" : "LOSS";
+}
+
 function isoOrEpoch(value: Date | string | null | undefined): string {
   return toIso(value ?? null) ?? new Date(0).toISOString();
 }
@@ -268,12 +275,7 @@ function toStatsMatch(row: MatchStatRow, teamId: number): StatsMatch {
     playedAt: isoOrEpoch(row.played_at),
     opponentTeamId: opponentId,
     opponentName,
-    outcome:
-      row.winner_team_id === null
-        ? "DRAW"
-        : Number(row.winner_team_id) === teamId
-          ? "WIN"
-          : "LOSS",
+    outcome: matchOutcomeFor(row.winner_team_id, teamId),
     scoreFor: maps.scoreFor,
     scoreAgainst: maps.scoreAgainst,
     forfeit,

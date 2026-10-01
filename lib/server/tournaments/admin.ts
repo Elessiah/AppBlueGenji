@@ -7,6 +7,7 @@ import { toIso } from "@/lib/server/serialization";
 import {
   checkMatchScores,
   matchWinnerSide,
+  sideTeamIds,
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { MatchRow } from "./_internal";
@@ -556,8 +557,7 @@ export async function adminResolveMatch(
     // saurait pas faire, et pourquoi il n'ouvre pas les égalités.
     const side = matchWinnerSide(format, team1Score, team2Score);
 
-    winnerTeamId = side === null ? null : Number(side === 1 ? match.team1_id : match.team2_id);
-    loserTeamId = side === null ? null : Number(side === 1 ? match.team2_id : match.team1_id);
+    ({ winnerTeamId, loserTeamId } = sideTeamIds(side, match.team1_id, match.team2_id));
     resultTeam1Score = team1Score;
     resultTeam2Score = team2Score;
   } else {

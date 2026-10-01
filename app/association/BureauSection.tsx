@@ -163,6 +163,8 @@ export function BureauSection({ initialMembers, isAdmin }: Readonly<BureauSectio
     }
   }
 
+  const submitLabel = editing ? "Enregistrer" : "Ajouter";
+
   return (
     <section className={styles.section}>
       <header className={styles.head}>
@@ -300,7 +302,7 @@ export function BureauSection({ initialMembers, isAdmin }: Readonly<BureauSectio
               Annuler
             </CyberButton>
             <CyberButton variant="primary" onClick={submit} disabled={busy}>
-              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+              {busy ? "…" : submitLabel}
             </CyberButton>
           </div>
         </LandingDialog>

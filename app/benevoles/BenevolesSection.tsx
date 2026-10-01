@@ -254,6 +254,8 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
   }
 
   const totalCount = benevoles.length;
+  const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  const photoLabel = form.photoUrl ? "Changer la photo" : "Importer une image";
 
   return (
     <>
@@ -486,7 +488,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
                 onClick={() => photoFileRef.current?.click()}
                 disabled={photoBusy || busy}
               >
-                {photoBusy ? "Envoi…" : form.photoUrl ? "Changer la photo" : "Importer une image"}
+                {photoBusy ? "Envoi…" : photoLabel}
               </button>
               {form.photoUrl && (
                 <button
@@ -516,7 +518,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
               Annuler
             </CyberButton>
             <CyberButton variant="primary" onClick={submit} disabled={busy}>
-              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+              {busy ? "…" : submitLabel}
             </CyberButton>
           </div>
         </LandingDialog>

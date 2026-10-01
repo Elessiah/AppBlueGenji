@@ -16,6 +16,7 @@
 import { formatMatchStart } from "./discord-notifications";
 import { tournamentMatchHref } from "./match-anchor";
 import { REPORT_CATEGORY_DEFINITIONS, reportConcernedHref, type ReportCategory } from "./content-reports";
+import { plural } from "./plural";
 import type { PushContent } from "./push-notifications";
 
 type MatchSide = {
@@ -127,12 +128,7 @@ export function moderationPush(input: {
 }): PushContent {
   const subject = input.teamName ? `Le logo de ${input.teamName}` : "Ton avatar";
   const verb = { HIDDEN: "a été masqué", REMOVED: "a été supprimé", RESTORED: "a été rétabli" }[input.kind];
-  const next =
-    input.kind === "RESTORED"
-      ? "La contestation a été acceptée."
-      : input.reportId !== null
-        ? "Tu peux contester la décision."
-        : "Écris à l'association si tu en détiens les droits.";
+  const next = moderationNextStep(input.kind, input.reportId);
   const fallback = input.teamId ? `/equipes/${input.teamId}` : "/profil";
   return {
     title: "Décision de modération",
@@ -140,6 +136,12 @@ export function moderationPush(input: {
     url: input.reportId !== null ? reportConcernedHref(input.reportId) : fallback,
     tag: input.teamId ? `moderation-team-${input.teamId}` : "moderation-avatar",
   };
+}
+
+/** Ce qui reste à faire après une décision de modération. */
+function moderationNextStep(kind: ModerationPushKind, reportId: number | null): string {
+  if (kind === "RESTORED") return "La contestation a été acceptée.";
+  return reportId !== null ? "Tu peux contester la décision." : "Écris à l'association si tu en détiens les droits.";
 }
 
 /**
@@ -167,7 +169,8 @@ export function suspensionPush(kind: "SUSPENDED" | "LIFTED"): PushContent {
 /** Des changements du traitement des données sont à lire — une information, aucun accord n'est demandé. */
 export function privacyChangePush(titles: readonly string[]): PushContent {
   const first = titles[0] ?? "Traitement de tes données";
-  const more = titles.length > 1 ? ` (et ${titles.length - 1} autre${titles.length > 2 ? "s" : ""})` : "";
+  const others = titles.length - 1;
+  const more = others > 0 ? ` (et ${plural(others, "autre")})` : "";
   return {
     title: "Tes données : ce qui change",
     body: `${first}${more}. Le détail t'attend à ta prochaine visite.`,

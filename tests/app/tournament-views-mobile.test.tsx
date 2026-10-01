@@ -83,13 +83,13 @@ describe("Classements — action sous le nom sous 720 px", () => {
 describe("Phase survie d'un multi-phases", () => {
   const closedSurvival = () =>
     page.slice(
-      page.indexOf(') : formatForBracket === "SURVIVAL" && isMulti ? ('),
-      page.indexOf(') : detail.card.format === "BG_SURVIE" && detail.endurance ? ('),
+      page.indexOf('if (formatForBracket === "SURVIVAL" && isMulti) {'),
+      page.indexOf('if (detail.card.format === "BG_SURVIE" && detail.endurance) {'),
     );
 
   it("ne rend la vue survie que si l'instantané décrit la phase affichée", () => {
     expect(page).toContain(
-      'formatForBracket === "SURVIVAL" && detail.survival && rankingMetaIsSelectedPhase ? (',
+      'if (formatForBracket === "SURVIVAL" && detail.survival && rankingMetaIsSelectedPhase) {',
     );
   });
 
@@ -106,7 +106,7 @@ describe("Phase survie d'un multi-phases", () => {
   });
 
   it("la branche des phases closes précède l'arbre à élimination", () => {
-    const closedAt = page.indexOf(') : formatForBracket === "SURVIVAL" && isMulti ? (');
+    const closedAt = page.indexOf('if (formatForBracket === "SURVIVAL" && isMulti) {');
     expect(closedAt).toBeGreaterThan(page.indexOf('formatForBracket === "SURVIVAL" && detail.survival'));
     expect(closedAt).toBeLessThan(page.indexOf("<BracketSections"));
   });
@@ -178,12 +178,12 @@ describe("SurvivalRounds — marques de coupe", () => {
 describe("Phase suisse d'un multi-phases", () => {
   it("rend la vue suisse pour la phase en cours, et ses rondes seules pour une phase close", () => {
     expect(page).toContain(
-      'formatForBracket === "SWISS" && detail.swiss && rankingMetaIsSelectedPhase ? (',
+      'if (formatForBracket === "SWISS" && detail.swiss && rankingMetaIsSelectedPhase) {',
     );
     expect(page).toMatch(/rankingMetaIsSelectedPhase =\s*!isMulti \|\| \(selectedPhase !== null && selectedPhase\.id === detail\.currentPhaseId\)/);
     const closed = page.slice(
-      page.indexOf(') : formatForBracket === "SWISS" ? ('),
-      page.indexOf(") : !filteredMatches.length ? ("),
+      page.indexOf('if (formatForBracket === "SWISS") {'),
+      page.indexOf("if (!filteredMatches.length) {"),
     );
     expect(closed).toContain("<SwissRounds");
     expect(closed).not.toContain("<BracketSections");
@@ -193,7 +193,7 @@ describe("Phase suisse d'un multi-phases", () => {
   it("la vue suisse ne reçoit que les matchs de la phase affichée", () => {
     const current = page.slice(
       page.indexOf('formatForBracket === "SWISS" && detail.swiss'),
-      page.indexOf(') : formatForBracket === "SWISS" ? ('),
+      page.indexOf('if (formatForBracket === "SWISS") {'),
     );
     expect(current).toContain("matches={filteredMatches}");
     // Dernière phase close avec le tournoi : la vue porte déjà le classement.

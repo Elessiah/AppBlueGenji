@@ -223,9 +223,10 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
     identity = await OAUTH_CLIENTS[provider].fetchIdentity(code);
   } catch (error) {
     const missing = isMissingConfiguration(error);
-    return saved.intent === "LINK"
-      ? linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED")
-      : loginFailure(base, provider, missing ? "not_configured" : "oauth");
+    if (saved.intent === "LINK") {
+      return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED");
+    }
+    return loginFailure(base, provider, missing ? "not_configured" : "oauth");
   }
 
   if (saved.intent === "LINK") {

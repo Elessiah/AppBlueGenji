@@ -1,7 +1,7 @@
 import crypto from "node:crypto";
 import path from "node:path";
 import { mkdir, unlink, writeFile } from "node:fs/promises";
-import sharp from "sharp";
+import sharp, { type ResizeOptions } from "sharp";
 import { cropRectToRegion, type CropRect, type ImageUploadKind } from "@/lib/shared/image-crop";
 import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES } from "@/lib/shared/uploads";
 
@@ -80,6 +80,20 @@ const KIND_CONFIG: Record<
     quality: 82,
   },
 };
+
+/** Format attendu d'après le type MIME déclaré (déjà filtré par `ALLOWED_MIME`). */
+function formatFromMime(mime: string): "png" | "jpeg" | "webp" {
+  if (mime === "image/png") return "png";
+  if (mime === "image/jpeg") return "jpeg";
+  return "webp";
+}
+
+/** Options `sharp` du gabarit : recadré, réduit sans agrandir, ou contenu sur fond transparent. */
+function resizeOptions(fit: (typeof KIND_CONFIG)[UploadKind]["fit"]): ResizeOptions {
+  if (fit === "cover") return { fit: "cover", position: "centre" };
+  if (fit === "inside") return { fit: "inside", withoutEnlargement: true };
+  return { fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } };
+}
 
 function detectFormat(buffer: Buffer): "png" | "jpeg" | "webp" | null {
   if (buffer.length < 12) return null;
@@ -166,9 +180,7 @@ export async function storeImageBuffer(
   if (!detected) {
     throw new Error("IMAGE_FORMAT_INVALID");
   }
-  const declaredFromMime =
-    declaredMime === "image/png" ? "png" : declaredMime === "image/jpeg" ? "jpeg" : "webp";
-  if (detected !== declaredFromMime) {
+  if (detected !== formatFromMime(declaredMime)) {
     throw new Error("IMAGE_FORMAT_INVALID");
   }
 
@@ -199,15 +211,7 @@ export async function storeImageBuffer(
     pipeline.extract(cropRectToRegion(crop, oriented));
   }
 
-  const resized =
-    config.fit === "cover"
-      ? pipeline.resize(config.width, config.height, { fit: "cover", position: "centre" })
-      : config.fit === "inside"
-        ? pipeline.resize(config.width, config.height, { fit: "inside", withoutEnlargement: true })
-        : pipeline.resize(config.width, config.height, {
-            fit: "contain",
-            background: { r: 0, g: 0, b: 0, alpha: 0 },
-          });
+  const resized = pipeline.resize(config.width, config.height, resizeOptions(config.fit));
 
   const output = await resized.webp({ quality: config.quality }).toBuffer();
 

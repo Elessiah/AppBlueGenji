@@ -1192,7 +1192,8 @@ async function acceptIntoTeam(
 ): Promise<void> {
   const claim = isGhostClaimRoles(roles);
   const filtered = sanitizeRoles(roles).filter((r) => r !== "OWNER");
-  const payload = claim ? ["OWNER"] : filtered.length === 0 ? ["DPS"] : filtered;
+  let payload: string[] = ["OWNER"];
+  if (!claim) payload = filtered.length === 0 ? ["DPS"] : filtered;
 
   const db = await getDatabase();
   const connection = await db.getConnection();
