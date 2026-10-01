@@ -137,8 +137,8 @@ Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
   Paris, l'aperçu ajoute « (… à ton heure locale) »
   (`localMatchTimeIfDifferent`), pour que l'organisateur reconnaisse l'horaire
   de la carte ;
-- l'aide se lit une fois, rattachée au groupe des trois champs
-  (`aria-describedby` du `fieldset`), pas à chacun ;
+- l'aide est rattachée au champ jour et l'aperçu au champ heure
+  (`aria-describedby`) : chacun lu une fois, plutôt qu'à chaque champ ;
 - une saisie inachevée affiche une consigne neutre dans l'aperçu (« À
   compléter… », « Aucune date possible… ») ; le refus lui-même part en
   notification à l'envoi et se rattache au champ ;
