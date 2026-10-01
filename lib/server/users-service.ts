@@ -1,5 +1,5 @@
 ﻿import crypto from "node:crypto";
-import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import {
@@ -1144,6 +1144,91 @@ export async function verifyDiscordChallenge(discordId: string, code: string): P
   return (await consumeDiscordChallenge(discordId, code)) !== null;
 }
 
+/**
+ * Pseudo du patch, contrôlé avant d'être lu : `null` s'il est absent, levée
+ * s'il est présent sans être un pseudo (voir `updateOwnProfile`).
+ */
+function readPseudoPatch(pseudo: unknown): string | null {
+  if (pseudo === undefined) return null;
+  if (typeof pseudo !== "string") throw new Error("INVALID_PSEUDO");
+  const nextPseudo = normalizePseudo(pseudo);
+  if (!nextPseudo) throw new Error("PSEUDO_EMPTY");
+  if (pseudoLength(nextPseudo) > PSEUDO_MAX_LENGTH) throw new Error("PSEUDO_TOO_LONG");
+  return nextPseudo;
+}
+
+/** Refus lisible d'un pseudo déjà pris ; l'index unique tranche la course. */
+async function assertPseudoAvailable(db: Pool, nextPseudo: string, userId: number): Promise<void> {
+  const [conflicts] = await db.execute<(RowDataPacket & { id: number })[]>(
+    `SELECT id FROM bg_users WHERE pseudo = ? AND id <> ? LIMIT 1`,
+    [nextPseudo, userId],
+  );
+  if (conflicts.length > 0) {
+    throw new Error("PSEUDO_ALREADY_USED");
+  }
+}
+
+/**
+ * Champ texte nullable du patch : chaîne vide et `null` valent un effacement,
+ * tout autre type que chaîne est refusé par `invalidCode`.
+ */
+function readNullableTextPatch(value: unknown, invalidCode: string): string | null {
+  if (value !== undefined && value !== null && typeof value !== "string") {
+    throw new Error(invalidCode);
+  }
+  return ((value as string | null | undefined) ?? "").trim() || null;
+}
+
+/** Refuse de réécrire le tag d'un compte Discord rattaché (voir `updateOwnProfile`). */
+async function assertDiscordTagWritable(
+  db: Pool,
+  userId: number,
+  nextDiscordPseudo: string,
+): Promise<void> {
+  const [lockRows] = await db.execute<(RowDataPacket & {
+    discord_id: string | null;
+    discord_pseudo: string | null;
+  })[]>(`SELECT discord_id, discord_pseudo FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
+  const lockRow = lockRows[0];
+  if (lockRow && isDiscordTagLocked({ linked: Boolean(lockRow.discord_id) })) {
+    // Comparaison **exacte**, casse comprise, et c'est un durcissement
+    // délibéré. Elle était insensible à la casse pour une raison qui a
+    // disparu : le formulaire renvoyait le tag à chaque sauvegarde, et
+    // refuser sur sa seule présence rendait tout le profil inenregistrable.
+    // Le client ne soumet plus ce champ que s'il a **changé**, si bien qu'une
+    // différence de casse ne peut plus venir que d'un appel direct.
+    //
+    // Or laisser passer une telle différence rendait un **200 qui n'écrivait
+    // rien** : le `CASE` de l'`UPDATE` garde la valeur stockée dès qu'un
+    // `discord_id` est posé, quoi qu'ait décidé ce contrôle. Le refus lisible
+    // annonce désormais ce que l'écriture fait vraiment — c'est Discord qui
+    // nomme ce tag, sa casse comprise.
+    if (lockRow.discord_pseudo !== nextDiscordPseudo) throw new Error(DISCORD_TAG_LOCKED);
+  }
+}
+
+/** Refuse de toucher au BattleTag d'un compte Blizzard rattaché (voir `updateOwnProfile`). */
+async function assertBattletagWritable(
+  db: Pool,
+  userId: number,
+  nextBattletag: string | null,
+): Promise<void> {
+  const [lockRows] = await db.execute<(RowDataPacket & {
+    blizzard_sub: string | null;
+    overwatch_battletag: string | null;
+  })[]>(`SELECT blizzard_sub, overwatch_battletag FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
+  const lockRow = lockRows[0];
+  if (lockRow && isBattletagLocked({ linked: Boolean(lockRow.blizzard_sub) })) {
+    // Comparaison **exacte**, casse comprise : un BattleTag la conserve, et
+    // c'est Blizzard qui la fixe. Le client ne soumet ce champ que s'il a
+    // changé, si bien qu'une différence de casse ne peut plus venir que d'un
+    // appel direct — qui recevrait sinon un **200 n'écrivant rien**, le
+    // `CASE` de l'`UPDATE` gardant la valeur stockée dès qu'un `blizzard_sub`
+    // est posé.
+    if (lockRow.overwatch_battletag !== nextBattletag) throw new Error(BATTLETAG_LOCKED);
+  }
+}
+
 export async function updateOwnProfile(
   userId: number,
   patch: {
@@ -1175,23 +1260,8 @@ export async function updateOwnProfile(
   // (un compte sans nom dans les brackets), et un pseudo plus long que la
   // colonne, refusé par MySQL avec un message qui nomme la colonne. Un pseudo
   // **absent** reste un pseudo inchangé ; un pseudo **présent** doit en être un.
-  let nextPseudo: string | null = null;
-  if (patch.pseudo !== undefined) {
-    if (typeof patch.pseudo !== "string") throw new Error("INVALID_PSEUDO");
-    nextPseudo = normalizePseudo(patch.pseudo);
-    if (!nextPseudo) throw new Error("PSEUDO_EMPTY");
-    if (pseudoLength(nextPseudo) > PSEUDO_MAX_LENGTH) throw new Error("PSEUDO_TOO_LONG");
-  }
-
-  if (nextPseudo) {
-    const [conflicts] = await db.execute<(RowDataPacket & { id: number })[]>(
-      `SELECT id FROM bg_users WHERE pseudo = ? AND id <> ? LIMIT 1`,
-      [nextPseudo, userId],
-    );
-    if (conflicts.length > 0) {
-      throw new Error("PSEUDO_ALREADY_USED");
-    }
-  }
+  const nextPseudo = readPseudoPatch(patch.pseudo);
+  if (nextPseudo) await assertPseudoAvailable(db, nextPseudo, userId);
 
   // **Un champ absent du patch n'est pas un champ vidé.** Quatre colonnes
   // nullables — le tag Discord, les deux identifiants de jeu et la majorité —
@@ -1217,14 +1287,7 @@ export async function updateOwnProfile(
   // lever `.trim()` — un `TypeError` dont le message interne ressortait tel quel
   // dans le corps du 400. Les voisines n'ont pas ce besoin : elles passent à
   // mysql2 sans être lues.
-  if (
-    touchesDiscordTag &&
-    patch.discordPseudo !== null &&
-    typeof patch.discordPseudo !== "string"
-  ) {
-    throw new Error("INVALID_DISCORD_PSEUDO");
-  }
-  const nextDiscordPseudo = (patch.discordPseudo ?? "").trim() || null;
+  const nextDiscordPseudo = readNullableTextPatch(patch.discordPseudo, "INVALID_DISCORD_PSEUDO");
 
   // **Un compte Discord rattaché possède son tag** (`lib/shared/discord-tag-lock.ts`) :
   // il ne peut pas en **inventer** un autre, Discord ayant nommé celui-là.
@@ -1245,26 +1308,7 @@ export async function updateOwnProfile(
   // quoi une correction de casse serait refusée là où la certification, elle, y
   // survit.
   if (touchesDiscordTag && nextDiscordPseudo !== null) {
-    const [lockRows] = await db.execute<(RowDataPacket & {
-      discord_id: string | null;
-      discord_pseudo: string | null;
-    })[]>(`SELECT discord_id, discord_pseudo FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
-    const lockRow = lockRows[0];
-    if (lockRow && isDiscordTagLocked({ linked: Boolean(lockRow.discord_id) })) {
-      // Comparaison **exacte**, casse comprise, et c'est un durcissement
-      // délibéré. Elle était insensible à la casse pour une raison qui a
-      // disparu : le formulaire renvoyait le tag à chaque sauvegarde, et
-      // refuser sur sa seule présence rendait tout le profil inenregistrable.
-      // Le client ne soumet plus ce champ que s'il a **changé**, si bien qu'une
-      // différence de casse ne peut plus venir que d'un appel direct.
-      //
-      // Or laisser passer une telle différence rendait un **200 qui n'écrivait
-      // rien** : le `CASE` de l'`UPDATE` garde la valeur stockée dès qu'un
-      // `discord_id` est posé, quoi qu'ait décidé ce contrôle. Le refus lisible
-      // annonce désormais ce que l'écriture fait vraiment — c'est Discord qui
-      // nomme ce tag, sa casse comprise.
-      if (lockRow.discord_pseudo !== nextDiscordPseudo) throw new Error(DISCORD_TAG_LOCKED);
-    }
+    await assertDiscordTagWritable(db, userId, nextDiscordPseudo);
   }
 
   // **Un compte Blizzard rattaché possède son BattleTag**
@@ -1277,31 +1321,9 @@ export async function updateOwnProfile(
   // le corps du `PATCH` n'est qu'*annoté*, jamais validé, et il faut lire la
   // valeur pour la comparer.
   const touchesBattletag = patch.overwatchBattletag !== undefined;
-  if (
-    touchesBattletag &&
-    patch.overwatchBattletag !== null &&
-    typeof patch.overwatchBattletag !== "string"
-  ) {
-    throw new Error("INVALID_OVERWATCH_BATTLETAG");
-  }
-  const nextBattletag = (patch.overwatchBattletag ?? "").trim() || null;
+  const nextBattletag = readNullableTextPatch(patch.overwatchBattletag, "INVALID_OVERWATCH_BATTLETAG");
 
-  if (touchesBattletag) {
-    const [lockRows] = await db.execute<(RowDataPacket & {
-      blizzard_sub: string | null;
-      overwatch_battletag: string | null;
-    })[]>(`SELECT blizzard_sub, overwatch_battletag FROM bg_users WHERE id = ? LIMIT 1`, [userId]);
-    const lockRow = lockRows[0];
-    if (lockRow && isBattletagLocked({ linked: Boolean(lockRow.blizzard_sub) })) {
-      // Comparaison **exacte**, casse comprise : un BattleTag la conserve, et
-      // c'est Blizzard qui la fixe. Le client ne soumet ce champ que s'il a
-      // changé, si bien qu'une différence de casse ne peut plus venir que d'un
-      // appel direct — qui recevrait sinon un **200 n'écrivant rien**, le
-      // `CASE` de l'`UPDATE` gardant la valeur stockée dès qu'un `blizzard_sub`
-      // est posé.
-      if (lockRow.overwatch_battletag !== nextBattletag) throw new Error(BATTLETAG_LOCKED);
-    }
-  }
+  if (touchesBattletag) await assertBattletagWritable(db, userId, nextBattletag);
 
   // **La certification se perd à chaque changement de tag.** Elle ne dit pas
   // « ce compte a un Discord » (c'est `discord_id`) mais « le tag stocké a été

@@ -602,38 +602,8 @@ async function reserveTargetNotices(
   const assigned = new Set<number>();
   const plan: TargetNoticePlan = [];
 
-  if (userIds.length > 0) {
-    const [rows] = await connection.execute<RecipientRow[]>(
-      `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
-       FROM bg_users u
-       WHERE u.is_deleted = 0 AND u.id IN (${userIds.map(() => "?").join(", ")})`,
-      userIds,
-    );
-    for (const row of rows.filter(notReporter)) {
-      assigned.add(Number(row.id));
-      plan.push({ target: ["USER", Number(row.id)] as const, recipients: [toNotificationRecipient(row, "proven")] });
-    }
-  }
-  if (teamIds.length > 0) {
-    const [rows] = await connection.execute<(RecipientRow & { team_id: number })[]>(
-      `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
-       FROM bg_team_members tm
-       JOIN bg_users u ON u.id = tm.user_id
-       WHERE tm.left_at IS NULL AND u.is_deleted = 0 AND tm.team_id IN (${teamIds.map(() => "?").join(", ")})`,
-      teamIds,
-    );
-    for (const teamId of teamIds) {
-      const recipients: NotificationRecipient[] = [];
-      for (const row of rows) {
-        if (Number(row.team_id) !== teamId || !notReporter(row) || assigned.has(Number(row.id))) continue;
-        assigned.add(Number(row.id));
-        recipients.push(toNotificationRecipient(row, "proven"));
-      }
-      // Une équipe sans membre à prévenir (ou dont chacun l'est déjà par un
-      // autre groupe) n'est pas marquée : rien ne lui a été envoyé en son nom.
-      if (recipients.length > 0) plan.push({ target: ["TEAM", teamId] as const, recipients });
-    }
-  }
+  if (userIds.length > 0) await planUserNotices(connection, userIds, notReporter, assigned, plan);
+  if (teamIds.length > 0) await planTeamNotices(connection, teamIds, notReporter, assigned, plan);
   if (plan.length === 0) return null;
   const marked = plan.map((group) => group.target);
 
@@ -643,6 +613,57 @@ async function reserveTargetNotices(
     [reportId, ...marked.flat()],
   );
   return plan;
+}
+
+/** Joueurs désignés : un groupe chacun (voir `reserveTargetNotices`). */
+async function planUserNotices(
+  connection: Executor,
+  userIds: number[],
+  notReporter: (row: RecipientRow) => boolean,
+  assigned: Set<number>,
+  plan: TargetNoticePlan,
+): Promise<void> {
+  const [rows] = await connection.execute<RecipientRow[]>(
+    `SELECT u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+       FROM bg_users u
+       WHERE u.is_deleted = 0 AND u.id IN (${userIds.map(() => "?").join(", ")})`,
+    userIds,
+  );
+  for (const row of rows.filter(notReporter)) {
+    assigned.add(Number(row.id));
+    plan.push({ target: ["USER", Number(row.id)] as const, recipients: [toNotificationRecipient(row, "proven")] });
+  }
+}
+
+/**
+ * Équipes désignées : leurs membres actuels, sauf ceux déjà prévenus par un
+ * autre groupe (voir `reserveTargetNotices`).
+ */
+async function planTeamNotices(
+  connection: Executor,
+  teamIds: number[],
+  notReporter: (row: RecipientRow) => boolean,
+  assigned: Set<number>,
+  plan: TargetNoticePlan,
+): Promise<void> {
+  const [rows] = await connection.execute<(RecipientRow & { team_id: number })[]>(
+    `SELECT tm.team_id, u.id, u.pseudo, u.discord_id, u.discord_pseudo, u.discord_verified_at
+       FROM bg_team_members tm
+       JOIN bg_users u ON u.id = tm.user_id
+       WHERE tm.left_at IS NULL AND u.is_deleted = 0 AND tm.team_id IN (${teamIds.map(() => "?").join(", ")})`,
+    teamIds,
+  );
+  for (const teamId of teamIds) {
+    const recipients: NotificationRecipient[] = [];
+    for (const row of rows) {
+      if (Number(row.team_id) !== teamId || !notReporter(row) || assigned.has(Number(row.id))) continue;
+      assigned.add(Number(row.id));
+      recipients.push(toNotificationRecipient(row, "proven"));
+    }
+    // Une équipe sans membre à prévenir (ou dont chacun l'est déjà par un
+    // autre groupe) n'est pas marquée : rien ne lui a été envoyé en son nom.
+    if (recipients.length > 0) plan.push({ target: ["TEAM", teamId] as const, recipients });
+  }
 }
 
 /**

@@ -790,15 +790,7 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     // la quarantaine intacte, sans une base qui annoncerait une image absente.
     await moveFile(files.quarantined, files.live);
     try {
-      if (isTeam) {
-        await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [row.logo_url, targetId]);
-      } else {
-        await connection.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`, [
-          row.logo_url,
-          targetId,
-        ]);
-        await syncSoloEntryIdentityOn(connection, targetId);
-      }
+      await writeRestoredImage(connection, row, isTeam, targetId);
       await connection.execute(
         `UPDATE bg_logo_quarantines SET status = 'RESTORED', closed_at = NOW() WHERE id = ?`,
         [quarantineId],
@@ -821,6 +813,29 @@ export async function restoreReportedImage(quarantineId: number, actor: ReportPe
     connection.release();
   }
 
+  await announceImageRestored(row, actor);
+}
+
+/** Remet l'adresse de l'image rétablie sur sa ligne, sous le verrou de la transaction. */
+async function writeRestoredImage(
+  connection: PoolConnection,
+  row: QuarantineRow,
+  isTeam: boolean,
+  targetId: number,
+): Promise<void> {
+  if (isTeam) {
+    await connection.execute(`UPDATE bg_teams SET logo_url = ? WHERE id = ?`, [row.logo_url, targetId]);
+    return;
+  }
+  await connection.execute(`UPDATE bg_users SET avatar_url = ? WHERE id = ? AND is_deleted = 0`, [
+    row.logo_url,
+    targetId,
+  ]);
+  await syncSoloEntryIdentityOn(connection, targetId);
+}
+
+/** Après le commit : journal du staff et message à l'équipe ou au joueur. */
+async function announceImageRestored(row: QuarantineRow, actor: ReportPerson): Promise<void> {
   if (row.target_type === "TEAM") {
     const teamName = row.target_name;
     publishStaffAction(`✅ Logo de l'équipe « ${discordInline(teamName)} » rétabli par le staff (contestation acceptée).`, {

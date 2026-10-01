@@ -21,7 +21,7 @@
  * (`lib/shared/account-connections.ts`), si bien qu'un bouton actif mène
  * toujours quelque part.
  */
-import { Fragment, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useToast } from "@/components/ui/toast";
 import {
   checkConnectionUnlink,
@@ -170,129 +170,16 @@ export function ConnectedAppsSection({
         <p style={{ fontSize: 13, color: "var(--text-2)", margin: 0 }}>Chargement…</p>
       ) : (
         <div className="table-like">
-          {connections.map((rawConnection) => {
-            // Discord a deux lignes pour une seule identité : la ligne du bouton
-            // ne se dit rattachée que si ce n'est pas le code qui porte le
-            // rattachement (`discordButtonLinked`) — sinon, c'est la ligne du bot
-            // qui le porte, et celle-ci propose d'ajouter le bouton.
-            const connection =
-              rawConnection.provider === "DISCORD"
-                ? { ...rawConnection, linked: discordButtonLinked(rawConnection) }
-                : rawConnection;
-            const discordByCode =
-              rawConnection.provider === "DISCORD" && rawConnection.linked && !connection.linked;
-            const refusal = checkConnectionUnlink(connections, connection.provider);
-            const label = OAUTH_PROVIDER_LABELS[connection.provider];
-            const handleLabel = OAUTH_PROVIDER_HANDLE_LABELS[connection.provider];
-            const slug = OAUTH_PROVIDER_SLUGS[connection.provider];
-            const detailsId = `connection-details-${slug}`;
-            const methodId = `connection-method-${slug}`;
-            // Calculé une fois : la condition et le rendu doivent dire la même
-            // chose, et le module est la seule autorité sur « y a-t-il quelque
-            // chose à dire ? ».
-            const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
-            let details: string;
-            if (connection.linked) {
-              details = connection.handle && handleLabel ? `${handleLabel} : ${connection.handle}` : "Rattaché";
-            } else if (discordByCode) {
-              details =
-                "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord.";
-            } else {
-              details = PROVIDER_NOTES[connection.provider];
-            }
-            return (
-              <Fragment key={connection.provider}>
-                <div
-                  className="table-row"
-                  style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
-                >
-                  <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-                    <strong style={{ fontSize: 14 }}>{label}</strong>
-                    <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
-                      {details}
-                    </span>
-                    {/*
-                      **Ce que « Rattaché » ne disait pas.** Discord a deux portes
-                      — le bouton, et le code reçu en message privé — et elles ne
-                      laissent pas la même trace : l'une pose une autorisation
-                      d'application chez Discord, que le joueur peut y révoquer,
-                      l'autre non. C'est exactement ce qu'une liste d'applications
-                      connectées doit dire. La phrase vient du module pur, qui
-                      rend `null` quand il n'y a rien à dire — un fournisseur à
-                      porte unique, ou un rattachement antérieur à cette colonne,
-                      qui ne se classe pas après coup.
-                    */}
-                    {methodLabel ? (
-                      <span
-                        id={methodId}
-                        style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}
-                      >
-                        {methodLabel}
-                      </span>
-                    ) : null}
-                    {/*
-                      **Le motif vit dans la colonne de texte, pas à la place du
-                      bouton.** Posé dans la cellule d'actions — large de la
-                      largeur d'un bouton —, il s'y repliait en quatre lignes de
-                      chasse fixe alignées à droite : une phrase qu'on déchiffre au
-                      lieu de la lire, à l'endroit précis où l'œil cherche un
-                      contrôle. Ici elle se lit d'un trait, et la cellule
-                      d'actions reste vide, ce qui est l'information.
-                    */}
-                    {connection.linked && refusal === "LAST_CONNECTION" ? (
-                      <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
-                        {connectionUnlinkRefusalMessage(refusal, connection.provider)}
-                      </span>
-                    ) : null}
-                  </span>
-
-                  <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
-                    {connection.linked && refusal !== "LAST_CONNECTION" ? (
-                      <button
-                        type="button"
-                        className="btn ghost"
-                        disabled={busy !== null}
-                        onClick={() => unlink(connection.provider)}
-                        aria-label={`Retirer ${label} de mon compte`}
-                        /* La **porte** fait partie de ce qui décrit ce bouton :
-                           laissée hors de la description, elle n'était lue par
-                           personne au clavier — un lecteur d'écran qui parcourt
-                           les contrôles ne rencontre jamais le texte voisin. */
-                        aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
-                        style={{ padding: "4px 12px", fontSize: 12 }}
-                      >
-                        {busy === connection.provider ? "Retrait…" : "Retirer"}
-                      </button>
-                    ) : null}
-                    {connection.linked ? null : (
-                      <a
-                        className="btn"
-                        href={oauthStartPath(connection.provider, { intent: "LINK" })}
-                        aria-label={`Rattacher ${label} à mon compte`}
-                        /* Ce que le fournisseur apporte tient dans la ligne d'à
-                           côté : `aria-describedby` la rattache au contrôle plutôt
-                           que de la laisser en texte voisin, qu'un lecteur d'écran
-                           parcourant les liens ne rencontre jamais. */
-                        aria-describedby={detailsId}
-                        style={{ padding: "4px 12px", fontSize: 12 }}
-                      >
-                        Rattacher
-                      </a>
-                    )}
-                  </span>
-                </div>
-                {connection.provider === "DISCORD" ? (
-                  <DiscordBotRow
-                    connections={connections}
-                    busy={busy !== null}
-                    disconnecting={busy === "DISCORD"}
-                    onUpdate={setBotDialog}
-                    onDisconnect={() => unlink("DISCORD")}
-                  />
-                ) : null}
-              </Fragment>
-            );
-          })}
+          {connections.map((rawConnection) => (
+            <ConnectionRow
+              key={rawConnection.provider}
+              rawConnection={rawConnection}
+              connections={connections}
+              busy={busy}
+              onUnlink={(provider) => void unlink(provider)}
+              onBotDialog={setBotDialog}
+            />
+          ))}
         </div>
       )}
 
@@ -312,6 +199,153 @@ export function ConnectedAppsSection({
       <OtherSessionsPanel version={sessionsVersion} />
     </>
   );
+}
+
+/**
+ * Une ligne de la liste : un fournisseur, son état et son geste (rattacher ou
+ * retirer) — suivie, pour Discord, de la ligne du bot.
+ */
+function ConnectionRow({
+  rawConnection,
+  connections,
+  busy,
+  onUnlink,
+  onBotDialog,
+}: Readonly<{
+  rawConnection: AccountConnection;
+  connections: AccountConnection[];
+  busy: OAuthProvider | null;
+  onUnlink: (provider: OAuthProvider) => void;
+  onBotDialog: (mode: "UPDATE" | "LINK") => void;
+}>): React.ReactElement {
+  // Discord a deux lignes pour une seule identité : la ligne du bouton
+  // ne se dit rattachée que si ce n'est pas le code qui porte le
+  // rattachement (`discordButtonLinked`) — sinon, c'est la ligne du bot
+  // qui le porte, et celle-ci propose d'ajouter le bouton.
+  const connection =
+    rawConnection.provider === "DISCORD"
+      ? { ...rawConnection, linked: discordButtonLinked(rawConnection) }
+      : rawConnection;
+  const discordByCode =
+    rawConnection.provider === "DISCORD" && rawConnection.linked && !connection.linked;
+  const refusal = checkConnectionUnlink(connections, connection.provider);
+  const label = OAUTH_PROVIDER_LABELS[connection.provider];
+  const handleLabel = OAUTH_PROVIDER_HANDLE_LABELS[connection.provider];
+  const slug = OAUTH_PROVIDER_SLUGS[connection.provider];
+  const detailsId = `connection-details-${slug}`;
+  const methodId = `connection-method-${slug}`;
+  // Calculé une fois : la condition et le rendu doivent dire la même
+  // chose, et le module est la seule autorité sur « y a-t-il quelque
+  // chose à dire ? ».
+  const methodLabel = connection.linked ? connectionMethodLabel(connection) : null;
+  const details = connectionDetails(connection, discordByCode, handleLabel);
+  return (
+    <>
+      <div
+        className="table-row"
+        style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
+      >
+        <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
+          <strong style={{ fontSize: 14 }}>{label}</strong>
+          <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
+            {details}
+          </span>
+          {/*
+            **Ce que « Rattaché » ne disait pas.** Discord a deux portes
+            — le bouton, et le code reçu en message privé — et elles ne
+            laissent pas la même trace : l'une pose une autorisation
+            d'application chez Discord, que le joueur peut y révoquer,
+            l'autre non. C'est exactement ce qu'une liste d'applications
+            connectées doit dire. La phrase vient du module pur, qui
+            rend `null` quand il n'y a rien à dire — un fournisseur à
+            porte unique, ou un rattachement antérieur à cette colonne,
+            qui ne se classe pas après coup.
+          */}
+          {methodLabel ? (
+            <span
+              id={methodId}
+              style={{ fontSize: 11, color: "var(--ink-dim)", lineHeight: 1.5 }}
+            >
+              {methodLabel}
+            </span>
+          ) : null}
+          {/*
+            **Le motif vit dans la colonne de texte, pas à la place du
+            bouton.** Posé dans la cellule d'actions — large de la
+            largeur d'un bouton —, il s'y repliait en quatre lignes de
+            chasse fixe alignées à droite : une phrase qu'on déchiffre au
+            lieu de la lire, à l'endroit précis où l'œil cherche un
+            contrôle. Ici elle se lit d'un trait, et la cellule
+            d'actions reste vide, ce qui est l'information.
+          */}
+          {connection.linked && refusal === "LAST_CONNECTION" ? (
+            <span style={{ fontSize: 11, color: "var(--amber)", lineHeight: 1.5, marginTop: 2 }}>
+              {connectionUnlinkRefusalMessage(refusal, connection.provider)}
+            </span>
+          ) : null}
+        </span>
+
+        <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
+          {connection.linked && refusal !== "LAST_CONNECTION" ? (
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy !== null}
+              onClick={() => onUnlink(connection.provider)}
+              aria-label={`Retirer ${label} de mon compte`}
+              /* La **porte** fait partie de ce qui décrit ce bouton :
+                 laissée hors de la description, elle n'était lue par
+                 personne au clavier — un lecteur d'écran qui parcourt
+                 les contrôles ne rencontre jamais le texte voisin. */
+              aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
+              style={{ padding: "4px 12px", fontSize: 12 }}
+            >
+              {busy === connection.provider ? "Retrait…" : "Retirer"}
+            </button>
+          ) : null}
+          {connection.linked ? null : (
+            <a
+              className="btn"
+              href={oauthStartPath(connection.provider, { intent: "LINK" })}
+              aria-label={`Rattacher ${label} à mon compte`}
+              /* Ce que le fournisseur apporte tient dans la ligne d'à
+                 côté : `aria-describedby` la rattache au contrôle plutôt
+                 que de la laisser en texte voisin, qu'un lecteur d'écran
+                 parcourant les liens ne rencontre jamais. */
+              aria-describedby={detailsId}
+              style={{ padding: "4px 12px", fontSize: 12 }}
+            >
+              Rattacher
+            </a>
+          )}
+        </span>
+      </div>
+      {connection.provider === "DISCORD" ? (
+        <DiscordBotRow
+          connections={connections}
+          busy={busy !== null}
+          disconnecting={busy === "DISCORD"}
+          onUpdate={onBotDialog}
+          onDisconnect={() => onUnlink("DISCORD")}
+        />
+      ) : null}
+    </>
+  );
+}
+
+/** Ce que la ligne dit du rattachement, sous le nom du fournisseur. */
+function connectionDetails(
+  connection: AccountConnection,
+  discordByCode: boolean,
+  handleLabel: string | null | undefined,
+): string {
+  if (connection.linked) {
+    return connection.handle && handleLabel ? `${handleLabel} : ${connection.handle}` : "Rattaché";
+  }
+  if (discordByCode) {
+    return "Ton Discord est rattaché par code. Le bouton y ajoute l'autorisation Discord — avec le même compte Discord.";
+  }
+  return PROVIDER_NOTES[connection.provider];
 }
 
 /**

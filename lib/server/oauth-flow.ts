@@ -44,7 +44,7 @@ import {
   fetchGoogleUser,
   getAppBaseUrl,
 } from "@/lib/server/google-oauth";
-import { consumeOAuthState, saveOAuthState } from "@/lib/server/oauth-state";
+import { consumeOAuthState, saveOAuthState, type OAuthStatePayload } from "@/lib/server/oauth-state";
 import {
   createOrGetOAuthUser,
   linkOAuthIdentity,
@@ -222,43 +222,69 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
   try {
     identity = await OAUTH_CLIENTS[provider].fetchIdentity(code);
   } catch (error) {
-    const missing = isMissingConfiguration(error);
-    if (saved.intent === "LINK") {
-      return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED");
-    }
-    return loginFailure(base, provider, missing ? "not_configured" : "oauth");
+    return identityFailure(base, provider, saved.intent, error);
   }
 
-  if (saved.intent === "LINK") {
-    // Relue ici et pas seulement au départ : dix minutes séparent les deux, et
-    // la session a pu expirer ou changer entre-temps. Rattacher sur la foi du
-    // seul cookie d'état poserait une porte d'entrée sur un compte que plus rien
-    // ne prouve être celui de l'appelant.
-    const user = await getCurrentUser();
-    if (!user) return loginFailure(base, provider, "session");
+  if (saved.intent === "LINK") return completeLink(base, provider, identity);
+  return completeLogin(base, provider, identity, saved);
+}
 
-    let outcome: OAuthLinkOutcome;
-    try {
-      outcome = await linkOAuthIdentity(user.id, identity);
-    } catch (error) {
-      // **Seuls les refus nommés voyagent.** `linkOAuthIdentity` ne lève pas que
-      // ses trois refus : tout ce que `mysql2` fait remonter le traverse, et ce
-      // message-ci finit dans une URL — donc dans l'historique du navigateur, le
-      // `Referer` de la requête suivante et les journaux de chaque relais. Le
-      // joueur, lui, ne verrait rien : le registre français retombe sur sa
-      // phrase générique, ce qui rend la fuite parfaitement discrète.
-      const message = (error as Error).message;
-      return linkFailure(base, provider, isLinkRefusal(message) ? message : "LINK_FAILED");
-    }
+/** Lecture de l'identité refusée par le fournisseur (ou configuration absente). */
+function identityFailure(
+  base: string,
+  provider: OAuthProvider,
+  intent: OAuthIntent,
+  error: unknown,
+): NextResponse {
+  const missing = isMissingConfiguration(error);
+  if (intent === "LINK") {
+    return linkFailure(base, provider, missing ? "NOT_CONFIGURED" : "OAUTH_FAILED");
+  }
+  return loginFailure(base, provider, missing ? "not_configured" : "oauth");
+}
 
-    const url = new URL(PROFILE_PATH, base);
-    url.searchParams.set("connected", OAUTH_PROVIDER_SLUGS[provider]);
-    // Une identité **déjà** rattachée vient d'être relue, pas ajoutée : le
-    // profil le dit autrement (« rattaché » serait faux, il l'était déjà).
-    if (outcome === "REFRESHED") url.searchParams.set("refreshed", "1");
-    return NextResponse.redirect(url);
+/** Retour d'un rattachement : session relue, identité posée, retour sur `/profil`. */
+async function completeLink(
+  base: string,
+  provider: OAuthProvider,
+  identity: OAuthIdentity,
+): Promise<NextResponse> {
+  // Relue ici et pas seulement au départ : dix minutes séparent les deux, et
+  // la session a pu expirer ou changer entre-temps. Rattacher sur la foi du
+  // seul cookie d'état poserait une porte d'entrée sur un compte que plus rien
+  // ne prouve être celui de l'appelant.
+  const user = await getCurrentUser();
+  if (!user) return loginFailure(base, provider, "session");
+
+  let outcome: OAuthLinkOutcome;
+  try {
+    outcome = await linkOAuthIdentity(user.id, identity);
+  } catch (error) {
+    // **Seuls les refus nommés voyagent.** `linkOAuthIdentity` ne lève pas que
+    // ses trois refus : tout ce que `mysql2` fait remonter le traverse, et ce
+    // message-ci finit dans une URL — donc dans l'historique du navigateur, le
+    // `Referer` de la requête suivante et les journaux de chaque relais. Le
+    // joueur, lui, ne verrait rien : le registre français retombe sur sa
+    // phrase générique, ce qui rend la fuite parfaitement discrète.
+    const message = (error as Error).message;
+    return linkFailure(base, provider, isLinkRefusal(message) ? message : "LINK_FAILED");
   }
 
+  const url = new URL(PROFILE_PATH, base);
+  url.searchParams.set("connected", OAUTH_PROVIDER_SLUGS[provider]);
+  // Une identité **déjà** rattachée vient d'être relue, pas ajoutée : le
+  // profil le dit autrement (« rattaché » serait faux, il l'était déjà).
+  if (outcome === "REFRESHED") url.searchParams.set("refreshed", "1");
+  return NextResponse.redirect(url);
+}
+
+/** Retour d'une connexion : compte retrouvé ou créé, session ouverte. */
+async function completeLogin(
+  base: string,
+  provider: OAuthProvider,
+  identity: OAuthIdentity,
+  saved: OAuthStatePayload,
+): Promise<NextResponse> {
   try {
     // L'acceptation voyage dans le cookie d'état, scellée à l'aller comme
     // l'intention : lue dans l'URL du rappel, elle serait choisie par

@@ -34,7 +34,7 @@
  * Discord. Au **détachement**, l'ordre s'inverse — c'est l'écriture qui porte la
  * borne, et le `SELECT` ne vient qu'après pour nommer le refus.
  */
-import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { Pool, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { assertIdentityNotSuspended } from "@/lib/server/account-suspensions";
 import { DISCORD_NAMED_PSEUDO_SQL } from "@/lib/server/discord-pseudo-sql";
@@ -200,6 +200,62 @@ async function subjectTakenByAnother(
 export type OAuthLinkOutcome = "LINKED" | "REFRESHED";
 
 /**
+ * Écrit l'identité rattachée — une instruction par fournisseur, chacune bornée
+ * à `is_deleted = 0` (voir `linkOAuthIdentity`).
+ */
+async function writeLinkedIdentity(
+  db: Pool,
+  userId: number,
+  identity: OAuthIdentity,
+): Promise<ResultSetHeader> {
+  if (identity.provider === "DISCORD") {
+    // Le rattachement **enregistre** le pseudo que Discord nomme, sans le
+    // certifier — exactement comme la connexion par Discord
+    // (`DISCORD_NAMED_PSEUDO_SQL`) : rattacher une porte n'est pas consentir à
+    // l'exposition. La certification se donne ensuite d'un clic sur `/profil`.
+    // Un pseudo entièrement numérique est écarté par `normalizeDiscordHandle`
+    // et le tag stocké reste alors tel quel, avec son origine : un tag tapé à
+    // la main avant le rattachement ne devient pas certifiable d'un clic.
+    //
+    // `discord_link_method` est posé dans la **même** instruction, et à
+    // `OAUTH` sans condition : c'est ce que ce rattachement-ci est, et il
+    // l'emporte sur une valeur plus ancienne — une autorisation donnée existe
+    // chez Discord jusqu'à ce que le joueur la retire, qu'il se connecte
+    // ensuite par code ou non (`lib/shared/account-connections.ts`).
+    const handle = normalizeDiscordHandle(identity.handle);
+    const [result] = await db.execute<ResultSetHeader>(
+      handle
+        ? `UPDATE bg_users
+             SET discord_id = ?, ${DISCORD_NAMED_PSEUDO_SQL},
+                 discord_link_method = 'OAUTH'
+             WHERE id = ? AND is_deleted = 0`
+        : `UPDATE bg_users
+             SET discord_id = ?, discord_link_method = 'OAUTH'
+             WHERE id = ? AND is_deleted = 0`,
+      handle ? [identity.subject, handle, handle, userId] : [identity.subject, userId],
+    );
+    return result;
+  }
+  if (identity.provider === "BLIZZARD") {
+    // Même règle qu'à la connexion : Blizzard fait foi sur le BattleTag, et
+    // n'efface rien quand il n'en a pas à donner.
+    const tag = normalizeBattletag(identity.handle);
+    const [result] = await db.execute<ResultSetHeader>(
+      tag
+        ? `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`
+        : `UPDATE bg_users SET blizzard_sub = ? WHERE id = ? AND is_deleted = 0`,
+      tag ? [identity.subject, tag, userId] : [identity.subject, userId],
+    );
+    return result;
+  }
+  const [result] = await db.execute<ResultSetHeader>(
+    `UPDATE bg_users SET google_sub = ? WHERE id = ? AND is_deleted = 0`,
+    [identity.subject, userId],
+  );
+  return result;
+}
+
+/**
  * Rattache cette identité au compte connecté.
  *
  * @returns `REFRESHED` si le compte portait déjà cette identité-là.
@@ -236,49 +292,7 @@ export async function linkOAuthIdentity(
   // le même fait.
   const db = await getDatabase();
   try {
-    let result: ResultSetHeader;
-    if (identity.provider === "DISCORD") {
-      // Le rattachement **enregistre** le pseudo que Discord nomme, sans le
-      // certifier — exactement comme la connexion par Discord
-      // (`DISCORD_NAMED_PSEUDO_SQL`) : rattacher une porte n'est pas consentir à
-      // l'exposition. La certification se donne ensuite d'un clic sur `/profil`.
-      // Un pseudo entièrement numérique est écarté par `normalizeDiscordHandle`
-      // et le tag stocké reste alors tel quel, avec son origine : un tag tapé à
-      // la main avant le rattachement ne devient pas certifiable d'un clic.
-      //
-      // `discord_link_method` est posé dans la **même** instruction, et à
-      // `OAUTH` sans condition : c'est ce que ce rattachement-ci est, et il
-      // l'emporte sur une valeur plus ancienne — une autorisation donnée existe
-      // chez Discord jusqu'à ce que le joueur la retire, qu'il se connecte
-      // ensuite par code ou non (`lib/shared/account-connections.ts`).
-      const handle = normalizeDiscordHandle(identity.handle);
-      [result] = await db.execute<ResultSetHeader>(
-        handle
-          ? `UPDATE bg_users
-             SET discord_id = ?, ${DISCORD_NAMED_PSEUDO_SQL},
-                 discord_link_method = 'OAUTH'
-             WHERE id = ? AND is_deleted = 0`
-          : `UPDATE bg_users
-             SET discord_id = ?, discord_link_method = 'OAUTH'
-             WHERE id = ? AND is_deleted = 0`,
-        handle ? [identity.subject, handle, handle, userId] : [identity.subject, userId],
-      );
-    } else if (identity.provider === "BLIZZARD") {
-      // Même règle qu'à la connexion : Blizzard fait foi sur le BattleTag, et
-      // n'efface rien quand il n'en a pas à donner.
-      const tag = normalizeBattletag(identity.handle);
-      [result] = await db.execute<ResultSetHeader>(
-        tag
-          ? `UPDATE bg_users SET blizzard_sub = ?, overwatch_battletag = ? WHERE id = ? AND is_deleted = 0`
-          : `UPDATE bg_users SET blizzard_sub = ? WHERE id = ? AND is_deleted = 0`,
-        tag ? [identity.subject, tag, userId] : [identity.subject, userId],
-      );
-    } else {
-      [result] = await db.execute<ResultSetHeader>(
-        `UPDATE bg_users SET google_sub = ? WHERE id = ? AND is_deleted = 0`,
-        [identity.subject, userId],
-      );
-    }
+    const result = await writeLinkedIdentity(db, userId, identity);
     if (Number(result.affectedRows) === 0) throw new Error("PROFILE_NOT_FOUND");
   } catch (error) {
     if (isDuplicateEntryError(error)) throw new Error("IDENTITY_ALREADY_LINKED");

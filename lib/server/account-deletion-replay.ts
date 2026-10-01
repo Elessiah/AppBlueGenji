@@ -68,15 +68,24 @@ export async function replayAccountDeletions(
       continue;
     }
 
-    try {
-      const plan = await deleteOwnAccount(entry.userId);
-      report.replayed += 1;
-      log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"}`);
-    } catch (error) {
-      report.failed += 1;
-      log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
-    }
+    await replayDeletion(entry, report, log);
   }
 
   return report;
+}
+
+/** Rejoue une suppression par le chemin ordinaire, et la compte. */
+async function replayDeletion(
+  entry: AccountDeletionEntry,
+  report: ReplayReport,
+  log: (line: string) => void,
+): Promise<void> {
+  try {
+    const plan = await deleteOwnAccount(entry.userId);
+    report.replayed += 1;
+    log(`  ✓ #${entry.userId} — ${plan.mode === "ERASE" ? "effacé" : "anonymisé"}`);
+  } catch (error) {
+    report.failed += 1;
+    log(`  ✗ #${entry.userId} — échec : ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
