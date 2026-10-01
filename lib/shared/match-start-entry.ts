@@ -175,7 +175,7 @@ const PARIS_FULL = new Intl.DateTimeFormat("fr-FR", {
 
 /**
  * Date complète, année comprise, à l'heure de Paris
- * (« samedi 3 janvier 2027 à 20:00 ») : l'aperçu que l'organisateur vérifie
+ * (« dimanche 3 janvier 2027 à 20:00 ») : l'aperçu que l'organisateur vérifie
  * avant d'enregistrer, puisqu'il n'a pas saisi l'année lui-même.
  */
 export function formatMatchStartEntryPreview(instant: number): string {
