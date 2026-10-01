@@ -272,6 +272,7 @@ export function RollbackRoundDialog({
               disabled={busy}
               style={{ marginTop: 2 }}
             />
+            {/* NOSONAR S6772 — label en flex avec `gap` */}
             J&apos;ai noté les scores ci-dessus.
           </label>
 

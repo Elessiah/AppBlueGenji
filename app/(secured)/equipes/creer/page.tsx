@@ -202,7 +202,7 @@ export default function CreateTeamPage() {
               />
             </div>
             <div className="field">
-              <label>Logo (optionnel)</label>
+              <span className="field-label">Logo (optionnel)</span>
               <input
                 ref={logoInputRef}
                 type="file"

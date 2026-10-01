@@ -526,7 +526,10 @@ textarea,
   gap: 6px;
 }
 
-.field label {
+/* `.field-label` : l'intitulé d'un `.field` qui n'a pas de champ à désigner
+   (bouton d'import, valeur affichée) — un `<label>` sans contrôle n'étiquette rien. */
+.field label,
+.field .field-label {
   font-size: 13px;
   color: var(--text-1);
 }

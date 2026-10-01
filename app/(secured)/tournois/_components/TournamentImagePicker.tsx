@@ -198,7 +198,9 @@ export function TournamentImagePicker({ existing, value, onChange, disabled }: T
           <fieldset className={s.modes}>
             <legend className="sr-only">Type d&apos;image</legend>
             {TOURNAMENT_IMAGE_FITS.map((fit) => (
-              <label key={fit} className={`${s.mode} ${settings.fit === fit ? s.modeActive : ""}`}>
+              <label // NOSONAR S6853 — label englobant : le bouton radio et son texte sont à l'intérieur
+                key={fit}
+                className={`${s.mode} ${settings.fit === fit ? s.modeActive : ""}`}>
                 <input
                   type="radio"
                   name={`${baseId}-fit`}

@@ -71,7 +71,7 @@ export function BotCommands({ isStaff }: BotCommandsProps) {
           {/* `role="list"` n'est pas redondant : Safari retire le rôle d'une
               liste dont on a ôté les puces (`list-style: none`), et VoiceOver
               n'annonce alors plus « liste, N éléments ». */}
-          <ul className="bot-docs-list" role="list">
+          <ul className="bot-docs-list" role="list">{/* NOSONAR S6822 — Safari retire le rôle d'une liste sans puces, voir plus haut */}
             {items.map((item) => (
               <li key={item.slug}>
                 <Link href={item.href} className="bot-docs-link">

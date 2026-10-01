@@ -228,7 +228,7 @@ export function AccessibilityPanel({
   return (
     // `tabIndex={-1}` : le panneau reçoit le focus quand le menu est ouvert
     // depuis le pied de page, sans devenir un arrêt de la tabulation.
-    <div id={id} className={styles.panel} role="region" aria-labelledby={titleId} tabIndex={-1}>
+    <section id={id} className={styles.panel} aria-labelledby={titleId} tabIndex={-1}>
       <div className={styles.head}>
         <p id={titleId} className={styles.title}>
           Accessibilité
@@ -294,6 +294,6 @@ export function AccessibilityPanel({
           Tout désactiver
         </button>
       </div>
-    </div>
+    </section>
   );
 }

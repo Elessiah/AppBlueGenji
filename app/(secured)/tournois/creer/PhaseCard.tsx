@@ -538,7 +538,7 @@ export function PhaseCard({
                 >
                   Options supplémentaires
                 </label>
-                <div
+                <div // NOSONAR S1082 — raccourci souris ; le clavier passe par la case native qu'elle contient
                   className="checkbox-card"
                   // Même carte, même verrou que `FormatSettings` : le survol
                   // perd son halo dès que la case est `disabled`, sans qu'aucun

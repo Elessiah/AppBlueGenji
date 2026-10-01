@@ -68,6 +68,7 @@ export function MatchReplayStrip({ match }: { match: BracketMatch }) {
         <span aria-hidden="true" className={styles.icon}>
           ▶
         </span>
+        {/* NOSONAR S6772 — lien en flex avec `gap` */}
         Rediff disponible
       </a>
       {editButton}

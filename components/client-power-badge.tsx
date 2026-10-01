@@ -69,7 +69,7 @@ export function ClientPowerBadge() {
   return (
     <div ref={rootRef} className={styles.root} data-mode={mode.toLowerCase()}>
       {open && (
-        <div id={panelId} className={styles.panel} role="region" aria-label="Mode d'affichage">
+        <section id={panelId} className={styles.panel} aria-label="Mode d'affichage">
           <p className={styles.title}>{label}</p>
           <p className={styles.text}>{powerModeDescription(mode)}</p>
           {reasons.length > 0 && (
@@ -92,11 +92,12 @@ export function ClientPowerBadge() {
                 checked={ignorePerformance}
                 onChange={(event) => setIgnorePerformance(event.target.checked)}
               />
+              {/* NOSONAR S6772 — label en flex avec `gap` */}
               Ignorer la détection de performances
             </label>
           )}
           <p className={styles.mono}>{powerProbeSummary(probe)}</p>
-        </div>
+        </section>
       )}
       <button
         type="button"

@@ -42,6 +42,7 @@ export function RegistrationCard({ t, priority }: RegistrationCardProps) {
       />
       <div className={`${s.cardRibbon} ${s.cardRibbonOpen}`}>
         <span className={s.dot} />
+        {/* NOSONAR S6772 — ruban en flex avec `gap` */}
         Inscriptions ouvertes
       </div>
 

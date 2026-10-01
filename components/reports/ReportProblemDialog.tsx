@@ -321,8 +321,10 @@ export function ReportProblemDialog({
                   {OFF_SITE_CONDUCT_NOTICE}{" "}
                   <a href={MODERATION_SUPPORT_PORTAL_URL} target="_blank" rel="noopener noreferrer">
                     portail de support BlueGenji
+                    {/* NOSONAR S6772 — l'espace est dans le texte réservé aux lecteurs d'écran */}
                     <span className="sr-only"> (nouvel onglet)</span>
                   </a>
+                  {/* NOSONAR S6772 — le point suit le lien sans espace */}
                   .
                 </p>
               )}

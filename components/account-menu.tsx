@@ -140,6 +140,7 @@ export function AccountMenuPanel({
           aria-label={`Mon équipe : ${activeTeam.teamName}`}
         >
           Mon équipe
+          {/* NOSONAR S6772 — entrée en flex colonne : l'indication passe à la ligne */}
           <span className={s.itemHint} aria-hidden="true">
             {activeTeam.teamName}
           </span>

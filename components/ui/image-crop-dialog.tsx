@@ -313,7 +313,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
               />
             )}
             {ready && (
-              <div
+              <div // NOSONAR S6847 — cadre `role="application"` piloté au pointeur et au clavier (onFrameKey)
                 ref={frameRef}
                 className={`${s.frame} ${round ? s.frameRound : ""}`}
                 style={frameStyle}
@@ -321,7 +321,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
                 aria-roledescription="cadre de recadrage"
                 aria-label={frameLabel}
                 aria-describedby={hintId}
-                tabIndex={0}
+                tabIndex={0} // NOSONAR S6845 — le cadre se déplace au clavier, il doit recevoir le focus
                 onKeyDown={onFrameKey}
                 // Un seul écouteur pour le cadre et ses poignées : la poignée
                 // saisie se lit sur la cible, sans quoi l'appui remonterait au

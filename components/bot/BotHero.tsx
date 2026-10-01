@@ -34,6 +34,7 @@ export function BotHero({ status }: { status: BotStatus | null }) {
         <div className="bot-name">
           <span className="bot-tag">
             <span className="sq" />
+            {/* NOSONAR S6772 — étiquette en flex avec `gap` */}
             BOT DISCORD · INTER-SERVEURS
           </span>
           <h1 className="bot-title">

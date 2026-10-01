@@ -91,7 +91,7 @@ const DATA_COLUMNS = ["Donnée", "Finalité", "Base légale", "Conservation"] as
  */
 function DataCell({ column, children }: { column: 0 | 1 | 2 | 3; children: ReactNode }) {
   return (
-    <td role="cell">
+    <td role="cell">{/* NOSONAR S6843 — cellule de tableau de données, non de grille : `display: block` retire la sémantique */}
       <span className={styles.cellLabel} aria-hidden="true">
         {DATA_COLUMNS[column]}
       </span>
@@ -240,7 +240,7 @@ export default async function RgpdPage() {
             ne défile plus en largeur. Les rôles explicites gardent la sémantique
             de tableau que `display: block` retire dans certains navigateurs. */}
         <table role="table" className={styles.dataTable} style={{ marginTop: 24 }}>
-          <thead role="rowgroup">
+          <thead role="rowgroup">{/* NOSONAR S6822 — `display: block` retire la sémantique de tableau, voir plus haut */}
             <tr role="row">
               {DATA_COLUMNS.map((column) => (
                 <th key={column} role="columnheader" scope="col">
@@ -249,7 +249,7 @@ export default async function RgpdPage() {
               ))}
             </tr>
           </thead>
-          <tbody role="rowgroup">
+          <tbody role="rowgroup">{/* NOSONAR S6822 — `display: block` retire la sémantique de tableau, voir plus haut */}
             {DONNEES_PROFIL.map((d, i) => (
               <tr key={i} role="row">
                 <DataCell column={0}>{d.donnee}</DataCell>
@@ -542,6 +542,7 @@ export default async function RgpdPage() {
             <li>
               <strong>Service worker et cache « bg-offline »</strong> — le site installe dans
               votre navigateur, <strong>pour tout visiteur</strong>, un petit programme (
+              {/* NOSONAR S6772 — accolé voulu : « (/push-sw.js) » */}
               <code>/push-sw.js</code>) qui met en cache une seule page, la page « hors
               ligne » du site, affichée à la place de l&apos;erreur du navigateur quand le réseau
               manque. Ce cache ne contient que cette page, identique pour tous : aucune donnée
@@ -1069,6 +1070,7 @@ export default async function RgpdPage() {
             >
               cnil.fr
             </a>
+            {/* NOSONAR S6772 — le point final suit le lien sans espace */}
             .
           </p>
           <p>
