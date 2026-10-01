@@ -48,8 +48,10 @@ Deux pièges de spécificité, tenus dans la feuille :
 
 - les jetons de police sont posés **en ligne** sur `<body>` (`FONT_VARIABLES`) :
   seule une déclaration `!important` les surcharge ;
-- `font` remet l'espacement des lettres à zéro partout ; combiné à `spacing`,
-  l'espacement est reposé élément par élément par une règle aux deux clés.
+- `font` remet l'espacement des lettres à zéro partout, en lisant le jeton
+  `--a11y-letter-spacing` (repli `normal`) ; `spacing` pose ce jeton sur
+  `:root`, si bien que, combinés, chaque élément reprend l'écart de
+  l'espacement — sans règle aux deux clés ni valeur `!important` en dur.
 
 ## Le bouton et son panneau (`components/accessibility/AccessibilityMenu.tsx`)
 
