@@ -65,14 +65,13 @@ describe("lectures mutualisées", () => {
     expect(fetchBotStatus).toHaveBeenCalledTimes(1);
   });
 
-  it("garde une entrée par plage d'activité", async () => {
-    jest.mocked(fetchBotActivity).mockImplementation(async (range) => activity(range));
+  it("ne lit l'activité (7 jours) qu'une fois pour toutes les vues", async () => {
+    jest.mocked(fetchBotActivity).mockResolvedValue(activity("7j"));
 
-    expect(await cachedBotActivity("30j")).toEqual({ range: "30j" });
-    expect(await cachedBotActivity("90j")).toEqual({ range: "90j" });
-    expect(await cachedBotActivity("30j")).toEqual({ range: "30j" });
+    expect(await cachedBotActivity()).toEqual({ range: "7j" });
+    expect(await cachedBotActivity()).toEqual({ range: "7j" });
 
-    expect(fetchBotActivity).toHaveBeenCalledTimes(2);
+    expect(fetchBotActivity).toHaveBeenCalledTimes(1);
   });
 
   it("garde une entrée par taille de liste de serveurs", async () => {

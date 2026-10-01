@@ -48,10 +48,9 @@ export function cachedBotServers(limit: number): Promise<BotServersPayload | nul
 }
 
 /**
- * Activité d'une plage. Partagée par le rendu de la page (plage de 30 jours) et
- * par `GET /api/bot/activity`, que le graphe appelle quand on change de plage :
- * une seule lecture par plage et par minute, d'où qu'elle vienne.
+ * Activité des 7 derniers jours, la seule plage que le bot garde (voir
+ * `fetchBotActivity`) : une seule lecture par minute pour toutes les vues.
  */
-export function cachedBotActivity(range: "7j" | "30j" | "90j"): Promise<BotActivity | null> {
-  return cached(`${PREFIX}activity:${range}`, BOT_SHOWCASE_TTL_MS, () => fetchBotActivity(range));
+export function cachedBotActivity(): Promise<BotActivity | null> {
+  return cached(`${PREFIX}activity`, BOT_SHOWCASE_TTL_MS, () => fetchBotActivity());
 }

@@ -519,9 +519,15 @@ export async function fetchBotServers(limit: number = 8): Promise<BotServersPayl
   }
 }
 
-export async function fetchBotActivity(
-  range: "7j" | "30j" | "90j"
-): Promise<BotActivity | null> {
+/**
+ * Activité du bot (relais et scrims par jour) sur **7 jours**.
+ *
+ * Le bot accepte aussi `30j` et `90j`, mais ses relais (`DPMsg`) sont purgés à
+ * 7 jours sans compteur journalier qui les prolonge : au-delà, la série ne
+ * valait que des zéros. Le site ne demande donc plus que la plage conservée.
+ * @returns La charge du bot, ou `null` s'il est injoignable.
+ */
+export async function fetchBotActivity(): Promise<BotActivity | null> {
   if (isCircuitOpen()) {
     return null;
   }
@@ -530,7 +536,7 @@ export async function fetchBotActivity(
 
   try {
     const url = new URL(`${baseUrl}/internal/activity`);
-    url.searchParams.set("range", range);
+    url.searchParams.set("range", "7j");
 
     const response = await fetch(url.toString(), {
       method: "GET",

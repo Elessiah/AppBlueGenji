@@ -35,11 +35,11 @@ export const metadata: Metadata = pageMetadata({
 // (nonce de la CSP), donc cette page est rendue à chaque requête quoi qu'on y
 // déclare. Le cache est celui des lectures du bot (`bot-showcase-cache`).
 export default async function BotPage() {
-  const [status, kpis, serversPayload, activity30j, user] = await Promise.all([
+  const [status, kpis, serversPayload, activity, user] = await Promise.all([
     cachedBotStatus(),
     cachedBotKpis(),
     cachedBotServers(8),
-    cachedBotActivity("30j"),
+    cachedBotActivity(),
     getCurrentUser(),
   ]);
   const isStaff = isStaffMember(user);
@@ -57,7 +57,7 @@ export default async function BotPage() {
 
           <div className="bot-grid">
             <div className="bot-stack">
-              <BotActivityChart initial={activity30j} />
+              <BotActivityChart initial={activity} />
               {/* La charge entière, et non `serversPayload?.servers ?? null` :
                   ce `??` ramenait « le bot a répondu sans champ `servers` » à
                   « le bot n'a pas répondu », et le panneau annonçait
