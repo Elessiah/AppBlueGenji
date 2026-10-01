@@ -515,3 +515,144 @@ describe("validateTournamentInput — planification par l'arbitrage", () => {
     });
   });
 });
+
+describe("validateTournamentInput — caractérisation des refus", () => {
+  const phase = (over: Record<string, unknown>) => ({
+    format: "SINGLE",
+    qualifierMode: "COUNT",
+    qualifierValue: 4,
+    ...over,
+  });
+  const multi = (phases: unknown) => validateTournamentInput({ ...base, format: "MULTI", phases });
+
+  it.each<[string, unknown, string | null]>([
+    ["phases absentes", undefined, "MISSING_PHASES"],
+    ["phase nulle", [null], "INVALID_PHASE_FORMAT"],
+    ["format de phase inconnu", [phase({ format: "MULTI" })], "INVALID_PHASE_FORMAT"],
+    ["pourcentage à 0", [phase({ qualifierMode: "PERCENT", qualifierValue: 0 }), phase({})], "INVALID_QUALIFIER_VALUE"],
+    ["pourcentage au-delà de 100", [phase({ qualifierMode: "PERCENT", qualifierValue: 101 }), phase({})], "INVALID_QUALIFIER_VALUE"],
+    ["pourcentage décimal", [phase({ qualifierMode: "PERCENT", qualifierValue: 50.5 }), phase({})], "INVALID_QUALIFIER_VALUE"],
+    ["nombre nul", [phase({ qualifierValue: 0 }), phase({})], "INVALID_QUALIFIER_VALUE"],
+    [
+      "nombres non décroissants",
+      [phase({ qualifierValue: 4 }), phase({ qualifierValue: 4 }), phase({ qualifierValue: 1 })],
+      "INVALID_QUALIFIER_COUNT",
+    ],
+    ["dernière phase non comparée", [phase({ qualifierValue: 8 }), phase({ qualifierValue: 64 })], null],
+    [
+      "pourcentage hors comparaison",
+      [
+        phase({ qualifierMode: "PERCENT", qualifierValue: 50 }),
+        phase({ qualifierMode: "PERCENT", qualifierValue: 80 }),
+        phase({}),
+      ],
+      null,
+    ],
+    ["survie sans cadence", [phase({ format: "SURVIVAL" }), phase({})], "INVALID_SURVIVAL_ROUNDS"],
+    [
+      "survie à première coupe invalide",
+      [phase({ format: "SURVIVAL", survivalRoundsPerCut: 2, survivalRoundsBeforeFirstCut: 0 }), phase({})],
+      "INVALID_SURVIVAL_ROUNDS",
+    ],
+    [
+      "survie à première coupe nulle",
+      [phase({ format: "SURVIVAL", survivalRoundsPerCut: 2, survivalRoundsBeforeFirstCut: null }), phase({})],
+      null,
+    ],
+    ["suisse sans rondes", [phase({ format: "SWISS" }), phase({})], "INVALID_SWISS_ROUNDS"],
+    ["suisse avec rondes", [phase({ format: "SWISS", swissTotalRounds: 3 }), phase({})], null],
+  ])("phases : %s", (_label, phases, expected) => {
+    const result = multi(phases);
+    if (expected === null) expect("value" in result).toBe(true);
+    else expect(result).toEqual({ error: expected });
+  });
+
+  it("l'erreur de format précède celle de double élimination", () => {
+    expect(multi([phase({ format: "DOUBLE" }), phase({ format: "X" })])).toEqual({
+      error: "INVALID_PHASE_FORMAT",
+    });
+  });
+
+  it("transmet les phases brutes en MULTI", () => {
+    const phases = [phase({}), phase({ qualifierValue: 1 })];
+    expect(value({ ...base, format: "MULTI", phases }).phases).toBe(phases);
+  });
+
+  it("refuse un type de participant inconnu", () => {
+    expect(validateTournamentInput({ ...base, participantType: "CLAN" as never })).toEqual({
+      error: "INVALID_PARTICIPANT_TYPE",
+    });
+  });
+
+  it("refuse un format de match invalide", () => {
+    expect(validateTournamentInput({ ...base, matchFormatType: "BO", matchFormatValue: 4 })).toEqual({
+      error: "INVALID_MATCH_FORMAT",
+    });
+  });
+
+  it.each<[number | undefined, number | undefined, string | null]>([
+    [0, undefined, "INVALID_SURVIVAL_ROUNDS"],
+    [51, undefined, "INVALID_SURVIVAL_ROUNDS"],
+    [2, 0, "INVALID_SURVIVAL_FIRST_CUT"],
+    [2, 51, "INVALID_SURVIVAL_FIRST_CUT"],
+    [2, 3, null],
+  ])("survie : cadence %p, première coupe %p", (perCut, firstCut, expected) => {
+    const result = validateTournamentInput({
+      ...base,
+      format: "SURVIVAL",
+      survivalRoundsPerCut: perCut,
+      survivalRoundsBeforeFirstCut: firstCut,
+    });
+    if (expected === null) {
+      expect("value" in result && result.value.survivalRoundsBeforeFirstCut).toBe(3);
+    } else {
+      expect(result).toEqual({ error: expected });
+    }
+  });
+
+  it.each<[string, number]>([
+    ["endurancePoints", 0],
+    ["endurancePoints", 100],
+    ["enduranceWinDelta", 21],
+    ["enduranceLossDelta", 0],
+    ["endurancePlayoffSize", 1],
+    ["endurancePlayoffSize", 33],
+    ["enduranceMaxRounds", 51],
+  ])("BG Survie : refuse %s = %p", (field, raw) => {
+    expect(validateTournamentInput({ ...base, format: "BG_SURVIE", [field]: raw })).toEqual({
+      error: "INVALID_ENDURANCE_SETTINGS",
+    });
+  });
+
+  it("BG Survie : garde le barème fourni", () => {
+    const v = value({
+      ...base,
+      format: "BG_SURVIE",
+      endurancePoints: 7,
+      enduranceWinDelta: 2,
+      enduranceLossDelta: 3,
+      endurancePlayoffSize: 4,
+    });
+    expect([v.endurancePoints, v.enduranceWinDelta, v.enduranceLossDelta, v.endurancePlayoffSize]).toEqual([
+      7, 2, 3, 4,
+    ]);
+  });
+
+  it.each<[Record<string, number>, string]>([
+    [{ swissTotalRounds: 0 }, "INVALID_SWISS_ROUNDS"],
+    [{ swissTotalRounds: 21 }, "INVALID_SWISS_ROUNDS"],
+    [{ swissPointsDraw: -1 }, "INVALID_SWISS_POINTS"],
+    [{ swissPointsWin: 100 }, "INVALID_SWISS_POINTS"],
+    [{ swissPointsWin: 3, swissPointsDraw: 4 }, "INVALID_SWISS_POINTS"],
+    [{ swissPointsLoss: 1, swissPointsDraw: 0 }, "INVALID_SWISS_POINTS"],
+  ])("suisse : %j", (fields, expected) => {
+    expect(validateTournamentInput({ ...base, format: "SWISS", ...fields })).toEqual({ error: expected });
+  });
+
+  it("suisse : garde les valeurs fournies et laisse null les omises", () => {
+    const v = value({ ...base, format: "SWISS", swissTotalRounds: 5, swissPointsWin: 2 });
+    expect([v.swissTotalRounds, v.swissPointsWin, v.swissPointsDraw, v.swissPointsLoss]).toEqual([
+      5, 2, null, null,
+    ]);
+  });
+});
