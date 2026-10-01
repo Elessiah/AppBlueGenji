@@ -37,6 +37,11 @@ et depuis deux endroits :
   « Modifier » reste affiché sur un tournoi lancé (`canShowEditButton`), le
   formulaire y est rendu grisé **sauf** cette case, et la page n'envoie alors
   que la bascule — jamais `PATCH .../edit`, que la fenêtre fermée refuserait.
+  La case part **à chaque** enregistrement, pas seulement quand elle diffère de
+  la lecture d'ouverture (qu'un arbitre a pu changer depuis la fiche entre-temps) :
+  la route est donc **idempotente** — sans changement, elle n'écrit, ne journalise
+  ni ne publie rien, et rend `changed: false`, que la confirmation lit pour ne
+  pas annoncer « modifié » quand rien ne l'a été (`editSavedMessage`).
   Cochée sur un tournoi en cours, la case annonce avant l'enregistrement les
   lancements qu'elle défera (`ENABLE_PLANNING_WHILE_RUNNING_WARNING`). La
   lecture d'édition (`loadEditableTournament`) rend l'option et l'état **à côté**

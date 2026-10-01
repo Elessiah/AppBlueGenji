@@ -18,7 +18,12 @@ import {
   type TournamentApiValues,
   type TournamentFormValues,
 } from "../../_components/TournamentForm";
-import { editLockNotice, FINISHED_EDIT_NOTICE } from "../_lib/edit-entry";
+import {
+  editLockNotice,
+  editSavedMessage,
+  FINISHED_EDIT_NOTICE,
+  type PlanningSaveResult,
+} from "../_lib/edit-entry";
 import {
   canToggleRefereeScheduling,
   refereeSchedulingErrorMessage,
@@ -97,14 +102,20 @@ async function saveEditableFields(tournamentId: number, body: Record<string, unk
   throw new CodedError(code, message);
 }
 
-async function saveRefereeScheduling(tournamentId: number, enabled: boolean): Promise<void> {
+async function saveRefereeScheduling(tournamentId: number, enabled: boolean): Promise<PlanningSaveResult> {
   const response = await fetch(`/api/admin/tournaments/${tournamentId}/referee-scheduling`, {
     method: "PUT",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ enabled }),
   });
-  if (response.ok) return;
-  const result = (await response.json().catch(() => ({}))) as { error?: string };
+  const result = (await response.json().catch(() => ({}))) as {
+    error?: string;
+    changed?: boolean;
+    movedToPlanning?: number;
+  };
+  if (response.ok) {
+    return { changed: result.changed === true, movedToPlanning: result.movedToPlanning ?? 0 };
+  }
   const code = result.error ?? "UNKNOWN";
   throw new CodedError(code, refereeSchedulingErrorMessage(code));
 }
@@ -261,16 +272,21 @@ export default function EditTournamentPage() {
 
           // Fenêtre fermée (tournoi lancé) : aucun champ à envoyer, la route
           // d'édition refuserait — seule la planification part.
-          if (Object.keys(body).length > 0) await saveEditableFields(tournamentId, body);
+          const fieldsSent = Object.keys(body).length > 0;
+          if (fieldsSent) await saveEditableFields(tournamentId, body);
 
           // La planification a sa route : bascule tenue sous verrou du
-          // tournoi, qui défait les lancements à défaire. Envoyée seulement si
-          // la case a changé — et après l'édition, qu'un refus n'emporte pas.
-          if (values.refereeScheduling !== loaded.refereeScheduling) {
-            await saveRefereeScheduling(tournamentId, values.refereeScheduling);
-          }
+          // tournoi, qui défait les lancements à défaire — et après l'édition,
+          // qu'un refus n'emporte pas. Envoyée **à chaque** enregistrement, et
+          // pas seulement quand la case diffère de la lecture d'ouverture :
+          // celle-ci a pu être changée depuis la fiche entre-temps, et
+          // l'enregistrement doit écrire ce que le formulaire montre. La route
+          // est idempotente (rien n'est réécrit ni annoncé sans changement).
+          const planning = planningEditable
+            ? await saveRefereeScheduling(tournamentId, values.refereeScheduling)
+            : null;
 
-          showSuccess("Tournoi modifié.");
+          showSuccess(editSavedMessage(fieldsSent, planning, values.refereeScheduling));
           router.push(`/tournois/${tournamentId}`);
           router.refresh();
         }}

@@ -68,6 +68,16 @@ export async function setRefereeScheduling(
       if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
       if (!canToggleRefereeScheduling(tournament.state)) throw new Error("TOURNAMENT_FINISHED");
 
+      // Sans changement, rien à écrire ni à annoncer : le formulaire d'édition
+      // renvoie la valeur affichée à chaque enregistrement, et rejouer
+      // l'allumage sur une option déjà allumée republierait l'instantané (et
+      // viderait les caches) pour rien.
+      const changed = (Number(tournament.referee_scheduling) === 1) !== enabled;
+      if (!changed) {
+        await connection.commit();
+        return { tournamentName: tournament.name, changed, movedToPlanning: 0 };
+      }
+
       await connection.execute(`UPDATE bg_tournaments SET referee_scheduling = ? WHERE id = ?`, [
         enabled ? 1 : 0,
         tournamentId,
@@ -113,7 +123,7 @@ export async function setRefereeScheduling(
       await connection.commit();
       return {
         tournamentName: tournament.name,
-        changed: (Number(tournament.referee_scheduling) === 1) !== enabled,
+        changed,
         movedToPlanning,
       };
     } catch (error) {
@@ -123,6 +133,6 @@ export async function setRefereeScheduling(
   });
 
   // La carte change (l'option y est publique) : listes et instantané suivent.
-  publishUpdatedEvent(tournamentId);
+  if (result.changed) publishUpdatedEvent(tournamentId);
   return { tournamentId, enabled, ...result };
 }

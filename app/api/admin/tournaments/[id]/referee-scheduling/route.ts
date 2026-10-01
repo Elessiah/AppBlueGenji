@@ -41,7 +41,11 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
         { id: user.id, pseudo: user.pseudo },
       );
     }
-    return ok({ enabled: result.enabled, movedToPlanning: result.movedToPlanning });
+    return ok({
+      enabled: result.enabled,
+      changed: result.changed,
+      movedToPlanning: result.movedToPlanning,
+    });
   } catch (error) {
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);

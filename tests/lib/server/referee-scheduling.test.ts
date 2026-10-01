@@ -109,6 +109,22 @@ describe("setRefereeScheduling", () => {
     expect((await setRefereeScheduling(7, false)).changed).toBe(true);
   });
 
+  // Le formulaire d'édition renvoie la valeur affichée à chaque
+  // enregistrement : sans changement, ni écriture ni publication.
+  it("ne réécrit ni ne publie rien quand l'option ne change pas", async () => {
+    const { statements, connection } = world({ state: "RUNNING", referee_scheduling: 1 });
+    const result = await setRefereeScheduling(7, true);
+    expect(result).toMatchObject({ changed: false, movedToPlanning: 0 });
+    expect(statements).toHaveLength(1);
+    expect(connection.commit).toHaveBeenCalledTimes(1);
+    expect(publishUpdatedEvent).not.toHaveBeenCalled();
+  });
+
+  it("refuse tout de même un tournoi terminé quand rien ne change", async () => {
+    world({ state: "FINISHED", referee_scheduling: 1 });
+    await expect(setRefereeScheduling(7, true)).rejects.toThrow("TOURNAMENT_FINISHED");
+  });
+
   it("éteint l'option sans rien réécrire des matchs : la phase se dérive", async () => {
     const { statements } = world({ state: "RUNNING", referee_scheduling: 1 });
 
