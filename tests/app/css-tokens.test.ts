@@ -22,8 +22,9 @@ function cssFiles(): string[] {
  * `--accent-*`, `--line`, `--radius`, `--danger`. Conséquence visible :
  * `body { color: var(--text-0) }` retombait sur du noir, et les ~90 endroits qui
  * écrivent `color: var(--text-2)` sans valeur de repli rendaient du noir sur
- * fond noir. Le second bloc `:root` (tokens cyber `--ink`, `--blue-*`) restait
- * intact, ce qui masquait la panne sur la plupart des écrans.
+ * fond noir. Le second bloc `:root` d'alors (tokens cyber `--ink`, `--blue-*`,
+ * fusionnés depuis dans le premier) restait intact, ce qui masquait la panne
+ * sur la plupart des écrans.
  *
  * Le piège se remet tout seul : un éditeur Windows qui réenregistre en
  * « UTF-8 avec BOM » suffit, et rien n'échoue — ni le build, ni le lint.

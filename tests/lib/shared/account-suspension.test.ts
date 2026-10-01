@@ -230,6 +230,17 @@ describe("exposé à la connexion refusée", () => {
     }
   });
 
+  it("encode en base64url sans bourrage, quel que soit le reste de la division par trois", () => {
+    // Ces motifs couvrent zéro, un et deux « = » de bourrage, et des « + » / « / » à traduire.
+    for (const reason of ["ab", "abc", "abcd", "?>?>é", "ÿÿÿ~~"]) {
+      const small = toSuspensionNotice({ id: 7, reason, ground: "CONTENT", endsAt: null });
+      const encoded = encodeSuspensionNotice(small);
+      expect(encoded).toBe(Buffer.from(JSON.stringify(small), "utf8").toString("base64url"));
+      expect(encoded).toMatch(/^[\w-]+$/);
+      expect(parseSuspensionNotice(encoded)).toEqual(small);
+    }
+  });
+
   it("garde une échéance nulle (durée indéterminée)", () => {
     expect(parseSuspensionNotice({ ...notice, endsAt: null })?.endsAt).toBeNull();
   });
