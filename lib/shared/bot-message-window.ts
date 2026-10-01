@@ -55,16 +55,27 @@ export function normalizeBotStats(raw: unknown): BotStats {
  * Une ligne de `/internal/servers` : `relays7j`, ou `relays30j` d'un bot
  * d'avant. Le reste de la ligne n'est pas validé ici — le tableau le lit par
  * `botPayloadNumber` et ses voisins, qui rendent un tiret plutôt qu'un zéro.
+ *
+ * Une ligne qui n'est pas un objet (`null`, chaîne, tableau) est rendue
+ * **telle quelle** : le tableau l'écarte comme illisible, et l'habiller en
+ * objet la ferait passer pour un serveur vide.
  */
 export function normalizeBotServerEntry(raw: unknown): BotServerEntry {
-  const record = asRecord(raw);
-  const { relays30j, ...rest } = record;
-  return { ...rest, relays7j: record.relays7j ?? relays30j } as BotServerEntry;
+  if (!isPlainRecord(raw)) return raw as BotServerEntry;
+  const { relays30j, ...rest } = raw;
+  return { ...rest, relays7j: raw.relays7j ?? relays30j } as BotServerEntry;
 }
 
-/** `/internal/servers` entier ; `servers` absent ou mal typé reste tel quel. */
+/**
+ * `/internal/servers` entier. Une charge qui n'est pas un objet, ou une liste
+ * `servers` absente ou mal typée, reste telle quelle — le tableau en dit
+ * déjà ce qu'il faut.
+ */
 export function normalizeBotServersPayload(raw: unknown): BotServersPayload {
-  const record = asRecord(raw);
-  const servers = Array.isArray(record.servers) ? record.servers.map(normalizeBotServerEntry) : record.servers;
-  return { ...record, servers } as BotServersPayload;
+  if (!isPlainRecord(raw) || !Array.isArray(raw.servers)) return raw as BotServersPayload;
+  return { ...raw, servers: raw.servers.map(normalizeBotServerEntry) } as BotServersPayload;
+}
+
+function isPlainRecord(value: unknown): value is RawRecord {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
 }

@@ -73,8 +73,15 @@ describe("normalizeBotServersPayload", () => {
     expect(payload).toMatchObject({ total: 1, limit: 8, offset: 0 });
   });
 
-  it("ne touche pas à une liste absente ou mal typée", () => {
+  it("ne touche pas à une liste absente ou mal typée, ni à une charge qui n'est pas un objet", () => {
     expect(normalizeBotServersPayload({ servers: "x" }).servers).toBe("x");
-    expect(normalizeBotServersPayload(null).servers).toBeUndefined();
+    expect(normalizeBotServersPayload(null)).toBeNull();
+  });
+
+  it("laisse illisibles les lignes qui ne sont pas des objets", () => {
+    // Habillées en `{ relays7j: undefined }`, elles passeraient pour des
+    // serveurs vides au lieu d'être écartées par le tableau.
+    const payload = normalizeBotServersPayload({ servers: [null, [], "x", { relays30j: 1 }] });
+    expect(payload.servers).toEqual([null, [], "x", { relays7j: 1 }]);
   });
 });
