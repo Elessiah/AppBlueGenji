@@ -256,6 +256,9 @@ export function readMatchStartEntry(
   if (current !== null) {
     const kept = parisParts(current);
     if (kept.day === day && kept.month === month) {
+      // Heure inchangée aussi : l'instant tel quel — la seconde occurrence de
+      // l'heure doublée d'octobre ne se relirait pas en première.
+      if (kept.hour === time.hour && kept.minute === time.minute) return { kind: "ready", instant: current };
       return { kind: "ready", instant: parisInstant(kept.year, month, day, time.hour, time.minute) };
     }
   }
