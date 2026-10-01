@@ -40,7 +40,7 @@ export function TeamSigil({
   size = 32,
   logoUrl = null,
 }: TeamSigilProps) {
-  const radius = size === 24 ? "4px" : size === 32 ? "6px" : "6px";
+  const radius = size === 24 ? "4px" : "6px";
   // Le cadre est carré et de taille fixe : c'est le texte qui s'y adapte, pas
   // l'inverse. Une valeur plus longue que le maximum d'un sigle est tronquée
   // plutôt que rendue illisible.

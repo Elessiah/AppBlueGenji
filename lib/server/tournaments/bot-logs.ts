@@ -108,7 +108,7 @@ type AssertSameKinds = [
   BotEventKind extends PendingBotLog["kind"] ? true : never,
 ];
 const KINDS_MATCH: AssertSameKinds = [true, true];
-void KINDS_MATCH;
+void KINDS_MATCH; // NOSONAR typescript:S3735 — assertion de type à la compilation, marquée utilisée
 
 /**
  * Une ligne prête à partir, le canal qui doit la porter, et l'entrée dont elle

@@ -21,6 +21,8 @@
  * ne fait pas foi).
  */
 
+import { trimTrailingSlashes } from "./trim-trailing";
+
 /** Destination de repli : l'accueil de l'espace compétitif. */
 export const DEFAULT_REDIRECT = "/tournois";
 
@@ -79,11 +81,11 @@ export function signedInLoginRedirect(value: unknown): string {
   const target = safeRedirectPath(value);
   let path: string;
   try {
-    path = decodeURIComponent(new URL(target, "http://site.invalid").pathname);
+    path = decodeURIComponent(new URL(target, "http://site.invalid").pathname); // NOSONAR typescript:S5332 — base fictive pour analyser un chemin, aucune requête
   } catch {
     // Encodage illisible : dans le doute, la destination par défaut.
     return DEFAULT_REDIRECT;
   }
-  path = path.replace(/\/+$/, "");
+  path = trimTrailingSlashes(path);
   return path === LOGIN_PATH || path.startsWith(`${LOGIN_PATH}/`) ? DEFAULT_REDIRECT : target;
 }

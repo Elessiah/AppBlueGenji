@@ -605,7 +605,8 @@ function qualificationMatches(
     }
   }
 
-  return matches.sort((x, y) => x.slot - y.slot).map((entry) => entry.match);
+  matches.sort((x, y) => x.slot - y.slot);
+  return matches.map((entry) => entry.match);
 }
 
 /**

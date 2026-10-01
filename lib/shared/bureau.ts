@@ -39,7 +39,7 @@ export const BUREAU_COLORS = [
 
 /** Renvoie une couleur aléatoire de la palette du bureau. */
 export function randomBureauColor(): string {
-  return BUREAU_COLORS[Math.floor(Math.random() * BUREAU_COLORS.length)];
+  return BUREAU_COLORS[Math.floor(Math.random() * BUREAU_COLORS.length)]; // NOSONAR typescript:S2245 — couleur décorative
 }
 
 /**

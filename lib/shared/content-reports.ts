@@ -342,7 +342,7 @@ function cleanText(value: unknown, keepNewlines: boolean): string {
  * qui ne peut pas en être une — un staff qui répond à « bonjour » perd son temps.
  */
 export function isPlausibleEmail(value: string): boolean {
-  return value.length <= REPORT_CONTACT_EMAIL_MAX_LENGTH && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return value.length <= REPORT_CONTACT_EMAIL_MAX_LENGTH && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value); // NOSONAR typescript:S8786 — longueur bornée avant le test (court-circuit)
 }
 
 /**
@@ -356,7 +356,7 @@ export function normalizeReportPagePath(value: unknown): string | null {
   const path = value.trim();
   if (path.length === 0 || path.length > REPORT_PAGE_PATH_MAX_LENGTH) return null;
   if (!path.startsWith("/") || path.startsWith("//") || path.startsWith("/\\")) return null;
-  if (/[\u0000-\u001F\u007F\s]/.test(path)) return null;
+  if (/[\u0000-\u001F\u007F]/.test(path) || /\s/.test(path)) return null;
   return path;
 }
 

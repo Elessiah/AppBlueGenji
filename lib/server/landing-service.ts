@@ -559,8 +559,8 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
 
     entries.push(...(await loadNewsEntries(db)));
 
+    entries.sort((left, right) => right.sortAt - left.sortAt);
     const items = entries
-      .sort((left, right) => right.sortAt - left.sortAt)
       .slice(0, 10)
       .map((entry) => entry.text);
 

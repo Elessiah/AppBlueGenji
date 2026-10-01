@@ -226,6 +226,10 @@ describe("normalizeReportPagePath", () => {
     "equipes/4",
     "/avec espace",
     "/saut\nde-ligne",
+    "/nul\u0000x",
+    "/del\u007Fx",
+    "/insecable x",
+    "/tab\tx",
     "",
     `/${"a".repeat(400)}`,
   ])("écarte ce qui n'est pas un chemin du site : %p", (value) => {

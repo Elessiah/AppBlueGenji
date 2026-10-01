@@ -427,7 +427,7 @@ export function PhaseCard({
                   <NumberInput
                     id={fieldId("qualifierValue")}
                     {...invalidAttrs("qualifierValue")}
-                    min={phase.qualifierMode === "COUNT" ? 1 : 1}
+                    min={1}
                     max={phase.qualifierMode === "COUNT" ? maxTeams : 99}
                     disabled={disabled}
                     value={phase.qualifierValue}

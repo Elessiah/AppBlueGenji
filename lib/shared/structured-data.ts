@@ -51,7 +51,7 @@ export type JsonLdNode = Record<string, unknown>;
 
 /** Retire la barre oblique finale d'une racine, pour ne jamais écrire `//`. */
 function normalizeBase(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, "");
+  return baseUrl.replace(/\/+$/, ""); // NOSONAR typescript:S8786 — adresse du site tirée de la configuration
 }
 
 /**

@@ -229,7 +229,7 @@ export function isAllowedPushEndpoint(endpoint: string): boolean {
 /** Décodage base64url tolérant (avec ou sans remplissage) ; `null` si invalide. */
 export function decodeBase64Url(value: string): Uint8Array | null {
   if (!/^[A-Za-z0-9_-]*={0,2}$/.test(value)) return null;
-  const base64 = value.replace(/=+$/, "").replace(/-/g, "+").replace(/_/g, "/");
+  const base64 = value.replace(/=+$/, "").replace(/-/g, "+").replace(/_/g, "/"); // NOSONAR typescript:S8786 — au plus deux = de fin, imposé par le test précédent
   if (base64.length % 4 === 1) return null;
   const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
   try {

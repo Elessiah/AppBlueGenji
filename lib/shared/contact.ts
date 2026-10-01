@@ -70,7 +70,7 @@ export const DISCORD_URL_MAX = 200;
 
 // Email : un seul `@`, deux côtés non vides, un point dans le domaine. Volontairement
 // permissif pour ne pas rejeter d'adresses exotiques valides.
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/; // NOSONAR typescript:S8786 — longueur bornée par EMAIL_MAX avant le test
 // Tag Discord : pas d'espace (les pseudos Discord n'en contiennent pas).
 const DISCORD_TAG_RE = /^\S+$/;
 // Hôtes acceptés pour le lien Discord.

@@ -316,7 +316,7 @@ async function pseudoExists(candidate: string): Promise<boolean> {
 
 export async function ensureUniquePseudo(raw: string): Promise<string> {
   const normalized = normalizePseudo(raw);
-  const safe = slugifyPseudo(normalized) || `player${Math.floor(Math.random() * 10000)}`;
+  const safe = slugifyPseudo(normalized) || `player${Math.floor(Math.random() * 10000)}`; // NOSONAR typescript:S2245 — pseudo par défaut, unicité tenue par pseudoExists, pas un secret
 
   if (!(await pseudoExists(safe))) {
     return safe;

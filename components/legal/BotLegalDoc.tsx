@@ -139,7 +139,7 @@ function Block({ block }: { block: LegalBlock }) {
  */
 function renderInline(text: string): ReactNode {
   // Découpe sur les liens markdown, puis traite le gras dans chaque segment.
-  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g;
+  const linkRe = /\[([^\]]+)\]\(([^)]+)\)/g; // NOSONAR typescript:S8786 — Markdown du dépôt du bot, source de confiance
   const nodes: ReactNode[] = [];
   let last = 0;
   let match: RegExpExecArray | null;
