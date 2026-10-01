@@ -2,6 +2,7 @@ import { describe, expect, it } from "@jest/globals";
 import {
   canShowEditButton,
   editLockNotice,
+  FINISHED_EDIT_NOTICE,
 } from "@/app/(secured)/tournois/[id]/_lib/edit-entry";
 
 const NOW = Date.parse("2026-08-27T12:00:00.000Z");
@@ -23,8 +24,14 @@ describe("canShowEditButton", () => {
     expect(canShowEditButton(card(), false, NOW)).toBe(false);
   });
 
-  it("cache le bouton sur un tournoi lancé", () => {
-    expect(canShowEditButton(card({ state: "RUNNING" }), true, NOW)).toBe(false);
+  // Lancé, seul l'interrupteur de planification reste réglable : le bouton y
+  // mène, il ne doit donc pas disparaître au coup d'envoi.
+  it("montre le bouton sur un tournoi lancé (planification encore réglable)", () => {
+    expect(canShowEditButton(card({ state: "RUNNING" }), true, NOW)).toBe(true);
+  });
+
+  it("cache le bouton lancé à un utilisateur sans permission", () => {
+    expect(canShowEditButton(card({ state: "RUNNING" }), false, NOW)).toBe(false);
   });
 
   it("cache le bouton sur un tournoi terminé", () => {
@@ -45,5 +52,13 @@ describe("editLockNotice", () => {
 
   it("explique le verrouillage d'un tournoi lancé", () => {
     expect(editLockNotice("STARTED", iso(-24))).toMatch(/en cours|lanc/i);
+  });
+
+  it("dit ce qui reste réglable sur un tournoi lancé", () => {
+    expect(editLockNotice("STARTED", iso(-24))).toContain("planification des matchs");
+  });
+
+  it("dit d'un tournoi terminé qu'il n'est plus modifiable", () => {
+    expect(FINISHED_EDIT_NOTICE).toMatch(/terminé.*plus modifiable/);
   });
 });
