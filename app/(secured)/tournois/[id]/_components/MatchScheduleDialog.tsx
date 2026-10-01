@@ -16,10 +16,8 @@ import {
   matchEntryReference,
   matchEntryTimeValue,
   matchStartEntryOf,
-  matchStartParisYear,
   readMatchStartEntry,
   nextValidYearShift,
-  shiftMatchStartYear,
   withYearShift,
   type MatchStartEntryField,
   type MatchStartEntryState,
@@ -67,7 +65,7 @@ function pendingPreview(state: MatchStartEntryState): string | null {
 
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit du tournoi.";
+  const year = "L'année se déduit automatiquement : vérifie l'aperçu.";
   if (refereeScheduling) {
     return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
@@ -194,12 +192,13 @@ export function MatchScheduleDialog({
   );
   const deduced = readMatchStartEntry({ day, month, time, timeBadInput }, reference, match.startAt);
   const entry = withYearShift(deduced, yearShift);
-  // Décalage et date de chaque bouton : un cran, ou quatre pour un 29 février.
+  // Décalage de chaque bouton : un cran, ou quatre pour un 29 février. Libellés
+  // fixes (« Année précédente ») : un libellé qui changerait au clic, sous le
+  // focus, ferait reculer de deux ans au double-clic sans qu'on le voie venir.
   const shiftTarget = (direction: -1 | 1) => {
     if (deduced.kind !== "ready") return null;
     const shift = nextValidYearShift(deduced.instant, yearShift, direction);
-    const instant = shift === null ? null : shiftMatchStartYear(deduced.instant, shift);
-    return shift === null || instant === null ? null : { shift, year: matchStartParisYear(instant) };
+    return shift === null ? null : { shift };
   };
   const previousYear = shiftTarget(-1);
   const nextYear = shiftTarget(1);
@@ -447,7 +446,7 @@ export function MatchScheduleDialog({
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
-                  Plutôt en {previousYear.year}
+                  Année précédente
                 </button>
               )}
               {nextYear !== null && (
@@ -459,7 +458,7 @@ export function MatchScheduleDialog({
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
-                  Plutôt en {nextYear.year}
+                  Année suivante
                 </button>
               )}
             </div>

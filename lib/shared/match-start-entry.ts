@@ -337,8 +337,3 @@ export function withYearShift(state: MatchStartEntryState, years: number): Match
   const instant = shiftMatchStartYear(state.instant, years);
   return instant === null ? { kind: "invalid", field: "day" } : { kind: "ready", instant };
 }
-
-/** Année de Paris d'un instant (libellé des boutons de décalage). */
-export function matchStartParisYear(instant: number): number {
-  return parisParts(instant).year;
-}
