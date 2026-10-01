@@ -283,19 +283,30 @@ export function readMatchStartEntry(
   if (month === null || !isIntegerIn(month, 1, 12)) return { kind: "incomplete", field: "month" };
   if (time === null) return { kind: "incomplete", field: "time" };
 
-  const current = matchStartAtTime({ startAt: currentStartAt });
-  if (current !== null) {
-    const kept = parisParts(current);
-    if (kept.day === day && kept.month === month) {
-      // Heure inchangée aussi : l'instant tel quel — la seconde occurrence de
-      // l'heure doublée d'octobre ne se relirait pas en première.
-      if (kept.hour === time.hour && kept.minute === time.minute) return { kind: "ready", instant: current };
-      return { kind: "ready", instant: parisInstant(kept.year, month, day, time.hour, time.minute) };
-    }
-  }
-
-  const instant = resolveMatchStartEntry({ day, month, ...time }, reference);
+  const instant =
+    keptYearInstant(currentStartAt, day, month, time) ?? resolveMatchStartEntry({ day, month, ...time }, reference);
   return instant === null ? { kind: "invalid", field: "day" } : { kind: "ready", instant };
+}
+
+/**
+ * La saisie à l'année de la date déjà posée, si le jour et le mois restent
+ * les siens ; `null` sinon (pas de date posée, ou jour/mois changés), et la
+ * déduction reprend la main.
+ */
+function keptYearInstant(
+  currentStartAt: MatchScheduleInput["startAt"],
+  day: number,
+  month: number,
+  time: Pick<MatchStartEntry, "hour" | "minute">,
+): number | null {
+  const current = matchStartAtTime({ startAt: currentStartAt });
+  if (current === null) return null;
+  const kept = parisParts(current);
+  if (kept.day !== day || kept.month !== month) return null;
+  // Heure inchangée aussi : l'instant tel quel — la seconde occurrence de
+  // l'heure doublée d'octobre ne se relirait pas en première.
+  if (kept.hour === time.hour && kept.minute === time.minute) return current;
+  return parisInstant(kept.year, month, day, time.hour, time.minute);
 }
 
 /**
