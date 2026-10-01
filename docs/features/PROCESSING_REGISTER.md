@@ -129,4 +129,4 @@ Ce que le registre dit honnêtement et qui mériterait une décision :
   qu'on cite souvent sont la durée de vie des **traceurs** (le site n'en pose
   qu'un pour compter les visites, une marque `sessionStorage` qui meurt avec
   l'onglet). L'empreinte illimitée est ce qui mériterait une décision.
-- **Journal Discord du staff (T05)** : aucune purge automatique du salon.
+- **Journal Discord du staff (T05)** : le bot purge ses messages du salon au bout d'un an (`BOT_STAFF_LOG_RETENTION_DAYS`, blueGenjiBot#37), par lots ; avant, seule la purge à la main de l'association.
