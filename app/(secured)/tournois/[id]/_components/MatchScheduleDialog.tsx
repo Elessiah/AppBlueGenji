@@ -431,12 +431,12 @@ export function MatchScheduleDialog({
             </button>
           )}
           {entry.kind === "ready" && yearFixOpen && (previousYear !== null || nextYear !== null) && (
-            <div
+            <fieldset
               id={YEAR_FIX_ID}
-              role="group"
-              aria-label="Corriger l'année"
-              style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}
+              style={{ margin: "6px 0 0", padding: 0, border: 0, minWidth: 0 }}
             >
+              <legend className="sr-only">Corriger l&apos;année</legend>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
               {previousYear !== null && (
                 <button
                   type="button"
@@ -461,7 +461,8 @@ export function MatchScheduleDialog({
                   Année suivante
                 </button>
               )}
-            </div>
+              </div>
+            </fieldset>
           )}
           <p
             id={HINT_ID}
