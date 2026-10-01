@@ -339,9 +339,9 @@ export function PhaseCard({
 
       {/* Expanded content — la région existe toujours, pour que `aria-controls`
           du bouton de repli désigne un élément réel même une fois replié. */}
-      <div
+      <fieldset
+        className="native-group"
         id={bodyId}
-        role="group"
         aria-labelledby={toggleId}
         hidden={!isExpanded}
         style={{
@@ -609,7 +609,7 @@ export function PhaseCard({
             )}
           </div>
         )}
-      </div>
+      </fieldset>
     </div>
   );
 }

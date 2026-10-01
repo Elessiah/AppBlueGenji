@@ -114,8 +114,8 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
   };
 
   return (
-    <div className={styles.overlay} role="presentation">
-      <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation">
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         className={styles.modal}
         role="dialog"

@@ -160,7 +160,7 @@ export function MatchScheduleDialog({
   };
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       {...backdrop}
       style={{
@@ -174,7 +174,7 @@ export function MatchScheduleDialog({
         padding: 16,
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

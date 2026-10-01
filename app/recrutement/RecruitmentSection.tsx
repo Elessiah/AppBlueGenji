@@ -477,7 +477,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
         </header>
 
         {showFilter && (
-          <div className={styles.filters} role="group" aria-label="Filtrer par pôle">
+          <fieldset className={`native-group ${styles.filters}`} aria-label="Filtrer par pôle">
             <button
               type="button"
               className={`${styles.filter} ${domainFilter === ALL_DOMAINS ? styles.filterOn : ""}`}
@@ -498,7 +498,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rec
                 <span className={styles.filterCount}>{domainCounts.get(d) ?? 0}</span>
               </button>
             ))}
-          </div>
+          </fieldset>
         )}
 
         {total === 0 ? (

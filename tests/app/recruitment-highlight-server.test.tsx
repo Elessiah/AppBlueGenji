@@ -121,7 +121,7 @@ describe("RecruitmentHighlight — banderole", () => {
   it("place la banderole dans le HTML initial", () => {
     const markup = render({ bannerAds: [important] });
     expect(markup).toContain("Cherche graphiste");
-    expect(markup).toMatch(/role="region"/);
+    expect(markup).toMatch(/<section class="banner" aria-label="Annonces de recrutement"/);
   });
 
   it("n'accorde la pastille « Urgente » qu'aux prioritaires", () => {
@@ -184,7 +184,7 @@ describe("RecruitmentHighlight — banderole", () => {
 
   it("se montre avec la modale : les deux ne s'excluent plus", () => {
     const markup = render({ modalAds: [urgent], bannerAds: [urgent, important] });
-    expect(markup).toMatch(/role="region"/);
+    expect(markup).toMatch(/<section class="banner" aria-label="Annonces de recrutement"/);
     expect(markup).toMatch(/role="dialog"/);
   });
 });

@@ -83,8 +83,8 @@ export function GhostTeamDialog({ onClose, onCreated }: GhostTeamDialogProps) {
   // d'empilement de `main.page-shell` (`z-index: 1`), sous la barre de
   // navigation (`z-index: 50`), qui restait nette et cliquable par-dessus le voile.
   return createPortal(
-    <div className={s.backdrop} role="presentation" {...backdrop}>
-      <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={s.backdrop} role="presentation" {...backdrop}>
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         className={s.panel}
         role="dialog"

@@ -184,12 +184,12 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   };
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       className={styles.backdrop}
       role="presentation"
       {...backdrop}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         className={styles.dialog}
         role="dialog"
@@ -212,13 +212,13 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
             {matchFormat && <Pill variant="blue">{matchFormatLabel(matchFormat)}</Pill>}
           </div>
 
-          {/* `role="status"` : le résultat enregistré peut changer sous les yeux
+          {/* `<output>` (région d'état native) : le résultat enregistré peut changer sous les yeux
               du lecteur (le flux apporte la saisie d'un autre arbitre), et le
               changement doit s'entendre autant qu'il se voit. */}
           {stored && (
-            <p className={styles.stored} role="status">
+            <output className={`${styles.stored} ${styles.notice}`}>
               {stored}
-            </p>
+            </output>
           )}
 
           {/* `<output>` : une région d'état native, que la phase peut changer
@@ -232,9 +232,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
           )}
 
           {proposalNotice && (
-            <p className={styles.stored} role="status">
+            <output className={`${styles.stored} ${styles.notice}`}>
               {proposalNotice}
-            </p>
+            </output>
           )}
 
           {form.conflict && (
@@ -378,9 +378,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               à défaut celle de l'enregistrement. Les empiler ferait répéter deux
               fois la même phrase dans le cas courant. */}
           {blocker && (
-            <p className={styles.blocker} role="status">
+            <output className={`${styles.blocker} ${styles.notice}`}>
               {scoreBlockerMessage(blocker, matchFormat)}
-            </p>
+            </output>
           )}
 
           <div className={styles.actions}>

@@ -223,8 +223,8 @@ export function GhostRegistrationDialog({
   // Portée dans <body> : rendue dans la page, elle restait sous la barre de
   // navigation (contexte d'empilement de `main.page-shell`).
   return createPortal(
-    <div role="presentation" {...backdrop} className={styles.overlay}>
-      <form
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" {...backdrop} className={styles.overlay}>
+      <form /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef as unknown as React.Ref<HTMLFormElement>}
         role="dialog"
         aria-modal="true"

@@ -30,7 +30,7 @@ export function SuspensionNoticeDialog({ notice, onClose }: { notice: Suspension
   const ground = SUSPENSION_GROUND_DEFINITIONS[notice.ground];
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       {...backdrop}
       style={{
@@ -44,7 +44,7 @@ export function SuspensionNoticeDialog({ notice, onClose }: { notice: Suspension
         backdropFilter: "blur(4px)",
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

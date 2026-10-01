@@ -36,7 +36,7 @@ export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) 
   // devenait la référence de `position: fixed`, et la notice se centrait au
   // milieu de la page (2 500 px de haut), hors de l'écran.
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       style={{
         position: "fixed",
@@ -49,7 +49,7 @@ export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) 
         backdropFilter: "blur(4px)",
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

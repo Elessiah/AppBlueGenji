@@ -234,8 +234,8 @@ export function PlayerScoreDialog({
       parseScoreInput(scores.score2) !== null);
 
   return createPortal(
-    <div className={styles.backdrop} role="presentation" {...backdrop}>
-      <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.backdrop} role="presentation" {...backdrop}>
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         className={styles.dialog}
         role="dialog"
@@ -256,12 +256,12 @@ export function PlayerScoreDialog({
             {matchFormat && <Pill variant="blue">{matchFormatLabel(matchFormat)}</Pill>}
           </div>
 
-          {/* `role="status"` : l'adversaire peut répondre pendant que la modale
+          {/* `<output>` (région d'état native) : l'adversaire peut répondre pendant que la modale
               est ouverte, et le flux change alors cette phrase. */}
           {status && (
-            <p className={styles.stored} role="status">
+            <output className={`${styles.stored} ${styles.notice}`}>
               {status}
-            </p>
+            </output>
           )}
 
           {canReportScore ? (
@@ -339,9 +339,9 @@ export function PlayerScoreDialog({
           )}
 
           {canReportScore && showBlocker && (
-            <p className={styles.blocker} role="status">
+            <output className={`${styles.blocker} ${styles.notice}`}>
               {blocker}
-            </p>
+            </output>
           )}
 
           <div className={styles.actions}>

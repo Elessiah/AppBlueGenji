@@ -79,7 +79,7 @@ export function loadActivityRange(
  */
 function RangeChips({ range, onChange }: { range: ActivityRange; onChange: (range: ActivityRange) => void }) {
   return (
-    <div className="chart-tools" role="group" aria-label="Plage d'activité affichée">
+    <fieldset className="chart-tools native-group" aria-label="Plage d'activité affichée">
       {RANGES.map((r) => (
         <button
           key={r}
@@ -91,7 +91,7 @@ function RangeChips({ range, onChange }: { range: ActivityRange; onChange: (rang
           {r}
         </button>
       ))}
-    </div>
+    </fieldset>
   );
 }
 

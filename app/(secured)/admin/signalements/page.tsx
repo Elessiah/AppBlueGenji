@@ -225,7 +225,7 @@ function ReportsPanel() {
       </header>
 
       <div className={styles.toolbar}>
-        <div className={styles.tabs} role="group" aria-label="Catégorie">
+        <fieldset className={`native-group ${styles.tabs}`} aria-label="Catégorie">
           {CATEGORY_TABS.map((tab) => (
             <button
               key={tab}
@@ -244,8 +244,8 @@ function ReportsPanel() {
               )}
             </button>
           ))}
-        </div>
-        <div className={styles.segmented} role="group" aria-label="État">
+        </fieldset>
+        <fieldset className={`native-group ${styles.segmented}`} aria-label="État">
           <button
             type="button"
             className={styles.segment}
@@ -273,7 +273,7 @@ function ReportsPanel() {
           <button type="button" className={styles.segment} onClick={() => void load()} disabled={busy}>
             Actualiser
           </button>
-        </div>
+        </fieldset>
       </div>
 
       <div className={styles.layout}>

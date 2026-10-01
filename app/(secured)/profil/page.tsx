@@ -695,7 +695,7 @@ export default function ProfilePage() {
                 nomme donc un **groupe** (un `<label>` sans `for` n'étiquette
                 rien, et le lecteur d'écran n'annonçait pas à quoi se
                 rapportaient les deux boutons). */}
-            <div className="field" role="group" aria-labelledby="profile-avatar-label">
+            <fieldset className="field native-group" aria-labelledby="profile-avatar-label">
               <span id="profile-avatar-label" className={s.groupLabel}>
                 Avatar
               </span>
@@ -736,7 +736,7 @@ export default function ProfilePage() {
               <p className={`${s.hint} ${s.hintMuted}`}>
                 PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo max.
               </p>
-            </div>
+            </fieldset>
             <div className="field">
               <label htmlFor="profile-adult">Statut majeur</label>
               <select

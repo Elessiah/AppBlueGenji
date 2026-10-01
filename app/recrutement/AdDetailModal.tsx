@@ -40,8 +40,8 @@ export function AdDetailModal({ ad, onClose }: AdDetailModalProps) {
   // Portée dans <body>, comme toutes les modales de page : son `z-index` ne
   // doit pas dépendre de ce que contient le `<main>` qui la rend.
   return createPortal(
-    <div className={styles.overlay} role="presentation" {...backdrop}>
-      <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation" {...backdrop}>
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         className={styles.modal}
         role="dialog"

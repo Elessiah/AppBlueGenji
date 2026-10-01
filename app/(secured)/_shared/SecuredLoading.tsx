@@ -23,7 +23,7 @@ import styles from "./SecuredLoading.module.css";
  */
 export function SecuredLoading() {
   return (
-    <div className={styles.shell} role="status" aria-live="polite">
+    <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.shell} role="status" aria-live="polite">
       <span className="sr-only">Chargement…</span>
       <div className={`${styles.bar} ${styles.title}`} aria-hidden="true" />
       <div className={`${styles.bar} ${styles.line}`} aria-hidden="true" />

@@ -42,7 +42,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
   const dialogRef = useDialogBehavior({ open: true, onClose: onRefuse, locked: true });
 
   return (
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       style={{
         position: "fixed",
@@ -55,7 +55,7 @@ export function RgpdConsentModal({ onAccept, onRefuse }: RgpdConsentModalProps) 
         backdropFilter: "blur(4px)",
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

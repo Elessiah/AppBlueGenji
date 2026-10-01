@@ -187,7 +187,7 @@ export function DiscordVerificationDialog({
   if (!mounted) return null;
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       {...backdrop}
       style={{
@@ -201,7 +201,7 @@ export function DiscordVerificationDialog({
         backdropFilter: "blur(4px)",
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

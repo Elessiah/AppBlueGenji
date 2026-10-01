@@ -84,7 +84,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
   };
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       {...backdrop}
       style={{
@@ -98,7 +98,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
         padding: 16,
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
@@ -131,7 +131,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
             </p>
 
             {conflict && (
-              <p
+              <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */
                 role="status"
                 style={{
                   margin: "0 0 16px",

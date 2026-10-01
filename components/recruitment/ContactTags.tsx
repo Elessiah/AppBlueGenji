@@ -48,7 +48,7 @@ export function ContactTags({ ad }: ContactTagsProps) {
 
   return (
     // `group` : sans rôle, le nom « Contacts » serait interdit (`aria-prohibited-attr`).
-    <div className={styles.contactTags} role="group" aria-label="Contacts">
+    <fieldset className={`native-group ${styles.contactTags}`} aria-label="Contacts">
       {ad.contactDiscord &&
         (isUrl(ad.contactDiscord) ? (
           <a
@@ -88,6 +88,6 @@ export function ContactTags({ ad }: ContactTagsProps) {
           <OpenGlyph className={styles.contactTagIcon} />
         </a>
       )}
-    </div>
+    </fieldset>
   );
 }
