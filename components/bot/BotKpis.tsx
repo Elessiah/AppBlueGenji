@@ -2,6 +2,7 @@ import { Sparkline } from "./Sparkline";
 import { BotKpis as BotKpisType } from "@/lib/shared/types";
 import { botPayloadNumber } from "@/lib/shared/bot-payload";
 import { resolveBotKpiDelta } from "@/lib/shared/bot-kpi-delta";
+import { BOT_MESSAGE_WINDOW_LABEL } from "@/lib/shared/bot-message-window";
 
 export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
   const entries = [
@@ -18,13 +19,15 @@ export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
     {
       key: "messages",
       lbl: "Messages traités",
-      unit: "30j",
+      unit: BOT_MESSAGE_WINDOW_LABEL,
+      comparable: false,
       data: kpis?.messages,
     },
     {
       key: "relays",
       lbl: "Relais inter-serveur",
-      unit: "30j",
+      unit: BOT_MESSAGE_WINDOW_LABEL,
+      comparable: false,
       data: kpis?.relays,
     },
   ];
@@ -49,11 +52,18 @@ export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
                   un nom d'auteur est ignoré — la pastille n'aurait alors
                   annoncé que « -8 % », sans son sens. Même piège, et même
                   remède, que `app/(secured)/equipes/cards/TeamCard.tsx`. */}
-              <span className={"kpi-delta " + delta.tone}>
-                {delta.glyph ? <span aria-hidden="true">{delta.glyph} </span> : null}
-                {delta.label}
-                {delta.direction ? <span className="sr-only"> {delta.direction}</span> : null}
-              </span>
+              {/* Messages et relais n'ont pas de période précédente : le bot
+                  les efface au bout de sept jours, et la comparaison à la
+                  période 30–60 jours portait sur une plage toujours vide. Pas
+                  de pastille, même si un bot d'avant envoie encore une
+                  variation. */}
+              {entry.comparable === false ? null : (
+                <span className={"kpi-delta " + delta.tone}>
+                  {delta.glyph ? <span aria-hidden="true">{delta.glyph} </span> : null}
+                  {delta.label}
+                  {delta.direction ? <span className="sr-only"> {delta.direction}</span> : null}
+                </span>
+              )}
             </div>
             <div className="kpi-val">
               {/* `entry.data ? entry.data.value.toLocaleString(…)` : la garde
