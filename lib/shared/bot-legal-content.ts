@@ -77,8 +77,12 @@ export const BOT_COPYRIGHT_HOLDER = "Keryan Houssin";
 // renvoient donc.
 const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
-const LAST_UPDATED_FR = "1er octobre 2026";
-const LAST_UPDATED_EN = "1 October 2026";
+const LAST_UPDATED_FR = "30 septembre 2026";
+const LAST_UPDATED_EN = "30 September 2026";
+// La politique a sa propre date : le passage des sauvegardes chez Hetzner ne
+// touche pas aux conditions, qui gardent la leur.
+const PRIVACY_LAST_UPDATED_FR = "1er octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "1 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
@@ -413,7 +417,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
     eyebrow: "BLUEGENJI BOT · CONFIDENTIALITÉ",
     title: "Politique de\nConfidentialité",
     lastUpdatedLabel: "Dernière mise à jour",
-    lastUpdated: LAST_UPDATED_FR,
+    lastUpdated: PRIVACY_LAST_UPDATED_FR,
     intro:
       "Cette politique vous informe des données que traite le bot Discord **BlueGenji Bot**, de leurs finalités, de leurs durées de conservation, de leurs destinataires et de vos droits (articles 13 et 14 du RGPD).",
     sections: [
@@ -621,7 +625,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
     eyebrow: "BLUEGENJI BOT · PRIVACY",
     title: "Privacy\nPolicy",
     lastUpdatedLabel: "Last updated",
-    lastUpdated: LAST_UPDATED_EN,
+    lastUpdated: PRIVACY_LAST_UPDATED_EN,
     intro:
       "This policy informs you of the data processed by the Discord bot **BlueGenji Bot**, why it is processed, how long it is kept, who receives it and what your rights are (Articles 13 and 14 GDPR).",
     sections: [
