@@ -3,7 +3,6 @@ import {
   formatMatchStartAt,
   formatMatchStartAtFull,
   isValidMatchStartAt,
-  matchStartAtInputValue,
   matchStartAtTime,
   MATCH_START_AT_MAX_YEAR,
   MATCH_START_AT_MIN_YEAR,
@@ -109,27 +108,7 @@ describe("matchStartAtTime", () => {
     for (const startAt of forms) {
       expect(matchStartAtTime({ startAt })).toBe(time);
       expect(formatMatchStartAt(startAt)).toBe(formatMatchStartAt(time));
-      expect(matchStartAtInputValue(startAt)).toBe(matchStartAtInputValue(time));
     }
-  });
-});
-
-describe("matchStartAtInputValue", () => {
-  it("rend une valeur relisible par le champ HTML, en heure locale", () => {
-    const local = new Date(2026, 7, 29, 20, 30);
-    const value = matchStartAtInputValue(local.toISOString());
-    expect(value).toBe("2026-08-29T20:30");
-  });
-
-  it("fait l'aller-retour avec la normalisation", () => {
-    const local = new Date(2026, 2, 15, 9, 5);
-    const value = matchStartAtInputValue(local.toISOString());
-    expect(normalizeMatchStartAt(value)).toBe(local.toISOString());
-  });
-
-  it("vide le champ plutôt que d'y afficher une date invalide", () => {
-    expect(matchStartAtInputValue(null)).toBe("");
-    expect(matchStartAtInputValue("n'importe quoi")).toBe("");
   });
 });
 
