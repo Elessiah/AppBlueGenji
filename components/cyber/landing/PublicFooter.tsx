@@ -5,7 +5,6 @@ import { getContactInfo } from "@/lib/server/contact-service";
 import { AccessibilityFooterLink } from "@/components/accessibility/AccessibilityFooterLink";
 import { FooterContact } from "./FooterContact";
 import styles from "./PublicFooter.module.css";
-import { DISCORD_INVITE_URL } from "@/lib/shared/discord";
 import { TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { ReportProblemButton } from "@/components/reports/ReportProblemButton";
 import { accessibilityFooterLabel } from "@/lib/shared/accessibility-statement";
@@ -17,6 +16,7 @@ import { ASSOCIATION_NAME } from "@/lib/shared/legal-contact";
 // Règlement **intérieur** de l'association — un document de l'association,
 // rangé sous LÉGAL. Les règles des tournois (`/regles`) ne sont pas listées :
 // elles s'ouvrent depuis la page du tournoi et les conditions d'utilisation.
+// Le serveur Discord n'a qu'une entrée, dans CONTACT (lien éditable).
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
@@ -53,12 +53,6 @@ export async function PublicFooter() {
             <ul>
               <li><Link className="tap-target" href="/tournois">Tournois</Link></li>
               <li><Link className="tap-target" href="/joueurs">Classement</Link></li>
-            </ul>
-          </div>
-          <div>
-            <div className={styles.heading}>COMMUNAUTÉ</div>
-            <ul>
-              <li><a className="tap-target" href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">Discord</a></li>
               <li><Link className="tap-target" href="/bot">Bot</Link></li>
             </ul>
           </div>
