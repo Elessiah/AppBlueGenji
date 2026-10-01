@@ -348,21 +348,21 @@ function findSinglePhaseIssue(phase: PhaseConfig, i: number, isLast: boolean): P
   }
 
   // Qualifiants.
-  if (!isLast && !qualifierInBounds(phase)) {
+  if (!isLast && qualifierOutOfBounds(phase)) {
     return issue("INVALID_PHASE_QUALIFIER", i, "qualifierValue");
   }
 
   // Manches SWISS.
-  if (phase.format === "SWISS" && !optionalRoundsInRange(phase.swissTotalRounds, 20)) {
+  if (phase.format === "SWISS" && roundsOutOfRange(phase.swissTotalRounds, 20)) {
     return issue("INVALID_PHASE_SWISS_ROUNDS", i, "swissTotalRounds");
   }
 
   // Cadences SURVIE.
   if (phase.format === "SURVIVAL") {
-    if (!optionalRoundsInRange(phase.survivalRoundsBeforeFirstCut, 50)) {
+    if (roundsOutOfRange(phase.survivalRoundsBeforeFirstCut, 50)) {
       return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsBeforeFirstCut");
     }
-    if (!optionalRoundsInRange(phase.survivalRoundsPerCut, 50)) {
+    if (roundsOutOfRange(phase.survivalRoundsPerCut, 50)) {
       return issue("INVALID_PHASE_SURVIVAL_ROUNDS", i, "survivalRoundsPerCut");
     }
   }
@@ -370,17 +370,19 @@ function findSinglePhaseIssue(phase: PhaseConfig, i: number, isLast: boolean): P
   return null;
 }
 
-/** COUNT ≥ 1, PERCENT dans 1..99 ; un autre mode n'est pas contrôlé ici. */
-function qualifierInBounds(phase: PhaseConfig): boolean {
-  if (phase.qualifierMode === "COUNT") return phase.qualifierValue >= 1;
-  if (phase.qualifierMode === "PERCENT") return phase.qualifierValue >= 1 && phase.qualifierValue <= 99;
-  return true;
+/**
+ * Vrai sur une qualification **hors bornes** : COUNT < 1, PERCENT hors 1..99.
+ * Un autre mode n'est pas contrôlé ici.
+ */
+function qualifierOutOfBounds(phase: PhaseConfig): boolean {
+  if (phase.qualifierMode === "COUNT") return phase.qualifierValue < 1;
+  if (phase.qualifierMode === "PERCENT") return phase.qualifierValue < 1 || phase.qualifierValue > 99;
+  return false;
 }
 
-/** `null` (non renseigné) ou un nombre dans 1..max. */
-function optionalRoundsInRange(value: number | null, max: number): boolean {
-  if (value === null) return true;
-  return typeof value === "number" && value >= 1 && value <= max;
+/** Vrai sur une cadence renseignée qui n'est pas un nombre de 1..max. */
+function roundsOutOfRange(value: number | null, max: number): boolean {
+  return value !== null && (typeof value !== "number" || value < 1 || value > max);
 }
 
 /**
