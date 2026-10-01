@@ -24,7 +24,7 @@ function server(overrides: Partial<BotServerEntry> = {}): BotServerEntry {
     sigil: "NV",
     accentColor: "#5ac8ff",
     memberCount: 12345,
-    relays30j: 4210,
+    relays7j: 4210,
     status: "ok",
     sparkline: [1, 4, 2, 8],
     ...overrides,
@@ -100,9 +100,9 @@ describe("BotServersTable — la grille reste un tableau", () => {
   it("intitule la colonne d'état sans homonyme de la colonne voisine", () => {
     const html = render([server()]);
     expect(html).toContain("ÉTAT DU ");
-    expect(html).toContain("RELAIS 30J");
+    expect(html).toContain("RELAIS 7J");
     // Le qualificatif est un élément à part : c'est lui que le CSS retire sous
-    // 640 px, où la colonne « RELAIS 30J » est masquée et l'homonymie tombe.
+    // 640 px, où la colonne « RELAIS 7J » est masquée et l'homonymie tombe.
     expect(html).toContain('class="srv-col-qualifier"');
   });
 });
@@ -126,7 +126,7 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     const html = render([broken]);
     expect(html).toContain("Sans rien");
     expect(html).toContain("Inconnu");
-    // `memberCount` et `relays30j` absents : un tiret, jamais un zéro — un
+    // `memberCount` et `relays7j` absents : un tiret, jamais un zéro — un
     // serveur où le bot est installé ne peut pas avoir zéro membre, et le
     // panneau au-dessus tient déjà la règle (« refus en `null`, jamais en
     // zéro »). On compte les **cellules** chiffrées : un `toContain("0")`
@@ -145,7 +145,7 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     const html = render([
       server({
         memberCount: "12345" as unknown as number,
-        relays30j: {} as unknown as number,
+        relays7j: {} as unknown as number,
       }),
     ]);
     expect(html).not.toContain("[object Object]");
@@ -202,7 +202,7 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
   });
 
   it("met les nombres au format français des deux côtés", () => {
-    const html = render([server({ memberCount: 12345, relays30j: 54321 })]);
+    const html = render([server({ memberCount: 12345, relays7j: 54321 })]);
     // Un compte groupé à côté d'un compte brut se lisait comme deux échelles.
     expect(html).toContain((12345).toLocaleString("fr-FR"));
     expect(html).toContain((54321).toLocaleString("fr-FR"));
@@ -214,7 +214,7 @@ describe("BotServersTable — une charge abîmée ne fait pas tomber la page", (
     // rendrait aussi illisible que le « 0 » inventé qu'on vient de retirer.
     // C'est la même distinction que le panneau tient plus haut entre
     // « AUCUN SERVEUR » et « RÉPONSE ILLISIBLE ».
-    const html = render([server({ memberCount: 0, relays30j: 0 })]);
+    const html = render([server({ memberCount: 0, relays7j: 0 })]);
     expect([...html.matchAll(/class="srv-num"[^>]*>([^<]*)</g)].map((m) => m[1])).toEqual([
       "0",
       "0",

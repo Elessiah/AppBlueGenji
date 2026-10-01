@@ -142,6 +142,30 @@ describe("BotKpis — la pastille de variation dit ce qu'elle colore", () => {
   });
 });
 
+describe("BotKpis — messages et relais comptés sur la conservation du bot", () => {
+  // Le bot efface ses messages relayés au bout de sept jours : les tuiles
+  // annonçaient « / 30j », et se comparaient à une période 30–60 jours vide.
+  it("annonce la fenêtre de sept jours, plus trente", () => {
+    const html = renderToStaticMarkup(<BotKpis kpis={kpis()} />);
+    expect(html.match(/\/ 7j/g)).toHaveLength(2);
+    expect(html).not.toContain("30j");
+  });
+
+  it("ne pose une pastille de variation que sur serveurs et salons", () => {
+    // Même si un bot d'avant envoie encore une variation pour les messages.
+    const html = renderToStaticMarkup(
+      <BotKpis
+        kpis={kpis({
+          messages: entry({ delta: "+100 %" }),
+          relays: entry({ delta: null }),
+        } as Partial<BotKpisType>)}
+      />,
+    );
+    expect(html.match(/class="kpi-delta /g)).toHaveLength(2);
+    expect(html).not.toContain("+100 %");
+  });
+});
+
 describe("Sparkline — pas de courbe plutôt qu'une courbe fausse", () => {
   it("trace une courbe à partir de deux points", () => {
     const html = renderToStaticMarkup(<Sparkline data={[1, 4, 2]} />);
