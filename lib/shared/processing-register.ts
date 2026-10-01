@@ -464,7 +464,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     sensitiveData: "Aucune",
     retention: [
-      "Messages Discord : conservés dans un salon réservé au staff, purgé à la main par l'association",
+      `Messages Discord : conservés dans un salon réservé au staff, purgé à la main par l'association et, au plus tard, par le bot au bout de ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an, traitement T08)`,
       "Journaux du serveur : selon leur rotation automatique",
     ],
     recipients: [

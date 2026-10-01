@@ -272,8 +272,8 @@ describe("bot legal content matches the bot's code and the association", () => {
     expect(en).toContain(`one year (${BOT_STAFF_LOG_RETENTION_DAYS} days)`);
     expect(fr).toMatch(/sont supprimés à la levée/);
     expect(en).toMatch(/are deleted when it is lifted/);
-    expect(fr).toMatch(/sans passer par Discord/);
-    expect(en).toMatch(/without going through Discord/);
+    expect(fr).toMatch(/la base ne transite plus par Discord/);
+    expect(en).toMatch(/the database no longer travels through Discord/);
     expect(fr).toMatch(/liste fermée/);
     expect(en).toMatch(/closed list/);
     const retention = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08")?.retention ?? []).join(" ");
