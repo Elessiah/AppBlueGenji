@@ -816,154 +816,199 @@ async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertCon
   };
 }
 
+async function resolveTournamentCreatedLog(
+  entry: Extract<PendingBotLog, { kind: "tournament_created" }>,
+): Promise<string | null> {
+  const tournament = await loadTournament(entry.tournamentId);
+  if (!tournament) return null;
+  const message = formatTournamentCreatedLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    format: tournament.format,
+    game: tournament.game,
+    maxTeams: Number(tournament.max_teams),
+    participantType: toParticipantType(tournament.participant_type),
+    startAt: tournament.start_at,
+  });
+  // L'organisateur n'est pas nommé sur Discord ; il l'est dans pm2.
+  if (tournament.organizer_id !== null && tournament.organizer_pseudo !== null) {
+    console.info(
+      staffAuditLine(message, {
+        id: Number(tournament.organizer_id),
+        pseudo: tournament.organizer_pseudo,
+      }),
+    );
+  }
+  return message;
+}
+
+async function resolveRegistrationLog(
+  entry: Extract<PendingBotLog, { kind: "registration" }>,
+): Promise<string | null> {
+  const [tournament, entrantName] = await Promise.all([
+    loadTournament(entry.tournamentId),
+    loadEntrantName(entry.teamId),
+  ]);
+  if (!tournament || !entrantName) return null;
+  return formatRegistrationLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    entrant: logEntrant(entrantName, tournament),
+    registeredTeams: Number(tournament.registered_teams),
+    maxTeams: Number(tournament.max_teams),
+    byStaff: entry.byStaff,
+  });
+}
+
+async function resolveForfeitLog(
+  entry: Extract<PendingBotLog, { kind: "forfeit" }>,
+): Promise<string | null> {
+  const [tournament, entrantName] = await Promise.all([
+    loadTournament(entry.tournamentId),
+    loadEntrantName(entry.teamId),
+  ]);
+  if (!tournament || !entrantName) return null;
+  return formatForfeitLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    entrant: logEntrant(entrantName, tournament),
+  });
+}
+
+async function resolveMatchFinishedLog(
+  entry: Extract<PendingBotLog, { kind: "match_finished" }>,
+): Promise<string | null> {
+  const match = await loadMatch(entry.matchId);
+  // Un bye ou un match fantôme porte un score posé par le moteur, pas saisi
+  // par une équipe : il n'a rien à raconter (et il y en a autant que
+  // d'effectifs impairs).
+  if (!match || Number(match.is_bye ?? 0) === 1) return null;
+  if (!match.team1_name || !match.team2_name) return null;
+  // Un forfait arbitré ne porte aucun score : c'est le seul cas où leur
+  // absence décrit un match bel et bien tranché.
+  const forfeit = match.forfeit_team_id !== null;
+  // Le double forfait non plus : il se clôt sans le moindre score.
+  const doubleForfeit = Number(match.double_forfeit ?? 0) === 1;
+  if (!forfeit && !doubleForfeit && (match.team1_score === null || match.team2_score === null)) {
+    return null;
+  }
+  return formatMatchResultLog({
+    tournament: { id: Number(match.tournament_id), name: match.tournament_name },
+    bracket: String(match.bracket),
+    roundNumber: Number(match.round_number),
+    team1: { name: match.team1_name, participantType: toParticipantType(match.participant_type) },
+    team2: { name: match.team2_name, participantType: toParticipantType(match.participant_type) },
+    team1Score: match.team1_score === null ? null : Number(match.team1_score),
+    team2Score: match.team2_score === null ? null : Number(match.team2_score),
+    forfeit,
+    doubleForfeit,
+  });
+}
+
+async function resolveScoreConflictLog(
+  entry: Extract<PendingBotLog, { kind: "score_conflict" }>,
+): Promise<string | null> {
+  const context = await loadRefereeAlertContext(entry.matchId);
+  return context === null ? null : formatScoreConflictAlert(context);
+}
+
+async function resolveScoreReportStalledLog(
+  entry: Extract<PendingBotLog, { kind: "score_report_stalled" }>,
+): Promise<string | null> {
+  const context = await loadRefereeAlertContext(entry.matchId);
+  return context === null
+    ? null
+    : formatStalledScoreReportAlert(context, SCORE_REPORT_TIMEOUT_MINUTES);
+}
+
+async function resolveTournamentStartedLog(
+  entry: Extract<PendingBotLog, { kind: "tournament_started" }>,
+): Promise<string | null> {
+  const tournament = await loadTournament(entry.tournamentId);
+  if (!tournament) return null;
+  return formatTournamentStartedLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    format: tournament.format,
+    registeredTeams: Number(tournament.registered_teams),
+    participantType: toParticipantType(tournament.participant_type),
+  });
+}
+
+async function resolveTournamentFinishedLog(
+  entry: Extract<PendingBotLog, { kind: "tournament_finished" }>,
+): Promise<string | null> {
+  const tournament = await loadTournament(entry.tournamentId);
+  if (!tournament) return null;
+  return formatTournamentFinishedLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    champion:
+      tournament.champion_name === null ? null : logEntrant(tournament.champion_name, tournament),
+  });
+}
+
+async function resolveTournamentUnderfilledLog(
+  entry: Extract<PendingBotLog, { kind: "tournament_underfilled" }>,
+): Promise<string | null> {
+  const tournament = await loadTournament(entry.tournamentId);
+  if (!tournament) return null;
+  return formatUnderfilledTournamentLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    registeredTeams: Number(tournament.registered_teams),
+    participantType: toParticipantType(tournament.participant_type),
+  });
+}
+
+async function resolveEndurancePenaltyLog(
+  entry: Extract<PendingBotLog, { kind: "endurance_penalty" }>,
+): Promise<string | null> {
+  const [tournament, entrantName] = await Promise.all([
+    loadTournament(entry.tournamentId),
+    loadEntrantName(entry.teamId),
+  ]);
+  if (!tournament || !entrantName) return null;
+  return formatEndurancePenaltyLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    entrant: logEntrant(entrantName, tournament),
+    points: entry.points,
+    reason: entry.reason,
+  });
+}
+
+async function resolveEndurancePenaltyLiftedLog(
+  entry: Extract<PendingBotLog, { kind: "endurance_penalty_lifted" }>,
+): Promise<string | null> {
+  const [tournament, entrantName] = await Promise.all([
+    loadTournament(entry.tournamentId),
+    loadEntrantName(entry.teamId),
+  ]);
+  if (!tournament || !entrantName) return null;
+  return formatEndurancePenaltyLiftedLog({
+    tournament: { id: Number(tournament.id), name: tournament.name },
+    entrant: logEntrant(entrantName, tournament),
+    points: entry.points,
+  });
+}
+
 async function resolveOne(entry: PendingBotLog): Promise<string | null> {
   switch (entry.kind) {
-    case "tournament_created": {
-      const tournament = await loadTournament(entry.tournamentId);
-      if (!tournament) return null;
-      const message = formatTournamentCreatedLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        format: tournament.format,
-        game: tournament.game,
-        maxTeams: Number(tournament.max_teams),
-        participantType: toParticipantType(tournament.participant_type),
-        startAt: tournament.start_at,
-      });
-      // L'organisateur n'est pas nommé sur Discord ; il l'est dans pm2.
-      if (tournament.organizer_id !== null && tournament.organizer_pseudo !== null) {
-        console.info(
-          staffAuditLine(message, {
-            id: Number(tournament.organizer_id),
-            pseudo: tournament.organizer_pseudo,
-          }),
-        );
-      }
-      return message;
-    }
-
-    case "registration": {
-      const [tournament, entrantName] = await Promise.all([
-        loadTournament(entry.tournamentId),
-        loadEntrantName(entry.teamId),
-      ]);
-      if (!tournament || !entrantName) return null;
-      return formatRegistrationLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        entrant: logEntrant(entrantName, tournament),
-        registeredTeams: Number(tournament.registered_teams),
-        maxTeams: Number(tournament.max_teams),
-        byStaff: entry.byStaff,
-      });
-    }
-
-    case "forfeit": {
-      const [tournament, entrantName] = await Promise.all([
-        loadTournament(entry.tournamentId),
-        loadEntrantName(entry.teamId),
-      ]);
-      if (!tournament || !entrantName) return null;
-      return formatForfeitLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        entrant: logEntrant(entrantName, tournament),
-      });
-    }
-
-    case "match_finished": {
-      const match = await loadMatch(entry.matchId);
-      // Un bye ou un match fantôme porte un score posé par le moteur, pas saisi
-      // par une équipe : il n'a rien à raconter (et il y en a autant que
-      // d'effectifs impairs).
-      if (!match || Number(match.is_bye ?? 0) === 1) return null;
-      if (!match.team1_name || !match.team2_name) return null;
-      // Un forfait arbitré ne porte aucun score : c'est le seul cas où leur
-      // absence décrit un match bel et bien tranché.
-      const forfeit = match.forfeit_team_id !== null;
-      // Le double forfait non plus : il se clôt sans le moindre score.
-      const doubleForfeit = Number(match.double_forfeit ?? 0) === 1;
-      if (!forfeit && !doubleForfeit && (match.team1_score === null || match.team2_score === null)) {
-        return null;
-      }
-      return formatMatchResultLog({
-        tournament: { id: Number(match.tournament_id), name: match.tournament_name },
-        bracket: String(match.bracket),
-        roundNumber: Number(match.round_number),
-        team1: { name: match.team1_name, participantType: toParticipantType(match.participant_type) },
-        team2: { name: match.team2_name, participantType: toParticipantType(match.participant_type) },
-        team1Score: match.team1_score === null ? null : Number(match.team1_score),
-        team2Score: match.team2_score === null ? null : Number(match.team2_score),
-        forfeit,
-        doubleForfeit,
-      });
-    }
-
-    case "score_conflict": {
-      const context = await loadRefereeAlertContext(entry.matchId);
-      return context === null ? null : formatScoreConflictAlert(context);
-    }
-
-    case "score_report_stalled": {
-      const context = await loadRefereeAlertContext(entry.matchId);
-      return context === null
-        ? null
-        : formatStalledScoreReportAlert(context, SCORE_REPORT_TIMEOUT_MINUTES);
-    }
-
-    case "tournament_started": {
-      const tournament = await loadTournament(entry.tournamentId);
-      if (!tournament) return null;
-      return formatTournamentStartedLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        format: tournament.format,
-        registeredTeams: Number(tournament.registered_teams),
-        participantType: toParticipantType(tournament.participant_type),
-      });
-    }
-
-    case "tournament_finished": {
-      const tournament = await loadTournament(entry.tournamentId);
-      if (!tournament) return null;
-      return formatTournamentFinishedLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        champion:
-          tournament.champion_name === null ? null : logEntrant(tournament.champion_name, tournament),
-      });
-    }
-
-    case "tournament_underfilled": {
-      const tournament = await loadTournament(entry.tournamentId);
-      if (!tournament) return null;
-      return formatUnderfilledTournamentLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        registeredTeams: Number(tournament.registered_teams),
-        participantType: toParticipantType(tournament.participant_type),
-      });
-    }
-
-    case "endurance_penalty": {
-      const [tournament, entrantName] = await Promise.all([
-        loadTournament(entry.tournamentId),
-        loadEntrantName(entry.teamId),
-      ]);
-      if (!tournament || !entrantName) return null;
-      return formatEndurancePenaltyLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        entrant: logEntrant(entrantName, tournament),
-        points: entry.points,
-        reason: entry.reason,
-      });
-    }
-
-    case "endurance_penalty_lifted": {
-      const [tournament, entrantName] = await Promise.all([
-        loadTournament(entry.tournamentId),
-        loadEntrantName(entry.teamId),
-      ]);
-      if (!tournament || !entrantName) return null;
-      return formatEndurancePenaltyLiftedLog({
-        tournament: { id: Number(tournament.id), name: tournament.name },
-        entrant: logEntrant(entrantName, tournament),
-        points: entry.points,
-      });
-    }
+    case "tournament_created":
+      return resolveTournamentCreatedLog(entry);
+    case "registration":
+      return resolveRegistrationLog(entry);
+    case "forfeit":
+      return resolveForfeitLog(entry);
+    case "match_finished":
+      return resolveMatchFinishedLog(entry);
+    case "score_conflict":
+      return resolveScoreConflictLog(entry);
+    case "score_report_stalled":
+      return resolveScoreReportStalledLog(entry);
+    case "tournament_started":
+      return resolveTournamentStartedLog(entry);
+    case "tournament_finished":
+      return resolveTournamentFinishedLog(entry);
+    case "tournament_underfilled":
+      return resolveTournamentUnderfilledLog(entry);
+    case "endurance_penalty":
+      return resolveEndurancePenaltyLog(entry);
+    case "endurance_penalty_lifted":
+      return resolveEndurancePenaltyLiftedLog(entry);
   }
 }

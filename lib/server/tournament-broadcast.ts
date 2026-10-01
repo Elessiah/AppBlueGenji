@@ -40,7 +40,7 @@
  * personne ne touche à rien. Plus aucune raison de marteler F5.
  */
 import { subscribeTournament } from "./live";
-import { getTournamentSnapshotFrame } from "./tournaments/snapshot";
+import { getTournamentSnapshotFrame, type TournamentSnapshotFrame } from "./tournaments/snapshot";
 import { snapshotFrameBytes, type StreamEncoding } from "./tournament-stream-frames";
 import { REFRESH_CADENCE, type RefreshTier } from "@/lib/shared/refresh-tiers";
 import { computeTournamentState, nextTournamentStateChangeAt } from "@/lib/shared/tournament-state";
@@ -477,6 +477,166 @@ function scheduleFlush(tournamentId: number, room: Room, delayMs: number): void 
 }
 
 /**
+ * « À qui doit-on cette version ? » se demande **par abonné**, et non par
+ * palier : deux connexions d'un même palier peuvent tenir deux versions
+ * différentes, la lecture d'ouverture d'une connexion pouvant précéder une
+ * diffusion qu'elle a manquée.
+ */
+function isBehind(
+  room: Room,
+  subscriber: TournamentSubscriber,
+  frame: TournamentSnapshotFrame,
+): boolean {
+  return subscriberState(room, subscriber).version !== frame.version;
+}
+
+/**
+ * Poids de ce que la salle doit écrire maintenant, compté sur les seuls abonnés
+ * que la cadence de leur palier rend dus : réserver du budget pour des
+ * spectateurs qui ne recevront rien retarderait les joueurs pour rien. Le
+ * plancher qui en découle est commun à la salle, parce qu'un plancher par
+ * palier ferait attendre les 128 inscrits d'un gros tournoi plus longtemps que
+ * la poignée de spectateurs qui les regarde.
+ */
+function dueAudienceBytes(room: Room, frame: TournamentSnapshotFrame, now: number): number {
+  let dueBytes = 0;
+  for (const subscriber of room.subscribers) {
+    if (
+      isBehind(room, subscriber, frame) &&
+      now - subscriberState(room, subscriber).lastSentAt >=
+        REFRESH_CADENCE[subscriber.tier].pushCoalesceMs
+    ) {
+      dueBytes += snapshotFrameBytes(frame, subscriber.encoding ?? "identity").byteLength;
+    }
+  }
+  return dueBytes;
+}
+
+/**
+ * Écrit l'instantané à un abonné si sa fenêtre de regroupement est écoulée.
+ *
+ * @returns Le délai avant le prochain essai qu'il réclame, ou `+∞` s'il n'en
+ *          réclame aucun (servi, ou retiré).
+ */
+function pushToSubscriber(
+  room: Room,
+  subscriber: TournamentSubscriber,
+  frame: TournamentSnapshotFrame,
+  coalesceWindow: number,
+  now: number,
+): number {
+  const state = subscriberState(room, subscriber);
+  const elapsed = now - state.lastSentAt;
+  if (elapsed < coalesceWindow) return coalesceWindow - elapsed;
+
+  try {
+    const bytes = snapshotFrameBytes(frame, subscriber.encoding ?? "identity");
+    if (subscriber.send(bytes) === false) {
+      // File du client pleine : rien n'est parti. Ni version ni horloge
+      // ne bougent, et un nouvel essai est programmé — espacé d'au moins
+      // `BACKED_UP_RETRY_MS` : à la fenêtre du palier (1 s), un client
+      // qui ne lit plus ferait repasser la salle, et reconstruire
+      // l'instantané, en continu jusqu'à sa fermeture.
+      return Math.max(coalesceWindow, BACKED_UP_RETRY_MS);
+    }
+    state.version = frame.version;
+    state.lastSentAt = now;
+  } catch {
+    // Connexion fermée entre-temps : on la retire et on continue.
+    room.subscribers.delete(subscriber);
+    room.states.delete(subscriber);
+  }
+  return Number.POSITIVE_INFINITY;
+}
+
+/**
+ * Sert les abonnés en retard d'un palier.
+ *
+ * @returns Le plus court délai réclamé par ses abonnés (`+∞` : aucun).
+ */
+function pushToTier(
+  room: Room,
+  frame: TournamentSnapshotFrame,
+  tier: RefreshTier,
+  roomFloor: number,
+  now: number,
+): number {
+  const audience = [...room.subscribers].filter(
+    (subscriber) => subscriber.tier === tier && isBehind(room, subscriber, frame),
+  );
+  if (audience.length === 0) return Number.POSITIVE_INFINITY;
+
+  // La fenêtre effective est la plus large des deux : celle du palier, et
+  // celle qu'impose le poids de ce que la salle entière écrit. Sa *durée*
+  // vient du palier ; le moment où elle a commencé appartient, lui, à chaque
+  // connexion — partagé, le rattrapage d'un retardataire remettait à zéro la
+  // cadence de tous ses voisins et les faisait attendre une fenêtre de plus.
+  const coalesceWindow = Math.max(REFRESH_CADENCE[tier].pushCoalesceMs, roomFloor);
+
+  let nextDelay = Number.POSITIVE_INFINITY;
+  for (const subscriber of audience) {
+    nextDelay = Math.min(
+      nextDelay,
+      pushToSubscriber(room, subscriber, frame, coalesceWindow, now),
+    );
+  }
+  return nextDelay;
+}
+
+/**
+ * Programme le réveil d'entretien à la prochaine échéance connue (bascule
+ * d'état, report expiré), à l'heure exacte : sans lui, il faudrait compter sur
+ * chaque client pour se réveiller seul, ce qui ferait repartir cent requêtes à
+ * la même seconde.
+ *
+ * Une échéance manquée se rattrape après le cache ; elle ne passe au pas lent
+ * que si elle survit à une lecture faite **après** l'expiration du cache — une
+ * autre lecture tombée dans la fenêtre (une connexion au coup d'envoi) relit le
+ * même instantané et ne prouve rien. Tant qu'on rattrape, un réveil déjà plus
+ * proche est gardé.
+ */
+function scheduleRoomWake(
+  tournamentId: number,
+  room: Room,
+  snapshot: TournamentSnapshot,
+  now: number,
+): void {
+  const overdue = isRoomOverdue(snapshot, now);
+  if (!overdue) room.overdueSince = null;
+  else room.overdueSince ??= now;
+  const persistent = room.overdueSince !== null && now - room.overdueSince >= STATE_CATCH_UP_MS;
+  scheduleMaintenance(
+    tournamentId,
+    room,
+    nextRoomWakeAt(snapshot, now, persistent ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS),
+    overdue && !persistent,
+  );
+}
+
+/**
+ * Envoie un instantané lu aux paliers dont la fenêtre de regroupement est
+ * écoulée, reprogramme les autres pour le reliquat, et ferme la salle si plus
+ * personne n'y écoute.
+ */
+function deliverFrame(tournamentId: number, room: Room, frame: TournamentSnapshotFrame): void {
+  const now = Date.now();
+  const roomFloor = roomBudgetDelayMs(dueAudienceBytes(room, frame, now));
+
+  let nextDelay = Number.POSITIVE_INFINITY;
+  for (const tier of activeTiers(room)) {
+    nextDelay = Math.min(nextDelay, pushToTier(room, frame, tier, roomFloor, now));
+  }
+
+  if (room.subscribers.size === 0) {
+    closeRoom(tournamentId, room);
+    return;
+  }
+
+  scheduleRoomWake(tournamentId, room, frame.snapshot, now);
+  if (Number.isFinite(nextDelay)) scheduleFlush(tournamentId, room, nextDelay);
+}
+
+/**
  * Recalcule l'instantané et l'envoie aux paliers dont la fenêtre de
  * regroupement est écoulée. Les autres sont reprogrammés pour le reliquat.
  */
@@ -495,7 +655,7 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     // pendant que chaque spectateur gardait une pastille « Direct ». Le chemin
     // d'échec définitif du client ne se déclenche que si le flux tombe : c'est
     // donc à la salle de le faire tomber.
-    let frame: Awaited<ReturnType<typeof getTournamentSnapshotFrame>>;
+    let frame: TournamentSnapshotFrame | null;
     try {
       frame = await getTournamentSnapshotFrame(tournamentId);
     } catch {
@@ -510,101 +670,7 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
     }
     if (room.subscribers.size === 0) return;
 
-    const now = Date.now();
-    let nextDelay = Number.POSITIVE_INFINITY;
-
-    // « À qui doit-on cette version ? » se demande **par abonné**, et non par
-    // palier : deux connexions d'un même palier peuvent tenir deux versions
-    // différentes, la lecture d'ouverture d'une connexion pouvant précéder une
-    // diffusion qu'elle a manquée.
-    const behind = (subscriber: TournamentSubscriber): boolean =>
-      subscriberState(room, subscriber).version !== frame.version;
-
-    // Plancher commun à toute la salle, calculé sur les seuls abonnés que la
-    // cadence de leur palier rend dus : réserver du budget pour des spectateurs
-    // qui ne recevront rien retarderait les joueurs pour rien. Commun, parce
-    // qu'un plancher par palier ferait attendre les 128 inscrits d'un gros
-    // tournoi plus longtemps que la poignée de spectateurs qui les regarde.
-    const dueAudience = [...room.subscribers].filter(
-      (subscriber) =>
-        behind(subscriber) &&
-        now - subscriberState(room, subscriber).lastSentAt >=
-          REFRESH_CADENCE[subscriber.tier].pushCoalesceMs,
-    );
-    let dueBytes = 0;
-    for (const subscriber of dueAudience) {
-      dueBytes += snapshotFrameBytes(frame, subscriber.encoding ?? "identity").byteLength;
-    }
-    const roomFloor = roomBudgetDelayMs(dueBytes);
-
-    for (const tier of activeTiers(room)) {
-      const audience = [...room.subscribers].filter(
-        (subscriber) => subscriber.tier === tier && behind(subscriber),
-      );
-      if (audience.length === 0) continue;
-
-      // La fenêtre effective est la plus large des deux : celle du palier, et
-      // celle qu'impose le poids de ce que la salle entière écrit. Sa *durée*
-      // vient du palier ; le moment où elle a commencé appartient, lui, à chaque
-      // connexion — partagé, le rattrapage d'un retardataire remettait à zéro la
-      // cadence de tous ses voisins et les faisait attendre une fenêtre de plus.
-      const coalesceWindow = Math.max(REFRESH_CADENCE[tier].pushCoalesceMs, roomFloor);
-
-      for (const subscriber of audience) {
-        const state = subscriberState(room, subscriber);
-        const elapsed = now - state.lastSentAt;
-        if (elapsed < coalesceWindow) {
-          nextDelay = Math.min(nextDelay, coalesceWindow - elapsed);
-          continue;
-        }
-
-        try {
-          const bytes = snapshotFrameBytes(frame, subscriber.encoding ?? "identity");
-          if (subscriber.send(bytes) === false) {
-            // File du client pleine : rien n'est parti. Ni version ni horloge
-            // ne bougent, et un nouvel essai est programmé — espacé d'au moins
-            // `BACKED_UP_RETRY_MS` : à la fenêtre du palier (1 s), un client
-            // qui ne lit plus ferait repasser la salle, et reconstruire
-            // l'instantané, en continu jusqu'à sa fermeture.
-            nextDelay = Math.min(nextDelay, Math.max(coalesceWindow, BACKED_UP_RETRY_MS));
-            continue;
-          }
-          state.version = frame.version;
-          state.lastSentAt = now;
-        } catch {
-          // Connexion fermée entre-temps : on la retire et on continue.
-          room.subscribers.delete(subscriber);
-          room.states.delete(subscriber);
-        }
-      }
-    }
-
-    if (room.subscribers.size === 0) {
-      closeRoom(tournamentId, room);
-      return;
-    }
-
-    // Réveil à la prochaine échéance connue (bascule d'état, report expiré),
-    // à l'heure exacte : sans lui, il faudrait compter sur chaque client pour
-    // se réveiller seul, ce qui ferait repartir cent requêtes à la même seconde.
-    //
-    // Une échéance manquée se rattrape après le cache ; elle ne passe au pas
-    // lent que si elle survit à une lecture faite **après** l'expiration du
-    // cache — une autre lecture tombée dans la fenêtre (une connexion au coup
-    // d'envoi) relit le même instantané et ne prouve rien. Tant qu'on rattrape,
-    // un réveil déjà plus proche est gardé.
-    const overdue = isRoomOverdue(frame.snapshot, now);
-    if (!overdue) room.overdueSince = null;
-    else room.overdueSince ??= now;
-    const persistent = room.overdueSince !== null && now - room.overdueSince >= STATE_CATCH_UP_MS;
-    scheduleMaintenance(
-      tournamentId,
-      room,
-      nextRoomWakeAt(frame.snapshot, now, persistent ? ROOM_READ_RETRY_MS : STATE_CATCH_UP_MS),
-      overdue && !persistent,
-    );
-
-    if (Number.isFinite(nextDelay)) scheduleFlush(tournamentId, room, nextDelay);
+    deliverFrame(tournamentId, room, frame);
   } finally {
     room.flushing = false;
     if (room.dirtyAgain) {

@@ -25,6 +25,19 @@ type MatchReplayRow = RowDataPacket & {
   double_forfeit: number | null;
 };
 
+const nullableId = (value: number | null): number | null => (value === null ? null : Number(value));
+
+/** La ligne lue décrit-elle une rencontre réellement disputée ? (`canHaveReplay`) */
+function isReplayableRow(row: MatchReplayRow): boolean {
+  return canHaveReplay({
+    status: row.status,
+    team1Id: nullableId(row.team1_id),
+    team2Id: nullableId(row.team2_id),
+    forfeitTeamId: nullableId(row.forfeit_team_id),
+    doubleForfeit: Number(row.double_forfeit ?? 0) === 1,
+  });
+}
+
 /**
  * Pose (ou efface) le lien de rediff d'un match.
  *
@@ -54,16 +67,7 @@ export async function setMatchReplayUrl(
   if (rows.length === 0) throw new Error("MATCH_NOT_FOUND");
   const row = rows[0];
 
-  if (replayUrl !== null) {
-    const replayable = canHaveReplay({
-      status: row.status,
-      team1Id: row.team1_id === null ? null : Number(row.team1_id),
-      team2Id: row.team2_id === null ? null : Number(row.team2_id),
-      forfeitTeamId: row.forfeit_team_id === null ? null : Number(row.forfeit_team_id),
-      doubleForfeit: Number(row.double_forfeit ?? 0) === 1,
-    });
-    if (!replayable) throw new Error("MATCH_NOT_REPLAYABLE");
-  }
+  if (replayUrl !== null && !isReplayableRow(row)) throw new Error("MATCH_NOT_REPLAYABLE");
 
   // Le statut est relu dans la condition : un retour en arrière passé entre la
   // lecture et l'écriture rouvrirait le match, et le lien s'y poserait quand

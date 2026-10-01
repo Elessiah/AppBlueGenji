@@ -213,6 +213,73 @@ async function planMatchSends(
   return planned;
 }
 
+/**
+ * Envoie un envoi retenu aux deux engagées de la manche.
+ *
+ * @returns Le nombre de messages déclenchés (un par engagée qui a des destinataires).
+ */
+async function dispatchPlannedSend(
+  { match, offset, remaining }: PlannedSend,
+  recipientsByTeam: Awaited<ReturnType<typeof loadRecipientsByTeam>>,
+): Promise<number> {
+  let dispatched = 0;
+  const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
+  const url = tournamentPageUrl(Number(match.tournament_id));
+
+  const sides: { teamId: number; teamName: string; opponentName: string }[] = [
+    {
+      teamId: Number(match.team1_id),
+      teamName: String(match.team1_name),
+      opponentName: String(match.team2_name),
+    },
+    {
+      teamId: Number(match.team2_id),
+      teamName: String(match.team2_name),
+      opponentName: String(match.team1_name),
+    },
+  ];
+
+  // Un message par engagée, pas un pour tout le monde : chaque joueur lit
+  // « ton équipe contre l'autre », dans le bon sens.
+  for (const side of sides) {
+    const recipients = recipientsByTeam.get(side.teamId) ?? [];
+    if (recipients.length === 0) continue;
+
+    const context = {
+      tournamentName: String(match.tournament_name),
+      tournamentUrl: url,
+      teamName: side.teamName,
+      opponentName: side.opponentName,
+      roundLabel,
+      startAt: match.start_at,
+    };
+
+    const message = offset
+      ? buildMatchReminderMessage(offset, context)
+      : buildMatchScheduleAnnouncement(context, remaining);
+
+    await notifyUsers(recipients, {
+      topic: "MATCH_REMINDER",
+      discord: { message, context: offset ? "match-reminder" : "match-scheduled" },
+      push: matchReminderPush(
+        {
+          tournamentId: Number(match.tournament_id),
+          tournamentName: context.tournamentName,
+          matchId: Number(match.id),
+          teamName: side.teamName,
+          opponentName: side.opponentName,
+          roundLabel,
+          startAt: match.start_at,
+          solo: match.participant_type === "SOLO",
+        },
+        offset ? offset.label : null,
+      ),
+    });
+    dispatched += 1;
+  }
+  return dispatched;
+}
+
 async function runSweep(now: Date): Promise<number> {
   const db = await getDatabase();
 
@@ -263,62 +330,7 @@ async function runSweep(now: Date): Promise<number> {
 
   let dispatched = 0;
 
-  for (const { match, offset, remaining } of planned) {
-    const roundLabel = matchRoundLabel(String(match.bracket), Number(match.round_number));
-    const url = tournamentPageUrl(Number(match.tournament_id));
-
-    const sides: { teamId: number; teamName: string; opponentName: string }[] = [
-      {
-        teamId: Number(match.team1_id),
-        teamName: String(match.team1_name),
-        opponentName: String(match.team2_name),
-      },
-      {
-        teamId: Number(match.team2_id),
-        teamName: String(match.team2_name),
-        opponentName: String(match.team1_name),
-      },
-    ];
-
-    // Un message par engagée, pas un pour tout le monde : chaque joueur lit
-    // « ton équipe contre l'autre », dans le bon sens.
-    for (const side of sides) {
-      const recipients = recipientsByTeam.get(side.teamId) ?? [];
-      if (recipients.length === 0) continue;
-
-      const context = {
-        tournamentName: String(match.tournament_name),
-        tournamentUrl: url,
-        teamName: side.teamName,
-        opponentName: side.opponentName,
-        roundLabel,
-        startAt: match.start_at,
-      };
-
-      const message = offset
-        ? buildMatchReminderMessage(offset, context)
-        : buildMatchScheduleAnnouncement(context, remaining);
-
-      await notifyUsers(recipients, {
-        topic: "MATCH_REMINDER",
-        discord: { message, context: offset ? "match-reminder" : "match-scheduled" },
-        push: matchReminderPush(
-          {
-            tournamentId: Number(match.tournament_id),
-            tournamentName: context.tournamentName,
-            matchId: Number(match.id),
-            teamName: side.teamName,
-            opponentName: side.opponentName,
-            roundLabel,
-            startAt: match.start_at,
-            solo: match.participant_type === "SOLO",
-          },
-          offset ? offset.label : null,
-        ),
-      });
-      dispatched += 1;
-    }
-  }
+  for (const send of planned) dispatched += await dispatchPlannedSend(send, recipientsByTeam);
 
   return dispatched;
 }
