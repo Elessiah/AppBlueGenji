@@ -1071,11 +1071,6 @@ async function generateSwissTournament(
   }
 }
 
-// Génère un tournoi « Survie » réaliste via l'orchestration de production
-// (initialize + generate + reconcile). Pour un tournoi RUNNING, on s'arrête
-// après `playWaves` vagues (des matchs restent READY) ; pour un FINISHED, on
-// joue jusqu'au sacre de la championne. `forfeits` équipes encore en lice
-// déclarent forfait à la fin de la simulation (couvre le rééquilibrage).
 /**
  * Fait déclarer forfait, une à une, aux `forfeits` dernières équipes encore en
  * lice d'un tournoi BG Survie.
@@ -1107,6 +1102,11 @@ async function forfeitLastEnduranceTeams(
   return forfeited;
 }
 
+// Génère un tournoi « Survie » réaliste via l'orchestration de production
+// (initialize + generate + reconcile). Pour un tournoi RUNNING, on s'arrête
+// après `playWaves` vagues (des matchs restent READY) ; pour un FINISHED, on
+// joue jusqu'au sacre de la championne. `forfeits` équipes encore en lice
+// déclarent forfait à la fin de la simulation (couvre le rééquilibrage).
 /**
  * Simule un tournoi « BlueGenji Survie » : manches d'endurance jusqu'à la
  * bascule en play-offs, puis l'arbre final. Même schéma que la Survie —
