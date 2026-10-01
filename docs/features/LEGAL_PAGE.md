@@ -45,8 +45,8 @@ un changement d'adresse se fait aux trois endroits.
   « Conditions d'utilisation » (→ `/conditions-utilisation`), « RGPD » (→ `/rgpd`),
   « Statuts », « Règlement intérieur », « Cookies » (→ `/rgpd#cookies`), le lien du
   code source, « Réglages d'accessibilité » (ouvre le menu d'accessibilité) et la
-  mention « Accessibilité : non conforme » (→ `/accessibilite`). La colonne
-  COMPÉTITIONS porte « Règles des tournois » (→ `/regles`).
+  mention « Accessibilité : non conforme » (→ `/accessibilite`). Les règles des
+  tournois n'y figurent plus (`PUBLIC_NAVIGATION.md`).
 - **Code source** — lien vers le dépôt (`SOURCE_CODE_URL`) dans la colonne LÉGAL de
   `PublicFooter` **et** dans `SiteFooterBar` (espace connecté, `/connexion`) : l'article 13
   de l'AGPL oblige à offrir le code source à tout utilisateur du service en ligne, donc sur
