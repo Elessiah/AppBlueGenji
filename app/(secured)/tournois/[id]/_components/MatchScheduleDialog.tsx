@@ -32,6 +32,7 @@ const FIELD_IDS = {
 } as const;
 const HINT_ID = "match-start-at-hint";
 const PREVIEW_ID = "match-start-at-preview";
+const YEAR_FIX_ID = "match-start-year-fix";
 
 const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
 
@@ -44,9 +45,19 @@ function entryRefusal(state: MatchStartEntryState): string | null {
   return null;
 }
 
+/**
+ * Ligne d'aperçu d'une saisie inachevée : une consigne neutre, pas un refus —
+ * le refus, lui, part en notification à l'envoi.
+ */
+function pendingPreview(state: MatchStartEntryState): string | null {
+  if (state.kind === "incomplete") return "À compléter : jour, mois et heure.";
+  if (state.kind === "invalid") return "Aucune date possible : ce jour n'existe pas dans ce mois.";
+  return null;
+}
+
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé) ; un jour et un mois inchangés gardent leur année. Si l'aperçu montre la mauvaise, décale-la.";
+  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé) ; un jour et un mois inchangés gardent leur année. Si l'aperçu montre la mauvaise, « Mauvaise année ? » permet de la décaler.";
   if (refereeScheduling) {
     return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
@@ -156,6 +167,9 @@ export function MatchScheduleDialog({
   // (archive ancienne, année déjà fausse). Remis à zéro dès que le jour ou le
   // mois change : la nouvelle date se déduit à nouveau.
   const [yearShift, setYearShift] = useState(0);
+  // Les boutons de décalage restent repliés tant qu'on ne les demande pas :
+  // l'aperçu juste — le cas courant — n'a pas à les montrer.
+  const [yearFixOpen, setYearFixOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
@@ -202,6 +216,9 @@ export function MatchScheduleDialog({
     setTimeKey((key) => key + 1);
     setYearShift(0);
     fieldErrors.clear();
+    // Le bouton « Vider la date » disparaît avec la date : le focus, qu'il
+    // portait, revient au premier champ plutôt que de tomber sur la page.
+    document.getElementById(FIELD_IDS.day)?.focus();
   };
 
   const submit = async (event: FormEvent) => {
@@ -375,9 +392,25 @@ export function MatchScheduleDialog({
               </>
             )}
             {cleared && "Aucun horaire annoncé."}
+            {pendingPreview(entry)}
           </output>
           {entry.kind === "ready" && (previousYear !== null || nextYear !== null) && (
+            // Le bouton reste en place une fois déplié : il garde le focus.
+            <button
+              type="button"
+              className="btn ghost"
+              disabled={busy}
+              onClick={() => setYearFixOpen((open) => !open)}
+              aria-expanded={yearFixOpen}
+              aria-controls={YEAR_FIX_ID}
+              style={{ padding: "4px 10px", fontSize: 12, marginTop: 6 }}
+            >
+              Mauvaise année ?
+            </button>
+          )}
+          {entry.kind === "ready" && yearFixOpen && (previousYear !== null || nextYear !== null) && (
             <div
+              id={YEAR_FIX_ID}
               role="group"
               aria-label="Corriger l'année"
               style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}
