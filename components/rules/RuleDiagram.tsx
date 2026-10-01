@@ -51,7 +51,7 @@ function Box({ x, y, w = 132, h = 44, lines, accent = LINE, dashed, dim }: BoxPr
       />
       {lines.map((line, i) => (
         <text
-          key={i}
+          key={i} /* NOSONAR S6479 — lignes d'une étiquette de schéma, constantes */
           x={x + 11}
           y={lines.length === 1 ? y + h / 2 + 4 : y + 18 + i * 16}
           fill={i === 0 ? INK : MUTE}
@@ -445,10 +445,10 @@ function SurvivalDiagram() {
   );
 }
 
-function MultiDiagram() {
-  type FunnelLevel = { in: number; out: number; x: number; y: number };
+type FunnelLevel = { in: number; out: number; x: number; y: number };
 
-  const FunnelBox = ({ in: inCount, out: outCount, x, y }: FunnelLevel) => (
+function FunnelBox({ in: inCount, out: outCount, x, y }: FunnelLevel) {
+  return (
     <g>
       <rect
         x={x}
@@ -468,7 +468,9 @@ function MultiDiagram() {
       </text>
     </g>
   );
+}
 
+function MultiDiagram() {
   return (
     <svg
       className={styles.svg}

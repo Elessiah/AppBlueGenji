@@ -64,7 +64,7 @@ export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
           </header>
           <div className={styles.prose}>
             {section.blocks.map((block, i) => (
-              <Block key={i} block={block} />
+              <Block key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */ block={block} />
             ))}
           </div>
         </section>
@@ -124,7 +124,7 @@ function Block({ block }: { block: LegalBlock }) {
     return (
       <ul className={styles.bullets}>
         {block.items?.map((item, i) => (
-          <li key={i}>{renderInline(item)}</li>
+          <li key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */>{renderInline(item)}</li>
         ))}
       </ul>
     );
@@ -176,9 +176,9 @@ function renderBold(text: string): ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
   return parts.map((part, i) =>
     part.startsWith("**") && part.endsWith("**") ? (
-      <strong key={i}>{part.slice(2, -2)}</strong>
+      <strong key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */>{part.slice(2, -2)}</strong>
     ) : (
-      <Fragment key={i}>{part}</Fragment>
+      <Fragment key={i} /* NOSONAR S6479 — fragments d'un document constant, jamais réordonnés */>{part}</Fragment>
     ),
   );
 }

@@ -250,8 +250,8 @@ export default async function RgpdPage() {
             </tr>
           </thead>
           <tbody role="rowgroup">{/* NOSONAR S6822 — `display: block` retire la sémantique de tableau, voir plus haut */}
-            {DONNEES_PROFIL.map((d, i) => (
-              <tr key={i} role="row">
+            {DONNEES_PROFIL.map((d) => (
+              <tr key={d.donnee} role="row">
                 <DataCell column={0}>{d.donnee}</DataCell>
                 <DataCell column={1}>{d.finalite}</DataCell>
                 <DataCell column={2}>
@@ -413,7 +413,7 @@ export default async function RgpdPage() {
         </header>
         <ul className={styles.rightsList}>
           {DROITS.map((droit, i) => (
-            <li key={i} className={styles.rightItem}>
+            <li key={droit.title} className={styles.rightItem}>
               <span className={styles.rightNum}>{String(i + 1).padStart(2, "0")}</span>
               <div>
                 <h3 className={styles.rightTitle}>{droit.title}</h3>

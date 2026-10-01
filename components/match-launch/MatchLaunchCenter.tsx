@@ -632,20 +632,29 @@ function SideCard({
           <span aria-hidden="true">🏠</span> Héberge la partie — crée le salon
         </p>
       )}
-      {side.isGhost ? (
-        <p className={styles.note}>Équipe invitée : pas de contact.</p>
-      ) : phase === "SCHEDULED" ? (
-        <p className={styles.note}>Les contacts s&apos;affichent au lancement.</p>
-      ) : side.contacts.length === 0 ? (
-        <p className={styles.note}>Aucun contact disponible.</p>
-      ) : (
-        <ul className={styles.contacts}>
-          {side.contacts.map((contact) => (
-            <ContactRow key={contact.userId} contact={contact} onCopy={onCopy} />
-          ))}
-        </ul>
-      )}
+      <SideContacts side={side} phase={phase} onCopy={onCopy} />
     </section>
+  );
+}
+
+function SideContacts({
+  side,
+  phase,
+  onCopy,
+}: {
+  side: LaunchSide;
+  phase: MatchLaunchInfo["phase"];
+  onCopy: CopyFn;
+}) {
+  if (side.isGhost) return <p className={styles.note}>Équipe invitée : pas de contact.</p>;
+  if (phase === "SCHEDULED") return <p className={styles.note}>Les contacts s&apos;affichent au lancement.</p>;
+  if (side.contacts.length === 0) return <p className={styles.note}>Aucun contact disponible.</p>;
+  return (
+    <ul className={styles.contacts}>
+      {side.contacts.map((contact) => (
+        <ContactRow key={contact.userId} contact={contact} onCopy={onCopy} />
+      ))}
+    </ul>
   );
 }
 

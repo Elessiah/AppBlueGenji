@@ -73,5 +73,6 @@ export function siteCanonicalBase(): string {
 export function siteUrl(path: string): string | null {
   const base = siteBaseUrl();
   if (!base) return null;
-  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const rooted = path.startsWith("/") ? path : `/${path}`;
+  return `${base}${rooted}`;
 }

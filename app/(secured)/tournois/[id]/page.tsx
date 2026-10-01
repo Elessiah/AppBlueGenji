@@ -821,11 +821,9 @@ export default function TournamentDetailPage() {
               {finishedPhaseStandings}
             </>
           ) : !filteredMatches.length ? (
-            <>
-              <p className={styles.empty}>
-                {noMatchesLabel}
-              </p>
-            </>
+            <p className={styles.empty}>
+              {noMatchesLabel}
+            </p>
           ) : (
             <>
               {brackets.map(({ type, matches }) => (

@@ -101,7 +101,7 @@ export function TeamCard({ team }: { team: TeamListItem }) {
               .join(", ")}`}
           >
             {team.form.map((r, i) => (
-              <div key={i} className={`${s.formCell} ${s[r]}`} />
+              <div key={i} /* NOSONAR S6479 — liste positionnelle (du plus récent au plus ancien), sans état ni identifiant propre */ className={`${s.formCell} ${s[r]}`} />
             ))}
           </div>
         </div>

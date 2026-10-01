@@ -3,8 +3,7 @@ import { getCurrentUser } from "@/lib/server/auth";
 import { getPlayerPageIdentity } from "@/lib/server/users-service";
 import { parseEntityPageId, playerPageTitle } from "@/lib/shared/entity-page-titles";
 
-type LayoutProps = {
-  children: React.ReactNode;
+type MetadataProps = {
   params: Promise<{ id: string }>;
 };
 
@@ -19,7 +18,7 @@ type LayoutProps = {
  * et un compte anonymisé s'annonce « Compte supprimé » plutôt que par son pseudo
  * d'emprunt (`playerPageTitle`).
  */
-export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
+export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const { id } = await params;
   const userId = parseEntityPageId(id);
   if (userId === null) return { title: playerPageTitle(null) };
@@ -31,6 +30,6 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
   return { title: playerPageTitle(player) };
 }
 
-export default function PlayerDetailLayout({ children }: LayoutProps) {
+export default function PlayerDetailLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

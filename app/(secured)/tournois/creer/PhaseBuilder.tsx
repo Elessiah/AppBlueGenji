@@ -190,7 +190,7 @@ export function PhaseBuilder({
             const isSkipped = plan[idx]?.skipped;
             return (
               <div
-                key={idx}
+                key={idx} /* NOSONAR S6479 — la ligne décrit la phase de ce rang, texte sans état */
                 style={{
                   fontSize: 13,
                   color: isSkipped ? "var(--ink-mute)" : "var(--ink)",

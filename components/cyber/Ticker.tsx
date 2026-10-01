@@ -31,7 +31,7 @@ export function Ticker({ items }: TickerProps) {
         {[0, 1].map((copy) => (
           <div key={copy} className={styles.copy} aria-hidden={copy === 1 ? true : undefined}>
             {items.map((item, i) => (
-              <span key={i} className={styles.item}>
+              <span key={i} /* NOSONAR S6479 — bandeau en lecture seule, entrées sans identifiant et possiblement en double */ className={styles.item}>
                 {item}
                 <i className={styles.sep} aria-hidden="true">
                   ◆

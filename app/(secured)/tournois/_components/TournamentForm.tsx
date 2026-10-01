@@ -176,6 +176,11 @@ export function TournamentForm({
         drawsAllowed: values.matchFormat?.drawsAllowed ?? false,
       });
   const matchFormatValid = isLibre || isValidMatchFormat(matchFormatType, matchFormatValue);
+  let matchFormatHint: string;
+  if (isLibre) matchFormatHint = "Les scores sont saisis sans contrainte.";
+  else if (matchFormatValid) matchFormatHint = `${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`;
+  else if (matchFormatType === "BO") matchFormatHint = "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…).";
+  else matchFormatHint = "Saisis le nombre de manches à gagner.";
 
   /**
    * Modifie le format de match **sans perdre ses réglages voisins**.
@@ -420,13 +425,7 @@ export function TournamentForm({
                 <option value="LIBRE">Libre (aucune limite)</option>
               </select>
               <p style={HINT}>
-                {isLibre
-                  ? "Les scores sont saisis sans contrainte."
-                  : matchFormatValid
-                    ? `${matchFormatLabel(matchFormat)} — ${matchFormatDescription(matchFormat)}`
-                    : matchFormatType === "BO"
-                      ? "Un Best of se joue en nombre impair de manches (BO1, BO3, BO5…)."
-                      : "Saisis le nombre de manches à gagner."}
+                {matchFormatHint}
               </p>
             </div>
 

@@ -9,8 +9,7 @@ import {
   tournamentShareTitle,
 } from "@/lib/shared/share-metadata";
 
-type LayoutProps = {
-  children: React.ReactNode;
+type MetadataProps = {
   params: Promise<{ id: string }>;
 };
 
@@ -37,7 +36,7 @@ type LayoutProps = {
  * — l'ouverture d'une fiche le construisait une fois pour ses métadonnées, puis
  * souvent une seconde fois pour le flux SSE, le cache ne durant que 3 s.
  */
-export async function generateMetadata({ params }: LayoutProps): Promise<Metadata> {
+export async function generateMetadata({ params }: MetadataProps): Promise<Metadata> {
   const fallback: Metadata = { title: "Tournoi", description: SITE_DESCRIPTION };
 
   const { id } = await params;
@@ -78,6 +77,6 @@ export async function generateMetadata({ params }: LayoutProps): Promise<Metadat
   };
 }
 
-export default function TournamentDetailLayout({ children }: LayoutProps) {
+export default function TournamentDetailLayout({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

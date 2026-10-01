@@ -335,7 +335,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
                 {CROP_HANDLES.map((handle) => (
                   <span
                     key={handle}
-                    className={`${s.handle} ${s[`handle_${handle}`]}`}
+                    className={`${s.handle} ${s["handle_" + handle]}`}
                     aria-hidden="true"
                     data-handle={handle}
                     title={`Redimensionner par le ${HANDLE_LABELS[handle]}`}

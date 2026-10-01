@@ -119,7 +119,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
               aria-valuetext={`${currentStage.label} — ${percent}%`}
             />
             <div
-              className={`${styles.fill}${showsFinished ? "" : ` ${styles.fillLive}`}`}
+              className={showsFinished ? styles.fill : `${styles.fill} ${styles.fillLive}`}
               style={{ width: `${percent}%` }}
             />
 

@@ -82,18 +82,17 @@ export function BotServersTable({ payload }: { payload: BotServersPayload | null
   // perd ses deux entrées au filtre, et le panneau annonçait alors le même
   // « le bot n'est installé nulle part » sur une réponse qui n'était
   // simplement pas lisible. Zéro reste réservé à un zéro constaté.
-  const meta =
-    payload === null
-      ? "BOT INJOIGNABLE"
-      : rows === null || (rows.length > 0 && list.length === 0)
-        ? "RÉPONSE ILLISIBLE"
-        : rows.length === 0
-          ? "AUCUN SERVEUR"
-          : // On ne dit rien de l'ordre ni du total : `fetchBotServers(8)`
-            // **plafonne** la demande, et le tri par activité est encore une
-            // case à cocher de `docs/features/BOT_FEATURES_NEEDED.md`. Le
-            // panneau ne compte que ce qu'il montre.
-            `${list.length} ${list.length === 1 ? "SERVEUR AFFICHÉ" : "SERVEURS AFFICHÉS"}`;
+  let meta: string;
+  if (payload === null) meta = "BOT INJOIGNABLE";
+  else if (rows === null || (rows.length > 0 && list.length === 0)) meta = "RÉPONSE ILLISIBLE";
+  else if (rows.length === 0) meta = "AUCUN SERVEUR";
+  else {
+    // On ne dit rien de l'ordre ni du total : `fetchBotServers(8)`
+    // **plafonne** la demande, et le tri par activité est encore une
+    // case à cocher de `docs/features/BOT_FEATURES_NEEDED.md`. Le
+    // panneau ne compte que ce qu'il montre.
+    meta = `${list.length} ${list.length === 1 ? "SERVEUR AFFICHÉ" : "SERVEURS AFFICHÉS"}`;
+  }
 
   return (
     <section className="panel">
@@ -207,7 +206,7 @@ export function BotServersTable({ payload }: { payload: BotServersPayload | null
                   « TENDANCE » reste en face des autres colonnes. */}
               <span className="srv-spark" role="cell">
                 {sparkline.map((v, i) => (
-                  <span key={i} aria-hidden="true" style={{ height: `${(point(v) / peak) * 100}%` }} />
+                  <span key={i} /* NOSONAR S6479 — barre du i-ème intervalle, dessin sans état */ aria-hidden="true" style={{ height: `${(point(v) / peak) * 100}%` }} />
                 ))}
               </span>
             </div>

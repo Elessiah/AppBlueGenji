@@ -43,6 +43,14 @@ const EMPTY_FORM: FormState = {
   joinedAt: "",
 };
 
+/** Nom affiché dans l'aperçu de la modale, avec des repères pour les champs vides. */
+function previewDisplayName(form: FormState): string {
+  if (!form.firstName && !form.lastName) return form.pseudo || "Pseudo, ou prénom et nom";
+  const pseudo = form.pseudo ? ` "${form.pseudo}"` : "";
+  const lastName = form.lastName ? form.lastName.toUpperCase() : "NOM";
+  return `${form.firstName || "Prénom"}${pseudo} ${lastName}`;
+}
+
 const VALIDATION_ERROR_MESSAGES: Record<string, string> = {
   FIRST_NAME_REQUIRED: "Le prénom est requis.",
   FIRST_NAME_TOO_LONG: "Le prénom est trop long.",
@@ -392,9 +400,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
               </div>
             )}
             <div className={styles.modalPreviewName}>
-              {form.firstName || form.lastName
-                ? `${form.firstName || "Prénom"}${form.pseudo ? ` "${form.pseudo}"` : ""} ${form.lastName ? form.lastName.toUpperCase() : "NOM"}`
-                : (form.pseudo || "Pseudo, ou prénom et nom")}
+              {previewDisplayName(form)}
             </div>
           </div>
 

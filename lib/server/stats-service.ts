@@ -490,17 +490,19 @@ async function loadMembershipsForUsers(
   userIds: number[] | null,
 ): Promise<Map<number, Membership[]>> {
   const list = userIds === null ? "" : placeholders(userIds.length);
+  const memberFilter = userIds === null ? "" : `
+     WHERE user_id IN (${list})`;
+  const soloFilter = userIds === null ? "IS NOT NULL" : `IN (${list})`;
   const [rows] = await db.execute<UserMembershipRow[]>(
     // Le filtre vit **dans chaque branche** de l'union : posé au-dessus, il
     // ferait scanner toutes les adhésions du site plutôt que d'attaquer
     // l'index `user_id`. Les identifiants passent donc deux fois.
     `SELECT user_id, team_id, joined_at, left_at
-     FROM bg_team_members${userIds === null ? "" : `
-     WHERE user_id IN (${list})`}
+     FROM bg_team_members${memberFilter}
      UNION ALL
      SELECT solo_user_id AS user_id, id AS team_id, created_at AS joined_at, NULL AS left_at
      FROM bg_teams
-     WHERE solo_user_id ${userIds === null ? "IS NOT NULL" : `IN (${list})`}`,
+     WHERE solo_user_id ${soloFilter}`,
     userIds === null ? [] : [...userIds, ...userIds],
   );
 

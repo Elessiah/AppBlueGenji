@@ -508,10 +508,14 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
     );
 
     entries.push(
-      ...resultRows.map((row) => ({
-        text: `RÉSULTAT · ${row.tournament_name} · ${row.team1_name ?? `Equipe #${row.team1_id}`} ${Number(row.team1_score ?? 0)} — ${row.team2_name ?? `Equipe #${row.team2_id}`} ${Number(row.team2_score ?? 0)}`,
-        sortAt: new Date(row.updated_at).getTime(),
-      })),
+      ...resultRows.map((row) => {
+        const team1 = row.team1_name ?? `Equipe #${row.team1_id}`;
+        const team2 = row.team2_name ?? `Equipe #${row.team2_id}`;
+        return {
+          text: `RÉSULTAT · ${row.tournament_name} · ${team1} ${Number(row.team1_score ?? 0)} — ${team2} ${Number(row.team2_score ?? 0)}`,
+          sortAt: new Date(row.updated_at).getTime(),
+        };
+      }),
     );
 
     const [registrationRows] = await db.execute<RegistrationRow[]>(

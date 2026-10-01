@@ -49,6 +49,8 @@ export function Coche({
   // `rgba(#ff0000,0.28)` — déclaration invalide, donc anneau de focus muet. Il
   // n'avait aucun appelant : il est retiré plutôt que rafistolé.
   const { base: color, rgb: rgbColor } = THEME_COLORS[theme];
+  const pillBorder = checked ? `rgba(${rgbColor},0.4)` : "var(--line)";
+  const markBorder = checked ? `rgba(${rgbColor},0.8)` : "rgba(255,255,255,0.2)";
 
   return (
     // L'anneau de focus se pose en CSS (`.coche-input:focus-visible ~ .coche-pill`,
@@ -93,7 +95,7 @@ export function Coche({
           gap: 8,
           padding: "7px 14px",
           borderRadius: 999,
-          border: `1px solid ${checked ? `rgba(${rgbColor},0.4)` : "var(--line)"}`,
+          border: `1px solid ${pillBorder}`,
           background: checked ? `rgba(${rgbColor},0.1)` : "rgba(255,255,255,0.03)",
           fontSize: 14,
           userSelect: "none",
@@ -109,7 +111,7 @@ export function Coche({
             width: 16,
             height: 16,
             borderRadius: "50%",
-            border: `1.5px solid ${checked ? `rgba(${rgbColor},0.8)` : "rgba(255,255,255,0.2)"}`,
+            border: `1.5px solid ${markBorder}`,
             background: checked ? color : "transparent",
             display: "flex",
             alignItems: "center",

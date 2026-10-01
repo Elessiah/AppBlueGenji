@@ -153,7 +153,8 @@ const SIGNUP_PROVIDER_LABELS: Record<PlayerSignupProvider, string> = OAUTH_PROVI
  */
 export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider }): string {
   const provider = SIGNUP_PROVIDER_LABELS[context.provider];
-  return `${leadOn("👋", "Nouveau joueur", `compte créé via ${provider}`)}.`;
+  const detail = `compte créé via ${provider}`;
+  return `${leadOn("👋", "Nouveau joueur", detail)}.`;
 }
 
 /** Création d'un tournoi par le staff. */

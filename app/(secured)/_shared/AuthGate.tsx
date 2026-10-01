@@ -34,7 +34,8 @@ export function AuthGate() {
   // On ne reconstitue qu'un chemin **du site** : il vient de `usePathname`, pas
   // d'un paramètre d'URL, donc il ne peut pas désigner un autre domaine.
   const query = searchParams.toString();
-  const destination = `${pathname}${query ? `?${query}` : ""}`;
+  const search = query ? `?${query}` : "";
+  const destination = `${pathname}${search}`;
   const loginHref = `/connexion?redirect=${encodeURIComponent(destination)}`;
 
   return (

@@ -7,6 +7,19 @@ import {
   DROITS,
 } from "@/lib/shared/rgpd-policy";
 
+describe("clés de rendu de /rgpd", () => {
+  // La page s'en sert comme `key` React : un doublon ferait confondre deux lignes.
+  it("chaque donnée du profil est nommée une seule fois", () => {
+    const names = DONNEES_PROFIL.map((d) => d.donnee);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it("chaque droit porte un titre distinct", () => {
+    const titles = DROITS.map((d) => d.title);
+    expect(new Set(titles).size).toBe(titles.length);
+  });
+});
+
 describe("contacts du lancement d'un match — base légale", () => {
   it("affiche l'exécution du contrat à côté du consentement, sans que la finalité les oppose", () => {
     for (const donnee of ["Certification du pseudo Discord", "Pseudo Overwatch"]) {

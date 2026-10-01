@@ -50,6 +50,7 @@ function buildIcs(events: LandingCalendarEvent[]): string {
   for (const event of events) {
     const start = new Date(event.startAt);
     const end = new Date(start.getTime() + 4 * 60 * 60 * 1000);
+    const description = `Inscriptions : ${event.registrationOpenAt} -> ${event.registrationCloseAt}`;
     lines.push(
       "BEGIN:VEVENT",
       `UID:bg-tournament-${event.tournamentId}@bluegenji-esport.fr`,
@@ -57,7 +58,7 @@ function buildIcs(events: LandingCalendarEvent[]): string {
       `DTSTART:${formatIcsDate(start)}`,
       `DTEND:${formatIcsDate(end)}`,
       `SUMMARY:${escapeIcsText(event.name)}`,
-      `DESCRIPTION:${escapeIcsText(`Inscriptions : ${event.registrationOpenAt} -> ${event.registrationCloseAt}`)}`,
+      `DESCRIPTION:${escapeIcsText(description)}`,
       `URL:${appUrl.replace(/\/$/, "")}/tournois/${event.tournamentId}`,
       "END:VEVENT",
     );

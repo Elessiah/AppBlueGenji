@@ -23,7 +23,7 @@ export default function GlobalError({
   error,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  // Next passe aussi `reset`, volontairement ignoré : voir `retry` plus bas.
 }) {
   const reference = errorReference(error.digest);
   const copy = runtimeErrorCopy(reference);

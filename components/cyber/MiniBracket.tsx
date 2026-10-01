@@ -29,7 +29,7 @@ export function MiniBracket({ matches }: MiniBracketProps) {
           saNum !== null && sbNum !== null && sbNum > saNum;
 
         return (
-          <div key={i} className={styles.match}>
+          <div key={i} /* NOSONAR S6479 — liste figée de la vitrine, sans identifiant de match */ className={styles.match}>
             <div className={`${styles.row} ${aWins ? styles.win : ""}`}>
               <span>{match.a}</span>
               <span className="num">{match.sa}</span>

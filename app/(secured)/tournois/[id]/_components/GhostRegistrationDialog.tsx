@@ -29,6 +29,16 @@ interface GhostRegistrationDialogProps {
   onRegistered: () => void;
 }
 
+/** Pourquoi le bouton d'inscription est grisé, `undefined` s'il ne l'est pas pour la place. */
+function capacityBlockTitle(noSlot: boolean, overCapacity: boolean, remainingSlots: number): string | undefined {
+  if (noSlot) return "Ce tournoi est complet : il n'y a plus de place à prendre.";
+  if (!overCapacity) return undefined;
+  if (remainingSlots <= GHOST_BATCH_MAX) {
+    return `Il ne reste que ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} dans ce tournoi.`;
+  }
+  return `${GHOST_BATCH_MAX} engagés au maximum par inscription : recommencez pour les suivants.`;
+}
+
 /**
  * Inscription par le staff (`tournaments`) d'engagés sans compte sur le site :
  * des équipes fantômes, ou des joueurs invités si le tournoi est individuel —
@@ -116,14 +126,11 @@ export function GhostRegistrationDialog({
   // Trois vides bien distincts : on ne sait pas encore, il n'y a plus rien à
   // inscrire, ou la recherche ne trouve rien. « Aucun résultat » sur une liste
   // qui n'a pas fini de charger enverrait créer une équipe déjà en stock.
-  const emptyMessage =
-    load === "pending"
-      ? "Chargement…"
-      : load === "failed"
-        ? "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer."
-        : teams.length === 0
-          ? wording.guestNoneAvailable
-          : "Aucun résultat pour cette recherche.";
+  let emptyMessage: string;
+  if (load === "pending") emptyMessage = "Chargement…";
+  else if (load === "failed") emptyMessage = "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer.";
+  else if (teams.length === 0) emptyMessage = wording.guestNoneAvailable;
+  else emptyMessage = "Aucun résultat pour cette recherche.";
 
   const toggle = (teamId: number) => {
     setSelected((current) =>
@@ -364,15 +371,7 @@ export function GhostRegistrationDialog({
             disabled={submitDisabled}
             // Le bouton grisé doit dire pourquoi : le compteur passe à l'ambre,
             // encore faut-il faire le lien.
-            title={
-              noSlot
-                ? "Ce tournoi est complet : il n'y a plus de place à prendre."
-                : overCapacity
-                ? remainingSlots <= GHOST_BATCH_MAX
-                  ? `Il ne reste que ${remainingSlots} place${remainingSlots > 1 ? "s" : ""} dans ce tournoi.`
-                  : `${GHOST_BATCH_MAX} engagés au maximum par inscription : recommencez pour les suivants.`
-                : undefined
-            }
+            title={capacityBlockTitle(noSlot, overCapacity, remainingSlots)}
           >
             {busy
               ? "Inscription…"

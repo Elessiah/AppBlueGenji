@@ -68,7 +68,7 @@ export default function TermsOfUsePage() {
                   {section.title}
                 </h2>
                 {section.paragraphs.map((paragraph, paragraphIndex) => (
-                  <p key={paragraphIndex}>
+                  <p key={paragraphIndex} /* NOSONAR S6479 — paragraphes d'un texte constant, jamais réordonnés */>
                     <EmphasisText text={paragraph} />
                   </p>
                 ))}

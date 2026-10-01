@@ -142,6 +142,7 @@ export async function reportTournamentIssue(
     match,
     message,
   });
+  const pushedRound = match ? `, ${match.round}` : "";
   const { discord: alert, pushed } = await notifyStaff({
     topic: "REFEREE_ALERT",
     discord: () => pushRefereeAlert(alertMessage, "issue-report"),
@@ -149,7 +150,7 @@ export async function reportTournamentIssue(
     // écran verrouillé, elle ne dit que ce qui attend un arbitre, et où.
     push: {
       title: "Arbitrage requis",
-      body: `Problème signalé · ${String(context.tournament_name)}${match ? `, ${match.round}` : ""}.`,
+      body: `Problème signalé · ${String(context.tournament_name)}${pushedRound}.`,
       url: tournamentMatchHref(tournamentId, match?.id ?? null),
       tag: `issue-${tournamentId}-${match?.id ?? 0}`,
     },

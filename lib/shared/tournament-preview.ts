@@ -432,8 +432,9 @@ function previewMulti(input: TournamentPreviewInput): TournamentPreview {
     phases: null,
   });
 
+  const phaseName = first.name ? ` — ${first.name}` : "";
   const notes = [
-    `Aperçu de la phase ${first.position}${first.name ? ` — ${first.name}` : ""}.`,
+    `Aperçu de la phase ${first.position}${phaseName}.`,
     ...plan
       .slice(0, firstPlayedIndex)
       .map((phase) => `La phase ${phase.position} serait sautée avec l'effectif actuel.`),

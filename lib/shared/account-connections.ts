@@ -217,17 +217,19 @@ export function discordBotRowState(connections: readonly AccountConnection[]): D
   const anyLinked = Boolean(discord?.linked);
   const linked = discordBotLinked(discord);
   const unlinkRefusal = linked ? checkConnectionUnlink(connections, "DISCORD") : null;
-  const note = linked
-    ? discord?.handle
-      ? `Pseudo Discord : ${discord.handle}`
-      : "Rattaché par code en message privé"
-    : anyLinked
-      ? // `null` = rattachement antérieur à la colonne : la porte est inconnue,
-        // la phrase ne l'affirme donc pas — elle ne dit que où se retirer.
-        discord?.method === "OAUTH"
+  let note: string;
+  if (linked) {
+    note = discord?.handle ? `Pseudo Discord : ${discord.handle}` : "Rattaché par code en message privé";
+  } else if (anyLinked) {
+    // `null` = rattachement antérieur à la colonne : la porte est inconnue,
+    // la phrase ne l'affirme donc pas — elle ne dit que où se retirer.
+    note =
+      discord?.method === "OAUTH"
         ? "Ton Discord est rattaché par le bouton Discord : il se retire sur cette ligne-là. Le code en message privé met ici ton pseudo à jour."
-        : "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour."
-      : "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.";
+        : "Ton Discord est rattaché : il se retire sur la ligne Discord. Le code en message privé met ici ton pseudo à jour.";
+  } else {
+    note = "Rattache ton Discord sans écran d'autorisation : le bot BlueGenji t'envoie un code en message privé.";
+  }
   return {
     linked,
     handle: linked ? (discord?.handle ?? null) : null,
