@@ -1,12 +1,15 @@
 import type { PoolConnection } from "mysql2/promise";
-import { generateSeedOrder, nextPowerOfTwo } from "@/lib/server/serialization";
-import { statusFromTeams, TournamentRow } from "./_internal";
+import { nextPowerOfTwo } from "@/lib/server/serialization";
+import { TournamentRow } from "./_internal";
+import { createMatch } from "./repository";
 import {
-  createMatch,
-  setMatchParticipants,
-  updateTournamentBracketSize,
-} from "./repository";
-import { tryAutoResolveByes } from "./byes";
+  createRoundMatches,
+  feederSlot,
+  linkMatchLoser,
+  linkMatchWinner,
+  seedAndFinalizeBracket,
+  setSlotPlaceholder,
+} from "./bracket-writes";
 import {
   LOWER_FINAL_WINNER_PLACEHOLDER,
   UPPER_FINAL_WINNER_PLACEHOLDER,
@@ -14,35 +17,14 @@ import {
   upperLoserPlaceholder,
 } from "@/lib/shared/bracket-placeholders";
 
-async function linkMatchWinner(
-  connection: PoolConnection,
-  matchId: number,
-  targetMatchId: number,
-  targetSlot: number,
-): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_matches
-     SET next_winner_match_id = ?,
-         next_winner_slot = ?
-     WHERE id = ?`,
-    [targetMatchId, targetSlot, matchId],
-  );
-}
-
-async function linkMatchLoser(
-  connection: PoolConnection,
-  matchId: number,
-  targetMatchId: number,
-  targetSlot: number,
-): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_matches
-     SET next_loser_match_id = ?,
-         next_loser_slot = ?
-     WHERE id = ?`,
-    [targetMatchId, targetSlot, matchId],
-  );
-}
+/** Rencontres créées d'un plateau à double élimination, tour par tour (index 1). */
+type DoubleBracketMatches = {
+  rounds: number;
+  upper: number[][];
+  lower: number[][];
+  lowerRoundsCount: number;
+  grandFinalMatchId: number | null;
+};
 
 async function linkMatchLoserWithPlaceholder(
   connection: PoolConnection,
@@ -55,16 +37,126 @@ async function linkMatchLoserWithPlaceholder(
   await linkMatchLoser(connection, sourceMatchId, targetMatchId, targetSlot);
 
   const placeholderText = upperLoserPlaceholder(sourceRound, sourceMatchNumber);
-  if (targetSlot === 1) {
-    await connection.execute(
-      `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
-      [placeholderText, targetMatchId],
+  await setSlotPlaceholder(connection, targetMatchId, targetSlot, placeholderText);
+}
+
+/**
+ * Crée toutes les rencontres : tableau principal, puis (dès deux tours)
+ * tableau de repêchage et grande finale.
+ */
+async function createDoubleBracketMatches(
+  connection: PoolConnection,
+  tournamentId: number,
+  bracketSize: number,
+  phaseId: number,
+): Promise<DoubleBracketMatches> {
+  const rounds = Math.ceil(Math.log2(bracketSize));
+  const upper: number[][] = [];
+
+  for (let round = 1; round <= rounds; round += 1) {
+    const matchesCount = bracketSize / 2 ** round;
+    upper[round] = await createRoundMatches(connection, tournamentId, "UPPER", round, matchesCount, phaseId);
+  }
+
+  const lower: number[][] = [];
+  let grandFinalMatchId: number | null = null;
+  let lowerRoundsCount = 0;
+
+  if (rounds >= 2) {
+    lowerRoundsCount = 2 * (rounds - 1);
+
+    for (let lbRound = 1; lbRound <= lowerRoundsCount; lbRound += 1) {
+      const matchCount = Math.round(Math.pow(2, rounds - 2 - Math.floor((lbRound - 1) / 2)));
+      lower[lbRound] = await createRoundMatches(connection, tournamentId, "LOWER", lbRound, matchCount, phaseId);
+    }
+
+    grandFinalMatchId = await createMatch(connection, tournamentId, "GRAND", 1, 1, phaseId);
+  }
+
+  return { rounds, upper, lower, lowerRoundsCount, grandFinalMatchId };
+}
+
+/** Relie une rencontre du tableau principal : vainqueur, puis perdant au repêchage. */
+async function linkUpperMatch(
+  connection: PoolConnection,
+  bracket: DoubleBracketMatches,
+  round: number,
+  matchIndex: number,
+): Promise<void> {
+  const { rounds, upper, lower, grandFinalMatchId } = bracket;
+  const source = upper[round][matchIndex];
+
+  if (round < rounds) {
+    const target = upper[round + 1][Math.floor(matchIndex / 2)];
+    await linkMatchWinner(connection, source, target, feederSlot(matchIndex));
+  } else if (grandFinalMatchId) {
+    await linkMatchWinner(connection, source, grandFinalMatchId, 1);
+    await setSlotPlaceholder(connection, grandFinalMatchId, 1, UPPER_FINAL_WINNER_PLACEHOLDER);
+  }
+
+  if (rounds < 2 || !grandFinalMatchId) {
+    return;
+  }
+
+  // Upper to lower bracket connections
+  if (round === 1) {
+    const target = lower[1][Math.floor(matchIndex / 2)];
+    await linkMatchLoserWithPlaceholder(
+      connection,
+      source,
+      target,
+      feederSlot(matchIndex),
+      round,
+      matchIndex + 1,
     );
-  } else {
-    await connection.execute(
-      `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
-      [placeholderText, targetMatchId],
-    );
+    return;
+  }
+
+  const lbTargetRound = 2 * (round - 1);
+  const target = lower[lbTargetRound]?.[matchIndex];
+  if (target) {
+    await linkMatchLoserWithPlaceholder(connection, source, target, 2, round, matchIndex + 1);
+  }
+}
+
+/**
+ * Relie une rencontre du repêchage au tour suivant : un tour impair alimente
+ * le créneau 1 de la rencontre de même rang, un tour pair fusionne deux
+ * rencontres en une.
+ */
+async function linkLowerMatch(
+  connection: PoolConnection,
+  lower: number[][],
+  lbRound: number,
+  matchIndex: number,
+): Promise<void> {
+  const source = lower[lbRound][matchIndex];
+  const placeholder = lowerWinnerPlaceholder(lbRound, matchIndex + 1);
+  const odd = lbRound % 2 === 1;
+  const slot = odd ? 1 : feederSlot(matchIndex);
+  const target = lower[lbRound + 1]?.[odd ? matchIndex : Math.floor(matchIndex / 2)];
+  if (target) {
+    await linkMatchWinner(connection, source, target, slot);
+    await setSlotPlaceholder(connection, target, slot, placeholder);
+  }
+}
+
+async function linkLowerBracket(
+  connection: PoolConnection,
+  bracket: DoubleBracketMatches,
+  grandFinalMatchId: number,
+): Promise<void> {
+  const { lower, lowerRoundsCount } = bracket;
+  for (let lbRound = 1; lbRound < lowerRoundsCount; lbRound += 1) {
+    for (let matchIndex = 0; matchIndex < lower[lbRound].length; matchIndex += 1) {
+      await linkLowerMatch(connection, lower, lbRound, matchIndex);
+    }
+  }
+
+  // Final lower → grand final
+  if (lower[lowerRoundsCount]?.length > 0) {
+    await linkMatchWinner(connection, lower[lowerRoundsCount][0], grandFinalMatchId, 2);
+    await setSlotPlaceholder(connection, grandFinalMatchId, 2, LOWER_FINAL_WINNER_PLACEHOLDER);
   }
 }
 
@@ -78,172 +170,20 @@ export async function createDoubleEliminationBracket(
   // Les phases intermédiaires doivent filtrer les équipes via SINGLE ou SWISS.
   const phaseId = options?.phaseId ?? 0;
   const bracketSize = nextPowerOfTwo(registeredTeamIds.length);
-  const rounds = Math.ceil(Math.log2(bracketSize));
-  const upper: number[][] = [];
-
-  for (let round = 1; round <= rounds; round += 1) {
-    const matchesCount = bracketSize / 2 ** round;
-    upper[round] = [];
-    for (let matchNumber = 1; matchNumber <= matchesCount; matchNumber += 1) {
-      const id = await createMatch(connection, tournament.id, "UPPER", round, matchNumber, phaseId);
-      upper[round].push(id);
-    }
-  }
-
-  const lower: number[][] = [];
-  let grandFinalMatchId: number | null = null;
-  let lowerRoundsCount = 0;
-
-  if (rounds >= 2) {
-    lowerRoundsCount = 2 * (rounds - 1);
-
-    for (let lbRound = 1; lbRound <= lowerRoundsCount; lbRound += 1) {
-      const matchCount = Math.round(Math.pow(2, rounds - 2 - Math.floor((lbRound - 1) / 2)));
-
-      lower[lbRound] = [];
-      for (let matchNumber = 1; matchNumber <= matchCount; matchNumber += 1) {
-        const id = await createMatch(connection, tournament.id, "LOWER", lbRound, matchNumber, phaseId);
-        lower[lbRound].push(id);
-      }
-    }
-
-    grandFinalMatchId = await createMatch(connection, tournament.id, "GRAND", 1, 1, phaseId);
-  }
+  const bracket = await createDoubleBracketMatches(connection, tournament.id, bracketSize, phaseId);
+  const { rounds, upper, grandFinalMatchId } = bracket;
 
   // Upper bracket progressions
   for (let round = 1; round <= rounds; round += 1) {
     for (let matchIndex = 0; matchIndex < upper[round].length; matchIndex += 1) {
-      const source = upper[round][matchIndex];
-
-      if (round < rounds) {
-        const target = upper[round + 1][Math.floor(matchIndex / 2)];
-        const slot = matchIndex % 2 === 0 ? 1 : 2;
-        await linkMatchWinner(connection, source, target, slot);
-      } else if (grandFinalMatchId) {
-        await linkMatchWinner(connection, source, grandFinalMatchId, 1);
-        await connection.execute(
-          `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
-          [UPPER_FINAL_WINNER_PLACEHOLDER, grandFinalMatchId],
-        );
-      }
-
-      if (rounds < 2 || !grandFinalMatchId) {
-        continue;
-      }
-
-      // Upper to lower bracket connections
-      if (round === 1) {
-        const target = lower[1][Math.floor(matchIndex / 2)];
-        const slot = matchIndex % 2 === 0 ? 1 : 2;
-        await linkMatchLoserWithPlaceholder(
-          connection,
-          source,
-          target,
-          slot,
-          round,
-          matchIndex + 1,
-        );
-      } else {
-        const lbTargetRound = 2 * (round - 1);
-        const target = lower[lbTargetRound]?.[matchIndex];
-        if (target) {
-          await linkMatchLoserWithPlaceholder(
-            connection,
-            source,
-            target,
-            2,
-            round,
-            matchIndex + 1,
-          );
-        }
-      }
+      await linkUpperMatch(connection, bracket, round, matchIndex);
     }
   }
 
   // Lower bracket internal progressions
   if (rounds >= 2 && grandFinalMatchId) {
-    for (let lbRound = 1; lbRound < lowerRoundsCount; lbRound += 1) {
-      for (let matchIndex = 0; matchIndex < lower[lbRound].length; matchIndex += 1) {
-        const source = lower[lbRound][matchIndex];
-        const placeholder = lowerWinnerPlaceholder(lbRound, matchIndex + 1);
-
-        if (lbRound % 2 === 1) {
-          const target = lower[lbRound + 1]?.[matchIndex];
-          if (target) {
-            await linkMatchWinner(connection, source, target, 1);
-            await connection.execute(
-              `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
-              [placeholder, target],
-            );
-          }
-        } else {
-          const targetIdx = Math.floor(matchIndex / 2);
-          const slot = matchIndex % 2 === 0 ? 1 : 2;
-          const target = lower[lbRound + 1]?.[targetIdx];
-          if (target) {
-            await linkMatchWinner(connection, source, target, slot);
-            if (slot === 1) {
-              await connection.execute(
-                `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`,
-                [placeholder, target],
-              );
-            } else {
-              await connection.execute(
-                `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
-                [placeholder, target],
-              );
-            }
-          }
-        }
-      }
-    }
-
-    // Final lower → grand final
-    if (lower[lowerRoundsCount]?.length > 0) {
-      await linkMatchWinner(connection, lower[lowerRoundsCount][0], grandFinalMatchId, 2);
-      await connection.execute(
-        `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
-        [LOWER_FINAL_WINNER_PLACEHOLDER, grandFinalMatchId],
-      );
-    }
+    await linkLowerBracket(connection, bracket, grandFinalMatchId);
   }
 
-  // Seed and place teams
-  const seedOrder = generateSeedOrder(bracketSize);
-  const seedToPosition = new Map<number, number>();
-  seedOrder.forEach((seed, index) => seedToPosition.set(seed, index));
-
-  const slots = new Array<number | null>(bracketSize).fill(null);
-  for (let i = 0; i < registeredTeamIds.length; i += 1) {
-    const seed = i + 1;
-    const position = seedToPosition.get(seed);
-    if (position !== undefined) {
-      slots[position] = registeredTeamIds[i];
-    }
-  }
-
-  for (let matchIndex = 0; matchIndex < upper[1].length; matchIndex += 1) {
-    const team1Id = slots[matchIndex * 2] ?? null;
-    const team2Id = slots[matchIndex * 2 + 1] ?? null;
-    const status = statusFromTeams(team1Id, team2Id);
-    await setMatchParticipants(connection, upper[1][matchIndex], team1Id, team2Id, status);
-  }
-
-  if (phaseId > 0) {
-    await updateTournamentPhase(connection, phaseId, bracketSize);
-  } else {
-    await updateTournamentBracketSize(connection, tournament.id, bracketSize);
-  }
-  await tryAutoResolveByes(connection, tournament.id, phaseId);
-}
-
-async function updateTournamentPhase(
-  connection: PoolConnection,
-  phaseId: number,
-  bracketSize: number,
-): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_tournament_phases SET bracket_size = ? WHERE id = ?`,
-    [bracketSize, phaseId],
-  );
+  await seedAndFinalizeBracket(connection, tournament, upper[1], bracketSize, registeredTeamIds, phaseId);
 }

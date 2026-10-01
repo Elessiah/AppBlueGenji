@@ -840,41 +840,60 @@ async function writePlayoffRound(
     const { bracket, pairing } = plan[index];
     const matchId =
       reusable[index]?.id ?? (await createMatch(conn, tournamentId, bracket, round, index + 1, 0));
+    await writePlayoffPairing(conn, matchId, pairing);
+  }
 
-    // Le résultat est remis à zéro en même temps que les engagées : un tour
-    // réécrit n'a pas été joué, et laisser un vainqueur derrière ferait avancer
-    // l'arbre sur une rencontre qui n'existe plus.
-    const isBye = pairing.teamBId === null;
-    await conn.execute(
-      `UPDATE bg_matches SET
+  await clearRewrittenReminders(conn, rewrittenPlayoffMatchIds(reusable, plan));
+}
+
+/**
+ * Pose les engagées d'une rencontre d'arbre final.
+ *
+ * Le résultat est remis à zéro en même temps que les engagées : un tour
+ * réécrit n'a pas été joué, et laisser un vainqueur derrière ferait avancer
+ * l'arbre sur une rencontre qui n'existe plus.
+ */
+async function writePlayoffPairing(
+  conn: PoolConnection,
+  matchId: number,
+  pairing: PlayoffRoundPlan[number]["pairing"],
+): Promise<void> {
+  const isBye = pairing.teamBId === null;
+  await conn.execute(
+    `UPDATE bg_matches SET
         team1_id = ?, team2_id = ?, status = ?, is_bye = ?,
         team1_score = ?, team2_score = ?,
         winner_team_id = ?, loser_team_id = NULL, forfeit_team_id = NULL,
         double_forfeit = 0
        WHERE id = ?`,
-      [
-        pairing.teamAId,
-        pairing.teamBId,
-        isBye ? "COMPLETED" : "READY",
-        isBye ? 1 : 0,
-        isBye ? 1 : null,
-        isBye ? 0 : null,
-        isBye ? pairing.teamAId : null,
-        matchId,
-      ],
-    );
-  }
+    [
+      pairing.teamAId,
+      pairing.teamBId,
+      isBye ? "COMPLETED" : "READY",
+      isBye ? 1 : 0,
+      isBye ? 1 : null,
+      isBye ? 0 : null,
+      isBye ? pairing.teamAId : null,
+      matchId,
+    ],
+  );
+}
 
-  // Les rappels déjà partis nommaient les anciennes engagées : les effacer fait
-  // repartir le cycle (`lib/server/tournaments/match-reminders.ts`), donc
-  // réannoncer la rencontre à celles qui la disputent réellement — même
-  // raisonnement qu'une manche reprogrammée.
-  //
-  // Seules les rencontres dont le couple **change** sont concernées. Un tour
-  // périmé n'en compte souvent qu'une : effacer les rappels du tour entier
-  // renverrait le même message privé aux joueurs d'une demi-finale que la
-  // correction n'a pas touchée.
-  const rewritten = reusable
+/**
+ * Rencontres réutilisées dont le couple d'engagées **change**.
+ *
+ * Les rappels déjà partis nommaient les anciennes engagées : les effacer fait
+ * repartir le cycle (`lib/server/tournaments/match-reminders.ts`), donc
+ * réannoncer la rencontre à celles qui la disputent réellement — même
+ * raisonnement qu'une manche reprogrammée.
+ *
+ * Seules les rencontres dont le couple **change** sont concernées. Un tour
+ * périmé n'en compte souvent qu'une : effacer les rappels du tour entier
+ * renverrait le même message privé aux joueurs d'une demi-finale que la
+ * correction n'a pas touchée.
+ */
+function rewrittenPlayoffMatchIds(reusable: PlayoffMatchRow[], plan: PlayoffRoundPlan): number[] {
+  return reusable
     .filter(
       (match, index) =>
         index < plan.length &&
@@ -882,9 +901,16 @@ async function writePlayoffRound(
           match.teamBId !== plan[index].pairing.teamBId),
     )
     .map((match) => match.id);
-  // Sous `ignoreMissingTable` : la création de la table est avalée par un
-  // `catch` dans `database.ts`, et une base à qui elle manque n'a aucun rappel
-  // à effacer — ce n'est pas une raison de laisser l'arbre sur un tour périmé.
+}
+
+/**
+ * Efface les rappels des rencontres réécrites.
+ *
+ * Sous `ignoreMissingTable` : la création de la table est avalée par un
+ * `catch` dans `database.ts`, et une base à qui elle manque n'a aucun rappel
+ * à effacer — ce n'est pas une raison de laisser l'arbre sur un tour périmé.
+ */
+async function clearRewrittenReminders(conn: PoolConnection, rewritten: number[]): Promise<void> {
   if (rewritten.length > 0) {
     await ignoreMissingTable(
       conn.execute(
@@ -969,44 +995,53 @@ async function finalizePlayoffsIfDone(conn: PoolConnection, tournamentId: number
   // boucle, l'arbre attendrait un score que personne n'a à saisir. Le nombre de
   // tours d'un arbre borne l'itération ; le plafond n'est qu'un garde-fou.
   for (let step = 0; step < MAX_PLAYOFF_STEPS; step += 1) {
-    const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
-    if (rounds.length === 0) return;
-
-    const lastRound = rounds.at(-1)!;
-    const matches = await loadPlayoffRoundMatches(conn, tournamentId, lastRound);
-
-    const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
-    if (decisive.length === 0 || decisive.some((match) => match.status !== "COMPLETED")) return;
-
-    // Une seule rencontre décisive terminée = finale jouée : reste à s'assurer
-    // que la petite finale l'est aussi avant de clore.
-    if (decisive.length === 1) {
-      if (matches.some((match) => match.status !== "COMPLETED")) return;
-      const standings = await loadEnduranceStandings(conn, tournamentId);
-      await finalizeEndurance(conn, tournamentId, standings, matches);
-      return;
-    }
-
-    const plan = planNextPlayoffRound(decisive);
-
-    // Les doubles forfaits ont vidé **tous** les créneaux du tour suivant : il
-    // n'y a plus personne pour jouer, et attendre ne ferait rien venir. Le
-    // tournoi se clôt sans championne, sur le classement de qualification.
-    if (!plan.some((entry) => entry.bracket === "UPPER")) {
-      if (decisive.some((match) => match.doubleForfeit)) {
-        const standings = await loadEnduranceStandings(conn, tournamentId);
-        await finalizeEndurance(conn, tournamentId, standings);
-      }
-      return;
-    }
-
-    await writePlayoffRound(conn, tournamentId, lastRound + 1, plan, []);
-
-    // On ne reboucle que sur un tour **né joué** — rien que des exemptions : un
-    // tour portant une vraie rencontre attend son score, et le relire tout de
-    // suite ne ferait qu'y constater qu'il n'est pas terminé.
-    if (plan.some((entry) => entry.pairing.teamBId !== null)) return;
+    if (!(await advancePlayoffsOneStep(conn, tournamentId))) return;
   }
+}
+
+/**
+ * Un pas de `finalizePlayoffsIfDone` : clôt le tournoi ou pose le tour
+ * suivant. Rend `true` seulement quand le tour posé est né joué et qu'il faut
+ * donc relire l'arbre aussitôt.
+ */
+async function advancePlayoffsOneStep(conn: PoolConnection, tournamentId: number): Promise<boolean> {
+  const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
+  if (rounds.length === 0) return false;
+
+  const lastRound = rounds.at(-1)!;
+  const matches = await loadPlayoffRoundMatches(conn, tournamentId, lastRound);
+
+  const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
+  if (decisive.length === 0 || decisive.some((match) => match.status !== "COMPLETED")) return false;
+
+  // Une seule rencontre décisive terminée = finale jouée : reste à s'assurer
+  // que la petite finale l'est aussi avant de clore.
+  if (decisive.length === 1) {
+    if (matches.some((match) => match.status !== "COMPLETED")) return false;
+    const standings = await loadEnduranceStandings(conn, tournamentId);
+    await finalizeEndurance(conn, tournamentId, standings, matches);
+    return false;
+  }
+
+  const plan = planNextPlayoffRound(decisive);
+
+  // Les doubles forfaits ont vidé **tous** les créneaux du tour suivant : il
+  // n'y a plus personne pour jouer, et attendre ne ferait rien venir. Le
+  // tournoi se clôt sans championne, sur le classement de qualification.
+  if (!plan.some((entry) => entry.bracket === "UPPER")) {
+    if (decisive.some((match) => match.doubleForfeit)) {
+      const standings = await loadEnduranceStandings(conn, tournamentId);
+      await finalizeEndurance(conn, tournamentId, standings);
+    }
+    return false;
+  }
+
+  await writePlayoffRound(conn, tournamentId, lastRound + 1, plan, []);
+
+  // On ne reboucle que sur un tour **né joué** — rien que des exemptions : un
+  // tour portant une vraie rencontre attend son score, et le relire tout de
+  // suite ne ferait qu'y constater qu'il n'est pas terminé.
+  return !plan.some((entry) => entry.pairing.teamBId !== null);
 }
 
 /** Plafond de tours posés en un seul entretien (un arbre en compte bien moins). */

@@ -12,6 +12,73 @@ import { createSingleEliminationBracket } from "./bracket-single";
 import { createDoubleEliminationBracket } from "./bracket-double";
 
 /**
+ * Le plateau déjà en base : y a-t-il des rencontres, et pour quelle taille ?
+ * Dans une phase, les deux se lisent sur la phase.
+ */
+async function loadExistingBracket(
+  connection: PoolConnection,
+  tournament: TournamentRow,
+  phaseId: number,
+): Promise<{ hasExisting: boolean; currentBracketSize: number | null }> {
+  if (phaseId > 0) {
+    const [rows] = await connection.execute<
+      (RowDataPacket & { c: number; bracket_size: number | null })[]
+    >(
+      `SELECT
+        (SELECT COUNT(*) FROM bg_matches WHERE tournament_id = ? AND phase_id = ?) AS c,
+        (SELECT bracket_size FROM bg_tournament_phases WHERE id = ?) AS bracket_size`,
+      [tournament.id, phaseId, phaseId],
+    );
+    return {
+      hasExisting: Number(rows[0]?.c ?? 0) > 0,
+      // La taille du bracket d'une phase est stockée sur la phase : comparer celle
+      // du tournoi (toujours NULL en MULTI) rendrait la reconstruction systématique.
+      currentBracketSize: rows[0]?.bracket_size === null ? null : Number(rows[0]?.bracket_size),
+    };
+  }
+  return {
+    hasExisting: await hasExistingMatches(connection, tournament.id),
+    currentBracketSize: tournament.bracket_size,
+  };
+}
+
+/** Supprime le plateau périmé — celui de la phase, ou celui du tournoi. */
+async function discardStaleBracket(
+  connection: PoolConnection,
+  tournamentId: number,
+  phaseId: number,
+): Promise<void> {
+  if (phaseId > 0) {
+    await deletePhaseMatches(connection, tournamentId, phaseId);
+  } else {
+    await deleteAllMatches(connection, tournamentId);
+  }
+}
+
+/** Clôt un tournoi à 0 ou 1 inscrite : l'unique inscrite, s'il y en a une, est première. */
+async function finishWithoutOpponents(
+  connection: PoolConnection,
+  tournament: TournamentRow,
+  registeredTeamIds: number[],
+): Promise<void> {
+  if (registeredTeamIds.length === 1) {
+    await connection.execute(
+      `UPDATE bg_tournament_registrations
+         SET final_rank = 1
+         WHERE tournament_id = ? AND team_id = ?`,
+      [tournament.id, registeredTeamIds[0]],
+    );
+  }
+
+  await connection.execute(
+    `UPDATE bg_tournaments
+       SET state = 'FINISHED', finished_at = NOW(), bracket_size = ?
+       WHERE id = ?`,
+    [registeredTeamIds.length, tournament.id],
+  );
+}
+
+/**
  * Crée le plateau d'élimination s'il manque (ou si l'effectif l'a périmé).
  *
  * **Ne publie aucun événement**, et ce n'est pas un oubli : cette fonction
@@ -46,25 +113,11 @@ export async function createBracketIfMissing(
       : await loadRegisteredTeamIds(connection, tournament.id);
   const expectedBracketSize = nextPowerOfTwo(registeredTeamIds.length);
 
-  let hasExisting: boolean;
-  let currentBracketSize: number | null;
-  if (phaseId > 0) {
-    const [rows] = await connection.execute<
-      (RowDataPacket & { c: number; bracket_size: number | null })[]
-    >(
-      `SELECT
-        (SELECT COUNT(*) FROM bg_matches WHERE tournament_id = ? AND phase_id = ?) AS c,
-        (SELECT bracket_size FROM bg_tournament_phases WHERE id = ?) AS bracket_size`,
-      [tournament.id, phaseId, phaseId],
-    );
-    hasExisting = Number(rows[0]?.c ?? 0) > 0;
-    // La taille du bracket d'une phase est stockée sur la phase : comparer celle
-    // du tournoi (toujours NULL en MULTI) rendrait la reconstruction systématique.
-    currentBracketSize = rows[0]?.bracket_size === null ? null : Number(rows[0]?.bracket_size);
-  } else {
-    hasExisting = await hasExistingMatches(connection, tournament.id);
-    currentBracketSize = tournament.bracket_size;
-  }
+  const { hasExisting, currentBracketSize } = await loadExistingBracket(
+    connection,
+    tournament,
+    phaseId,
+  );
 
   const bracketSizeChanged = currentBracketSize !== expectedBracketSize;
 
@@ -73,11 +126,7 @@ export async function createBracketIfMissing(
   }
 
   if (hasExisting && bracketSizeChanged) {
-    if (phaseId > 0) {
-      await deletePhaseMatches(connection, tournament.id, phaseId);
-    } else {
-      await deleteAllMatches(connection, tournament.id);
-    }
+    await discardStaleBracket(connection, tournament.id, phaseId);
   }
 
   // Handle single or zero teams (do not finish tournament inside a phase)
@@ -86,22 +135,7 @@ export async function createBracketIfMissing(
       return { finished: false, created: false };
     }
 
-    if (registeredTeamIds.length === 1) {
-      await connection.execute(
-        `UPDATE bg_tournament_registrations
-         SET final_rank = 1
-         WHERE tournament_id = ? AND team_id = ?`,
-        [tournament.id, registeredTeamIds[0]],
-      );
-    }
-
-    await connection.execute(
-      `UPDATE bg_tournaments
-       SET state = 'FINISHED', finished_at = NOW(), bracket_size = ?
-       WHERE id = ?`,
-      [registeredTeamIds.length, tournament.id],
-    );
-
+    await finishWithoutOpponents(connection, tournament, registeredTeamIds);
     return { finished: true, created: false };
   }
 

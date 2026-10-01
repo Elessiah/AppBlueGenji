@@ -567,6 +567,21 @@ async function finalizeSwiss(
 }
 
 /**
+ * Le tournoi ou la phase est joué : clôt le tournoi. Dans une phase, la
+ * clôture et le classement global appartiennent à l'orchestrateur : on se
+ * contente de signaler que la phase est finie.
+ */
+async function closeSwissScope(
+  tournamentId: number,
+  conn: PoolConnection,
+  ranked: SwissRankedStanding[],
+  phaseId: number,
+): Promise<{ done: boolean; ranked: SwissRankedStanding[] }> {
+  if (phaseId === 0) await finalizeSwiss(tournamentId, conn, ranked);
+  return { done: true, ranked };
+}
+
+/**
  * Réconcilie l'état du tournoi Suisse après tout changement de score.
  *
  * Idempotent : recalcule le classement depuis l'historique, réapparie la ronde
@@ -602,9 +617,7 @@ export async function reconcileSwiss(
   // rejeu, mais **aucune ronde n'est reposée** : un tournoi terminé ne se rouvre
   // pas. Voir `docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`.
   if (tournament.state === "FINISHED") {
-    // Dans une phase, la clôture appartient à l'orchestrateur.
-    if (phaseId === 0) await finalizeSwiss(tournamentId, conn, ranked);
-    return { done: true, ranked };
+    return closeSwissScope(tournamentId, conn, ranked, phaseId);
   }
 
   const active = activeStandings(state.standings);
@@ -612,10 +625,7 @@ export async function reconcileSwiss(
   // Aucune ronde générée (départ à 0 ou 1 équipe) : clôture immédiate.
   if (currentRound === 0) {
     if (active.length <= 1) {
-      // Dans une phase, la cloture et le classement global appartiennent a
-      // l'orchestrateur : on se contente de signaler que la phase est finie.
-      if (phaseId === 0) await finalizeSwiss(tournamentId, conn, ranked);
-      return { done: true, ranked };
+      return closeSwissScope(tournamentId, conn, ranked, phaseId);
     }
     return { done: false, ranked };
   }
@@ -637,8 +647,7 @@ export async function reconcileSwiss(
 
   // Toutes les rondes prévues sont jouées : le classement fait foi.
   if (isSwissComplete(currentRound, totalRounds) || active.length <= 1) {
-    if (phaseId === 0) await finalizeSwiss(tournamentId, conn, ranked);
-    return { done: true, ranked };
+    return closeSwissScope(tournamentId, conn, ranked, phaseId);
   }
 
   const changed = await ensureRound(conn, tournamentId, currentRound + 1, state, phaseId);

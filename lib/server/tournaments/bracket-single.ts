@@ -1,41 +1,29 @@
 import type { PoolConnection } from "mysql2/promise";
-import { generateSeedOrder, nextPowerOfTwo } from "@/lib/server/serialization";
-import { statusFromTeams, TournamentRow } from "./_internal";
+import { nextPowerOfTwo } from "@/lib/server/serialization";
+import { TournamentRow } from "./_internal";
+import { createMatch } from "./repository";
 import {
-  createMatch,
-  setMatchParticipants,
-  updateTournamentBracketSize,
-} from "./repository";
-import { tryAutoResolveByes } from "./byes";
+  createRoundMatches,
+  feederSlot,
+  linkMatchLoser,
+  linkMatchWinner,
+  seedAndFinalizeBracket,
+  setSlotPlaceholder,
+} from "./bracket-writes";
 
-async function linkMatchWinner(
+/** Pose la petite finale et y relie les perdants des demi-finales. */
+async function createThirdPlaceMatch(
   connection: PoolConnection,
-  matchId: number,
-  targetMatchId: number,
-  targetSlot: number,
+  tournamentId: number,
+  semis: number[],
+  phaseId: number,
 ): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_matches
-     SET next_winner_match_id = ?,
-         next_winner_slot = ?
-     WHERE id = ?`,
-    [targetMatchId, targetSlot, matchId],
-  );
-}
-
-async function linkMatchLoser(
-  connection: PoolConnection,
-  matchId: number,
-  targetMatchId: number,
-  targetSlot: number,
-): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_matches
-     SET next_loser_match_id = ?,
-         next_loser_slot = ?
-     WHERE id = ?`,
-    [targetMatchId, targetSlot, matchId],
-  );
+  const thirdPlaceId = await createMatch(connection, tournamentId, "THIRD_PLACE", 1, 1, phaseId);
+  for (let i = 0; i < semis.length; i += 1) {
+    const slot = (i + 1) as 1 | 2;
+    await linkMatchLoser(connection, semis[i], thirdPlaceId, slot);
+    await setSlotPlaceholder(connection, thirdPlaceId, slot, `Perdant demi-finale ${slot}`);
+  }
 }
 
 export async function createSingleEliminationBracket(
@@ -52,76 +40,21 @@ export async function createSingleEliminationBracket(
 
   for (let round = 1; round <= rounds; round += 1) {
     const matchesCount = bracketSize / 2 ** round;
-    upper[round] = [];
-    for (let matchNumber = 1; matchNumber <= matchesCount; matchNumber += 1) {
-      const id = await createMatch(connection, tournament.id, "UPPER", round, matchNumber, phaseId);
-      upper[round].push(id);
-    }
+    upper[round] = await createRoundMatches(connection, tournament.id, "UPPER", round, matchesCount, phaseId);
   }
 
   // Link winner progression only between generated rounds
   for (let round = 1; round < rounds; round += 1) {
     for (let matchIndex = 0; matchIndex < upper[round].length; matchIndex += 1) {
-      const source = upper[round][matchIndex];
       const target = upper[round + 1][Math.floor(matchIndex / 2)];
-      const slot = matchIndex % 2 === 0 ? 1 : 2;
-      await linkMatchWinner(connection, source, target, slot);
+      await linkMatchWinner(connection, upper[round][matchIndex], target, feederSlot(matchIndex));
     }
   }
 
   // Third place match only when bracket is not truncated
   if (tournament.has_third_place_match && rounds >= 2 && rounds === fullRounds) {
-    const thirdPlaceId = await createMatch(connection, tournament.id, "THIRD_PLACE", 1, 1, phaseId);
-    const semis = upper[rounds - 1];
-    for (let i = 0; i < semis.length; i += 1) {
-      const slot = (i + 1) as 1 | 2;
-      await linkMatchLoser(connection, semis[i], thirdPlaceId, slot);
-      const placeholder = `Perdant demi-finale ${slot}`;
-      await connection.execute(
-        slot === 1
-          ? `UPDATE bg_matches SET team1_placeholder = ? WHERE id = ?`
-          : `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,
-        [placeholder, thirdPlaceId],
-      );
-    }
+    await createThirdPlaceMatch(connection, tournament.id, upper[rounds - 1], phaseId);
   }
 
-  // Seed and place teams
-  const seedOrder = generateSeedOrder(bracketSize);
-  const seedToPosition = new Map<number, number>();
-  seedOrder.forEach((seed, index) => seedToPosition.set(seed, index));
-
-  const slots = new Array<number | null>(bracketSize).fill(null);
-  for (let i = 0; i < registeredTeamIds.length; i += 1) {
-    const seed = i + 1;
-    const position = seedToPosition.get(seed);
-    if (position !== undefined) {
-      slots[position] = registeredTeamIds[i];
-    }
-  }
-
-  for (let matchIndex = 0; matchIndex < upper[1].length; matchIndex += 1) {
-    const team1Id = slots[matchIndex * 2] ?? null;
-    const team2Id = slots[matchIndex * 2 + 1] ?? null;
-    const status = statusFromTeams(team1Id, team2Id);
-    await setMatchParticipants(connection, upper[1][matchIndex], team1Id, team2Id, status);
-  }
-
-  if (phaseId > 0) {
-    await updateTournamentPhase(connection, phaseId, bracketSize);
-  } else {
-    await updateTournamentBracketSize(connection, tournament.id, bracketSize);
-  }
-  await tryAutoResolveByes(connection, tournament.id, phaseId);
-}
-
-async function updateTournamentPhase(
-  connection: PoolConnection,
-  phaseId: number,
-  bracketSize: number,
-): Promise<void> {
-  await connection.execute(
-    `UPDATE bg_tournament_phases SET bracket_size = ? WHERE id = ?`,
-    [bracketSize, phaseId],
-  );
+  await seedAndFinalizeBracket(connection, tournament, upper[1], bracketSize, registeredTeamIds, phaseId);
 }

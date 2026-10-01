@@ -527,6 +527,21 @@ async function ensureNextRound(
 }
 
 /**
+ * Le tournoi ou la phase est joué : clôt le tournoi, sauf dans une phase, dont
+ * la clôture appartient à l'orchestrateur, comme partout ailleurs dans ce
+ * module.
+ */
+async function closeSurvivalScope(
+  tournamentId: number,
+  conn: PoolConnection,
+  standings: SurvivalStanding[],
+  phaseId: number,
+): Promise<{ done: boolean; standings: SurvivalStanding[] }> {
+  if (phaseId === 0) await finalizeSurvival(tournamentId, conn, standings);
+  return { done: true, standings };
+}
+
+/**
  * Réconcilie l'état du tournoi/phase Survie après tout changement de score.
  * Idempotent : recalcule les stats, applique la coupe due, puis clôt ou génère
  * le round suivant. Retourne `{ done, standings }` pour que les orchestrateurs
@@ -566,20 +581,14 @@ export async function reconcileSurvival(
   // précédentes sont verrouillées par `match-lock`).
   // Voir `docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`.
   if (tournament.state === "FINISHED") {
-    // Dans une phase, la clôture appartient à l'orchestrateur, comme partout
-    // ailleurs dans ce module.
-    if (phaseId === 0) await finalizeSurvival(tournamentId, conn, standings);
-    return { done: true, standings };
+    return closeSurvivalScope(tournamentId, conn, standings, phaseId);
   }
 
   // Aucun round généré (départ avec 0 ou targetTeams équipes) : clôture immédiate.
   if (currentRound === 0) {
     const active = rankActiveTeams(standings);
     if (active.length <= targetTeams) {
-      if (phaseId === 0) {
-        await finalizeSurvival(tournamentId, conn, standings);
-      }
-      return { done: true, standings };
+      return closeSurvivalScope(tournamentId, conn, standings, phaseId);
     }
     return { done: false, standings };
   }
@@ -601,10 +610,7 @@ export async function reconcileSurvival(
   }
 
   if (active.length <= targetTeams) {
-    if (phaseId === 0) {
-      await finalizeSurvival(tournamentId, conn, standings);
-    }
-    return { done: true, standings };
+    return closeSurvivalScope(tournamentId, conn, standings, phaseId);
   }
 
   const scope = buildSurvivalScope(tournamentId, phaseId);
