@@ -273,6 +273,17 @@ export const TOURNAMENT_FIELD_ERRORS: FieldErrorMap<TournamentFormField> = {
   INVALID_MATCH_FORMAT: "matchFormatValue",
 };
 
+/**
+ * Date de début d'un match (`MatchScheduleDialog`) : saisie en jour, mois et
+ * heure. Un refus du serveur désigne la date entière, rattachée au premier
+ * champ, le jour.
+ */
+export type MatchScheduleField = "day" | "month" | "time";
+
+export const MATCH_SCHEDULE_FIELD_ERRORS: FieldErrorMap<MatchScheduleField> = {
+  INVALID_MATCH_START_AT: "day",
+};
+
 /** Refus de date du serveur, rattachés au premier jalon mal placé. */
 export const DATE_ORDER_CODES: ReadonlySet<string> = new Set(["INVALID_DATES", "INVALID_DATE_ORDER"]);
 

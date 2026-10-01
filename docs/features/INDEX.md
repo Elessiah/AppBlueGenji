@@ -160,7 +160,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `REFEREE_ALERTS.md` — Alertes au rôle arbitre.
 - `PUSH_NOTIFICATIONS.md` — Notifications push, registre `PUSH_TOPICS`, `notifyUsers` / `notifyStaff`.
 - `LIVE_STREAMS.md` — Diffusion en direct, vocabulaire « En cours » / « En direct ».
-- `MATCH_START_DATES.md` — Dates de début des matchs.
+- `MATCH_START_DATES.md` — Dates de début des matchs (saisie jour/mois/heure, année déduite).
 - `MATCH_REPLAYS.md` — Rediff YouTube d'un match terminé.
 
 ## Infra et outillage

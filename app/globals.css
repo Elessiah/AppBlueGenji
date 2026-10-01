@@ -634,19 +634,23 @@ textarea,
   box-shadow: 0 0 0 3px rgba(var(--danger-rgb), 0.25);
 }
 
-input[type="datetime-local"] {
+input[type="datetime-local"],
+input[type="time"] {
   appearance: none;
   cursor: pointer;
 }
 
-input[type="datetime-local"]::-webkit-calendar-picker-indicator {
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
   filter: invert(0.8) brightness(1.1);
   cursor: pointer;
   margin-right: 4px;
 }
 
 input[type="datetime-local"]::-webkit-outer-spin-button,
-input[type="datetime-local"]::-webkit-inner-spin-button {
+input[type="datetime-local"]::-webkit-inner-spin-button,
+input[type="time"]::-webkit-outer-spin-button,
+input[type="time"]::-webkit-inner-spin-button {
   display: none;
 }
 
