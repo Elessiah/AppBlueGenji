@@ -45,9 +45,9 @@ describe("/rgpd — destinataires et transferts", () => {
   it("informe de la retransmission et du droit d'opposition, sans transfert par le site", () => {
     const retransmission = section.slice(section.indexOf('id="retransmission"'));
     expect(section).toContain('id="retransmission"');
-    expect(retransmission).toMatch(/jamais de webcam ni le chat vocal/);
-    expect(retransmission).toMatch(/nom neutre/);
-    expect(retransmission).toMatch(/catégorie RGPD/);
+    // Les phrases viennent du module partagé avec l'inscription et les conditions.
+    expect(retransmission).toContain("{STREAM_NOTICE_SHOWN}");
+    expect(retransmission).toContain("{STREAM_NOTICE_OBJECTION}");
     expect(section).toMatch(/il ne leur\s+transmet rien et n&apos;intègre aucun de leurs lecteurs/);
     // Les plateformes ne figurent pas dans la liste des destinataires.
     const list = section.slice(section.indexOf("<ul>"), section.indexOf("</ul>"));

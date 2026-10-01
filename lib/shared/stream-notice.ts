@@ -33,5 +33,5 @@ export function registrationStreamNotice(solo: boolean): string {
   return `Les matchs de ce tournoi peuvent être diffusés en direct et enregistrés, avec ${shown} — jamais de webcam ni de chat vocal. Tu peux t'y opposer et apparaître sous un nom neutre.`;
 }
 
-/** Libellé du lien qui suit `REGISTRATION_STREAM_NOTICE`. */
+/** Libellé du lien qui suit la mention de `registrationStreamNotice`. */
 export const REGISTRATION_STREAM_NOTICE_LINK_LABEL = "En savoir plus";

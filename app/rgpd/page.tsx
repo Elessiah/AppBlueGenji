@@ -59,6 +59,7 @@ import {
   copyrightNoticeElementsText,
 } from "@/lib/shared/content-reports";
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { STREAM_NOTICE_OBJECTION, STREAM_NOTICE_SHOWN } from "@/lib/shared/stream-notice";
 import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
 import { SITE_MINIMUM_AGE, TERMS_PATH } from "@/lib/shared/terms-of-use";
 import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
@@ -939,14 +940,10 @@ export default async function RgpdPage() {
           <p id="retransmission">
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
             direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
-            ou d&apos;un caster. On y voit votre <strong>pseudo</strong>, le{" "}
-            <strong>nom de votre équipe</strong> et vos <strong>résultats et performances en
-            jeu</strong> — jamais de webcam ni le chat vocal des joueurs. Ce traitement repose sur
-            l&apos;intérêt légitime de l&apos;association à faire connaître ses compétitions, et
-            vous pouvez vous y <strong>opposer</strong> à tout moment : vous apparaissez alors
-            sous un nom neutre, et un lien de rediffusion qui vous montre est retiré. La demande se
-            fait par le bouton <strong>« Signaler un problème »</strong>, catégorie RGPD. Les
-            spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
+            ou d&apos;un caster. {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
+            légitime de l&apos;association à faire connaître ses compétitions.{" "}
+            {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors
+            retiré du site. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>).
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
