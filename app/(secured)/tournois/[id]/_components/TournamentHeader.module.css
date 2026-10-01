@@ -243,6 +243,14 @@
   max-width: 46ch;
 }
 
+/* `a` est sans soulignement ni couleur dans tout le site : le lien de la
+   mention de retransmission doit se distinguer du texte qui l'entoure. */
+.registerNotice a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 @media (max-width: 640px) {
   .shell {
     gap: 18px;

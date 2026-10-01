@@ -411,8 +411,8 @@ la trace neuve et anonymisant. Tout code inconnu retombe sur la phrase génériq
 
 ## Les sauvegardes
 
-Une suppression ne peut pas atteindre les archives chiffrées déjà envoyées sur
-OneDrive : le compte y survit jusqu'à leur purge (30 jours). Pour qu'une
+Une suppression ne peut pas atteindre les archives chiffrées déjà envoyées sur le
+stockage distant : le compte y survit jusqu'à leur purge (30 jours). Pour qu'une
 restauration ne le fasse pas revenir, `deleteOwnAccount` consigne chaque
 suppression **après le commit** dans un journal hors de la base
 (`recordAccountDeletion`), que `npm run replay:deletions` rejoue sur la base

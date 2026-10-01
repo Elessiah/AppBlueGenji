@@ -79,6 +79,10 @@ const CONTACT_DISCORD = LEGAL_CONTACT_DISCORD;
 
 const LAST_UPDATED_FR = "30 septembre 2026";
 const LAST_UPDATED_EN = "30 September 2026";
+// La politique a sa propre date : le passage des sauvegardes chez Hetzner ne
+// touche pas aux conditions, qui gardent la leur.
+const PRIVACY_LAST_UPDATED_FR = "1er octobre 2026";
+const PRIVACY_LAST_UPDATED_EN = "1 October 2026";
 
 const CONTACT_ITEMS_FR = [
   `Formulaire **« ${REPORT_FORM_NAME} »** en bas de chaque page du site (catégorie « RGPD » pour vos données)`,
@@ -413,7 +417,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
     eyebrow: "BLUEGENJI BOT · CONFIDENTIALITÉ",
     title: "Politique de\nConfidentialité",
     lastUpdatedLabel: "Dernière mise à jour",
-    lastUpdated: LAST_UPDATED_FR,
+    lastUpdated: PRIVACY_LAST_UPDATED_FR,
     intro:
       "Cette politique vous informe des données que traite le bot Discord **BlueGenji Bot**, de leurs finalités, de leurs durées de conservation, de leurs destinataires et de vos droits (articles 13 et 14 du RGPD).",
     sections: [
@@ -499,7 +503,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "**Journaux du serveur** : selon leur rotation automatique.",
               // « Au plus » tient bien que l'archive soit hebdomadaire : la purge
               // (`rclone delete --min-age`) est refaite **chaque heure** par
-              // `blueGenjiBot/scripts/sync-uploads-onedrive.sh`, et pas seulement
+              // `blueGenjiBot/scripts/sync-uploads-onedrive.sh` (nom historique), et pas seulement
               // par la sauvegarde du lundi — même promesse que T09 et `/rgpd`.
               `**Sauvegardes** : la base du Bot est sauvegardée chaque semaine, chiffrée, et chaque copie est supprimée définitivement au bout de ${BACKUP_RETENTION_DAYS} jours au plus.`,
             ],
@@ -523,7 +527,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "Les administrateurs de tout serveur où le Bot est installé, et les titulaires du rôle d'administration du Bot que chaque serveur désigne (**/set-bot-admin**), qui peuvent lire la liste des exclusions (commande **/ban-list**, réponse visible du seul demandeur).",
               `L'hébergeur technique, ${SITE_HOST.name}, qui fournit la machine sur laquelle tourne le Bot (${SITE_HOST.machine}) : sous-traitant.`,
               "Discord, plateforme sur laquelle le Bot fonctionne.",
-              "Microsoft, qui stocke sur le OneDrive personnel de l'hébergeur technique les sauvegardes, chiffrées avant envoi avec une clé que Microsoft ne détient pas ; et qui héberge la messagerie personnelle (Outlook.com) de l'hébergeur technique, par où passent, non chiffrées par l'association et lisibles par Microsoft, toute demande relative à vos données que vous envoyez par courriel à l'hébergeur technique et la réponse que celui-ci vous adresse par courriel.",
+              "Hetzner Online GmbH (Allemagne), qui stocke les sauvegardes, chiffrées avant envoi avec des clés que Hetzner ne détient pas, dans l'Union européenne : sous-traitant ultérieur, par l'hébergeur technique.",
+              "Microsoft, qui héberge la messagerie personnelle (Outlook.com) de l'hébergeur technique, par où passent, non chiffrées par l'association et lisibles par Microsoft, toute demande relative à vos données que vous envoyez par courriel à l'hébergeur technique et la réponse que celui-ci vous adresse par courriel.",
               "L'opérateur téléphonique de l'hébergeur technique, si vous l'appelez ou lui laissez un SMS ou un message vocal au sujet de vos données.",
               "Aucune donnée n'est vendue, ni cédée à d'autres destinataires que ceux listés ici.",
             ],
@@ -539,7 +544,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Discord** (États-Unis) : ${DPF_ADEQUACY_DECISION}.`,
-              `**Microsoft** : transfert possible vers les États-Unis, Microsoft ne garantissant pas le lieu de stockage d'un compte personnel ; il ne reçoit que des données chiffrées pour les sauvegardes, mais une demande envoyée par courriel à l'hébergeur technique, et sa réponse par courriel, lui parviennent non chiffrées par l'association, donc lisibles par Microsoft — ${DPF_ADEQUACY_DECISION}.`,
+              `**Microsoft** : transfert possible vers les États-Unis, Microsoft ne garantissant pas le lieu de stockage d'un compte personnel ; une demande envoyée par courriel à l'hébergeur technique, et sa réponse par courriel, lui parviennent non chiffrées par l'association, donc lisibles par Microsoft — ${DPF_ADEQUACY_DECISION}.`,
+              "Depuis le 1er octobre 2026, les sauvegardes sont envoyées chez Hetzner, en Allemagne : elles ne font l'objet d'aucun transfert hors de l'Union.",
             ],
           },
         ],
@@ -619,7 +625,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
     eyebrow: "BLUEGENJI BOT · PRIVACY",
     title: "Privacy\nPolicy",
     lastUpdatedLabel: "Last updated",
-    lastUpdated: LAST_UPDATED_EN,
+    lastUpdated: PRIVACY_LAST_UPDATED_EN,
     intro:
       "This policy informs you of the data processed by the Discord bot **BlueGenji Bot**, why it is processed, how long it is kept, who receives it and what your rights are (Articles 13 and 14 GDPR).",
     sections: [
@@ -725,7 +731,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
               "The administrators of any server where the Bot is installed, and the holders of the Bot administration role each server designates (**/set-bot-admin**), who can read the list of exclusions (**/ban-list** command, reply visible only to the person who asked).",
               `The technical host, ${SITE_HOST.name}, who provides the machine the Bot runs on (${SITE_HOST.machineEn}): processor.`,
               "Discord, the platform the Bot runs on.",
-              "Microsoft, which stores the backups on the technical host's personal OneDrive, encrypted before upload with a key Microsoft does not hold; and which hosts the technical host's personal mailbox (Outlook.com), through which any request about your data that you email to them, and their emailed reply, pass without encryption by the association, readable by Microsoft.",
+              "Hetzner Online GmbH (Germany), which stores the backups, encrypted before upload with keys Hetzner does not hold, within the European Union: sub-processor, through the technical host.",
+              "Microsoft, which hosts the technical host's personal mailbox (Outlook.com), through which any request about your data that you email to them, and their emailed reply, pass without encryption by the association, readable by Microsoft.",
               "The technical host's phone operator, if you call them or leave them a text or voicemail about your data.",
               "No data is sold, or handed over to any recipient other than those listed here.",
             ],
@@ -741,7 +748,8 @@ export const PRIVACY_POLICY: BilingualDoc = {
             kind: "bullets",
             items: [
               `**Discord** (United States): ${DPF_ADEQUACY_DECISION_EN}.`,
-              `**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; it only receives encrypted data for the backups, but a request emailed to the technical host, and their emailed reply, reach it without encryption by the association, and so readable by Microsoft — ${DPF_ADEQUACY_DECISION_EN}.`,
+              `**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; a request emailed to the technical host, and their emailed reply, reach it without encryption by the association, and so readable by Microsoft — ${DPF_ADEQUACY_DECISION_EN}.`,
+              "Since 1 October 2026, backups are sent to Hetzner, in Germany: they are not transferred outside the Union.",
             ],
           },
         ],

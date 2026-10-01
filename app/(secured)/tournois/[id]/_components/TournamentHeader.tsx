@@ -8,9 +8,14 @@ import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tourn
 import type { RefreshTier } from "@/lib/shared/refresh-tiers";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
-import { participantWording } from "@/lib/shared/participants";
+import { isSoloTournament, participantWording } from "@/lib/shared/participants";
 import { canReturnInSite, isPlainLeftClick, previousSitePathname } from "@/lib/shared/site-back";
 import { advanceTarget } from "@/lib/shared/tournament-launch";
+import {
+  REGISTRATION_STREAM_NOTICE_LINK_LABEL,
+  STREAM_NOTICE_PRIVACY_PATH,
+  registrationStreamNotice,
+} from "@/lib/shared/stream-notice";
 import { TOURNAMENT_STAGE_META } from "@/lib/shared/tournament-progress";
 import type { LiveFailure } from "../_lib/live-state";
 import { canShowEditButton } from "../_lib/edit-entry";
@@ -207,6 +212,15 @@ export function TournamentHeader({
             >
               {wording.registerCta}
             </CyberButton>
+          )}
+          {/* Information sur la retransmission, à l'endroit où l'on s'engage —
+              sans case à cocher : la base est l'intérêt légitime, le joueur
+              garde son droit d'opposition (`lib/shared/stream-notice.ts`). */}
+          {detail.canRegister && !frozen && (
+            <p className={s.registerNotice}>
+              {registrationStreamNotice(isSoloTournament(card.participantType))}{" "}
+              <Link href={STREAM_NOTICE_PRIVACY_PATH}>{REGISTRATION_STREAM_NOTICE_LINK_LABEL}</Link>
+            </p>
           )}
           {/* À la place du bouton, et non à côté : le lecteur cherche là où
               l'action devrait être. */}

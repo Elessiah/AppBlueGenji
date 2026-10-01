@@ -39,8 +39,10 @@ support Spiceworks (`T15`, tickets supprimés un mois après leur clôture —
 journaux d'accès nginx (`T17`, 14 jours — `WEB_ACCESS_LOG_RETENTION_DAYS`, à
 poser en production : `docs/DEPLOYMENT.md`) y ont une fiche ; la gestion des
 adhésions **ne relève pas du site** (décision de l'association) et n'y figure
-pas. Ce qui reste inconnu (qualification et transferts de Spiceworks, de Twitch
-et de Kick) est écrit « décision requise », jamais deviné (voir `ERREUR.txt`).
+pas. Spiceworks est sous-traitant (son accord de traitement des données) et la
+retransmission n'emporte aucun transfert de la part du site (voir « Transferts »
+ci-dessous) ; ce qui resterait inconnu s'écrit « décision requise », jamais
+deviné (voir `ERREUR.txt`).
 Les deux constantes servent `/rgpd` et `/rgpd/registre`.
 
 L'hébergeur technique est sous-traitant : son contrat au sens de l'article 28
@@ -60,16 +62,21 @@ l'organisation restant fondée sur le consentement.
 ## Transferts : un mécanisme par destinataire
 
 `TRANSFER_RECIPIENTS` rattache chaque destinataire hors UE à **son** mécanisme —
-Google, Microsoft, Apple, Mozilla et Discord à la décision d'adéquation
+Google, Microsoft, Apple, Mozilla, Discord et Spiceworks (Ziff Davis, Inc.) à
+la décision d'adéquation
 (UE) 2023/1795 (EU-U.S. Data Privacy Framework), Blizzard aux clauses
 contractuelles types —, et `transferBasis([...])` en rédige la phrase, regroupée
 par mécanisme, pour le registre comme pour `/rgpd`. La formule d'avant
 (« adéquation pour un destinataire certifié, à défaut clauses contractuelles
 types ») ne disait pour aucun sur quoi il reposait. Un destinataire ajouté
 demain s'ajoute au registre avec son mécanisme, vérifié sur la liste officielle
-du DPF. Les sauvegardes OneDrive ont leur cadre à part
-(`ONEDRIVE_BACKUP_FRAMEWORK` : compte personnel, sans contrat de sous-traitance
-ni lieu de stockage garanti), voir `BACKUP_DATA_PROTECTION.md`.
+du DPF. Spiceworks, sous-traitant du portail de support (T15), garde en
+repli les clauses contractuelles types de son accord de traitement des données
+(`SPICEWORKS_SCC_FALLBACK`). Les sauvegardes n'ont plus de transfert : elles
+sont stockées chez Hetzner, en Allemagne (`HETZNER_BACKUP_FRAMEWORK`, T09), voir
+`BACKUP_DATA_PROTECTION.md`. La retransmission des matchs (T16) n'en a pas non
+plus : le site ne fait que lier les chaînes, sans lecteur intégré, et chaque
+plateforme traite les données de ses spectateurs en responsable.
 
 ## Les durées ne peuvent pas mentir
 

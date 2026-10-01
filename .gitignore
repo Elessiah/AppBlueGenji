@@ -89,5 +89,5 @@ Thumbs.db
 .claude/settings.local.json
 
 # Journal des suppressions de compte (lib/server/account-deletion-journal.ts) :
-# hors du dépôt, jamais servi, copié sur OneDrive par la sauvegarde du bot.
+# hors du dépôt, jamais servi, copié, chiffré, sur le stockage distant par la sauvegarde du bot.
 /data/

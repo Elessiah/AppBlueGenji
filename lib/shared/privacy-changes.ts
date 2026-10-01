@@ -555,6 +555,29 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
       { href: "/rgpd#age-minimum", label: "Lire le paragraphe « Âge minimum »" },
     ],
   },
+  // Changement de sous-traitant et de lieu : les sauvegardes quittent le
+  // OneDrive personnel de l'hébergeur (lieu non garanti, transfert possible
+  // vers les États-Unis) pour Hetzner, en Allemagne, le 1er octobre 2026 en
+  // production. Daté du lendemain de la mise en ligne de cette entrée, comme
+  // les précédentes. Les précisions du même lot (Spiceworks sous-traitant,
+  // retransmission sans transfert par le site) y sont jointes.
+  {
+    id: "2026-10-sauvegardes-hetzner",
+    publishedAt: "2026-10-02",
+    title: "Sauvegardes hébergées en Allemagne",
+    summary:
+      "Depuis le 1er octobre 2026, les sauvegardes chiffrées du site et du bot sont envoyées chez Hetzner, en Allemagne, et non plus chez Microsoft (OneDrive) : elles restent dans l'Union européenne.",
+    details: [
+      "Hetzner Online GmbH stocke les copies de sauvegarde dans l'Union européenne, comme sous-traitant, et ne peut pas les lire : elles sont chiffrées avant envoi, avec des clés que seul l'hébergeur du site détient. Les durées de conservation ne changent pas.",
+      "Microsoft ne reçoit plus de nouvelle sauvegarde. Il reste destinataire de la messagerie de la personne à contacter pour tes demandes relatives à tes données.",
+      "Portail de support : Spiceworks y agit comme sous-traitant de l'association, et ses transferts vers les États-Unis reposent sur le Data Privacy Framework.",
+      "Retransmission des matchs : seuls ton pseudo, le nom de ton équipe et tes résultats en jeu apparaissent, jamais de webcam ni de chat vocal ; le site ne transmet rien aux plateformes de diffusion. Tu peux t'y opposer et apparaître sous un nom neutre.",
+    ],
+    links: [
+      { href: "/rgpd#destinataires", label: "Lire la section « Destinataires et transferts »" },
+      { href: "/rgpd#retransmission", label: "Lire le paragraphe « Retransmission des matchs »" },
+    ],
+  },
 ];
 
 /** Fuseau des dates de publication : celui de l'association. */

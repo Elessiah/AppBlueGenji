@@ -17,7 +17,7 @@ import { accountDeletionJournalPath, readAccountDeletionJournal } from "./accoun
  *
  * Le journal par défaut est celui du site (`ACCOUNT_DELETION_JOURNAL_PATH`,
  * sinon `data/account-deletions.jsonl`). Si la machine elle-même a été perdue,
- * sa copie se récupère sur OneDrive — voir `docs/features/BACKUP_DATA_PROTECTION.md`.
+ * sa copie se récupère sur le stockage distant — voir `docs/features/BACKUP_DATA_PROTECTION.md`.
  *
  * Fait pour tourner **en production**, d'où `./script-env` (voir
  * `backfill-avatars.ts`).

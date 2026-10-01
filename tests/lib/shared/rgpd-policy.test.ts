@@ -250,7 +250,7 @@ describe("DONNEE_SAUVEGARDES", () => {
   });
 
   it("nomme l'hébergeur et le chiffrement", () => {
-    expect(DONNEE_SAUVEGARDES.finalite).toMatch(/Microsoft/);
+    expect(DONNEE_SAUVEGARDES.finalite).toMatch(/Hetzner, en Allemagne/);
     expect(DONNEE_SAUVEGARDES.finalite).toMatch(/chiffrées/i);
   });
 });

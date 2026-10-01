@@ -114,6 +114,25 @@ Une seule boucle de sondage alimente les deux : `useLandingLive`, appelé par le
 `Hero` (`components/cyber/landing/`). Deux sondages séparés les feraient diverger
 le temps d'un tick — une carte annonçant un direct au-dessus d'un bouton absent.
 
+## Information des joueurs (RGPD)
+
+La retransmission est un traitement (registre, **T16**) : intérêt légitime de
+l'association, droit d'opposition. Elle ne montre que le **pseudo**, le **nom
+d'équipe** et les **résultats et performances en jeu** — ni webcam ni chat
+vocal des joueurs. Le site ne fait que **lier** les chaînes, sans lecteur
+intégré : il ne transmet rien aux plateformes, qui traitent leurs spectateurs en
+responsables de leur propre traitement (T16 : transferts « Aucun »).
+
+Le joueur en est informé là où il s'engage, sans case à cocher — ce n'est pas
+un consentement : sous le bouton d'inscription de la fiche du tournoi
+(`TournamentHeader`, en équipe comme en individuel) et dans la confirmation
+d'inscription (`registration-confirm.ts`). Les phrases viennent d'un module pur,
+`lib/shared/stream-notice.ts`, partagé avec la section « Retransmission des
+matchs » des conditions d'utilisation (une précision : `TERMS_VERSION` ne bouge
+pas) ; le détail est sur `/rgpd#retransmission`. L'opposition se demande par
+« Signaler un problème », catégorie RGPD : le joueur apparaît alors sous un nom
+neutre, et un lien de rediffusion qui le montre est retiré.
+
 ## Liste blanche de plateformes
 
 `normalizeStreamUrl` n'accepte que `twitch.tv`, `youtube.com`, `youtu.be` et

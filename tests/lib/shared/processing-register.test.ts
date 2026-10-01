@@ -13,7 +13,9 @@ import {
   SESSION_RETENTION_DAYS,
   ALL_TRANSFER_RECIPIENTS,
   DPF_ADEQUACY_DECISION,
-  ONEDRIVE_BACKUP_FRAMEWORK,
+  HETZNER_BACKUP_FRAMEWORK,
+  SPICEWORKS_PROCESSOR_FRAMEWORK,
+  SPICEWORKS_SCC_FALLBACK,
   STANDARD_CONTRACTUAL_CLAUSES,
   TRANSFER_RECIPIENTS,
   transferBasis,
@@ -344,9 +346,9 @@ describe("bases légales : le registre et la politique disent la même chose", (
     expect(STANDARD_CONTRACTUAL_CLAUSES).toMatch(/clauses contractuelles types/);
   });
 
-  it("rattache Google, Microsoft, Apple, Mozilla et Discord au DPF, Blizzard aux clauses contractuelles types", () => {
+  it("rattache Google, Microsoft, Apple, Mozilla, Discord et Spiceworks au DPF, Blizzard aux clauses contractuelles types", () => {
     expect(ALL_TRANSFER_RECIPIENTS).toHaveLength(Object.keys(TRANSFER_RECIPIENTS).length);
-    for (const r of ["GOOGLE", "MICROSOFT", "APPLE", "MOZILLA", "DISCORD"] as const) {
+    for (const r of ["GOOGLE", "MICROSOFT", "APPLE", "MOZILLA", "DISCORD", "SPICEWORKS"] as const) {
       expect(TRANSFER_RECIPIENTS[r].mechanism).toBe("DPF");
     }
     expect(TRANSFER_RECIPIENTS.BLIZZARD.mechanism).toBe("SCC");
@@ -381,25 +383,22 @@ describe("bases légales : le registre et la politique disent la même chose", (
     });
   });
 
-  it("nomme Microsoft, destinataire des sauvegardes chiffrées (T09), avec le pays du transfert", () => {
-    const backups = PROCESSING_ACTIVITIES.find((a) => a.recipients.join(" ").includes("OneDrive"));
-    expect(backups).toBeDefined();
-    expect(backups!.recipients.join(" ")).toMatch(/Microsoft/);
-    expect(backups!.transfers.join(" ")).toMatch(/États-Unis/);
-    expect(backups!.transfers.join(" ")).toContain(transferBasis(["MICROSOFT"]));
+  it("nomme Hetzner, en Allemagne, destinataire des sauvegardes chiffrées (T09), sans transfert", () => {
+    const backups = byRef("T09");
+    expect(backups.recipients.join(" ")).toContain(HETZNER_BACKUP_FRAMEWORK);
+    expect(HETZNER_BACKUP_FRAMEWORK).toMatch(/Hetzner Online GmbH \(Allemagne\)/);
+    expect(HETZNER_BACKUP_FRAMEWORK).toMatch(/version 1\.2/);
+    expect(HETZNER_BACKUP_FRAMEWORK).toMatch(/1er octobre 2026/);
+    expect(HETZNER_BACKUP_FRAMEWORK).toMatch(/exclusivement dans l'Union européenne/);
+    expect(backups.transfers).toEqual(["Aucun"]);
   });
 
-  it("n'affirme aucun lieu de stockage des sauvegardes, ni un DPA qu'un compte personnel n'a pas", () => {
-    const backups = PROCESSING_ACTIVITIES.find((a) => a.recipients.join(" ").includes("OneDrive"))!;
-    const text = JSON.stringify(backups);
-    expect(text).not.toMatch(/Irlande|Pays-Bas|Data Protection Addendum|\bDPA\b/);
-    expect(text).toContain(ONEDRIVE_BACKUP_FRAMEWORK);
-    expect(ONEDRIVE_BACKUP_FRAMEWORK).toMatch(/Contrat de services Microsoft/);
-    expect(ONEDRIVE_BACKUP_FRAMEWORK).toMatch(/lieu de stockage non garanti/);
-    // La garantie est le chiffrement côté association ; celui de Microsoft n'est qu'un complément.
-    expect(backups.security.join(" ")).toMatch(/avant tout envoi/);
-    expect(backups.security.join(" ")).toMatch(/aucune clé n'est transmise à Microsoft/);
-    expect(backups.security.join(" ")).toMatch(/Mesures complémentaires de Microsoft/);
+  it("ne nomme plus Microsoft ni OneDrive pour les sauvegardes, clés chez le seul hébergeur", () => {
+    const text = JSON.stringify(byRef("T09"));
+    expect(text).not.toMatch(/Microsoft|OneDrive/);
+    expect(byRef("T09").recipients.join(" ")).toMatch(/Keryan Houssin, .*seul détenteur des clés/);
+    expect(byRef("T09").security.join(" ")).toMatch(/avant tout envoi/);
+    expect(byRef("T09").security.join(" ")).toMatch(/jamais transmises à Hetzner/);
   });
 
   it("dit où le site et le bot sont hébergés", () => {
@@ -421,10 +420,14 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.name).toMatch(/Spiceworks/);
     expect(SUPPORT_TICKET_RETENTION_MONTHS).toBe(1);
     expect(sheet.retention.join(" ")).toContain(`${SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture`);
-    // Qualification et transfert inconnus : dits, jamais devinés.
-    expect(sheet.recipients.join(" ")).toMatch(/décision requise/);
-    expect(sheet.transfers.join(" ")).toMatch(/décision requise/);
-    expect(text(sheet)).not.toMatch(/Data Privacy Framework/);
+    // Sous-traitant sous l'accord de traitement de Spiceworks ; transfert sur
+    // le DPF de Ziff Davis, clauses contractuelles types en repli.
+    expect(text(sheet)).not.toMatch(/décision requise/);
+    expect(sheet.recipients.join(" ")).toContain(SPICEWORKS_PROCESSOR_FRAMEWORK);
+    expect(SPICEWORKS_PROCESSOR_FRAMEWORK).toMatch(/sous-traitant/);
+    expect(sheet.transfers.join(" ")).toContain(transferBasis(["SPICEWORKS"]));
+    expect(sheet.transfers.join(" ")).toMatch(/Ziff Davis, Inc\./);
+    expect(sheet.transfers.join(" ")).toContain(SPICEWORKS_SCC_FALLBACK);
   });
 
   it("donne une fiche à la retransmission, avec un droit d'opposition", () => {
@@ -433,8 +436,12 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(sheet.legalBasis).toMatch(/droit d'opposition/);
     expect(sheet.dataCategories.join(" ")).toMatch(/Pseudos .* noms d'équipe/);
     expect(sheet.retention.join(" ")).toMatch(/Lien de rediffusion : conservé avec le match/);
-    expect(sheet.transfers.join(" ")).toMatch(/YouTube \(Google\)/);
-    expect(sheet.transfers.join(" ")).toMatch(/Twitch et Kick — décision requise/);
+    // Le site ne fait que lier les chaînes : aucun transfert de sa part.
+    expect(sheet.transfers).toEqual(["Aucun"]);
+    expect(sheet.recipients.join(" ")).toMatch(/n'intègre aucun lecteur/);
+    expect(sheet.dataCategories.join(" ")).toMatch(/ni webcam ni chat vocal des joueurs/);
+    expect(sheet.retention.join(" ")).toMatch(/nom neutre/);
+    expect(text(sheet)).not.toMatch(/décision requise/);
   });
 
   it("donne une fiche aux journaux nginx, 14 jours", () => {
@@ -449,8 +456,6 @@ describe("décisions de l'association du 2026-09-30", () => {
     expect(HOST_PROCESSING_AGREEMENT).toMatch(/en attente de signature/);
     expect(controller.host).toContain(HOST_PROCESSING_AGREEMENT);
     expect(byRef("T09").recipients.join(" ")).toContain(HOST_PROCESSING_AGREEMENT);
-    // Aucun contrat de sous-traitance prétendu avec Microsoft.
-    expect(byRef("T09").recipients.join(" ")).toContain("sans contrat de sous-traitance");
     expect(byRef("T09").security.join(" ")).toMatch(/remote rclone de type crypt .* vérifié en production le 30 septembre 2026/);
   });
 

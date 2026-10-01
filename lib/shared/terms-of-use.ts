@@ -26,6 +26,7 @@ import { NOTIFIER_FOLLOW_UP, copyrightNoticeElementsText } from "./content-repor
 import { LOGO_QUARANTINE_MONTHS } from "./logo-quarantine";
 import { SUSPENSION_MAX_DAYS } from "./account-suspension";
 import { SITE_MINIMUM_AGE } from "./legal-durations";
+import { STREAM_NOTICE_OBJECTION, STREAM_NOTICE_PRIVACY_PATH, STREAM_NOTICE_SHOWN } from "./stream-notice";
 
 /**
  * Version en vigueur. L'avancer redemande l'acceptation.
@@ -194,6 +195,18 @@ export const TERMS_SECTIONS: readonly TermsSection[] = [
       "Il peut retirer ce contenu à tout moment, par les moyens que le site lui offre (un nom d'équipe se remplace et ne disparaît qu'avec l'équipe ; un BattleTag reçu de Battle.net ne s'efface qu'une fois le compte Battle.net détaché, ce qui suppose un autre moyen de connexion). Le retrait vaut pour l'avenir : le contenu cesse d'être affiché sur le site et d'être repris dans de nouvelles communications, mais les diffusions, rediffusions et publications **déjà faites** avant le retrait ne sont pas concernées.",
       "Pour une équipe, répondent aussi de ses contenus, en plus de leur auteur : le **propriétaire** du nom, du sigle et de la description de l'équipe, qu'il est seul à pouvoir modifier ; le propriétaire et les **gérants** de son logo, qu'ils peuvent l'un et l'autre changer. Une **équipe fantôme**, créée et gérée par le staff de l'association pour un tournoi, n'a pas de propriétaire : l'association répond de ses contenus.",
     ],
+  },
+  // Précision, et non règle de fond nouvelle : la retransmission figurait déjà
+  // à la licence ci-dessus et à la politique de confidentialité. Elle ne change
+  // donc pas `TERMS_VERSION` (aucune nouvelle acceptation demandée).
+  {
+    id: "retransmission",
+    title: "Retransmission des matchs",
+    paragraphs: [
+      `Un match de tournoi peut être **diffusé en direct et enregistré** (YouTube, Twitch ou Kick), par la chaîne de l'association ou d'un caster. ${STREAM_NOTICE_SHOWN}`,
+      `${STREAM_NOTICE_OBJECTION} La diffusion se regarde sur la plateforme qui la publie : le site ne fait que lier la chaîne.`,
+    ],
+    links: [{ href: STREAM_NOTICE_PRIVACY_PATH, label: "Politique de confidentialité — retransmission des matchs" }],
   },
   {
     id: "signalement",

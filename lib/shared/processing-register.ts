@@ -47,7 +47,7 @@ import {
 } from "@/lib/shared/legal-contact";
 
 /** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
-export const REGISTER_UPDATED_AT = "2026-09-30";
+export const REGISTER_UPDATED_AT = "2026-10-01";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
@@ -84,7 +84,14 @@ export const BOT_ACTIVITY_AUTHOR_RETENTION_DAYS = 30;
  * types ») ne disait pour aucun d'eux sur quoi il reposait. Écrit une fois pour
  * le registre et pour `/rgpd`.
  */
-export type TransferRecipient = "DISCORD" | "GOOGLE" | "MICROSOFT" | "APPLE" | "MOZILLA" | "BLIZZARD";
+export type TransferRecipient =
+  | "DISCORD"
+  | "GOOGLE"
+  | "MICROSOFT"
+  | "APPLE"
+  | "MOZILLA"
+  | "SPICEWORKS"
+  | "BLIZZARD";
 
 /** Décision d'adéquation qui couvre les entreprises certifiées EU-U.S. Data Privacy Framework. */
 export const DPF_ADEQUACY_DECISION =
@@ -106,6 +113,9 @@ export const TRANSFER_RECIPIENTS: Record<TransferRecipient, { name: string; mech
   MICROSOFT: { name: "Microsoft", mechanism: "DPF" },
   APPLE: { name: "Apple", mechanism: "DPF" },
   MOZILLA: { name: "Mozilla", mechanism: "DPF" },
+  // Spiceworks appartient à Ziff Davis, Inc., inscrite à la liste du Data
+  // Privacy Framework (dataprivacyframework.gov, vérifié par l'association).
+  SPICEWORKS: { name: "Spiceworks (Ziff Davis, Inc.)", mechanism: "DPF" },
   BLIZZARD: { name: "Blizzard", mechanism: "SCC" },
 };
 
@@ -116,6 +126,7 @@ export const ALL_TRANSFER_RECIPIENTS: readonly TransferRecipient[] = [
   "MICROSOFT",
   "APPLE",
   "MOZILLA",
+  "SPICEWORKS",
   "BLIZZARD",
 ];
 
@@ -146,24 +157,38 @@ export function transferBasis(recipients: readonly TransferRecipient[]): string 
 }
 
 /**
- * Cadre des sauvegardes déposées sur OneDrive. Le compte est **personnel** : il
- * relève du Contrat de services Microsoft et de sa déclaration de
- * confidentialité, sans contrat de sous-traitance (le DPA de Microsoft ne vaut
- * que pour ses offres professionnelles), et Microsoft n'y garantit aucun lieu de
- * stockage — d'où aucune localisation affirmée. Le chiffrement avant envoi, sur
- * le serveur du site, est une mesure de sécurité (art. 32) : il ne tient lieu ni
- * de contrat de sous-traitance (art. 28) ni de mécanisme de transfert (art. 44
- * et s.). Le chiffrement au repos de Microsoft et le TLS en transit s'y ajoutent.
+ * Cadre des sauvegardes hors du serveur, déposées depuis le 1er octobre 2026
+ * sur Hetzner Storage Share (Nextcloud géré). Hetzner Online GmbH (Allemagne)
+ * est **sous-traitant ultérieur** de l'association, par l'hébergeur qui a
+ * souscrit le service et accepté son contrat de traitement des données
+ * (version 1.2, le 1er octobre 2026 — le document signé n'est pas publié) ;
+ * traitement exclusivement dans l'Union européenne ou l'Espace économique
+ * européen (§ 3 de ce contrat), donc **aucun transfert hors de l'Union**. Le
+ * chiffrement avant envoi, sur le serveur du site, est une mesure de sécurité
+ * (art. 32) qui s'y ajoute : Hetzner stocke des copies qu'il ne peut pas lire.
  */
-export const ONEDRIVE_BACKUP_FRAMEWORK =
-  "compte Microsoft personnel, régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft";
+export const HETZNER_BACKUP_FRAMEWORK =
+  "Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant ultérieur de l'association par l'hébergeur du site, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
+
+/**
+ * Portail de support (T15) : Spiceworks est **sous-traitant** de l'association,
+ * dans le cadre de son accord de traitement des données (Data Processing
+ * Agreement). Le transfert vers les États-Unis repose sur la certification
+ * Data Privacy Framework de Ziff Davis, Inc. (`TRANSFER_RECIPIENTS.SPICEWORKS`),
+ * avec à défaut les clauses contractuelles types que contient cet accord.
+ */
+export const SPICEWORKS_PROCESSOR_FRAMEWORK =
+  "sous-traitant de l'association, dans le cadre de l'accord de traitement des données de Spiceworks (Data Processing Agreement)";
+
+/** Repli du transfert de Spiceworks, si la certification de Ziff Davis venait à manquer. */
+export const SPICEWORKS_SCC_FALLBACK =
+  "en repli, clauses contractuelles types de la Commission européenne (art. 46 RGPD) contenues dans l'accord de traitement des données de Spiceworks";
 
 /**
  * Messagerie de la personne à contacter pour les demandes relatives aux
- * données : un compte Outlook.com **personnel**, comme le OneDrive des
- * sauvegardes (`ONEDRIVE_BACKUP_FRAMEWORK`) — même régime, sans contrat de
- * sous-traitance —, mais **sans chiffrement** propre à l'association :
- * Microsoft peut lire ce qu'on y écrit.
+ * données : un compte Outlook.com **personnel**, sans contrat de
+ * sous-traitance, et **sans chiffrement** propre à l'association : Microsoft
+ * peut lire ce qu'on y écrit.
  */
 export const OUTLOOK_MAIL_FRAMEWORK =
   "compte Microsoft personnel (Outlook.com), régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft ; messages non chiffrés par l'association, lisibles par Microsoft";
@@ -557,16 +582,16 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       `Journal des suppressions : ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours par entrée`,
     ],
     recipients: [
-      `Responsable technique de l'association, qui est aussi l'hébergeur du site (sous-traitant — ${HOST_PROCESSING_AGREEMENT}), seul détenteur des clés de déchiffrement, côté association`,
-      `Microsoft (OneDrive de l'hébergeur du site — ${ONEDRIVE_BACKUP_FRAMEWORK}), qui stocke les copies chiffrées sans pouvoir les lire`,
+      `${SITE_HOST.name}, responsable technique de l'association et hébergeur du site (sous-traitant — ${HOST_PROCESSING_AGREEMENT}), seul détenteur des clés de déchiffrement`,
+      `${HETZNER_BACKUP_FRAMEWORK}, qui stocke les copies chiffrées sans pouvoir les lire`,
     ],
-    transfers: [
-      `Possibles vers les États-Unis (lieu de stockage non garanti par Microsoft) : Microsoft, qui ne reçoit que des données chiffrées avant envoi avec une clé que Microsoft ne détient pas — ${transferBasis(["MICROSOFT"])}`,
-    ],
+    // Stockage en Allemagne, traitement exclusivement dans l'UE/EEE (§ 3 du
+    // contrat de Hetzner) : aucun transfert hors de l'Union.
+    transfers: ["Aucun"],
     security: [
-      "Chiffrement sur le serveur du site avant tout envoi (age pour les archives, remote rclone de type crypt pour les images, les logos masqués et le journal — vérifié en production le 30 septembre 2026) : aucune clé n'est transmise à Microsoft",
-      "Mesures complémentaires de Microsoft : chiffrement au repos de ses serveurs, envoi chiffré en transit (HTTPS/TLS)",
-      "Suppression définitive, sans corbeille ni historique de versions",
+      `Chiffrement sur le serveur du site avant tout envoi (age pour les archives, remote rclone de type crypt pour les images, les logos masqués et le journal — vérifié en production le 30 septembre 2026, maintenu pour le stockage chez Hetzner) : clés détenues par le seul hébergeur du site, ${SITE_HOST.name}, et jamais transmises à Hetzner`,
+      "Envoi chiffré en transit (HTTPS/TLS)",
+      "Suppression définitive, sans corbeille ni historique de versions chez le fournisseur du stockage",
       "Clé privée des archives conservée hors du serveur ; clé des images et du journal sur le seul serveur, avec une copie de secours hors du serveur",
       "Suppressions de compte rejouées avant toute remise en service après restauration",
     ],
@@ -770,10 +795,10 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     ],
     recipients: [
       "Membres du staff de l'association chargés du support et de la modération",
-      "Spiceworks, qui héberge le portail (décision requise : qualification — sous-traitant — et contrat au sens de l'article 28 non établis)",
+      `Spiceworks, qui héberge le portail (${SPICEWORKS_PROCESSOR_FRAMEWORK})`,
     ],
     transfers: [
-      "Possibles vers les États-Unis : Spiceworks — décision requise : mécanisme d'encadrement du transfert (certification ou clauses contractuelles types) à vérifier",
+      `Possibles vers les États-Unis : Spiceworks — ${transferBasis(["SPICEWORKS"])} ; ${SPICEWORKS_SCC_FALLBACK}`,
     ],
     security: [
       "Accès au portail réservé aux membres du staff chargés du support",
@@ -792,7 +817,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",
     dataSubjects: ["Joueurs des matchs diffusés", "Casters"],
     dataCategories: [
-      "Pseudos en jeu et du site, noms d'équipe, images de la partie et scores, tels qu'ils apparaissent à l'écran",
+      "Pseudos en jeu et du site, noms d'équipe, images de la partie, résultats et performances en jeu, tels qu'ils apparaissent à l'écran — ni webcam ni chat vocal des joueurs",
       "Voix et pseudo des casters",
       "Lien de la diffusion et de la rediffusion d'un match",
     ],
@@ -800,18 +825,20 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
     retention: [
       "Direct : aucune conservation par le site, qui ne garde que le lien de la chaîne",
       "Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée",
-      "Droit d'opposition : sur demande, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée",
+      "Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée",
     ],
     recipients: [
       "Public des plateformes de diffusion et du site",
-      "Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement",
+      "Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée",
     ],
-    transfers: [
-      `Possibles vers les États-Unis : YouTube (Google) — ${transferBasis(["GOOGLE"])} ; Twitch et Kick — décision requise : mécanisme d'encadrement du transfert à vérifier`,
-    ],
+    // Le site ne transmet rien aux plateformes : la diffusion est publiée par la
+    // chaîne qui la produit, chaque plateforme traitant ses spectateurs en
+    // responsable de son propre traitement.
+    transfers: ["Aucun"],
     security: [
       ...COMMON_SECURITY,
-      "Liens de diffusion limités à une liste de plateformes ; aucune donnée de contact affichée à l'écran par le site",
+      "Liens de diffusion limités à une liste de plateformes, aucun lecteur intégré ; aucune donnée de contact affichée à l'écran par le site",
+      "Aucune webcam ni chat vocal des joueurs à l'écran",
     ],
   },
   {

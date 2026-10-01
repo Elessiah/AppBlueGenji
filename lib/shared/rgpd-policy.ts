@@ -158,14 +158,14 @@ export const DONNEE_TOURNOIS: DonneEntry = {
  * La page disait qu'elles « peuvent subsister quelques jours » ; elles étaient
  * gardées six mois. La durée vient désormais de la constante que le script de
  * sauvegarde doit respecter (`BACKUP_RETENTION_DAYS`), et la phrase nomme les
- * deux choses qui rendent cette survie acceptable : le chiffrement (Microsoft
- * héberge sans pouvoir lire) et le rejeu des suppressions de compte à la
+ * deux choses qui rendent cette survie acceptable : le chiffrement (Hetzner
+ * héberge, en Allemagne, sans pouvoir lire) et le rejeu des suppressions de compte à la
  * restauration — les seules qui soient rejouées.
  */
 export const DONNEE_SAUVEGARDES: DonneEntry = {
   donnee: "Copies de sauvegarde",
   finalite:
-    "Reprise après incident (panne, corruption). Chiffrées avant envoi, avec une clé que détient le seul responsable technique de l'association (qui est aussi l'hébergeur du site), puis hébergées chez Microsoft (OneDrive)",
+    "Reprise après incident (panne, corruption). Chiffrées avant envoi, avec des clés que détient le seul responsable technique de l'association (qui est aussi l'hébergeur du site), puis hébergées chez Hetzner, en Allemagne",
   base: "Intérêt légitime",
   duree: `${BACKUP_RETENTION_DAYS} jours au plus`,
 };

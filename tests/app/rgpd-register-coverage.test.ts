@@ -36,12 +36,12 @@ describe("/rgpd — couverture du registre", () => {
     expect(REGISTER_SCOPE_DETAIL).toMatch(/adhésions à l'association ne relève pas du site/);
   });
 
-  it("nomme Google (Gmail), Spiceworks et les plateformes de diffusion parmi les destinataires", () => {
+  it("nomme Google (Gmail) et Spiceworks parmi les destinataires, et les plateformes de diffusion dans la section", () => {
     const destinataires = page.slice(page.indexOf('id="destinataires"'), page.indexOf('id="exercer-vos-droits"'));
     expect(destinataires).toMatch(/<strong>Google<\/strong> \(Gmail\)/);
     expect(destinataires).toMatch(/<strong>Spiceworks<\/strong>/);
     expect(destinataires).toMatch(/<strong>YouTube, Twitch ou Kick<\/strong>/);
-    expect(destinataires).toMatch(/en cours de vérification/);
+    expect(destinataires).not.toMatch(/en cours de vérification/);
   });
 
   it("applique aux demandes adressées à l'association la durée des demandes RGPD", () => {
