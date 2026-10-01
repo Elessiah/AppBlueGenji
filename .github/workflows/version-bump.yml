@@ -2,18 +2,25 @@
 # Niveau lu sur les étiquettes de la PR : release:major, release:minor, sinon patch ;
 # release:skip = aucun bump. Le commit de version porte [skip ci] et n'ouvre aucune PR,
 # donc il ne relance ni ce workflow ni le CI.
+#
+# pull_request_target et non pull_request : une PR venue d'un fork recevrait sinon un
+# jeton en lecture seule et ne serait jamais versionnée. C'est sans danger ici, le job
+# n'extrait que main et n'exécute aucun code de la PR.
 name: Version bump
 
 on:
-  pull_request:
+  pull_request_target:
     types: [closed]
     branches: [main]
 
 permissions:
   contents: write
 
+# Pas de groupe global : GitHub ne garde qu'une exécution en attente par groupe et
+# annulerait les autres (un bump perdu sans erreur). Les fusions simultanées se
+# départagent au push, qui recalcule la version sur main à jour à chaque essai.
 concurrency:
-  group: version-bump
+  group: version-bump-${{ github.event.pull_request.number }}
   cancel-in-progress: false
 
 jobs:
@@ -28,6 +35,7 @@ jobs:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
       IS_MAJOR: ${{ contains(github.event.pull_request.labels.*.name, 'release:major') }}
       IS_MINOR: ${{ contains(github.event.pull_request.labels.*.name, 'release:minor') }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,41 +56,53 @@ jobs:
           fi
           echo "level=$level" >> "$GITHUB_OUTPUT"
 
-      - name: Monter la version
+      - name: Monter la version, commiter, taguer et pousser
         id: bump
-        run: |
-          git pull --ff-only origin main
-          npm version "${{ steps.level.outputs.level }}" --no-git-tag-version --ignore-scripts
-          version="v$(node -p "require('./package.json').version")"
-          if git rev-parse -q --verify "refs/tags/$version" >/dev/null || git ls-remote --exit-code --tags origin "refs/tags/$version" >/dev/null; then
-            echo "::error::Le tag $version existe déjà."
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - name: Commiter, taguer et pousser
         env:
-          VERSION: ${{ steps.bump.outputs.version }}
+          LEVEL: ${{ steps.level.outputs.level }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package.json package-lock.json
-          git commit -m "release $VERSION [skip ci]"
+          marker="(#$PR_NUMBER) [skip ci]"
           for attempt in 1 2 3 4 5; do
-            if git push origin HEAD:main; then
-              break
+            git fetch --tags origin main
+            git reset -q --hard origin/main
+            # Relance après un échec partiel : la version de cette PR est déjà sur
+            # main, on la reprend au lieu d'en monter une seconde.
+            done_sha=$(git log -n 1 --format=%H --fixed-strings --grep="$marker" origin/main)
+            if [ -n "$done_sha" ]; then
+              version=$(git log -n 1 --format=%s "$done_sha" | awk '{print $2}')
+              git rev-parse -q --verify "refs/tags/$version" >/dev/null || git tag "$version" "$done_sha"
+              git push origin "refs/tags/$version"
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              exit 0
             fi
-            if [ "$attempt" = 5 ]; then
-              echo "::error::Push refusé cinq fois."
+            npm version "$LEVEL" --no-git-tag-version --ignore-scripts
+            version="v$(node -p "require('./package.json').version")"
+            if git rev-parse -q --verify "refs/tags/$version" >/dev/null; then
+              echo "::error::Le tag $version existe déjà."
               exit 1
             fi
+            git add package.json package-lock.json
+            git commit -q -m "release $version $marker"
+            git tag "$version"
+            # Atomique : le commit et son tag arrivent ensemble ou pas du tout.
+            if git push --atomic origin HEAD:main "refs/tags/$version"; then
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git tag -d "$version"
             sleep $((attempt * 5))
-            git pull --rebase origin main
           done
-          git tag "$VERSION"
-          git push origin "refs/tags/$VERSION"
+          echo "::error::Push refusé cinq fois."
+          exit 1
 
       - name: Publier la release
         env:
           VERSION: ${{ steps.bump.outputs.version }}
-        run: gh release create "$VERSION" --title "$VERSION" --generate-notes --verify-tag
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release $VERSION déjà publiée."
+          else
+            gh release create "$VERSION" --title "$VERSION" --generate-notes --verify-tag
+          fi

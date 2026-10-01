@@ -14,7 +14,7 @@ const workflow = readSource(".github/workflows/version-bump.yml");
 
 describe("workflow de bump de version", () => {
   it("ne se déclenche qu'à la fusion d'une PR dans main", () => {
-    expect(workflow).toMatch(/pull_request:\s*\n\s*types: \[closed\]\s*\n\s*branches: \[main\]/);
+    expect(workflow).toMatch(/pull_request_target:\s*\n\s*types: \[closed\]\s*\n\s*branches: \[main\]/);
     expect(workflow).toContain("github.event.pull_request.merged == true");
   });
 
@@ -22,7 +22,8 @@ describe("workflow de bump de version", () => {
     expect(workflow).toContain("!contains(github.event.pull_request.labels.*.name, 'release:skip')");
     expect(workflow).toContain("!startsWith(github.event.pull_request.head.ref, 'release/')");
     expect(workflow).toContain("github.event.pull_request.user.login != 'github-actions[bot]'");
-    expect(workflow).toContain('git commit -m "release $VERSION [skip ci]"');
+    expect(workflow).toContain('marker="(#$PR_NUMBER) [skip ci]"');
+    expect(workflow).toContain('git commit -q -m "release $version $marker"');
   });
 
   it("lit le niveau sur les étiquettes major puis minor, patch par défaut", () => {
@@ -31,13 +32,25 @@ describe("workflow de bump de version", () => {
     expect(workflow).toMatch(/IS_MAJOR[\s\S]*level=major[\s\S]*IS_MINOR[\s\S]*level=minor[\s\S]*else level=patch/);
   });
 
-  it("sérialise les exécutions sans les annuler", () => {
-    expect(workflow).toMatch(/concurrency:\s*\n\s*group: version-bump\s*\n\s*cancel-in-progress: false/);
+  it("ne met aucune fusion en file commune, où GitHub annulerait les attentes", () => {
+    expect(workflow).toMatch(
+      /group: version-bump-\$\{\{ github\.event\.pull_request\.number \}\}\s*\n\s*cancel-in-progress: false/,
+    );
+  });
+
+  it("pousse commit et tag ensemble, recalculés sur main à chaque essai", () => {
+    expect(workflow).toContain("git reset -q --hard origin/main");
+    expect(workflow).toContain('git push --atomic origin HEAD:main "refs/tags/$version"');
+  });
+
+  it("reprend la version déjà posée pour la PR au lieu d'en monter une seconde", () => {
+    expect(workflow).toContain('--fixed-strings --grep="$marker" origin/main');
+    expect(workflow).toContain('gh release view "$VERSION"');
   });
 
   it("part de main à jour, pas du commit de fusion", () => {
     expect(workflow).toMatch(/ref: main\s*\n\s*fetch-depth: 0/);
-    expect(workflow).toContain("npm version \"${{ steps.level.outputs.level }}\" --no-git-tag-version");
+    expect(workflow).toContain('npm version "$LEVEL" --no-git-tag-version');
   });
 
   it("publie un tag et une release, avec un jeton de repli", () => {

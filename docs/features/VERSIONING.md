@@ -4,14 +4,16 @@ La version du site vit dans `package.json` (et `package-lock.json`), au format [
 
 ## Comment la version monte
 
-Le workflow `.github/workflows/version-bump.yml` se déclenche à la **fusion** d'une PR dans `main` (`pull_request` `closed`, `merged == true`) :
+Le workflow `.github/workflows/version-bump.yml` se déclenche à la **fusion** d'une PR dans `main` (`pull_request_target` `closed`, `merged == true` — `pull_request_target` pour qu'une PR venue d'un fork reçoive un jeton en écriture ; sans danger, le job n'extrait que `main` et n'exécute aucun code de la PR) :
 
 1. il lit le niveau sur les **étiquettes** de la PR ;
 2. extrait `main` à jour (pas le commit de fusion : une autre fusion a pu passer entre-temps) et lance `npm version <niveau> --no-git-tag-version` ;
-3. commite `release vX.Y.Z [skip ci]` au nom de `github-actions[bot]`, pousse sur `main` (rebase puis nouvel essai en cas de refus, cinq essais au plus), pose le tag `vX.Y.Z` ;
+3. commite `release vX.Y.Z (#N) [skip ci]` au nom de `github-actions[bot]` et pousse ce commit **et** le tag `vX.Y.Z` d'un seul push atomique ; en cas de refus (une autre fusion est passée), il repart de `main` à jour et recalcule la version, cinq essais au plus ;
 4. publie la release GitHub avec `gh release create --generate-notes`.
 
-Les exécutions sont **sérialisées** (`concurrency: version-bump`, sans annulation) : deux fusions rapprochées donnent deux versions successives, jamais deux fois la même. Un tag déjà existant fait échouer le job plutôt que d'écraser une release.
+Aucun groupe de concurrence global : GitHub n'y garde qu'une exécution en attente et **annule** les autres, si bien qu'un bump serait perdu sans erreur. Les fusions rapprochées se départagent au push atomique — deux versions successives, jamais deux fois la même. Un tag déjà existant fait échouer le job plutôt que d'écraser une release.
+
+**Relancer un job** est sûr : si `main` porte déjà le commit `(#N)` de la PR, le job reprend cette version (tag reposé au besoin, release publiée si elle manque) au lieu d'en monter une seconde.
 
 Pas de boucle : le commit de version ne passe par aucune PR, et le job ignore les branches `release/*` et les PR ouvertes par `github-actions[bot]`. `[skip ci]` évite de rejouer le CI sur ce seul changement de numéro.
 
