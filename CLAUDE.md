@@ -23,7 +23,7 @@ NODE_ENV=production npm run replay:deletions  # après restauration d'une sauveg
 NODE_ENV=production npm run rotate:hidden-avatars  # une fois après déploiement : renomme les avatars déjà masqués
 npm run push:keys  # paire de clés VAPID, une fois pour toutes
 npm run sonar  # SonarQube local de la branche (Docker, aucun jeton) — voir Pipeline Git
-./update.sh  # Déploiement (docs/DEPLOYMENT.md — n'effacez jamais les journaux pm2 à la main)
+./update.sh  # Déploiement (docs/DEPLOYMENT.md — ne jamais effacer les journaux pm2)
 npx jest tests/path/to/file.test.ts  # un seul fichier
 ```
 
@@ -32,7 +32,7 @@ npx jest tests/path/to/file.test.ts  # un seul fichier
 ### Stack
 - **Next.js 15** (App Router), React 18, TypeScript strict.
 - **MySQL 8+** via `mysql2` — **aucun ORM**, SQL brut, schéma joué à la première requête (`lib/server/database.ts`).
-- **La production tourne sous MariaDB 11.8**, pas MySQL : une syntaxe propre à MySQL ne casse qu'en production. Deux l'ont fait — `FOR UPDATE OF m` (lancement anticipé en « Erreur lors du lancement ») et `FOR SHARE` (acceptation d'une invitation d'équipe) : verrouiller une seule table par une requête **sans jointure**, et écrire `LOCK IN SHARE MODE`. `tests/lib/server/mariadb-sql-compat.test.ts` balaie les sources ; y ajouter tout nouveau motif découvert.
+- **La production tourne sous MariaDB 11.8**, pas MySQL : une syntaxe propre à MySQL ne casse qu'en production. Deux l'ont fait — `FOR UPDATE OF m` et `FOR SHARE` : verrouiller une seule table par une requête **sans jointure**, et écrire `LOCK IN SHARE MODE`. `tests/lib/server/mariadb-sql-compat.test.ts` balaie les sources ; y ajouter tout nouveau motif découvert.
 - **CSS Modules + `app/globals.css`** (aucun framework utilitaire), Radix UI Slot, Lucide.
 - Types partagés : `lib/shared/types.ts` (à lire en premier). Alias `@/*` → racine.
 
@@ -156,9 +156,9 @@ Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`
 
 ## Communication Style
 
-- **Exécute sans détailler** : ne décris pas ce que tu vas faire avant d'agir, fais le travail.
+- **Exécute sans détailler** : ne décris pas ce que tu vas faire, fais-le.
 - **Court résumé à la fin** des changements effectués et des problèmes rencontrés.
-- **Arrête les previews** : à la fin de chaque prompt, arrête tous les serveurs (`npm run dev`, serveurs de tests…) pour éviter l'accumulation de processus.
+- **Arrête les previews** : à la fin de chaque prompt, arrête tous les serveurs (`npm run dev`, tests…).
 
 ## Règles de travail → détail dans `docs/WORKFLOW.md`
 
@@ -166,10 +166,11 @@ Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`
 - **Tests** : toute feature a ses tests (nominal, limites, erreurs), sinon elle n'est pas terminée.
 - **Deux TypeScript** : `typescript` 5.x (Next, ts-jest, ESLint) et `typescript-native` (7, pour `npm run typecheck`) — les scripts désignent leur `tsc` **par chemin**, jamais `npx tsc`.
 - **Les tests sont type-vérifiés** : fabriques complètes de `tests/helpers/`, `jest.mocked(fn)`, doubles SQL `jest.fn<SqlQuery>()` ; jamais `x as never` sur une valeur simulée ni `it.each([...] as const)`.
-- **Branches** : `feature/<nom-kebab>`. **PR** vers `main` ; CI (lint + typecheck → build → tests) : corriger dans cet ordre, ne jamais merger rouge.
+- **Branches** : `feature/<nom-kebab>`. **PR** vers `main`, avec l'étiquette de version qui convient (`release:major` / `release:minor` / aucune = patch / `release:skip`) ; CI (lint + typecheck → build → tests) : corriger dans cet ordre, ne jamais merger rouge.
+- **Versionnage** — bump, tag et release automatiques à la fusion → `docs/features/VERSIONING.md`.
 - **`ERREUR.txt`** : toute erreur **préexistante** rencontrée et non réglée s'y consigne (une entrée, à la fin : `- [AAAA-MM-JJ] <zone> — <symptôme> — <piste> — (rencontré sur : <branche>)`), sans élargir la tâche ; vérifier les doublons ; retirer l'entrée dans le commit qui la règle.
 - **Accessibilité (`ACCESSIBILITE.md`)** : tout problème d'accessibilité non réglé s'y consigne (titre, Critère, Constat, À faire). **Choisir ou ajouter une tâche se pousse sur `main` sur-le-champ**, par un commit qui ne touche que ce fichier, **avant** tout code (sélection = retirer la section, recopiée dans la description de la PR ; tâche abandonnée = remise sous son numéro ; ajout = numéro suivant le « dernier numéro attribué », avancé dans le même commit).
-- **Complexité** : demande importante → plan écrit puis exécution dans la session, sans `/OpusLocalManager` ni `/opus-haiku-pipeline`.
+- **Complexité** : demande importante → plan écrit puis exécution dans la session, sans pipeline externe.
 - **Dépôt voisin `blueGenjiBot`** : sa doc Markdown (`doc/*.md`, `help.md`, `helpfr.md`) est servie à chaud sur `/bot/docs` — la corriger avec toute commande touchée ; la référence JSDoc (`docs/`) se régénère (vider puis `npm run docs`) dans la même PR que le code, commitée à part.
 
 ## Pipeline Git (workflow de livraison) → détail dans `docs/WORKFLOW.md`
@@ -183,4 +184,4 @@ Enchaîner sans s'arrêter :
 4. Commit tests (`jest`)
 5. Commit polish UI/UX (aucune logique) — les problèmes d'accessibilité non réglés vont dans `ACCESSIBILITE.md` par un commit direct sur `main`
 6. `git push -u origin feature/<short-name>`
-7. `gh pr create`, puis revue `/code-review --comment` **en boucle** jusqu'à un cycle sans finding (corriger, commiter, pousser, relancer une revue complète). **SonarQube** (`npm run sonar`, local, aucun jeton à demander) avant le premier cycle et après le dernier ; nouveau code : Quality Gate vert, notes A, zéro problème, hotspots 100 % examinés, couverture ≥ 80 %, duplication ≤ 3 %, aucun « Accepté »/« Faux positif » non justifié. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL ; copier le `.env` parent dans le worktree).
+7. `gh pr create`, puis revue `/code-review --comment` **en boucle** jusqu'à un cycle sans finding (corriger, commiter, pousser, relancer une revue complète). **SonarQube** (`npm run sonar`, local, aucun jeton à demander) avant le premier cycle et après le dernier ; nouveau code : Quality Gate vert, notes A, zéro problème, hotspots 100 % examinés, couverture ≥ 80 %, duplication ≤ 3 %, aucun « Accepté »/« Faux positif » non justifié. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL ; `.env` parent copié).
