@@ -41,7 +41,7 @@ describe("/rgpd — couverture du registre", () => {
     expect(destinataires).toMatch(/<strong>Google<\/strong> \(Gmail\)/);
     expect(destinataires).toMatch(/<strong>Spiceworks<\/strong>/);
     expect(destinataires).toMatch(/<strong>YouTube, Twitch ou Kick<\/strong>/);
-    expect(destinataires).toMatch(/en cours de vérification/);
+    expect(destinataires).not.toMatch(/en cours de vérification/);
   });
 
   it("applique aux demandes adressées à l'association la durée des demandes RGPD", () => {

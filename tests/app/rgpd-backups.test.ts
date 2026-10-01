@@ -28,7 +28,7 @@ describe("/rgpd — sauvegardes", () => {
 
   it("ne dit plus que seule l'association détient la clé des sauvegardes", () => {
     expect(SOURCE).not.toMatch(/seule l&apos;association détient/);
-    expect(SOURCE).toMatch(/responsable technique de l&apos;association — qui est\s+aussi l&apos;hébergeur du site/);
+    expect(SOURCE).toMatch(/détient le seul hébergeur du site, {DATA_CONTACT_NAME}/);
   });
 
   it("déclare la ligne « Copies de sauvegarde » du tableau", () => {

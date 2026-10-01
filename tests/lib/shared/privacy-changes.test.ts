@@ -508,7 +508,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
     // Suivie de l'entrée du contact données, de celle des suspensions puis de
     // celle du registre complété, publiées le même jour.
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -535,7 +535,7 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
 
   it("précède l'entrée des suspensions, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -569,7 +569,7 @@ describe("PRIVACY_CHANGES — suspension d'un compte", () => {
 
   it("précède l'entrée du registre complété, publiée le lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -592,9 +592,9 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-registre-complete")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, datée du 1er octobre 2026, pour tous les comptes", () => {
+  it("précède l'entrée des sauvegardes chez Hetzner, datée du 1er octobre 2026, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -625,5 +625,37 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
     expect(source).not.toMatch(/from "@\/lib\/shared\/processing-register"/);
     expect(source).not.toMatch(/from "@\/lib\/shared\/terms-of-use"/);
     expect(source).toMatch(/from "@\/lib\/shared\/legal-durations"/);
+  });
+});
+
+describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-traitant et de lieu)", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-sauvegardes-hetzner")!;
+  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-02");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("annonce le nouveau lieu, sans transfert hors de l'Union, et la fin de OneDrive", () => {
+    expect(entry.summary).toMatch(/Hetzner, en Allemagne/);
+    expect(entry.summary).toMatch(/ne quittent plus l'Union européenne/);
+    expect(text()).toMatch(/Microsoft n'est plus destinataire des sauvegardes/);
+    // Microsoft reste nommé pour la messagerie de la personne à contacter.
+    expect(text()).toMatch(/messagerie de la personne à contacter/);
+  });
+
+  it("joint les précisions sur Spiceworks et la retransmission, avec le droit d'opposition", () => {
+    expect(text()).toMatch(/Spiceworks .* sous-traitant/);
+    expect(text()).toMatch(/jamais de webcam ni de chat vocal/);
+    expect(text()).toMatch(/nom neutre/);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd#destinataires", "/rgpd#retransmission"]);
+  });
+
+  it("tient dans un message privé à elle seule, sans nommer personne", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
+    expect(text()).not.toContain(DATA_CONTACT_NAME);
   });
 });
