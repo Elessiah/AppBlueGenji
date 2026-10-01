@@ -109,7 +109,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
               conteneur, il rendrait muets les six jalons et leurs dates. Il ne
               porte donc que la piste, qui n'a pas d'enfant.
             */}
-            <div
+            <div /* NOSONAR S6819 — piste stylée sans enfant ; `<progress>` ne se stylise pas pareil */
               className={styles.track}
               role="progressbar"
               aria-label="Avancement du tournoi"

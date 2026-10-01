@@ -203,27 +203,26 @@ function RecruitmentBanner({
 
   // Au doigt, un tap émet l'entrée du pointeur mais jamais sa sortie : compté
   // comme un survol, il figerait la banderole pour toute la visite.
-  function onPointerEnter(event: PointerEvent<HTMLDivElement>) {
+  function onPointerEnter(event: PointerEvent<HTMLElement>) {
     if (event.pointerType !== "mouse") return;
     releaseResume();
     setHovered(true);
   }
 
-  function onFocus(event: FocusEvent<HTMLDivElement>) {
+  function onFocus(event: FocusEvent<HTMLElement>) {
     if (!isKeyboardFocus(event.target)) return;
     releaseResume();
     setFocused(true);
   }
 
-  function onBlur(event: FocusEvent<HTMLDivElement>) {
+  function onBlur(event: FocusEvent<HTMLElement>) {
     // Le focus qui passe d'un bouton à l'autre de la banderole ne relance rien.
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
   }
 
   return (
-    <div
+    <section
       className={styles.banner}
-      role="region"
       aria-label="Annonces de recrutement"
       onPointerEnter={onPointerEnter}
       onPointerLeave={() => setHovered(false)}
@@ -304,7 +303,7 @@ function RecruitmentBanner({
       >
         ✕
       </button>
-    </div>
+    </section>
   );
 }
 
@@ -372,8 +371,8 @@ function RecruitmentArrivalModal({
   const titleId = `recruitment-arrival-title-${ad.id}`;
 
   return (
-    <div className={styles.modalOverlay} role="presentation" {...backdrop}>
-      <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.modalOverlay} role="presentation" {...backdrop}>
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         className={styles.modal}
         role="dialog"

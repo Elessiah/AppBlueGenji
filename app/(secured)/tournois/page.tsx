@@ -656,7 +656,7 @@ export default function TournamentsPage() {
                     s'afficherait sur les douze mêmes cartes, comme si le clic
                     n'avait rien donné. */}
                 {finishedArchiveLoading && (
-                  <div className={s.showMoreRow} role="status">
+                  <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.showMoreRow} role="status">
                     Chargement des tournois terminés…
                   </div>
                 )}

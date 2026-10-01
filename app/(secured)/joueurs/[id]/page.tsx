@@ -151,11 +151,11 @@ export default function PlayerDetailPage() {
                 >
                   {data.profile.pseudo}
                 </h1>
-                <div
-                  // `group` : un nom n'est admis que sur un élément qui a un rôle
-                  // (`aria-prohibited-attr`), et c'en est un — l'équipe et les
-                  // rôles du joueur, lus ensemble.
-                  role="group"
+                <fieldset
+                  // `<fieldset>` (rôle `group`) : un nom n'est admis que sur un
+                  // élément qui a un rôle (`aria-prohibited-attr`), et c'en est
+                  // un — l'équipe et les rôles du joueur, lus ensemble.
+                  className="native-group"
                   aria-label="Équipe et rôles du joueur"
                   style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 2 }}
                 >
@@ -183,7 +183,7 @@ export default function PlayerDetailPage() {
                       {ROLE_LABELS[role]}
                     </span>
                   ))}
-                </div>
+                </fieldset>
               </div>
             </div>
             <Link href="/joueurs" className={`btn ghost ${styles.back}`}>
@@ -296,7 +296,7 @@ export default function PlayerDetailPage() {
           <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 16 }}>
             Les rôles sont cumulables. Un administrateur dispose de tous les droits, dont l&apos;attribution des rôles.
           </p>
-          <div role="group" aria-label="Rôles de permission" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <fieldset className="native-group" aria-label="Rôles de permission" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {PLATFORM_ROLES.map((role) => {
               const checked = selectedRoles.includes(role);
               return (
@@ -318,7 +318,7 @@ export default function PlayerDetailPage() {
                 </label>
               );
             })}
-          </div>
+          </fieldset>
           <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
             <button
               type="button"

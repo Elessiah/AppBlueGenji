@@ -52,7 +52,7 @@ export function PlayerModerationBar({
   };
 
   return (
-    <div className={styles.moderationBar} role="group" aria-label="Modération">
+    <fieldset className={`native-group ${styles.moderationBar}`} aria-label="Modération">
       <span className={styles.moderationLabel}>MODÉRATION</span>
       {suspension && (
         <span className={styles.moderationStatus}>
@@ -80,7 +80,7 @@ export function PlayerModerationBar({
       {dialog === "lift" && suspension && (
         <LiftDialog profile={profile} reference={suspensionReference(suspension.id)} onClose={close} onDone={done} />
       )}
-    </div>
+    </fieldset>
   );
 }
 
@@ -314,7 +314,7 @@ function ModerationDialog({
   if (!mounted) return null;
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       {...backdrop}
       style={{
@@ -328,7 +328,7 @@ function ModerationDialog({
         backdropFilter: "blur(4px)",
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

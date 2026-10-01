@@ -86,7 +86,7 @@ export function ReportDetail({
         <StatusPill status={report.status} contested={report.contests.length > 0} />
       </header>
 
-      <div className={styles.actions} role="group" aria-label="Traitement du signalement">
+      <fieldset className={`native-group ${styles.actions}`} aria-label="Traitement du signalement">
         {report.status === "OPEN" && (
           <button
             type="button"
@@ -145,7 +145,7 @@ export function ReportDetail({
             </p>
           </div>
         )}
-      </div>
+      </fieldset>
 
       <dl className={styles.facts}>
         <div>

@@ -65,7 +65,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="sr-only" role="status" aria-live="polite">
+      <div /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className="sr-only" role="status" aria-live="polite">
         {toasts
           .filter((toast) => toast.type === "success")
           .map((toast) => (

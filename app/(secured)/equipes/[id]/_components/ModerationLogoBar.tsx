@@ -41,7 +41,7 @@ export function ModerationLogoBar({ team, onChanged }: { team: TeamDetailRespons
   };
 
   return (
-    <div className={styles.moderationBar} role="group" aria-label="Modération">
+    <fieldset className={`native-group ${styles.moderationBar}`} aria-label="Modération">
       <span className={styles.moderationLabel}>MODÉRATION</span>
       <button type="button" className="btn ghost" onClick={() => setConfirming(true)}>
         Retirer le logo
@@ -62,6 +62,6 @@ export function ModerationLogoBar({ team, onChanged }: { team: TeamDetailRespons
           <ModerationReasonField value={reason} onChange={setReason} recipient="ses membres" />
         </ConfirmDialog>
       )}
-    </div>
+    </fieldset>
   );
 }

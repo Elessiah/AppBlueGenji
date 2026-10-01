@@ -11,7 +11,7 @@ import styles from "./TournamentLoading.module.css";
  */
 export function TournamentLoading() {
   return (
-    <section className={styles.root} role="status" aria-busy="true">
+    <section /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.root} role="status" aria-busy="true">
       <span className="sr-only">Chargement du tournoi…</span>
       <div className={styles.shapes} aria-hidden="true">
         <div className={`${styles.bar} ${styles.back}`} />

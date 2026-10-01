@@ -56,12 +56,12 @@ export function LandingDialog({
   const backdrop = useBackdropDismiss(onClose, busy);
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       className={styles.overlay}
       role="presentation"
       {...backdrop}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         className={`${styles.panel} ${className}`}
         role="dialog"

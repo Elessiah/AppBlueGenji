@@ -1426,6 +1426,26 @@ html {
   border: 0;
 }
 
+/* Balises natives à la place d'un rôle ARIA (Sonar S6819) : un `<fieldset>`
+   porte le rôle `group`, un `<ul>`/`<li>` celui de liste. Ces classes leur
+   retirent l'habillage du navigateur pour qu'ils se rendent comme le `<div>`
+   ou le `<span>` qu'ils remplacent. `:where()` ramène la spécificité à zéro :
+   toute règle d'auteur (module CSS, style en ligne) l'emporte, et seul l'aspect
+   par défaut du navigateur est effacé. `min-inline-size: auto` défait le
+   `min-content` d'un `<fieldset>`, qui l'empêchait de rétrécir comme un `<div>`. */
+:where(fieldset.native-group) {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-inline-size: auto;
+}
+
+:where(ul.native-list, ol.native-list) {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 .fabric {
   position: absolute;
   inset: 0;

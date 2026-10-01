@@ -111,7 +111,7 @@ export function AdvanceTournamentDialog({
   if (!mounted) return null;
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       {...backdrop}
       style={{
@@ -125,7 +125,7 @@ export function AdvanceTournamentDialog({
         padding: 16,
       }}
     >
-      <div
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="dialog"
         aria-modal="true"

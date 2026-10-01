@@ -65,7 +65,7 @@ export function PushNotificationsPanel({
 
   if (push.support === null || push.server === null) {
     return variant === "compact" ? null : (
-      <p className={s.muted} role="status">
+      <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.muted} role="status">
         Chargement des notifications…
       </p>
     );
@@ -86,7 +86,7 @@ export function PushNotificationsPanel({
     // L'abonnement du navigateur n'est pas encore relu : proposer d'activer
     // maintenant, ce serait le proposer un instant à qui l'est déjà.
     deviceControl = (
-      <p className={s.muted} role="status">
+      <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.muted} role="status">
         Vérification de cet appareil…
       </p>
     );
@@ -96,7 +96,7 @@ export function PushNotificationsPanel({
     deviceControl = (
       <div className={s.deviceRow}>
         {/* Annoncé aux lecteurs d'écran : c'est l'issue du geste qu'on vient de faire. */}
-        <span className={s.status} role="status">
+        <span /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.status} role="status">
           <span className={s.dot} aria-hidden="true" /> Activées sur cet appareil
         </span>
         <CyberButton

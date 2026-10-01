@@ -78,7 +78,7 @@ export function TeamDialog({
   };
 
   return createPortal(
-    <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
       className={`${styles.backdrop} ${styles.page}`}
       {...backdrop}

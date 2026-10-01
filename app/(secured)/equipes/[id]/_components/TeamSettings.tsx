@@ -345,7 +345,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
               tabIndex={-1}
               aria-hidden
             />
-            <div className={styles.actionsRow} aria-labelledby="team-logo-label" role="group">
+            <fieldset className={`native-group ${styles.actionsRow}`} aria-labelledby="team-logo-label">
               <button
                 type="button"
                 className="btn"
@@ -359,7 +359,7 @@ export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
                   Retirer le logo
                 </button>
               ) : null}
-            </div>
+            </fieldset>
           </div>
           <p className={styles.help}>PNG, JPEG ou WebP — {IMAGE_UPLOAD_MAX_BYTES / (1024 * 1024)} Mo au maximum.</p>
           {pendingLogo ? (

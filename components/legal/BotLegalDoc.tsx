@@ -94,7 +94,7 @@ export function BotLegalDoc({ doc }: { doc: BilingualDoc }) {
 
 function LangSwitch({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => void }) {
   return (
-    <div className={styles.langSwitch} role="group" aria-label="Language / Langue">
+    <fieldset className={`native-group ${styles.langSwitch}`} aria-label="Language / Langue">
       {(["fr", "en"] as const).map((code) => {
         const active = lang === code;
         return (
@@ -112,7 +112,7 @@ function LangSwitch({ lang, onChange }: { lang: Lang; onChange: (l: Lang) => voi
           </button>
         );
       })}
-    </div>
+    </fieldset>
   );
 }
 

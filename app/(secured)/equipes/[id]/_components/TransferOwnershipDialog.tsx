@@ -112,7 +112,7 @@ export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }:
       )}
 
       {confirmStep && target ? (
-        <p className={styles.help} role="status">
+        <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={styles.help} role="status">
           Dernière vérification : {target.pseudo} deviendra propriétaire, et sera la seule
           personne à pouvoir te rendre ce rôle.
         </p>

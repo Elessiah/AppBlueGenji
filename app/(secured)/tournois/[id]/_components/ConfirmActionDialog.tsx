@@ -71,8 +71,8 @@ export function ConfirmActionDialog({
   if (!mounted) return null;
 
   return createPortal(
-    <div role="presentation" className={styles.backdrop} {...backdrop}>
-      <div
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={styles.backdrop} {...backdrop}>
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
         ref={dialogRef}
         role="alertdialog"
         aria-modal="true"

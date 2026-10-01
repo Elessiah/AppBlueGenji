@@ -396,8 +396,8 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
   }
 
   return createPortal(
-    <div role="presentation" className={s.backdrop} {...backdrop}>
-      <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={s.dialog}>
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ role="presentation" className={s.backdrop} {...backdrop}>
+      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */ ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby={titleId} tabIndex={-1} className={s.dialog}>
         <h2 id={titleId} className={s.title}>
           {title}
         </h2>

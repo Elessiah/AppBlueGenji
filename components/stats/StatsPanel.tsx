@@ -281,9 +281,11 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
         <Group id="stats-forme" title="Forme récente">
           {stats.form.length > 0 ? (
             <div className={s.formRow}>
-              <div
-                className={s.form}
-                role="list"
+              {/* `role="list"` n'est pas redondant : Safari retire le rôle d'une
+                  liste dont on a ôté les puces (`list-style: none`). */}
+              <ul
+                className={`native-list ${s.form}`}
+                role="list" // NOSONAR S6822 — Safari retire le rôle d'une liste sans puces
                 aria-label={`${stats.form.length} derniers résultats, du plus récent au plus ancien`}
               >
                 {stats.form.map((result, index) => {
@@ -296,18 +298,17 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
                   const tone = result === "W" ? s.formWin : result === "L" ? s.formLoss : s.formDraw;
 
                   return (
-                    <span
+                    <li
                       key={`${result}-${index}`}
-                      role="listitem"
                       className={`${s.formBadge} ${tone}`}
                       aria-label={label}
                       title={label}
                     >
                       <span aria-hidden="true">{letter}</span>
-                    </span>
+                    </li>
                   );
                 })}
-              </div>
+              </ul>
               <span className={s.splitValue}>{formatStreak(stats.currentStreak)}</span>
             </div>
           ) : (

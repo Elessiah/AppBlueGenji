@@ -114,7 +114,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   // confirmation retirent chacun le bouton qui l'avait, et le focus sortait
   // alors de la modale (sur `<body>`). Consommé par l'effet plus bas.
   const pendingFocusRef = useRef<"confirm" | "ready" | null>(null);
-  const confirmRef = useRef<HTMLDivElement>(null);
+  const confirmRef = useRef<HTMLFieldSetElement>(null);
   const readyRef = useRef<HTMLButtonElement>(null);
   const [busy, setBusy] = useState(false);
   const dismissedRef = useRef<Set<string> | null>(null);
@@ -349,7 +349,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
   const partyWord = current.viewer.role === "CASTER" ? "Je suis prêt" : "Mon équipe est prête";
 
   return (
-    <div className={styles.overlay} role="presentation">
+    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation">
       <div
         ref={dialogRef}
         className={styles.modal}
@@ -378,7 +378,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
               <span className="sr-only"> contre </span>
               <span className={styles.titleTeam}>{current.team2.name}</span>
             </h2>
-            <p id={statusId} className={styles.status} data-phase={current.phase} role="status">
+            <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ id={statusId} className={styles.status} data-phase={current.phase} role="status">
               {current.phase === "LOBBY" && (
                 <>
                   En attente des « Prêt » —{" "}
@@ -421,10 +421,9 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
         {/* La confirmation n'a d'objet qu'en lancement : un match lancé entre-temps
             (arbitrage, délai) la referme d'elle-même. */}
         {confirming && current.phase === "LOBBY" ? (
-          <div
+          <fieldset
             ref={confirmRef}
-            className={styles.confirm}
-            role="group"
+            className={`native-group ${styles.confirm}`}
             aria-labelledby={confirmTextId}
             tabIndex={-1}
           >
@@ -455,7 +454,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
                 {busy ? "…" : "Confirmer : prêt"}
               </button>
             </div>
-          </div>
+          </fieldset>
         ) : (
           <footer className={styles.footer}>
             {current.phase === "LOBBY" && current.viewer.canDeclareReady && (
