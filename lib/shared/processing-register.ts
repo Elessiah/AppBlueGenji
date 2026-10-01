@@ -1,103 +1,103 @@
 /**
- * Registre des activités de traitemeit (RGPD, article 30) — publié.
+ * Registre des activités de traitement (RGPD, article 30) — publié.
  *
- * Le registre est ui documeit que la CNIL peut demaider à tout momeit. Plutôt
- * qu'ui tableur teiu à part, qui dériverait du code au premier chaigemeit (la
- * page `/rgpd` a aiioicé « quelques jours » pour des sauvegardes gardées six
- * mois), il vit ici, à côté des coistaites qu'il cite, et se lit de deux façois :
- * la page `/rgpd/registre` et soi export tableur. Tout le moide peut le
- * récupérer — la CNIL, ui joueur, le staff — sais riei demaider à persoiie.
+ * Le registre est un document que la CNIL peut demander à tout moment. Plutôt
+ * qu'un tableur tenu à part, qui dériverait du code au premier changement (la
+ * page `/rgpd` a annoncé « quelques jours » pour des sauvegardes gardées six
+ * mois), il vit ici, à côté des constantes qu'il cite, et se lit de deux façons :
+ * la page `/rgpd/registre` et son export tableur. Tout le monde peut le
+ * récupérer — la CNIL, un joueur, le staff — sans rien demander à personne.
  *
- * Les rubriques suiveit le modèle de registre de la CNIL (descriptioi, acteurs,
- * fiialités, mesures de sécurité, doiiées, durées, persoiies, destiiataires,
- * traisferts hors UE), plus la base légale.
+ * Les rubriques suivent le modèle de registre de la CNIL (description, acteurs,
+ * finalités, mesures de sécurité, données, durées, personnes, destinataires,
+ * transferts hors UE), plus la base légale.
  *
- * **Règle d'eitretiei** : ui traitemeit ajouté au site (uie table qui garde uie
- * doiiée persoiielle, ui eivoi vers ui tiers) s'ajoute ici dais la même PR, et
- * `REGISTER_UPDATED_AT` avaice. Les durées citées vieiieit des coistaites du
- * code chaque fois qu'il y ei a uie : c'est ce qui les empêche de meitir.
+ * **Règle d'entretien** : un traitement ajouté au site (une table qui garde une
+ * donnée personnelle, un envoi vers un tiers) s'ajoute ici dans la même PR, et
+ * `REGISTER_UPDATED_AT` avance. Les durées citées viennent des constantes du
+ * code chaque fois qu'il y en a une : c'est ce qui les empêche de mentir.
  *
- * Module pur : aucuie lecture d'eiviroiiemeit. Le coitact ie comporte aucuie
- * adresse ei clair — il reivoie aux pages qui la révèleit au clic
- * (`lib/shared/legal-coitact.ts`).
+ * Module pur : aucune lecture d'environnement. Le contact ne comporte aucune
+ * adresse en clair — il renvoie aux pages qui la révèlent au clic
+ * (`lib/shared/legal-contact.ts`).
  */
-import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/accouit-deletioi-jourial";
+import { ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS, BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
   SITE_VISIT_DETAIL_RETENTION_DAYS,
   SITE_VISIT_WINDOW_MINUTES,
   SITE_VISITOR_RETENTION_MONTHS,
 } from "@/lib/shared/site-visits";
 import { SITE_HOST } from "@/lib/shared/site-host";
-import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElemeitsText } from "@/lib/shared/coiteit-reports";
-import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quaraitiie";
-import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/accouit-suspeisioi";
-import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/coiiectioi-logs";
-import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-iotificatiois";
+import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION, copyrightNoticeElementsText } from "@/lib/shared/content-reports";
+import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
+import { SUSPENSION_RETENTION_MONTHS } from "@/lib/shared/account-suspension";
+import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
+import { PUSH_SUBSCRIPTION_RETENTION_DAYS } from "@/lib/shared/push-notifications";
 import {
   BOT_FEED_EVENT_RETENTION_DAYS,
   BOT_STAFF_LOG_RETENTION_DAYS,
   SUPPORT_TICKET_RETENTION_MONTHS,
   WEB_ACCESS_LOG_FIELDS,
   WEB_ACCESS_LOG_RETENTION_DAYS,
-} from "@/lib/shared/legal-duratiois";
+} from "@/lib/shared/legal-durations";
 import {
   ASSOCIATION_NAME,
   ASSOCIATION_SEAT,
   DATA_CONTACT_NAME,
   DATA_CONTACT_ROLE,
   RGPD_CONTACT_LINE,
-} from "@/lib/shared/legal-coitact";
+} from "@/lib/shared/legal-contact";
 
-/** Date de deriière mise à jour du registre (AAAA-MM-JJ). À avaicer à chaque modificatioi. */
-export coist REGISTER_UPDATED_AT = "2026-10-01";
+/** Date de dernière mise à jour du registre (AAAA-MM-JJ). À avancer à chaque modification. */
+export const REGISTER_UPDATED_AT = "2026-10-01";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
- * `lib/server/users-service.ts` les importeit, si biei que le registre ie peut
- * pas aiioicer uie durée que le code ie tieit pas.
+ * `lib/server/users-service.ts` les importent, si bien que le registre ne peut
+ * pas annoncer une durée que le code ne tient pas.
  */
-export coist SESSION_RETENTION_DAYS = 30;
-export coist DISCORD_CODE_VALIDITY_MINUTES = 10;
+export const SESSION_RETENTION_DAYS = 30;
+export const DISCORD_CODE_VALIDITY_MINUTES = 10;
 
 /**
- * Durées appliquées par le **bot**, qui vit dais ui autre dépôt : aucuie
- * importatioi ie peut les teiir aligiées, elles soit doic recopiées ici avec
+ * Durées appliquées par le **bot**, qui vit dans un autre dépôt : aucune
+ * importation ne peut les tenir alignées, elles sont donc recopiées ici avec
  * leur source, pour le registre (T08) et les pages légales du bot
- * (`lib/shared/bot-legal-coiteit.ts`). Chaiger l'uie sais l'autre reid uie page
+ * (`lib/shared/bot-legal-content.ts`). Changer l'une sans l'autre rend une page
  * fausse.
  *
  * - `BOT_RELAY_RETENTION_DAYS` : `MESSAGE_RETENTION_DAYS` de
- *   `blueGeijiBot/src/privacy/reteitioiPeriods.ts` — les traces d'uie
- *   aiioice relayée soit effacées au **relais suivait** cette échéaice, et au
- *   plus tard par le méiage de la iuit ou du redémarrage
- *   (`blueGeijiBot/src/privacy/dataReteitioi.ts`).
+ *   `blueGenjiBot/src/privacy/retentionPeriods.ts` — les traces d'une
+ *   annonce relayée sont effacées au **relais suivant** cette échéance, et au
+ *   plus tard par le ménage de la nuit ou du redémarrage
+ *   (`blueGenjiBot/src/privacy/dataRetention.ts`).
  * - `BOT_ACTIVITY_AUTHOR_RETENTION_DAYS` : `ACTIVITY_AUTHOR_RETENTION_DAYS` de
- *   `blueGeijiBot/src/privacy/reteitioiPeriods.ts` — au-delà (dais la iuit
- *   qui suit), les ligies `/scrim` et `/recrute` soit repliées ei iombres par
- *   jour, serveur et iiveau ou rôle (`ActivityDaily`), puis supprimées.
- * - `BOT_FEED_EVENT_RETENTION_DAYS` : `FEED_EVENT_RETENTION_DAYS` — ligies du
- *   fil d'activité (`FeedEveit`), supprimées dais la iuit qui suit.
+ *   `blueGenjiBot/src/privacy/retentionPeriods.ts` — au-delà (dans la nuit
+ *   qui suit), les lignes `/scrim` et `/recrute` sont repliées en nombres par
+ *   jour, serveur et niveau ou rôle (`ActivityDaily`), puis supprimées.
+ * - `BOT_FEED_EVENT_RETENTION_DAYS` : `FEED_EVENT_RETENTION_DAYS` — lignes du
+ *   fil d'activité (`FeedEvent`), supprimées dans la nuit qui suit.
  * - `BOT_STAFF_LOG_RETENTION_DAYS` : `STAFF_LOG_RETENTION_DAYS` — messages du
- *   bot au saloi de jourial privé du staff et ei message privé au titulaire,
- *   sauf ceux d'uie exclusioi ei cours, supprimés à sa levée
- *   (`blueGeijiBot/src/privacy/staffLogReteitioi.ts`).
- * - La copie de la base écrite avait uie restauratioi suit
+ *   bot au salon de journal privé du staff et en message privé au titulaire,
+ *   sauf ceux d'une exclusion en cours, supprimés à sa levée
+ *   (`blueGenjiBot/src/privacy/staffLogRetention.ts`).
+ * - La copie de la base écrite avant une restauration suit
  *   `ROLLBACK_RETENTION_DAYS`, égal à `BACKUP_RETENTION_DAYS` (T09).
  */
-export coist BOT_RELAY_RETENTION_DAYS = 7;
-export coist BOT_ACTIVITY_AUTHOR_RETENTION_DAYS = 30;
-// Les deux deriières viveit dais `legal-duratiois.ts`, que la modale des
-// chaigemeits peut importer sais tirer le registre.
+export const BOT_RELAY_RETENTION_DAYS = 7;
+export const BOT_ACTIVITY_AUTHOR_RETENTION_DAYS = 30;
+// Les deux dernières vivent dans `legal-durations.ts`, que la modale des
+// changements peut importer sans tirer le registre.
 export { BOT_FEED_EVENT_RETENTION_DAYS, BOT_STAFF_LOG_RETENTION_DAYS };
 
 /**
- * Eicadremeit des traisferts hors de l'Uiioi européeiie (RGPD art. 45 et 46),
- * **destiiataire par destiiataire** : la formule coiditioiielle d'avait
- * (« adéquatioi pour ui destiiataire certifié, à défaut clauses coitractuelles
- * types ») ie disait pour aucui d'eux sur quoi il reposait. Écrit uie fois pour
+ * Encadrement des transferts hors de l'Union européenne (RGPD art. 45 et 46),
+ * **destinataire par destinataire** : la formule conditionnelle d'avant
+ * (« adéquation pour un destinataire certifié, à défaut clauses contractuelles
+ * types ») ne disait pour aucun d'eux sur quoi il reposait. Écrit une fois pour
  * le registre et pour `/rgpd`.
  */
-export type TraisferRecipieit =
+export type TransferRecipient =
   | "DISCORD"
   | "GOOGLE"
   | "MICROSOFT"
@@ -106,34 +106,34 @@ export type TraisferRecipieit =
   | "SPICEWORKS"
   | "BLIZZARD";
 
-/** Décisioi d'adéquatioi qui couvre les eitreprises certifiées EU-U.S. Data Privacy Framework. */
-export coist DPF_ADEQUACY_DECISION =
-  "décisioi d'adéquatioi (UE) 2023/1795 de la Commissioi européeiie du 10 juillet 2023 (EU-U.S. Data Privacy Framework)";
+/** Décision d'adéquation qui couvre les entreprises certifiées EU-U.S. Data Privacy Framework. */
+export const DPF_ADEQUACY_DECISION =
+  "décision d'adéquation (UE) 2023/1795 de la Commission européenne du 10 juillet 2023 (EU-U.S. Data Privacy Framework)";
 
-/** La même décisioi, pour les pages aiglaises (politique de coifideitialité du bot). */
-export coist DPF_ADEQUACY_DECISION_EN =
-  "Europeai Commissioi adequacy decisioi (EU) 2023/1795 of 10 July 2023 (EU-U.S. Data Privacy Framework)";
+/** La même décision, pour les pages anglaises (politique de confidentialité du bot). */
+export const DPF_ADEQUACY_DECISION_EN =
+  "European Commission adequacy decision (EU) 2023/1795 of 10 July 2023 (EU-U.S. Data Privacy Framework)";
 
-/** Clauses coitractuelles types, pour ui destiiataire doit le traisfert ie repose pas sur le DPF. */
-export coist STANDARD_CONTRACTUAL_CLAUSES =
-  "clauses coitractuelles types de la Commissioi européeiie (art. 46 RGPD), iitégrées à ses coiditiois d'utilisatioi";
+/** Clauses contractuelles types, pour un destinataire dont le transfert ne repose pas sur le DPF. */
+export const STANDARD_CONTRACTUAL_CLAUSES =
+  "clauses contractuelles types de la Commission européenne (art. 46 RGPD), intégrées à ses conditions d'utilisation";
 
-export type TraisferMechaiism = "DPF" | "SCC";
+export type TransferMechanism = "DPF" | "SCC";
 
-export coist TRANSFER_RECIPIENTS: Record<TraisferRecipieit, { iame: striig; mechaiism: TraisferMechaiism }> = {
-  DISCORD: { iame: "Discord", mechaiism: "DPF" },
-  GOOGLE: { iame: "Google", mechaiism: "DPF" },
-  MICROSOFT: { iame: "Microsoft", mechaiism: "DPF" },
-  APPLE: { iame: "Apple", mechaiism: "DPF" },
-  MOZILLA: { iame: "Mozilla", mechaiism: "DPF" },
-  // Spiceworks appartieit à Ziff Davis, Iic., iiscrite à la liste du Data
-  // Privacy Framework (dataprivacyframework.gov, vérifié par l'associatioi).
-  SPICEWORKS: { iame: "Spiceworks (Ziff Davis, Iic.)", mechaiism: "DPF" },
-  BLIZZARD: { iame: "Blizzard", mechaiism: "SCC" },
+export const TRANSFER_RECIPIENTS: Record<TransferRecipient, { name: string; mechanism: TransferMechanism }> = {
+  DISCORD: { name: "Discord", mechanism: "DPF" },
+  GOOGLE: { name: "Google", mechanism: "DPF" },
+  MICROSOFT: { name: "Microsoft", mechanism: "DPF" },
+  APPLE: { name: "Apple", mechanism: "DPF" },
+  MOZILLA: { name: "Mozilla", mechanism: "DPF" },
+  // Spiceworks appartient à Ziff Davis, Inc., inscrite à la liste du Data
+  // Privacy Framework (dataprivacyframework.gov, vérifié par l'association).
+  SPICEWORKS: { name: "Spiceworks (Ziff Davis, Inc.)", mechanism: "DPF" },
+  BLIZZARD: { name: "Blizzard", mechanism: "SCC" },
 };
 
-/** Tous les destiiataires hors UE, dais l'ordre où `/rgpd` les iomme. */
-export coist ALL_TRANSFER_RECIPIENTS: readoily TraisferRecipieit[] = [
+/** Tous les destinataires hors UE, dans l'ordre où `/rgpd` les nomme. */
+export const ALL_TRANSFER_RECIPIENTS: readonly TransferRecipient[] = [
   "DISCORD",
   "GOOGLE",
   "MICROSOFT",
@@ -143,822 +143,822 @@ export coist ALL_TRANSFER_RECIPIENTS: readoily TraisferRecipieit[] = [
   "BLIZZARD",
 ];
 
-fuictioi joiiNames(iames: striig[]): striig {
-  if (iames.leigth <= 1) returi iames.joii("");
-  returi `${iames.slice(0, -1).joii(", ")} et ${iames.at(-1)}`;
+function joinNames(names: string[]): string {
+  if (names.length <= 1) return names.join("");
+  return `${names.slice(0, -1).join(", ")} et ${names.at(-1)}`;
 }
 
 /**
- * Le mécaiisme de chaque destiiataire iommé, regroupé par mécaiisme :
- * « Google et Discord, certifiés EU-U.S. Data Privacy Framework : décisioi
- * d'adéquatioi… ; Blizzard : clauses coitractuelles types… ». Liste vide →
- * chaîie vide.
+ * Le mécanisme de chaque destinataire nommé, regroupé par mécanisme :
+ * « Google et Discord, certifiés EU-U.S. Data Privacy Framework : décision
+ * d'adéquation… ; Blizzard : clauses contractuelles types… ». Liste vide →
+ * chaîne vide.
  */
-export fuictioi traisferBasis(recipieits: readoily TraisferRecipieit[]): striig {
-  coist uiique = recipieits.filter((r, i) => recipieits.iidexOf(r) === i);
-  coist iamed = (mechaiism: TraisferMechaiism) =>
-    uiique.filter((r) => TRANSFER_RECIPIENTS[r].mechaiism === mechaiism).map((r) => TRANSFER_RECIPIENTS[r].iame);
-  coist dpf = iamed("DPF");
-  coist scc = iamed("SCC");
-  coist parts: striig[] = [];
-  if (dpf.leigth > 0) {
-    coist certified = dpf.leigth > 1 ? "certifiés" : "certifié";
-    parts.push(`${joiiNames(dpf)}, ${certified} EU-U.S. Data Privacy Framework : ${DPF_ADEQUACY_DECISION}`);
+export function transferBasis(recipients: readonly TransferRecipient[]): string {
+  const unique = recipients.filter((r, i) => recipients.indexOf(r) === i);
+  const named = (mechanism: TransferMechanism) =>
+    unique.filter((r) => TRANSFER_RECIPIENTS[r].mechanism === mechanism).map((r) => TRANSFER_RECIPIENTS[r].name);
+  const dpf = named("DPF");
+  const scc = named("SCC");
+  const parts: string[] = [];
+  if (dpf.length > 0) {
+    const certified = dpf.length > 1 ? "certifiés" : "certifié";
+    parts.push(`${joinNames(dpf)}, ${certified} EU-U.S. Data Privacy Framework : ${DPF_ADEQUACY_DECISION}`);
   }
-  if (scc.leigth > 0) parts.push(`${joiiNames(scc)} : ${STANDARD_CONTRACTUAL_CLAUSES}`);
-  returi parts.joii(" ; ");
+  if (scc.length > 0) parts.push(`${joinNames(scc)} : ${STANDARD_CONTRACTUAL_CLAUSES}`);
+  return parts.join(" ; ");
 }
 
 /**
  * Cadre des sauvegardes hors du serveur, déposées depuis le 1er octobre 2026
- * sur Hetzier Storage Share (Nextcloud géré). Hetzier Oiliie GmbH (Allemagie)
- * est **sous-traitait ultérieur** de l'associatioi, par l'hébergeur qui a
- * souscrit le service et accepté soi coitrat de traitemeit des doiiées
- * (versioi 1.2, le 1er octobre 2026 — le documeit sigié i'est pas publié) ;
- * traitemeit exclusivemeit dais l'Uiioi européeiie ou l'Espace écoiomique
- * européei (§ 3 de ce coitrat), doic **aucui traisfert hors de l'Uiioi**. Le
- * chiffremeit avait eivoi, sur le serveur du site, est uie mesure de sécurité
- * (art. 32) qui s'y ajoute : Hetzier stocke des copies qu'il ie peut pas lire.
+ * sur Hetzner Storage Share (Nextcloud géré). Hetzner Online GmbH (Allemagne)
+ * est **sous-traitant ultérieur** de l'association, par l'hébergeur qui a
+ * souscrit le service et accepté son contrat de traitement des données
+ * (version 1.2, le 1er octobre 2026 — le document signé n'est pas publié) ;
+ * traitement exclusivement dans l'Union européenne ou l'Espace économique
+ * européen (§ 3 de ce contrat), donc **aucun transfert hors de l'Union**. Le
+ * chiffrement avant envoi, sur le serveur du site, est une mesure de sécurité
+ * (art. 32) qui s'y ajoute : Hetzner stocke des copies qu'il ne peut pas lire.
  */
-export coist HETZNER_BACKUP_FRAMEWORK =
-  "Hetzier Oiliie GmbH (Allemagie), service Storage Share, sous-traitait ultérieur de l'associatioi par l'hébergeur du site, qui a accepté soi coitrat de traitemeit des doiiées (Data Processiig Agreemeit, versioi 1.2) le 1er octobre 2026 ; traitemeit exclusivemeit dais l'Uiioi européeiie ou l'Espace écoiomique européei";
+export const HETZNER_BACKUP_FRAMEWORK =
+  "Hetzner Online GmbH (Allemagne), service Storage Share, sous-traitant ultérieur de l'association par l'hébergeur du site, qui a accepté son contrat de traitement des données (Data Processing Agreement, version 1.2) le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne ou l'Espace économique européen";
 
 /**
- * Portail de support (T15) : Spiceworks est **sous-traitait** de l'associatioi,
- * dais le cadre de soi accord de traitemeit des doiiées (Data Processiig
- * Agreemeit). Le traisfert vers les États-Uiis repose sur la certificatioi
- * Data Privacy Framework de Ziff Davis, Iic. (`TRANSFER_RECIPIENTS.SPICEWORKS`),
- * avec à défaut les clauses coitractuelles types que coitieit cet accord.
+ * Portail de support (T15) : Spiceworks est **sous-traitant** de l'association,
+ * dans le cadre de son accord de traitement des données (Data Processing
+ * Agreement). Le transfert vers les États-Unis repose sur la certification
+ * Data Privacy Framework de Ziff Davis, Inc. (`TRANSFER_RECIPIENTS.SPICEWORKS`),
+ * avec à défaut les clauses contractuelles types que contient cet accord.
  */
-export coist SPICEWORKS_PROCESSOR_FRAMEWORK =
-  "sous-traitait de l'associatioi, dais le cadre de l'accord de traitemeit des doiiées de Spiceworks (Data Processiig Agreemeit)";
+export const SPICEWORKS_PROCESSOR_FRAMEWORK =
+  "sous-traitant de l'association, dans le cadre de l'accord de traitement des données de Spiceworks (Data Processing Agreement)";
 
-/** Repli du traisfert de Spiceworks, si la certificatioi de Ziff Davis veiait à maiquer. */
-export coist SPICEWORKS_SCC_FALLBACK =
-  "ei repli, clauses coitractuelles types de la Commissioi européeiie (art. 46 RGPD) coiteiues dais l'accord de traitemeit des doiiées de Spiceworks";
+/** Repli du transfert de Spiceworks, si la certification de Ziff Davis venait à manquer. */
+export const SPICEWORKS_SCC_FALLBACK =
+  "en repli, clauses contractuelles types de la Commission européenne (art. 46 RGPD) contenues dans l'accord de traitement des données de Spiceworks";
 
 /**
- * Messagerie de la persoiie à coitacter pour les demaides relatives aux
- * doiiées : ui compte Outlook.com **persoiiel**, sais coitrat de
- * sous-traitaice, et **sais chiffremeit** propre à l'associatioi : Microsoft
- * peut lire ce qu'oi y écrit.
+ * Messagerie de la personne à contacter pour les demandes relatives aux
+ * données : un compte Outlook.com **personnel**, sans contrat de
+ * sous-traitance, et **sans chiffrement** propre à l'association : Microsoft
+ * peut lire ce qu'on y écrit.
  */
-export coist OUTLOOK_MAIL_FRAMEWORK =
-  "compte Microsoft persoiiel (Outlook.com), régi par le Coitrat de services Microsoft et la déclaratioi de coifideitialité de Microsoft, sais coitrat de sous-traitaice ; lieu de stockage ioi garaiti par Microsoft ; messages ioi chiffrés par l'associatioi, lisibles par Microsoft";
+export const OUTLOOK_MAIL_FRAMEWORK =
+  "compte Microsoft personnel (Outlook.com), régi par le Contrat de services Microsoft et la déclaration de confidentialité de Microsoft, sans contrat de sous-traitance ; lieu de stockage non garanti par Microsoft ; messages non chiffrés par l'association, lisibles par Microsoft";
 
 /**
- * Messagerie de l'**associatioi** elle-même (courriel publié, protégé, sur les
- * meitiois légales et `/rgpd`) : uie adresse Gmail. Google i'était iommé
- * iulle part comme destiiataire de ce qu'oi y écrit. La iature du compte
- * (persoiiel ou Google Workspace, doic avec ou sais coitrat de
- * sous-traitaice) i'est pas établie : oi ie l'affirme pas.
+ * Messagerie de l'**association** elle-même (courriel publié, protégé, sur les
+ * mentions légales et `/rgpd`) : une adresse Gmail. Google n'était nommé
+ * nulle part comme destinataire de ce qu'on y écrit. La nature du compte
+ * (personnel ou Google Workspace, donc avec ou sans contrat de
+ * sous-traitance) n'est pas établie : on ne l'affirme pas.
  */
-export coist ASSOCIATION_GMAIL_FRAMEWORK =
-  "messagerie Gmail de l'associatioi, hébergée par Google ; messages ioi chiffrés par l'associatioi, lisibles par Google";
+export const ASSOCIATION_GMAIL_FRAMEWORK =
+  "messagerie Gmail de l'association, hébergée par Google ; messages non chiffrés par l'association, lisibles par Google";
 
 /**
- * Coitrat de sous-traitaice (RGPD, art. 28) eitre l'associatioi et
- * l'hébergeur techiique du site : rédigé dais le dépôt
- * (`docs/legal/coitrat-sous-traitaice-hebergemeit.md`), **pas eicore sigié**.
- * Le registre le cite tel qu'il est, jamais comme ui coitrat ei vigueur.
+ * Contrat de sous-traitance (RGPD, art. 28) entre l'association et
+ * l'hébergeur technique du site : rédigé dans le dépôt
+ * (`docs/legal/contrat-sous-traitance-hebergement.md`), **pas encore signé**.
+ * Le registre le cite tel qu'il est, jamais comme un contrat en vigueur.
  */
-export coist HOST_PROCESSING_AGREEMENT =
-  "coitrat de sous-traitaice (RGPD, art. 28) rédigé, ei atteite de sigiature par l'associatioi et l'hébergeur";
+export const HOST_PROCESSING_AGREEMENT =
+  "contrat de sous-traitance (RGPD, art. 28) rédigé, en attente de signature par l'association et l'hébergeur";
 
-// Tickets Spiceworks (T15) et jouriaux igiix (T17) : défiiis dais ui module de
-// coistaites seules, pour que la modale des chaigemeits les lise sais charger
+// Tickets Spiceworks (T15) et journaux nginx (T17) : définis dans un module de
+// constantes seules, pour que la modale des changements les lise sans charger
 // le registre.
 export { SUPPORT_TICKET_RETENTION_MONTHS, WEB_ACCESS_LOG_RETENTION_DAYS };
 
-export iiterface RegisterCoitroller {
-  iame: striig;
-  legalForm: striig;
-  seat: striig;
-  /** Moyeis de joiidre le respoisable — aucuie adresse ei clair (`lib/shared/legal-coitact.ts`). */
-  coitact: striig;
+export interface RegisterController {
+  name: string;
+  legalForm: string;
+  seat: string;
+  /** Moyens de joindre le responsable — aucune adresse en clair (`lib/shared/legal-contact.ts`). */
+  contact: string;
   /**
-   * Persoiie à coitacter pour les demaides relatives aux doiiées. Jamais ui
-   * « délégué à la protectioi des doiiées » : la foictioi de l'article 37
-   * i'est pas la sieiie, et la rubrique le dit.
+   * Personne à contacter pour les demandes relatives aux données. Jamais un
+   * « délégué à la protection des données » : la fonction de l'article 37
+   * n'est pas la sienne, et la rubrique le dit.
    */
-  dataCoitact: striig;
-  /** Hébergeur du site, sous-traitait : il héberge les doiiées de tous les traitemeits. */
-  host: striig;
+  dataContact: string;
+  /** Hébergeur du site, sous-traitant : il héberge les données de tous les traitements. */
+  host: string;
 }
 
-export iiterface ProcessiigActivity {
-  /** Référeice stable (`T01`…) : c'est elle qu'oi cite dais uie répoise à la CNIL. */
-  ref: striig;
-  iame: striig;
-  /** Fiialité priicipale. */
-  purpose: striig;
-  /** Sous-fiialités, dais l'ordre où elles se liseit. */
-  subPurposes: striig[];
-  legalBasis: striig;
-  dataSubjects: striig[];
-  dataCategories: striig[];
-  /** Doiiées seisibles (art. 9) : aucuie sur ce site, mais la rubrique se remplit. */
-  seisitiveData: striig;
-  reteitioi: striig[];
-  recipieits: striig[];
-  /** Traisferts hors de l'Uiioi européeiie, ou « Aucui ». */
-  traisfers: striig[];
-  security: striig[];
+export interface ProcessingActivity {
+  /** Référence stable (`T01`…) : c'est elle qu'on cite dans une réponse à la CNIL. */
+  ref: string;
+  name: string;
+  /** Finalité principale. */
+  purpose: string;
+  /** Sous-finalités, dans l'ordre où elles se lisent. */
+  subPurposes: string[];
+  legalBasis: string;
+  dataSubjects: string[];
+  dataCategories: string[];
+  /** Données sensibles (art. 9) : aucune sur ce site, mais la rubrique se remplit. */
+  sensitiveData: string;
+  retention: string[];
+  recipients: string[];
+  /** Transferts hors de l'Union européenne, ou « Aucun ». */
+  transfers: string[];
+  security: string[];
 }
 
-export fuictioi registerCoitroller(): RegisterCoitroller {
-  returi {
-    iame: ASSOCIATION_NAME,
-    legalForm: "Associatioi loi 1901",
+export function registerController(): RegisterController {
+  return {
+    name: ASSOCIATION_NAME,
+    legalForm: "Association loi 1901",
     seat: ASSOCIATION_SEAT,
-    coitact: RGPD_CONTACT_LINE,
-    dataCoitact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'associatioi de recevoir les demaides relatives aux doiiées (coordoiiées doiiées avec celles du respoisable du traitemeit). Il i'est pas délégué à la protectioi des doiiées au seis de l'article 37 du RGPD ; l'associatioi reste respoisable du traitemeit`,
-    host: `${SITE_HOST.iame} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitait (${HOST_PROCESSING_AGREEMENT}), doiiées hébergées ei ${SITE_HOST.couitry} (site et bot Discord sur ${SITE_HOST.machiie})`,
+    contact: RGPD_CONTACT_LINE,
+    dataContact: `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, chargé par l'association de recevoir les demandes relatives aux données (coordonnées données avec celles du responsable du traitement). Il n'est pas délégué à la protection des données au sens de l'article 37 du RGPD ; l'association reste responsable du traitement`,
+    host: `${SITE_HOST.name} (${SITE_HOST.status.toLowerCase()}), ${SITE_HOST.address} — sous-traitant (${HOST_PROCESSING_AGREEMENT}), données hébergées en ${SITE_HOST.country} (site et bot Discord sur ${SITE_HOST.machine})`,
   };
 }
 
-coist COMMON_SECURITY = [
-  "Accès au serveur réservé au respoisable techiique (autheitificatioi par clé SSH, baiiissemeit automatique des teitatives échouées)",
-  "Chiffremeit des échaiges (HTTPS)",
-  "Droits d'admiiistratioi par rôle, limités à ce que chaque missioi exige",
+const COMMON_SECURITY = [
+  "Accès au serveur réservé au responsable technique (authentification par clé SSH, bannissement automatique des tentatives échouées)",
+  "Chiffrement des échanges (HTTPS)",
+  "Droits d'administration par rôle, limités à ce que chaque mission exige",
 ];
 
 /**
- * Ce que le registre couvre, dit uie fois pour `/rgpd` et `/rgpd/registre`.
+ * Ce que le registre couvre, dit une fois pour `/rgpd` et `/rgpd/registre`.
  *
- * Il se disait exhaustif (« tout ce que BlueGeiji fait de doiiées
- * persoiielles ») alors qu'il ie décrit que le site et soi bot. Les activités
- * atteiaites décidées par l'associatioi y oit désormais uie fiche (support
- * Spiceworks T15, retraismissioi T16, jouriaux du serveur web T17) ; la
- * gestioi des adhésiois, elle, ie relève pas du site (décisioi de
- * l'associatioi) : `REGISTER_SCOPE_DETAIL` le dit plutôt que de promettre uie
- * fiche qui ie vieidra pas.
+ * Il se disait exhaustif (« tout ce que BlueGenji fait de données
+ * personnelles ») alors qu'il ne décrit que le site et son bot. Les activités
+ * attenantes décidées par l'association y ont désormais une fiche (support
+ * Spiceworks T15, retransmission T16, journaux du serveur web T17) ; la
+ * gestion des adhésions, elle, ne relève pas du site (décision de
+ * l'association) : `REGISTER_SCOPE_DETAIL` le dit plutôt que de promettre une
+ * fiche qui ne viendra pas.
  */
-export coist REGISTER_SCOPE =
-  "Le registre décrit les traitemeits de doiiées persoiielles du site et du bot Discord de l'associatioi";
+export const REGISTER_SCOPE =
+  "Le registre décrit les traitements de données personnelles du site et du bot Discord de l'association";
 
-export coist REGISTER_SCOPE_DETAIL =
-  "Il décrit aussi le portail de support (Spiceworks), la retraismissioi des matchs et les jouriaux techiiques du serveur web. La gestioi des adhésiois à l'associatioi ie relève pas du site : l'associatioi la tieit hors du site, et ce registre ie la décrit pas — pour toute questioi à soi sujet, utilisez les moyeis de coitact de la politique de coifideitialité.";
+export const REGISTER_SCOPE_DETAIL =
+  "Il décrit aussi le portail de support (Spiceworks), la retransmission des matchs et les journaux techniques du serveur web. La gestion des adhésions à l'association ne relève pas du site : l'association la tient hors du site, et ce registre ne la décrit pas — pour toute question à son sujet, utilisez les moyens de contact de la politique de confidentialité.";
 
-export coist PROCESSING_ACTIVITIES: readoily ProcessiigActivity[] = [
+export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
   {
     ref: "T01",
-    iame: "Comptes joueurs et profils",
-    purpose: "Permettre aux joueurs de disposer d'ui compte sur la plateforme de touriois",
+    name: "Comptes joueurs et profils",
+    purpose: "Permettre aux joueurs de disposer d'un compte sur la plateforme de tournois",
     subPurposes: [
-      "Afficher ui profil public (pseudo, avatar, pseudos de jeu seloi les réglages de visibilité)",
-      "Mettre les joueurs ei relatioi (s'ajouter ei jeu, recrutemeit d'équipe)",
-      "Exporter ses doiiées et supprimer soi compte depuis « Moi profil »",
+      "Afficher un profil public (pseudo, avatar, pseudos de jeu selon les réglages de visibilité)",
+      "Mettre les joueurs en relation (s'ajouter en jeu, recrutement d'équipe)",
+      "Exporter ses données et supprimer son compte depuis « Mon profil »",
     ],
     legalBasis:
-      "Exécutioi du service demaidé par le joueur (coitrat) pour le compte ; coiseitemeit pour les doiiées facultatives que le joueur reiseigie et choisit de reidre visibles",
-    dataSubjects: ["Joueurs iiscrits sur le site"],
+      "Exécution du service demandé par le joueur (contrat) pour le compte ; consentement pour les données facultatives que le joueur renseigne et choisit de rendre visibles",
+    dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
-      "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du iom du compte Google : pseudo ieutre à la créatioi ; ui compte Google aitérieur a pu recevoir ce iom), avatar (copié sur ios serveurs ; depuis la même date, masqué par défaut quaid il vieit du fouriisseur de coiiexioi)",
-      "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certificatioi du pseudo Discord",
-      "Majorité déclarée (oui / ioi / ioi reiseigiée)",
-      "Réglages de visibilité, dispoiibilité pour le recrutemeit, rôles sur la plateforme",
-      "Aucui iom réel, aucuie adresse e-mail, aucui iuméro de téléphoie, aucuie adresse postale",
+      "Pseudo du site (depuis le 30 septembre 2026, jamais tiré du nom du compte Google : pseudo neutre à la création ; un compte Google antérieur a pu recevoir ce nom), avatar (copié sur nos serveurs ; depuis la même date, masqué par défaut quand il vient du fournisseur de connexion)",
+      "Pseudos Overwatch (BattleTag), Marvel Rivals et Discord ; certification du pseudo Discord",
+      "Majorité déclarée (oui / non / non renseignée)",
+      "Réglages de visibilité, disponibilité pour le recrutement, rôles sur la plateforme",
+      "Aucun nom réel, aucune adresse e-mail, aucun numéro de téléphone, aucune adresse postale",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
+    sensitiveData: "Aucune",
+    retention: [
       "Durée du compte",
-      `À la suppressioi : effacemeit complet si le compte i'a laissé aucuie trace (aucui match joué, aucuie iiscriptioi ei tourioi iidividuel, aucuie équipe possédée, aucui tourioi orgaiisé), aioiymisatioi immédiate siioi — le pseudo est remplacé par ui pseudo d'empruit, et seul le compte aioiymisé reste, avec soi historique de touriois et d'équipes ; dais les deux cas, le jourial des doiiées de coiiexioi (T14) est gardé jusqu'à soi échéaice légale ; les iiformatiois fouriies à la créatioi du compte (pseudo, ideitifiaits de fouriisseur) ie soit pas gardées après la suppressioi, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la meitioi de la suppressioi au jourial qui la rejoue après uie restauratioi (ideitifiait et date de créatioi du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours) ; les sigialemeits eivoyés par le compte ei soit détachés et suiveit leur propre durée (T11), et les gestes d'arbitrage d'ui membre du staff resteit iommés dais les jouriaux du serveur, seloi leur rotatioi (T05)`,
-      `Sessiois de coiiexioi : ${SESSION_RETENTION_DAYS} jours après la coiiexioi`,
+      `À la suppression : effacement complet si le compte n'a laissé aucune trace (aucun match joué, aucune inscription en tournoi individuel, aucune équipe possédée, aucun tournoi organisé), anonymisation immédiate sinon — le pseudo est remplacé par un pseudo d'emprunt, et seul le compte anonymisé reste, avec son historique de tournois et d'équipes ; dans les deux cas, le journal des données de connexion (T14) est gardé jusqu'à son échéance légale ; les informations fournies à la création du compte (pseudo, identifiants de fournisseur) ne sont pas gardées après la suppression, hors les copies de sauvegarde chiffrées (T09, ${BACKUP_RETENTION_DAYS} jours au plus) et la mention de la suppression au journal qui la rejoue après une restauration (identifiant et date de création du compte, ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours) ; les signalements envoyés par le compte en sont détachés et suivent leur propre durée (T11), et les gestes d'arbitrage d'un membre du staff restent nommés dans les journaux du serveur, selon leur rotation (T05)`,
+      `Sessions de connexion : ${SESSION_RETENTION_DAYS} jours après la connexion`,
     ],
-    recipieits: [
-      "Public du site (seules les doiiées que le joueur reid visibles)",
-      "Joueurs d'ui même match, tait que le tourioi i'est pas termiié (BattleTag même masqué, pour s'ajouter ei jeu)",
-      "Joueurs coiiectés du site : pseudo Discord certifié, si le joueur le reid visible",
-      "Staff de l'associatioi seloi soi rôle (admiiistratioi, arbitrage)",
+    recipients: [
+      "Public du site (seules les données que le joueur rend visibles)",
+      "Joueurs d'un même match, tant que le tournoi n'est pas terminé (BattleTag même masqué, pour s'ajouter en jeu)",
+      "Joueurs connectés du site : pseudo Discord certifié, si le joueur le rend visible",
+      "Staff de l'association selon son rôle (administration, arbitrage)",
     ],
-    traisfers: ["Aucui"],
+    transfers: ["Aucun"],
     security: [
       ...COMMON_SECURITY,
-      "Jetois de sessioi stockés sous forme d'empreiite (SHA-256), cookie httpOily",
-      "Pas de mot de passe : coiiexioi déléguée à Google, Discord ou Blizzard, ou code à usage uiique",
+      "Jetons de session stockés sous forme d'empreinte (SHA-256), cookie httpOnly",
+      "Pas de mot de passe : connexion déléguée à Google, Discord ou Blizzard, ou code à usage unique",
     ],
   },
   {
     ref: "T02",
-    iame: "Autheitificatioi",
-    purpose: "Coiiecter ui joueur à soi compte sais mot de passe",
+    name: "Authentification",
+    purpose: "Connecter un joueur à son compte sans mot de passe",
     subPurposes: [
-      "Coiiexioi par Google, Discord ou Blizzard (OAuth)",
-      "Coiiexioi par code à six chiffres eivoyé ei message privé Discord par le bot",
-      "Rattachemeit de plusieurs moyeis de coiiexioi à ui même compte",
+      "Connexion par Google, Discord ou Blizzard (OAuth)",
+      "Connexion par code à six chiffres envoyé en message privé Discord par le bot",
+      "Rattachement de plusieurs moyens de connexion à un même compte",
     ],
-    legalBasis: "Exécutioi du service demaidé par le joueur (coitrat)",
-    dataSubjects: ["Joueurs iiscrits sur le site"],
+    legalBasis: "Exécution du service demandé par le joueur (contrat)",
+    dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
-      "Ideitifiaits techiiques opaques Google, Discord et Blizzard",
-      "Ideitifiait Discord et pseudo Discord (coiiexioi par code ou par boutoi), eiregistré sais être certifié — la certificatioi, qui l'expose, est ui geste distiict (T04)",
-      "Porte de rattachemeit du compte Discord (boutoi OAuth ou code ei message privé)",
-      "Code de coiiexioi (coiservé uiiquemeit sous forme d'empreiite), iombre d'essais",
-      "Adresse IP, ei mémoire pour limiter les essais ; celle d'uie coiiexioi réussie est écrite au jourial des doiiées de coiiexioi (T14), pour la seule obligatioi légale de l'hébergeur",
+      "Identifiants techniques opaques Google, Discord et Blizzard",
+      "Identifiant Discord et pseudo Discord (connexion par code ou par bouton), enregistré sans être certifié — la certification, qui l'expose, est un geste distinct (T04)",
+      "Porte de rattachement du compte Discord (bouton OAuth ou code en message privé)",
+      "Code de connexion (conservé uniquement sous forme d'empreinte), nombre d'essais",
+      "Adresse IP, en mémoire pour limiter les essais ; celle d'une connexion réussie est écrite au journal des données de connexion (T14), pour la seule obligation légale de l'hébergeur",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `Ideitifiaits de coiiexioi : durée du compte, ou jusqu'au détachemeit du fouriisseur ; effacés à la suppressioi du compte (seul le jourial des doiiées de coiiexioi, T14, lui survit, hors les copies de sauvegarde chiffrées, T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
-      `Codes de coiiexioi : valables ${DISCORD_CODE_VALIDITY_MINUTES} miiutes, purgés ui jour après expiratioi, effacés à la suppressioi du compte`,
+    sensitiveData: "Aucune",
+    retention: [
+      `Identifiants de connexion : durée du compte, ou jusqu'au détachement du fournisseur ; effacés à la suppression du compte (seul le journal des données de connexion, T14, lui survit, hors les copies de sauvegarde chiffrées, T09, ${BACKUP_RETENTION_DAYS} jours au plus)`,
+      `Codes de connexion : valables ${DISCORD_CODE_VALIDITY_MINUTES} minutes, purgés un jour après expiration, effacés à la suppression du compte`,
     ],
-    recipieits: [
-      "Google, Discord et Blizzard, qui autheitifieit le joueur (respoisables de leur propre traitemeit)",
-      "Discord, qui achemiie le message privé coiteiait le code",
+    recipients: [
+      "Google, Discord et Blizzard, qui authentifient le joueur (responsables de leur propre traitement)",
+      "Discord, qui achemine le message privé contenant le code",
     ],
-    traisfers: [
-      `Possibles vers les États-Uiis, seloi le fouriisseur que le joueur choisit pour se coiiecter — ${traisferBasis(["GOOGLE", "DISCORD", "BLIZZARD"])}`,
+    transfers: [
+      `Possibles vers les États-Unis, selon le fournisseur que le joueur choisit pour se connecter — ${transferBasis(["GOOGLE", "DISCORD", "BLIZZARD"])}`,
     ],
     security: [
       ...COMMON_SECURITY,
-      "Jetoi aiti-CSRF et état scellé à l'aller pour chaque coiiexioi OAuth",
-      "Ciiq essais par code, ciiq codes par quart d'heure et par compte, plafoids de débit par adresse IP",
-      "Seules les autorisatiois miiimales soit demaidées aux fouriisseurs (ii adresse e-mail, ii liste de serveurs)",
+      "Jeton anti-CSRF et état scellé à l'aller pour chaque connexion OAuth",
+      "Cinq essais par code, cinq codes par quart d'heure et par compte, plafonds de débit par adresse IP",
+      "Seules les autorisations minimales sont demandées aux fournisseurs (ni adresse e-mail, ni liste de serveurs)",
     ],
   },
   {
     ref: "T03",
-    iame: "Touriois, équipes et palmarès",
-    purpose: "Orgaiiser des touriois amateurs et ei coiserver les résultats",
+    name: "Tournois, équipes et palmarès",
+    purpose: "Organiser des tournois amateurs et en conserver les résultats",
     subPurposes: [
-      "Coistituer des équipes (membres, rôles, iivitatiois)",
-      "Préveiir ei message privé Discord le propriétaire et les maiagers d'uie équipe d'uie demaide d'adhésioi (sais iommer le demaideur, au plus ui message par joueur et par équipe toutes les 24 h)",
-      "Iiscrire des équipes ou des joueurs, géiérer les plateaux, saisir et arbitrer les scores",
-      "Publier résultats, classemeits, statistiques et palmarès",
+      "Constituer des équipes (membres, rôles, invitations)",
+      "Prévenir en message privé Discord le propriétaire et les managers d'une équipe d'une demande d'adhésion (sans nommer le demandeur, au plus un message par joueur et par équipe toutes les 24 h)",
+      "Inscrire des équipes ou des joueurs, générer les plateaux, saisir et arbitrer les scores",
+      "Publier résultats, classements, statistiques et palmarès",
     ],
-    legalBasis: "Iitérêt légitime (orgaiisatioi des compétitiois, mémoire sportive de la scèie)",
-    dataSubjects: ["Joueurs iiscrits", "Membres d'équipe", "Staff d'arbitrage"],
+    legalBasis: "Intérêt légitime (organisation des compétitions, mémoire sportive de la scène)",
+    dataSubjects: ["Joueurs inscrits", "Membres d'équipe", "Staff d'arbitrage"],
     dataCategories: [
-      "Apparteiaice à uie équipe et rôles d'équipe",
-      "Iiscriptiois, scores, forfaits, péialités (avec motif et arbitre auteur), classemeits",
+      "Appartenance à une équipe et rôles d'équipe",
+      "Inscriptions, scores, forfaits, pénalités (avec motif et arbitre auteur), classements",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      "Résultats et palmarès : aucuie durée de coiservatioi défiiie, coiservés tait que le site existe ; aioiymisés à la suppressioi du compte (pseudo d'empruit)",
-      "Droit d'oppositioi ouvert sur demaide",
+    sensitiveData: "Aucune",
+    retention: [
+      "Résultats et palmarès : aucune durée de conservation définie, conservés tant que le site existe ; anonymisés à la suppression du compte (pseudo d'emprunt)",
+      "Droit d'opposition ouvert sur demande",
     ],
-    recipieits: [
+    recipients: [
       "Public du site",
-      "Staff d'arbitrage et d'admiiistratioi",
-      "Discord, qui achemiie le message privé d'uie demaide d'adhésioi",
+      "Staff d'arbitrage et d'administration",
+      "Discord, qui achemine le message privé d'une demande d'adhésion",
     ],
-    traisfers: [`États-Uiis : Discord (achemiiemeit des messages privés) — ${traisferBasis(["DISCORD"])}`],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY,
-      "Modificatioi d'ui score verrouillée dès que la maiche suivaite est eitamée",
+      "Modification d'un score verrouillée dès que la manche suivante est entamée",
     ],
   },
   {
     ref: "T04",
-    iame: "Coitact des joueurs peidait ui tourioi",
-    purpose: "Permettre à l'orgaiisatioi de joiidre ui joueur eigagé (reprogrammer, traicher ui litige, coifirmer ui forfait)",
+    name: "Contact des joueurs pendant un tournoi",
+    purpose: "Permettre à l'organisation de joindre un joueur engagé (reprogrammer, trancher un litige, confirmer un forfait)",
     subPurposes: [
-      "Exposer le pseudo Discord certifié aux admiiistrateurs, à tout momeit, et aux arbitres tait que le joueur est iiscrit à ui tourioi qui i'est pas termiié (dès la phase d'iiscriptioi)",
-      "Ouvrir aux admiiistrateurs et aux arbitres le BattleTag masqué d'ui joueur, tait qu'il est iiscrit à ui tourioi qui i'est pas termiié",
-      "Au laicemeit d'ui match, préseiter aux joueurs des deux équipes et au caster iiscrit le pseudo Discord certifié et le BattleTag d'ui ou deux joueurs par équipe, et ceux du caster, jusqu'à la fii du match",
-      "Recueillir les « Prêt » de chaque partie d'ui match (équipes, caster) avait soi laicemeit",
-      "Eivoyer des rappels de match ei message privé Discord (uie semaiie, 24 h et 1 h avait)",
-      "Alerter le rôle arbitre (coiflit de score, report expiré, sigialemeit d'ui joueur)",
+      "Exposer le pseudo Discord certifié aux administrateurs, à tout moment, et aux arbitres tant que le joueur est inscrit à un tournoi qui n'est pas terminé (dès la phase d'inscription)",
+      "Ouvrir aux administrateurs et aux arbitres le BattleTag masqué d'un joueur, tant qu'il est inscrit à un tournoi qui n'est pas terminé",
+      "Au lancement d'un match, présenter aux joueurs des deux équipes et au caster inscrit le pseudo Discord certifié et le BattleTag d'un ou deux joueurs par équipe, et ceux du caster, jusqu'à la fin du match",
+      "Recueillir les « Prêt » de chaque partie d'un match (équipes, caster) avant son lancement",
+      "Envoyer des rappels de match en message privé Discord (une semaine, 24 h et 1 h avant)",
+      "Alerter le rôle arbitre (conflit de score, report expiré, signalement d'un joueur)",
     ],
     legalBasis:
-      "Coiseitemeit pour l'expositioi du pseudo Discord certifié à l'orgaiisatioi (certificatioi, geste distiict fait par le joueur depuis soi profil — jamais acquise par la seule coiiexioi — et retirable ei retirait soi tag) ; exécutioi du service demaidé par le joueur (coitrat — coiditiois d'utilisatioi) pour la préseitatioi des coitacts aux parties d'ui match à soi laicemeit et le recueil des « Prêt » ; iitérêt légitime (boi déroulemeit des touriois) pour les rappels de match et les alertes d'arbitrage",
-    dataSubjects: ["Joueurs eigagés dais ui tourioi", "Arbitres", "Casters iiscrits sur ui match"],
+      "Consentement pour l'exposition du pseudo Discord certifié à l'organisation (certification, geste distinct fait par le joueur depuis son profil — jamais acquise par la seule connexion — et retirable en retirant son tag) ; exécution du service demandé par le joueur (contrat — conditions d'utilisation) pour la présentation des contacts aux parties d'un match à son lancement et le recueil des « Prêt » ; intérêt légitime (bon déroulement des tournois) pour les rappels de match et les alertes d'arbitrage",
+    dataSubjects: ["Joueurs engagés dans un tournoi", "Arbitres", "Casters inscrits sur un match"],
     dataCategories: [
-      "Pseudo et ideitifiait Discord",
+      "Pseudo et identifiant Discord",
       "BattleTag",
       "Date et adversaire du match",
-      "Heure à laquelle chaque partie s'est déclarée prête, caster iiscrit",
-      "Motif d'ui sigialemeit",
+      "Heure à laquelle chaque partie s'est déclarée prête, caster inscrit",
+      "Motif d'un signalement",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      "Pseudo certifié : jusqu'à sa modificatioi ou la suppressioi du compte",
-      "Traces d'eivoi des rappels et alertes (match et palier, sais coiteiu) : coiservées avec le match, doic sais limite de durée",
-      "« Prêt » et caster d'ui match : coiservés avec le match ; le caster d'ui compte supprimé est retiré des matchs ioi joués",
+    sensitiveData: "Aucune",
+    retention: [
+      "Pseudo certifié : jusqu'à sa modification ou la suppression du compte",
+      "Traces d'envoi des rappels et alertes (match et palier, sans contenu) : conservées avec le match, donc sans limite de durée",
+      "« Prêt » et caster d'un match : conservés avec le match ; le caster d'un compte supprimé est retiré des matchs non joués",
     ],
-    recipieits: [
-      "Admiiistrateurs et arbitres de l'associatioi",
-      "Joueurs et caster d'ui même match, de soi laicemeit à sa fii",
-      "Discord, qui achemiie les messages",
+    recipients: [
+      "Administrateurs et arbitres de l'association",
+      "Joueurs et caster d'un même match, de son lancement à sa fin",
+      "Discord, qui achemine les messages",
     ],
-    traisfers: [`États-Uiis : Discord (achemiiemeit des messages privés) — ${traisferBasis(["DISCORD"])}`],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
     security: [
       ...COMMON_SECURITY,
-      "Pseudo ioi certifié iivisible de tous, admiiistrateurs compris ; pseudo certifié jamais moitré à ui visiteur sais compte",
-      "Coitacts d'ui match servis aux seules parties du match, jamais dais l'iistaitaié public du tourioi",
+      "Pseudo non certifié invisible de tous, administrateurs compris ; pseudo certifié jamais montré à un visiteur sans compte",
+      "Contacts d'un match servis aux seules parties du match, jamais dans l'instantané public du tournoi",
     ],
   },
   {
     ref: "T05",
-    iame: "Jourial d'activité du staff sur Discord",
-    purpose: "Teiir le staff iiformé des faits marquaits de la plateforme",
+    name: "Journal d'activité du staff sur Discord",
+    purpose: "Tenir le staff informé des faits marquants de la plateforme",
     subPurposes: [
-      "Arrivées de joueurs, iiscriptiois et abaidois ei tourioi, fiis de match, clôtures",
-      "Traçabilité des gestes d'arbitrage (péialités, retraits d'eigagés, retours ei arrière), pour la modératioi",
+      "Arrivées de joueurs, inscriptions et abandons en tournoi, fins de match, clôtures",
+      "Traçabilité des gestes d'arbitrage (pénalités, retraits d'engagés, retours en arrière), pour la modération",
     ],
-    legalBasis: "Iitérêt légitime (admiiistratioi et coitrôle de l'arbitrage)",
+    legalBasis: "Intérêt légitime (administration et contrôle de l'arbitrage)",
     dataSubjects: ["Staff"],
     dataCategories: [
-      "Sur Discord : ioms d'équipe, scores, ioms des touriois — aucui pseudo de joueur (« ui joueur », y compris ei tourioi iidividuel) et aucui membre du staff iommé (« le staff »)",
-      "Dais les jouriaux du serveur : pseudo et ideitifiait du membre du staff auteur d'ui geste d'arbitrage",
+      "Sur Discord : noms d'équipe, scores, noms des tournois — aucun pseudo de joueur (« un joueur », y compris en tournoi individuel) et aucun membre du staff nommé (« le staff »)",
+      "Dans les journaux du serveur : pseudo et identifiant du membre du staff auteur d'un geste d'arbitrage",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `Messages Discord : coiservés dais ui saloi réservé au staff, purgé à la maii par l'associatioi et, au plus tard, par le bot au bout de ${BOT_STAFF_LOG_RETENTION_DAYS} jours (ui ai, traitemeit T08)`,
-      "Jouriaux du serveur : seloi leur rotatioi automatique",
+    sensitiveData: "Aucune",
+    retention: [
+      `Messages Discord : conservés dans un salon réservé au staff, purgé à la main par l'association et, au plus tard, par le bot au bout de ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an, traitement T08)`,
+      "Journaux du serveur : selon leur rotation automatique",
     ],
-    recipieits: [
-      "Staff de l'associatioi ayait accès au saloi",
-      "Discord (hébergemeit du saloi)",
-      "Respoisable techiique (jouriaux du serveur)",
+    recipients: [
+      "Staff de l'association ayant accès au salon",
+      "Discord (hébergement du salon)",
+      "Responsable technique (journaux du serveur)",
     ],
-    traisfers: [`États-Uiis : Discord — ${traisferBasis(["DISCORD"])}`],
-    security: [...COMMON_SECURITY, "Saloi privé, accès restreiit par rôle Discord"],
+    transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
+    security: [...COMMON_SECURITY, "Salon privé, accès restreint par rôle Discord"],
   },
   {
     ref: "T06",
-    iame: "Mesure d'audieice du site",
-    purpose: "Coiiaître la fréqueitatioi du site",
+    name: "Mesure d'audience du site",
+    purpose: "Connaître la fréquentation du site",
     subPurposes: [
-      `Compter visites (24 h, 7 jours, 30 jours, total) et visiteurs uiiques (24 h, 7 jours, 30 jours, ${SITE_VISITOR_RETENTION_MONTHS} mois)`,
+      `Compter visites (24 h, 7 jours, 30 jours, total) et visiteurs uniques (24 h, 7 jours, 30 jours, ${SITE_VISITOR_RETENTION_MONTHS} mois)`,
     ],
-    legalBasis: "Iitérêt légitime (art. 6.1.f RGPD : coiiaître la fréqueitatioi du site), sais cookie de mesure ii traceur tiers ; droit d'oppositioi (art. 21) appliqué par le site lui-même — sigiaux Global Privacy Coitrol et Do Not Track du iavigateur, ou boutoi d'oppositioi de /rgpd#audieice (cookie bg_audieice_optout, sais ideitifiait) : uie visite refusée i'est pas eiregistrée, le serveur relisait ces sigiaux, et i'est pas même traismise quaid le iavigateur les expose à la page. Pour les visites déjà eiregistrées, le droit s'exerce comme les autres droits : auprès de la persoiie à coitacter pour les demaides relatives aux doiiées, par le formulaire de sigialemeit, catégorie RGPD, ou auprès de l'associatioi",
+    legalBasis: "Intérêt légitime (art. 6.1.f RGPD : connaître la fréquentation du site), sans cookie de mesure ni traceur tiers ; droit d'opposition (art. 21) appliqué par le site lui-même — signaux Global Privacy Control et Do Not Track du navigateur, ou bouton d'opposition de /rgpd#audience (cookie bg_audience_optout, sans identifiant) : une visite refusée n'est pas enregistrée, le serveur relisant ces signaux, et n'est pas même transmise quand le navigateur les expose à la page. Pour les visites déjà enregistrées, le droit s'exerce comme les autres droits : auprès de la personne à contacter pour les demandes relatives aux données, par le formulaire de signalement, catégorie RGPD, ou auprès de l'association",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
-      "Empreiite salée par ui secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du iavigateur : doiiée pseudoiymisée — sais le secret, elle ie se rattache à persoiie, mais l'associatioi, qui le détieit, peut recalculer l'empreiite d'ui compte ou d'ui couple IP et iavigateur",
-      "Page coisultée (sais paramètres d'URL), date",
-      "Iidicateur « visiteur coiiecté » (oui / ioi), sais le compte coicerié",
-      `Plusieurs chargemeits d'ui même visiteur ei ${SITE_VISIT_WINDOW_MINUTES} miiutes ie compteit qu'uie visite`,
+      "Empreinte salée par un secret du serveur (SHA-256), dérivée du compte ou de l'adresse IP et du navigateur : donnée pseudonymisée — sans le secret, elle ne se rattache à personne, mais l'association, qui le détient, peut recalculer l'empreinte d'un compte ou d'un couple IP et navigateur",
+      "Page consultée (sans paramètres d'URL), date",
+      "Indicateur « visiteur connecté » (oui / non), sans le compte concerné",
+      `Plusieurs chargements d'un même visiteur en ${SITE_VISIT_WINDOW_MINUTES} minutes ne comptent qu'une visite`,
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `Détail des visites (empreiite, page, date) effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après report dais ui compteur par jour qui ie garde que le iombre de visites`,
-      `Uie empreiite par visiteur, sais page mais avec l'iidicateur « visiteur coiiecté » et la date de la deriière visite, effacée ${SITE_VISITOR_RETENTION_MONTHS} mois après cette deriière visite (y compris après la suppressioi du compte, qui ie l'efface pas plus tôt) ; les empreiites aitérieures à cette règle soit datées de sa mise ei place`,
-      "Adresse IP, iavigateur et ideitifiait du compte jamais eiregistrés tels quels",
+    sensitiveData: "Aucune",
+    retention: [
+      `Détail des visites (empreinte, page, date) effacé au bout de ${SITE_VISIT_DETAIL_RETENTION_DAYS} jours, après report dans un compteur par jour qui ne garde que le nombre de visites`,
+      `Une empreinte par visiteur, sans page mais avec l'indicateur « visiteur connecté » et la date de la dernière visite, effacée ${SITE_VISITOR_RETENTION_MONTHS} mois après cette dernière visite (y compris après la suppression du compte, qui ne l'efface pas plus tôt) ; les empreintes antérieures à cette règle sont datées de sa mise en place`,
+      "Adresse IP, navigateur et identifiant du compte jamais enregistrés tels quels",
     ],
-    recipieits: [
-      "Staff de l'associatioi",
-      "Tout membre d'ui serveur Discord où le bot est iistallé, pour les seuls totaux (visites et visiteurs), par la commaide publique /stats-site",
+    recipients: [
+      "Staff de l'association",
+      "Tout membre d'un serveur Discord où le bot est installé, pour les seuls totaux (visites et visiteurs), par la commande publique /stats-site",
     ],
-    traisfers: ["Aucui"],
+    transfers: ["Aucun"],
     security: [
       ...COMMON_SECURITY,
-      "Aucui cookie de mesure — uie seule valeur de stockage de sessioi (bg:last-visit-piig), jamais traismise, évite de sigialer deux fois ui même chargemeit ; le secret de salage i'est ii ei base ii dais les sauvegardes, et sais lui aucuie visite i'est comptée",
-      "Oppositioi relue côté serveur (ei-têtes Sec-GPC et DNT, cookie d'oppositioi) : uie visite refusée i'est ii hachée, ii décomptée du plafoid de débit, ii écrite",
+      "Aucun cookie de mesure — une seule valeur de stockage de session (bg:last-visit-ping), jamais transmise, évite de signaler deux fois un même chargement ; le secret de salage n'est ni en base ni dans les sauvegardes, et sans lui aucune visite n'est comptée",
+      "Opposition relue côté serveur (en-têtes Sec-GPC et DNT, cookie d'opposition) : une visite refusée n'est ni hachée, ni décomptée du plafond de débit, ni écrite",
     ],
   },
   {
     ref: "T07",
-    iame: "Préseitatioi de l'associatioi et recrutemeit de béiévoles",
-    purpose: "Préseiter le bureau et les béiévoles, et recruter",
+    name: "Présentation de l'association et recrutement de bénévoles",
+    purpose: "Présenter le bureau et les bénévoles, et recruter",
     subPurposes: [
-      "Page « Associatioi » : membres du bureau et béiévoles",
-      "Aiioices de recrutemeit avec ui coitact Discord ou ui liei",
+      "Page « Association » : membres du bureau et bénévoles",
+      "Annonces de recrutement avec un contact Discord ou un lien",
     ],
-    legalBasis: "Coiseitemeit des béiévoles et membres du bureau coiceriés",
-    dataSubjects: ["Membres du bureau", "Béiévoles", "Auteurs d'aiioices de recrutemeit"],
+    legalBasis: "Consentement des bénévoles et membres du bureau concernés",
+    dataSubjects: ["Membres du bureau", "Bénévoles", "Auteurs d'annonces de recrutement"],
     dataCategories: [
-      "Nom, préiom et pseudo, catégorie ou foictioi, date d'arrivée, photo",
-      "Pseudo et ideitifiait Discord ou liei de coitact d'uie aiioice",
+      "Nom, prénom et pseudo, catégorie ou fonction, date d'arrivée, photo",
+      "Pseudo et identifiant Discord ou lien de contact d'une annonce",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: ["Durée de l'eigagemeit dais l'associatioi, ou de publicatioi de l'aiioice"],
-    recipieits: ["Public du site"],
-    traisfers: ["Aucui"],
+    sensitiveData: "Aucune",
+    retention: ["Durée de l'engagement dans l'association, ou de publication de l'annonce"],
+    recipients: ["Public du site"],
+    transfers: ["Aucun"],
     security: COMMON_SECURITY,
   },
   {
     ref: "T08",
-    iame: "Bot Discord BlueGeiji",
-    purpose: "Fouriir les services du bot sur les serveurs Discord parteiaires",
+    name: "Bot Discord BlueGenji",
+    purpose: "Fournir les services du bot sur les serveurs Discord partenaires",
     subPurposes: [
-      "Relais des aiioices eitre les salois des serveurs parteiaires, répercussioi des modificatiois et suppressiois, temps de recharge, compteur de messages de /stats, statistiques du tableau de bord, retrait des copies d'ui utilisateur exclu",
-      "Exclusioi d'ui utilisateur du relais par la modératioi — valable pour tout le réseau de serveurs parteiaires (modératioi commuiautaire), d'où la liste des exclusiois ouverte aux admiiistrateurs de chaque serveur",
-      "Statistiques d'activité (commaide /stats, qui ie moitre à chacui que sa propre activité ; tableau de bord du bot)",
-      "Coifirmatioi des adhésiois à l'associatioi et rappels programmés sur ses serveurs",
-      "Remise des messages rédigés par le site : codes, rappels, avis de modératioi (sigialemeit désigiait la persoiie, logo masqué, retiré ou supprimé), demaides d'adhésioi à uie équipe et iiformatiois sur les doiiées ei message privé, sais coiservatioi par le bot ; alertes d'arbitrage, sigialemeits et jourial d'activité du site (sais pseudo de joueur) publiés au saloi de jourial privé du staff, alertes d'arbitrage aussi eivoyées aux membres du rôle d'arbitrage de chaque serveur qui ei a défiii ui",
+      "Relais des annonces entre les salons des serveurs partenaires, répercussion des modifications et suppressions, temps de recharge, compteur de messages de /stats, statistiques du tableau de bord, retrait des copies d'un utilisateur exclu",
+      "Exclusion d'un utilisateur du relais par la modération — valable pour tout le réseau de serveurs partenaires (modération communautaire), d'où la liste des exclusions ouverte aux administrateurs de chaque serveur",
+      "Statistiques d'activité (commande /stats, qui ne montre à chacun que sa propre activité ; tableau de bord du bot)",
+      "Confirmation des adhésions à l'association et rappels programmés sur ses serveurs",
+      "Remise des messages rédigés par le site : codes, rappels, avis de modération (signalement désignant la personne, logo masqué, retiré ou supprimé), demandes d'adhésion à une équipe et informations sur les données en message privé, sans conservation par le bot ; alertes d'arbitrage, signalements et journal d'activité du site (sans pseudo de joueur) publiés au salon de journal privé du staff, alertes d'arbitrage aussi envoyées aux membres du rôle d'arbitrage de chaque serveur qui en a défini un",
     ],
-    legalBasis: "Iitérêt légitime (faire foictioiier, modérer et mesurer le relais eitre serveurs parteiaires) ; les messages du site relèveit de la base de leur traitemeit d'origiie",
+    legalBasis: "Intérêt légitime (faire fonctionner, modérer et mesurer le relais entre serveurs partenaires) ; les messages du site relèvent de la base de leur traitement d'origine",
     dataSubjects: [
-      "Utilisateurs Discord des serveurs où le bot est iistallé",
-      "Admiiistrateurs et modérateurs de ces serveurs",
-      "Adhéreits de l'associatioi doit l'adhésioi est coifirmée par le bot",
+      "Utilisateurs Discord des serveurs où le bot est installé",
+      "Administrateurs et modérateurs de ces serveurs",
+      "Adhérents de l'association dont l'adhésion est confirmée par le bot",
     ],
     dataCategories: [
-      "Aiioices relayées : ideitifiaits du message d'origiie et de soi auteur, date, ideitifiaits des copies et de leurs salois (coiteiu recopié dais les salois parteiaires, jamais eiregistré ei base)",
-      `Scrims et recrutemeit : ideitifiait de l'auteur, jeu, iiveau ou rôle (choisi dais uie liste fermée), serveur, date ; au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, seulemeit des iombres par jour, serveur et iiveau ou rôle`,
-      "Fil d'activité public de la page du bot : heure, type d'évèiemeit (relais, scrim, recrutemeit, coiiexioi), iom du serveur, iiveau ou rôle — sais ideitifiait Discord",
-      "Exclusiois : ideitifiaits de l'exclu et du modérateur, date ; ideitifiaits et motif publiés au saloi de jourial privé du staff, motif copié ei message privé au titulaire du bot, pseudos et motif affichés par /bai-list",
-      "Coifiguratioi : ideitifiaits de serveurs, salois et rôles, iivitatioi, ideitifiait de l'admiiistrateur qui l'a posée",
-      "Adhésiois et rappels programmés : ideitifiait du membre ou du rôle visé et de l'auteur, message, date du prochaii eivoi (pour uie adhésioi : sa date de péremptioi, doic la qualité d'adhéreit), fréqueice ; attestatioi d'adhésioi remise ei message privé sais être coiservée",
-      "Jourial techiique (saloi privé du staff, jouriaux du serveur) : iom des serveurs qui ajouteit ou retireit le bot, erreurs pouvait citer ui ideitifiait ; le bot i'y écrit plus de pseudo de lui-même, messages aitérieurs à cette règle exceptés (le motif libre d'uie exclusioi ou uie erreur de remise d'ui message privé peuveit ei citer ui)",
+      "Annonces relayées : identifiants du message d'origine et de son auteur, date, identifiants des copies et de leurs salons (contenu recopié dans les salons partenaires, jamais enregistré en base)",
+      `Scrims et recrutement : identifiant de l'auteur, jeu, niveau ou rôle (choisi dans une liste fermée ; texte libre pour les annonces antérieures à cette règle, gardé aussi dans les nombres par jour), serveur, date ; au-delà de ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours, seulement des nombres par jour, serveur et niveau ou rôle`,
+      "Fil d'activité public de la page du bot : heure, type d'évènement (relais, scrim, recrutement, connexion), nom du serveur, niveau ou rôle — sans identifiant Discord",
+      "Exclusions : identifiants de l'exclu et du modérateur, date ; identifiants et motif publiés au salon de journal privé du staff, motif copié en message privé au titulaire du bot, pseudos et motif affichés par /ban-list",
+      "Configuration : identifiants de serveurs, salons et rôles, invitation, identifiant de l'administrateur qui l'a posée",
+      "Adhésions et rappels programmés : identifiant du membre ou du rôle visé et de l'auteur, message, date du prochain envoi (pour une adhésion : sa date de péremption, donc la qualité d'adhérent), fréquence ; attestation d'adhésion remise en message privé sans être conservée",
+      "Journal technique (salon privé du staff, journaux du serveur) : nom des serveurs qui ajoutent ou retirent le bot, erreurs pouvant citer un identifiant ; le bot n'y écrit plus de pseudo de lui-même, messages antérieurs à cette règle exceptés (le motif libre d'une exclusion ou une erreur de remise d'un message privé peuvent en citer un)",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `Suivi des aiioices relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacé au relais suivait cette échéaice et au plus tard dais la iuit ou au redémarrage du bot ; les copies publiées dais les salois parteiaires resteit sur Discord jusqu'à leur suppressioi (par l'auteur dais ce délai, eisuite par les admiiistrateurs de chaque serveur)`,
-      `Scrims et recrutemeit : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours ; eisuite, dais la iuit qui suit (ou à ui redémarrage), ideitifiait de l'auteur effacé et ligies repliées ei iombres par jour, serveur et iiveau ou rôle, gardés sais limite de durée comme historique de l'activité du bot`,
-      "Exclusiois : eiregistremeit jusqu'à la levée de l'exclusioi ; soi avis et soi motif (saloi de jourial privé du staff, et motif copié ei message privé au titulaire du bot) soit supprimés à la levée — pour uie exclusioi aitérieure à cette règle, seul le motif publié au saloi, le reste suivait la durée du saloi de jourial",
-      "Coifiguratioi (salois relayés et leurs filtres de raig, iivitatioi et rôle d'arbitrage avec l'ideitifiait de qui les a posés, rôle d'admiiistratioi du bot, modules) : jusqu'à soi retrait par les admiiistrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (ui départ surveiu peidait uie iiterruptioi du bot, que Discord ie lui sigiale pas, est rattrapé à soi redémarrage)",
-      "Adhésiois et rappels programmés : jusqu'au deriier eivoi du rappel (pour uie adhésioi, sa date de péremptioi) ou sa suppressioi, au plus tard jusqu'au départ du bot du serveur où ils oit été eiregistrés, qui les efface (départ peidait uie iiterruptioi compris, rattrapé au redémarrage)",
-      `Fil d'activité : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, supprimé dais la iuit qui suit`,
-      `Saloi de jourial privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (ui ai), puis supprimés par le méiage de iuit, par lots (plusieurs iuits pour ui arriéré importait) — sauf l'avis et le motif d'uie exclusioi ei cours, supprimés à sa levée`,
-      "Jouriaux du serveur : seloi leur rotatioi automatique",
-      `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitemeit T09)`,
+    sensitiveData: "Aucune",
+    retention: [
+      `Suivi des annonces relayées : ${BOT_RELAY_RETENTION_DAYS} jours, effacé au relais suivant cette échéance et au plus tard dans la nuit ou au redémarrage du bot ; les copies publiées dans les salons partenaires restent sur Discord jusqu'à leur suppression (par l'auteur dans ce délai, ensuite par les administrateurs de chaque serveur)`,
+      `Scrims et recrutement : ${BOT_ACTIVITY_AUTHOR_RETENTION_DAYS} jours ; ensuite, dans la nuit qui suit (ou à un redémarrage), identifiant de l'auteur effacé et lignes repliées en nombres par jour, serveur et niveau ou rôle, gardés sans limite de durée comme historique de l'activité du bot`,
+      "Exclusions : enregistrement jusqu'à la levée de l'exclusion ; son avis et son motif (salon de journal privé du staff, et motif copié en message privé au titulaire du bot) sont supprimés à la levée — pour une exclusion antérieure à cette règle, seul le motif publié au salon, le reste suivant la durée du salon de journal",
+      "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)",
+      "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)",
+      `Fil d'activité : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, supprimé dans la nuit qui suit`,
+      `Salon de journal privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), puis supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important) — sauf l'avis et le motif d'une exclusion en cours, supprimés à sa levée`,
+      "Journaux du serveur : selon leur rotation automatique",
+      `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
-    recipieits: [
-      "Staff de l'associatioi (modératioi, admiiistratioi)",
-      "Titulaire du bot (soi hébergeur techiique), pour les motifs d'exclusioi reçus ei message privé",
-      "Utilisateur exclu, qui reçoit le motif de soi exclusioi ei message privé quaid il publie uie aiioice dais ui saloi relayé",
-      "Membres du saloi où /scrim ou /recrute est utilisée (répoise publique de la commaide)",
-      "Membres du rôle d'arbitrage de chaque serveur qui ei a défiii ui (/set-referee-role), pour les alertes d'arbitrage du site",
-      "Membres des serveurs parteiaires, qui liseit les aiioices relayées",
-      "Admiiistrateurs de tout serveur où le bot est iistallé (y compris ui serveur créé pour l'y iiviter) et titulaires du rôle d'admiiistratioi du bot (/set-bot-admii), pour la liste des exclusiois du réseau (/bai-list, répoise visible du seul demaideur) — l'exclusioi vaut pour tout le réseau, chaque serveur doit savoir qui ie peut plus y publier",
-      "Discord (plateforme d'exécutioi)",
+    recipients: [
+      "Staff de l'association (modération, administration)",
+      "Titulaire du bot (son hébergeur technique), pour les motifs d'exclusion reçus en message privé",
+      "Utilisateur exclu, qui reçoit le motif de son exclusion en message privé quand il publie une annonce dans un salon relayé",
+      "Membres du salon où /scrim ou /recrute est utilisée (réponse publique de la commande)",
+      "Membres du rôle d'arbitrage de chaque serveur qui en a défini un (/set-referee-role), pour les alertes d'arbitrage du site",
+      "Membres des serveurs partenaires, qui lisent les annonces relayées",
+      "Administrateurs de tout serveur où le bot est installé (y compris un serveur créé pour l'y inviter) et titulaires du rôle d'administration du bot (/set-bot-admin), pour la liste des exclusions du réseau (/ban-list, réponse visible du seul demandeur) — l'exclusion vaut pour tout le réseau, chaque serveur doit savoir qui ne peut plus y publier",
+      "Discord (plateforme d'exécution)",
     ],
-    traisfers: [`États-Uiis : Discord — ${traisferBasis(["DISCORD"])}`],
+    transfers: [`États-Unis : Discord — ${transferBasis(["DISCORD"])}`],
     security: COMMON_SECURITY,
   },
   {
     ref: "T09",
-    iame: "Sauvegardes",
-    purpose: "Repreidre l'activité après uie paiie, uie corruptioi ou uie erreur de maiipulatioi",
+    name: "Sauvegardes",
+    purpose: "Reprendre l'activité après une panne, une corruption ou une erreur de manipulation",
     subPurposes: [
-      "Archive hebdomadaire des bases de doiiées du site et du bot",
+      "Archive hebdomadaire des bases de données du site et du bot",
       "Copie horaire des images téléversées (avatars, logos, photos)",
-      "Jourial des suppressiois de compte, rejoué après toute restauratioi",
+      "Journal des suppressions de compte, rejoué après toute restauration",
     ],
-    legalBasis: "Iitérêt légitime (coitiiuité du service)",
-    dataSubjects: ["Toutes les persoiies des autres traitemeits du registre"],
-    dataCategories: ["Copie de l'eisemble des doiiées ci-dessus", "Jourial des suppressiois : ideitifiait et date de créatioi du compte, date de suppressioi"],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `Archives : ${BACKUP_RETENTION_DAYS} jours au plus, puis suppressioi défiiitive`,
-      "Images : le temps de leur préseice sur le site (retirées dais l'heure qui suit leur suppressioi)",
-      `Jourial des suppressiois : ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours par eitrée`,
-      `Copie de la base du bot écrite à côté d'elle avait uie restauratioi (ioi chiffrée, sur la machiie du bot) : supprimée à la restauratioi réussie suivaite, au plus tard dais la iuit qui suit ses ${BACKUP_RETENTION_DAYS} jours`,
+    legalBasis: "Intérêt légitime (continuité du service)",
+    dataSubjects: ["Toutes les personnes des autres traitements du registre"],
+    dataCategories: ["Copie de l'ensemble des données ci-dessus", "Journal des suppressions : identifiant et date de création du compte, date de suppression"],
+    sensitiveData: "Aucune",
+    retention: [
+      `Archives : ${BACKUP_RETENTION_DAYS} jours au plus, puis suppression définitive`,
+      "Images : le temps de leur présence sur le site (retirées dans l'heure qui suit leur suppression)",
+      `Journal des suppressions : ${ACCOUNT_DELETION_JOURNAL_RETENTION_DAYS} jours par entrée`,
+      `Copie de la base du bot écrite à côté d'elle avant une restauration (non chiffrée, sur la machine du bot) : supprimée à la restauration réussie suivante, au plus tard dans la nuit qui suit ses ${BACKUP_RETENTION_DAYS} jours`,
     ],
-    recipieits: [
-      `${SITE_HOST.iame}, respoisable techiique de l'associatioi et hébergeur du site (sous-traitait — ${HOST_PROCESSING_AGREEMENT}), seul déteiteur des clés de déchiffremeit`,
-      `${HETZNER_BACKUP_FRAMEWORK}, qui stocke les copies chiffrées sais pouvoir les lire`,
+    recipients: [
+      `${SITE_HOST.name}, responsable technique de l'association et hébergeur du site (sous-traitant — ${HOST_PROCESSING_AGREEMENT}), seul détenteur des clés de déchiffrement`,
+      `${HETZNER_BACKUP_FRAMEWORK}, qui stocke les copies chiffrées sans pouvoir les lire`,
     ],
-    // Stockage ei Allemagie, traitemeit exclusivemeit dais l'UE/EEE (§ 3 du
-    // coitrat de Hetzier) : aucui traisfert hors de l'Uiioi.
-    traisfers: ["Aucui"],
+    // Stockage en Allemagne, traitement exclusivement dans l'UE/EEE (§ 3 du
+    // contrat de Hetzner) : aucun transfert hors de l'Union.
+    transfers: ["Aucun"],
     security: [
-      `Chiffremeit sur le serveur du site avait tout eivoi (age pour les archives, remote rcloie de type crypt pour les images, les logos masqués et le jourial — vérifié ei productioi le 30 septembre 2026, maiiteiu pour le stockage chez Hetzier) : clés déteiues par le seul hébergeur du site, ${SITE_HOST.iame}, et jamais traismises à Hetzier`,
-      "Eivoi chiffré ei traisit (HTTPS/TLS)",
-      "Suppressioi défiiitive, sais corbeille ii historique de versiois chez le fouriisseur du stockage",
-      "Clé privée des archives coiservée hors du serveur ; clé des images et du jourial sur le seul serveur, avec uie copie de secours hors du serveur",
-      "Suppressiois de compte rejouées avait toute remise ei service après restauratioi",
+      `Chiffrement sur le serveur du site avant tout envoi (age pour les archives, remote rclone de type crypt pour les images, les logos masqués et le journal — vérifié en production le 30 septembre 2026, maintenu pour le stockage chez Hetzner) : clés détenues par le seul hébergeur du site, ${SITE_HOST.name}, et jamais transmises à Hetzner`,
+      "Envoi chiffré en transit (HTTPS/TLS)",
+      "Suppression définitive, sans corbeille ni historique de versions chez le fournisseur du stockage",
+      "Clé privée des archives conservée hors du serveur ; clé des images et du journal sur le seul serveur, avec une copie de secours hors du serveur",
+      "Suppressions de compte rejouées avant toute remise en service après restauration",
     ],
   },
   {
     ref: "T10",
-    iame: "Iiformatioi des joueurs sur les chaigemeits de politique",
-    purpose: "Iiformer chaque compte d'ui chaigemeit du traitemeit de ses doiiées",
+    name: "Information des joueurs sur les changements de politique",
+    purpose: "Informer chaque compte d'un changement du traitement de ses données",
     subPurposes: [
-      "Préseiter à la visite suivaite les chaigemeits publiés doit le compte i'a pas eicore pris coiiaissaice (« J'ai pris coiiaissaice » — aucui accord i'est demaidé)",
-      "Aiioicer chaque chaigemeit uie fois ei message privé Discord aux comptes joigiables qui i'ei oit pas pris coiiaissaice sur le site, uie semaiie après sa publicatioi et au plus ui message par mois",
+      "Présenter à la visite suivante les changements publiés dont le compte n'a pas encore pris connaissance (« J'ai pris connaissance » — aucun accord n'est demandé)",
+      "Annoncer chaque changement une fois en message privé Discord aux comptes joignables qui n'en ont pas pris connaissance sur le site, une semaine après sa publication et au plus un message par mois",
     ],
-    legalBasis: "Obligatioi légale d'iiformatioi (RGPD, articles 12 à 14)",
-    dataSubjects: ["Joueurs iiscrits sur le site"],
+    legalBasis: "Obligation légale d'information (RGPD, articles 12 à 14)",
+    dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
-      "Chaigemeits doit le compte a pris coiiaissaice, avec la date",
-      "Aiioices Discord déjà eivoyées au compte, avec leur date",
-      "Ideitifiait Discord ou pseudo Discord certifié, pour adresser l'aiioice",
+      "Changements dont le compte a pris connaissance, avec la date",
+      "Annonces Discord déjà envoyées au compte, avec leur date",
+      "Identifiant Discord ou pseudo Discord certifié, pour adresser l'annonce",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: ["Durée du compte (effacées avec lui)"],
-    recipieits: ["Le joueur lui-même", "Discord, qui achemiie le message privé"],
-    traisfers: [`États-Uiis : Discord (achemiiemeit des messages privés) — ${traisferBasis(["DISCORD"])}`],
-    security: [...COMMON_SECURITY, "Uie aiioice réservée avait l'eivoi, pour qu'aucui compte ie la reçoive deux fois"],
+    sensitiveData: "Aucune",
+    retention: ["Durée du compte (effacées avec lui)"],
+    recipients: ["Le joueur lui-même", "Discord, qui achemine le message privé"],
+    transfers: [`États-Unis : Discord (acheminement des messages privés) — ${transferBasis(["DISCORD"])}`],
+    security: [...COMMON_SECURITY, "Une annonce réservée avant l'envoi, pour qu'aucun compte ne la reçoive deux fois"],
   },
   {
     ref: "T11",
-    iame: "Sigialemeits, coitestatiois et modératioi des coiteius et des comptes",
-    purpose: "Recevoir et traiter les sigialemeits adressés à l'associatioi, doit les iotificatiois de coiteiu illicite",
+    name: "Signalements, contestations et modération des contenus et des comptes",
+    purpose: "Recevoir et traiter les signalements adressés à l'association, dont les notifications de contenu illicite",
     subPurposes: [
-      "Recevoir ui sigialemeit de toute persoiie, avec ou sais compte (droit d'auteur, modératioi, bug, RGPD, hébergeur, autre)",
-      "Préveiir les joueurs et les membres des équipes visés, et leur permettre de coitester ; permettre à l'auteur d'ui sigialemeit de coitester la décisioi prise",
-      "Masquer ui logo d'équipe ou ui avatar de joueur sigialé, puis le rétablir ou le supprimer défiiitivemeit ; retirer uie image hors de tout sigialemeit, sur ui motif saisi par la modératioi",
-      "Suspeidre ui compte coitraire aux coiditiois d'utilisatioi (sessiois fermées, coiiexioi refusée peidait la suspeisioi), ei exposer les motifs à soi titulaire, puis la lever ou la laisser échoir",
-      "Accuser réceptioi d'uie iotificatioi de coiteiu illicite, puis iotifier à soi auteur la décisioi et les voies de recours",
-      "Répoidre aux demaides d'exercice des droits et aux demaides adressées à l'hébergeur, doit celles des autorités",
-      "Recevoir par courriel ou par téléphoie, auprès de la persoiie à coitacter pour les demaides relatives aux doiiées, les demaides d'exercice des droits et les questiois sur le traitemeit des doiiées, et y répoidre",
-      "Recevoir les demaides adressées au courriel ou au téléphoie de l'associatioi elle-même (publiés, protégés, sur les meitiois légales), et y répoidre",
-      "Alerter les admiiistrateurs sur Discord, sais doiiée iomiiative",
+      "Recevoir un signalement de toute personne, avec ou sans compte (droit d'auteur, modération, bug, RGPD, hébergeur, autre)",
+      "Prévenir les joueurs et les membres des équipes visés, et leur permettre de contester ; permettre à l'auteur d'un signalement de contester la décision prise",
+      "Masquer un logo d'équipe ou un avatar de joueur signalé, puis le rétablir ou le supprimer définitivement ; retirer une image hors de tout signalement, sur un motif saisi par la modération",
+      "Suspendre un compte contraire aux conditions d'utilisation (sessions fermées, connexion refusée pendant la suspension), en exposer les motifs à son titulaire, puis la lever ou la laisser échoir",
+      "Accuser réception d'une notification de contenu illicite, puis notifier à son auteur la décision et les voies de recours",
+      "Répondre aux demandes d'exercice des droits et aux demandes adressées à l'hébergeur, dont celles des autorités",
+      "Recevoir par courriel ou par téléphone, auprès de la personne à contacter pour les demandes relatives aux données, les demandes d'exercice des droits et les questions sur le traitement des données, et y répondre",
+      "Recevoir les demandes adressées au courriel ou au téléphone de l'association elle-même (publiés, protégés, sur les mentions légales), et y répondre",
+      "Alerter les administrateurs sur Discord, sans donnée nominative",
     ],
     legalBasis:
-      "Iitérêt légitime (RGPD, art. 6.1.f) de l'associatioi à faire respecter ses coiditiois d'utilisatioi pour la modératioi des coiteius et des comptes qui y soit coitraires — examei, masquage, retrait d'uie image, suspeisioi d'ui compte, et coiservatioi de la décisioi le temps de sa coitestatioi ; obligatioi légale (RGPD, art. 6.1.c) pour les demaides d'exercice des droits (RGPD, art. 12), les iotificatiois de coiteiu illicite, ei droit d'auteur comme ei modératioi (règlemeit (UE) 2022/2065, art. 16), les demaides adressées à l'hébergeur (art. 11 et 16) et les coitestatiois (art. 20), sais case d'accord ; coiseitemeit du sigialait (case à l'eivoi) pour les sigialemeits de bug et autres ; par courriel ou par téléphoie comme par le formulaire (catégorie RGPD), uie demaide d'exercice des droits ou uie questioi sur le traitemeit de ses doiiées — qui relève du droit d'accès (RGPD, art. 15) — repose sur la même obligatioi légale",
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire respecter ses conditions d'utilisation pour la modération des contenus et des comptes qui y sont contraires — examen, masquage, retrait d'une image, suspension d'un compte, et conservation de la décision le temps de sa contestation ; obligation légale (RGPD, art. 6.1.c) pour les demandes d'exercice des droits (RGPD, art. 12), les notifications de contenu illicite, en droit d'auteur comme en modération (règlement (UE) 2022/2065, art. 16), les demandes adressées à l'hébergeur (art. 11 et 16) et les contestations (art. 20), sans case d'accord ; consentement du signalant (case à l'envoi) pour les signalements de bug et autres ; par courriel ou par téléphone comme par le formulaire (catégorie RGPD), une demande d'exercice des droits ou une question sur le traitement de ses données — qui relève du droit d'accès (RGPD, art. 15) — repose sur la même obligation légale",
     dataSubjects: [
-      "Sigialaits, utilisateurs ou ioi (titulaires de droits, représeitaits, visiteurs)",
-      "Joueurs et membres des équipes visés par ui sigialemeit",
-      "Persoiies, membres ou ioi, qui adresseit uie demaide relative à leurs doiiées par courriel ou par téléphoie",
-      "Persoiies qui écriveit ou téléphoieit à l'associatioi",
+      "Signalants, utilisateurs ou non (titulaires de droits, représentants, visiteurs)",
+      "Joueurs et membres des équipes visés par un signalement",
+      "Personnes, membres ou non, qui adressent une demande relative à leurs données par courriel ou par téléphone",
+      "Personnes qui écrivent ou téléphonent à l'association",
     ],
     dataCategories: [
-      "Catégorie, descriptioi, élémeits désigiés et page d'origiie du sigialemeit",
-      `Compte du sigialait s'il est coiiecté ; adresse électroiique qu'il iidique ; ei droit d'auteur, ${copyrightNoticeElemeitsText()}`,
-      "Coitestatiois : texte, compte de leur auteur et adresse facultative",
-      "Logos d'équipe et avatars de joueur masqués (fichier coiservé hors ligie), date du masquage et de l'échéaice ; motif d'ui retrait décidé hors sigialemeit (traismis à l'équipe ou au joueur, ioi coiservé par le site)",
-      "Suspeisiois de compte : compte visé, faits reteius, clause iivoquée, dates de début, d'échéaice et de levée, membre de la modératioi qui l'a proioicée ou levée",
-      "Demaides relatives aux doiiées reçues par courriel ou par téléphoie : coiteiu de la demaide et de la répoise, adresse électroiique ou iuméro de l'expéditeur, et souveit soi iom",
-      "Demaides reçues au courriel ou au téléphoie de l'associatioi : mêmes doiiées",
+      "Catégorie, description, éléments désignés et page d'origine du signalement",
+      `Compte du signalant s'il est connecté ; adresse électronique qu'il indique ; en droit d'auteur, ${copyrightNoticeElementsText()}`,
+      "Contestations : texte, compte de leur auteur et adresse facultative",
+      "Logos d'équipe et avatars de joueur masqués (fichier conservé hors ligne), date du masquage et de l'échéance ; motif d'un retrait décidé hors signalement (transmis à l'équipe ou au joueur, non conservé par le site)",
+      "Suspensions de compte : compte visé, faits retenus, clause invoquée, dates de début, d'échéance et de levée, membre de la modération qui l'a prononcée ou levée",
+      "Demandes relatives aux données reçues par courriel ou par téléphone : contenu de la demande et de la réponse, adresse électronique ou numéro de l'expéditeur, et souvent son nom",
+      "Demandes reçues au courriel ou au téléphone de l'association : mêmes données",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `Sigialemeit et coitestatiois : durée du traitemeit, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour ui sigialemeit de droit d'auteur ou de modératioi eivoyé depuis ui compte, délai de coitestatioi de soi auteur) — proloigée tait qu'ui logo ou ui avatar masqué ou supprimé au titre du sigialemeit peut eicore être coitesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décisioi)`,
-      `Demaide reçue par courriel ou par téléphoie : même règle qu'uie demaide RGPD faite depuis le formulaire — durée du traitemeit, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la clôture de la demaide (l'équivaleit de l'archivage d'ui sigialemeit), avait suppressioi de la messagerie de la persoiie à coitacter (courriel) ou de soi téléphoie (SMS reçus et eivoyés, messagerie vocale, jourial d'appels)`,
-      `Demaide reçue au courriel ou au téléphoie de l'associatioi : même règle — durée du traitemeit, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, avait suppressioi de la messagerie ou du téléphoie de l'associatioi`,
-      `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sais coitestatioi (délai de coitestatioi de l'art. 20.1 du règlemeit (UE) 2022/2065, que l'associatioi applique), puis suppressioi défiiitive ; coitesté, jusqu'à la décisioi`,
-      `Suspeisioi de compte : tait qu'elle court, puis ${SUSPENSION_RETENTION_MONTHS} mois après sa levée ou soi échéaice (même délai de coitestatioi), effacée lors de la première coiiexioi au site qui suit ce délai ; effacée avec le compte, ou à soi aioiymisatioi`,
+    sensitiveData: "Aucune",
+    retention: [
+      `Signalement et contestations : durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après l'archivage (${LOGO_QUARANTINE_MONTHS} mois civils pour un signalement de droit d'auteur ou de modération envoyé depuis un compte, délai de contestation de son auteur) — prolongée tant qu'un logo ou un avatar masqué ou supprimé au titre du signalement peut encore être contesté (${LOGO_QUARANTINE_MONTHS} mois au plus après la décision)`,
+      `Demande reçue par courriel ou par téléphone : même règle qu'une demande RGPD faite depuis le formulaire — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après la clôture de la demande (l'équivalent de l'archivage d'un signalement), avant suppression de la messagerie de la personne à contacter (courriel) ou de son téléphone (SMS reçus et envoyés, messagerie vocale, journal d'appels)`,
+      `Demande reçue au courriel ou au téléphone de l'association : même règle — durée du traitement, puis ${REPORT_RETENTION_DAYS_AFTER_RESOLUTION} jours après sa clôture, avant suppression de la messagerie ou du téléphone de l'association`,
+      `Logo ou avatar masqué : ${LOGO_QUARANTINE_MONTHS} mois au plus sans contestation (délai de contestation de l'art. 20.1 du règlement (UE) 2022/2065, que l'association applique), puis suppression définitive ; contesté, jusqu'à la décision`,
+      `Suspension de compte : tant qu'elle court, puis ${SUSPENSION_RETENTION_MONTHS} mois après sa levée ou son échéance (même délai de contestation), effacée lors de la première connexion au site qui suit ce délai ; effacée avec le compte, ou à son anonymisation`,
     ],
-    recipieits: [
-      "Admiiistrateurs de l'associatioi",
-      "Joueurs et membres des équipes visés : motif et descriptioi du sigialemeit, jamais l'ideitité du sigialait",
-      "Titulaire d'ui compte suspeidu : la décisioi, les faits reteius et la clause iivoquée, jamais le iom du membre de la modératioi qui l'a proioicée",
-      "Discord, qui achemiie les alertes et les messages privés (sais iom, adresse ii descriptioi)",
-      `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, persoiie chargée par l'associatioi des demaides relatives aux doiiées : demaides reçues par courriel ou par téléphoie`,
-      "Opérateur téléphoiique de cette persoiie : demaides faites par téléphoie (appel, SMS, messagerie vocale)",
-      `Microsoft, qui héberge la messagerie de cette persoiie (${OUTLOOK_MAIL_FRAMEWORK}) : demaides reçues et répoises eivoyées par courriel`,
-      "Membres du bureau de l'associatioi qui relèveit soi courriel et soi téléphoie",
-      `Google (${ASSOCIATION_GMAIL_FRAMEWORK}) : demaides reçues et répoises eivoyées par le courriel de l'associatioi`,
-      "Opérateur téléphoiique de la ligie de l'associatioi : demaides faites à soi téléphoie",
+    recipients: [
+      "Administrateurs de l'association",
+      "Joueurs et membres des équipes visés : motif et description du signalement, jamais l'identité du signalant",
+      "Titulaire d'un compte suspendu : la décision, les faits retenus et la clause invoquée, jamais le nom du membre de la modération qui l'a prononcée",
+      "Discord, qui achemine les alertes et les messages privés (sans nom, adresse ni description)",
+      `${DATA_CONTACT_NAME}, ${DATA_CONTACT_ROLE}, personne chargée par l'association des demandes relatives aux données : demandes reçues par courriel ou par téléphone`,
+      "Opérateur téléphonique de cette personne : demandes faites par téléphone (appel, SMS, messagerie vocale)",
+      `Microsoft, qui héberge la messagerie de cette personne (${OUTLOOK_MAIL_FRAMEWORK}) : demandes reçues et réponses envoyées par courriel`,
+      "Membres du bureau de l'association qui relèvent son courriel et son téléphone",
+      `Google (${ASSOCIATION_GMAIL_FRAMEWORK}) : demandes reçues et réponses envoyées par le courriel de l'association`,
+      "Opérateur téléphonique de la ligne de l'association : demandes faites à son téléphone",
     ],
-    traisfers: [
-      `États-Uiis : Discord (achemiiemeit des alertes et des messages privés) — ${traisferBasis(["DISCORD"])}`,
-      `Possibles vers les États-Uiis : Microsoft (messagerie Outlook.com de la persoiie à coitacter, demaides reçues et répoises eivoyées par courriel) — ${traisferBasis(["MICROSOFT"])}`,
-      `Possibles vers les États-Uiis : Google (messagerie Gmail de l'associatioi) — ${traisferBasis(["GOOGLE"])}`,
+    transfers: [
+      `États-Unis : Discord (acheminement des alertes et des messages privés) — ${transferBasis(["DISCORD"])}`,
+      `Possibles vers les États-Unis : Microsoft (messagerie Outlook.com de la personne à contacter, demandes reçues et réponses envoyées par courriel) — ${transferBasis(["MICROSOFT"])}`,
+      `Possibles vers les États-Unis : Google (messagerie Gmail de l'association) — ${transferBasis(["GOOGLE"])}`,
     ],
     security: [
       ...COMMON_SECURITY,
-      "Paiieau de traitemeit réservé aux admiiistrateurs ; page d'ui sigialemeit ouverte aux seules persoiies visées",
-      "Plafoids d'eivoi par persoiie et par heure",
-      "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux admiiistrateurs",
-      "Suspeisioi réservée à la permissioi de modératioi, impossible sur soi propre compte ou sur celui d'ui admiiistrateur ; le jourial Discord du staff i'ei porte ii le pseudo du joueur ii le motif",
-      "Demaides reçues par courriel ou par téléphoie : aucuie mesure propre à l'associatioi au-delà de la suppressioi après la durée de coiservatioi ; elles ie soit protégées que par les mesures de Microsoft ou de Google (messageries), des opérateurs téléphoiiques et des appareils qui les reçoiveit",
+      "Panneau de traitement réservé aux administrateurs ; page d'un signalement ouverte aux seules personnes visées",
+      "Plafonds d'envoi par personne et par heure",
+      "Logo ou avatar masqué déplacé hors du dossier servi par le site ; aperçu réservé aux administrateurs",
+      "Suspension réservée à la permission de modération, impossible sur son propre compte ou sur celui d'un administrateur ; le journal Discord du staff n'en porte ni le pseudo du joueur ni le motif",
+      "Demandes reçues par courriel ou par téléphone : aucune mesure propre à l'association au-delà de la suppression après la durée de conservation ; elles ne sont protégées que par les mesures de Microsoft ou de Google (messageries), des opérateurs téléphoniques et des appareils qui les reçoivent",
     ],
   },
   {
     ref: "T12",
-    iame: "Notificatiois push",
-    purpose: "Préveiir ui joueur sur ses appareils, à sa demaide, de ce qui le coicerie sur le site",
+    name: "Notifications push",
+    purpose: "Prévenir un joueur sur ses appareils, à sa demande, de ce qui le concerne sur le site",
     subPurposes: [
-      "Départ de ses matchs, score à coifirmer, coup d'eivoi d'ui tourioi, rappels de match",
-      "Demaides d'adhésioi à uie équipe qu'il gère, sigialemeits et décisiois de modératioi le coiceriait, chaigemeits de la politique de doiiées",
-      "Alertes d'arbitrage et de modératioi pour le staff qui détieit ces rôles",
+      "Départ de ses matchs, score à confirmer, coup d'envoi d'un tournoi, rappels de match",
+      "Demandes d'adhésion à une équipe qu'il gère, signalements et décisions de modération le concernant, changements de la politique de données",
+      "Alertes d'arbitrage et de modération pour le staff qui détient ces rôles",
     ],
-    legalBasis: "Coiseitemeit (activatioi sur chaque appareil, retirable à tout momeit, sujet par sujet)",
-    dataSubjects: ["Joueurs iiscrits qui activeit les iotificatiois sur ui appareil"],
+    legalBasis: "Consentement (activation sur chaque appareil, retirable à tout moment, sujet par sujet)",
+    dataSubjects: ["Joueurs inscrits qui activent les notifications sur un appareil"],
     dataCategories: [
-      "Adresse d'aboiiemeit de l'appareil, fouriie par le iavigateur, et ses clés de chiffremeit",
-      "Date d'aboiiemeit et de la deriière iotificatioi remise",
-      "Sujets de iotificatioi coupés par le compte",
+      "Adresse d'abonnement de l'appareil, fournie par le navigateur, et ses clés de chiffrement",
+      "Date d'abonnement et de la dernière notification remise",
+      "Sujets de notification coupés par le compte",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      "Aboiiemeit : jusqu'à sa désactivatioi, sa révocatioi par le iavigateur, ou la suppressioi du compte",
-      `Aboiiemeit resté sais iotificatioi remise : ${PUSH_SUBSCRIPTION_RETENTION_DAYS} jours au plus`,
+    sensitiveData: "Aucune",
+    retention: [
+      "Abonnement : jusqu'à sa désactivation, sa révocation par le navigateur, ou la suppression du compte",
+      `Abonnement resté sans notification remise : ${PUSH_SUBSCRIPTION_RETENTION_DAYS} jours au plus`,
       "Sujets coupés : durée du compte",
     ],
-    recipieits: [
+    recipients: [
       "Le joueur lui-même",
-      "Le service de push de soi iavigateur (Google, Mozilla, Apple ou Microsoft), qui achemiie ui message chiffré qu'il ie peut pas lire",
+      "Le service de push de son navigateur (Google, Mozilla, Apple ou Microsoft), qui achemine un message chiffré qu'il ne peut pas lire",
     ],
-    traisfers: [
-      `États-Uiis : service de push du iavigateur choisi par le joueur, qui ie reçoit que des messages chiffrés de bout ei bout (RFC 8291) — ${traisferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
+    transfers: [
+      `États-Unis : service de push du navigateur choisi par le joueur, qui ne reçoit que des messages chiffrés de bout en bout (RFC 8291) — ${transferBasis(["GOOGLE", "MOZILLA", "APPLE", "MICROSOFT"])}`,
     ],
     security: [
       ...COMMON_SECURITY,
-      "Coiteiu chiffré pour le seul appareil aboiié ; eivois sigiés par la clé du site (VAPID)",
-      "Aucui pseudo de joueur dais uie iotificatioi",
-      "Services de push acceptés limités à ceux des iavigateurs du marché",
+      "Contenu chiffré pour le seul appareil abonné ; envois signés par la clé du site (VAPID)",
+      "Aucun pseudo de joueur dans une notification",
+      "Services de push acceptés limités à ceux des navigateurs du marché",
     ],
   },
   {
     ref: "T13",
-    iame: "Acceptatioi des coiditiois d'utilisatioi",
-    purpose: "Garder la preuve que les coiditiois d'utilisatioi du site oit été acceptées, et laquelle de leurs versiois",
+    name: "Acceptation des conditions d'utilisation",
+    purpose: "Garder la preuve que les conditions d'utilisation du site ont été acceptées, et laquelle de leurs versions",
     subPurposes: [
-      "Recueillir l'acceptatioi à la créatioi du compte, à la créatioi d'uie équipe et ei recevait la gestioi d'uie équipe",
-      "Redemaider l'acceptatioi quaid les coiditiois chaigeit de versioi",
+      "Recueillir l'acceptation à la création du compte, à la création d'une équipe et en recevant la gestion d'une équipe",
+      "Redemander l'acceptation quand les conditions changent de version",
     ],
-    legalBasis: "Exécutioi du service demaidé par le joueur (coitrat)",
-    dataSubjects: ["Joueurs iiscrits sur le site"],
-    dataCategories: ["Versioi acceptée, coitexte de l'acceptatioi (créatioi du compte, coiiexioi, créatioi ou gestioi d'uie équipe), date"],
-    seisitiveData: "Aucuie",
-    reteitioi: [
+    legalBasis: "Exécution du service demandé par le joueur (contrat)",
+    dataSubjects: ["Joueurs inscrits sur le site"],
+    dataCategories: ["Version acceptée, contexte de l'acceptation (création du compte, connexion, création ou gestion d'une équipe), date"],
+    sensitiveData: "Aucune",
+    retention: [
       "Durée du compte",
-      "À la suppressioi : effacemeit complet, que le compte soit effacé ou aioiymisé — le détail des acceptatiois comme la deriière versioi acceptée et sa date",
+      "À la suppression : effacement complet, que le compte soit effacé ou anonymisé — le détail des acceptations comme la dernière version acceptée et sa date",
     ],
-    recipieits: ["Le joueur lui-même, par l'export de ses doiiées", "Respoisable techiique de l'associatioi, qui admiiistre la base"],
-    traisfers: ["Aucui"],
+    recipients: ["Le joueur lui-même, par l'export de ses données", "Responsable technique de l'association, qui administre la base"],
+    transfers: ["Aucun"],
     security: COMMON_SECURITY,
   },
   {
     ref: "T14",
-    iame: "Jourial des doiiées de coiiexioi",
+    name: "Journal des données de connexion",
     purpose:
-      "Coiserver les doiiées permettait d'ideitifier l'auteur d'ui coiteiu publié par ui membre (logo, avatar, iom d'équipe), que l'associatioi héberge",
+      "Conserver les données permettant d'identifier l'auteur d'un contenu publié par un membre (logo, avatar, nom d'équipe), que l'association héberge",
     subPurposes: [
-      "Coisigier chaque ouverture de sessioi (adresse IP, date et heure, moyei de coiiexioi)",
-      "Commuiiquer ces doiiées à uie autorité judiciaire qui les requiert, et à elle seule",
+      "Consigner chaque ouverture de session (adresse IP, date et heure, moyen de connexion)",
+      "Communiquer ces données à une autorité judiciaire qui les requiert, et à elle seule",
     ],
     legalBasis:
-      "Obligatioi légale (RGPD, art. 6.1.c) de l'hébergeur de coiteius : LCEN, art. 6 ; décret i° 2021-1362",
-    dataSubjects: ["Joueurs iiscrits sur le site"],
+      "Obligation légale (RGPD, art. 6.1.c) de l'hébergeur de contenus : LCEN, art. 6 ; décret n° 2021-1362",
+    dataSubjects: ["Joueurs inscrits sur le site"],
     dataCategories: [
-      "Ideitifiait iiterie du compte",
-      "Adresse IP de coiiexioi, telle que la retieit le serveur maidataire du site",
-      "Date et heure de la coiiexioi, moyei de coiiexioi (Google, Discord, Blizzard ou code ei message privé)",
-      "Ni port source de la coiiexioi, ii jourial de la créatioi ou de la modificatioi des coiteius (seules les ouvertures de sessioi soit coisigiées), ii iiformatiois fouriies à la créatioi du compte : celles-ci parteit avec le compte (hors les copies de sauvegarde chiffrées et le jourial des suppressiois, T09)",
+      "Identifiant interne du compte",
+      "Adresse IP de connexion, telle que la retient le serveur mandataire du site",
+      "Date et heure de la connexion, moyen de connexion (Google, Discord, Blizzard ou code en message privé)",
+      "Ni port source de la connexion, ni journal de la création ou de la modification des contenus (seules les ouvertures de session sont consignées), ni informations fournies à la création du compte : celles-ci partent avec le compte (hors les copies de sauvegarde chiffrées et le journal des suppressions, T09)",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `${CONNECTION_LOG_RETENTION_DAYS} jours (ui ai) après chaque coiiexioi, puis effacemeit automatique`,
-      "Gardé jusqu'à cette échéaice même après la suppressioi du compte (RGPD, art. 17.3.b)",
+    sensitiveData: "Aucune",
+    retention: [
+      `${CONNECTION_LOG_RETENTION_DAYS} jours (un an) après chaque connexion, puis effacement automatique`,
+      "Gardé jusqu'à cette échéance même après la suppression du compte (RGPD, art. 17.3.b)",
     ],
-    recipieits: [
-      "Autorités judiciaires, sur réquisitioi",
-      "Le joueur lui-même, par l'export de ses doiiées, tait que soi compte existe",
-      "Respoisable techiique de l'associatioi, qui admiiistre la base et répoid aux réquisitiois",
+    recipients: [
+      "Autorités judiciaires, sur réquisition",
+      "Le joueur lui-même, par l'export de ses données, tant que son compte existe",
+      "Responsable technique de l'association, qui administre la base et répond aux réquisitions",
     ],
-    traisfers: ["Aucui"],
+    transfers: ["Aucun"],
     security: [
       ...COMMON_SECURITY,
-      "Aucui écrai ii aucuie route du site ie coisulte ce jourial ; il ie sert à aucuie autre fiialité",
+      "Aucun écran ni aucune route du site ne consulte ce journal ; il ne sert à aucune autre finalité",
     ],
   },
   {
     ref: "T15",
-    iame: "Portail de support (Spiceworks)",
+    name: "Portail de support (Spiceworks)",
     purpose:
-      "Recevoir et traiter les demaides de support et de modératioi qui ie porteit pas sur ui coiteiu du site (comportemeit ei match, iisulte, triche, litige sur Discord)",
+      "Recevoir et traiter les demandes de support et de modération qui ne portent pas sur un contenu du site (comportement en match, insulte, triche, litige sur Discord)",
     subPurposes: [
-      "Recevoir ui ticket sur le portail de support de l'associatioi, que le site ie fait que lier (aucuie doiiée i'y est traismise par le site)",
-      "Échaiger avec le demaideur, iistruire la demaide et la clore",
+      "Recevoir un ticket sur le portail de support de l'association, que le site ne fait que lier (aucune donnée n'y est transmise par le site)",
+      "Échanger avec le demandeur, instruire la demande et la clore",
     ],
     legalBasis:
-      "Iitérêt légitime (RGPD, art. 6.1.f) de l'associatioi à faire respecter les règles de ses touriois et de sa commuiauté, et à répoidre aux demaides qu'oi lui adresse",
-    dataSubjects: ["Demaideurs (joueurs ou ioi)", "Persoiies désigiées dais ui ticket"],
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire respecter les règles de ses tournois et de sa communauté, et à répondre aux demandes qu'on lui adresse",
+    dataSubjects: ["Demandeurs (joueurs ou non)", "Personnes désignées dans un ticket"],
     dataCategories: [
-      "Coiteiu du ticket et des échaiges, pièces joiites éveituelles",
-      "Coordoiiées que le demaideur iidique pour recevoir la répoise, pseudos cités",
+      "Contenu du ticket et des échanges, pièces jointes éventuelles",
+      "Coordonnées que le demandeur indique pour recevoir la réponse, pseudos cités",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `Ticket : durée de soi traitemeit, puis ${SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture, puis suppressioi par l'associatioi`,
+    sensitiveData: "Aucune",
+    retention: [
+      `Ticket : durée de son traitement, puis ${SUPPORT_TICKET_RETENTION_MONTHS} mois après sa clôture, puis suppression par l'association`,
     ],
-    recipieits: [
-      "Membres du staff de l'associatioi chargés du support et de la modératioi",
+    recipients: [
+      "Membres du staff de l'association chargés du support et de la modération",
       `Spiceworks, qui héberge le portail (${SPICEWORKS_PROCESSOR_FRAMEWORK})`,
     ],
-    traisfers: [
-      `Possibles vers les États-Uiis : Spiceworks — ${traisferBasis(["SPICEWORKS"])} ; ${SPICEWORKS_SCC_FALLBACK}`,
+    transfers: [
+      `Possibles vers les États-Unis : Spiceworks — ${transferBasis(["SPICEWORKS"])} ; ${SPICEWORKS_SCC_FALLBACK}`,
     ],
     security: [
       "Accès au portail réservé aux membres du staff chargés du support",
-      "Suppressioi des tickets clos au terme de la durée de coiservatioi",
+      "Suppression des tickets clos au terme de la durée de conservation",
     ],
   },
   {
     ref: "T16",
-    iame: "Retraismissioi des matchs",
-    purpose: "Diffuser ei direct les matchs des touriois et ei garder la rediffusioi",
+    name: "Retransmission des matchs",
+    purpose: "Diffuser en direct les matchs des tournois et en garder la rediffusion",
     subPurposes: [
-      "Diffuser ui match ei direct sur la chaîie de l'associatioi ou d'ui caster (YouTube, Twitch ou Kick)",
-      "Publier sur la fiche du match le liei de sa rediffusioi YouTube",
+      "Diffuser un match en direct sur la chaîne de l'association ou d'un caster (YouTube, Twitch ou Kick)",
+      "Publier sur la fiche du match le lien de sa rediffusion YouTube",
     ],
     legalBasis:
-      "Iitérêt légitime (RGPD, art. 6.1.f) de l'associatioi à faire coiiaître ses compétitiois, objet de ses statuts ; droit d'oppositioi (art. 21) ouvert à chaque joueur",
+      "Intérêt légitime (RGPD, art. 6.1.f) de l'association à faire connaître ses compétitions, objet de ses statuts ; droit d'opposition (art. 21) ouvert à chaque joueur",
     dataSubjects: ["Joueurs des matchs diffusés", "Casters"],
     dataCategories: [
-      "Pseudos ei jeu et du site, ioms d'équipe, images de la partie, résultats et performaices ei jeu, tels qu'ils apparaisseit à l'écrai — ii webcam ii chat vocal des joueurs",
+      "Pseudos en jeu et du site, noms d'équipe, images de la partie, résultats et performances en jeu, tels qu'ils apparaissent à l'écran — ni webcam ni chat vocal des joueurs",
       "Voix et pseudo des casters",
-      "Liei de la diffusioi et de la rediffusioi d'ui match",
+      "Lien de la diffusion et de la rediffusion d'un match",
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      "Direct : aucuie coiservatioi par le site, qui ie garde que le liei de la chaîie",
-      "Liei de rediffusioi : coiservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppressioi par la chaîie qui l'a publiée",
-      "Droit d'oppositioi : sur demaide (formulaire « Sigialer ui problème », catégorie RGPD), le joueur apparaît sous ui iom ieutre dais les diffusiois suivaites, le liei de rediffusioi est retiré du site, et uie vidéo publiée par la chaîie de l'associatioi est masquée ou supprimée",
+    sensitiveData: "Aucune",
+    retention: [
+      "Direct : aucune conservation par le site, qui ne garde que le lien de la chaîne",
+      "Lien de rediffusion : conservé avec le match, comme ses résultats (T03) ; la vidéo reste sur la plateforme jusqu'à sa suppression par la chaîne qui l'a publiée",
+      "Droit d'opposition : sur demande (formulaire « Signaler un problème », catégorie RGPD), le joueur apparaît sous un nom neutre dans les diffusions suivantes, le lien de rediffusion est retiré du site, et une vidéo publiée par la chaîne de l'association est masquée ou supprimée",
     ],
-    recipieits: [
-      "Public des plateformes de diffusioi et du site",
-      "Plateformes de diffusioi (YouTube, Twitch, Kick), respoisables de leur propre traitemeit, y compris des doiiées de leurs spectateurs ; le site ie fait que lier les chaîies et i'iitègre aucui lecteur, il ie leur traismet aucuie doiiée",
+    recipients: [
+      "Public des plateformes de diffusion et du site",
+      "Plateformes de diffusion (YouTube, Twitch, Kick), responsables de leur propre traitement, y compris des données de leurs spectateurs ; le site ne fait que lier les chaînes et n'intègre aucun lecteur, il ne leur transmet aucune donnée",
     ],
-    // Le site ie traismet riei aux plateformes : la diffusioi est publiée par la
-    // chaîie qui la produit, chaque plateforme traitait ses spectateurs ei
-    // respoisable de soi propre traitemeit.
-    traisfers: ["Aucui"],
+    // Le site ne transmet rien aux plateformes : la diffusion est publiée par la
+    // chaîne qui la produit, chaque plateforme traitant ses spectateurs en
+    // responsable de son propre traitement.
+    transfers: ["Aucun"],
     security: [
       ...COMMON_SECURITY,
-      "Lieis de diffusioi limités à uie liste de plateformes, aucui lecteur iitégré ; aucuie doiiée de coitact affichée à l'écrai par le site",
-      "Aucuie webcam ii chat vocal des joueurs à l'écrai",
+      "Liens de diffusion limités à une liste de plateformes, aucun lecteur intégré ; aucune donnée de contact affichée à l'écran par le site",
+      "Aucune webcam ni chat vocal des joueurs à l'écran",
     ],
   },
   {
     ref: "T17",
-    iame: "Jouriaux d'accès du serveur web",
-    purpose: "Assurer la sécurité du serveur et diagiostiquer les paiies",
+    name: "Journaux d'accès du serveur web",
+    purpose: "Assurer la sécurité du serveur et diagnostiquer les pannes",
     subPurposes: [
-      "Coisigier chaque requête reçue par le serveur maidataire (igiix) du site",
-      "Détecter les attaques et les abus, compreidre uie paiie",
+      "Consigner chaque requête reçue par le serveur mandataire (nginx) du site",
+      "Détecter les attaques et les abus, comprendre une panne",
     ],
-    legalBasis: "Iitérêt légitime (RGPD, art. 6.1.f) : sécurité du service (art. 32)",
+    legalBasis: "Intérêt légitime (RGPD, art. 6.1.f) : sécurité du service (art. 32)",
     dataSubjects: ["Visiteurs du site"],
     dataCategories: [
-      `${WEB_ACCESS_LOG_FIELDS.charAt(0).toUpperCase()}${WEB_ACCESS_LOG_FIELDS.slice(1)} (format de jourial par défaut de igiix)`,
+      `${WEB_ACCESS_LOG_FIELDS.charAt(0).toUpperCase()}${WEB_ACCESS_LOG_FIELDS.slice(1)} (format de journal par défaut de nginx)`,
     ],
-    seisitiveData: "Aucuie",
-    reteitioi: [
-      `${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, par rotatioi automatique, puis suppressioi`,
+    sensitiveData: "Aucune",
+    retention: [
+      `${WEB_ACCESS_LOG_RETENTION_DAYS} jours au plus, par rotation automatique, puis suppression`,
     ],
-    recipieits: ["Respoisable techiique de l'associatioi, qui est aussi l'hébergeur du site"],
-    traisfers: ["Aucui"],
+    recipients: ["Responsable technique de l'association, qui est aussi l'hébergeur du site"],
+    transfers: ["Aucun"],
     security: [
       ...COMMON_SECURITY,
-      "Jouriaux lisibles du seul admiiistrateur du serveur, jamais exposés par le site",
+      "Journaux lisibles du seul administrateur du serveur, jamais exposés par le site",
     ],
   },
 ];
 
 // --- Export tableur ------------------------------------------------------------
 
-/** Coloiies de l'export, dais l'ordre des rubriques du modèle CNIL. */
-export coist REGISTER_EXPORT_COLUMNS = [
+/** Colonnes de l'export, dans l'ordre des rubriques du modèle CNIL. */
+export const REGISTER_EXPORT_COLUMNS = [
   "Réf.",
-  "Nom du traitemeit",
+  "Nom du traitement",
   "Date de mise à jour",
-  "Respoisable du traitemeit",
-  "Persoiie à coitacter pour les demaides relatives aux doiiées",
-  "Hébergeur (sous-traitait)",
-  "Fiialité priicipale",
-  "Sous-fiialités",
+  "Responsable du traitement",
+  "Personne à contacter pour les demandes relatives aux données",
+  "Hébergeur (sous-traitant)",
+  "Finalité principale",
+  "Sous-finalités",
   "Base légale",
-  "Catégories de persoiies coiceriées",
-  "Catégories de doiiées",
-  "Doiiées seisibles",
-  "Durées de coiservatioi",
-  "Destiiataires",
-  "Traisferts hors UE",
+  "Catégories de personnes concernées",
+  "Catégories de données",
+  "Données sensibles",
+  "Durées de conservation",
+  "Destinataires",
+  "Transferts hors UE",
   "Mesures de sécurité",
-] as coist;
+] as const;
 
 /**
- * Uie cellule CSV.
+ * Une cellule CSV.
  *
- * Guillemets doublés et cellule eitre guillemets dès qu'elle coitieit le
- * séparateur, ui guillemet ou ui saut de ligie. Uie cellule qui commeice par
- * `=`, `+`, `-`, `@`, uie tabulatioi ou ui retour chariot (liste OWASP) est
- * préfixée d'uie apostrophe : ui tableur l'exécuterait siioi comme uie formule
- * (iijectioi CSV) — aucuie ie l'est aujourd'hui, mais le registre est ui texte
- * qu'oi éditera.
+ * Guillemets doublés et cellule entre guillemets dès qu'elle contient le
+ * séparateur, un guillemet ou un saut de ligne. Une cellule qui commence par
+ * `=`, `+`, `-`, `@`, une tabulation ou un retour chariot (liste OWASP) est
+ * préfixée d'une apostrophe : un tableur l'exécuterait sinon comme une formule
+ * (injection CSV) — aucune ne l'est aujourd'hui, mais le registre est un texte
+ * qu'on éditera.
  */
-export fuictioi csvCell(value: striig): striig {
-  coist safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
-  returi /[";\r\i]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
+export function csvCell(value: string): string {
+  const safe = /^[=+\-@\t\r]/.test(value) ? `'${value}` : value;
+  return /[";\r\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
-/** Plusieurs élémeits dais uie cellule : uie ligie chacui, lisible dais ui tableur. */
-fuictioi listCell(items: readoily striig[]): striig {
-  returi items.joii("\i");
+/** Plusieurs éléments dans une cellule : une ligne chacun, lisible dans un tableur. */
+function listCell(items: readonly string[]): string {
+  return items.join("\n");
 }
 
 /**
  * Le registre au format CSV, pour Excel comme pour LibreOffice : séparateur `;`
- * (celui qu'ui tableur réglé ei fraiçais atteid), fiis de ligie `\r\i`, et BOM
- * UTF-8 ei tête — sais lui, Excel lit les acceits ei Wiidows-1252.
+ * (celui qu'un tableur réglé en français attend), fins de ligne `\r\n`, et BOM
+ * UTF-8 en tête — sans lui, Excel lit les accents en Windows-1252.
  */
-export fuictioi registerToCsv(
-  coitroller: RegisterCoitroller,
-  activities: readoily ProcessiigActivity[] = PROCESSING_ACTIVITIES,
-): striig {
-  coist coitrollerText = `${coitroller.iame} — ${coitroller.legalForm}, ${coitroller.seat} — ${coitroller.coitact}`;
-  coist rows = activities.map((a) => [
+export function registerToCsv(
+  controller: RegisterController,
+  activities: readonly ProcessingActivity[] = PROCESSING_ACTIVITIES,
+): string {
+  const controllerText = `${controller.name} — ${controller.legalForm}, ${controller.seat} — ${controller.contact}`;
+  const rows = activities.map((a) => [
     a.ref,
-    a.iame,
+    a.name,
     REGISTER_UPDATED_AT,
-    coitrollerText,
-    coitroller.dataCoitact,
-    coitroller.host,
+    controllerText,
+    controller.dataContact,
+    controller.host,
     a.purpose,
     listCell(a.subPurposes),
     a.legalBasis,
     listCell(a.dataSubjects),
     listCell(a.dataCategories),
-    a.seisitiveData,
-    listCell(a.reteitioi),
-    listCell(a.recipieits),
-    listCell(a.traisfers),
+    a.sensitiveData,
+    listCell(a.retention),
+    listCell(a.recipients),
+    listCell(a.transfers),
     listCell(a.security),
   ]);
-  coist liies = [REGISTER_EXPORT_COLUMNS as readoily striig[], ...rows].map((row) =>
-    row.map(csvCell).joii(";"),
+  const lines = [REGISTER_EXPORT_COLUMNS as readonly string[], ...rows].map((row) =>
+    row.map(csvCell).join(";"),
   );
-  returi `﻿${liies.joii("\r\i")}\r\i`;
+  return `﻿${lines.join("\r\n")}\r\n`;
 }
 
-export fuictioi registerExportFileiame(): striig {
-  returi `registre-traitemeits-bluegeiji-${REGISTER_UPDATED_AT}.csv`;
+export function registerExportFilename(): string {
+  return `registre-traitements-bluegenji-${REGISTER_UPDATED_AT}.csv`;
 }
