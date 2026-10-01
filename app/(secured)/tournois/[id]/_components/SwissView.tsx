@@ -239,12 +239,7 @@ export function SwissView({
                 >
                   {swiss.standings.map((team, idx) => {
                     // Tournoi clos : la tête du classement est championne, pas « en lice ».
-                    const meta =
-                      isFinished && team.status === "ACTIVE" && team.rank === 1
-                        ? { label: "Championne", color: ACCENT }
-                        : isFinished && team.status === "ACTIVE"
-                          ? { label: "Classée", color: "var(--text-2)" }
-                          : STATUS_META[team.status];
+                    const meta = standingMeta(team, isFinished);
                     const isMine = team.teamId === myTeamId;
                     const forfeitable = isForfeitable(team);
                     return (
@@ -503,4 +498,12 @@ export function SwissRounds({
       )}
     </ScrollArea>
   );
+}
+
+/** Pastille d'une ligne du classement ; tournoi clos, une équipe en lice est classée. */
+function standingMeta(team: SwissStandingRow, isFinished: boolean): { label: string; color: string } {
+  if (isFinished && team.status === "ACTIVE") {
+    return team.rank === 1 ? { label: "Championne", color: ACCENT } : { label: "Classée", color: "var(--text-2)" };
+  }
+  return STATUS_META[team.status];
 }

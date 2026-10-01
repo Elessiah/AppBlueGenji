@@ -34,6 +34,7 @@ export function MatchReplayStrip({ match }: { match: BracketMatch }) {
   // 210 px, et un libellé complet repliait « Rediff disponible » sur deux
   // lignes. Le nom accessible, lui, reste complet.
   const compact = replayUrl !== null;
+  const editLabel = match.replayUrl === null ? "＋ Rediff" : "✎ Rediff";
   const editButton = showEdit && (
     <button
       type="button"
@@ -46,7 +47,7 @@ export function MatchReplayStrip({ match }: { match: BracketMatch }) {
           : `Modifier la rediff de ${matchLabel}`
       }
     >
-      {compact ? "✎" : match.replayUrl === null ? "＋ Rediff" : "✎ Rediff"}
+      {compact ? "✎" : editLabel}
     </button>
   );
 

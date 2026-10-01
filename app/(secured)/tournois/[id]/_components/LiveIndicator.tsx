@@ -54,12 +54,16 @@ function cadenceLabel(tier: RefreshTier): string {
  * la moindre coupure réseau. L'explication vit dans `title`.
  */
 export function LiveIndicator({ isLive, tier, fatal = null }: LiveIndicatorProps) {
-  const label = fatal ? "Hors ligne" : isLive ? "À jour" : "Reconnexion…";
-  const title = fatal
-    ? FATAL_TITLES[fatal]
-    : isLive
-      ? `Mise à jour automatique ${cadenceLabel(tier)}. Inutile de recharger la page.`
-      : "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.";
+  let label = "Reconnexion…";
+  let title =
+    "Connexion au flux temps réel interrompue. La page se reconnecte seule et continue de se mettre à jour, plus lentement.";
+  if (fatal) {
+    label = "Hors ligne";
+    title = FATAL_TITLES[fatal];
+  } else if (isLive) {
+    label = "À jour";
+    title = `Mise à jour automatique ${cadenceLabel(tier)}. Inutile de recharger la page.`;
+  }
 
   return (
     <Pill

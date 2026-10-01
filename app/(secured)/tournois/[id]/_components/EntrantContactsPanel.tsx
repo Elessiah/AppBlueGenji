@@ -84,6 +84,81 @@ export function EntrantContactsPanel({ tournamentId }: { tournamentId: number })
     if (next) void load();
   };
 
+  // Contenu du panneau selon l'état de la lecture.
+  const renderContacts = () => {
+    if (view === "LOADING") {
+      return (
+        /* `aria-live` : le contenu arrive après un aller-retour, et rien ne
+           le dirait autrement à qui ne voit pas la page. */
+        <p className={styles.hint} aria-live="polite">
+          Chargement…
+        </p>
+      );
+    }
+    if (view === "ERROR") {
+      return (
+        /* Le refus **et** le geste qui le lève, au même endroit : relancer ne
+           doit pas demander de replier le panneau d'abord. `role="alert"`
+           parce que le message remplace un contenu attendu. */
+        <div className={styles.hint} role="alert">
+          <p style={{ margin: "0 0 8px" }}>{failure}</p>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => void load()}
+            disabled={loading}
+            style={{ padding: "6px 14px", fontSize: 12 }}
+          >
+            Réessayer
+          </button>
+        </div>
+      );
+    }
+    if (view === "EMPTY") {
+      return (
+        <p className={styles.hint}>Aucun engagé pour le moment.</p>
+      );
+    }
+    return (
+      entrants?.map((entrant) => (
+        <div key={entrant.teamId} className={styles.group}>
+          <div className={styles.groupHead}>
+            <EntrantName
+              teamId={entrant.teamId}
+              name={entrant.teamName}
+              logoSize={20}
+              textClassName={styles.teamName}
+            />
+            {!entrant.reachable && (
+              <span className={styles.unreachable}>Aucun contact certifié</span>
+            )}
+          </div>
+          {entrant.members.length === 0 ? (
+            <p className={styles.hint}>
+              {/* Tournure neutre : « équipe » et « joueur » n'ont pas le même
+                  genre, et l'engagé sans joueur est une fantôme dans les deux
+                  cas. */}
+              Aucun joueur rattaché : engagé invité par le staff.
+            </p>
+          ) : (
+            <ul className={styles.members}>
+              {entrant.members.map((member) => (
+                <li key={member.userId} className={styles.member}>
+                  <span className={styles.pseudo}>{member.pseudo}</span>
+                  <DiscordTag
+                    tag={member.discordTag}
+                    verified={member.discordTag !== null}
+                    fallback="Non certifié"
+                  />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      ))
+    );
+  };
+
   return (
     <div className="ds-block">
       <div className="ds-section-title blue" style={{ alignItems: "center" }}>
@@ -114,68 +189,7 @@ export function EntrantContactsPanel({ tournamentId }: { tournamentId: number })
 
       {open && (
         <div id="entrant-contacts-list" className={styles.list}>
-          {view === "LOADING" ? (
-            /* `aria-live` : le contenu arrive après un aller-retour, et rien ne
-               le dirait autrement à qui ne voit pas la page. */
-            <p className={styles.hint} aria-live="polite">
-              Chargement…
-            </p>
-          ) : view === "ERROR" ? (
-            /* Le refus **et** le geste qui le lève, au même endroit : relancer ne
-               doit pas demander de replier le panneau d'abord. `role="alert"`
-               parce que le message remplace un contenu attendu. */
-            <div className={styles.hint} role="alert">
-              <p style={{ margin: "0 0 8px" }}>{failure}</p>
-              <button
-                type="button"
-                className="btn"
-                onClick={() => void load()}
-                disabled={loading}
-                style={{ padding: "6px 14px", fontSize: 12 }}
-              >
-                Réessayer
-              </button>
-            </div>
-          ) : view === "EMPTY" ? (
-            <p className={styles.hint}>Aucun engagé pour le moment.</p>
-          ) : (
-            entrants?.map((entrant) => (
-              <div key={entrant.teamId} className={styles.group}>
-                <div className={styles.groupHead}>
-                  <EntrantName
-                    teamId={entrant.teamId}
-                    name={entrant.teamName}
-                    logoSize={20}
-                    textClassName={styles.teamName}
-                  />
-                  {!entrant.reachable && (
-                    <span className={styles.unreachable}>Aucun contact certifié</span>
-                  )}
-                </div>
-                {entrant.members.length === 0 ? (
-                  <p className={styles.hint}>
-                    {/* Tournure neutre : « équipe » et « joueur » n'ont pas le même
-                        genre, et l'engagé sans joueur est une fantôme dans les deux
-                        cas. */}
-                    Aucun joueur rattaché : engagé invité par le staff.
-                  </p>
-                ) : (
-                  <ul className={styles.members}>
-                    {entrant.members.map((member) => (
-                      <li key={member.userId} className={styles.member}>
-                        <span className={styles.pseudo}>{member.pseudo}</span>
-                        <DiscordTag
-                          tag={member.discordTag}
-                          verified={member.discordTag !== null}
-                          fallback="Non certifié"
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))
-          )}
+          {renderContacts()}
         </div>
       )}
     </div>

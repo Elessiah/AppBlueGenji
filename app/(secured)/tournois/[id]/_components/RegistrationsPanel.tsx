@@ -192,10 +192,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
     const preferred = buttons.current.get(key(refocus.direction));
     // Arrivé en tête ou en queue, le bouton actionné n'existe plus comme cible :
     // on rend la main à celui qui ramène la ligne d'où elle vient.
-    const target =
-      preferred && !preferred.disabled
-        ? preferred
-        : buttons.current.get(key(refocus.direction === "up" ? "down" : "up"));
+    const opposite = refocus.direction === "up" ? "down" : "up";
+    const target = preferred && !preferred.disabled ? preferred : buttons.current.get(key(opposite));
     target?.focus();
     setRefocus(null);
   }, [refocus]);
@@ -218,11 +216,17 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
   // commandes est là. Les gabarits sont exclusifs — deux classes de même poids
   // sur la même propriété se départageraient par l'ordre de la feuille, ce qui
   // n'est pas une règle qu'on veut avoir à relire.
-  const gridClass = reorderable ? styles.reorderable : removable ? styles.withActions : "";
+  let gridClass = "";
+  if (reorderable) gridClass = styles.reorderable;
+  else if (removable) gridClass = styles.withActions;
   // L'intitulé nomme ce que la colonne contient réellement, et il n'y a pas
   // toujours les deux : « Ordre » seul sur un tournoi lancé sans score,
   // « Retrait » seul sur un plateau d'un unique engagé.
-  const actionsLabel = reorderable && removable ? "Actions" : reorderable ? "Ordre" : "Retrait";
+  let actionsLabel = "Retrait";
+  if (reorderable) actionsLabel = removable ? "Actions" : "Ordre";
+  const seedingHint = reorderable
+    ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
+    : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`;
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
@@ -252,11 +256,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsP
       {staff && (
         <>
           <p className={styles.hint}>
-            {lockReason !== null
-              ? LOCK_MESSAGES[lockReason]
-              : reorderable
-                ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
-                : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`}
+            {lockReason !== null ? LOCK_MESSAGES[lockReason] : seedingHint}
           </p>
           {removalNotice !== null && rows.length > 0 && (
             /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit

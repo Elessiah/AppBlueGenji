@@ -74,6 +74,26 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
   // premier — nommer l'un de deux ex æquo serait choisir à la place du
   // classement, et la liste des tournois ne le fait pas.
   const champion = showsFinished ? detail.card.champion : null;
+  const finishedFoot = champion ? (
+    <>
+      <span>Vainqueur :</span>
+      <EntrantName teamId={champion.teamId} name={champion.name} textClassName={styles.footStrong} />
+    </>
+  ) : (
+    <span>Le tournoi est clos.</span>
+  );
+  const upcomingFoot = progress.next?.at ? (
+    <>
+      <span>Prochaine étape :</span>
+      <span className={styles.footStrong}>{progress.next.label}</span>
+      <span>· {shortDateTime(progress.next.at)}</span>
+      {countdown && <span>· {countdown}</span>}
+    </>
+  ) : (
+    // Reste le seul jalon sans horaire annoncé : la fin, qui dépend du
+    // dernier match joué.
+    <span>Le tournoi se clôturera une fois tous les matchs joués.</span>
+  );
 
   return (
     <div className="ds-block">
@@ -167,31 +187,7 @@ export function TournamentProgress({ detail }: TournamentProgressProps) {
       </ScrollArea>
 
       <p className={styles.foot}>
-        {showsFinished ? (
-          champion ? (
-            <>
-              <span>Vainqueur :</span>
-              <EntrantName
-                teamId={champion.teamId}
-                name={champion.name}
-                textClassName={styles.footStrong}
-              />
-            </>
-          ) : (
-            <span>Le tournoi est clos.</span>
-          )
-        ) : progress.next?.at ? (
-          <>
-            <span>Prochaine étape :</span>
-            <span className={styles.footStrong}>{progress.next.label}</span>
-            <span>· {shortDateTime(progress.next.at)}</span>
-            {countdown && <span>· {countdown}</span>}
-          </>
-        ) : (
-          // Reste le seul jalon sans horaire annoncé : la fin, qui dépend du
-          // dernier match joué.
-          <span>Le tournoi se clôturera une fois tous les matchs joués.</span>
-        )}
+        {showsFinished ? finishedFoot : upcomingFoot}
       </p>
     </div>
   );

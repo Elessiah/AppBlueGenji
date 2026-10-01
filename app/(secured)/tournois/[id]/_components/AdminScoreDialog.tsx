@@ -75,6 +75,18 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
   return `Tranché : ${score}, ${winner} l'emporte.`;
 }
 
+/** Score proposé par une engagée, en attente de la confirmation de l'autre. */
+function proposalNoticeText(
+  proposal: NonNullable<ReturnType<typeof pendingScoreProposal>>,
+  team1: string,
+  team2: string,
+  dirty: boolean,
+): string {
+  const [proposer, confirmer] = proposal.proposedBy === "team1" ? [team1, team2] : [team2, team1];
+  const next = dirty ? "Ta saisie le remplace." : "Vérifie-le puis valide le résultat pour le confirmer.";
+  return `Score proposé par ${proposer} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${confirmer}. ${next}`;
+}
+
 /**
  * Édition d'un score par l'arbitrage (permission `tournaments`).
  *
@@ -123,12 +135,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   const doubleForfeit = form.doubleForfeit;
   // Un forfait, simple ou double, remplace le score saisi.
   const anyForfeit = forfeitTeamId !== undefined || doubleForfeit;
-  const forfeiting =
-    forfeitTeamId === undefined
-      ? null
-      : forfeitTeamId === match.team1Id
-        ? { out: team1, through: team2 }
-        : { out: team2, through: team1 };
+  const forfeitingSides =
+    forfeitTeamId === match.team1Id ? { out: team1, through: team2 } : { out: team2, through: team1 };
+  const forfeiting = forfeitTeamId === undefined ? null : forfeitingSides;
   // Un forfait déjà posé ne se cache pas derrière un lien : il commande la
   // rencontre, et le replier laisserait croire à un match encore à jouer.
   // Avant le lancement, le forfait est le seul geste possible : il s'offre
@@ -153,9 +162,8 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
   // vérifier puis à le valider, sans le recopier.
   const proposal = pendingScoreProposal(match);
-  const proposalNotice = proposal
-    ? `Score proposé par ${proposal.proposedBy === "team1" ? team1 : team2} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${proposal.proposedBy === "team1" ? team2 : team1}. ${form.dirty ? "Ta saisie le remplace." : "Vérifie-le puis valide le résultat pour le confirmer."}`
-    : null;
+  const proposalNotice = proposal ? proposalNoticeText(proposal, team1, team2, form.dirty) : null;
+  const forfeitToggleLabel = showForfeit ? "Annuler" : "Déclarer un forfait sur cette manche";
 
   const run = async (action: "save" | "resolve") => {
     const ok = await form.submit(action);
@@ -307,11 +315,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
               {/* « Annuler le forfait » n'a de sens qu'une fois une équipe
                   désignée : panneau ouvert et vide, il n'y a que le panneau à
                   refermer. */}
-              {anyForfeit
-                ? "Annuler le forfait"
-                : showForfeit
-                  ? "Annuler"
-                  : "Déclarer un forfait sur cette manche"}
+              {anyForfeit ? "Annuler le forfait" : forfeitToggleLabel}
             </button>
             )}
 

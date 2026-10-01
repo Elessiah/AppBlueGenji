@@ -220,11 +220,9 @@ export function PlayerScoreDialog({
   })();
 
   const submitLabel = confirmsTheirs ? "Confirmer le score" : "Envoyer le score";
-  const blocker = unchangedMine
-    ? `Score déjà envoyé : en attente de ${opponentName}.`
-    : decision.resolveBlocker
-      ? scoreBlockerMessage(decision.resolveBlocker, matchFormat)
-      : null;
+  let blocker: string | null = null;
+  if (unchangedMine) blocker = `Score déjà envoyé : en attente de ${opponentName}.`;
+  else if (decision.resolveBlocker) blocker = scoreBlockerMessage(decision.resolveBlocker, matchFormat);
   // Une saisie partielle n'est pas un refus : la raison ne s'affiche qu'une
   // fois un champ rempli, pour ne pas ouvrir la modale sur un reproche.
   const showBlocker =
