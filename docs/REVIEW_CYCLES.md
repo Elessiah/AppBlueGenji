@@ -13,7 +13,7 @@ Règle posée le 2026-10-01, une fois les deux projets arrivés à une version s
 Une fois la boucle standard propre, trois cycles thématiques, **chacun relancé jusqu'à revenir sans finding** (corriger, commiter, pousser, relancer le même thème) :
 
 1. **UI/UX** — états (chargement, vide, erreur, désactivé), accessibilité, textes en français, messages par toast (`useToast()`), rendu mobile/responsive, aucune régression visuelle.
-2. **Sécurité** — autorisations et permissions (`can(user, …)`), validation des entrées, injections (SQL, HTML, Markdown Discord), secrets, exposition de données (ce qui part dans une réponse, un instantané ou un message Discord), plafonds de débit, CSRF et redirections. Une PR qui change ce que le site collecte, qui le lit, combien de temps il le garde ou ce qu'une suppression emporte y est aussi relue pour ses **déclarations** : entrée `PRIVACY_CHANGES`, fiche du registre des traitements, mise à jour de `/rgpd`.
+2. **Sécurité** — autorisations et permissions (`can(user, …)`), validation des entrées, injections (SQL, HTML, Markdown Discord), secrets, exposition de données (ce qui part dans une réponse, un instantané ou un message Discord), plafonds de débit, CSRF et redirections. Une PR qui change ce que le site collecte, qui le lit, combien de temps il le garde ou ce qu'une suppression emporte y est aussi relue pour ses **déclarations** : entrée `PRIVACY_CHANGES`, fiche du registre des traitements avec `REGISTER_UPDATED_AT` avancée, mise à jour de `/rgpd`.
 3. **Performance** — requêtes et N+1, cache et invalidation, rendus React inutiles, taille du paquet client, poids des réponses et des instantanés, chemins chauds.
 
 Un cycle thématique se lance avec le skill `code-review` et des arguments qui **nomment le thème**, par exemple :
@@ -29,7 +29,7 @@ Une correction faite dans un cycle thématique peut en appeler d'autres : si ell
 ## 3. Exceptions
 
 - **Renommage seul** (fichier, symbole, libellé, sans changement de comportement) : boucle standard uniquement, **aucun** cycle thématique.
-- **Documentation ou textes légaux seulement** : la boucle standard reste due (c'est elle qui vérifie l'exactitude technique d'un `docs/features/*.md`) ; à la place des trois cycles thématiques, **un cycle orienté juridique**, relancé jusqu'à revenir propre — RGPD, LCEN/DSA, recommandations CNIL, cohérence avec `/rgpd`, le registre des traitements (`lib/shared/processing-register.ts`) et `PRIVACY_CHANGES`, aucune donnée personnelle ni aucun secret publié. Exemple :
+- **Documentation ou textes légaux seulement** : la boucle standard reste due (c'est elle qui vérifie l'exactitude technique d'un `docs/features/*.md`) ; à la place des trois cycles thématiques, **un cycle orienté juridique**, relancé jusqu'à revenir propre — RGPD, LCEN/DSA, recommandations CNIL, cohérence avec `/rgpd`, le registre des traitements (`lib/shared/processing-register.ts`, `REGISTER_UPDATED_AT` avancée) et `PRIVACY_CHANGES`, dates et versions des textes avancées avec eux (`TERMS_VERSION` pour les conditions d'utilisation, `ACCESSIBILITY_STATEMENT_DATE` pour la déclaration d'accessibilité), aucune donnée personnelle ni aucun secret publié. Exemple :
 
   ```
   /code-review --comment focus: legal review — GDPR/RGPD, LCEN/DSA, CNIL, consistency with /rgpd, processing register, PRIVACY_CHANGES, no personal data or secrets published
