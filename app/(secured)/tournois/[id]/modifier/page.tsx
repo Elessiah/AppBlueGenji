@@ -80,6 +80,23 @@ function lockReasonFor(window: EditWindow): EditLockReason {
   return window === "LOCKED" ? "STARTED" : "VISIBLE";
 }
 
+/** Envoie les champs de la fenêtre d'édition ; un refus nomme le champ en cause. */
+async function saveEditableFields(tournamentId: number, body: Record<string, unknown>): Promise<void> {
+  const response = await fetch(`/api/tournaments/${tournamentId}/edit`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (response.ok) return;
+  const result = (await response.json().catch(() => ({}))) as { error?: string; field?: string };
+  const code = result.error ?? "TOURNAMENT_UPDATE_FAILED";
+  let message = mapError(code);
+  if (result.field && FIELD_LABELS[result.field as TournamentField]) {
+    message += ` (${FIELD_LABELS[result.field as TournamentField]})`;
+  }
+  throw new CodedError(code, message);
+}
+
 async function saveRefereeScheduling(tournamentId: number, enabled: boolean): Promise<void> {
   const response = await fetch(`/api/admin/tournaments/${tournamentId}/referee-scheduling`, {
     method: "PUT",
@@ -244,22 +261,7 @@ export default function EditTournamentPage() {
 
           // Fenêtre fermée (tournoi lancé) : aucun champ à envoyer, la route
           // d'édition refuserait — seule la planification part.
-          if (Object.keys(body).length > 0) {
-            const response = await fetch(`/api/tournaments/${tournamentId}/edit`, {
-              method: "PATCH",
-              headers: { "content-type": "application/json" },
-              body: JSON.stringify(body),
-            });
-            const result = (await response.json().catch(() => ({}))) as { error?: string; field?: string };
-            if (!response.ok) {
-              const code = result.error ?? "TOURNAMENT_UPDATE_FAILED";
-              let message = mapError(code);
-              if (result.field && FIELD_LABELS[result.field as TournamentField]) {
-                message += ` (${FIELD_LABELS[result.field as TournamentField]})`;
-              }
-              throw new CodedError(code, message);
-            }
-          }
+          if (Object.keys(body).length > 0) await saveEditableFields(tournamentId, body);
 
           // La planification a sa route : bascule tenue sous verrou du
           // tournoi, qui défait les lancements à défaire. Envoyée seulement si
