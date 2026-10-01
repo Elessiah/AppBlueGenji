@@ -124,6 +124,9 @@ async function createTable(db: Pool, ddl: string): Promise<void> {
   await db.execute(ddl);
 }
 
+/** Premiers mots d'une clause de clé : elle décrit la table, pas une colonne. */
+const KEY_CLAUSE_WORDS = ["PRIMARY", "UNIQUE", "KEY", "INDEX", "CONSTRAINT", "FOREIGN", "FULLTEXT", "SPATIAL"];
+
 /**
  * Les colonnes déclarées par un `CREATE TABLE`, et le nom de sa table.
  *
@@ -154,6 +157,25 @@ export function declaredColumns(ddl: string): { table: string; columns: string[]
     // Un commentaire SQL peut tomber entre deux colonnes : sa première ligne se
     // lirait comme une définition de plus.
     .replace(/--[^\n]*/g, "");
+  const columns: string[] = [];
+  for (const definition of splitTopLevelDefinitions(body)) {
+    const word = /^`?(\w+)`?\s+\S/.exec(definition.trim().replace(/\s+/g, " "));
+    if (!word) continue;
+    if (KEY_CLAUSE_WORDS.includes(word[1].toUpperCase())) continue;
+    columns.push(word[1]);
+  }
+  return { table: named[1], columns };
+}
+
+/** Ce que chaque parenthèse fait à la profondeur d'imbrication. */
+const PAREN_DEPTH_STEP: Readonly<Record<string, number>> = { "(": 1, ")": -1 };
+
+/**
+ * Découpe le corps d'un `CREATE TABLE` (ce qui suit sa parenthèse ouvrante) sur
+ * ses virgules **de premier niveau**, en s'arrêtant à la parenthèse qui le
+ * ferme.
+ */
+function splitTopLevelDefinitions(body: string): string[] {
   const definitions: string[] = [];
   let depth = 1;
   let quote: string | null = null;
@@ -167,11 +189,10 @@ export function declaredColumns(ddl: string): { table: string; columns: string[]
       continue;
     }
     if (char === "'" || char === '"') quote = char;
-    else if (char === "(") depth += 1;
-    else if (char === ")") {
-      depth -= 1;
-      if (depth === 0) break;
-    }
+    depth += PAREN_DEPTH_STEP[char] ?? 0;
+    // Seule une parenthèse fermante fait tomber la profondeur à zéro : c'est
+    // celle qui ferme le corps.
+    if (depth === 0) break;
     if (char === "," && depth === 1) {
       definitions.push(current);
       current = "";
@@ -180,31 +201,15 @@ export function declaredColumns(ddl: string): { table: string; columns: string[]
     current += char;
   }
   definitions.push(current);
-  const columns: string[] = [];
-  for (const definition of definitions) {
-    const word = /^`?(\w+)`?\s+\S/.exec(definition.trim().replace(/\s+/g, " "));
-    if (!word) continue;
-    const first = word[1].toUpperCase();
-    if (["PRIMARY", "UNIQUE", "KEY", "INDEX", "CONSTRAINT", "FOREIGN", "FULLTEXT", "SPATIAL"].includes(first)) {
-      continue;
-    }
-    columns.push(word[1]);
-  }
-  return { table: named[1], columns };
+  return definitions;
 }
 
-async function runMigrations(db: Pool): Promise<void> {
-  // La porte **oublie ses échecs** (`createOnceGate`) : une passe interrompue se
-  // rejoue dans le même processus, et la liste retenue par `createTable`
-  // doublerait à chaque reprise — le filet annoncerait alors deux fois chaque
-  // colonne manquante, et un compte deux fois trop grand. Elle appartient à la
-  // passe, pas au processus.
-  DECLARED_TABLES.length = 0;
+// ───────────────────────────────────────────────────────────────────────────
+// Comptes
+// ───────────────────────────────────────────────────────────────────────────
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Comptes
-  // ───────────────────────────────────────────────────────────────────────────
-
+/** Comptes : `bg_users` et les tables qui en dépendent directement. */
+async function createAccountTables(db: Pool): Promise<void> {
   // Les trois portes d'entrée du site (`google_sub`, `discord_id`,
   // `blizzard_sub`) sont des colonnes **uniques** de cette table plutôt qu'une
   // table d'identités : un compte n'a qu'une identité par fournisseur, et c'est
@@ -297,11 +302,14 @@ async function runMigrations(db: Pool): Promise<void> {
       UNIQUE INDEX uniq_bg_challenges_lookup (lookup_hash)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Équipes
-  // ───────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────────────────
+// Équipes
+// ───────────────────────────────────────────────────────────────────────────
 
+/** Équipes, et la règle de `fk_bg_team_inv_creator` vérifiée après la table. */
+async function createTeamTables(db: Pool): Promise<void> {
   // Trois sortes de lignes cohabitent ici : les **équipes** ordinaires, les
   // **fantômes** (`is_ghost`, créées par le staff pour remplir un plateau) et
   // les **entrées solo** (`solo_user_id`, un joueur engagé en tournoi
@@ -471,11 +479,14 @@ async function runMigrations(db: Pool): Promise<void> {
       error,
     );
   }
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Tournois
-  // ───────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────────────────
+// Tournois
+// ───────────────────────────────────────────────────────────────────────────
 
+/** Tournois : réglages, inscriptions et matchs. */
+async function createTournamentTables(db: Pool): Promise<void> {
   // Les réglages sont groupés par famille et non par date d'ajout : général,
   // inscriptions, format de match, puis un bloc par moteur (suisse, survie,
   // endurance). Un tournoi ne renseigne jamais que le bloc de son format.
@@ -656,11 +667,14 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Classements des moteurs à rejeu
-  // ───────────────────────────────────────────────────────────────────────────
-  //
+// ───────────────────────────────────────────────────────────────────────────
+// Classements des moteurs à rejeu
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Classements des moteurs à rejeu. */
+async function createReplayStandingTables(db: Pool): Promise<void> {
   // Les trois tables suivantes sont des **résultats**, pas des accumulateurs :
   // chaque entretien les réécrit depuis l'historique des matchs. Seules les
   // décisions humaines y sont des *entrées* du rejeu — le seed initial et les
@@ -768,11 +782,14 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Table déjà présente, ou création refusée : les sanctions se taisent.
   }
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Tournois multi-phases
-  // ───────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────────────────
+// Tournois multi-phases
+// ───────────────────────────────────────────────────────────────────────────
 
+/** Tournois multi-phases. */
+async function createPhaseTables(db: Pool): Promise<void> {
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_tournament_phases (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -820,11 +837,14 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_teams(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Notifications déjà envoyées
-  // ───────────────────────────────────────────────────────────────────────────
-  //
+// ───────────────────────────────────────────────────────────────────────────
+// Notifications déjà envoyées
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Notifications déjà envoyées. */
+async function createSentNotificationTables(db: Pool): Promise<void> {
   // Même motif dans les deux tables : la ligne est **réservée avant l'envoi**,
   // et c'est sa clé unique qui interdit le doublon — deux requêtes concurrentes
   // déclenchent toutes deux le balayage. `ON DELETE CASCADE` suit la manche : un
@@ -930,11 +950,14 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Table déjà présente, ou création refusée : les départs se taisent.
   }
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Vitrine et association
-  // ───────────────────────────────────────────────────────────────────────────
+// ───────────────────────────────────────────────────────────────────────────
+// Vitrine et association
+// ───────────────────────────────────────────────────────────────────────────
 
+/** Vitrine et association. */
+async function createShowcaseTables(db: Pool): Promise<void> {
   await createTable(db, `
       CREATE TABLE IF NOT EXISTS bg_sponsors (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -1272,11 +1295,14 @@ async function runMigrations(db: Pool): Promise<void> {
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Migrations
-  // ───────────────────────────────────────────────────────────────────────────
-  //
+// ───────────────────────────────────────────────────────────────────────────
+// Migrations
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Migrations : les changements trop récents pour être repliés (`RECENT_SCHEMA_CHANGES`). */
+async function applyRecentSchemaChanges(db: Pool): Promise<void> {
   // Ce que les `CREATE TABLE` ci-dessus ne font **pas** sur une base qui existe
   // déjà : un `CREATE TABLE IF NOT EXISTS` n'ajoute aucune colonne à une table
   // présente, il ne fait rien du tout. C'est la seconde moitié de la règle des
@@ -1460,7 +1486,10 @@ async function runMigrations(db: Pool): Promise<void> {
       reportSchemaFailure(error, statement.replace(/\s+/g, " ").trim());
     }
   }
+}
 
+/** Ajout de `bg_matches.launched_at`, et lancement des matchs déjà jouables. */
+async function backfillLaunchedAt(db: Pool): Promise<void> {
   // `launched_at` : un match jouable ne se joue plus qu'une fois **lancé**
   // (`lib/shared/match-launch.ts`). Sur une base qui tourne, les matchs déjà
   // jouables au déploiement se jouaient sous l'ancienne règle : ils sont posés
@@ -1485,7 +1514,10 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch (error) {
     reportSchemaFailure(error, launchedAtStatement);
   }
+}
 
+/** Bascule du défaut de `bg_users.open_to_recruitment`, jouée une fois. */
+async function switchOpenToRecruitmentDefault(db: Pool): Promise<void> {
   // `open_to_recruitment` : un compte neuf ne s'annonce plus « free agent »
   // (`lib/shared/player-roster-status.ts`). Le défaut était « ouvert », si bien
   // que tout joueur sans équipe se présentait disponible sans l'avoir jamais
@@ -1563,7 +1595,10 @@ async function runMigrations(db: Pool): Promise<void> {
       }
     }
   }
+}
 
+/** Retrait de `bg_recruitment_ads.contact_email`. */
+async function dropRecruitmentContactEmail(db: Pool): Promise<void> {
   // **Un retrait de colonne ne se replie pas.** Une colonne qui part n'a aucune
   // contrepartie dans un `CREATE TABLE` : elle y est simplement absente, si bien
   // qu'une table neuve ne la porte jamais et qu'une base existante la garde pour
@@ -1578,7 +1613,10 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch (error) {
     reportSchemaFailure(error, "ALTER TABLE bg_recruitment_ads DROP COLUMN contact_email");
   }
+}
 
+/** Retrait de `bg_users.email`, vidée à défaut. */
+async function dropUserEmail(db: Pool): Promise<void> {
   // L'adresse e-mail n'a plus aucun lecteur — le scope `email` a disparu de la
   // demande faite à Google et un compte ne se revendique plus par son adresse
   // (`docs/features/OAUTH_PROVIDERS.md`). La colonne restait pourtant, et avec
@@ -1623,7 +1661,10 @@ async function runMigrations(db: Pool): Promise<void> {
       }
     }
   }
+}
 
+/** Retrait de `bg_site_visits.user_id`, vidée à défaut. */
+async function dropSiteVisitUserId(db: Pool): Promise<void> {
   // Les visites ne pointent plus vers un compte : `bg_site_visits.user_id` gardait
   // qui avait vu quelle page, et à quelle heure, tant que le compte vivait — une
   // trace de navigation nominative que la mesure d'audience n'a jamais demandée.
@@ -1661,7 +1702,10 @@ async function runMigrations(db: Pool): Promise<void> {
       }
     }
   }
+}
 
+/** Reprise unique des empreintes dans `bg_site_visitors`. */
+async function seedSiteVisitors(db: Pool): Promise<void> {
   // Les visiteurs uniques « depuis toujours » se comptent désormais sur
   // `bg_site_visitors`, alimentée à chaque visite enregistrée : sur une base qui
   // tourne, elle naît vide alors que le détail garde tout l'historique. Elle est
@@ -1686,7 +1730,10 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch (error) {
     reportSchemaFailure(error, "INSERT INTO bg_site_visitors (reprise des empreintes)");
   }
+}
 
+/** Report de `highlight` vers `priority`, puis retrait de `highlight`. */
+async function migrateRecruitmentPriority(db: Pool): Promise<void> {
   // La mise en avant d'une annonce de recrutement (`highlight` : `NONE` /
   // `BANNER` / `MODAL`) est devenue un **statut d'importance** (`priority`,
   // `lib/shared/recruitment.ts`) : modale → prioritaire, banderole → importante,
@@ -1738,11 +1785,14 @@ async function runMigrations(db: Pool): Promise<void> {
       reportSchemaFailure(error, DROP_RECRUITMENT_HIGHLIGHT);
     }
   }
+}
 
-  // ───────────────────────────────────────────────────────────────────────────
-  // Rattrapages permanents
-  // ───────────────────────────────────────────────────────────────────────────
-  //
+// ───────────────────────────────────────────────────────────────────────────
+// Rattrapages permanents
+// ───────────────────────────────────────────────────────────────────────────
+
+/** Rattrapages permanents, rejoués à chaque démarrage. */
+async function applyPermanentCatchUps(db: Pool): Promise<void> {
   // Trois filets, et non des migrations à cocher : leur cause peut se reproduire,
   // et ils sont donc **volontairement** rejoués à chaque démarrage. Tous trois
   // sont idempotents et ne trouvent rien à faire dans le cas nominal.
@@ -1812,7 +1862,32 @@ async function runMigrations(db: Pool): Promise<void> {
   } catch {
     // Rattrapage remis au prochain démarrage.
   }
+}
 
+async function runMigrations(db: Pool): Promise<void> {
+  // La porte **oublie ses échecs** (`createOnceGate`) : une passe interrompue se
+  // rejoue dans le même processus, et la liste retenue par `createTable`
+  // doublerait à chaque reprise — le filet annoncerait alors deux fois chaque
+  // colonne manquante, et un compte deux fois trop grand. Elle appartient à la
+  // passe, pas au processus.
+  DECLARED_TABLES.length = 0;
+
+  await createAccountTables(db);
+  await createTeamTables(db);
+  await createTournamentTables(db);
+  await createReplayStandingTables(db);
+  await createPhaseTables(db);
+  await createSentNotificationTables(db);
+  await createShowcaseTables(db);
+  await applyRecentSchemaChanges(db);
+  await backfillLaunchedAt(db);
+  await switchOpenToRecruitmentDefault(db);
+  await dropRecruitmentContactEmail(db);
+  await dropUserEmail(db);
+  await dropSiteVisitUserId(db);
+  await seedSiteVisitors(db);
+  await migrateRecruitmentPriority(db);
+  await applyPermanentCatchUps(db);
   await warnIfSchemaIsBehind(db);
 }
 
@@ -1840,41 +1915,6 @@ async function runMigrations(db: Pool): Promise<void> {
  * éteint.
  */
 async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
-  /**
-   * Un témoin, et ce qu'on attend de lui.
-   *
-   * `expect` couvre une classe que la seule **présence** d'une colonne ne voit
-   * pas : un `ALTER … MODIFY` replié. La conversion de `game` de
-   * `ENUM('OW2','MR')` vers `ENUM('OW','MR')` est la plus récente des trois, et
-   * une base restée avant elle porte bien la colonne — elle rendrait simplement
-   * « Data truncated for column 'game' » au premier tournoi écrit.
-   *
-   * `absent` couvre la classe symétrique : une colonne qui devait **partir**. Le
-   * retrait de `bg_users.email` est au mieux best-effort — un dépassement de
-   * délai de verrou suffit à le manquer — et il n'est jamais rejoué dans le
-   * processus, la porte mémorisant une passe qui se résout désormais toujours.
-   * Or plus rien d'autre n'efface ces adresses : `anonymizeOwnAccount` a perdu
-   * son `email = NULL` dans la même version.
-   */
-  type Witness = {
-    table: string;
-    column: string;
-    /** Fragment attendu dans `COLUMN_TYPE`, pour un type replié par `MODIFY`. */
-    expect?: string;
-    /**
-     * Fragment qui ne doit **plus** figurer dans `COLUMN_TYPE`.
-     *
-     * `expect` seul ne suffit pas sur un `ENUM` : une base à demi convertie
-     * porte `enum('OW2','MR','OW')`, qui contient bien `'OW'` et passerait le
-     * filet — alors qu'elle n'est ni réparée (la conversion est repliée) ni
-     * signalée. Ce qui distingue une base à jour est l'**absence** de l'ancienne
-     * valeur, pas la présence de la neuve.
-     */
-    forbid?: string;
-    /** La colonne devait disparaître : la trouver **est** l'anomalie. */
-    absent?: true;
-  };
-
   // Une entrée par lot replié, la plus récente d'abord.
   const WITNESSES: readonly Witness[] = [
     { table: "bg_users", column: "email", absent: true },
@@ -1905,27 +1945,8 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
     const found = new Map(rows.map((r) => [`${r.TABLE_NAME}.${r.COLUMN_NAME}`, r.COLUMN_TYPE]));
 
     for (const witness of WITNESSES) {
-      const name = `${witness.table}.${witness.column}`;
-      const type = found.get(name);
-      if (witness.absent) {
-        if (type !== undefined) {
-          // Le filet dit l'état du **schéma**, jamais celui des données : il ne
-          // lit qu'`information_schema`. Annoncer « les adresses y sont
-          // encore » était donc une affirmation qu'il ne peut pas soutenir — et
-          // fausse précisément dans le cas qui compte, celui où le repli sans
-          // DDL vient de les vider : les deux lignes se contredisaient dans le
-          // même démarrage. Ce qu'il sait, et qui suffit, c'est que la colonne
-          // est toujours là. Combien d'adresses ont été effacées, c'est le repli
-          // qui le dit, parce que lui seul a compté.
-          gaps.push(`${name} devrait avoir disparu — la colonne reste à retirer à la main`);
-        }
-      } else if (type === undefined) {
-        gaps.push(`${name} manque`);
-      } else if (witness.expect && !type.includes(witness.expect)) {
-        gaps.push(`${name} est resté « ${type} », sans ${witness.expect}`);
-      } else if (witness.forbid && type.includes(witness.forbid)) {
-        gaps.push(`${name} porte encore ${witness.forbid} : « ${type} »`);
-      }
+      const gap = witnessGap(witness, found.get(`${witness.table}.${witness.column}`));
+      if (gap !== null) gaps.push(gap);
     }
 
   } catch {
@@ -2013,6 +2034,71 @@ async function warnIfSchemaIsBehind(db: Pool): Promise<void> {
         `rien sur une base existante — il faut la migrer à la main (docs/DATABASE_SCHEMA.md).`,
     );
   }
+}
+
+/**
+ * Un témoin, et ce qu'on attend de lui.
+ *
+ * `expect` couvre une classe que la seule **présence** d'une colonne ne voit
+ * pas : un `ALTER … MODIFY` replié. La conversion de `game` de
+ * `ENUM('OW2','MR')` vers `ENUM('OW','MR')` est la plus récente des trois, et
+ * une base restée avant elle porte bien la colonne — elle rendrait simplement
+ * « Data truncated for column 'game' » au premier tournoi écrit.
+ *
+ * `absent` couvre la classe symétrique : une colonne qui devait **partir**. Le
+ * retrait de `bg_users.email` est au mieux best-effort — un dépassement de
+ * délai de verrou suffit à le manquer — et il n'est jamais rejoué dans le
+ * processus, la porte mémorisant une passe qui se résout désormais toujours.
+ * Or plus rien d'autre n'efface ces adresses : `anonymizeOwnAccount` a perdu
+ * son `email = NULL` dans la même version.
+ */
+type Witness = {
+  table: string;
+  column: string;
+  /** Fragment attendu dans `COLUMN_TYPE`, pour un type replié par `MODIFY`. */
+  expect?: string;
+  /**
+   * Fragment qui ne doit **plus** figurer dans `COLUMN_TYPE`.
+   *
+   * `expect` seul ne suffit pas sur un `ENUM` : une base à demi convertie
+   * porte `enum('OW2','MR','OW')`, qui contient bien `'OW'` et passerait le
+   * filet — alors qu'elle n'est ni réparée (la conversion est repliée) ni
+   * signalée. Ce qui distingue une base à jour est l'**absence** de l'ancienne
+   * valeur, pas la présence de la neuve.
+   */
+  forbid?: string;
+  /** La colonne devait disparaître : la trouver **est** l'anomalie. */
+  absent?: true;
+};
+
+/**
+ * Ce qu'un témoin dit du schéma, d'après le `COLUMN_TYPE` lu (`undefined` :
+ * colonne absente).
+ *
+ * @returns La ligne du rapport, ou `null` si le témoin est conforme.
+ */
+function witnessGap(witness: Witness, type: string | undefined): string | null {
+  const name = `${witness.table}.${witness.column}`;
+  if (witness.absent) {
+    if (type !== undefined) {
+      // Le filet dit l'état du **schéma**, jamais celui des données : il ne
+      // lit qu'`information_schema`. Annoncer « les adresses y sont
+      // encore » était donc une affirmation qu'il ne peut pas soutenir — et
+      // fausse précisément dans le cas qui compte, celui où le repli sans
+      // DDL vient de les vider : les deux lignes se contredisaient dans le
+      // même démarrage. Ce qu'il sait, et qui suffit, c'est que la colonne
+      // est toujours là. Combien d'adresses ont été effacées, c'est le repli
+      // qui le dit, parce que lui seul a compté.
+      return `${name} devrait avoir disparu — la colonne reste à retirer à la main`;
+    }
+  } else if (type === undefined) {
+    return `${name} manque`;
+  } else if (witness.expect && !type.includes(witness.expect)) {
+    return `${name} est resté « ${type} », sans ${witness.expect}`;
+  } else if (witness.forbid && type.includes(witness.forbid)) {
+    return `${name} porte encore ${witness.forbid} : « ${type} »`;
+  }
+  return null;
 }
 
 /**

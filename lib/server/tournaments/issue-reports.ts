@@ -24,7 +24,7 @@
  */
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase, withConnection } from "@/lib/server/database";
-import { toParticipantType } from "@/lib/shared/participants";
+import { toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import { pushRefereeAlert } from "@/lib/server/bot-integration";
 import { notifyStaff } from "@/lib/server/notify";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
@@ -57,6 +57,48 @@ type MatchRow = RowDataPacket & {
 export interface IssueReportResult {
   /** Arbitres joints en message privé (le log part dans tous les cas). */
   notifiedReferees: number;
+}
+
+/** Manche signalée, telle que le message à l'arbitrage la décrit. */
+type ReportedMatch = { round: string; team1: LogEntrant | null; team2: LogEntrant | null; id: number };
+
+/**
+ * Relit la manche désignée par un signalement et vérifie que l'engagé la joue.
+ *
+ * @throws `MATCH_NOT_FOUND` | `NOT_MATCH_PARTICIPANT`
+ */
+async function loadReportedMatch(
+  db: Awaited<ReturnType<typeof getDatabase>>,
+  tournamentId: number,
+  matchId: number,
+  entrantTeamId: number,
+  participantType: ParticipantType,
+): Promise<ReportedMatch> {
+  const [matchRows] = await db.execute<MatchRow[]>(
+    `SELECT m.team1_id, m.team2_id, m.bracket, m.round_number,
+              t1.name AS team1_name, t2.name AS team2_name
+         FROM bg_matches m
+         LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
+         LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
+        WHERE m.id = ? AND m.tournament_id = ?
+        LIMIT 1`,
+    [matchId, tournamentId],
+  );
+  // Le match doit appartenir au tournoi : sans ce contrôle, un identifiant
+  // pris ailleurs ferait décrire à l'arbitre une manche d'un autre plateau.
+  if (matchRows.length === 0) throw new Error("MATCH_NOT_FOUND");
+  const row = matchRows[0];
+  // Seul un engagé qui **joue** la manche peut la signaler : l'interface
+  // n'affiche le bouton que sur sa carte, le serveur le revérifie.
+  if (Number(row.team1_id) !== entrantTeamId && Number(row.team2_id) !== entrantTeamId) {
+    throw new Error("NOT_MATCH_PARTICIPANT");
+  }
+  return {
+    round: matchRoundLabel(String(row.bracket), Number(row.round_number)),
+    team1: row.team1_name ? { name: row.team1_name, participantType } : null,
+    team2: row.team2_name ? { name: row.team2_name, participantType } : null,
+    id: matchId,
+  };
 }
 
 /**
@@ -105,35 +147,10 @@ export async function reportTournamentIssue(
   const context = rows[0];
   const participantType = toParticipantType(context.participant_type);
 
-  let match: { round: string; team1: LogEntrant | null; team2: LogEntrant | null; id: number } | null =
-    null;
-  if (matchId !== null) {
-    const [matchRows] = await db.execute<MatchRow[]>(
-      `SELECT m.team1_id, m.team2_id, m.bracket, m.round_number,
-              t1.name AS team1_name, t2.name AS team2_name
-         FROM bg_matches m
-         LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
-         LEFT JOIN bg_teams t2 ON t2.id = m.team2_id
-        WHERE m.id = ? AND m.tournament_id = ?
-        LIMIT 1`,
-      [matchId, tournamentId],
-    );
-    // Le match doit appartenir au tournoi : sans ce contrôle, un identifiant
-    // pris ailleurs ferait décrire à l'arbitre une manche d'un autre plateau.
-    if (matchRows.length === 0) throw new Error("MATCH_NOT_FOUND");
-    const row = matchRows[0];
-    // Seul un engagé qui **joue** la manche peut la signaler : l'interface
-    // n'affiche le bouton que sur sa carte, le serveur le revérifie.
-    if (Number(row.team1_id) !== entrantTeamId && Number(row.team2_id) !== entrantTeamId) {
-      throw new Error("NOT_MATCH_PARTICIPANT");
-    }
-    match = {
-      round: matchRoundLabel(String(row.bracket), Number(row.round_number)),
-      team1: row.team1_name ? { name: row.team1_name, participantType } : null,
-      team2: row.team2_name ? { name: row.team2_name, participantType } : null,
-      id: matchId,
-    };
-  }
+  const match =
+    matchId === null
+      ? null
+      : await loadReportedMatch(db, tournamentId, matchId, entrantTeamId, participantType);
 
   const alertMessage = buildIssueReportMessage({
     tournamentName: String(context.tournament_name),
