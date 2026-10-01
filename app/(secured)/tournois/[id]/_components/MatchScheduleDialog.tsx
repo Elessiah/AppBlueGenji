@@ -2,32 +2,52 @@
 
 import { FormEvent, ReactNode, useState } from "react";
 import { createPortal } from "react-dom";
+import { FieldErrorText } from "@/components/ui/field-error-text";
 import { useToast } from "@/components/ui/toast";
+import { CodedError, MATCH_SCHEDULE_FIELD_ERRORS, errorCode } from "@/lib/shared/field-errors";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { requiresMatchStartAt } from "@/lib/shared/live-streams";
 import {
-  isValidMatchStartAt,
-  matchStartAtInputValue,
-} from "@/lib/shared/match-schedule";
+  MATCH_ENTRY_MONTHS,
+  formatMatchStartEntryPreview,
+  matchEntryReference,
+  matchEntryTimeValue,
+  matchStartEntryOf,
+  readMatchStartEntry,
+  type MatchStartEntryState,
+} from "@/lib/shared/match-start-entry";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
 
-/** Aide sous le champ : l'erreur de saisie d'abord, sinon ce que la date va produire. */
-function startAtHint(input: {
-  incomplete: boolean;
-  invalid: boolean;
-  refereeScheduling: boolean;
-}): string {
-  if (input.incomplete) {
-    return "Date incomplète : renseigne le jour et l'heure, ou efface tout le champ pour ne pas annoncer d'horaire.";
+const FIELD_IDS = {
+  day: "match-start-day",
+  month: "match-start-month",
+  time: "match-start-time",
+} as const;
+const HINT_ID = "match-start-at-hint";
+const PREVIEW_ID = "match-start-at-preview";
+
+const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
+
+/** Refus de saisie, avant tout envoi. */
+function entryRefusal(state: MatchStartEntryState): string | null {
+  if (state.kind === "incomplete") {
+    return "Date incomplète : choisis le jour, le mois et l'heure, ou vide les trois champs pour ne pas annoncer d'horaire.";
   }
-  if (input.invalid) return "Date non reconnue.";
-  if (input.refereeScheduling) {
-    return "Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.";
+  if (state.kind === "invalid") return "Ce jour n'existe pas dans ce mois.";
+  return null;
+}
+
+/** Aide sous les champs : ce que la date va produire. */
+function startAtHint(refereeScheduling: boolean): string {
+  const year = "L'année se déduit : la date retenue est la plus proche du début du tournoi.";
+  if (refereeScheduling) {
+    return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
-  return "Laisser vide pour ne pas annoncer d'horaire. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.";
+  return `${year} Laisser vide pour ne pas annoncer d'horaire. À l'heure dite, le match entre en lancement : les deux équipes se déclarent prêtes.`;
 }
 
 /** Confirmation après enregistrement. */
@@ -68,6 +88,12 @@ function ScheduleWarning({ children }: Readonly<{ children: ReactNode }>) {
 interface MatchScheduleDialogProps {
   match: BracketMatch;
   /**
+   * Début du tournoi : référence de la déduction de l'année
+   * (`lib/shared/match-start-entry.ts`). Illisible, on se rabat sur
+   * l'instant présent.
+   */
+  tournamentStartAt: string | null;
+  /**
    * Le tournoi fait planifier ses matchs par l'arbitrage : effacer la date
    * renvoie le match « À planifier » (`lib/shared/match-planning.ts`).
    */
@@ -78,6 +104,11 @@ interface MatchScheduleDialogProps {
 
 /**
  * Date de début d'un match, pour la permission `tournaments`.
+ *
+ * Saisie en **jour, mois et heure de Paris**, sans année : elle se déduit de
+ * la date du tournoi (`resolveMatchStartEntry`), et la date complète s'affiche
+ * avant l'envoi pour que l'organisateur la vérifie. Le serveur reçoit, comme
+ * avant, un instant ISO complet.
  *
  * La date ne verrouille rien, mais elle rythme le match : à l'heure dite il
  * entre en **lancement** (`lib/shared/match-launch.ts`), et elle sert de
@@ -90,17 +121,22 @@ interface MatchScheduleDialogProps {
  */
 export function MatchScheduleDialog({
   match,
+  tournamentStartAt,
   refereeScheduling,
   onClose,
   onSaved,
 }: Readonly<MatchScheduleDialogProps>) {
   const { showError, showSuccess } = useToast();
-  const [startAt, setStartAt] = useState(() => matchStartAtInputValue(match.startAt));
-  // Saisie commencée mais incomplète (« 01/09/____ __:__ »). Le champ
-  // `datetime-local` rend alors `value === ""` — indiscernable d'un champ vidé —
-  // tout en refusant la soumission par la validation native. Sans cet état, le
-  // bouton « Enregistrer » ne ferait donc rien, sans un mot d'explication.
-  const [incomplete, setIncomplete] = useState(false);
+  const fieldErrors = useFieldErrors(MATCH_SCHEDULE_FIELD_ERRORS, FIELD_IDS);
+  const [initial] = useState(() => matchStartEntryOf(match.startAt));
+  const [day, setDay] = useState(initial ? String(initial.day) : "");
+  const [month, setMonth] = useState(initial ? String(initial.month) : "");
+  const [time, setTime] = useState(initial ? matchEntryTimeValue(initial) : "");
+  // Saisie d'heure commencée mais incomplète (« 20:__ ») : le champ rend alors
+  // `value === ""`, indiscernable d'un champ vidé.
+  const [timeBadInput, setTimeBadInput] = useState(false);
+  // Figée à l'ouverture : l'année déduite ne doit pas changer pendant la saisie.
+  const [reference] = useState(() => matchEntryReference(tournamentStartAt, Date.now()));
   const [busy, setBusy] = useState(false);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
@@ -113,22 +149,21 @@ export function MatchScheduleDialog({
   const [planning] = useState(
     () => matchLaunchPhase({ ...match, refereeScheduling }, Date.now()) === "TO_PLAN",
   );
-  const touched = startAt.trim().length > 0;
-  const invalid = incomplete || (touched && !isValidMatchStartAt(startAt));
+  const entry = readMatchStartEntry({ day, month, time, timeBadInput }, reference);
+  const cleared = entry.kind === "empty";
+  const refusal = entryRefusal(entry);
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
   // le laisse programmé sans jamais passer à l'antenne : on le dit plutôt que
   // de refuser l'effacement — le calendrier ne dépend pas de la diffusion.
   // Une saisie seulement incomplète n'est pas un effacement : on n'avertit pas
   // encore, l'utilisateur est en train de taper.
-  const clearsLiveTrigger =
-    !touched && !incomplete && requiresMatchStartAt(match.liveTrigger);
+  const clearsLiveTrigger = cleared && requiresMatchStartAt(match.liveTrigger);
   // Effacer la date d'un match non lancé d'un tournoi planifié le renvoie à
   // l'arbitrage : on le dit avant l'envoi. Un match lancé ou joué n'est pas
   // concerné (sa phase ne dépend plus de la date).
   const returnsToPlanning =
     refereeScheduling &&
-    !touched &&
-    !incomplete &&
+    cleared &&
     match.startAt !== null &&
     match.launchedAt === null &&
     match.status === "READY" &&
@@ -136,28 +171,50 @@ export function MatchScheduleDialog({
     match.team1Score === null &&
     match.team2Score === null;
 
+  const clearAll = () => {
+    setDay("");
+    setMonth("");
+    setTime("");
+    setTimeBadInput(false);
+    fieldErrors.clear();
+  };
+
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (invalid) return;
+    if (entry.kind === "incomplete" || entry.kind === "invalid") {
+      const message = refusal ?? "Date non reconnue.";
+      fieldErrors.flag(entry.field, message);
+      showError(message);
+      return;
+    }
 
     setBusy(true);
     try {
       const response = await fetch(`/api/admin/matches/${match.id}/schedule`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ startAt: touched ? new Date(startAt).toISOString() : null }),
+        body: JSON.stringify({
+          startAt: entry.kind === "ready" ? new Date(entry.instant).toISOString() : null,
+        }),
       });
       const payload = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(payload.error || "MATCH_SCHEDULE_UPDATE_FAILED");
-      showSuccess(savedMessage(touched, planning));
+      if (!response.ok) {
+        const code = payload.error || "MATCH_SCHEDULE_UPDATE_FAILED";
+        throw new CodedError(code, mapError(code));
+      }
+      showSuccess(savedMessage(!cleared, planning));
       onSaved();
       onClose();
     } catch (error) {
-      showError(mapError((error as Error).message));
+      const message = error instanceof CodedError ? error.message : mapError((error as Error).message);
+      fieldErrors.report(errorCode(error), message);
+      showError(message);
     } finally {
       setBusy(false);
     }
   };
+
+  const fieldStyle = { flex: "1 1 96px", margin: 0, minWidth: 0 } as const;
 
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
@@ -191,7 +248,7 @@ export function MatchScheduleDialog({
           padding: 22,
         }}
       >
-        <form onSubmit={submit}>
+        <form onSubmit={submit} noValidate>
           <h3 id="match-schedule-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
             {planning ? "Planifier le match" : "Date de début du match"}
           </h3>
@@ -199,30 +256,90 @@ export function MatchScheduleDialog({
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
           </p>
 
-          <div className="field" style={{ marginTop: 18 }}>
-            <label htmlFor="match-start-at">Début programmé</label>
-            <input
-              id="match-start-at"
-              type="datetime-local"
-              value={startAt}
-              onChange={(e) => {
-                setStartAt(e.target.value);
-                setIncomplete(e.target.validity.badInput);
-              }}
-              aria-invalid={invalid}
-              aria-describedby="match-start-at-hint"
-            />
-            <p
-              id="match-start-at-hint"
-              style={{
-                margin: "6px 0 0",
-                fontSize: 12,
-                color: invalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
-              }}
-            >
-              {startAtHint({ incomplete, invalid, refereeScheduling })}
-            </p>
-          </div>
+          <fieldset style={{ margin: "18px 0 0", padding: 0, border: 0, minWidth: 0 }}>
+            <legend style={{ padding: 0, marginBottom: 8, fontSize: 13, color: "var(--ink)" }}>
+              Début programmé (heure de Paris)
+            </legend>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+              <div className="field" style={fieldStyle}>
+                <label htmlFor={FIELD_IDS.day}>Jour</label>
+                <select
+                  id={FIELD_IDS.day}
+                  value={day}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setDay(e.target.value);
+                    fieldErrors.clear();
+                  }}
+                  {...fieldErrors.aria("day", HINT_ID)}
+                >
+                  <option value="">—</option>
+                  {DAYS.map((value) => (
+                    <option key={value} value={String(value)}>
+                      {value}
+                    </option>
+                  ))}
+                </select>
+                <FieldErrorText fieldId={FIELD_IDS.day} message={fieldErrors.message("day")} />
+              </div>
+              <div className="field" style={{ ...fieldStyle, flexGrow: 2 }}>
+                <label htmlFor={FIELD_IDS.month}>Mois</label>
+                <select
+                  id={FIELD_IDS.month}
+                  value={month}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setMonth(e.target.value);
+                    fieldErrors.clear();
+                  }}
+                  {...fieldErrors.aria("month", HINT_ID)}
+                >
+                  <option value="">—</option>
+                  {MATCH_ENTRY_MONTHS.map((name, index) => (
+                    <option key={name} value={String(index + 1)}>
+                      {name}
+                    </option>
+                  ))}
+                </select>
+                <FieldErrorText fieldId={FIELD_IDS.month} message={fieldErrors.message("month")} />
+              </div>
+              <div className="field" style={fieldStyle}>
+                <label htmlFor={FIELD_IDS.time}>Heure</label>
+                <input
+                  id={FIELD_IDS.time}
+                  type="time"
+                  value={time}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setTime(e.target.value);
+                    setTimeBadInput(e.target.validity.badInput);
+                    fieldErrors.clear();
+                  }}
+                  {...fieldErrors.aria("time", HINT_ID)}
+                />
+                <FieldErrorText fieldId={FIELD_IDS.time} message={fieldErrors.message("time")} />
+              </div>
+            </div>
+          </fieldset>
+
+          <output
+            id={PREVIEW_ID}
+            style={{ display: "block", margin: "10px 0 0", fontSize: 13, color: "var(--ink)" }}
+          >
+            {entry.kind === "ready" && (
+              <>
+                Date retenue : <strong>{formatMatchStartEntryPreview(entry.instant)}</strong>
+              </>
+            )}
+            {refusal && <span style={{ color: "var(--danger)" }}>{refusal}</span>}
+            {cleared && "Aucun horaire annoncé."}
+          </output>
+          <p
+            id={HINT_ID}
+            style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2, #9aa4b2)" }}
+          >
+            {startAtHint(refereeScheduling)}
+          </p>
 
           {clearsLiveTrigger && (
             <ScheduleWarning>
@@ -238,7 +355,18 @@ export function MatchScheduleDialog({
             </ScheduleWarning>
           )}
 
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+            {!cleared && (
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={clearAll}
+                disabled={busy}
+                style={{ padding: "8px 14px", fontSize: 13, marginRight: "auto" }}
+              >
+                Vider la date
+              </button>
+            )}
             <button
               type="button"
               className="btn ghost"
@@ -251,7 +379,7 @@ export function MatchScheduleDialog({
             <button
               type="submit"
               className="btn"
-              disabled={busy || invalid}
+              disabled={busy}
               style={{ padding: "8px 20px", fontSize: 13 }}
             >
               {submitLabel(busy, planning)}

@@ -1077,6 +1077,7 @@ export default function TournamentDetailPage() {
         <MatchScheduleDialog
           key={matchForSchedule.id}
           match={matchForSchedule}
+          tournamentStartAt={detail.card.startAt}
           refereeScheduling={detail.card.refereeScheduling}
           onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}

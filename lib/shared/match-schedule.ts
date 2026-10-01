@@ -97,23 +97,6 @@ export function matchStartAtTime(match: MatchScheduleInput): number | null {
 }
 
 /**
- * Valeur d'un `<input type="datetime-local">` pour une date ISO donnée.
- *
- * Le champ HTML travaille en heure **locale** et sans fuseau : on décale donc
- * l'instant du décalage du navigateur avant de le tronquer à la minute. Une
- * date absente ou illisible donne une chaîne vide, ce qui vide le champ plutôt
- * que d'y afficher `Invalid Date`.
- */
-export function matchStartAtInputValue(
-  startAt: MatchScheduleInput["startAt"],
-): string {
-  const time = matchStartAtTime({ startAt });
-  if (time === null) return "";
-  const local = new Date(time - new Date(time).getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
-}
-
-/**
  * Libellé court et lisible d'une date de début (« 29/08 20:30 »).
  *
  * Sans l'année ni les secondes : la carte de match fait 210 px, et l'année d'un
