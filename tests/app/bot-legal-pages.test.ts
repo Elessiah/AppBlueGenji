@@ -10,7 +10,9 @@ import {
 import { BACKUP_RETENTION_DAYS } from "@/lib/shared/account-deletion-journal";
 import {
   BOT_ACTIVITY_AUTHOR_RETENTION_DAYS,
+  BOT_FEED_EVENT_RETENTION_DAYS,
   BOT_RELAY_RETENTION_DAYS,
+  BOT_STAFF_LOG_RETENTION_DAYS,
   DPF_ADEQUACY_DECISION,
   DPF_ADEQUACY_DECISION_EN,
   PROCESSING_ACTIVITIES,
@@ -251,8 +253,33 @@ describe("bot legal content matches the bot's code and the association", () => {
 
   it("does not claim that no personal data is kept permanently", () => {
     expect(flatOf(PRIVACY_POLICY, "fr")).not.toMatch(/Aucune donnée personnelle n'est conservée de manière permanente/);
-    expect(flatOf(PRIVACY_POLICY, "fr")).toContain("aucune suppression automatique à ce jour");
-    expect(flatOf(PRIVACY_POLICY, "en")).toContain("no automatic deletion at present");
+    // Le journal du staff, le fil d'activité et les messages d'une exclusion
+    // ont désormais une durée (ménage de nuit du bot).
+    expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("aucune suppression automatique");
+    expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("no automatic deletion");
+    expect(flatOf(PRIVACY_POLICY, "fr")).not.toContain("où il reste sans limite de durée");
+    expect(flatOf(PRIVACY_POLICY, "en")).not.toContain("where it stays with no time limit");
+  });
+
+  it("declares the bot's feed, staff log and exclusion-message durations from the constants", () => {
+    const fr = flatOf(PRIVACY_POLICY, "fr");
+    const en = flatOf(PRIVACY_POLICY, "en");
+    expect(BOT_FEED_EVENT_RETENTION_DAYS).toBe(30);
+    expect(BOT_STAFF_LOG_RETENTION_DAYS).toBe(365);
+    expect(fr).toContain(`**Fil d'activité public** (heure, serveur, niveau ou rôle de chaque évènement) : ${BOT_FEED_EVENT_RETENTION_DAYS} jours`);
+    expect(en).toContain(`**Public activity feed** (time, server, level or role of each event): ${BOT_FEED_EVENT_RETENTION_DAYS} days`);
+    expect(fr).toContain(`un an (${BOT_STAFF_LOG_RETENTION_DAYS} jours)`);
+    expect(en).toContain(`one year (${BOT_STAFF_LOG_RETENTION_DAYS} days)`);
+    expect(fr).toMatch(/sont supprimés à la levée/);
+    expect(en).toMatch(/are deleted when it is lifted/);
+    expect(fr).toMatch(/sans passer par Discord/);
+    expect(en).toMatch(/without going through Discord/);
+    expect(fr).toMatch(/liste fermée/);
+    expect(en).toMatch(/closed list/);
+    const retention = (PROCESSING_ACTIVITIES.find((activity) => activity.ref === "T08")?.retention ?? []).join(" ");
+    expect(retention).toContain(`Fil d'activité : ${BOT_FEED_EVENT_RETENTION_DAYS} jours`);
+    expect(retention).toContain(`${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an)`);
+    expect(retention).not.toContain("aucune suppression automatique");
   });
 
   it("declares /stats, the backups and the transfer basis", () => {
