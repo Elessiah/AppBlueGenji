@@ -17,8 +17,11 @@ describe("MatchLaunchCenter — focus rendu après chaque étape", () => {
   });
 
   it("l'étape de confirmation est focalisable et nommée par sa question", () => {
-    const confirm = source.slice(source.indexOf("ref={confirmRef}"), source.indexOf("</p>", source.indexOf("ref={confirmRef}")));
-    expect(confirm).toContain('role="group"');
+    // `<fieldset>` porte nativement le rôle `group` (Sonar S6819).
+    const start = source.lastIndexOf("<fieldset", source.indexOf("ref={confirmRef}"));
+    const confirm = source.slice(start, source.indexOf("</p>", source.indexOf("ref={confirmRef}")));
+    expect(confirm.startsWith("<fieldset")).toBe(true);
+    expect(confirm).not.toContain('role="group"');
     expect(confirm).toContain("aria-labelledby={confirmTextId}");
     expect(confirm).toContain("tabIndex={-1}");
     expect(confirm).toContain("id={confirmTextId}");

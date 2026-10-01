@@ -334,7 +334,7 @@ describe("Un contrôle désactivé se voit", () => {
  */
 describe("Le groupe « Avatar » porte un nom", () => {
   it("nomme un groupe plutôt qu'un champ", () => {
-    expect(page).toContain('role="group" aria-labelledby="profile-avatar-label"');
+    expect(page).toContain('<fieldset className="field native-group" aria-labelledby="profile-avatar-label"');
     expect(page).not.toContain('<label id="profile-avatar-label">');
   });
 

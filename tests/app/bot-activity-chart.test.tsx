@@ -41,7 +41,7 @@ describe("BotActivityChart — une charge saine", () => {
     expect(html.match(/aria-pressed="false"/g)).toHaveLength(2);
     // Le nom d'une pastille est son texte visible ; le groupe dit de quoi.
     expect(html).not.toContain("Filtrer par");
-    expect(html).toMatch(/role="group" aria-label="Plage d&#x27;activité affichée"/);
+    expect(html).toMatch(/<fieldset class="chart-tools native-group" aria-label="Plage d&#x27;activité affichée"/);
   });
 
   it("ne s'annonce pas en chargement au premier rendu", () => {
