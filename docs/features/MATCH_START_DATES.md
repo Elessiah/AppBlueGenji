@@ -130,7 +130,7 @@ Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
   référence. Pour l'archive d'un match plus ancien, ou une année déjà fausse,
   un bouton « Mauvaise année ? » sous l'aperçu déplie deux boutons
   « Plutôt en <année> » qui décalent l'année d'un cran (`shiftMatchStartYear`,
-  `withYearShift`). Ce n'est pas un champ année : rien n'est demandé, et la
+  `withYearShift` ; quatre ans pour un 29 février, `nextValidYearShift`). Ce n'est pas un champ année : rien n'est demandé, et la
   correction reste repliée tant qu'on ne la demande pas. Le décalage repart de
   zéro quand le jour ou le mois change ;
 - une saisie inachevée affiche une consigne neutre dans l'aperçu (« À
