@@ -62,9 +62,15 @@ battement de cœur (25 s) aurait coûté une requête par flux et laissé encore
 jusqu'à 25 s de lecture.
 
 Le registre vit en mémoire du processus, comme les salles de diffusion qu'il
-accompagne : il suppose l'instance unique que le flux suppose déjà. Reste une
-fenêtre de quelques millisecondes — une révocation commitée entre la lecture de
-la session et l'inscription du flux —, que la prochaine reconnexion referme.
+accompagne : il suppose l'instance unique que le flux suppose déjà.
+
+Une révocation commitée **pendant la lecture de la session** ne trouve pas
+encore le flux à fermer. Elle laisse donc une trace datée (`revocationMark` /
+`revokedSince`, gardée une minute) : la route prend un repère avant de lire la
+session et, une fois le flux inscrit, refuse en 401 si une révocation
+postérieure vise son compte ou sa session. Enfin, une lecture d'ouverture qui
+lève désinscrit le flux — le registre est global, et une reconnexion en boucle
+pendant une panne de base le ferait sinon grossir sans fin.
 
 ## Hors champ
 

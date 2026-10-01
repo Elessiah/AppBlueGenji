@@ -342,6 +342,43 @@ describe("GET /api/tournaments/[id]/stream — révocation de la session", () =>
     expect(registeredStreamCount()).toBe(0);
   });
 
+  it("répond 401 quand la révocation tombe pendant la lecture de la session elle-même", async () => {
+    // Aucun flux n'est encore inscrit : seule la trace de la révocation le rattrape.
+    jest.mocked(getCurrentUser).mockImplementation(async () => {
+      closeUserStreams(1);
+      return authUser({ id: 1, isAdmin: false, roles: [] });
+    });
+
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(401);
+    expect(registeredStreamCount()).toBe(0);
+    expect(getVisibleTournamentSnapshot).not.toHaveBeenCalled();
+  });
+
+  it("ouvre normalement quand la révocation pendant la lecture gardait cette session", async () => {
+    jest.mocked(getCurrentUser).mockImplementation(async () => {
+      closeUserStreams(1, { keepTokenHash: "empreinte-A" });
+      return authUser({ id: 1, isAdmin: false, roles: [] });
+    });
+
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(200);
+    await response.body!.cancel();
+  });
+
+  it("ignore une révocation antérieure à l'ouverture", async () => {
+    closeUserStreams(1);
+    const response = await GET(new Request("http://t/"), params("5"));
+    expect(response.status).toBe(200);
+    await response.body!.cancel();
+  });
+
+  it("désinscrit le flux quand une lecture d'ouverture lève", async () => {
+    jest.mocked(getVisibleTournamentSnapshot).mockRejectedValue(new Error("db down"));
+    await expect(GET(new Request("http://t/"), params("5"))).rejects.toThrow("db down");
+    expect(registeredStreamCount()).toBe(0);
+  });
+
   it("ne laisse aucune inscription derrière une requête déjà abandonnée", async () => {
     const controller = new AbortController();
     controller.abort();

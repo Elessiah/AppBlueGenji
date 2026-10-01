@@ -4,6 +4,10 @@ import {
   closeUserStreams,
   registerSessionStream,
   registeredStreamCount,
+  resetSessionStreams,
+  REVOCATION_MEMORY_MS,
+  revocationMark,
+  revokedSince,
 } from "@/lib/server/session-streams";
 
 const cleanups: (() => void)[] = [];
@@ -15,6 +19,8 @@ function register(userId: number, tokenHash: string, close: () => void = jest.fn
 
 afterEach(() => {
   cleanups.splice(0).forEach((fn) => fn());
+  resetSessionStreams();
+  jest.useRealTimers();
 });
 
 describe("session-streams", () => {
@@ -113,5 +119,44 @@ describe("session-streams", () => {
 
     expect(closeUserStreams(1)).toBe(2);
     expect(registeredStreamCount()).toBe(0);
+  });
+});
+
+describe("revokedSince", () => {
+  it("ne voit que les révocations postérieures au repère", () => {
+    closeUserStreams(1);
+    const mark = revocationMark();
+    expect(revokedSince(1, "h", mark)).toBe(false);
+    closeUserStreams(1);
+    expect(revokedSince(1, "h", mark)).toBe(true);
+    expect(revokedSince(2, "h", mark)).toBe(false);
+  });
+
+  it("respecte la session gardée", () => {
+    const mark = revocationMark();
+    closeUserStreams(1, { keepTokenHash: "garde" });
+    expect(revokedSince(1, "garde", mark)).toBe(false);
+    expect(revokedSince(1, "autre", mark)).toBe(true);
+  });
+
+  it("relie une déconnexion à sa session, quel que soit le compte", () => {
+    const mark = revocationMark();
+    closeSessionStreams("h");
+    expect(revokedSince(1, "h", mark)).toBe(true);
+    expect(revokedSince(1, "h2", mark)).toBe(false);
+  });
+
+  it("ne retient pas une déconnexion sans session", () => {
+    const mark = revocationMark();
+    closeSessionStreams("");
+    expect(revokedSince(1, "", mark)).toBe(false);
+  });
+
+  it("oublie les révocations au-delà de la mémoire", () => {
+    jest.useFakeTimers();
+    const mark = revocationMark();
+    closeUserStreams(1);
+    jest.advanceTimersByTime(REVOCATION_MEMORY_MS);
+    expect(revokedSince(1, "h", mark)).toBe(false);
   });
 });

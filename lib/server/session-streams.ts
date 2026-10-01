@@ -27,9 +27,70 @@ type Entry = {
   close: () => void;
 };
 
+/**
+ * Une révocation récente, gardée le temps qu'un flux en cours d'ouverture
+ * puisse la constater (`revokedSince`).
+ */
+type Revocation = {
+  mark: number;
+  at: number;
+  userId?: number;
+  tokenHash?: string;
+  keepTokenHash?: string;
+};
+
 type GlobalWithRegistry = typeof globalThis & {
   __bgSessionStreams?: Set<Entry>;
+  __bgStreamRevocations?: { mark: number; recent: Revocation[] };
 };
+
+/**
+ * Durée pendant laquelle une révocation reste lisible par un flux qui
+ * s'ouvrait au même moment. Il ne lui faut que le temps d'une lecture de
+ * session : une minute laisse une large marge sous charge.
+ */
+export const REVOCATION_MEMORY_MS = 60_000;
+
+function revocations(): { mark: number; recent: Revocation[] } {
+  const globalRef = globalThis as GlobalWithRegistry;
+  if (!globalRef.__bgStreamRevocations) globalRef.__bgStreamRevocations = { mark: 0, recent: [] };
+  return globalRef.__bgStreamRevocations;
+}
+
+function prune(now: number): void {
+  const state = revocations();
+  state.recent = state.recent.filter((entry) => now - entry.at < REVOCATION_MEMORY_MS);
+}
+
+function noteRevocation(revocation: Omit<Revocation, "mark" | "at">): void {
+  const now = Date.now();
+  prune(now);
+  const state = revocations();
+  state.mark += 1;
+  state.recent.push({ ...revocation, mark: state.mark, at: now });
+}
+
+/**
+ * Repère à prendre **avant** de lire la session : une révocation commitée
+ * pendant cette lecture ne trouve pas encore le flux à fermer, mais laisse une
+ * trace que `revokedSince` retrouve une fois le flux inscrit.
+ */
+export function revocationMark(): number {
+  return revocations().mark;
+}
+
+/** Une révocation postérieure au repère vise-t-elle ce compte ou cette session ? */
+export function revokedSince(userId: number, tokenHash: string, mark: number): boolean {
+  prune(Date.now());
+  return revocations().recent.some((entry) => {
+    if (entry.mark <= mark) return false;
+    if (entry.tokenHash !== undefined) return entry.tokenHash === tokenHash;
+    return (
+      entry.userId === userId &&
+      (entry.keepTokenHash === undefined || entry.keepTokenHash !== tokenHash)
+    );
+  });
+}
 
 function registry(): Set<Entry> {
   const globalRef = globalThis as GlobalWithRegistry;
@@ -75,6 +136,7 @@ function closeMatching(predicate: (entry: Entry) => boolean): number {
  */
 export function closeUserStreams(userId: number, options: { keepTokenHash?: string } = {}): number {
   const { keepTokenHash } = options;
+  noteRevocation({ userId, keepTokenHash });
   return closeMatching(
     (entry) =>
       entry.userId === userId &&
@@ -88,12 +150,14 @@ export function closeUserStreams(userId: number, options: { keepTokenHash?: stri
  */
 export function closeSessionStreams(tokenHash: string): number {
   if (!tokenHash) return 0;
+  noteRevocation({ tokenHash });
   return closeMatching((entry) => entry.tokenHash === tokenHash);
 }
 
-/** Oublie tous les flux inscrits, sans les fermer. Réservé aux tests. */
+/** Oublie tous les flux inscrits (sans les fermer) et les révocations récentes. Réservé aux tests. */
 export function resetSessionStreams(): void {
   registry().clear();
+  revocations().recent = [];
 }
 
 /** Pour les tests : nombre de flux inscrits. */
