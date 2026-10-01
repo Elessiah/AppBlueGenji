@@ -119,46 +119,56 @@ export function documentPathOf(value: unknown): string {
  * @returns Les violations lisibles, éventuellement aucune.
  */
 export function parseCspReport(payload: unknown): CspViolation[] {
-  const bodies: Record<string, unknown>[] = [];
-
-  if (Array.isArray(payload)) {
-    for (const entry of payload) {
-      if (bodies.length >= CSP_MAX_VIOLATIONS_PER_REPORT) break;
-      if (typeof entry !== "object" || entry === null) continue;
-      const record = entry as Record<string, unknown>;
-      if (record.type !== undefined && record.type !== "csp-violation") continue;
-      const body = record.body;
-      if (typeof body === "object" && body !== null && !Array.isArray(body)) {
-        bodies.push(body as Record<string, unknown>);
-      }
-    }
-  } else if (typeof payload === "object" && payload !== null) {
-    const record = payload as Record<string, unknown>;
-    const legacy = record["csp-report"];
-    if (typeof legacy === "object" && legacy !== null && !Array.isArray(legacy)) {
-      bodies.push(legacy as Record<string, unknown>);
-    }
-  }
-
   const violations: CspViolation[] = [];
-  for (const body of bodies) {
-    // Les deux formats nomment les mêmes champs différemment : tirets pour
-    // l'historique, camelCase pour le Reporting API.
-    const directive =
-      body["effective-directive"] ??
-      body.effectiveDirective ??
-      body["violated-directive"] ??
-      body.violatedDirective;
-    if (typeof directive !== "string" || directive.trim().length === 0) continue;
-
-    violations.push({
-      directive: directive.trim(),
-      blockedOrigin: blockedOriginOf(body["blocked-uri"] ?? body.blockedURL),
-      documentPath: documentPathOf(body["document-uri"] ?? body.documentURL),
-    });
+  for (const body of reportBodies(payload)) {
+    const violation = violationOf(body);
+    if (violation) violations.push(violation);
   }
 
   return violations;
+}
+
+/** Objet simple (ni `null`, ni tableau), seule forme qu'un corps peut prendre. */
+function asPlainRecord(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+/** Corps de violation portés par un rapport, sous l'un ou l'autre format. */
+function reportBodies(payload: unknown): Record<string, unknown>[] {
+  if (!Array.isArray(payload)) {
+    const legacy = asPlainRecord(asPlainRecord(payload)?.["csp-report"]);
+    return legacy ? [legacy] : [];
+  }
+  const bodies: Record<string, unknown>[] = [];
+  for (const entry of payload) {
+    if (bodies.length >= CSP_MAX_VIOLATIONS_PER_REPORT) break;
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as Record<string, unknown>;
+    if (record.type !== undefined && record.type !== "csp-violation") continue;
+    const body = asPlainRecord(record.body);
+    if (body) bodies.push(body);
+  }
+  return bodies;
+}
+
+/** Violation lue dans un corps, ou `null` s'il ne nomme aucune directive. */
+function violationOf(body: Record<string, unknown>): CspViolation | null {
+  // Les deux formats nomment les mêmes champs différemment : tirets pour
+  // l'historique, camelCase pour le Reporting API.
+  const directive =
+    body["effective-directive"] ??
+    body.effectiveDirective ??
+    body["violated-directive"] ??
+    body.violatedDirective;
+  if (typeof directive !== "string" || directive.trim().length === 0) return null;
+
+  return {
+    directive: directive.trim(),
+    blockedOrigin: blockedOriginOf(body["blocked-uri"] ?? body.blockedURL),
+    documentPath: documentPathOf(body["document-uri"] ?? body.documentURL),
+  };
 }
 
 /** Clé de dédoublonnage : ce qui distingue deux causes à corriger. */

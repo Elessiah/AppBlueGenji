@@ -38,6 +38,48 @@ export type BenevoleValidationResult =
   | { ok: true; value: BenevoleNormalized }
   | { ok: false; error: string };
 
+function benevoleNameError(firstName: string, lastName: string, pseudo: string): string | null {
+  if (firstName.length > BENEVOLE_FIRST_NAME_MAX) return "FIRST_NAME_TOO_LONG";
+  if (lastName.length > BENEVOLE_LAST_NAME_MAX) return "LAST_NAME_TOO_LONG";
+  // Prénom/nom civil facultatif : un pseudo seul suffit à identifier le bénévole.
+  // Mais un prénom/nom partiel (l'un sans l'autre) reste invalide.
+  if (!firstName && !lastName && !pseudo) return "NAME_REQUIRED";
+  if (firstName && !lastName) return "LAST_NAME_REQUIRED";
+  if (lastName && !firstName) return "FIRST_NAME_REQUIRED";
+  return null;
+}
+
+function benevoleCategoryError(category: string): string | null {
+  if (!category) return "CATEGORY_REQUIRED";
+  if (category.length > BENEVOLE_CATEGORY_MAX) return "CATEGORY_TOO_LONG";
+  return null;
+}
+
+/** Date d'arrivée `AAAA-MM-JJ`, refusée si elle n'existe pas au calendrier. */
+function benevoleJoinedAtError(joinedAt: string): string | null {
+  if (!joinedAt) return "JOINED_AT_REQUIRED";
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) return "JOINED_AT_INVALID";
+  const [y, m, d] = joinedAt.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
+    return "JOINED_AT_INVALID";
+  }
+  return null;
+}
+
+function benevoleExtrasError(pseudo: string, photoUrl: string): string | null {
+  if (pseudo && pseudo.length > BENEVOLE_PSEUDO_MAX) return "PSEUDO_TOO_LONG";
+  if (photoUrl && photoUrl.length > BENEVOLE_PHOTO_URL_MAX) return "PHOTO_URL_TOO_LONG";
+  // Une photo téléversée vit dans `benevoles/` : une autre adresse d'upload
+  // (avatar d'un joueur, logo d'une équipe) serait effacée au remplacement de
+  // la photo. Une adresse étrangère reste acceptée ; `localUploadUrl` la
+  // tait à la sortie.
+  if (photoUrl && toDiskUploadPath(photoUrl) !== null && !isStoredUploadIn(photoUrl, "benevoles")) {
+    return "INVALID_PHOTO_URL";
+  }
+  return null;
+}
+
 export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationResult {
   const firstName = typeof input.firstName === "string" ? input.firstName.trim() : "";
   const lastName = typeof input.lastName === "string" ? input.lastName.trim() : "";
@@ -46,33 +88,12 @@ export function validateBenevoleInput(input: BenevoleInput): BenevoleValidationR
   const photoUrl = typeof input.photoUrl === "string" ? input.photoUrl.trim() : "";
   const joinedAt = typeof input.joinedAt === "string" ? input.joinedAt.trim() : "";
 
-  if (firstName.length > BENEVOLE_FIRST_NAME_MAX) return { ok: false, error: "FIRST_NAME_TOO_LONG" };
-  if (lastName.length > BENEVOLE_LAST_NAME_MAX) return { ok: false, error: "LAST_NAME_TOO_LONG" };
-  // Prénom/nom civil facultatif : un pseudo seul suffit à identifier le bénévole.
-  // Mais un prénom/nom partiel (l'un sans l'autre) reste invalide.
-  if (!firstName && !lastName && !pseudo) return { ok: false, error: "NAME_REQUIRED" };
-  if (firstName && !lastName) return { ok: false, error: "LAST_NAME_REQUIRED" };
-  if (lastName && !firstName) return { ok: false, error: "FIRST_NAME_REQUIRED" };
-  if (!category) return { ok: false, error: "CATEGORY_REQUIRED" };
-  if (category.length > BENEVOLE_CATEGORY_MAX) return { ok: false, error: "CATEGORY_TOO_LONG" };
-  if (!joinedAt) return { ok: false, error: "JOINED_AT_REQUIRED" };
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(joinedAt)) return { ok: false, error: "JOINED_AT_INVALID" };
-  {
-    const [y, m, d] = joinedAt.split("-").map(Number);
-    const dt = new Date(y, m - 1, d);
-    if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d) {
-      return { ok: false, error: "JOINED_AT_INVALID" };
-    }
-  }
-  if (pseudo && pseudo.length > BENEVOLE_PSEUDO_MAX) return { ok: false, error: "PSEUDO_TOO_LONG" };
-  if (photoUrl && photoUrl.length > BENEVOLE_PHOTO_URL_MAX) return { ok: false, error: "PHOTO_URL_TOO_LONG" };
-  // Une photo téléversée vit dans `benevoles/` : une autre adresse d'upload
-  // (avatar d'un joueur, logo d'une équipe) serait effacée au remplacement de
-  // la photo. Une adresse étrangère reste acceptée ; `localUploadUrl` la
-  // tait à la sortie.
-  if (photoUrl && toDiskUploadPath(photoUrl) !== null && !isStoredUploadIn(photoUrl, "benevoles")) {
-    return { ok: false, error: "INVALID_PHOTO_URL" };
-  }
+  const error =
+    benevoleNameError(firstName, lastName, pseudo) ??
+    benevoleCategoryError(category) ??
+    benevoleJoinedAtError(joinedAt) ??
+    benevoleExtrasError(pseudo, photoUrl);
+  if (error) return { ok: false, error };
 
   return {
     ok: true,

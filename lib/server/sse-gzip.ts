@@ -89,17 +89,25 @@ export function acceptsGzip(header: string | null | undefined): boolean {
     const [rawName, ...params] = entry.split(";");
     const name = rawName.trim().toLowerCase();
     if (!name) continue;
-    let quality = 1;
-    for (const param of params) {
-      const [key, value] = param.split("=");
-      if (key?.trim().toLowerCase() === "q") {
-        const parsed = Number(value?.trim());
-        quality = Number.isFinite(parsed) ? parsed : 0;
-      }
-    }
-    const accepted = quality > 0;
+    const accepted = codingQuality(params) > 0;
     if (name === "gzip" || name === "x-gzip") gzip = accepted;
     else if (name === "*") wildcard = accepted;
   }
   return gzip ?? wildcard ?? false;
+}
+
+/**
+ * Qualité d'un codage d'après ses paramètres : 1 par défaut, le dernier `q`
+ * l'emportant, et une valeur illisible valant refus.
+ */
+function codingQuality(params: string[]): number {
+  let quality = 1;
+  for (const param of params) {
+    const [key, value] = param.split("=");
+    if (key?.trim().toLowerCase() === "q") {
+      const parsed = Number(value?.trim());
+      quality = Number.isFinite(parsed) ? parsed : 0;
+    }
+  }
+  return quality;
 }

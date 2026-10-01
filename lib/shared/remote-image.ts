@@ -67,15 +67,18 @@ function embeddedIpv4(high: number, low: number): string {
   return [high >> 8, high & 0xff, low >> 8, low & 0xff].join(".");
 }
 
-function isPrivateIpv6(g: number[]): boolean {
+/**
+ * Verdict des familles IPv6 qui portent (ou remplacent) une IPv4 : `null`
+ * quand l'adresse n'appartient à aucune d'elles.
+ */
+function embeddedFamilyVerdict(g: number[]): boolean | null {
   const [g0, g1, g2, g3, g4, g5, g6, g7] = g;
+  const zeroPrefix = g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0;
   // `::/96` : indéterminée, bouclage et IPv4 « compatible » (`::7f00:1`),
   // toutes obsolètes ou locales — rien de public ne s'y écrit.
-  if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0) return true;
+  if (zeroPrefix && g5 === 0) return true;
   // `::ffff:0:0/96` : IPv4 encapsulée, jugée sur l'IPv4 qu'elle porte.
-  if (g0 === 0 && g1 === 0 && g2 === 0 && g3 === 0 && g4 === 0 && g5 === 0xffff) {
-    return isPrivateIpv4(embeddedIpv4(g6, g7));
-  }
+  if (zeroPrefix && g5 === 0xffff) return isPrivateIpv4(embeddedIpv4(g6, g7));
   // `64:ff9b::/96` : NAT64 bien connu, jugé sur l'IPv4 traduite ; et
   // `64:ff9b:1::/48`, sa variante d'usage local.
   if (g0 === 0x64 && g1 === 0xff9b) {
@@ -84,6 +87,13 @@ function isPrivateIpv6(g: number[]): boolean {
   }
   // `2002::/16` : 6to4, l'IPv4 suit le préfixe.
   if (g0 === 0x2002) return isPrivateIpv4(embeddedIpv4(g1, g2));
+  return null;
+}
+
+function isPrivateIpv6(g: number[]): boolean {
+  const embedded = embeddedFamilyVerdict(g);
+  if (embedded !== null) return embedded;
+  const [g0, g1, g2, g3] = g;
   if (g0 === 0x100 && g1 === 0 && g2 === 0 && g3 === 0) return true; // `100::/64`, poubelle
   if ((g0 & 0xfe00) === 0xfc00) return true; // `fc00::/7`, adresses uniques locales
   if ((g0 & 0xffc0) === 0xfe80) return true; // `fe80::/10`, lien-local

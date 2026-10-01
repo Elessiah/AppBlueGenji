@@ -378,6 +378,47 @@ function normalizeTargets(raw: unknown): ReportTargetRef[] | "INVALID" {
   return targets;
 }
 
+/** Identifiant du signalement contesté, `false` s'il n'en désigne aucun. */
+function parseParentReportId(raw: unknown): number | false {
+  const parent = typeof raw === "number" ? raw : Number(raw);
+  return Number.isSafeInteger(parent) && parent > 0 ? parent : false;
+}
+
+function reportTargetsError(
+  targets: ReportTargetRef[],
+  allowed: readonly ReportTargetType[],
+): ReportValidationError | null {
+  if (targets.some((target) => !allowed.includes(target.type))) return "REPORT_TARGET_NOT_ALLOWED";
+  if (targets.length > REPORT_MAX_TARGETS) return "REPORT_TOO_MANY_TARGETS";
+  return null;
+}
+
+/** Déclaration exigée d'un signalement de droit d'auteur : lien aux droits, puis bonne foi. */
+function readRightsDeclaration(
+  raw: Record<string, unknown>,
+): { rightsRelation: RightsRelation } | { error: ReportValidationError } {
+  if (!isRightsRelation(raw.rightsRelation)) return { error: "REPORT_RIGHTS_RELATION_REQUIRED" };
+  if (raw.goodFaith !== true) return { error: "REPORT_GOOD_FAITH_REQUIRED" };
+  return { rightsRelation: raw.rightsRelation };
+}
+
+function reportDescriptionError(description: string): ReportValidationError | null {
+  if (description.length < REPORT_DESCRIPTION_MIN_LENGTH) return "REPORT_DESCRIPTION_TOO_SHORT";
+  if (description.length > REPORT_DESCRIPTION_MAX_LENGTH) return "REPORT_DESCRIPTION_TOO_LONG";
+  return null;
+}
+
+function reportContactError(
+  requiresContact: boolean,
+  contactName: string | null,
+  contactEmail: string | null,
+): ReportValidationError | null {
+  if (requiresContact && (!contactName || !contactEmail)) return "REPORT_CONTACT_REQUIRED";
+  if (contactName && contactName.length > REPORT_CONTACT_NAME_MAX_LENGTH) return "REPORT_CONTACT_TOO_LONG";
+  if (contactEmail && !isPlausibleEmail(contactEmail)) return "REPORT_INVALID_EMAIL";
+  return null;
+}
+
 /**
  * Valide et normalise un envoi du formulaire.
  *
@@ -394,44 +435,26 @@ export function validateReportSubmission(input: unknown): ReportValidation {
   // Une contestation se rattache à un signalement ; aucune autre catégorie ne
   // porte ce lien — il est ignoré ailleurs, pour ne pas ranger un signalement
   // ordinaire sous un autre.
-  let parentReportId: number | null = null;
-  if (category === "CONTEST") {
-    const parent = typeof raw.parentReportId === "number" ? raw.parentReportId : Number(raw.parentReportId);
-    if (!Number.isSafeInteger(parent) || parent <= 0) return { ok: false, error: "REPORT_PARENT_REQUIRED" };
-    parentReportId = parent;
-  }
+  const parentReportId = category === "CONTEST" ? parseParentReportId(raw.parentReportId) : null;
+  if (parentReportId === false) return { ok: false, error: "REPORT_PARENT_REQUIRED" };
 
   const targets = normalizeTargets(raw.targets);
   if (targets === "INVALID") return { ok: false, error: "REPORT_INVALID_TARGET" };
-  if (targets.some((target) => !definition.targets.includes(target.type))) {
-    return { ok: false, error: "REPORT_TARGET_NOT_ALLOWED" };
-  }
-  if (targets.length > REPORT_MAX_TARGETS) return { ok: false, error: "REPORT_TOO_MANY_TARGETS" };
+  const targetsError = reportTargetsError(targets, definition.targets);
+  if (targetsError) return { ok: false, error: targetsError };
 
   const description = cleanText(raw.description, true);
-  if (description.length < REPORT_DESCRIPTION_MIN_LENGTH) {
-    return { ok: false, error: "REPORT_DESCRIPTION_TOO_SHORT" };
-  }
-  if (description.length > REPORT_DESCRIPTION_MAX_LENGTH) {
-    return { ok: false, error: "REPORT_DESCRIPTION_TOO_LONG" };
-  }
+  const descriptionError = reportDescriptionError(description);
+  if (descriptionError) return { ok: false, error: descriptionError };
 
   const contactName = cleanText(raw.contactName, false) || null;
   const contactEmail = cleanText(raw.contactEmail, false).toLowerCase() || null;
-  if (definition.requiresContact && (!contactName || !contactEmail)) {
-    return { ok: false, error: "REPORT_CONTACT_REQUIRED" };
-  }
-  if (contactName && contactName.length > REPORT_CONTACT_NAME_MAX_LENGTH) {
-    return { ok: false, error: "REPORT_CONTACT_TOO_LONG" };
-  }
-  if (contactEmail && !isPlausibleEmail(contactEmail)) return { ok: false, error: "REPORT_INVALID_EMAIL" };
+  const contactError = reportContactError(definition.requiresContact, contactName, contactEmail);
+  if (contactError) return { ok: false, error: contactError };
 
-  let rightsRelation: RightsRelation | null = null;
-  if (definition.requiresRightsDeclaration) {
-    if (!isRightsRelation(raw.rightsRelation)) return { ok: false, error: "REPORT_RIGHTS_RELATION_REQUIRED" };
-    rightsRelation = raw.rightsRelation;
-    if (raw.goodFaith !== true) return { ok: false, error: "REPORT_GOOD_FAITH_REQUIRED" };
-  }
+  const rights = definition.requiresRightsDeclaration ? readRightsDeclaration(raw) : { rightsRelation: null };
+  if ("error" in rights) return { ok: false, error: rights.error };
+  const { rightsRelation } = rights;
 
   if (reportRequiresConsent(category) && raw.consent !== true) {
     return { ok: false, error: "REPORT_CONSENT_REQUIRED" };
