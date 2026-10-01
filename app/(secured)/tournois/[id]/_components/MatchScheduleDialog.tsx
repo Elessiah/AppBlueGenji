@@ -17,8 +17,10 @@ import {
   matchStartEntryOf,
   matchStartParisYear,
   readMatchStartEntry,
+  nextValidYearShift,
   shiftMatchStartYear,
   withYearShift,
+  type MatchStartEntryField,
   type MatchStartEntryState,
 } from "@/lib/shared/match-start-entry";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
@@ -33,6 +35,13 @@ const FIELD_IDS = {
 const HINT_ID = "match-start-at-hint";
 const PREVIEW_ID = "match-start-at-preview";
 const YEAR_FIX_ID = "match-start-year-fix";
+
+/** Premier champ manquant, tel que l'aperçu le nomme. */
+const MISSING_FIELD_LABELS: Readonly<Record<MatchStartEntryField, string>> = {
+  day: "le jour",
+  month: "le mois",
+  time: "l'heure",
+};
 
 const DAYS = Array.from({ length: 31 }, (_, index) => index + 1);
 
@@ -50,7 +59,7 @@ function entryRefusal(state: MatchStartEntryState): string | null {
  * le refus, lui, part en notification à l'envoi.
  */
 function pendingPreview(state: MatchStartEntryState): string | null {
-  if (state.kind === "incomplete") return "À compléter : jour, mois et heure.";
+  if (state.kind === "incomplete") return `À compléter : ${MISSING_FIELD_LABELS[state.field]}.`;
   if (state.kind === "invalid") return "Aucune date possible : ce jour n'existe pas dans ce mois.";
   return null;
 }
@@ -184,8 +193,13 @@ export function MatchScheduleDialog({
   );
   const deduced = readMatchStartEntry({ day, month, time, timeBadInput }, reference, match.startAt);
   const entry = withYearShift(deduced, yearShift);
-  const shiftTarget = (delta: number) =>
-    deduced.kind === "ready" ? shiftMatchStartYear(deduced.instant, yearShift + delta) : null;
+  // Décalage et date de chaque bouton : un cran, ou quatre pour un 29 février.
+  const shiftTarget = (direction: -1 | 1) => {
+    if (deduced.kind !== "ready") return null;
+    const shift = nextValidYearShift(deduced.instant, yearShift, direction);
+    const instant = shift === null ? null : shiftMatchStartYear(deduced.instant, shift);
+    return shift === null || instant === null ? null : { shift, year: matchStartParisYear(instant) };
+  };
   const previousYear = shiftTarget(-1);
   const nextYear = shiftTarget(1);
   const cleared = entry.kind === "empty";
@@ -420,11 +434,11 @@ export function MatchScheduleDialog({
                   type="button"
                   className="btn ghost"
                   disabled={busy}
-                  onClick={() => setYearShift((shift) => shift - 1)}
+                  onClick={() => setYearShift(previousYear.shift)}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
-                  Plutôt en {matchStartParisYear(previousYear)}
+                  Plutôt en {previousYear.year}
                 </button>
               )}
               {nextYear !== null && (
@@ -432,11 +446,11 @@ export function MatchScheduleDialog({
                   type="button"
                   className="btn ghost"
                   disabled={busy}
-                  onClick={() => setYearShift((shift) => shift + 1)}
+                  onClick={() => setYearShift(nextYear.shift)}
                   aria-controls={PREVIEW_ID}
                   style={{ padding: "4px 10px", fontSize: 12 }}
                 >
-                  Plutôt en {matchStartParisYear(nextYear)}
+                  Plutôt en {nextYear.year}
                 </button>
               )}
             </div>

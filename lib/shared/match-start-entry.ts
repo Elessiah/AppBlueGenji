@@ -287,6 +287,19 @@ export function shiftMatchStartYear(instant: number, years: number): number | nu
   return normalizeMatchStartAt(shifted) === null ? null : shifted;
 }
 
+/**
+ * Prochain décalage valable dans un sens (`-1` en arrière, `1` en avant) à
+ * partir de `shift` : un cran d'ordinaire, quatre pour un 29 février (d'une
+ * année bissextile à l'autre). `null` si rien ne convient en huit ans.
+ */
+export function nextValidYearShift(instant: number, shift: number, direction: -1 | 1): number | null {
+  for (let step = 1; step <= 8; step += 1) {
+    const candidate = shift + direction * step;
+    if (shiftMatchStartYear(instant, candidate) !== null) return candidate;
+  }
+  return null;
+}
+
 /** Applique le décalage d'année choisi à une saisie prête ; les autres états passent tels quels. */
 export function withYearShift(state: MatchStartEntryState, years: number): MatchStartEntryState {
   if (state.kind !== "ready" || years === 0) return state;
