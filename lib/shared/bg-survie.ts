@@ -694,7 +694,60 @@ export function replayEndurance(input: ReplayEnduranceInput): EnduranceStanding[
 export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceReplay {
   const { teams, matches, forfeits, penalties = [], config, lastRound, matchFormat } = input;
 
-  const standings = new Map<number, EnduranceStanding>(
+  const standings = initialEnduranceStandings(teams, config);
+  const forfeitsByRound = groupForfeitsByRound(forfeits);
+  const penaltiesByRound = groupPenaltiesByRound(penalties);
+
+  const maxRound = Math.max(
+    lastRound,
+    ...matches.map((m) => m.round),
+    ...forfeits.map((f) => f.round),
+    ...penalties.map((p) => p.round),
+    0,
+  );
+
+  const roundIsClosed = closedRoundPredicate(matches);
+
+  const rounds: number[] = [];
+  const history = new Map<number, EnduranceRoundCell[]>(teams.map((team) => [team.teamId, []]));
+  const penaltyTotals = new Map<number, number>();
+
+  for (let round = 1; round <= maxRound; round += 1) {
+    for (const match of matches) {
+      if (match.round !== round || !match.completed) continue;
+      applyEnduranceMatch(match, standings, config, round, matchFormat);
+    }
+
+    // Les pénalités tombent **après** les matchs de la manche et **avant** les
+    // abandons : une sanction qui vide le capital élimine, mais un abandon
+    // déclaré la même manche reste ce qui s'écrit au classement (la bascule
+    // `eliminatedThisRound` de `applyRoundForfeits` s'en charge, exactement
+    // comme pour une élimination venue d'un score).
+    const applied = applyRoundPenalties(standings, penaltiesByRound.get(round), round);
+    applyRoundForfeits(standings, forfeitsByRound.get(round), round);
+
+    // Coupe de fin de manche — seulement sous plafond de manches, seulement sur
+    // une manche close. Les équipes écartées gardent leur capital : c'est
+    // l'horizon qui leur manque, pas les points.
+    if (config.maxRounds !== null && roundIsClosed(round)) {
+      applyRoundCut(standings, config, config.maxRounds - round, round, matchFormat);
+    }
+
+    freezePreviousRanks(standings);
+
+    rounds.push(round);
+    recordRoundHistory(standings, round, applied, history, penaltyTotals);
+  }
+
+  return { standings: assignRanks([...standings.values()]), rounds, history, penaltyTotals };
+}
+
+/** Classement de départ : capital plein, rang = seed. */
+function initialEnduranceStandings(
+  teams: ReplayEnduranceInput["teams"],
+  config: EnduranceConfig,
+): Map<number, EnduranceStanding> {
+  return new Map<number, EnduranceStanding>(
     teams.map((team) => [
       team.teamId,
       {
@@ -711,36 +764,43 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
       },
     ]),
   );
+}
 
+/** Abandons rangés par manche, dans l'ordre de leur déclaration. */
+function groupForfeitsByRound(forfeits: EnduranceForfeit[]): Map<number, number[]> {
   const forfeitsByRound = new Map<number, number[]>();
   for (const forfeit of forfeits) {
     const list = forfeitsByRound.get(forfeit.round) ?? [];
     list.push(forfeit.teamId);
     forfeitsByRound.set(forfeit.round, list);
   }
+  return forfeitsByRound;
+}
 
-  // Les pénalités d'une manche sont **cumulées** par équipe : rien n'interdit à
-  // l'arbitrage d'en prononcer deux dans la même manche, et le tableau doit
-  // alors montrer le retrait total, pas la dernière.
+/**
+ * Pénalités rangées par manche puis par équipe.
+ *
+ * Les pénalités d'une manche sont **cumulées** par équipe : rien n'interdit à
+ * l'arbitrage d'en prononcer deux dans la même manche, et le tableau doit alors
+ * montrer le retrait total, pas la dernière.
+ */
+function groupPenaltiesByRound(penalties: EndurancePenalty[]): Map<number, Map<number, number>> {
   const penaltiesByRound = new Map<number, Map<number, number>>();
   for (const penalty of penalties) {
     const byTeam = penaltiesByRound.get(penalty.round) ?? new Map<number, number>();
     byTeam.set(penalty.teamId, (byTeam.get(penalty.teamId) ?? 0) + penalty.points);
     penaltiesByRound.set(penalty.round, byTeam);
   }
+  return penaltiesByRound;
+}
 
-  const maxRound = Math.max(
-    lastRound,
-    ...matches.map((m) => m.round),
-    ...forfeits.map((f) => f.round),
-    ...penalties.map((p) => p.round),
-    0,
-  );
-
-  // Une manche est **close** quand elle a des matchs et qu'ils sont tous joués.
-  // La coupe de fin de manche s'y adosse : sur une manche entamée, une équipe
-  // qui n'a pas encore disputé la sienne verrait son plafond calculé comme si
-  // elle avait déjà tout perdu.
+/**
+ * Une manche est **close** quand elle a des matchs et qu'ils sont tous joués.
+ * La coupe de fin de manche s'y adosse : sur une manche entamée, une équipe qui
+ * n'a pas encore disputé la sienne verrait son plafond calculé comme si elle
+ * avait déjà tout perdu.
+ */
+function closedRoundPredicate(matches: EnduranceMatchOutcome[]): (round: number) => boolean {
   const roundProgress = new Map<number, { total: number; done: number }>();
   for (const match of matches) {
     const entry = roundProgress.get(match.round) ?? { total: 0, done: 0 };
@@ -748,142 +808,182 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
     if (match.completed) entry.done += 1;
     roundProgress.set(match.round, entry);
   }
-  const roundIsClosed = (round: number): boolean => {
+  return (round: number): boolean => {
     const entry = roundProgress.get(round);
     return entry !== undefined && entry.total > 0 && entry.total === entry.done;
   };
+}
 
-  const rounds: number[] = [];
-  const history = new Map<number, EnduranceRoundCell[]>(teams.map((team) => [team.teamId, []]));
-  const penaltyTotals = new Map<number, number>();
-
-  for (let round = 1; round <= maxRound; round += 1) {
-    for (const match of matches) {
-      if (match.round !== round || !match.completed) continue;
-
-      // Match nul : ni vainqueur ni perdant, mais des maps de part et d'autre.
-      // Le capital bouge quand même — le barème est map par map, pas match par
-      // match : à ±1 un 2-2 ne déplace rien, à +2/−1 il rapporte deux points à
-      // chacune. Le cas passe **avant** la lecture vainqueur/perdant, qui n'a
-      // rien à lire ici.
-      // Double forfait : deux perdantes, et pas de gagnante pour empocher les
-      // maps. Chacune encaisse ce qu'encaisse la perdante d'un forfait
-      // ordinaire — le score plein du format, jamais un match blanc.
-      if (match.winnerTeamId === null && match.doubleForfeitTeamIds) {
-        const lostMaps = forfeitMapCount(matchFormat);
-        for (const teamId of match.doubleForfeitTeamIds) {
-          const team = standings.get(teamId);
-          if (team?.status !== "ACTIVE") continue;
-          team.losses += 1;
-          applyMapDelta(team, 0, lostMaps, config, round);
-        }
-        continue;
-      }
-
-      if (match.winnerTeamId === null && match.drawTeamIds) {
-        const [aId, bId] = match.drawTeamIds;
-        const a = standings.get(aId);
-        const b = standings.get(bId);
-        if (!a || !b || a.status !== "ACTIVE" || b.status !== "ACTIVE") continue;
-
-        const maps = Math.max(0, Math.floor(Number(match.drawMaps ?? 0)));
-        a.draws += 1;
-        b.draws += 1;
-        applyMapDelta(a, maps, maps, config, round);
-        applyMapDelta(b, maps, maps, config, round);
-        continue;
-      }
-
-      const winner = match.winnerTeamId === null ? null : standings.get(match.winnerTeamId);
-      const loser = match.loserTeamId === null ? null : standings.get(match.loserTeamId);
-
-      // Un match impliquant une équipe déjà sortie ne compte pour personne : ni
-      // résurrection de l'éliminée, ni point retiré à son adversaire. Le cas ne
-      // devrait pas se produire (le moteur n'apparie que des équipes actives),
-      // mais un score corrigé après coup peut le faire apparaître.
-      if (!winner || !loser || winner.status !== "ACTIVE" || loser.status !== "ACTIVE") {
-        continue;
-      }
-
-      const { winnerMaps, loserMaps } = enduranceMatchMaps(match, matchFormat);
-
-      winner.wins += 1;
-      loser.losses += 1;
-
-      // Barème map par map, dans les deux sens : le vainqueur d'un 3-2 ne
-      // gagne qu'un point net, celui d'un 3-0 en gagne trois.
-      applyMapDelta(winner, winnerMaps, loserMaps, config, round);
-      applyMapDelta(loser, loserMaps, winnerMaps, config, round);
-    }
-
-    // Les pénalités tombent **après** les matchs de la manche et **avant** les
-    // abandons : une sanction qui vide le capital élimine, mais un abandon
-    // déclaré la même manche reste ce qui s'écrit au classement (la bascule
-    // `eliminatedThisRound` ci-dessous s'en charge, exactement comme pour une
-    // élimination venue d'un score).
-    //
-    // Seuls les points **effectivement retirés** sont retenus pour l'affichage :
-    // une sanction visant une équipe déjà sortie n'ampute rien, et une sanction
-    // plus lourde que le capital n'en retire que ce qu'il restait. Annoncer
-    // autre chose ferait douter du tableau.
-    const applied = new Map<number, number>();
-    for (const [teamId, points] of penaltiesByRound.get(round) ?? []) {
-      const standing = standings.get(teamId);
-      if (!standing) continue;
-      const removed = applyPenalty(standing, points, round);
-      if (removed > 0) applied.set(teamId, removed);
-    }
-
-    for (const teamId of forfeitsByRound.get(round) ?? []) {
-      const standing = standings.get(teamId);
-      if (!standing) continue;
-      // L'abandon prime sur l'élimination que son propre match de forfait vient
-      // peut-être de provoquer dans cette même manche (le score plein peut vider
-      // le capital) : c'est la décision humaine qui est écrite au classement.
-      const eliminatedThisRound =
-        standing.status === "ELIMINATED" && standing.eliminatedRound === round;
-      if (standing.status === "ACTIVE" || eliminatedThisRound) {
-        standing.status = "FORFEIT";
-        standing.eliminatedRound = round;
-        standing.points = 0;
-      }
-    }
-
-    // Coupe de fin de manche — seulement sous plafond de manches, seulement sur
-    // une manche close. Les équipes écartées gardent leur capital : c'est
-    // l'horizon qui leur manque, pas les points.
-    if (config.maxRounds !== null && roundIsClosed(round)) {
-      const cut = enduranceEliminationCut(
-        [...standings.values()],
-        config,
-        config.maxRounds - round,
-        matchFormat,
-      );
-      for (const teamId of cut) {
-        const standing = standings.get(teamId);
-        if (!standing) continue;
-        standing.status = "OUT_OF_CONTENTION";
-        standing.eliminatedRound = round;
-      }
-    }
-
-    // Fige l'ordre de cette manche : il servira de départage à la suivante.
-    const ordered = [...standings.values()].filter((s) => s.status === "ACTIVE").sort(compareEndurance);
-    ordered.forEach((standing, index) => {
-      standing.previousRank = index + 1;
-    });
-
-    rounds.push(round);
-    for (const standing of standings.values()) {
-      const removed = applied.get(standing.teamId) ?? 0;
-      if (removed > 0) {
-        penaltyTotals.set(standing.teamId, (penaltyTotals.get(standing.teamId) ?? 0) + removed);
-      }
-      history.get(standing.teamId)?.push(enduranceRoundCell(standing, round, removed));
-    }
+/** Porte au classement un match clos de la manche rejouée. */
+function applyEnduranceMatch(
+  match: EnduranceMatchOutcome,
+  standings: Map<number, EnduranceStanding>,
+  config: EnduranceConfig,
+  round: number,
+  matchFormat: MatchFormat | null | undefined,
+): void {
+  // Match nul : ni vainqueur ni perdant, mais des maps de part et d'autre.
+  // Le capital bouge quand même — le barème est map par map, pas match par
+  // match : à ±1 un 2-2 ne déplace rien, à +2/−1 il rapporte deux points à
+  // chacune. Le cas passe **avant** la lecture vainqueur/perdant, qui n'a
+  // rien à lire ici.
+  // Double forfait : deux perdantes, et pas de gagnante pour empocher les
+  // maps. Chacune encaisse ce qu'encaisse la perdante d'un forfait
+  // ordinaire — le score plein du format, jamais un match blanc.
+  if (match.winnerTeamId === null && match.doubleForfeitTeamIds) {
+    applyDoubleForfeitMatch(match.doubleForfeitTeamIds, standings, config, round, matchFormat);
+    return;
   }
 
-  return { standings: assignRanks([...standings.values()]), rounds, history, penaltyTotals };
+  if (match.winnerTeamId === null && match.drawTeamIds) {
+    applyDrawMatch(match.drawTeamIds, match.drawMaps, standings, config, round);
+    return;
+  }
+
+  applyDecisiveMatch(match, standings, config, round, matchFormat);
+}
+
+function applyDoubleForfeitMatch(
+  teamIds: readonly [number, number],
+  standings: Map<number, EnduranceStanding>,
+  config: EnduranceConfig,
+  round: number,
+  matchFormat: MatchFormat | null | undefined,
+): void {
+  const lostMaps = forfeitMapCount(matchFormat);
+  for (const teamId of teamIds) {
+    const team = standings.get(teamId);
+    if (team?.status !== "ACTIVE") continue;
+    team.losses += 1;
+    applyMapDelta(team, 0, lostMaps, config, round);
+  }
+}
+
+function applyDrawMatch(
+  [aId, bId]: readonly [number, number],
+  drawMaps: number | null | undefined,
+  standings: Map<number, EnduranceStanding>,
+  config: EnduranceConfig,
+  round: number,
+): void {
+  const a = standings.get(aId);
+  const b = standings.get(bId);
+  if (!a || !b || a.status !== "ACTIVE" || b.status !== "ACTIVE") return;
+
+  const maps = Math.max(0, Math.floor(Number(drawMaps ?? 0)));
+  a.draws += 1;
+  b.draws += 1;
+  applyMapDelta(a, maps, maps, config, round);
+  applyMapDelta(b, maps, maps, config, round);
+}
+
+function applyDecisiveMatch(
+  match: EnduranceMatchOutcome,
+  standings: Map<number, EnduranceStanding>,
+  config: EnduranceConfig,
+  round: number,
+  matchFormat: MatchFormat | null | undefined,
+): void {
+  const winner = match.winnerTeamId === null ? null : standings.get(match.winnerTeamId);
+  const loser = match.loserTeamId === null ? null : standings.get(match.loserTeamId);
+
+  // Un match impliquant une équipe déjà sortie ne compte pour personne : ni
+  // résurrection de l'éliminée, ni point retiré à son adversaire. Le cas ne
+  // devrait pas se produire (le moteur n'apparie que des équipes actives),
+  // mais un score corrigé après coup peut le faire apparaître.
+  if (!winner || !loser || winner.status !== "ACTIVE" || loser.status !== "ACTIVE") return;
+
+  const { winnerMaps, loserMaps } = enduranceMatchMaps(match, matchFormat);
+
+  winner.wins += 1;
+  loser.losses += 1;
+
+  // Barème map par map, dans les deux sens : le vainqueur d'un 3-2 ne
+  // gagne qu'un point net, celui d'un 3-0 en gagne trois.
+  applyMapDelta(winner, winnerMaps, loserMaps, config, round);
+  applyMapDelta(loser, loserMaps, winnerMaps, config, round);
+}
+
+/**
+ * Applique les pénalités d'une manche et rend, par équipe, les points
+ * **effectivement retirés** : une sanction visant une équipe déjà sortie
+ * n'ampute rien, et une sanction plus lourde que le capital n'en retire que ce
+ * qu'il restait. Annoncer autre chose ferait douter du tableau.
+ */
+function applyRoundPenalties(
+  standings: Map<number, EnduranceStanding>,
+  byTeam: Map<number, number> | undefined,
+  round: number,
+): Map<number, number> {
+  const applied = new Map<number, number>();
+  for (const [teamId, points] of byTeam ?? []) {
+    const standing = standings.get(teamId);
+    if (!standing) continue;
+    const removed = applyPenalty(standing, points, round);
+    if (removed > 0) applied.set(teamId, removed);
+  }
+  return applied;
+}
+
+function applyRoundForfeits(
+  standings: Map<number, EnduranceStanding>,
+  teamIds: number[] | undefined,
+  round: number,
+): void {
+  for (const teamId of teamIds ?? []) {
+    const standing = standings.get(teamId);
+    if (!standing) continue;
+    // L'abandon prime sur l'élimination que son propre match de forfait vient
+    // peut-être de provoquer dans cette même manche (le score plein peut vider
+    // le capital) : c'est la décision humaine qui est écrite au classement.
+    const eliminatedThisRound =
+      standing.status === "ELIMINATED" && standing.eliminatedRound === round;
+    if (standing.status === "ACTIVE" || eliminatedThisRound) {
+      standing.status = "FORFEIT";
+      standing.eliminatedRound = round;
+      standing.points = 0;
+    }
+  }
+}
+
+function applyRoundCut(
+  standings: Map<number, EnduranceStanding>,
+  config: EnduranceConfig,
+  remainingRounds: number,
+  round: number,
+  matchFormat: MatchFormat | null | undefined,
+): void {
+  const cut = enduranceEliminationCut([...standings.values()], config, remainingRounds, matchFormat);
+  for (const teamId of cut) {
+    const standing = standings.get(teamId);
+    if (!standing) continue;
+    standing.status = "OUT_OF_CONTENTION";
+    standing.eliminatedRound = round;
+  }
+}
+
+/** Fige l'ordre de cette manche : il servira de départage à la suivante. */
+function freezePreviousRanks(standings: Map<number, EnduranceStanding>): void {
+  const ordered = [...standings.values()].filter((s) => s.status === "ACTIVE").sort(compareEndurance);
+  ordered.forEach((standing, index) => {
+    standing.previousRank = index + 1;
+  });
+}
+
+function recordRoundHistory(
+  standings: Map<number, EnduranceStanding>,
+  round: number,
+  applied: Map<number, number>,
+  history: Map<number, EnduranceRoundCell[]>,
+  penaltyTotals: Map<number, number>,
+): void {
+  for (const standing of standings.values()) {
+    const removed = applied.get(standing.teamId) ?? 0;
+    if (removed > 0) {
+      penaltyTotals.set(standing.teamId, (penaltyTotals.get(standing.teamId) ?? 0) + removed);
+    }
+    history.get(standing.teamId)?.push(enduranceRoundCell(standing, round, removed));
+  }
 }
 
 /**

@@ -137,57 +137,7 @@ export function replaySwiss(input: ReplaySwissInput): SwissStanding[] {
   const ordered = [...input.matches].sort((a, b) => a.round - b.round);
 
   for (const match of ordered) {
-    const team1 = match.team1Id === null ? undefined : state.get(match.team1Id);
-    const team2 = match.team2Id === null ? undefined : state.get(match.team2Id);
-
-    // Historique des rencontres : dès la programmation du match.
-    if (team1 && team2) {
-      team1.opponentIds.push(team2.teamId);
-      team2.opponentIds.push(team1.teamId);
-    }
-
-    if (!match.completed) continue;
-
-    if (match.isBye) {
-      const beneficiary = match.winnerTeamId === null ? team1 : state.get(match.winnerTeamId);
-      if (beneficiary) {
-        beneficiary.byes += 1;
-        beneficiary.points += input.points.bye;
-      }
-      continue;
-    }
-
-    if (!team1 || !team2) continue;
-
-    if (match.doubleForfeit) {
-      team1.losses += 1;
-      team2.losses += 1;
-      team1.points += input.points.loss;
-      team2.points += input.points.loss;
-      continue;
-    }
-
-    if (match.winnerTeamId === null) {
-      // Match terminé sans vainqueur : match nul.
-      team1.draws += 1;
-      team2.draws += 1;
-      team1.points += input.points.draw;
-      team2.points += input.points.draw;
-      continue;
-    }
-
-    const winner = state.get(match.winnerTeamId);
-    const otherTeam = match.winnerTeamId === team1.teamId ? team2 : team1;
-    const loser = match.loserTeamId === null ? otherTeam : state.get(match.loserTeamId);
-
-    if (winner) {
-      winner.wins += 1;
-      winner.points += input.points.win;
-    }
-    if (loser) {
-      loser.losses += 1;
-      loser.points += input.points.loss;
-    }
+    applySwissMatch(match, state, input.points);
   }
 
   for (const forfeit of input.forfeits) {
@@ -198,6 +148,73 @@ export function replaySwiss(input: ReplaySwissInput): SwissStanding[] {
   }
 
   return [...state.values()];
+}
+
+/** Porte un match au rejeu : historique des rencontres puis résultat s'il est clos. */
+function applySwissMatch(
+  match: SwissMatchOutcome,
+  state: Map<number, SwissStanding>,
+  points: SwissPointsConfig,
+): void {
+  const team1 = match.team1Id === null ? undefined : state.get(match.team1Id);
+  const team2 = match.team2Id === null ? undefined : state.get(match.team2Id);
+
+  // Historique des rencontres : dès la programmation du match.
+  if (team1 && team2) {
+    team1.opponentIds.push(team2.teamId);
+    team2.opponentIds.push(team1.teamId);
+  }
+
+  if (!match.completed) return;
+
+  if (match.isBye) {
+    const beneficiary = match.winnerTeamId === null ? team1 : state.get(match.winnerTeamId);
+    if (beneficiary) {
+      beneficiary.byes += 1;
+      beneficiary.points += points.bye;
+    }
+    return;
+  }
+
+  if (team1 && team2) applySwissResult(match, team1, team2, state, points);
+}
+
+/** Résultat d'un match clos entre deux équipes connues : double forfait, nul ou victoire. */
+function applySwissResult(
+  match: SwissMatchOutcome,
+  team1: SwissStanding,
+  team2: SwissStanding,
+  state: Map<number, SwissStanding>,
+  points: SwissPointsConfig,
+): void {
+  if (match.doubleForfeit) {
+    recordSwissResult(team1, "losses", points.loss);
+    recordSwissResult(team2, "losses", points.loss);
+    return;
+  }
+
+  if (match.winnerTeamId === null) {
+    // Match terminé sans vainqueur : match nul.
+    recordSwissResult(team1, "draws", points.draw);
+    recordSwissResult(team2, "draws", points.draw);
+    return;
+  }
+
+  const winner = state.get(match.winnerTeamId);
+  const otherTeam = match.winnerTeamId === team1.teamId ? team2 : team1;
+  const loser = match.loserTeamId === null ? otherTeam : state.get(match.loserTeamId);
+
+  if (winner) recordSwissResult(winner, "wins", points.win);
+  if (loser) recordSwissResult(loser, "losses", points.loss);
+}
+
+function recordSwissResult(
+  standing: SwissStanding,
+  counter: "wins" | "draws" | "losses",
+  awarded: number,
+): void {
+  standing[counter] += 1;
+  standing.points += awarded;
 }
 
 /** Équipes encore en lice (les abandons ne sont plus appariés). */
@@ -251,32 +268,46 @@ export function computeTiebreaks(
       counted += 1;
     }
 
-    let sonnebornBerger = 0;
-    for (const match of matches) {
-      if (!match.completed || match.isBye) continue;
-      if (match.team1Id === null || match.team2Id === null) continue;
-      const isTeam1 = match.team1Id === standing.teamId;
-      const isTeam2 = match.team2Id === standing.teamId;
-      if (!isTeam1 && !isTeam2) continue;
-
-      const opponent = byId.get(isTeam1 ? match.team2Id : match.team1Id);
-      if (!opponent) continue;
-
-      // Un double forfait n'a rien battu : il ne rapporte rien, pas même la
-      // moitié d'un nul.
-      if (match.doubleForfeit) continue;
-      if (match.winnerTeamId === standing.teamId) sonnebornBerger += opponent.points;
-      else if (match.winnerTeamId === null) sonnebornBerger += opponent.points / 2;
-    }
-
     scores.set(standing.teamId, {
       buchholz,
-      sonnebornBerger,
+      sonnebornBerger: sonnebornBergerOf(standing.teamId, matches, byId),
       opponentMatchWinPercent: counted === 0 ? 0 : winPercentSum / counted,
     });
   }
 
   return scores;
+}
+
+/** Somme des points des adversaires battus, et de la moitié de ceux tenus en échec. */
+function sonnebornBergerOf(
+  teamId: number,
+  matches: SwissMatchOutcome[],
+  byId: Map<number, SwissStanding>,
+): number {
+  let sonnebornBerger = 0;
+  for (const match of matches) {
+    const opponentId = playedOpponentId(match, teamId);
+    if (opponentId === null) continue;
+
+    const opponent = byId.get(opponentId);
+    if (!opponent) continue;
+
+    // Un double forfait n'a rien battu : il ne rapporte rien, pas même la
+    // moitié d'un nul.
+    if (match.doubleForfeit) continue;
+    if (match.winnerTeamId === teamId) sonnebornBerger += opponent.points;
+    else if (match.winnerTeamId === null) sonnebornBerger += opponent.points / 2;
+  }
+  return sonnebornBerger;
+}
+
+/** Adversaire de `teamId` dans un match clos entre deux équipes, sinon `null`. */
+function playedOpponentId(match: SwissMatchOutcome, teamId: number): number | null {
+  if (!match.completed || match.isBye) return null;
+  if (match.team1Id === null || match.team2Id === null) return null;
+  if (match.team1Id === teamId) return match.team2Id;
+  if (match.team2Id === teamId) return match.team1Id;
+  return null;
 }
 
 /**
@@ -337,18 +368,8 @@ export function rankSwiss(
   };
   const scoreOf = (s: SwissStanding): SwissTiebreakScores => scores.get(s.teamId) ?? zero;
 
-  /** Critères ordonnés, hors confrontation directe : tous des nombres. */
-  const criteria: ((s: SwissStanding) => number)[] = [
-    (s) => (s.status === "ACTIVE" ? 0 : 1),
-    (s) => -s.points,
-  ];
-  for (const tiebreaker of tiebreakers) {
-    if (tiebreaker === "buchholz") criteria.push((s) => -scoreOf(s).buchholz);
-    if (tiebreaker === "sonneborn-berger") criteria.push((s) => -scoreOf(s).sonnebornBerger);
-    if (tiebreaker === "opponent-mwp") criteria.push((s) => -scoreOf(s).opponentMatchWinPercent);
-  }
+  const criteria = rankingCriteria(tiebreakers, scoreOf);
 
-  /** Vrai si les deux équipes sont indépartageables par les critères numériques. */
   const tied = (a: SwissStanding, b: SwissStanding): boolean =>
     criteria.every((key) => key(a) === key(b));
 
@@ -362,32 +383,57 @@ export function rankSwiss(
 
   const ordered = [...standings].sort(compare);
 
-  // Confrontation directe : on repère les blocs d'ex æquo parfaits et on les
-  // réordonne sur leur bilan interne, puis sur le seed.
-  if (tiebreakers.includes("head-to-head")) {
-    for (let start = 0; start < ordered.length; ) {
-      let end = start + 1;
-      while (end < ordered.length && tied(ordered[start], ordered[end])) end += 1;
-
-      if (end - start > 1) {
-        const group = ordered.slice(start, end);
-        const direct = headToHeadScores(group, matches);
-        group.sort(
-          (a, b) =>
-            (direct.get(b.teamId) ?? 0) - (direct.get(a.teamId) ?? 0) || a.seed - b.seed,
-        );
-        ordered.splice(start, group.length, ...group);
-      }
-
-      start = end;
-    }
-  }
+  if (tiebreakers.includes("head-to-head")) reorderTiedBlocksByHeadToHead(ordered, matches, tied);
 
   return ordered.map((standing, index) => ({
     ...standing,
     ...scoreOf(standing),
     rank: index + 1,
   }));
+}
+
+/** Clés de tri, dans l'ordre : actives d'abord, points, puis les départages choisis. */
+function rankingCriteria(
+  tiebreakers: SwissTiebreaker[],
+  scoreOf: (s: SwissStanding) => SwissTiebreakScores,
+): ((s: SwissStanding) => number)[] {
+  const criteria: ((s: SwissStanding) => number)[] = [
+    (s) => (s.status === "ACTIVE" ? 0 : 1),
+    (s) => -s.points,
+  ];
+  for (const tiebreaker of tiebreakers) {
+    if (tiebreaker === "buchholz") criteria.push((s) => -scoreOf(s).buchholz);
+    if (tiebreaker === "sonneborn-berger") criteria.push((s) => -scoreOf(s).sonnebornBerger);
+    if (tiebreaker === "opponent-mwp") criteria.push((s) => -scoreOf(s).opponentMatchWinPercent);
+  }
+  return criteria;
+}
+
+/**
+ * Confrontation directe : on repère les blocs d'ex æquo parfaits et on les
+ * réordonne sur leur bilan interne, puis sur le seed. Modifie `ordered` en place.
+ */
+function reorderTiedBlocksByHeadToHead(
+  ordered: SwissStanding[],
+  matches: SwissMatchOutcome[],
+  tied: (a: SwissStanding, b: SwissStanding) => boolean,
+): void {
+  for (let start = 0; start < ordered.length; ) {
+    let end = start + 1;
+    while (end < ordered.length && tied(ordered[start], ordered[end])) end += 1;
+
+    if (end - start > 1) {
+      const group = ordered.slice(start, end);
+      const direct = headToHeadScores(group, matches);
+      group.sort(
+        (a, b) =>
+          (direct.get(b.teamId) ?? 0) - (direct.get(a.teamId) ?? 0) || a.seed - b.seed,
+      );
+      ordered.splice(start, group.length, ...group);
+    }
+
+    start = end;
+  }
 }
 
 /**

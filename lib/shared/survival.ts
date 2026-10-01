@@ -288,16 +288,6 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
     forfeitsByRound.set(round, [...(forfeitsByRound.get(round) ?? []), forfeit.teamId]);
   }
 
-  const activeStandings = (): SurvivalStanding[] =>
-    rankActiveTeams([...state.values()]);
-
-  const eliminate = (teamId: number, round: number, status: SurvivalStatus): void => {
-    const team = state.get(teamId);
-    if (team?.status !== "ACTIVE") return;
-    team.status = status;
-    team.eliminatedRound = round;
-  };
-
   const lastRound = Math.max(input.lastRound, ...input.matches.map((m) => m.round), 0);
 
   for (let round = 1; round <= lastRound; round++) {
@@ -305,60 +295,91 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
 
     // 1. Résultats du round.
     for (const match of roundMatches) {
-      if (!match.completed) continue;
-      if (match.winnerTeamId !== null) {
-        const winner = state.get(match.winnerTeamId);
-        if (winner) {
-          winner.wins += 1;
-          if (match.isBye) winner.hasBye = true;
-        }
-      }
-      if (match.loserTeamId !== null) {
-        const loser = state.get(match.loserTeamId);
-        if (loser) loser.losses += 1;
-      }
-      for (const teamId of match.doubleForfeitTeamIds ?? []) {
-        const loser = state.get(teamId);
-        if (loser) loser.losses += 1;
-      }
+      if (match.completed) applySurvivalMatch(match, state);
     }
 
     // 2. Abandons déclarés pendant ce round (avant la coupe, comme en production).
     for (const teamId of forfeitsByRound.get(round) ?? []) {
-      eliminate(teamId, round, "FORFEIT");
+      eliminateSurvivalTeam(state, teamId, round, "FORFEIT");
     }
 
     // Une coupe ne s'applique qu'à un round entièrement joué.
     const roundComplete = roundMatches.length > 0 && roundMatches.every((m) => m.completed);
-    if (!roundComplete) continue;
-
-    // 3. Barrage : le perdant sort, si l'effectif est encore impair.
-    if (input.barrageRounds > 0 && round <= input.barrageRounds) {
-      if (shouldEliminateBarrageLoser(activeStandings().length, targetTeams)) {
-        const loserId = roundMatches.find((m) => m.loserTeamId !== null)?.loserTeamId ?? null;
-        if (loserId !== null) eliminate(loserId, round, "ELIMINATED");
-        // Un barrage clos sur un double forfait a deux perdantes : les deux
-        // sortent. L'effectif reste alors impair, et la parité se rattrape comme
-        // après un abandon — par la victoire d'office des manches suivantes.
-        for (const match of roundMatches) {
-          for (const teamId of match.doubleForfeitTeamIds ?? []) {
-            eliminate(teamId, round, "ELIMINATED");
-          }
-        }
-      }
-      continue;
-    }
-
-    // 4. Coupe périodique.
-    if (isCutRound(round, input)) {
-      const active = activeStandings();
-      for (const teamId of selectEliminatedTeamIds(active, teamsToEliminate(active.length, targetTeams))) {
-        eliminate(teamId, round, "ELIMINATED");
-      }
-    }
+    if (roundComplete) applyRoundEliminations(input, state, roundMatches, round, targetTeams);
   }
 
   return [...state.values()];
+}
+
+/** Sort une équipe encore active (élimination ou abandon) ; sans effet sinon. */
+function eliminateSurvivalTeam(
+  state: Map<number, SurvivalStanding>,
+  teamId: number,
+  round: number,
+  status: SurvivalStatus,
+): void {
+  const team = state.get(teamId);
+  if (team?.status !== "ACTIVE") return;
+  team.status = status;
+  team.eliminatedRound = round;
+}
+
+/** Porte au bilan un match clos : victoire (et bye), défaite, double forfait. */
+function applySurvivalMatch(match: SurvivalMatchOutcome, state: Map<number, SurvivalStanding>): void {
+  const winner = match.winnerTeamId === null ? undefined : state.get(match.winnerTeamId);
+  if (winner) {
+    winner.wins += 1;
+    if (match.isBye) winner.hasBye = true;
+  }
+  const loser = match.loserTeamId === null ? undefined : state.get(match.loserTeamId);
+  if (loser) loser.losses += 1;
+  for (const teamId of match.doubleForfeitTeamIds ?? []) {
+    const doubleForfeitLoser = state.get(teamId);
+    if (doubleForfeitLoser) doubleForfeitLoser.losses += 1;
+  }
+}
+
+/** Éliminations d'un round entièrement joué : barrage, sinon coupe périodique. */
+function applyRoundEliminations(
+  input: ReplaySurvivalInput,
+  state: Map<number, SurvivalStanding>,
+  roundMatches: SurvivalMatchOutcome[],
+  round: number,
+  targetTeams: number,
+): void {
+  // 3. Barrage : le perdant sort, si l'effectif est encore impair.
+  if (input.barrageRounds > 0 && round <= input.barrageRounds) {
+    applyBarrageElimination(state, roundMatches, round, targetTeams);
+    return;
+  }
+
+  // 4. Coupe périodique.
+  if (isCutRound(round, input)) {
+    const active = rankActiveTeams([...state.values()]);
+    for (const teamId of selectEliminatedTeamIds(active, teamsToEliminate(active.length, targetTeams))) {
+      eliminateSurvivalTeam(state, teamId, round, "ELIMINATED");
+    }
+  }
+}
+
+function applyBarrageElimination(
+  state: Map<number, SurvivalStanding>,
+  roundMatches: SurvivalMatchOutcome[],
+  round: number,
+  targetTeams: number,
+): void {
+  if (!shouldEliminateBarrageLoser(rankActiveTeams([...state.values()]).length, targetTeams)) return;
+
+  const loserId = roundMatches.find((m) => m.loserTeamId !== null)?.loserTeamId ?? null;
+  if (loserId !== null) eliminateSurvivalTeam(state, loserId, round, "ELIMINATED");
+  // Un barrage clos sur un double forfait a deux perdantes : les deux
+  // sortent. L'effectif reste alors impair, et la parité se rattrape comme
+  // après un abandon — par la victoire d'office des manches suivantes.
+  for (const match of roundMatches) {
+    for (const teamId of match.doubleForfeitTeamIds ?? []) {
+      eliminateSurvivalTeam(state, teamId, round, "ELIMINATED");
+    }
+  }
 }
 
 /**
