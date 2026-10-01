@@ -16,6 +16,7 @@
  * (`purgeEndedSuspensions`, appelée par `createSession`), comme celle des
  * sessions expirées qu'elle suit.
  */
+import { closeUserStreams } from "@/lib/server/session-streams";
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { loadNotificationRecipients, notifyUsers } from "@/lib/server/notify";
@@ -224,6 +225,11 @@ export async function suspendAccount(
   } finally {
     connection.release();
   }
+
+  // Après le commit : un flux fermé sur une suspension défaite par un rollback
+  // aurait seulement fait se reconnecter le client, mais la règle est la même
+  // partout — on ne ferme que ce qui est réellement révoqué.
+  closeUserStreams(targetUserId);
 
   publishStaffAction(formatSuspensionLog({ id: view.id, ground: view.ground, endsAt: view.endsAt }), actor);
   void loadNotificationRecipients([targetUserId], "proven")

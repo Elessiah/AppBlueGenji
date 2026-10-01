@@ -10,7 +10,8 @@
  * `lib/server/tournament-broadcast.ts` : une seule passe en base par tournoi,
  * quel que soit le nombre de spectateurs.
  */
-import { getCurrentUser } from "@/lib/server/auth";
+import { currentTokenHash, getCurrentUser } from "@/lib/server/auth";
+import { registerSessionStream } from "@/lib/server/session-streams";
 import { enforceRateLimit, STREAM_OPEN_RULE } from "@/lib/server/api-guard";
 import {
   acquireStreamSlot,
@@ -59,17 +60,43 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
     return new Response("Unauthorized", { status: 401 });
   }
 
+  /**
+   * Nettoyage de la connexion, hissé hors de `start` pour que `cancel` — et la
+   * révocation de la session — puissent l'appeler.
+   *
+   * Le flux se termine par deux portes distinctes : le signal de la requête,
+   * quand le client se déconnecte, et l'annulation du corps de la réponse, quand
+   * c'est le runtime qui le referme. Ne brancher que la première laisse la place
+   * de flux prise par la seconde — et quatre occurrences valent un 429 permanent
+   * sur son propre tournoi.
+   */
+  let cleanup: () => void = () => undefined;
+
+  // La session n'est lue qu'ici : le flux s'inscrit donc **dès maintenant**
+  // auprès d'elle (`lib/server/session-streams.ts`), pour qu'une déconnexion,
+  // une révocation, une suspension ou une suppression de compte le ferme —
+  // y compris pendant les lectures qui précèdent l'ouverture.
+  let revoked = false;
+  const unregister = registerSessionStream(user.id, await currentTokenHash(), () => {
+    revoked = true;
+    cleanup();
+  });
+  const refuse = (response: Response): Response => {
+    unregister();
+    return response;
+  };
+
   // Le plafond de flux simultanés ne borne pas le *rythme* d'ouverture : un
   // client qui ouvre et referme en boucle libère sa place à chaque fermeture et
   // y échapperait, tout en refaisant à chaque tour le travail le plus cher de
   // la route (session, instantané, contexte du lecteur).
   const throttled = enforceRateLimit(STREAM_OPEN_RULE, user.id);
-  if (throttled) return throttled;
+  if (throttled) return refuse(throttled);
 
   const { id } = await context.params;
   const tournamentId = Number(id);
   if (!Number.isInteger(tournamentId) || tournamentId <= 0) {
-    return new Response("Invalid tournament id", { status: 400 });
+    return refuse(new Response("Invalid tournament id", { status: 400 }));
   }
 
   // Gestion résolue **avant** la lecture : elle décide aussi de l'accès. Un
@@ -83,7 +110,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // de refus. « N'existe pas » et « pas encore publié » se répondent pareil.
   const snapshot = await getVisibleTournamentSnapshot(tournamentId, { canManage });
   if (!snapshot) {
-    return new Response("Tournament not found", { status: 404 });
+    return refuse(new Response("Tournament not found", { status: 404 }));
   }
 
   // L'aperçu du plateau va plus loin que la gestion : le cast y a droit sans
@@ -127,12 +154,19 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
 
   // Un onglet ouvre un flux. Le plafond ne gêne personne d'ordinaire ; il évite
   // qu'un client en boucle de reconnexion accapare la machine.
+  // Session révoquée pendant les lectures : la porte ordinaire répondrait 401.
+  if (revoked) {
+    return refuse(new Response("Unauthorized", { status: 401 }));
+  }
+
   const releaseSlot = acquireStreamSlot(user.id);
   if (!releaseSlot) {
-    return new Response("Too many streams", {
-      status: 429,
-      headers: { "Retry-After": "30" },
-    });
+    return refuse(
+      new Response("Too many streams", {
+        status: 429,
+        headers: { "Retry-After": "30" },
+      }),
+    );
   }
 
   // Rien à servir si le client est déjà parti : ni encoder l'instantané (jusqu'à
@@ -141,6 +175,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   // inutile coûte le plus cher.
   if (req.signal.aborted) {
     releaseSlot();
+    unregister();
     // 204 plutôt que le 499 d'nginx : ce dernier est un code de journal, pas un
     // statut HTTP, et un mandataire ou une supervision le compterait comme une
     // famille d'erreurs inventée.
@@ -153,18 +188,6 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
   const encoding: StreamEncoding = acceptsGzip(req.headers.get("accept-encoding"))
     ? "gzip"
     : "identity";
-
-  /**
-   * Nettoyage de la connexion, hissé hors de `start` pour que `cancel` puisse
-   * l'appeler.
-   *
-   * Le flux se termine par deux portes distinctes : le signal de la requête,
-   * quand le client se déconnecte, et l'annulation du corps de la réponse, quand
-   * c'est le runtime qui le referme. Ne brancher que la première laisse la place
-   * de flux prise par la seconde — et quatre occurrences valent un 429 permanent
-   * sur son propre tournoi.
-   */
-  let cleanup: () => void = () => undefined;
 
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
@@ -180,6 +203,7 @@ export async function GET(req: Request, context: { params: Promise<{ id: string 
         if (heartbeat !== null) clearInterval(heartbeat);
         leaveRoom?.();
         releaseSlot();
+        unregister();
         try {
           controller.close();
         } catch {

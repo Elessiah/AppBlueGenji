@@ -18,6 +18,7 @@ import {
 } from "@/lib/shared/discord-tag-lock";
 import { NamedLockUnavailableError, withNamedLock } from "@/lib/server/named-lock";
 import { ensureUniquePseudo, resolveRoles } from "@/lib/server/auth";
+import { closeUserStreams } from "@/lib/server/session-streams";
 import { normalizePseudo, parseRoles, toIso } from "@/lib/server/serialization";
 import { listPrivacyAcknowledgments } from "@/lib/server/privacy-consent";
 import { listOwnConnectionLogs } from "@/lib/server/connection-logs";
@@ -1733,6 +1734,10 @@ export async function deleteOwnAccount(userId: number): Promise<AccountDeletionP
   } finally {
     connection.release();
   }
+
+  // Ses sessions sont parties avec la transaction, pas ses flux de tournoi
+  // ouverts, qui ne relisent pas la session (`session-streams.ts`).
+  closeUserStreams(userId);
 
   // Les deux modes effacent la photo : l'un fait disparaître la ligne, l'autre
   // met `avatar_url` à `NULL` — dans les deux cas le fichier resterait servi
