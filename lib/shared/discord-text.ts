@@ -36,7 +36,7 @@ const LINE_BREAKS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g;
 const MENTION_BREAK = "@\u200B";
 
 /** Barre oblique inverse, qui échappe le caractère qu'elle précède. */
-const BACKSLASH = String.fromCharCode(92);
+const BACKSLASH = String.fromCodePoint(92);
 
 function neutralize(value: string): string {
   return value.replace(MARKDOWN, (char) => BACKSLASH + char).replace(/@/g, MENTION_BREAK);

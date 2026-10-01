@@ -300,7 +300,7 @@ export function SurvivalRounds({
   emptyLabel,
 }: SurvivalRoundsProps) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
-  const lastRound = roundNums.length > 0 ? roundNums[roundNums.length - 1] : null;
+  const lastRound = roundNums.at(-1) ?? null;
   const barrageRounds = cutSchedule?.barrageRounds ?? 0;
   return (
     <ScrollArea

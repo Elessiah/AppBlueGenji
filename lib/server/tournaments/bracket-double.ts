@@ -1,12 +1,11 @@
 import type { PoolConnection } from "mysql2/promise";
 import { generateSeedOrder, nextPowerOfTwo } from "@/lib/server/serialization";
-import { TournamentRow } from "./_internal";
+import { statusFromTeams, TournamentRow } from "./_internal";
 import {
   createMatch,
   setMatchParticipants,
   updateTournamentBracketSize,
 } from "./repository";
-import { statusFromTeams } from "./_internal";
 import { tryAutoResolveByes } from "./byes";
 import {
   LOWER_FINAL_WINNER_PLACEHOLDER,

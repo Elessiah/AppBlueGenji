@@ -356,7 +356,7 @@ function SurvivalDiagram() {
             {i + 1}
           </text>
           <text x={x + 26} y={y + i * 26 + 15} fill={inCut ? RED : INK} fontSize={11} fontFamily={MONO}>
-            {`Équipe ${String.fromCharCode(65 + i)}`}
+            {`Équipe ${String.fromCodePoint(65 + i)}`}
           </text>
         </g>
       );

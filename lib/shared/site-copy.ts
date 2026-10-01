@@ -197,7 +197,7 @@ export function validateSiteCopy(key: string, rawValue: unknown): SiteCopyValida
   const field = FIELD_BY_KEY.get(key);
   if (!field) return { ok: false, error: "UNKNOWN_COPY_KEY" };
 
-  const value = String(rawValue ?? "").replace(/\r\n/g, "\n").trim();
+  const value = String(rawValue ?? "").replace(/\r\n/g, "\n").trim(); // NOSONAR typescript:S6551 — champ d'un corps JSON ; un objet y serait de toute façon refusé à la validation de longueur
   if (value.length === 0) return { ok: false, error: "COPY_EMPTY" };
   if (value.length > field.maxLength) return { ok: false, error: "COPY_TOO_LONG" };
 

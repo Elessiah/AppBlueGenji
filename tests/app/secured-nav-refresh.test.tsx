@@ -47,7 +47,7 @@ describe("frontière de chargement de l'espace connecté", () => {
   it.each(["tournois", "equipes", "joueurs", "profil", "signalements"])(
     "le segment %s a sa frontière, qui rend le squelette partagé",
     (segment) => {
-      expect(read(`app/(secured)/${segment}/loading.tsx`)).toContain("export default SecuredLoading");
+      expect(read(`app/(secured)/${segment}/loading.tsx`)).toContain("export { SecuredLoading as default }");
     },
   );
 

@@ -41,7 +41,7 @@ export async function initializeMultiTournament(
   conn: PoolConnection,
 ): Promise<void> {
   const tournament = await loadTournamentRow(conn, tournamentId);
-  if (!tournament || tournament.format !== "MULTI") return;
+  if (tournament?.format !== "MULTI") return;
 
   const phases = await loadPhases(conn, tournamentId);
   const registrations = await getRegistrationRows(conn, tournamentId);
@@ -151,7 +151,7 @@ export async function startPhase(
   conn: PoolConnection,
 ): Promise<void> {
   const phase = await loadPhase(conn, phaseId);
-  if (!phase || phase.state !== "PENDING") return;
+  if (phase?.state !== "PENDING") return;
 
   // Met en état RUNNING + timestamp started_at
   await setPhaseState(conn, phaseId, "RUNNING", "started_at");
@@ -500,7 +500,7 @@ export async function loadPhasesForDetail(
   phaseStandings: Record<number, TournamentPhaseStanding[]>;
 } | null> {
   const tournament = await loadTournamentRow(conn, tournamentId);
-  if (!tournament || tournament.format !== "MULTI") return null;
+  if (tournament?.format !== "MULTI") return null;
 
   const { mapPhase } = await import("./_internal");
   const phaseRows = await loadPhases(conn, tournamentId);

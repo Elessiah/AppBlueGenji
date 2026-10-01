@@ -74,7 +74,8 @@ function NetworkCanvas({ rgb }: { rgb: string }) {
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    return runNetwork(canvas, rgb, policy, (nodesRef.current ??= createNodes()));
+    nodesRef.current ??= createNodes();
+    return runNetwork(canvas, rgb, policy, nodesRef.current);
   }, [rgb, policy]);
 
   return <canvas ref={canvasRef} aria-hidden className={s.bgCanvas} />; // NOSONAR S6825 — un <canvas> sans tabIndex n'est pas focalisable : fond décoratif
@@ -129,7 +130,7 @@ function runNetwork(
       for (let j = i + 1; j < nodes.length; j += 1) {
         const dx = nodes[i].x - nodes[j].x;
         const dy = nodes[i].y - nodes[j].y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
+        const distance = Math.hypot(dx, dy);
         if (distance < 180) {
           ctx.globalAlpha = (1 - distance / 180) * 0.6;
           ctx.beginPath();

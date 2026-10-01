@@ -112,8 +112,8 @@ export function planSurvivalRound(
     return {
       pairings: [
         {
-          teamAId: teams[teams.length - 2].teamId,
-          teamBId: teams[teams.length - 1].teamId,
+          teamAId: teams.at(-2)!.teamId,
+          teamBId: teams.at(-1)!.teamId,
         },
       ],
       byeTeamId: null,
@@ -293,7 +293,7 @@ export function replaySurvival(input: ReplaySurvivalInput): SurvivalStanding[] {
 
   const eliminate = (teamId: number, round: number, status: SurvivalStatus): void => {
     const team = state.get(teamId);
-    if (!team || team.status !== "ACTIVE") return;
+    if (team?.status !== "ACTIVE") return;
     team.status = status;
     team.eliminatedRound = round;
   };

@@ -132,7 +132,7 @@ export const ALL_TRANSFER_RECIPIENTS: readonly TransferRecipient[] = [
 
 function joinNames(names: string[]): string {
   if (names.length <= 1) return names.join("");
-  return `${names.slice(0, -1).join(", ")} et ${names[names.length - 1]}`;
+  return `${names.slice(0, -1).join(", ")} et ${names.at(-1)}`;
 }
 
 /**

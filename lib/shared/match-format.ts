@@ -320,7 +320,7 @@ export function matchWinnerSide(
  * close et que l'arbre resterait bloqué à ce tour, sans qualifiée à propager.
  */
 export function withoutDraws(format: MatchFormat | null): MatchFormat | null {
-  if (!format || !format.drawsAllowed) return format;
+  if (!format?.drawsAllowed) return format;
 
   return { type: format.type, value: format.value, maxMaps: null };
 }

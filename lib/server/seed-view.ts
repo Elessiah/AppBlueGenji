@@ -178,7 +178,7 @@ async function main(): Promise<void> {
   try {
     const db = await getDatabase();
     const arg = process.argv[2];
-    const tournamentId = arg ? Number(arg) : NaN;
+    const tournamentId = arg ? Number(arg) : Number.NaN;
 
     if (Number.isInteger(tournamentId) && tournamentId > 0) {
       await detail(db, tournamentId);
@@ -193,4 +193,4 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+await main();

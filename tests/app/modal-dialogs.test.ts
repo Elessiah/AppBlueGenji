@@ -149,12 +149,12 @@ describe("useDialogBehavior — focus initial", () => {
   it("vise le champ marqué data-autofocus, pris parmi les focalisables", () => {
     // Pris ailleurs, un champ marqué mais désactivé ou masqué ferait échouer
     // `focus()` en silence : le focus resterait derrière le voile.
-    expect(hook).toMatch(/candidates\.find\(\(el\) => el\.hasAttribute\("data-autofocus"\)\)/);
+    expect(hook).toMatch(/candidates\.find\(\(el\) => el\.dataset\.autofocus !== undefined\)/);
     expect(hook).toContain("(preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus()");
   });
 
   it("passe le bouton « × » d'en-tête pour aller au premier contrôle du contenu", () => {
-    expect(hook).toMatch(/candidates\.find\(\(el\) => !el\.hasAttribute\("data-dialog-close"\)\)/);
+    expect(hook).toMatch(/candidates\.find\(\(el\) => el\.dataset\.dialogClose === undefined\)/);
   });
 });
 

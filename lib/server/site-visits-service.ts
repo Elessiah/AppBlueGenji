@@ -67,20 +67,25 @@ const VISIT_RATE_RULE: RateLimitRule = {
 
 let lastBotSyncAt = 0;
 
+/** Un agrégat SQL tel que `mysql2` le rend (nombre, chaîne pour un `BIGINT`, ou `NULL`). */
+type SqlCount = number | string | null;
+/** Une date SQL telle que `mysql2` la rend. */
+type SqlDate = string | Date | null;
+
 interface VisitStatsRow extends RowDataPacket {
-  recent_visits: number | string | null;
-  archived_visits: number | string | null;
-  unique_visitors: number | string | null;
-  identified_visitors: number | string | null;
-  visits_24h: number | string | null;
-  unique_24h: number | string | null;
-  visits_7d: number | string | null;
-  unique_7d: number | string | null;
-  visits_30d: number | string | null;
-  unique_30d: number | string | null;
-  first_recent_visit_at: string | Date | null;
-  first_archived_visit_at: string | Date | null;
-  last_visit_at: string | Date | null;
+  recent_visits: SqlCount;
+  archived_visits: SqlCount;
+  unique_visitors: SqlCount;
+  identified_visitors: SqlCount;
+  visits_24h: SqlCount;
+  unique_24h: SqlCount;
+  visits_7d: SqlCount;
+  unique_7d: SqlCount;
+  visits_30d: SqlCount;
+  unique_30d: SqlCount;
+  first_recent_visit_at: SqlDate;
+  first_archived_visit_at: SqlDate;
+  last_visit_at: SqlDate;
 }
 
 /**

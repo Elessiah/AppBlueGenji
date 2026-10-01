@@ -133,7 +133,7 @@ export function teamErrorMessage(
   fallbackCode?: string,
 ): string {
   const fallback = () =>
-    fallbackCode && Object.prototype.hasOwnProperty.call(TEAM_ERRORS, fallbackCode)
+    fallbackCode && Object.hasOwn(TEAM_ERRORS, fallbackCode)
       ? TEAM_ERRORS[fallbackCode]
       : FALLBACK;
   if (!code) return fallback();
@@ -144,7 +144,7 @@ export function teamErrorMessage(
   const imageMessage = imageUploadErrorMessage(code);
   if (imageMessage) return imageMessage;
   // `code in` remonterait la chaîne de prototypes (« constructor »).
-  return Object.prototype.hasOwnProperty.call(TEAM_ERRORS, code) ? TEAM_ERRORS[code] : fallback();
+  return Object.hasOwn(TEAM_ERRORS, code) ? TEAM_ERRORS[code] : fallback();
 }
 
 /**

@@ -17,7 +17,7 @@ import {
 import { toServedUploadUrl } from "@/lib/shared/uploads";
 import styles from "./page.module.css";
 
-const ACCEPTED_PHOTO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const ACCEPTED_PHOTO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
 
 interface BenevoleSectionProps {
@@ -177,7 +177,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionP
     // Réinitialise pour permettre de re-sélectionner le même fichier ensuite.
     event.target.value = "";
     if (!file) return;
-    if (!ACCEPTED_PHOTO_TYPES.includes(file.type)) {
+    if (!ACCEPTED_PHOTO_TYPES.has(file.type)) {
       showError("Format invalide : PNG, JPEG ou WebP uniquement.");
       return;
     }

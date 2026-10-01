@@ -285,14 +285,14 @@ export type RecruiterContactDefaults = {
 export type RecruitmentAdInput = {
   title: string;
   teamName?: string | null;
-  domain?: RecruitmentDomain | string;
+  domain?: RecruitmentDomain | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une saisie brute, validée ensuite
   roles?: string | null;
   body?: string | null;
   contactUrl?: string | null;
   contactDiscord?: string | null;
   contactDiscordId?: string | null;
-  contactPreferred?: RecruitmentContactChannel | string;
-  priority?: RecruitmentPriority | string;
+  contactPreferred?: RecruitmentContactChannel | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une saisie brute, validée ensuite
+  priority?: RecruitmentPriority | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une saisie brute, validée ensuite
   active?: boolean;
 };
 

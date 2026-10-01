@@ -91,7 +91,7 @@ export function resyncImageDraft(
  * sélecteur la montre, l'organisateur la change d'un clic.
  */
 export function suggestImageFit(width: number, height: number): TournamentImageFit {
-  if (!(width > 0) || !(height > 0)) return DEFAULT_IMAGE_SETTINGS.fit;
+  if (!(width > 0) || !(height > 0)) return DEFAULT_IMAGE_SETTINGS.fit; // NOSONAR typescript:S1940 — la négation écarte aussi NaN, ce que `<= 0` laisserait passer
   return width / height >= 1.4 ? "COVER" : "CONTAIN";
 }
 

@@ -219,7 +219,7 @@ function scoreDeadlineAssignment(otherSide: "team1" | "team2"): string {
 
 function validateScoreValue(value: number): number {
   if (!Number.isFinite(value)) {
-    throw new Error("INVALID_SCORE");
+    throw new TypeError("INVALID_SCORE");
   }
   if (value < 0 || value > 99) {
     throw new Error("INVALID_SCORE_RANGE");

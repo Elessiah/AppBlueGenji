@@ -207,7 +207,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
 
   const onImageLoad = () => {
     const image = imageRef.current;
-    if (!image || !image.naturalWidth || !image.naturalHeight) {
+    if (!image?.naturalWidth || !image.naturalHeight) {
       setFailed(true);
       return;
     }
@@ -238,7 +238,7 @@ export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Imag
 
   const onDragMove = (event: PointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
-    if (!drag || drag.pointerId !== event.pointerId || !size) return;
+    if (drag?.pointerId !== event.pointerId || !size) return;
     const factor = screenToImage();
     const dx = (event.clientX - drag.startX) * factor;
     const dy = (event.clientY - drag.startY) * factor;

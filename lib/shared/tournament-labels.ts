@@ -26,11 +26,11 @@ export const GAME_LABELS: Record<TournamentGame, string> = {
 };
 
 /** Libellé d'un format, ou la valeur brute si elle vient d'ailleurs. */
-export function formatLabel(format: TournamentFormat | string): string {
+export function formatLabel(format: TournamentFormat | string): string { // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; une valeur brute venue d'ailleurs est rendue telle quelle
   return FORMAT_LABELS[format as TournamentFormat] ?? String(format);
 }
 
 /** Libellé d'un jeu, ou la valeur brute si elle vient d'ailleurs. */
-export function gameLabel(game: TournamentGame | string): string {
+export function gameLabel(game: TournamentGame | string): string { // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; une valeur brute venue d'ailleurs est rendue telle quelle
   return GAME_LABELS[game as TournamentGame] ?? String(game);
 }

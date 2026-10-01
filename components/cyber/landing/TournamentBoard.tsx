@@ -23,7 +23,7 @@ export function TournamentBoard({ buckets, featured, miniBracket }: TournamentBo
   // pourraient se contredire sur une échéance qui tombe pendant le rendu.
   const now = Date.now();
   const upcomingCards = activeTournamentCards(buckets)
-    .filter((card) => !featured || card.id !== featured.id)
+    .filter((card) => card.id !== featured?.id)
     .slice(0, 3);
   const openCount = buckets.registration.length + buckets.running.length;
 

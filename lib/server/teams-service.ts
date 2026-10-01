@@ -983,7 +983,7 @@ export async function transferTeamOwnership(
     teamId,
     async (connection) => {
       const requesterRoles = await lockMemberRoles(connection, teamId, requesterId);
-      if (!requesterRoles || !requesterRoles.includes("OWNER")) {
+      if (!requesterRoles?.includes("OWNER")) {
         throw new Error("FORBIDDEN");
       }
       await assertTermsAccepted(requesterId, connection);
@@ -1076,7 +1076,7 @@ export async function softDeleteTeam(
     if (locked[0].deleted_at) throw new Error("TEAM_ALREADY_DELETED");
     if (viaOwnership) {
       const roles = await lockMemberRoles(connection, teamId, requesterId);
-      if (!roles || !roles.includes("OWNER")) throw new Error("FORBIDDEN");
+      if (!roles?.includes("OWNER")) throw new Error("FORBIDDEN");
     } else if (locked[0].is_ghost !== 1) {
       throw new Error("FORBIDDEN");
     }

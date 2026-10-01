@@ -50,7 +50,7 @@ export function imageUploadErrorMessage(code: string | null | undefined): string
  */
 export function isImageUploadError(code: string | null | undefined): code is string {
   // `code in` remonterait la chaîne de prototypes (« constructor »).
-  return !!code && Object.prototype.hasOwnProperty.call(IMAGE_UPLOAD_ERRORS, code);
+  return !!code && Object.hasOwn(IMAGE_UPLOAD_ERRORS, code);
 }
 
 /**

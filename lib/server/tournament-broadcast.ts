@@ -623,7 +623,7 @@ async function flush(tournamentId: number, room: Room): Promise<void> {
  * direct.
  */
 function closeGoneRoom(tournamentId: number, room: Room): void {
-  for (const subscriber of [...room.subscribers]) {
+  for (const subscriber of [...room.subscribers]) { // NOSONAR typescript:S7747 — instantané voulu : `close()` peut retirer d'autres abonnés pendant le parcours
     room.subscribers.delete(subscriber);
     room.states.delete(subscriber);
     try {
@@ -763,7 +763,7 @@ export function tournamentAudience(tournamentId: number): number {
 
 /** Remet la diffusion à zéro. Réservé aux tests. */
 export function resetTournamentBroadcast(): void {
-  for (const [tournamentId, room] of [...rooms]) closeRoom(tournamentId, room);
+  for (const [tournamentId, room] of rooms) closeRoom(tournamentId, room);
   rooms.clear();
   streamsPerUser.clear();
 }

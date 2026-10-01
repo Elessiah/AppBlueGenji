@@ -25,7 +25,7 @@ const DEV_FALLBACK_URL = "http://localhost:3000";
 /** Racine publique du site, sans barre oblique finale. `null` si inconnue. */
 export function siteBaseUrl(): string | null {
   const base = process.env.APP_URL?.trim().replace(/\/+$/, ""); // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
-  return base ? base : null;
+  return base || null;
 }
 
 /**

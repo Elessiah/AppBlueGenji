@@ -179,7 +179,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDial
   };
 
   const closeForfeit = () => {
-    form.setForfeitTeamId(undefined);
+    form.setForfeitTeamId();
     form.setDoubleForfeit(false);
   };
 

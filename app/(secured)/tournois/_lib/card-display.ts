@@ -63,7 +63,7 @@ export function registrationFill(
 ): RegistrationFill {
   const max = Number(card.maxTeams);
   const registered = Math.max(0, Number(card.registeredTeams) || 0);
-  if (!(max > 0)) return { ratio: 0, percent: 0, full: false };
+  if (!(max > 0)) return { ratio: 0, percent: 0, full: false }; // NOSONAR typescript:S1940 — la négation écarte aussi NaN, ce que `max <= 0` laisserait passer
 
   const ratio = Math.min(1, registered / max);
   // Tronqué : arrondi, 199/200 afficherait « 100 % » sur un plateau qui

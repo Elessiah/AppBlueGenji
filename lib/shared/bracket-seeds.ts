@@ -32,8 +32,7 @@ export function generateSeedOrder(size: number): number[] {
   const previous = generateSeedOrder(size / 2);
   const result: number[] = [];
   for (const seed of previous) {
-    result.push(seed);
-    result.push(size + 1 - seed);
+    result.push(seed, size + 1 - seed);
   }
   return result;
 }

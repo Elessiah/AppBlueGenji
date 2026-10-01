@@ -96,7 +96,7 @@ export function PhaseBuilder({
     if (focusRequest === handledRequest.current) return;
     handledRequest.current = focusRequest;
     const current = issueRef.current;
-    if (!current || current.phaseIndex === null || current.field === null) return;
+    if (!current || current.phaseIndex === null || current.field === null) return; // NOSONAR typescript:S6582 — `current?.phaseIndex === null` serait faux sur `current` absent : le chaînage inverserait la garde
     setExpandedIndex(current.phaseIndex);
     setPendingFocusId(phaseFieldId(current.phaseIndex + 1, current.field));
   }, [focusRequest]);

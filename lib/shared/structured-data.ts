@@ -145,7 +145,7 @@ export function breadcrumbJsonLd(baseUrl: string, items: BreadcrumbItem[]): Json
  */
 export function serializeJsonLd(data: JsonLdNode | JsonLdNode[]): string {
   return JSON.stringify(data)
-    .replace(/</g, "\\u003c")
-    .replace(/>/g, "\\u003e")
-    .replace(/&/g, "\\u0026");
+    .replace(/</g, String.raw`\u003c`)
+    .replace(/>/g, String.raw`\u003e`)
+    .replace(/&/g, String.raw`\u0026`);
 }

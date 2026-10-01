@@ -192,11 +192,11 @@ export function renderMarkdown(markdown: string): string {
     if (bullet) {
       closeParagraph();
       const indent = bullet[1].replace(/\t/g, "  ").length;
-      const current = listStack[listStack.length - 1];
-      if (!listStack.length || indent > current) {
+      const current = listStack.at(-1);
+      if (current === undefined || indent > current) {
         openLevel(indent);
       } else {
-        while (listStack.length > 1 && indent < listStack[listStack.length - 1]) closeLevel();
+        while (listStack.length > 1 && indent < listStack.at(-1)!) closeLevel();
         closeLi();
       }
       out.push(`<li>${renderInline(bullet[2].trim())}`);

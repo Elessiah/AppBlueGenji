@@ -45,7 +45,7 @@ export function TeamSigil({
   // l'inverse. Une valeur plus longue que le maximum d'un sigle est tronquée
   // plutôt que rendue illisible.
   const text = label.toUpperCase().slice(0, TEAM_TAG_MAX_LENGTH);
-  const ratio = FONT_RATIO[text.length] ?? FONT_RATIO[FONT_RATIO.length - 1];
+  const ratio = FONT_RATIO[text.length] ?? FONT_RATIO.at(-1)!;
 
   return (
     <div

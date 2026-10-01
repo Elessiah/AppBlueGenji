@@ -438,9 +438,9 @@ export function computeDeepStats(
 
   if (ordered.length > 0) {
     stats.firstMatchAt = ordered[0].playedAt;
-    stats.lastMatchAt = ordered[ordered.length - 1].playedAt;
+    stats.lastMatchAt = ordered.at(-1)!.playedAt;
 
-    const last = ordered[ordered.length - 1].outcome;
+    const last = ordered.at(-1)!.outcome;
     stats.currentStreak = {
       kind: last,
       // Un nul remet les deux compteurs à zéro : la série en cours vaut donc 1,

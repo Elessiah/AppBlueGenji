@@ -20,10 +20,10 @@ function parseLimit(value: string | null): number {
 
 function escapeIcsText(value: string): string {
   return value
-    .replace(/\\/g, "\\\\")
-    .replace(/\r?\n/g, "\\n")
-    .replace(/,/g, "\\,")
-    .replace(/;/g, "\\;");
+    .replace(/\\/g, String.raw`\\`)
+    .replace(/\r?\n/g, String.raw`\n`)
+    .replace(/,/g, String.raw`\,`)
+    .replace(/;/g, String.raw`\;`);
 }
 
 function formatIcsDate(value: string | Date): string {

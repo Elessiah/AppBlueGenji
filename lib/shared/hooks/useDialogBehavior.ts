@@ -80,11 +80,11 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       );
     const focusables = () => focusablesIn(containerRef.current);
     const candidates = focusables();
-    const preferred = candidates.find((el) => el.hasAttribute("data-autofocus"));
+    const preferred = candidates.find((el) => el.dataset.autofocus !== undefined);
     // Un bouton « × » d'en-tête (`data-dialog-close`) vient en tête du DOM pour
     // rester collé en haut du panneau : il n'est pas ce qu'on vient faire dans
     // la modale, le focus d'ouverture va au premier contrôle qui suit.
-    const firstContent = candidates.find((el) => !el.hasAttribute("data-dialog-close"));
+    const firstContent = candidates.find((el) => el.dataset.dialogClose === undefined);
 
     (preferred ?? firstContent ?? candidates[0] ?? containerRef.current)?.focus();
 
@@ -136,7 +136,7 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
       }
       const extra = layers.flatMap((layer) => focusablesIn(layer));
       const start = items[0];
-      const end = items[items.length - 1];
+      const end = items.at(-1)!;
       const active = document.activeElement;
       const inModal = containerRef.current?.contains(active as Node) ?? false;
       const inLayer = !inModal && extra.length > 0 && layers.some((layer) => layer.contains(active as Node));
@@ -146,7 +146,7 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
         el.focus();
       };
       if (inLayer) {
-        if (!event.shiftKey && active === extra[extra.length - 1]) go(start);
+        if (!event.shiftKey && active === extra.at(-1)) go(start);
         else if (event.shiftKey && active === extra[0]) go(end);
         return;
       }
@@ -154,7 +154,7 @@ export function useDialogBehavior({ open, onClose, locked = false }: DialogBehav
         go(event.shiftKey ? end : start);
         return;
       }
-      if (event.shiftKey && active === start) go(extra[extra.length - 1] ?? end);
+      if (event.shiftKey && active === start) go(extra.at(-1) ?? end);
       else if (!event.shiftKey && active === end) go(extra[0] ?? start);
     };
 

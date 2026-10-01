@@ -501,10 +501,10 @@ async function clearDatabase(db: Pool): Promise<void> {
     { label: "annonces de recrutement", sql: "DELETE FROM bg_recruitment_ads WHERE title LIKE 'Test -%'" },
     { label: "membres du bureau", sql: "DELETE FROM bg_bureau_members" },
     // Équipes héritées préfixées « Team_ » (underscore échappé pour LIKE).
-    { label: "matchs (équipes Team_)", sql: "DELETE FROM bg_matches WHERE team1_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%') OR team2_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
-    { label: "inscriptions (équipes Team_)", sql: "DELETE FROM bg_tournament_registrations WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
-    { label: "membres d'équipe (équipes Team_)", sql: "DELETE FROM bg_team_members WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\\_%')" },
-    { label: "équipes Team_", sql: "DELETE FROM bg_teams WHERE name LIKE 'Team\\_%'" },
+    { label: "matchs (équipes Team_)", sql: String.raw`DELETE FROM bg_matches WHERE team1_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%') OR team2_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%')` },
+    { label: "inscriptions (équipes Team_)", sql: String.raw`DELETE FROM bg_tournament_registrations WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%')` },
+    { label: "membres d'équipe (équipes Team_)", sql: String.raw`DELETE FROM bg_team_members WHERE team_id IN (SELECT id FROM bg_teams WHERE name LIKE 'Team\_%')` },
+    { label: "équipes Team_", sql: String.raw`DELETE FROM bg_teams WHERE name LIKE 'Team\_%'` },
   ];
 
   try {
@@ -1929,4 +1929,4 @@ async function seed(db: Pool): Promise<void> {
   console.log(`\n  Admin de test : DEV_AUTH_USER_ID=${organizerId}\n`);
 }
 
-main();
+await main();

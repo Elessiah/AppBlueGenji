@@ -308,7 +308,7 @@ export function BracketTree({
           <div style={{ height: 26 }} />
           <div style={{ width: CONN_W + BADGE_W, height: totalH, flexShrink: 0, position: "relative" }}>
             {(() => {
-              const lastRoundNum = roundNums[roundNums.length - 1];
+              const lastRoundNum = roundNums.at(-1)!;
               const lastMatches = matchesByRound.get(lastRoundNum)!;
               const lastSlotH = slotHByRound.get(lastRoundNum)!;
               const lastGlobalIdx = roundIdxBase + roundNums.length - 1;

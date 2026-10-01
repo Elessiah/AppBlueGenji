@@ -27,8 +27,8 @@ import styles from "./AccessibilityMenu.module.css";
 function applySettings(keys: A11ySettingKey[]): void {
   const root = document.documentElement;
   const attribute = a11yAttribute(keys);
-  if (attribute) root.setAttribute("data-a11y", attribute);
-  else root.removeAttribute("data-a11y");
+  if (attribute) root.dataset.a11y = attribute;
+  else delete root.dataset.a11y;
   try {
     document.cookie = a11yCookieString(keys, window.location.protocol === "https:");
   } catch {

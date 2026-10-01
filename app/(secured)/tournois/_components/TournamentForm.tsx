@@ -45,11 +45,7 @@ import {
 } from "../_lib/form-styles";
 import {
   DEFAULT_QUALIFICATION_DRAWS,
-  defaultTournamentFormValues,
   effectiveMatchFormat,
-  toApiPayload,
-  toFormValues,
-  type TournamentApiValues,
   type TournamentFormValues,
 } from "../_lib/tournament-form-values";
 import {
@@ -85,7 +81,7 @@ export {
   toFormValues,
   type TournamentApiValues,
   type TournamentFormValues,
-};
+} from "../_lib/tournament-form-values";
 
 /**
  * Formulaire de tournoi, partagé par la création et l'édition.

@@ -342,7 +342,7 @@ export async function canUserRegister(
   userId: number,
 ): Promise<boolean> {
   const tournament = await loadTournamentRow(connection, tournamentId);
-  if (!tournament || tournament.state !== "REGISTRATION") return false;
+  if (tournament?.state !== "REGISTRATION") return false;
 
   const solo = isSoloTournament(tournament.participant_type);
   const filters = tournamentRegistrationFilters(tournament);

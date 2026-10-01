@@ -69,7 +69,7 @@ export function planFirstRound(participants: Participant[]): SwissRoundPlan {
   // Effectif impair : la dernière du seeding reçoit la victoire d'office.
   let byeTeamId: number | null = null;
   if (sorted.length % 2 === 1) {
-    byeTeamId = sorted[sorted.length - 1].teamId;
+    byeTeamId = sorted.at(-1)!.teamId;
     sorted.pop();
   }
 

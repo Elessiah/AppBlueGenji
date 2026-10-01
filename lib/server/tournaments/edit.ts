@@ -114,7 +114,7 @@ function toValues(
   );
   return {
     name: String(row.name),
-    description: row.description === null ? null : String(row.description),
+    description: row.description === null ? null : String(row.description), // NOSONAR typescript:S6551 — colonne texte lue par mysql2, jamais un objet
     game: row.game as TournamentGame,
     format: row.format as TournamentFormat,
     participantType: row.participant_type as ParticipantType,
@@ -170,7 +170,7 @@ async function loadPhaseConfigs(
   return (rows as unknown as Record<string, unknown>[]).map((row) => ({
     position: Number(row.position),
     format: row.format as PhaseConfig["format"],
-    name: row.name === null ? null : String(row.name),
+    name: row.name === null ? null : String(row.name), // NOSONAR typescript:S6551 — colonne texte lue par mysql2, jamais un objet
     qualifierMode: row.qualifier_mode as PhaseConfig["qualifierMode"],
     qualifierValue: Number(row.qualifier_value),
     hasThirdPlaceMatch: Boolean(row.has_third_place_match),

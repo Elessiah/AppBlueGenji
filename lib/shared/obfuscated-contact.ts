@@ -24,13 +24,13 @@ export type ContactKind = "email" | "phone";
 function toBase64(text: string): string {
   const bytes = new TextEncoder().encode(text);
   let binary = "";
-  for (const byte of bytes) binary += String.fromCharCode(byte);
+  for (const byte of bytes) binary += String.fromCodePoint(byte);
   return btoa(binary);
 }
 
 function fromBase64(encoded: string): string {
   const binary = atob(encoded);
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const bytes = Uint8Array.from(binary, (c) => c.codePointAt(0) ?? 0);
   return new TextDecoder().decode(bytes);
 }
 

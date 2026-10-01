@@ -214,7 +214,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
 
   useEffect(() => {
     if (waiting || current !== null) return;
-    if (dismissedRef.current === null) dismissedRef.current = readDismissed();
+    dismissedRef.current ??= readDismissed();
     const now = Date.now();
     const next = launches.find(
       (info) => wantsAutoOpen(info, now) && !dismissedRef.current?.has(launchModalKey(info)),
@@ -235,7 +235,7 @@ export function MatchLaunchCenter({ privacyPending = false }: { privacyPending?:
 
   const close = useCallback(() => {
     if (current) {
-      if (dismissedRef.current === null) dismissedRef.current = readDismissed();
+      dismissedRef.current ??= readDismissed();
       dismissedRef.current.add(launchModalKey(current));
       writeDismissed(dismissedRef.current);
     }

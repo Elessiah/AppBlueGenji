@@ -94,7 +94,7 @@ function evictIfNeeded(now: number): void {
   // quitté `inflight` alors que son chargeur, lui, va encore comparer son
   // compteur au retour.
   if (generations.size >= MAX_ENTRIES) {
-    for (const key of [...generations.keys()]) {
+    for (const key of generations.keys()) {
       if (!store.has(key) && !inflight.has(key) && !pending.has(key)) generations.delete(key);
     }
   }

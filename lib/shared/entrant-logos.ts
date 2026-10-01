@@ -40,5 +40,5 @@ export function buildEntrantLogoMap(
  */
 export function entrantLogoUrl(logos: EntrantLogoMap, teamId: number | null): string | null {
   if (teamId === null) return null;
-  return Object.prototype.hasOwnProperty.call(logos, teamId) ? logos[teamId] : null;
+  return Object.hasOwn(logos, teamId) ? logos[teamId] : null;
 }

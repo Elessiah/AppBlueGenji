@@ -315,7 +315,7 @@ export async function notifyScoreToConfirm(matchId: number): Promise<number> {
       [matchId],
     );
     const row = rows[0];
-    if (!row || row.status !== "AWAITING_CONFIRMATION" || row.team1_id === null || row.team2_id === null) {
+    if (row?.status !== "AWAITING_CONFIRMATION" || row.team1_id === null || row.team2_id === null) {
       return 0;
     }
     const team1Reported = row.team1_reported_at !== null;

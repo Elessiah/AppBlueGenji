@@ -247,7 +247,7 @@ export type VisibilitySettings = {
   discord: boolean;
 };
 
-export type PlayerRole = TeamRole;
+export type PlayerRole = TeamRole; // NOSONAR typescript:S6564 — alias de domaine (rôle vu depuis le joueur), importé par plusieurs modules
 
 export type PublicUserProfile = {
   id: number;

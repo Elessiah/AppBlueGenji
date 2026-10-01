@@ -681,7 +681,7 @@ async function loadTournamentBuckets(
   const where: string[] = [scope.hiddenOnly ? `t.start_visibility_at > ?` : `t.start_visibility_at <= ?`];
   const params: SqlParams = [now];
 
-  if (searchTerm && searchTerm.trim()) {
+  if (searchTerm?.trim()) {
     where.push(`LOWER(t.name) LIKE ?`);
     params.push(`%${searchTerm.trim().toLowerCase()}%`);
   }

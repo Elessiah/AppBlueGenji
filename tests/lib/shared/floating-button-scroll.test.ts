@@ -154,9 +154,9 @@ describe("le menu d'accessibilité garde son clavier au-dessus d'une modale", ()
     expect(hook).toContain('document.querySelectorAll("[data-dialog-exempt]")');
     expect(tab).toContain("const extra = layers.flatMap((layer) => focusablesIn(layer));");
     // Bords de la modale → la couche ; bords de la couche → la modale.
-    expect(tab).toMatch(/if \(event\.shiftKey && active === start\) go\(extra\[extra\.length - 1\] \?\? end\);/);
+    expect(tab).toMatch(/if \(event\.shiftKey && active === start\) go\(extra\.at\(-1\) \?\? end\);/);
     expect(tab).toMatch(/else if \(!event\.shiftKey && active === end\) go\(extra\[0\] \?\? start\);/);
-    expect(tab).toMatch(/if \(!event\.shiftKey && active === extra\[extra\.length - 1\]\) go\(start\);/);
+    expect(tab).toMatch(/if \(!event\.shiftKey && active === extra\.at\(-1\)\) go\(start\);/);
     expect(tab).toMatch(/else if \(event\.shiftKey && active === extra\[0\]\) go\(end\);/);
   });
 

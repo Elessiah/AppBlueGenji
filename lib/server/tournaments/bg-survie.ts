@@ -233,7 +233,7 @@ export async function initializeEnduranceTournament(
   conn: PoolConnection,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
-  if (!tournament || tournament.format !== "BG_SURVIE") return;
+  if (tournament?.format !== "BG_SURVIE") return;
 
   const config = configOf(tournament);
 
@@ -292,7 +292,7 @@ export async function generateEnduranceRound(
   conn: PoolConnection,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
-  if (!tournament || tournament.format !== "BG_SURVIE") return;
+  if (tournament?.format !== "BG_SURVIE") return;
   if (Number(tournament.endurance_playoffs_started) === 1) return;
 
   const config = configOf(tournament);
@@ -446,7 +446,7 @@ export async function reconcileEndurance(
   conn: PoolConnection,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
-  if (!tournament || tournament.format !== "BG_SURVIE") return;
+  if (tournament?.format !== "BG_SURVIE") return;
   // Un tournoi terminé n'est **pas** hors de portée : corriger le score de la
   // finale d'une archive doit se voir au palmarès, et `adminResolveMatch` le
   // permet exprès (`finishTournament` prévoit d'ailleurs le rejeu de sa
@@ -692,7 +692,7 @@ export async function startEndurancePlayoffs(
   conn: PoolConnection,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId);
-  if (!tournament || tournament.format !== "BG_SURVIE") return;
+  if (tournament?.format !== "BG_SURVIE") return;
   if (Number(tournament.endurance_playoffs_started) === 1) return;
 
   const config = configOf(tournament);
@@ -972,7 +972,7 @@ async function finalizePlayoffsIfDone(conn: PoolConnection, tournamentId: number
     const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
     if (rounds.length === 0) return;
 
-    const lastRound = rounds[rounds.length - 1];
+    const lastRound = rounds.at(-1)!;
     const matches = await loadPlayoffRoundMatches(conn, tournamentId, lastRound);
 
     const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");
@@ -1095,7 +1095,7 @@ export async function forfeitEnduranceTeam(
   conn: PoolConnection,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId, true);
-  if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  if (tournament?.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   // Avant le contrôle des play-offs, comme en Survie et en Ronde suisse : sur un
   // tournoi clos, « le tournoi n'est pas en cours » est le vrai motif, et il
   // reste juste dans le cas que le contrôle suivant ne voit pas — un tournoi
@@ -1254,7 +1254,7 @@ export async function applyEndurancePenalty(
   conn: PoolConnection,
 ): Promise<{ reason: string }> {
   const tournament = await loadTournament(conn, tournamentId, true);
-  if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  if (tournament?.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {
     throw new Error("ENDURANCE_PLAYOFFS_STARTED");
@@ -1335,7 +1335,7 @@ export async function liftEndurancePenalty(
   conn: PoolConnection,
 ): Promise<{ teamId: number; points: number }> {
   const tournament = await loadTournament(conn, tournamentId, true);
-  if (!tournament || tournament.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
+  if (tournament?.format !== "BG_SURVIE") throw new Error("NOT_BG_SURVIE");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
   if (Number(tournament.endurance_playoffs_started) === 1) {
     throw new Error("ENDURANCE_PLAYOFFS_STARTED");
@@ -1371,7 +1371,7 @@ export async function liftEndurancePenalty(
 /** Métadonnées d'affichage : barème, manche courante, classement complet. */
 export async function loadEnduranceMeta(conn: PoolConnection, tournamentId: number) {
   const tournament = await loadTournament(conn, tournamentId);
-  if (!tournament || tournament.format !== "BG_SURVIE") return null;
+  if (tournament?.format !== "BG_SURVIE") return null;
 
   const config = configOf(tournament);
 

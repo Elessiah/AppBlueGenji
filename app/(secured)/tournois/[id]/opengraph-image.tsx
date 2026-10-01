@@ -24,7 +24,7 @@ import { SITE_NAME, SITE_SHARE_CARD, tournamentShareCard } from "@/lib/shared/sh
  */
 export const alt = `Aperçu du tournoi — ${SITE_NAME}`;
 export const size = SHARE_CARD_SIZE;
-export const contentType = SHARE_CARD_CONTENT_TYPE;
+export const contentType = SHARE_CARD_CONTENT_TYPE; // NOSONAR typescript:S7763 — export de convention de Next (`opengraph-image`), déclaré en constante du module
 
 /**
  * L'effectif engagé figure sur la carte : elle vieillit. Cinq minutes suffisent

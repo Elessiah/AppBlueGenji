@@ -297,7 +297,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       game: gameLabel(tournament.game),
       phase: inferPhaseLabel(currentMatch),
       stream:
-        broadcasting && broadcasting.tournamentId === tournament.id
+        broadcasting?.tournamentId === tournament.id
           ? {
               tournamentId: tournament.id,
               tournamentName: tournament.name,
@@ -555,9 +555,8 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
         text: `VAINQUEUR · ${row.name} · ${row.winner_name ?? "Champion inconnu"}`,
         sortAt: new Date(row.finished_at ?? Date.now()).getTime(),
       })),
+      ...(await loadNewsEntries(db)),
     );
-
-    entries.push(...(await loadNewsEntries(db)));
 
     entries.sort((left, right) => right.sortAt - left.sortAt);
     const items = entries

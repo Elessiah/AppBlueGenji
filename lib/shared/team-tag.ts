@@ -123,7 +123,7 @@ export function teamTagErrorMessage(code: string | null | undefined): string | n
   // `code in MESSAGES` remonterait la chaîne de prototypes : « constructor » ou
   // « toString » y passeraient le test et rendraient une **fonction** au lieu
   // d'une chaîne, que l'appelant afficherait telle quelle en toast.
-  if (!Object.prototype.hasOwnProperty.call(MESSAGES, code)) return null;
+  if (!Object.hasOwn(MESSAGES, code)) return null;
   return MESSAGES[code as keyof typeof MESSAGES];
 }
 

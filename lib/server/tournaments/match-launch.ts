@@ -486,7 +486,7 @@ export async function releaseIneligibleCast(matchId: number, casterId: number): 
   let tournamentId: number | null = null;
   await inTransaction(async (connection) => {
     const row = await lockLaunchMatch(connection, matchId);
-    if (!row || row.caster_user_id === null || Number(row.caster_user_id) !== casterId) return;
+    if (!row || row.caster_user_id === null || Number(row.caster_user_id) !== casterId) return; // NOSONAR typescript:S6582 — `row?.caster_user_id === null` serait faux sur `row` absent : le chaînage inverserait la garde
     // Seul un match qui attend encore son lancement est concerné. Un match
     // lancé n'attend plus aucun « Prêt » (l'inscription y reste, la lecture
     // des contacts la tait) ; un match joué entre la lecture et ce verrou est
@@ -578,7 +578,7 @@ export async function maintainMatchLaunches(
     // décidé sur un « Prêt » tout juste retiré.
     if (matchLaunchPhase(toLaunchInput(candidate), now) !== "LOBBY") continue;
     const row = await lockLaunchMatch(connection, Number(candidate.id));
-    if (!row || row.status !== "READY" || matchLaunchPhase(toLaunchInput(row), now) !== "LOBBY") {
+    if (row?.status !== "READY" || matchLaunchPhase(toLaunchInput(row), now) !== "LOBBY") {
       continue;
     }
     const stale = row.launch_pairing !== launchPairingKey(nullableId(row.team1_id), nullableId(row.team2_id));
