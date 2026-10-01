@@ -3,6 +3,7 @@ import {
   MATCH_ENTRY_MONTHS,
   formatMatchStartEntryPreview,
   isMatchStartEntryInRange,
+  localMatchTimeIfDifferent,
   matchEntryReference,
   matchEntryTimeValue,
   matchStartEntryOf,
@@ -194,6 +195,24 @@ describe("formatMatchStartEntryPreview", () => {
   it("écrit la date complète, année comprise, à l'heure de Paris", () => {
     const text = formatMatchStartEntryPreview(at("2027-01-03T19:00:00Z")).replaceAll(/\s/g, " ");
     expect(text).toBe("dimanche 3 janvier 2027 à 20:00");
+  });
+});
+
+describe("localMatchTimeIfDifferent", () => {
+  const instant = at("2026-08-29T18:30:00Z");
+
+  it("rien à ajouter à l'heure de Paris", () => {
+    expect(localMatchTimeIfDifferent(instant, "Europe/Paris")).toBeNull();
+    expect(localMatchTimeIfDifferent(instant, "Europe/Brussels")).toBeNull();
+  });
+
+  it("donne l'heure locale hors du fuseau de Paris", () => {
+    expect(localMatchTimeIfDifferent(instant, "America/Martinique")?.replaceAll(/\s/g, " ")).toBe("29/08/2026 14:30");
+    expect(localMatchTimeIfDifferent(instant, "UTC")?.replaceAll(/\s/g, " ")).toBe("29/08/2026 18:30");
+  });
+
+  it("ignore un fuseau inconnu", () => {
+    expect(localMatchTimeIfDifferent(instant, "Pas/UnFuseau")).toBeNull();
   });
 });
 
