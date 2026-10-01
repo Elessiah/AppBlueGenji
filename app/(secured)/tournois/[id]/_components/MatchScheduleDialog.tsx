@@ -15,7 +15,10 @@ import {
   matchEntryReference,
   matchEntryTimeValue,
   matchStartEntryOf,
+  matchStartParisYear,
   readMatchStartEntry,
+  shiftMatchStartYear,
+  withYearShift,
   type MatchStartEntryState,
 } from "@/lib/shared/match-start-entry";
 import { matchLaunchPhase } from "@/lib/shared/match-launch";
@@ -43,7 +46,7 @@ function entryRefusal(state: MatchStartEntryState): string | null {
 
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé) ; un jour et un mois inchangés gardent leur année.";
+  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé) ; un jour et un mois inchangés gardent leur année. Si l'aperçu montre la mauvaise, décale-la.";
   if (refereeScheduling) {
     return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
@@ -149,6 +152,10 @@ export function MatchScheduleDialog({
       Date.now(),
     ),
   );
+  // Décalage d'année choisi à la main quand la déduction tombe à côté
+  // (archive ancienne, année déjà fausse). Remis à zéro dès que le jour ou le
+  // mois change : la nouvelle date se déduit à nouveau.
+  const [yearShift, setYearShift] = useState(0);
   const [busy, setBusy] = useState(false);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
@@ -161,7 +168,12 @@ export function MatchScheduleDialog({
   const [planning] = useState(
     () => matchLaunchPhase({ ...match, refereeScheduling }, Date.now()) === "TO_PLAN",
   );
-  const entry = readMatchStartEntry({ day, month, time, timeBadInput }, reference, match.startAt);
+  const deduced = readMatchStartEntry({ day, month, time, timeBadInput }, reference, match.startAt);
+  const entry = withYearShift(deduced, yearShift);
+  const shiftTarget = (delta: number) =>
+    deduced.kind === "ready" ? shiftMatchStartYear(deduced.instant, yearShift + delta) : null;
+  const previousYear = shiftTarget(-1);
+  const nextYear = shiftTarget(1);
   const cleared = entry.kind === "empty";
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
   // le laisse programmé sans jamais passer à l'antenne : on le dit plutôt que
@@ -188,6 +200,7 @@ export function MatchScheduleDialog({
     setTime("");
     setTimeBadInput(false);
     setTimeKey((key) => key + 1);
+    setYearShift(0);
     fieldErrors.clear();
   };
 
@@ -197,7 +210,10 @@ export function MatchScheduleDialog({
     const sent =
       badInputNow === timeBadInput
         ? entry
-        : readMatchStartEntry({ day, month, time, timeBadInput: badInputNow }, reference, match.startAt);
+        : withYearShift(
+            readMatchStartEntry({ day, month, time, timeBadInput: badInputNow }, reference, match.startAt),
+            yearShift,
+          );
     if (badInputNow !== timeBadInput) setTimeBadInput(badInputNow);
     if (sent.kind === "incomplete" || sent.kind === "invalid") {
       const message = entryRefusal(sent) ?? "Date non reconnue.";
@@ -287,6 +303,7 @@ export function MatchScheduleDialog({
                   disabled={busy}
                   onChange={(e) => {
                     setDay(e.target.value);
+                    setYearShift(0);
                     fieldErrors.clear();
                   }}
                   {...fieldErrors.aria("day", HINT_ID)}
@@ -308,6 +325,7 @@ export function MatchScheduleDialog({
                   disabled={busy}
                   onChange={(e) => {
                     setMonth(e.target.value);
+                    setYearShift(0);
                     fieldErrors.clear();
                   }}
                   {...fieldErrors.aria("month", HINT_ID)}
@@ -358,6 +376,38 @@ export function MatchScheduleDialog({
             )}
             {cleared && "Aucun horaire annoncé."}
           </output>
+          {entry.kind === "ready" && (previousYear !== null || nextYear !== null) && (
+            <div
+              role="group"
+              aria-label="Corriger l'année"
+              style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}
+            >
+              {previousYear !== null && (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={busy}
+                  onClick={() => setYearShift((shift) => shift - 1)}
+                  aria-controls={PREVIEW_ID}
+                  style={{ padding: "4px 10px", fontSize: 12 }}
+                >
+                  Plutôt en {matchStartParisYear(previousYear)}
+                </button>
+              )}
+              {nextYear !== null && (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={busy}
+                  onClick={() => setYearShift((shift) => shift + 1)}
+                  aria-controls={PREVIEW_ID}
+                  style={{ padding: "4px 10px", fontSize: 12 }}
+                >
+                  Plutôt en {matchStartParisYear(nextYear)}
+                </button>
+              )}
+            </div>
+          )}
           <p
             id={HINT_ID}
             style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2, #9aa4b2)" }}

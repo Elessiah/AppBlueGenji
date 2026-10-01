@@ -263,3 +263,35 @@ export function readMatchStartEntry(
   const instant = resolveMatchStartEntry({ day, month, ...time }, reference);
   return instant === null ? { kind: "invalid", field: "day" } : { kind: "ready", instant };
 }
+
+/**
+ * Même jour, même heure de Paris, `years` années plus tard (ou plus tôt) ;
+ * `null` si ce jour n'existe pas cette année-là (29 février) ou sort des
+ * bornes du serveur.
+ *
+ * C'est l'échappatoire de la déduction : elle tombe juste à six mois près
+ * autour de sa référence, et rien d'autre ne permettrait de corriger l'archive
+ * d'un match joué il y a plus longtemps, ni une année déjà fausse. Le dialogue
+ * ne **demande** pas l'année ; il offre seulement de la décaler quand l'aperçu
+ * montre la mauvaise.
+ */
+export function shiftMatchStartYear(instant: number, years: number): number | null {
+  if (!Number.isInteger(years) || !Number.isFinite(instant)) return null;
+  const p = parisParts(instant);
+  const year = p.year + years;
+  if (p.day > daysInMonth(year, p.month)) return null;
+  const shifted = parisInstant(year, p.month, p.day, p.hour, p.minute);
+  return normalizeMatchStartAt(shifted) === null ? null : shifted;
+}
+
+/** Applique le décalage d'année choisi à une saisie prête ; les autres états passent tels quels. */
+export function withYearShift(state: MatchStartEntryState, years: number): MatchStartEntryState {
+  if (state.kind !== "ready" || years === 0) return state;
+  const instant = shiftMatchStartYear(state.instant, years);
+  return instant === null ? { kind: "invalid", field: "day" } : { kind: "ready", instant };
+}
+
+/** Année de Paris d'un instant (libellé des boutons de décalage). */
+export function matchStartParisYear(instant: number): number {
+  return parisParts(instant).year;
+}
