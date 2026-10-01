@@ -24,7 +24,11 @@ import type { PhaseConfig } from "@/lib/shared/tournament-phases";
 import { normalizePhaseConfigs, validatePhases } from "@/lib/shared/tournament-phases";
 import type { TournamentFormat, TournamentGame, TournamentState } from "@/lib/shared/types";
 import { toIso } from "@/lib/server/serialization";
-import { validateDateOrder, validateTournamentInput } from "./validation";
+import {
+  validateDateOrder,
+  validateTournamentInput,
+  type ValidatedTournamentInput,
+} from "./validation";
 import { insertPhases } from "./phases-repository";
 import { publishUpdatedEvent } from "./notifications";
 
@@ -267,57 +271,7 @@ export async function updateTournament(
 
     const next: EditableTournamentValues = { ...current, ...patch };
 
-    const validation = validateTournamentInput({
-      name: next.name,
-      description: next.description,
-      format: next.format,
-      game: next.game,
-      participantType: next.participantType,
-      maxTeams: next.maxTeams,
-      hasThirdPlaceMatch: next.hasThirdPlaceMatch,
-      survivalRoundsBeforeFirstCut: next.survivalRoundsBeforeFirstCut ?? undefined,
-      survivalRoundsPerCut: next.survivalRoundsPerCut ?? undefined,
-      swissTotalRounds: next.swissTotalRounds ?? undefined,
-      swissPointsWin: next.swissPointsWin ?? undefined,
-      swissPointsDraw: next.swissPointsDraw ?? undefined,
-      swissPointsLoss: next.swissPointsLoss ?? undefined,
-      endurancePoints: next.endurancePoints ?? undefined,
-      enduranceWinDelta: next.enduranceWinDelta ?? undefined,
-      enduranceLossDelta: next.enduranceLossDelta ?? undefined,
-      endurancePlayoffSize: next.endurancePlayoffSize ?? undefined,
-      enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
-      matchFormatType: next.matchFormat?.type ?? null,
-      matchFormatValue: next.matchFormat?.value ?? null,
-      matchFormatMaxMaps: next.matchFormat?.maxMaps ?? null,
-      matchFormatDraws: next.matchFormat?.drawsAllowed ?? null,
-      endurancePlayoffFormatType: next.endurancePlayoffFormat?.type ?? null,
-      endurancePlayoffFormatValue: next.endurancePlayoffFormat?.value ?? null,
-      registrationDiscordRequirement: next.registrationDiscordRequirement,
-      registrationBlizzardRequirement: next.registrationBlizzardRequirement,
-      registrationMinPlayers: next.registrationMinPlayers,
-      phases: next.phases ?? undefined,
-    });
-    if ("error" in validation) throw new Error(validation.error);
-    const valid = validation.value;
-
-    const dateError = validateDateOrder({
-      startVisibilityAt: next.startVisibilityAt,
-      registrationOpenAt: next.registrationOpenAt,
-      registrationCloseAt: next.registrationCloseAt,
-      startAt: next.startAt,
-    });
-    if (dateError) throw new Error(dateError);
-
-    // Les phases brutes de `validateTournamentInput` ne portent pas de position
-    // (le client ne l'envoie pas) : il faut les normaliser puis les valider
-    // strictement avant d'y toucher, exactement comme `createTournament`
-    // (lib/server/tournaments/index.ts).
-    let normalizedPhases: PhaseConfig[] | null = null;
-    if (valid.format === "MULTI" && valid.phases) {
-      normalizedPhases = normalizePhaseConfigs(valid.phases);
-      const phaseError = validatePhases(normalizedPhases);
-      if (phaseError) throw new Error(phaseError);
-    }
+    const { valid, normalizedPhases } = validateEditedValues(next);
 
     await connection.execute(
       `UPDATE bg_tournaments SET
@@ -404,4 +358,66 @@ export async function updateTournament(
   }
 
   publishUpdatedEvent(tournamentId);
+}
+
+/**
+ * Valide les valeurs **résultantes** d'une édition — champs modifiés et champs
+ * conservés mêlés — par les mêmes règles que la création.
+ */
+function validateEditedValues(next: EditableTournamentValues): {
+  valid: ValidatedTournamentInput;
+  normalizedPhases: PhaseConfig[] | null;
+} {
+  const validation = validateTournamentInput({
+    name: next.name,
+    description: next.description,
+    format: next.format,
+    game: next.game,
+    participantType: next.participantType,
+    maxTeams: next.maxTeams,
+    hasThirdPlaceMatch: next.hasThirdPlaceMatch,
+    survivalRoundsBeforeFirstCut: next.survivalRoundsBeforeFirstCut ?? undefined,
+    survivalRoundsPerCut: next.survivalRoundsPerCut ?? undefined,
+    swissTotalRounds: next.swissTotalRounds ?? undefined,
+    swissPointsWin: next.swissPointsWin ?? undefined,
+    swissPointsDraw: next.swissPointsDraw ?? undefined,
+    swissPointsLoss: next.swissPointsLoss ?? undefined,
+    endurancePoints: next.endurancePoints ?? undefined,
+    enduranceWinDelta: next.enduranceWinDelta ?? undefined,
+    enduranceLossDelta: next.enduranceLossDelta ?? undefined,
+    endurancePlayoffSize: next.endurancePlayoffSize ?? undefined,
+    enduranceMaxRounds: next.enduranceMaxRounds ?? undefined,
+    matchFormatType: next.matchFormat?.type ?? null,
+    matchFormatValue: next.matchFormat?.value ?? null,
+    matchFormatMaxMaps: next.matchFormat?.maxMaps ?? null,
+    matchFormatDraws: next.matchFormat?.drawsAllowed ?? null,
+    endurancePlayoffFormatType: next.endurancePlayoffFormat?.type ?? null,
+    endurancePlayoffFormatValue: next.endurancePlayoffFormat?.value ?? null,
+    registrationDiscordRequirement: next.registrationDiscordRequirement,
+    registrationBlizzardRequirement: next.registrationBlizzardRequirement,
+    registrationMinPlayers: next.registrationMinPlayers,
+    phases: next.phases ?? undefined,
+  });
+  if ("error" in validation) throw new Error(validation.error);
+  const valid = validation.value;
+
+  const dateError = validateDateOrder({
+    startVisibilityAt: next.startVisibilityAt,
+    registrationOpenAt: next.registrationOpenAt,
+    registrationCloseAt: next.registrationCloseAt,
+    startAt: next.startAt,
+  });
+  if (dateError) throw new Error(dateError);
+
+  // Les phases brutes de `validateTournamentInput` ne portent pas de position
+  // (le client ne l'envoie pas) : il faut les normaliser puis les valider
+  // strictement avant d'y toucher, exactement comme `createTournament`
+  // (lib/server/tournaments/index.ts).
+  let normalizedPhases: PhaseConfig[] | null = null;
+  if (valid.format === "MULTI" && valid.phases) {
+    normalizedPhases = normalizePhaseConfigs(valid.phases);
+    const phaseError = validatePhases(normalizedPhases);
+    if (phaseError) throw new Error(phaseError);
+  }
+  return { valid, normalizedPhases };
 }

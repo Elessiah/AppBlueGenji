@@ -425,12 +425,7 @@ export async function resolveExpiredScoreReports(
     // la règle vit dans `matchWinnerSide`, partagée avec l'arbitrage et
     // l'accord des deux engagés.
     if (team1Reported !== team2Reported) {
-      const team1Score = team1Reported
-        ? Number(match.team1_report_score)
-        : Number(match.team2_report_opponent_score);
-      const team2Score = team1Reported
-        ? Number(match.team1_report_opponent_score)
-        : Number(match.team2_report_score);
+      const { team1Score, team2Score } = singleReportScores(match, team1Reported);
 
       const format = await loadTournamentMatchFormat(
         connection,
@@ -465,6 +460,22 @@ export async function resolveExpiredScoreReports(
   }
 
   return resolved;
+}
+
+/** Score de la manche lu dans le seul report déposé, côté plateau. */
+function singleReportScores(
+  match: ExpiredMatchRow,
+  team1Reported: boolean,
+): { team1Score: number; team2Score: number } {
+  return team1Reported
+    ? {
+        team1Score: Number(match.team1_report_score),
+        team2Score: Number(match.team1_report_opponent_score),
+      }
+    : {
+        team1Score: Number(match.team2_report_opponent_score),
+        team2Score: Number(match.team2_report_score),
+      };
 }
 
 // Import MatchRow type

@@ -71,17 +71,7 @@ export async function checkDownstreamMatchesHaveNoScores(
   connection: PoolConnection,
   match: MatchRow,
 ): Promise<void> {
-  const [currentRows] = await connection.execute<
-    (RowDataPacket & {
-      round_number: number;
-      status: MatchStatus;
-      next_winner_match_id: number | null;
-      next_loser_match_id: number | null;
-      tournament_id: number;
-      phase_id: number | null;
-      format: TournamentFormat;
-    })[]
-  >(
+  const [currentRows] = await connection.execute<CurrentMatchRow[]>(
     `SELECT m.round_number, m.status, m.next_winner_match_id, m.next_loser_match_id,
             m.tournament_id, m.phase_id, t.format
      FROM bg_matches m
@@ -103,52 +93,34 @@ export async function checkDownstreamMatchesHaveNoScores(
   // (`isScoreEditLocked` juge, lui, sur `decided`).
   if (!current || !isMatchPlayed({ status: current.status })) return;
 
-  let dependents: DependentMatchRow[];
-
-  if (current.format === "MULTI") {
-    // Multi-phases : la règle dépend du format de CHAQUE phase et une phase
-    // ultérieure dépend toujours de celle-ci. On délègue au module partagé
-    // (`lib/shared/match-lock.ts`) pour que serveur et interface appliquent
-    // exactement le même verrou, plutôt que de réécrire la règle en SQL.
-    const [rows] = await connection.execute<
-      (DependentMatchRow & {
-        phase_id: number;
-        phase_position: number | null;
-        next_winner_match_id: number | null;
-        next_loser_match_id: number | null;
-      })[]
-    >(
-      `SELECT ${DEPENDENT_COLUMNS_M}, m.phase_id, p.position AS phase_position,
-              m.next_winner_match_id, m.next_loser_match_id
-       FROM bg_matches m
-       LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
-       WHERE m.tournament_id = ?`,
-      [Number(current.tournament_id)],
-    );
-
-    const [phaseRows] = await connection.execute<
-      (RowDataPacket & { format: PhaseFormat })[]
-    >(`SELECT format FROM bg_tournament_phases WHERE id = ? LIMIT 1`, [
-      Number(current.phase_id ?? 0),
-    ]);
-
-    const states = rows.map((row) => ({
-      ...toMatchScoreState(row),
-      phaseId: Number(row.phase_id ?? 0),
-      phasePosition: row.phase_position === null ? null : Number(row.phase_position),
-      nextWinnerMatchId:
-        row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
-      nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
-    }));
-
-    const self = states.find((s) => s.id === Number(match.id));
-    if (!self) return;
-
-    if (dependentMatches(self, states, "MULTI", phaseRows[0]?.format).some(hasScoreInput)) {
-      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
-    }
-    return;
+  if (await dependentsHaveScoreInput(connection, current, Number(match.id))) {
+    throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
   }
+}
+
+/** Ligne du match corrigé, telle que la lit le verrou. */
+type CurrentMatchRow = RowDataPacket & {
+  round_number: number;
+  status: MatchStatus;
+  next_winner_match_id: number | null;
+  next_loser_match_id: number | null;
+  tournament_id: number;
+  phase_id: number | null;
+  format: TournamentFormat;
+};
+
+/** Identifiant facultatif d'une ligne : `NULL` reste `null`. */
+function nullableId(value: number | null): number | null {
+  return value === null ? null : Number(value);
+}
+
+/** Un match dépendant de celui-ci porte-t-il la moindre saisie ? */
+function dependentsHaveScoreInput(
+  connection: PoolConnection,
+  current: CurrentMatchRow,
+  matchId: number,
+): Promise<boolean> {
+  if (current.format === "MULTI") return multiPhaseDependentsHaveInput(connection, current, matchId);
 
   // Survie, ronde suisse et BlueGenji Survie n'ont aucun lien de bracket : les
   // appariements de tout tour ultérieur sont recalculés depuis le classement (ou,
@@ -158,75 +130,120 @@ export async function checkDownstreamMatchesHaveNoScores(
   // et le serveur n'opposait donc **aucun** verrou, là où l'interface masquait
   // pourtant le bouton d'édition (`lib/shared/match-lock.ts` classe bien les
   // trois formats ensemble).
-  if (
-    current.format === "SURVIVAL" ||
-    current.format === "SWISS" ||
-    current.format === "BG_SURVIE"
-  ) {
-    const [rows] = await connection.execute<DependentMatchRow[]>(
-      `SELECT ${DEPENDENT_COLUMNS}
-       FROM bg_matches
-       WHERE tournament_id = ? AND round_number > ?`,
-      [Number(current.tournament_id), Number(current.round_number)],
-    );
-    dependents = rows;
-  } else {
-    // Élimination : les cibles de bracket, **à travers** les rencontres que le
-    // moteur a closes d'office. Un double forfait vide un créneau, l'exemption
-    // qui en naît fait monter l'adversaire d'un tour, et corriger le résultat
-    // amont défait toute cette chaîne (`./bracket-cascade.ts`) : c'est la
-    // première rencontre réellement disputée au bout qui doit verrouiller, pas
-    // la cible directe, qui n'a jamais été jouée. Le parcours vit dans le module
-    // partagé, pour que l'interface cache le bouton exactement là où le serveur
-    // refuse.
-    if (current.next_winner_match_id === null && current.next_loser_match_id === null) return;
-
-    const [rows] = await connection.execute<
-      (DependentMatchRow & {
-        next_winner_match_id: number | null;
-        next_loser_match_id: number | null;
-      })[]
-    >(
-      `SELECT ${DEPENDENT_COLUMNS}, next_winner_match_id, next_loser_match_id
-       FROM bg_matches
-       WHERE tournament_id = ? AND phase_id = ?`,
-      [Number(current.tournament_id), Number(current.phase_id ?? 0)],
-    );
-
-    const states = rows.map((row) => ({
-      ...toMatchScoreState(row),
-      nextWinnerMatchId:
-        row.next_winner_match_id === null ? null : Number(row.next_winner_match_id),
-      nextLoserMatchId: row.next_loser_match_id === null ? null : Number(row.next_loser_match_id),
-    }));
-    // Le point de départ du parcours se lit sur la ligne déjà chargée : seuls
-    // ses liens d'aval comptent, et ils y sont.
-    const self: MatchScoreState = {
-      id: Number(match.id),
-      roundNumber: Number(current.round_number),
-      team1Id: null,
-      team2Id: null,
-      team1Score: null,
-      team2Score: null,
-      winnerTeamId: null,
-      forfeitTeamId: null,
-      decided: true,
-      hasPendingReport: false,
-      nextWinnerMatchId:
-        current.next_winner_match_id === null ? null : Number(current.next_winner_match_id),
-      nextLoserMatchId:
-        current.next_loser_match_id === null ? null : Number(current.next_loser_match_id),
-    };
-
-    if (dependentMatches(self, states, current.format).some(hasScoreInput)) {
-      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
-    }
-    return;
+  if (current.format === "SURVIVAL" || current.format === "SWISS" || current.format === "BG_SURVIE") {
+    return laterRoundsHaveInput(connection, current);
   }
+  return bracketDependentsHaveInput(connection, current, matchId);
+}
 
-  if (dependents.map(toMatchScoreState).some(hasScoreInput)) {
-    throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
-  }
+async function multiPhaseDependentsHaveInput(
+  connection: PoolConnection,
+  current: CurrentMatchRow,
+  matchId: number,
+): Promise<boolean> {
+  // Multi-phases : la règle dépend du format de CHAQUE phase et une phase
+  // ultérieure dépend toujours de celle-ci. On délègue au module partagé
+  // (`lib/shared/match-lock.ts`) pour que serveur et interface appliquent
+  // exactement le même verrou, plutôt que de réécrire la règle en SQL.
+  const [rows] = await connection.execute<
+    (DependentMatchRow & {
+      phase_id: number;
+      phase_position: number | null;
+      next_winner_match_id: number | null;
+      next_loser_match_id: number | null;
+    })[]
+  >(
+    `SELECT ${DEPENDENT_COLUMNS_M}, m.phase_id, p.position AS phase_position,
+            m.next_winner_match_id, m.next_loser_match_id
+     FROM bg_matches m
+     LEFT JOIN bg_tournament_phases p ON p.id = m.phase_id
+     WHERE m.tournament_id = ?`,
+    [Number(current.tournament_id)],
+  );
+
+  const [phaseRows] = await connection.execute<
+    (RowDataPacket & { format: PhaseFormat })[]
+  >(`SELECT format FROM bg_tournament_phases WHERE id = ? LIMIT 1`, [
+    Number(current.phase_id ?? 0),
+  ]);
+
+  const states = rows.map((row) => ({
+    ...toMatchScoreState(row),
+    phaseId: Number(row.phase_id ?? 0),
+    phasePosition: nullableId(row.phase_position),
+    nextWinnerMatchId: nullableId(row.next_winner_match_id),
+    nextLoserMatchId: nullableId(row.next_loser_match_id),
+  }));
+
+  const self = states.find((s) => s.id === matchId);
+  if (!self) return false;
+
+  return dependentMatches(self, states, "MULTI", phaseRows[0]?.format).some(hasScoreInput);
+}
+
+async function laterRoundsHaveInput(
+  connection: PoolConnection,
+  current: CurrentMatchRow,
+): Promise<boolean> {
+  const [rows] = await connection.execute<DependentMatchRow[]>(
+    `SELECT ${DEPENDENT_COLUMNS}
+     FROM bg_matches
+     WHERE tournament_id = ? AND round_number > ?`,
+    [Number(current.tournament_id), Number(current.round_number)],
+  );
+  return rows.map(toMatchScoreState).some(hasScoreInput);
+}
+
+async function bracketDependentsHaveInput(
+  connection: PoolConnection,
+  current: CurrentMatchRow,
+  matchId: number,
+): Promise<boolean> {
+  // Élimination : les cibles de bracket, **à travers** les rencontres que le
+  // moteur a closes d'office. Un double forfait vide un créneau, l'exemption
+  // qui en naît fait monter l'adversaire d'un tour, et corriger le résultat
+  // amont défait toute cette chaîne (`./bracket-cascade.ts`) : c'est la
+  // première rencontre réellement disputée au bout qui doit verrouiller, pas
+  // la cible directe, qui n'a jamais été jouée. Le parcours vit dans le module
+  // partagé, pour que l'interface cache le bouton exactement là où le serveur
+  // refuse.
+  if (current.next_winner_match_id === null && current.next_loser_match_id === null) return false;
+
+  const [rows] = await connection.execute<
+    (DependentMatchRow & {
+      next_winner_match_id: number | null;
+      next_loser_match_id: number | null;
+    })[]
+  >(
+    `SELECT ${DEPENDENT_COLUMNS}, next_winner_match_id, next_loser_match_id
+     FROM bg_matches
+     WHERE tournament_id = ? AND phase_id = ?`,
+    [Number(current.tournament_id), Number(current.phase_id ?? 0)],
+  );
+
+  const states = rows.map((row) => ({
+    ...toMatchScoreState(row),
+    nextWinnerMatchId: nullableId(row.next_winner_match_id),
+    nextLoserMatchId: nullableId(row.next_loser_match_id),
+  }));
+  // Le point de départ du parcours se lit sur la ligne déjà chargée : seuls
+  // ses liens d'aval comptent, et ils y sont.
+  const self: MatchScoreState = {
+    id: matchId,
+    roundNumber: Number(current.round_number),
+    team1Id: null,
+    team2Id: null,
+    team1Score: null,
+    team2Score: null,
+    winnerTeamId: null,
+    forfeitTeamId: null,
+    decided: true,
+    hasPendingReport: false,
+    nextWinnerMatchId: nullableId(current.next_winner_match_id),
+    nextLoserMatchId: nullableId(current.next_loser_match_id),
+  };
+
+  return dependentMatches(self, states, current.format).some(hasScoreInput);
 }
 
 /**
@@ -505,6 +522,60 @@ export async function adminResolveMatch(
 
   const tournamentId = Number(match.tournament_id);
 
+  const { winnerTeamId, loserTeamId, resultTeam1Score, resultTeam2Score } = await resolveAdminOutcome(
+    connection,
+    tournamentId,
+    match,
+    { team1Score, team2Score, forfeitTeamId, doubleForfeit },
+  );
+
+  // Effets en cascade : ce que l'**ancien** résultat avait fait descendre dans
+  // le tableau (une équipe dans un créneau, ou une exemption close d'office
+  // faute d'équipe) est défait avant que le nouveau ne soit propagé. Sans effet
+  // hors élimination — un match sans lien d'aval n'a rien propagé.
+  const reopened = await detachDownstreamOutcome(connection, match, { winnerTeamId, loserTeamId });
+
+  if (reopened > 0) await reopenAfterCascade(connection, tournamentId, match);
+
+  await finalizeMatch(connection, tournamentId, match, {
+    team1Score: resultTeam1Score,
+    team2Score: resultTeam2Score,
+    winnerTeamId,
+    loserTeamId,
+  });
+
+  await connection.execute(
+    `UPDATE bg_matches SET forfeit_team_id = ?, double_forfeit = ? WHERE id = ?`,
+    [forfeitTeamId ?? null, doubleForfeit ? 1 : 0, matchId],
+  );
+
+  await tryAutoResolveByes(connection, tournamentId);
+}
+
+/** Issue d'une rencontre tranchée par l'arbitrage, avant propagation. */
+type AdminOutcome = {
+  winnerTeamId: number | null;
+  loserTeamId: number | null;
+  resultTeam1Score: number | null;
+  resultTeam2Score: number | null;
+};
+
+/**
+ * Déduit l'issue du geste d'arbitrage — double forfait, forfait nominatif ou
+ * score — après l'avoir contrôlé. Refuse un geste vide ou mêlé.
+ */
+async function resolveAdminOutcome(
+  connection: PoolConnection,
+  tournamentId: number,
+  match: MatchRow,
+  input: {
+    team1Score?: number;
+    team2Score?: number;
+    forfeitTeamId?: number;
+    doubleForfeit: boolean;
+  },
+): Promise<AdminOutcome> {
+  const { team1Score, team2Score, forfeitTeamId, doubleForfeit } = input;
   let winnerTeamId: number | null;
   let loserTeamId: number | null;
   let resultTeam1Score: number | null;
@@ -564,61 +635,49 @@ export async function adminResolveMatch(
     throw new Error("INVALID_REQUEST");
   }
 
-  // Effets en cascade : ce que l'**ancien** résultat avait fait descendre dans
-  // le tableau (une équipe dans un créneau, ou une exemption close d'office
-  // faute d'équipe) est défait avant que le nouveau ne soit propagé. Sans effet
-  // hors élimination — un match sans lien d'aval n'a rien propagé.
-  const reopened = await detachDownstreamOutcome(connection, match, { winnerTeamId, loserTeamId });
+  return { winnerTeamId, loserTeamId, resultTeam1Score, resultTeam2Score };
+}
 
-  // Une exemption rouverte peut appartenir à un tournoi **déjà clos** : c'est
-  // même le cas ordinaire — un double forfait en demi-finale fait de la finale
-  // une exemption, et le tableau se termine dans la même transaction. Corriger
-  // ce double forfait rouvre la finale ; le tournoi doit repartir avec elle,
-  // sinon il resterait « terminé » sur une rencontre que plus personne ne peut
-  // saisir (`reportMatchScore` exige `RUNNING`, l'entretien ne visite que
-  // `RUNNING`). Il se reclôt de lui-même si le tableau est de nouveau complet.
-  if (reopened > 0) {
-    const phaseId = Number(match.phase_id ?? 0);
-    const phaseFinished =
-      phaseId > 0 &&
-      (
-        await connection.execute<(RowDataPacket & { state: string })[]>(
-          `SELECT state FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
-          [phaseId],
-        )
-      )[0][0]?.state === "FINISHED";
+/**
+ * Une exemption rouverte peut appartenir à un tournoi **déjà clos** : c'est
+ * même le cas ordinaire — un double forfait en demi-finale fait de la finale
+ * une exemption, et le tableau se termine dans la même transaction. Corriger
+ * ce double forfait rouvre la finale ; le tournoi doit repartir avec elle,
+ * sinon il resterait « terminé » sur une rencontre que plus personne ne peut
+ * saisir (`reportMatchScore` exige `RUNNING`, l'entretien ne visite que
+ * `RUNNING`). Il se reclôt de lui-même si le tableau est de nouveau complet.
+ */
+async function reopenAfterCascade(
+  connection: PoolConnection,
+  tournamentId: number,
+  match: MatchRow,
+): Promise<void> {
+  const phaseId = Number(match.phase_id ?? 0);
+  const phaseFinished =
+    phaseId > 0 &&
+    (
+      await connection.execute<(RowDataPacket & { state: string })[]>(
+        `SELECT state FROM bg_tournament_phases WHERE id = ? LIMIT 1`,
+        [phaseId],
+      )
+    )[0][0]?.state === "FINISHED";
 
-    if (await reopenTournament(connection, tournamentId)) {
-      // Dans un tournoi multi-phases clos, la phase du match est la dernière :
-      // elle doit repartir elle aussi, `reconcilePhases` n'avançant qu'une
-      // phase `RUNNING` d'un tournoi en cours.
-      if (phaseFinished) {
-        await connection.execute(
-          `UPDATE bg_tournament_phases SET state = 'RUNNING', finished_at = NULL WHERE id = ?`,
-          [phaseId],
-        );
-      }
-    } else if (phaseFinished) {
-      // Tournoi en cours, phase du match **déjà close** : une phase suivante a
-      // été lancée sur ses qualifiées. Rouvrir une rencontre ici la laisserait
-      // à jamais « à jouer » — `reconcilePhases` ne relit que la phase
-      // courante — et les qualifiées ne suivraient pas. On refuse : la
-      // correction passe par un retour en arrière, qui défait la phase suivante.
-      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
+  if (await reopenTournament(connection, tournamentId)) {
+    // Dans un tournoi multi-phases clos, la phase du match est la dernière :
+    // elle doit repartir elle aussi, `reconcilePhases` n'avançant qu'une
+    // phase `RUNNING` d'un tournoi en cours.
+    if (phaseFinished) {
+      await connection.execute(
+        `UPDATE bg_tournament_phases SET state = 'RUNNING', finished_at = NULL WHERE id = ?`,
+        [phaseId],
+      );
     }
+  } else if (phaseFinished) {
+    // Tournoi en cours, phase du match **déjà close** : une phase suivante a
+    // été lancée sur ses qualifiées. Rouvrir une rencontre ici la laisserait
+    // à jamais « à jouer » — `reconcilePhases` ne relit que la phase
+    // courante — et les qualifiées ne suivraient pas. On refuse : la
+    // correction passe par un retour en arrière, qui défait la phase suivante.
+    throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
   }
-
-  await finalizeMatch(connection, tournamentId, match, {
-    team1Score: resultTeam1Score,
-    team2Score: resultTeam2Score,
-    winnerTeamId,
-    loserTeamId,
-  });
-
-  await connection.execute(
-    `UPDATE bg_matches SET forfeit_team_id = ?, double_forfeit = ? WHERE id = ?`,
-    [forfeitTeamId ?? null, doubleForfeit ? 1 : 0, matchId],
-  );
-
-  await tryAutoResolveByes(connection, tournamentId);
 }

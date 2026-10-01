@@ -106,33 +106,7 @@ export async function syncTournamentState(
     // plateau y échappaient seuls, `createBracketIfMissing` les rattrapant dans
     // l'entretien ci-dessous.
     const isStarting = computed === "RUNNING";
-
-    const isSwissStart = isStarting && tournament.format === "SWISS";
-    if (isSwissStart) {
-      const { initializeSwissTournament, generateSwissRound } = await import("./swiss");
-      await initializeSwissTournament(tournamentId, connection);
-      await generateSwissRound(tournamentId, connection);
-    }
-
-    const isSurvivalStart = isStarting && tournament.format === "SURVIVAL";
-    if (isSurvivalStart) {
-      const { initializeSurvivalTournament, generateSurvivalRound } = await import("./survival");
-      await initializeSurvivalTournament(tournamentId, connection);
-      await generateSurvivalRound(tournamentId, connection);
-    }
-
-    const isEnduranceStart = isStarting && tournament.format === "BG_SURVIE";
-    if (isEnduranceStart) {
-      const { initializeEnduranceTournament, generateEnduranceRound } = await import("./bg-survie");
-      await initializeEnduranceTournament(tournamentId, connection);
-      await generateEnduranceRound(tournamentId, connection);
-    }
-
-    const isMultiStart = isStarting && tournament.format === "MULTI";
-    if (isMultiStart) {
-      const { initializeMultiTournament } = await import("./phases");
-      await initializeMultiTournament(tournamentId, connection);
-    }
+    if (isStarting) await initializeFormat(connection, tournamentId, tournament.format);
 
     await updateTournamentState(connection, tournamentId, computed);
     tournament.state = computed;
@@ -152,24 +126,9 @@ export async function syncTournamentState(
     }
 
     // Après passage en RUNNING : clôture immédiate si départ à ≤ 1 équipe.
-    if (isSurvivalStart) {
-      const { reconcileSurvival } = await import("./survival");
-      await reconcileSurvival(tournamentId, connection);
-    }
-    if (isSwissStart) {
-      const { reconcileSwiss } = await import("./swiss");
-      await reconcileSwiss(tournamentId, connection);
-    }
-
-    if (isEnduranceStart) {
-      const { reconcileEndurance } = await import("./bg-survie");
-      await reconcileEndurance(tournamentId, connection);
-    }
-
-    if (isMultiStart) {
-      const { reconcilePhases } = await import("./phases");
-      await reconcilePhases(tournamentId, connection);
-    }
+    // Mêmes formats que l'initialisation ci-dessus (`reconcileFormat` ne
+    // rappelle que les quatre moteurs qui en ont une).
+    if (isStarting) await reconcileFormat(connection, tournamentId, tournament.format);
   }
 
   // Entretien passif d'un tournoi en cours. Ce bloc existait avant le découpage
@@ -179,63 +138,108 @@ export async function syncTournamentState(
   // expiré n'est jamais tranché — alors que `getTournamentDetail` déclenche
   // justement cette synchronisation pour ces trois raisons.
   if (tournament.state === "RUNNING") {
-    // Réservé aux formats à plateau : la survie, la ronde suisse et le
-    // multi-phases construisent leurs matchs par leur propre orchestration.
-    let bracketCreated = false;
-    if (tournament.format === "SINGLE" || tournament.format === "DOUBLE") {
-      const { createBracketIfMissing } = await import("./bracket-generator");
-      // Le plateau se crée dans **cette** transaction ; l'annonce, elle, revient
-      // à l'appelant qui la commite (`contentChanged` ci-dessous).
-      bracketCreated = (await createBracketIfMissing(connection, tournament)).created;
-    }
-
-    const { resolveExpiredScoreReports, finalizeTournamentIfDone } = await import("./finalization");
-    const { tryAutoResolveByes } = await import("./byes");
-
-    const resolvedByTimeout = await resolveExpiredScoreReports(connection, tournamentId);
-    await tryAutoResolveByes(connection, tournamentId);
-
-    // Une manche close par le **délai** n'a traversé aucun chemin d'écriture :
-    // personne n'a rapporté de score, donc personne n'a réconcilié derrière.
-    // `finalizeMatch` sait pousser une équipe le long des liens de bracket, et
-    // c'est tout ce dont l'élimination a besoin — mais la Survie, la Ronde
-    // suisse, la BlueGenji Survie et le multi-phases ne posent leur manche
-    // suivante qu'en réconciliant. Sans ce rappel, la dernière manche d'une
-    // ronde tranchée par le délai laissait le tournoi **définitivement** en
-    // cours : plus aucun score à rapporter, donc plus aucun déclencheur, et le
-    // tournoi quittait même `findDueMaintenance` (`./sync-scope`) — plus rien
-    // ne le revisitait.
-    //
-    // Conditionné à un résultat réellement écrit : ces réconciliations rejouent
-    // le tournoi entier, et l'entretien passif repasse, lui, à chaque balayage.
-    if (resolvedByTimeout > 0) {
-      await reconcileFormat(connection, tournamentId, tournament.format);
-    }
-
-    await finalizeTournamentIfDone(connection, tournamentId);
-
-    // Lancement des matchs (`lib/shared/match-launch.ts`) : ouverture du délai,
-    // lancement des matchs dont toutes les parties sont prêtes — deux fantômes
-    // le sont d'office — et lancement d'office une fois le délai écoulé. Rien
-    // d'autre ne le ferait : aucune partie n'a à cliquer pour qu'il arrive.
-    const { maintainMatchLaunches } = await import("./match-launch");
-    const launchesChanged = await maintainMatchLaunches(connection, tournamentId);
-
-    // `finalizeTournamentIfDone` a pu passer le tournoi à `FINISHED` : le
-    // drapeau posé plus haut ne le sait pas. Sans cette comparaison, un tournoi
-    // clos par un bye résolu à la lecture resterait annoncé « En cours » dans la
-    // liste en cache — et le reclassement client ne rattrape pas ce cas-là, une
-    // clôture ne se déduisant d'aucune date.
-    const refreshed = await loadTournamentRow(connection, tournamentId);
-    return {
-      row: refreshed,
-      stateChanged: stateChanged || (refreshed !== null && refreshed.state !== stateAtEntry),
-      contentChanged: bracketCreated || resolvedByTimeout > 0,
-      launchesChanged: launchesChanged > 0,
-    };
+    return maintainRunningTournament(connection, tournamentId, tournament, stateChanged, stateAtEntry);
   }
 
   return { row: tournament, stateChanged, contentChanged: false, launchesChanged: false };
+}
+
+/**
+ * Initialisation d'un format à classement ou multi-phases au coup d'envoi.
+ * Les formats à plateau n'en ont pas : `createBracketIfMissing` les rattrape
+ * dans l'entretien passif.
+ */
+async function initializeFormat(
+  connection: PoolConnection,
+  tournamentId: number,
+  format: TournamentRow["format"],
+): Promise<void> {
+  if (format === "SWISS") {
+    const { initializeSwissTournament, generateSwissRound } = await import("./swiss");
+    await initializeSwissTournament(tournamentId, connection);
+    await generateSwissRound(tournamentId, connection);
+    return;
+  }
+  if (format === "SURVIVAL") {
+    const { initializeSurvivalTournament, generateSurvivalRound } = await import("./survival");
+    await initializeSurvivalTournament(tournamentId, connection);
+    await generateSurvivalRound(tournamentId, connection);
+    return;
+  }
+  if (format === "BG_SURVIE") {
+    const { initializeEnduranceTournament, generateEnduranceRound } = await import("./bg-survie");
+    await initializeEnduranceTournament(tournamentId, connection);
+    await generateEnduranceRound(tournamentId, connection);
+    return;
+  }
+  if (format === "MULTI") {
+    const { initializeMultiTournament } = await import("./phases");
+    await initializeMultiTournament(tournamentId, connection);
+  }
+}
+
+/** Entretien passif d'un tournoi en cours (voir `syncTournamentState`). */
+async function maintainRunningTournament(
+  connection: PoolConnection,
+  tournamentId: number,
+  tournament: TournamentRow,
+  stateChanged: boolean,
+  stateAtEntry: TournamentRow["state"],
+): Promise<TournamentSyncResult> {
+  // Réservé aux formats à plateau : la survie, la ronde suisse et le
+  // multi-phases construisent leurs matchs par leur propre orchestration.
+  let bracketCreated = false;
+  if (tournament.format === "SINGLE" || tournament.format === "DOUBLE") {
+    const { createBracketIfMissing } = await import("./bracket-generator");
+    // Le plateau se crée dans **cette** transaction ; l'annonce, elle, revient
+    // à l'appelant qui la commite (`contentChanged` ci-dessous).
+    bracketCreated = (await createBracketIfMissing(connection, tournament)).created;
+  }
+
+  const { resolveExpiredScoreReports, finalizeTournamentIfDone } = await import("./finalization");
+  const { tryAutoResolveByes } = await import("./byes");
+
+  const resolvedByTimeout = await resolveExpiredScoreReports(connection, tournamentId);
+  await tryAutoResolveByes(connection, tournamentId);
+
+  // Une manche close par le **délai** n'a traversé aucun chemin d'écriture :
+  // personne n'a rapporté de score, donc personne n'a réconcilié derrière.
+  // `finalizeMatch` sait pousser une équipe le long des liens de bracket, et
+  // c'est tout ce dont l'élimination a besoin — mais la Survie, la Ronde
+  // suisse, la BlueGenji Survie et le multi-phases ne posent leur manche
+  // suivante qu'en réconciliant. Sans ce rappel, la dernière manche d'une
+  // ronde tranchée par le délai laissait le tournoi **définitivement** en
+  // cours : plus aucun score à rapporter, donc plus aucun déclencheur, et le
+  // tournoi quittait même `findDueMaintenance` (`./sync-scope`) — plus rien
+  // ne le revisitait.
+  //
+  // Conditionné à un résultat réellement écrit : ces réconciliations rejouent
+  // le tournoi entier, et l'entretien passif repasse, lui, à chaque balayage.
+  if (resolvedByTimeout > 0) {
+    await reconcileFormat(connection, tournamentId, tournament.format);
+  }
+
+  await finalizeTournamentIfDone(connection, tournamentId);
+
+  // Lancement des matchs (`lib/shared/match-launch.ts`) : ouverture du délai,
+  // lancement des matchs dont toutes les parties sont prêtes — deux fantômes
+  // le sont d'office — et lancement d'office une fois le délai écoulé. Rien
+  // d'autre ne le ferait : aucune partie n'a à cliquer pour qu'il arrive.
+  const { maintainMatchLaunches } = await import("./match-launch");
+  const launchesChanged = await maintainMatchLaunches(connection, tournamentId);
+
+  // `finalizeTournamentIfDone` a pu passer le tournoi à `FINISHED` : le
+  // drapeau posé plus haut ne le sait pas. Sans cette comparaison, un tournoi
+  // clos par un bye résolu à la lecture resterait annoncé « En cours » dans la
+  // liste en cache — et le reclassement client ne rattrape pas ce cas-là, une
+  // clôture ne se déduisant d'aucune date.
+  const refreshed = await loadTournamentRow(connection, tournamentId);
+  return {
+    row: refreshed,
+    stateChanged: stateChanged || (refreshed !== null && refreshed.state !== stateAtEntry),
+    contentChanged: bracketCreated || resolvedByTimeout > 0,
+    launchesChanged: launchesChanged > 0,
+  };
 }
 
 /**

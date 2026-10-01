@@ -677,31 +677,7 @@ async function loadTournamentBuckets(
 ): Promise<TournamentBuckets> {
   const db = await getDatabase();
   const now = new Date();
-
-  const where: string[] = [scope.hiddenOnly ? `t.start_visibility_at > ?` : `t.start_visibility_at <= ?`];
-  const params: SqlParams = [now];
-
-  if (searchTerm?.trim()) {
-    where.push(`LOWER(t.name) LIKE ?`);
-    params.push(`%${searchTerm.trim().toLowerCase()}%`);
-  }
-
-  // La table dérivée n'est pas décorative : ni MariaDB ni MySQL n'acceptent un
-  // `LIMIT` directement dans un `IN (SELECT …)`. Même ordre que la liste, pour
-  // que les terminés portés soient bien les premiers qu'elle affiche.
-  // `finishedLimit` est un entier du module, jamais une entrée.
-  if (finishedLimit !== null) {
-    where.push(
-      `(t.state <> 'FINISHED' OR t.id IN (
-         SELECT recent.id FROM (
-           SELECT f.id FROM bg_tournaments f
-           WHERE f.state = 'FINISHED' AND f.start_visibility_at <= ?
-           ORDER BY f.start_at DESC, f.id DESC
-           LIMIT ${Math.max(0, Math.floor(finishedLimit))}
-         ) recent))`,
-    );
-    params.push(now);
-  }
+  const { where, params } = tournamentListFilter(searchTerm, scope, finishedLimit, now);
 
   const [rows] = await db.execute<TournamentListRow[]>(
     `SELECT
@@ -814,11 +790,8 @@ async function loadTournamentBuckets(
   });
 
   for (const [index, row] of rows.entries()) {
-    const card = { ...cards[index], ...summaries.get(cards[index].id) };
-    if (row.state === "UPCOMING") buckets.upcoming.push(card);
-    if (row.state === "REGISTRATION") buckets.registration.push(card);
-    if (row.state === "RUNNING") buckets.running.push(card);
-    if (row.state === "FINISHED") buckets.finished.push(card);
+    const bucket = BUCKET_BY_STATE.get(row.state);
+    if (bucket) buckets[bucket].push({ ...cards[index], ...summaries.get(cards[index].id) });
   }
 
   // Rien n'a été laissé de côté : la liste est complète, et le dit par
@@ -828,6 +801,49 @@ async function loadTournamentBuckets(
   }
 
   return buckets;
+}
+
+/** Panier de la liste où range chaque état de tournoi. */
+const BUCKET_BY_STATE: ReadonlyMap<string, "upcoming" | "registration" | "running" | "finished"> =
+  new Map([
+    ["UPCOMING", "upcoming"],
+    ["REGISTRATION", "registration"],
+    ["RUNNING", "running"],
+    ["FINISHED", "finished"],
+  ]);
+
+/** Clause `WHERE` de la liste : visibilité, recherche et troncature des terminés. */
+function tournamentListFilter(
+  searchTerm: string | null,
+  scope: TournamentListScope,
+  finishedLimit: number | null,
+  now: Date,
+): { where: string[]; params: SqlParams } {
+  const where: string[] = [scope.hiddenOnly ? `t.start_visibility_at > ?` : `t.start_visibility_at <= ?`];
+  const params: SqlParams = [now];
+
+  if (searchTerm?.trim()) {
+    where.push(`LOWER(t.name) LIKE ?`);
+    params.push(`%${searchTerm.trim().toLowerCase()}%`);
+  }
+
+  // La table dérivée n'est pas décorative : ni MariaDB ni MySQL n'acceptent un
+  // `LIMIT` directement dans un `IN (SELECT …)`. Même ordre que la liste, pour
+  // que les terminés portés soient bien les premiers qu'elle affiche.
+  // `finishedLimit` est un entier du module, jamais une entrée.
+  if (finishedLimit !== null) {
+    where.push(
+      `(t.state <> 'FINISHED' OR t.id IN (
+         SELECT recent.id FROM (
+           SELECT f.id FROM bg_tournaments f
+           WHERE f.state = 'FINISHED' AND f.start_visibility_at <= ?
+           ORDER BY f.start_at DESC, f.id DESC
+           LIMIT ${Math.max(0, Math.floor(finishedLimit))}
+         ) recent))`,
+    );
+    params.push(now);
+  }
+  return { where, params };
 }
 
 export async function registerCurrentUserTeam(tournamentId: number, userId: number): Promise<void> {

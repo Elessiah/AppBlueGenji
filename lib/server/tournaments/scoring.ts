@@ -227,17 +227,16 @@ function validateScoreValue(value: number): number {
   return Math.trunc(value);
 }
 
-export async function reportMatchScore(
+/**
+ * Engagé au nom duquel le joueur reporte, après synchronisation du tournoi :
+ * refuse un tournoi absent ou pas en cours, un joueur sans engagé, et un
+ * membre qui ne mène pas le match.
+ */
+async function resolveReportingTeamId(
   connection: PoolConnection,
   tournamentId: number,
-  matchId: number,
   userId: number,
-  myScoreRaw: number,
-  opponentScoreRaw: number,
-): Promise<void> {
-  const myScore = validateScoreValue(myScoreRaw);
-  const opponentScore = validateScoreValue(opponentScoreRaw);
-
+): Promise<number> {
   const { row: tournament } = await syncTournamentState(connection, tournamentId);
   if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
@@ -259,6 +258,49 @@ export async function reportMatchScore(
   if (!entrant.canConductMatch) {
     throw new Error("NOT_TEAM_MATCH_LEADER");
   }
+  return reporterTeamId;
+}
+
+/**
+ * Un match se joue une fois **lancé** : les deux équipes (et le caster) se
+ * sont déclarées prêtes, l'arbitrage l'a forcé, ou le délai l'a fait partir
+ * (`lib/shared/match-launch.ts`). Le report d'un joueur n'y déroge pas ;
+ * l'arbitrage, qui passe par un autre chemin, garde la main.
+ */
+function assertMatchLaunchedForPlayers(match: MatchRow): void {
+  if (
+    !canPlayersReportScore(
+      {
+        status: match.status,
+        team1Id: Number(match.team1_id),
+        team2Id: Number(match.team2_id),
+        startAt: toIso(match.start_at ?? null),
+        // Un lancement posé pour un autre appariement ne lance pas celui-ci.
+        launchedAt:
+          launchPairingKey(Number(match.team1_id), Number(match.team2_id)) ===
+          (match.launch_pairing ?? null)
+            ? toIso(match.launched_at ?? null)
+            : null,
+      },
+      Date.now(),
+    )
+  ) {
+    throw new Error("MATCH_NOT_LAUNCHED");
+  }
+}
+
+export async function reportMatchScore(
+  connection: PoolConnection,
+  tournamentId: number,
+  matchId: number,
+  userId: number,
+  myScoreRaw: number,
+  opponentScoreRaw: number,
+): Promise<void> {
+  const myScore = validateScoreValue(myScoreRaw);
+  const opponentScore = validateScoreValue(opponentScoreRaw);
+
+  const reporterTeamId = await resolveReportingTeamId(connection, tournamentId, userId);
 
   const [matches] = await connection.execute<MatchRow[]>(
     `SELECT
@@ -321,29 +363,7 @@ export async function reportMatchScore(
     throw new Error("NOT_IN_MATCH");
   }
 
-  // Un match se joue une fois **lancé** : les deux équipes (et le caster) se
-  // sont déclarées prêtes, l'arbitrage l'a forcé, ou le délai l'a fait partir
-  // (`lib/shared/match-launch.ts`). Le report d'un joueur n'y déroge pas ;
-  // l'arbitrage, qui passe par un autre chemin, garde la main.
-  if (
-    !canPlayersReportScore(
-      {
-        status: match.status,
-        team1Id: Number(match.team1_id),
-        team2Id: Number(match.team2_id),
-        startAt: toIso(match.start_at ?? null),
-        // Un lancement posé pour un autre appariement ne lance pas celui-ci.
-        launchedAt:
-          launchPairingKey(Number(match.team1_id), Number(match.team2_id)) ===
-          (match.launch_pairing ?? null)
-            ? toIso(match.launched_at ?? null)
-            : null,
-      },
-      Date.now(),
-    )
-  ) {
-    throw new Error("MATCH_NOT_LAUNCHED");
-  }
+  assertMatchLaunchedForPlayers(match);
 
   // Un report d'équipe **clôt** la rencontre : le score doit donc constituer un
   // résultat final, et pas seulement respecter le plafond. Ce qu'est un

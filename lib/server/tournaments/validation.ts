@@ -59,25 +59,33 @@ function validateRawPhases(phases: unknown): string | null {
 
   const list = phases as RawPhase[];
 
+  if (list.some((phase) => !phase || !PHASE_FORMATS.has(String(phase.format)))) {
+    return "INVALID_PHASE_FORMAT";
+  }
+  if (list.some((phase, i) => phase.format === "DOUBLE" && i !== list.length - 1)) {
+    return "DOUBLE_MUST_BE_LAST_PHASE";
+  }
+  if (list.some((phase) => !isValidQualifierValue(phase))) return "INVALID_QUALIFIER_VALUE";
+  if (hasNonDecreasingQualifierCounts(list)) return "INVALID_QUALIFIER_COUNT";
+
   for (const phase of list) {
-    if (!phase || !PHASE_FORMATS.has(String(phase.format))) return "INVALID_PHASE_FORMAT";
+    const settingsError = rawPhaseSettingsError(phase);
+    if (settingsError) return settingsError;
   }
 
-  for (let i = 0; i < list.length; i += 1) {
-    if (list[i].format === "DOUBLE" && i !== list.length - 1) {
-      return "DOUBLE_MUST_BE_LAST_PHASE";
-    }
-  }
+  return null;
+}
 
-  for (const phase of list) {
-    const value = Number(phase.qualifierValue);
-    if (phase.qualifierMode === "PERCENT") {
-      if (!Number.isInteger(value) || value < 1 || value > 100) return "INVALID_QUALIFIER_VALUE";
-    } else if (!isPositiveInt(value)) {
-      return "INVALID_QUALIFIER_VALUE";
-    }
+/** Cible de qualification lisible : pourcentage entier de 1 à 100, ou nombre ≥ 1. */
+function isValidQualifierValue(phase: RawPhase): boolean {
+  const value = Number(phase.qualifierValue);
+  if (phase.qualifierMode === "PERCENT") {
+    return Number.isInteger(value) && value >= 1 && value <= 100;
   }
+  return isPositiveInt(value);
+}
 
+function hasNonDecreasingQualifierCounts(list: readonly RawPhase[]): boolean {
   // Décroissance stricte des COUNT consécutifs, sur les seules phases
   // non-terminales : la **dernière** phase couronne toujours une seule
   // championne (sa valeur de qualification n'est jamais lue, voir
@@ -97,26 +105,27 @@ function validateRawPhases(phases: unknown): string | null {
       next.qualifierMode === "COUNT" &&
       Number(current.qualifierValue) <= Number(next.qualifierValue)
     ) {
-      return "INVALID_QUALIFIER_COUNT";
+      return true;
     }
   }
+  return false;
+}
 
-  for (const phase of list) {
-    if (phase.format === "SURVIVAL") {
-      if (!isPositiveInt(phase.survivalRoundsPerCut)) return "INVALID_SURVIVAL_ROUNDS";
-      if (
-        phase.survivalRoundsBeforeFirstCut !== undefined &&
-        phase.survivalRoundsBeforeFirstCut !== null &&
-        !isPositiveInt(phase.survivalRoundsBeforeFirstCut)
-      ) {
-        return "INVALID_SURVIVAL_ROUNDS";
-      }
-    }
-    if (phase.format === "SWISS" && !isPositiveInt(phase.swissTotalRounds)) {
-      return "INVALID_SWISS_ROUNDS";
+/** Réglages propres au format d'une phase (cadence de survie, rondes suisses). */
+function rawPhaseSettingsError(phase: RawPhase): string | null {
+  if (phase.format === "SURVIVAL") {
+    if (!isPositiveInt(phase.survivalRoundsPerCut)) return "INVALID_SURVIVAL_ROUNDS";
+    if (
+      phase.survivalRoundsBeforeFirstCut !== undefined &&
+      phase.survivalRoundsBeforeFirstCut !== null &&
+      !isPositiveInt(phase.survivalRoundsBeforeFirstCut)
+    ) {
+      return "INVALID_SURVIVAL_ROUNDS";
     }
   }
-
+  if (phase.format === "SWISS" && !isPositiveInt(phase.swissTotalRounds)) {
+    return "INVALID_SWISS_ROUNDS";
+  }
   return null;
 }
 
@@ -223,36 +232,97 @@ export type ValidatedTournamentInput = {
   refereeScheduling: boolean;
 };
 
+/** Issue d'un contrôle : un code d'erreur, ou la valeur validée. */
+type Checked<T> = { error: string } | { value: T };
+
+const TOURNAMENT_FORMATS: ReadonlySet<string> = new Set([
+  "SINGLE",
+  "DOUBLE",
+  "SURVIVAL",
+  "SWISS",
+  "MULTI",
+  "BG_SURVIE",
+]);
+
+function isTournamentFormat(format: TournamentFormat | undefined): format is TournamentFormat {
+  return TOURNAMENT_FORMATS.has(String(format));
+}
+
 export function validateTournamentInput(
   body: TournamentInputBody,
 ): { error: string } | { value: ValidatedTournamentInput } {
   if (!body.name?.trim()) return { error: "MISSING_NAME" };
-  if (
-    body.format !== "SINGLE" &&
-    body.format !== "DOUBLE" &&
-    body.format !== "SURVIVAL" &&
-    body.format !== "SWISS" &&
-    body.format !== "MULTI" &&
-    body.format !== "BG_SURVIE"
-  ) {
-    return { error: "INVALID_FORMAT" };
-  }
+  if (!isTournamentFormat(body.format)) return { error: "INVALID_FORMAT" };
 
-  if (body.format === "MULTI") {
-    const phaseError = validateRawPhases(body.phases);
-    if (phaseError) return { error: phaseError };
-  }
-  if (body.game && body.game !== "OW" && body.game !== "MR") return { error: "INVALID_GAME" };
-  // Type de participant : équipes (défaut) ou joueurs inscrits individuellement.
-  if (body.participantType !== undefined && !isParticipantType(body.participantType)) {
-    return { error: "INVALID_PARTICIPANT_TYPE" };
-  }
+  const shapeError = tournamentShapeError(body);
+  if (shapeError) return { error: shapeError };
 
   const maxTeams = Number(body.maxTeams ?? 0);
   if (!Number.isInteger(maxTeams) || maxTeams < 2 || maxTeams > 256) {
     return { error: "INVALID_MAX_TEAMS" };
   }
 
+  const matchFormat = validateMatchFormat(body);
+  if ("error" in matchFormat) return matchFormat;
+  const endurancePlayoffFormat = validateEndurancePlayoffFormat(body);
+  if ("error" in endurancePlayoffFormat) return endurancePlayoffFormat;
+  const registration = validateRegistrationSettings(body);
+  if ("error" in registration) return registration;
+  const survival = validateSurvivalSettings(body);
+  if ("error" in survival) return survival;
+  const endurance = validateEnduranceSettings(body);
+  if ("error" in endurance) return endurance;
+  const swiss = validateSwissSettings(body);
+  if ("error" in swiss) return swiss;
+
+  return {
+    value: {
+      name: body.name.trim(),
+      description: body.description ?? null,
+      format: body.format,
+      game: body.game ?? "OW",
+      participantType: body.participantType ?? "TEAM",
+      maxTeams,
+      // La petite finale n'a de sens qu'en élimination simple : on la neutralise
+      // ailleurs plutôt que de la stocker telle quelle. `createTournament`
+      // portait seule cette règle, si bien qu'une **édition** basculant un
+      // tournoi de `SINGLE` à `DOUBLE` laissait la case cochée en base là où sa
+      // création l'aurait mise à zéro : le formulaire la rouvrait cochée au
+      // retour vers `SINGLE`, activant une petite finale que personne n'avait
+      // redemandée. (`rankEliminationPhase` lit bien la colonne quel que soit le
+      // format, mais ne s'en sert que dans sa branche `SINGLE`.)
+      hasThirdPlaceMatch: body.format === "SINGLE" && Boolean(body.hasThirdPlaceMatch),
+      ...survival.value,
+      ...swiss.value,
+      ...endurance.value,
+      matchFormat: matchFormat.value,
+      endurancePlayoffFormat: endurancePlayoffFormat.value,
+      registrationFilters: registration.value,
+      refereeScheduling: body.refereeScheduling === true,
+      // Les phases ne concernent que le format MULTI : on ne les transmet pas
+      // aux autres formats, même si le client en a envoyé. Voir le
+      // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :
+      // elles restent brutes ici, à normaliser par l'appelant.
+      phases: body.format === "MULTI" ? (body.phases as Partial<PhaseConfig>[]) : null,
+    },
+  };
+}
+
+/** Plan de phases (MULTI), jeu et type de participant. */
+function tournamentShapeError(body: TournamentInputBody): string | null {
+  if (body.format === "MULTI") {
+    const phaseError = validateRawPhases(body.phases);
+    if (phaseError) return phaseError;
+  }
+  if (body.game && body.game !== "OW" && body.game !== "MR") return "INVALID_GAME";
+  // Type de participant : équipes (défaut) ou joueurs inscrits individuellement.
+  if (body.participantType !== undefined && !isParticipantType(body.participantType)) {
+    return "INVALID_PARTICIPANT_TYPE";
+  }
+  return null;
+}
+
+function validateMatchFormat(body: TournamentInputBody): Checked<MatchFormat | null> {
   // Format des matchs (BO5, FT3…) — commun à tous les formats de tournoi.
   // Les deux champs vont ensemble : omettre les deux laisse la saisie libre,
   // n'en envoyer qu'un est une erreur du client plutôt qu'un demi-réglage.
@@ -315,7 +385,10 @@ export function validateTournamentInput(
     }
     matchFormat.maxMaps = Number(body.matchFormatMaxMaps);
   }
+  return { value: matchFormat };
+}
 
+function validateEndurancePlayoffFormat(body: TournamentInputBody): Checked<MatchFormat | null> {
   // Format de l'arbre final (BG Survie). Même règle de paire que le format du
   // tournoi ; les égalités n'y sont pas proposées, donc pas non plus lues.
   let endurancePlayoffFormat: MatchFormat | null = null;
@@ -336,7 +409,10 @@ export function validateTournamentInput(
       value: Number(body.endurancePlayoffFormatValue),
     };
   }
+  return { value: endurancePlayoffFormat };
+}
 
+function validateRegistrationSettings(body: TournamentInputBody): Checked<RegistrationFilters> {
   // Conditions d'inscription. Contrairement aux réglages de format, elles ne
   // sont **pas** propres à un format : elles portent sur qui a le droit
   // d'entrer, question que les six formats posent à l'identique. Rien n'est donc
@@ -373,7 +449,12 @@ export function validateTournamentInput(
         ? DEFAULT_REGISTRATION_FILTERS.minPlayers
         : Number(body.registrationMinPlayers),
   };
+  return { value: registrationFilters };
+}
 
+function validateSurvivalSettings(
+  body: TournamentInputBody,
+): Checked<Pick<ValidatedTournamentInput, "survivalRoundsPerCut" | "survivalRoundsBeforeFirstCut">> {
   let survivalRoundsPerCut: number | null = null;
   let survivalRoundsBeforeFirstCut: number | null = null;
   if (body.format === "SURVIVAL") {
@@ -393,7 +474,21 @@ export function validateTournamentInput(
       return { error: "INVALID_SURVIVAL_FIRST_CUT" };
     }
   }
+  return { value: { survivalRoundsPerCut, survivalRoundsBeforeFirstCut } };
+}
 
+function validateEnduranceSettings(
+  body: TournamentInputBody,
+): Checked<
+  Pick<
+    ValidatedTournamentInput,
+    | "endurancePoints"
+    | "enduranceWinDelta"
+    | "enduranceLossDelta"
+    | "endurancePlayoffSize"
+    | "enduranceMaxRounds"
+  >
+> {
   // BlueGenji Survie : barème d'endurance. Tout est facultatif — le moteur
   // retombe sur 9 points, ±1 et des play-offs à 8.
   let endurancePoints: number | null = null;
@@ -421,7 +516,22 @@ export function validateTournamentInput(
       assign(value);
     }
   }
+  return {
+    value: {
+      endurancePoints,
+      enduranceWinDelta,
+      enduranceLossDelta,
+      endurancePlayoffSize,
+      enduranceMaxRounds,
+    },
+  };
+}
 
+function validateSwissSettings(
+  body: TournamentInputBody,
+): Checked<
+  Pick<ValidatedTournamentInput, "swissTotalRounds" | "swissPointsWin" | "swissPointsDraw" | "swissPointsLoss">
+> {
   // Ronde suisse : nombre de rondes et barème. `null` laisse le moteur retomber
   // sur la recommandation ⌈log₂(N)⌉ + 1, calculée au démarrage sur l'effectif
   // réellement inscrit plutôt que sur la capacité annoncée.
@@ -429,88 +539,50 @@ export function validateTournamentInput(
   let swissPointsWin: number | null = null;
   let swissPointsDraw: number | null = null;
   let swissPointsLoss: number | null = null;
-  if (body.format === "SWISS") {
-    if (body.swissTotalRounds != null) {
-      swissTotalRounds = Number(body.swissTotalRounds);
-      if (!Number.isInteger(swissTotalRounds) || swissTotalRounds < 1 || swissTotalRounds > 20) {
-        return { error: "INVALID_SWISS_ROUNDS" };
-      }
-    }
+  const settings = () => ({ swissTotalRounds, swissPointsWin, swissPointsDraw, swissPointsLoss });
+  if (body.format !== "SWISS") return { value: settings() };
 
-    const points: [number | undefined, number, (v: number | null) => void][] = [
-      [body.swissPointsWin, DEFAULT_SWISS_POINTS.win, (v) => (swissPointsWin = v)],
-      [body.swissPointsDraw, DEFAULT_SWISS_POINTS.draw, (v) => (swissPointsDraw = v)],
-      [body.swissPointsLoss, DEFAULT_SWISS_POINTS.loss, (v) => (swissPointsLoss = v)],
-    ];
-
-    // Valeurs **effectives** : un champ omis n'est pas « pas de contrainte »,
-    // c'est le défaut que `createTournament` appliquera derrière. Valider les
-    // valeurs brutes laissait passer `{swissPointsWin: 0}` seul, qui produit
-    // un barème victoire = défaite = 0.
-    const effective: number[] = [];
-    for (const [raw, fallback, assign] of points) {
-      if (raw == null) {
-        effective.push(fallback);
-        assign(null);
-        continue;
-      }
-      const value = Number(raw);
-      if (!Number.isInteger(value) || value < 0 || value > 99) {
-        return { error: "INVALID_SWISS_POINTS" };
-      }
-      effective.push(value);
-      assign(value);
-    }
-
-    const [win, draw, loss] = effective;
-    // Le barème doit rester monotone : un nul ne peut pas rapporter plus
-    // qu'une victoire ni moins qu'une défaite, et une victoire doit valoir
-    // strictement plus qu'une défaite. Sinon le classement — et donc les
-    // appariements par groupe de points — n'a plus de sens.
-    if (win <= loss || draw > win || draw < loss) {
-      return { error: "INVALID_SWISS_POINTS" };
+  if (body.swissTotalRounds != null) {
+    swissTotalRounds = Number(body.swissTotalRounds);
+    if (!Number.isInteger(swissTotalRounds) || swissTotalRounds < 1 || swissTotalRounds > 20) {
+      return { error: "INVALID_SWISS_ROUNDS" };
     }
   }
 
-  return {
-    value: {
-      name: body.name.trim(),
-      description: body.description ?? null,
-      format: body.format,
-      game: body.game ?? "OW",
-      participantType: body.participantType ?? "TEAM",
-      maxTeams,
-      // La petite finale n'a de sens qu'en élimination simple : on la neutralise
-      // ailleurs plutôt que de la stocker telle quelle. `createTournament`
-      // portait seule cette règle, si bien qu'une **édition** basculant un
-      // tournoi de `SINGLE` à `DOUBLE` laissait la case cochée en base là où sa
-      // création l'aurait mise à zéro : le formulaire la rouvrait cochée au
-      // retour vers `SINGLE`, activant une petite finale que personne n'avait
-      // redemandée. (`rankEliminationPhase` lit bien la colonne quel que soit le
-      // format, mais ne s'en sert que dans sa branche `SINGLE`.)
-      hasThirdPlaceMatch: body.format === "SINGLE" && Boolean(body.hasThirdPlaceMatch),
-      survivalRoundsBeforeFirstCut,
-      survivalRoundsPerCut,
-      swissTotalRounds,
-      swissPointsWin,
-      swissPointsDraw,
-      swissPointsLoss,
-      endurancePoints,
-      enduranceWinDelta,
-      enduranceLossDelta,
-      endurancePlayoffSize,
-      enduranceMaxRounds,
-      matchFormat,
-      endurancePlayoffFormat,
-      registrationFilters,
-      refereeScheduling: body.refereeScheduling === true,
-      // Les phases ne concernent que le format MULTI : on ne les transmet pas
-      // aux autres formats, même si le client en a envoyé. Voir le
-      // commentaire du champ `phases` de `ValidatedTournamentInput` ci-dessus :
-      // elles restent brutes ici, à normaliser par l'appelant.
-      phases: body.format === "MULTI" ? (body.phases as Partial<PhaseConfig>[]) : null,
-    },
-  };
+  const points: [number | undefined, number, (v: number | null) => void][] = [
+    [body.swissPointsWin, DEFAULT_SWISS_POINTS.win, (v) => (swissPointsWin = v)],
+    [body.swissPointsDraw, DEFAULT_SWISS_POINTS.draw, (v) => (swissPointsDraw = v)],
+    [body.swissPointsLoss, DEFAULT_SWISS_POINTS.loss, (v) => (swissPointsLoss = v)],
+  ];
+
+  // Valeurs **effectives** : un champ omis n'est pas « pas de contrainte »,
+  // c'est le défaut que `createTournament` appliquera derrière. Valider les
+  // valeurs brutes laissait passer `{swissPointsWin: 0}` seul, qui produit
+  // un barème victoire = défaite = 0.
+  const effective: number[] = [];
+  for (const [raw, fallback, assign] of points) {
+    if (raw == null) {
+      effective.push(fallback);
+      assign(null);
+      continue;
+    }
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < 0 || value > 99) {
+      return { error: "INVALID_SWISS_POINTS" };
+    }
+    effective.push(value);
+    assign(value);
+  }
+
+  const [win, draw, loss] = effective;
+  // Le barème doit rester monotone : un nul ne peut pas rapporter plus
+  // qu'une victoire ni moins qu'une défaite, et une victoire doit valoir
+  // strictement plus qu'une défaite. Sinon le classement — et donc les
+  // appariements par groupe de points — n'a plus de sens.
+  if (win <= loss || draw > win || draw < loss) {
+    return { error: "INVALID_SWISS_POINTS" };
+  }
+  return { value: settings() };
 }
 
 /** Les quatre jalons d'un tournoi, en ISO. */

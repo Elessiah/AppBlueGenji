@@ -14,6 +14,7 @@ import {
   loadPhaseTeamIds,
   loadPhaseStandings,
 } from "./phases-repository";
+import type { PhaseRow, TournamentRow } from "./_internal";
 import { loadTournamentRow, finishTournament, getRegistrationRows } from "./repository";
 import { loadEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { createBracketIfMissing } from "./bracket-generator";
@@ -48,43 +49,9 @@ export async function initializeMultiTournament(
   const registeredCount = registrations.length;
 
   // Résout le plan des phases (effectifs, qualifiants, phases sautées)
-  const phaseConfigs = phases.map((p) => ({
-    position: p.position,
-    format: p.format,
-    name: p.name,
-    qualifierMode: p.qualifier_mode,
-    qualifierValue: p.qualifier_value,
-    hasThirdPlaceMatch: Boolean(p.has_third_place_match),
-    swissTotalRounds: p.swiss_total_rounds,
-    survivalRoundsBeforeFirstCut: p.survival_rounds_before_first_cut,
-    survivalRoundsPerCut: p.survival_rounds_per_cut,
-  }));
+  const resolved = resolvePhasePlan(registeredCount, phases.map(toPhaseConfig));
 
-  const resolved = resolvePhasePlan(registeredCount, phaseConfigs);
-
-  // Seed la phase 1 depuis le classement du site (exactement comme Survie), par
-  // le chargeur unique `loadEntrantsBySiteRanking` — sauf si le staff a ordonné
-  // le seeding à la main, auquel cas l'ordre des inscriptions fait autorité.
-  //
-  // Le rang n'est plus posé par un `ROW_NUMBER()` : une cote rejouée ne s'écrit
-  // pas en SQL, l'ordre vient donc du chargeur et la numérotation de sa place
-  // dans la liste.
-  const seededRows: Array<{ team_id: number; seed: number }> =
-    Number(tournament.manual_seeding ?? 0) === 1
-      ? (
-          await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
-            `SELECT
-              team_id,
-              ROW_NUMBER() OVER (ORDER BY COALESCE(seed, 1000000), registered_at ASC) AS seed
-             FROM bg_tournament_registrations
-             WHERE tournament_id = ?`,
-            [tournamentId],
-          )
-        )[0].map((row) => ({ team_id: Number(row.team_id), seed: Number(row.seed) }))
-      : (await loadEntrantsBySiteRanking(conn, tournamentId)).map((entrant, index) => ({
-          team_id: entrant.teamId,
-          seed: index + 1,
-        }));
+  const seededRows = await loadFirstPhaseSeeds(conn, tournament, tournamentId);
 
   // Persiste les métriques de chaque phase (entrants, qualifiants, max_rounds, state=SKIPPED)
   for (const resolvedPhase of resolved) {
@@ -100,41 +67,73 @@ export async function initializeMultiTournament(
   }
 
   // Insère les équipes de la phase 1 avec seed
-  if (seededRows.length > 0) {
-    const firstNonSkipped = resolved.find((p) => !p.skipped);
-    if (firstNonSkipped) {
-      const firstPhaseRow = phases.find((p) => p.position === firstNonSkipped.position);
-      if (firstPhaseRow) {
-        await insertPhaseTeams(
-          conn,
-          tournamentId,
-          firstPhaseRow.id,
-          seededRows.map((row) => ({
-            teamId: Number(row.team_id),
-            seed: Number(row.seed),
-          })),
-        );
-
-        // Lance la première phase non-sautée
-        await startPhase(tournamentId, firstPhaseRow.id, conn);
-
-        // Réconcilie immédiatement pour avancer si la phase est dégénérée (0 ou 1 équipe)
-        await reconcilePhases(tournamentId, conn);
-      }
-    } else {
-      // Toutes les phases sont sautées : finalise immédiatement
-      if (seededRows.length === 1) {
-        await conn.execute(
-          `UPDATE bg_tournament_registrations SET final_rank = 1 WHERE tournament_id = ? AND team_id = ?`,
-          [tournamentId, seededRows[0].team_id],
-        );
-      }
-      await finishTournament(conn, tournamentId);
-    }
-  } else {
+  if (seededRows.length === 0) {
     // Zéro inscription : finalise vide
     await finishTournament(conn, tournamentId);
+    return;
   }
+
+  const firstNonSkipped = resolved.find((p) => !p.skipped);
+  if (!firstNonSkipped) {
+    // Toutes les phases sont sautées : finalise immédiatement
+    if (seededRows.length === 1) {
+      await conn.execute(
+        `UPDATE bg_tournament_registrations SET final_rank = 1 WHERE tournament_id = ? AND team_id = ?`,
+        [tournamentId, seededRows[0].team_id],
+      );
+    }
+    await finishTournament(conn, tournamentId);
+    return;
+  }
+
+  const firstPhaseRow = phases.find((p) => p.position === firstNonSkipped.position);
+  if (!firstPhaseRow) return;
+  await insertPhaseTeams(
+    conn,
+    tournamentId,
+    firstPhaseRow.id,
+    seededRows.map((row) => ({
+      teamId: Number(row.team_id),
+      seed: Number(row.seed),
+    })),
+  );
+
+  // Lance la première phase non-sautée
+  await startPhase(tournamentId, firstPhaseRow.id, conn);
+
+  // Réconcilie immédiatement pour avancer si la phase est dégénérée (0 ou 1 équipe)
+  await reconcilePhases(tournamentId, conn);
+}
+
+/**
+ * Seed la phase 1 depuis le classement du site (exactement comme Survie), par
+ * le chargeur unique `loadEntrantsBySiteRanking` — sauf si le staff a ordonné
+ * le seeding à la main, auquel cas l'ordre des inscriptions fait autorité.
+ *
+ * Le rang n'est plus posé par un `ROW_NUMBER()` : une cote rejouée ne s'écrit
+ * pas en SQL, l'ordre vient donc du chargeur et la numérotation de sa place
+ * dans la liste.
+ */
+async function loadFirstPhaseSeeds(
+  conn: PoolConnection,
+  tournament: TournamentRow,
+  tournamentId: number,
+): Promise<Array<{ team_id: number; seed: number }>> {
+  if (Number(tournament.manual_seeding ?? 0) === 1) {
+    const [rows] = await conn.execute<(RowDataPacket & { team_id: number; seed: number })[]>(
+      `SELECT
+        team_id,
+        ROW_NUMBER() OVER (ORDER BY COALESCE(seed, 1000000), registered_at ASC) AS seed
+       FROM bg_tournament_registrations
+       WHERE tournament_id = ?`,
+      [tournamentId],
+    );
+    return rows.map((row) => ({ team_id: Number(row.team_id), seed: Number(row.seed) }));
+  }
+  return (await loadEntrantsBySiteRanking(conn, tournamentId)).map((entrant, index) => ({
+    team_id: entrant.teamId,
+    seed: index + 1,
+  }));
 }
 
 /**
@@ -211,126 +210,17 @@ export async function startPhase(
  * la réconciliation, ce qui est critique pour les appels concurrents du même tournoi.
  */
 export async function reconcilePhases(tournamentId: number, conn: PoolConnection): Promise<void> {
-  const [rows] = await conn.execute<(RowDataPacket & { format: string; state: string })[]>(
-    `SELECT format, state FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
-    [tournamentId],
-  );
-
-  if (rows.length === 0 || rows[0].format !== "MULTI") return;
-
-  // Un tournoi **clos** se relit sans se rouvrir : corriger le score de sa
-  // finale doit se voir au palmarès, comme dans les trois modes à classement
-  // (`docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`). Les autres états
-  // n'ont ni phase courante ni match à relire.
-  const finished = rows[0].state === "FINISHED";
-  if (rows[0].state !== "RUNNING" && !finished) return;
-
-  const phases = await loadPhases(conn, tournamentId);
-  const tournament = await loadTournamentRow(conn, tournamentId);
-  if (!tournament) return;
-
-  // Charge la phase active
-  const currentPhaseId = tournament.current_phase_id;
-  if (!currentPhaseId) return;
-
-  const currentPhase = await loadPhase(conn, currentPhaseId);
-  if (!currentPhase) return;
-
-  // Sur un tournoi clos, la phase courante est close elle aussi : c'est la
-  // dernière jouée, celle qui a désigné la championne. Attendre `RUNNING` ici
-  // était la seconde moitié du défaut — lever la seule garde du tournoi n'aurait
-  // rien changé.
-  if (currentPhase.state !== (finished ? "FINISHED" : "RUNNING")) return;
+  const target = await loadReconcilablePhase(tournamentId, conn);
+  if (!target) return;
+  const { phases, currentPhase, currentPhaseId, finished } = target;
 
   // Vérifie si la phase est complète selon son format
-  let isDone = false;
-  let phaseFinalRanking: number[] = [];
-  // Rangs d'un tableau à élimination, ex æquo compris (double forfait au
-  // podium), et équipes qu'un double forfait a sorties. Vides hors élimination :
-  // Survie et Ronde suisse rendent un ordre strict.
-  let eliminationRanks = new Map<number, number>();
-  let doubleForfeited = new Set<number>();
-
-  if (currentPhase.format === "SURVIVAL") {
-    const { reconcileSurvival: reconcileSurvivalInternal } = await import("./survival");
-    const result = await reconcileSurvivalInternal(tournamentId, conn, {
-      phaseId: currentPhaseId,
-      targetTeams: currentPhase.qualifiers ?? undefined,
-    });
-    isDone = result?.done ?? false;
-    if (isDone && result?.standings) {
-      const { computeFinalRanks } = await import("@/lib/shared/survival");
-      const rankMap = computeFinalRanks(result.standings);
-      phaseFinalRanking = Array.from(rankMap.entries())
-        .sort((a, b) => a[1] - b[1])
-        .map(([teamId]) => teamId);
-    }
-  } else if (currentPhase.format === "SWISS") {
-    // On DÉLÈGUE au moteur suisse, exactement comme la branche Survie ci-dessus :
-    // c'est `reconcileSwiss` qui apparie la ronde suivante et incrémente le
-    // compteur de la phase. Se contenter de lire `swiss_current_round` laissait
-    // la phase figée à la ronde 1 — le tournoi ne se terminait jamais.
-    const result = await reconcileSwiss(tournamentId, conn, { phaseId: currentPhaseId });
-    isDone = result.done;
-
-    if (isDone) {
-      phaseFinalRanking = await loadSwissRanking(conn, tournamentId, currentPhaseId);
-    }
-  } else {
-    // SINGLE ou DOUBLE : les byes de la phase d'abord, la complétude ensuite.
-    // Un match d'exemption n'a pas de perdant : le match de lower qu'il
-    // alimentait reste à une seule équipe, sans plus aucun feeder à attendre.
-    // Sans cette résolution **portée par la phase** (les appels du reste du
-    // moteur travaillent sur `phase_id = 0`, où il n'y a rien à résoudre en
-    // MULTI), le plateau se fige sur des matchs PENDING sans adversaire et la
-    // phase n'est jamais complète — le tournoi ne se termine donc jamais.
-    // Sur un tournoi clos, il n'y a rien à résoudre — la phase s'est terminée
-    // — et surtout rien à écrire : on relit, on ne pose pas.
-    if (!finished) await tryAutoResolveByes(conn, tournamentId, currentPhaseId);
-
-    isDone = await isEliminationPhaseComplete(conn, tournamentId, currentPhaseId);
-
-    if (isDone) {
-      const ranking = await rankEliminationPhase(
-        conn,
-        tournamentId,
-        currentPhaseId,
-        currentPhase.format as "SINGLE" | "DOUBLE",
-        Boolean(currentPhase.has_third_place_match),
-      );
-      phaseFinalRanking = ranking.map((entry) => entry.teamId);
-      eliminationRanks = new Map(ranking.map((entry) => [entry.teamId, entry.rank]));
-      doubleForfeited = new Set(
-        ranking.filter((entry) => entry.eliminatedByDoubleForfeit).map((entry) => entry.teamId),
-      );
-    }
-  }
-
-  if (!isDone) {
+  const outcome = await evaluatePhase(tournamentId, conn, currentPhase, currentPhaseId, finished);
+  if (!outcome.isDone) {
     return; // Phase non terminée, rien à faire
   }
 
-  // Phase terminée. Le classement vient du **moteur de la phase** (survie, ronde
-  // suisse ou bracket) : surtout pas de l'ordre des standings en base, qui est
-  // encore l'ordre de seeding tant que `savePhaseResults` n'a pas écrit les rangs.
-  // S'y fier qualifierait les têtes de série, pas les équipes qui ont gagné.
-  const standings = await loadPhaseStandings(conn, currentPhaseId);
-  const ordered = [...phaseFinalRanking];
-  const alreadyRanked = new Set(ordered);
-  for (const standing of standings) {
-    if (!alreadyRanked.has(standing.teamId)) ordered.push(standing.teamId);
-  }
-
-  const qualifiersCount = currentPhase.qualifiers ?? 1;
-  // Une équipe sortie par un double forfait n'est jamais qualifiée, même si son
-  // rang tombe dans la cible : elle a perdu, comme toute perdante d'un tableau
-  // à élimination. Sa place n'est pas repêchée — la phase suivante se joue à
-  // une qualifiée de moins, le plan restant étant re-résolu sur l'effectif réel.
-  const rankedStandings = ordered.map((teamId, index) => ({
-    teamId,
-    rank: eliminationRanks.get(teamId) ?? index + 1,
-    qualified: index < qualifiersCount && !doubleForfeited.has(teamId),
-  }));
+  const rankedStandings = await rankPhaseStandings(conn, currentPhaseId, currentPhase, outcome);
 
   await savePhaseResults(conn, currentPhaseId, rankedStandings);
 
@@ -353,13 +243,197 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
   await setPhaseState(conn, currentPhaseId, "FINISHED", "finished_at");
 
   const qualifiedTeamIds = rankedStandings.filter((r) => r.qualified).map((r) => r.teamId);
-  const actualQualifiers = qualifiedTeamIds.length;
+  await advanceAfterPhase(tournamentId, conn, phases, currentPhase, qualifiedTeamIds);
+}
 
-  // Re-résout le plan **restant** à partir du nombre réel de qualifiées : des
-  // abandons en cours de phase peuvent rendre une phase suivante inutile, qui
-  // devient alors SKIPPED à la volée. Les phases déjà jouées ne sont pas touchées.
-  const remaining = phases.filter((p) => p.position > currentPhase.position);
-  const phaseConfigs = remaining.map((p) => ({
+/**
+ * Phase courante d'un tournoi MULTI à réconcilier, ou `null` s'il n'y a rien à
+ * relire. Pose le verrou du tournoi (FOR UPDATE) en première instruction.
+ */
+async function loadReconcilablePhase(
+  tournamentId: number,
+  conn: PoolConnection,
+): Promise<{
+  phases: PhaseRow[];
+  currentPhase: PhaseRow;
+  currentPhaseId: number;
+  finished: boolean;
+} | null> {
+  const [rows] = await conn.execute<(RowDataPacket & { format: string; state: string })[]>(
+    `SELECT format, state FROM bg_tournaments WHERE id = ? LIMIT 1 FOR UPDATE`,
+    [tournamentId],
+  );
+
+  if (rows.length === 0 || rows[0].format !== "MULTI") return null;
+
+  // Un tournoi **clos** se relit sans se rouvrir : corriger le score de sa
+  // finale doit se voir au palmarès, comme dans les trois modes à classement
+  // (`docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`). Les autres états
+  // n'ont ni phase courante ni match à relire.
+  const finished = rows[0].state === "FINISHED";
+  if (rows[0].state !== "RUNNING" && !finished) return null;
+
+  const phases = await loadPhases(conn, tournamentId);
+  const tournament = await loadTournamentRow(conn, tournamentId);
+  if (!tournament) return null;
+
+  // Charge la phase active
+  const currentPhaseId = tournament.current_phase_id;
+  if (!currentPhaseId) return null;
+
+  const currentPhase = await loadPhase(conn, currentPhaseId);
+  if (!currentPhase) return null;
+
+  // Sur un tournoi clos, la phase courante est close elle aussi : c'est la
+  // dernière jouée, celle qui a désigné la championne. Attendre `RUNNING` ici
+  // était la seconde moitié du défaut — lever la seule garde du tournoi n'aurait
+  // rien changé.
+  if (currentPhase.state !== (finished ? "FINISHED" : "RUNNING")) return null;
+
+  return { phases, currentPhase, currentPhaseId, finished };
+}
+
+/** Verdict du moteur d'une phase : est-elle complète, et dans quel ordre ? */
+type PhaseOutcome = {
+  isDone: boolean;
+  phaseFinalRanking: number[];
+  /**
+   * Rangs d'un tableau à élimination, ex æquo compris (double forfait au
+   * podium), et équipes qu'un double forfait a sorties. Vides hors élimination :
+   * Survie et Ronde suisse rendent un ordre strict.
+   */
+  eliminationRanks: Map<number, number>;
+  doubleForfeited: Set<number>;
+};
+
+function strictOutcome(isDone: boolean, phaseFinalRanking: number[] = []): PhaseOutcome {
+  return { isDone, phaseFinalRanking, eliminationRanks: new Map(), doubleForfeited: new Set() };
+}
+
+function evaluatePhase(
+  tournamentId: number,
+  conn: PoolConnection,
+  currentPhase: PhaseRow,
+  currentPhaseId: number,
+  finished: boolean,
+): Promise<PhaseOutcome> {
+  if (currentPhase.format === "SURVIVAL") {
+    return evaluateSurvivalPhase(tournamentId, conn, currentPhase, currentPhaseId);
+  }
+  if (currentPhase.format === "SWISS") {
+    return evaluateSwissPhase(tournamentId, conn, currentPhaseId);
+  }
+  return evaluateEliminationPhase(tournamentId, conn, currentPhase, currentPhaseId, finished);
+}
+
+async function evaluateSurvivalPhase(
+  tournamentId: number,
+  conn: PoolConnection,
+  currentPhase: PhaseRow,
+  currentPhaseId: number,
+): Promise<PhaseOutcome> {
+  const { reconcileSurvival: reconcileSurvivalInternal } = await import("./survival");
+  const result = await reconcileSurvivalInternal(tournamentId, conn, {
+    phaseId: currentPhaseId,
+    targetTeams: currentPhase.qualifiers ?? undefined,
+  });
+  const isDone = result?.done ?? false;
+  if (!isDone || !result?.standings) return strictOutcome(isDone);
+  const { computeFinalRanks } = await import("@/lib/shared/survival");
+  const rankMap = computeFinalRanks(result.standings);
+  return strictOutcome(
+    isDone,
+    Array.from(rankMap.entries())
+      .sort((a, b) => a[1] - b[1])
+      .map(([teamId]) => teamId),
+  );
+}
+
+async function evaluateSwissPhase(
+  tournamentId: number,
+  conn: PoolConnection,
+  currentPhaseId: number,
+): Promise<PhaseOutcome> {
+  // On DÉLÈGUE au moteur suisse, exactement comme la branche Survie : c'est
+  // `reconcileSwiss` qui apparie la ronde suivante et incrémente le compteur de
+  // la phase. Se contenter de lire `swiss_current_round` laissait la phase
+  // figée à la ronde 1 — le tournoi ne se terminait jamais.
+  const result = await reconcileSwiss(tournamentId, conn, { phaseId: currentPhaseId });
+  if (!result.done) return strictOutcome(false);
+  return strictOutcome(true, await loadSwissRanking(conn, tournamentId, currentPhaseId));
+}
+
+async function evaluateEliminationPhase(
+  tournamentId: number,
+  conn: PoolConnection,
+  currentPhase: PhaseRow,
+  currentPhaseId: number,
+  finished: boolean,
+): Promise<PhaseOutcome> {
+  // SINGLE ou DOUBLE : les byes de la phase d'abord, la complétude ensuite.
+  // Un match d'exemption n'a pas de perdant : le match de lower qu'il
+  // alimentait reste à une seule équipe, sans plus aucun feeder à attendre.
+  // Sans cette résolution **portée par la phase** (les appels du reste du
+  // moteur travaillent sur `phase_id = 0`, où il n'y a rien à résoudre en
+  // MULTI), le plateau se fige sur des matchs PENDING sans adversaire et la
+  // phase n'est jamais complète — le tournoi ne se termine donc jamais.
+  // Sur un tournoi clos, il n'y a rien à résoudre — la phase s'est terminée
+  // — et surtout rien à écrire : on relit, on ne pose pas.
+  if (!finished) await tryAutoResolveByes(conn, tournamentId, currentPhaseId);
+
+  const isDone = await isEliminationPhaseComplete(conn, tournamentId, currentPhaseId);
+  if (!isDone) return strictOutcome(false);
+
+  const ranking = await rankEliminationPhase(
+    conn,
+    tournamentId,
+    currentPhaseId,
+    currentPhase.format as "SINGLE" | "DOUBLE",
+    Boolean(currentPhase.has_third_place_match),
+  );
+  return {
+    isDone,
+    phaseFinalRanking: ranking.map((entry) => entry.teamId),
+    eliminationRanks: new Map(ranking.map((entry) => [entry.teamId, entry.rank])),
+    doubleForfeited: new Set(
+      ranking.filter((entry) => entry.eliminatedByDoubleForfeit).map((entry) => entry.teamId),
+    ),
+  };
+}
+
+/** Rang et qualification de chaque équipe d'une phase terminée. */
+async function rankPhaseStandings(
+  conn: PoolConnection,
+  currentPhaseId: number,
+  currentPhase: PhaseRow,
+  outcome: PhaseOutcome,
+): Promise<{ teamId: number; rank: number; qualified: boolean }[]> {
+  // Phase terminée. Le classement vient du **moteur de la phase** (survie, ronde
+  // suisse ou bracket) : surtout pas de l'ordre des standings en base, qui est
+  // encore l'ordre de seeding tant que `savePhaseResults` n'a pas écrit les rangs.
+  // S'y fier qualifierait les têtes de série, pas les équipes qui ont gagné.
+  const standings = await loadPhaseStandings(conn, currentPhaseId);
+  const ordered = [...outcome.phaseFinalRanking];
+  const alreadyRanked = new Set(ordered);
+  for (const standing of standings) {
+    if (!alreadyRanked.has(standing.teamId)) ordered.push(standing.teamId);
+  }
+
+  const qualifiersCount = currentPhase.qualifiers ?? 1;
+  // Une équipe sortie par un double forfait n'est jamais qualifiée, même si son
+  // rang tombe dans la cible : elle a perdu, comme toute perdante d'un tableau
+  // à élimination. Sa place n'est pas repêchée — la phase suivante se joue à
+  // une qualifiée de moins, le plan restant étant re-résolu sur l'effectif réel.
+  return ordered.map((teamId, index) => ({
+    teamId,
+    rank: outcome.eliminationRanks.get(teamId) ?? index + 1,
+    qualified: index < qualifiersCount && !outcome.doubleForfeited.has(teamId),
+  }));
+}
+
+/** Configuration d'une phase telle que la lit `resolvePhasePlan`. */
+function toPhaseConfig(p: PhaseRow) {
+  return {
     position: p.position,
     format: p.format,
     name: p.name,
@@ -369,9 +443,24 @@ export async function reconcilePhases(tournamentId: number, conn: PoolConnection
     swissTotalRounds: p.swiss_total_rounds,
     survivalRoundsBeforeFirstCut: p.survival_rounds_before_first_cut,
     survivalRoundsPerCut: p.survival_rounds_per_cut,
-  }));
+  };
+}
 
-  const reresolved = resolvePhasePlan(actualQualifiers, phaseConfigs);
+/** Phase close : re-résout le plan restant et lance la suivante, ou finalise. */
+async function advanceAfterPhase(
+  tournamentId: number,
+  conn: PoolConnection,
+  phases: PhaseRow[],
+  currentPhase: PhaseRow,
+  qualifiedTeamIds: number[],
+): Promise<void> {
+  const actualQualifiers = qualifiedTeamIds.length;
+
+  // Re-résout le plan **restant** à partir du nombre réel de qualifiées : des
+  // abandons en cours de phase peuvent rendre une phase suivante inutile, qui
+  // devient alors SKIPPED à la volée. Les phases déjà jouées ne sont pas touchées.
+  const remaining = phases.filter((p) => p.position > currentPhase.position);
+  const reresolved = resolvePhasePlan(actualQualifiers, remaining.map(toPhaseConfig));
 
   for (let i = 0; i < remaining.length; i += 1) {
     const phaseRow = remaining[i];
