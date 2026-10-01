@@ -39,8 +39,10 @@ support Spiceworks (`T15`, tickets supprimés un mois après leur clôture —
 journaux d'accès nginx (`T17`, 14 jours — `WEB_ACCESS_LOG_RETENTION_DAYS`, à
 poser en production : `docs/DEPLOYMENT.md`) y ont une fiche ; la gestion des
 adhésions **ne relève pas du site** (décision de l'association) et n'y figure
-pas. Ce qui reste inconnu (qualification et transferts de Spiceworks, de Twitch
-et de Kick) est écrit « décision requise », jamais deviné (voir `ERREUR.txt`).
+pas. Spiceworks est sous-traitant (son accord de traitement des données) et la
+retransmission n'emporte aucun transfert de la part du site (voir « Transferts »
+ci-dessous) ; ce qui resterait inconnu s'écrit « décision requise », jamais
+deviné (voir `ERREUR.txt`).
 Les deux constantes servent `/rgpd` et `/rgpd/registre`.
 
 L'hébergeur technique est sous-traitant : son contrat au sens de l'article 28
