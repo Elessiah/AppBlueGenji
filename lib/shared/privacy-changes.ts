@@ -593,7 +593,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     details: [
       `Fil d'activité public de la page du bot (heure, serveur, niveau ou rôle de chaque annonce) : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, puis supprimé.`,
       `Journal privé du staff, et messages privés du bot à son titulaire : un an (${BOT_STAFF_LOG_RETENTION_DAYS} jours), puis supprimés.`,
-      "Exclusion du relais : son avis et son motif sont supprimés, du journal comme des messages privés, dès qu'elle est levée.",
+      "Exclusion du relais prononcée à partir de maintenant : son avis et son motif sont supprimés, du journal comme des messages privés, dès qu'elle est levée.",
       "Commandes /scrim et /recrute : le niveau et le rôle se choisissent maintenant dans une liste, plus de texte libre.",
       `Restauration d'une sauvegarde du bot : elle se fait sur la machine du bot, la base ne transite plus par Discord ; la copie de la base précédente est supprimée au plus tard après ${BACKUP_RETENTION_DAYS} jours.`,
     ],
