@@ -37,7 +37,7 @@ describe("checkTeamName", () => {
     // Un emoji vaut deux unités en JavaScript, un caractère dans un VARCHAR
     // utf8mb4 : `String.length` refuserait un nom que la colonne accepte.
     const name = "🐉".repeat(TEAM_NAME_MAX_LENGTH);
-    expect(name.length).toBe(TEAM_NAME_MAX_LENGTH * 2);
+    expect(name).toHaveLength(TEAM_NAME_MAX_LENGTH * 2);
     expect(teamNameLength(name)).toBe(TEAM_NAME_MAX_LENGTH);
     expect(checkTeamName(name).ok).toBe(true);
   });

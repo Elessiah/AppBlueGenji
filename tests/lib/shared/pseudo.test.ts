@@ -11,7 +11,7 @@ describe("pseudo — bornes de la colonne", () => {
 
   it("compte en caractères, comme MySQL, et non en unités UTF-16", () => {
     expect(pseudoLength("Nova")).toBe(4);
-    expect("🎮".length).toBe(2);
+    expect("🎮").toHaveLength(2);
     expect(pseudoLength("🎮")).toBe(1);
     expect(pseudoLength("🎮".repeat(PSEUDO_MAX_LENGTH))).toBe(PSEUDO_MAX_LENGTH);
   });

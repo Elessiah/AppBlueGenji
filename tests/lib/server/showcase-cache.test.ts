@@ -142,7 +142,7 @@ describe("écritures de vitrine — chacune invalide sa lecture", () => {
 
     // Le cache mord : une seconde lecture ne touche pas la base.
     await read();
-    expect(execute.mock.calls.length).toBe(afterFirstRead);
+    expect(execute.mock.calls).toHaveLength(afterFirstRead);
 
     await write().catch(() => undefined);
     const afterWrite = execute.mock.calls.length;
@@ -169,7 +169,7 @@ describe("écritures de textes — le cache est repeuplé sur place", () => {
     const afterFirstRead = execute.mock.calls.length;
 
     await getSiteCopy();
-    expect(execute.mock.calls.length).toBe(afterFirstRead);
+    expect(execute.mock.calls).toHaveLength(afterFirstRead);
 
     // L'écriture doit aboutir : un `catch` masquerait un contrat non tenu.
     await write();

@@ -43,7 +43,7 @@ describe("bot legal content is fully bilingual", () => {
   });
 
   it.each(DOCS)("%s keeps the same section count across languages", (_name, doc) => {
-    expect(doc.fr.sections.length).toBe(doc.en.sections.length);
+    expect(doc.fr.sections).toHaveLength(doc.en.sections.length);
     expect(doc.fr.sections.length).toBeGreaterThanOrEqual(8);
   });
 

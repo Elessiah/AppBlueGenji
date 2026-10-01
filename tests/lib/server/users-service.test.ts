@@ -121,7 +121,7 @@ describe("users-service", () => {
     it("list users paginated", () => {
       const users = Array.from({ length: 5 }, (_, i) => ({ id: i + 1 }));
       const page1 = users.slice(0, 3);
-      expect(page1.length).toBe(3);
+      expect(page1).toHaveLength(3);
     });
 
     it("filter users by visibility", () => {
@@ -131,7 +131,7 @@ describe("users-service", () => {
         { id: 3, visible: true },
       ];
       const publicUsers = users.filter((u) => u.visible);
-      expect(publicUsers.length).toBe(2);
+      expect(publicUsers).toHaveLength(2);
     });
   });
 
@@ -148,7 +148,7 @@ describe("users-service", () => {
 
     it("calculate tournament appearances", () => {
       const tournaments = [{ id: 1 }, { id: 2 }, { id: 3 }];
-      expect(tournaments.length).toBe(3);
+      expect(tournaments).toHaveLength(3);
     });
 
     it("calculate average ranking", () => {
@@ -176,7 +176,7 @@ describe("users-service", () => {
         { id: 2, members: [5, 7] },
       ];
       const userTeams = teams.filter((t) => t.members.includes(userId));
-      expect(userTeams.length).toBe(2);
+      expect(userTeams).toHaveLength(2);
     });
 
     it("find user's active team", () => {

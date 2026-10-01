@@ -148,16 +148,16 @@ describe("findTournamentsNeedingSync — entretien dû", () => {
 
   // Une condition par tâche de la branche RUNNING de `syncTournamentState` :
   // ce qui n'a pas de précondition ici ne sera jamais entretenu.
-  it("couvre le plateau d'élimination manquant", async () => {
+  it.each<[string, string[]]>([
+    ["le plateau d'élimination manquant", ["t.bracket_size IS NULL", "t.format IN ('SINGLE', 'DOUBLE')"]],
+    ["les reports de score expirés", ["m.status = 'AWAITING_CONFIRMATION'", "m.score_deadline_at <= NOW()"]],
+    [
+      "la clôture d'une élimination entièrement jouée",
+      ["m.winner_team_id IS NULL", "m.team1_id IS NOT NULL OR m.team2_id IS NOT NULL"],
+    ],
+  ])("couvre %s", async (_task, fragments) => {
     const sql = await maintenanceSql();
-    expect(sql).toContain("t.bracket_size IS NULL");
-    expect(sql).toContain("t.format IN ('SINGLE', 'DOUBLE')");
-  });
-
-  it("couvre les reports de score expirés", async () => {
-    const sql = await maintenanceSql();
-    expect(sql).toContain("m.status = 'AWAITING_CONFIRMATION'");
-    expect(sql).toContain("m.score_deadline_at <= NOW()");
+    for (const fragment of fragments) expect(sql).toContain(fragment);
   });
 
   // Un conflit expiré n'est pas tranché par l'entretien, seulement escaladé —
@@ -207,12 +207,6 @@ describe("findTournamentsNeedingSync — entretien dû", () => {
     expect(RESOLVABLE_GHOST_SQL.replace(/\s+/g, " ")).toContain(
       "m.team1_id IS NULL AND m.team2_id IS NULL",
     );
-  });
-
-  it("couvre la clôture d'une élimination entièrement jouée", async () => {
-    const sql = await maintenanceSql();
-    expect(sql).toContain("m.winner_team_id IS NULL");
-    expect(sql).toContain("m.team1_id IS NOT NULL OR m.team2_id IS NOT NULL");
   });
 
   // Un plateau sans adversaires resté « en cours » doit être rattrapé : aucun

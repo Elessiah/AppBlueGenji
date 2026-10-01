@@ -242,7 +242,7 @@ describe("gestes du roster — sous transaction et sous verrou (§3.1)", () => {
       for (const sql of roleReads) expect(sql).toMatch(/FOR UPDATE/);
       // Rien sur le pool : chaque lecture et chaque écriture passent par la
       // connexion de la transaction (qui délègue au même `execute`).
-      expect(execute.mock.calls.length).toBe(connection.execute.mock.calls.length);
+      expect(execute.mock.calls).toHaveLength(connection.execute.mock.calls.length);
       expect(connection.commit).toHaveBeenCalled();
       expect(connection.release).toHaveBeenCalled();
     },

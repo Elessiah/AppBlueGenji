@@ -52,7 +52,7 @@ describe("auth", () => {
       const hash1 = crypto.createHash("sha256").update(token).digest("hex");
       const hash2 = crypto.createHash("sha256").update(token).digest("hex");
       expect(hash1).toBe(hash2);
-      expect(hash1.length).toBe(64); // SHA-256 hex is 64 chars
+      expect(hash1).toHaveLength(64); // SHA-256 hex is 64 chars
     });
 
     it("produces different hashes for different tokens", () => {
@@ -252,21 +252,15 @@ describe("auth", () => {
       expect(user?.isAdmin).toBe(true);
     });
 
-    it("is INACTIVE in production even when DEV_AUTH_USER_ID is set", async () => {
-      expect(await runWithEnv("production")).toBeNull();
-    });
-
-    it("is INACTIVE when NODE_ENV is test (allowlist, not denylist)", async () => {
-      expect(await runWithEnv("test")).toBeNull();
-    });
-
-    it("is INACTIVE when NODE_ENV is staging (allowlist, not denylist)", async () => {
-      expect(await runWithEnv("staging")).toBeNull();
-    });
-
-    it("is INACTIVE when NODE_ENV is undefined (misconfigured server)", async () => {
-      expect(await runWithEnv(undefined)).toBeNull();
-    });
+    // Liste blanche, pas liste noire : seul `development` ouvre le contournement,
+    // même quand DEV_AUTH_USER_ID est posé (production, test, staging, serveur
+    // mal configuré sans NODE_ENV).
+    it.each<[string | undefined]>([["production"], ["test"], ["staging"], [undefined]])(
+      "is INACTIVE when NODE_ENV is %p",
+      async (env) => {
+        expect(await runWithEnv(env)).toBeNull();
+      },
+    );
 
     it("is INACTIVE in development when DEV_AUTH_USER_ID is absent", async () => {
       (process.env as Record<string, string | undefined>).NODE_ENV = "development";
@@ -383,15 +377,21 @@ describe("auth", () => {
   });
 
   describe("ensureUniquePseudo", () => {
-    it("returns pseudo when it is available", async () => {
-      const { getDatabase } = await import("@/lib/server/database");
+    // Pseudo libre (« NewPlayer »), slug vidé par les caractères spéciaux
+    // (« !!!___ », repli sur l'identifiant joueur), espaces multiples normalisés
+    // avant le slug (« Test   User ») : un pseudo est toujours rendu.
+    it.each<[string]>([["NewPlayer"], ["!!!___"], ["Test   User"]])(
+      "returns a pseudo for %p when it is available",
+      async (input) => {
+        const { getDatabase } = await import("@/lib/server/database");
 
-      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
-      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
+        const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
+        jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
 
-      const result = await ensureUniquePseudo("NewPlayer");
-      expect(result).toBeTruthy();
-    });
+        const result = await ensureUniquePseudo(input);
+        expect(result).toBeTruthy();
+      },
+    );
 
     it("returns pseudo with suffix when original is taken", async () => {
       const { getDatabase } = await import("@/lib/server/database");
@@ -408,28 +408,6 @@ describe("auth", () => {
 
       const result = await ensureUniquePseudo("Player");
       expect(result).toContain("_");
-    });
-
-    it("handles empty slug with fallback player ID", async () => {
-      const { getDatabase } = await import("@/lib/server/database");
-
-      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
-      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
-
-      // Use special characters that slug away to nothing
-      const result = await ensureUniquePseudo("!!!___");
-      expect(result).toBeTruthy();
-    });
-
-    it("applies normalizePseudo before slugifying", async () => {
-      const { getDatabase } = await import("@/lib/server/database");
-
-      const mockExecute = jest.fn<SqlQuery>().mockResolvedValue([[{ c: 0 }]]);
-      jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: mockExecute }));
-
-      // Multiple spaces should normalize
-      const result = await ensureUniquePseudo("Test   User");
-      expect(result).toBeTruthy();
     });
 
     it("respects 40 character limit from slugifyPseudo", async () => {

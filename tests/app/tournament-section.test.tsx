@@ -17,7 +17,7 @@ describe("Section — en-tête accessible", () => {
     );
     expect(markup).toMatch(/<h2[^>]*><button[^>]*>/);
     // Aucun titre ne réapparaît hors du <h2> : un seul niveau de titre par section.
-    expect((markup.match(/<h2/g) ?? []).length).toBe(1);
+    expect(markup.match(/<h2/g) ?? []).toHaveLength(1);
   });
 
   it("le nom accessible du titre se limite au titre, sans l'index ni le compte", () => {

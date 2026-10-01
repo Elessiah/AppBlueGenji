@@ -109,7 +109,7 @@ describe("truncateForShare", () => {
   it("tranche dans un mot unique trop long, faute d'espace où couper", () => {
     const result = truncateForShare("Supercalifragilisticexpialidocious", 12);
     expect(result).toBe("Supercalifr…");
-    expect(result.length).toBe(12);
+    expect(result).toHaveLength(12);
   });
 
   it("ne coupe pas au milieu d'un emoji", () => {

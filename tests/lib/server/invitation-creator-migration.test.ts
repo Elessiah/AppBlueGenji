@@ -100,7 +100,7 @@ describe("bg_team_invitations.created_by — l'auteur devient facultatif", () =>
       SQL.indexOf("REFERENTIAL_CONSTRAINTS"),
       SQL.indexOf("bg_bureau_members"),
     );
-    expect([...block.matchAll(/console\.warn\(/g)].length).toBe(2);
+    expect([...block.matchAll(/console\.warn\(/g)]).toHaveLength(2);
     expect(block).toContain("fk_bg_team_inv_creator non reposée");
   });
 

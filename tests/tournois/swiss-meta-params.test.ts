@@ -39,7 +39,7 @@ describe("loadSwissMeta — paramètres de la requête de classement", () => {
 
     const [sql, params] = execute.mock.calls[1] as [string, unknown[]];
     expect(sql).toMatch(/FROM bg_swiss_standings/);
-    expect((sql.match(/\?/g) ?? []).length).toBe(params.length);
+    expect(sql.match(/\?/g) ?? []).toHaveLength(params.length);
     expect(params).toEqual([42, 0]);
   });
 

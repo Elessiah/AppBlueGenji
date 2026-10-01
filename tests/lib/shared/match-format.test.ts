@@ -354,6 +354,7 @@ describe("match-format — une seule écriture de la notation", () => {
         ].join("\n"),
       );
     }
+    expect(offenders).toHaveLength(0);
   });
 
   it("`lib/shared/landing.ts` n'écrit plus de notation de format", () => {
