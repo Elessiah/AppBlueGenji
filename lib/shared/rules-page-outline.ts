@@ -38,7 +38,7 @@ export function ruleAnchorSlug(title: string): string {
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+    .replace(/^-+|-+$/g, ""); // NOSONAR typescript:S8786 — titres du registre des règles, source de confiance
 }
 
 /**

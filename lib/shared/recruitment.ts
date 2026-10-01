@@ -471,7 +471,7 @@ export function buildRecruitmentPreview(
   // de l'extrait — sinon un mot très long ramènerait l'aperçu à quelques signes.
   const cut = lastSpace > limit / 2 ? hardCut.slice(0, lastSpace) : hardCut;
   // Ponctuation et espaces de fin retirés : « … » suit directement le dernier mot.
-  return { text: `${cut.replace(/[\s.,;:!?·—–-]+$/u, "")}…`, truncated: true };
+  return { text: `${cut.replace(/[\s.,;:!?·—–-]+$/u, "")}…`, truncated: true }; // NOSONAR typescript:S8786 — texte déjà tronqué, longueur bornée
 }
 
 /**
@@ -488,7 +488,7 @@ export type RecruitmentBodyBlock =
 const HEADING_MAX = 80;
 // Une puce est un marqueur suivi d'une espace ; le marqueur seul sur sa ligne
 // compte aussi (puce vide, ignorée) pour ne pas devenir un paragraphe « - ».
-const BULLET_RE = /^[-–—•*](?:\s+(.*))?$/u;
+const BULLET_RE = /^[-–—•*](?:\s+(.*))?$/u; // NOSONAR typescript:S8786 — ancré en tête, une seule position de départ
 
 /**
  * Transforme une description en texte brut en blocs affichables (intertitre,
@@ -548,7 +548,7 @@ export function formatRecruitmentBody(body: string | null | undefined): Recruitm
     if (line.length <= HEADING_MAX && /[:：]$/u.test(line)) {
       flushParagraph();
       // Le deux-points est retiré : l'intertitre est rendu en eyebrow, où il jurerait.
-      blocks.push({ kind: "heading", text: line.replace(/\s*[:：]$/u, "") });
+      blocks.push({ kind: "heading", text: line.replace(/\s*[:：]$/u, "") }); // NOSONAR typescript:S8786 — ligne bornée par HEADING_MAX
       continue;
     }
 

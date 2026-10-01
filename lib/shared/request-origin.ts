@@ -30,6 +30,8 @@
  *   pas.
  */
 
+import { trimTrailingSlashes } from "./trim-trailing";
+
 /** Refus : la requête vient d'un autre site. */
 export const CROSS_SITE_REQUEST = "CROSS_SITE_REQUEST";
 
@@ -86,7 +88,7 @@ export const PROVENANCE_EXEMPT_API_PATHS: readonly string[] = ["/api/csp-report"
 /** La route d'écriture `pathname` doit-elle prouver sa provenance ? */
 export function apiWriteNeedsProvenance(pathname: string, method: string): boolean {
   if (!pathname.startsWith("/api/") || !isWriteMethod(method)) return false;
-  const path = pathname.replace(/\/+$/, "");
+  const path = trimTrailingSlashes(pathname);
   return !PROVENANCE_EXEMPT_API_PATHS.includes(path);
 }
 

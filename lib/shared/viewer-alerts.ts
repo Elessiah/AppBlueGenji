@@ -238,6 +238,6 @@ function viewerMatchesFingerprint(detail: ViewerAlertDetail, viewer: ViewerAlert
         match.casterUserId ?? "",
       ].join(":"),
     )
-    .sort()
+    .sort((x, y) => x.localeCompare(y))
     .join("|");
 }

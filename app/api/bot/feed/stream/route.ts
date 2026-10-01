@@ -53,7 +53,7 @@ export async function GET(req: Request): Promise<Response> {
   const attempt = release ? null : reserveBotFeedEvictionAttempt(clientIp);
   if (!release && !attempt) return tooMany();
 
-  const baseUrl = (process.env.BOT_INTERNAL_URL || 'http://127.0.0.1:4400').replace(/\/+$/, '');
+  const baseUrl = (process.env.BOT_INTERNAL_URL || 'http://127.0.0.1:4400').replace(/\/+$/, ''); // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
   const headers: Record<string, string> = { accept: 'text/event-stream' };
   const token = process.env.BOT_INTERNAL_TOKEN;
   if (token) headers['x-internal-token'] = token;

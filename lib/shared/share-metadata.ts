@@ -103,7 +103,7 @@ export function truncateForShare(text: string, maxLength: number): string {
   // Un mot unique plus long que la limite n'a pas d'espace où se couper : on
   // tranche dedans plutôt que de rendre une ellipse seule.
   const cut = lastSpace > maxLength / 2 ? hardCut.slice(0, lastSpace) : hardCut;
-  return `${cut.replace(/[\s,;:.]+$/u, "")}…`;
+  return `${cut.replace(/[\s,;:.]+$/u, "")}…`; // NOSONAR typescript:S8786 — texte déjà tronqué, longueur bornée
 }
 
 /** Une date rédigée pour un encart : « 14 septembre 2026 à 20:00 ». */

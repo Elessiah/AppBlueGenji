@@ -109,7 +109,7 @@ function buildWebPushConfig(env: Readonly<Record<string, string | undefined>>): 
 
 function defaultSubject(env: Readonly<Record<string, string | undefined>>): string | null {
   const appUrl = env.APP_URL?.trim();
-  return appUrl && appUrl.startsWith("https://") ? appUrl.replace(/\/+$/, "") : null;
+  return appUrl && appUrl.startsWith("https://") ? appUrl.replace(/\/+$/, "") : null; // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
 }
 
 /** Durée de validité d'un jeton VAPID (RFC 8292 : 24 h au plus). */

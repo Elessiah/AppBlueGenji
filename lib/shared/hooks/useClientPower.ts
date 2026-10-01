@@ -86,7 +86,7 @@ let samplePending = false;
 const tabId =
   typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
     ? crypto.randomUUID()
-    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`; // NOSONAR typescript:S2245 — nom de bail entre onglets, pas un secret
 
 function readAttention(): PageAttention {
   if (document.visibilityState === "hidden") return "HIDDEN";

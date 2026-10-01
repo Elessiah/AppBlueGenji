@@ -32,10 +32,10 @@ type Node = { x: number; y: number; vx: number; vy: number };
 
 function createNodes(): Node[] {
   return Array.from({ length: NODE_COUNT }, () => ({
-    x: Math.random() * SPACE_W,
-    y: Math.random() * SPACE_H,
-    vx: (Math.random() - 0.5) * 0.18,
-    vy: (Math.random() - 0.5) * 0.18,
+    x: Math.random() * SPACE_W, // NOSONAR typescript:S2245 — animation décorative, aucun usage de sécurité
+    y: Math.random() * SPACE_H, // NOSONAR typescript:S2245 — animation décorative, aucun usage de sécurité
+    vx: (Math.random() - 0.5) * 0.18, // NOSONAR typescript:S2245 — animation décorative, aucun usage de sécurité
+    vy: (Math.random() - 0.5) * 0.18, // NOSONAR typescript:S2245 — animation décorative, aucun usage de sécurité
   }));
 }
 

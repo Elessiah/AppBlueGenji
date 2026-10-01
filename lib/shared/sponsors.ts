@@ -69,7 +69,7 @@ export function slugifySponsor(name: string): string {
     .replace(/[̀-ͯ]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
+    .replace(/^-+|-+$/g, "") // NOSONAR typescript:S8786 — nom saisi par le staff, borné par SPONSOR_NAME_MAX
     .slice(0, SPONSOR_SLUG_MAX);
 }
 

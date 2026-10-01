@@ -200,7 +200,7 @@ export async function createDoubleEliminationBracket(
     }
 
     // Final lower → grand final
-    if (lower[lowerRoundsCount]?.length > 0 && grandFinalMatchId) {
+    if (lower[lowerRoundsCount]?.length > 0) {
       await linkMatchWinner(connection, lower[lowerRoundsCount][0], grandFinalMatchId, 2);
       await connection.execute(
         `UPDATE bg_matches SET team2_placeholder = ? WHERE id = ?`,

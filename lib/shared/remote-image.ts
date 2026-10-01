@@ -33,7 +33,7 @@
  */
 export function isPrivateImageHostname(hostname: string): boolean {
   // `localhost.` (point final) est le même nom que `localhost` pour le résolveur.
-  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.+$/, "");
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, "").replace(/\.+$/, ""); // NOSONAR typescript:S8786 — nom d'hôte déjà analysé par URL, court
   if (!host) return true;
   if (host === "localhost" || host.endsWith(".localhost")) return true;
   if (host.endsWith(".local") || host.endsWith(".internal") || host.endsWith(".home.arpa")) return true;

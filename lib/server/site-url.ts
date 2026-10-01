@@ -24,7 +24,7 @@ const DEV_FALLBACK_URL = "http://localhost:3000";
 
 /** Racine publique du site, sans barre oblique finale. `null` si inconnue. */
 export function siteBaseUrl(): string | null {
-  const base = process.env.APP_URL?.trim().replace(/\/+$/, "");
+  const base = process.env.APP_URL?.trim().replace(/\/+$/, ""); // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
   return base ? base : null;
 }
 
@@ -66,7 +66,7 @@ export function siteMetadataBase(): URL {
  * racine fausse ne dégrade pas le résultat, elle l'invalide.
  */
 export function siteCanonicalBase(): string {
-  return siteMetadataBase().href.replace(/\/+$/, "");
+  return siteMetadataBase().href.replace(/\/+$/, ""); // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
 }
 
 /** URL absolue d'un chemin du site, ou `null` si la racine est inconnue. */

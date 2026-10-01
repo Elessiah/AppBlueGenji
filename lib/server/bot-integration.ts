@@ -64,7 +64,7 @@ function getInternalHeaders(): HeadersInit {
 function resolveBotInternalUrl(): string {
   const directUrl = process.env.BOT_INTERNAL_URL?.trim();
   if (directUrl) {
-    return directUrl.replace(/\/+$/, "");
+    return directUrl.replace(/\/+$/, ""); // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
   }
 
   const host = process.env.BOT_INTERNAL_HOST?.trim() || DEFAULT_BOT_INTERNAL_HOST;

@@ -371,8 +371,8 @@ export function samePairings(a: SurvivalRoundPlan, b: SurvivalRoundPlan): boolea
   if (a.pairings.length !== b.pairings.length) return false;
   const key = (p: SurvivalPairing): string =>
     [p.teamAId, p.teamBId ?? -1].sort((x, y) => x - y).join("-");
-  const left = a.pairings.map(key).sort();
-  const right = b.pairings.map(key).sort();
+  const left = a.pairings.map(key).sort((x, y) => x.localeCompare(y));
+  const right = b.pairings.map(key).sort((x, y) => x.localeCompare(y));
   return left.every((value, index) => value === right[index]);
 }
 

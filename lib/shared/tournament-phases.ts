@@ -163,7 +163,7 @@ export function resolvePhasePlan(
 
     let skipped = false;
     let skipReason: "TOO_FEW_TEAMS" | "NO_CUT" | null = null;
-    let qualifiers = currentEntrants;
+    let qualifiers: number;
     let maxRounds: number | null = null;
 
     // Pas assez d'équipes.

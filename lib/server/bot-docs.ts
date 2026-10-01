@@ -87,7 +87,7 @@ function isSafeHref(href: string): boolean {
 
 function renderEmphasis(text: string): string {
   return escapeHtml(text)
-    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, href: string) =>
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_m, label: string, href: string) => // NOSONAR typescript:S8786 — Markdown du dépôt du bot, source de confiance
       isSafeHref(href) ? `<a href="${href}" rel="noreferrer">${label}</a>` : label,
     )
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
@@ -179,7 +179,7 @@ export function renderMarkdown(markdown: string): string {
       continue;
     }
 
-    const heading = /^(#{1,6})\s+(.*)$/.exec(line);
+    const heading = /^(#{1,6})\s+(.*)$/.exec(line); // NOSONAR typescript:S8786 — Markdown du dépôt du bot, source de confiance
     if (heading) {
       flush();
       // Le `#` du fichier devient un h2 : le h1 de la page reste le titre de la doc.
@@ -188,7 +188,7 @@ export function renderMarkdown(markdown: string): string {
       continue;
     }
 
-    const bullet = /^([ \t]*)[-*]\s+(.*)$/.exec(line);
+    const bullet = /^([ \t]*)[-*]\s+(.*)$/.exec(line); // NOSONAR typescript:S8786 — Markdown du dépôt du bot, source de confiance
     if (bullet) {
       closeParagraph();
       const indent = bullet[1].replace(/\t/g, "  ").length;
