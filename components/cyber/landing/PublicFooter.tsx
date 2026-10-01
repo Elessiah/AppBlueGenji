@@ -15,8 +15,8 @@ import { SOURCE_CODE_LINK_LABEL, SOURCE_CODE_URL } from "@/lib/shared/source-cod
 import { ASSOCIATION_NAME } from "@/lib/shared/legal-contact";
 
 // Règlement **intérieur** de l'association — un document de l'association,
-// rangé sous LÉGAL. Les règles des tournois, qu'invoquent les conditions
-// d'utilisation, vivent sur `/regles` (colonne COMPÉTITIONS).
+// rangé sous LÉGAL. Les règles des tournois (`/regles`) ne sont pas listées :
+// elles s'ouvrent depuis la page du tournoi et les conditions d'utilisation.
 const REGLEMENT_URL =
   "https://docs.google.com/document/d/1f3X3tbgs0U7Gwz0qSfotgW-HqMLKIb6DUKqlbz-ZCq8/preview";
 
@@ -51,18 +51,14 @@ export async function PublicFooter() {
           <div>
             <div className={styles.heading}>COMPÉTITIONS</div>
             <ul>
-              <li><Link className="tap-target" href="/tournois">Tournois actifs</Link></li>
-              <li><Link className="tap-target" href="/tournois">Archives</Link></li>
+              <li><Link className="tap-target" href="/tournois">Tournois</Link></li>
               <li><Link className="tap-target" href="/joueurs">Classement</Link></li>
-              <li><Link className="tap-target" href="/regles">Règles des tournois</Link></li>
             </ul>
           </div>
           <div>
             <div className={styles.heading}>COMMUNAUTÉ</div>
             <ul>
               <li><a className="tap-target" href={DISCORD_INVITE_URL} target="_blank" rel="noreferrer">Discord</a></li>
-              <li><Link className="tap-target" href="/#sponsors">Partenaires</Link></li>
-              <li><Link className="tap-target" href="/benevoles">Bénévoles</Link></li>
               <li><Link className="tap-target" href="/bot">Bot</Link></li>
             </ul>
           </div>
@@ -70,8 +66,8 @@ export async function PublicFooter() {
             <div className={styles.heading}>ASSOCIATION</div>
             <ul>
               <li><Link className="tap-target" href="/association#manifeste">Manifeste</Link></li>
-              <li><Link className="tap-target" href="/benevoles">Équipe bénévole</Link></li>
-              <li><Link className="tap-target" href="/#sponsors">Partenariats</Link></li>
+              <li><Link className="tap-target" href="/benevoles">Bénévoles</Link></li>
+              <li><Link className="tap-target" href="/#sponsors">Partenaires</Link></li>
             </ul>
           </div>
           <div>

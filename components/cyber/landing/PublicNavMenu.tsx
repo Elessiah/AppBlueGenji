@@ -8,9 +8,14 @@ import styles from "./PublicNavMenu.module.css";
 
 type NavLink = { href: string; label: string };
 
-const LINKS: NavLink[] = [
+/**
+ * Une entrée par page, jamais deux vers la même adresse ; les règles des
+ * tournois n'y figurent pas — elles se lisent depuis la page du tournoi
+ * (`RulesHelpFab`), qui mène au mode réellement joué
+ * (docs/features/PUBLIC_NAVIGATION.md).
+ */
+export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
   { href: "/tournois", label: "Tournois" },
-  { href: "/regles", label: "Règles des tournois" },
   { href: "/equipes", label: "Équipes" },
   { href: "/joueurs", label: "Joueurs" },
   { href: "/recrutement", label: "Recrutement" },
@@ -69,7 +74,7 @@ export function PublicNavPanel({
 }>) {
   return (
     <nav id={id} className={styles.panel} aria-label="Navigation principale">
-      {LINKS.map((link) => {
+      {PUBLIC_NAV_LINKS.map((link) => {
         const isActive = isNavLinkActive(pathname, link.href);
         return (
           <Link
