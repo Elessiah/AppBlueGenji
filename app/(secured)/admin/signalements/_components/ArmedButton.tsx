@@ -23,7 +23,7 @@ interface ArmedButtonProps {
  * Le changement de libellé est annoncé (`aria-live`) : un lecteur d'écran doit
  * savoir que le bouton attend une confirmation.
  */
-export function ArmedButton({ label, confirmLabel, onConfirm, disabled, className }: ArmedButtonProps) {
+export function ArmedButton({ label, confirmLabel, onConfirm, disabled, className }: Readonly<ArmedButtonProps>) {
   const [armed, setArmed] = useState(false);
 
   useEffect(() => {

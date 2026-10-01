@@ -38,7 +38,7 @@ const PREVIEW_ACCENT = "var(--blue-300, #8fd5ff)";
  * figure jamais — l'arbitrage s'en sert pour ouvrir des salons et annoncer des
  * horaires, et un couple annoncé à tort se paierait devant deux équipes.
  */
-export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: EnduranceNextRoundPanelProps) {
+export function EnduranceNextRoundPanel({ preview, maxRounds, teamNames }: Readonly<EnduranceNextRoundPanelProps>) {
   const [open, setOpen] = useState(true);
   const panelId = useId();
   const title = nextRoundTitle(preview, maxRounds);

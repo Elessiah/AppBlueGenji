@@ -39,7 +39,7 @@ const KIND_LABELS: Record<Exclude<PreviewPairingKind, "MATCH">, string> = {
  */
 const ROW_GRID = "28px minmax(0, 1fr) 24px minmax(0, 1fr)";
 
-function EntrantCell({ pairing, side }: { pairing: PreviewPairing; side: "A" | "B" }) {
+function EntrantCell({ pairing, side }: Readonly<{ pairing: PreviewPairing; side: "A" | "B" }>) {
   const entrant = side === "A" ? pairing.teamA : pairing.teamB;
 
   // Emplacement vide : dire ce qui se passe vaut mieux qu'un tiret muet.
@@ -75,7 +75,7 @@ function EntrantCell({ pairing, side }: { pairing: PreviewPairing; side: "A" | "
  * le flux d'événements. Rien n'est écrit : ce n'est pas le plateau, c'est ce
  * qu'il serait.
  */
-export function BracketPreview({ preview, canReorder }: BracketPreviewProps) {
+export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewProps>) {
   const wording = useParticipantWording();
 
   return (

@@ -53,7 +53,7 @@ function cadenceLabel(tier: RefreshTier): string {
  * `aria-label` portant toute l'explication ferait réciter une phrase entière à
  * la moindre coupure réseau. L'explication vit dans `title`.
  */
-export function LiveIndicator({ isLive, tier, fatal = null }: LiveIndicatorProps) {
+export function LiveIndicator({ isLive, tier, fatal = null }: Readonly<LiveIndicatorProps>) {
   const label = fatal ? "Hors ligne" : isLive ? "À jour" : "Reconnexion…";
   const title = fatal
     ? FATAL_TITLES[fatal]

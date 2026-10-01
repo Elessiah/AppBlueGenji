@@ -70,7 +70,7 @@ export function BracketTree({
   onOpenAdminModal,
   format,
   resolveNextMatchId,
-}: BracketTreeProps) {
+}: Readonly<BracketTreeProps>) {
   // La hauteur d'un créneau se **mesure** : une carte grandit d'une rangée par
   // action offerte au lecteur, et une hauteur figée la laissait déborder sur le
   // libellé du match voisin. Voir `_lib/bracket-layout.ts`.

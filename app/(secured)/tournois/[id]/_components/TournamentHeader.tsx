@@ -99,7 +99,7 @@ export function TournamentHeader({
   onAdvance,
   onLiveSaved,
   onEditImage,
-}: TournamentHeaderProps) {
+}: Readonly<TournamentHeaderProps>) {
   const { card } = detail;
   const wording = participantWording(card.participantType);
   const state = STATE_META[card.state] ?? { label: card.state, tone: "neutral" as HeaderTone };
@@ -275,7 +275,7 @@ export function TournamentHeader({
  * Une case de la grille. Les dates ne sont mises en forme qu'ici : leur rendu
  * dépend du fuseau du lecteur, que le module pur n'a pas à connaître.
  */
-function MetaCell({ item }: { item: HeaderMetaItem }) {
+function MetaCell({ item }: Readonly<{ item: HeaderMetaItem }>) {
   const isNumeric = item.kind === "count";
   const text = item.kind === "date" ? formatHeaderDate(item.value) : item.value;
 

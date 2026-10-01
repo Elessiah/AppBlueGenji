@@ -32,7 +32,7 @@ export function TournamentLiveLink({
   liveUrl,
   canEdit,
   onSaved,
-}: TournamentLiveLinkProps) {
+}: Readonly<TournamentLiveLinkProps>) {
   const { showError, showSuccess } = useToast();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(liveUrl ?? "");

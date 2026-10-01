@@ -19,7 +19,7 @@ interface TeamHeaderProps {
  * vient voir — commençait sous la ligne de flottaison. Les paramètres vivent
  * désormais dans `TeamSettings`, sous le roster.
  */
-export function TeamHeader({ team }: TeamHeaderProps) {
+export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
   const stats = [
     { label: "Tournois joués", value: team.stats.tournamentsPlayed },
     { label: "Podiums", value: team.stats.podiums },

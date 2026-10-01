@@ -19,7 +19,7 @@ interface MembershipActionsProps {
   onRequestsChanged: () => void;
 }
 
-export function MembershipActions({ team, requests, onChanged, onRequestsChanged }: MembershipActionsProps) {
+export function MembershipActions({ team, requests, onChanged, onRequestsChanged }: Readonly<MembershipActionsProps>) {
   const { showError, showSuccess } = useToast();
   const router = useRouter();
   const teamId = team.team.id;

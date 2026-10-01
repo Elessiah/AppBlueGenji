@@ -8,7 +8,7 @@ const TONES: Record<ReportStatus, string> = {
 };
 
 /** État d'un signalement, et « contesté » à côté quand quelqu'un attend une réponse. */
-export function StatusPill({ status, contested }: { status: ReportStatus; contested: boolean }) {
+export function StatusPill({ status, contested }: Readonly<{ status: ReportStatus; contested: boolean }>) {
   return (
     <span style={{ display: "inline-flex", gap: 6, flexWrap: "wrap" }}>
       <span className={`${styles.pill} ${TONES[status]}`}>{REPORT_STATUS_LABELS[status]}</span>

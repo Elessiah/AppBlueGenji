@@ -18,7 +18,7 @@ interface PhaseStandingsBlockProps {
  * phase avec leur rang, les qualifiées marquées d'une colonne : c'est un
  * classement, d'où le titre.
  */
-export function PhaseStandingsBlock({ standings }: PhaseStandingsBlockProps) {
+export function PhaseStandingsBlock({ standings }: Readonly<PhaseStandingsBlockProps>) {
   return (
     <section className={styles.block} aria-labelledby="phase-standings-title">
       <h3 id="phase-standings-title" className={styles.title}>

@@ -29,11 +29,11 @@ export function MatchAnchorProvider({
   targetMatchId,
   highlightedMatchId,
   children,
-}: {
+}: Readonly<{
   targetMatchId: number | null;
   highlightedMatchId: number | null;
   children: ReactNode;
-}) {
+}>) {
   return (
     <MatchAnchorTargetContext.Provider value={targetMatchId}>
       <HighlightedMatchContext.Provider value={highlightedMatchId}>

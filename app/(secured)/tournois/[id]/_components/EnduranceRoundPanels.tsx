@@ -57,7 +57,7 @@ export function EnduranceRoundPanels({
   adminResolvable,
   onOpenAdminModal,
   format,
-}: EnduranceRoundPanelsProps) {
+}: Readonly<EnduranceRoundPanelsProps>) {
   const autoOpen = defaultOpenEnduranceRound(sections, myTeamId, playoffsStarted);
 
   const [openRounds, setOpenRounds] = useState<Set<number>>(

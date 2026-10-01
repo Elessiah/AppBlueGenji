@@ -11,7 +11,7 @@ import styles from "../team.module.css";
  * (« 3W / 1L ») sous un en-tête « Rank », et rien du tout — pas même une
  * phrase — quand l'équipe n'avait encore joué aucun tournoi.
  */
-export function TeamHistory({ tournaments }: { tournaments: TeamHistoryRow[] }) {
+export function TeamHistory({ tournaments }: Readonly<{ tournaments: TeamHistoryRow[] }>) {
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby="team-history-title">
       <div className="ds-section-title orange">

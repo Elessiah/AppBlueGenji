@@ -39,7 +39,7 @@ export type EntrantContactGroup = {
   members: EntrantContact[];
 };
 
-export function EntrantContactsPanel({ tournamentId }: { tournamentId: number }) {
+export function EntrantContactsPanel({ tournamentId }: Readonly<{ tournamentId: number }>) {
   const { showError } = useToast();
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);

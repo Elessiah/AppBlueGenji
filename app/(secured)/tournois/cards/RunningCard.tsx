@@ -22,7 +22,7 @@ interface RunningCardProps {
  * tournoi en cours n'est pas une diffusion. La place ainsi rendue sert à dire
  * où en est le tournoi (`runningProgress`).
  */
-export function RunningCard({ t, priority }: RunningCardProps) {
+export function RunningCard({ t, priority }: Readonly<RunningCardProps>) {
   const wording = participantWording(t.participantType);
   const percent = progressPercent(t.runningProgress);
 

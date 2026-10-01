@@ -67,7 +67,7 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
  * plutôt que d'une requête à part : les commandes apparaissent avec la page, et
  * le serveur reste le juge, qui refuse en 409 une écriture devenue interdite.
  */
-export function RegistrationsPanel({ detail, canAct, onChanged }: RegistrationsPanelProps) {
+export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<RegistrationsPanelProps>) {
   const { showError, showSuccess } = useToast();
   const wording = useParticipantWording();
   const [busy, setBusy] = useState(false);

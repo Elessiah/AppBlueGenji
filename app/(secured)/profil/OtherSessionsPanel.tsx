@@ -23,7 +23,7 @@ async function readError(res: Response): Promise<string> {
   return payload?.error ?? "";
 }
 
-export function OtherSessionsPanel({ version }: { version: number }): React.ReactElement {
+export function OtherSessionsPanel({ version }: Readonly<{ version: number }>): React.ReactElement {
   const { showError, showSuccess } = useToast();
   const [count, setCount] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);

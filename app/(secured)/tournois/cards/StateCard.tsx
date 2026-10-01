@@ -19,7 +19,7 @@ interface StateCardProps {
  * regroupe des tournois de n'importe quel état : c'est le seul endroit qui a
  * besoin d'aiguiller.
  */
-export function StateCard({ t, priority }: StateCardProps) {
+export function StateCard({ t, priority }: Readonly<StateCardProps>) {
   if (t.state === "RUNNING") return <RunningCard t={t} priority={priority} />;
   if (t.state === "REGISTRATION") return <RegistrationCard t={t} priority={priority} />;
   if (t.state === "FINISHED") return <FinishedCard t={t} priority={priority} />;

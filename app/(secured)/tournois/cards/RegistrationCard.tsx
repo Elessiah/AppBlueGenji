@@ -23,7 +23,7 @@ interface RegistrationCardProps {
  * qui tranche (`registerBlockedNotice`). Un plateau plein, lui, se lit sur la
  * carte : c'est le seul refus qui ne dépend de personne.
  */
-export function RegistrationCard({ t, priority }: RegistrationCardProps) {
+export function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps>) {
   const wording = participantWording(t.participantType);
   const fill = registrationFill(t);
 

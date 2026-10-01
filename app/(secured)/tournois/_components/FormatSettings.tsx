@@ -47,7 +47,7 @@ export function FormatSettings({
   lockedAttr,
   onSwissTotalRoundsChange,
   phaseFocusRequest,
-}: FormatSettingsProps) {
+}: Readonly<FormatSettingsProps>) {
   const { format, maxTeams, phases } = values;
   const wording = participantWording(values.participantType);
   const recommendedRounds = computeRecommendedRounds(maxTeams);

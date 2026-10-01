@@ -53,7 +53,7 @@ export function BoardPanel({
   flag = null,
   highlighted = false,
   children,
-}: BoardPanelProps) {
+}: Readonly<BoardPanelProps>) {
   return (
     <div
       className={`${styles.panel} ${open || highlighted ? styles.panelActive : ""}`}
@@ -88,6 +88,6 @@ export function BoardPanel({
 }
 
 /** Pastille neutre d'en-tête de volet — `done` la passe au vert des manches jouées. */
-export function PanelPill({ children, done = false }: { children: ReactNode; done?: boolean }) {
+export function PanelPill({ children, done = false }: Readonly<{ children: ReactNode; done?: boolean }>) {
   return <span className={`${styles.pill} ${done ? styles.pillDone : ""}`}>{children}</span>;
 }

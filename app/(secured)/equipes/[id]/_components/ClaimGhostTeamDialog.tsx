@@ -26,7 +26,7 @@ interface ClaimGhostTeamDialogProps {
  * devient OWNER et que l'équipe cesse d'être fantôme — elle retrouve alors le
  * fonctionnement normal (invitations, gestion du roster par son propriétaire).
  */
-export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: ClaimGhostTeamDialogProps) {
+export function ClaimGhostTeamDialog({ teamId, teamName, onClose, onChanged }: Readonly<ClaimGhostTeamDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [pseudo, setPseudo] = useState("");
   const [busy, setBusy] = useState(false);

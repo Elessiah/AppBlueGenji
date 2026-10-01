@@ -19,7 +19,7 @@ import styles from "./MatchReplayStrip.module.css";
  * match rouvert par un retour en arrière. Le staff garde alors son bouton, pour
  * pouvoir retirer un lien qui ne correspondrait plus.
  */
-export function MatchReplayStrip({ match }: { match: BracketMatch }) {
+export function MatchReplayStrip({ match }: Readonly<{ match: BracketMatch }>) {
   const { canManage, openReplay } = useLiveControls();
 
   const replayUrl = visibleReplayUrl(match);

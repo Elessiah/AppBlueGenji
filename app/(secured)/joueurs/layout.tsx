@@ -7,6 +7,6 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
  */
 export const metadata: Metadata = { title: segmentTitle("Joueurs") };
 
-export default function PlayersLayout({ children }: { children: React.ReactNode }) {
+export default function PlayersLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }

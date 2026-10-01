@@ -12,7 +12,7 @@ export const metadata: Metadata = { title: segmentTitle("Signalements") };
  * routes qu'il appelle refont le contrôle ; celui-ci évite seulement de rendre
  * un écran vide qui n'afficherait que des refus.
  */
-export default async function ReportsAdminLayout({ children }: { children: React.ReactNode }) {
+export default async function ReportsAdminLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const user = await getCurrentUser();
   if (!can(user, "moderation")) notFound();
   return <>{children}</>;

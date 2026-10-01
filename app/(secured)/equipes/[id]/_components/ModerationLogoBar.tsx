@@ -19,7 +19,7 @@ import styles from "../team.module.css";
  * laisse une trace dans le journal du staff. Hors signalement, le **motif**
  * est exigé : c'est le fait que le message à l'équipe expose (DSA, art. 17).
  */
-export function ModerationLogoBar({ team, onChanged }: { team: TeamDetailResponse; onChanged: () => void }) {
+export function ModerationLogoBar({ team, onChanged }: Readonly<{ team: TeamDetailResponse; onChanged: () => void }>) {
   const { showError, showSuccess } = useToast();
   const [confirming, setConfirming] = useState(false);
   const [reason, setReason] = useState("");

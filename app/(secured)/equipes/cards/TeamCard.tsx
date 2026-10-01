@@ -31,7 +31,7 @@ import s from "./TeamCard.module.css";
  * `TeamListItem.logoUrl` voyageait bien de `listTeams` jusqu'ici, mais aucun
  * rendu ne le lisait — le logo n'apparaissait donc que sur `/equipes/[id]`.
  */
-export function TeamCard({ team }: { team: TeamListItem }) {
+export function TeamCard({ team }: Readonly<{ team: TeamListItem }>) {
   const color = getPaletteColor(team.id);
   const isTop3 = team.rank <= 3;
   const ranked = isRankedTeam(team);

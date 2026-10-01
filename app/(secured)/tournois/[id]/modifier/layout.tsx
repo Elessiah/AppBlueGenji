@@ -24,6 +24,6 @@ export const metadata: Metadata = {
   twitter: null,
 };
 
-export default function EditTournamentLayout({ children }: { children: React.ReactNode }) {
+export default function EditTournamentLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }
