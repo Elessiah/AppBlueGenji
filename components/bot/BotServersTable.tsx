@@ -110,9 +110,9 @@ export function BotServersTable({ payload }: { payload: BotServersPayload | null
           <span role="columnheader">#</span>
           <span role="columnheader">SERVEUR</span>
           <span role="columnheader" style={{ textAlign: "right" }}>MEMBRES</span>
-          <span role="columnheader" style={{ textAlign: "right" }}>RELAIS 30J</span>
+          <span role="columnheader" style={{ textAlign: "right" }}>RELAIS 7J</span>
           <span role="columnheader" style={{ textAlign: "right" }}>
-            {/* « RELAIS 30J » compte, celle-ci qualifie : deux en-têtes
+            {/* « RELAIS 7J » compte, celle-ci qualifie : deux en-têtes
                 homonymes se reliraient l'un pour l'autre. Sous 640 px la
                 colonne des relais est masquée — l'homonymie part avec elle,
                 et « ÉTAT DU » avec, faute de place dans la piste. */}
@@ -192,7 +192,7 @@ export function BotServersTable({ payload }: { payload: BotServersPayload | null
                   typée n'était que mal formatée. Le zéro reste réservé à un
                   zéro reçu ; ne pas savoir se dit. */}
               <span className="srv-num" role="cell">{botPayloadNumber(s.memberCount)?.toLocaleString("fr-FR") ?? "—"}</span>
-              <span className="srv-num" role="cell">{botPayloadNumber(s.relays30j)?.toLocaleString("fr-FR") ?? "—"}</span>
+              <span className="srv-num" role="cell">{botPayloadNumber(s.relays7j)?.toLocaleString("fr-FR") ?? "—"}</span>
               <span
                 className={"srv-status " + relay.tone}
                 role="cell"

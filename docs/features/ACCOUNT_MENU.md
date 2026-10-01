@@ -30,3 +30,9 @@ Le bouton « Déconnexion » du bas de `/profil` reste en place.
 ## Tests
 
 `tests/app/account-menu.test.tsx`, `tests/app/navigation-a11y.test.tsx`, `tests/app/public-header.test.ts`.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Menu du compte et hauteur des barres** (`components/account-menu.tsx`) : « Mon profil / Mon équipe / Déconnexion » vivent sous l'avatar, **le même composant** dans `ArenaNav` et dans `PublicHeader` — la déconnexion n'existait qu'au bas de `/profil`, et « Mon équipe » disparaissait de la barre sous 720 px. Bouton de divulgation (jamais `role="menu"`), mêmes règles de fermeture que le burger de la vitrine (`handleMenuEscape`, `focusLeftMenu`) ; une déconnexion refusée le dit en toast au lieu de ramener à l'accueil un joueur toujours connecté. Les deux barres étant collantes, elles tiennent sur **une ligne** là où c'est possible (l'en-tête public raccourcit son CTA sous 960 px et réduit la marque à l'emblème sous 480 px ; entre 721 et 1150 px « Accueil » / « Mon équipe » passent au pictogramme, libellé gardé pour les technologies d'assistance) et **cessent d'être collantes** en paysage bas (`max-height: 500px`). Voir `docs/features/ACCOUNT_MENU.md`.

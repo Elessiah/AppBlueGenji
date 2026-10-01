@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import {
+  fetchBotServers,
   fetchBotStats,
   pushDiscordDirectMessages,
   pushRefereeAlert,
@@ -190,10 +191,51 @@ describe("bot-integration", () => {
     expect(stats).toEqual({
       affiliatedServers: 0,
       affiliatedChannels: 0,
-      messagesLast30Days: 0,
-      relayedMessagesLast30Days: 0,
-      uniqueUsersLast30Days: 0,
+      messagesLast7Days: 0,
+      relayedMessagesLast7Days: 0,
+      uniqueUsersLast7Days: 0,
     });
+  });
+
+  // Le bot et le site se déploient séparément : les deux noms de champ
+  // doivent être lus, le nouveau d'abord.
+  it.each<[string, Record<string, number>]>([
+    ["un bot à jour", { messagesLast7Days: 12, relayedMessagesLast7Days: 34, uniqueUsersLast7Days: 5, windowDays: 7 }],
+    ["un bot d'avant", { messagesLast30Days: 12, relayedMessagesLast30Days: 34, uniqueUsersLast30Days: 5 }],
+  ])("fetchBotStats lit les compteurs de %s", async (_label, counters) => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ affiliatedServers: 3, affiliatedChannels: 9, ...counters }), { status: 200 }),
+    );
+
+    expect(await fetchBotStats()).toEqual({
+      affiliatedServers: 3,
+      affiliatedChannels: 9,
+      messagesLast7Days: 12,
+      relayedMessagesLast7Days: 34,
+      uniqueUsersLast7Days: 5,
+    });
+  });
+
+  it("fetchBotServers rend relays7j, y compris depuis le relays30j d'un bot d'avant", async () => {
+    jest.spyOn(global, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          servers: [
+            { id: "1", name: "A", relays7j: 40 },
+            { id: "2", name: "B", relays30j: 12 },
+          ],
+          total: 2,
+          limit: 8,
+          offset: 0,
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const payload = await fetchBotServers();
+    expect(payload?.servers.map((s) => s.relays7j)).toEqual([40, 12]);
+    expect(payload?.servers[1]).not.toHaveProperty("relays30j");
+    expect(payload?.total).toBe(2);
   });
   describe("pushSiteVisitStats", () => {
     const stats: SiteVisitStats = {

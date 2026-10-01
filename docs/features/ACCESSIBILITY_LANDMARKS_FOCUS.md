@@ -105,3 +105,9 @@ clic dans le vide, que l'écouteur de clic extérieur traite déjà.
   lui-même** (un focus dans `:not(…)`, dans `:has(…)` ou sur un ancêtre habille
   un voisin, qui porte son propre repère) et cumule les règles d'un même
   sélecteur dans une feuille (un anneau écrit en deux fois reste un anneau).
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Repères des pages vitrine et focus des champs** (`components/cyber/landing/PublicPageShell.tsx`) : une page vitrine passe par **`<PublicPageShell>`**, qui rend `PublicHeader`, `<main>` puis `PublicFooter` **en frères** — jamais l'en-tête ni le pied dans `<main>`, où ils perdent leur rôle de repère (`banner`, `contentinfo`) ; `/bot` et `/bot/docs` font de même à la main. Pas d'`<aside>` dans une page (il serait imbriqué dans `<main>`, donc pas un repère de premier niveau). Une règle de **focus** ne se contente jamais de changer la couleur d'une bordure : elle pose un anneau (`box-shadow`) ou un contour — et en **contrastes forcés**, qui impose une seule couleur de bordure et supprime les ombres, une règle globale `:focus-visible:not([tabindex="-1"])` rétablit un `outline` pour tout contrôle, `!important` compris, faute de quoi les `outline: none` éparpillés ne laissaient aucun repère. Le menu burger se ferme quand la tabulation en sort (`focusLeftMenu`). Un balayage (`tests/app/accessibility-landmarks-focus.test.tsx`) tient les trois règles. Voir `docs/features/ACCESSIBILITY_LANDMARKS_FOCUS.md`.

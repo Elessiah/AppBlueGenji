@@ -346,3 +346,16 @@ retenu par son plafond, rendre muet le signalement d'un autre.
   qui empêchent deux processus de jouer le schéma en même temps.
 - `docs/features/OAUTH_PROVIDERS.md` — pourquoi le site ne collecte plus
   d'adresse.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+### Database (`lib/server/database.ts`)
+Direct MySQL2 pool. Le schéma est joué automatiquement à la première requête. Tables : `bg_users`, `bg_teams`, `bg_team_members`, `bg_tournaments`, `bg_tournament_registrations`, `bg_matches`, `bg_user_sessions`, et une par moteur ou fonctionnalité (classements, phases, notifications envoyées, vitrine).
+
+**Le fichier décrit le schéma tel qu'il est, pas l'histoire de la façon dont on y est arrivé.** Soixante-trois `ALTER TABLE` s'y étaient empilés, chacun dans un `catch {}` vide pour retomber en silence sur une base qui l'avait déjà subi : on ne pouvait plus lire la définition d'une table sans parcourir mille lignes, l'ordre des colonnes racontait la chronologie des fonctionnalités plutôt que la structure de l'objet, et chaque démarrage rejouait des conversions d'ENUM et des backfills sans objet depuis des mois — certains en balayage de table complète. Ils sont désormais repliés dans les `CREATE TABLE`, groupés par domaine.
+
+**La contrepartie est à connaître avant de toucher au fichier** : sur une base qui existe déjà, `CREATE TABLE IF NOT EXISTS` ne fait **rien** — il ne rattrape ni une colonne ni un index. Le repli n'est sans danger que parce que la production porte déjà le schéma complet ; une base restée à une version antérieure doit être migrée à la main. **La règle pour la suite est donc inchangée** : un changement de schéma s'écrit à **deux** endroits — dans le `CREATE TABLE` (bases neuves) *et* en `ALTER TABLE` tolérant dans la section « Migrations » (bases qui tournent) —, cette seconde entrée pouvant être retirée une fois qu'on la sait jouée partout. Seuls trois **rattrapages permanents** subsistent, dont la cause peut se reproduire : l'invitation Discord périmée du pied de page, le faux courriel qu'un ancien défaut y avait écrit (`SUPERSEDED_CONTACT_EMAILS`, vidé) et le logo d'une entrée solo qui republierait un avatar masqué.
+
+**`bg_users.email` n'existe plus.** La colonne n'avait plus aucun lecteur (le scope `email` a disparu de la demande faite à Google, un compte ne se revendique plus par son adresse) et gardait pourtant les adresses collectées avant la règle : garder une donnée que plus personne ne lit n'est pas de la prudence, c'est une fuite en attente. Le `DROP COLUMN` est l'un des trois chemins d'`ALTER` que le fichier porte encore, avec le retrait de `bg_recruitment_ads.contact_email` et la liste `RECENT_SCHEMA_CHANGES` (les changements trop récents pour qu'on sache la production passée dessus — des instructions entières, pour que la règle couvre aussi un `ENUM` élargi ou un index posé) ; il est **irréversible** et s'applique au prochain redémarrage — un retour en arrière de la version applicative après ce déploiement casserait les lectures de session. `AuthUser.email`, l'anonymisation, l'export RGPD et le jeu de test l'ont suivi. Voir `docs/DATABASE_SCHEMA.md`.

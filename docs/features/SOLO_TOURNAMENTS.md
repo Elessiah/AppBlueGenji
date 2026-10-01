@@ -132,3 +132,9 @@ terminée (`lib/server/seed-cases.ts`, champ `participantType`).
   inscription dans les deux modes, avec tous les refus.
 - `tests/app/api/tournaments/create-solo.test.ts` — validation de la route.
 - `tests/tournois/tournament-mappers.test.ts` — repli sur `TEAM`.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Tournoi individuel** (`bg_tournaments.participant_type = 'SOLO'`) : les joueurs s'inscrivent eux-mêmes, sans équipe. Le moteur ne connaît que des **engagés** identifiés par un `team_id` ; un joueur reçoit donc une **entrée solo** (ligne `bg_teams` avec `solo_user_id`, sans membre, comme une fantôme), créée à sa première inscription. Tous les formats fonctionnent inchangés. L'entrée solo n'est pas une équipe : exclue de `/equipes`, du classement du site et du compteur d'équipes ; sa fiche renvoie vers `/joueurs/[id]`. Résolution unique de l'engagé : `resolveUserEntrantTeamId` (`lib/server/tournaments/registration.ts`), à utiliser pour l'inscription, le report de score et l'abandon. Vocabulaire pur dans `lib/shared/participants.ts`, service dans `lib/server/solo-entries-service.ts`. Voir `docs/features/SOLO_TOURNAMENTS.md`.

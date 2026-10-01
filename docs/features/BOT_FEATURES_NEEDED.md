@@ -47,16 +47,17 @@ mocks.
       (afin de calculer les deltas % affichés dans les cartes KPI du dashboard)
 - [ ] **Compteur de serveurs** + delta vs N-30j
 - [ ] **Compteur de channels relayés** + delta vs N-30j
-- [ ] **Compteur de messages traités** + delta % vs N-30j
-- [ ] **Compteur de relais inter-serveurs** + delta % vs N-30j
+- [ ] **Compteur de messages traités** sur 7 jours (purge des messages relayés), **sans delta** (`null`) : la période précédente est déjà purgée
+- [ ] **Compteur de relais inter-serveurs** sur 7 jours, **sans delta** (`null`), même raison
 
 Format suggéré :
 ```json
 {
   "servers":      { "value": 15,   "delta": "+3",    "series": [/* 12 points */] },
   "channels":     { "value": 57,   "delta": "+12",   "series": [...] },
-  "messages":     { "value": 8419, "delta": "+18 %", "series": [...] },
-  "relays":       { "value": 462,  "delta": "+24 %", "series": [...] }
+  "messages":     { "value": 8419, "delta": null,    "series": [...] },
+  "relays":       { "value": 462,  "delta": null,    "series": [...] },
+  "windowDays":   7
 }
 ```
 
@@ -68,11 +69,11 @@ Nouvel endpoint `GET /internal/servers` :
 
 - [ ] **Nom** du serveur Discord
 - [ ] **Nombre de membres**
-- [ ] **Nombre de relais sur 30j**
+- [ ] **Nombre de relais sur 7j** (`relays7j`, ex-`relays30j` : la table est purgée à 7 jours)
 - [ ] **Status** par serveur : `ok` / `lag` / `off` (dérivé de la dernière activité)
 - [ ] **Tendance d'activité** : tableau de 10 points (sparkline)
 - [ ] **Couleur d'accent** ou identifiant déterministe pour le sigil (premier caractère + couleur)
-- [ ] **Tri** par activité 30j décroissante
+- [ ] **Tri** par activité 7j décroissante
 - [ ] **Pagination** ou cap (le design affiche 8 serveurs visibles)
 
 ---

@@ -74,3 +74,9 @@ l'association.
 Le registre des traitements (`/rgpd/registre`, fiches T05 et T06) et le
 récapitulatif présenté aux joueurs (`lib/shared/privacy-changes.ts`) disent la
 nouvelle règle.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Journaux Discord et visites sans données nominatives** (`lib/shared/log-privacy.ts` pur + `lib/server/staff-audit.ts`) : **règle pour toute feature future** — un message Discord (journal, alerte arbitre, signalement) ne porte **aucun pseudo de joueur** ni `#id` de joueur (« un joueur », y compris en tournoi individuel, où le nom d'un engagé *est* un pseudo), les **noms d'équipe** restent, et un **membre du staff** y est « le staff » tandis que son geste part nominatif dans pm2 (`publishStaffAction` → `[staff-audit] … — auteur : <pseudo> (#id)`). Les formateurs ne prennent jamais un nom nu mais un `LogEntrant` rendu par `entrantLabel`. Côté audience, `bg_site_visits` ne garde plus `user_id` (remplacée par `authenticated`) : l'empreinte salée rend un visiteur unique sans remonter à lui, et sans secret en production on ne compte pas. Voir `docs/features/RGPD_LOGS_AND_VISITS.md`.

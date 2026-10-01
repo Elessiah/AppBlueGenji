@@ -110,3 +110,9 @@ Relire la seule phase courante suffit, et pour la même raison qu'ailleurs :
 l'intérieur de la dernière, la règle du format verrouille les manches amont. La
 dernière manche de la dernière phase est la seule chose qui reste corrigible —
 c'est précisément celle que l'on rejoue.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Corriger le score d'un tournoi terminé** (`reconcileEndurance` / `reconcileSurvival` / `reconcileSwiss`) : les trois modes à classement sortaient **en tête** de leur réconciliation sur un tournoi `FINISHED`, si bien que corriger le vainqueur de la finale changeait `winner_team_id` en base sans recalculer ni le podium ni `final_rank` — le tournoi gardait l'ancienne championne à son palmarès, que la page (qui rejoue toujours) contredisait. Or `adminResolveMatch` n'a **aucune garde d'état**, par choix (une archive fausse se répare), et `finishTournament` est écrit pour ce cas (`state <> 'FINISHED'` : ni seconde date de clôture, ni seconde annonce Discord). La règle tient en une phrase : **le classement se rejoue, le tournoi ne se rouvre pas** — rejeu et finalisation sont rejoués, la pose d'une manche, d'une ronde, d'un tour d'arbre ou la bascule en play-offs ne l'est pas (sans quoi une correction pouvait reposer une manche à un tournoi clos, que plus rien n'aurait fait avancer, `syncTournamentState` ne visitant que les `RUNNING`). La branche play-offs de l'endurance passe par le chemin ordinaire : `repairPlayoffBracket` ne réécrit jamais un tour portant une saisie, et dans un tournoi clos ils en portent tous. En pratique `match-lock` ne laisse corriger que la **finale** (et la petite finale) : tout ce qui est en amont est verrouillé par ce qui suit. Abandons et pénalités restent, eux, refusés hors `RUNNING`. Le mode `MULTI` garde le défaut (voir `ERREUR.txt`). Voir `docs/features/FINISHED_TOURNAMENT_RECONCILIATION.md`.

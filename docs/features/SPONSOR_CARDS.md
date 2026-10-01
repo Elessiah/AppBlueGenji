@@ -80,3 +80,9 @@ changement (la plus longue fait 20 caractères).
 `npm run seed` crée trois partenaires visibles couvrant les trois dispositions
 (bandeau + logo, logo seul, bandeau seul), avec de **vrais fichiers** sous
 `public/uploads/sponsors` — une URL étrangère serait refusée à l'affichage.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Cartes partenaires de l'accueil** (`lib/shared/sponsor-card.ts` pur + `components/cyber/landing/SponsorsGrid.tsx`) : la vitrine n'affichait qu'un logo rogné en 3:1, sans nom ni description (pourtant stockée) — des miniatures anonymes. Une carte porte désormais un **bandeau** (`bg_sponsors.banner_url`, **téléversement seulement** par `POST /api/landing/sponsors/banner`, WebP 1200 × 400 recadré, `INVALID_BANNER_URL` pour toute autre adresse — un autre dossier d'upload compris, que le nettoyage effacerait), le **logo** en pastille sur le bandeau ou entier sans lui (gabarit `sponsor-logo` passé à 600 × 600 `inside`), le **nom** en lien étiré, une **brève description** (200 caractères, refusée au-delà et jamais tronquée) et le domaine du site ; `sponsorCardMedia` décide de la disposition et ne rend que des adresses du site, `sponsorWebsiteHref` n'accepte que `http(s)` (fini le `href="#"`). Introduction de section éditable (`home.sponsors.lede`). Voir `docs/features/SPONSOR_CARDS.md`.

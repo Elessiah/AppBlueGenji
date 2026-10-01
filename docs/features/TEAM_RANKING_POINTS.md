@@ -131,3 +131,9 @@ diverger, et ne le peut plus, c'est le **nombre de points d'une équipe**.
   fenêtre de tendance, dégradation si la base tombe.
 - `tests/lib/server/ranking-service.test.ts` — `loadTeamRanking` : tri, bornage,
   découpage, mutualisation.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Points d'équipe — une seule source** (`lib/shared/ranking.ts` pur + `loadTeamRanking` dans `lib/server/ranking-service.ts`) : le même mot « points » recouvrait trois nombres différents pour la même équipe — la carte d'annuaire `/equipes` comptait 3 points la victoire et **+1 la défaite**, sur des victoires **multipliées par l'effectif** (la jointure des membres et celle des matchs formaient un produit cartésien dans la même requête) et byes compris ; la fiche appliquait le barème partagé à l'assiette de `PLAYED_MATCH_SQL` ; le leaderboard avait le bon barème mais lisait les défaites sur `loser_team_id`, que le moteur ne renseigne pas toujours. Un barème partagé ne suffit pas : posé sur deux assiettes différentes, il rend encore deux nombres. `lib/shared/ranking.ts` porte donc **les deux** — le calcul et l'assiette (`playedMatchSql`, `rankingMatchJoinSql`) — et `loadTeamRanking` est l'**unique** source de points d'équipe : annuaire, place au classement de la fiche, leaderboard (tendance comprise) et seeding en descendent tous. Voir `docs/features/TEAM_RANKING_POINTS.md`.

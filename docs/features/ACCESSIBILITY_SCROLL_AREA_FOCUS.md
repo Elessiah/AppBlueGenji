@@ -82,3 +82,9 @@ pose le focus sur la modale elle-même — jamais sur le bouton de refus.
 À l'ouverture de la même modale, `useDialogBehavior` prend le premier élément
 focalisable : la liste si elle l'est, sinon le lien vers la politique, qui la
 suit — là encore, pas le bouton de refus.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Zones défilantes** : toute zone qui défile passe par `<ScrollArea>` (`@/components/cyber`) — jamais un `overflowX/Y: "auto"` posé à la main. Le style des barres est global (`app/globals.css`) : plus aucune barre blanche par défaut, ni sur la page, ni dans un conteneur. `ScrollArea` y ajoute la variante discrète (barre révélée au survol), le dégradé de bord optionnel (`fade`) et l'accessibilité clavier — `tabIndex` et, avec un `ariaLabel` (à renseigner systématiquement), `role="region"` et le nom, **seulement quand la zone déborde réellement** (`lib/shared/scroll-overflow.ts`, relu à chaque changement de taille de la zone ou d'un enfant, de son contenu, d'un réglage d'accessibilité et au chargement d'une police) : une zone dont le contenu tient n'est ni un arrêt de tabulation ni un repère. Avant toute mesure (rendu serveur, hydratation) elle est focalisable — un arrêt de trop gêne, une zone qui déborde sans être atteignable bloque —, et elle le reste tant qu'elle a le focus. Un appelant ne compte donc jamais sur le `role` pour retrouver la zone sans prévoir de repli (voir `docs/features/ACCESSIBILITY_SCROLL_AREA_FOCUS.md`). Les couleurs se règlent par les tokens `--scrollbar-size`, `--scrollbar-thumb`, `--scrollbar-thumb-hover`, `--scrollbar-track`, surchargeables localement. Au doigt (`(pointer: coarse)`), une zone horizontale sans `fade` estompe le bord où il reste du contenu (`data-scroll-hint`, `lib/shared/scroll-hint.ts`) : la barre des navigateurs mobiles se superpose et s'efface, rien d'autre ne dit que la zone continue.

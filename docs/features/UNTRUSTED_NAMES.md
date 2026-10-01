@@ -55,3 +55,9 @@ par le site lui-même (`**…**`, liens) restent actives.
 Côté bot, `allowedMentions: { parse: [] }` par défaut reste une défense en
 profondeur à poser dans le dépôt `blueGenjiBot` : le site neutralise tout ce
 qu'il rédige, mais pas ce que d'autres modules du bot pourraient relayer.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Noms saisis et textes vers Discord** (`lib/shared/visible-text.ts` + `lib/shared/discord-text.ts`, purs) : pseudos et noms d'équipe passent par `visibleText` (NFKC, invisibles et commandes de direction retirés, une seule ligne) — via `normalizePseudo` et `checkTeamName`, recherche par pseudo comprise, si bien qu'un sosie à espace de largeur nulle désigne l'original. **Règle pour tout rédacteur Discord futur** : un texte venu d'un utilisateur n'entre dans un message que par `discordInline` (fragment : balisage échappé, `@` et `<@…>` désamorcés, une ligne) ou `discordQuote` (texte libre, cité ligne à ligne) ; `entrantLabel` le fait déjà pour les noms d'engagés. Voir `docs/features/UNTRUSTED_NAMES.md`.

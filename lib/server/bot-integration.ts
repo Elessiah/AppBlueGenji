@@ -6,6 +6,7 @@ import type {
   BotActivity,
   SiteVisitStats,
 } from "@/lib/shared/types";
+import { normalizeBotServersPayload, normalizeBotStats } from "@/lib/shared/bot-message-window";
 
 const DEFAULT_BOT_INTERNAL_HOST = "127.0.0.1";
 const DEFAULT_BOT_INTERNAL_PORT = "4400";
@@ -76,9 +77,9 @@ function emptyBotStats(): BotStats {
   return {
     affiliatedServers: 0,
     affiliatedChannels: 0,
-    messagesLast30Days: 0,
-    relayedMessagesLast30Days: 0,
-    uniqueUsersLast30Days: 0,
+    messagesLast7Days: 0,
+    relayedMessagesLast7Days: 0,
+    uniqueUsersLast7Days: 0,
   };
 }
 
@@ -146,7 +147,7 @@ export async function fetchBotStats(): Promise<BotStats> {
     }
 
     recordSuccess();
-    return (await response.json()) as BotStats;
+    return normalizeBotStats(await response.json());
   } catch {
     recordFailure();
     return emptyBotStats();
@@ -511,7 +512,7 @@ export async function fetchBotServers(limit: number = 8): Promise<BotServersPayl
     }
 
     recordSuccess();
-    return (await response.json()) as BotServersPayload;
+    return normalizeBotServersPayload(await response.json());
   } catch {
     recordFailure();
     return null;
