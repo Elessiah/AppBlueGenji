@@ -104,14 +104,44 @@ l'antenne en `START_TIME` — et les séparer ajouterait une ligne à une carte 
 | `live` | + bouton d'antenne (`MANUAL`) et configuration de diffusion. |
 | `tournaments` | + bouton `🗓 Date` ouvrant `MatchScheduleDialog`. |
 
-Le dialogue est un simple `<input type="datetime-local">` : champ vidé =
-horaire effacé.
+### Saisie sans année
+
+Le dialogue demande le **jour** (liste 1–31), le **mois** (liste janvier–décembre)
+et l'**heure** (`<input type="time">`), à l'**heure de Paris** quel que soit le
+fuseau du navigateur — **jamais l'année**. Les trois champs vidés (bouton
+« Vider la date ») = horaire effacé. Une date déjà posée pré-remplit les trois
+champs (`matchStartEntryOf`).
+
+Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
+(`resolveMatchStartEntry`, `lib/shared/match-start-entry.ts`, pur) :
+
+- référence = début du tournoi s'il est lisible, sinon l'instant présent, figée à
+  l'ouverture du dialogue (`matchEntryReference`) ;
+- `Y` = année **à Paris** de la référence ; parmi `Y − 1`, `Y`, `Y + 1`, on garde
+  la date la plus proche de la référence. Toute date à moins de six mois de la
+  référence tombe donc sur la bonne année — dans les deux sens : « 3 janvier »
+  saisi le 20 décembre donne l'année suivante, « 28 décembre » corrigé le
+  5 janvier l'année précédente ;
+- une année où le jour n'existe pas (31 avril, 29 février hors bissextile) est
+  écartée ; si aucune ne convient, le champ jour est signalé
+  (`useFieldErrors`) et le refus part en notification ;
+- changement d'heure : une heure avalée (2 h 30 le dernier dimanche de mars)
+  est lue avec le décalage d'hiver, soit 3 h 30 ; une heure doublée (fin
+  octobre) retient sa première occurrence (heure d'été).
+
+La **date complète, année comprise** (« dimanche 3 janvier 2027 à 20:00 »)
+s'affiche sous les champs avant l'envoi, dans une région d'état, pour que
+l'organisateur la vérifie. Rien ne change côté serveur : la route reçoit
+toujours un instant ISO complet, validé par `normalizeMatchStartAt`, et un
+refus `INVALID_MATCH_START_AT` est rattaché au champ jour
+(`MATCH_SCHEDULE_FIELD_ERRORS`).
 
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
-| `lib/shared/match-schedule.ts` | Module **pur** : validation, bornes, formatage, valeur du champ HTML. |
+| `lib/shared/match-schedule.ts` | Module **pur** : validation, bornes, formatage. |
+| `lib/shared/match-start-entry.ts` | Module **pur** : saisie jour/mois/heure de Paris, déduction de l'année, aperçu. |
 | `lib/shared/live-streams.ts` | `START_TIME`, `resolveMatchLiveState(match, now)`, `nextMatchLiveChangeAt`. |
 | `lib/shared/hooks/useMatchLiveState.ts` | Bascule client à la seconde dite (un `setTimeout`). |
 | `lib/server/tournaments/match-schedule.ts` | Écriture de `start_at` + publication de l'événement. |
