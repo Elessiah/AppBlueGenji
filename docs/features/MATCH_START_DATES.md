@@ -126,6 +126,12 @@ Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
   **son année est gardée** (`readMatchStartEntry`, `currentStartAt`) : retoucher
   l'heure ou enregistrer sans rien changer ne déplace jamais un match d'un an ;
   changer le jour ou le mois relance la déduction ;
+- **échappatoire** : la déduction tombe juste à six mois près autour de sa
+  référence. Pour l'archive d'un match plus ancien, ou une année déjà fausse,
+  deux boutons « Plutôt en <année> » sous l'aperçu décalent l'année d'un cran
+  (`shiftMatchStartYear`, `withYearShift`). Ce n'est pas un champ année : rien
+  n'est demandé, la correction n'est offerte que si l'aperçu est faux. Le
+  décalage repart de zéro quand le jour ou le mois change ;
 - `Y` = année **à Paris** de la référence ; parmi `Y − 1`, `Y`, `Y + 1`, on garde
   la date la plus proche de la référence. Toute date à moins de six mois de la
   référence tombe donc sur la bonne année — dans les deux sens : « 3 janvier »
