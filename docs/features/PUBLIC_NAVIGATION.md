@@ -8,7 +8,8 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 
 - **Une adresse, une entrée.** Deux libellés vers la même page (« Tournois actifs » et
   « Archives » vers `/tournois`, « Partenaires » et « Partenariats » vers
-  `/#sponsors`, « Bénévoles » et « Équipe bénévole » vers `/benevoles`) allongeaient
+  `/#sponsors`, « Bénévoles » et « Équipe bénévole » vers `/benevoles`, « Discord » de
+  l'ancienne colonne COMMUNAUTÉ et « Serveur Discord » de CONTACT vers la même invitation) allongeaient
   les listes sans rien ouvrir de plus : il n'en reste qu'un. Le menu burger le
   vérifie par test ; le pied de page aussi.
 - **Pas de « Règles des tournois » dans les menus.** L'association ne joue pas tous
@@ -22,7 +23,7 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 
 | Menu burger | Pied de page |
 |---|---|
-| Tournois · Équipes · Joueurs · Recrutement · Bot · L'asso · Bénévoles | COMPÉTITIONS : Tournois, Classement · COMMUNAUTÉ : Discord, Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT · LÉGAL (voir `LEGAL_PAGE.md`) |
+| Tournois · Équipes · Joueurs · Recrutement · Bot · L'asso · Bénévoles | COMPÉTITIONS : Tournois, Classement, Bot · ASSOCIATION : Manifeste, Bénévoles, Partenaires · CONTACT (courriel, tag et serveur Discord, `FooterContact`) · LÉGAL (voir `LEGAL_PAGE.md`) |
 
 Accessibilité du menu (Échap, sortie au clavier, `aria-current`) →
 `ACCESSIBILITY_LANDMARKS_FOCUS.md`.
