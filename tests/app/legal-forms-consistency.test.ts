@@ -46,11 +46,24 @@ describe("/rgpd — un seul registre de langue", () => {
 describe("pied de page — règles des tournois et règlement intérieur", () => {
   const footer = read("components/cyber/landing/PublicFooter.tsx");
 
-  it("mène aux règles des tournois depuis COMPÉTITIONS", () => {
-    const competitions = footer.slice(footer.indexOf(">COMPÉTITIONS<"), footer.indexOf(">COMMUNAUTÉ<"));
-    expect(competitions).toContain('href="/regles"');
-    expect(competitions).toContain("Règles des tournois");
+  it("ne liste pas les règles des tournois (modes non joués par l'asso)", () => {
+    expect(footer).not.toContain('href="/regles');
+    expect(footer).not.toContain("Règles des tournois");
+    const competitions = footer.slice(footer.indexOf(">COMPÉTITIONS<"), footer.indexOf(">ASSOCIATION<"));
     expect(competitions).not.toContain("REGLEMENT_URL");
+  });
+
+  it("ne mène jamais deux fois à la même adresse", () => {
+    const hrefs = [...footer.matchAll(/href="([^"]+)"/g)].map((m) => m[1]);
+    expect(hrefs.length).toBeGreaterThan(5);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+
+  it("laisse le serveur Discord à la seule colonne CONTACT", () => {
+    // `FooterContact` rend déjà le lien d'invitation (par défaut le même) :
+    // un second « Discord » ailleurs y menait aussi.
+    expect(footer).not.toContain("DISCORD_INVITE_URL");
+    expect(footer).not.toContain(">COMMUNAUTÉ<");
   });
 
   it("range le règlement intérieur sous LÉGAL, nommé comme tel", () => {

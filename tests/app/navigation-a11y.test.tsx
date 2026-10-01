@@ -10,6 +10,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { ArenaNav } from "@/components/arena-nav";
 import { ToastProvider } from "@/components/ui/toast";
 import {
+  PUBLIC_NAV_LINKS,
   PublicNavMenu,
   PublicNavPanel,
   handleMenuEscape,
@@ -70,7 +71,7 @@ describe("PublicNavPanel — page courante", () => {
     renderToStaticMarkup(<PublicNavPanel id="menu" pathname={pathname} onNavigate={() => undefined} />);
 
   it("signale la section courante, sous-pages comprises", () => {
-    expect(currentLinks(panel("/regles/ronde-suisse"))).toEqual(["Règles des tournois"]);
+    expect(currentLinks(panel("/recrutement/annonce"))).toEqual(["Recrutement"]);
     expect(currentLinks(panel("/bot"))).toEqual(["Bot"]);
   });
 
@@ -92,6 +93,19 @@ describe("PublicNavPanel — page courante", () => {
 
   it("porte l'identifiant que le bouton désigne", () => {
     expect(panel("/")).toContain('<nav id="menu"');
+  });
+
+  it("rend exactement les entrées de la liste, une par adresse", () => {
+    const hrefs = [...panel("/").matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
+    expect(hrefs).toEqual(PUBLIC_NAV_LINKS.map((l) => l.href));
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+
+  it("ne liste plus les règles des tournois, même sur une page de règles", () => {
+    const html = panel("/regles/ronde-suisse");
+    expect(html).not.toContain('href="/regles');
+    expect(html).not.toContain("Règles");
+    expect(currentLinks(html)).toEqual([]);
   });
 });
 

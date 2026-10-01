@@ -104,9 +104,9 @@ describe("public footer wires legal documents", () => {
     expect(read("app/association/page.tsx")).toContain('id="manifeste"');
   });
 
-  it("routes Partenariats to the landing sponsors section", () => {
-    expect(source).toContain('href="/#sponsors">Partenariats');
-    expect(source).not.toContain('href="/association">Partenariats');
+  it("routes Partenaires to the landing sponsors section, once", () => {
+    expect(source).toContain('href="/#sponsors">Partenaires');
+    expect(source).not.toContain("Partenariats");
   });
 
   it("renders a dedicated CONTACT category in the footer", () => {

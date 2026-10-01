@@ -279,8 +279,7 @@ directement.
 
 L'en-tête public `PublicHeader` présente désormais un **menu burger**
 (`PublicNavMenu`) regroupant tous les liens de navigation, dont une entrée
-**Recrutement**. Un **bouton « Recrutement »** dédié est également ajouté dans la
-barre d'actions de l'en-tête.
+**Recrutement** (contenu du menu → `PUBLIC_NAVIGATION.md`).
 
 ## Fichiers clés
 
