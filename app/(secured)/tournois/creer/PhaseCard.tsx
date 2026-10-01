@@ -86,6 +86,11 @@ interface PhaseCardProps {
   onUpdate: (phase: PhaseConfig) => void;
 }
 
+/** Curseur et teinte d'une commande de la carte, selon qu'elle répond ou non. */
+function commandAvailability(enabled: boolean): { cursor: "pointer" | "not-allowed"; color: string } {
+  return enabled ? { cursor: "pointer", color: "var(--ink)" } : { cursor: "not-allowed", color: "var(--ink-mute)" };
+}
+
 export function PhaseCard({
   phase,
   isLast,
@@ -228,8 +233,7 @@ export function PhaseCard({
               backgroundColor: "transparent",
               border: `1px solid var(--line-strong-cy)`,
               borderRadius: 6,
-              cursor: canMoveUp ? "pointer" : "not-allowed",
-              color: canMoveUp ? "var(--ink)" : "var(--ink-mute)",
+              ...commandAvailability(canMoveUp),
               fontSize: 14,
               transition: "all 0.2s ease",
             }}
@@ -261,8 +265,7 @@ export function PhaseCard({
               backgroundColor: "transparent",
               border: `1px solid var(--line-strong-cy)`,
               borderRadius: 6,
-              cursor: canMoveDown ? "pointer" : "not-allowed",
-              color: canMoveDown ? "var(--ink)" : "var(--ink-mute)",
+              ...commandAvailability(canMoveDown),
               fontSize: 14,
               transition: "all 0.2s ease",
             }}
@@ -294,8 +297,7 @@ export function PhaseCard({
               backgroundColor: "transparent",
               border: `1px solid var(--line-strong-cy)`,
               borderRadius: 6,
-              cursor: canRemove ? "pointer" : "not-allowed",
-              color: canRemove ? "var(--ink)" : "var(--ink-mute)",
+              ...commandAvailability(canRemove),
               fontSize: 14,
               transition: "all 0.2s ease",
             }}
@@ -562,7 +564,7 @@ export function PhaseCard({
                     // seulement sur le texte.
                     ...checkboxCardChrome(phase.hasThirdPlaceMatch, disabled),
                     borderRadius: 10,
-                    cursor: disabled ? "not-allowed" : "pointer",
+                    cursor: commandAvailability(!disabled).cursor,
                     transition: "border-color 0.2s ease, background-color 0.2s ease",
                   }}
                 >
@@ -587,14 +589,13 @@ export function PhaseCard({
                       style={{
                         display: "block",
                         margin: "0 0 4px",
-                        cursor: disabled ? "not-allowed" : "pointer",
                         userSelect: "none",
                         fontSize: 14,
                         fontWeight: 500,
                         // Ternir en **couleurs** et non en `opacity` : celle-ci
                         // se multiplierait avec la bordure de la case, seule à
                         // la dessiner. Même traitement que `FormatSettings`.
-                        color: disabled ? "var(--ink-mute)" : "var(--ink)",
+                        ...commandAvailability(!disabled),
                       }}
                     >
                       Petite finale

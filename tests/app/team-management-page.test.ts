@@ -258,9 +258,11 @@ describe("correctifs de la première revue", () => {
   it("Échap revient d'abord au contrôle qui a quelque chose d'ouvert", () => {
     const hook = readFileSync(join(ROOT, "lib", "shared", "hooks", "useDialogBehavior.ts"), "utf8");
     const escape = hook.slice(hook.indexOf('event.key === "Escape"'), hook.indexOf("closeRef.current()"));
+    expect(escape).toMatch(/if \(escapeBelongsElsewhere\(layers, event\.target as HTMLElement \| null\)\) return;/);
     // Le rôle est exigé : un bouton de dépliage porte aussi `aria-expanded`,
     // et n'écoute pas Échap — la modale ne se fermerait plus du tout.
-    expect(escape).toMatch(/getAttribute\?\.\("role"\) === "combobox" &&\s*target\.getAttribute\("aria-expanded"\) === "true"/);
+    const rule = readFileSync(join(ROOT, "lib", "shared", "dialog-focus.ts"), "utf8");
+    expect(rule).toMatch(/getAttribute\?\.\("role"\) === "combobox" && target\.getAttribute\("aria-expanded"\) === "true"/);
   });
 
   it("l'annuaire des joueurs est partagé entre les montages du champ", () => {

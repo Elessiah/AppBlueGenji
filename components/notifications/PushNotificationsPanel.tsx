@@ -19,7 +19,7 @@
  * bloquée) est dit **à la place** du bouton — un bouton qui mène à un refus est
  * un bouton qui ment.
  */
-import { useCallback, useId, type ReactNode } from "react";
+import { useCallback, useId } from "react";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import {
@@ -44,7 +44,7 @@ export function PushNotificationsPanel({
   topics,
   lead,
 }: Readonly<PushNotificationsPanelProps>): React.ReactElement | null {
-  const { showError, showSuccess } = useToast();
+  const { showError } = useToast();
   const onError = useCallback((code: string) => showError(pushErrorMessage(code)), [showError]);
   const push = usePushNotifications(onError, {
     syncExisting: variant === "full",
@@ -79,54 +79,7 @@ export function PushNotificationsPanel({
   // elle se tait plutôt que d'occuper la place d'un écran qui a autre chose à dire.
   if (variant === "compact" && (!push.checked || push.subscribed || !configured || blocked)) return null;
 
-  let deviceControl: ReactNode;
-  if (!configured) {
-    deviceControl = <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>;
-  } else if (!push.checked) {
-    // L'abonnement du navigateur n'est pas encore relu : proposer d'activer
-    // maintenant, ce serait le proposer un instant à qui l'est déjà.
-    deviceControl = (
-      <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.muted} role="status">
-        Vérification de cet appareil…
-      </p>
-    );
-  } else if (blocked && !push.subscribed) {
-    deviceControl = <p className={s.notice}>{blocked}</p>;
-  } else if (push.subscribed) {
-    deviceControl = (
-      <div className={s.deviceRow}>
-        {/* Annoncé aux lecteurs d'écran : c'est l'issue du geste qu'on vient de faire. */}
-        <span /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.status} role="status">
-          <span className={s.dot} aria-hidden="true" /> Activées sur cet appareil
-        </span>
-        <CyberButton
-          type="button"
-          variant="ghost"
-          disabled={push.busy}
-          onClick={async () => {
-            if (await push.disable()) showSuccess("Notifications désactivées sur cet appareil.");
-          }}
-        >
-          Désactiver sur cet appareil
-        </CyberButton>
-      </div>
-    );
-  } else {
-    deviceControl = (
-      <div className={s.deviceRow}>
-        <CyberButton
-          type="button"
-          aria-busy={push.busy}
-          disabled={push.busy}
-          onClick={async () => {
-            if (await push.enable()) showSuccess("Notifications activées sur cet appareil.");
-          }}
-        >
-          {push.busy ? "Activation…" : "Activer les notifications sur cet appareil"}
-        </CyberButton>
-      </div>
-    );
-  }
+  const deviceControl = <DeviceControl push={push} configured={configured} blocked={blocked} />;
 
   if (variant === "compact") {
     return (
@@ -180,6 +133,71 @@ export function PushNotificationsPanel({
           </p>
         </fieldset>
       ) : null}
+    </div>
+  );
+}
+
+/**
+ * Contrôle de l'appareil : activer, désactiver, ou la phrase qui dit pourquoi
+ * le bouton n'est pas offert.
+ */
+function DeviceControl({
+  push,
+  configured,
+  blocked,
+}: Readonly<{
+  push: ReturnType<typeof usePushNotifications>;
+  configured: boolean;
+  blocked: string | null;
+}>): React.ReactElement {
+  const { showSuccess } = useToast();
+  if (!configured) {
+    return <p className={s.notice}>Les notifications push ne sont pas encore activées sur le site.</p>;
+  }
+  if (!push.checked) {
+    // L'abonnement du navigateur n'est pas encore relu : proposer d'activer
+    // maintenant, ce serait le proposer un instant à qui l'est déjà.
+    return (
+      <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.muted} role="status">
+        Vérification de cet appareil…
+      </p>
+    );
+  }
+  if (blocked && !push.subscribed) {
+    return <p className={s.notice}>{blocked}</p>;
+  }
+  if (push.subscribed) {
+    return (
+      <div className={s.deviceRow}>
+        {/* Annoncé aux lecteurs d'écran : c'est l'issue du geste qu'on vient de faire. */}
+        <span /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ className={s.status} role="status">
+          <span className={s.dot} aria-hidden="true" /> Activées sur cet appareil
+        </span>
+        <CyberButton
+          type="button"
+          variant="ghost"
+          disabled={push.busy}
+          onClick={async () => {
+            if (await push.disable()) showSuccess("Notifications désactivées sur cet appareil.");
+          }}
+        >
+          Désactiver sur cet appareil
+        </CyberButton>
+      </div>
+    );
+  }
+  return (
+    <div className={s.deviceRow}>
+      <CyberButton
+        type="button"
+        aria-busy={push.busy}
+        disabled={push.busy}
+        onClick={async () => {
+          if (await push.enable()) showSuccess("Notifications activées sur cet appareil.");
+        }}
+      >
+        {push.busy ? "Activation…" : "Activer les notifications sur cet appareil"}
+      </CyberButton>
     </div>
   );
 }

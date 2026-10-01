@@ -104,17 +104,16 @@ describe("Bouton de retrait dans la liste des inscrites", () => {
 
   it("met la phrase du refus là où le bouton aurait été", () => {
     // Rien sur la ligne ne dirait pourquoi la commande a disparu.
-    expect(panel).toMatch(/\{removalNotice !== null && rows\.length > 0 && \(/);
-    expect(panel).toMatch(/entrantRemovalBlockMessage\(removalNotice\)/);
+    expect(panel).toMatch(/\{removalNoticeReason !== null && rows\.length > 0 && \(/);
+    expect(panel).toMatch(/entrantRemovalBlockMessage\(removalNoticeReason\)/);
   });
 
   it("ne répète pas le verrou du seeding quand les deux disent la même chose", () => {
     // Sur un tournoi terminé, « l'ordre n'a plus d'effet » et « la liste est un
     // palmarès » énoncent le même fait : trois paragraphes empilés au-dessus
     // d'une liste ne se lisent plus. Le verrou de l'ordre parle le premier.
-    expect(panel).toMatch(
-      /lockReason === "FINISHED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_FINISHED"/,
-    );
+    // La règle est pure (`removalNotice`, tests/tournois/registrations-actions.test.ts).
+    expect(panel).toMatch(/const removalNoticeReason = removalNotice\(removalBlock, lockReason\);/);
   });
 
   it("annonce le retrait à l'oreille, comme le réordonnancement", () => {
@@ -135,9 +134,9 @@ describe("Cellule d'actions partagée", () => {
     // Deux classes de même poids posant `grid-template-columns` se
     // départageraient par l'ordre de la feuille : le ternaire garantit qu'une
     // seule s'applique.
-    expect(panel).toMatch(
-      /const gridClass = reorderable \? styles\.reorderable : removable \? styles\.withActions : "";/,
-    );
+    // Le choix est pur (`registrationActionsColumn`) : un seul gabarit à la fois.
+    expect(panel).toMatch(/const actionsColumn = registrationActionsColumn\(reorderable, removable\);/);
+    expect(panel).toMatch(/const gridClass = actionsColumn\.grid \? styles\[actionsColumn\.grid\] : "";/);
     // Et le même gabarit coiffe l'en-tête et les lignes, sinon les colonnes
     // seraient décalées de l'un à l'autre.
     expect(panel.match(/\$\{gridClass\}|gridClass,/g)?.length).toBeGreaterThanOrEqual(2);
@@ -151,9 +150,7 @@ describe("Cellule d'actions partagée", () => {
   });
 
   it("nomme la colonne d'après ce qu'elle contient", () => {
-    expect(panel).toMatch(
-      /const actionsLabel = reorderable && removable \? "Actions" : reorderable \? "Ordre" : "Retrait";/,
-    );
+    expect(panel).toMatch(/const actionsLabel = actionsColumn\.label;/);
   });
 
   it("distingue le bouton de retrait des flèches", () => {
