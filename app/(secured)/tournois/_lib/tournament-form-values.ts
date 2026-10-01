@@ -216,6 +216,11 @@ function isoToLocalInput(iso: string): string {
   return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 }
 
+/** `value` si le réglage concerne le format choisi, `undefined` (champ non envoyé) sinon. */
+function onlyFor<T>(applies: boolean, value: T): T | undefined {
+  return applies ? value : undefined;
+}
+
 /**
  * Corps de requête attendu par `POST /api/tournaments` et
  * `PATCH /api/tournaments/[id]/edit`.
@@ -243,19 +248,18 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     registrationOpenAt: new Date(values.registrationOpenAt).toISOString(),
     registrationCloseAt: new Date(values.registrationCloseAt).toISOString(),
     startAt: new Date(values.startAt).toISOString(),
-    hasThirdPlaceMatch: format === "SINGLE" ? values.hasThirdPlaceMatch : false,
-    survivalRoundsPerCut: format === "SURVIVAL" ? values.survivalRoundsPerCut : undefined,
-    survivalRoundsBeforeFirstCut:
-      format === "SURVIVAL" ? values.survivalRoundsBeforeFirstCut : undefined,
-    phases: format === "MULTI" ? values.phases : undefined,
-    swissTotalRounds: format === "SWISS" ? values.swissTotalRounds : undefined,
-    swissPointsWin: format === "SWISS" ? values.swissPointsWin : undefined,
-    swissPointsDraw: format === "SWISS" ? values.swissPointsDraw : undefined,
-    swissPointsLoss: format === "SWISS" ? values.swissPointsLoss : undefined,
-    endurancePoints: format === "BG_SURVIE" ? values.endurancePoints : undefined,
-    enduranceWinDelta: format === "BG_SURVIE" ? values.enduranceWinDelta : undefined,
-    enduranceLossDelta: format === "BG_SURVIE" ? values.enduranceLossDelta : undefined,
-    endurancePlayoffSize: format === "BG_SURVIE" ? values.endurancePlayoffSize : undefined,
+    hasThirdPlaceMatch: format === "SINGLE" && values.hasThirdPlaceMatch,
+    survivalRoundsPerCut: onlyFor(format === "SURVIVAL", values.survivalRoundsPerCut),
+    survivalRoundsBeforeFirstCut: onlyFor(format === "SURVIVAL", values.survivalRoundsBeforeFirstCut),
+    phases: onlyFor(format === "MULTI", values.phases),
+    swissTotalRounds: onlyFor(format === "SWISS", values.swissTotalRounds),
+    swissPointsWin: onlyFor(format === "SWISS", values.swissPointsWin),
+    swissPointsDraw: onlyFor(format === "SWISS", values.swissPointsDraw),
+    swissPointsLoss: onlyFor(format === "SWISS", values.swissPointsLoss),
+    endurancePoints: onlyFor(format === "BG_SURVIE", values.endurancePoints),
+    enduranceWinDelta: onlyFor(format === "BG_SURVIE", values.enduranceWinDelta),
+    enduranceLossDelta: onlyFor(format === "BG_SURVIE", values.enduranceLossDelta),
+    endurancePlayoffSize: onlyFor(format === "BG_SURVIE", values.endurancePlayoffSize),
     // 0 n'est pas une valeur à enregistrer, c'est l'absence de plafond — et
     // c'est `null` qui le dit, jamais `undefined` : la liste blanche de
     // `PATCH .../edit` ne recopie que les champs dont `body[field] !==
@@ -264,8 +268,7 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // plafond une fois posé ne pourrait plus jamais être retiré. Hors du mode,
     // en revanche, on ne touche effectivement à rien (comme le reste du barème
     // d'endurance).
-    enduranceMaxRounds:
-      format === "BG_SURVIE" ? (values.enduranceMaxRounds > 0 ? values.enduranceMaxRounds : null) : undefined,
+    enduranceMaxRounds: onlyFor(format === "BG_SURVIE", values.enduranceMaxRounds > 0 ? values.enduranceMaxRounds : null),
     matchFormatType: values.matchFormat?.type ?? null,
     matchFormatValue: values.matchFormat?.value ?? null,
     // Le plafond de maps et les égalités voyagent **aplatis** eux aussi, comme
@@ -277,10 +280,8 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
     // en est la fenêtre, suit (`effectiveMatchFormat`).
     matchFormatMaxMaps: matchFormat?.maxMaps ?? null,
     matchFormatDraws: matchFormat?.drawsAllowed ?? false,
-    endurancePlayoffFormatType:
-      format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.type ?? null) : null,
-    endurancePlayoffFormatValue:
-      format === "BG_SURVIE" ? (values.endurancePlayoffFormat?.value ?? null) : null,
+    endurancePlayoffFormatType: onlyFor(format === "BG_SURVIE", values.endurancePlayoffFormat?.type) ?? null,
+    endurancePlayoffFormatValue: onlyFor(format === "BG_SURVIE", values.endurancePlayoffFormat?.value) ?? null,
     // Les conditions partent pour **tous** les formats : elles ne portent pas
     // sur le déroulé du tournoi mais sur qui a le droit d'y entrer, question
     // que les six formats posent à l'identique.

@@ -86,31 +86,40 @@ export function podiumRanks(
 
   for (const match of matches) {
     if (!match) continue;
-
-    if (match.doubleForfeit) {
-      const teams = [match.team1Id, match.team2Id].filter((id): id is number => id !== null);
-      if (teams.length === 0) continue;
-      // Les deux places sont consommées, la première restant vacante.
-      const rank = next + 1;
-      for (const teamId of teams) entries.push({ teamId, rank });
-      next += 2;
-      continue;
-    }
-
-    if (match.winnerTeamId === null && match.loserTeamId === null) continue;
-
-    if (match.loserTeamId === null && !options.byeLeavesVacancy) {
-      entries.push({ teamId: match.winnerTeamId as number, rank: next });
-      next += 1;
-      continue;
-    }
-
-    if (match.winnerTeamId !== null) entries.push({ teamId: match.winnerTeamId, rank: next });
-    if (match.loserTeamId !== null) entries.push({ teamId: match.loserTeamId, rank: next + 1 });
-    next += 2;
+    const placed = podiumMatchRanks(match, next, options.byeLeavesVacancy ?? false);
+    entries.push(...placed.entries);
+    next += placed.consumed;
   }
 
   return { entries, nextRank: next };
+}
+
+/**
+ * Rangs qu'une rencontre de podium attribue à partir de la place `next`, et
+ * nombre de places qu'elle consomme (0 si elle n'a rien tranché).
+ */
+function podiumMatchRanks(
+  match: PodiumMatch,
+  next: number,
+  byeLeavesVacancy: boolean,
+): { entries: RankedEntry[]; consumed: number } {
+  if (match.doubleForfeit) {
+    const teams = [match.team1Id, match.team2Id].filter((id): id is number => id !== null);
+    if (teams.length === 0) return { entries: [], consumed: 0 };
+    // Les deux places sont consommées, la première restant vacante.
+    return { entries: teams.map((teamId) => ({ teamId, rank: next + 1 })), consumed: 2 };
+  }
+
+  if (match.winnerTeamId === null && match.loserTeamId === null) return { entries: [], consumed: 0 };
+
+  if (match.loserTeamId === null && !byeLeavesVacancy) {
+    return { entries: [{ teamId: match.winnerTeamId as number, rank: next }], consumed: 1 };
+  }
+
+  const entries: RankedEntry[] = [];
+  if (match.winnerTeamId !== null) entries.push({ teamId: match.winnerTeamId, rank: next });
+  if (match.loserTeamId !== null) entries.push({ teamId: match.loserTeamId, rank: next + 1 });
+  return { entries, consumed: 2 };
 }
 
 /**
