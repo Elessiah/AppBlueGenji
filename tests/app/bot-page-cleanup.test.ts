@@ -280,7 +280,7 @@ describe("/bot — aucune lecture pour rien, aucun cache promis en vain", () => 
   it("passe par les lectures mutualisées plutôt que par des appels directs au bot", () => {
     expect(page).not.toContain("@/lib/server/bot-integration");
     expect(page).toContain("@/lib/server/bot-showcase-cache");
-    expect(read("app/api/bot/activity/route.ts")).toContain("cachedBotActivity(range)");
+    expect(page).toContain("cachedBotActivity()");
     expect(docsPage).toContain("loadBotDocCached(section)");
     expect(docsPage).not.toMatch(/\bloadBotDoc\(/);
   });

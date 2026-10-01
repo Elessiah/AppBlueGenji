@@ -1,21 +1,20 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { BotActivityChart, activityView, loadActivityRange } from "@/components/bot/BotActivityChart";
+import { BotActivityChart } from "@/components/bot/BotActivityChart";
 import type { BotActivity } from "@/lib/shared/types";
 
 /**
  * Le graphe « Activité · relais & scrims » de `/bot`, **rendu** plutôt que relu.
  *
  * `fetchBotActivity` rend sa charge par un simple `as BotActivity` sur du JSON
- * reçu par le réseau, et `/api/bot/activity` ne valide pas davantage ce que le
- * client remet ensuite dans l'état. Les cas ci-dessous sont donc exactement ce
- * que ce `as` laisse passer — et comme le composant est rendu côté serveur dans
+ * reçu par le réseau, et rien ne la valide avant le rendu. Les cas ci-dessous
+ * sont donc exactement ce que ce `as` laisse passer — et comme le composant est rendu côté serveur dans
  * `app/bot/page.tsx`, une exception pendant le rendu ne fait pas une case vide :
  * elle sert **toute** la page en 500.
  */
 const activity = (overrides: Partial<BotActivity> = {}): BotActivity =>
   ({
-    range: "30j",
+    range: "7j",
     labels: ["01/09", "02/09", "03/09"],
     relays: [3, 5, 2],
     scrims: [1, 2, 1],
@@ -35,20 +34,16 @@ describe("BotActivityChart — une charge saine", () => {
     expect(html).toContain("01/09");
   });
 
-  it("annonce la plage affichée aux technologies d'assistance", () => {
-    const html = render(activity());
-    expect(html).toMatch(/aria-pressed="true"[^>]*>30j</);
-    expect(html.match(/aria-pressed="false"/g)).toHaveLength(2);
-    // Le nom d'une pastille est son texte visible ; le groupe dit de quoi.
-    expect(html).not.toContain("Filtrer par");
-    expect(html).toMatch(/<fieldset class="chart-tools native-group" aria-label="Plage d&#x27;activité affichée"/);
-  });
-
-  it("ne s'annonce pas en chargement au premier rendu", () => {
-    const html = render(activity());
-    expect(html).toContain('aria-busy="false"');
-    expect(html).not.toContain("is-loading");
-    expect(html).not.toContain("CHARGEMENT");
+  it("ne montre que les 7 jours que le bot garde, sans sélecteur de plage", () => {
+    // Les relais sont purgés à 7 jours chez le bot : une plage de 30 ou 90 jours
+    // affichait des zéros au-delà de la première semaine.
+    for (const html of [render(activity()), render(null)]) {
+      expect(html).toContain("7 DERNIERS JOURS");
+      expect(html).not.toMatch(/30j|90j/);
+      expect(html).not.toContain("aria-pressed");
+      expect(html).not.toContain("chart-tools");
+      expect(html).not.toContain("CHARGEMENT");
+    }
   });
 
   it("dit « Données indisponibles » plutôt que d'inventer un graphe vide", () => {
@@ -158,8 +153,8 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
   });
 
   it("plafonne le nombre de colonnes, et gradue l'axe sur ce qu'il dessine", () => {
-    // C'est la seule série de la page que le client **redemande**
-    // (`/api/bot/activity` laisse passer le corps du bot tel quel) : cinquante
+    // Le corps du bot arrive tel quel : cinquante
+    // (rien ne le borne avant le rendu) —
     // mille points y écrivaient trois nœuds DOM chacun, et l'onglet se fige.
     // Ne pas lever n'est pas la même chose que rester utilisable.
     const huge = Array.from({ length: 5_000 }, () => 1);
@@ -181,111 +176,5 @@ describe("BotActivityChart — une charge abîmée ne fait pas tomber la page", 
     expect(() =>
       render(activity({ relays: huge, scrims: huge, labels: [] })),
     ).not.toThrow();
-  });
-});
-
-/**
- * Le changement de plage, sans DOM : `loadActivityRange` est la seule partie du
- * composant qui dépende de l'ordre d'arrivée des réponses. Chaque requête reçoit
- * une promesse tenue à la main, pour faire arriver la plus ancienne en dernier.
- */
-describe("loadActivityRange — une plage abandonnée n'écrit plus rien", () => {
-  type Pending = { url: string; signal: AbortSignal | undefined; settle: (res: Response | Error) => void };
-
-  function deferredFetcher() {
-    const pending: Pending[] = [];
-    const fetcher = ((url: string, init?: RequestInit) =>
-      new Promise<Response>((resolve, reject) => {
-        pending.push({
-          url,
-          signal: init?.signal ?? undefined,
-          settle: (res) => (res instanceof Error ? reject(res) : resolve(res)),
-        });
-      })) as unknown as typeof fetch;
-    return { pending, fetcher };
-  }
-
-  const ok = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
-  const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
-
-  it("ne laisse pas la réponse lente de « 90j » écraser « 7j »", async () => {
-    const { pending, fetcher } = deferredFetcher();
-    const applied: unknown[] = [];
-    const apply = (data: unknown) => applied.push(data);
-
-    // « 90j » puis « 7j » : React nettoie l'effet de la première plage avant
-    // de lancer la seconde.
-    const cancel90 = loadActivityRange("90j", apply, fetcher);
-    cancel90();
-    loadActivityRange("7j", apply, fetcher);
-
-    // La plus récente arrive d'abord, la plus ancienne ensuite.
-    pending[1].settle(ok({ range: "7j" }));
-    await flush();
-    pending[0].settle(ok({ range: "90j" }));
-    await flush();
-
-    expect(applied).toEqual([{ range: "7j" }]);
-  });
-
-  it("annule la requête elle-même, pas seulement son effet", () => {
-    const { pending, fetcher } = deferredFetcher();
-    const cancel = loadActivityRange("90j", () => {}, fetcher);
-    expect(pending[0].url).toBe("/api/bot/activity?range=90j");
-    expect(pending[0].signal?.aborted).toBe(false);
-    cancel();
-    expect(pending[0].signal?.aborted).toBe(true);
-  });
-
-  it("n'efface pas le graphe sur l'échec d'une plage abandonnée", async () => {
-    // Une requête interrompue rejette (`AbortError`) : son `catch` rend
-    // `null`, qui aurait remplacé le graphe de la plage suivante par
-    // « Données indisponibles ».
-    const { pending, fetcher } = deferredFetcher();
-    const applied: unknown[] = [];
-    const cancel = loadActivityRange("90j", (d) => applied.push(d), fetcher);
-    cancel();
-    pending[0].settle(new Error("AbortError"));
-    await flush();
-    expect(applied).toEqual([]);
-  });
-
-  it("remet la réponse de la plage courante, et `null` sur son échec", async () => {
-    const { pending, fetcher } = deferredFetcher();
-    const applied: unknown[] = [];
-    loadActivityRange("7j", (d) => applied.push(d), fetcher);
-    pending[0].settle(ok({ range: "7j" }));
-    await flush();
-
-    loadActivityRange("90j", (d) => applied.push(d), fetcher);
-    pending[1].settle({ ok: false, json: async () => ({}) } as unknown as Response);
-    await flush();
-
-    loadActivityRange("90j", (d) => applied.push(d), fetcher);
-    pending[2].settle(new Error("réseau"));
-    await flush();
-
-    expect(applied).toEqual([{ range: "7j" }, null, null]);
-  });
-});
-
-describe("activityView — la charge affichée et la plage demandée", () => {
-  const shown = (range: "7j" | "30j" | "90j", data: BotActivity | null) => ({ range, data });
-
-  it("n'est pas en chargement quand la charge décrit la plage demandée", () => {
-    const data = activity();
-    expect(activityView(shown("30j", data), "30j")).toEqual({ data, loading: false });
-  });
-
-  it("garde la charge précédente, mais la dit en chargement, entre le clic et la réponse", () => {
-    // Sans ce drapeau, le graphe décrivait 30 jours sous une pastille déjà
-    // allumée sur « 90j », le temps de l'aller-retour.
-    const data = activity();
-    expect(activityView(shown("30j", data), "90j")).toEqual({ data, loading: true });
-  });
-
-  it("ne dit pas « indisponible » la plage qui n'a pas encore répondu", () => {
-    expect(activityView(shown("7j", null), "90j")).toEqual({ data: null, loading: true });
-    expect(activityView(shown("90j", null), "90j")).toEqual({ data: null, loading: false });
   });
 });
