@@ -354,12 +354,11 @@ const SECTIONS: { title: string; meta: string; body: React.ReactNode; id?: strin
           pour gérer votre participation à ses activités. Elles ne sont pas réservées à
           l&apos;association : ce que le site publie se lit des autres joueurs et du public, et
           certaines données sont communiquées à des services tiers — Discord, Google, Blizzard, le
-          service de push de votre navigateur, Microsoft pour les sauvegardes chiffrées et, sans
-          chiffrement propre à l&apos;association, pour la messagerie de la personne à contacter
-          pour vos demandes, Google (Gmail) pour le courriel de l&apos;association, ainsi que les
+          service de push de votre navigateur, Hetzner (Allemagne) pour les sauvegardes
+          chiffrées, Microsoft, sans chiffrement propre à l&apos;association, pour la messagerie
+          de la personne à contacter pour vos demandes, Google (Gmail) pour le courriel de l&apos;association, ainsi que les
           opérateurs téléphoniques de cette personne et de l&apos;association si vous les appelez
-          ou leur laissez un SMS ou un message vocal, Spiceworks pour le portail de support et les
-          plateformes de diffusion des matchs —, dans les
+          ou leur laissez un SMS ou un message vocal, et Spiceworks pour le portail de support —, dans les
           limites décrites à la section{" "}
           <Link href="/rgpd#destinataires">« Destinataires et transferts »</Link> de la politique de
           confidentialité et, traitement par traitement, dans son registre.

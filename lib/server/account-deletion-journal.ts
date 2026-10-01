@@ -71,7 +71,7 @@ async function writeEntry(entry: AccountDeletionEntry, filePath: string, now: Da
 /**
  * Retire du journal les lignes échues, **sans** suppression nouvelle : élaguer
  * dans `writeEntry` seulement laissait une ligne survivre — et sa copie
- * OneDrive horaire avec elle — tant que personne d'autre ne supprimait son
+ * distante horaire avec elle — tant que personne d'autre ne supprimait son
  * compte, au-delà de la durée annoncée par le registre et `/rgpd`.
  *
  * Passe par la même file que les écritures (une suppression simultanée ne

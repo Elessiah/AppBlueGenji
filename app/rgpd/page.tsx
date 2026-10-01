@@ -35,7 +35,9 @@ import {
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import {
   ALL_TRANSFER_RECIPIENTS,
-  ONEDRIVE_BACKUP_FRAMEWORK,
+  HETZNER_BACKUP_FRAMEWORK,
+  SPICEWORKS_PROCESSOR_FRAMEWORK,
+  SPICEWORKS_SCC_FALLBACK,
   PROCESSING_ACTIVITIES,
   REGISTER_SCOPE_DETAIL,
   REGISTER_SCOPE,
@@ -865,7 +867,8 @@ export default async function RgpdPage() {
             Le site et le bot Discord de l&apos;association sont hébergés{" "}
             <strong>en France</strong>, sur un Raspberry Pi installé à Caen, par un bénévole de
             l&apos;association (voir les{" "}
-            <Link href="/mentions-legales#hebergement">mentions légales</Link>). Vos données
+            <Link href="/mentions-legales#hebergement">mentions légales</Link>), et leurs
+            sauvegardes chiffrées sont stockées <strong>en Allemagne</strong>. Vos données
             n&apos;en sortent que vers les destinataires suivants — les trois derniers ne
             voient passer que ce que vous échangez vous-même, par courriel ou par téléphone, avec
             l&apos;association ou avec la personne à contacter pour vos demandes relatives à vos
@@ -887,18 +890,19 @@ export default async function RgpdPage() {
               messages chiffrés qu&apos;il ne peut pas lire.
             </li>
             <li>
-              <strong>Microsoft</strong> (OneDrive) : les sauvegardes, <strong>chiffrées avant
-              envoi</strong> avec une clé que Microsoft ne détient pas — Microsoft les
-              stocke sans pouvoir les lire.
+              <strong>Hetzner</strong> (Allemagne) : les sauvegardes, <strong>chiffrées avant
+              envoi</strong> avec des clés que Hetzner ne détient pas — Hetzner les stocke sans
+              pouvoir les lire, dans l&apos;Union européenne.
             </li>
             <li>
-              <strong>Spiceworks</strong> : le portail de support de l&apos;association, seulement si
-              vous y ouvrez un ticket ou y êtes désigné (<Link href="/rgpd/registre#t15">registre, T15</Link>).
+              <strong>Spiceworks</strong> (États-Unis) : le portail de support de l&apos;association,
+              seulement si vous y ouvrez un ticket ou y êtes désigné. Spiceworks est{" "}
+              {SPICEWORKS_PROCESSOR_FRAMEWORK} (<Link href="/rgpd/registre#t15">registre, T15</Link>).
             </li>
             <li>
               <strong>YouTube, Twitch ou Kick</strong> : la retransmission d&apos;un match montre les
-              pseudos et les noms d&apos;équipe de ses joueurs ; vous pouvez vous y opposer
-              (<Link href="/rgpd/registre#t16">registre, T16</Link>).
+              pseudos, les noms d&apos;équipe et les résultats de ses joueurs (section suivante). Le
+              site ne leur transmet rien : il ne fait que lier les chaînes.
             </li>
             <li>
               <strong>Microsoft</strong> (Outlook.com) : la messagerie personnelle de la personne à
@@ -924,21 +928,30 @@ export default async function RgpdPage() {
             <strong>Encadrement des transferts.</strong> Parmi ces services, ceux qui peuvent
             traiter ou héberger des données aux États-Unis — pas les opérateurs téléphoniques —
             le font sur le fondement suivant :{" "}
-            {transferBasis(ALL_TRANSFER_RECIPIENTS)}. L&apos;encadrement des transferts de
-            Spiceworks, de Twitch et de Kick est en cours de vérification (registre, <Link href="/rgpd/registre#t15">T15</Link> et{" "}
-            <Link href="/rgpd/registre#t16">T16</Link>).
+            {transferBasis(ALL_TRANSFER_RECIPIENTS)} ; pour Spiceworks, {SPICEWORKS_SCC_FALLBACK}.
+            Les plateformes de diffusion ne sont pas des destinataires du site : il n&apos;y
+            transmet rien et n&apos;intègre aucun de leurs lecteurs.
           </p>
           <p>
-            <strong>Sauvegardes.</strong> Elles sont déposées sur le OneDrive d&apos;un{" "}
-            {ONEDRIVE_BACKUP_FRAMEWORK} : le site n&apos;affirme donc aucun lieu de stockage, et un
-            transfert vers les États-Unis repose sur le mécanisme de Microsoft Corporation (
-            {transferBasis(["MICROSOFT"])}). Le chiffrement est une
-            mesure de sécurité, qui ne tient lieu ni de contrat ni de mécanisme de transfert :
-            archives de la base, images, logos masqués et journal
-            des suppressions sont <strong>chiffrés sur le Raspberry Pi avant tout envoi</strong>,
-            avec une clé que détient le seul responsable technique de l&apos;association — qui est
-            aussi l&apos;hébergeur du site — et qui n&apos;est jamais transmise à Microsoft. Le chiffrement au repos de ses serveurs par Microsoft et le chiffrement en
-            transit (HTTPS/TLS) s&apos;y ajoutent comme mesures complémentaires.
+            <strong>Sauvegardes.</strong> Elles sont stockées chez{" "}
+            {HETZNER_BACKUP_FRAMEWORK} : <strong>aucun transfert hors de l&apos;Union</strong>.
+            Archives de la base, images, logos masqués et journal des suppressions sont en outre{" "}
+            <strong>chiffrés sur le Raspberry Pi avant tout envoi</strong>, avec des clés que
+            détient le seul hébergeur du site, {DATA_CONTACT_NAME}, et qui ne sont jamais
+            transmises à Hetzner ; l&apos;envoi est chiffré en transit (HTTPS/TLS).
+          </p>
+          <p id="retransmission">
+            <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
+            direct et enregistré sur YouTube, Twitch ou Kick, par la chaîne de l&apos;association
+            ou d&apos;un caster. On y voit votre <strong>pseudo</strong>, le{" "}
+            <strong>nom de votre équipe</strong> et vos <strong>résultats et performances en
+            jeu</strong> — jamais de webcam ni le chat vocal des joueurs. Ce traitement repose sur
+            l&apos;intérêt légitime de l&apos;association à faire connaître ses compétitions, et
+            vous pouvez vous y <strong>opposer</strong> à tout moment : vous apparaissez alors
+            sous un nom neutre, et un lien de rediffusion qui vous montre est retiré. La demande se
+            fait par le bouton <strong>« Signaler un problème »</strong>, catégorie RGPD. Les
+            spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
+            responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>).
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>
         </div>

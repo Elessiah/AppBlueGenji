@@ -9,7 +9,7 @@
  * service ; encore faut-il savoir lesquelles, et la base restaurée ne peut pas
  * le dire, puisqu'elle date d'avant.
  *
- * D'où ce journal, tenu **hors de la base** (un fichier, copié sur OneDrive par
+ * D'où ce journal, tenu **hors de la base** (un fichier, copié, chiffré, sur le stockage distant par
  * la synchronisation horaire du bot) : une ligne par suppression, et rien qui
  * désigne une personne — un identifiant de ligne, la date de création du
  * compte, la date de la suppression. C'est le minimum pour rejouer, et rien de
