@@ -163,7 +163,6 @@ export function MatchScheduleDialog({
   );
   const entry = readMatchStartEntry({ day, month, time, timeBadInput }, reference, match.startAt);
   const cleared = entry.kind === "empty";
-  const refusal = entryRefusal(entry);
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
   // le laisse programmé sans jamais passer à l'antenne : on le dit plutôt que
   // de refuser l'effacement — le calendrier ne dépend pas de la diffusion.
@@ -336,6 +335,10 @@ export function MatchScheduleDialog({
                     setTimeBadInput(e.target.validity.badInput);
                     fieldErrors.clear();
                   }}
+                  // Chrome ne signale pas une heure tapée à moitié dans un champ
+                  // parti de vide (`onChange` muet) : on relit sa validité à
+                  // chaque touche et à la sortie.
+                  onKeyUp={(e) => setTimeBadInput(e.currentTarget.validity.badInput)}
                   onBlur={(e) => setTimeBadInput(e.target.validity.badInput)}
                   {...fieldErrors.aria("time", HINT_ID)}
                 />
@@ -353,7 +356,6 @@ export function MatchScheduleDialog({
                 Date retenue : <strong>{formatMatchStartEntryPreview(entry.instant)}</strong>
               </>
             )}
-            {refusal && <span style={{ color: "var(--danger)" }}>{refusal}</span>}
             {cleared && "Aucun horaire annoncé."}
           </output>
           <p
