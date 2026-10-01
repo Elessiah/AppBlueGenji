@@ -77,7 +77,7 @@ export function ScrollArea({
   style,
   ariaLabel,
   revealKey = null,
-}: ScrollAreaProps) {
+}: Readonly<ScrollAreaProps>) {
   const ref = useRef<HTMLElement>(null);
   // `true` tant que rien n'est mesuré : le rendu serveur et le premier rendu
   // client doivent coïncider, et le défaut prudent est « atteignable ».

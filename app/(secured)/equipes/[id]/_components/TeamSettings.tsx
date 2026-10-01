@@ -45,7 +45,7 @@ interface TeamSettingsProps {
  * « Mettre à jour » finissait en `FORBIDDEN` : il voit désormais le logo, et une
  * phrase qui dit à qui s'adresser pour le reste.
  */
-export function TeamSettings({ team, onChanged }: TeamSettingsProps) {
+export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
   const { showError, showSuccess } = useToast();
   const router = useRouter();
   const managedAsGhost = team.managedAsGhost;

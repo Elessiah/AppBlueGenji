@@ -79,7 +79,7 @@ export function SwissView({
   canForfeit,
   onForfeit,
   emptyLabel = "Aucun match pour l'instant.",
-}: SwissViewProps) {
+}: Readonly<SwissViewProps>) {
   const activeCount = swiss.standings.filter((s) => s.status === "ACTIVE").length;
   const roundsLeft = Math.max(swiss.totalRounds - swiss.currentRound, 0);
   // Le statut compte autant que le rang : si toutes les équipes ont abandonné,
@@ -393,7 +393,7 @@ export function SwissRounds({
   adminResolvable,
   onOpenAdminModal,
   emptyLabel,
-}: SwissRoundsProps) {
+}: Readonly<SwissRoundsProps>) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const lastRound = roundNums.at(-1) ?? null;
   return (

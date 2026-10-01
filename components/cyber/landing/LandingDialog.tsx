@@ -51,7 +51,7 @@ export function LandingDialog({
   label,
   ariaBusy = busy,
   children,
-}: LandingDialogProps) {
+}: Readonly<LandingDialogProps>) {
   const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
   const backdrop = useBackdropDismiss(onClose, busy);
 

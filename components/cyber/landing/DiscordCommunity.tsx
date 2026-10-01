@@ -26,7 +26,7 @@ type DiscordCommunityProps = {
  * compteur n'en est que l'argument. Un Discord injoignable retire l'argument,
  * pas l'invitation.
  */
-export function DiscordCommunity({ stats }: DiscordCommunityProps) {
+export function DiscordCommunity({ stats }: Readonly<DiscordCommunityProps>) {
   return (
     <a
       className={styles.root}

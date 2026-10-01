@@ -34,7 +34,7 @@ export function audienceOptOutStatus(reason: AudienceOptOutReason | null): strin
  * @param initialReason État lu par le serveur sur la requête de la page, pour
  * que la phrase soit juste dès le premier affichage.
  */
-export function AudienceOptOutControl({ initialReason }: { initialReason: AudienceOptOutReason | null }) {
+export function AudienceOptOutControl({ initialReason }: Readonly<{ initialReason: AudienceOptOutReason | null }>) {
   const [reason, setReason] = useState<AudienceOptOutReason | null>(initialReason);
   const { showError, showSuccess } = useToast();
 

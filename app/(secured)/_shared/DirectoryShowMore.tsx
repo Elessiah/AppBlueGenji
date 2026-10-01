@@ -19,7 +19,7 @@ export function DirectoryShowMore({
   noun,
   gridRef,
   onShowMore,
-}: {
+}: Readonly<{
   hidden: number;
   /** Cartes rendues avant le clic : index de la première carte ajoutée. */
   shown: number;
@@ -28,7 +28,7 @@ export function DirectoryShowMore({
   /** Grille dont chaque enfant est une carte. */
   gridRef: RefObject<HTMLElement | null>;
   onShowMore: () => void;
-}) {
+}>) {
   if (hidden <= 0) return null;
   const step = Math.min(hidden, DIRECTORY_PAGE_SIZE);
   const label = `Voir plus (${step} sur ${hidden} restant${hidden > 1 ? "s" : ""})`;

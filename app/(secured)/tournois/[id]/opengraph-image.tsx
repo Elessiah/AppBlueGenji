@@ -33,7 +33,7 @@ export const contentType = SHARE_CARD_CONTENT_TYPE; // NOSONAR typescript:S7763 
  */
 export const revalidate = 300;
 
-export default async function Image({ params }: { params: Promise<{ id: string }> }) {
+export default async function Image({ params }: Readonly<{ params: Promise<{ id: string }> }>) {
   const { id } = await params;
   const tournamentId = Number(id);
 

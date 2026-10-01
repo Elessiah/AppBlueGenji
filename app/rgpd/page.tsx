@@ -89,7 +89,7 @@ const DATA_COLUMNS = ["Donnée", "Finalité", "Base légale", "Conservation"] as
  * (sous 640 px) et reste masqué des technologies d'assistance, qui lisent
  * déjà l'en-tête de colonne.
  */
-function DataCell({ column, children }: { column: 0 | 1 | 2 | 3; children: ReactNode }) {
+function DataCell({ column, children }: Readonly<{ column: 0 | 1 | 2 | 3; children: ReactNode }>) {
   return (
     <td role="cell">{/* NOSONAR S6843 — cellule de tableau de données, non de grille : `display: block` retire la sémantique */}
       <span className={styles.cellLabel} aria-hidden="true">

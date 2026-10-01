@@ -4,7 +4,7 @@ import { botPayloadNumber } from "@/lib/shared/bot-payload";
 import { resolveBotKpiDelta } from "@/lib/shared/bot-kpi-delta";
 import { BOT_MESSAGE_WINDOW_LABEL } from "@/lib/shared/bot-message-window";
 
-export function BotKpis({ kpis }: { kpis: BotKpisType | null }) {
+export function BotKpis({ kpis }: Readonly<{ kpis: BotKpisType | null }>) {
   const entries = [
     {
       key: "servers",

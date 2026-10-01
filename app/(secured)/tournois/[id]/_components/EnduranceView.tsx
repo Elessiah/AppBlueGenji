@@ -80,7 +80,7 @@ interface EnduranceViewProps {
  * distinguent plus l'un de l'autre. La casse est décidée par la feuille de
  * style, pas écrite dans le texte.
  */
-function BoardHeading({ children }: { children: React.ReactNode }) {
+function BoardHeading({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <h3 className={`mono ${styles.boardHeading}`}>{children}</h3>
   );
@@ -148,10 +148,10 @@ const CELL_CLASS: Record<EnduranceCellTone, string> = {
 function EnduranceHistory({
   endurance,
   myTeamId,
-}: {
+}: Readonly<{
   endurance: EnduranceMeta;
   myTeamId: number | null;
-}) {
+}>) {
   if (endurance.rounds.length === 0) return null;
 
   const columns = enduranceHistoryColumns(endurance.rounds.length);
@@ -255,11 +255,11 @@ function EnduranceHistory({
 function PenaltyLog({
   penalties,
   onLift,
-}: {
+}: Readonly<{
   penalties: EndurancePenaltyRow[];
   /** Retrait proposé, `undefined` pour un lecteur sans droit d'arbitrage. */
   onLift?: (penalty: EndurancePenaltyRow) => void;
-}) {
+}>) {
   if (penalties.length === 0) return null;
 
   return (
@@ -354,7 +354,7 @@ export function EnduranceView({
   emptyLabel = "Aucun match pour l'instant.",
   showNextRound = false,
   qualificationFormat = null,
-}: EnduranceViewProps) {
+}: Readonly<EnduranceViewProps>) {
   const wording = useParticipantWording();
 
   // Calculé ici, sur l'instantané que le flux pousse à chaque score : l'aperçu

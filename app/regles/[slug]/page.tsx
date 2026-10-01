@@ -89,7 +89,7 @@ export async function generateMetadata({ params }: Pick<PageProps, "params">): P
   });
 }
 
-function RuleBody({ rule }: { rule: RuleSection }) {
+function RuleBody({ rule }: Readonly<{ rule: RuleSection }>) {
   return (
     <>
       {rule.body.map((paragraph) => (
@@ -110,7 +110,7 @@ function RuleBody({ rule }: { rule: RuleSection }) {
   );
 }
 
-function SectionHead({ id, eyebrow, title }: { id: string; eyebrow: string; title: string }) {
+function SectionHead({ id, eyebrow, title }: Readonly<{ id: string; eyebrow: string; title: string }>) {
   return (
     <div className={styles.sectionHead}>
       <span className="eyebrow">{eyebrow}</span>
@@ -127,7 +127,7 @@ function SectionHead({ id, eyebrow, title }: { id: string; eyebrow: string; titl
  * tous. Le sommaire (`RulesToc`) dit où l'on est ; les règles communes, les
  * mêmes sur chaque page, sont repliées pour ne pas noyer celles du mode.
  */
-export default async function RuleModePage({ params, searchParams }: PageProps) {
+export default async function RuleModePage({ params, searchParams }: Readonly<PageProps>) {
   const { slug } = await params;
   const mode = ruleModeBySlug(slug);
   if (!mode) notFound();

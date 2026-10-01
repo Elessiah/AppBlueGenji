@@ -20,12 +20,12 @@ export function ModerationReasonField({
   onChange,
   recipient,
   disabled = false,
-}: {
+}: Readonly<{
   value: string;
   onChange: (value: string) => void;
   recipient: string;
   disabled?: boolean;
-}) {
+}>) {
   const id = useId();
   const helpId = `${id}-help`;
   const length = cleanModerationReason(value).length;

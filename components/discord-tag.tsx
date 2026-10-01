@@ -19,7 +19,7 @@ export type VerifiedBadgeProps = {
   size?: number;
 };
 
-export function VerifiedBadge({ size = 16 }: VerifiedBadgeProps) {
+export function VerifiedBadge({ size = 16 }: Readonly<VerifiedBadgeProps>) {
   return (
     <Image
       src={BADGE_SRC}
@@ -55,7 +55,7 @@ export type DiscordTagProps = {
  * simplement `verified={tag !== null}` : la règle reste la sienne, ce composant
  * ne fait qu'afficher.
  */
-export function DiscordTag({ tag, verified = false, fallback = "—" }: DiscordTagProps) {
+export function DiscordTag({ tag, verified = false, fallback = "—" }: Readonly<DiscordTagProps>) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
       {tag ? (

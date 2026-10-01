@@ -66,7 +66,7 @@ const VALIDATION_ERROR_MESSAGES: Record<string, string> = {
   INVALID_PHOTO_URL: "Cette photo est une image d'une autre partie du site : importe-la.",
 };
 
-export function BenevolesSection({ initialBenevoles, isAdmin }: BenevoleSectionProps) {
+export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<BenevoleSectionProps>) {
   const { showError, showSuccess } = useToast();
   const { cropImage, cropDialog } = useImageCropper();
   const [benevoles, setBenevoles] = useState<Benevole[]>(initialBenevoles);

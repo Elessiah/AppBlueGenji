@@ -15,7 +15,7 @@ interface RecruitmentBodyProps {
  *
  * Ne rend rien si la description est vide.
  */
-export function RecruitmentBody({ body, className }: RecruitmentBodyProps) {
+export function RecruitmentBody({ body, className }: Readonly<RecruitmentBodyProps>) {
   const blocks = formatRecruitmentBody(body);
   if (blocks.length === 0) return null;
 

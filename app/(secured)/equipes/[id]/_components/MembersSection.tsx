@@ -42,7 +42,7 @@ export function MembersSection({
   invitations,
   onChanged,
   onInvitationsChanged,
-}: MembersSectionProps) {
+}: Readonly<MembersSectionProps>) {
   const [memberPseudo, setMemberPseudo] = useState("");
   const [memberRoles, setMemberRoles] = useState<TeamRole[]>([...DEFAULT_INVITE_ROLES]);
   const [inviting, setInviting] = useState(false);

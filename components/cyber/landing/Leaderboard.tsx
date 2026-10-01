@@ -18,7 +18,7 @@ type LeaderboardResponse = {
 
 type GameFilter = "all" | "ow" | "mr";
 
-export function Leaderboard({ initialRows }: LeaderboardProps) {
+export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
   const [game, setGame] = useState<GameFilter>("all");
   const [rows, setRows] = useState(initialRows);
   const [loading, setLoading] = useState(false);

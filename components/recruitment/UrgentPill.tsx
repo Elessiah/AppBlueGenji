@@ -8,7 +8,7 @@ import { Pill } from "@/components/cyber";
  * pas changer de mot ni de forme d'un écran à l'autre. Le clignotement
  * (`.pill-urgent`) suit le régime de charge comme toute animation infinie.
  */
-export function UrgentPill({ className = "" }: { className?: string }) {
+export function UrgentPill({ className = "" }: Readonly<{ className?: string }>) {
   return (
     <Pill variant="live" className={`pill-urgent ${className}`.trim()}>
       Urgente

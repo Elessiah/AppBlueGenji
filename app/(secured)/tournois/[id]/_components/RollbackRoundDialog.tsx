@@ -79,7 +79,7 @@ export function RollbackRoundDialog({
   tournamentFinished,
   onClose,
   onRolledBack,
-}: RollbackRoundDialogProps) {
+}: Readonly<RollbackRoundDialogProps>) {
   const { showError } = useToast();
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);

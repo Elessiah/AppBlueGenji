@@ -87,7 +87,7 @@ export function PlayerScoreDialog({
   canForfeit,
   onClose,
   onSubmitted,
-}: PlayerScoreDialogProps) {
+}: Readonly<PlayerScoreDialogProps>) {
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
   // Phase de lancement, pour dire **pourquoi** le score n'est pas encore

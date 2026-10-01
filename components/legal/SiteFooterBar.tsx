@@ -14,7 +14,7 @@ import styles from "./SiteFooterBar.module.css";
  * et les textes qui engagent l'association — conditions d'utilisation,
  * mentions légales, confidentialité.
  */
-export function SiteFooterBar({ authenticated }: { authenticated: boolean }) {
+export function SiteFooterBar({ authenticated }: Readonly<{ authenticated: boolean }>) {
   return (
     <footer className={styles.root}>
       <nav className={styles.inner} aria-label="Informations légales">

@@ -77,6 +77,6 @@ export async function generateMetadata({ params }: MetadataProps): Promise<Metad
   };
 }
 
-export default function TournamentDetailLayout({ children }: { children: React.ReactNode }) {
+export default function TournamentDetailLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }

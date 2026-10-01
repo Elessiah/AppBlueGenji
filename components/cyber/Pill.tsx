@@ -15,7 +15,7 @@ interface PillProps extends Omit<ComponentPropsWithoutRef<"span">, "children" | 
   style?: CSSProperties;
 }
 
-export function Pill({ variant = "default", children, className = "", style, ...rest }: PillProps) {
+export function Pill({ variant = "default", children, className = "", style, ...rest }: Readonly<PillProps>) {
   const classes = [
     "pill",
     variant === "live" && "pill-live",

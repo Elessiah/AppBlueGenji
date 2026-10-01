@@ -52,7 +52,7 @@ export function ReportTargetCard({
   onDeleteLogo,
   onRestore,
   onPurge,
-}: ReportTargetCardProps) {
+}: Readonly<ReportTargetCardProps>) {
   const hidden = quarantines.find((quarantine) => quarantine.status === "HIDDEN") ?? null;
   const closed = quarantines.filter((quarantine) => quarantine.status !== "HIDDEN");
   const image = IMAGE_NOUN[target.type];

@@ -7,6 +7,6 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
  */
 export const metadata: Metadata = { title: segmentTitle("Équipes") };
 
-export default function TeamsLayout({ children }: { children: React.ReactNode }) {
+export default function TeamsLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }

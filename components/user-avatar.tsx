@@ -70,7 +70,7 @@ export function UserAvatar({
   style,
   glow,
   decorative,
-}: UserAvatarProps) {
+}: Readonly<UserAvatarProps>) {
   // Une image décorative porte un `alt` **vide** : c'est ce qui la retire de
   // l'arbre d'accessibilité, là où l'omettre la ferait annoncer par son nom de
   // fichier.

@@ -37,7 +37,7 @@ export function ConfirmDialog({
   disabled = false,
   onClose,
   onConfirm,
-}: ConfirmDialogProps) {
+}: Readonly<ConfirmDialogProps>) {
   const inputId = useId();
   const [typed, setTyped] = useState("");
   const [pending, setPending] = useState(false);

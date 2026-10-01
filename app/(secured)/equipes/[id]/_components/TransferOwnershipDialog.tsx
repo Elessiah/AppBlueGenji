@@ -17,7 +17,7 @@ interface TransferOwnershipDialogProps {
   onChanged: () => void;
 }
 
-export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }: TransferOwnershipDialogProps) {
+export function TransferOwnershipDialog({ teamId, members, onClose, onChanged }: Readonly<TransferOwnershipDialogProps>) {
   const [targetId, setTargetId] = useState<number | null>(null);
   const [confirmStep, setConfirmStep] = useState(false);
   const [pending, setPending] = useState(false);

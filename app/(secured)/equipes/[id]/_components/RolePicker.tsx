@@ -22,7 +22,7 @@ interface RolePickerProps {
  * donne la main sur l'équipe : il est séparé, et son effet est écrit sous lui.
  * `OWNER` n'y figure jamais — il se transfère, il ne se coche pas.
  */
-export function RolePicker({ selected, onChange }: RolePickerProps) {
+export function RolePicker({ selected, onChange }: Readonly<RolePickerProps>) {
   // Deux sélecteurs peuvent coexister (formulaire d'invitation et modale des
   // rôles) : un identifiant écrit en dur serait dupliqué dans la page.
   const helpId = useId();

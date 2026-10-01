@@ -7,6 +7,6 @@ import { segmentTitle } from "@/lib/shared/page-metadata";
  */
 export const metadata: Metadata = { title: segmentTitle("Signalement") };
 
-export default function ConcernedReportLayout({ children }: { children: React.ReactNode }) {
+export default function ConcernedReportLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return <>{children}</>;
 }

@@ -122,7 +122,7 @@ export function TournamentForm({
   explanationId,
   refereeSchedulingEditable = true,
   tournamentState,
-}: TournamentFormProps) {
+}: Readonly<TournamentFormProps>) {
   const { showError } = useToast();
   const fieldErrors = useFieldErrors(TOURNAMENT_FIELD_ERRORS, FIELD_IDS);
 

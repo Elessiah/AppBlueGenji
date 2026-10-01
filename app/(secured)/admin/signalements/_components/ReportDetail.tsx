@@ -47,7 +47,7 @@ export function ReportDetail({
   onDeleteLogo,
   onRestore,
   onPurge,
-}: ReportDetailProps) {
+}: Readonly<ReportDetailProps>) {
   const titleId = useId();
   const noteId = useId();
   const definition = REPORT_CATEGORY_DEFINITIONS[report.category];

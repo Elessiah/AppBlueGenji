@@ -31,7 +31,7 @@ function currentAnchor(ids: string[]): string | null {
  * — c'est ce qui manquait à une page de neuf blocs de même poids. Sans
  * JavaScript, il reste une liste de liens d'ancre qui fonctionne.
  */
-export function RulesToc({ entries }: { entries: RulesOutlineEntry[] }) {
+export function RulesToc({ entries }: Readonly<{ entries: RulesOutlineEntry[] }>) {
   const [active, setActive] = useState<string | null>(null);
 
   useEffect(() => {

@@ -34,7 +34,7 @@ interface MatchLiveDialogProps {
  * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
-export function MatchLiveDialog({ match, onClose, onSaved }: MatchLiveDialogProps) {
+export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [streamed, setStreamed] = useState(match.liveTrigger !== null);
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");

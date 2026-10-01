@@ -28,7 +28,7 @@ interface TargetPickerProps {
 }
 
 /** Vignette d'une cible : son image publiée, ou son initiale. */
-export function TargetThumb({ option }: { option: Pick<ReportTargetOption, "label" | "imageUrl"> }) {
+export function TargetThumb({ option }: Readonly<{ option: Pick<ReportTargetOption, "label" | "imageUrl"> }>) {
   if (option.imageUrl) {
     // Une image du site (garantie par le serveur, `localUploadUrl`), décorative :
     // le nom est écrit juste à côté.
@@ -50,7 +50,7 @@ export function TargetThumb({ option }: { option: Pick<ReportTargetOption, "labe
  * ouverte). La recherche est faite par le serveur, sur l'annuaire entier : le
  * formulaire vit sur toutes les pages, il ne télécharge rien d'avance.
  */
-export function TargetPicker({ type, selected, onChange, full }: TargetPickerProps) {
+export function TargetPicker({ type, selected, onChange, full }: Readonly<TargetPickerProps>) {
   const inputId = useId();
   const listId = useId();
   const [query, setQuery] = useState("");

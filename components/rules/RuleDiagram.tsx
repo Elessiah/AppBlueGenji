@@ -35,7 +35,7 @@ type BoxProps = {
 };
 
 /** Boîte de match : cadre fin + une ou deux lignes de texte. */
-function Box({ x, y, w = 132, h = 44, lines, accent = LINE, dashed, dim }: BoxProps) {
+function Box({ x, y, w = 132, h = 44, lines, accent = LINE, dashed, dim }: Readonly<BoxProps>) {
   return (
     <g opacity={dim ? 0.45 : 1}>
       <rect
@@ -71,12 +71,12 @@ function Elbow({
   to,
   color = LINE,
   dashed,
-}: {
+}: Readonly<{
   from: [number, number];
   to: [number, number];
   color?: string;
   dashed?: boolean;
-}) {
+}>) {
   const midX = from[0] + (to[0] - from[0]) / 2;
   return (
     <polyline
@@ -109,7 +109,7 @@ function ArrowDefs() {
 }
 
 /** Étiquette de colonne (nom de round). */
-function ColumnLabel({ x, y, children }: { x: number; y: number; children: string }) {
+function ColumnLabel({ x, y, children }: Readonly<{ x: number; y: number; children: string }>) {
   return (
     <text
       x={x}
@@ -447,7 +447,7 @@ function SurvivalDiagram() {
 
 type FunnelLevel = { in: number; out: number; x: number; y: number };
 
-function FunnelBox({ in: inCount, out: outCount, x, y }: FunnelLevel) {
+function FunnelBox({ in: inCount, out: outCount, x, y }: Readonly<FunnelLevel>) {
   return (
     <g>
       <rect
@@ -732,10 +732,10 @@ const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
 export function RuleDiagramFigure({
   diagram,
   caption,
-}: {
+}: Readonly<{
   diagram: RuleDiagram;
   caption: string;
-}) {
+}>) {
   const Diagram = DIAGRAMS[diagram];
   return (
     <figure className={styles.frame} style={{ margin: 0 }}>

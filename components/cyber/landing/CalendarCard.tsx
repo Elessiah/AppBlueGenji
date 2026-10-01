@@ -26,7 +26,7 @@ function tagLabel(state: LandingCalendarEvent["state"]): string {
   return "BIENTÔT";
 }
 
-export function CalendarCard({ events }: CalendarCardProps) {
+export function CalendarCard({ events }: Readonly<CalendarCardProps>) {
   return (
     <div id="calendrier" className={styles.root}>
       <div className={styles.head}>

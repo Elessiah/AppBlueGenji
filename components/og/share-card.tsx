@@ -64,7 +64,7 @@ function titleFontSize(title: string): number {
 }
 
 /** La carte, prête à être passée à `ImageResponse`. */
-export function ShareCard({ eyebrow, title, subtitle, facts = [] }: ShareCardProps): ReactElement {
+export function ShareCard({ eyebrow, title, subtitle, facts = [] }: Readonly<ShareCardProps>): ReactElement {
   return (
     <div
       style={{

@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   });
 }
 
-export default async function BotDocsPage({ params }: PageProps) {
+export default async function BotDocsPage({ params }: Readonly<PageProps>) {
   const { slug } = await params;
   if (slug && slug.length > 1) notFound();
 

@@ -99,7 +99,7 @@ export function PhaseCard({
   onMoveDown,
   onRemove,
   onUpdate,
-}: PhaseCardProps) {
+}: Readonly<PhaseCardProps>) {
   const canMoveUp = !disabled && phase.position > 1;
   const canMoveDown = !disabled && phase.position < totalPhases;
   const canRemove = !disabled && totalPhases > MIN_PHASES;

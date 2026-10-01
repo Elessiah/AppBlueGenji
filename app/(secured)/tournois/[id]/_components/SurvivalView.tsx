@@ -55,7 +55,7 @@ export function SurvivalView({
   canForfeit,
   onForfeit,
   emptyLabel = "Aucun match pour l'instant.",
-}: SurvivalViewProps) {
+}: Readonly<SurvivalViewProps>) {
   const activeCount = survival.standings.filter((s) => s.status === "ACTIVE").length;
   const barrageRounds = survival.barrageRounds ?? 0;
   // Pendant le barrage, le danger porte sur ses deux participants (le perdant
@@ -298,7 +298,7 @@ export function SurvivalRounds({
   adminResolvable,
   onOpenAdminModal,
   emptyLabel,
-}: SurvivalRoundsProps) {
+}: Readonly<SurvivalRoundsProps>) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   const lastRound = roundNums.at(-1) ?? null;
   const barrageRounds = cutSchedule?.barrageRounds ?? 0;

@@ -12,7 +12,7 @@ interface SparklineProps {
  */
 const MAX_POINTS = 120;
 
-export function Sparkline({ data, color = "var(--blue-500)" }: SparklineProps) {
+export function Sparkline({ data, color = "var(--blue-500)" }: Readonly<SparklineProps>) {
   // Même prémisse que le reste de `/bot` : la charge arrive par un `as` sur du
   // JSON reçu par le réseau. Un point non numérique empoisonnait `Math.max`, et
   // toute la courbe sortait en « MNaN,NaN » — un cadre vide, sans une erreur.

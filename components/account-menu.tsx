@@ -32,7 +32,7 @@ export const LOGOUT_FAILED_MESSAGE = "La déconnexion a échoué. Réessaie dans
  * en dehors, sur un lien, avec Échap (le focus revient au bouton) et quand la
  * tabulation en sort — mêmes règles que le menu de la vitrine.
  */
-export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: AccountMenuProps) {
+export function AccountMenu({ pseudo, avatarUrl, activeTeam = null }: Readonly<AccountMenuProps>) {
   const router = useRouter();
   const { showError } = useToast();
   const [open, setOpen] = useState(false);
@@ -120,13 +120,13 @@ export function AccountMenuPanel({
   leaving,
   onNavigate,
   onLogout,
-}: {
+}: Readonly<{
   id: string;
   activeTeam: AccountMenuTeam | null;
   leaving: boolean;
   onNavigate: () => void;
   onLogout: () => void;
-}) {
+}>) {
   return (
     <div id={id} className={s.panel}>
       <Link href="/profil" className={s.item} onClick={onNavigate}>

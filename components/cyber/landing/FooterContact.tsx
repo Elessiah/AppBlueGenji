@@ -26,7 +26,7 @@ interface FooterContactProps {
  * l'adresse » (`ProtectedContact`) ; la fenêtre d'édition le décode à
  * l'ouverture, un geste du staff lui aussi.
  */
-export function FooterContact({ initialContact, isAdmin }: FooterContactProps) {
+export function FooterContact({ initialContact, isAdmin }: Readonly<FooterContactProps>) {
   const { showError, showSuccess } = useToast();
   const [contact, setContact] = useState<PublicContactInfo>(initialContact);
   const [form, setForm] = useState<ContactInfo>(() => editableContact(initialContact));

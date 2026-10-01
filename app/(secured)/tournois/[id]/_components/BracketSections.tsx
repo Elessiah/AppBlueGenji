@@ -46,7 +46,7 @@ export function BracketSections({
   format,
   resolveNextMatchId,
   plannedRounds,
-}: BracketSectionsProps) {
+}: Readonly<BracketSectionsProps>) {
   const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
   // Les stades se nomment à partir de la **fin** du tableau : sur un arbre qui
   // pousse un tour à la fois, ce repère ne peut pas venir des tours posés.

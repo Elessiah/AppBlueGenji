@@ -11,7 +11,7 @@ import { serializeJsonLd, type JsonLdNode } from "@/lib/shared/structured-data";
  * L'échappement vit dans le module pur ({@link serializeJsonLd}) : c'est la
  * partie qui peut casser la page, et elle se teste sans rendu.
  */
-export function JsonLd({ data }: { data: JsonLdNode | JsonLdNode[] }) {
+export function JsonLd({ data }: Readonly<{ data: JsonLdNode | JsonLdNode[] }>) {
   return (
     <script
       type="application/ld+json"

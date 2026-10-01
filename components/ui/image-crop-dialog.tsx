@@ -166,7 +166,7 @@ function handleOf(target: EventTarget): CropHandle | null {
  * Portée dans `document.body`, pile commune de modales, voile fermé par
  * `useBackdropDismiss` — les trois règles de `docs/features/MODAL_DIALOGS.md`.
  */
-export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: ImageCropDialogProps) {
+export function ImageCropDialog({ file, kind, title, onCancel, onConfirm }: Readonly<ImageCropDialogProps>) {
   const titleId = useId();
   const hintId = useId();
   const aspect = IMAGE_CROP_ASPECTS[kind];

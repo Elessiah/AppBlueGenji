@@ -13,7 +13,7 @@ const FAMILY_ICON: Record<ReturnType<typeof teamRoleFamily>, string | null> = {
  * au plus sportif, la famille dite par la couleur **et** par un pictogramme —
  * la couleur seule ne se lit pas partout.
  */
-export function RolePills({ roles, label }: { roles: readonly TeamRole[]; label?: string }) {
+export function RolePills({ roles, label }: Readonly<{ roles: readonly TeamRole[]; label?: string }>) {
   const sorted = sortTeamRoles(roles);
   if (sorted.length === 0) return <span className={styles.joinedAt}>—</span>;
   return (

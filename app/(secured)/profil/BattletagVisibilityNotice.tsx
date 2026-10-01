@@ -24,7 +24,7 @@ import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
  * une *information*, pas une confirmation — la déguiser en question obligerait
  * à répondre pour un geste déjà fait, et suggérerait qu'un « non » existe.
  */
-export function BattletagVisibilityNotice({ onClose }: { onClose: () => void }) {
+export function BattletagVisibilityNotice({ onClose }: Readonly<{ onClose: () => void }>) {
   // Le focus entre dans la modale (sur son seul bouton) et Échap en sort :
   // sans cela, un lecteur d'écran resterait sur la case à cocher, et le clavier
   // n'aurait aucun moyen de refermer ce qu'il vient d'ouvrir. La pile partagée

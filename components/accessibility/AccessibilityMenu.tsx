@@ -66,7 +66,7 @@ interface AccessibilityMenuProps {
  * le focus, puisque le panneau ne suit pas ce lien dans l'ordre du document, et
  * le rend en se fermant à l'élément qui l'a demandé plutôt qu'au bouton flottant.
  */
-export function AccessibilityMenu({ initialSettings }: AccessibilityMenuProps) {
+export function AccessibilityMenu({ initialSettings }: Readonly<AccessibilityMenuProps>) {
   const [settings, setSettings] = useState<A11ySettingKey[]>(initialSettings);
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -224,7 +224,7 @@ export function AccessibilityPanel({
   onReset,
   onClose,
   onNavigate,
-}: AccessibilityPanelProps) {
+}: Readonly<AccessibilityPanelProps>) {
   return (
     // `tabIndex={-1}` : le panneau reçoit le focus quand le menu est ouvert
     // depuis le pied de page, sans devenir un arrêt de la tabulation.

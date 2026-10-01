@@ -8,7 +8,7 @@ import { parseEmphasis } from "@/lib/shared/inline-emphasis";
  * registre est du contenu de confiance, mais il n'y a aucune raison de lui
  * ouvrir `dangerouslySetInnerHTML` pour du gras.
  */
-export function EmphasisText({ text }: { text: string }) {
+export function EmphasisText({ text }: Readonly<{ text: string }>) {
   return (
     <>
       {parseEmphasis(text).map((segment, index) => (

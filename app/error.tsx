@@ -26,10 +26,10 @@ import {
 export default function ErrorBoundary({
   error,
   reset,
-}: {
+}: Readonly<{
   error: Error & { digest?: string };
   reset: () => void;
-}) {
+}>) {
   const router = useRouter();
   const reference = errorReference(error.digest);
   const copy = runtimeErrorCopy(reference);

@@ -17,7 +17,7 @@ function parseScore(s: number | string): number | null {
   return Number.isNaN(n) ? null : n;
 }
 
-export function MiniBracket({ matches }: MiniBracketProps) {
+export function MiniBracket({ matches }: Readonly<MiniBracketProps>) {
   return (
     <div className={styles.root}>
       {matches.map((match, i) => {

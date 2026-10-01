@@ -22,7 +22,7 @@ export function CyberCard({
   children,
   style,
   id,
-}: CyberCardProps) {
+}: Readonly<CyberCardProps>) {
   const classes = [
     styles.root,
     lift && styles.lift,

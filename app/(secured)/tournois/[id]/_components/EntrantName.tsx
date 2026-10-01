@@ -35,7 +35,7 @@ type EntrantLogoProps = {
  * nom écrit juste à côté, et une lecture d'écran qui annoncerait « D, Dragon
  * Squad » n'apprendrait rien.
  */
-export function EntrantLogo({ teamId, name, size = 16, logoUrl: knownLogoUrl }: EntrantLogoProps) {
+export function EntrantLogo({ teamId, name, size = 16, logoUrl: knownLogoUrl }: Readonly<EntrantLogoProps>) {
   const contextLogoUrl = useEntrantLogo(teamId);
   const logoUrl = knownLogoUrl === undefined ? contextLogoUrl : knownLogoUrl;
   const style = { "--size": `${size}px` } as CSSProperties;
@@ -94,7 +94,7 @@ export function EntrantName({
   textClassName,
   textStyle,
   title,
-}: EntrantNameProps) {
+}: Readonly<EntrantNameProps>) {
   const textClass = [styles.text, truncate ? styles.truncate : "", textClassName ?? ""]
     .filter(Boolean)
     .join(" ");

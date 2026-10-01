@@ -13,7 +13,7 @@ type AnnuaireSearchFieldProps = {
   label: string;
 };
 
-export function AnnuaireSearchField({ value, onChange, placeholder, label }: AnnuaireSearchFieldProps) {
+export function AnnuaireSearchField({ value, onChange, placeholder, label }: Readonly<AnnuaireSearchFieldProps>) {
   const inputRef = useRef<HTMLInputElement>(null);
   const shortcutLabel = useSearchShortcut(inputRef);
   return (

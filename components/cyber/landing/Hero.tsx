@@ -29,7 +29,7 @@ type HeroProps = {
   canEditCopy: boolean;
 };
 
-export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy }: HeroProps) {
+export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy }: Readonly<HeroProps>) {
   // Une seule source pour la carte live et le bouton « Regarder le live » :
   // deux sondages séparés les feraient diverger le temps d'un tick.
   const live = useLandingLive(initialLive);

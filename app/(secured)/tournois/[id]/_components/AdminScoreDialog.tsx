@@ -96,7 +96,7 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
  * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
-export function AdminScoreDialog({ match, onClose, onSubmitted }: AdminScoreDialogProps) {
+export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<AdminScoreDialogProps>) {
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
   // attente de départ » s'ouvre de lui-même à l'heure dite.

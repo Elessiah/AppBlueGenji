@@ -8,7 +8,7 @@ type LeaderCalProps = {
   events: LandingCalendarEvent[];
 };
 
-export function LeaderCal({ leaderboard, events }: LeaderCalProps) {
+export function LeaderCal({ leaderboard, events }: Readonly<LeaderCalProps>) {
   const rankedCount = leaderboard.length;
   return (
     <section id="equipes" className={styles.root}>

@@ -38,12 +38,12 @@ export function MatchFormatProvider({
   playoffFormat,
   tournamentFormat,
   children,
-}: {
+}: Readonly<{
   format: MatchFormat | null;
   playoffFormat: MatchFormat | null;
   tournamentFormat: TournamentFormat;
   children: ReactNode;
-}) {
+}>) {
   // Valeur stable tant que les formats ne changent pas **de contenu** : chaque
   // instantané du flux en apporte des objets neufs, et une valeur neuve à
   // chaque rendu redessinerait toutes les cartes de match, pourtant mémorisées.

@@ -20,7 +20,7 @@ import { TERMS_PATH } from "@/lib/shared/terms-of-use";
  * qui joigne un compte sans Discord rattaché — d'où une modale qu'on lit à son
  * rythme, plutôt qu'une notification qui s'efface.
  */
-export function SuspensionNoticeDialog({ notice, onClose }: { notice: SuspensionNotice; onClose: () => void }) {
+export function SuspensionNoticeDialog({ notice, onClose }: Readonly<{ notice: SuspensionNotice; onClose: () => void }>) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const dialogRef = useDialogBehavior({ open: mounted, onClose });

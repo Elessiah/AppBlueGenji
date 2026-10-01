@@ -30,7 +30,7 @@ interface IssueReportDialogProps {
  * serveur applique : l'interface ne peut donc pas accepter ce que la route
  * refusera.
  */
-export function IssueReportDialog({ tournamentId, match, onClose }: IssueReportDialogProps) {
+export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<IssueReportDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);

@@ -42,7 +42,7 @@ const ROLE_LABEL: Record<string, string> = {
  * transparente posée par-dessus (`.cardOverlay`), que le lien d'équipe traverse
  * en repassant au-dessus d'elle (`.aboveOverlay`).
  */
-export function PlayerCard({ player }: { player: PublicUserProfile }) {
+export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) {
   const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
   return (
