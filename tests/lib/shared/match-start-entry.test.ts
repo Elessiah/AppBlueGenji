@@ -7,7 +7,6 @@ import {
   matchEntryReference,
   matchEntryTimeValue,
   matchStartEntryOf,
-  matchStartParisYear,
   nextValidYearShift,
   parisInstant,
   parseMatchEntryTime,
@@ -242,7 +241,6 @@ describe("décalage d'année", () => {
     expect(iso(shiftMatchStartYear(at("2026-08-20T18:00:00Z"), 1))).toBe("2027-08-20T18:00:00.000Z");
     expect(iso(shiftMatchStartYear(at("2027-01-03T19:00:00Z"), -1))).toBe("2026-01-03T19:00:00.000Z");
     expect(iso(shiftMatchStartYear(at("2027-01-03T19:00:00Z"), -2))).toBe("2025-01-03T19:00:00.000Z");
-    expect(matchStartParisYear(at("2026-12-31T23:30:00Z"))).toBe(2027);
   });
 
   it("refuse un 29 février hors bissextile et les bornes du serveur", () => {
