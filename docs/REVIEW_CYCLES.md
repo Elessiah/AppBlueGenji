@@ -22,12 +22,14 @@ Un cycle thématique se lance avec le skill `code-review` et des arguments qui *
 /code-review --comment focus: security review — authz, input validation, injection, secrets, data exposure, rate limits, CSRF/redirects
 ```
 
+Le thème voyage en **texte libre** dans les arguments du skill, après `--comment` : ne compter un cycle thématique comme fait que si son compte rendu traite bien du thème nommé — une revue revenue généraliste ne vaut pas cycle thématique et se relance.
+
 Une correction faite dans un cycle thématique peut en appeler d'autres : si elle touche du code au-delà du thème, la boucle standard est relancée avant de reprendre.
 
 ## 3. Exceptions
 
 - **Renommage seul** (fichier, symbole, libellé, sans changement de comportement) : boucle standard uniquement, **aucun** cycle thématique.
-- **Documentation ou textes légaux seulement** : à la place des trois cycles, **un cycle orienté juridique**, relancé jusqu'à revenir propre — RGPD, LCEN/DSA, recommandations CNIL, cohérence avec `/rgpd`, le registre des traitements (`lib/shared/processing-register.ts`) et `PRIVACY_CHANGES`, aucune donnée personnelle ni aucun secret publié. Exemple :
+- **Documentation ou textes légaux seulement** : la boucle standard reste due (c'est elle qui vérifie l'exactitude technique d'un `docs/features/*.md`) ; à la place des trois cycles thématiques, **un cycle orienté juridique**, relancé jusqu'à revenir propre — RGPD, LCEN/DSA, recommandations CNIL, cohérence avec `/rgpd`, le registre des traitements (`lib/shared/processing-register.ts`) et `PRIVACY_CHANGES`, aucune donnée personnelle ni aucun secret publié. Exemple :
 
   ```
   /code-review --comment focus: legal review — GDPR/RGPD, LCEN/DSA, CNIL, consistency with /rgpd, processing register, PRIVACY_CHANGES, no personal data or secrets published
