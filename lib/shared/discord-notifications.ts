@@ -326,12 +326,7 @@ function reporterLabel(entrant: LogEntrant): string {
     : `${ANONYMOUS_PLAYER_LABEL} de l'équipe ${discordInline(entrant.name)}`;
 }
 
-/**
- * Rédige un signalement de problème pour le staff.
- *
- * @param context Le tournoi, l'auteur et, le cas échéant, la manche visée.
- * @returns Le message à poster dans les logs et à envoyer aux arbitres.
- */
+/** Ligne de portée d'un signalement : la manche visée, ou le tournoi entier. */
 function issueReportScope(match: IssueReportContext["match"]): string {
   if (!match) return "Portée : tournoi entier";
   const team1 = match.team1 ? entrantLabel(match.team1) : "TBD";
@@ -339,6 +334,12 @@ function issueReportScope(match: IssueReportContext["match"]): string {
   return `Match : ${match.round} — ${team1} vs ${team2} (#${match.id})`;
 }
 
+/**
+ * Rédige un signalement de problème pour le staff.
+ *
+ * @param context Le tournoi, l'auteur et, le cas échéant, la manche visée.
+ * @returns Le message à poster dans les logs et à envoyer aux arbitres.
+ */
 export function buildIssueReportMessage(context: IssueReportContext): string {
   const lines = [
     "**Signalement de problème**",
