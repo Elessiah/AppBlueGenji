@@ -738,9 +738,9 @@ export type SiteVisitStats = {
 export type BotStats = {
   affiliatedServers: number;
   affiliatedChannels: number;
-  messagesLast30Days: number;
-  relayedMessagesLast30Days: number;
-  uniqueUsersLast30Days: number;
+  messagesLast7Days: number;
+  relayedMessagesLast7Days: number;
+  uniqueUsersLast7Days: number;
 };
 
 export type BotStatus = {
@@ -758,7 +758,8 @@ export type BotStatus = {
 
 export type BotKpiEntry = {
   value: number;
-  delta: string;
+  /** `null` : aucune période de comparaison (tuiles « messages » et « relais »). */
+  delta: string | null;
   series: number[];
 };
 
@@ -773,7 +774,7 @@ export type BotServerEntry = {
   id: string;
   name: string;
   memberCount: number;
-  relays30j: number;
+  relays7j: number;
   status: "ok" | "lag" | "off";
   sparkline: number[];
   accentColor: string;
