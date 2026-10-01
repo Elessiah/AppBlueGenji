@@ -137,7 +137,7 @@ function readReducedMotion(): boolean {
 
 /** « Réduire les animations » coché dans le menu d'accessibilité (attribut de `<html>`). */
 function readMotionSetting(): boolean {
-  return hasA11ySetting(document.documentElement.getAttribute("data-a11y"), "motion");
+  return hasA11ySetting(document.documentElement.dataset.a11y, "motion");
 }
 
 /** Ce que le navigateur déclare de la machine ; lu une fois, ça ne bouge pas. */

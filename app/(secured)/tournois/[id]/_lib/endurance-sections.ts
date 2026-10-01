@@ -120,7 +120,7 @@ export function defaultOpenEnduranceRound(
   const pending = sections.find((section) => !section.isComplete);
   if (pending) return pending.round;
 
-  return playoffsStarted ? null : sections[sections.length - 1].round;
+  return playoffsStarted ? null : sections.at(-1)!.round;
 }
 
 /**

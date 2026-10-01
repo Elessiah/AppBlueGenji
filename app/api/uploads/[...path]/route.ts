@@ -26,7 +26,7 @@ export async function GET(_req: Request, context: { params: Promise<{ path: stri
     return new Response(null, { status: 404 });
   }
 
-  const ext = path.extname(segments[segments.length - 1]).toLowerCase();
+  const ext = path.extname(segments.at(-1)!).toLowerCase();
   const contentType = CONTENT_TYPES[ext];
   if (!contentType) {
     return new Response(null, { status: 404 });

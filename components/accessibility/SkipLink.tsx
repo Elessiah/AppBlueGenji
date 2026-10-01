@@ -27,10 +27,10 @@ export function focusMainContent(
   // n'est retiré que s'il a été ajouté ici.
   const addedTabIndex = !target.hasAttribute("tabindex");
   if (addedTabIndex) target.setAttribute("tabindex", "-1");
-  target.setAttribute("data-skip-target", "");
+  target.dataset.skipTarget = "";
   const cleanup = () => {
     if (addedTabIndex) target.removeAttribute("tabindex");
-    target.removeAttribute("data-skip-target");
+    delete target.dataset.skipTarget;
   };
   target.addEventListener("blur", cleanup, { once: true });
   target.focus();

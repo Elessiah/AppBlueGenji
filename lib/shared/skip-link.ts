@@ -55,8 +55,8 @@ function isLeadingChrome(node: SkipLinkNode): boolean {
  * bas fait partie du contenu.
  */
 export function skipLinkTarget<T extends SkipLinkNode>(main: T): T {
-  for (let i = 0; i < main.children.length; i += 1) {
-    const child = main.children[i] as T;
+  for (const node of Array.from(main.children)) {
+    const child = node as T;
     if (!isLeadingChrome(child)) return child;
   }
   return main;

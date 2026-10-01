@@ -28,7 +28,7 @@ export function Sparkline({ data, color = "var(--blue-500)" }: SparklineProps) {
   // valeur que le bot n'a pas donnée (« jamais zéro pour dire je ne sais
   // pas », la règle du panneau d'à côté et du compteur Discord de l'accueil).
   // D'où le seul repli qui ne mente sur rien : pas de courbe.
-  if (read.some((v) => v === null)) return null;
+  if (read.includes(null)) return null;
   const points = read as number[];
 
   // Deux points au minimum. Avec un seul, `i / (n - 1)` vaut `0 / 0` : le

@@ -69,14 +69,16 @@ export function rulesPageOutline(
   if (options.hasTournamentSettings) {
     entries.push({ id: RULES_PAGE_ANCHORS.tournament, label: "Ce tournoi" });
   }
-  entries.push({ id: RULES_PAGE_ANCHORS.essentials, label: "L'essentiel" });
-  entries.push({
-    id: RULES_PAGE_ANCHORS.details,
-    label: "Règles du mode",
-    children: mode.sections.map((section, i) => ({ id: anchors[i], label: section.title })),
-  });
-  entries.push({ id: RULES_PAGE_ANCHORS.common, label: "Règles communes" });
-  entries.push({ id: RULES_PAGE_ANCHORS.others, label: "Autres modes" });
+  entries.push(
+    { id: RULES_PAGE_ANCHORS.essentials, label: "L'essentiel" },
+    {
+      id: RULES_PAGE_ANCHORS.details,
+      label: "Règles du mode",
+      children: mode.sections.map((section, i) => ({ id: anchors[i], label: section.title })),
+    },
+    { id: RULES_PAGE_ANCHORS.common, label: "Règles communes" },
+    { id: RULES_PAGE_ANCHORS.others, label: "Autres modes" },
+  );
   return entries;
 }
 

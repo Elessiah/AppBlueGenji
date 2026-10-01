@@ -195,9 +195,7 @@ export function useTournamentLive(tournamentId: number) {
         flushRender();
         return;
       }
-      if (renderTimerRef.current === null) {
-        renderTimerRef.current = setTimeout(flushRender, delay);
-      }
+      renderTimerRef.current ??= setTimeout(flushRender, delay);
     },
     [flushRender, updateMatchFocus],
   );
@@ -220,8 +218,8 @@ export function useTournamentLive(tournamentId: number) {
             clearTimeout(renderTimerRef.current);
             renderTimerRef.current = null;
           }
-        } else if (renderTimerRef.current === null) {
-          renderTimerRef.current = setTimeout(flushRender, delay);
+        } else {
+          renderTimerRef.current ??= setTimeout(flushRender, delay);
         }
       }
 

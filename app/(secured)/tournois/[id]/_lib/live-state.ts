@@ -68,7 +68,7 @@ export function parseLiveMessage(raw: string): LiveMessage | null {
     return {
       type: "snapshot",
       tournamentId: Number(message.tournamentId),
-      version: String(message.version ?? ""),
+      version: String(message.version ?? ""), // NOSONAR typescript:S6551 — champ scalaire d'un message JSON du flux, jamais un objet
       snapshot: message.snapshot as TournamentSnapshot,
     };
   }
@@ -225,7 +225,7 @@ function sameValue(a: unknown, b: unknown): boolean {
   const keys = Object.keys(left);
   if (keys.length !== Object.keys(right).length) return false;
   for (const key of keys) {
-    if (!Object.prototype.hasOwnProperty.call(right, key)) return false;
+    if (!Object.hasOwn(right, key)) return false;
     if (!sameValue(left[key], right[key])) return false;
   }
   return true;

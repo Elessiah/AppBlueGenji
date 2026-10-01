@@ -18,7 +18,7 @@
  * Le point focal est conservé en mode logo (il n'y sert à rien) : repasser en
  * illustration retrouve le cadrage choisi.
  */
-import { IMAGE_UPLOAD_MAX_BYTES, IMAGE_UPLOAD_MIME_TYPES, localUploadUrl } from "./uploads";
+import { IMAGE_UPLOAD_MIME_TYPES, localUploadUrl } from "./uploads";
 
 export const TOURNAMENT_IMAGE_FITS = ["COVER", "CONTAIN"] as const;
 
@@ -136,7 +136,7 @@ export function checkTournamentImageSettings(raw: {
 function readFocus(value: unknown): number | null {
   if (value === undefined || value === null || value === "") return DEFAULT_IMAGE_FOCUS;
   const number =
-    typeof value === "number" ? value : typeof value === "string" && /^\d{1,3}$/.test(value.trim()) ? Number(value) : NaN;
+    typeof value === "number" ? value : typeof value === "string" && /^\d{1,3}$/.test(value.trim()) ? Number(value) : Number.NaN;
   if (!Number.isInteger(number) || number < 0 || number > 100) return null;
   return number;
 }
@@ -248,7 +248,7 @@ export function planTournamentImageChange(
 export const TOURNAMENT_IMAGE_ACCEPT = IMAGE_UPLOAD_MIME_TYPES.join(",");
 
 /** Poids maximal d'un fichier : la limite du serveur, partagée. */
-export const TOURNAMENT_IMAGE_MAX_BYTES = IMAGE_UPLOAD_MAX_BYTES;
+export { IMAGE_UPLOAD_MAX_BYTES as TOURNAMENT_IMAGE_MAX_BYTES } from "./uploads";
 
 /** Refus rendus par `/api/admin/tournaments/[id]/image`, en français. */
 export function tournamentImageErrorMessage(code: string): string {

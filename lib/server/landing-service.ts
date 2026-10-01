@@ -555,9 +555,8 @@ async function loadLandingTicker(): Promise<LandingTickerPayload> {
         text: `VAINQUEUR · ${row.name} · ${row.winner_name ?? "Champion inconnu"}`,
         sortAt: new Date(row.finished_at ?? Date.now()).getTime(),
       })),
+      ...(await loadNewsEntries(db)),
     );
-
-    entries.push(...(await loadNewsEntries(db)));
 
     entries.sort((left, right) => right.sortAt - left.sortAt);
     const items = entries

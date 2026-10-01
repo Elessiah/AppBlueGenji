@@ -18,7 +18,7 @@ export interface ForfeitContext {
 }
 
 /** Formats où une équipe reste en lice tant qu'elle ne se retire pas d'elle-même. */
-const FORMATS_WITH_FORFEIT: TournamentFormat[] = ["SURVIVAL", "SWISS", "BG_SURVIE"];
+const FORMATS_WITH_FORFEIT: ReadonlySet<TournamentFormat> = new Set<TournamentFormat>(["SURVIVAL", "SWISS", "BG_SURVIE"]);
 
 /**
  * Le bouton « Forfait » du classement doit-il être proposé pour cette équipe ?
@@ -39,7 +39,7 @@ const FORMATS_WITH_FORFEIT: TournamentFormat[] = ["SURVIVAL", "SWISS", "BG_SURVI
  * cours**, pas `MULTI` : c'est la phase qui détermine si l'abandon a un sens.
  */
 export function canForfeitTeam(context: ForfeitContext, teamId: number): boolean {
-  if (!FORMATS_WITH_FORFEIT.includes(context.format)) return false;
+  if (!FORMATS_WITH_FORFEIT.has(context.format)) return false;
   if (context.state !== "RUNNING") return false;
   if (context.isAdmin) return true;
   if (!context.canActForEntrant) return false;

@@ -301,7 +301,7 @@ export function toApiPayload(values: TournamentFormValues): Record<string, unkno
  */
 export function toFormValues(apiValues: TournamentApiValues): TournamentFormValues {
   const defaults = defaultTournamentFormValues();
-  const or = (value: number | null, fallback: number) => (value === null ? fallback : value);
+  const or = (value: number | null, fallback: number) => (value ?? fallback);
 
   return {
     name: apiValues.name,

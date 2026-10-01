@@ -4,8 +4,8 @@ import { hideTeamLogo, hideUserAvatarForReport } from "@/lib/server/logo-quarant
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
 
-const TEAM_ERRORS = ["TEAM_NOT_TARGETED", "TEAM_HAS_NO_LOGO", "LOGO_CHANGED", "LOGO_NOT_MOVABLE", "LOGO_FILE_MISSING"];
-const USER_ERRORS = ["USER_NOT_TARGETED", "USER_HAS_NO_AVATAR", "AVATAR_CHANGED", "AVATAR_NOT_MOVABLE", "AVATAR_FILE_MISSING"];
+const TEAM_ERRORS = new Set(["TEAM_NOT_TARGETED", "TEAM_HAS_NO_LOGO", "LOGO_CHANGED", "LOGO_NOT_MOVABLE", "LOGO_FILE_MISSING"]);
+const USER_ERRORS = new Set(["USER_NOT_TARGETED", "USER_HAS_NO_AVATAR", "AVATAR_CHANGED", "AVATAR_NOT_MOVABLE", "AVATAR_FILE_MISSING"]);
 
 /**
  * Masque l'image (logo d'équipe ou avatar de joueur) d'une cible visée par ce
@@ -35,7 +35,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   } catch (error) {
     const message = (error as Error).message;
     if (message === "REPORT_NOT_FOUND") return fail(message, 404);
-    if (TEAM_ERRORS.includes(message) || USER_ERRORS.includes(message)) return fail(message, 409);
+    if (TEAM_ERRORS.has(message) || USER_ERRORS.has(message)) return fail(message, 409);
     console.error("[moderation] masquage de l'image impossible", error);
     return fail("LOGO_HIDE_FAILED", 500);
   }

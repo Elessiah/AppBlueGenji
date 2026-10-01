@@ -12,9 +12,9 @@ import { SITE_NAME, SITE_SHARE_CARD } from "@/lib/shared/share-metadata";
  * racine et par `pageMetadata`), et un segment qui pose la sienne — la fiche
  * d'un tournoi — garde la sienne.
  */
-export const alt = SITE_NAME;
+export const alt = SITE_NAME; // NOSONAR typescript:S7763 — export de convention de Next (`opengraph-image`), déclaré en constante du module
 export const size = SHARE_CARD_SIZE;
-export const contentType = SHARE_CARD_CONTENT_TYPE;
+export const contentType = SHARE_CARD_CONTENT_TYPE; // NOSONAR typescript:S7763 — export de convention de Next (`opengraph-image`), déclaré en constante du module
 
 export default function Image() {
   return new ImageResponse(<ShareCard {...SITE_SHARE_CARD} />, size);

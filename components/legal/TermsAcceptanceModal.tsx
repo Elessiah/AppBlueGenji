@@ -117,7 +117,7 @@ export function TermsAcceptanceModal({ initiallyRequired, request = null, privac
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ version: TERMS_VERSION }),
       });
-      if (!response.ok) throw new Error();
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       writePostponedCookie(false);
       setRequested(false);
       showSuccess("Merci, tu peux gérer ton équipe.");

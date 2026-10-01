@@ -66,7 +66,7 @@ export function resolveBotStatusLabel(status: string | null | undefined): BotSta
   // `== null` et non `!status` : la chaîne vide est une **réponse** reçue dont
   // l'état est illisible, pas une absence de réponse.
   if (status == null) return "UNREACHABLE";
-  if (!Object.prototype.hasOwnProperty.call(KNOWN_STATUSES, status)) {
+  if (!Object.hasOwn(KNOWN_STATUSES, status)) {
     return "UNREADABLE";
   }
   return status as BotStatusLabel;

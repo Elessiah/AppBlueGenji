@@ -159,8 +159,8 @@ export function formatPlayerSignupLog(context: { provider: PlayerSignupProvider 
 /** Création d'un tournoi par le staff. */
 export function formatTournamentCreatedLog(context: {
   tournament: BotLogTournament;
-  format: TournamentFormat | string;
-  game: TournamentGame | string;
+  format: TournamentFormat | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une valeur brute venue de la base
+  game: TournamentGame | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une valeur brute venue de la base
   maxTeams: number;
   participantType: ParticipantType;
   startAt: string | Date | null;
@@ -282,7 +282,7 @@ export function formatMatchResultLog(context: {
 /** Coup d'envoi : le tournoi passe « en cours ». */
 export function formatTournamentStartedLog(context: {
   tournament: BotLogTournament;
-  format: TournamentFormat | string;
+  format: TournamentFormat | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une valeur brute venue de la base
   registeredTeams: number;
   participantType: ParticipantType;
 }): string {

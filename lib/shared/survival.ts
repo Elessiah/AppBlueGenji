@@ -112,8 +112,8 @@ export function planSurvivalRound(
     return {
       pairings: [
         {
-          teamAId: teams[teams.length - 2].teamId,
-          teamBId: teams[teams.length - 1].teamId,
+          teamAId: teams.at(-2)!.teamId,
+          teamBId: teams.at(-1)!.teamId,
         },
       ],
       byeTeamId: null,

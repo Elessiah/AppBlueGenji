@@ -44,9 +44,7 @@ export function useSlotHeight(): SlotMeasure {
   const [slotHeight, setSlotHeight] = useState(MIN_SLOT_HEIGHT);
   const observer = useRef<ResizeObserver | null>(null);
   const registry = useRef<SlotRegistry<HTMLElement> | null>(null);
-  if (registry.current === null) {
-    registry.current = createSlotRegistry<HTMLElement>(() => observer.current);
-  }
+  registry.current ??= createSlotRegistry<HTMLElement>(() => observer.current);
   const slots: SlotRegistry<HTMLElement> = registry.current;
 
   const recompute = useCallback(() => {

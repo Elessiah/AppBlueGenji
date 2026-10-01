@@ -37,7 +37,7 @@ const ADMIN_REPORT_ERRORS: Record<string, string> = {
 };
 
 export function adminReportErrorMessage(code: string | null | undefined): string {
-  if (code && Object.prototype.hasOwnProperty.call(ADMIN_REPORT_ERRORS, code)) return ADMIN_REPORT_ERRORS[code];
+  if (code && Object.hasOwn(ADMIN_REPORT_ERRORS, code)) return ADMIN_REPORT_ERRORS[code];
   return "L'opération a échoué. Réessaie dans un instant.";
 }
 

@@ -1,7 +1,6 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { SqlParam, SqlParams } from "@/lib/server/database";
 import {
-  compareStanding,
   computeFinalRanks,
   planSurvivalRound,
   rankActiveTeams,
@@ -747,4 +746,4 @@ export async function loadSurvivalMeta(
   };
 }
 
-export { compareStanding };
+export { compareStanding } from "@/lib/shared/survival";

@@ -105,7 +105,7 @@ export function matchStartAtTime(match: MatchScheduleInput): number | null {
  * que d'y afficher `Invalid Date`.
  */
 export function matchStartAtInputValue(
-  startAt: string | Date | number | null | undefined,
+  startAt: MatchScheduleInput["startAt"],
 ): string {
   const time = matchStartAtTime({ startAt });
   if (time === null) return "";
@@ -121,7 +121,7 @@ export function matchStartAtInputValue(
  * accessible en `title`/`aria-label` via {@link formatMatchStartAtFull}.
  */
 export function formatMatchStartAt(
-  startAt: string | Date | number | null | undefined,
+  startAt: MatchScheduleInput["startAt"],
 ): string | null {
   const time = matchStartAtTime({ startAt });
   if (time === null) return null;
@@ -135,7 +135,7 @@ export function formatMatchStartAt(
 
 /** Date de début complète, pour les infobulles et les lecteurs d'écran. */
 export function formatMatchStartAtFull(
-  startAt: string | Date | number | null | undefined,
+  startAt: MatchScheduleInput["startAt"],
 ): string | null {
   const time = matchStartAtTime({ startAt });
   if (time === null) return null;

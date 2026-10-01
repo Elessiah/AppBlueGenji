@@ -72,7 +72,7 @@ const UNKNOWN_RELAY_STATE: BotRelayState = {
  */
 export function resolveBotRelayState(status: string | null | undefined): BotRelayState {
   if (!status) return UNKNOWN_RELAY_STATE;
-  if (!Object.prototype.hasOwnProperty.call(RELAY_STATES, status)) {
+  if (!Object.hasOwn(RELAY_STATES, status)) {
     return UNKNOWN_RELAY_STATE;
   }
   return RELAY_STATES[status as BotRelayStatus];

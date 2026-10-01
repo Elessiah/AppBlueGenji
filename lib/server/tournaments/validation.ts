@@ -38,7 +38,7 @@ type RawPhase = {
   survivalRoundsPerCut?: number | null;
 };
 
-const PHASE_FORMATS = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
+const PHASE_FORMATS = new Set(["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"]);
 
 function isPositiveInt(value: unknown): boolean {
   return Number.isInteger(Number(value)) && Number(value) >= 1;
@@ -60,7 +60,7 @@ function validateRawPhases(phases: unknown): string | null {
   const list = phases as RawPhase[];
 
   for (const phase of list) {
-    if (!phase || !PHASE_FORMATS.includes(String(phase.format))) return "INVALID_PHASE_FORMAT";
+    if (!phase || !PHASE_FORMATS.has(String(phase.format))) return "INVALID_PHASE_FORMAT";
   }
 
   for (let i = 0; i < list.length; i += 1) {

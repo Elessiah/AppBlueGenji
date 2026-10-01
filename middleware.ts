@@ -31,7 +31,7 @@ export function middleware(request: NextRequest) {
 
   const bytes = new Uint8Array(16);
   crypto.getRandomValues(bytes);
-  const nonce = btoa(String.fromCharCode(...bytes));
+  const nonce = btoa(String.fromCodePoint(...bytes));
 
   const policy = contentSecurityPolicy(nonce, {
     dev: process.env.NODE_ENV === "development",
@@ -115,7 +115,7 @@ function guardApiRequest(request: NextRequest) {
 export const config = {
   matcher: [
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|txt|xml|webmanifest)$).*)",
+      source: "/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:png|jpg|jpeg|gif|webp|svg|ico|txt|xml|webmanifest)$).*)", // NOSONAR typescript:S7780 — `config.matcher` doit rester un littéral simple, que Next analyse statiquement à la compilation
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },

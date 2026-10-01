@@ -229,7 +229,7 @@ async function loadRegistrationRows(
      JOIN bg_tournaments t ON t.id = r.tournament_id${teamIds === null ? "" : `
      WHERE r.team_id IN (${placeholders(teamIds.length)})`}
      ORDER BY played_at DESC`,
-    teamIds === null ? [] : teamIds,
+    teamIds ?? [],
   );
   return rows;
 }
@@ -386,7 +386,7 @@ function collectForPlayer(
   matchRows: MatchStatRow[],
   registrationRows: RegistrationStatRow[],
 ): Collected {
-  const teamIds = [...new Set(memberships.map((membership) => membership.teamId))];
+  const teamIds = new Set(memberships.map((membership) => membership.teamId));
 
   // Le crédit se décide **par tournoi**, jamais match par match : un joueur est
   // crédité d'une campagne entière ou d'aucune de ses rencontres.
@@ -425,7 +425,7 @@ function collectForPlayer(
     // fois, du côté de la première créditée — sans quoi il ajouterait à la fois
     // une victoire et une défaite.
     const side = [Number(row.team1_id), Number(row.team2_id)].find((id) => {
-      if (!teamIds.includes(id)) return false;
+      if (!teamIds.has(id)) return false;
       if (credited.has(`${id}:${tournamentId}`)) return true;
       // Match sans ligne d'inscription correspondante : on se rabat sur sa
       // propre date plutôt que d'écarter silencieusement la rencontre.

@@ -9,7 +9,7 @@ export interface ScrollLockTarget {
 }
 
 /** Jeton identifiant une couche ouverte. Un jeton par ouverture de modale. */
-export type DialogToken = symbol;
+export type DialogToken = symbol; // NOSONAR typescript:S6564 — nomme le rôle du symbole (jeton de couche) dans les signatures de la pile
 
 export interface DialogStack {
   /** Ouvre une couche. La première pose le verrou de défilement. */
@@ -68,7 +68,7 @@ export function createDialogStack(target: ScrollLockTarget): DialogStack {
     },
 
     isTop(token) {
-      return stack.length > 0 && stack[stack.length - 1] === token;
+      return stack.at(-1) === token;
     },
 
     get size() {

@@ -71,7 +71,7 @@ function sponsorErrorMessage(code: string | undefined, fallback: string): string
   }
 }
 
-const ACCEPTED_LOGO_TYPES = ["image/png", "image/jpeg", "image/webp"];
+const ACCEPTED_LOGO_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const MAX_LOGO_BYTES = 5 * 1024 * 1024;
 
 // Tri par palier (GOLD → PARTNER), comme côté serveur. `sort` est stable :
@@ -247,7 +247,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
     // Réinitialise pour permettre de re-sélectionner le même fichier ensuite.
     event.target.value = "";
     if (!file) return;
-    if (!ACCEPTED_LOGO_TYPES.includes(file.type)) {
+    if (!ACCEPTED_LOGO_TYPES.has(file.type)) {
       showError("Format invalide : PNG, JPEG ou WebP uniquement.");
       return;
     }

@@ -14,7 +14,7 @@ interface MiniBracketProps {
 function parseScore(s: number | string): number | null {
   if (s === "—" || s === "-") return null;
   const n = Number(s);
-  return isNaN(n) ? null : n;
+  return Number.isNaN(n) ? null : n;
 }
 
 export function MiniBracket({ matches }: MiniBracketProps) {

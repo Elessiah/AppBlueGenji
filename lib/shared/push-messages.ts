@@ -184,7 +184,7 @@ export function privacyChangePush(titles: readonly string[]): PushContent {
 export function refereeAlertPush(message: string, key: string): PushContent {
   // Le lien du tournoi est dans la ligne (URL absolue) : c'est là qu'on
   // arbitre. `buildPushPayload` le ramène à un chemin du site.
-  const url = message.match(/https?:\/\/\S+/)?.[0] ?? "/tournois";
+  const url = /https?:\/\/\S+/.exec(message)?.[0] ?? "/tournois";
   return {
     title: "Arbitrage requis",
     body: stripMarkdown(message),

@@ -1,4 +1,2 @@
-import { SecuredLoading } from "../_shared/SecuredLoading";
-
 /** Frontière de chargement du segment — voir `SecuredLoading`. */
-export default SecuredLoading;
+export { SecuredLoading as default } from "../_shared/SecuredLoading";

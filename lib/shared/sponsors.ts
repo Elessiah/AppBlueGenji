@@ -21,7 +21,7 @@ export type Sponsor = {
 
 export type SponsorInput = {
   name: string;
-  tier?: SponsorTier | string;
+  tier?: SponsorTier | string; // NOSONAR typescript:S6571 — l'union documente les valeurs attendues ; `string` admet une saisie brute, validée ensuite
   logoUrl?: string | null;
   bannerUrl?: string | null;
   websiteUrl?: string | null;

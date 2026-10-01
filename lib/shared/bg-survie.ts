@@ -463,7 +463,7 @@ export function planEnduranceRound(standings: EnduranceStanding[]): EndurancePai
   }
 
   if (ordered.length % 2 === 1) {
-    pairings.push({ teamAId: ordered[ordered.length - 1].teamId, teamBId: null });
+    pairings.push({ teamAId: ordered.at(-1)!.teamId, teamBId: null });
   }
 
   return pairings;

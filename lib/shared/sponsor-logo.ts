@@ -54,7 +54,7 @@ export function sponsorLogoProxyPath(sponsorId: number, logoUrl: string): string
 export function logoVersion(logoUrl: string): string {
   let hash = 0x811c9dc5;
   for (let i = 0; i < logoUrl.length; i += 1) {
-    hash ^= logoUrl.charCodeAt(i);
+    hash ^= logoUrl.charCodeAt(i); // NOSONAR typescript:S7758 — empreinte par unité UTF-16 : `codePointAt` changerait le `?v=` des URL déjà publiées
     hash = Math.imul(hash, 0x01000193);
   }
   return (hash >>> 0).toString(36);

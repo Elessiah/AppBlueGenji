@@ -972,7 +972,7 @@ async function finalizePlayoffsIfDone(conn: PoolConnection, tournamentId: number
     const rounds = await loadPlayoffRoundNumbers(conn, tournamentId);
     if (rounds.length === 0) return;
 
-    const lastRound = rounds[rounds.length - 1];
+    const lastRound = rounds.at(-1)!;
     const matches = await loadPlayoffRoundMatches(conn, tournamentId, lastRound);
 
     const decisive = matches.filter((match) => match.bracket !== "THIRD_PLACE");

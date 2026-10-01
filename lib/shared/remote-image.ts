@@ -48,7 +48,7 @@ export function isPrivateImageHostname(hostname: string): boolean {
 }
 
 function isPrivateIpv4(address: string): boolean {
-  const parts = address.split(".").map((p) => Number(p));
+  const parts = address.split(".").map(Number);
   if (parts.length !== 4 || parts.some((p) => !Number.isInteger(p) || p < 0 || p > 255)) return true;
   const [a, b, c] = parts;
   if (a === 0 || a === 10 || a === 127) return true;
@@ -117,7 +117,7 @@ export function parseIpv6(raw: string): number[] | null {
     const out: number[] = [];
     for (const group of side.split(":")) {
       if (!/^[0-9a-f]{1,4}$/.test(group)) return null;
-      out.push(parseInt(group, 16));
+      out.push(Number.parseInt(group, 16));
     }
     return out;
   };

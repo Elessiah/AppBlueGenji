@@ -210,7 +210,7 @@ export function checkEditPatch(
   // `computeTournamentState` renverrait `UPCOMING` et le tournoi reculerait
   // d'un état. Pour clore tout de suite, on avance `startAt`.
   if (current.state === "REGISTRATION" && patch.registrationCloseAt !== undefined) {
-    const closeAt = new Date(String(patch.registrationCloseAt)).getTime();
+    const closeAt = new Date(String(patch.registrationCloseAt)).getTime(); // NOSONAR typescript:S6551 — date ISO d'un corps JSON ; une valeur illisible donne NaN, écartée juste après
     if (Number.isFinite(closeAt) && closeAt < now) return { code: "REGISTRATION_CLOSE_IN_PAST" };
   }
 

@@ -77,7 +77,7 @@ const SHARED_ERRORS: Record<string, string> = {
 /** Le code nommé du registre, ou `null` : `code in` remonterait la chaîne de prototypes. */
 function lookup(registry: Record<string, string>, code: string | null | undefined): string | null {
   if (!code) return null;
-  return Object.prototype.hasOwnProperty.call(registry, code) ? registry[code] : null;
+  return Object.hasOwn(registry, code) ? registry[code] : null;
 }
 
 /** Le code nommé d'une écriture, ou `null`. */

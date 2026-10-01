@@ -72,7 +72,7 @@ export function PrivacyChangesModal({ changes }: { changes: PrivacyChange[] }) {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ changeIds }),
     });
-    if (!response.ok) throw new Error();
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
   };
 
   const close = () => {

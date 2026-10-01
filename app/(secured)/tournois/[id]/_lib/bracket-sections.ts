@@ -122,7 +122,7 @@ export function buildSections(
         ? stageName(base, stageTotal, bracketType)
         : singleEarly
           ? "Premiers tours"
-          : `Tours ${chunk[0]} à ${chunk[chunk.length - 1]}`;
+          : `Tours ${chunk[0]} à ${chunk.at(-1)}`;
     sections.push({
       key: String(chunk[0]),
       title,
@@ -198,5 +198,5 @@ export function defaultOpenKey(
     .sort((a, b) => a.roundNumber - b.roundNumber)[0];
   if (active) return sectionOfRound(active.roundNumber);
 
-  return sections[sections.length - 1].key;
+  return sections.at(-1)!.key;
 }

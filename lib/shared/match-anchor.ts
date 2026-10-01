@@ -60,7 +60,7 @@ export function parseMatchAnchor(hash: string | null | undefined): number | null
   if (!raw.startsWith(MATCH_ANCHOR_PREFIX)) return null;
 
   const digits = raw.slice(MATCH_ANCHOR_PREFIX.length);
-  if (!/^[1-9][0-9]*$/.test(digits)) return null;
+  if (!/^[1-9]\d*$/.test(digits)) return null;
 
   const matchId = Number(digits);
   return isMatchId(matchId) ? matchId : null;
