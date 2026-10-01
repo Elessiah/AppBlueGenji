@@ -72,6 +72,27 @@ function formatTime(iso: string | null): string | null {
   return date.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Libellés qui dépendent de qui déclare « Prêt » : une équipe, ou le caster. */
+function viewerLaunchCopy(role: MatchLaunchInfo["viewer"]["role"]): { partyWord: string; confirmQuestion: string } {
+  if (role === "CASTER") {
+    return { partyWord: "Je suis prêt", confirmQuestion: "Confirmes-tu être prêt à caster ce match ?" };
+  }
+  return {
+    partyWord: "Mon équipe est prête",
+    confirmQuestion: "Confirmes-tu que ton équipe est au complet et prête à jouer ?",
+  };
+}
+
+/** Sur-titre de la modale. */
+function launchEyebrow(phase: MatchLaunchInfo["phase"]): string {
+  return phase === "LAUNCHED" ? "MATCH LANCÉ" : "LANCEMENT DU MATCH";
+}
+
+/** Libellé d'un bouton, remplacé par « … » le temps d'un envoi. */
+function busyLabel(busy: boolean, label: string): string {
+  return busy ? "…" : label;
+}
+
 /** Doit-on ouvrir la modale d'office pour ce match ? */
 function wantsAutoOpen(info: MatchLaunchInfo, now: number): boolean {
   if (info.phase === "LOBBY") return true;
@@ -107,7 +128,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
     privacyAnswered,
     onPrivacyPage: pathname === PRIVACY_POLICY_PATH,
   });
-  const [launches, setLaunches] = useState<MatchLaunchInfo[]>([]);
+  const { launches, refresh } = useMatchLaunchFeed(clocks);
   const [openMatchId, setOpenMatchId] = useState<number | null>(null);
   const [confirming, setConfirming] = useState(false);
   // Où rendre le focus au prochain rendu : « Prêt », « Retour » et la
@@ -119,64 +140,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
   const [busy, setBusy] = useState(false);
   const dismissedRef = useRef<Set<string> | null>(null);
 
-  // Numéros de séquence : une réponse lente (relève et signal qui se croisent)
-  // ne doit pas écraser une réponse plus récente déjà appliquée.
-  const requestSeqRef = useRef(0);
-  const appliedSeqRef = useRef(0);
-
-  const refresh = useCallback(async () => {
-    const seq = ++requestSeqRef.current;
-    try {
-      const response = await fetch("/api/me/match-launches", { cache: "no-store" });
-      if (!response.ok) return;
-      const payload = (await response.json()) as { launches?: MatchLaunchInfo[] };
-      if (seq < appliedSeqRef.current) return;
-      appliedSeqRef.current = seq;
-      setLaunches(Array.isArray(payload.launches) ? payload.launches : []);
-    } catch {
-      // Réseau coupé : la liste actuelle reste, la prochaine relève rattrapera.
-    }
-  }, []);
-
-  const hasLobby = launches.some((info) => info.phase === "LOBBY");
-  const hasActive = launches.some((info) => info.phase !== "SCHEDULED");
-  let pollMs = POLL_IDLE_MS;
-  if (hasLobby) pollMs = POLL_LOBBY_MS;
-  else if (hasActive) pollMs = POLL_ACTIVE_MS;
-
-  // Lecture au montage et au retour sur l'onglet — et **seulement** là : posée
-  // dans l'effet de relève, qui dépend de `pollMs`, elle repartait à chaque
-  // changement de phase, en double de la lecture qui venait de le révéler.
-  useEffect(() => {
-    if (clocks) void refresh();
-  }, [clocks, refresh]);
-
-  // Relève périodique, suspendue onglet caché.
-  useEffect(() => {
-    if (!clocks) return;
-    const timer = setInterval(() => void refresh(), pollMs);
-    return () => clearInterval(timer);
-  }, [clocks, pollMs, refresh]);
-
-  // L'heure du prochain match programmé : relue à la seconde dite plutôt qu'au
-  // prochain passage de la relève.
-  const nextStart = useMemo(() => {
-    const now = Date.now();
-    const times = launches
-      .filter((info) => info.phase === "SCHEDULED" && info.startAt)
-      .map((info) => new Date(info.startAt as string).getTime())
-      .filter((time) => Number.isFinite(time) && time > now);
-    return times.length > 0 ? Math.min(...times) : null;
-  }, [launches]);
-
-  useEffect(() => {
-    if (nextStart === null || !clocks) return;
-    const timer = setTimeout(() => void refresh(), Math.max(0, nextStart - Date.now()) + 500);
-    return () => clearTimeout(timer);
-  }, [nextStart, clocks, refresh]);
-
-  // Ouverture demandée ailleurs (carte du match), et relecture après une
-  // écriture faite ailleurs (caster inscrit, lancement forcé).
+  // Ouverture demandée ailleurs (carte du match).
   useEffect(() => {
     const onOpen = (event: Event) => {
       const matchId = Number((event as CustomEvent<{ matchId?: unknown }>).detail?.matchId);
@@ -185,24 +149,8 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
       setOpenMatchId(matchId);
       void refresh();
     };
-    // Regroupés : la fiche d'un tournoi signale chaque changement d'une
-    // rencontre du lecteur, et une rafale d'instantanés ne doit valoir qu'une
-    // lecture.
-    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
-    const onRefresh = () => {
-      if (refreshTimer !== null) return;
-      refreshTimer = setTimeout(() => {
-        refreshTimer = null;
-        void refresh();
-      }, REFRESH_EVENT_COALESCE_MS);
-    };
     window.addEventListener(MATCH_LAUNCH_OPEN_EVENT, onOpen);
-    window.addEventListener(MATCH_LAUNCH_REFRESH_EVENT, onRefresh);
-    return () => {
-      if (refreshTimer !== null) clearTimeout(refreshTimer);
-      window.removeEventListener(MATCH_LAUNCH_OPEN_EVENT, onOpen);
-      window.removeEventListener(MATCH_LAUNCH_REFRESH_EVENT, onRefresh);
-    };
+    return () => window.removeEventListener(MATCH_LAUNCH_OPEN_EVENT, onOpen);
   }, [refresh]);
 
   // Ouverture d'office : un match qui entre en lancement, ou qui vient d'être
@@ -307,24 +255,14 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
 
   if (!current) {
     if (waiting || pending.length === 0) return null;
-    const lobby = pending.find((info) => info.phase === "LOBBY");
-    const target = lobby ?? pending[0];
     return (
-      <button
-        type="button"
-        className={styles.fab}
-        data-phase={target.phase}
-        onClick={() => {
+      <LaunchFab
+        pending={pending}
+        onOpen={(matchId) => {
           setConfirming(false);
-          setOpenMatchId(target.matchId);
+          setOpenMatchId(matchId);
         }}
-      >
-        <span aria-hidden="true">{lobby ? "⏳" : "▶"}</span>
-        {lobby ? "Match en lancement" : "Mon match"}
-        <span className={styles.fabTeams}>
-          {target.team1.name} vs {target.team2.name}
-        </span>
-      </button>
+      />
     );
   }
 
@@ -343,7 +281,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
     pending.map((info) => info.matchId),
     current.matchId,
   );
-  const partyWord = current.viewer.role === "CASTER" ? "Je suis prêt" : "Mon équipe est prête";
+  const { partyWord, confirmQuestion } = viewerLaunchCopy(current.viewer.role);
 
   return (
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation">
@@ -361,7 +299,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
         <ScrollArea orientation="y" className={styles.scroll} ariaLabel="Détails du match">
           <header className={styles.head}>
             <span className="eyebrow">
-              {current.phase === "LAUNCHED" ? "MATCH LANCÉ" : "LANCEMENT DU MATCH"} ·{" "}
+              {launchEyebrow(current.phase)} ·{" "}
               {current.tournamentName}
             </span>
             <h2 id={titleId} className={styles.title}>
@@ -376,20 +314,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
               <span className={styles.titleTeam}>{current.team2.name}</span>
             </h2>
             <p /* NOSONAR S6819 — région live d'état, pas le résultat d'un formulaire */ id={statusId} className={styles.status} data-phase={current.phase} role="status">
-              {current.phase === "LOBBY" && (
-                <>
-                  En attente des « Prêt » —{" "}
-                  <strong className="num">
-                    {count.ready}/{count.expected}
-                  </strong>{" "}
-                  prêts
-                  {autoAt && <> · lancement automatique à <span className="num">{autoAt}</span></>}
-                </>
-              )}
-              {current.phase === "LAUNCHED" && <>Le match est lancé — bonne partie !</>}
-              {current.phase === "SCHEDULED" && (
-                <>Début prévu à <span className="num">{startAt ?? "—"}</span></>
-              )}
+              <LaunchStatus phase={current.phase} count={count} autoAt={autoAt} startAt={startAt} />
             </p>
           </header>
 
@@ -425,9 +350,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
             tabIndex={-1}
           >
             <p id={confirmTextId} className={styles.confirmText}>
-              {current.viewer.role === "CASTER"
-                ? "Confirmes-tu être prêt à caster ce match ?"
-                : "Confirmes-tu que ton équipe est au complet et prête à jouer ?"}{" "}
+              {confirmQuestion}{" "}
               Le match démarre dès que toutes les parties sont prêtes.
             </p>
             <div className={styles.actions}>
@@ -448,7 +371,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                 onClick={() => void setReady(true)}
                 disabled={busy}
               >
-                {busy ? "…" : "Confirmer : prêt"}
+                {busyLabel(busy, "Confirmer : prêt")}
               </button>
             </div>
           </fieldset>
@@ -465,7 +388,7 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
                   aria-pressed="true"
                   title="Cliquer pour annuler ton « Prêt »"
                 >
-                  {busy ? "…" : "✓ Prêt — annuler"}
+                  {busyLabel(busy, "✓ Prêt — annuler")}
                 </button>
               ) : (
                 <button
@@ -522,6 +445,155 @@ export function MatchLaunchCenter({ privacyPending = false }: Readonly<{ privacy
         )}
       </div>
     </div>
+  );
+}
+
+/** Cadence de relève selon la phase la plus pressante de la liste. */
+function launchPollInterval(launches: readonly MatchLaunchInfo[]): number {
+  const hasLobby = launches.some((info) => info.phase === "LOBBY");
+  const hasActive = launches.some((info) => info.phase !== "SCHEDULED");
+  let pollMs = POLL_IDLE_MS;
+  if (hasLobby) pollMs = POLL_LOBBY_MS;
+  else if (hasActive) pollMs = POLL_ACTIVE_MS;
+  return pollMs;
+}
+
+/**
+ * Liste des lancements du lecteur, tenue à jour : lecture au montage et au
+ * retour sur l'onglet, relève périodique suspendue onglet caché, relecture à
+ * l'heure du prochain match programmé et sur demande d'une autre page.
+ */
+function useMatchLaunchFeed(clocks: boolean) {
+  const [launches, setLaunches] = useState<MatchLaunchInfo[]>([]);
+
+  // Numéros de séquence : une réponse lente (relève et signal qui se croisent)
+  // ne doit pas écraser une réponse plus récente déjà appliquée.
+  const requestSeqRef = useRef(0);
+  const appliedSeqRef = useRef(0);
+
+  const refresh = useCallback(async () => {
+    const seq = ++requestSeqRef.current;
+    try {
+      const response = await fetch("/api/me/match-launches", { cache: "no-store" });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { launches?: MatchLaunchInfo[] };
+      if (seq < appliedSeqRef.current) return;
+      appliedSeqRef.current = seq;
+      setLaunches(Array.isArray(payload.launches) ? payload.launches : []);
+    } catch {
+      // Réseau coupé : la liste actuelle reste, la prochaine relève rattrapera.
+    }
+  }, []);
+
+  const pollMs = launchPollInterval(launches);
+
+  // Lecture au montage et au retour sur l'onglet — et **seulement** là : posée
+  // dans l'effet de relève, qui dépend de `pollMs`, elle repartait à chaque
+  // changement de phase, en double de la lecture qui venait de le révéler.
+  useEffect(() => {
+    if (clocks) void refresh();
+  }, [clocks, refresh]);
+
+  // Relève périodique, suspendue onglet caché.
+  useEffect(() => {
+    if (!clocks) return;
+    const timer = setInterval(() => void refresh(), pollMs);
+    return () => clearInterval(timer);
+  }, [clocks, pollMs, refresh]);
+
+  // L'heure du prochain match programmé : relue à la seconde dite plutôt qu'au
+  // prochain passage de la relève.
+  const nextStart = useMemo(() => {
+    const now = Date.now();
+    const times = launches
+      .filter((info) => info.phase === "SCHEDULED" && info.startAt)
+      .map((info) => new Date(info.startAt as string).getTime())
+      .filter((time) => Number.isFinite(time) && time > now);
+    return times.length > 0 ? Math.min(...times) : null;
+  }, [launches]);
+
+  useEffect(() => {
+    if (nextStart === null || !clocks) return;
+    const timer = setTimeout(() => void refresh(), Math.max(0, nextStart - Date.now()) + 500);
+    return () => clearTimeout(timer);
+  }, [nextStart, clocks, refresh]);
+
+  // Relecture après une écriture faite ailleurs (caster inscrit, lancement
+  // forcé).
+  useEffect(() => {
+    // Regroupés : la fiche d'un tournoi signale chaque changement d'une
+    // rencontre du lecteur, et une rafale d'instantanés ne doit valoir qu'une
+    // lecture.
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const onRefresh = () => {
+      if (refreshTimer !== null) return;
+      refreshTimer = setTimeout(() => {
+        refreshTimer = null;
+        void refresh();
+      }, REFRESH_EVENT_COALESCE_MS);
+    };
+    window.addEventListener(MATCH_LAUNCH_REFRESH_EVENT, onRefresh);
+    return () => {
+      if (refreshTimer !== null) clearTimeout(refreshTimer);
+      window.removeEventListener(MATCH_LAUNCH_REFRESH_EVENT, onRefresh);
+    };
+  }, [refresh]);
+
+  return { launches, refresh };
+}
+
+/** Pastille qui rouvre la modale tant qu'un match du lecteur se joue. */
+function LaunchFab({
+  pending,
+  onOpen,
+}: Readonly<{ pending: readonly MatchLaunchInfo[]; onOpen: (matchId: number) => void }>) {
+  const lobby = pending.find((info) => info.phase === "LOBBY");
+  const target = lobby ?? pending[0];
+  return (
+    <button
+      type="button"
+      className={styles.fab}
+      data-phase={target.phase}
+      onClick={() => onOpen(target.matchId)}
+    >
+      <span aria-hidden="true">{lobby ? "⏳" : "▶"}</span>
+      {lobby ? "Match en lancement" : "Mon match"}
+      <span className={styles.fabTeams}>
+        {target.team1.name} vs {target.team2.name}
+      </span>
+    </button>
+  );
+}
+
+/** État du lancement, annoncé aux technologies d'assistance. */
+function LaunchStatus({
+  phase,
+  count,
+  autoAt,
+  startAt,
+}: Readonly<{
+  phase: MatchLaunchInfo["phase"];
+  count: { ready: number; expected: number };
+  autoAt: string | null;
+  startAt: string | null;
+}>) {
+  return (
+    <>
+      {phase === "LOBBY" && (
+        <>
+          En attente des « Prêt » —{" "}
+          <strong className="num">
+            {count.ready}/{count.expected}
+          </strong>{" "}
+          prêts
+          {autoAt && <> · lancement automatique à <span className="num">{autoAt}</span></>}
+        </>
+      )}
+      {phase === "LAUNCHED" && <>Le match est lancé — bonne partie !</>}
+      {phase === "SCHEDULED" && (
+        <>Début prévu à <span className="num">{startAt ?? "—"}</span></>
+      )}
+    </>
   );
 }
 

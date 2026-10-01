@@ -9,6 +9,7 @@ import type {
   BracketMatch,
   BracketType,
   EndurancePenaltyRow,
+  TournamentDetail,
   TournamentFormat,
 } from "@/lib/shared/types";
 import { participantWording } from "@/lib/shared/participants";
@@ -17,6 +18,7 @@ import { advanceSuccessMessage } from "@/lib/shared/tournament-launch";
 import { useToast } from "@/components/ui/toast";
 import { CyberButton } from "@/components/cyber";
 import { useTournamentLive } from "./_hooks/useTournamentLive";
+import type { LiveFailure } from "./_lib/live-state";
 import { mapError } from "./_lib/error-map";
 import { registrationConfirmText } from "./_lib/registration-confirm";
 import { formatLocalDateTime } from "@/lib/shared/dates";
@@ -120,6 +122,198 @@ function preLaunchBoardText(formatForBracket: string, format: TournamentFormat, 
     return "Le classement de départ (seeding) et la première ronde seront générés au démarrage du tournoi.";
   }
   return "Le bracket sera généré automatiquement au démarrage du tournoi.";
+}
+
+/** Page d'un tournoi inaccessible : session expirée, ou tournoi introuvable. */
+function TournamentFatal({ fatal }: Readonly<{ fatal: LiveFailure }>) {
+  return (
+    <section className={`ds-block ${styles.status}`} role="alert">
+      <h1 className={styles.fatalTitle}>
+        {fatal === "UNAUTHORIZED" ? "Session expirée" : "Tournoi introuvable"}
+      </h1>
+      <p className={styles.fatalText}>
+        {fatal === "UNAUTHORIZED"
+          ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
+          : // Volontairement neutre : ce 404 recouvre le tournoi supprimé et
+            // le tournoi pas encore publié, que le serveur refuse sans dire
+            // lequel des deux (`docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`).
+            "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public."}
+      </p>
+      <CyberButton asChild variant="primary">
+        <Link href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}>
+          {fatal === "UNAUTHORIZED" ? "Se reconnecter" : "Retour aux tournois"}
+        </Link>
+      </CyberButton>
+    </section>
+  );
+}
+
+/** Rencontre désignée par un identifiant, relue dans la liste du moment. */
+function matchById(matches: readonly BracketMatch[], id: number | null): BracketMatch | null {
+  return id === null ? null : matches.find((match) => match.id === id) ?? null;
+}
+
+/** Retour en arrière : le plan du moment, son refus, et les rencontres qu'il efface. */
+function rollbackView(detail: TournamentDetail, frozen: boolean) {
+  const rollbackTargetState =
+    detail.card.state === "RUNNING" || detail.card.state === "FINISHED";
+  const rollbackPlan =
+    detail.isAdmin && !frozen && rollbackTargetState
+      ? planRoundRollback(
+          detail.matches.map((match) => ({
+            ...fromBracketMatch(match),
+            bracket: match.bracket,
+          })),
+        )
+      : null;
+  const rollbackRefusal = typeof rollbackPlan === "string" ? rollbackPlan : null;
+  const rollbackReady =
+    rollbackPlan !== null && typeof rollbackPlan !== "string" ? rollbackPlan : null;
+  // Les rencontres de la manche, relues à chaque rendu depuis le flux : le
+  // dialogue annonce les scores du moment, pas ceux d'une photo prise à
+  // l'ouverture.
+  const rollbackMatches =
+    rollbackReady === null
+      ? []
+      : detail.matches.filter((match) => rollbackReady.clearedMatchIds.includes(match.id));
+  return { rollbackPlan, rollbackRefusal, rollbackReady, rollbackMatches };
+}
+
+type TournamentPhaseView = NonNullable<TournamentDetail["phases"]>[number];
+
+/** Phase consultée d'un multi-phases, et ce qu'elle restreint du plateau. */
+function selectedPhaseView(detail: TournamentDetail, selectedPhaseId: number | null) {
+  const isMulti = detail.card.format === "MULTI";
+  const selectedPhase =
+    isMulti && selectedPhaseId && detail.phases
+      ? detail.phases.find((p) => p.id === selectedPhaseId) || null
+      : null;
+
+  const phaseNameSuffix = selectedPhase?.name ? ` — ${selectedPhase.name}` : "";
+  const contextLabel =
+    isMulti && selectedPhase ? `Phase ${selectedPhase.position}${phaseNameSuffix}` : undefined;
+
+  const filteredMatches = isMulti && selectedPhase
+    ? detail.matches.filter((m) => m.phaseId === selectedPhase.id)
+    : detail.matches;
+
+  const formatForBracket = isMulti && selectedPhase ? selectedPhase.format : detail.card.format;
+  return { isMulti, selectedPhase, contextLabel, filteredMatches, formatForBracket };
+}
+
+/** Disposition du plateau selon la phase consultée. */
+function phaseBoardLayout(
+  detail: TournamentDetail,
+  isMulti: boolean,
+  selectedPhase: TournamentPhaseView | null,
+  formatForBracket: TournamentFormat,
+) {
+  // Les classements suisse et survie de l'instantané sont ceux du tournoi, ou —
+  // en multi-phases — de la seule phase **en cours** (`snapshot.ts`). Ils ne
+  // décrivent donc la phase affichée que si c'est elle ; une phase close montre
+  // ses manches seules, et son classement de phase dessous.
+  const rankingMetaIsSelectedPhase =
+    !isMulti || (selectedPhase !== null && selectedPhase.id === detail.currentPhaseId);
+  // Clé des vues à manches : changer de phase les remonte, et leur zone de
+  // manches se rouvre sur la dernière (`revealKey` ne suffit pas quand deux
+  // phases ont autant de manches).
+  const phaseViewKey = selectedPhase ? `phase-${selectedPhase.id}` : "tournament";
+  const hasThirdPlaceForPhase = isMulti && selectedPhase ? selectedPhase.hasThirdPlaceMatch : detail.card.hasThirdPlaceMatch;
+
+  const singleBracketOrder: BracketType[] = hasThirdPlaceForPhase ? ["UPPER", "THIRD_PLACE"] : ["UPPER"];
+  const bracketOrder: BracketType[] =
+    formatForBracket === "SINGLE" ? singleBracketOrder : ["UPPER", "LOWER", "GRAND"];
+  return { rankingMetaIsSelectedPhase, phaseViewKey, bracketOrder };
+}
+
+/** Classement d'une phase terminée, quand c'est elle qu'on consulte. */
+function finishedPhaseStandingRows(
+  detail: TournamentDetail,
+  isMulti: boolean,
+  selectedPhase: TournamentPhaseView | null,
+) {
+  return isMulti && selectedPhase?.state === "FINISHED"
+    ? detail.phaseStandings?.[selectedPhase.id] ?? null
+    : null;
+}
+
+interface TournamentDangerZoneProps {
+  detail: TournamentDetail;
+  rollbackPlan: ReturnType<typeof rollbackView>["rollbackPlan"];
+  rollbackReady: ReturnType<typeof rollbackView>["rollbackReady"];
+  rollbackRefusal: ReturnType<typeof rollbackView>["rollbackRefusal"];
+  rollbackReopenNote: string;
+  onRollback: () => void;
+  onDelete: () => void;
+}
+
+/**
+ * Zone de danger : les gestes qu'on ne défait pas, volontairement isolés en bas
+ * de page. Chaque bloc garde sa propre garde.
+ */
+function TournamentDangerZone({
+  detail,
+  rollbackPlan,
+  rollbackReady,
+  rollbackRefusal,
+  rollbackReopenNote,
+  onRollback,
+  onDelete,
+}: Readonly<TournamentDangerZoneProps>) {
+  return (
+    <div className={`ds-block ${styles.danger}`}>
+      <div className="ds-section-title">
+        <h2 className={styles.dangerTitle}>Zone de danger</h2>
+      </div>
+      {/* Retour en arrière — au-dessus de la suppression : c'est le geste
+          qu'un arbitre vient chercher ici, et le seul des deux qui se
+          rejoue. Rendu même quand il est refusé, avec son motif : un
+          bouton qui disparaît laisse chercher, une phrase explique. */}
+      {detail.isAdmin && rollbackPlan !== null && (
+        <div className={styles.dangerRow}>
+          <p id="rollback-hint" className={styles.dangerText}>
+            {rollbackReady
+              ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${rollbackReopenNote} Pense à noter les scores avant : rien n'est archivé.`
+              : mapError(rollbackRefusal ?? "")}
+          </p>
+          <CyberButton
+            variant="ghost"
+            onClick={() => {
+              if (rollbackReady !== null) onRollback();
+            }}
+            // `aria-disabled` et non `disabled` : un bouton désactivé n'est
+            // pas focalisable, si bien qu'un lecteur d'écran sautait le
+            // contrôle **et** le motif du refus qui lui est rattaché.
+            // Focalisable, il reste inerte par la garde du clic — et le
+            // style du refus vit sur le même attribut.
+            aria-disabled={rollbackReady === null}
+            // La phrase à gauche dit ce que le geste efface, ou pourquoi il
+            // est refusé : elle fait partie du bouton, pas de son décor.
+            aria-describedby="rollback-hint"
+            className={`${styles.dangerAction} ${styles.rollbackAction}`}
+          >
+            Revenir en arrière d&apos;une manche
+          </CyberButton>
+        </div>
+      )}
+
+      {detail.canDelete && (
+        <div className={styles.dangerRow}>
+          <p className={styles.dangerText}>
+            Supprimer ce tournoi l&apos;efface du site pour de bon, avec ses matchs, ses
+            inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.
+          </p>
+          <CyberButton
+            variant="ghost"
+            onClick={() => onDelete()}
+            className={`${styles.dangerAction} ${styles.deleteAction}`}
+          >
+            Supprimer le tournoi
+          </CyberButton>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function TournamentDetailPage() {
@@ -315,26 +509,7 @@ export default function TournamentDetailPage() {
   // page resterait sur « Chargement… » pour toujours — le seul état où il ne
   // reste que le F5, et où il ne sert à rien.
   if (fatal && !detail) {
-    return (
-      <section className={`ds-block ${styles.status}`} role="alert">
-        <h1 className={styles.fatalTitle}>
-          {fatal === "UNAUTHORIZED" ? "Session expirée" : "Tournoi introuvable"}
-        </h1>
-        <p className={styles.fatalText}>
-          {fatal === "UNAUTHORIZED"
-            ? "Ta session a expiré : le suivi en direct est arrêté. Reconnecte-toi pour le reprendre."
-            : // Volontairement neutre : ce 404 recouvre le tournoi supprimé et
-              // le tournoi pas encore publié, que le serveur refuse sans dire
-              // lequel des deux (`docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`).
-              "Ce tournoi n'est pas accessible. Il a pu être supprimé, ou n'est pas encore ouvert au public."}
-        </p>
-        <CyberButton asChild variant="primary">
-          <Link href={fatal === "UNAUTHORIZED" ? "/connexion" : "/tournois"}>
-            {fatal === "UNAUTHORIZED" ? "Se reconnecter" : "Retour aux tournois"}
-          </Link>
-        </CyberButton>
-      </section>
-    );
+    return <TournamentFatal fatal={fatal} />;
   }
 
   if (!detail) {
@@ -356,27 +531,7 @@ export default function TournamentDetailPage() {
    * cas qui manquait le plus, l'erreur de finale étant la seule que `match-lock`
    * ne laisse plus corriger. Le geste le rouvrira, et le dialogue le dit.
    */
-  const rollbackTargetState =
-    detail.card.state === "RUNNING" || detail.card.state === "FINISHED";
-  const rollbackPlan =
-    detail.isAdmin && !frozen && rollbackTargetState
-      ? planRoundRollback(
-          detail.matches.map((match) => ({
-            ...fromBracketMatch(match),
-            bracket: match.bracket,
-          })),
-        )
-      : null;
-  const rollbackRefusal = typeof rollbackPlan === "string" ? rollbackPlan : null;
-  const rollbackReady =
-    rollbackPlan !== null && typeof rollbackPlan !== "string" ? rollbackPlan : null;
-  // Les rencontres de la manche, relues à chaque rendu depuis le flux : le
-  // dialogue annonce les scores du moment, pas ceux d'une photo prise à
-  // l'ouverture.
-  const rollbackMatches =
-    rollbackReady === null
-      ? []
-      : detail.matches.filter((match) => rollbackReady.clearedMatchIds.includes(match.id));
+  const { rollbackPlan, rollbackRefusal, rollbackReady, rollbackMatches } = rollbackView(detail, frozen);
 
   // Vocabulaire de l'affichage : un tournoi individuel parle de joueurs, pas
   // d'équipes (`lib/shared/participants.ts`).
@@ -529,37 +684,17 @@ export default function TournamentDetailPage() {
     setPendingConfirm({ ...text, tone: "primary", run: performRegister });
   };
 
-  const isMulti = detail.card.format === "MULTI";
-  const selectedPhase =
-    isMulti && selectedPhaseId && detail.phases
-      ? detail.phases.find((p) => p.id === selectedPhaseId) || null
-      : null;
-
+  const { isMulti, selectedPhase, contextLabel, filteredMatches, formatForBracket } = selectedPhaseView(
+    detail,
+    selectedPhaseId,
+  );
   const visibleFormat = visibleRulesFormat(detail.card, selectedPhase);
-  const phaseNameSuffix = selectedPhase?.name ? ` — ${selectedPhase.name}` : "";
-  const contextLabel =
-    isMulti && selectedPhase ? `Phase ${selectedPhase.position}${phaseNameSuffix}` : undefined;
-
-  const filteredMatches = isMulti && selectedPhase
-    ? detail.matches.filter((m) => m.phaseId === selectedPhase.id)
-    : detail.matches;
-
-  const formatForBracket = isMulti && selectedPhase ? selectedPhase.format : detail.card.format;
-  // Les classements suisse et survie de l'instantané sont ceux du tournoi, ou —
-  // en multi-phases — de la seule phase **en cours** (`snapshot.ts`). Ils ne
-  // décrivent donc la phase affichée que si c'est elle ; une phase close montre
-  // ses manches seules, et son classement de phase dessous.
-  const rankingMetaIsSelectedPhase =
-    !isMulti || (selectedPhase !== null && selectedPhase.id === detail.currentPhaseId);
-  // Clé des vues à manches : changer de phase les remonte, et leur zone de
-  // manches se rouvre sur la dernière (`revealKey` ne suffit pas quand deux
-  // phases ont autant de manches).
-  const phaseViewKey = selectedPhase ? `phase-${selectedPhase.id}` : "tournament";
-  const hasThirdPlaceForPhase = isMulti && selectedPhase ? selectedPhase.hasThirdPlaceMatch : detail.card.hasThirdPlaceMatch;
-
-  const singleBracketOrder: BracketType[] = hasThirdPlaceForPhase ? ["UPPER", "THIRD_PLACE"] : ["UPPER"];
-  const bracketOrder: BracketType[] =
-    formatForBracket === "SINGLE" ? singleBracketOrder : ["UPPER", "LOWER", "GRAND"];
+  const { rankingMetaIsSelectedPhase, phaseViewKey, bracketOrder } = phaseBoardLayout(
+    detail,
+    isMulti,
+    selectedPhase,
+    formatForBracket,
+  );
   const bracketLabels: Record<BracketType, string> = {
     UPPER: "Tableau principal",
     LOWER: "Tableau perdants",
@@ -569,31 +704,16 @@ export default function TournamentDetailPage() {
   // Résolu à chaque rendu depuis la liste fraîche : le dialogue de diffusion
   // travaille toujours sur l'état courant du match, et se ferme de lui-même si
   // le match disparaît (plateau régénéré).
-  const matchForAdminScore =
-    selectedMatchForAdminId === null
-      ? null
-      : detail.matches.find((match) => match.id === selectedMatchForAdminId) ?? null;
+  const matchForAdminScore = matchById(detail.matches, selectedMatchForAdminId);
   // Relu comme l'arbitrage, et refermé de lui-même dès que le match n'appelle
   // plus de geste du lecteur : l'adversaire vient de confirmer, l'arbitrage de
   // trancher — la modale ne reste pas ouverte sur un résultat acquis.
-  const playerScoreCandidate =
-    playerScoreMatchId === null
-      ? null
-      : detail.matches.find((match) => match.id === playerScoreMatchId) ?? null;
+  const playerScoreCandidate = matchById(detail.matches, playerScoreMatchId);
   const matchForPlayerScore =
     playerScoreCandidate && canOpenPlayerScore(playerScoreCandidate) ? playerScoreCandidate : null;
-  const matchForLive =
-    matchForLiveId === null
-      ? null
-      : detail.matches.find((match) => match.id === matchForLiveId) ?? null;
-  const matchForSchedule =
-    matchForScheduleId === null
-      ? null
-      : detail.matches.find((match) => match.id === matchForScheduleId) ?? null;
-  const matchForReplay =
-    matchForReplayId === null
-      ? null
-      : detail.matches.find((match) => match.id === matchForReplayId) ?? null;
+  const matchForLive = matchById(detail.matches, matchForLiveId);
+  const matchForSchedule = matchById(detail.matches, matchForScheduleId);
+  const matchForReplay = matchById(detail.matches, matchForReplayId);
 
   const brackets = bracketOrder
     .map((b) => ({ type: b, matches: filteredMatches.filter((m) => m.bracket === b) }))
@@ -620,10 +740,7 @@ export default function TournamentDetailPage() {
 
   // Classement d'une phase terminée, affiché sous son plateau quand on la
   // consulte — le même bloc pour les trois vues qui en ont un.
-  const selectedPhaseStandings =
-    isMulti && selectedPhase?.state === "FINISHED"
-      ? detail.phaseStandings?.[selectedPhase.id] ?? null
-      : null;
+  const selectedPhaseStandings = finishedPhaseStandingRows(detail, isMulti, selectedPhase);
   const finishedPhaseStandings = selectedPhaseStandings ? (
     <PhaseStandingsBlock standings={selectedPhaseStandings} />
   ) : null;
@@ -910,58 +1027,15 @@ export default function TournamentDetailPage() {
             réservée aux administrateurs stricts (`canDelete`). La section
             s'ouvre donc au premier, chaque bloc gardant sa propre garde. */}
         {(detail.isAdmin || detail.canDelete) && !frozen && (
-          <div className={`ds-block ${styles.danger}`}>
-            <div className="ds-section-title">
-              <h2 className={styles.dangerTitle}>Zone de danger</h2>
-            </div>
-            {/* Retour en arrière — au-dessus de la suppression : c'est le geste
-                qu'un arbitre vient chercher ici, et le seul des deux qui se
-                rejoue. Rendu même quand il est refusé, avec son motif : un
-                bouton qui disparaît laisse chercher, une phrase explique. */}
-            {detail.isAdmin && rollbackPlan !== null && (
-              <div className={styles.dangerRow}>
-                <p id="rollback-hint" className={styles.dangerText}>
-                  {rollbackReady
-                    ? `Effacer ${rollbackStageLabelWithArticle(rollbackReady)} rouvre la manche précédente à la correction. Le geste se répète : de manche en manche, on remonte jusqu'au début du tournoi.${rollbackReopenNote} Pense à noter les scores avant : rien n'est archivé.`
-                    : mapError(rollbackRefusal ?? "")}
-                </p>
-                <CyberButton
-                  variant="ghost"
-                  onClick={() => {
-                    if (rollbackReady !== null) setRollbackDialogOpen(true);
-                  }}
-                  // `aria-disabled` et non `disabled` : un bouton désactivé n'est
-                  // pas focalisable, si bien qu'un lecteur d'écran sautait le
-                  // contrôle **et** le motif du refus qui lui est rattaché.
-                  // Focalisable, il reste inerte par la garde du clic — et le
-                  // style du refus vit sur le même attribut.
-                  aria-disabled={rollbackReady === null}
-                  // La phrase à gauche dit ce que le geste efface, ou pourquoi il
-                  // est refusé : elle fait partie du bouton, pas de son décor.
-                  aria-describedby="rollback-hint"
-                  className={`${styles.dangerAction} ${styles.rollbackAction}`}
-                >
-                  Revenir en arrière d&apos;une manche
-                </CyberButton>
-              </div>
-            )}
-
-            {detail.canDelete && (
-              <div className={styles.dangerRow}>
-                <p className={styles.dangerText}>
-                  Supprimer ce tournoi l&apos;efface du site pour de bon, avec ses matchs, ses
-                  inscriptions et ses classements. Les équipes et les joueurs, eux, sont conservés.
-                </p>
-                <CyberButton
-                  variant="ghost"
-                  onClick={() => setDeleteDialogOpen(true)}
-                  className={`${styles.dangerAction} ${styles.deleteAction}`}
-                >
-                  Supprimer le tournoi
-                </CyberButton>
-              </div>
-            )}
-          </div>
+          <TournamentDangerZone
+            detail={detail}
+            rollbackPlan={rollbackPlan}
+            rollbackReady={rollbackReady}
+            rollbackRefusal={rollbackRefusal}
+            rollbackReopenNote={rollbackReopenNote}
+            onRollback={() => setRollbackDialogOpen(true)}
+            onDelete={() => setDeleteDialogOpen(true)}
+          />
         )}
       </section>
 
