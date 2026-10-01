@@ -307,6 +307,15 @@ describe("readMatchStartEntry", () => {
     });
   });
 
+  it("date inchangée : l'instant exact, même sur l'heure doublée d'octobre", () => {
+    // Seconde occurrence de 2 h 30 le 25 octobre 2026 (heure d'hiver).
+    const current = "2026-10-25T01:30:00.000Z";
+    expect(readMatchStartEntry(raw("25", "10", "02:30"), at("2026-10-01T00:00:00Z"), current)).toEqual({
+      kind: "ready",
+      instant: at(current),
+    });
+  });
+
   it("jour ou mois changé : la déduction reprend", () => {
     const current = "2026-03-10T19:00:00.000Z";
     expect(readMatchStartEntry(raw("5", "1", "20:00"), at("2026-12-15T10:00:00Z"), current)).toEqual({
