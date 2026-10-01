@@ -48,7 +48,7 @@ Sessions `bg_user_sessions` (30 j, cookie `bg_session`), révocables (`SESSION_R
 **Un changement de schéma s'écrit à deux endroits** : dans le `CREATE TABLE` (bases neuves) **et** en `ALTER TABLE` tolérant dans la section « Migrations » (bases existantes, où `CREATE TABLE IF NOT EXISTS` ne fait rien) — la seconde entrée se retire une fois jouée partout.
 
 ### Tournament Engine (`lib/server/tournaments-service.ts`)
-États `UPCOMING → REGISTRATION → RUNNING → FINISHED` ; matchs `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED` ; positions `UPPER`/`LOWER`/`GRAND`. Les modes à classement **rejouent** tout depuis l'historique des matchs (rien n'est accumulé). Une transaction qui compte les inscrites contre un plafond (inscription, lot de fantômes, retrait) prend `lockTournamentRow` **en toute première instruction** : sous `REPEATABLE READ`, une lecture avant le verrou fige un effectif périmé. Byes → `BYE_FUNCTIONALITY.md`, `VARIABLE_SIZE_TOURNAMENTS.md`.
+États `UPCOMING → REGISTRATION → RUNNING → FINISHED` ; matchs `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED` ; positions `UPPER`/`LOWER`/`GRAND`. Les modes à classement **rejouent** tout depuis l'historique des matchs (rien n'est accumulé). Une transaction qui lit puis écrit les inscrites (inscription, lot de fantômes, retrait, seeding) prend `lockTournamentRow` **en toute première instruction** : sous `REPEATABLE READ`, une lecture avant le verrou fige un état périmé. Byes → `BYE_FUNCTIONALITY.md`, `VARIABLE_SIZE_TOURNAMENTS.md`.
 - **Survie** (`SURVIVAL`) — coupes des 2 derniers, barrage si impair → `SURVIVAL_MODE.md`
 - **Ronde suisse** → `SWISS_MODE.md`
 - **Multi-phases** (`MULTI`, 2 à 8 phases) → `MULTI_PHASE_TOURNAMENTS.md`
@@ -84,15 +84,31 @@ Appels toujours app → bot (`lib/server/bot-integration.ts`, dégradation si in
 ## Environment Variables → `docs/ENVIRONMENT.md` (défauts et commentaires)
 
 ```env
-DB_HOST= DB_USER= DB_PASSWORD= DB_DATABASE=
+DB_HOST=
+DB_USER=
+DB_PASSWORD=
+DB_DATABASE=
 APP_URL=http://localhost:3000
-GOOGLE_CLIENT_ID= GOOGLE_CLIENT_SECRET= GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
-DISCORD_AUTH_CLIENT_ID= DISCORD_CLIENT_SECRET= DISCORD_REDIRECT_URI=   # OAuth Discord
-BLIZZARD_CLIENT_ID= BLIZZARD_CLIENT_SECRET= BLIZZARD_REDIRECT_URI= BLIZZARD_REGION=
-BOT_INTERNAL_URL=http://127.0.0.1:4400 BOT_INTERNAL_TOKEN=   # = INTERNAL_API_TOKEN du bot
-DEV_AUTH_USER_ID=   # bypass en dev seulement (voir plus bas)
-BOT_DOCS_PATH= VISIT_HASH_SALT= TRUSTED_PROXY_HOPS=1 TRUSTED_PROXY_REAL_IP=false
-VAPID_PUBLIC_KEY= VAPID_PRIVATE_KEY= VAPID_SUBJECT=   # push ; ne jamais changer la clé privée en production
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/auth/google/callback
+DISCORD_AUTH_CLIENT_ID=
+DISCORD_CLIENT_SECRET=
+DISCORD_REDIRECT_URI=
+BLIZZARD_CLIENT_ID=
+BLIZZARD_CLIENT_SECRET=
+BLIZZARD_REDIRECT_URI=
+BLIZZARD_REGION=
+BOT_INTERNAL_URL=http://127.0.0.1:4400
+BOT_INTERNAL_TOKEN=  # = INTERNAL_API_TOKEN du bot
+DEV_AUTH_USER_ID=  # bypass en dev seulement (voir plus bas)
+BOT_DOCS_PATH=
+VISIT_HASH_SALT=
+TRUSTED_PROXY_HOPS=1
+TRUSTED_PROXY_REAL_IP=false
+VAPID_PUBLIC_KEY=
+VAPID_PRIVATE_KEY=  # ne jamais la changer en production
+VAPID_SUBJECT=
 ```
 
 ## Dev auth bypass → `docs/features/DEV_AUTH_BYPASS.md`
@@ -108,7 +124,7 @@ Refuse `NODE_ENV=production` ; verrou nommé `bg_seed` (les worktrees partagent 
 - `lib/server/*` : serveur seulement, jamais importé côté client. `lib/shared/*` : importable partout (logique pure).
 - Helpers obligatoires : `normalizePseudo()` / `slugifyPseudo()`, `toIso()`, `parseRoles()`. Noms saisis via `visibleText` → `UNTRUSTED_NAMES.md`.
 - **Permissions de plateforme** : protéger une route par `can(user, "<permission>")` / `canAny` (`@/lib/shared/permissions` : `tournaments`, `casting`, `live`, `showcase`, `recruitment`, `roles`, `moderation`), jamais `user.isAdmin` pour un domaine scopé (seule exception : suppression d'un tournoi) → `PERMISSION_ROLES.md`. Routes admin sous `app/api/admin/`.
-- **Rôles d'équipe** (JSON cumulatif : `OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`) : seuls `OWNER`/`MANAGER` gèrent (inscription, abandon) via `hasTeamManagementRole` → `docs/AUTHORIZATION_RULES.md`.
+- **Rôles d'équipe** (JSON cumulatif : `OWNER`, `CAPITAINE`, `MANAGER`, `COACH`, `TANK`, `DPS`, `HEAL`) : `OWNER`/`MANAGER` gèrent (inscription, abandon) via `hasTeamManagementRole` ; nom, sigle, transfert, dissolution : `OWNER` seul → `docs/AUTHORIZATION_RULES.md`.
 - **Entrées solo** (`bg_teams.solo_user_id`) : ne jamais compter `bg_teams` sans filtrer `solo_user_id IS NULL`. Équipes fantômes (`is_ghost`) → `GHOST_TEAMS.md`.
 - **Noms cliquables** : un nom d'équipe/joueur passe par `TeamLink` / `PlayerLink` / `EntrantLink` (jamais un chemin écrit à la main — une entrée solo n'a pas de fiche d'équipe) ; un écran de tournoi rend un engagé par `EntrantName` → `ENTITY_LINKS.md`, `TOURNAMENT_ENTRANT_LOGOS.md`.
 - **Modales** : portées dans `document.body`, `useDialogBehavior`, `useBackdropDismiss` → `MODAL_DIALOGS.md`. Gestes sans retour par `ConfirmActionDialog`, jamais `window.confirm`.
@@ -136,7 +152,7 @@ Refuse `NODE_ENV=production` ; verrou nommé `bg_seed` (les worktrees partagent 
 - **Discord et diffusion** : messages automatisés `DISCORD_NOTIFICATIONS.md` · journal `BOT_ACTIVITY_LOG.md` · alertes arbitre `REFEREE_ALERTS.md` · dates des matchs `MATCH_START_DATES.md` · rediffs `MATCH_REPLAYS.md`
 
 ## Design System — « Cyber minimal » → `docs/features/DESIGN_SYSTEM.md`
-Noir profond, bleu glacier `#5ac8ff`. Jetons `--cyber-bg*`, `--ink*`, `--blue-100`–`700`, `--red-live`, `--line-*`, `--r-cy-*`. Primitives `components/cyber/` (`CyberButton`, `CyberCard`, `Pill`, `ScrollArea`…). Autres docs : `docs/features/`.
+Noir profond, bleu glacier `#5ac8ff`. Jetons `--cyber-bg*`, `--ink*`, `--blue-100`–`700`, `--red-live`, `--line-*`, `--r-cy-*`. Primitives `components/cyber/` (`CyberButton`, `CyberCard`, `Pill`, `ScrollArea`…).
 
 ## Communication Style
 
@@ -167,4 +183,4 @@ Enchaîner sans s'arrêter :
 4. Commit tests (`jest`)
 5. Commit polish UI/UX (aucune logique) — les problèmes d'accessibilité non réglés vont dans `ACCESSIBILITE.md` par un commit direct sur `main`
 6. `git push -u origin feature/<short-name>`
-7. `gh pr create`, puis revue `/code-review --comment` **en boucle** jusqu'à un cycle sans finding (corriger, commiter, pousser, relancer une revue complète). **SonarQube** (`npm run sonar`, local, aucun jeton à demander) avant le premier cycle et après le dernier ; nouveau code : Quality Gate vert, notes A, zéro problème, hotspots 100 % examinés, couverture ≥ 80 %, duplication ≤ 3 %, aucun « Faux positif » non justifié. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL ; copier le `.env` parent dans le worktree).
+7. `gh pr create`, puis revue `/code-review --comment` **en boucle** jusqu'à un cycle sans finding (corriger, commiter, pousser, relancer une revue complète). **SonarQube** (`npm run sonar`, local, aucun jeton à demander) avant le premier cycle et après le dernier ; nouveau code : Quality Gate vert, notes A, zéro problème, hotspots 100 % examinés, couverture ≥ 80 %, duplication ≤ 3 %, aucun « Accepté »/« Faux positif » non justifié. Ne rendre la main qu'avec `npm test`, `npm run lint`, `npm run typecheck` verts **et** `npm run seed` exécuté (seul contrôle réel du SQL ; copier le `.env` parent dans le worktree).
