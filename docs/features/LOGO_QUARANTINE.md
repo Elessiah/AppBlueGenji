@@ -117,7 +117,7 @@ retire jamais.
 
 ## Sauvegarde
 
-Le miroir horaire des images (dépôt du bot, `scripts/sync-uploads-onedrive.sh`)
+Le miroir horaire des images (dépôt du bot, `scripts/sync-uploads-onedrive.sh`, nom historique)
 synchronise aussi `data/quarantine` vers `quarantine/` du remote chiffré : une
 image masquée doit pouvoir être rétablie même après la perte de la machine.
 Rétablie ou supprimée, elle quitte le dossier, donc la sauvegarde au passage

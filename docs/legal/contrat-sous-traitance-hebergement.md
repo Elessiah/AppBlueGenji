@@ -86,9 +86,9 @@ L'Hébergeur met en œuvre les mesures décrites au registre, notamment :
   archives de la base, remote `rclone` de type `crypt` pour les images, les
   logos masqués et le journal des suppressions), déposées sur un stockage en
   ligne qui ne reçoit aucune clé ; conservation limitée à la durée annoncée ;
-- clés de déchiffrement détenues côté Association : [à compléter — détenteur(s)
-  de la clé privée des archives et de la copie de secours du mot de passe
-  `rclone`, lieu de conservation hors du serveur] ;
+- clés de déchiffrement (clé privée des archives, mot de passe `rclone` et sa
+  copie de secours) détenues par l'Hébergeur, Keryan Houssin, seul à les
+  détenir, et conservées hors du serveur ;
 - rejeu des suppressions de compte avant toute remise en service après une
   restauration.
 
@@ -98,13 +98,13 @@ L'Association autorise l'Hébergeur à recourir aux services suivants :
 
 | Service | Rôle | Cadre |
 |---|---|---|
-| Microsoft (OneDrive, compte personnel) | Stockage des sauvegardes **chiffrées avant envoi** | Contrat de services Microsoft et déclaration de confidentialité de Microsoft ; **aucun contrat de sous-traitance** n'est conclu avec Microsoft (le DPA de Microsoft ne vaut que pour ses offres professionnelles) ; lieu de stockage non garanti ; transfert éventuel vers les États-Unis : certification EU-U.S. Data Privacy Framework de Microsoft Corporation |
+| Hetzner Online GmbH (Allemagne) — Storage Share (Nextcloud géré) | Stockage des sauvegardes **chiffrées avant envoi** (depuis le 1er octobre 2026) | Contrat de traitement des données de Hetzner (Data Processing Agreement, version 1.2), accepté par l'Hébergeur le 1er octobre 2026 ; traitement exclusivement dans l'Union européenne / l'EEE (§ 3), donc aucun transfert hors de l'Union |
 
-L'absence de contrat au sens de l'article 28 avec Microsoft est connue de
-l'Association : [décision de l'Association — maintien de ce stockage, le
-chiffrement préalable garantissant que Microsoft ne peut pas lire les copies,
-ou passage à un stockage professionnel sous contrat, dans l'Union européenne de
-préférence].
+Le contrat signé avec Hetzner est conservé par l'Hébergeur et tenu à la
+disposition de l'Association ; il n'est pas reproduit ici. Le stockage
+OneDrive (compte Microsoft personnel, sans contrat de sous-traitance) utilisé
+jusqu'au 30 septembre 2026 n'est plus un sous-traitant autorisé : l'Hébergeur
+en efface définitivement les copies restantes.
 
 L'Hébergeur informe l'Association de tout ajout ou remplacement d'un
 sous-traitant ultérieur, qui peut s'y opposer. Il impose à tout sous-traitant
