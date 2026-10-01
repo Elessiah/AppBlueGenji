@@ -566,10 +566,10 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     publishedAt: "2026-10-02",
     title: "Sauvegardes hébergées en Allemagne",
     summary:
-      "Les sauvegardes chiffrées du site et du bot ne sont plus stockées chez Microsoft (OneDrive) mais chez Hetzner, en Allemagne : elles ne quittent plus l'Union européenne.",
+      "Depuis le 1er octobre 2026, les sauvegardes chiffrées du site et du bot sont envoyées chez Hetzner, en Allemagne, et non plus chez Microsoft (OneDrive) : elles restent dans l'Union européenne.",
     details: [
       "Hetzner Online GmbH stocke les copies de sauvegarde dans l'Union européenne, comme sous-traitant, et ne peut pas les lire : elles sont chiffrées avant envoi, avec des clés que seul l'hébergeur du site détient. Les durées de conservation ne changent pas.",
-      "Microsoft n'est plus destinataire des sauvegardes. Il reste celui de la messagerie de la personne à contacter pour tes demandes relatives à tes données.",
+      "Microsoft ne reçoit plus de nouvelle sauvegarde. Il reste destinataire de la messagerie de la personne à contacter pour tes demandes relatives à tes données.",
       "Portail de support : Spiceworks y agit comme sous-traitant de l'association, et ses transferts vers les États-Unis reposent sur le Data Privacy Framework.",
       "Retransmission des matchs : seuls ton pseudo, le nom de ton équipe et tes résultats en jeu apparaissent, jamais de webcam ni de chat vocal ; le site ne transmet rien aux plateformes de diffusion. Tu peux t'y opposer et apparaître sous un nom neutre.",
     ],

@@ -641,8 +641,10 @@ describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-trait
 
   it("annonce le nouveau lieu, sans transfert hors de l'Union, et la fin de OneDrive", () => {
     expect(entry.summary).toMatch(/Hetzner, en Allemagne/);
-    expect(entry.summary).toMatch(/ne quittent plus l'Union européenne/);
-    expect(text()).toMatch(/Microsoft n'est plus destinataire des sauvegardes/);
+    expect(entry.summary).toMatch(/restent dans l'Union européenne/);
+    // Le message ne promet pas l'effacement des copies déjà déposées chez
+    // Microsoft, qui reste une action à mener en production.
+    expect(text()).toMatch(/Microsoft ne reçoit plus de nouvelle sauvegarde/);
     // Microsoft reste nommé pour la messagerie de la personne à contacter.
     expect(text()).toMatch(/messagerie de la personne à contacter/);
   });

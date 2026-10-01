@@ -48,6 +48,9 @@ describe("/rgpd — destinataires et transferts", () => {
     expect(retransmission).toMatch(/jamais de webcam ni le chat vocal/);
     expect(retransmission).toMatch(/nom neutre/);
     expect(retransmission).toMatch(/catégorie RGPD/);
-    expect(section).toMatch(/Le\s+site ne leur transmet rien/);
+    expect(section).toMatch(/il ne leur\s+transmet rien et n&apos;intègre aucun de leurs lecteurs/);
+    // Les plateformes ne figurent pas dans la liste des destinataires.
+    const list = section.slice(section.indexOf("<ul>"), section.indexOf("</ul>"));
+    expect(list).not.toMatch(/YouTube|Twitch|Kick/);
   });
 });

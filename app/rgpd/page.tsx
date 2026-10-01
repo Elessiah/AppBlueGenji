@@ -900,11 +900,6 @@ export default async function RgpdPage() {
               {SPICEWORKS_PROCESSOR_FRAMEWORK} (<Link href="/rgpd/registre#t15">registre, T15</Link>).
             </li>
             <li>
-              <strong>YouTube, Twitch ou Kick</strong> : la retransmission d&apos;un match montre les
-              pseudos, les noms d&apos;équipe et les résultats de ses joueurs (section suivante). Le
-              site ne leur transmet rien : il ne fait que lier les chaînes.
-            </li>
-            <li>
               <strong>Microsoft</strong> (Outlook.com) : la messagerie personnelle de la personne à
               contacter pour vos demandes relatives à vos données est hébergée par Microsoft sur un
               compte personnel, sans contrat de sous-traitance. Un courriel que vous envoyez à{" "}
@@ -929,8 +924,9 @@ export default async function RgpdPage() {
             traiter ou héberger des données aux États-Unis — pas les opérateurs téléphoniques —
             le font sur le fondement suivant :{" "}
             {transferBasis(ALL_TRANSFER_RECIPIENTS)} ; pour Spiceworks, {SPICEWORKS_SCC_FALLBACK}.
-            Les plateformes de diffusion ne sont pas des destinataires du site : il n&apos;y
-            transmet rien et n&apos;intègre aucun de leurs lecteurs.
+            Les plateformes de diffusion ne sont pas des destinataires du site : il ne leur
+            transmet rien et n&apos;intègre aucun de leurs lecteurs (paragraphe « Retransmission
+            des matchs » ci-dessous).
           </p>
           <p>
             <strong>Sauvegardes.</strong> Elles sont stockées chez{" "}
@@ -942,7 +938,7 @@ export default async function RgpdPage() {
           </p>
           <p id="retransmission">
             <strong>Retransmission des matchs.</strong> Un match de tournoi peut être diffusé en
-            direct et enregistré sur YouTube, Twitch ou Kick, par la chaîne de l&apos;association
+            direct et enregistré sur <strong>YouTube, Twitch ou Kick</strong>, par la chaîne de l&apos;association
             ou d&apos;un caster. On y voit votre <strong>pseudo</strong>, le{" "}
             <strong>nom de votre équipe</strong> et vos <strong>résultats et performances en
             jeu</strong> — jamais de webcam ni le chat vocal des joueurs. Ce traitement repose sur

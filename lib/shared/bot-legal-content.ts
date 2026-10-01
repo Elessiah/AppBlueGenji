@@ -545,7 +545,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               `**Discord** (États-Unis) : ${DPF_ADEQUACY_DECISION}.`,
               `**Microsoft** : transfert possible vers les États-Unis, Microsoft ne garantissant pas le lieu de stockage d'un compte personnel ; une demande envoyée par courriel à l'hébergeur technique, et sa réponse par courriel, lui parviennent non chiffrées par l'association, donc lisibles par Microsoft — ${DPF_ADEQUACY_DECISION}.`,
-              "Les sauvegardes ne quittent pas l'Union européenne : Hetzner les stocke en Allemagne.",
+              "Depuis le 1er octobre 2026, les sauvegardes sont envoyées chez Hetzner, en Allemagne : elles ne font l'objet d'aucun transfert hors de l'Union.",
             ],
           },
         ],
@@ -749,7 +749,7 @@ export const PRIVACY_POLICY: BilingualDoc = {
             items: [
               `**Discord** (United States): ${DPF_ADEQUACY_DECISION_EN}.`,
               `**Microsoft**: possible transfer to the United States, as Microsoft does not guarantee the storage location of a personal account; a request emailed to the technical host, and their emailed reply, reach it without encryption by the association, and so readable by Microsoft — ${DPF_ADEQUACY_DECISION_EN}.`,
-              "Backups do not leave the European Union: Hetzner stores them in Germany.",
+              "Since 1 October 2026, backups are sent to Hetzner, in Germany: they are not transferred outside the Union.",
             ],
           },
         ],
