@@ -181,3 +181,9 @@ Formulaire `/tournois/creer` :
 | `tests/swiss/orchestration.test.ts` | Cycle de vie sur base factice : génération, enchaînement, réappariement, idempotence, clôture, abandon. |
 | `tests/tournois/forfeit-eligibility.test.ts` | Formats autorisant l'abandon. |
 | `tests/lib/shared/match-lock.test.ts` | Verrouillage des scores en suisse. |
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Ronde suisse** (`SWISS`, ouvert à la création — `docs/features/SWISS_MODE.md`) : nombre de rondes fixe, aucune élimination, appariement par groupe de points. Même modèle que la Survie : logique pure dans `lib/shared/swiss.ts` (rejeu, points, départages) + `lib/shared/swiss-pairing.ts` (appariement par **retour sur trace**, qui trouve les combinaisons sans rematch qu'un tirage glouton manque), orchestration dans `lib/server/tournaments/swiss.ts`. `reconcileSwiss` **rejoue** tout depuis l'historique des matchs (`replaySwiss`) — une correction de score se répercute d'elle-même sur le classement et réapparie la ronde suivante tant qu'elle n'est pas entamée ; seuls seed initial et abandons sont stockés en entrée. Piège à connaître : apparier la ronde R se fait sur l'état rejoué **avant** R (`SwissState.before`), sinon les paires déjà posées bloquent leur propre reformation. Départages : Buchholz, Sonneborn-Berger, % de victoires adverses, confrontation directe, puis seed. Seeding par `loadEntrantsBySiteRanking`, comme la Survie et le leaderboard.

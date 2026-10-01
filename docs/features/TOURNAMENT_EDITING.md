@@ -146,3 +146,9 @@ La page d'édition ne reçoit du serveur que la **fenêtre**, pas l'état : elle
 champs modifiables par `editableFieldsForWindow`, la même fonction que sert
 `editableFieldsFor` côté serveur. Elle rejouait auparavant le `switch` en miniature —
 deux écritures de la même règle, dont une seule aurait suivi l'ajout d'une fenêtre.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Édition d'un tournoi après création** (`lib/shared/tournament-edit.ts` pur + `lib/server/tournaments/edit.ts`) : le staff `tournaments` peut modifier un tournoi selon trois fenêtres — `FULL` (tournoi caché, tout éditable), `RESTRICTED` (annoncé mais pas lancé, cinq champs : nom, description, clôture des inscriptions, début du tournoi, effectif maximal), `LOCKED` (en cours ou terminé, rien). Le module pur décide quels champs sont modifiables ; le serveur le rejoue sous `SELECT … FOR UPDATE` pour refuser une modification devenue interdite entre le chargement du formulaire et sa soumission. Validation partagée avec la création (`lib/server/tournaments/validation.ts`) : même barème, mêmes règles d'ordre des dates, pas de divergence possible. La route `PATCH /api/tournaments/[id]/edit` applique une liste blanche sur le corps (seuls les champs de `ALL_TOURNAMENT_FIELDS` passent) et mappe les erreurs HTTP (fenêtre fermée → 409, incohérence → 400). Voir `docs/features/TOURNAMENT_EDITING.md`.

@@ -70,3 +70,9 @@ gestion la verra sur la fiche. Un échec est journalisé dans pm2.
 Nouvel usage de l'identifiant Discord / du tag certifié : déclaré au registre
 (T03), dans la politique (`rgpd-policy.ts`, ligne « ID Discord ») et par une
 entrée de `PRIVACY_CHANGES` (`2026-09-demande-adhesion-discord`).
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Demande d'adhésion annoncée à la gestion** (`lib/shared/team-join-request-notice.ts` pur + `lib/server/team-join-notifications.ts`) : une demande (`REQUEST`) enregistrée par `requestToJoinTeam` fait écrire le bot en message privé au **propriétaire et aux managers** (`hasTeamManagementRole` — ceux qui peuvent y répondre ; ni capitaine ni rôle sportif), joignables par un moyen prouvé (identifiant ou tag certifié). Message sans pseudo de joueur, lien vers `/equipes/[id]`. Au plus un message par joueur et par équipe toutes les 24 h (`TEAM_JOIN_REQUEST_NOTICE_COOLDOWN_HOURS`, compté sur `bg_team_invitations`, tous statuts : retirer et redéposer ne fait pas vibrer le téléphone en boucle). Jamais attendu, la demande reste écrite si le bot est injoignable ; rien ne part quand la demande rejoint directement (invitation en attente). Voir `docs/features/TEAM_JOIN_REQUEST_NOTIFICATION.md`.

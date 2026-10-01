@@ -73,3 +73,9 @@ qui attend encore son plateau.
 - Tests : `tests/tournois/underfilled-finalization.test.ts` (la clôture
   elle-même) et `tests/tournois/underfilled-start.test.ts` (son déclenchement
   dans la synchronisation).
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Tournoi sans adversaires** : un tournoi qui atteint son coup d'envoi avec **0 ou 1 engagée** ne passe pas « en cours » — il est clos sur-le-champ (l'unique engagée, s'il y en a une, est déclarée première). `finalizeUnderfilledTournament` (`lib/server/tournaments/finalization.ts`) est appelée par `syncTournamentState` **avant toute initialisation de format**, sur l'état *calculé* (`RUNNING`) et non sur la seule bascule depuis les inscriptions — un tournoi repasse par `UPCOMING` entre la clôture des inscriptions et l'heure de début, et un tournoi déjà `RUNNING` doit être rattrapé pareillement. Sans cette règle, chaque format doit connaître le cas dégénéré, et un plateau **sans aucune** engagée reste « en cours » à jamais en Suisse comme en BG Survie (leur réconciliation abandonne sur un classement vide) : c'est la fin des matchs qui clôt un tournoi, et il n'y en a aucun. Voir `docs/features/UNDERFILLED_TOURNAMENTS.md`.

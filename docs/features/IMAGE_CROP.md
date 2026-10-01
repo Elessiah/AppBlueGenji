@@ -93,3 +93,9 @@ La modale suit les règles de `MODAL_DIALOGS.md` (portail, `useDialogBehavior`,
 
 Une image **déjà enregistrée** ne se recadre pas : le serveur ne garde que la
 version traitée. Il faut la réimporter.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Recadrage manuel des images importées** (`lib/shared/image-crop.ts` pur + `components/ui/image-crop-dialog.tsx`) : **tout import d'image passe par la modale de recadrage** — avatar, logo d'équipe, photo de bénévole, logo et bandeau de partenaire, image de tournoi ; un écran d'import ajouté demain appelle `useImageCropper()` puis `appendCroppedImage`, et sa route lit `parseImageCropField(form.get(IMAGE_CROP_FIELD))` avant `processAndStoreImage`. Le navigateur envoie le **fichier d'origine et un rectangle** (fractions de l'image **orientée**), jamais une image réencodée par un `<canvas>` : `sharp` découpe (`extract` **avant** le gabarit), le serveur garde son unique chaîne de contrôle, et Safari, qui ne sait pas encoder de WebP, ferait passer un PNG au-dessus de 5 Mo. `sharp` est ouvert en `autoOrient` — une photo de téléphone ne ressort plus couchée. Cadre **imposé** là où le gabarit recadre (avatar et bénévole carrés, bandeau 3:1), **libre** ailleurs ; le cadre proposé est **celui que le serveur appliquait seul**, si bien que valider sans toucher rend le fichier d'avant l'outil, et un cadre couvrant toute l'image n'est pas envoyé. Champ illisible → 400 `IMAGE_CROP_INVALID`, jamais un repli silencieux sur l'image entière. Voir `docs/features/IMAGE_CROP.md`.

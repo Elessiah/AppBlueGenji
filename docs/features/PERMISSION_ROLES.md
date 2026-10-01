@@ -83,3 +83,9 @@ en-tête de la fiche joueur, à côté du badge « Joueur BlueGenji ». Ce rendu
 s'appuie sur le champ `displayRoles` de `FullProfileResponse`, renseigné pour
 tous les visiteurs — distinct du champ `roles` (réservé au viewer admin pour
 l'édition, non divulgué aux autres).
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Rôles de permission de plateforme** (cumulables, distincts des rôles d'équipe) : `ADMIN`, `ARBITRE` (tournois + diffusion), `CASTER` (aperçu du plateau en lecture seule + diffusion), `COMMUNITY_MANAGER` (site vitrine + association), `RECRUTEUR` (recrutement). Toujours protéger une route avec `can(user, "<permission>")` de `@/lib/shared/permissions` (permissions : `tournaments`, `casting`, `live`, `showcase`, `recruitment`, `roles`, `moderation`) — ne pas tester `user.isAdmin` directement pour un domaine scopé. `canAny(user, [...])` pour un accès ouvert à plusieurs domaines. `casting` ne donne **que** la lecture de l'aperçu ; `live` est le droit d'écriture sur l'état de diffusion. `ADMIN` a tous les droits. Voir `docs/features/PERMISSION_ROLES.md`.

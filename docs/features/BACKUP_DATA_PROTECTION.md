@@ -163,3 +163,9 @@ sous le tableau. La durée vient de `BACKUP_RETENTION_DAYS` : **si
 `RETENTION_DAYS` change côté bot, la constante doit changer avec** — la page
 annoncerait sinon une durée fausse, ce qu'elle a fait longtemps (« quelques
 jours » pour des archives gardées six mois).
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Sauvegardes et journal des suppressions** (`lib/shared/account-deletion-journal.ts` pur + `lib/server/account-deletion-journal.ts` + `npm run replay:deletions`) : les sauvegardes (dépôt du bot) sont des archives chiffrées gardées **30 jours** (`BACKUP_RETENTION_DAYS`, qui doit suivre `RETENTION_DAYS` côté bot : `/rgpd` l'affiche) et un miroir horaire chiffré des images, supprimé sans corbeille. Une archive ne se corrige pas compte par compte, donc restaurer ferait **revenir** les comptes supprimés depuis : `deleteOwnAccount` consigne chaque suppression **après le commit** (une ligne pour une suppression annulée ferait effacer un innocent à la restauration) dans `data/account-deletions.jsonl`, hors de la base et hors de `public/`, copié, chiffré, chaque heure sur le stockage distant (Hetzner, Allemagne — DPA accepté par l'hébergeur, qui détient seul les clés ; les noms `*-onedrive.*` des scripts du bot sont historiques), et le script la rejoue par le chemin ordinaire. Une ligne porte l'identifiant **et la date de création** du compte — le compteur d'identifiants reculant avec la restauration, l'identifiant seul peut désigner un compte neuf —, jamais le mode, redécidé sur la base restaurée. Voir `docs/features/BACKUP_DATA_PROTECTION.md`.

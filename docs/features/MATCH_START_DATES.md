@@ -144,3 +144,9 @@ champ `matchSchedule` — décalage de la manche 1 et écart entre manches) :
   « programmé » et bascule tout seul.
 - **Plateau Horaires (sans live)** — le cas le plus courant : des horaires
   annoncés, aucune diffusion.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Dates de début des matchs** (`lib/shared/match-schedule.ts` pur + `lib/server/tournaments/match-schedule.ts`) : chaque match porte son heure (`bg_matches.start_at`, `NULL` = aucun horaire annoncé), fixée par la permission `tournaments` (arbitre, admin) — **distincte de `live`** : un caster pose la chaîne d'un match, pas son horaire. La date est **descriptive** : elle n'avance pas le match, ne verrouille rien, n'entre dans aucune règle du moteur, et n'a donc **aucune garde d'état** en écriture (programmer un match déjà joué est une correction d'archive). Son seul effet est le mode d'antenne `START_TIME` (`LIVE` une fois l'heure atteinte sur un match jouable) — le seul état de diffusion qui bascule **sans écriture**, donc sans que le flux SSE puisse l'annoncer : `resolveMatchLiveState(match, now)` prend l'instant en argument, `nextMatchLiveChangeAt` donne la frontière, et `useMatchLiveState` en fait un unique `setTimeout` côté client (même principe que `useScheduledBuckets`). `START_TIME` sans date est refusé en 409 à l'écriture de la diffusion, mais effacer la date d'un match déjà casté reste permis — le calendrier n'est pas pris en otage par la diffusion, le match retombe à « programmé » et l'interface le signale. Voir `docs/features/MATCH_START_DATES.md`.

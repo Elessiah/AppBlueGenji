@@ -82,3 +82,9 @@ vitrine étant lue sans compte.
 Les fiches d'équipe et de joueur (adversaire favori, bête noire, historique) : ces
 écrans ne reçoivent qu'un identifiant et un nom, et y ajouter le logo demande de
 toucher aux requêtes des statistiques.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Logos des engagés dans les tournois** (`lib/shared/entrant-logos.ts` pur + `_components/EntrantName.tsx`) : le logo voyageait jusqu'à la fiche d'un tournoi (`registrations[].logoUrl`) sans qu'aucune vue le rende. La page construit **une** table `team_id → logo` depuis les inscrites (`buildEntrantLogoMap`) et la pose dans `EntrantProvider` — un engagé du plateau est forcément inscrit, aucune forme de ligne n'a donc à porter de colonne de logo. `EntrantName` (emblème + `EntrantLink`) est le passage des vues : cartes de match, classements, inscrites, aperçu, championne ; un nouvel écran de tournoi passe par lui, pas par `EntrantLink` seul. Repli : l'**initiale**, jamais un fichier ; emblème toujours décoratif ; une case vide (TBD, exemption) réserve la place pour garder les noms alignés. L'emblème de 16 px tient dans la ligne de texte : la hauteur d'une carte de match, sur laquelle l'arbre cale ses connecteurs, ne change pas. Accueil : `TeamSigil` prend un `logoUrl` facultatif (classement, carte du direct — `team1LogoUrl`/`team2LogoUrl`, filtrés par `localUploadUrl`). Voir `docs/features/TOURNAMENT_ENTRANT_LOGOS.md`.

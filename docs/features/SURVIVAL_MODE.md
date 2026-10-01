@@ -128,3 +128,9 @@ admin, forfait).
   si possible) jusqu'à la coupe d'équilibrage.
 - Toutes cadences de coupe (`roundsPerCut` = 1…N) convergent vers une championne.
 - Forfaits multiples en cours de tournoi.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Formats:** `SINGLE`, `DOUBLE`, `SWISS`, `SURVIVAL` (single group, seed by site ranking, adjacent pairing, coupes des 2 derniers — `survivalRoundsBeforeFirstCut` manches avant la première, puis toutes les `survivalRoundsPerCut` — jusqu'à une championne ; odd field → round-1 barrage between the bottom two so no byes are ever handed out — see `docs/features/SURVIVAL_MODE.md`). Survival logic lives in `lib/shared/survival.ts` (pure) + `lib/server/tournaments/survival.ts` (orchestration). `reconcileSurvival` **rejoue** tout le tournoi depuis l'historique des matchs (`replaySurvival`) : victoires, défaites, éliminations et rangs sont dérivés, jamais accumulés — une correction de score défait donc la coupe qu'elle avait provoquée, et le round suivant est réapparié tant qu'il n'est pas entamé. Seuls les abandons sont conservés en entrée. Le seeding utilise le classement partagé du site (`loadEntrantsBySiteRanking`), commun au leaderboard de la landing.

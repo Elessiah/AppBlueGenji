@@ -80,3 +80,9 @@ tourne, aucune entrée de migration n'est due.
   d'équipes.
 
 Registre : T01, T02, T14 ; le journal d'accès nginx a sa fiche (T17, 14 jours).
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Journal des données de connexion — obligation légale de l'hébergeur** (`lib/shared/connection-logs.ts` pur + `lib/server/connection-logs.ts`) : l'association héberge les contenus de ses membres et garde donc **un an** (`CONNECTION_LOG_RETENTION_DAYS`) l'adresse IP, la date et la porte de chaque **ouverture de session** (LCEN art. 6 ; décret n° 2021-1362 ; registre T14, base « obligation légale »). Écrit par `createSession`, point de passage unique des quatre portes — qui **nomme sa porte** (`createSession(userId, event)`) ; adresse lue par `clientIpFromHeaders` (`api-guard.ts`, chaîne des proxys de confiance, jamais un en-tête brut) ; **jamais bloquant**. Table `bg_connection_logs` **sans clé étrangère** : la ligne survit à la suppression du compte jusqu'à son échéance (RGPD art. 17.3.b), aucun chemin de suppression n'y touche. **Aucune route de lecture** (consultation sur réquisition d'une autorité seulement), sauf l'export RGPD du titulaire (`connectionLogs`). Purge entraînée par les connexions et par `listTournamentBuckets`, une fois par heure au plus, séparée de l'écriture. Port source non écrit (décision requise, `ERREUR.txt`). Les contenus publiés ne sont pas journalisés à part (pas de point de passage unique). Voir `docs/features/CONNECTION_LOGS.md`.

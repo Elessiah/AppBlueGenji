@@ -61,3 +61,9 @@ date reprise à la main sur un tournoi déjà lancé reste correctement rendue.
 La section ne change rien aux droits : la fiche `/tournois/[id]` d'un tournoi
 invisible était déjà accessible à tout utilisateur connecté qui en connaissait
 l'identifiant. La visibilité gouverne le **listage**, pas la lecture.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Section « Tournois invisibles »** (`/tournois`) : la liste ne montre que les tournois déjà visibles (`start_visibility_at <= NOW()`), ce qui rendait un tournoi programmé introuvable, même pour le staff qui doit le relire avant publication. `listTournamentBuckets(search, scope)` accepte une portée `{ hiddenOnly: true }` qui prend le **complément exact** du filtre de visibilité (`> NOW()`) — exposée par `GET /api/tournaments?scope=hidden`, **réservée à `can(user, "tournaments")`** (403 sinon, avant toute lecture). La section n'est rendue en tête de page que pour le staff et que s'il y a des invisibles ; elle les rassemble tous états confondus (`flattenBuckets` + `StateCard`). Voir `docs/features/HIDDEN_TOURNAMENTS_SECTION.md`.

@@ -85,3 +85,9 @@ Les dialogues de la fiche tournoi (diffusion, horaire, rediff, signalement,
 pénalité, avancée, suppression, retrait, retour en arrière, image) la
 portent ; les feuilles de module (`ScoreDialog.module.css`,
 `ConfirmActionDialog.module.css`) posent la même borne.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Modales** (`docs/features/MODAL_DIALOGS.md`) : toute modale est **portée dans `document.body`** (`createPortal`), passe par **`useDialogBehavior`** (focus, Échap, tabulation, verrou du défilement — jamais d'écouteur Échap ni d'`overflow` à la main) et ferme son voile par **`useBackdropDismiss`** (appui *et* relâchement sur le voile — `onClick` + `stopPropagation()` fermait la modale sur une sélection de texte relâchée à côté). Rendue dans la page, une modale hérite des contextes d'empilement de ses ancêtres : `main.page-shell` (`z-index: 1`) la mettait sous la barre de navigation dans tout l'espace connecté, le `transform` laissé par `.fade-in` la décentrait hors de l'écran sur `/profil`, et les sections en `z-index: 1` de la vitrine laissaient passer la section suivante par-dessus. Sur les pages publiques, `LandingDialog` applique les trois règles. Le champ à focaliser d'abord, s'il n'est pas le premier, porte `data-autofocus`. Une modale qui peut dépasser l'écran porte `.dialog-bounded` (hauteur bornée en `100dvh`, défilement interne). Un balayage (`tests/app/modal-dialogs.test.ts`) tient les trois règles sur toute modale portant `aria-modal`, exceptions nommées.

@@ -55,3 +55,9 @@ disparaître sans écriture — et le rejouer le fait revenir.
 Le tournoi « Live Auto (à l'antenne) » porte `replays: true` : une rencontre
 jouée sur deux (par identifiant) reçoit une rediff, pour voir côte à côte des
 cartes avec et sans bandeau.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Rediff d'un match terminé** (`lib/shared/match-replay.ts` pur + `lib/server/tournaments/match-replay.ts` + `PUT /api/admin/matches/[matchId]/replay`) : la permission `live` (admin, arbitre, caster) pose sur un match joué le lien YouTube de sa rediff (`bg_matches.replay_url`), annoncé à tous par un bandeau « Rediff disponible » sous la carte (`MatchReplayStrip`). **YouTube seulement, et une vidéo** (`watch?v=`, `youtu.be/`, `live/`) — une chaîne Twitch ne garde pas de rediff. Posé seulement sur une rencontre **réellement disputée** (`canHaveReplay` : terminée, deux engagées, sans forfait), statut relu dans l'`UPDATE` ; l'effacement n'a aucune condition. Visibilité **dérivée** (`visibleReplayUrl`) : un retour en arrière tait le bandeau sans rien écrire. Voir `docs/features/MATCH_REPLAYS.md`.

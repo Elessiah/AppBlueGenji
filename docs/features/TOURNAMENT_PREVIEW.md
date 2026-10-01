@@ -146,3 +146,9 @@ exactement le seuil auquel le moteur lui-même refuse de générer un plateau.
   `manual_seeding`, réglages repris, phases chargées, états sans aperçu.
 - `tests/app/api/tournaments/detail-preview.test.ts` — qui a droit à l'aperçu.
 - `tests/lib/shared/permissions.test.ts` — périmètre du rôle `CASTER`.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Aperçu du plateau pendant les inscriptions** (`lib/shared/tournament-preview.ts` pur + `lib/server/tournaments/preview.ts`) : le staff (`tournaments`) et le cast (`casting`) voient l'appariement que produirait un lancement immédiat, recalculé à chaque inscription — plutôt qu'une phase de préparation, qui rognerait la fenêtre d'inscription. **Aucune écriture** : ni match ni classement, seulement une lecture des inscrites. L'aperçu voyage dans `TournamentDetail.preview` (`null` sans permission, et dès `RUNNING`), donc il se rafraîchit avec le SSE existant. Il réutilise les fonctions pures du moteur — `bracket-seeds.ts` (extrait de `serialization.ts`, qui le réexporte), `planFirstRound`, `planSurvivalRound`, `planEnduranceRound`, `resolvePhasePlan` — pour ne jamais montrer autre chose que le tirage réel. Voir `docs/features/TOURNAMENT_PREVIEW.md`.
