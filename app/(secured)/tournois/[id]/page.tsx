@@ -1078,6 +1078,7 @@ export default function TournamentDetailPage() {
           key={matchForSchedule.id}
           match={matchForSchedule}
           tournamentStartAt={detail.card.startAt}
+          tournamentFinished={detail.card.state === "FINISHED"}
           refereeScheduling={detail.card.refereeScheduling}
           onClose={() => setMatchForScheduleId(null)}
           onSaved={() => void refresh()}

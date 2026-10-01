@@ -43,7 +43,7 @@ function entryRefusal(state: MatchStartEntryState): string | null {
 
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit : la date retenue est la plus proche du début du tournoi.";
+  const year = "L'année se déduit : c'est la date la plus proche de l'horaire actuel du match, sinon du tournoi.";
   if (refereeScheduling) {
     return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
@@ -88,11 +88,11 @@ function ScheduleWarning({ children }: Readonly<{ children: ReactNode }>) {
 interface MatchScheduleDialogProps {
   match: BracketMatch;
   /**
-   * Début du tournoi : référence de la déduction de l'année
-   * (`lib/shared/match-start-entry.ts`). Illisible, on se rabat sur
-   * l'instant présent.
+   * Début du tournoi et son achèvement : de quoi choisir la référence de la
+   * déduction de l'année (`matchEntryReference`).
    */
   tournamentStartAt: string | null;
+  tournamentFinished: boolean;
   /**
    * Le tournoi fait planifier ses matchs par l'arbitrage : effacer la date
    * renvoie le match « À planifier » (`lib/shared/match-planning.ts`).
@@ -122,6 +122,7 @@ interface MatchScheduleDialogProps {
 export function MatchScheduleDialog({
   match,
   tournamentStartAt,
+  tournamentFinished,
   refereeScheduling,
   onClose,
   onSaved,
@@ -136,7 +137,12 @@ export function MatchScheduleDialog({
   // `value === ""`, indiscernable d'un champ vidé.
   const [timeBadInput, setTimeBadInput] = useState(false);
   // Figée à l'ouverture : l'année déduite ne doit pas changer pendant la saisie.
-  const [reference] = useState(() => matchEntryReference(tournamentStartAt, Date.now()));
+  const [reference] = useState(() =>
+    matchEntryReference(
+      { matchStartAt: match.startAt, tournamentStartAt, tournamentFinished },
+      Date.now(),
+    ),
+  );
   const [busy, setBusy] = useState(false);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
