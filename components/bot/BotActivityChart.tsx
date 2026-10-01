@@ -1,123 +1,35 @@
-"use client";
-
-import { useState, useEffect } from "react";
 import { BotActivity } from "@/lib/shared/types";
 import { botPayloadLabel, botPayloadNumber } from "@/lib/shared/bot-payload";
 
 /**
- * Le nombre de colonnes tracées. La plage la plus large offerte par la page
- * est de 90 jours ; la borne laisse donc la marge d'un point par jour, et ne
- * coupe que des charges qui ne décrivent plus une activité quotidienne.
+ * Le nombre de colonnes tracées. La page ne montre que 7 jours ; la borne
+ * garde la marge des anciennes plages (90 jours) et ne coupe que des charges
+ * qui ne décrivent plus une activité quotidienne.
  */
 const MAX_COLUMNS = 120;
 
-type ActivityRange = "7j" | "30j" | "90j";
-
-const RANGES: readonly ActivityRange[] = ["7j", "30j", "90j"];
-
-/** Une charge, et la plage qu'elle **décrit** — pas forcément celle demandée. */
-export type ShownActivity = { range: ActivityRange; data: BotActivity | null };
-
 /**
- * Ce que le graphe peut afficher pour la plage `requested`.
+ * Activité · relais & scrims, sur **7 jours** et seulement 7.
  *
- * Entre le clic et la réponse, la charge affichée est encore celle de la plage
- * précédente : la montrer sans rien dire faisait décrire 30 jours au graphe
- * sous une pastille déjà allumée sur « 90j ». `loading` le dit, et une plage
- * précédente **illisible** ne s'annonce pas « indisponible » pour la suivante,
- * qui n'a pas encore répondu.
+ * Le graphe offrait 7, 30 et 90 jours, mais les relais (`DPMsg`) sont purgés à
+ * 7 jours chez le bot et aucun compteur journalier ne les prolonge : au-delà de
+ * la première semaine, la série tombait à zéro et la moyenne se divisait par
+ * 30 ou 90. Les plages plus longues ont donc été retirées plutôt que d'afficher
+ * une chute d'activité qui n'a jamais eu lieu. Plus de sélecteur, plus de
+ * rechargement côté client : la charge est celle du rendu serveur.
  */
-export function activityView(shown: ShownActivity, requested: ActivityRange) {
-  return { data: shown.data, loading: shown.range !== requested };
-}
-
-/**
- * Recharge une plage et remet sa réponse à `apply` — **tant qu'elle est encore
- * demandée**. Rend la fonction qui l'annule, posée telle quelle en nettoyage de
- * l'effet.
- *
- * Sans cette garde, cliquer « 90j » puis « 7j » assez vite laissait la réponse
- * la plus lente écraser la plus récente : le graphe, l'axe et la moyenne
- * décrivaient 90 jours sous une pastille qui annonçait « 7j », et rien ne le
- * signalait, les deux réponses étant valides. L'annulation écarte la réponse
- * *et* son échec : une requête abandonnée qui rejette ne doit pas non plus
- * effacer le graphe de la plage qui l'a remplacée.
- *
- * Exportée pour être testée sans DOM : c'est la seule partie du composant qui
- * dépende de l'ordre d'arrivée des réponses.
- */
-export function loadActivityRange(
-  range: ActivityRange,
-  apply: (data: BotActivity | null) => void,
-  fetcher: typeof fetch = fetch,
-): () => void {
-  const controller = new AbortController();
-  let current = true;
-
-  (async () => {
-    let result: BotActivity | null;
-    try {
-      const res = await fetcher(`/api/bot/activity?range=${range}`, { signal: controller.signal });
-      if (!res.ok) throw new Error("Failed to fetch");
-      result = await res.json();
-    } catch {
-      result = null;
-    }
-    if (current) apply(result);
-  })();
-
-  return () => {
-    current = false;
-    controller.abort();
-  };
-}
-
-/**
- * Les trois plages. Leur nom accessible **est** leur texte visible (WCAG
- * 2.5.3) : le groupe dit de quoi elles sont la plage, `aria-pressed` laquelle
- * est affichée.
- */
-function RangeChips({ range, onChange }: Readonly<{ range: ActivityRange; onChange: (range: ActivityRange) => void }>) {
-  return (
-    <fieldset className="chart-tools native-group" aria-label="Plage d'activité affichée">
-      {RANGES.map((r) => (
-        <button
-          key={r}
-          type="button"
-          className={"chip" + (range === r ? " chip-on" : "")}
-          onClick={() => onChange(r)}
-          aria-pressed={range === r}
-        >
-          {r}
-        </button>
-      ))}
-    </fieldset>
-  );
-}
-
 export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | null }>) {
-  const [range, setRange] = useState<ActivityRange>("30j");
-  const [shown, setShown] = useState<ShownActivity>({ range: "30j", data: initial });
-
-  useEffect(() => {
-    if (range === "30j") {
-      setShown({ range, data: initial });
-      return;
-    }
-    return loadActivityRange(range, (data) => setShown({ range, data }));
-  }, [range, initial]);
-
-  const { data, loading } = activityView(shown, range);
+  const data = initial;
 
   if (!data) {
     return (
-      <section className="panel" aria-busy={loading}>
+      <section className="panel">
         <div className="panel-head">
           <span className="title">Activité · relais & scrims</span>
-          <RangeChips range={range} onChange={setRange} />
+          <span className="meta">7 DERNIERS JOURS</span>
         </div>
         <div style={{ padding: "2rem", textAlign: "center", color: "var(--ink-mute)" }}>
-          <p>{loading ? "Chargement…" : "Données indisponibles"}</p>
+          <p>Données indisponibles</p>
         </div>
       </section>
     );
@@ -125,15 +37,11 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
 
   // Plafonné à ce que le graphe peut dire, comme la colonne « tendance » du
   // tableau des serveurs (`MAX_SPARKLINE_POINTS`) et comme `Sparkline`
-  // (`MAX_POINTS`). C'est la **seule** série de la page que le client
-  // **redemande** (`/api/bot/activity`, qui valide `range` et laisse passer le
-  // corps du bot tel quel), donc la seule qu'un navigateur reçoive sans être
-  // jamais passée par un rendu serveur. Cinquante mille points y écrivaient
-  // trois nœuds DOM chacun — l'onglet se fige. Ne pas lever n'est pas la même
-  // chose que rester utilisable.
+  // (`MAX_POINTS`) : le corps du bot arrive tel quel, et cinquante mille
+  // points y écrivaient trois nœuds DOM chacun — l'onglet se fige. Ne pas
+  // lever n'est pas la même chose que rester utilisable.
   //
-  // On garde les plus **récentes** : une activité se lit par sa fin, et la
-  // plage la plus large proposée (90 jours) tient largement sous la borne.
+  // On garde les plus **récentes** : une activité se lit par sa fin.
   const relays = (Array.isArray(data.relays) ? data.relays : []).slice(-MAX_COLUMNS);
   const scrims = (Array.isArray(data.scrims) ? data.scrims : []).slice(-MAX_COLUMNS);
   // Un point ramené à un nombre affichable, **borné des deux côtés** — la même
@@ -180,12 +88,12 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
   const avgLabel = avgPerDay === null ? "—" : Math.round(avgPerDay);
 
   return (
-    <section className="panel" aria-busy={loading}>
+    <section className="panel">
       <div className="panel-head">
         <span className="title">Activité · relais & scrims</span>
-        <RangeChips range={range} onChange={setRange} />
+        <span className="meta">7 DERNIERS JOURS</span>
       </div>
-      <div className={"chart-wrap" + (loading ? " is-loading" : "")}>
+      <div className="chart-wrap">
         <div className="chart">
           <div className="y-axis">
             <span>0</span>
@@ -230,7 +138,7 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
           <span className="lg">RELAIS INTER-SERVEUR</span>
           <span className="lg amber">SCRIMS PROPOSÉS</span>
           <span style={{ marginLeft: "auto" }}>
-            {loading ? "CHARGEMENT…" : `MOY. ${avgLabel} / JOUR`}
+            {`MOY. ${avgLabel} / JOUR`}
           </span>
         </div>
       </div>
