@@ -153,8 +153,7 @@ export function multiTournamentRanks(
     const current = order[i];
     const previous = order[i - 1];
     if (
-      previous &&
-      previous.phaseReached === current.phaseReached &&
+      previous?.phaseReached === current.phaseReached &&
       previous.phaseRank === current.phaseRank
     ) {
       ranks.push(ranks[i - 1]);

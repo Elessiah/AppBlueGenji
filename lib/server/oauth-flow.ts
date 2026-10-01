@@ -214,7 +214,7 @@ export async function completeOAuth(req: NextRequest, provider: OAuthProvider): 
   if (!code || !state) {
     return linking ? linkFailure(base, provider, "LINK_CANCELLED") : loginFailure(base, provider, "params");
   }
-  if (!saved || saved.state !== state || saved.provider !== provider) {
+  if (saved?.state !== state || saved.provider !== provider) {
     return linking ? linkFailure(base, provider, "LINK_STATE_MISMATCH") : loginFailure(base, provider, "state");
   }
 

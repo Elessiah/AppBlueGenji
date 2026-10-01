@@ -313,7 +313,7 @@ export async function initializeSwissTournament(
 ): Promise<void> {
   const phaseId = options?.phaseId ?? 0;
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
-  if (!tournament || tournament.format !== "SWISS") return;
+  if (tournament?.format !== "SWISS") return;
 
   // Seed par le classement du site, par le **même chargeur** que le leaderboard
   // de la landing, l'annuaire et le mode Survie
@@ -441,7 +441,7 @@ async function readRoundPlan(
   return {
     pairings,
     byeTeamId:
-      byeRow === undefined || byeRow.team1_id === null ? null : Number(byeRow.team1_id),
+      byeRow === undefined || byeRow.team1_id === null ? null : Number(byeRow.team1_id), // NOSONAR typescript:S6582 — `byeRow?.team1_id === null` serait faux sur une ligne absente : le chaînage changerait le résultat
   };
 }
 
@@ -508,7 +508,7 @@ export async function generateSwissRound(
   phaseId = 0,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
-  if (!tournament || tournament.format !== "SWISS") return;
+  if (tournament?.format !== "SWISS") return;
   if (Number(tournament.swiss_current_round) > 0) return;
 
   const state = await deriveState(conn, tournamentId, tournament, phaseId);
@@ -584,7 +584,7 @@ export async function reconcileSwiss(
   // simultanés clôturant la même ronde) pour éviter de générer deux fois la
   // ronde suivante.
   const tournament = await loadTournament(conn, tournamentId, true, phaseId);
-  if (!tournament || tournament.format !== "SWISS") return { done: false, ranked: [] };
+  if (tournament?.format !== "SWISS") return { done: false, ranked: [] };
 
   const tiebreakers = parseTiebreakers(tournament.swiss_tiebreakers_json);
   const currentRound = Number(tournament.swiss_current_round);
@@ -667,7 +667,7 @@ export async function forfeitSwissTeam(
   phaseId = 0,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId, true, phaseId);
-  if (!tournament || tournament.format !== "SWISS") throw new Error("NOT_SWISS");
+  if (tournament?.format !== "SWISS") throw new Error("NOT_SWISS");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 
   const [standingRows] = await conn.execute<StandingDbRow[]>(
@@ -743,7 +743,7 @@ export async function loadSwissMeta(
   phaseId = 0,
 ): Promise<SwissMeta | null> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
-  if (!tournament || tournament.format !== "SWISS") return null;
+  if (tournament?.format !== "SWISS") return null;
 
   const [rows] = await conn.execute<
     (RowDataPacket & {

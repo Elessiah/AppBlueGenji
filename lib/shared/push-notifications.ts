@@ -285,8 +285,8 @@ export function parsePushSubscription(
   if (typeof p256dh !== "string" || typeof auth !== "string") return invalid;
   const publicKey = decodeBase64Url(p256dh);
   const secret = decodeBase64Url(auth);
-  if (!publicKey || publicKey.length !== 65 || publicKey[0] !== 0x04) return invalid;
-  if (!secret || secret.length !== 16) return invalid;
+  if (publicKey?.length !== 65 || publicKey[0] !== 0x04) return invalid;
+  if (secret?.length !== 16) return invalid;
   if (!isAllowedPushEndpoint(raw.endpoint)) {
     return { ok: false, error: "PUSH_SERVICE_NOT_ALLOWED" };
   }

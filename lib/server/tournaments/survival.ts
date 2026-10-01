@@ -291,7 +291,7 @@ export async function initializeSurvivalTournament(
 ): Promise<void> {
   const phaseId = options?.phaseId ?? 0;
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
-  if (!tournament || tournament.format !== "SURVIVAL") return;
+  if (tournament?.format !== "SURVIVAL") return;
 
   let seedRows: Array<{ team_id: number; wins: number; losses: number }>;
 
@@ -367,7 +367,7 @@ export async function generateSurvivalRound(
   phaseId = 0,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
-  if (!tournament || tournament.format !== "SURVIVAL") return;
+  if (tournament?.format !== "SURVIVAL") return;
 
   const standings = await loadStandings(conn, tournamentId, phaseId);
   const active = rankActiveTeams(standings);
@@ -541,7 +541,7 @@ export async function reconcileSurvival(
   const targetTeams = options?.targetTeams ?? 1;
 
   const tournament = await loadTournament(conn, tournamentId, true, phaseId);
-  if (!tournament || tournament.format !== "SURVIVAL") {
+  if (tournament?.format !== "SURVIVAL") {
     return { done: false, standings: [] };
   }
   const schedule = resolveCutSchedule(tournament);
@@ -633,7 +633,7 @@ export async function forfeitSurvivalTeam(
   phaseId = 0,
 ): Promise<void> {
   const tournament = await loadTournament(conn, tournamentId, true, phaseId);
-  if (!tournament || tournament.format !== "SURVIVAL") throw new Error("NOT_SURVIVAL");
+  if (tournament?.format !== "SURVIVAL") throw new Error("NOT_SURVIVAL");
   if (tournament.state !== "RUNNING") throw new Error("TOURNAMENT_NOT_RUNNING");
 
   const [standingRows] = await conn.execute<StandingDbRow[]>(
@@ -710,7 +710,7 @@ export async function loadSurvivalMeta(
   phaseId = 0,
 ): Promise<import("@/lib/shared/types").SurvivalMeta | null> {
   const tournament = await loadTournament(conn, tournamentId, false, phaseId);
-  if (!tournament || tournament.format !== "SURVIVAL") return null;
+  if (tournament?.format !== "SURVIVAL") return null;
 
   const [rows] = await conn.execute<
     (StandingDbRow & { team_name: string; logo_url: string | null; rank: number })[]

@@ -123,7 +123,7 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
 
   const updateTarget = useCallback(() => {
     const current = session.current;
-    if (!current || !current.active) return;
+    if (!current?.active) return;
     const pageY = current.pointerClientY + window.scrollY;
     const next = dropIndexAt(current.slotMidpoints, pageY);
     current.targetIndex = next;
@@ -175,7 +175,7 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
   useEffect(() => {
     const move = (event: PointerEvent) => {
       const current = session.current;
-      if (!current || event.pointerId !== current.pointerId) return;
+      if (event.pointerId !== current?.pointerId) return;
 
       current.pointerClientY = event.clientY;
 
@@ -192,7 +192,7 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
 
     const finish = (event: PointerEvent) => {
       const current = session.current;
-      if (!current || event.pointerId !== current.pointerId) return;
+      if (event.pointerId !== current?.pointerId) return;
 
       const { baseOrder, teamId, active, targetIndex: landing } = current;
       endSession();
@@ -212,7 +212,7 @@ export function useSeedingDrag({ order, enabled, onDrop }: UseSeedingDragOptions
     };
 
     const cancel = (event: PointerEvent) => {
-      if (session.current && event.pointerId === session.current.pointerId) endSession();
+      if (event.pointerId === session.current?.pointerId) endSession();
     };
 
     // Échapper annule : le geste est réversible tant qu'on n'a pas relâché.

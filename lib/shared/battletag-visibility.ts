@@ -69,7 +69,7 @@ export function canViewBattletag(
   viewer: BattletagViewer | null | undefined,
   subject: BattletagSubject,
 ): boolean {
-  if (viewer && viewer.id === subject.userId) return true;
+  if (viewer?.id === subject.userId) return true;
   if (subject.visible) return true;
   if (!viewer) return false;
   if (subject.sharesLiveMatch) return true;

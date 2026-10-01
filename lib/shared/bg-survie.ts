@@ -773,7 +773,7 @@ export function replayEnduranceDetailed(input: ReplayEnduranceInput): EnduranceR
         const lostMaps = forfeitMapCount(matchFormat);
         for (const teamId of match.doubleForfeitTeamIds) {
           const team = standings.get(teamId);
-          if (!team || team.status !== "ACTIVE") continue;
+          if (team?.status !== "ACTIVE") continue;
           team.losses += 1;
           applyMapDelta(team, 0, lostMaps, config, round);
         }

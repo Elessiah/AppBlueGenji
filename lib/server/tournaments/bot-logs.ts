@@ -803,7 +803,7 @@ async function loadMatch(matchId: number): Promise<MatchLogRow | null> {
  */
 async function loadRefereeAlertContext(matchId: number): Promise<RefereeAlertContext | null> {
   const match = await loadMatch(matchId);
-  if (!match || !match.team1_name || !match.team2_name) return null;
+  if (!match?.team1_name || !match.team2_name) return null;
   const participantType = toParticipantType(match.participant_type);
   return {
     tournament: { id: Number(match.tournament_id), name: match.tournament_name },

@@ -452,7 +452,7 @@ function qualificationUnits(input: EnduranceNextRoundInput): {
   for (const standing of active) {
     if (grouped.has(standing.teamId)) continue;
     const after = afterById.get(standing.teamId);
-    const afterMatch = after && after.status === "ACTIVE" ? after.points : null;
+    const afterMatch = after?.status === "ACTIVE" ? after.points : null;
     units.push({ teamIds: [standing.teamId], outcomes: [[settle(standing.teamId, afterMatch)]] });
   }
 

@@ -57,7 +57,7 @@ export async function rotateHiddenAvatarFile(userId: number): Promise<string | n
     [userId],
   );
   const row = rows[0];
-  if (!row || row.visible_avatar !== 0 || !row.avatar_url) return null;
+  if (row?.visible_avatar !== 0 || !row.avatar_url) return null;
 
   const target = rotatedAvatarTarget(row.avatar_url, userId);
   if (!target) return null;
@@ -202,7 +202,7 @@ export function rotatedAvatarTarget(
   userId: number,
 ): { from: string; to: string; url: string } | null {
   const disk = toDiskUploadPath(avatarUrl);
-  if (!disk || !disk.startsWith(AVATAR_DISK_PREFIX)) return null;
+  if (!disk?.startsWith(AVATAR_DISK_PREFIX)) return null;
   const filename = disk.slice(AVATAR_DISK_PREFIX.length);
   if (!AVATAR_FILENAME.test(filename) || !Number.isSafeInteger(userId) || userId <= 0) return null;
   const nextName = `${userId}-${crypto.randomBytes(8).toString("hex")}.webp`;

@@ -38,7 +38,7 @@ export function createSlotRegistry<E>(getObserver: () => SlotObserver<E> | null)
 
   function refFor(roundNumber: number, matchId: number): (element: E | null) => void {
     const cached = refs.get(matchId);
-    if (cached && cached.roundNumber === roundNumber) return cached.ref;
+    if (cached?.roundNumber === roundNumber) return cached.ref;
 
     let attached: E | null = null;
     const ref = (element: E | null) => {

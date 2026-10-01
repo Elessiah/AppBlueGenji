@@ -297,7 +297,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       game: gameLabel(tournament.game),
       phase: inferPhaseLabel(currentMatch),
       stream:
-        broadcasting && broadcasting.tournamentId === tournament.id
+        broadcasting?.tournamentId === tournament.id
           ? {
               tournamentId: tournament.id,
               tournamentName: tournament.name,

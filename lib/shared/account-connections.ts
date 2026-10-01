@@ -86,7 +86,7 @@ export function checkConnectionUnlink(
   provider: OAuthProvider,
 ): ConnectionUnlinkRefusal | null {
   const target = connections.find((connection) => connection.provider === provider);
-  if (!target || !target.linked) return "NOT_LINKED";
+  if (!target?.linked) return "NOT_LINKED";
   if (linkedConnectionCount(connections) <= 1) return "LAST_CONNECTION";
   return null;
 }
@@ -185,14 +185,14 @@ export const DISCORD_BOT_CONNECTION_LABEL = "Bot Discord (code par message privÃ
  */
 export function discordButtonLinked(connection: AccountConnection | undefined): boolean {
   return Boolean(
-    connection && connection.provider === "DISCORD" && connection.linked && connection.method !== "DM_CODE",
+    connection?.provider === "DISCORD" && connection.linked && connection.method !== "DM_CODE",
   );
 }
 
 /** La ligne du bot porte-t-elle le rattachement ? (Voir {@link discordButtonLinked}.) */
 export function discordBotLinked(connection: AccountConnection | undefined): boolean {
   return Boolean(
-    connection && connection.provider === "DISCORD" && connection.linked && connection.method === "DM_CODE",
+    connection?.provider === "DISCORD" && connection.linked && connection.method === "DM_CODE",
   );
 }
 

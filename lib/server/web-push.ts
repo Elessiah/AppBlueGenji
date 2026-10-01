@@ -43,7 +43,7 @@ function toBase64Url(bytes: Uint8Array | Buffer): string {
 export function vapidKeyPair(publicKey: string, privateKey: string): crypto.KeyObject | null {
   const pub = decodeBase64Url(publicKey);
   const raw = decodeBase64Url(privateKey);
-  if (!pub || pub.length !== 65 || pub[0] !== 0x04 || !raw || raw.length === 0 || raw.length > 32) return null;
+  if (pub?.length !== 65 || pub[0] !== 0x04 || !raw || raw.length === 0 || raw.length > 32) return null;
   // Un scalaire dont l'octet de tête est nul s'écrit parfois sur 31 octets (ou
   // moins) : c'est ce que rendait `ECDH.getPrivateKey()` une fois sur 256. Il
   // se complète à gauche, sans quoi une clé valide serait refusée.
@@ -85,7 +85,7 @@ let memo: { key: string; config: WebPushConfig | null } | null = null;
  */
 export function webPushConfig(env: Readonly<Record<string, string | undefined>> = process.env): WebPushConfig | null {
   const key = [env.VAPID_PUBLIC_KEY, env.VAPID_PRIVATE_KEY, env.VAPID_SUBJECT, env.APP_URL].join("|");
-  if (memo && memo.key === key) return memo.config;
+  if (memo?.key === key) return memo.config;
   const config = buildWebPushConfig(env);
   memo = { key, config };
   return config;
@@ -109,7 +109,7 @@ function buildWebPushConfig(env: Readonly<Record<string, string | undefined>>): 
 
 function defaultSubject(env: Readonly<Record<string, string | undefined>>): string | null {
   const appUrl = env.APP_URL?.trim();
-  return appUrl && appUrl.startsWith("https://") ? appUrl.replace(/\/+$/, "") : null; // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
+  return appUrl?.startsWith("https://") ? appUrl.replace(/\/+$/, "") : null; // NOSONAR typescript:S8786 — configuration du serveur, pas une entrée utilisateur
 }
 
 /** Durée de validité d'un jeton VAPID (RFC 8292 : 24 h au plus). */
@@ -156,7 +156,7 @@ export function encryptPushPayload(
 ): Buffer {
   const uaPublic = decodeBase64Url(subscription.p256dh);
   const authSecret = decodeBase64Url(subscription.auth);
-  if (!uaPublic || uaPublic.length !== 65 || !authSecret || authSecret.length !== 16) {
+  if (uaPublic?.length !== 65 || authSecret?.length !== 16) {
     throw new Error("INVALID_PUSH_SUBSCRIPTION");
   }
   const ecdh = options.ephemeral ?? crypto.createECDH("prime256v1");

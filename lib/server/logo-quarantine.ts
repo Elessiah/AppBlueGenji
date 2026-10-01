@@ -92,7 +92,7 @@ export function logoFileLocations(
   teamId: number,
 ): { live: string; quarantined: string } | null {
   const relative = toDiskUploadPath(logoUrl);
-  if (!relative || !relative.startsWith(TEAM_UPLOAD_PREFIX)) return null;
+  if (!relative?.startsWith(TEAM_UPLOAD_PREFIX)) return null;
   const filename = relative.slice(TEAM_UPLOAD_PREFIX.length);
   if (!LOGO_FILENAME.test(filename) || !Number.isSafeInteger(teamId) || teamId <= 0) return null;
   return {
@@ -112,7 +112,7 @@ export function avatarFileLocations(
   userId: number,
 ): { live: string; quarantined: string } | null {
   const relative = toDiskUploadPath(avatarUrl);
-  if (!relative || !relative.startsWith(USER_UPLOAD_PREFIX)) return null;
+  if (!relative?.startsWith(USER_UPLOAD_PREFIX)) return null;
   const filename = relative.slice(USER_UPLOAD_PREFIX.length);
   if (!LOGO_FILENAME.test(filename) || !Number.isSafeInteger(userId) || userId <= 0) return null;
   return {
