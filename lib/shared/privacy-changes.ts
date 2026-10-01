@@ -589,7 +589,7 @@ export const PRIVACY_CHANGES: readonly PrivacyChange[] = [
     publishedAt: "2026-10-02",
     title: "Bot Discord : journaux et fil d'activité limités dans le temps",
     summary:
-      "Le bot Discord BlueGenji efface désormais son fil d'activité et son journal du staff au bout d'une durée fixe, et les messages d'une exclusion dès qu'elle est levée.",
+      "Le bot Discord BlueGenji efface désormais son fil d'activité et son journal du staff au bout d'une durée fixe, et les messages d'une exclusion prononcée désormais dès qu'elle est levée.",
     details: [
       `Fil d'activité public de la page du bot (heure, serveur, niveau ou rôle de chaque annonce) : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, puis supprimé.`,
       `Journal privé du staff, et messages privés du bot à son titulaire : un an (${BOT_STAFF_LOG_RETENTION_DAYS} jours), puis supprimés.`,
