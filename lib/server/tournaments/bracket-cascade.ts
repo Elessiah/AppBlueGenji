@@ -88,6 +88,36 @@ function isEngineResolved(row: CascadeRow): boolean {
 }
 
 /**
+ * Rouvre une rencontre d'aval close d'office, après avoir défait ce que son
+ * résultat avait fait monter. Rend le nombre de rencontres rouvertes, elle
+ * comprise.
+ */
+async function reopenEngineResolved(
+  connection: PoolConnection,
+  target: CascadeRow,
+  targetId: number,
+  depth: number,
+): Promise<number> {
+  if (!isEngineResolved(target)) {
+    // Une rencontre disputée derrière : le verrou aurait dû refuser. On
+    // refuse ici plutôt que d'effacer un résultat que personne n'a montré.
+    throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
+  }
+  // Ce que l'exemption avait fait monter redescend, en entier : la cible sera
+  // tranchée de nouveau, et rien ne dit encore par qui.
+  const reopened = 1 + (await undoPropagation(connection, target, null, null, depth + 1, true));
+  await connection.execute(
+    `UPDATE bg_matches
+       SET team1_score = NULL, team2_score = NULL,
+           winner_team_id = NULL, loser_team_id = NULL,
+           forfeit_team_id = NULL, double_forfeit = 0
+       WHERE id = ?`,
+    [targetId],
+  );
+  return reopened;
+}
+
+/**
  * Vide un créneau d'aval et défait tout ce qui en était descendu.
  *
  * `keepTeamId` : l'équipe que la correction va reposer dans ce créneau. S'il
@@ -121,25 +151,7 @@ async function vacateSlot(
 
   if (currentId === keepTeamId && !(force && closed)) return 0;
 
-  let reopened = 0;
-  if (closed) {
-    if (!isEngineResolved(target)) {
-      // Une rencontre disputée derrière : le verrou aurait dû refuser. On
-      // refuse ici plutôt que d'effacer un résultat que personne n'a montré.
-      throw new Error("CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES");
-    }
-    // Ce que l'exemption avait fait monter redescend, en entier : la cible sera
-    // tranchée de nouveau, et rien ne dit encore par qui.
-    reopened += 1 + (await undoPropagation(connection, target, null, null, depth + 1, true));
-    await connection.execute(
-      `UPDATE bg_matches
-       SET team1_score = NULL, team2_score = NULL,
-           winner_team_id = NULL, loser_team_id = NULL,
-           forfeit_team_id = NULL, double_forfeit = 0
-       WHERE id = ?`,
-      [targetId],
-    );
-  }
+  const reopened = closed ? await reopenEngineResolved(connection, target, targetId, depth) : 0;
 
   const team1 = slot === 1 ? null : target.team1_id;
   const team2 = slot === 2 ? null : target.team2_id;
