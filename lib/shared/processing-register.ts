@@ -561,7 +561,7 @@ export const PROCESSING_ACTIVITIES: readonly ProcessingActivity[] = [
       "Configuration (salons relayés et leurs filtres de rang, invitation et rôle d'arbitrage avec l'identifiant de qui les a posés, rôle d'administration du bot, modules) : jusqu'à son retrait par les administrateurs, au plus tard jusqu'au départ du bot du serveur, qui l'efface (un départ survenu pendant une interruption du bot, que Discord ne lui signale pas, est rattrapé à son redémarrage)",
       "Adhésions et rappels programmés : jusqu'au dernier envoi du rappel (pour une adhésion, sa date de péremption) ou sa suppression, au plus tard jusqu'au départ du bot du serveur où ils ont été enregistrés, qui les efface (départ pendant une interruption compris, rattrapé au redémarrage)",
       `Fil d'activité : ${BOT_FEED_EVENT_RETENTION_DAYS} jours, supprimé dans la nuit qui suit`,
-      `Salon de journal privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), supprimés dans la nuit qui suit — sauf l'avis et le motif d'une exclusion en cours, supprimés à sa levée`,
+      `Salon de journal privé du staff, et messages privés du bot au titulaire : ${BOT_STAFF_LOG_RETENTION_DAYS} jours (un an), puis supprimés par le ménage de nuit, par lots (plusieurs nuits pour un arriéré important) — sauf l'avis et le motif d'une exclusion en cours, supprimés à sa levée`,
       "Journaux du serveur : selon leur rotation automatique",
       `Sauvegardes : ${BACKUP_RETENTION_DAYS} jours au plus (traitement T09)`,
     ],
