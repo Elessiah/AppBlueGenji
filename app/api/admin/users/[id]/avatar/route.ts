@@ -47,7 +47,7 @@ export async function DELETE(req: Request, context: { params: Promise<{ id: stri
       console.error("[moderation] fichier de l'avatar non effacé", error);
     });
     // Jamais le pseudo du joueur sur Discord (lib/shared/log-privacy.ts) : ce
-    // canal est un tiers hébergé hors de l'Union européenne, sans purge.
+    // canal est un tiers hébergé hors de l'Union européenne, purgé au bout d'un an.
     publishStaffAction(`🧹 Avatar d'${ANONYMOUS_PLAYER_LABEL} retiré par le staff (modération).`, {
       id: user.id,
       pseudo: user.pseudo,
