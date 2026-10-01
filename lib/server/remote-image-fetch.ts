@@ -86,6 +86,49 @@ export type FetchRemoteImageOptions = {
 };
 
 /**
+ * Destination d'une redirection, revalidée comme l'URL d'origine (`https`,
+ * hôte public par son nom), ou `null` si elle manque ou ne passe pas.
+ */
+function redirectTarget(res: Response, from: URL): URL | null {
+  const location = res.headers.get("location");
+  if (!location) return null;
+  let next: URL;
+  try {
+    next = new URL(location, from);
+  } catch {
+    return null;
+  }
+  return parseRemoteImageUrl(next.toString());
+}
+
+/**
+ * Corps d'une réponse finale, s'il est une image acceptée dans le plafond de
+ * taille ; `null` sinon.
+ */
+async function readImageResponse(res: Response, maxBytes: number): Promise<FetchedRemoteImage | null> {
+  if (!res.ok) return null;
+
+  const contentType = acceptedRemoteImageContentType(res.headers.get("content-type"));
+  if (!contentType) return null;
+
+  // Refus avant lecture quand le serveur annonce la taille ; le contrôle
+  // après lecture reste nécessaire, un en-tête absent ou menteur étant
+  // possible.
+  const declared = Number(res.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > maxBytes) return null;
+
+  let body: ArrayBuffer;
+  try {
+    body = await res.arrayBuffer();
+  } catch {
+    return null;
+  }
+  if (body.byteLength === 0 || body.byteLength > maxBytes) return null;
+
+  return { body, contentType };
+}
+
+/**
  * Va chercher l'image, en suivant au plus `maxRedirects` redirections et en
  * revalidant l'hôte à chacune — nom écrit **et** adresses résolues.
  *
@@ -133,40 +176,13 @@ export async function fetchRemoteImage(
       }
 
       if (res.status >= 300 && res.status < 400) {
-        const location = res.headers.get("location");
-        if (!location) return null;
-        let next: URL;
-        try {
-          next = new URL(location, target);
-        } catch {
-          return null;
-        }
-        const revalidated = parseRemoteImageUrl(next.toString());
-        if (!revalidated) return null;
-        target = revalidated;
+        const next = redirectTarget(res, target);
+        if (!next) return null;
+        target = next;
         continue;
       }
 
-      if (!res.ok) return null;
-
-      const contentType = acceptedRemoteImageContentType(res.headers.get("content-type"));
-      if (!contentType) return null;
-
-      // Refus avant lecture quand le serveur annonce la taille ; le contrôle
-      // après lecture reste nécessaire, un en-tête absent ou menteur étant
-      // possible.
-      const declared = Number(res.headers.get("content-length"));
-      if (Number.isFinite(declared) && declared > maxBytes) return null;
-
-      let body: ArrayBuffer;
-      try {
-        body = await res.arrayBuffer();
-      } catch {
-        return null;
-      }
-      if (body.byteLength === 0 || body.byteLength > maxBytes) return null;
-
-      return { body, contentType };
+      return await readImageResponse(res, maxBytes);
     } finally {
       clearTimeout(timer);
       // Referme le saut, quoi qu'il advienne. Sur les chemins de refus (statut

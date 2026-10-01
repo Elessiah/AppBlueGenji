@@ -109,6 +109,15 @@ export function renderInline(text: string): string {
 }
 
 /**
+ * Une puce indentée de `indent` colonnes ouvre-t-elle un niveau de liste, le
+ * niveau ouvert le plus profond étant à `current` colonnes (`undefined` hors
+ * liste) ?
+ */
+function opensListLevel(indent: number, current: number | undefined): boolean {
+  return current === undefined || indent > current;
+}
+
+/**
  * Rend le sous-ensemble Markdown utilisé par la doc du bot : titres, listes,
  * blocs de code, paragraphes. Volontairement minimal — pas de dépendance
  * externe, et la source est un contenu de confiance du dépôt voisin.
@@ -157,18 +166,41 @@ export function renderMarkdown(markdown: string): string {
     closeList();
   };
 
+  const isFence = (line: string) => line.trim().startsWith("```");
+  const closeFence = (code: string[]) => {
+    out.push(`<pre><code>${escapeHtml(code.join("\n"))}</code></pre>`);
+  };
+  const addHeading = (marks: string, text: string) => {
+    flush();
+    // Le `#` du fichier devient un h2 : le h1 de la page reste le titre de la doc.
+    const level = Math.min(marks.length + 1, 6);
+    out.push(`<h${level}>${renderInline(text.trim())}</h${level}>`);
+  };
+  const addBullet = (rawIndent: string, text: string) => {
+    closeParagraph();
+    const indent = rawIndent.replace(/\t/g, "  ").length;
+    if (opensListLevel(indent, listStack.at(-1))) {
+      openLevel(indent);
+    } else {
+      while (listStack.length > 1 && indent < listStack.at(-1)!) closeLevel();
+      closeLi();
+    }
+    out.push(`<li>${renderInline(text.trim())}`);
+    liOpen = true;
+  };
+
   for (const line of lines) {
+    if (fence !== null && !isFence(line)) {
+      fence.push(line);
+      continue;
+    }
     if (fence !== null) {
-      if (line.trim().startsWith("```")) {
-        out.push(`<pre><code>${escapeHtml(fence.join("\n"))}</code></pre>`);
-        fence = null;
-      } else {
-        fence.push(line);
-      }
+      closeFence(fence);
+      fence = null;
       continue;
     }
 
-    if (line.trim().startsWith("```")) {
+    if (isFence(line)) {
       flush();
       fence = [];
       continue;
@@ -181,26 +213,13 @@ export function renderMarkdown(markdown: string): string {
 
     const heading = /^(#{1,6})\s+(.*)$/.exec(line); // NOSONAR typescript:S8786 — Markdown du dépôt du bot, source de confiance
     if (heading) {
-      flush();
-      // Le `#` du fichier devient un h2 : le h1 de la page reste le titre de la doc.
-      const level = Math.min(heading[1].length + 1, 6);
-      out.push(`<h${level}>${renderInline(heading[2].trim())}</h${level}>`);
+      addHeading(heading[1], heading[2]);
       continue;
     }
 
     const bullet = /^([ \t]*)[-*]\s+(.*)$/.exec(line); // NOSONAR typescript:S8786 — Markdown du dépôt du bot, source de confiance
     if (bullet) {
-      closeParagraph();
-      const indent = bullet[1].replace(/\t/g, "  ").length;
-      const current = listStack.at(-1);
-      if (current === undefined || indent > current) {
-        openLevel(indent);
-      } else {
-        while (listStack.length > 1 && indent < listStack.at(-1)!) closeLevel();
-        closeLi();
-      }
-      out.push(`<li>${renderInline(bullet[2].trim())}`);
-      liOpen = true;
+      addBullet(bullet[1], bullet[2]);
       continue;
     }
 
@@ -208,7 +227,7 @@ export function renderMarkdown(markdown: string): string {
     paragraph.push(line.trim());
   }
 
-  if (fence !== null) out.push(`<pre><code>${escapeHtml(fence.join("\n"))}</code></pre>`);
+  if (fence !== null) closeFence(fence);
   flush();
 
   return out.join("\n");
