@@ -65,6 +65,22 @@ interface ReportProblemDialogProps {
 type Selection = Record<ReportTargetType, ReportTargetOption[]>;
 const EMPTY_SELECTION: Selection = { USER: [], TEAM: [], TOURNAMENT: [] };
 
+/** Mention à côté du champ d'adresse de réponse. */
+function replyChannelRequirement(requiresReplyChannel: boolean, authenticated: boolean): string {
+  if (!requiresReplyChannel) return "(facultatif)";
+  return authenticated ? "(obligatoire sans tag Discord certifié)" : "(obligatoire sans compte)";
+}
+
+/** Ce que l'absence d'adresse de réponse implique. */
+function replyChannelHint(requiresReplyChannel: boolean, authenticated: boolean): string {
+  if (authenticated) {
+    return "Sans adresse, l'association te répondra sur Discord, si ton tag Discord est certifié.";
+  }
+  return requiresReplyChannel
+    ? "Sans compte, c'est la seule façon pour l'association de te répondre."
+    : "Sans adresse, l'association ne pourra pas te tenir au courant.";
+}
+
 /**
  * Formulaire « Signaler un problème », ouvert depuis le pied de page de toutes
  * les pages.
@@ -230,6 +246,54 @@ export function ReportProblemDialog({
     }
   };
 
+  // Bloc « Signalement contesté » : connexion requise, contestation déjà
+  // désignée, rien à contester, ou choix du signalement.
+  const renderContestField = () => {
+    if (!authenticated) {
+      return (
+        <p className={styles.anonNote}>
+          <Link href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
+            Connecte-toi
+          </Link>{" "}
+          pour contester un signalement : seuls les joueurs visés, les membres des équipes visées
+          et l&apos;auteur d&apos;un signalement de droit d&apos;auteur ou de modération, une fois le
+          dossier archivé, peuvent le faire.
+        </p>
+      );
+    }
+    if (contestOf !== undefined) {
+      return <p className={styles.lead}>Tu contestes le signalement n° {contestOf}.</p>;
+    }
+    if (contestable !== null && contestable.length === 0) {
+      return (
+        <p className={styles.anonNote}>
+          Aucun signalement ne te vise, ni toi ni ton équipe, et aucun de ceux que tu as envoyés
+          n&apos;est archivé : il n&apos;y a rien à contester.
+        </p>
+      );
+    }
+    return (
+      <div className="field">
+        <label htmlFor={`${titleId}-parent`}>Signalement contesté</label>
+        <select
+          id={`${titleId}-parent`}
+          value={parentReportId ?? ""}
+          onChange={(event) => setParentReportId(event.target.value ? Number(event.target.value) : null)}
+          disabled={contestable === null}
+        >
+          <option value="">{contestable === null ? "Chargement…" : "Choisir…"}</option>
+          {(contestable ?? []).map((option) => (
+            <option key={option.id} value={option.id}>
+              N° {option.id} · {REPORT_CATEGORY_DEFINITIONS[option.category].label} · du{" "}
+              {new Date(option.createdAt).toLocaleDateString("fr-FR")} ·{" "}
+              {REPORT_STATUS_LABELS[option.status]}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
+
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.overlay} role="presentation" {...backdrop}>
       <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
@@ -351,43 +415,7 @@ export function ReportProblemDialog({
                   </p>
                 ))}
 
-              {category === "CONTEST" &&
-                (!authenticated ? (
-                  <p className={styles.anonNote}>
-                    <Link href={`/connexion?redirect=${encodeURIComponent(pathname)}`} onClick={onClose}>
-                      Connecte-toi
-                    </Link>{" "}
-                    pour contester un signalement : seuls les joueurs visés, les membres des équipes visées
-                    et l&apos;auteur d&apos;un signalement de droit d&apos;auteur ou de modération, une fois le
-                    dossier archivé, peuvent le faire.
-                  </p>
-                ) : contestOf !== undefined ? (
-                  <p className={styles.lead}>Tu contestes le signalement n° {contestOf}.</p>
-                ) : contestable !== null && contestable.length === 0 ? (
-                  <p className={styles.anonNote}>
-                    Aucun signalement ne te vise, ni toi ni ton équipe, et aucun de ceux que tu as envoyés
-                    n&apos;est archivé : il n&apos;y a rien à contester.
-                  </p>
-                ) : (
-                  <div className="field">
-                    <label htmlFor={`${titleId}-parent`}>Signalement contesté</label>
-                    <select
-                      id={`${titleId}-parent`}
-                      value={parentReportId ?? ""}
-                      onChange={(event) => setParentReportId(event.target.value ? Number(event.target.value) : null)}
-                      disabled={contestable === null}
-                    >
-                      <option value="">{contestable === null ? "Chargement…" : "Choisir…"}</option>
-                      {(contestable ?? []).map((option) => (
-                        <option key={option.id} value={option.id}>
-                          N° {option.id} · {REPORT_CATEGORY_DEFINITIONS[option.category].label} · du{" "}
-                          {new Date(option.createdAt).toLocaleDateString("fr-FR")} ·{" "}
-                          {REPORT_STATUS_LABELS[option.status]}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                ))}
+              {category === "CONTEST" && renderContestField()}
 
               <div className="field">
                 <label htmlFor={`${titleId}-description`}>Description</label>
@@ -468,11 +496,7 @@ export function ReportProblemDialog({
                   <label htmlFor={`${titleId}-email`}>
                     Adresse pour te répondre{" "}
                     <span className={styles.optional}>
-                      {definition.requiresReplyChannel
-                        ? authenticated
-                          ? "(obligatoire sans tag Discord certifié)"
-                          : "(obligatoire sans compte)"
-                        : "(facultatif)"}
+                      {replyChannelRequirement(definition.requiresReplyChannel, authenticated)}
                     </span>
                   </label>
                   <input
@@ -484,11 +508,7 @@ export function ReportProblemDialog({
                     autoComplete="email"
                   />
                   <p className={styles.hint}>
-                    {authenticated
-                      ? "Sans adresse, l'association te répondra sur Discord, si ton tag Discord est certifié."
-                      : definition.requiresReplyChannel
-                        ? "Sans compte, c'est la seule façon pour l'association de te répondre."
-                        : "Sans adresse, l'association ne pourra pas te tenir au courant."}
+                    {replyChannelHint(definition.requiresReplyChannel, authenticated)}
                   </p>
                 </div>
               )}

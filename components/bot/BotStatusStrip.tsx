@@ -41,7 +41,8 @@ export function BotStatusStrip({ status }: { status: BotStatus | null }) {
   const statusLabel = botStatusOf(status);
   const version = botPayloadText(status?.version);
   const buildHash = botPayloadText(status?.buildHash);
-  const versionLabel = version ? (buildHash ? `${version} · ${buildHash.slice(0, 4)}` : version) : "—";
+  let versionLabel = "—";
+  if (version) versionLabel = buildHash ? `${version} · ${buildHash.slice(0, 4)}` : version;
   const buildDate = botPayloadText(status?.buildDate) ?? "—";
   // Les champs **chiffrés** passent par `botPayloadNumber` et non par
   // `botPayloadText`, qui laisse filer n'importe quelle chaîne : la case

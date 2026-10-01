@@ -177,6 +177,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
   // moyenne **mesurée**, sur une charge que la page venait de juger illisible.
   // Le zéro reste réservé à un zéro reçu.
   const avgPerDay = botPayloadNumber(data.avgPerDay);
+  const avgLabel = avgPerDay === null ? "—" : Math.round(avgPerDay);
 
   return (
     <section className="panel" aria-busy={loading}>
@@ -229,7 +230,7 @@ export function BotActivityChart({ initial }: { initial: BotActivity | null }) {
           <span className="lg">RELAIS INTER-SERVEUR</span>
           <span className="lg amber">SCRIMS PROPOSÉS</span>
           <span style={{ marginLeft: "auto" }}>
-            {loading ? "CHARGEMENT…" : `MOY. ${avgPerDay === null ? "—" : Math.round(avgPerDay)} / JOUR`}
+            {loading ? "CHARGEMENT…" : `MOY. ${avgLabel} / JOUR`}
           </span>
         </div>
       </div>

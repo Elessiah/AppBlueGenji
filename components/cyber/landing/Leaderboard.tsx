@@ -18,6 +18,18 @@ type LeaderboardResponse = {
 
 type GameFilter = "all" | "ow" | "mr";
 
+const TREND_CLASSES: Record<LandingLeaderboardRow["trend"], string | undefined> = {
+  up: styles.trendUp,
+  down: styles.trendDown,
+  flat: styles.trendFlat,
+};
+
+/** Évolution affichée : un tiret quand rien n'a bougé, sinon la variation signée. */
+function trendLabel(row: Pick<LandingLeaderboardRow, "trend" | "trendValue">): string {
+  if (row.trend === "flat") return "—";
+  return row.trend === "up" ? `+${row.trendValue}` : `-${row.trendValue}`;
+}
+
 export function Leaderboard({ initialRows }: LeaderboardProps) {
   const [game, setGame] = useState<GameFilter>("all");
   const [rows, setRows] = useState(initialRows);
@@ -103,9 +115,8 @@ export function Leaderboard({ initialRows }: LeaderboardProps) {
           </div>
         ) : (
           rows.map((row) => {
-            const trend = row.trend === "flat" ? "—" : row.trend === "up" ? `+${row.trendValue}` : `-${row.trendValue}`;
-            const trendClass =
-              row.trend === "up" ? styles.trendUp : row.trend === "down" ? styles.trendDown : styles.trendFlat;
+            const trend = trendLabel(row);
+            const trendClass = TREND_CLASSES[row.trend];
 
             return (
               <div key={row.teamId} className={`${styles.row} ${row.rank <= 3 ? styles.top : ""}`} role="row">

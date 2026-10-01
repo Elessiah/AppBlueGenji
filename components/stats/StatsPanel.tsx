@@ -20,6 +20,7 @@ import {
   rankingPointsHint,
 } from "@/lib/shared/ranking";
 import s from "./StatsPanel.module.css";
+import { plural } from "@/lib/shared/plural";
 
 interface StatsPanelProps {
   stats: DeepStats;
@@ -30,6 +31,13 @@ interface StatsPanelProps {
 }
 
 const MONTH_SHORT = ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."];
+
+/** Pastille de forme de chaque issue ; le nul porte « N », « D » étant la défaite. */
+const FORM_BADGES: Record<DeepStats["form"][number], { label: string; letter: string; tone: string | undefined }> = {
+  W: { label: "Victoire", letter: "V", tone: s.formWin },
+  L: { label: "Défaite", letter: "D", tone: s.formLoss },
+  D: { label: "Match nul", letter: "N", tone: s.formDraw },
+};
 
 /** Libellé court d'une clé `YYYY-MM` (`"2026-03"` → `"mars"`). */
 function monthLabel(month: string): string {
@@ -208,7 +216,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
             value={stats.tournamentsPlayed}
             hint={
               stats.tournamentsUpcoming > 0
-                ? `+ ${stats.tournamentsUpcoming} inscription${stats.tournamentsUpcoming > 1 ? "s" : ""} à venir`
+                ? `+ ${plural(stats.tournamentsUpcoming, "inscription")} à venir`
                 : undefined
             }
           />
@@ -292,10 +300,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: StatsPane
                   // « D » désigne déjà la **défaite** sur ces pastilles : un nul
                   // porte donc « N », faute de quoi les deux issues se liraient
                   // sous la même lettre.
-                  const label =
-                    result === "W" ? "Victoire" : result === "L" ? "Défaite" : "Match nul";
-                  const letter = result === "W" ? "V" : result === "L" ? "D" : "N";
-                  const tone = result === "W" ? s.formWin : result === "L" ? s.formLoss : s.formDraw;
+                  const { label, letter, tone } = FORM_BADGES[result];
 
                   return (
                     <li

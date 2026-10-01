@@ -152,6 +152,8 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
     }
   }
 
+  const submitLabel = editing ? "Enregistrer" : "Ajouter";
+
   return (
     <>
       {pillars.map((p, index) => (
@@ -253,7 +255,7 @@ export function AboutPillars({ initialPillars, isAdmin }: AboutPillarsProps) {
               disabled={busy}
               aria-busy={busy}
             >
-              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+              {busy ? "…" : submitLabel}
             </button>
           </div>
         </LandingDialog>

@@ -11,8 +11,9 @@ export function BotInviteCard() {
   // elle annonçait cinq permissions que l'invitation ne demandait pas.
   const perms = decodeDiscordPermissions(permissions);
   // Une seule ligne d'absence, dont seul le motif change.
-  const emptyNotice =
-    perms === null ? "Valeur de permissions illisible" : perms.length === 0 ? "Aucune permission de serveur" : null;
+  let emptyNotice: string | null = null;
+  if (perms === null) emptyNotice = "Valeur de permissions illisible";
+  else if (perms.length === 0) emptyNotice = "Aucune permission de serveur";
 
   return (
     <div className="card card-ticks invite-card" style={{ marginTop: 28 }}>

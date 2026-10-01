@@ -152,6 +152,8 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
     }
   }
 
+  const submitLabel = editing ? "Enregistrer" : "Ajouter";
+
   return (
     <>
       <div className={styles.stats}>
@@ -255,7 +257,7 @@ export function AboutStats({ initialStats, isAdmin }: AboutStatsProps) {
               disabled={busy}
               aria-busy={busy}
             >
-              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+              {busy ? "…" : submitLabel}
             </button>
           </div>
         </LandingDialog>

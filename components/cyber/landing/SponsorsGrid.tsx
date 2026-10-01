@@ -285,6 +285,10 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
     }
   }
 
+  const submitLabel = editing ? "Enregistrer" : "Ajouter";
+  const bannerFileLabel = form.bannerUrl ? "Changer le fichier" : "Importer un fichier";
+  const logoFileLabel = form.logoUrl ? "Changer le fichier" : "Importer un fichier";
+
   return (
     <section id="sponsors" className={styles.root}>
       {cropDialog}
@@ -524,7 +528,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
                   onClick={() => bannerFileRef.current?.click()}
                   disabled={uploading || busy}
                 >
-                  {bannerBusy ? "Envoi…" : form.bannerUrl ? "Changer le fichier" : "Importer un fichier"}
+                  {bannerBusy ? "Envoi…" : bannerFileLabel}
                 </button>
                 {form.bannerUrl && (
                   <button
@@ -568,7 +572,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
                   onClick={() => logoFileRef.current?.click()}
                   disabled={uploading || busy}
                 >
-                  {logoBusy ? "Envoi…" : form.logoUrl ? "Changer le fichier" : "Importer un fichier"}
+                  {logoBusy ? "Envoi…" : logoFileLabel}
                 </button>
                 {form.logoUrl && (
                   <button
@@ -601,7 +605,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: SponsorsGridPr
               Annuler
             </CyberButton>
             <CyberButton variant="primary" onClick={submit} disabled={busy}>
-              {busy ? "…" : editing ? "Enregistrer" : "Ajouter"}
+              {busy ? "…" : submitLabel}
             </CyberButton>
           </div>
         </LandingDialog>
