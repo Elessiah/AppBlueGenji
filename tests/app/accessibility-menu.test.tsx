@@ -48,7 +48,7 @@ describe("AccessibilityMenu — rendu serveur", () => {
     expect(html).toContain('aria-label="Réglages d&#x27;accessibilité"');
     expect(html).toContain('aria-expanded="false"');
     expect(html).not.toContain("aria-controls");
-    expect(html).not.toContain('role="region"');
+    expect(html).not.toContain("<section");
     expect(html).toMatch(/<button type="button"/);
   });
 
@@ -75,8 +75,9 @@ describe("AccessibilityMenu — rendu serveur", () => {
 describe("AccessibilityPanel", () => {
   it("est une région nommée par son titre", () => {
     const html = panel([]);
-    expect(html).toContain('role="region"');
-    expect(html).toContain('aria-labelledby="a11y-title"');
+    // Un `<section>` nommé *est* une région : le rôle n'a pas à être redit.
+    expect(html).toMatch(/^<section id="[^"]*" class="[^"]*panel[^"]*" aria-labelledby="a11y-title" tabindex="-1">/);
+    expect(html).not.toMatch(/^<[^>]*role="region"/);
     expect(html).toMatch(/id="a11y-title"[^>]*>Accessibilité</);
   });
 
