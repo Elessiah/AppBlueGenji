@@ -122,6 +122,10 @@ Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
   maintenant si le début est illisible. La date déjà posée sur le match n'y
   entre pas : elle ancrerait l'année sur une erreur ou un report, sans champ
   année pour en sortir ;
+- en revanche, tant que le jour et le mois restent ceux de la date déjà posée,
+  **son année est gardée** (`readMatchStartEntry`, `currentStartAt`) : retoucher
+  l'heure ou enregistrer sans rien changer ne déplace jamais un match d'un an ;
+  changer le jour ou le mois relance la déduction ;
 - `Y` = année **à Paris** de la référence ; parmi `Y − 1`, `Y`, `Y + 1`, on garde
   la date la plus proche de la référence. Toute date à moins de six mois de la
   référence tombe donc sur la bonne année — dans les deux sens : « 3 janvier »
