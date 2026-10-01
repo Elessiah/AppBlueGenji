@@ -943,7 +943,8 @@ export default async function RgpdPage() {
             ou d&apos;un caster. {STREAM_NOTICE_SHOWN} Ce traitement repose sur l&apos;intérêt
             légitime de l&apos;association à faire connaître ses compétitions.{" "}
             {STREAM_NOTICE_OBJECTION} Un lien de rediffusion qui montre le joueur est alors
-            retiré du site. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
+            retiré du site, et une vidéo publiée par la chaîne de l&apos;association est masquée
+            ou supprimée. Les spectateurs, eux, voient la diffusion sur la plateforme, qui traite leurs données en
             responsable de son propre traitement (<Link href="/rgpd/registre#t16">registre, T16</Link>).
           </p>
           <p>Le détail, par traitement, figure au registre ci-dessous.</p>

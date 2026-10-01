@@ -15,7 +15,7 @@ describe("information sur la retransmission des matchs", () => {
   });
 
   it("dit ce qui est montré, et ce qui ne l'est jamais", () => {
-    expect(STREAM_NOTICE_SHOWN).toMatch(/pseudo, le nom d'équipe et les résultats et performances en jeu/);
+    expect(STREAM_NOTICE_SHOWN).toMatch(/pseudo des joueurs, le nom de leur équipe et leurs résultats et performances en jeu/);
     expect(STREAM_NOTICE_SHOWN).toMatch(/jamais de webcam ni de chat vocal/);
   });
 

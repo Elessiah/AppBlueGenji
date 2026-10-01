@@ -17,7 +17,7 @@ export const STREAM_NOTICE_PRIVACY_PATH = "/rgpd#retransmission";
 
 /** Ce qu'une retransmission montre d'un joueur, et ce qu'elle ne montre jamais. */
 export const STREAM_NOTICE_SHOWN =
-  "Seuls y apparaissent le pseudo, le nom d'équipe et les résultats et performances en jeu des joueurs — jamais de webcam ni de chat vocal.";
+  "Y apparaissent le pseudo des joueurs, le nom de leur équipe et leurs résultats et performances en jeu — jamais de webcam ni de chat vocal.";
 
 /** Le droit d'opposition, et la façon de l'exercer. */
 export const STREAM_NOTICE_OBJECTION =

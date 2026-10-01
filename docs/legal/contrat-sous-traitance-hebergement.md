@@ -86,9 +86,10 @@ L'Hébergeur met en œuvre les mesures décrites au registre, notamment :
   archives de la base, remote `rclone` de type `crypt` pour les images, les
   logos masqués et le journal des suppressions), déposées sur un stockage en
   ligne qui ne reçoit aucune clé ; conservation limitée à la durée annoncée ;
-- clés de déchiffrement (clé privée des archives, mot de passe `rclone` et sa
-  copie de secours) détenues par l'Hébergeur, Keryan Houssin, seul à les
-  détenir, et conservées hors du serveur ;
+- clés de déchiffrement détenues par l'Hébergeur, Keryan Houssin, seul à les
+  détenir : clé privée des archives conservée hors du serveur ; mot de passe
+  `rclone` sur le serveur (la synchronisation horaire en a besoin), avec une
+  copie de secours hors du serveur ;
 - rejeu des suppressions de compte avant toute remise en service après une
   restauration.
 
