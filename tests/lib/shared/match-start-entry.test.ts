@@ -7,6 +7,7 @@ import {
   matchEntryTimeValue,
   matchStartEntryOf,
   matchStartParisYear,
+  nextValidYearShift,
   parisInstant,
   parseMatchEntryTime,
   readMatchStartEntry,
@@ -230,6 +231,18 @@ describe("décalage d'année", () => {
     expect(iso(shiftMatchStartYear(at("2028-02-29T19:00:00Z"), 4))).toBe("2032-02-29T19:00:00.000Z");
     expect(shiftMatchStartYear(at("2100-06-01T18:00:00Z"), 1)).toBeNull();
     expect(shiftMatchStartYear(at("2026-06-01T18:00:00Z"), 0.5)).toBeNull();
+  });
+
+  it("prochain décalage valable : un cran, ou quatre pour un 29 février", () => {
+    const ordinary = at("2026-08-20T18:00:00Z");
+    expect(nextValidYearShift(ordinary, 0, -1)).toBe(-1);
+    expect(nextValidYearShift(ordinary, 0, 1)).toBe(1);
+    expect(nextValidYearShift(ordinary, -1, -1)).toBe(-2);
+    const leap = at("2028-02-29T19:00:00Z");
+    expect(nextValidYearShift(leap, 0, -1)).toBe(-4);
+    expect(nextValidYearShift(leap, 0, 1)).toBe(4);
+    // 2096 → 2100 n'est pas bissextile et 2104 sort des bornes.
+    expect(nextValidYearShift(at("2096-02-29T19:00:00Z"), 0, 1)).toBeNull();
   });
 
   it("corrige l'archive d'un match joué il y a plus de six mois", () => {
