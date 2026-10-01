@@ -39,6 +39,18 @@ function capacityBlockTitle(noSlot: boolean, overCapacity: boolean, remainingSlo
   return `${GHOST_BATCH_MAX} engagés au maximum par inscription : recommencez pour les suivants.`;
 }
 
+/** Message d'une liste vide, selon qu'elle charge, a échoué, est épuisée ou filtrée. */
+function ghostListEmptyMessage(
+  load: "pending" | "loaded" | "failed",
+  teamCount: number,
+  noneAvailable: string,
+): string {
+  if (load === "pending") return "Chargement…";
+  if (load === "failed") return "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer.";
+  if (teamCount === 0) return noneAvailable;
+  return "Aucun résultat pour cette recherche.";
+}
+
 /**
  * Inscription par le staff (`tournaments`) d'engagés sans compte sur le site :
  * des équipes fantômes, ou des joueurs invités si le tournoi est individuel —
@@ -126,11 +138,7 @@ export function GhostRegistrationDialog({
   // Trois vides bien distincts : on ne sait pas encore, il n'y a plus rien à
   // inscrire, ou la recherche ne trouve rien. « Aucun résultat » sur une liste
   // qui n'a pas fini de charger enverrait créer une équipe déjà en stock.
-  let emptyMessage: string;
-  if (load === "pending") emptyMessage = "Chargement…";
-  else if (load === "failed") emptyMessage = "Liste indisponible. Ferme et rouvre la fenêtre pour réessayer.";
-  else if (teams.length === 0) emptyMessage = wording.guestNoneAvailable;
-  else emptyMessage = "Aucun résultat pour cette recherche.";
+  const emptyMessage = ghostListEmptyMessage(load, teams.length, wording.guestNoneAvailable);
 
   const toggle = (teamId: number) => {
     setSelected((current) =>

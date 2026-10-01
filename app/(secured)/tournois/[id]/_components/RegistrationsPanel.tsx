@@ -28,6 +28,8 @@ import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
 import {
   hiddenRegistrationCount,
   mustExpandToShow,
+  registrationActionsColumn,
+  removalNotice,
   visibleRegistrationCount,
 } from "../_lib/registrations-list";
 import styles from "./RegistrationsPanel.module.css";
@@ -123,11 +125,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // l'ordre parle le premier, il garde la parole ; la phrase du retrait ne
   // s'affiche que lorsqu'elle apprend quelque chose — typiquement sur un
   // tournoi lancé, où l'ordre reste réglable mais où le retrait, lui, est clos.
-  const removalNotice =
-    removalBlock !== null
-    && !(lockReason === "FINISHED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_FINISHED")
-      ? removalBlock
-      : null;
+  const removalNoticeReason = removalNotice(removalBlock, lockReason);
 
   // Engagé dont on confirme le retrait. La ligne est gardée en entier plutôt
   // que son seul identifiant : le dialogue reste monté pendant que le flux
@@ -218,11 +216,12 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // commandes est là. Les gabarits sont exclusifs — deux classes de même poids
   // sur la même propriété se départageraient par l'ordre de la feuille, ce qui
   // n'est pas une règle qu'on veut avoir à relire.
-  const gridClass = reorderable ? styles.reorderable : removable ? styles.withActions : "";
+  const actionsColumn = registrationActionsColumn(reorderable, removable);
+  const gridClass = actionsColumn.grid ? styles[actionsColumn.grid] : "";
   // L'intitulé nomme ce que la colonne contient réellement, et il n'y a pas
   // toujours les deux : « Ordre » seul sur un tournoi lancé sans score,
   // « Retrait » seul sur un plateau d'un unique engagé.
-  const actionsLabel = reorderable && removable ? "Actions" : reorderable ? "Ordre" : "Retrait";
+  const actionsLabel = actionsColumn.label;
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
@@ -258,11 +257,11 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
                 ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
                 : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`}
           </p>
-          {removalNotice !== null && rows.length > 0 && (
+          {removalNoticeReason !== null && rows.length > 0 && (
             /* Le bouton « Retirer » a disparu, et rien sur la ligne ne dit
                pourquoi : la phrase vient du module pur, celle-là même que le
                serveur renverrait sur une écriture tardive. */
-            <p className={styles.hint}>{entrantRemovalBlockMessage(removalNotice)}</p>
+            <p className={styles.hint}>{entrantRemovalBlockMessage(removalNoticeReason)}</p>
           )}
           {followsRanking && rows.length > 0 && (
             <p className={styles.hint}>

@@ -17,7 +17,12 @@ import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
 import { useScoreForm } from "../_hooks/useScoreForm";
 import { useLiveControls } from "../_lib/live-context";
-import { pendingScoreProposal, scoreBlockerMessage } from "../_lib/score-form";
+import {
+  adminProposalNotice,
+  forfeitParties,
+  pendingScoreProposal,
+  scoreBlockerMessage,
+} from "../_lib/score-form";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
@@ -123,12 +128,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const doubleForfeit = form.doubleForfeit;
   // Un forfait, simple ou double, remplace le score saisi.
   const anyForfeit = forfeitTeamId !== undefined || doubleForfeit;
-  const forfeiting =
-    forfeitTeamId === undefined
-      ? null
-      : forfeitTeamId === match.team1Id
-        ? { out: team1, through: team2 }
-        : { out: team2, through: team1 };
+  const forfeiting = forfeitParties(forfeitTeamId, match.team1Id, team1, team2);
   // Un forfait déjà posé ne se cache pas derrière un lien : il commande la
   // rencontre, et le replier laisserait croire à un match encore à jouer.
   // Avant le lancement, le forfait est le seul geste possible : il s'offre
@@ -153,9 +153,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   // fantôme ne confirme jamais. Les champs s'ouvrent dessus : il reste à le
   // vérifier puis à le valider, sans le recopier.
   const proposal = pendingScoreProposal(match);
-  const proposalNotice = proposal
-    ? `Score proposé par ${proposal.proposedBy === "team1" ? team1 : team2} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${proposal.proposedBy === "team1" ? team2 : team1}. ${form.dirty ? "Ta saisie le remplace." : "Vérifie-le puis valide le résultat pour le confirmer."}`
-    : null;
+  const proposalNotice = adminProposalNotice(proposal, team1, team2, form.dirty);
 
   const run = async (action: "save" | "resolve") => {
     const ok = await form.submit(action);

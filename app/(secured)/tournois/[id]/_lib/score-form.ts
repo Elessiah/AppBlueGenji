@@ -322,3 +322,30 @@ export function scoreBlockerMessage(
       return "Ce match est déjà tranché. Corrige-le avec « Valider le résultat » pour que le vainqueur et la suite du plateau suivent.";
   }
 }
+
+/**
+ * Annonce, dans le dialogue d'arbitrage, d'un score proposé par une engagée
+ * et jamais confirmé par l'autre ; `null` sans proposition.
+ */
+export function adminProposalNotice(
+  proposal: PendingScoreProposal | null,
+  team1: string,
+  team2: string,
+  dirty: boolean,
+): string | null {
+  if (!proposal) return null;
+  const [author, other] = proposal.proposedBy === "team1" ? [team1, team2] : [team2, team1];
+  const next = dirty ? "Ta saisie le remplace." : "Vérifie-le puis valide le résultat pour le confirmer.";
+  return `Score proposé par ${author} (${proposal.team1Score} – ${proposal.team2Score}), en attente de confirmation de ${other}. ${next}`;
+}
+
+/** Engagée qui déclare forfait et celle qui passe, `null` sans forfait nominatif. */
+export function forfeitParties(
+  forfeitTeamId: number | undefined,
+  team1Id: number | null,
+  team1: string,
+  team2: string,
+): { out: string; through: string } | null {
+  if (forfeitTeamId === undefined) return null;
+  return forfeitTeamId === team1Id ? { out: team1, through: team2 } : { out: team2, through: team1 };
+}
