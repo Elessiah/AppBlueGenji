@@ -1,0 +1,40 @@
+# Versionnage du site
+
+La version du site vit dans `package.json` (et `package-lock.json`), au format [SemVer](https://semver.org/lang/fr/) `MAJEUR.MINEUR.CORRECTIF`. La première version publiée est **v1.0.0**.
+
+## Comment la version monte
+
+Le workflow `.github/workflows/version-bump.yml` se déclenche à la **fusion** d'une PR dans `main` (`pull_request` `closed`, `merged == true`) :
+
+1. il lit le niveau sur les **étiquettes** de la PR ;
+2. extrait `main` à jour (pas le commit de fusion : une autre fusion a pu passer entre-temps) et lance `npm version <niveau> --no-git-tag-version` ;
+3. commite `release vX.Y.Z [skip ci]` au nom de `github-actions[bot]`, pousse sur `main` (rebase puis nouvel essai en cas de refus, cinq essais au plus), pose le tag `vX.Y.Z` ;
+4. publie la release GitHub avec `gh release create --generate-notes`.
+
+Les exécutions sont **sérialisées** (`concurrency: version-bump`, sans annulation) : deux fusions rapprochées donnent deux versions successives, jamais deux fois la même. Un tag déjà existant fait échouer le job plutôt que d'écraser une release.
+
+Pas de boucle : le commit de version ne passe par aucune PR, et le job ignore les branches `release/*` et les PR ouvertes par `github-actions[bot]`. `[skip ci]` évite de rejouer le CI sur ce seul changement de numéro.
+
+## Étiquettes
+
+| Étiquette | Effet à la fusion |
+|---|---|
+| `release:major` | `X+1.0.0` |
+| `release:minor` | `X.Y+1.0` |
+| *(aucune)* | `X.Y.Z+1` (correctif, défaut) |
+| `release:skip` | aucun bump, aucune release |
+
+`release:skip` l'emporte sur les autres, `release:major` sur `release:minor`.
+
+## Choisir le niveau
+
+- **major** — changement **cassant** pour les utilisateurs, les données ou l'API : parcours supprimé ou profondément changé, migration irréversible (colonne supprimée, données effacées), route d'API retirée ou dont le contrat change, retour arrière impossible sans restauration.
+- **minor** — **nouvelle fonctionnalité** visible : écran, mode de tournoi, réglage, route, notification.
+- **patch** (défaut) — correctif, refonte interne, performance, dépendances, tests, documentation.
+- **skip** — la PR ne doit pas produire de version (outillage de dépôt pur, ou PR qui fixe elle-même la version, comme celle qui a posé v1.0.0).
+
+Les **notes de release** générées tiennent lieu de journal des modifications : elles listent les PR fusionnées depuis le tag précédent, d'où l'intérêt d'un titre de PR lisible.
+
+## Jeton
+
+Le job pousse avec `secrets.RELEASE_TOKEN` s'il existe, sinon avec le `GITHUB_TOKEN` du dépôt (`permissions: contents: write`). `main` n'a aujourd'hui ni protection de branche ni ruleset : le `GITHUB_TOKEN` suffit. Si une protection est posée un jour, il faudra soit autoriser GitHub Actions en contournement du ruleset, soit créer le secret `RELEASE_TOKEN` (PAT à droit `contents: write`) — ne jamais affaiblir la protection pour autant.
