@@ -34,36 +34,13 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   const body = (await readJsonBody(req).catch(() => ({}))) as { teamId?: number };
   const isReferee = can(user, "tournaments");
 
-  let teamId: number | null = null;
-  // `null` = arbitrage : le service ne revérifie alors aucun engagé.
-  let actingUserId: number | null = null;
-  if (isReferee && body.teamId) {
-    teamId = Number(body.teamId);
-  } else {
-    let entrant: Awaited<ReturnType<typeof getUserEntrant>>;
-    try {
-      entrant = await getUserEntrant(tournamentId, user.id);
-    } catch (error) {
-      // Tournoi inconnu : ne pas le maquiller en problème d'équipe.
-      if ((error as Error).message === "TOURNAMENT_NOT_FOUND") {
-        return fail("TOURNAMENT_NOT_FOUND", 404);
-      }
-      throw error;
-    }
-    if (entrant.teamId === null) return fail("NO_ACTIVE_TEAM", 400);
-    // Même refus et même code que l'inscription : c'est la même qualité qu'on
-    // exige, pour la même raison — l'acte engage l'équipe entière.
-    //
-    // Ce contrôle-ci sert à répondre vite et juste ; le service le rejoue dans
-    // sa transaction, seul endroit où le droit fasse foi.
-    if (!entrant.canActForEntrant) return fail("NOT_TEAM_MANAGER", 403);
-    teamId = entrant.teamId;
-    actingUserId = user.id;
-    // Un non-arbitre ne peut forfaiter que son propre engagé.
-    if (body.teamId && Number(body.teamId) !== teamId) {
-      return fail("FORBIDDEN", 403);
-    }
-  }
+  // `actingUserId` à `null` = arbitrage : le service ne revérifie alors aucun engagé.
+  const acting =
+    isReferee && body.teamId
+      ? { teamId: Number(body.teamId), actingUserId: null }
+      : await resolveOwnForfeit(tournamentId, user.id, body.teamId);
+  if (acting instanceof Response) return acting;
+  const { teamId, actingUserId } = acting;
 
   if (!Number.isInteger(teamId) || teamId <= 0) return fail("INVALID_TEAM", 400);
 
@@ -72,22 +49,55 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     return ok({ success: true });
   } catch (error) {
     const message = (error as Error).message;
-    if (
-      message === "NOT_SURVIVAL" ||
-      message === "NOT_SWISS" ||
-      message === "NOT_BG_SURVIE" ||
-      message === "ENDURANCE_PLAYOFFS_STARTED" ||
-      message === "FORMAT_WITHOUT_FORFEIT" ||
-      message === "TOURNAMENT_NOT_RUNNING" ||
-      message === "TEAM_ALREADY_OUT"
-    ) {
-      return fail(message, 400);
-    }
-    if (message === "TEAM_NOT_IN_TOURNAMENT") return fail(message, 404);
-    // Le droit a changé entre la lecture ci-dessus et l'écriture : le service
-    // tranche, la route se contente de traduire.
-    if (message === "NOT_TEAM_MANAGER" || message === "FORBIDDEN") return fail(message, 403);
-    if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
-    return fail(message || "FORFEIT_FAILED", 500);
+    return fail(message || "FORFEIT_FAILED", FORFEIT_ERROR_STATUS.get(message) ?? 500);
   }
 }
+
+/**
+ * Engagé qu'un non-arbitre fait abandonner : le sien, et seulement s'il a
+ * qualité pour agir en son nom. Rend la réponse de refus sinon.
+ */
+async function resolveOwnForfeit(
+  tournamentId: number,
+  userId: number,
+  requestedTeamId: number | undefined,
+): Promise<{ teamId: number; actingUserId: number } | Response> {
+  let entrant: Awaited<ReturnType<typeof getUserEntrant>>;
+  try {
+    entrant = await getUserEntrant(tournamentId, userId);
+  } catch (error) {
+    // Tournoi inconnu : ne pas le maquiller en problème d'équipe.
+    if ((error as Error).message === "TOURNAMENT_NOT_FOUND") {
+      return fail("TOURNAMENT_NOT_FOUND", 404);
+    }
+    throw error;
+  }
+  if (entrant.teamId === null) return fail("NO_ACTIVE_TEAM", 400);
+  // Même refus et même code que l'inscription : c'est la même qualité qu'on
+  // exige, pour la même raison — l'acte engage l'équipe entière.
+  //
+  // Ce contrôle-ci sert à répondre vite et juste ; le service le rejoue dans
+  // sa transaction, seul endroit où le droit fasse foi.
+  if (!entrant.canActForEntrant) return fail("NOT_TEAM_MANAGER", 403);
+  // Un non-arbitre ne peut forfaiter que son propre engagé.
+  if (requestedTeamId && Number(requestedTeamId) !== entrant.teamId) {
+    return fail("FORBIDDEN", 403);
+  }
+  return { teamId: entrant.teamId, actingUserId: userId };
+}
+
+const FORFEIT_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
+  ["NOT_SURVIVAL", 400],
+  ["NOT_SWISS", 400],
+  ["NOT_BG_SURVIE", 400],
+  ["ENDURANCE_PLAYOFFS_STARTED", 400],
+  ["FORMAT_WITHOUT_FORFEIT", 400],
+  ["TOURNAMENT_NOT_RUNNING", 400],
+  ["TEAM_ALREADY_OUT", 400],
+  ["TEAM_NOT_IN_TOURNAMENT", 404],
+  // Le droit a changé entre la lecture ci-dessus et l'écriture : le service
+  // tranche, la route se contente de traduire.
+  ["NOT_TEAM_MANAGER", 403],
+  ["FORBIDDEN", 403],
+  ["TOURNAMENT_NOT_FOUND", 404],
+]);

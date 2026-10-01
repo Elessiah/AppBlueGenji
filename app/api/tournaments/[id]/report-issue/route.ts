@@ -38,28 +38,32 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
     matchId?: unknown;
   };
 
-  let matchId: number | null = null;
-  if (body.matchId !== undefined && body.matchId !== null) {
-    const parsed = Number(body.matchId);
-    if (!Number.isInteger(parsed) || parsed <= 0) return fail("INVALID_MATCH_ID", 400);
-    matchId = parsed;
-  }
+  const matchId = parseMatchId(body.matchId);
+  if (matchId === false) return fail("INVALID_MATCH_ID", 400);
 
   try {
     const result = await reportTournamentIssue(tournamentId, user.id, body.message, matchId);
     return ok(result);
   } catch (error) {
     const message = (error as Error).message;
-    if (message === "INVALID_ISSUE_MESSAGE") return fail(message, 400);
-    if (message === "NOT_REGISTERED" || message === "NOT_MATCH_PARTICIPANT") {
-      return fail(message, 403);
-    }
-    if (message === "TOURNAMENT_NOT_FOUND" || message === "MATCH_NOT_FOUND") {
-      return fail(message, 404);
-    }
-    // Le bot est le seul chemin vers les arbitres : injoignable, le signalement
-    // n'a pas eu lieu et l'interface doit le dire plutôt que rassurer à tort.
-    if (message === "BOT_INTERNAL_UNREACHABLE") return fail(message, 503);
-    return fail(message || "ISSUE_REPORT_FAILED", 500);
+    return fail(message || "ISSUE_REPORT_FAILED", ISSUE_REPORT_ERROR_STATUS.get(message) ?? 500);
   }
 }
+
+/** Manche visée : `null` pour le tournoi entier, `false` si l'identifiant est invalide. */
+function parseMatchId(raw: unknown): number | null | false {
+  if (raw === undefined || raw === null) return null;
+  const parsed = Number(raw);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : false;
+}
+
+const ISSUE_REPORT_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
+  ["INVALID_ISSUE_MESSAGE", 400],
+  ["NOT_REGISTERED", 403],
+  ["NOT_MATCH_PARTICIPANT", 403],
+  ["TOURNAMENT_NOT_FOUND", 404],
+  ["MATCH_NOT_FOUND", 404],
+  // Le bot est le seul chemin vers les arbitres : injoignable, le signalement
+  // n'a pas eu lieu et l'interface doit le dire plutôt que rassurer à tort.
+  ["BOT_INTERNAL_UNREACHABLE", 503],
+]);

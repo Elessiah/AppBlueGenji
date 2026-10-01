@@ -325,6 +325,19 @@ function isContactChannel(value: unknown): value is RecruitmentContactChannel {
   );
 }
 
+/**
+ * Valeur d'énumération saisie : `fallback` si le champ est absent ou vide,
+ * `null` si la valeur n'appartient pas à l'énumération.
+ */
+function enumOrDefault<T extends string>(
+  raw: unknown,
+  isValid: (value: unknown) => value is T,
+  fallback: T,
+): T | null {
+  if (raw === undefined || raw === null || raw === "") return fallback;
+  return isValid(raw) ? raw : null;
+}
+
 function normalizeOptional(value: unknown, max: number): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -364,31 +377,20 @@ export function validateRecruitmentAdInput(input: RecruitmentAdInput): Recruitme
   if (!title) return { ok: false, error: "TITLE_REQUIRED" };
   if (title.length > RECRUITMENT_TITLE_MAX) return { ok: false, error: "TITLE_TOO_LONG" };
 
-  let domain: RecruitmentDomain = "AUTRE";
-  if (input.domain !== undefined && input.domain !== null && input.domain !== "") {
-    if (!isDomain(input.domain)) return { ok: false, error: "INVALID_DOMAIN" };
-    domain = input.domain;
-  }
+  const domain = enumOrDefault<RecruitmentDomain>(input.domain, isDomain, "AUTRE");
+  if (domain === null) return { ok: false, error: "INVALID_DOMAIN" };
 
   // Défaut « facultative » : une annonce ne s'impose à tous les visiteurs que
   // si quelqu'un l'a demandé.
-  let priority: RecruitmentPriority = "OPTIONAL";
-  if (input.priority !== undefined && input.priority !== null && input.priority !== "") {
-    if (!isPriority(input.priority)) return { ok: false, error: "INVALID_PRIORITY" };
-    priority = input.priority;
-  }
+  const priority = enumOrDefault<RecruitmentPriority>(input.priority, isPriority, "OPTIONAL");
+  if (priority === null) return { ok: false, error: "INVALID_PRIORITY" };
 
-  let contactPreferred: RecruitmentContactChannel = "AUTO";
-  if (
-    input.contactPreferred !== undefined &&
-    input.contactPreferred !== null &&
-    input.contactPreferred !== ""
-  ) {
-    if (!isContactChannel(input.contactPreferred)) {
-      return { ok: false, error: "INVALID_CONTACT_CHANNEL" };
-    }
-    contactPreferred = input.contactPreferred;
-  }
+  const contactPreferred = enumOrDefault<RecruitmentContactChannel>(
+    input.contactPreferred,
+    isContactChannel,
+    "AUTO",
+  );
+  if (contactPreferred === null) return { ok: false, error: "INVALID_CONTACT_CHANNEL" };
 
   const teamName = normalizeOptional(input.teamName, RECRUITMENT_TEAM_MAX);
   const roles = normalizeOptional(input.roles, RECRUITMENT_ROLES_MAX);

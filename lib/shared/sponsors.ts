@@ -87,6 +87,24 @@ function isTier(value: unknown): value is SponsorTier {
   return typeof value === "string" && (SPONSOR_TIERS as readonly string[]).includes(value);
 }
 
+/** Palier saisi : « PARTNER » par défaut, `null` pour une valeur inconnue. */
+function parseSponsorTier(raw: unknown): SponsorTier | null {
+  if (raw === undefined || raw === null || raw === "") return "PARTNER";
+  return isTier(raw) ? raw : null;
+}
+
+/**
+ * Bandeau saisi : `null` s'il est vide, `false` s'il est refusé. Le bandeau ne
+ * se pose que par téléversement : une autre adresse est un refus, pas un repli
+ * silencieux sur « aucun bandeau ».
+ */
+function parseSponsorBanner(raw: unknown): string | null | false {
+  const banner = typeof raw === "string" ? raw.trim() : "";
+  if (!banner) return null;
+  if (banner.length > SPONSOR_BANNER_URL_MAX || !isStoredSponsorBanner(banner)) return false;
+  return banner;
+}
+
 function normalizeOptional(value: unknown, max: number): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -122,11 +140,8 @@ export function validateSponsorInput(input: SponsorInput): SponsorValidationResu
   if (!name) return { ok: false, error: "NAME_REQUIRED" };
   if (name.length > SPONSOR_NAME_MAX) return { ok: false, error: "NAME_TOO_LONG" };
 
-  let tier: SponsorTier = "PARTNER";
-  if (input.tier !== undefined && input.tier !== null && input.tier !== "") {
-    if (!isTier(input.tier)) return { ok: false, error: "INVALID_TIER" };
-    tier = input.tier;
-  }
+  const tier = parseSponsorTier(input.tier);
+  if (tier === null) return { ok: false, error: "INVALID_TIER" };
 
   const logoUrl = normalizeOptional(input.logoUrl, SPONSOR_URL_MAX);
   // Un logo collé peut être une adresse étrangère (servie par le relais) ; mais
@@ -137,16 +152,8 @@ export function validateSponsorInput(input: SponsorInput): SponsorValidationResu
   }
   const websiteUrl = normalizeOptional(input.websiteUrl, SPONSOR_URL_MAX);
 
-  const rawBanner = typeof input.bannerUrl === "string" ? input.bannerUrl.trim() : "";
-  let bannerUrl: string | null = null;
-  if (rawBanner) {
-    // Le bandeau ne se pose que par téléversement : une autre adresse est un
-    // refus, pas un repli silencieux sur « aucun bandeau ».
-    if (rawBanner.length > SPONSOR_BANNER_URL_MAX || !isStoredSponsorBanner(rawBanner)) {
-      return { ok: false, error: "INVALID_BANNER_URL" };
-    }
-    bannerUrl = rawBanner;
-  }
+  const bannerUrl = parseSponsorBanner(input.bannerUrl);
+  if (bannerUrl === false) return { ok: false, error: "INVALID_BANNER_URL" };
 
   const rawDescription = typeof input.description === "string" ? input.description.trim() : "";
   if (rawDescription.length > SPONSOR_DESCRIPTION_MAX) return { ok: false, error: "DESCRIPTION_TOO_LONG" };

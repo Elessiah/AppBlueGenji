@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { adminSaveMatchScores } from "@/lib/server/tournaments-service";
 import { can } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
+import { parseAdminScoreBody } from "@/lib/shared/admin-score-body";
 
 export async function PATCH(req: Request, context: { params: Promise<{ matchId: string }> }) {
   const user = await getCurrentUser();
@@ -25,52 +26,30 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   // l'accepter ici laisserait une rencontre « en cours » sans score ni équipe.
   if (body.doubleForfeit === true) return fail("DOUBLE_FORFEIT_RESOLVE_ONLY", 400);
 
-  const forfeitTeamId = body.forfeitTeamId !== undefined && body.forfeitTeamId !== null ? Number(body.forfeitTeamId) : undefined;
-  const team1Score = body.team1Score !== undefined && body.team1Score !== null ? Number(body.team1Score) : undefined;
-  const team2Score = body.team2Score !== undefined && body.team2Score !== null ? Number(body.team2Score) : undefined;
-
-  // Validate forfeit mode
-  if (forfeitTeamId !== undefined) {
-    if (!Number.isInteger(forfeitTeamId) || forfeitTeamId <= 0) {
-      return fail("INVALID_FORFEIT_TEAM_ID", 400);
-    }
-  }
-  // Validate score mode
-  else if (team1Score !== undefined && team2Score !== undefined) {
-    if (
-      !Number.isFinite(team1Score) ||
-      !Number.isFinite(team2Score) ||
-      !Number.isInteger(team1Score) ||
-      !Number.isInteger(team2Score) ||
-      team1Score < 0 ||
-      team2Score < 0 ||
-      team1Score > 99 ||
-      team2Score > 99
-    ) {
-      return fail("INVALID_SCORES", 400);
-    }
-    // L'égalité est autorisée sur cette route : on enregistre les scores sans déclarer de vainqueur.
-  } else {
-    return fail("MISSING_SCORES_OR_FORFEIT", 400);
-  }
+  const parsed = parseAdminScoreBody(body);
+  if (!parsed.ok) return fail(parsed.error, 400);
+  // L'égalité est autorisée sur cette route : on enregistre les scores sans déclarer de vainqueur.
+  const { team1Score, team2Score, forfeitTeamId } = parsed.value;
 
   try {
     await adminSaveMatchScores(matchId_, team1Score, team2Score, forfeitTeamId);
     return ok({});
   } catch (e) {
     const msg = (e as Error).message;
-    const status =
-      msg === "MATCH_NOT_FOUND" ? 404
-      : msg === "MATCH_ALREADY_COMPLETED" ||
-        msg === "MATCH_NOT_READY" ||
-        msg === "MATCH_NOT_IN_LAUNCH" ||
-        msg === "CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES" ? 409
-      : msg === "SCORE_EXCEEDS_MATCH_FORMAT" || msg === "SCORE_BELOW_MATCH_FORMAT" ? 400
-      // Forfait déclaré pour une équipe qui ne joue pas ce match : corps
-      // invalide, pas une panne — le contrôle n'est possible qu'une fois le
-      // match chargé, donc à l'intérieur du service.
-      : msg === "INVALID_FORFEIT_TEAM_ID" ? 400
-      : 500;
-    return fail(msg || "ADMIN_SAVE_SCORES_FAILED", status);
+    return fail(msg || "ADMIN_SAVE_SCORES_FAILED", SAVE_SCORES_ERROR_STATUS.get(msg) ?? 500);
   }
 }
+
+const SAVE_SCORES_ERROR_STATUS: ReadonlyMap<string, number> = new Map([
+  ["MATCH_NOT_FOUND", 404],
+  ["MATCH_ALREADY_COMPLETED", 409],
+  ["MATCH_NOT_READY", 409],
+  ["MATCH_NOT_IN_LAUNCH", 409],
+  ["CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES", 409],
+  ["SCORE_EXCEEDS_MATCH_FORMAT", 400],
+  ["SCORE_BELOW_MATCH_FORMAT", 400],
+  // Forfait déclaré pour une équipe qui ne joue pas ce match : corps
+  // invalide, pas une panne — le contrôle n'est possible qu'une fois le
+  // match chargé, donc à l'intérieur du service.
+  ["INVALID_FORFEIT_TEAM_ID", 400],
+]);
