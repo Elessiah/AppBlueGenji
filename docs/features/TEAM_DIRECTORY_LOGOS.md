@@ -68,3 +68,9 @@ pas rouvrir le `<a>` dans un `<a>` que la plaque existe précisément pour évit
 - `tests/lib/server/teams-service.list.test.ts` — l'autre bout du fil :
   `listTeams` expose bien le logo, `null` quand il n'y en a pas, et le garde
   attaché à son équipe après le tri par classement.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Logos d'équipe dans l'annuaire** (`app/(secured)/equipes/cards/TeamCard.tsx`) : l'emblème d'une carte d'annuaire montre le **logo** de l'équipe quand elle en a un, et retombe sur l'initiale de son nom sinon — jamais un fichier de repli, qui rendrait un 404 pour toutes les équipes sans logo. Le champ voyageait déjà de `listTeams` (`t.logo_url`) jusqu'à `TeamListItem.logoUrl` : il ne manquait que le rendu, panne sans erreur ni image cassée. Deux pièges de mise en page, invisibles tant que la case ne contient qu'une lettre : un sélecteur d'en-tête écrit `> div` attrape aussi l'emblème (et son `flex: 1`, plus spécifique, écrase le `flex-shrink: 0` de la case — d'où `.headText`, dédiée au bloc de texte), et une image **en flux** impose sa taille intrinsèque à un élément flex (`min-width: auto` vaut le contenu, `flex-shrink: 0` n'interdit que le rétrécissement) — le logo est donc posé hors du flux dans un cadre déjà dimensionné. Le logo reste une décoration sous la plaque `.cardOverlay`, et hors de l'ancre : les trois étages d'empilement de la carte sont inchangés. Voir `docs/features/TEAM_DIRECTORY_LOGOS.md`.

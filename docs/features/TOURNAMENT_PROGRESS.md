@@ -122,3 +122,9 @@ que l'afficher à l'envers.
   s'ouvrent sur la dernière : `ScrollArea` reçoit un `revealKey` et défile
   jusqu'à l'élément marqué `data-scroll-reveal`, du plus petit défilement
   possible, marge du dégradé de bord comprise (`lib/shared/scroll-reveal.ts`).
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Frise de progression d'un tournoi** (`lib/shared/tournament-progress.ts` pur) : le bas de `/tournois/[id]` situe le tournoi sur son cycle de vie, de **masqué** à **terminé**. Six étapes là où `TournamentState` n'en connaît que quatre — l'état stocké ignore la visibilité, et `UPCOMING` recouvre aussi bien l'avant-ouverture des inscriptions que l'attente du coup d'envoi. L'étape courante croise les deux sources : les dates départagent les visages d'`UPCOMING`, l'état stocké impose un plancher pour `REGISTRATION`/`RUNNING`/`FINISHED` (un tournoi peut être clos à la main avant l'heure). Le remplissage est **indexé sur les étapes, pas sur le temps** (un sixième chacune), sans quoi une visibilité ouverte trois mois à l'avance écraserait tout le tournoi sur un centimètre. `computeRunningRatio` situe l'intérieur d'un tournoi en cours avec une mesure **par famille de formats** — matchs joués en élimination, rondes en suisse, éliminations en survie, phases en multi : compter les matchs partout afficherait une survie à 100 % dès sa première manche. Voir `docs/features/TOURNAMENT_PROGRESS.md`.

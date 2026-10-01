@@ -123,3 +123,9 @@ l'ouverture, une fois.
   défaut sans droits déclarés (spectateur, pas staff).
 - `tests/app/api/tournaments/stream.test.ts` — le flux transmet bien `canManage` à
   la garde, le cast reste spectateur, et le refus est un 404.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Accès à la fiche d'un tournoi non publié** (`lib/shared/tournament-visibility.ts` pur) : la liste respectait `start_visibility_at`, la **fiche** ne la consultait nulle part — un compte sans rôle qui devinait l'identifiant lisait en entier un tournoi en préparation, par la lecture REST, par le flux SSE et donc par la page. La règle est celle de la liste des invisibles, mot pour mot : **un tournoi non publié n'est lisible que par `can(user, "tournaments")`** — un seul public, aucune divergence possible entre ce qui est listé et ce qui s'ouvre ; le cast (`casting`) n'y a pas droit. Elle est posée à **un** endroit, `getVisibleTournamentSnapshot`, désormais **unique porte** vers l'instantané hors du module : `getTournamentSnapshot` n'est plus réexporté (ni par `tournaments/index.ts`, ni par `tournaments-service.ts`), donc aucune route ne peut l'atteindre par distraction — même précaution que `getTournamentPreview`. Les deux portes de lecture y passent, le flux **et** la lecture REST de secours. Refus en **404, jamais 403** : sur un identifiant devinable, un « interdit » confirmerait l'existence qu'on protège. Les routes d'écriture n'ont rien à contrôler, et pas par oubli : `validateDateOrder` garantit `startVisibilityAt <= registrationOpenAt`, donc un tournoi caché est toujours `UPCOMING`. Voir `docs/features/TOURNAMENT_VISIBILITY_ACCESS.md`.

@@ -50,3 +50,9 @@ La hauteur est désormais **mesurée** :
 **Règle** : aucune cible ne pose de `scroll-margin-top` en pixels (il
 s'ajouterait à la marge globale). `tests/app/sticky-header-offset.test.ts` le
 balaie. Le sommaire collant des règles se pose à `--sticky-header-h`.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Pages d'erreur et arrivée des ancres** (`app/not-found.tsx`, `app/error.tsx`, `app/global-error.tsx` + `lib/shared/error-pages.ts` ; `lib/shared/sticky-header.ts` + `components/sticky-header-offset.tsx`) : 404 et erreurs d'exécution en français, dans le thème du site, avec des chemins de retour (la 404 passe par `PublicPageShell`). Les ancres s'arrêtent sous l'en-tête collant par **une** règle, `html { scroll-padding-top }`, calée sur la hauteur **mesurée** de l'en-tête (`data-sticky-header` → `--sticky-header-h`) — jamais de `scroll-margin-top` en pixels sur une cible, un balayage le refuse. Voir `docs/features/ERROR_PAGES_AND_ANCHORS.md`.

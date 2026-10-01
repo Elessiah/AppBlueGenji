@@ -84,3 +84,9 @@ Exception : un compte connecté qui arrive avec `?error=` reste sur la page, qui
 annonce le refus. Un rattachement OAuth raté avant la lecture de son intention
 (`params`, `state`) retombe encore ici plutôt que sur `/profil` (consigné dans
 `ERREUR.txt`), et le rediriger ferait disparaître le message.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Destination d'après connexion** (`lib/shared/safe-redirect.ts` pur) : le `?redirect=` de `/connexion` n'était contrôlé nulle part — `/connexion?redirect=https://exemple.invalid` déposait l'utilisateur **hors du site** une fois authentifié (redirection ouverte, l'appât classique du hameçonnage : vrai domaine, vraie page de connexion, et l'on ne part ailleurs qu'une fois la confiance acquise). La voie Google la reproduisait, la valeur traversant le cookie d'état OAuth pour ressortir par `new URL(redirectTo, base)` — **une base ne borne rien**, `new URL` l'ignore dès que la valeur est absolue. N'est accepté qu'un **chemin du site** : une seule barre en tête, donc ni `//exemple.invalid` (protocole-relative) ni `/\exemple.invalid` (que les navigateurs lisent pareil) ni un schéma exécutable ni un chemin relatif ; refus aussi de tout **caractère de contrôle** — les navigateurs retirent tabulation, saut de ligne et retour chariot avant de résoudre une URL, si bien qu'un saut de ligne glissé après la barre ferait redevenir `/…/exemple.invalid` une adresse protocole-relative. Filtré aux **trois** portes : la page de connexion, l'aller OAuth (avant écriture du cookie d'état) et le retour OAuth (le cookie n'est pas signé, il ne fait pas foi). `AuthGate` n'a rien à filtrer, sa destination venant de `usePathname()`. Voir `docs/features/SAFE_LOGIN_REDIRECT.md`.

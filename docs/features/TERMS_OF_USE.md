@@ -123,3 +123,9 @@ jeu, données personnelles à finalité étroite (`rgpd-policy.ts`), ne sont sou
 licence que sur le site. Le titre de cette
 section est cité par `lib/shared/logo-quarantine.ts` : le renommer, c'est
 renommer ces citations dans le même changement.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Conditions d'utilisation** (`lib/shared/terms-of-use.ts` pur + `lib/server/terms-acceptance.ts`, page `/conditions-utilisation`) : texte et **version** au même endroit ; avancer `TERMS_VERSION` redemande l'acceptation. Acceptées à la **création du compte** (case de la modale d'entrée de `/connexion` ; `terms=1` scellé dans le cookie d'état OAuth comme l'intention, `termsAccepted` pour le code Discord — un compte **neuf** sans acceptation est refusé, `TERMS_REQUIRED`), à la **création d'une équipe** (`acceptTerms`, exigé par `POST /api/teams`), avant d'**inscrire** l'équipe à un tournoi, et en **recevant la gestion** d'une équipe — geste que le receveur ne fait pas : la mise en page racine présente les conditions (`TermsAcceptanceModal`) et les gestes de gestion sont refusés en 409 `TERMS_ACCEPTANCE_REQUIRED` tant qu'il ne les a pas acceptées (jamais pour retirer un logo, ni pour le staff sur une fantôme). L'envoi d'un logo exige en plus la case « je détiens les droits » (`LOGO_RIGHTS_NOT_CERTIFIED`). Preuve dans `bg_terms_acceptances`. Voir `docs/features/TERMS_OF_USE.md`.

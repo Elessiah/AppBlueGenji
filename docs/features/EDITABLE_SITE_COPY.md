@@ -62,3 +62,9 @@ les convertit en `<br />`, la dernière ligne portant l'accent de couleur.
 - `tests/lib/server/site-copy-service.test.ts` — défauts, upsert, réinitialisation,
   résilience à une base injoignable.
 - `tests/app/api/site-copy.test.ts` — permissions et codes d'erreur.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Textes éditables de la vitrine** : titres, slogans et descriptions de `/` et `/association` sortent du JSX via le registre `lib/shared/site-copy.ts` (clé → libellé + valeur d'origine), sont stockés dans `bg_settings` (préfixe `copy_`) et s'éditent en place avec `<EditableCopy>` pour la permission `showcase`. Une clé absente ou vide retombe sur la valeur d'origine. Voir `docs/features/EDITABLE_SITE_COPY.md`.

@@ -130,3 +130,9 @@ Ce que le registre dit honnêtement et qui mériterait une décision :
   qu'un pour compter les visites, une marque `sessionStorage` qui meurt avec
   l'onglet). L'empreinte illimitée est ce qui mériterait une décision.
 - **Journal Discord du staff (T05)** : aucune purge automatique du salon.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **Registre des traitements publié** (`lib/shared/processing-register.ts` pur → `/rgpd/registre` + `/rgpd/registre.csv`, bouton sur `/rgpd`) : le registre de l'article 30, tenu dans le code et récupérable par tous sans demande (CNIL, joueurs, staff) — une fiche par traitement aux rubriques du modèle CNIL, plus la base légale. **Un traitement ajouté au site (table qui garde une donnée personnelle, envoi vers un tiers) s'ajoute au registre dans la même PR**, et `REGISTER_UPDATED_AT` avance. Les durées citées sont les **constantes** du code : `SESSION_RETENTION_DAYS` et `DISCORD_CODE_VALIDITY_MINUTES` y vivent et sont importées par `auth.ts` / `users-service.ts`, si bien que le registre ne peut pas annoncer une durée que le serveur ne tient pas. Export CSV `;` + BOM UTF-8 (Excel), cellules protégées contre l'injection de formule. Voir `docs/features/PROCESSING_REGISTER.md`.

@@ -58,3 +58,9 @@ Son échec est **silencieux** — la page retombe sur ses sections habituelles.
 Ce n'est pas l'ancien onglet « Mes tournois » (`scope=mine`, retiré avec la
 section des invisibles), qui listait les tournois **organisés** par le
 lecteur.
+
+## Notes reprises de CLAUDE.md
+
+Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
+
+- **« Mes tournois » en tête de `/tournois`** (`app/(secured)/tournois/_lib/page-sections.ts` pur + `lib/server/tournaments/my-tournaments.ts` + `GET /api/me/tournaments`) : les tournois en cours, aux inscriptions ou à venir où le lecteur est engagé (membre **actuel** d'une équipe inscrite, ou entrée solo) quittent leur section pour une section « Mes tournois » placée juste après celle du staff ; les terminés restent sous « Terminés ». La liste publique restant **la même pour tous** (et mutualisée), la route ne rend que des identifiants et la page découpe ses paniers (`splitMyTournaments`), sur les paniers déjà reclassés par l'horloge ; échec silencieux. Une section **vide n'est plus rendue** : le **sommaire** qui remplace le bandeau de chiffres liste toutes les sections avec leur compte (zéro grisé), mène à chacune et déplie celle qui était repliée — d'où une ouverture des sections tenue par la page (`Section` : `open`/`onOpenChange`). Voir `docs/features/MY_TOURNAMENTS_SECTION.md`.
