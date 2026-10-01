@@ -43,6 +43,16 @@ const ROLE_LABEL: Record<string, string> = {
  * en repassant au-dessus d'elle (`.aboveOverlay`).
  */
 export function PlayerCard({ player }: { player: PublicUserProfile }) {
+  // Le statut d'un compte sans équipe est une **invitation à recruter** —
+  // « FREE AGENT » ouvertement, « SANS ÉQUIPE » par défaut —, et un compte
+  // supprimé est justement celui qu'on ne peut plus rattacher :
+  // `getUserIdByPseudo` refuse son pseudo en `USER_NOT_FOUND`. Affiché sous
+  // « Compte supprimé », il envoyait le recruteur vers un refus. Le roster,
+  // lui, se garde : l'anonymisation retire l'identité, pas l'appartenance —
+  // c'est un fait, pas une offre.
+  const noTeamStatus = player.isDeleted ? null : (
+    <span className={s.plNoTeam}>{PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}</span>
+  );
   const teamColor = player.team ? getPaletteColor(player.team.colorIndex) : "var(--ink-mute)";
 
   return (
@@ -92,18 +102,8 @@ export function PlayerCard({ player }: { player: PublicUserProfile }) {
                 <em>{player.team.name.toUpperCase()}</em>
               </TeamLink>
             </>
-          ) : player.isDeleted ? null : (
-            // Le statut d'un compte sans équipe est une **invitation à
-            // recruter** — « FREE AGENT » ouvertement, « SANS ÉQUIPE » par
-            // défaut —, et un compte supprimé est justement celui qu'on ne peut
-            // plus rattacher : `getUserIdByPseudo` refuse son pseudo en
-            // `USER_NOT_FOUND`. Affiché sous « Compte supprimé », il envoyait le
-            // recruteur vers un refus. Le roster, lui, se garde :
-            // l'anonymisation retire l'identité, pas l'appartenance — c'est un
-            // fait, pas une offre.
-            <span className={s.plNoTeam}>
-              {PLAYER_ROSTER_STATUS_LABEL[playerRosterStatus(player)]}
-            </span>
+          ) : (
+            noTeamStatus
           )}
         </div>
       </div>

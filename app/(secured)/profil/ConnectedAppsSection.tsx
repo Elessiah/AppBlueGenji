@@ -247,25 +247,24 @@ export function ConnectedAppsSection({
                   </span>
 
                   <span style={{ display: "flex", gap: 8, justifyContent: "flex-end", alignItems: "center" }}>
-                    {connection.linked ? (
-                      refusal === "LAST_CONNECTION" ? null : (
-                        <button
-                          type="button"
-                          className="btn ghost"
-                          disabled={busy !== null}
-                          onClick={() => unlink(connection.provider)}
-                          aria-label={`Retirer ${label} de mon compte`}
-                          /* La **porte** fait partie de ce qui décrit ce bouton :
-                             laissée hors de la description, elle n'était lue par
-                             personne au clavier — un lecteur d'écran qui parcourt
-                             les contrôles ne rencontre jamais le texte voisin. */
-                          aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
-                          style={{ padding: "4px 12px", fontSize: 12 }}
-                        >
-                          {busy === connection.provider ? "Retrait…" : "Retirer"}
-                        </button>
-                      )
-                    ) : (
+                    {connection.linked && refusal !== "LAST_CONNECTION" ? (
+                      <button
+                        type="button"
+                        className="btn ghost"
+                        disabled={busy !== null}
+                        onClick={() => unlink(connection.provider)}
+                        aria-label={`Retirer ${label} de mon compte`}
+                        /* La **porte** fait partie de ce qui décrit ce bouton :
+                           laissée hors de la description, elle n'était lue par
+                           personne au clavier — un lecteur d'écran qui parcourt
+                           les contrôles ne rencontre jamais le texte voisin. */
+                        aria-describedby={methodLabel ? `${detailsId} ${methodId}` : detailsId}
+                        style={{ padding: "4px 12px", fontSize: 12 }}
+                      >
+                        {busy === connection.provider ? "Retrait…" : "Retirer"}
+                      </button>
+                    ) : null}
+                    {connection.linked ? null : (
                       <a
                         className="btn"
                         href={oauthStartPath(connection.provider, { intent: "LINK" })}

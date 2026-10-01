@@ -14,6 +14,13 @@ import {
 } from "@/lib/shared/ranking";
 import s from "./TeamCard.module.css";
 
+/** Issue d'un match, lue par l'infobulle de la barre de forme. */
+const FORM_RESULT_LABELS: Record<TeamListItem["form"][number], string> = {
+  w: "victoire",
+  l: "défaite",
+  d: "nul",
+};
+
 /**
  * Carte d'annuaire d'une équipe.
  *
@@ -97,7 +104,7 @@ export function TeamCard({ team }: { team: TeamListItem }) {
             className={s.formBar}
             role="img"
             aria-label={`${team.form.length} derniers matchs, du plus récent au plus ancien : ${team.form
-              .map((r) => (r === "w" ? "victoire" : r === "l" ? "défaite" : "nul"))
+              .map((r) => FORM_RESULT_LABELS[r])
               .join(", ")}`}
           >
             {team.form.map((r, i) => (

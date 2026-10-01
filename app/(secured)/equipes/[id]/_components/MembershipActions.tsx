@@ -174,6 +174,29 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
     );
   }
 
+  // Sans demande en cours : rejoindre sur invitation, ou demander à rejoindre.
+  const joinPrompt =
+    team.viewerInvitation === "INVITED" ? (
+      <div className={styles.actionsRow}>
+        <p className={styles.notice}>Tu as reçu une invitation pour cette équipe.</p>
+        <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
+          Rejoindre
+        </button>
+        <button
+          type="button"
+          className="btn ghost"
+          onClick={() => void declineInvitation()}
+          disabled={busy || team.viewerInvitationId === null}
+        >
+          Décliner
+        </button>
+      </div>
+    ) : (
+      <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
+        Demander à rejoindre l&apos;équipe
+      </button>
+    );
+
   return (
     <>
       {team.viewerMembership === "NONE" && (
@@ -192,25 +215,8 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
                 Retirer ma demande
               </button>
             </div>
-          ) : team.viewerInvitation === "INVITED" ? (
-            <div className={styles.actionsRow}>
-              <p className={styles.notice}>Tu as reçu une invitation pour cette équipe.</p>
-              <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
-                Rejoindre
-              </button>
-              <button
-                type="button"
-                className="btn ghost"
-                onClick={() => void declineInvitation()}
-                disabled={busy || team.viewerInvitationId === null}
-              >
-                Décliner
-              </button>
-            </div>
           ) : (
-            <button type="button" className={`btn ${styles.primaryButton}`} onClick={() => void join()} disabled={busy}>
-              Demander à rejoindre l&apos;équipe
-            </button>
+            joinPrompt
           )}
         </div>
       )}

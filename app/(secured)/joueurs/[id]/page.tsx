@@ -96,12 +96,12 @@ export default function PlayerDetailPage() {
 
   // Un BattleTag masqué au public n'arrive jusqu'ici que pour son titulaire, ou
   // pour un lecteur que la règle d'exposition autorise (même match, arbitrage).
+  const hiddenBattletagHint = data.isSelf
+    ? "Masqué au public : seuls les joueurs de tes matchs et l'arbitrage le lisent, tant que le tournoi n'est pas terminé."
+    : "Masqué au public : tu le lis pour jouer ou arbitrer un tournoi qui n'est pas terminé. Ne le diffuse pas.";
   const battletagHint =
-    data.profile.overwatchBattletag && !data.profile.visibility.overwatch
-      ? data.isSelf
-        ? "Masqué au public : seuls les joueurs de tes matchs et l'arbitrage le lisent, tant que le tournoi n'est pas terminé."
-        : "Masqué au public : tu le lis pour jouer ou arbitrer un tournoi qui n'est pas terminé. Ne le diffuse pas."
-      : null;
+    data.profile.overwatchBattletag && !data.profile.visibility.overwatch ? hiddenBattletagHint : null;
+  const adultLabel = data.profile.isAdult ? "Oui (18+)" : "Non (mineur)";
 
   // Un compte supprimé garde sa fiche — ses résultats appartiennent aussi à
   // ceux qu'il a affrontés —, mais sous un pseudo d'emprunt qui se lit comme
@@ -277,9 +277,7 @@ export default function PlayerDetailPage() {
               <label htmlFor="player-adult">Majorité</label>
               <input
                 id="player-adult"
-                value={
-                  data.profile.isAdult === null ? "Masqué" : data.profile.isAdult ? "Oui (18+)" : "Non (mineur)"
-                }
+                value={data.profile.isAdult === null ? "Masqué" : adultLabel}
                 readOnly
               />
             </div>

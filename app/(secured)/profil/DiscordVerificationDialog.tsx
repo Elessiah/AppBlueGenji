@@ -186,6 +186,144 @@ export function DiscordVerificationDialog({
 
   if (!mounted) return null;
 
+  // Étape du dialogue : confirmation d'un tag déjà nommé par Discord, passage
+  // par Discord, demande d'un code, puis saisie du code.
+  const renderStep = () => {
+    if (linked && attested && initialTag) {
+      return (
+        <form onSubmit={requestVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Le pseudo a déjà été nommé par Discord à ta connexion : la preuve
+              est faite, ce clic ne donne que le consentement. Le tag est
+              montré tel qu'il sera exposé — c'est lui, et rien d'autre. */}
+          <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
+            Pseudo donné par Discord à ta dernière connexion : <strong>{initialTag}</strong>. Il
+            suffit de confirmer — ni code, ni nouvelle autorisation Discord.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <CyberButton variant="ghost" type="button" onClick={onClose}>
+              Annuler
+            </CyberButton>
+            <CyberButton variant="primary" type="submit" disabled={loading}>
+              {loading ? "Certification…" : "Certifier ce tag"}
+            </CyberButton>
+          </div>
+        </form>
+      );
+    }
+    if (linked) {
+      return (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* `--ink-mute` et non `--ink-dim` : c'est la seule phrase qui dit
+              pourquoi le bouton quitte la page, elle doit se lire avant le
+              clic. */}
+          <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
+            Ton compte est relié à Discord, mais aucun pseudo donné par Discord n&apos;est
+            enregistré. Passe par sa page d&apos;autorisation, avec le compte Discord déjà relié :
+            il nommera ton pseudo, que tu pourras ensuite certifier ici d&apos;un clic. Un pseudo
+            fait uniquement de chiffres n&apos;est pas certifiable.
+          </p>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <CyberButton variant="ghost" type="button" onClick={onClose}>
+              Annuler
+            </CyberButton>
+            {/* Une navigation et non un appel de fond : l'aller-retour OAuth
+                quitte la page. Un `<a>` plutôt qu'un `<Link>` — la route
+                répond par une redirection vers Discord, rien que le routeur
+                client puisse précharger ou rendre. */}
+            <CyberButton variant="primary" asChild>
+              <a href={oauthStartPath("DISCORD", { intent: "LINK" })}>Continuer avec Discord →</a>
+            </CyberButton>
+          </div>
+        </div>
+      );
+    }
+    if (!awaitingCode) {
+      return (
+        <form onSubmit={requestVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div className="field">
+            <label htmlFor="discord-verify-handle">Tag Discord</label>
+            <input
+              id={FIELD_IDS.handle}
+              value={handle}
+              onChange={(e) => {
+                setHandle(e.target.value);
+                fieldErrors.clear("handle");
+              }}
+              placeholder="ton_pseudo"
+              required
+              {...fieldErrors.aria("handle", "discord-verify-handle-help")}
+            />
+            <FieldErrorText fieldId={FIELD_IDS.handle} message={fieldErrors.message("handle")} />
+            <p
+              id="discord-verify-handle-help"
+              style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0", lineHeight: 1.6 }}
+            >
+              Le bot doit partager un serveur avec toi pour retrouver ton compte :{" "}
+              <Link
+                href={DISCORD_INVITE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "var(--blue-300)", textDecoration: "underline" }}
+              >
+                rejoins le serveur BlueGenji
+              </Link>{" "}
+              avant de certifier. Tu recevras un code à six chiffres en message privé.
+            </p>
+          </div>
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+            <CyberButton variant="ghost" type="button" onClick={onClose}>
+              Annuler
+            </CyberButton>
+            <CyberButton variant="primary" type="submit" disabled={loading}>
+              {loading ? "Vérification…" : "Recevoir un code →"}
+            </CyberButton>
+          </div>
+        </form>
+      );
+    }
+    return (
+      <form onSubmit={confirmVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+        <div className="field">
+          <label htmlFor="discord-verify-code">Code reçu en message privé</label>
+          <input
+            id={FIELD_IDS.code}
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value);
+              fieldErrors.clear("code");
+            }}
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            pattern="\d{6}"
+            placeholder="123456"
+            required
+            {...fieldErrors.aria("code", "discord-verify-code-help")}
+          />
+          <FieldErrorText fieldId={FIELD_IDS.code} message={fieldErrors.message("code")} />
+          <p id="discord-verify-code-help" style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0" }}>
+            Cinq essais, puis le code est brûlé — demande-en un nouveau si tu te trompes.
+          </p>
+        </div>
+        {/* Trois boutons : à la largeur d'un téléphone ils ne tiennent pas
+            sur une ligne, la rangée passe à la ligne plutôt que de déborder. */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
+          <CyberButton variant="ghost" type="button" onClick={onClose}>
+            Annuler
+          </CyberButton>
+          {/* Un code brûlé (cinq essais) ou expiré ne se corrige pas en le
+              retapant : le refus le dit (« Recommence la certification »),
+              et ce retour à la première étape est le geste qu'il nomme. */}
+          <CyberButton variant="ghost" type="button" disabled={loading} onClick={restartVerification}>
+            Nouveau code
+          </CyberButton>
+          <CyberButton variant="primary" type="submit" disabled={loading}>
+            {loading ? "Certification…" : "Certifier mon tag"}
+          </CyberButton>
+        </div>
+      </form>
+    );
+  };
+
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
       role="presentation"
@@ -266,130 +404,7 @@ export function DiscordVerificationDialog({
           ))}
         </ul>
 
-        {linked && attested && initialTag ? (
-          <form onSubmit={requestVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* Le pseudo a déjà été nommé par Discord à ta connexion : la preuve
-                est faite, ce clic ne donne que le consentement. Le tag est
-                montré tel qu'il sera exposé — c'est lui, et rien d'autre. */}
-            <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
-              Pseudo donné par Discord à ta dernière connexion : <strong>{initialTag}</strong>. Il
-              suffit de confirmer — ni code, ni nouvelle autorisation Discord.
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <CyberButton variant="ghost" type="button" onClick={onClose}>
-                Annuler
-              </CyberButton>
-              <CyberButton variant="primary" type="submit" disabled={loading}>
-                {loading ? "Certification…" : "Certifier ce tag"}
-              </CyberButton>
-            </div>
-          </form>
-        ) : linked ? (
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            {/* `--ink-mute` et non `--ink-dim` : c'est la seule phrase qui dit
-                pourquoi le bouton quitte la page, elle doit se lire avant le
-                clic. */}
-            <p style={{ fontSize: 12.5, color: "var(--ink-mute)", margin: 0, lineHeight: 1.6 }}>
-              Ton compte est relié à Discord, mais aucun pseudo donné par Discord n&apos;est
-              enregistré. Passe par sa page d&apos;autorisation, avec le compte Discord déjà relié :
-              il nommera ton pseudo, que tu pourras ensuite certifier ici d&apos;un clic. Un pseudo
-              fait uniquement de chiffres n&apos;est pas certifiable.
-            </p>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <CyberButton variant="ghost" type="button" onClick={onClose}>
-                Annuler
-              </CyberButton>
-              {/* Une navigation et non un appel de fond : l'aller-retour OAuth
-                  quitte la page. Un `<a>` plutôt qu'un `<Link>` — la route
-                  répond par une redirection vers Discord, rien que le routeur
-                  client puisse précharger ou rendre. */}
-              <CyberButton variant="primary" asChild>
-                <a href={oauthStartPath("DISCORD", { intent: "LINK" })}>Continuer avec Discord →</a>
-              </CyberButton>
-            </div>
-          </div>
-        ) : !awaitingCode ? (
-          <form onSubmit={requestVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div className="field">
-              <label htmlFor="discord-verify-handle">Tag Discord</label>
-              <input
-                id={FIELD_IDS.handle}
-                value={handle}
-                onChange={(e) => {
-                  setHandle(e.target.value);
-                  fieldErrors.clear("handle");
-                }}
-                placeholder="ton_pseudo"
-                required
-                {...fieldErrors.aria("handle", "discord-verify-handle-help")}
-              />
-              <FieldErrorText fieldId={FIELD_IDS.handle} message={fieldErrors.message("handle")} />
-              <p
-                id="discord-verify-handle-help"
-                style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0", lineHeight: 1.6 }}
-              >
-                Le bot doit partager un serveur avec toi pour retrouver ton compte :{" "}
-                <Link
-                  href={DISCORD_INVITE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  style={{ color: "var(--blue-300)", textDecoration: "underline" }}
-                >
-                  rejoins le serveur BlueGenji
-                </Link>{" "}
-                avant de certifier. Tu recevras un code à six chiffres en message privé.
-              </p>
-            </div>
-            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-              <CyberButton variant="ghost" type="button" onClick={onClose}>
-                Annuler
-              </CyberButton>
-              <CyberButton variant="primary" type="submit" disabled={loading}>
-                {loading ? "Vérification…" : "Recevoir un code →"}
-              </CyberButton>
-            </div>
-          </form>
-        ) : (
-          <form onSubmit={confirmVerification} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div className="field">
-              <label htmlFor="discord-verify-code">Code reçu en message privé</label>
-              <input
-                id={FIELD_IDS.code}
-                value={code}
-                onChange={(e) => {
-                  setCode(e.target.value);
-                  fieldErrors.clear("code");
-                }}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="\d{6}"
-                placeholder="123456"
-                required
-                {...fieldErrors.aria("code", "discord-verify-code-help")}
-              />
-              <FieldErrorText fieldId={FIELD_IDS.code} message={fieldErrors.message("code")} />
-              <p id="discord-verify-code-help" style={{ fontSize: 11, color: "var(--ink-dim)", margin: "6px 0 0" }}>
-                Cinq essais, puis le code est brûlé — demande-en un nouveau si tu te trompes.
-              </p>
-            </div>
-            {/* Trois boutons : à la largeur d'un téléphone ils ne tiennent pas
-                sur une ligne, la rangée passe à la ligne plutôt que de déborder. */}
-            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "flex-end", gap: 10 }}>
-              <CyberButton variant="ghost" type="button" onClick={onClose}>
-                Annuler
-              </CyberButton>
-              {/* Un code brûlé (cinq essais) ou expiré ne se corrige pas en le
-                  retapant : le refus le dit (« Recommence la certification »),
-                  et ce retour à la première étape est le geste qu'il nomme. */}
-              <CyberButton variant="ghost" type="button" disabled={loading} onClick={restartVerification}>
-                Nouveau code
-              </CyberButton>
-              <CyberButton variant="primary" type="submit" disabled={loading}>
-                {loading ? "Certification…" : "Certifier mon tag"}
-              </CyberButton>
-            </div>
-          </form>
-        )}
+        {renderStep()}
       </div>
     </div>,
     document.body,
