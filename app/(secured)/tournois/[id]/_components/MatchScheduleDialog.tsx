@@ -43,7 +43,7 @@ function entryRefusal(state: MatchStartEntryState): string | null {
 
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé).";
+  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé) ; un jour et un mois inchangés gardent leur année.";
   if (refereeScheduling) {
     return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
@@ -161,7 +161,7 @@ export function MatchScheduleDialog({
   const [planning] = useState(
     () => matchLaunchPhase({ ...match, refereeScheduling }, Date.now()) === "TO_PLAN",
   );
-  const entry = readMatchStartEntry({ day, month, time, timeBadInput }, reference);
+  const entry = readMatchStartEntry({ day, month, time, timeBadInput }, reference, match.startAt);
   const cleared = entry.kind === "empty";
   const refusal = entryRefusal(entry);
   // Effacer la date d'un match casté « à la date de début » ne casse rien, mais
@@ -198,7 +198,7 @@ export function MatchScheduleDialog({
     const sent =
       badInputNow === timeBadInput
         ? entry
-        : readMatchStartEntry({ day, month, time, timeBadInput: badInputNow }, reference);
+        : readMatchStartEntry({ day, month, time, timeBadInput: badInputNow }, reference, match.startAt);
     if (badInputNow !== timeBadInput) setTimeBadInput(badInputNow);
     if (sent.kind === "incomplete" || sent.kind === "invalid") {
       const message = entryRefusal(sent) ?? "Date non reconnue.";

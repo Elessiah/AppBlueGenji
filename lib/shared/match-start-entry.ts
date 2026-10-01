@@ -231,10 +231,16 @@ export type MatchStartEntryState =
  * liste, `""` = non choisi ; `time` : valeur d'un `<input type="time">`).
  * `timeBadInput` : le champ heure porte une saisie partielle, qu'il rend comme
  * `""` — indiscernable d'un champ vide sans ce drapeau.
+ *
+ * `currentStartAt` : date déjà posée sur le match. Tant que le jour et le mois
+ * restent les siens, **son année est gardée** — retoucher l'heure, ou
+ * enregistrer sans rien changer, ne déplace jamais un match d'un an. Changer
+ * le jour ou le mois relance la déduction.
  */
 export function readMatchStartEntry(
   raw: Readonly<{ day: string; month: string; time: string; timeBadInput: boolean }>,
   reference: number,
+  currentStartAt: MatchScheduleInput["startAt"] = null,
 ): MatchStartEntryState {
   const day = raw.day === "" ? null : Number(raw.day);
   const month = raw.month === "" ? null : Number(raw.month);
@@ -245,6 +251,14 @@ export function readMatchStartEntry(
   if (day === null || !isIntegerIn(day, 1, 31)) return { kind: "incomplete", field: "day" };
   if (month === null || !isIntegerIn(month, 1, 12)) return { kind: "incomplete", field: "month" };
   if (time === null) return { kind: "incomplete", field: "time" };
+
+  const current = matchStartAtTime({ startAt: currentStartAt });
+  if (current !== null) {
+    const kept = parisParts(current);
+    if (kept.day === day && kept.month === month) {
+      return { kind: "ready", instant: parisInstant(kept.year, month, day, time.hour, time.minute) };
+    }
+  }
 
   const instant = resolveMatchStartEntry({ day, month, ...time }, reference);
   return instant === null ? { kind: "invalid", field: "day" } : { kind: "ready", instant };
