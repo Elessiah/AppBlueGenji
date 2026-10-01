@@ -35,6 +35,11 @@ describe("findBotDocSection", () => {
     expect(findBotDocSection("architecture", false)).toBeNull();
     expect(findBotDocSection("base-de-donnees", false)).toBeNull();
     expect(findBotDocSection("adhesions", false)).toBeNull();
+    expect(findBotDocSection("reprise-apres-sinistre", false)).toBeNull();
+  });
+
+  it("publie le guide de reprise après sinistre au staff", () => {
+    expect(findBotDocSection("reprise-apres-sinistre", true)?.file).toBe("doc/disaster-recovery.md");
   });
 
   it("garde les pages publiques accessibles sans rôle", () => {

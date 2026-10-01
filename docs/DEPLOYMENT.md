@@ -16,6 +16,43 @@ de se déclarer fini. Un déploiement qui ne contrôle rien annonce un succès
 qu'il n'a pas constaté : c'est ainsi qu'une panne reste invisible jusqu'au
 premier visiteur.
 
+## Reprise après perte de la machine
+
+Le guide complet — bot **et** site, dans l'ordre — vit dans le dépôt du bot :
+`blueGenjiBot/doc/disaster-recovery.md`, publié pour le staff sur
+`/bot/docs/reprise-apres-sinistre`. Les sauvegardes elles-mêmes sont décrites
+par `docs/features/BACKUP_DATA_PROTECTION.md`. Ce qui concerne le site, en bref :
+
+1. **Avant la panne** : `.env.production` gardé hors de la machine, avec la clé
+   `age` et `rclone.conf` du bot. Les clés VAPID doivent revenir **à
+   l'identique** (voir plus bas), et `BOT_INTERNAL_TOKEN` rester égal à
+   `INTERNAL_API_TOKEN` du bot.
+2. **Base** : MariaDB **11.8** (une version plus ancienne refuse la collation du
+   dump), base et compte de `DB_DATABASE` / `DB_USER` créés à la main — le dump
+   est fait sans `--databases` —, puis import de `appbluegenji.sql` tiré de **la
+   même archive** que celle restaurée côté bot.
+3. **Code** : clone, `.env.production` en `600`, `npm ci` **sans**
+   `NODE_ENV=production` (`tsx`, qui sert au rejeu, est une dépendance de
+   développement), `npm run build`.
+4. **Images et quarantaine** : `rclone copy` du remote chiffré **vers**
+   `public/uploads` et `data/quarantine` — jamais `rclone sync`, qui dans le
+   mauvais sens effacerait la seule copie.
+5. **Suppressions de compte**, avant toute ouverture : journal recopié dans
+   `data/`, puis `replay:deletions` avec le chemin du journal **en argument**
+   (`docs/features/BACKUP_DATA_PROTECTION.md`).
+6. **Démarrage** : la première fois, l'entrée pm2 se crée à la main (commande de
+   « Se remettre d'une entrée perdue », plus bas) suivie de `pm2 save` —
+   `./update.sh` ne fait que `pm2 restart bluegenji`, il échoue sans entrée.
+   Les déploiements suivants passent par lui.
+7. **nginx** : la configuration n'est pas versionnée ; la reconstruire d'après
+   les sections de ce document (plafonds de débit, `proxy_buffering off` sur
+   `/api/`, `client_max_body_size 6m`, journaux d'accès à 14 jours), plus le
+   TLS et `Strict-Transport-Security`. Si la machine change d'hébergement,
+   mettre d'abord à jour `lib/shared/site-host.ts`.
+8. **Crons de sauvegarde en dernier** : la synchronisation horaire est un
+   miroir, et elle supprime la copie distante du journal des suppressions
+   quand il manque sur la machine.
+
 ## `npm ci` : scripts d'installation et paquets dépréciés
 
 Le serveur tourne sous **npm 12**, qui bloque par défaut les scripts

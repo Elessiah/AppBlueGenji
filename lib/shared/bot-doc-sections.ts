@@ -85,6 +85,14 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
     staffOnly: true,
   },
   {
+    slug: "reprise-apres-sinistre",
+    title: "Reprise après sinistre",
+    eyebrow: "EXPLOITATION · SAUVEGARDES",
+    summary: "Reconstruire le bot et le site sur une machine neuve depuis les sauvegardes.",
+    file: "doc/disaster-recovery.md",
+    staffOnly: true,
+  },
+  {
     slug: "user-guide-en",
     title: "User guide (EN)",
     eyebrow: "GETTING STARTED · EN",
