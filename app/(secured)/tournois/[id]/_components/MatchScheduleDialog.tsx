@@ -43,7 +43,7 @@ function entryRefusal(state: MatchStartEntryState): string | null {
 
 /** Aide sous les champs : ce que la date va produire. */
 function startAtHint(refereeScheduling: boolean): string {
-  const year = "L'année se déduit : c'est la date la plus proche de l'horaire actuel du match, sinon du tournoi.";
+  const year = "L'année se déduit : c'est la date la plus proche du tournoi (de son début, ou d'aujourd'hui s'il a déjà commencé).";
   if (refereeScheduling) {
     return `${year} Le match reste « En attente de départ » jusqu'à cette heure, puis entre en lancement : les deux équipes se déclarent prêtes.`;
   }
@@ -145,7 +145,7 @@ export function MatchScheduleDialog({
   // Figée à l'ouverture : l'année déduite ne doit pas changer pendant la saisie.
   const [reference] = useState(() =>
     matchEntryReference(
-      { matchStartAt: match.startAt, tournamentStartAt, tournamentFinished },
+      { tournamentStartAt, tournamentFinished },
       Date.now(),
     ),
   );

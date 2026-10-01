@@ -9,8 +9,7 @@
  *
  * La règle : parmi les années `Y - 1`, `Y` et `Y + 1` (`Y` = année, à Paris,
  * de l'instant de référence), on garde la date la plus proche de la référence
- * (`matchEntryReference` : date déjà posée, sinon début du tournoi ou
- * aujourd'hui). Une date de ±6 mois autour de la référence tombe toujours sur
+ * (`matchEntryReference` : début du tournoi ou aujourd'hui). Une date de ±6 mois autour de la référence tombe toujours sur
  * la bonne année, ce qui couvre largement l'horizon de trois mois.
  *
  * Le serveur ne voit rien de tout cela : il reçoit l'instant complet (ISO),
@@ -111,28 +110,26 @@ export function isMatchStartEntryInRange(entry: MatchStartEntry): boolean {
 }
 
 /**
- * Référence de la déduction, du plus précis au plus général :
+ * Référence de la déduction :
  *
- * 1. la date **déjà posée** sur le match : la modifier ne la fait jamais
- *    changer d'année à l'insu de l'organisateur, et corriger l'archive d'un
- *    match passé reste possible ;
- * 2. le début du tournoi s'il est **terminé** (correction d'archive) ;
- * 3. sinon le plus tardif du début du tournoi et de `now` : un tournoi à venir
+ * 1. le début du tournoi s'il est **terminé** (correction d'archive) ;
+ * 2. sinon le plus tardif du début du tournoi et de `now` : un tournoi à venir
  *    se programme autour de son début, un tournoi en cours — une ligue qui
  *    dure des mois — autour d'aujourd'hui, puisqu'aucun match ne se programme
  *    à plus de trois mois ;
- * 4. `now` si rien n'est lisible.
+ * 3. `now` si le début est illisible.
+ *
+ * La date déjà posée sur le match n'entre **pas** en compte : elle ancrerait
+ * l'année sur une erreur ou sur un report, sans aucun moyen d'en sortir (le
+ * dialogue n'a pas de champ année). L'aperçu montre l'année retenue.
  */
 export function matchEntryReference(
   input: Readonly<{
-    matchStartAt: MatchScheduleInput["startAt"];
     tournamentStartAt: MatchScheduleInput["startAt"];
     tournamentFinished: boolean;
   }>,
   now: number,
 ): number {
-  const matchStart = matchStartAtTime({ startAt: input.matchStartAt });
-  if (matchStart !== null) return matchStart;
   const tournamentStart = matchStartAtTime({ startAt: input.tournamentStartAt });
   if (tournamentStart === null) return now;
   return input.tournamentFinished ? tournamentStart : Math.max(tournamentStart, now);
