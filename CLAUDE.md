@@ -163,6 +163,7 @@ Noir profond, bleu glacier `#5ac8ff`. Jetons `--cyber-bg*`, `--ink*`, `--blue-10
 
 ## Règles de travail → détail dans `docs/WORKFLOW.md`
 
+- **Documentation** : le détail d'une fonctionnalité va dans `docs/features/<NOM>.md` (créé ou complété dans la PR). `CLAUDE.md` ne reçoit qu'**un pointeur d'une ligne** (`- **<Fonctionnalité>** — <quoi/où> → docs/features/<X>.md`) et les règles transverses, et **doit rester sous ~20 Ko**.
 - **Tests** : toute feature est livrée avec ses tests (nominal, limites, erreurs) ; rien n'est terminé sans eux.
 - **Deux TypeScript** : `typescript` 5.x (Next, ts-jest, ESLint) et `typescript-native` (7, pour `npm run typecheck`) — les scripts désignent leur `tsc` **par chemin**, jamais `npx tsc`.
 - **Les tests sont type-vérifiés** : fabriques complètes de `tests/helpers/`, `jest.mocked(fn)`, doubles SQL `jest.fn<SqlQuery>()` ; jamais `x as never` sur une valeur simulée ni `it.each([...] as const)`.
