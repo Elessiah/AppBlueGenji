@@ -53,7 +53,7 @@ export const REVOCATION_MEMORY_MS = 60_000;
 
 function revocations(): { mark: number; recent: Revocation[] } {
   const globalRef = globalThis as GlobalWithRegistry;
-  if (!globalRef.__bgStreamRevocations) globalRef.__bgStreamRevocations = { mark: 0, recent: [] };
+  globalRef.__bgStreamRevocations ??= { mark: 0, recent: [] };
   return globalRef.__bgStreamRevocations;
 }
 
@@ -94,7 +94,7 @@ export function revokedSince(userId: number, tokenHash: string, mark: number): b
 
 function registry(): Set<Entry> {
   const globalRef = globalThis as GlobalWithRegistry;
-  if (!globalRef.__bgSessionStreams) globalRef.__bgSessionStreams = new Set();
+  globalRef.__bgSessionStreams ??= new Set();
   return globalRef.__bgSessionStreams;
 }
 

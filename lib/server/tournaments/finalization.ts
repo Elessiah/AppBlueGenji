@@ -415,17 +415,15 @@ export async function resolveExpiredScoreReports(
       continue;
     }
 
-    const team1Reported =
-      match.team1_report_score !== null && match.team1_report_opponent_score !== null;
-    const team2Reported =
-      match.team2_report_score !== null && match.team2_report_opponent_score !== null;
+    const team1Reported = hasTeam1Report(match);
+    const team2Reported = hasTeam2Report(match);
 
     // Un seul report : il fait foi. Le vainqueur se dérive du **format** de la
     // manche, seul à savoir si un score nul est un résultat ou une aberration —
     // la règle vit dans `matchWinnerSide`, partagée avec l'arbitrage et
     // l'accord des deux engagés.
     if (team1Reported !== team2Reported) {
-      const { team1Score, team2Score } = singleReportScores(match, team1Reported);
+      const { team1Score, team2Score } = singleReportScores(match);
 
       const format = await loadTournamentMatchFormat(
         connection,
@@ -462,20 +460,31 @@ export async function resolveExpiredScoreReports(
   return resolved;
 }
 
-/** Score de la manche lu dans le seul report déposé, côté plateau. */
-function singleReportScores(
-  match: ExpiredMatchRow,
-  team1Reported: boolean,
-): { team1Score: number; team2Score: number } {
-  return team1Reported
-    ? {
-        team1Score: Number(match.team1_report_score),
-        team2Score: Number(match.team1_report_opponent_score),
-      }
-    : {
-        team1Score: Number(match.team2_report_opponent_score),
-        team2Score: Number(match.team2_report_score),
-      };
+/** L'engagé 1 a-t-il déposé son report (son score et celui de l'adversaire) ? */
+function hasTeam1Report(match: ExpiredMatchRow): boolean {
+  return match.team1_report_score !== null && match.team1_report_opponent_score !== null;
+}
+
+/** L'engagé 2 a-t-il déposé son report (son score et celui de l'adversaire) ? */
+function hasTeam2Report(match: ExpiredMatchRow): boolean {
+  return match.team2_report_score !== null && match.team2_report_opponent_score !== null;
+}
+
+/**
+ * Score de la manche lu dans le seul report déposé, côté plateau. À n'appeler
+ * que lorsqu'un seul des deux engagés a reporté.
+ */
+function singleReportScores(match: ExpiredMatchRow): { team1Score: number; team2Score: number } {
+  if (hasTeam1Report(match)) {
+    return {
+      team1Score: Number(match.team1_report_score),
+      team2Score: Number(match.team1_report_opponent_score),
+    };
+  }
+  return {
+    team1Score: Number(match.team2_report_opponent_score),
+    team2Score: Number(match.team2_report_score),
+  };
 }
 
 // Import MatchRow type

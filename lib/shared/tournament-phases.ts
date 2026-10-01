@@ -333,12 +333,12 @@ export function findPhaseIssue(phases: PhaseConfig[]): PhaseIssue | null {
   return findNonDecreasingQualifiers(phases);
 }
 
-const PHASE_FORMATS: readonly string[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];
+const PHASE_FORMATS: ReadonlySet<string> = new Set(["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"]);
 
 /** Premier défaut d'une phase prise isolément (format, qualification, cadences). */
 function findSinglePhaseIssue(phase: PhaseConfig, i: number, isLast: boolean): PhaseIssue | null {
   // Format.
-  if (!PHASE_FORMATS.includes(phase.format)) {
+  if (!PHASE_FORMATS.has(phase.format)) {
     return issue("INVALID_PHASE_FORMAT", i, "format");
   }
 

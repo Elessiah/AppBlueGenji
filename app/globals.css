@@ -24,6 +24,41 @@
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
+
+  /* Barres de défilement (section « BARRES DE DÉFILEMENT » plus bas). */
+  --scrollbar-size: 10px;
+  --scrollbar-thumb: rgba(var(--blue-rgb), 0.28);
+  --scrollbar-thumb-hover: rgba(var(--blue-rgb), 0.5);
+  --scrollbar-thumb-active: rgba(var(--blue-rgb), 0.65);
+  --scrollbar-track: transparent;
+
+  /* Cyber-minimal (refonte additive — docs/features/DESIGN_SYSTEM.md). */
+  --cyber-bg: #05060a;
+  --cyber-bg-1: #0a0c11;
+  --cyber-bg-2: #0f1218;
+  --cyber-bg-3: #161a22;
+  --ink: #eaf2f7;
+  --ink-mute: #93a3b2;
+  --ink-dim: #55636f;
+  --blue-100: #dff2ff;
+  --blue-300: #8fd5ff;
+  --blue-500: #5ac8ff;
+  /* Le même bleu, en composantes, pour les transparences. `--blue-rgb` (89,
+     212, 255) est le bleu **hérité** et n'est pas celui-ci : les mélanger sur
+     un même contrôle pose une bordure d'une teinte sur un fond d'une autre —
+     12 points de vert d'écart —, et faisait changer de teinte la bordure d'une
+     case cochée au moment précis où le clavier s'y pose. */
+  --blue-500-rgb: 90, 200, 255;
+  --blue-600: #2aa8e6;
+  --blue-700: #1b6a8f;
+  --blue-glow: rgba(90, 200, 255, 0.14);
+  --amber: #f5a524;
+  --red-live: #ff4d5e;
+  --line-soft: rgba(180, 210, 230, 0.08);
+  --line-strong-cy: rgba(180, 210, 230, 0.14);
+  --r-cy-sm: 4px;
+  --r-cy-md: 8px;
+  --r-cy-lg: 14px;
 }
 
 /* Régime de charge (`lib/shared/client-power.ts`) : toute animation décorative
@@ -1204,20 +1239,32 @@ input[type="number"] {
    standards que là où les pseudo-éléments n'existent pas
    (Firefox), pour garder le pouce arrondi ailleurs. Les deux
    rendus visent le même résultat — fin, bleu glacier, piste
-   transparente.
+   transparente. Leurs jetons (`--scrollbar-*`) sont déclarés
+   dans le bloc `:root` en tête de fichier.
    =========================================================== */
-:root {
-  --scrollbar-size: 10px;
-  --scrollbar-thumb: rgba(var(--blue-rgb), 0.28);
-  --scrollbar-thumb-hover: rgba(var(--blue-rgb), 0.5);
-  --scrollbar-thumb-active: rgba(var(--blue-rgb), 0.65);
-  --scrollbar-track: transparent;
-}
 
-/* Firefox (et tout moteur sans ::-webkit-scrollbar) */
+/* Seule règle `html` du document hors requêtes : la marge de défilement
+   (`scroll-padding-*`) y vit aussi. Elle précède les reprises qui doivent
+   l'emporter à spécificité égale — le bloc `@supports` des barres, juste en
+   dessous, et `scroll-padding-bottom` sous 720 px, plus bas. */
 html {
+  /* Firefox (et tout moteur sans ::-webkit-scrollbar) */
   scrollbar-width: thin;
   scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  /* Marge de défilement sous les boutons flottants du bas (« ? » et témoin du
+     régime de charge à droite ; sous 720 px, le bouton d'accessibilité à
+     gauche) : quand le focus clavier fait défiler la page, l'élément atteint
+     s'arrête au-dessus d'eux au lieu de finir caché dessous (WCAG 2.4.11). Pas
+     un réglage : rien ne change à l'œil tant qu'on ne tabule pas. La valeur
+     sous 720 px suit plus bas, avec le lien d'évitement. */
+  scroll-padding-bottom: 92px;
+  /* Marge sous l'en-tête collant, dont la hauteur varie (110 à 134 px mesurés
+     selon l'en-tête et la largeur) : elle est **mesurée** et posée sur `<html>`
+     par `StickyHeaderOffset` (`lib/shared/sticky-header.ts`). Une seule règle
+     pour toute ancre, tout `scrollIntoView` et tout défilement de focus —
+     jamais de `scroll-margin-top` en dur sur une cible, qui s'y ajouterait.
+     Le repli couvre l'en-tête le plus haut, le temps de la première mesure. */
+  scroll-padding-top: calc(var(--sticky-header-h, 134px) + 16px);
 }
 
 @supports selector(::-webkit-scrollbar) {
@@ -1339,37 +1386,9 @@ html {
 }
 
 /* ===========================================================
-   CYBER-MINIMAL TOKENS (refonte additive — voir CLAUDE.md)
+   CYBER-MINIMAL — classes de base (jetons `--cyber-*`, `--ink*`,
+   `--blue-*` : bloc `:root` en tête de fichier)
    =========================================================== */
-
-:root {
-  --cyber-bg: #05060a;
-  --cyber-bg-1: #0a0c11;
-  --cyber-bg-2: #0f1218;
-  --cyber-bg-3: #161a22;
-  --ink: #eaf2f7;
-  --ink-mute: #93a3b2;
-  --ink-dim: #55636f;
-  --blue-100: #dff2ff;
-  --blue-300: #8fd5ff;
-  --blue-500: #5ac8ff;
-  /* Le même bleu, en composantes, pour les transparences. `--blue-rgb` (89,
-     212, 255) est le bleu **hérité** et n'est pas celui-ci : les mélanger sur
-     un même contrôle pose une bordure d'une teinte sur un fond d'une autre —
-     12 points de vert d'écart —, et faisait changer de teinte la bordure d'une
-     case cochée au moment précis où le clavier s'y pose. */
-  --blue-500-rgb: 90, 200, 255;
-  --blue-600: #2aa8e6;
-  --blue-700: #1b6a8f;
-  --blue-glow: rgba(90, 200, 255, 0.14);
-  --amber: #f5a524;
-  --red-live: #ff4d5e;
-  --line-soft: rgba(180, 210, 230, 0.08);
-  --line-strong-cy: rgba(180, 210, 230, 0.14);
-  --r-cy-sm: 4px;
-  --r-cy-md: 8px;
-  --r-cy-lg: 14px;
-}
 
 .eyebrow {
   font-family: var(--font-mono);
@@ -1896,25 +1915,8 @@ input[type="radio"]:disabled:checked {
   }
 }
 
-/* Marge de défilement sous les boutons flottants du bas (« ? » et témoin du
-   régime de charge à droite ; sous 720 px, le bouton d'accessibilité à
-   gauche) : quand le focus clavier fait défiler la page, l'élément atteint
-   s'arrête au-dessus d'eux au lieu de finir caché dessous (WCAG 2.4.11). Pas
-   un réglage : rien ne change à l'œil tant qu'on ne tabule pas. */
-html {
-  scroll-padding-bottom: 92px;
-}
-
-html {
-  /* Marge sous l'en-tête collant, dont la hauteur varie (110 à 134 px mesurés
-     selon l'en-tête et la largeur) : elle est **mesurée** et posée sur `<html>`
-     par `StickyHeaderOffset` (`lib/shared/sticky-header.ts`). Une seule règle
-     pour toute ancre, tout `scrollIntoView` et tout défilement de focus —
-     jamais de `scroll-margin-top` en dur sur une cible, qui s'y ajouterait.
-     Le repli couvre l'en-tête le plus haut, le temps de la première mesure. */
-  scroll-padding-top: calc(var(--sticky-header-h, 134px) + 16px);
-}
-
+/* Marge de défilement sous les boutons flottants, sous 720 px (la valeur de
+   base et son explication sont dans la règle `html` des barres de défilement). */
 @media (max-width: 720px) {
   html {
     scroll-padding-bottom: 76px;
@@ -2061,17 +2063,25 @@ html {
   --font-display: var(--font-sans) !important;
 }
 
+/* L'écart entre les lettres retombe à `normal`, sauf si l'espacement du texte
+   est aussi actif : il pose alors `--a11y-letter-spacing` (plus bas), que
+   chaque élément reprend — la règle du body ne s'hérite plus une fois
+   l'espacement remis à zéro élément par élément. */
 :root[data-a11y~="font"] body * {
   text-transform: none !important;
-  letter-spacing: normal !important;
+  letter-spacing: var(--a11y-letter-spacing, normal) !important;
 }
 
 /* Espacement du texte (WCAG 1.4.12) : interlignage des blocs de texte, écart
    entre les mots et les lettres, respiration entre paragraphes. L'interlignage
    ne vise que les blocs de lecture : imposé partout, il déborderait des
    pastilles et des cartes de match à hauteur fixe. */
+:root[data-a11y~="spacing"] {
+  --a11y-letter-spacing: 0.04em;
+}
+
 :root[data-a11y~="spacing"] body {
-  letter-spacing: 0.04em;
+  letter-spacing: var(--a11y-letter-spacing);
   word-spacing: 0.16em;
 }
 
@@ -2081,12 +2091,6 @@ html {
 
 :root[data-a11y~="spacing"] p:not(:last-child) {
   margin-bottom: 1.25em !important;
-}
-
-/* Avec la police simplifiée, qui remet l'espacement à zéro partout, celui-ci
-   doit être reposé élément par élément. */
-:root[data-a11y~="font"][data-a11y~="spacing"] body * {
-  letter-spacing: 0.04em !important;
 }
 
 /* Réduire les animations : même effet que la préférence système, sans avoir à

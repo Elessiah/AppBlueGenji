@@ -14,7 +14,7 @@
 
 .tag {
   color: var(--ink);
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .empty {

@@ -102,8 +102,8 @@ export const BOT_DOC_SECTIONS: BotDocSection[] = [
 ];
 
 /** Sous-ensemble visible par un visiteur sans rôle de permission de plateforme. */
-export function visibleBotDocSections(isStaff: boolean): BotDocSection[] { // NOSONAR typescript:S2301 — le paramètre décrit le lecteur (staff ou non), pas un choix de comportement ; quatre appelants le passent tel quel
-  return isStaff ? BOT_DOC_SECTIONS : BOT_DOC_SECTIONS.filter((s) => !s.staffOnly);
+export function visibleBotDocSections(isStaff: boolean): BotDocSection[] {
+  return BOT_DOC_SECTIONS.filter((s) => isStaff || !s.staffOnly);
 }
 
 /**

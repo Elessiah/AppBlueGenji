@@ -124,7 +124,7 @@ self.addEventListener("push", (event) => {
 
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
-  const target = new URL(sitePath(event.notification.data && event.notification.data.url), self.location.origin);
+  const target = new URL(sitePath(event.notification.data?.url), self.location.origin);
   event.waitUntil(
     (async () => {
       const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
@@ -150,7 +150,7 @@ self.addEventListener("notificationclick", (event) => {
 // sache. Sans session (déconnecté), le serveur refuse — le panneau le
 // rattachera à la prochaine visite de /profil.
 self.addEventListener("pushsubscriptionchange", (event) => {
-  const options = event.oldSubscription && event.oldSubscription.options;
+  const options = event.oldSubscription?.options;
   if (!options) return;
   event.waitUntil(
     self.registration.pushManager.subscribe(options).then((subscription) =>
