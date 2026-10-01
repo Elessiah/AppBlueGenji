@@ -189,7 +189,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `Les administrateurs des serveurs partenaires d'au moins 50 membres — seuil dont les serveurs de l'association sont dispensés — (ou les titulaires du rôle d'administration du Bot que ces serveurs désignent) et le staff de l'association peuvent **exclure un utilisateur du relais** en cas de manquement à ces conditions : il ne peut plus utiliser les commandes du Bot, ses annonces ne sont plus relayées et les copies de celles que le Bot suit encore (au moins les ${BOT_RELAY_RETENTION_DAYS} derniers jours) sont retirées. L'exclusion vaut pour tout le réseau de serveurs partenaires ; son motif est obligatoire et consigné au journal de modération.`,
+            text: `Les administrateurs de tout serveur où le Bot est installé et qui compte au moins 50 membres, comptes de bots compris — seuil dont les serveurs de l'association sont dispensés — (ou les titulaires du rôle d'administration du Bot que ces serveurs désignent), ainsi que le titulaire du Bot et la présidence de l'association, peuvent **exclure un utilisateur du relais** en cas de manquement à ces conditions : il ne peut plus utiliser les commandes du Bot, ses annonces ne sont plus relayées et les copies de celles que le Bot suit encore (au moins les ${BOT_RELAY_RETENTION_DAYS} derniers jours) sont retirées. L'exclusion vaut pour tout le réseau de serveurs partenaires ; son motif est obligatoire et consigné au journal de modération.`,
           },
           {
             kind: "p",
@@ -328,7 +328,7 @@ export const TERMS_OF_SERVICE: BilingualDoc = {
         blocks: [
           {
             kind: "p",
-            text: `The administrators of partner servers with at least 50 members — a threshold the association's servers are exempt from — (or the holders of the Bot administration role those servers designate) and the association's staff may **exclude a user from the relay** for breaching these terms: they can no longer use the Bot's commands, their advertisements are no longer relayed and the copies of those the Bot still tracks (at least the last ${BOT_RELAY_RETENTION_DAYS} days) are removed. The exclusion applies to the whole network of partner servers; a reason is mandatory and recorded in the moderation log.`,
+            text: `The administrators of any server where the Bot is installed and which has at least 50 members, bot accounts included — a threshold the association's servers are exempt from — (or the holders of the Bot administration role those servers designate), as well as the Bot's owner and the association's presidency, may **exclude a user from the relay** for breaching these terms: they can no longer use the Bot's commands, their advertisements are no longer relayed and the copies of those the Bot still tracks (at least the last ${BOT_RELAY_RETENTION_DAYS} days) are removed. The exclusion applies to the whole network of partner servers; a reason is mandatory and recorded in the moderation log.`,
           },
           {
             kind: "p",
