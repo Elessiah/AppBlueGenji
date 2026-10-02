@@ -1,21 +1,23 @@
 import { describe, expect, it } from "@jest/globals";
 import { dependentMatches, isScoreEditLocked, type MatchScoreState } from "@/lib/shared/match-lock";
+import { DEFAULT_ENDURANCE_CONFIG, resolveEnduranceConfig } from "@/lib/shared/bg-survie/config";
+import {
+  enduranceMatchMaps,
+  type EnduranceMatchOutcome,
+} from "@/lib/shared/bg-survie/match-outcome";
+import { buildPlayoffPairings, PLAYOFF_QUARTER_PAIRINGS } from "@/lib/shared/bg-survie/playoffs";
+import {
+  qualificationComplete,
+  selectQualifiedTeamIds,
+} from "@/lib/shared/bg-survie/qualification";
+import { replayEndurance } from "@/lib/shared/bg-survie/replay";
 import {
   assignRanks,
-  buildPlayoffPairings,
   compareEndurance,
-  DEFAULT_ENDURANCE_CONFIG,
-  enduranceMatchMaps,
-  forfeitMapCount,
   planEnduranceRound,
-  PLAYOFF_QUARTER_PAIRINGS,
-  qualificationComplete,
-  replayEndurance,
-  resolveEnduranceConfig,
-  selectQualifiedTeamIds,
-  type EnduranceMatchOutcome,
   type EnduranceStanding,
-} from "@/lib/shared/bg-survie";
+} from "@/lib/shared/bg-survie/standings";
+import { forfeitMapCount } from "@/lib/shared/match-format";
 
 const CONFIG = DEFAULT_ENDURANCE_CONFIG;
 

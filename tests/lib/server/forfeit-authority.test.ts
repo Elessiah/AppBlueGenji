@@ -5,7 +5,9 @@ jest.mock("@/lib/server/tournaments/notifications");
 jest.mock("@/lib/server/tournaments/registration");
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/bot-logs");
-jest.mock("@/lib/server/tournaments/bg-survie");
+jest.mock("@/lib/server/tournaments/bg-survie/reconcile");
+jest.mock("@/lib/server/tournaments/bg-survie/forfeit");
+jest.mock("@/lib/server/tournaments/bg-survie/penalties");
 
 import { forfeitTournamentTeamPublic } from "@/lib/server/tournaments";
 import { getDatabase } from "@/lib/server/database";
@@ -13,7 +15,7 @@ import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
 import { resolveUserEntrant } from "@/lib/server/tournaments/registration";
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 import { discardBotLogs, flushBotLogs, queueBotLog } from "@/lib/server/tournaments/bot-logs";
-import { forfeitEnduranceTeam } from "@/lib/server/tournaments/bg-survie";
+import { forfeitEnduranceTeam } from "@/lib/server/tournaments/bg-survie/forfeit";
 import { fakePool } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";
 

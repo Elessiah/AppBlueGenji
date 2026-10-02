@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments/repository");
 
-import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
+import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import {
   createMatch,
   finishTournament,

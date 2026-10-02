@@ -37,9 +37,8 @@ describe("cartes de match mémorisées — ce qui descend jusqu'à elles reste s
 
 describe("modale de lancement — alimentée par le flux de la fiche", () => {
   it("signale à la modale chaque changement d'une rencontre du lecteur", () => {
-    expect(hook).toMatch(
-      /if \(viewerLaunchChanged\(previous\.detail, next\.detail\)\) \{\s*window\.dispatchEvent\(new Event\(MATCH_LAUNCH_REFRESH_EVENT\)\);/,
-    );
+    // L'annonce elle-même : `live-alerts.test.ts`. Elle part de tout état reçu.
+    expect(hook).toContain("if (next.detail) announceViewerChanges(previous.detail, next.detail);");
   });
 
   it("regroupe les signaux en une seule lecture", () => {

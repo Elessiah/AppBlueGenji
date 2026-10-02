@@ -97,36 +97,21 @@ describe("flux du bot", () => {
 describe("flux du tournoi", () => {
   const hook = readSource("app/(secured)/tournois/[id]/_hooks/useTournamentLive.ts");
 
+  // Le rendu selon le régime (regroupement, page vide, veille) et le palier
+  // spectateur se jouent sur leurs contrôleurs : `live-render-gate.test.ts`.
+  // On tient ici leur câblage dans le hook.
   it("annonce sur l'état reçu, avant de décider du rendu", () => {
-    const alert = hook.indexOf("const alert = viewerAlert(previous.detail, next.detail);");
-    const delay = hook.indexOf("const delay = policyRef.current.snapshotRenderDelayMs;");
+    const alert = hook.indexOf("announceViewerChanges(previous.detail, next.detail);");
+    const render = hook.indexOf("renderGate.received(policyRef.current.snapshotRenderDelayMs");
     expect(alert).toBeGreaterThan(0);
-    expect(delay).toBeGreaterThan(alert);
+    expect(render).toBeGreaterThan(alert);
   });
 
-  it("ne regroupe jamais le match du lecteur", () => {
-    expect(hook).toMatch(/touchesViewerMatches\(previous\.detail, next\.detail\);\s*if \(urgent\) \{\s*flushRender\(\);/);
-  });
-
-  it("se déclasse par `?quiet=1` et se reclasse au retour", () => {
-    expect(hook).toContain('const quiet = quietRef.current ? "?quiet=1" : "";');
-    expect(hook).toMatch(/if \(quietAfter === null\) \{\s*if \(quietRef\.current\) \{\s*quietRef\.current = false;\s*reconnectRef\.current\?\.\(\);/);
-  });
-
-  it("ne fait jamais patienter une page encore vide", () => {
-    // Ouverte onglet caché puis montrée sur un second écran en match : les
-    // données sont là, « Chargement… » ne doit pas durer cinq secondes.
-    expect(hook).toContain("renderedRef.current = stateRef.current;");
-    expect(hook).toMatch(/const urgent =\s*!renderedRef\.current\.detail \|\|/);
+  it("ouvre le flux au palier que dit le régime, et le rouvre quand il change", () => {
+    expect(hook).toContain("quiet: quietStream.isQuiet,");
+    expect(hook).toContain("createQuietStream(() => reconnectRef.current?.())");
     expect(hook).toContain(
-      "if (delay === 0 || (delay !== null && !renderedRef.current.detail)) flushRender();",
-    );
-  });
-
-  it("désarme le regroupement quand l'onglet passe en veille", () => {
-    // Le rendu reste dû, mais pas derrière le jeu.
-    expect(hook).toMatch(
-      /else if \(delay === null\) \{\s*if \(renderTimerRef\.current !== null\) \{\s*clearTimeout\(renderTimerRef\.current\);\s*renderTimerRef\.current = null;/,
+      "quietStream.policyChanged(previous.quietStreamAfterMs, next.quietStreamAfterMs);",
     );
   });
 

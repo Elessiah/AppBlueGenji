@@ -1,15 +1,17 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   DEFAULT_ENDURANCE_CONFIG,
+  resolveEnduranceConfig,
+  type EnduranceConfig,
+} from "@/lib/shared/bg-survie/config";
+import { type EnduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
+import {
   enduranceEliminationCut,
   enduranceRoundSwing,
-  replayEnduranceDetailed,
-  resolveEnduranceConfig,
   roundLimitReached,
-  type EnduranceConfig,
-  type EnduranceMatchOutcome,
-  type EnduranceStanding,
-} from "@/lib/shared/bg-survie";
+} from "@/lib/shared/bg-survie/qualification";
+import { replayEnduranceDetailed } from "@/lib/shared/bg-survie/replay";
+import { type EnduranceStanding } from "@/lib/shared/bg-survie/standings";
 
 const FT3 = { type: "FT", value: 3 } as const;
 

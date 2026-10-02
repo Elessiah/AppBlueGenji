@@ -14,7 +14,9 @@ const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
  *
  * Ce qui a une logique propre est couvert ailleurs, et doit le rester :
  * `live-state.test.ts` (analyse et fusion des messages, reconnexion, échecs
- * définitifs), `tournament-broadcast.test.ts` (mutualisation, paliers, budget,
+ * définitifs), `live-connection.test.ts` (reconnexion sans abandon, sondage de
+ * secours, retour sur l'onglet, guet du premier instantané),
+ * `live-render-gate.test.ts` (régime de charge), `tournament-broadcast.test.ts` (mutualisation, paliers, budget,
  * cycle de vie des salles), `cache.test.ts` (vol unique, invalidation),
  * `tournament-schedule.test.ts` (reclassement, comparaison des paniers),
  * `tournament-snapshot-frame.test.ts` (trame SSE), `tournament-snapshot.test.ts`
@@ -79,32 +81,13 @@ describe("flux SSE — le contrat de la route", () => {
 });
 
 describe("hook temps réel — les garde-fous de dégradation", () => {
-  it("n'abandonne jamais la reconnexion, sauf échec définitif", () => {
-    // L'ancienne version renonçait après cinq essais : la page restait figée
-    // jusqu'au F5. À l'inverse, réessayer sur une session expirée laisserait
-    // « Reconnexion… » à l'écran pour l'éternité.
-    expect(hook).not.toContain("maxReconnectAttempts");
-    expect(hook).toMatch(/source\.onopen = \(\) => \{[\s\S]*?attempts = 0;/);
-    expect(hook).toContain("const giveUp = (failure: LiveFailure)");
-    expect(hook).toContain("showError(mapError(failure))");
-  });
-
-  it("rafraîchit au retour sur l'onglet, mais pas par-dessus un flux vivant", () => {
-    // Relire alors que le flux tient relancerait, à la fin d'une manche, la
-    // centaine de requêtes que ce flux existe pour éviter.
-    expect(hook).toContain('document.addEventListener("visibilitychange", onVisible)');
-    expect(hook).toContain('window.addEventListener("online", onVisible)');
-    expect(hook).toContain("FOCUS_REFRESH_MIN_INTERVAL_MS");
-    expect(hook).toContain("if (!source && stale && !recentlyFetched) void load(true)");
-  });
-
-  it("ne sonde qu'en secours, à la cadence du palier", () => {
+  // Les garde-fous de la connexion elle-même — reconnexion sans abandon, échec
+  // définitif, retour sur l'onglet, sondage de secours, libération — se jouent
+  // sur `openLiveConnection` : `live-connection.test.ts`. On ne tient ici que
+  // ce que le hook lui confie.
+  it("annonce l'échec définitif et sonde à la cadence du palier", () => {
+    expect(hook).toContain("showError(mapError(failure));");
     expect(hook).toContain("REFRESH_CADENCE[stateRef.current.tier].detailFallbackMs");
-    // Rien ne part quand l'onglet est caché, et le sondage cesse dès le retour
-    // du flux comme après un échec définitif.
-    expect(hook).toContain('document.visibilityState === "hidden"');
-    expect(hook).toMatch(/source\.onopen[\s\S]*?stopFallback\(\)/);
-    expect(hook).toContain("if (fallbackTimer !== null || stopped) return;");
   });
 
   it("repart de zéro quand on change de tournoi", () => {
@@ -112,15 +95,12 @@ describe("hook temps réel — les garde-fous de dégradation", () => {
     // remise à zéro, l'échec définitif du tournoi précédent condamnerait le
     // suivant, et son plateau s'afficherait un instant sous la mauvaise URL.
     expect(hook).toMatch(
-      /useEffect\(\(\) => \{[\s\S]{0,300}?setFatal\(null\);[\s\S]{0,40}?\}, \[tournamentId\]\);/,
+      /useEffect\(\(\) => \{[\s\S]{0,600}?setFatal\(null\);\s*\}, \[tournamentId, renderGate, quietStream\]\);/,
     );
   });
 
-  it("libère tout au démontage", () => {
-    expect(hook).toContain('document.removeEventListener("visibilitychange", onVisible)');
-    expect(hook).toContain('window.removeEventListener("online", onVisible)');
-    expect(hook).toContain("stopFallback();");
-    expect(hook).toContain("source?.close();");
+  it("ferme la connexion au démontage", () => {
+    expect(hook).toMatch(/return \(\) => \{\s*reconnectRef\.current = null;\s*connection\.close\(\);/);
   });
 });
 

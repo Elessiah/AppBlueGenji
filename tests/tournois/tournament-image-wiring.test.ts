@@ -90,10 +90,13 @@ describe("écrans", () => {
   });
 
   it("les quatre cartes de /tournois posent le bandeau et la pastille", () => {
+    // Posés une fois, par le cadre commun que chaque carte emprunte.
+    const frame = read("app/(secured)/tournois/cards/CardParts.tsx");
+    expect(frame).toMatch(/<TournamentImageBanner\s+image=\{t\.image\}[\s\S]{0,200}priority=\{priority\}/);
+    expect(frame).toContain("<TournamentImageEmblem image={t.image}");
     for (const name of ["FinishedCard", "RegistrationCard", "RunningCard", "UpcomingCard"]) {
       const source = read(`app/(secured)/tournois/cards/${name}.tsx`);
-      expect(source).toMatch(/<TournamentImageBanner\s+image=\{t\.image\}[\s\S]{0,200}priority=\{priority\}/);
-      expect(source).toContain("<TournamentImageEmblem image={t.image}");
+      expect(source).toMatch(/<TournamentCardFrame\s+t=\{t\}\s+priority=\{priority\}/);
     }
   });
 

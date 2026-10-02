@@ -4,7 +4,7 @@ import { join } from "node:path";
 
 jest.mock("@/lib/server/tournaments/repository");
 
-import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
+import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { createMatch } from "@/lib/server/tournaments/repository";
 import type { BracketMatch, MatchStatus } from "@/lib/shared/types";
 import { endurancePlayoffLinks } from "@/app/(secured)/tournois/[id]/_lib/endurance-sections";

@@ -13,7 +13,7 @@ import {
   splitEnduranceMatches,
   splitPlayoffBrackets,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-sections";
-import { PLAYOFF_ROUND_OFFSET as ENGINE_PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+import { PLAYOFF_ROUND_OFFSET as ENGINE_PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { bracketMatch } from "../helpers/bracket-match";
 
 const mockMatch = (overrides: Partial<BracketMatch>): BracketMatch => bracketMatch({

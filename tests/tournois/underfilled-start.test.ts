@@ -10,7 +10,8 @@ jest.mock("@/lib/server/tournaments/byes");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/swiss");
 jest.mock("@/lib/server/tournaments/survival");
-jest.mock("@/lib/server/tournaments/bg-survie");
+jest.mock("@/lib/server/tournaments/bg-survie/qualification");
+jest.mock("@/lib/server/tournaments/bg-survie/reconcile");
 jest.mock("@/lib/server/tournaments/phases");
 
 import { syncTournamentState } from "@/lib/server/tournaments/state";
@@ -24,7 +25,7 @@ import { createBracketIfMissing } from "@/lib/server/tournaments/bracket-generat
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { initializeSwissTournament, reconcileSwiss } from "@/lib/server/tournaments/swiss";
 import { initializeSurvivalTournament } from "@/lib/server/tournaments/survival";
-import { initializeEnduranceTournament } from "@/lib/server/tournaments/bg-survie";
+import { initializeEnduranceTournament } from "@/lib/server/tournaments/bg-survie/qualification";
 import { initializeMultiTournament } from "@/lib/server/tournaments/phases";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import type { RowOverrides } from "../helpers/row-overrides";

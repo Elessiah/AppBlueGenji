@@ -5,7 +5,7 @@ import {
   enduranceCellTone,
   enduranceHistoryColumns,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-history";
-import type { EnduranceRoundCell } from "@/lib/shared/bg-survie";
+import type { EnduranceRoundCell } from "@/lib/shared/bg-survie/replay";
 
 const points = (round: number, value: number): EnduranceRoundCell => ({
   round,

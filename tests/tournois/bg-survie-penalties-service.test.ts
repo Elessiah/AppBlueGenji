@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments/repository");
 
+import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie/meta";
 import {
   applyEndurancePenalty,
   liftEndurancePenalty,
-  loadEnduranceMeta,
-} from "@/lib/server/tournaments/bg-survie";
+} from "@/lib/server/tournaments/bg-survie/penalties";
 import type { PoolConnection } from "mysql2/promise";
 
 type Row = Record<string, unknown>;
