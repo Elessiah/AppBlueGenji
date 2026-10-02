@@ -15,7 +15,7 @@ import {
   listTeamPendingInvitations,
   requestToJoinTeam,
   respondToInvitation,
-} from "@/lib/server/teams-service";
+} from "@/lib/server/teams/invitations";
 import { getDatabase } from "@/lib/server/database";
 import { getUserIdByPseudo } from "@/lib/server/users-service";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";

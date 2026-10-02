@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
+import { removeTeamLogoAsModerator } from "@/lib/server/teams/identity";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/terms-acceptance", () =>

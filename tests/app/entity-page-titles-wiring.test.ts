@@ -11,7 +11,7 @@ import { metadata as teamsMetadata } from "@/app/(secured)/equipes/layout";
 import { metadata as playersMetadata } from "@/app/(secured)/joueurs/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
-import { getTeamPageIdentity } from "@/lib/server/teams-service";
+import { getTeamPageIdentity } from "@/lib/server/teams/detail";
 import { getPlayerPageIdentity } from "@/lib/server/users-service";
 import { SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";

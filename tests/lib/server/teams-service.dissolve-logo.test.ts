@@ -6,7 +6,7 @@ jest.mock("@/lib/server/stored-upload-cleanup");
 
 import { getDatabase } from "@/lib/server/database";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { softDeleteTeam } from "@/lib/server/teams-service";
+import { softDeleteTeam } from "@/lib/server/teams/dissolution";
 
 /**
  * Dissoudre une équipe remettait `logo_url` à NULL sans effacer le fichier : le

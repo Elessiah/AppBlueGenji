@@ -4,7 +4,13 @@ jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/content-reports");
 jest.mock("@/lib/server/logo-quarantine");
 jest.mock("@/lib/server/terms-acceptance");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/access");
+jest.mock("@/lib/server/teams/detail");
+jest.mock("@/lib/server/teams/directory");
+jest.mock("@/lib/server/teams/dissolution");
+jest.mock("@/lib/server/teams/identity");
+jest.mock("@/lib/server/teams/invitations");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/users-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/staff-audit");
@@ -43,7 +49,7 @@ import {
   restoreReportedImage,
 } from "@/lib/server/logo-quarantine";
 import { recordTermsAcceptance } from "@/lib/server/terms-acceptance";
-import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
+import { removeTeamLogoAsModerator } from "@/lib/server/teams/identity";
 import { removeUserAvatarAsModerator } from "@/lib/server/users-service";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { publishStaffAction } from "@/lib/server/staff-audit";

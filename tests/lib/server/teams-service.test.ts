@@ -6,12 +6,8 @@ jest.mock("@/lib/server/terms-acceptance", () =>
 jest.mock("@/lib/server/database");
 
 import { getDatabase } from "@/lib/server/database";
-import {
-  canManageTeam,
-  leaveTeam,
-  removeTeamMember,
-  updateTeamMemberRoles,
-} from "@/lib/server/teams-service";
+import { canManageTeam } from "@/lib/server/teams/access";
+import { leaveTeam, removeTeamMember, updateTeamMemberRoles } from "@/lib/server/teams/roster";
 import type { TeamRole } from "@/lib/shared/types";
 import { connectionMock, fakePool } from "../../helpers/sql-double";
 

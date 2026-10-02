@@ -6,7 +6,13 @@ jest.mock("@/lib/server/terms-acceptance", () =>
 );
 jest.mock("@/lib/server/tournaments/bot-logs");
 jest.mock("@/lib/server/tournaments/state");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/access");
+jest.mock("@/lib/server/teams/detail");
+jest.mock("@/lib/server/teams/directory");
+jest.mock("@/lib/server/teams/dissolution");
+jest.mock("@/lib/server/teams/identity");
+jest.mock("@/lib/server/teams/invitations");
+jest.mock("@/lib/server/teams/roster");
 
 import {
   registerCurrentUserTeam,
@@ -14,7 +20,7 @@ import {
 } from "@/lib/server/tournaments/registration";
 import { MAX_PENDING_PER_TRANSACTION, queueBotLog } from "@/lib/server/tournaments/bot-logs";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { GHOST_BATCH_MAX, registrationErrorTeamId } from "@/lib/shared/ghost-registration";
 import type { SqlMock } from "../../helpers/sql-double";
 import { tournamentRow } from "../../helpers/tournament-rows";

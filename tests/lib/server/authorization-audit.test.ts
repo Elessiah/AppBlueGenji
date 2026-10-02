@@ -10,12 +10,18 @@ import type { PoolConnection } from "mysql2/promise";
  * jour où la passe sera refaite.
  */
 
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/access");
+jest.mock("@/lib/server/teams/detail");
+jest.mock("@/lib/server/teams/directory");
+jest.mock("@/lib/server/teams/dissolution");
+jest.mock("@/lib/server/teams/identity");
+jest.mock("@/lib/server/teams/invitations");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/state");
 jest.mock("@/lib/server/tournaments/byes");
 
 import { reportMatchScore } from "@/lib/server/tournaments/scoring";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { sanitizeRoles } from "@/lib/server/users-service";

@@ -4,7 +4,13 @@ import type { PoolConnection } from "mysql2/promise";
 jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../helpers/terms-acceptance-double")>("../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/access");
+jest.mock("@/lib/server/teams/detail");
+jest.mock("@/lib/server/teams/directory");
+jest.mock("@/lib/server/teams/dissolution");
+jest.mock("@/lib/server/teams/identity");
+jest.mock("@/lib/server/teams/invitations");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/state");
@@ -14,7 +20,7 @@ import {
   registerCurrentUserTeam,
   resolveUserEntrantTeamId,
 } from "@/lib/server/tournaments/registration";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { loadTournamentRow } from "@/lib/server/tournaments/repository";
 import { syncTournamentState } from "@/lib/server/tournaments/state";

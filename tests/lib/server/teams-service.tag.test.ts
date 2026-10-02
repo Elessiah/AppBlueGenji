@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { createTeam, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
+import { softDeleteTeam } from "@/lib/server/teams/dissolution";
+import { createTeam, updateTeamMeta } from "@/lib/server/teams/identity";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/terms-acceptance", () =>

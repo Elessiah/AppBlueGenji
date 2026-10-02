@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/team-join-notifications");
 
-import { requestToJoinTeam } from "@/lib/server/teams-service";
+import { requestToJoinTeam } from "@/lib/server/teams/invitations";
 import { getDatabase } from "@/lib/server/database";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";

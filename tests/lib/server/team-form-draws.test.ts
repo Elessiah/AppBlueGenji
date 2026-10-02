@@ -16,7 +16,7 @@ import { playedMatchSql } from "@/lib/shared/ranking";
  * contredisant sur la même rencontre, sans qu'aucune erreur ne le signale.
  */
 const SERVICE = readFileSync(
-  join(__dirname, "..", "..", "..", "lib", "server", "teams-service.ts"),
+  join(__dirname, "..", "..", "..", "lib", "server", "teams", "directory.ts"),
   "utf8",
 );
 
