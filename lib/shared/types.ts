@@ -1,4 +1,5 @@
-﻿import type { EnduranceRoundCell, EnduranceStatus } from "./bg-survie";
+﻿import type { EnduranceRoundCell } from "./bg-survie/replay";
+import type { EnduranceStatus } from "./bg-survie/standings";
 import type { AccountSuspensionView } from "./account-suspension";
 import type { ConnectionMethod } from "./account-connections";
 import type { MatchFormat } from "./match-format";
@@ -402,7 +403,7 @@ export type TournamentCard = {
    *
    * Le mode est le seul à en jouer deux : sa qualification peut clore un match
    * sans vainqueur (map nulle), pas son élimination directe. Voir
-   * `tournamentMatchFormat` (`lib/shared/bg-survie.ts`), qui tranche pour les
+   * `tournamentMatchFormat` (`lib/shared/bg-survie/rounds.ts`), qui tranche pour les
    * deux côtés.
    */
   endurancePlayoffFormat: MatchFormat | null;

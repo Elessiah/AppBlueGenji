@@ -137,14 +137,11 @@ export {
 } from "./survival";
 
 // BlueGenji Survie (endurance)
-export {
-  initializeEnduranceTournament,
-  generateEnduranceRound,
-  reconcileEndurance,
-  startEndurancePlayoffs,
-  forfeitEnduranceTeam,
-  loadEnduranceMeta,
-} from "./bg-survie";
+export { forfeitEnduranceTeam } from "./bg-survie/forfeit";
+export { loadEnduranceMeta } from "./bg-survie/meta";
+export { startEndurancePlayoffs } from "./bg-survie/playoffs";
+export { initializeEnduranceTournament, generateEnduranceRound } from "./bg-survie/qualification";
+export { reconcileEndurance } from "./bg-survie/reconcile";
 
 // Phases (Multi)
 export {
@@ -1242,7 +1239,7 @@ async function runPlayerMatchWrite(
     await reconcileSurvival(tournamentId, connection);
     const { reconcileSwiss } = await import("./swiss");
     await reconcileSwiss(tournamentId, connection);
-    const { reconcileEndurance } = await import("./bg-survie");
+    const { reconcileEndurance } = await import("./bg-survie/reconcile");
     await reconcileEndurance(tournamentId, connection);
 
     // Réconcilie les phases multi (idempotent)
@@ -1298,7 +1295,7 @@ export async function adminSaveMatchScoresPublic(
       await reconcileSurvival(savedTournamentId, connection);
       const { reconcileSwiss } = await import("./swiss");
       await reconcileSwiss(savedTournamentId, connection);
-      const { reconcileEndurance } = await import("./bg-survie");
+      const { reconcileEndurance } = await import("./bg-survie/reconcile");
       await reconcileEndurance(savedTournamentId, connection);
 
       const { reconcilePhases: reconcileMultiPhases } = await import("./phases");
@@ -1394,7 +1391,7 @@ export async function forfeitTournamentTeamPublic(
       const { forfeitSwissTeam } = await import("./swiss");
       await forfeitSwissTeam(tournamentId, teamId, connection, forfeitPhaseId);
     } else if (engineFormat === "BG_SURVIE") {
-      const { forfeitEnduranceTeam } = await import("./bg-survie");
+      const { forfeitEnduranceTeam } = await import("./bg-survie/forfeit");
       await forfeitEnduranceTeam(tournamentId, teamId, connection);
     } else {
       throw new Error("FORMAT_WITHOUT_FORFEIT");
@@ -1442,7 +1439,7 @@ export async function applyEndurancePenaltyPublic(
   try {
     await connection.beginTransaction();
 
-    const { applyEndurancePenalty } = await import("./bg-survie");
+    const { applyEndurancePenalty } = await import("./bg-survie/penalties");
     const applied = await applyEndurancePenalty(
       tournamentId,
       teamId,
@@ -1492,7 +1489,7 @@ export async function liftEndurancePenaltyPublic(
   try {
     await connection.beginTransaction();
 
-    const { liftEndurancePenalty } = await import("./bg-survie");
+    const { liftEndurancePenalty } = await import("./bg-survie/penalties");
     const lifted = await liftEndurancePenalty(tournamentId, penaltyId, connection);
 
     queueBotLog(connection, {
@@ -1553,7 +1550,7 @@ export async function adminResolveMatchPublic(
     await reconcileSurvival(tournamentId, connection);
     const { reconcileSwiss } = await import("./swiss");
     await reconcileSwiss(tournamentId, connection);
-    const { reconcileEndurance } = await import("./bg-survie");
+    const { reconcileEndurance } = await import("./bg-survie/reconcile");
     await reconcileEndurance(tournamentId, connection);
 
     const { reconcilePhases: reconcileMultiPhases } = await import("./phases");

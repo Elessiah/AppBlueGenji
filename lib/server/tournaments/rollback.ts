@@ -46,7 +46,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
-import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import {
   planRoundRollback,
   rollbackStageLabelWithArticle,
@@ -635,7 +635,7 @@ async function reconcileAfterRollback(
   await reconcileSurvival(tournamentId, connection);
   const { reconcileSwiss } = await import("./swiss");
   await reconcileSwiss(tournamentId, connection);
-  const { reconcileEndurance } = await import("./bg-survie");
+  const { reconcileEndurance } = await import("./bg-survie/reconcile");
   await reconcileEndurance(tournamentId, connection);
   const { reconcilePhases } = await import("./phases");
   await reconcilePhases(tournamentId, connection);

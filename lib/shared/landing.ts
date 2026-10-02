@@ -54,7 +54,7 @@ export type LandingLiveMatch = {
   /**
    * Format **de ce match**, et non du tournoi : « BlueGenji Survie » en joue
    * deux — sa qualification, qui tolère l'égalité, et son arbre final, qui
-   * exige un vainqueur (`tournamentMatchFormat`, `lib/shared/bg-survie.ts`).
+   * exige un vainqueur (`tournamentMatchFormat`, `lib/shared/bg-survie/rounds.ts`).
    * Lire `TournamentCard.matchFormat` étiquetait une demi-finale avec le
    * plafond de maps de la qualification.
    *

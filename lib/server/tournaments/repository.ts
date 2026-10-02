@@ -1,7 +1,7 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import type { TournamentState } from "@/lib/shared/types";
 import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
-import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
+import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
 import { queueBotLog } from "./bot-logs";
 

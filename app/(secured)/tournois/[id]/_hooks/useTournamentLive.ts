@@ -1,17 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { TournamentDetail } from "@/lib/shared/types";
 import { useToast } from "@/components/ui/toast";
-import { REFRESH_CADENCE, FOCUS_REFRESH_MIN_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
+import { REFRESH_CADENCE } from "@/lib/shared/refresh-tiers";
 import { mapError } from "../_lib/error-map";
-import { playAlertChime } from "../_lib/sounds";
-import { clearAttention, raiseAttention } from "../_lib/attention";
-import {
-  isPersonalAlert,
-  touchesViewerMatches,
-  viewerAlert,
-  viewerLaunchChanged,
-} from "@/lib/shared/viewer-alerts";
-import { MATCH_LAUNCH_REFRESH_EVENT } from "@/lib/shared/match-launch";
+import { clearAttention } from "../_lib/attention";
 import {
   nextViewerMatchFocusChangeAt,
   powerPolicy,
@@ -27,16 +19,17 @@ import {
 import {
   applyLiveMessage,
   fatalFailure,
-  FIRST_SNAPSHOT_TIMEOUT_MS,
   INITIAL_LIVE_STATE,
-  parseLiveMessage,
-  reconnectDelayMs,
   shareUnchanged,
   shouldCommitFetched,
   shouldRefreshViewerContext,
   type LiveFailure,
+  type LiveMessage,
   type LiveState,
 } from "../_lib/live-state";
+import { announceViewerChanges } from "../_lib/live-alerts";
+import { openLiveConnection } from "../_lib/live-connection";
+import { createLiveRenderGate, createQuietStream } from "../_lib/live-render-gate";
 
 /** Plafond d'un `setTimeout` (~24,8 jours) : au-delà, il se déclencherait tout de suite. */
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -53,34 +46,15 @@ const FULL_POWER_INPUT: ClientPowerInput = { attention: "FOCUSED", matchFocus: f
  * qui permet à cent spectateurs de suivre un plateau sans que le serveur ne
  * calcule cent fois la même chose.
  *
- * Quatre filets de sécurité, dans cet ordre :
- * 1. **reconnexion sans abandon** — attente exponentielle plafonnée avec gigue,
- *    indéfiniment. L'ancienne version renonçait après cinq essais et laissait la
- *    page figée : il ne restait que le F5 ;
- * 2. **sauf échec définitif** — une session expirée ou un tournoi supprimé ne
- *    passeront pas tout seuls. Réessayer indéfiniment laisserait la page sur
- *    « Reconnexion… » pour l'éternité, sans jamais dire quoi faire : la boucle
- *    s'arrête alors et l'utilisateur est prévenu ;
- * 3. **retour sur l'onglet** — reprendre la main relit la donnée si elle a
- *    vieilli, ce qui remplace le réflexe de recharger ;
- * 4. **sondage de secours** — uniquement tant que le flux est coupé, à la
- *    cadence du palier accordé par le serveur — ou tant qu'un flux **ouvert**
- *    n'a livré aucun instantané (`FIRST_SNAPSHOT_TIMEOUT_MS` : réponse mise en
- *    tampon par un proxy, qui ne déclare aucune erreur).
- *
- * Et une règle de sobriété, le **régime de charge** (`lib/shared/client-power.ts`) :
- * ce qui est *reçu* et ce qui est *rendu* sont deux choses. Tout instantané est
- * intégré sur-le-champ — c'est sur lui qu'on détecte « ton match est prêt »,
- * qu'on sonne et qu'on écrit le titre d'onglet —, mais il n'est **rendu** que si
- * quelqu'un peut le voir : tout de suite quand la page est regardée ou sur un
- * second écran, regroupé toutes les cinq secondes pour un joueur en match qui
- * regarde son jeu (sauf ce qui touche son propre match), et pas avant le retour
- * quand l'onglet est caché. Redessiner l'arbre d'un gros plateau à chaque score
- * d'un autre match, c'était prendre au jeu du joueur des images par dizaines.
- *
- * Onglet caché depuis une minute, hors match : le flux est rouvert au palier
- * spectateur (`?quiet=1`). Les annonces arrivent encore — à la cadence des
- * spectateurs —, et le budget de sortie de la salle revient à ceux qui jouent.
+ * Le hook assemble trois pièces, chacune dans son module :
+ * - la **connexion** (`_lib/live-connection.ts`) — reconnexion sans abandon,
+ *   échec définitif, retour sur l'onglet, sondage de secours et guet du premier
+ *   instantané ;
+ * - le **régime de charge** (`_lib/live-render-gate.ts`) — ce qui est *reçu* et
+ *   ce qui est *rendu* sont deux choses, et un onglet caché depuis une minute,
+ *   hors match, rouvre le flux au palier spectateur (`?quiet=1`) ;
+ * - les **annonces** au lecteur (`_lib/live-alerts.ts`) — signal sonore, titre
+ *   d'onglet, modale de lancement.
  */
 export function useTournamentLive(tournamentId: number) {
   const { showError } = useToast();
@@ -106,30 +80,20 @@ export function useTournamentLive(tournamentId: number) {
    * Part du régime complet : la souscription corrige dès le montage.
    */
   const policyRef = useRef<ClientPowerPolicy>(powerPolicy(FULL_POWER_INPUT));
-  const quietTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Un état reçu attend d'être rendu. */
-  const pendingRenderRef = useRef(false);
-  /** Dernier état **rendu** : sans détail, la page affiche encore « Chargement… ». */
-  const renderedRef = useRef<LiveState>(INITIAL_LIVE_STATE);
-  const renderTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  /** Flux ouvert au palier spectateur (`?quiet=1`). */
-  const quietRef = useRef(false);
+  /** Rendu du dernier état reçu, selon le régime. */
+  const [renderGate] = useState(() =>
+    createLiveRenderGate(() => {
+      setState(stateRef.current);
+      return stateRef.current;
+    }),
+  );
+  /** Palier spectateur du flux. */
+  const [quietStream] = useState(() => createQuietStream(() => reconnectRef.current?.()));
 
   /** Le lecteur a une rencontre en cours — lu sur l'état reçu, pas sur le rendu. */
   const [matchFocus, setMatchFocus] = useState(false);
   const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useMatchFocusLease(matchFocus);
-
-  /** Rend le dernier état reçu. */
-  const flushRender = useCallback(() => {
-    pendingRenderRef.current = false;
-    if (renderTimerRef.current !== null) {
-      clearTimeout(renderTimerRef.current);
-      renderTimerRef.current = null;
-    }
-    renderedRef.current = stateRef.current;
-    setState(stateRef.current);
-  }, []);
 
   /**
    * Réévalue le régime `MATCH` sur l'état reçu, et se réveille seul à l'approche
@@ -157,47 +121,13 @@ export function useTournamentLive(tournamentId: number) {
       stateRef.current = next;
       lastUpdateAtRef.current = Date.now();
 
-      // Détecté sur ce qui est **reçu** : l'annonce part même quand rien n'est
-      // rendu — c'est justement quand le lecteur ne regarde pas qu'elle sert.
-      if (next.detail) {
-        const alert = viewerAlert(previous.detail, next.detail);
-        if (alert) {
-          if (isPersonalAlert(alert)) playAlertChime(alert);
-          raiseAttention(alert);
-        }
-        // La modale de lancement ne vit que de sa propre interrogation : on lui
-        // signale ce que le flux vient d'apprendre sur une rencontre du lecteur
-        // (lobby, « Prêt », lancement), plutôt que de la laisser le découvrir
-        // jusqu'à une minute plus tard. Elle regroupe ces signaux.
-        if (viewerLaunchChanged(previous.detail, next.detail)) {
-          window.dispatchEvent(new Event(MATCH_LAUNCH_REFRESH_EVENT));
-        }
-      }
+      // Détecté sur ce qui est **reçu**, avant de décider du rendu.
+      if (next.detail) announceViewerChanges(previous.detail, next.detail);
       updateMatchFocus();
 
-      const delay = policyRef.current.snapshotRenderDelayMs;
-      if (delay === 0) {
-        flushRender();
-        return;
-      }
-      pendingRenderRef.current = true;
-      // Onglet caché : rien avant le retour (l'effet sur le régime s'en charge).
-      if (delay === null) return;
-      // Ne se regroupent pas : une page encore vide (rien n'a été *rendu*, même
-      // si quelque chose a été reçu onglet caché), et le match du lecteur,
-      // c'est ce qu'il regarde.
-      const urgent =
-        !renderedRef.current.detail ||
-        !previous.detail ||
-        !next.detail ||
-        touchesViewerMatches(previous.detail, next.detail);
-      if (urgent) {
-        flushRender();
-        return;
-      }
-      renderTimerRef.current ??= setTimeout(flushRender, delay);
+      renderGate.received(policyRef.current.snapshotRenderDelayMs, previous.detail, next.detail);
     },
-    [flushRender, updateMatchFocus],
+    [renderGate, updateMatchFocus],
   );
 
   useEffect(() => {
@@ -205,64 +135,26 @@ export function useTournamentLive(tournamentId: number) {
       const previous = policyRef.current;
       const next = powerPolicy(getClientPowerInput());
       policyRef.current = next;
-
-      // Ce qui attendait est rendu dès qu'on peut le voir — et pas avant : un
-      // regroupement armé hors focus ne doit pas redessiner l'arbre derrière le
-      // jeu si l'onglet vient d'être caché. Le rendu reste dû, pour le retour.
-      const delay = next.snapshotRenderDelayMs;
-      if (pendingRenderRef.current) {
-        // Une page encore vide ne patiente pas : les données sont là.
-        if (delay === 0 || (delay !== null && !renderedRef.current.detail)) flushRender();
-        else if (delay === null) {
-          if (renderTimerRef.current !== null) {
-            clearTimeout(renderTimerRef.current);
-            renderTimerRef.current = null;
-          }
-        } else {
-          renderTimerRef.current ??= setTimeout(flushRender, delay);
-        }
-      }
-
-      // Palier spectateur pour un onglet caché hors match ; palier normal au retour.
-      const quietAfter = next.quietStreamAfterMs;
-      if (quietAfter === previous.quietStreamAfterMs) return;
-      if (quietTimerRef.current !== null) {
-        clearTimeout(quietTimerRef.current);
-        quietTimerRef.current = null;
-      }
-      if (quietAfter === null) {
-        if (quietRef.current) {
-          quietRef.current = false;
-          reconnectRef.current?.();
-        }
-        return;
-      }
-      quietTimerRef.current = setTimeout(() => {
-        quietTimerRef.current = null;
-        quietRef.current = true;
-        reconnectRef.current?.();
-      }, quietAfter);
+      renderGate.policyChanged(next.snapshotRenderDelayMs);
+      quietStream.policyChanged(previous.quietStreamAfterMs, next.quietStreamAfterMs);
     };
 
     const unsubscribe = subscribeClientPower(apply);
     apply();
     return () => {
       unsubscribe();
-      if (quietTimerRef.current !== null) {
-        clearTimeout(quietTimerRef.current);
-        quietTimerRef.current = null;
-      }
+      quietStream.dispose();
     };
-  }, [flushRender]);
+  }, [renderGate, quietStream]);
 
   // Au démontage : aucun minuteur ni titre d'appel ne survit à la page.
   useEffect(
     () => () => {
-      if (renderTimerRef.current !== null) clearTimeout(renderTimerRef.current);
+      renderGate.dispose();
       if (focusTimerRef.current !== null) clearTimeout(focusTimerRef.current);
       clearAttention();
     },
-    [],
+    [renderGate],
   );
 
   /**
@@ -325,23 +217,6 @@ export function useTournamentLive(tournamentId: number) {
     }
   }, [load]);
 
-  // Même remise à zéro pour le régime de charge : un rendu en attente, un match
-  // en cours ou un titre d'appel du tournoi précédent n'ont rien à faire ici.
-  useEffect(() => {
-    pendingRenderRef.current = false;
-    if (renderTimerRef.current !== null) {
-      clearTimeout(renderTimerRef.current);
-      renderTimerRef.current = null;
-    }
-    if (focusTimerRef.current !== null) {
-      clearTimeout(focusTimerRef.current);
-      focusTimerRef.current = null;
-    }
-    quietRef.current = false;
-    clearAttention();
-    setMatchFocus(false);
-  }, [tournamentId]);
-
   /**
    * Repart de zéro quand on change de tournoi.
    *
@@ -350,223 +225,75 @@ export function useTournamentLive(tournamentId: number) {
    * l'échec définitif du tournoi précédent condamnerait le suivant, son plateau
    * s'afficherait un instant sous la mauvaise URL — pastille « Direct »
    * comprise — et la comparaison des deux détails ferait sonner le signal
-   * « score à confirmer » sur une simple navigation.
+   * « score à confirmer » sur une simple navigation. Même remise à zéro pour
+   * le régime de charge : un rendu en attente, un match en cours ou un titre
+   * d'appel du tournoi précédent n'ont rien à faire ici.
    */
   useEffect(() => {
+    renderGate.reset();
+    if (focusTimerRef.current !== null) {
+      clearTimeout(focusTimerRef.current);
+      focusTimerRef.current = null;
+    }
+    quietStream.reset();
+    clearAttention();
+    setMatchFocus(false);
     stateRef.current = INITIAL_LIVE_STATE;
     lastUpdateAtRef.current = 0;
     lastFetchAtRef.current = 0;
-    renderedRef.current = INITIAL_LIVE_STATE;
     setState(INITIAL_LIVE_STATE);
     setIsLive(false);
     setFatal(null);
-  }, [tournamentId]);
+  }, [tournamentId, renderGate, quietStream]);
+
+  /**
+   * Message du flux : intégré tout de suite, puis — pour qui en a un — aperçu
+   * du plateau relu quand il a bougé.
+   */
+  const onMessage = useCallback(
+    (message: LiveMessage) => {
+      // Le contexte du lecteur n'arrive qu'à la connexion — sauf l'aperçu du
+      // plateau, qui se périme à chaque inscription. On ne le redemande que
+      // pour ceux qui en ont un, et seulement quand il a bougé.
+      const previous = stateRef.current.detail;
+      const stalePreview =
+        message.type === "snapshot" &&
+        previous !== null &&
+        shouldRefreshViewerContext(previous, message.snapshot);
+
+      commit(applyLiveMessage(stateRef.current, message));
+      // `force` : on vient de commiter cette version, la déduplication par
+      // version rejetterait la relecture avant d'en avoir pris l'aperçu.
+      if (stalePreview) void load(true, true);
+    },
+    [commit, load],
+  );
 
   useEffect(() => {
     if (!tournamentId) return;
 
-    let cancelled = false;
-    let source: EventSource | null = null;
-    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
-    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
-    /** Guette le premier instantané d'un flux ouvert (`FIRST_SNAPSHOT_TIMEOUT_MS`). */
-    let firstSnapshotTimer: ReturnType<typeof setTimeout> | null = null;
-    let attempts = 0;
-    let stopped = false;
-
-    /**
-     * Un échec dont on ne se relèvera pas : on cesse de réessayer et on le dit.
-     * Sans cela la page resterait indéfiniment sur « Reconnexion… », à ouvrir un
-     * flux qui refusera toujours, sans jamais orienter vers `/connexion`.
-     */
-    const giveUp = (failure: LiveFailure) => {
-      if (stopped) return;
-      stopped = true;
-      stopFallback();
-      stopFirstSnapshotWatch();
-      if (reconnectTimer !== null) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-      }
-      source?.close();
-      source = null;
-      setIsLive(false);
-      setFatal(failure);
-      showError(mapError(failure));
-    };
-
-    const stopFallback = () => {
-      if (fallbackTimer !== null) {
-        clearInterval(fallbackTimer);
-        fallbackTimer = null;
-      }
-    };
-
-    const stopFirstSnapshotWatch = () => {
-      if (firstSnapshotTimer !== null) {
-        clearTimeout(firstSnapshotTimer);
-        firstSnapshotTimer = null;
-      }
-    };
-
-    /**
-     * Flux ouvert, page encore vide : si rien n'arrive dans le délai, la donnée
-     * est lue par REST et le sondage de secours prend le relais. Le flux reste
-     * ouvert — un premier message tardif coupe le sondage et reprend la main.
-     */
-    const watchFirstSnapshot = () => {
-      stopFirstSnapshotWatch();
-      if (stateRef.current.detail) return;
-      firstSnapshotTimer = setTimeout(() => {
-        firstSnapshotTimer = null;
-        if (cancelled || stopped || stateRef.current.detail) return;
-        // Le témoin dit ce qui est : ce flux ne livre rien.
-        setIsLive(false);
-        void load(true).then((failure) => {
-          if (failure && !cancelled) giveUp(failure);
-        });
-        startFallback();
-      }, FIRST_SNAPSHOT_TIMEOUT_MS);
-    };
-
-    /** Sondage de secours, tant que le flux est coupé. */
-    const startFallback = () => {
-      if (fallbackTimer !== null || stopped) return;
-      const period = REFRESH_CADENCE[stateRef.current.tier].detailFallbackMs;
-      fallbackTimer = setInterval(() => {
-        if (cancelled || stopped || document.visibilityState === "hidden") return;
-        void load(true).then((failure) => {
-          if (failure && !cancelled) giveUp(failure);
-        });
-      }, period);
-    };
-
-    const scheduleReconnect = () => {
-      if (cancelled || stopped || reconnectTimer !== null) return;
-      attempts += 1;
-      reconnectTimer = setTimeout(() => {
-        reconnectTimer = null;
-        connect();
-      }, reconnectDelayMs(attempts));
-    };
-
-    const connect = () => {
-      if (cancelled || stopped) return;
-
-      try {
-        const quiet = quietRef.current ? "?quiet=1" : "";
-        source = new EventSource(`/api/tournaments/${tournamentId}/stream${quiet}`);
-      } catch {
-        startFallback();
-        scheduleReconnect();
-        return;
-      }
-
-      source.onopen = () => {
-        if (cancelled) return;
-        attempts = 0;
-        setIsLive(true);
-        stopFallback();
-        watchFirstSnapshot();
-      };
-
-      source.onmessage = (event) => {
-        if (cancelled) return;
-        const message = parseLiveMessage(event.data);
-        if (!message) return;
-        // Le premier message porte déjà tout : la connexion vaut chargement.
-        // Il lève aussi le guet et le sondage qu'un flux muet avait armés.
-        setIsLive(true);
-        stopFirstSnapshotWatch();
-        stopFallback();
-
-        // Le contexte du lecteur n'arrive qu'à la connexion — sauf l'aperçu du
-        // plateau, qui se périme à chaque inscription. On ne le redemande que
-        // pour ceux qui en ont un, et seulement quand il a bougé.
-        const previous = stateRef.current.detail;
-        const stalePreview =
-          message.type === "snapshot" &&
-          previous !== null &&
-          shouldRefreshViewerContext(previous, message.snapshot);
-
-        commit(applyLiveMessage(stateRef.current, message));
-        // `force` : on vient de commiter cette version, la déduplication par
-        // version rejetterait la relecture avant d'en avoir pris l'aperçu.
-        if (stalePreview) void load(true, true);
-      };
-
-      source.onerror = () => {
-        if (cancelled) return;
-        stopFirstSnapshotWatch();
-        source?.close();
-        source = null;
-        setIsLive(false);
-        // La page ne doit pas rester vide si le flux échoue d'entrée (session
-        // expirée, tournoi introuvable, plafond de flux atteint).
-        if (!stateRef.current.detail) {
-          void load(attempts > 0).then((failure) => {
-            if (failure && !cancelled) giveUp(failure);
-          });
-        }
-        startFallback();
-        scheduleReconnect();
-      };
-    };
-
-    /**
-     * Retour sur l'onglet : c'est le moment où l'on rechargeait la page à la
-     * main. On relit si la donnée a vieilli, et on retente tout de suite une
-     * connexion plutôt que d'attendre la fin de l'attente en cours.
-     */
-    const onVisible = () => {
-      if (cancelled || stopped || document.visibilityState !== "visible") return;
-
-      // Tant que le flux tient, la donnée est déjà à jour : la relire ferait
-      // repartir, à la fin d'une manche, la centaine de requêtes simultanées
-      // que ce flux existe précisément pour éviter. On ne relit donc que
-      // lorsqu'il est coupé.
-      const now = Date.now();
-      const stale = now - lastUpdateAtRef.current > FOCUS_REFRESH_MIN_INTERVAL_MS;
-      const recentlyFetched = now - lastFetchAtRef.current < FOCUS_REFRESH_MIN_INTERVAL_MS;
-      if (!source && stale && !recentlyFetched) void load(true);
-
-      if (!source && reconnectTimer !== null) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-        attempts = 0;
-        connect();
-      }
-    };
-
-    reconnectRef.current = () => {
-      if (cancelled || stopped) return;
-      if (reconnectTimer !== null) {
-        clearTimeout(reconnectTimer);
-        reconnectTimer = null;
-      }
-      stopFirstSnapshotWatch();
-      source?.close();
-      source = null;
-      attempts = 0;
-      connect();
-    };
-
-    connect();
-    document.addEventListener("visibilitychange", onVisible);
-    window.addEventListener("online", onVisible);
+    const connection = openLiveConnection({
+      tournamentId,
+      quiet: quietStream.isQuiet,
+      hasDetail: () => Boolean(stateRef.current.detail),
+      fallbackPeriodMs: () => REFRESH_CADENCE[stateRef.current.tier].detailFallbackMs,
+      lastUpdateAt: () => lastUpdateAtRef.current,
+      lastFetchAt: () => lastFetchAtRef.current,
+      load: (silent) => load(silent),
+      onMessage,
+      onLiveChange: setIsLive,
+      onFatal: (failure) => {
+        setFatal(failure);
+        showError(mapError(failure));
+      },
+    });
+    reconnectRef.current = connection.reconnect;
 
     return () => {
-      cancelled = true;
       reconnectRef.current = null;
-      document.removeEventListener("visibilitychange", onVisible);
-      window.removeEventListener("online", onVisible);
-      if (reconnectTimer !== null) clearTimeout(reconnectTimer);
-      stopFallback();
-      stopFirstSnapshotWatch();
-      source?.close();
-      setIsLive(false);
+      connection.close();
     };
-  }, [tournamentId, load, commit, showError]);
+  }, [tournamentId, load, onMessage, showError, quietStream]);
 
   return {
     tournament: state.detail,

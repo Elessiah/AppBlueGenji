@@ -110,7 +110,7 @@ export function headerMetaItems(
 
   // « BlueGenji Survie » est le seul mode à jouer **deux** formats de match : sa
   // qualification peut clore une rencontre sans vainqueur, son arbre final non
-  // (`lib/shared/bg-survie.ts`). Une case unique intitulée « Format des matchs »
+  // (`lib/shared/bg-survie/rounds.ts`). Une case unique intitulée « Format des matchs »
   // affirmerait donc du tournoi entier ce qui n'est vrai que de sa première
   // phase — une équipe qui prépare sa demi-finale y lirait le plafond de maps de
   // la qualification, et l'infobulle lui promettrait une égalité impossible.

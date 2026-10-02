@@ -1,9 +1,9 @@
-import { resolveEnduranceConfig } from "@/lib/shared/bg-survie";
+import { resolveEnduranceConfig } from "@/lib/shared/bg-survie/config";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import type {
   EnduranceNextRoundInput,
   EnduranceNextRoundPreview,
-} from "@/lib/shared/endurance-next-round";
+} from "@/lib/shared/endurance-next-round/types";
 import { plural } from "@/lib/shared/plural";
 import type { BracketMatch, EnduranceMeta } from "@/lib/shared/types";
 

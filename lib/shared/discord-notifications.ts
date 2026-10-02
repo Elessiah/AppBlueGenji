@@ -18,7 +18,7 @@
  * base ni réseau, pour que la règle soit testable et que serveur et interface ne
  * puissent pas en avoir deux lectures.
  */
-import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie";
+import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { ANONYMOUS_PLAYER_LABEL, entrantLabel, type LogEntrant } from "./log-privacy";
 import { discordInline, discordQuote } from "./discord-text";
 

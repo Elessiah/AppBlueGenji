@@ -1,4 +1,4 @@
-import type { EnduranceRoundCell } from "@/lib/shared/bg-survie";
+import type { EnduranceRoundCell } from "@/lib/shared/bg-survie/replay";
 
 /**
  * Lecture du tableau d'endurance **manche par manche** — la vue « feuille de

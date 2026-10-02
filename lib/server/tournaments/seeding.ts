@@ -270,8 +270,8 @@ async function rebuildStartedTournament(
   if (format === "BG_SURVIE") {
     // Le classement d'endurance porte les seeds : il doit être resemé depuis le
     // nouvel ordre, sans quoi le tournoi resterait figé sur l'ancien.
-    const { initializeEnduranceTournament, generateEnduranceRound, reconcileEndurance } =
-      await import("./bg-survie");
+    const { initializeEnduranceTournament, generateEnduranceRound } = await import("./bg-survie/qualification");
+    const { reconcileEndurance } = await import("./bg-survie/reconcile");
     await initializeEnduranceTournament(tournamentId, connection);
     await generateEnduranceRound(tournamentId, connection);
     await reconcileEndurance(tournamentId, connection);

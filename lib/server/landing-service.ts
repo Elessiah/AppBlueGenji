@@ -36,7 +36,7 @@ import {
 import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { entrantHref } from "@/lib/shared/participants";
 import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
-import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
+import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
 

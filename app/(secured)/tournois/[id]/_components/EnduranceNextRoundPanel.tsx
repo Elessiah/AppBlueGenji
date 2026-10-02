@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import type { EnduranceNextRoundPreview } from "@/lib/shared/endurance-next-round";
+import type { EnduranceNextRoundPreview } from "@/lib/shared/endurance-next-round/types";
 import {
   nextRoundEmptyLabel,
   nextRoundPendingLabel,

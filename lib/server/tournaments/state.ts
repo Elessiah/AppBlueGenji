@@ -167,7 +167,7 @@ async function initializeFormat(
     return;
   }
   if (format === "BG_SURVIE") {
-    const { initializeEnduranceTournament, generateEnduranceRound } = await import("./bg-survie");
+    const { initializeEnduranceTournament, generateEnduranceRound } = await import("./bg-survie/qualification");
     await initializeEnduranceTournament(tournamentId, connection);
     await generateEnduranceRound(tournamentId, connection);
     return;
@@ -268,7 +268,7 @@ async function reconcileFormat(
     return;
   }
   if (format === "BG_SURVIE") {
-    const { reconcileEndurance } = await import("./bg-survie");
+    const { reconcileEndurance } = await import("./bg-survie/reconcile");
     await reconcileEndurance(tournamentId, connection);
     return;
   }

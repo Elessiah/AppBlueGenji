@@ -1,13 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { participantWording } from "@/lib/shared/participants";
-import { formatLabel, gameLabel } from "@/lib/shared/tournament-labels";
 import type { TournamentCard } from "@/lib/shared/types";
-import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { formatCardDate, registrationFill, upcomingCardFace } from "../_lib/card-display";
-import { CARD_IMAGE_SIZES } from "./card-image";
+import { CardMetaItem, CardProgress, TournamentCardFrame } from "./CardParts";
 import s from "../tournois.module.css";
 
 interface UpcomingCardProps {
@@ -31,65 +28,31 @@ export function UpcomingCard({ t, priority }: Readonly<UpcomingCardProps>) {
   const locked = upcomingCardFace(t, Date.now()) === "LOCKED";
 
   return (
-    <article className={s.card} data-state="soon">
-      <Link
-        href={`/tournois/${t.id}`}
-        className={s.cardOverlay}
-        aria-label={`Voir le tournoi ${t.name}`}
-      />
-      <TournamentImageBanner
-        image={t.image}
-        sizes={CARD_IMAGE_SIZES}
-        className={s.cardBanner}
-        priority={priority}
-      />
-      <div className={`${s.cardRibbon} ${s.cardRibbonSoon}`}>
-        {locked ? "Inscriptions closes" : "À venir"}
-      </div>
-
-      <div className={s.cardHead}>
-        <div className={s.cardGame}>
-          {gameLabel(t.game)}
-          <span className={s.dot}>◆</span>
-          {formatLabel(t.format)}
-        </div>
-        <TournamentImageEmblem image={t.image} size={40} />
-      </div>
-
-      <h3 className={s.cardTitle}>{t.name}</h3>
-      {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
-
+    <TournamentCardFrame
+      t={t}
+      priority={priority}
+      state="soon"
+      ribbonClassName={s.cardRibbonSoon}
+      ribbon={locked ? "Inscriptions closes" : "À venir"}
+    >
       <div className={s.cardMeta}>
-        <div>
-          <div className={s.cardMetaLbl}>Début</div>
-          <div className={s.cardMetaVal}>{formatCardDate(t.startAt, true)}</div>
-        </div>
+        <CardMetaItem label="Début">{formatCardDate(t.startAt, true)}</CardMetaItem>
         {locked ? (
-          <div>
-            <div className={s.cardMetaLbl}>Inscriptions closes le</div>
-            <div className={s.cardMetaVal}>{formatCardDate(t.registrationCloseAt, true)}</div>
-          </div>
+          <CardMetaItem label="Inscriptions closes le">
+            {formatCardDate(t.registrationCloseAt, true)}
+          </CardMetaItem>
         ) : (
-          <div>
-            <div className={s.cardMetaLbl}>Ouverture inscriptions</div>
-            <div className={s.cardMetaVal}>{formatCardDate(t.registrationOpenAt, true)}</div>
-          </div>
+          <CardMetaItem label="Ouverture inscriptions">
+            {formatCardDate(t.registrationOpenAt, true)}
+          </CardMetaItem>
         )}
-        <div>
-          <div className={s.cardMetaLbl}>{wording.manyCapitalized}</div>
-          <div className={`${s.cardMetaVal} ${s.num}`}>
-            {t.registeredTeams}/{t.maxTeams}
-          </div>
-        </div>
-        <div>
-          <div className={s.cardMetaLbl}>Matchs</div>
-          <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
-        </div>
+        <CardMetaItem label={wording.manyCapitalized} valueClassName={`${s.cardMetaVal} ${s.num}`}>
+          {t.registeredTeams}/{t.maxTeams}
+        </CardMetaItem>
+        <CardMetaItem label="Matchs">{matchFormatLabel(t.matchFormat)}</CardMetaItem>
       </div>
 
-      <div className={s.progress} aria-hidden="true">
-        <div className={s.progressBar} style={{ width: `${fill.percent}%` }} />
-      </div>
+      <CardProgress percent={fill.percent} />
 
       <div className={s.cardFoot}>
         <div>
@@ -100,6 +63,6 @@ export function UpcomingCard({ t, priority }: Readonly<UpcomingCardProps>) {
         </div>
         <span className={`${s.cardCta} ${s.cardCtaMuted}`}>Détails</span>
       </div>
-    </article>
+    </TournamentCardFrame>
   );
 }
