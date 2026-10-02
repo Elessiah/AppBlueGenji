@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/user-avatar-import");
 
-import { adoptRemoteAvatar } from "@/lib/server/users-service";
+import { adoptRemoteAvatar } from "@/lib/server/users/sign-in";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { importRemoteAvatar, shouldImportRemoteAvatar } from "@/lib/server/user-avatar-import";

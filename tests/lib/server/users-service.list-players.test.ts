@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { listPlayers } from "@/lib/server/users-service";
+import { listPlayers } from "@/lib/server/users/players";
 import { clearCache } from "@/lib/server/cache";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 

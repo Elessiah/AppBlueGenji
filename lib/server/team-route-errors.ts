@@ -4,7 +4,7 @@ import { INVALID_TEAM_NAME, TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-nam
 import { JOIN_CONFLICTS } from "./team-invite-roles";
 
 /**
- * Statuts HTTP des refus levés par `teams-service`, une table par geste des
+ * Statuts HTTP des refus levés par `lib/server/teams/`, une table par geste des
  * routes `/api/teams/[id]/*`. Un code absent de la table garde le statut par
  * défaut des routes d'équipe (400, `teamErrorStatus`) : les tables ne nomment
  * que ce qui s'en écarte, plus les 400 qui méritent d'être lus ici.

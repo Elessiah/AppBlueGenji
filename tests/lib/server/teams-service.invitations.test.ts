@@ -4,8 +4,8 @@ jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/users-service", () => {
-  const actual = jest.requireActual("@/lib/server/users-service") as Record<string, unknown>;
+jest.mock("@/lib/server/users/roles", () => {
+  const actual = jest.requireActual("@/lib/server/users/roles") as Record<string, unknown>;
   return { ...actual, getUserIdByPseudo: jest.fn() };
 });
 
@@ -15,9 +15,9 @@ import {
   listTeamPendingInvitations,
   requestToJoinTeam,
   respondToInvitation,
-} from "@/lib/server/teams-service";
+} from "@/lib/server/teams/invitations";
 import { getDatabase } from "@/lib/server/database";
-import { getUserIdByPseudo } from "@/lib/server/users-service";
+import { getUserIdByPseudo } from "@/lib/server/users/roles";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";
 
 /**

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/tournaments/state");
 jest.mock("@/lib/server/tournaments/repository");
@@ -15,7 +15,7 @@ import {
   registerCurrentUserTeam,
   registerTeamsByIds,
 } from "@/lib/server/tournaments/registration";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { syncTournamentState } from "@/lib/server/tournaments/state";

@@ -53,7 +53,7 @@ export const REGISTER_UPDATED_AT = "2026-10-01";
 
 /**
  * Durées appliquées par le serveur, et déclarées ici : `lib/server/auth.ts` et
- * `lib/server/users-service.ts` les importent, si bien que le registre ne peut
+ * `lib/server/users/discord-challenges.ts` les importent, si bien que le registre ne peut
  * pas annoncer une durée que le code ne tient pas.
  */
 export const SESSION_RETENTION_DAYS = 30;

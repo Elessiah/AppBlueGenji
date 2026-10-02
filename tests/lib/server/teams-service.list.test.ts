@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { listTeams } from "@/lib/server/teams-service";
+import { listTeams } from "@/lib/server/teams/directory";
 import { clearCache } from "@/lib/server/cache";
 import { invalidateStats } from "@/lib/server/stats-cache";
 import { fakePool } from "../../helpers/sql-double";

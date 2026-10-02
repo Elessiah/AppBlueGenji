@@ -2,12 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/image-upload");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users/avatar");
 
 import { DELETE, POST } from "@/app/api/profile/avatar/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
-import { updateUserAvatar } from "@/lib/server/users-service";
+import { updateUserAvatar } from "@/lib/server/users/avatar";
 import { authUser } from "../../../helpers/auth-user";
 
 const user = authUser({ id: 42 });

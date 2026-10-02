@@ -15,7 +15,7 @@ import {
   MAX_DISCORD_CODES_PER_DAY,
   MAX_DISCORD_CODES_PER_WINDOW,
   verifyDiscordChallenge,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/discord-challenges";
 import { getDatabase } from "@/lib/server/database";
 import { fakePool } from "../../helpers/sql-double";
 

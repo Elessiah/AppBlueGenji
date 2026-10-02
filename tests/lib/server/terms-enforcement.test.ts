@@ -20,15 +20,14 @@ import {
   recordTermsAcceptance,
   recordTermsAcceptanceIfBehind,
 } from "@/lib/server/terms-acceptance";
+import { createTeam, updateTeamLogo } from "@/lib/server/teams/identity";
+import { respondToInvitation } from "@/lib/server/teams/invitations";
+import { removeTeamMember, transferTeamOwnership, updateTeamMemberRoles } from "@/lib/server/teams/roster";
 import {
-  createTeam,
-  removeTeamMember,
-  respondToInvitation,
-  transferTeamOwnership,
-  updateTeamLogo,
-  updateTeamMemberRoles,
-} from "@/lib/server/teams-service";
-import { createOrGetBlizzardUser, createOrGetDiscordUser, createOrGetGoogleUser } from "@/lib/server/users-service";
+  createOrGetBlizzardUser,
+  createOrGetDiscordUser,
+  createOrGetGoogleUser,
+} from "@/lib/server/users/sign-in";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 type Route = [RegExp, (params: unknown[]) => unknown];

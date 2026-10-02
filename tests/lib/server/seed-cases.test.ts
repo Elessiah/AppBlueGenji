@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "@/lib/server/seed-cases";
+import { TOURNAMENTS, type SeedFormat, type TournamentDef } from "@/lib/server/seed/cases";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 
 const FORMATS: SeedFormat[] = ["SINGLE", "DOUBLE", "SWISS", "SURVIVAL"];

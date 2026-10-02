@@ -44,10 +44,9 @@ import {
   createOrGetBlizzardUser,
   createOrGetDiscordUser,
   createOrGetGoogleUser,
-  normalizeBattletag,
-  normalizeDiscordHandle,
   type TermsConsent,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/sign-in";
+import { normalizeBattletag, normalizeDiscordHandle } from "@/lib/server/users/tag-normalization";
 import {
   buildAccountConnections,
   checkConnectionUnlink,
@@ -136,7 +135,7 @@ export async function listAccountConnections(userId: number): Promise<AccountCon
  * Ouvre (ou retrouve) le compte que désigne cette identité.
  *
  * Simple aiguillage : chaque fournisseur a déjà sa fonction dans
- * `users-service`, avec ses effets propres — le tag (enregistré, non certifié)
+ * `users/sign-in`, avec ses effets propres — le tag (enregistré, non certifié)
  * pour Discord, le BattleTag pour Blizzard, la photo pour Google. Les regrouper ici
  * évite qu'une route ait à savoir lequel appeler, ce qui est exactement le genre
  * d'aiguillage qu'on oublie de compléter en ajoutant un fournisseur.

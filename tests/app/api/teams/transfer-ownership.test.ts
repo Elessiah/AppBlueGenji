@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/detail");
+jest.mock("@/lib/server/teams/roster");
 
 import { POST as transferRoute } from "@/app/api/teams/[id]/transfer-ownership/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getTeamDetail, transferTeamOwnership } from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { transferTeamOwnership } from "@/lib/server/teams/roster";
 import { authUser } from "../../../helpers/auth-user";
 import { teamDetailResponse } from "../../../helpers/team-detail";
 

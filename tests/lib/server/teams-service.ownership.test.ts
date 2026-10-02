@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { transferTeamOwnership } from "@/lib/server/teams-service";
+import { transferTeamOwnership } from "@/lib/server/teams/roster";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { type SqlQuery, connectionMock, fakePool } from "../../helpers/sql-double";
 

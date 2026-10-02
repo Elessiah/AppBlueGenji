@@ -44,7 +44,7 @@ s'additionnent.
   `permissionsForRoles()`, `sanitizePlatformRoles()`). Importable partout.
 - **Stockage** : le rôle `ADMIN` reste porté par la colonne `bg_users.is_admin` ;
   les autres rôles cumulables sont sérialisés dans `bg_users.platform_roles_json`
-  (migration automatique dans `lib/server/database.ts`).
+  (migration automatique dans `lib/server/database/`).
 - **Résolution** : `resolveRoles(isAdmin, platform_roles_json)` (dans
   `lib/server/auth.ts`) reconstitue la liste complète ; elle est exposée sur
   `AuthUser.roles` et via `GET /api/auth/me`.

@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users/data-export");
 
 import { GET } from "@/app/api/profile/export/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { exportOwnData } from "@/lib/server/users-service";
+import { exportOwnData } from "@/lib/server/users/data-export";
 import { emptyDeepStats } from "@/lib/shared/stats";
 import type { PersonalDataExport } from "@/lib/shared/types";
 import { authUser } from "../../../helpers/auth-user";

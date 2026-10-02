@@ -2,7 +2,9 @@
 import { DIRECTORY_READ_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { TEAM_DELETE_ERROR_STATUS, TEAM_META_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
-import { getTeamDetail, softDeleteTeam, updateTeamMeta } from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { softDeleteTeam } from "@/lib/server/teams/dissolution";
+import { updateTeamMeta } from "@/lib/server/teams/identity";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { can } from "@/lib/shared/permissions";
 import { INVALID_TEAM_FIELDS, teamFieldsAreText } from "@/lib/shared/team-name";

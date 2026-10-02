@@ -42,8 +42,8 @@ import {
   consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
   discardDiscordChallenge,
-  normalizeDiscordHandle,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/discord-challenges";
+import { normalizeDiscordHandle } from "@/lib/server/users/tag-normalization";
 
 /** État Discord d'un compte, tel que le profil le lit. */
 export type DiscordAccountState = {

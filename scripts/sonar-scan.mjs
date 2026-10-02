@@ -50,7 +50,7 @@ const TEST_DIRECTORIES = ["tests", "e2e"];
 // Ce qui ne s'exécute pas sous Jest : configuration, scripts d'exploitation.
 const COVERAGE_EXCLUSIONS = [
     "*.config.*", "*.cjs", "*.mjs", "scripts/**", "middleware.ts", "public/**",
-    "lib/server/seed*.ts", "lib/server/backfill-*.ts", "lib/server/replay-*.ts",
+    "lib/server/seed-view.ts", "lib/server/seed/**", "lib/server/backfill-*.ts", "lib/server/replay-*.ts",
     "lib/server/rotate-*.ts", "lib/server/generate-*.ts",
 ];
 const RATING = { "1.0": "A", "2.0": "B", "3.0": "C", "4.0": "D", "5.0": "E" };

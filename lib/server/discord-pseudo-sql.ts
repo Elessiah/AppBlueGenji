@@ -15,7 +15,7 @@
  * pas celui qu'il prendra demain. Le `CASE` précède l'affectation du pseudo,
  * MySQL évaluant de gauche à droite ; `<=>` parce que l'ancien peut être `NULL`.
  *
- * Module à part, et non une constante de `users-service` : les deux écrivains
+ * Module à part, et non une constante de `users/sign-in` : les deux écrivains
  * vivent dans deux modules, et les tests qui simulent l'un ne doivent pas
  * rendre l'autre silencieusement faux (une constante absente d'un bouchon
  * s'interpole en `undefined` dans la requête).

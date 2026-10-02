@@ -7,15 +7,12 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 
-import {
-  deleteOwnAccount,
-  createOrGetDiscordUser,
-  getFullProfile,
-  getUserById,
-  listPlayers,
-  normalizeDiscordHandle,
-  updateOwnProfile,
-} from "@/lib/server/users-service";
+import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { getFullProfile } from "@/lib/server/users/full-profile";
+import { getUserById, listPlayers } from "@/lib/server/users/players";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
+import { createOrGetDiscordUser } from "@/lib/server/users/sign-in";
+import { normalizeDiscordHandle } from "@/lib/server/users/tag-normalization";
 import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { fakePool } from "../../helpers/sql-double";

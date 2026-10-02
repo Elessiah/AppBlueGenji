@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import { POST } from "@/app/api/auth/discord/request/route";
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
-import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users-service";
+import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users/discord-challenges";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { DISCORD_CODE_REQUEST_IP_RULE, DISCORD_CODE_REQUEST_RULE } from "@/lib/server/api-guard";
 
@@ -10,7 +10,7 @@ jest.mock("@/lib/server/bot-integration", () => ({
   sendDiscordLoginCode: jest.fn(),
 }));
 
-jest.mock("@/lib/server/users-service", () => ({
+jest.mock("@/lib/server/users/discord-challenges", () => ({
   createDiscordLoginChallenge: jest.fn(),
   discardDiscordChallenge: jest.fn(),
 }));

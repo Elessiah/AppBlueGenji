@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/tournaments/registration-eligibility");
 // L'entrée solo se lit en base ; ici seul son absence nous intéresse — c'est le
@@ -10,7 +10,7 @@ jest.mock("@/lib/server/solo-entries-service");
 
 import { getTournamentViewerContext } from "@/lib/server/tournaments";
 import { withConnection } from "@/lib/server/database";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { getTournamentPreview } from "@/lib/server/tournaments/preview-cache";
 import { checkEntrantEligibility } from "@/lib/server/tournaments/registration-eligibility";
 import { findSoloEntry } from "@/lib/server/solo-entries-service";

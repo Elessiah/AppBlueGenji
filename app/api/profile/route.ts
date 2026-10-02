@@ -1,6 +1,8 @@
 ﻿import { clearSession, getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { deleteOwnAccount, getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
+import { getFullProfile } from "@/lib/server/users/full-profile";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { BATTLETAG_LOCKED } from "@/lib/shared/battletag-lock";
 import { DISCORD_TAG_LOCKED } from "@/lib/shared/discord-tag-lock";

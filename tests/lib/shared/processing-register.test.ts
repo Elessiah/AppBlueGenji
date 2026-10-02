@@ -33,6 +33,7 @@ import { REPORT_RETENTION_DAYS_AFTER_RESOLUTION } from "@/lib/shared/content-rep
 import { LOGO_QUARANTINE_MONTHS } from "@/lib/shared/logo-quarantine";
 import { SITE_HOST } from "@/lib/shared/site-host";
 import { DATA_CONTACT_NAME, LEGAL_CONTACT_DISCORD, RGPD_CONTACT_LINE } from "@/lib/shared/legal-contact";
+import { readSource } from "../../helpers/read-source";
 
 const controller = registerController();
 const byRef = (ref: string) => PROCESSING_ACTIVITIES.find((a) => a.ref === ref) as ProcessingActivity;
@@ -166,7 +167,7 @@ describe("durées : le registre cite les constantes que le code applique", () =>
   it("le serveur tire bien ces durées du registre, sans les réécrire à la main", () => {
     const root = join(__dirname, "..", "..", "..");
     const auth = readFileSync(join(root, "lib", "server", "auth.ts"), "utf8");
-    const users = readFileSync(join(root, "lib", "server", "users-service.ts"), "utf8");
+    const users = readSource("lib/server/users/discord-challenges.ts");
     expect(auth).toContain("SESSION_TTL_DAYS = SESSION_RETENTION_DAYS");
     expect(users).toContain("INTERVAL ${DISCORD_CODE_VALIDITY_MINUTES} MINUTE");
     expect(users).not.toMatch(/INTERVAL 10 MINUTE/);

@@ -5,7 +5,7 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 
 import type { Pool } from "mysql2/promise";
-import { getFullProfile } from "@/lib/server/users-service";
+import { getFullProfile } from "@/lib/server/users/full-profile";
 import { getDatabase } from "@/lib/server/database";
 import { getPlayerEntityStats } from "@/lib/server/stats-service";
 import { emptyDeepStats } from "@/lib/shared/stats";

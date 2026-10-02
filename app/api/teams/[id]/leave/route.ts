@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { leaveTeam } from "@/lib/server/teams-service";
+import { leaveTeam } from "@/lib/server/teams/roster";
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();

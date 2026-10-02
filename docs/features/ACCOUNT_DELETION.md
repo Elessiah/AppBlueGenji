@@ -2,7 +2,7 @@
 
 > **On efface ce qui ne laisse rien, on anonymise le reste.**
 > `lib/shared/account-deletion.ts` (pur) + `deleteOwnAccount`
-> (`lib/server/users-service.ts`).
+> (`lib/server/users/account-deletion.ts`).
 
 ## Le manque
 

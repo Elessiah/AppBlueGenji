@@ -98,7 +98,7 @@ describe("branchements du moteur", () => {
   });
 
   it("efface les abonnements d'un compte anonymisé", () => {
-    const users = readSource("lib/server/users-service.ts");
+    const users = readSource("lib/server/users/account-erasure.ts");
     expect(users).toContain("DELETE FROM bg_push_subscriptions WHERE user_id = ?");
     expect(users).toContain("DELETE FROM bg_push_topic_optouts WHERE user_id = ?");
   });

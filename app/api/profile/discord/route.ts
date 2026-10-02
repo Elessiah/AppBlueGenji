@@ -27,7 +27,7 @@ import {
   startDiscordVerification,
 } from "@/lib/server/discord-verification";
 import { readJsonBody } from "@/lib/server/request-body";
-import { isDiscordChallengeToken } from "@/lib/server/users-service";
+import { isDiscordChallengeToken } from "@/lib/server/users/discord-challenges";
 
 /**
  * Codes de refus et leur statut.

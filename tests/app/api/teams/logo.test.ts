@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/image-upload");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/access");
+jest.mock("@/lib/server/teams/identity");
 
 import { DELETE, POST } from "@/app/api/teams/[id]/logo/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
-import { canManageTeam, getTeamLogoUrl, isGhostTeam, updateTeamLogo } from "@/lib/server/teams-service";
+import { canManageTeam, isGhostTeam } from "@/lib/server/teams/access";
+import { getTeamLogoUrl, updateTeamLogo } from "@/lib/server/teams/identity";
 import { authUser } from "../../../helpers/auth-user";
 
 const user = authUser({ id: 7 });

@@ -10,7 +10,7 @@ import type { TournamentSnapshot } from "@/lib/shared/types";
  * a le droit de la recevoir.
  */
 jest.mock("@/lib/server/tournaments/snapshot");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/match-launch");
@@ -21,7 +21,7 @@ import {
 } from "@/lib/server/tournaments-service";
 import { getTournamentSnapshot } from "@/lib/server/tournaments/snapshot";
 import { getTournamentPreview } from "@/lib/server/tournaments/preview-cache";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 
 const HOUR = 3_600_000;
 

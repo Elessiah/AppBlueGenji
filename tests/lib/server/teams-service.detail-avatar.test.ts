@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/ranking-service");
 
-import { getTeamDetail } from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
 import { getDatabase } from "@/lib/server/database";
 import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition } from "@/lib/server/ranking-service";

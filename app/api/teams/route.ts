@@ -1,7 +1,9 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { DIRECTORY_READ_RULE, enforceRateLimit } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
-import { createTeam, getUserActiveTeam, listTeams } from "@/lib/server/teams-service";
+import { listTeams } from "@/lib/server/teams/directory";
+import { createTeam } from "@/lib/server/teams/identity";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { createGhostTeam } from "@/lib/server/ghost-teams-service";
 import { can } from "@/lib/shared/permissions";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";

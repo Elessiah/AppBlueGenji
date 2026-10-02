@@ -109,7 +109,7 @@ et se diffuse dans la page de tournoi par le contexte
 
 Les tournois joués en individuel comptent dans le palmarès et les statistiques
 du joueur au même titre que ceux joués en équipe : les requêtes de
-`lib/server/users-service.ts` passent par `USER_ENTRIES_SQL`, l'union de ses
+`lib/server/users/` passent par `USER_ENTRIES_SQL`, l'union de ses
 adhésions d'équipe et de son entrée solo.
 
 ## Champs exposés
@@ -121,7 +121,7 @@ adhésions d'équipe et de son entrée solo.
 
 `npm run seed` crée une entrée solo par joueur nommé, et trois tournois
 individuels : inscriptions ouvertes, simple élimination en cours, ronde suisse
-terminée (`lib/server/seed-cases.ts`, champ `participantType`).
+terminée (`lib/server/seed/cases.ts`, champ `participantType`).
 
 ## Tests
 

@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail } from "@/lib/server/http";
-import { exportOwnData } from "@/lib/server/users-service";
+import { exportOwnData } from "@/lib/server/users/data-export";
 
 /**
  * Export RGPD des données personnelles (droit à la portabilité, art. 20).

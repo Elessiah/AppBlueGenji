@@ -64,7 +64,7 @@ export function localAvatarUrl(avatarUrl: string | null | undefined): string | n
  *
  * `visible_avatar` est un réglage de profil : à `0`, l'image ne sort pas du
  * compte — sauf pour son propriétaire, qui doit continuer de voir la sienne.
- * La règle vivait dans `applyVisibility` (`lib/server/users-service.ts`), et
+ * La règle vivait dans `applyVisibility` (`lib/server/users/players.ts`), et
  * elle n'y voyait que les deux lectures de profil : le **roster** d'une équipe
  * — carte d'annuaire comme fiche — et le **logo d'une entrée solo** lisaient
  * `bg_users.avatar_url` sans jamais la consulter, si bien qu'un avatar masqué

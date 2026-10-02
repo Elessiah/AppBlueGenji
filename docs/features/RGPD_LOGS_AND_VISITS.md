@@ -22,7 +22,7 @@ visiteurs **uniques**, pas des personnes.
 - **Sans secret en production, on ne compte pas** (`visitHashSalt` rend `null`,
   une erreur est journalisée une fois) plutôt que de compter avec la constante de
   repli, que n'importe qui pourrait renverser.
-- **Migration** (`lib/server/database.ts`) : `authenticated` est ajoutée, reportée
+- **Migration** (`lib/server/database/data-migrations.ts`) : `authenticated` est ajoutée, reportée
   depuis `user_id IS NOT NULL`, puis `user_id` est retirée. Si le `DROP` est
   refusé, la colonne est **vidée** — c'est l'effacement qui est urgent.
 - **La suppression de compte** n'a plus rien à détacher : les visites ne

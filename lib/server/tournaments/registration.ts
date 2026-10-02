@@ -1,5 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { ensureSoloEntry, findSoloEntry } from "@/lib/server/solo-entries-service";
 import { isSoloTournament } from "@/lib/shared/participants";
 import { hasTeamManagementRole } from "@/lib/shared/team-roles";

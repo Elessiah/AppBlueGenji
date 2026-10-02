@@ -34,7 +34,7 @@ export const DISCORD_INVITE_URL = `https://discord.gg/${DISCORD_INVITE_CODE}`;
  * constante. Corriger le code ne corrige donc pas une installation où l'ancienne
  * adresse a été enregistrée un jour — elle continuerait de s'afficher en pied de
  * page, et c'est précisément l'endroit qu'on ne relit jamais. Le rattrapage de
- * `lib/server/database.ts` remplace ces valeurs-là, **et seulement celles-là** :
+ * `lib/server/database/catch-ups.ts` remplace ces valeurs-là, **et seulement celles-là** :
  * une adresse que le staff a choisie n'a pas à être écrasée au démarrage.
  *
  * Une liste close : elle ne grandit que si l'invitation change encore.

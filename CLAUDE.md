@@ -44,8 +44,8 @@ npx jest tests/path/to/file.test.ts  # un seul fichier
 ### Auth (`lib/server/auth.ts`) → `AUTH_SYSTEM.md`
 Sessions `bg_user_sessions` (30 j, cookie `bg_session`). **Aucun mot de passe** : OAuth Google/Discord/Blizzard, code Discord par message privé, Google One Tap. Un quota se **réserve en une instruction** (`UPDATE … WHERE attempts < ?` + `affectedRows`), jamais lu puis écrit après un `await`. Écritures `/api/` : provenance vérifiée (403 `CROSS_SITE_REQUEST`). Une réponse d'erreur ne porte **qu'un code** (`fail`), jamais une phrase. Un geste qui change la barre de navigation appelle `router.refresh()`.
 
-### Database (`lib/server/database.ts`) → `docs/DATABASE_SCHEMA.md`
-**Un changement de schéma s'écrit à deux endroits** : dans le `CREATE TABLE` (bases neuves) **et** en `ALTER TABLE` tolérant dans la section « Migrations » (bases existantes, où `CREATE TABLE IF NOT EXISTS` ne fait rien) — la seconde entrée se retire une fois jouée partout.
+### Database (`lib/server/database.ts`, schéma sous `lib/server/database/`) → `docs/DATABASE_SCHEMA.md`
+**Un changement de schéma s'écrit à deux endroits** : dans le `CREATE TABLE` (`database/schema/`, bases neuves) **et** en `ALTER TABLE` tolérant dans `RECENT_SCHEMA_CHANGES` (bases existantes, où `CREATE TABLE IF NOT EXISTS` ne fait rien) — la seconde entrée se retire une fois jouée partout.
 
 ### Tournament Engine (`lib/server/tournaments-service.ts`) → `INDEX.md` § Moteur
 Formats `SINGLE`, `DOUBLE`, `SWISS`, `SURVIVAL`, `MULTI`, `BG_SURVIE`. États `UPCOMING → REGISTRATION → RUNNING → FINISHED` ; matchs `PENDING → READY → AWAITING_CONFIRMATION → COMPLETED` ; positions `UPPER`/`LOWER`/`GRAND`. Les modes à classement **rejouent** tout depuis l'historique des matchs (rien n'est accumulé). Une transaction qui lit puis écrit les inscrites prend `lockTournamentRow` **en toute première instruction** (sous `REPEATABLE READ`, une lecture avant le verrou fige un état périmé).

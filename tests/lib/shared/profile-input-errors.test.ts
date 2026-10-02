@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { PROFILE_INPUT_ERRORS, isProfileInputError } from "@/lib/shared/profile-input-errors";
 import { profileErrorMessage } from "@/app/(secured)/profil/profile-errors";
+import { readSource } from "../../helpers/read-source";
 
 const ROOT = join(__dirname, "..", "..", "..");
 
@@ -29,7 +30,7 @@ describe("PROFILE_INPUT_ERRORS", () => {
     // Tout code levé par le service est soit un refus de saisie de la liste,
     // soit l'un des conflits d'état que la route rend en 409 : un troisième
     // genre ressortirait en code générique.
-    const source = readFileSync(join(ROOT, "lib", "server", "users-service.ts"), "utf8").replace(/\r\n/g, "\n");
+    const source = readSource("lib/server/users/profile-update.ts");
     const start = source.indexOf("export async function updateOwnProfile(");
     // La fonction se ferme sur la première accolade en colonne 0.
     const end = source.indexOf("\n}\n", start);

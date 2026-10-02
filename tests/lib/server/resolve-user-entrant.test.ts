@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/solo-entries-service");
 
 import { resolveUserEntrant, resolveUserEntrantTeamId } from "@/lib/server/tournaments/registration";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { findSoloEntry } from "@/lib/server/solo-entries-service";
 import type { TeamRole } from "@/lib/shared/types";
 

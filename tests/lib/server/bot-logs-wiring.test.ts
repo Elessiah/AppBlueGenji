@@ -5,7 +5,7 @@ jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/tournaments/bot-logs");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/byes");
 jest.mock("@/lib/server/tournaments/state");
 
@@ -14,7 +14,7 @@ import { finalizeMatch, reportMatchScore } from "@/lib/server/tournaments/scorin
 import { finishTournament } from "@/lib/server/tournaments/repository";
 import { finalizeUnderfilledTournament } from "@/lib/server/tournaments/finalization";
 import { registerCurrentUserTeam, registerTeamsByIds } from "@/lib/server/tournaments/registration";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";

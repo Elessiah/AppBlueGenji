@@ -3,24 +3,17 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
 jest.mock("@/lib/server/user-avatar-import");
-jest.mock("@/lib/server/users-service", () => {
-  const actual = jest.requireActual<typeof import("@/lib/server/users-service")>(
-    "@/lib/server/users-service",
-  );
-  return {
-    // Les deux normalisations restent **les vraies** : ce sont elles qui
-    // décident de la forme de l'écriture (tag publiable ou non, BattleTag ou
-    // non), donc du nombre de variantes à garder.
-    normalizeDiscordHandle: actual.normalizeDiscordHandle,
-    normalizeBattletag: actual.normalizeBattletag,
-    createDiscordLoginChallenge: jest.fn(),
-    consumeDiscordChallenge: jest.fn(),
-    discardDiscordChallenge: jest.fn(),
-    // La copie de la photo est hors sujet ici, et elle est déjà avalée par
-    // `linkOAuthIdentity` : un bouchon suffit.
-    adoptRemoteAvatar: jest.fn(async () => undefined),
-  };
-});
+// Les deux normalisations (`users/tag-normalization`) restent **les vraies** :
+// ce sont elles qui décident de la forme de l'écriture (tag publiable ou non,
+// BattleTag ou non), donc du nombre de variantes à garder.
+jest.mock("@/lib/server/users/discord-challenges", () => ({
+  createDiscordLoginChallenge: jest.fn(),
+  consumeDiscordChallenge: jest.fn(),
+  discardDiscordChallenge: jest.fn(),
+}));
+// La copie de la photo est hors sujet ici, et elle est déjà avalée par
+// `linkOAuthIdentity` : un bouchon suffit.
+jest.mock("@/lib/server/users/sign-in", () => ({ adoptRemoteAvatar: jest.fn(async () => undefined) }));
 
 import { linkOAuthIdentity, type OAuthIdentity } from "@/lib/server/account-identities";
 import { startDiscordVerification } from "@/lib/server/discord-verification";

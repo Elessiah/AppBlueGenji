@@ -7,11 +7,13 @@ jest.mock("@/lib/server/account-suspensions", () => {
   );
   return { ...actual, assertIdentityNotSuspended: jest.fn(async () => undefined) };
 });
-jest.mock("@/lib/server/users-service", () => ({
+jest.mock("@/lib/server/users/sign-in", () => ({
   adoptRemoteAvatar: jest.fn(),
   createOrGetBlizzardUser: jest.fn(),
   createOrGetDiscordUser: jest.fn(),
   createOrGetGoogleUser: jest.fn(),
+}));
+jest.mock("@/lib/server/users/tag-normalization", () => ({
   normalizeBattletag: (raw: string | null | undefined) => {
     const trimmed = (raw ?? "").trim();
     return trimmed.length === 0 ? null : trimmed.slice(0, 64);
@@ -31,7 +33,7 @@ import {
   createOrGetBlizzardUser,
   createOrGetDiscordUser,
   createOrGetGoogleUser,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/sign-in";
 import {
   createOrGetOAuthUser,
   linkOAuthIdentity,

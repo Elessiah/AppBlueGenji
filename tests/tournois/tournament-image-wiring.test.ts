@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readDatabaseSource } from "../helpers/read-source";
 
 /**
  * Câblage de l'image d'un tournoi, là où une panne serait **muette** : une
@@ -38,7 +39,7 @@ describe("lectures d'une carte de tournoi", () => {
 });
 
 describe("schéma", () => {
-  const database = read("lib/server/database.ts");
+  const database = readDatabaseSource();
 
   it("déclare les colonnes pour une base neuve et les ajoute à une base qui tourne", () => {
     const create = database.match(/CREATE TABLE IF NOT EXISTS bg_tournaments \(([\s\S]*?)\) ENGINE/);

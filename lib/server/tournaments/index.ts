@@ -11,7 +11,7 @@ import type {
   TournamentViewerContext,
 } from "@/lib/shared/types";
 import { getDatabase, withConnection, type SqlParams } from "@/lib/server/database";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { isSoloTournament, toParticipantType, type ParticipantType } from "@/lib/shared/participants";
 import {

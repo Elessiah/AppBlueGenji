@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/database");
 
-import { updateOwnProfile } from "@/lib/server/users-service";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { PSEUDO_MAX_LENGTH } from "@/lib/shared/pseudo";
 import { fakePool } from "../../helpers/sql-double";
 

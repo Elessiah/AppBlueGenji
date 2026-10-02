@@ -7,7 +7,7 @@ import {
 import { resolveDiscordUser, sendDiscordLoginCode } from "@/lib/server/bot-integration";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
-import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users-service";
+import { createDiscordLoginChallenge, discardDiscordChallenge } from "@/lib/server/users/discord-challenges";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 
 function mapRequestError(message: string): { code: string; status: number } {

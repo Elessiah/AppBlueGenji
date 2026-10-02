@@ -279,7 +279,7 @@ All test data uses specific prefixes for easy filtering:
 
 ## 📂 Files Generated
 
-- `lib/server/seed.ts` - Main seed script with tournament generation
+- `lib/server/seed/main.ts` - Main seed script (`seed/tournaments.ts`: tournament generation)
 - `lib/server/seed-view.ts` - Utility to view test data
 - `TOURNAMENTS_TEST_DATA.md` - This file
 - `TEST_DATA_SETUP.md` - General setup guide

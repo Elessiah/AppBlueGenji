@@ -4,11 +4,8 @@ import { ACCOUNT_SUSPENDED } from "@/lib/shared/account-suspension";
 import { DISCORD_CODE_VERIFY_RULE, enforceRateLimit, requestClientIp } from "@/lib/server/api-guard";
 import { fail, ok } from "@/lib/server/http";
 import { rejectCrossSiteRequest } from "@/lib/server/request-origin";
-import {
-  consumeDiscordLoginChallenge,
-  createOrGetDiscordUser,
-  isDiscordChallengeToken,
-} from "@/lib/server/users-service";
+import { consumeDiscordLoginChallenge, isDiscordChallengeToken } from "@/lib/server/users/discord-challenges";
+import { createOrGetDiscordUser } from "@/lib/server/users/sign-in";
 import { TERMS_REQUIRED } from "@/lib/shared/terms-of-use";
 import { SMALL_JSON_BODY_MAX_BYTES, readJsonBody } from "@/lib/server/request-body";
 

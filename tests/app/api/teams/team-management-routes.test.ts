@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/detail");
+jest.mock("@/lib/server/teams/directory");
+jest.mock("@/lib/server/teams/dissolution");
+jest.mock("@/lib/server/teams/identity");
+jest.mock("@/lib/server/teams/invitations");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/ghost-teams-service");
 jest.mock("@/lib/server/solo-entries-service");
 
@@ -12,16 +17,10 @@ import { PATCH as teamPatch } from "@/app/api/teams/[id]/route";
 import { POST as teamCreate } from "@/app/api/teams/route";
 import { POST as transferPost } from "@/app/api/teams/[id]/transfer-ownership/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import {
-  cancelInvitation,
-  createTeam,
-  getTeamDetail,
-  inviteToTeam,
-  listTeamPendingInvitations,
-  removeTeamMember,
-  transferTeamOwnership,
-  updateTeamMeta,
-} from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { createTeam, updateTeamMeta } from "@/lib/server/teams/identity";
+import { cancelInvitation, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams/invitations";
+import { removeTeamMember, transferTeamOwnership } from "@/lib/server/teams/roster";
 import { authUser } from "../../../helpers/auth-user";
 import { teamDetailResponse } from "../../../helpers/team-detail";
 

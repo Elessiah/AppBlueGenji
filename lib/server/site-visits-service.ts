@@ -348,7 +348,7 @@ async function rollUpExpiredSiteVisitsNow(): Promise<number> {
     try {
       // Aucune ligne ne part sans que son empreinte soit au total des visiteurs
       // uniques : `rememberVisitor` peut avoir échoué, ou la reprise du
-      // démarrage (`database.ts`) ne pas avoir abouti — sans ce report, ces
+      // démarrage (`database/data-migrations.ts`) ne pas avoir abouti — sans ce report, ces
       // visiteurs disparaîtraient du total avec leur détail, pour toujours.
       await connection.execute(
         `INSERT INTO bg_site_visitors (visitor_key, authenticated, last_seen_at)

@@ -18,7 +18,7 @@ import {
   createOrGetBlizzardUser,
   createOrGetDiscordUser,
   createOrGetGoogleUser,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/sign-in";
 import { fakePool } from "../../helpers/sql-double";
 
 /**

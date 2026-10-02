@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { setUserRoles } from "@/lib/server/users-service";
+import { setUserRoles } from "@/lib/server/users/roles";
 import { can, isPlatformRole } from "@/lib/shared/permissions";
 import { readJsonBody } from "@/lib/server/request-body";
 

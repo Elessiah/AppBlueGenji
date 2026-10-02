@@ -398,7 +398,7 @@ elle n'a pas de lecteur à qui faire exception.
 Une valeur stockée demande un **rattrapage**, et pas seulement une règle à
 l'écriture : les entrées solo créées avant cette passe portaient déjà la copie,
 et rien ne les aurait réécrites avant la prochaine inscription ou la prochaine
-édition de profil de leur joueur. `lib/server/database.ts` vide donc ces
+édition de profil de leur joueur. `lib/server/database/catch-ups.ts` vide donc ces
 logos-là au démarrage, en une écriture idempotente rejouée à chaque fois — un
 filet, pas une migration à cocher. Le chemin inverse (l'avatar redevient public)
 est tenu par `syncSoloEntryIdentity`, appelé sur la bascule du réglage.
@@ -930,7 +930,7 @@ juge.
 Une **équipe fantôme** (`bg_teams.is_ghost`) est une équipe sans joueur, créée
 par le staff `tournaments` pour remplir un plateau ou inviter une structure.
 C'est la seule dérogation d'administration sur une équipe, portée par le
-paramètre `viewerManagesGhostTeams` des fonctions de `teams-service` :
+paramètre `viewerManagesGhostTeams` des fonctions de `lib/server/teams/` :
 
 - ✅ le staff `tournaments` crée, renomme, logote, inscrit en lot et dissout une
   équipe **fantôme** sans en être membre ;

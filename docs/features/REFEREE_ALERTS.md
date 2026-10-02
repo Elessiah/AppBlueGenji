@@ -288,7 +288,7 @@ que sur ce qui a **déjà défait la transaction** — un interblocage, qu'InnoD
 règle en annulant la transaction entière : l'avaler laisserait le moteur
 poursuivre et commiter sur une écriture qui n'existe plus, et rendre un 200 pour
 un report de score disparu (`lib/server/mysql-errors.ts`). Tout le reste — table
-absente parce que la migration de `database.ts` avale ses erreurs, verrou dépassé
+absente parce que la migration de `database/schema/notifications.ts` avale ses erreurs, verrou dépassé
 (qui n'annule que la requête) — est absorbé : cela ne doit pas faire échouer le
 report de score ni le balayage qui l'a appelé. Le **conflit** part alors quand
 même, sans marque : c'est une alerte par report, donc une par action d'un joueur,
@@ -344,7 +344,7 @@ Rien de tout cela ne peut faire échouer une transaction du moteur.
 | Réservation du conflit, effacement à l'arbitrage | `lib/server/tournaments/scoring.ts` |
 | Transport vers le bot | `lib/server/bot-integration.ts` (`pushRefereeAlert`) |
 | Lien vers la page d'un tournoi | `lib/server/tournaments/app-url.ts` |
-| Table de réservation | `bg_referee_alerts` (`lib/server/database.ts`) |
+| Table de réservation | `bg_referee_alerts` (`lib/server/database/schema/notifications.ts`) |
 | Effacement à la suppression d'un tournoi | `lib/server/tournaments/deletion.ts` |
 | Erreurs MySQL qu'on a le droit d'ignorer | `lib/server/mysql-errors.ts` |
 

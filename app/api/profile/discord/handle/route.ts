@@ -26,7 +26,7 @@ import {
   startDiscordHandleUpdate,
 } from "@/lib/server/discord-verification";
 import { readJsonBody } from "@/lib/server/request-body";
-import { isDiscordChallengeToken } from "@/lib/server/users-service";
+import { isDiscordChallengeToken } from "@/lib/server/users/discord-challenges";
 
 /** Codes de refus et leur statut — les mêmes que la certification. */
 function discordHandleStatusFor(message: string): number {

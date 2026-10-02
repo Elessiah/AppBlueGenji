@@ -21,7 +21,7 @@ jest.mock("@/lib/server/auth");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 
-import { createOrGetGoogleUser, type GoogleProfilePayload } from "@/lib/server/users-service";
+import { createOrGetGoogleUser, type GoogleProfilePayload } from "@/lib/server/users/sign-in";
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo } from "@/lib/server/auth";

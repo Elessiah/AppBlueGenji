@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { listTeams } from "@/lib/server/teams-service";
+import { listTeams } from "@/lib/server/teams/directory";
 import { getTeamEntityStats } from "@/lib/server/stats-service";
 import { getTeamRankingPosition, loadTeamRanking } from "@/lib/server/ranking-service";
 import { getLandingLeaderboard } from "@/lib/server/landing-service";

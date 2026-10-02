@@ -99,7 +99,7 @@ All 8 teams are seeded 1-8 based on their registration order:
 
 ## Customizing the Seed
 
-To modify the test data, edit `lib/server/seed.ts`:
+To modify the test data, edit the modules of `lib/server/seed/`:
 
 ### Change Number of Teams
 Modify `FICTIONAL_TEAMS` array in the seed file and update the bracket generation function.

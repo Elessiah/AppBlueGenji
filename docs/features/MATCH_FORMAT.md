@@ -166,7 +166,7 @@ renseigné (`INVALID_MATCH_FORMAT`) plutôt que d'écrire une contrainte bancale
 
 ## Jeu de test
 
-`npm run seed` couvre trois cas (`lib/server/seed-cases.ts`) : un BO5 en
+`npm run seed` couvre trois cas (`lib/server/seed/cases.ts`) : un BO5 en
 élimination simple, un FT3 en ronde suisse, un BO3 en survie terminée. Le
 simulateur de matchs du seed lit l'objectif du tournoi, de sorte que les scores
 générés sont toujours saisissables dans l'interface.
@@ -177,7 +177,7 @@ générés sont toujours saisissables dans l'interface.
 |---|---|
 | Logique pure (validation, libellés, contrôles) | `lib/shared/match-format.ts` |
 | Format applicable à une manche (BG Survie en joue deux) | `lib/shared/bg-survie.ts`, `lib/server/tournaments/repository.ts` |
-| Migration des colonnes | `lib/server/database.ts` |
+| Migration des colonnes | `lib/server/database/` (`schema/tournaments.ts`) |
 | Création du tournoi | `app/api/tournaments/route.ts`, `lib/server/tournaments/index.ts` |
 | Garde-fou report d'équipe | `lib/server/tournaments/scoring.ts` |
 | Garde-fou arbitrage | `lib/server/tournaments/admin.ts` |

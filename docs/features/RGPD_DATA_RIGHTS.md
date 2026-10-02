@@ -35,7 +35,7 @@ affichées dans le tableau « Données collectées ») :
   (TTL absolu fixé dans `createSession`, jamais rafraîchi) — et non « après
   30 jours d'inactivité ».
 - **Suppression de compte** : deux gestes, décidés par `deleteOwnAccount`
-  (`lib/server/users-service.ts`, règle pure `lib/shared/account-deletion.ts`)
+  (`lib/server/users/account-deletion.ts`, règle pure `lib/shared/account-deletion.ts`)
   selon ce que le compte laisse derrière lui. Un compte qui n'a **joué aucun
   match**, n'a aucune **entrée solo inscrite** à un tournoi, n'**organise** aucun
   tournoi et ne **possède** aucune équipe vivante est **effacé** : sa ligne
@@ -66,7 +66,7 @@ affichées dans le tableau « Données collectées ») :
 
 - **Route** : `GET /api/profile/export` — réservée au **propriétaire** du compte
   (`getCurrentUser`). N'exporte jamais les données d'un tiers.
-- **Service** : `exportOwnData(userId)` dans `lib/server/users-service.ts`.
+- **Service** : `exportOwnData(userId)` dans `lib/server/users/data-export.ts`.
   Rassemble le compte et ses identifiants bruts (ID Discord et méthode de
   rattachement, tag et date de certification, identifiants Google et Blizzard),
   le profil et ses réglages de visibilité, les statistiques, l'historique
@@ -103,7 +103,7 @@ aussi un résumé en message privé. Déclencher = ajouter une entrée à
 | `components/cyber/RgpdConsentModal.tsx` | Popup de consentement |
 | `app/connexion/_components/LoginForm.tsx` | Montage de l'information d'entrée et des conditions d'utilisation avant login |
 | `app/api/profile/export/route.ts` | Endpoint d'export RGPD |
-| `lib/server/users-service.ts` | `exportOwnData()` / `deleteOwnAccount()` |
+| `lib/server/users/data-export.ts`, `users/account-deletion.ts` | `exportOwnData()` / `deleteOwnAccount()` |
 | `app/(secured)/profil/page.tsx` | Bouton d'export + mentions OW/Marvel |
 | `lib/shared/privacy-changes.ts` | Registre des changements du traitement |
 | `components/privacy/PrivacyChangesModal.tsx` | Modale d'information sur les changements |

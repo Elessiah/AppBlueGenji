@@ -1,6 +1,6 @@
 import type { RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { deleteOwnAccount } from "@/lib/server/users-service";
+import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import {
   replayDecision,
   type AccountDeletionEntry,

@@ -196,7 +196,7 @@ match casté. `ADMIN` a tout.
 
 ## Jeu de test
 
-`npm run seed` produit cinq cas (`lib/server/seed-cases.ts`, champ `live`) :
+`npm run seed` produit cinq cas (`lib/server/seed/cases.ts`, champ `live`) :
 
 - **Live Auto (à l'antenne)** — chaîne officielle + matchs en `AUTO` : le cas
   nominal du bouton d'accueil.

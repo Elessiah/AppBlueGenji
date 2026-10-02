@@ -7,21 +7,22 @@ jest.mock("@/lib/server/account-suspensions", () => {
   );
   return { ...actual, assertIdentityNotSuspended: jest.fn(async () => undefined) };
 });
-jest.mock("@/lib/server/users-service", () => {
-  const actual = jest.requireActual<typeof import("@/lib/server/users-service")>(
-    "@/lib/server/users-service",
+jest.mock("@/lib/server/users/discord-challenges", () => {
+  const actual = jest.requireActual<typeof import("@/lib/server/users/discord-challenges")>(
+    "@/lib/server/users/discord-challenges",
   );
   return {
     consumeDiscordLoginChallenge: jest.fn(),
-    createOrGetDiscordUser: jest.fn(),
     // La forme du jeton est la vraie règle : la simuler la rendrait décorative.
     isDiscordChallengeToken: actual.isDiscordChallengeToken,
   };
 });
+jest.mock("@/lib/server/users/sign-in", () => ({ createOrGetDiscordUser: jest.fn() }));
 
 import { POST } from "@/app/api/auth/discord/verify/route";
 import { createSession } from "@/lib/server/auth";
-import { consumeDiscordLoginChallenge, createOrGetDiscordUser } from "@/lib/server/users-service";
+import { consumeDiscordLoginChallenge } from "@/lib/server/users/discord-challenges";
+import { createOrGetDiscordUser } from "@/lib/server/users/sign-in";
 import { DISCORD_CODE_VERIFY_RULE } from "@/lib/server/api-guard";
 import { resetRateLimit } from "@/lib/server/rate-limit";
 import { AccountSuspendedError, assertIdentityNotSuspended } from "@/lib/server/account-suspensions";

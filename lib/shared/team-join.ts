@@ -2,7 +2,7 @@ import type { TeamRole } from "@/lib/shared/types";
 
 /**
  * Règles pures d'une arrivée dans une équipe (`acceptIntoTeam`,
- * `lib/server/teams-service.ts`), séparées de la transaction qui les applique.
+ * `lib/server/teams/invitations.ts`), séparées de la transaction qui les applique.
  */
 
 /**

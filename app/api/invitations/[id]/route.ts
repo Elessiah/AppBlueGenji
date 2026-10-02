@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
-import { cancelInvitation, respondToInvitation } from "@/lib/server/teams-service";
+import { cancelInvitation, respondToInvitation } from "@/lib/server/teams/invitations";
 import { JOIN_CONFLICTS } from "@/lib/server/team-invite-roles";
 import { readJsonBody } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";

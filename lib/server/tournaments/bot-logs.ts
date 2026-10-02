@@ -588,7 +588,7 @@ export function dropQueuedRefereeAlerts(connection: PoolConnection, matchId: num
  * Une notification est au meilleur effort de bout en bout, et le moteur ne doit
  * pas rendre un 500 sur un report de score parce qu'un `INSERT` d'alerte a
  * heurté un verrou — ou parce que la table manque, la migration de
- * `database.ts` avalant ses erreurs. En cas d'échec on renonce à alerter, ce
+ * `database/schema/notifications.ts` avalant ses erreurs. En cas d'échec on renonce à alerter, ce
  * qui est exactement l'état d'avant cette fonctionnalité.
  *
  * @returns `true` si la réservation est acquise **et** l'entrée mise en file.

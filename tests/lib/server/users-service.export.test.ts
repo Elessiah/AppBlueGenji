@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { exportOwnData } from "@/lib/server/users-service";
+import { exportOwnData } from "@/lib/server/users/data-export";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/content-reports", () => ({

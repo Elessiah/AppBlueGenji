@@ -121,7 +121,7 @@ npm run seed:view
 ```
 
 ### Manual Database Editing
-For detailed customization, edit `lib/server/seed.ts`:
+For detailed customization, edit the modules of `lib/server/seed/`:
 
 **Increase number of teams:**
 ```typescript
@@ -181,7 +181,7 @@ Then run `npm run seed` again to apply changes.
 
 ## 📝 Files Created
 
-- `lib/server/seed.ts` - Main seed script
+- `lib/server/seed/main.ts` - Main seed script (modules under `lib/server/seed/`)
 - `lib/server/seed-view.ts` - Data viewing script
 - `SEED_TESTING.md` - Detailed seeding documentation
 - `TEST_DATA_SETUP.md` - This file

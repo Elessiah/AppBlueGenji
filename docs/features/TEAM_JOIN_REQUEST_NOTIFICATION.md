@@ -12,7 +12,7 @@ pour y répondre**.
 | --- | --- |
 | Règle pure (destinataires, borne, message) | `lib/shared/team-join-request-notice.ts` |
 | Lecture et envoi | `lib/server/team-join-notifications.ts` |
-| Point de départ | `requestToJoinTeam` (`lib/server/teams-service.ts`) |
+| Point de départ | `requestToJoinTeam` (`lib/server/teams/invitations.ts`) |
 | Transport | `pushDiscordDirectMessages` → `POST /internal/notify/dm` (bot, route existante) |
 
 ## Qui reçoit

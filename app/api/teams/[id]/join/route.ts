@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { getTeamDetail, requestToJoinTeam } from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { requestToJoinTeam } from "@/lib/server/teams/invitations";
 import { JOIN_CONFLICTS } from "@/lib/server/team-invite-roles";
 
 export async function POST(_: Request, context: { params: Promise<{ id: string }> }) {

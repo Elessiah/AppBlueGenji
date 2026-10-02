@@ -2,19 +2,13 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
-jest.mock("@/lib/server/users-service", () => {
-  const actual = jest.requireActual<
-    typeof import("@/lib/server/users-service")
-  >("@/lib/server/users-service");
-  return {
-    // La vraie : c'est elle qui décide qu'un identifiant numérique n'est pas un
-    // pseudo.
-    normalizeDiscordHandle: actual.normalizeDiscordHandle,
-    createDiscordLoginChallenge: jest.fn(),
-    consumeDiscordLoginChallenge: jest.fn(),
-    discardDiscordChallenge: jest.fn(),
-  };
-});
+// `normalizeDiscordHandle` (`users/tag-normalization`) reste la vraie : c'est
+// elle qui décide qu'un identifiant numérique n'est pas un pseudo.
+jest.mock("@/lib/server/users/discord-challenges", () => ({
+  createDiscordLoginChallenge: jest.fn(),
+  consumeDiscordLoginChallenge: jest.fn(),
+  discardDiscordChallenge: jest.fn(),
+}));
 
 import {
   confirmDiscordHandleUpdate,
@@ -29,7 +23,7 @@ import {
   consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
   discardDiscordChallenge,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/discord-challenges";
 import { fakePool } from "../../helpers/sql-double";
 
 /**

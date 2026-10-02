@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
 
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/state");
 jest.mock("@/lib/server/tournaments/byes");
 
 import { reportMatchScore } from "@/lib/server/tournaments/scoring";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { syncTournamentState } from "@/lib/server/tournaments/state";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";

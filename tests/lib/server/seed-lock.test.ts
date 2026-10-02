@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Pool } from "mysql2/promise";
 import { NamedLockUnavailableError } from "@/lib/server/named-lock";
-import { SEED_LOCK_NAME, SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "@/lib/server/seed-lock";
+import { SEED_LOCK_NAME, SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "@/lib/server/seed/lock";
 
 /**
  * Deux `npm run seed` lancés ensemble sur la même base s'effaçaient l'un
@@ -109,8 +109,8 @@ describe("withSeedLock", () => {
   });
 });
 
-describe("seed.ts", () => {
-  const source = readFileSync(join(process.cwd(), "lib", "server", "seed.ts"), "utf8");
+describe("seed/main.ts", () => {
+  const source = readFileSync(join(process.cwd(), "lib", "server", "seed", "main.ts"), "utf8");
 
   it("efface et régénère sous le verrou, jamais avant de l'avoir pris", () => {
     expect(source).toMatch(/withSeedLock\(\s*db,\s*\(\) => seed\(db\)/);

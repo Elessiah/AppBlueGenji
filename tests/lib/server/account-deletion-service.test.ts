@@ -5,7 +5,7 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 
-import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users-service";
+import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
 import { getDatabase } from "@/lib/server/database";
 import { deleteStoredImage } from "@/lib/server/image-upload";
 import { syncSoloEntryIdentityOn } from "@/lib/server/solo-entries-service";

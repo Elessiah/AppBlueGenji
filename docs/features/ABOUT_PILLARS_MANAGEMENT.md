@@ -18,7 +18,7 @@ Pour les visiteurs non-admins (et anonymes), la section reste en lecture seule.
 
 ## Modèle de données
 
-Table `bg_about_pillars` (migration auto dans `lib/server/database.ts`) :
+Table `bg_about_pillars` (migration auto dans `lib/server/database/schema/showcase.ts`) :
 
 | Colonne         | Type          | Notes                                   |
 | --------------- | ------------- | ---------------------------------------- |

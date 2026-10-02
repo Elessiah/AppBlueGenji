@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/teams-service");
+jest.mock("@/lib/server/teams/detail");
+jest.mock("@/lib/server/teams/dissolution");
+jest.mock("@/lib/server/teams/identity");
 jest.mock("@/lib/server/solo-entries-service");
 
 import { GET as teamDetailRoute } from "@/app/api/teams/[id]/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getTeamDetail } from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
 import { findSoloEntryUser } from "@/lib/server/solo-entries-service";
 import { authUser } from "../../../helpers/auth-user";
 import { teamDetailResponse } from "../../../helpers/team-detail";

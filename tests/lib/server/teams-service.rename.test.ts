@@ -5,7 +5,7 @@ jest.mock("@/lib/server/terms-acceptance", () =>
 );
 jest.mock("@/lib/server/database");
 
-import { updateTeamMeta } from "@/lib/server/teams-service";
+import { updateTeamMeta } from "@/lib/server/teams/identity";
 import { assertTeamNameAvailable, isTeamNameConflict } from "@/lib/server/team-tags";
 import { getDatabase } from "@/lib/server/database";
 import { type SqlMock, fakePool } from "../../helpers/sql-double";

@@ -7,7 +7,7 @@
  * simple remplissage de bracket. Elle porte `bg_teams.is_ghost = 1` et n'a
  * **aucun membre** — c'est ce qui la distingue d'une équipe réelle, et ce qui
  * permet au staff de l'administrer sans en être propriétaire (voir
- * `teams-service.ts`, paramètre `viewerManagesGhostTeams`).
+ * `teams/access.ts`, paramètre `viewerManagesGhostTeams`).
  *
  * Cycle de vie : création par le staff → inscription à un tournoi →
  * éventuellement reprise par un joueur réel (`claimGhostTeam` propose, le

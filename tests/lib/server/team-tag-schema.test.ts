@@ -1,8 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { bulkTeamTag } from "@/lib/server/seed-cases";
+import { bulkTeamTag } from "@/lib/server/seed/cases";
 import { checkTeamTag } from "@/lib/shared/team-tag";
+import { readDatabaseSource } from "../../helpers/read-source";
 
 /**
  * Le sigle **dans le schéma**, et les sigles que produit le jeu de test.
@@ -28,7 +29,7 @@ function source(relative: string): string {
 }
 
 describe("sigle d'équipe dans le schéma (lib/server/database.ts)", () => {
-  const sql = source(join("lib", "server", "database.ts"));
+  const sql = readDatabaseSource();
   const teamsTable = sql.slice(
     sql.indexOf("CREATE TABLE IF NOT EXISTS bg_teams"),
     sql.indexOf("CREATE TABLE IF NOT EXISTS bg_team_members"),
@@ -55,9 +56,9 @@ describe("sigle d'équipe dans le schéma (lib/server/database.ts)", () => {
 });
 
 describe("sigles du jeu de test", () => {
-  const seed = source(join("lib", "server", "seed.ts"));
+  const seed = source(join("lib", "server", "seed", "teams.ts"));
 
-  /** Sigles écrits à la main dans `seed.ts` (`tag: "XXXX"`). */
+  /** Sigles écrits à la main dans `seed/teams.ts` (`tag: "XXXX"`). */
   const literals = [...seed.matchAll(/\btag:\s*"([^"]*)"/g)].map((match) => match[1]);
 
   it("en déclare autant que d'équipes nommées", () => {

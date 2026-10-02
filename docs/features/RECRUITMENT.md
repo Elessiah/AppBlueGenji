@@ -16,7 +16,7 @@ l'en-tête vitrine `PublicHeader`.
 
 ## Modèle de données
 
-Table `bg_recruitment_ads` (migration auto dans `lib/server/database.ts`) :
+Table `bg_recruitment_ads` (migration auto dans `lib/server/database/schema/showcase.ts`) :
 
 | Colonne         | Type                                   | Rôle |
 | --------------- | -------------------------------------- | ---- |
@@ -243,7 +243,7 @@ fait reparaître aussitôt. Aucun identifiant de personne (voir `/rgpd`).
 ### Migration
 
 La colonne `highlight` a été reportée puis retirée au démarrage
-(`lib/server/database.ts`) : `MODAL` → `PRIORITY`, `BANNER` → `IMPORTANT`, `NONE`
+(`lib/server/database/data-migrations.ts`) : `MODAL` → `PRIORITY`, `BANNER` → `IMPORTANT`, `NONE`
 → `OPTIONAL` (le défaut). Le report **consomme sa source** dans la même
 instruction (`highlight = 'NONE'` après lecture) : si le `DROP` qui suit échouait,
 le report rejoué au démarrage suivant ne trouverait plus rien et ne pourrait pas

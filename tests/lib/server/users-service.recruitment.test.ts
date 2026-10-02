@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { updateOwnProfile } from "@/lib/server/users-service";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");
