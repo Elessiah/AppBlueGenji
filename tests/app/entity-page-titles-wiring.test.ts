@@ -12,7 +12,7 @@ import { metadata as playersMetadata } from "@/app/(secured)/joueurs/layout";
 import { getCurrentUser } from "@/lib/server/auth";
 import { getDatabase } from "@/lib/server/database";
 import { getTeamPageIdentity } from "@/lib/server/teams/detail";
-import { getPlayerPageIdentity } from "@/lib/server/users-service";
+import { getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { SITE_TITLE_TEMPLATE } from "@/lib/shared/page-metadata";
 import { SITE_NAME } from "@/lib/shared/share-metadata";
 import { authUser } from "../helpers/auth-user";

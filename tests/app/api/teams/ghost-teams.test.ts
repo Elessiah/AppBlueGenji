@@ -1,22 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/teams/access");
-jest.mock("@/lib/server/teams/detail");
 jest.mock("@/lib/server/teams/directory");
-jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/identity");
-jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/ghost-teams-service");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users/roles");
 
 import { POST as createTeamRoute } from "@/app/api/teams/route";
 import { POST as claimRoute } from "@/app/api/teams/[id]/claim/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { createTeam } from "@/lib/server/teams/identity";
 import { claimGhostTeam, createGhostTeam } from "@/lib/server/ghost-teams-service";
-import { getUserIdByPseudo } from "@/lib/server/users-service";
+import { getUserIdByPseudo } from "@/lib/server/users/roles";
 import { authUser } from "../../../helpers/auth-user";
 
 const player = authUser({ id: 2, isAdmin: false, roles: [] });

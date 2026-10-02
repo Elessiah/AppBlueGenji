@@ -12,7 +12,8 @@ jest.mock("@/lib/server/stats-service");
 import { sendBotLog } from "@/lib/server/bot-integration";
 import { getDatabase } from "@/lib/server/database";
 import { ensureUniquePseudo } from "@/lib/server/auth";
-import { createOrGetBlizzardUser, normalizeBattletag } from "@/lib/server/users-service";
+import { createOrGetBlizzardUser } from "@/lib/server/users/sign-in";
+import { normalizeBattletag } from "@/lib/server/users/tag-normalization";
 import { fakePool } from "../../helpers/sql-double";
 
 /**

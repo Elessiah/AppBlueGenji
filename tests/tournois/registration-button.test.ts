@@ -1,12 +1,6 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/teams/access");
-jest.mock("@/lib/server/teams/detail");
-jest.mock("@/lib/server/teams/directory");
-jest.mock("@/lib/server/teams/dissolution");
-jest.mock("@/lib/server/teams/identity");
-jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/tournaments/registration-eligibility");

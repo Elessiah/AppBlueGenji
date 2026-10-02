@@ -23,7 +23,11 @@ import {
 import { createTeam, updateTeamLogo } from "@/lib/server/teams/identity";
 import { respondToInvitation } from "@/lib/server/teams/invitations";
 import { removeTeamMember, transferTeamOwnership, updateTeamMemberRoles } from "@/lib/server/teams/roster";
-import { createOrGetBlizzardUser, createOrGetDiscordUser, createOrGetGoogleUser } from "@/lib/server/users-service";
+import {
+  createOrGetBlizzardUser,
+  createOrGetDiscordUser,
+  createOrGetGoogleUser,
+} from "@/lib/server/users/sign-in";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 type Route = [RegExp, (params: unknown[]) => unknown];

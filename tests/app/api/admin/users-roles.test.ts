@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users/roles");
 
 import { POST } from "@/app/api/admin/users/[id]/roles/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import * as service from "@/lib/server/users-service";
+import * as service from "@/lib/server/users/roles";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });

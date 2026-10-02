@@ -10,12 +10,6 @@ import type { TournamentSnapshot } from "@/lib/shared/types";
  * a le droit de la recevoir.
  */
 jest.mock("@/lib/server/tournaments/snapshot");
-jest.mock("@/lib/server/teams/access");
-jest.mock("@/lib/server/teams/detail");
-jest.mock("@/lib/server/teams/directory");
-jest.mock("@/lib/server/teams/dissolution");
-jest.mock("@/lib/server/teams/identity");
-jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/preview-cache");
 jest.mock("@/lib/server/database");

@@ -1,20 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/database");
 
-import {
-  createOrGetBlizzardUser,
-  createOrGetDiscordUser,
-  getUserIdByPseudo,
-  setUserRoles,
-  updateOwnProfile,
-} from "@/lib/server/users-service";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
+import { getUserIdByPseudo, setUserRoles } from "@/lib/server/users/roles";
+import { createOrGetBlizzardUser, createOrGetDiscordUser } from "@/lib/server/users/sign-in";
 import { type SqlQuery, type SqlMock, fakePool } from "../../helpers/sql-double";
+import { readSources } from "../../helpers/read-source";
 
 /**
  * Ce qu'une ligne morte ne doit plus accepter ni fournir.
@@ -231,10 +226,7 @@ describe("connexions OAuth — une ligne supprimée ne reprend pas son identité
     // seules — l'anonymisation *pose* le drapeau, la migration de démarrage
     // rattrape des colonnes de visibilité, et le rapatriement d'avatars ne
     // sélectionne que des URL distantes, qu'une ligne anonymisée n'a plus.
-    const source = readFileSync(
-      join(__dirname, "..", "..", "..", "lib", "server", "users-service.ts"),
-      "utf8",
-    );
+    const source = readSources("lib/server/users");
     const writes = [...source.matchAll(/UPDATE bg_users\b[\s\S]{0,400}?`/g)].map((m) => m[0]);
     expect(writes.length).toBeGreaterThanOrEqual(5);
     for (const write of writes) {

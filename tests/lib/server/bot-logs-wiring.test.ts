@@ -5,12 +5,6 @@ jest.mock("@/lib/server/terms-acceptance", () =>
   jest.requireActual<typeof import("../../helpers/terms-acceptance-double")>("../../helpers/terms-acceptance-double").termsAcceptanceDouble(),
 );
 jest.mock("@/lib/server/tournaments/bot-logs");
-jest.mock("@/lib/server/teams/access");
-jest.mock("@/lib/server/teams/detail");
-jest.mock("@/lib/server/teams/directory");
-jest.mock("@/lib/server/teams/dissolution");
-jest.mock("@/lib/server/teams/identity");
-jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/tournaments/byes");
 jest.mock("@/lib/server/tournaments/state");

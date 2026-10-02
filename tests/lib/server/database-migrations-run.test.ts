@@ -823,7 +823,7 @@ describe("getDatabase — rattrapage des comptes supprimés", () => {
   async function runOnServer(reconcile: () => Promise<ReconcileResult>): Promise<jest.Mock<() => Promise<ReconcileResult>>> {
     const mock = jest.fn(reconcile);
     await jest.isolateModulesAsync(async () => {
-      jest.doMock("@/lib/server/users-service", () => ({ reconcileDeletedAccounts: mock }));
+      jest.doMock("@/lib/server/users/deleted-accounts", () => ({ reconcileDeletedAccounts: mock }));
       process.env.NEXT_RUNTIME = "nodejs";
       try {
         const fresh = await import("@/lib/server/database");

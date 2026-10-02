@@ -1,7 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/tournaments-service");
-jest.mock("@/lib/server/users-service");
 
 describe("GET /api/landing/stats", () => {
   beforeEach(() => {

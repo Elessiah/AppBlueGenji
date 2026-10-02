@@ -2,20 +2,14 @@ import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/bot-integration");
-jest.mock("@/lib/server/users-service", () => {
-  const actual = jest.requireActual<typeof import("@/lib/server/users-service")>(
-    "@/lib/server/users-service",
-  );
-  return {
-    // `normalizeDiscordHandle` reste **la vraie** : c'est elle qui décide qu'un
-    // identifiant numérique n'est pas un tag, et la remplacer par un bouchon
-    // ferait passer ce test sans rien prouver de la règle.
-    normalizeDiscordHandle: actual.normalizeDiscordHandle,
-    createDiscordLoginChallenge: jest.fn(),
-    consumeDiscordLoginChallenge: jest.fn(),
-    discardDiscordChallenge: jest.fn(),
-  };
-});
+// `normalizeDiscordHandle` (`users/tag-normalization`) reste **la vraie** :
+// c'est elle qui décide qu'un identifiant numérique n'est pas un tag, et la
+// remplacer par un bouchon ferait passer ce test sans rien prouver de la règle.
+jest.mock("@/lib/server/users/discord-challenges", () => ({
+  createDiscordLoginChallenge: jest.fn(),
+  consumeDiscordLoginChallenge: jest.fn(),
+  discardDiscordChallenge: jest.fn(),
+}));
 
 import {
   certifyLinkedDiscordTag,
@@ -29,7 +23,7 @@ import {
   consumeDiscordLoginChallenge,
   createDiscordLoginChallenge,
   discardDiscordChallenge,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/discord-challenges";
 import { fakePool } from "../../helpers/sql-double";
 
 /**

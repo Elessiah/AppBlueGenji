@@ -4,7 +4,7 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 
-import { updateOwnProfile } from "@/lib/server/users-service";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { getDatabase } from "@/lib/server/database";
 import { fakePool } from "../../helpers/sql-double";
 

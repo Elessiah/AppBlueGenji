@@ -9,7 +9,7 @@ import {
 } from "@/lib/server/connection-logs";
 import { CONNECTION_LOG_RETENTION_DAYS } from "@/lib/shared/connection-logs";
 import { type SqlQuery, fakePool } from "../../helpers/sql-double";
-import { readDatabaseSource } from "../../helpers/read-source";
+import { readDatabaseSource, readSources } from "../../helpers/read-source";
 
 jest.mock("@/lib/server/database");
 jest.mock("next/headers", () => ({ headers: jest.fn() }));
@@ -136,15 +136,12 @@ describe("journal des données de connexion (serveur)", () => {
 });
 
 describe("aucune suppression de compte n'efface le journal", () => {
-  it("la table n'a pas de clé étrangère et n'est effacée que par sa purge", async () => {
-    const fs = await import("node:fs");
-    const path = await import("node:path");
-    const root = path.resolve(__dirname, "../../..");
+  it("la table n'a pas de clé étrangère et n'est effacée que par sa purge", () => {
     const schema = readDatabaseSource();
     const table = schema.slice(schema.indexOf("CREATE TABLE IF NOT EXISTS bg_connection_logs"));
     expect(table.slice(0, table.indexOf(") ENGINE"))).not.toMatch(/FOREIGN KEY|REFERENCES/);
 
-    const users = fs.readFileSync(path.join(root, "lib/server/users-service.ts"), "utf8");
+    const users = readSources("lib/server/users");
     expect(users).not.toMatch(/DELETE FROM bg_connection_logs/);
   });
 });

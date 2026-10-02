@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
-import { removeUserAvatarAsModerator } from "@/lib/server/users-service";
+import { removeUserAvatarAsModerator } from "@/lib/server/users/avatar";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";
 
 jest.mock("@/lib/server/database");

@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users/account-deletion");
+jest.mock("@/lib/server/users/full-profile");
+jest.mock("@/lib/server/users/profile-update");
 
 import { GET, PATCH } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getFullProfile, updateOwnProfile } from "@/lib/server/users-service";
+import { getFullProfile } from "@/lib/server/users/full-profile";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { profilePatchRequest } from "../../../helpers/profile-request";
 import { authUser, fullProfileResponse } from "../../../helpers/auth-user";
 

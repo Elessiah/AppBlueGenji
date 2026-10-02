@@ -1,12 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/teams/access");
 jest.mock("@/lib/server/teams/detail");
 jest.mock("@/lib/server/teams/directory");
 jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/identity");
-jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/ghost-teams-service");
 jest.mock("@/lib/server/solo-entries-service");

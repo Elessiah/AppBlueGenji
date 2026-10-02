@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users/account-deletion");
+jest.mock("@/lib/server/users/full-profile");
+jest.mock("@/lib/server/users/profile-update");
 
 import { GET } from "@/app/api/profile/deletion/route";
 import { DELETE } from "@/app/api/profile/route";
 import { getCurrentUser } from "@/lib/server/auth";
 import { clearSession } from "@/lib/server/auth";
-import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users-service";
+import { deleteOwnAccount, getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
 import { authUser } from "../../../helpers/auth-user";
 
 /**

@@ -6,7 +6,7 @@ jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/account-deletion-journal");
 
-import { deleteOwnAccount } from "@/lib/server/users-service";
+import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { fakePool } from "../../helpers/sql-double";

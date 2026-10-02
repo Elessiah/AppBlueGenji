@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/database");
-jest.mock("@/lib/server/users-service");
+jest.mock("@/lib/server/users/account-deletion");
 
 import { replayAccountDeletions } from "@/lib/server/account-deletion-replay";
 import { getDatabase } from "@/lib/server/database";
-import { deleteOwnAccount } from "@/lib/server/users-service";
+import { deleteOwnAccount } from "@/lib/server/users/account-deletion";
 import type { AccountDeletionEntry } from "@/lib/shared/account-deletion-journal";
 import { fakePool } from "../../helpers/sql-double";
 

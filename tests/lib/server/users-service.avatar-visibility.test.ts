@@ -4,7 +4,8 @@ jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/avatar-rotation");
 
-import { updateOwnProfile, updateUserAvatar } from "@/lib/server/users-service";
+import { updateUserAvatar } from "@/lib/server/users/avatar";
+import { updateOwnProfile } from "@/lib/server/users/profile-update";
 import { getDatabase } from "@/lib/server/database";
 import { syncSoloEntryIdentity } from "@/lib/server/solo-entries-service";
 import { rotateHiddenAvatarFile } from "@/lib/server/avatar-rotation";

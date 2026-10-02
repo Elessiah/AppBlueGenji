@@ -8,12 +8,11 @@ jest.mock("@/lib/server/solo-entries-service");
 jest.mock("@/lib/server/stats-service");
 jest.mock("next/headers");
 
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
-import { createOrGetGoogleUser } from "@/lib/server/users-service";
+import { createOrGetGoogleUser } from "@/lib/server/users/sign-in";
 import { getDatabase } from "@/lib/server/database";
 import { buildGoogleAuthorizationUrl } from "@/lib/server/google-oauth";
 import { fakePool } from "../../helpers/sql-double";
+import { readSources } from "../../helpers/read-source";
 
 /**
  * **L'authentification ne dépend d'aucune adresse e-mail.**
@@ -34,8 +33,7 @@ import { fakePool } from "../../helpers/sql-double";
  * colonne absente passerait ici et n'échouerait qu'en production, sur **toutes**
  * les sessions à la fois.
  */
-const ROOT = join(__dirname, "..", "..", "..");
-const read = (relative: string) => readFileSync(join(ROOT, relative), "utf8");
+const read = (relative: string) => readSources(relative);
 
 type Query = { sql: string; params: unknown[] };
 
@@ -116,7 +114,7 @@ describe("Aucune requête du chemin d'authentification ne nomme la colonne", () 
   // tous les tests et n'échouerait qu'en production, sur toutes les sessions.
   it.each([
     "lib/server/auth.ts",
-    "lib/server/users-service.ts",
+    "lib/server/users",
     "lib/server/account-identities.ts",
     "lib/server/oauth-flow.ts",
     "lib/server/google-oauth.ts",

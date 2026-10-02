@@ -1,12 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/teams/access");
 jest.mock("@/lib/server/teams/detail");
-jest.mock("@/lib/server/teams/directory");
-jest.mock("@/lib/server/teams/dissolution");
-jest.mock("@/lib/server/teams/identity");
-jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 
 import { POST as transferRoute } from "@/app/api/teams/[id]/transfer-ownership/route";

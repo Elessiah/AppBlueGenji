@@ -1,13 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals";
 
 jest.mock("@/lib/server/auth");
-jest.mock("@/lib/server/users-service");
-jest.mock("@/lib/server/teams/access");
+jest.mock("@/lib/server/users/full-profile");
+jest.mock("@/lib/server/users/players");
 jest.mock("@/lib/server/teams/detail");
 jest.mock("@/lib/server/teams/directory");
 jest.mock("@/lib/server/teams/dissolution");
 jest.mock("@/lib/server/teams/identity");
-jest.mock("@/lib/server/teams/invitations");
 jest.mock("@/lib/server/teams/roster");
 jest.mock("@/lib/server/solo-entries-service");
 
@@ -18,7 +17,8 @@ import { GET as teamRoute } from "@/app/api/teams/[id]/route";
 import { DIRECTORY_READ_RULE } from "@/lib/server/api-guard";
 import { getCurrentUser } from "@/lib/server/auth";
 import { resetRateLimit } from "@/lib/server/rate-limit";
-import { getFullProfile, listPlayers } from "@/lib/server/users-service";
+import { getFullProfile } from "@/lib/server/users/full-profile";
+import { listPlayers } from "@/lib/server/users/players";
 import { getTeamDetail } from "@/lib/server/teams/detail";
 import { listTeams } from "@/lib/server/teams/directory";
 import { getUserActiveTeam } from "@/lib/server/teams/roster";

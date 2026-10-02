@@ -6,7 +6,7 @@ jest.mock("@/lib/server/stats-service");
 jest.mock("@/lib/server/image-upload");
 jest.mock("@/lib/server/account-deletion-journal");
 
-import { reconcileDeletedAccounts } from "@/lib/server/users-service";
+import { reconcileDeletedAccounts } from "@/lib/server/users/deleted-accounts";
 import { getDatabase } from "@/lib/server/database";
 import { recordAccountDeletion } from "@/lib/server/account-deletion-journal";
 import { ANONYMOUS_PSEUDOS } from "@/lib/shared/anonymous-pseudos";
