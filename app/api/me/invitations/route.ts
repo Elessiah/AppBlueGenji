@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { listUserInvitations } from "@/lib/server/teams-service";
+import { listUserInvitations } from "@/lib/server/teams/invitations";
 
 /** Invitations (INVITE) en attente adressées au joueur connecté. */
 export async function GET() {

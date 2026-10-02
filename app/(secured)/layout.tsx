@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { ArenaNav } from "@/components/arena-nav";
 import { AuthGate } from "./_shared/AuthGate";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";

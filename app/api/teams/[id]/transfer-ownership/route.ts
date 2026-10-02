@@ -1,7 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { TERMS_ACCEPTANCE_REQUIRED } from "@/lib/shared/terms-of-use";
-import { getTeamDetail, transferTeamOwnership } from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { transferTeamOwnership } from "@/lib/server/teams/roster";
 import { readJsonBody } from "@/lib/server/request-body";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string }> }) {

@@ -5,7 +5,7 @@ import { notifyTeamLogoRemoved } from "@/lib/server/logo-quarantine";
 import { readJsonBody } from "@/lib/server/request-body";
 import { validateModerationReasonBody } from "@/lib/shared/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
-import { removeTeamLogoAsModerator } from "@/lib/server/teams-service";
+import { removeTeamLogoAsModerator } from "@/lib/server/teams/identity";
 import { can } from "@/lib/shared/permissions";
 import { toDiskUploadPath } from "@/lib/shared/uploads";
 import { discordInline } from "@/lib/shared/discord-text";

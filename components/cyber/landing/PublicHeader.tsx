@@ -3,7 +3,7 @@ import Image from "next/image";
 import { AccountMenu } from "@/components/account-menu";
 import { CyberButton } from "@/components/cyber";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getUserActiveTeam } from "@/lib/server/teams-service";
+import { getUserActiveTeam } from "@/lib/server/teams/roster";
 import { PublicNavMenu } from "./PublicNavMenu";
 import styles from "./PublicHeader.module.css";
 

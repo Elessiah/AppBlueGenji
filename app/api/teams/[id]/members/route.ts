@@ -2,12 +2,9 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { TEAM_INVITE_ERROR_STATUS, TEAM_MEMBER_REMOVE_ERROR_STATUS, TEAM_MEMBER_ROLES_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
-import {
-  getTeamDetail,
-  inviteToTeam,
-  removeTeamMember,
-  updateTeamMemberRoles,
-} from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { inviteToTeam } from "@/lib/server/teams/invitations";
+import { removeTeamMember, updateTeamMemberRoles } from "@/lib/server/teams/roster";
 import { inviteRolesFromBody } from "@/lib/server/team-invite-roles";
 import { readJsonBody } from "@/lib/server/request-body";
 

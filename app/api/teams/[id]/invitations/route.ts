@@ -1,7 +1,8 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { TEAM_INVITE_ERROR_STATUS, parseTeamId, teamErrorStatus } from "@/lib/server/team-route-errors";
-import { getTeamDetail, inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams-service";
+import { getTeamDetail } from "@/lib/server/teams/detail";
+import { inviteToTeam, listTeamPendingInvitations } from "@/lib/server/teams/invitations";
 import { inviteRolesFromBody } from "@/lib/server/team-invite-roles";
 import { readJsonBody } from "@/lib/server/request-body";
 import { can } from "@/lib/shared/permissions";
