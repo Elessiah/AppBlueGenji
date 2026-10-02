@@ -12,6 +12,7 @@ const PANEL = "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx";
 const PANEL_CSS = "app/(secured)/tournois/[id]/_components/RegistrationsPanel.module.css";
 const DIALOG = "app/(secured)/tournois/[id]/_components/RemoveEntrantDialog.tsx";
 const SHELL = "app/(secured)/tournois/[id]/_components/TournamentDialogShell.tsx";
+const FRAME = "app/(secured)/tournois/[id]/_components/TournamentDialogFrame.tsx";
 
 /**
  * Retrait d'un engagé — le câblage de l'interface.
@@ -218,11 +219,15 @@ describe("Dialogue de confirmation", () => {
     // par Échap et verrou de défilement partagés — portés par la coquille
     // commune, que le dialogue nomme par ses identifiants.
     const shell = stripComments(read(SHELL));
-    expect(shell).toMatch(/createPortal\(/);
-    expect(shell).toMatch(/useDialogBehavior\(\{ open: mounted, onClose, locked: busy \}\)/);
-    expect(shell).toMatch(/aria-modal="true"/);
-    expect(shell).toMatch(/aria-labelledby=\{titleId\}/);
-    expect(shell).toMatch(/aria-describedby=\{summaryId\}/);
+    const frame = stripComments(read(FRAME));
+    expect(frame).toMatch(/createPortal\(/);
+    expect(frame).toMatch(/useDialogBehavior\(\{ open: mounted, onClose, locked: busy \}\)/);
+    expect(frame).toMatch(/aria-modal="true"/);
+    expect(frame).toMatch(/aria-labelledby=\{titleId\}/);
+    expect(frame).toMatch(/aria-describedby=\{describedBy\}/);
+    expect(shell).toMatch(/<TournamentDialogFrame/);
+    expect(shell).toMatch(/describedBy=\{summaryId\}/);
+    expect(shell).toMatch(/deferMount/);
     expect(dialog).toMatch(/<TournamentDialogShell/);
     expect(dialog).toMatch(/titleId="remove-entrant-title"/);
     expect(dialog).toMatch(/summaryId="remove-entrant-summary"/);

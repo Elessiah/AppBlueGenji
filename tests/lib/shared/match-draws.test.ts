@@ -18,7 +18,7 @@ import {
   PLAYOFF_ROUND_OFFSET,
   isEndurancePlayoffRound,
   tournamentMatchFormat,
-} from "@/lib/shared/bg-survie";
+} from "@/lib/shared/bg-survie/rounds";
 
 const FT3: MatchFormat = { type: "FT", value: 3 };
 const BO5: MatchFormat = { type: "BO", value: 5 };

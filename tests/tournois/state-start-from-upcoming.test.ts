@@ -8,7 +8,8 @@ jest.mock("@/lib/server/tournaments/byes");
 jest.mock("@/lib/server/tournaments/match-launch");
 jest.mock("@/lib/server/tournaments/swiss");
 jest.mock("@/lib/server/tournaments/survival");
-jest.mock("@/lib/server/tournaments/bg-survie");
+jest.mock("@/lib/server/tournaments/bg-survie/qualification");
+jest.mock("@/lib/server/tournaments/bg-survie/reconcile");
 jest.mock("@/lib/server/tournaments/phases");
 jest.mock("@/lib/server/tournaments/bot-logs");
 
@@ -34,8 +35,8 @@ import {
 import {
   generateEnduranceRound,
   initializeEnduranceTournament,
-  reconcileEndurance,
-} from "@/lib/server/tournaments/bg-survie";
+} from "@/lib/server/tournaments/bg-survie/qualification";
+import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { initializeMultiTournament, reconcilePhases } from "@/lib/server/tournaments/phases";
 import { queueBotLog } from "@/lib/server/tournaments/bot-logs";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";

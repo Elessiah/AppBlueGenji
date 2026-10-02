@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import type { MatchFormat } from "@/lib/shared/match-format";
-import { tournamentMatchFormat } from "@/lib/shared/bg-survie";
+import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import type { TournamentFormat } from "@/lib/shared/types";
 
 /**

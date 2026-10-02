@@ -347,7 +347,7 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
 
     const endurance =
       card.format === "BG_SURVIE"
-        ? await (await import("./bg-survie")).loadEnduranceMeta(connection, tournamentId)
+        ? await (await import("./bg-survie/meta")).loadEnduranceMeta(connection, tournamentId)
         : null;
 
     const loadSwiss = async () => {

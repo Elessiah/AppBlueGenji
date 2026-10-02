@@ -47,6 +47,8 @@ const sources = [...walk(join(ROOT, "app")), ...walk(join(ROOT, "components"))].
 // `aria-modal` et non `role="dialog"` : deux modales choisissent leur rôle à la
 // volée (`role={confirming ? "alertdialog" : "dialog"}`).
 const dialogs = sources.filter(({ src }) => /aria-modal/.test(src));
+/** Cadre commun de la fiche tournoi : sa couche lui vient de ceux qui l'emploient. */
+const FRAME = "app/(secured)/tournois/[id]/_components/TournamentDialogFrame.tsx";
 
 /**
  * Modales montées au niveau de `<body>` ou rendues dès le rendu serveur — un
@@ -135,12 +137,27 @@ describe("boutons flottants — sous toute modale", () => {
     expect(z).toBeGreaterThan(0);
   });
 
-  it.each<[string, number]>(dialogs.map((d) => [d.file, dialogLayer(d.file, d.src)]))(
-    "%s passe devant les boutons flottants",
-    (_file, layer) => {
-      for (const [, z] of floating) expect(layer).toBeGreaterThan(z);
-    },
+  it.each<[string, number]>(
+    dialogs.filter((d) => d.file !== FRAME).map((d) => [d.file, dialogLayer(d.file, d.src)]),
+  )("%s passe devant les boutons flottants", (_file, layer) => {
+    for (const [, z] of floating) expect(layer).toBeGreaterThan(z);
+  });
+
+  // Le cadre commun des dialogues de la fiche tournoi reçoit sa couche de
+  // chaque dialogue qui l'emprunte : c'est elle qui se vérifie, appel par appel.
+  const frameLayers = sources.flatMap(({ file, src }) =>
+    [...src.matchAll(/<TournamentDialogFrame[^>]*?zIndex=\{(\d+)\}/g)].map(
+      (m): [string, number] => [file, Number(m[1])],
+    ),
   );
+
+  it("le cadre commun reçoit sa couche de ceux qui l'emploient", () => {
+    expect(frameLayers.length).toBeGreaterThanOrEqual(6);
+  });
+
+  it.each(frameLayers)("%s pose le cadre commun devant les boutons flottants", (_file, layer) => {
+    for (const [, z] of floating) expect(layer).toBeGreaterThan(z);
+  });
 });
 
 describe("useDialogBehavior — focus initial", () => {

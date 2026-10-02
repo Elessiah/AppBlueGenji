@@ -5,15 +5,15 @@
  */
 
 import type { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
-import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { createDoubleEliminationBracket } from "../tournaments/bracket-double";
 import { createSingleEliminationBracket } from "../tournaments/bracket-single";
+import { forfeitEnduranceTeam } from "../tournaments/bg-survie/forfeit";
 import {
-  forfeitEnduranceTeam,
   generateEnduranceRound,
   initializeEnduranceTournament,
-  reconcileEndurance,
-} from "../tournaments/bg-survie";
+} from "../tournaments/bg-survie/qualification";
+import { reconcileEndurance } from "../tournaments/bg-survie/reconcile";
 import { finalizeTournamentIfDone } from "../tournaments/finalization";
 import { getMatchRows, loadRegisteredTeamIds, loadTournamentRow } from "../tournaments/repository";
 import { finalizeMatch } from "../tournaments/scoring";

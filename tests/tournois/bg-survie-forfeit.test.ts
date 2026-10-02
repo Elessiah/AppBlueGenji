@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { PoolConnection } from "mysql2/promise";
-import {
-  DEFAULT_ENDURANCE_CONFIG,
-  replayEnduranceDetailed,
-  type EnduranceMatchOutcome,
-  type EnduranceRoundCell,
-} from "@/lib/shared/bg-survie";
+import { DEFAULT_ENDURANCE_CONFIG } from "@/lib/shared/bg-survie/config";
+import { type EnduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
+import { replayEnduranceDetailed, type EnduranceRoundCell } from "@/lib/shared/bg-survie/replay";
 import { forfeitMatchScores, loadTournamentMatchFormat } from "@/lib/server/tournaments/repository";
 import { forfeitMapCount } from "@/lib/shared/match-format";
 import { forfeitAwareMapScore } from "@/lib/shared/stats";
@@ -388,7 +385,7 @@ describe("loadEnduranceMeta — l'historique voyage jusqu'à la vue", () => {
   }
 
   it("expose les colonnes et les cases « FF » de l'équipe retirée", async () => {
-    const { loadEnduranceMeta } = await import("@/lib/server/tournaments/bg-survie");
+    const { loadEnduranceMeta } = await import("@/lib/server/tournaments/bg-survie/meta");
     const meta = await loadEnduranceMeta(metaConnection(), 7);
 
     expect(meta).not.toBeNull();

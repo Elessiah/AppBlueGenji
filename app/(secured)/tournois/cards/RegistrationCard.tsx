@@ -1,13 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { participantWording } from "@/lib/shared/participants";
-import { formatLabel, gameLabel } from "@/lib/shared/tournament-labels";
 import type { TournamentCard } from "@/lib/shared/types";
-import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { formatCardDate, registrationFill } from "../_lib/card-display";
-import { CARD_IMAGE_SIZES } from "./card-image";
+import { CardMetaItem, CardProgress, LiveRibbon, TournamentCardFrame } from "./CardParts";
 import s from "../tournois.module.css";
 
 interface RegistrationCardProps {
@@ -28,62 +25,25 @@ export function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps
   const fill = registrationFill(t);
 
   return (
-    <article className={s.card} data-state="open">
-      <Link
-        href={`/tournois/${t.id}`}
-        className={s.cardOverlay}
-        aria-label={`Voir le tournoi ${t.name}`}
-      />
-      <TournamentImageBanner
-        image={t.image}
-        sizes={CARD_IMAGE_SIZES}
-        className={s.cardBanner}
-        priority={priority}
-      />
-      <div className={`${s.cardRibbon} ${s.cardRibbonOpen}`}>
-        <span className={s.dot} />
-        {/* NOSONAR S6772 — ruban en flex avec `gap` */}
-        Inscriptions ouvertes
-      </div>
-
-      <div className={s.cardHead}>
-        <div className={s.cardGame}>
-          {gameLabel(t.game)}
-          <span className={s.dot}>◆</span>
-          {formatLabel(t.format)}
-        </div>
-        <TournamentImageEmblem image={t.image} size={40} />
-      </div>
-
-      <h3 className={s.cardTitle}>{t.name}</h3>
-      {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
-
+    <TournamentCardFrame
+      t={t}
+      priority={priority}
+      state="open"
+      ribbonClassName={s.cardRibbonOpen}
+      ribbon={<LiveRibbon label="Inscriptions ouvertes" />}
+    >
       <div className={s.cardMeta}>
-        <div>
-          <div className={s.cardMetaLbl}>Début</div>
-          <div className={s.cardMetaVal}>{formatCardDate(t.startAt, true)}</div>
-        </div>
-        <div>
-          <div className={s.cardMetaLbl}>Clôture</div>
-          <div className={`${s.cardMetaVal} ${s.cardMetaValWarn}`}>
-            {formatCardDate(t.registrationCloseAt, true)}
-          </div>
-        </div>
-        <div>
-          <div className={s.cardMetaLbl}>{wording.manyCapitalized}</div>
-          <div className={`${s.cardMetaVal} ${s.num}`}>
-            {t.registeredTeams}/{t.maxTeams}
-          </div>
-        </div>
-        <div>
-          <div className={s.cardMetaLbl}>Matchs</div>
-          <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
-        </div>
+        <CardMetaItem label="Début">{formatCardDate(t.startAt, true)}</CardMetaItem>
+        <CardMetaItem label="Clôture" valueClassName={`${s.cardMetaVal} ${s.cardMetaValWarn}`}>
+          {formatCardDate(t.registrationCloseAt, true)}
+        </CardMetaItem>
+        <CardMetaItem label={wording.manyCapitalized} valueClassName={`${s.cardMetaVal} ${s.num}`}>
+          {t.registeredTeams}/{t.maxTeams}
+        </CardMetaItem>
+        <CardMetaItem label="Matchs">{matchFormatLabel(t.matchFormat)}</CardMetaItem>
       </div>
 
-      <div className={s.progress} aria-hidden="true">
-        <div className={s.progressBar} style={{ width: `${fill.percent}%` }} />
-      </div>
+      <CardProgress percent={fill.percent} />
 
       <div className={s.cardFoot}>
         <div>
@@ -98,6 +58,6 @@ export function RegistrationCard({ t, priority }: Readonly<RegistrationCardProps
           Voir le tournoi
         </span>
       </div>
-    </article>
+    </TournamentCardFrame>
   );
 }

@@ -1,13 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { participantWording } from "@/lib/shared/participants";
-import { formatLabel, gameLabel } from "@/lib/shared/tournament-labels";
 import type { TournamentCard } from "@/lib/shared/types";
-import { TournamentImageBanner, TournamentImageEmblem } from "@/components/tournament-image";
 import { formatCardDate } from "../_lib/card-display";
-import { CARD_IMAGE_SIZES } from "./card-image";
+import { CardMetaItem, TournamentCardFrame } from "./CardParts";
 import s from "../tournois.module.css";
 
 interface FinishedCardProps {
@@ -29,47 +26,19 @@ export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
   const finishDate = formatCardDate(t.finishedAt ?? t.startAt, false);
 
   return (
-    <article className={s.card} data-state="done">
-      <Link
-        href={`/tournois/${t.id}`}
-        className={s.cardOverlay}
-        aria-label={`Voir le tournoi ${t.name}`}
-      />
-      <TournamentImageBanner
-        image={t.image}
-        sizes={CARD_IMAGE_SIZES}
-        className={s.cardBanner}
-        priority={priority}
-      />
-      <div className={`${s.cardRibbon} ${s.cardRibbonDone}`}>
-        Terminé · {finishDate}
-      </div>
-
-      <div className={s.cardHead}>
-        <div className={s.cardGame}>
-          {gameLabel(t.game)}
-          <span className={s.dot}>◆</span>
-          {formatLabel(t.format)}
-        </div>
-        <TournamentImageEmblem image={t.image} size={40} />
-      </div>
-
-      <h3 className={s.cardTitle}>{t.name}</h3>
-      {t.description ? <div className={s.cardSub}>{t.description}</div> : null}
-
+    <TournamentCardFrame
+      t={t}
+      priority={priority}
+      state="done"
+      ribbonClassName={s.cardRibbonDone}
+      ribbon={<>Terminé · {finishDate}</>}
+    >
       <div className={s.cardMeta}>
-        <div>
-          <div className={s.cardMetaLbl}>Début</div>
-          <div className={s.cardMetaVal}>{formatCardDate(t.startAt, false)}</div>
-        </div>
-        <div>
-          <div className={s.cardMetaLbl}>{wording.manyParticipating}</div>
-          <div className={`${s.cardMetaVal} ${s.num}`}>{t.registeredTeams}</div>
-        </div>
-        <div>
-          <div className={s.cardMetaLbl}>Matchs</div>
-          <div className={s.cardMetaVal}>{matchFormatLabel(t.matchFormat)}</div>
-        </div>
+        <CardMetaItem label="Début">{formatCardDate(t.startAt, false)}</CardMetaItem>
+        <CardMetaItem label={wording.manyParticipating} valueClassName={`${s.cardMetaVal} ${s.num}`}>
+          {t.registeredTeams}
+        </CardMetaItem>
+        <CardMetaItem label="Matchs">{matchFormatLabel(t.matchFormat)}</CardMetaItem>
       </div>
 
       <div className={s.cardFoot}>
@@ -92,6 +61,6 @@ export function FinishedCard({ t, priority }: Readonly<FinishedCardProps>) {
         </div>
         <span className={s.cardCta}>Voir les résultats</span>
       </div>
-    </article>
+    </TournamentCardFrame>
   );
 }

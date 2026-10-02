@@ -8,11 +8,10 @@ import {
   nextRoundSummary,
   nextRoundTitle,
 } from "@/app/(secured)/tournois/[id]/_lib/endurance-next-round";
-import { DEFAULT_ENDURANCE_CONFIG, PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
-import {
-  previewEnduranceNextRound,
-  type EnduranceNextRoundPreview,
-} from "@/lib/shared/endurance-next-round";
+import { DEFAULT_ENDURANCE_CONFIG } from "@/lib/shared/bg-survie/config";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/preview";
+import { type EnduranceNextRoundPreview } from "@/lib/shared/endurance-next-round/types";
 import type { EnduranceMeta, EnduranceStandingRow } from "@/lib/shared/types";
 import { bracketMatch } from "../helpers/bracket-match";
 

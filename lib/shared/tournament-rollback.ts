@@ -63,7 +63,7 @@
  * pour décider ce qu'il écrit (`lib/server/tournaments/rollback.ts`). Deux
  * implémentations divergeraient au premier format ajouté.
  */
-import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie";
+import { isEndurancePlayoffRound, PLAYOFF_ROUND_OFFSET } from "./bg-survie/rounds";
 import { hasScoreInput, type MatchScoreState } from "./match-lock";
 import type { BracketType } from "./types";
 

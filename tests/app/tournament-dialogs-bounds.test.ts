@@ -48,21 +48,28 @@ describe("dialogues de la fiche tournoi — hauteur bornée", () => {
   it("repère bien les dialogues stylés en ligne", () => {
     expect(inlineDialogs).toEqual(
       expect.arrayContaining([
-        "MatchLiveDialog.tsx",
         "MatchScheduleDialog.tsx",
         "MatchReplayDialog.tsx",
-        "IssueReportDialog.tsx",
-        "EndurancePenaltyDialog.tsx",
         "TournamentImageDialog.tsx",
+        "TournamentDialogFrame.tsx",
       ]),
     );
   });
 
-  it.each(["MatchLiveDialog.tsx", "MatchScheduleDialog.tsx", "MatchReplayDialog.tsx", "IssueReportDialog.tsx", "EndurancePenaltyDialog.tsx", "TournamentDialogShell.tsx", "DeleteTournamentDialog.tsx", "RollbackRoundDialog.tsx", "TournamentImageDialog.tsx"])(
+  it.each(["MatchScheduleDialog.tsx", "MatchReplayDialog.tsx", "TournamentDialogFrame.tsx", "TournamentImageDialog.tsx"])(
     "%s porte `.dialog-bounded` et aucune borne en `vh` en ligne",
     (name) => {
       const src = stripComments(read(join(DIR, name)));
       expect(src).toContain('className="dialog-bounded"');
+      expect(src).not.toMatch(/maxHeight:\s*"[^"]*\bvh/);
+    },
+  );
+
+  it.each(["MatchLiveDialog.tsx", "IssueReportDialog.tsx", "EndurancePenaltyDialog.tsx", "TournamentDialogShell.tsx", "DeleteTournamentDialog.tsx", "RollbackRoundDialog.tsx"])(
+    "%s passe par le cadre commun, sans borne en `vh` en ligne",
+    (name) => {
+      const src = stripComments(read(join(DIR, name)));
+      expect(src).toContain("<TournamentDialogFrame");
       expect(src).not.toMatch(/maxHeight:\s*"[^"]*\bvh/);
     },
   );

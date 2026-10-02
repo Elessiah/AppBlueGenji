@@ -7,7 +7,7 @@ jest.mock("@/lib/server/tournaments/byes");
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { tryAutoResolveByes } from "@/lib/server/tournaments/byes";
-import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 /**
  * Arbitrage d'un tournoi « BlueGenji Survie », le seul mode à jouer **deux**

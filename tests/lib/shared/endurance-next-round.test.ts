@@ -1,25 +1,22 @@
 import { describe, expect, it } from "@jest/globals";
+import { DEFAULT_ENDURANCE_CONFIG, type EnduranceConfig } from "@/lib/shared/bg-survie/config";
+import { enduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
+import { planPlayoffFirstRound } from "@/lib/shared/bg-survie/playoffs";
 import {
-  DEFAULT_ENDURANCE_CONFIG,
-  enduranceMatchOutcome,
-  PLAYOFF_ROUND_OFFSET,
-  planEnduranceRound,
-  planPlayoffFirstRound,
   qualificationComplete,
-  rankActiveTeams,
-  replayEndurance,
   roundLimitReached,
   selectQualifiedTeamIds,
-  type EnduranceConfig,
-  type EndurancePenalty,
-} from "@/lib/shared/bg-survie";
+} from "@/lib/shared/bg-survie/qualification";
+import { replayEndurance, type EndurancePenalty } from "@/lib/shared/bg-survie/replay";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
+import { planEnduranceRound, rankActiveTeams } from "@/lib/shared/bg-survie/standings";
+import { pendingMatchDeltas } from "@/lib/shared/endurance-next-round/outcomes";
+import { analyseEnduranceRound } from "@/lib/shared/endurance-next-round/position-bounds";
+import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/preview";
 import {
-  analyseEnduranceRound,
-  pendingMatchDeltas,
-  previewEnduranceNextRound,
   type EnduranceNextRoundInput,
   type EnduranceNextRoundMatchRecord,
-} from "@/lib/shared/endurance-next-round";
+} from "@/lib/shared/endurance-next-round/types";
 import { checkMatchScores, matchWinsRequired, type MatchFormat } from "@/lib/shared/match-format";
 
 const FT3: MatchFormat = { type: "FT", value: 3 };

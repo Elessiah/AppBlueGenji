@@ -1,6 +1,6 @@
 import type { BracketMatch } from "@/lib/shared/types";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
-import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import { pluralSuffix } from "@/lib/shared/plural";
 
 /**
@@ -28,7 +28,7 @@ import { pluralSuffix } from "@/lib/shared/plural";
  * des manches qualificatives à l'intérieur de l'arbre, et leur appliquerait
  * l'autre format que celui qu'annonce le volet qui les contient.
  */
-export { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+export { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 
 /** Un volet = une manche qualificative. */
 export interface EnduranceRoundSection {

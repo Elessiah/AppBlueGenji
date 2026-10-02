@@ -25,8 +25,8 @@
  *
  * Module pur (`lib/shared`) : la même règle borne le formulaire et la route,
  * sans qu'aucune des deux ne la réécrive. Le rejeu, lui, vit dans
- * `lib/shared/bg-survie.ts` ; l'orchestration dans
- * `lib/server/tournaments/bg-survie.ts`.
+ * `lib/shared/bg-survie/replay-steps.ts` ; l'orchestration dans
+ * `lib/server/tournaments/bg-survie/penalties.ts`.
  */
 
 /** Retrait maximal d'une pénalité, en points d'endurance. */

@@ -26,7 +26,7 @@ import {
 } from "../_lib/endurance-sections";
 import { useParticipantWording } from "../_lib/entrant-link";
 import { enduranceNextRoundInput } from "../_lib/endurance-next-round";
-import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round";
+import { previewEnduranceNextRound } from "@/lib/shared/endurance-next-round/preview";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { EnduranceNextRoundPanel } from "./EnduranceNextRoundPanel";
 import { EntrantName } from "./EntrantName";

@@ -14,6 +14,7 @@ import { readSource } from "../helpers/read-source";
 
 const DIR = "app/(secured)/tournois/[id]";
 const hook = readSource(`${DIR}/_hooks/useTournamentLive.ts`);
+const connection = readSource(`${DIR}/_lib/live-connection.ts`);
 const page = readSource(`${DIR}/page.tsx`);
 const header = readSource(`${DIR}/_components/TournamentHeader.tsx`);
 const launchStrip = readSource(`${DIR}/_components/MatchLaunchStrip.tsx`);
@@ -26,45 +27,24 @@ function block(source: string, start: string, end: string): string {
   return source.slice(from, source.indexOf(end, from));
 }
 
-const handler = (name: string) => block(hook, `source.${name} = `, "\n      };");
-
 describe("flux ouvert sans premier instantané", () => {
   it("accorde quelques secondes, pas davantage", () => {
     expect(FIRST_SNAPSHOT_TIMEOUT_MS).toBeGreaterThanOrEqual(2_000);
     expect(FIRST_SNAPSHOT_TIMEOUT_MS).toBeLessThanOrEqual(10_000);
   });
 
-  it("arme le guet à l'ouverture du flux", () => {
-    const onopen = handler("onopen");
-    // Armé **après** la coupure du sondage : l'ouverture ne vaut plus livraison.
-    expect(onopen.indexOf("watchFirstSnapshot();")).toBeGreaterThan(onopen.indexOf("stopFallback();"));
-    expect(onopen.indexOf("stopFallback();")).toBeGreaterThan(-1);
+  // Le guet lui-même — armé à l'ouverture, lecture REST et sondage passé le
+  // délai, levé par un message, une erreur, une reconnexion ou la fermeture —
+  // se joue sur `openLiveConnection` : `live-connection.test.ts`.
+  it("le hook confie le guet à la connexion, qui sait si la page est remplie", () => {
+    expect(hook).toContain("openLiveConnection({");
+    expect(hook).toContain("hasDetail: () => Boolean(stateRef.current.detail),");
   });
 
-  it("passé le délai, lit par REST et sonde en secours sans fermer le flux", () => {
-    const body = block(hook, "const watchFirstSnapshot = () => {", "\n    };");
-    expect(body).toContain("if (stateRef.current.detail) return;");
-    expect(body).toContain("FIRST_SNAPSHOT_TIMEOUT_MS");
-    expect(body).toContain("setIsLive(false);");
-    expect(body).toContain("void load(true)");
-    expect(body).toContain("giveUp(failure)");
-    expect(body).toContain("startFallback();");
+  it("le guet arrête tout sur un échec définitif", () => {
+    const body = block(connection, "const watchFirstSnapshot = () => {", "\n  };");
+    expect(body).toContain("loadOrGiveUp(true);");
     expect(body).not.toContain("source?.close()");
-  });
-
-  it("un message lève le guet et le sondage", () => {
-    const onmessage = handler("onmessage");
-    expect(onmessage).toContain("stopFirstSnapshotWatch();");
-    expect(onmessage).toContain("stopFallback();");
-  });
-
-  it("aucun guet ne survit à une erreur, une reconnexion, un abandon ou au démontage", () => {
-    expect(handler("onerror")).toContain("stopFirstSnapshotWatch();");
-    expect(block(hook, "reconnectRef.current = () => {", "\n    };")).toContain("stopFirstSnapshotWatch();");
-    expect(block(hook, "const giveUp = ", "\n    };")).toContain("stopFirstSnapshotWatch();");
-    expect(block(hook, "    return () => {\n      cancelled = true;", "\n    };")).toContain(
-      "stopFirstSnapshotWatch();",
-    );
   });
 });
 

@@ -16,11 +16,8 @@
  * BlueGenji Survie et `resolvePhasePlan` pour le multi-phases.
  */
 import { nextPowerOfTwo, seedSlots } from "./bracket-seeds";
-import {
-  planEnduranceRound,
-  resolveEnduranceConfig,
-  type EnduranceStanding,
-} from "./bg-survie";
+import { resolveEnduranceConfig } from "./bg-survie/config";
+import { planEnduranceRound, type EnduranceStanding } from "./bg-survie/standings";
 import { plural } from "./plural";
 import type { SeedingSource } from "./seeding";
 import { planSurvivalRound, type SurvivalStanding } from "./survival";

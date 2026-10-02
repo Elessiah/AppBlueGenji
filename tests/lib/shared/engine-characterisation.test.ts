@@ -13,14 +13,14 @@
  */
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "@jest/globals";
+import { type EnduranceConfig } from "@/lib/shared/bg-survie/config";
+import { type EnduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
 import {
-  planEnduranceRound,
   replayEndurance,
   replayEnduranceDetailed,
-  type EnduranceConfig,
-  type EnduranceMatchOutcome,
   type ReplayEnduranceInput,
-} from "@/lib/shared/bg-survie";
+} from "@/lib/shared/bg-survie/replay";
+import { planEnduranceRound } from "@/lib/shared/bg-survie/standings";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import { computeDeepStats, type StatsMatch, type StatsTournament } from "@/lib/shared/stats";
 import {

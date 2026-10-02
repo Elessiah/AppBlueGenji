@@ -12,7 +12,8 @@ en tampon la garde tant qu'elle n'est pas finie, et un flux ne finit pas. Aucune
 erreur ne se déclarait, `onopen` coupait même le sondage de secours : la page
 restait sur « Chargement du tournoi… » **indéfiniment**.
 
-Désormais (`useTournamentLive`), un flux ouvert sur une page encore vide arme un
+Désormais (`openLiveConnection`, `_lib/live-connection.ts`, que câble
+`useTournamentLive`), un flux ouvert sur une page encore vide arme un
 guet de `FIRST_SNAPSHOT_TIMEOUT_MS` (5 s, `_lib/live-state.ts`). Passé ce délai
 sans instantané :
 

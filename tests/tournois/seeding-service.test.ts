@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/database");
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/tournaments/notifications");
-jest.mock("@/lib/server/tournaments/bg-survie");
+jest.mock("@/lib/server/tournaments/bg-survie/qualification");
+jest.mock("@/lib/server/tournaments/bg-survie/reconcile");
 jest.mock("@/lib/server/tournaments/swiss");
 jest.mock("@/lib/server/tournaments/survival");
 jest.mock("@/lib/server/tournaments/phases");
@@ -17,7 +18,7 @@ import {
   resetRegistrationRanks,
 } from "@/lib/server/tournaments/repository";
 import { publishUpdatedEvent } from "@/lib/server/tournaments/notifications";
-import { initializeEnduranceTournament } from "@/lib/server/tournaments/bg-survie";
+import { initializeEnduranceTournament } from "@/lib/server/tournaments/bg-survie/qualification";
 import { initializeSwissTournament } from "@/lib/server/tournaments/swiss";
 import { initializeSurvivalTournament } from "@/lib/server/tournaments/survival";
 import { initializeMultiTournament } from "@/lib/server/tournaments/phases";

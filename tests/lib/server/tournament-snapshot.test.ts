@@ -22,7 +22,7 @@ jest.mock("@/lib/server/database");
 // exigeraient une vraie base.
 jest.mock("@/lib/server/tournaments/swiss");
 jest.mock("@/lib/server/tournaments/survival");
-jest.mock("@/lib/server/tournaments/bg-survie");
+jest.mock("@/lib/server/tournaments/bg-survie/meta");
 // Le classement du site rejoue tout `bg_matches` : bouchonné, seul compte ici
 // l'ordre qu'il rend.
 jest.mock("@/lib/server/ranking-service");
@@ -50,7 +50,7 @@ import { invalidateStats } from "@/lib/server/stats-cache";
 import { getDatabase } from "@/lib/server/database";
 import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
-import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie";
+import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie/meta";
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { clearCache } from "@/lib/server/cache";
 import { dispatchMatchStartNotices } from "@/lib/server/tournaments/player-pushes";

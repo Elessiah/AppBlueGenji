@@ -14,7 +14,9 @@ jest.mock("@/lib/server/tournaments/player-forfeit");
 jest.mock("@/lib/server/tournaments/admin");
 jest.mock("@/lib/server/tournaments/survival");
 jest.mock("@/lib/server/tournaments/swiss");
-jest.mock("@/lib/server/tournaments/bg-survie");
+jest.mock("@/lib/server/tournaments/bg-survie/reconcile");
+jest.mock("@/lib/server/tournaments/bg-survie/forfeit");
+jest.mock("@/lib/server/tournaments/bg-survie/penalties");
 jest.mock("@/lib/server/tournaments/phases");
 jest.mock("@/lib/server/tournaments/phases-repository");
 
@@ -53,12 +55,12 @@ import { forfeitOwnMatch } from "@/lib/server/tournaments/player-forfeit";
 import { adminResolveMatch, adminSaveMatchScores } from "@/lib/server/tournaments/admin";
 import { forfeitSurvivalTeam, reconcileSurvival } from "@/lib/server/tournaments/survival";
 import { forfeitSwissTeam, reconcileSwiss } from "@/lib/server/tournaments/swiss";
+import { forfeitEnduranceTeam } from "@/lib/server/tournaments/bg-survie/forfeit";
 import {
   applyEndurancePenalty,
-  forfeitEnduranceTeam,
   liftEndurancePenalty,
-  reconcileEndurance,
-} from "@/lib/server/tournaments/bg-survie";
+} from "@/lib/server/tournaments/bg-survie/penalties";
+import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { reconcilePhases } from "@/lib/server/tournaments/phases";
 import { insertPhases } from "@/lib/server/tournaments/phases-repository";
 import { connectionMock, fakeConnection, fakePool, type SqlQuery } from "../../helpers/sql-double";

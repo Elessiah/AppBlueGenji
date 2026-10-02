@@ -176,7 +176,7 @@ générés sont toujours saisissables dans l'interface.
 | Rôle | Fichier |
 |---|---|
 | Logique pure (validation, libellés, contrôles) | `lib/shared/match-format.ts` |
-| Format applicable à une manche (BG Survie en joue deux) | `lib/shared/bg-survie.ts`, `lib/server/tournaments/repository.ts` |
+| Format applicable à une manche (BG Survie en joue deux) | `lib/shared/bg-survie/rounds.ts`, `lib/server/tournaments/repository.ts` |
 | Migration des colonnes | `lib/server/database/` (`schema/tournaments.ts`) |
 | Création du tournoi | `app/api/tournaments/route.ts`, `lib/server/tournaments/index.ts` |
 | Garde-fou report d'équipe | `lib/server/tournaments/scoring.ts` |

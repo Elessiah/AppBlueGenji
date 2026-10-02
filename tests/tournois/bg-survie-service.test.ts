@@ -3,13 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 jest.mock("@/lib/server/tournaments/repository");
 jest.mock("@/lib/server/ranking-service");
 
+import { forfeitEnduranceTeam } from "@/lib/server/tournaments/bg-survie/forfeit";
+import { startEndurancePlayoffs } from "@/lib/server/tournaments/bg-survie/playoffs";
 import {
-  forfeitEnduranceTeam,
   generateEnduranceRound,
   initializeEnduranceTournament,
-  reconcileEndurance,
-  startEndurancePlayoffs,
-} from "@/lib/server/tournaments/bg-survie";
+} from "@/lib/server/tournaments/bg-survie/qualification";
+import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import {
   createMatch,
   finishTournament,

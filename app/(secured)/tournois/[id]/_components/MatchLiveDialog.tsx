@@ -1,10 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
-import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   isValidStreamUrl,
   LIVE_PLATFORMS,
@@ -17,6 +14,7 @@ import {
 import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
+import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface MatchLiveDialogProps {
   match: BracketMatch;
@@ -31,8 +29,9 @@ interface MatchLiveDialogProps {
  * officielle du tournoi : le lien saisi ici est celui de la chaîne qui montre
  * **ce** match, éventuellement celle d'un streamer indépendant.
  *
- * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
- * arrière-plan figé, focus rendu au déclencheur à la fermeture.
+ * Voile, cadre et comportement modal : `TournamentDialogFrame`. `busy`
+ * verrouille Échap pendant l'envoi : une modale en train d'écrire ne se
+ * referme pas.
  */
 export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveDialogProps>) {
   const { showError, showSuccess } = useToast();
@@ -40,10 +39,6 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
   const [trigger, setTrigger] = useState<MatchLiveTrigger>(match.liveTrigger ?? "MANUAL");
   const [liveUrl, setLiveUrl] = useState(match.liveUrl ?? "");
   const [busy, setBusy] = useState(false);
-  // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
-  // d'écrire.
-  const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
-  const backdrop = useBackdropDismiss(onClose, busy);
 
   const urlTouched = liveUrl.trim().length > 0;
   // Conditionné à `streamed`, comme `triggerNeedsDate` : décocher la case
@@ -91,165 +86,139 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
     }
   };
 
-  return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
-      role="presentation"
-      {...backdrop}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        background: "rgba(6, 8, 12, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
+  return (
+    <TournamentDialogFrame
+      titleId="match-live-title"
+      maxWidth={460}
+      zIndex={80}
+      busy={busy}
+      onClose={onClose}
     >
-      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        className="dialog-bounded"
-        aria-labelledby="match-live-title"
-        tabIndex={-1}
-        style={{
-          width: "100%",
-          maxWidth: 460,
-          background: "var(--cyber-bg-2, #14181f)",
-          border: "1px solid var(--line-strong-cy, var(--line-soft))",
-          borderRadius: "var(--r-cy-md, 12px)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-          padding: 22,
-        }}
-      >
-        <form onSubmit={submit}>
-          <h3 id="match-live-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-            Diffusion du match
-          </h3>
-          <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
-            {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
-          </p>
+      <form onSubmit={submit}>
+        <h3 id="match-live-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
+          Diffusion du match
+        </h3>
+        <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
+          {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
+        </p>
 
-          <label
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 10,
-              margin: "18px 0",
-              fontSize: 14,
-              color: "var(--text-0, #e6ebf2)",
-              cursor: "pointer",
-            }}
+        <label
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            margin: "18px 0",
+            fontSize: 14,
+            color: "var(--text-0, #e6ebf2)",
+            cursor: "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={streamed}
+            onChange={(e) => setStreamed(e.target.checked)}
+          />
+          {/* NOSONAR S6772 — label en flex avec `gap` */}
+          Ce match est casté
+        </label>
+
+        {streamed && (
+          <>
+            <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px" }}>
+              <legend
+                style={{
+                  fontSize: 12,
+                  textTransform: "uppercase",
+                  letterSpacing: "0.06em",
+                  color: "var(--text-2, #9aa4b2)",
+                  padding: 0,
+                  marginBottom: 8,
+                }}
+              >
+                Passage à l&apos;antenne
+              </legend>
+              {MATCH_LIVE_TRIGGERS.map((option) => {
+                const disabled = requiresMatchStartAt(option) && startAtMissing;
+                return (
+                  <label
+                    key={option}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      fontSize: 13,
+                      color: disabled ? "var(--text-2, #9aa4b2)" : "var(--text-1, #c3ccd8)",
+                      marginBottom: 6,
+                      cursor: disabled ? "not-allowed" : "pointer",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="match-live-trigger"
+                      value={option}
+                      checked={trigger === option}
+                      disabled={disabled}
+                      onChange={() => setTrigger(option)}
+                    />
+                    {MATCH_LIVE_TRIGGER_LABELS[option]}
+                    {requiresMatchStartAt(option) && startAtLabel && ` (${startAtLabel})`}
+                  </label>
+                );
+              })}
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-2, #9aa4b2)" }}>
+                {startAtMissing
+                  ? "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire."
+                  : "Le direct s'arrête tout seul dès qu'un score est saisi."}
+              </p>
+            </fieldset>
+
+            <div className="field">
+              <label htmlFor="match-live-url">Chaîne du match (facultatif)</label>
+              <input
+                id="match-live-url"
+                value={liveUrl}
+                onChange={(e) => setLiveUrl(e.target.value)}
+                maxLength={MAX_STREAM_URL_LENGTH}
+                placeholder="https://twitch.tv/…"
+                aria-invalid={urlInvalid}
+                aria-describedby="match-live-url-hint"
+              />
+              <p
+                id="match-live-url-hint"
+                style={{
+                  margin: "6px 0 0",
+                  fontSize: 12,
+                  color: urlInvalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+                }}
+              >
+                {urlInvalid
+                  ? `Lien non reconnu. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`
+                  : `Laisser vide pour signaler le match sans lien. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`}
+              </p>
+            </div>
+          </>
+        )}
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={onClose}
+            disabled={busy}
+            style={{ padding: "8px 18px", fontSize: 13 }}
           >
-            <input
-              type="checkbox"
-              checked={streamed}
-              onChange={(e) => setStreamed(e.target.checked)}
-            />
-            {/* NOSONAR S6772 — label en flex avec `gap` */}
-            Ce match est casté
-          </label>
-
-          {streamed && (
-            <>
-              <fieldset style={{ border: "none", padding: 0, margin: "0 0 16px" }}>
-                <legend
-                  style={{
-                    fontSize: 12,
-                    textTransform: "uppercase",
-                    letterSpacing: "0.06em",
-                    color: "var(--text-2, #9aa4b2)",
-                    padding: 0,
-                    marginBottom: 8,
-                  }}
-                >
-                  Passage à l&apos;antenne
-                </legend>
-                {MATCH_LIVE_TRIGGERS.map((option) => {
-                  const disabled = requiresMatchStartAt(option) && startAtMissing;
-                  return (
-                    <label
-                      key={option}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        fontSize: 13,
-                        color: disabled ? "var(--text-2, #9aa4b2)" : "var(--text-1, #c3ccd8)",
-                        marginBottom: 6,
-                        cursor: disabled ? "not-allowed" : "pointer",
-                      }}
-                    >
-                      <input
-                        type="radio"
-                        name="match-live-trigger"
-                        value={option}
-                        checked={trigger === option}
-                        disabled={disabled}
-                        onChange={() => setTrigger(option)}
-                      />
-                      {MATCH_LIVE_TRIGGER_LABELS[option]}
-                      {requiresMatchStartAt(option) && startAtLabel && ` (${startAtLabel})`}
-                    </label>
-                  );
-                })}
-                <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-2, #9aa4b2)" }}>
-                  {startAtMissing
-                    ? "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire."
-                    : "Le direct s'arrête tout seul dès qu'un score est saisi."}
-                </p>
-              </fieldset>
-
-              <div className="field">
-                <label htmlFor="match-live-url">Chaîne du match (facultatif)</label>
-                <input
-                  id="match-live-url"
-                  value={liveUrl}
-                  onChange={(e) => setLiveUrl(e.target.value)}
-                  maxLength={MAX_STREAM_URL_LENGTH}
-                  placeholder="https://twitch.tv/…"
-                  aria-invalid={urlInvalid}
-                  aria-describedby="match-live-url-hint"
-                />
-                <p
-                  id="match-live-url-hint"
-                  style={{
-                    margin: "6px 0 0",
-                    fontSize: 12,
-                    color: urlInvalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
-                  }}
-                >
-                  {urlInvalid
-                    ? `Lien non reconnu. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`
-                    : `Laisser vide pour signaler le match sans lien. Plateformes acceptées : ${LIVE_PLATFORMS.join(", ")}.`}
-                </p>
-              </div>
-            </>
-          )}
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn"
-              disabled={busy || urlInvalid || triggerNeedsDate}
-              style={{ padding: "8px 20px", fontSize: 13 }}
-            >
-              {busy ? "Enregistrement…" : "Enregistrer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body,
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn"
+            disabled={busy || urlInvalid || triggerNeedsDate}
+            style={{ padding: "8px 20px", fontSize: 13 }}
+          >
+            {busy ? "Enregistrement…" : "Enregistrer"}
+          </button>
+        </div>
+      </form>
+    </TournamentDialogFrame>
   );
 }

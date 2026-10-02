@@ -5,6 +5,13 @@ Chaque tournoi de `/tournois` est rendu par une carte propre à son état
 jusqu'à quatre fois et annonçaient des faits faux ; elles disent désormais ce
 qu'on vient y chercher.
 
+Les quatre cartes partagent leur cadre par `cards/CardParts.tsx` :
+`TournamentCardFrame` (plaque de lien, bandeau, ruban, jeu et format, emblème,
+titre, description), `CardMetaItem` (une case d'informations), `CardProgress`
+(la jauge) et `LiveRibbon` (pastille + libellé). Chaque carte ne garde que ce
+qu'elle dit de son état ; leur rendu est figé par
+`tests/app/tournament-list-cards-render.test.tsx`.
+
 ## Ce que dit chaque carte
 
 | État | Ruban | Fait du pied | Action |

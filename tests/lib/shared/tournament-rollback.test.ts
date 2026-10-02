@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 
-import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie";
+import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
 import {
   compareRollbackStages,
   planRoundRollback,

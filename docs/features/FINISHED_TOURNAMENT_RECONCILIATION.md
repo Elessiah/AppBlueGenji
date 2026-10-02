@@ -6,7 +6,7 @@ fausse se répare. `finishTournament` est d'ailleurs écrit pour ce cas, sa clau
 `state <> 'FINISHED'` faisant de la clôture une opération à effet unique (pas de
 seconde date de clôture, pas de seconde annonce Discord de la championne).
 
-- Endurance : `reconcileEndurance` (`lib/server/tournaments/bg-survie.ts`)
+- Endurance : `reconcileEndurance` (`lib/server/tournaments/bg-survie/reconcile.ts`)
 - Survie : `reconcileSurvival` (`lib/server/tournaments/survival.ts`)
 - Ronde suisse : `reconcileSwiss` (`lib/server/tournaments/swiss.ts`)
 - Multi-phases : `reconcilePhases` (`lib/server/tournaments/phases.ts`)

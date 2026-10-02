@@ -1,11 +1,8 @@
 import { describe, expect, it } from "@jest/globals";
-import {
-  DEFAULT_ENDURANCE_CONFIG,
-  enduranceEliminationCut,
-  replayEndurance,
-  type EnduranceConfig,
-  type EnduranceMatchOutcome,
-} from "@/lib/shared/bg-survie";
+import { DEFAULT_ENDURANCE_CONFIG, type EnduranceConfig } from "@/lib/shared/bg-survie/config";
+import { type EnduranceMatchOutcome } from "@/lib/shared/bg-survie/match-outcome";
+import { enduranceEliminationCut } from "@/lib/shared/bg-survie/qualification";
+import { replayEndurance } from "@/lib/shared/bg-survie/replay";
 import type { MatchFormat } from "@/lib/shared/match-format";
 
 const CONFIG = DEFAULT_ENDURANCE_CONFIG;

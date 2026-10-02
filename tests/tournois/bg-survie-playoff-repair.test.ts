@@ -2,15 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, jest } from "@jest/globals
 
 jest.mock("@/lib/server/tournaments/repository");
 
+import { DEFAULT_ENDURANCE_CONFIG } from "@/lib/shared/bg-survie/config";
+import { pairingsAreStale, playoffRoundIsStale } from "@/lib/shared/bg-survie/pairing-staleness";
 import {
-  pairingsAreStale,
   planNextPlayoffRound,
   planPlayoffFallbackRound,
   planPlayoffFirstRound,
-  playoffRoundIsStale,
-  DEFAULT_ENDURANCE_CONFIG,
-} from "@/lib/shared/bg-survie";
-import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie";
+} from "@/lib/shared/bg-survie/playoffs";
+import { reconcileEndurance } from "@/lib/server/tournaments/bg-survie/reconcile";
 import { createMatch } from "@/lib/server/tournaments/repository";
 import type { SqlMock } from "../helpers/sql-double";
 

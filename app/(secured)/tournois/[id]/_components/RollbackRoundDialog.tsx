@@ -1,15 +1,13 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { FormEvent, useState } from "react";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
-import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { teamLabel } from "@/lib/shared/match-card-viewer";
 import { isMatchDoubleForfeit, isMatchDrawn } from "@/lib/shared/match-outcome";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
+import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface RollbackRoundDialogProps {
   tournamentId: number;
@@ -68,8 +66,8 @@ function scoreLabel(match: BracketMatch): string {
  * recopie du nom sur la suppression : l'action est irréversible, elle ne doit
  * pas partir d'un clic distrait.
  *
- * Portail sur `document.body` (voir `DeleteTournamentDialog`) : la page vit dans
- * `.page-shell`, qui enferme ses enfants sous la barre de navigation.
+ * Voile, cadre et portail : `TournamentDialogFrame`, monté après le premier
+ * rendu comme la suppression.
  */
 export function RollbackRoundDialog({
   tournamentId,
@@ -83,10 +81,6 @@ export function RollbackRoundDialog({
   const { showError } = useToast();
   const [acknowledged, setAcknowledged] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
-  const backdrop = useBackdropDismiss(onClose, busy);
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
@@ -114,198 +108,172 @@ export function RollbackRoundDialog({
     }
   };
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
-      role="presentation"
-      {...backdrop}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 90,
-        background: "rgba(6, 8, 12, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
+  return (
+    <TournamentDialogFrame
+      titleId="rollback-round-title"
+      maxWidth={520}
+      border="1px solid var(--red-live, #ff4d4d)"
+      zIndex={90}
+      deferMount
+      busy={busy}
+      onClose={onClose}
     >
-      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        className="dialog-bounded"
-        aria-labelledby="rollback-round-title"
-        tabIndex={-1}
-        style={{
-          width: "100%",
-          maxWidth: 520,
-          background: "var(--cyber-bg-2, #14181f)",
-          border: "1px solid var(--red-live, #ff4d4d)",
-          borderRadius: "var(--r-cy-md, 12px)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-          padding: 22,
-        }}
+      <h3
+        id="rollback-round-title"
+        style={{ margin: 0, fontSize: 18, color: "var(--red-live, #ff4d4d)" }}
       >
-        <h3
-          id="rollback-round-title"
-          style={{ margin: 0, fontSize: 18, color: "var(--red-live, #ff4d4d)" }}
-        >
-          Effacer {stageLabel}
-        </h3>
+        Effacer {stageLabel}
+      </h3>
 
-        <p style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
-          <strong style={{ color: "var(--ink)" }}>{stageLabel}</strong> perd tout ce qui y a été
-          saisi : scores, vainqueurs, forfaits de match et reports en attente. Les rencontres
-          restent en place, avec les mêmes équipes, et redeviennent à jouer.
-        </p>
-        <p style={{ marginTop: 8, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
-          C&apos;est ce qui rouvre la manche précédente à la correction. Le geste se répète : chaque
-          fois, le tournoi recule d&apos;une manche. Les abandons et les pénalités déjà déclarés,
-          eux, restent en vigueur.
-        </p>
+      <p style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
+        <strong style={{ color: "var(--ink)" }}>{stageLabel}</strong> perd tout ce qui y a été
+        saisi : scores, vainqueurs, forfaits de match et reports en attente. Les rencontres
+        restent en place, avec les mêmes équipes, et redeviennent à jouer.
+      </p>
+      <p style={{ marginTop: 8, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
+        C&apos;est ce qui rouvre la manche précédente à la correction. Le geste se répète : chaque
+        fois, le tournoi recule d&apos;une manche. Les abandons et les pénalités déjà déclarés,
+        eux, restent en vigueur.
+      </p>
 
-        {tournamentFinished && (
-          <div
-            role="note"
-            style={{
-              marginTop: 14,
-              padding: "10px 12px",
-              borderRadius: "var(--r-cy-sm, 8px)",
-              border: "1px solid color-mix(in srgb, var(--red-live, #ff4d4d) 45%, transparent)",
-              background: "color-mix(in srgb, var(--red-live, #ff4d4d) 8%, transparent)",
-              fontSize: 12.5,
-              lineHeight: 1.5,
-              color: "var(--ink, #e7ecf3)",
-            }}
-          >
-            🏁 <strong>Ce tournoi est terminé : il va être rouvert.</strong> Son classement final
-            est effacé et il repasse « en cours ». Une nouvelle championne sera proclamée — et
-            réannoncée sur Discord — dès que cette manche aura été rejouée.
-          </div>
-        )}
-
+      {tournamentFinished && (
         <div
           role="note"
           style={{
             marginTop: 14,
             padding: "10px 12px",
             borderRadius: "var(--r-cy-sm, 8px)",
-            border: "1px solid color-mix(in srgb, var(--amber, #ffb020) 45%, transparent)",
-            background: "color-mix(in srgb, var(--amber, #ffb020) 8%, transparent)",
+            border: "1px solid color-mix(in srgb, var(--red-live, #ff4d4d) 45%, transparent)",
+            background: "color-mix(in srgb, var(--red-live, #ff4d4d) 8%, transparent)",
             fontSize: 12.5,
             lineHeight: 1.5,
             color: "var(--ink, #e7ecf3)",
           }}
         >
-          ⚠️ <strong>Note les scores ci-dessous avant de continuer.</strong> Rien n&apos;est
-          archivé : une fois la manche effacée, il faudra les ressaisir à la main pour revenir à
-          l&apos;état actuel.
+          🏁 <strong>Ce tournoi est terminé : il va être rouvert.</strong> Son classement final
+          est effacé et il repasse « en cours ». Une nouvelle championne sera proclamée — et
+          réannoncée sur Discord — dès que cette manche aura été rejouée.
         </div>
+      )}
 
-        {/* Une manche à seize équipes déborde des 220 pixels : la zone passe par
-            `ScrollArea`, comme toute zone défilante du projet — c'est ce qui lui
-            donne sa barre discrète et, surtout, l'accès au clavier qu'un
-            `overflow: auto` posé à la main ne donne pas. La liste garde ses
-            propres sémantiques à l'intérieur. */}
-        <ScrollArea
-          orientation="y"
-          ariaLabel="Scores qui vont être effacés"
-          style={{ maxHeight: 220, marginTop: 12 }}
+      <div
+        role="note"
+        style={{
+          marginTop: 14,
+          padding: "10px 12px",
+          borderRadius: "var(--r-cy-sm, 8px)",
+          border: "1px solid color-mix(in srgb, var(--amber, #ffb020) 45%, transparent)",
+          background: "color-mix(in srgb, var(--amber, #ffb020) 8%, transparent)",
+          fontSize: 12.5,
+          lineHeight: 1.5,
+          color: "var(--ink, #e7ecf3)",
+        }}
+      >
+        ⚠️ <strong>Note les scores ci-dessous avant de continuer.</strong> Rien n&apos;est
+        archivé : une fois la manche effacée, il faudra les ressaisir à la main pour revenir à
+        l&apos;état actuel.
+      </div>
+
+      {/* Une manche à seize équipes déborde des 220 pixels : la zone passe par
+          `ScrollArea`, comme toute zone défilante du projet — c'est ce qui lui
+          donne sa barre discrète et, surtout, l'accès au clavier qu'un
+          `overflow: auto` posé à la main ne donne pas. La liste garde ses
+          propres sémantiques à l'intérieur. */}
+      <ScrollArea
+        orientation="y"
+        ariaLabel="Scores qui vont être effacés"
+        style={{ maxHeight: 220, marginTop: 12 }}
+      >
+        <ul
+          style={{
+            listStyle: "none",
+            margin: 0,
+            padding: 0,
+            display: "flex",
+            flexDirection: "column",
+            gap: 6,
+          }}
         >
-          <ul
-            style={{
-              listStyle: "none",
-              margin: 0,
-              padding: 0,
-              display: "flex",
-              flexDirection: "column",
-              gap: 6,
-            }}
-          >
-            {matches.map((match) => (
-              <li
-                key={match.id}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  gap: 12,
-                  fontSize: 12.5,
-                  padding: "6px 10px",
-                  borderRadius: "var(--r-cy-sm, 8px)",
-                  background: "var(--cyber-bg-3, #1b2029)",
-                }}
-              >
-                <span style={{ color: "var(--text-2, #9aa4b2)" }}>
-                  {teamLabel(match.team1Name, match.team1Placeholder, "À venir")} vs{" "}
-                  {teamLabel(match.team2Name, match.team2Placeholder, "À venir")}
-                </span>
-                <span
-                  className="mono"
-                  style={{ color: "var(--ink, #e7ecf3)", whiteSpace: "nowrap" }}
-                >
-                  {scoreLabel(match)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </ScrollArea>
-
-        <form onSubmit={submit}>
-          <label
-            style={{
-              display: "flex",
-              alignItems: "flex-start",
-              gap: 8,
-              marginTop: 16,
-              fontSize: 13,
-              lineHeight: 1.5,
-              color: "var(--text-2, #9aa4b2)",
-              cursor: busy ? "default" : "pointer",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={acknowledged}
-              onChange={(e) => setAcknowledged(e.target.checked)}
-              disabled={busy}
-              style={{ marginTop: 2 }}
-            />
-            {/* NOSONAR S6772 — label en flex avec `gap` */}
-            J&apos;ai noté les scores ci-dessus.
-          </label>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn"
-              disabled={!acknowledged || busy}
+          {matches.map((match) => (
+            <li
+              key={match.id}
               style={{
-                padding: "8px 20px",
-                fontSize: 13,
-                borderColor: "var(--red-live, #ff4d4d)",
-                color: acknowledged && !busy ? "var(--red-live, #ff4d4d)" : undefined,
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 12,
+                fontSize: 12.5,
+                padding: "6px 10px",
+                borderRadius: "var(--r-cy-sm, 8px)",
+                background: "var(--cyber-bg-3, #1b2029)",
               }}
             >
-              {/* Neutre, et pas « cette manche » : le stade peut être un *tour*
-                  d'arbre final, et le libellé se serait trompé de genre une fois
-                  sur deux. Le titre du dialogue, lui, porte déjà le nom exact. */}
-              {busy ? "Effacement…" : "Effacer et reculer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body,
+              <span style={{ color: "var(--text-2, #9aa4b2)" }}>
+                {teamLabel(match.team1Name, match.team1Placeholder, "À venir")} vs{" "}
+                {teamLabel(match.team2Name, match.team2Placeholder, "À venir")}
+              </span>
+              <span
+                className="mono"
+                style={{ color: "var(--ink, #e7ecf3)", whiteSpace: "nowrap" }}
+              >
+                {scoreLabel(match)}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </ScrollArea>
+
+      <form onSubmit={submit}>
+        <label
+          style={{
+            display: "flex",
+            alignItems: "flex-start",
+            gap: 8,
+            marginTop: 16,
+            fontSize: 13,
+            lineHeight: 1.5,
+            color: "var(--text-2, #9aa4b2)",
+            cursor: busy ? "default" : "pointer",
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={acknowledged}
+            onChange={(e) => setAcknowledged(e.target.checked)}
+            disabled={busy}
+            style={{ marginTop: 2 }}
+          />
+          {/* NOSONAR S6772 — label en flex avec `gap` */}
+          J&apos;ai noté les scores ci-dessus.
+        </label>
+
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={onClose}
+            disabled={busy}
+            style={{ padding: "8px 18px", fontSize: 13 }}
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn"
+            disabled={!acknowledged || busy}
+            style={{
+              padding: "8px 20px",
+              fontSize: 13,
+              borderColor: "var(--red-live, #ff4d4d)",
+              color: acknowledged && !busy ? "var(--red-live, #ff4d4d)" : undefined,
+            }}
+          >
+            {/* Neutre, et pas « cette manche » : le stade peut être un *tour*
+                d'arbre final, et le libellé se serait trompé de genre une fois
+                sur deux. Le titre du dialogue, lui, porte déjà le nom exact. */}
+            {busy ? "Effacement…" : "Effacer et reculer"}
+          </button>
+        </div>
+      </form>
+    </TournamentDialogFrame>
   );
 }

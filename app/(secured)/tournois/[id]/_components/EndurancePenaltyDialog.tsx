@@ -1,10 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/toast";
-import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   MAX_ENDURANCE_PENALTY_POINTS,
   MAX_ENDURANCE_PENALTY_REASON,
@@ -12,6 +9,7 @@ import {
   endurancePenaltyMessage,
 } from "@/lib/shared/endurance-penalty";
 import { mapError } from "../_lib/error-map";
+import { TournamentDialogFrame } from "./TournamentDialogFrame";
 
 interface EndurancePenaltyDialogProps {
   tournamentId: number;
@@ -48,8 +46,6 @@ export function EndurancePenaltyDialog({
   const [points, setPoints] = useState("1");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
-  const dialogRef = useDialogBehavior({ open: true, onClose, locked: busy });
-  const backdrop = useBackdropDismiss(onClose, busy);
 
   const parsedPoints = Number(points);
   const violation = checkEndurancePenalty(parsedPoints, reason);
@@ -97,118 +93,92 @@ export function EndurancePenaltyDialog({
     }
   };
 
-  return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
-      role="presentation"
-      {...backdrop}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 80,
-        background: "rgba(6, 8, 12, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
+  return (
+    <TournamentDialogFrame
+      titleId="endurance-penalty-title"
+      maxWidth={480}
+      zIndex={80}
+      busy={busy}
+      onClose={onClose}
     >
-      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        className="dialog-bounded"
-        aria-labelledby="endurance-penalty-title"
-        tabIndex={-1}
-        style={{
-          width: "100%",
-          maxWidth: 480,
-          background: "var(--cyber-bg-2, #14181f)",
-          border: "1px solid var(--line-strong-cy, var(--line-soft))",
-          borderRadius: "var(--r-cy-md, 12px)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-          padding: 22,
-        }}
-      >
-        <form onSubmit={submit}>
-          <h3 id="endurance-penalty-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
-            Pénalité d&apos;endurance
-          </h3>
-          <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
-            {teamName} · {currentPoints} point{currentPoints > 1 ? "s" : ""} ·{" "}
-            {round > 0 ? `manche ${round}` : "avant la première manche"}
+      <form onSubmit={submit}>
+        <h3 id="endurance-penalty-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
+          Pénalité d&apos;endurance
+        </h3>
+        <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
+          {teamName} · {currentPoints} point{currentPoints > 1 ? "s" : ""} ·{" "}
+          {round > 0 ? `manche ${round}` : "avant la première manche"}
+        </p>
+
+        <div className="field" style={{ marginTop: 18 }}>
+          <label htmlFor="endurance-penalty-points">Points retirés</label>
+          <input
+            id="endurance-penalty-points"
+            type="number"
+            inputMode="numeric"
+            min={1}
+            max={MAX_ENDURANCE_PENALTY_POINTS}
+            step={1}
+            value={points}
+            onChange={(e) => setPoints(e.target.value)}
+            aria-invalid={violation === "POINTS_NOT_POSITIVE" || violation === "POINTS_TOO_HIGH"}
+            aria-describedby="endurance-penalty-hint"
+            style={{ width: 120, fontSize: 13 }}
+          />
+        </div>
+
+        <div className="field" style={{ marginTop: 14 }}>
+          <label htmlFor="endurance-penalty-reason">Motif</label>
+          <textarea
+            id="endurance-penalty-reason"
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            rows={3}
+            maxLength={MAX_ENDURANCE_PENALTY_REASON}
+            aria-invalid={violation === "REASON_TOO_LONG"}
+            aria-describedby="endurance-penalty-hint"
+            placeholder="Retard au coup d'envoi, joueur non éligible aligné…"
+            style={{ width: "100%", resize: "vertical", fontSize: 13 }}
+          />
+          {/*
+            `aria-live` : la ligne change sous les doigts de l'arbitre (le
+            capital restant suit la saisie, l'élimination s'annonce), et un
+            lecteur d'écran qui ne la relit pas laisserait cette annonce à la
+            seule couleur.
+          */}
+          <p
+            id="endurance-penalty-hint"
+            aria-live="polite"
+            style={{
+              margin: "6px 0 0",
+              fontSize: 12,
+              color: hintIsWarning ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+            }}
+          >
+            {hint}
           </p>
+        </div>
 
-          <div className="field" style={{ marginTop: 18 }}>
-            <label htmlFor="endurance-penalty-points">Points retirés</label>
-            <input
-              id="endurance-penalty-points"
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={MAX_ENDURANCE_PENALTY_POINTS}
-              step={1}
-              value={points}
-              onChange={(e) => setPoints(e.target.value)}
-              aria-invalid={violation === "POINTS_NOT_POSITIVE" || violation === "POINTS_TOO_HIGH"}
-              aria-describedby="endurance-penalty-hint"
-              style={{ width: 120, fontSize: 13 }}
-            />
-          </div>
-
-          <div className="field" style={{ marginTop: 14 }}>
-            <label htmlFor="endurance-penalty-reason">Motif</label>
-            <textarea
-              id="endurance-penalty-reason"
-              value={reason}
-              onChange={(e) => setReason(e.target.value)}
-              rows={3}
-              maxLength={MAX_ENDURANCE_PENALTY_REASON}
-              aria-invalid={violation === "REASON_TOO_LONG"}
-              aria-describedby="endurance-penalty-hint"
-              placeholder="Retard au coup d'envoi, joueur non éligible aligné…"
-              style={{ width: "100%", resize: "vertical", fontSize: 13 }}
-            />
-            {/*
-              `aria-live` : la ligne change sous les doigts de l'arbitre (le
-              capital restant suit la saisie, l'élimination s'annonce), et un
-              lecteur d'écran qui ne la relit pas laisserait cette annonce à la
-              seule couleur.
-            */}
-            <p
-              id="endurance-penalty-hint"
-              aria-live="polite"
-              style={{
-                margin: "6px 0 0",
-                fontSize: 12,
-                color: hintIsWarning ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
-              }}
-            >
-              {hint}
-            </p>
-          </div>
-
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn"
-              disabled={busy || violation !== null}
-              style={{ padding: "8px 20px", fontSize: 13 }}
-            >
-              {busy ? "Enregistrement…" : "Appliquer la pénalité"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body,
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button
+            type="button"
+            className="btn ghost"
+            onClick={onClose}
+            disabled={busy}
+            style={{ padding: "8px 18px", fontSize: 13 }}
+          >
+            Annuler
+          </button>
+          <button
+            type="submit"
+            className="btn"
+            disabled={busy || violation !== null}
+            style={{ padding: "8px 20px", fontSize: 13 }}
+          >
+            {busy ? "Enregistrement…" : "Appliquer la pénalité"}
+          </button>
+        </div>
+      </form>
+    </TournamentDialogFrame>
   );
 }

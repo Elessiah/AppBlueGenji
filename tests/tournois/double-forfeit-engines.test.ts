@@ -1,11 +1,9 @@
 import { describe, expect, it } from "@jest/globals";
 import { DEFAULT_SWISS_POINTS, computeTiebreaks, replaySwiss } from "@/lib/shared/swiss";
 import { replaySurvival } from "@/lib/shared/survival";
-import {
-  DEFAULT_ENDURANCE_CONFIG,
-  planNextPlayoffRound,
-  replayEndurance,
-} from "@/lib/shared/bg-survie";
+import { DEFAULT_ENDURANCE_CONFIG } from "@/lib/shared/bg-survie/config";
+import { planNextPlayoffRound } from "@/lib/shared/bg-survie/playoffs";
+import { replayEndurance } from "@/lib/shared/bg-survie/replay";
 import type { MatchFormat } from "@/lib/shared/match-format";
 
 /**
