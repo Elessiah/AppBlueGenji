@@ -170,6 +170,7 @@ const MAX_UNFINISHED_RATIO = 0.99;
 
 /** Part parcourue d'un segment borné par deux jalons, ramenée dans [0, 1]. */
 function segmentRatio(from: number, to: number, now: number): number {
+  // eslint-disable-next-line sonarjs/no-inverted-boolean-check -- voir le NOSONAR ci-dessous
   if (!(to > from)) return 0; // NOSONAR typescript:S1940 — la négation écarte aussi NaN, ce que `to <= from` laisserait passer
   return clamp01((now - from) / (to - from));
 }
@@ -287,6 +288,7 @@ function roundsRatio(
   currentRound: number,
   totalRounds: number,
 ): number {
+  // eslint-disable-next-line sonarjs/no-inverted-boolean-check -- voir le NOSONAR ci-dessous
   if (!(totalRounds > 0) || currentRound < 1) return 0; // NOSONAR typescript:S1940 — la négation écarte aussi NaN, ce que `totalRounds <= 0` laisserait passer
   const inner = completedRatio(matches.filter((match) => match.roundNumber === currentRound)) ?? 0;
   return clamp01((currentRound - 1 + inner) / totalRounds);

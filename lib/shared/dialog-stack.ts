@@ -9,6 +9,7 @@ export interface ScrollLockTarget {
 }
 
 /** Jeton identifiant une couche ouverte. Un jeton par ouverture de modale. */
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- voir le NOSONAR ci-dessous
 export type DialogToken = symbol; // NOSONAR typescript:S6564 — nomme le rôle du symbole (jeton de couche) dans les signatures de la pile
 
 export interface DialogStack {

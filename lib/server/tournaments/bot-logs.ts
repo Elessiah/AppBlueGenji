@@ -108,6 +108,7 @@ type AssertSameKinds = [
   BotEventKind extends PendingBotLog["kind"] ? true : never,
 ];
 const KINDS_MATCH: AssertSameKinds = [true, true];
+// eslint-disable-next-line sonarjs/void-use -- voir le NOSONAR ci-dessous
 void KINDS_MATCH; // NOSONAR typescript:S3735 — assertion de type à la compilation, marquée utilisée
 
 /**
