@@ -13,7 +13,7 @@
  */
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
-import { getAccountDeletionPlan } from "@/lib/server/users-service";
+import { getAccountDeletionPlan } from "@/lib/server/users/account-deletion";
 
 export async function GET() {
   const user = await getCurrentUser();

@@ -2,7 +2,7 @@ import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { parseRoles, toIso } from "@/lib/server/serialization";
 import type { TeamJoinRequest, TeamRole, TeamSentInvitation } from "@/lib/shared/types";
-import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users-service";
+import { getUserIdByPseudo, sanitizeRoles } from "@/lib/server/users/roles";
 import { arrivalRoles, teamJoinRefusal } from "@/lib/shared/team-join";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { notifyTeamJoinRequest } from "@/lib/server/team-join-notifications";

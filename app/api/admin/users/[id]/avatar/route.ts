@@ -5,7 +5,7 @@ import { notifyUserAvatarRemoved } from "@/lib/server/logo-quarantine";
 import { readJsonBody } from "@/lib/server/request-body";
 import { validateModerationReasonBody } from "@/lib/shared/logo-quarantine";
 import { publishStaffAction } from "@/lib/server/staff-audit";
-import { removeUserAvatarAsModerator } from "@/lib/server/users-service";
+import { removeUserAvatarAsModerator } from "@/lib/server/users/avatar";
 import { ANONYMOUS_PLAYER_LABEL } from "@/lib/shared/log-privacy";
 import { can } from "@/lib/shared/permissions";
 import { toDiskUploadPath } from "@/lib/shared/uploads";

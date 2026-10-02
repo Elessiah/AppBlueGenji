@@ -1,7 +1,7 @@
 import { getCurrentUser } from "@/lib/server/auth";
 import { fail, ok } from "@/lib/server/http";
 import { deleteStoredImage, processAndStoreImage } from "@/lib/server/image-upload";
-import { updateUserAvatar } from "@/lib/server/users-service";
+import { updateUserAvatar } from "@/lib/server/users/avatar";
 import { ACCOUNT_DELETED_ERROR } from "@/lib/shared/account-deletion";
 import { isImageUploadError } from "@/lib/shared/image-upload-errors";
 import { toDiskUploadPath, toServedUploadUrl } from "@/lib/shared/uploads";

@@ -106,7 +106,7 @@ const reconciliationState = globalThis as typeof globalThis & {
  * attend, et ce rattrapage passe par le service des comptes, qui rappelle
  * `getDatabase` — sous la porte des migrations, il s'attendrait lui-même.
  * L'import est dynamique pour la même raison, à l'échelle des modules :
- * `users-service` importe ce fichier.
+ * `users/deleted-accounts` importe ce fichier.
  *
  * Un échec est dit et **non** retenté dans ce processus : un rattrapage qui
  * tombe à chaque requête ferait d'une panne un déluge. Le redémarrage suivant
@@ -119,7 +119,7 @@ const reconciliationState = globalThis as typeof globalThis & {
  */
 function scheduleDeletedAccountsReconciliation(): void {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  reconciliationState.__bgDeletedAccountsReconciliation ??= import("@/lib/server/users-service")
+  reconciliationState.__bgDeletedAccountsReconciliation ??= import("@/lib/server/users/deleted-accounts")
     .then(({ reconcileDeletedAccounts }) => reconcileDeletedAccounts())
     .then(({ erased, renamed, failed }) => {
       if (erased + renamed + failed > 0) {

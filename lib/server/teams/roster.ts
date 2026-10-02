@@ -2,7 +2,7 @@ import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { parseRoles } from "@/lib/server/serialization";
 import type { TeamRole } from "@/lib/shared/types";
-import { sanitizeRoles } from "@/lib/server/users-service";
+import { sanitizeRoles } from "@/lib/server/users/roles";
 import { assertTermsAccepted } from "@/lib/server/terms-acceptance";
 import { lockMemberRoles, withTeamRosterLock, writeActiveMembership } from "./access";
 

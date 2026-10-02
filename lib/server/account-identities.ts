@@ -44,10 +44,9 @@ import {
   createOrGetBlizzardUser,
   createOrGetDiscordUser,
   createOrGetGoogleUser,
-  normalizeBattletag,
-  normalizeDiscordHandle,
   type TermsConsent,
-} from "@/lib/server/users-service";
+} from "@/lib/server/users/sign-in";
+import { normalizeBattletag, normalizeDiscordHandle } from "@/lib/server/users/tag-normalization";
 import {
   buildAccountConnections,
   checkConnectionUnlink,

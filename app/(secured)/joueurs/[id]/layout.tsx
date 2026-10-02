@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getPlayerPageIdentity } from "@/lib/server/users-service";
+import { getPlayerPageIdentity } from "@/lib/server/users/full-profile";
 import { parseEntityPageId, playerPageTitle } from "@/lib/shared/entity-page-titles";
 
 type MetadataProps = {
