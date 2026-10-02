@@ -191,6 +191,14 @@ export async function rankEliminationPhase(
   const doubleForfeited = `(m.status = 'COMPLETED' AND m.double_forfeit = 1 AND ${involved})`;
   const exclusion =
     placed.length > 0 ? `AND r.team_id NOT IN (${placed.map(() => "?").join(",")})` : "";
+  // Seules les engagées **du tableau** sont rangées. Dans une phase d'un
+  // tournoi `MULTI` (`phaseId > 0`), la jointure sur les équipes de la phase
+  // est stricte : une équipe sortie à une phase antérieure, sans aucun match
+  // ici (0 V – 0 D), se rangeait sinon devant les perdantes 0 V – 1 D de la
+  // phase, décalait leurs rangs et pouvait prendre une place de qualifiée.
+  // Hors phase (`phaseId = 0`), tout le plateau est inscrit au tableau : la
+  // jointure reste facultative et ne sert qu'au seed.
+  const phaseTeamsJoin = phaseId > 0 ? "JOIN" : "LEFT JOIN";
   // L'ordre est donné par `orderEliminationRest`, pas par un `ORDER BY` : il
   // se teste sans base, et le départage s'y lit en entier.
   const [rankingRows] = await connection.execute<(RowDataPacket & EliminationRestRow)[]>(
@@ -207,7 +215,7 @@ export async function rankEliminationPhase(
         ELSE NULL
       END) AS last_stage
      FROM bg_tournament_registrations r
-     LEFT JOIN bg_tournament_phase_teams pt ON pt.phase_id = ? AND pt.team_id = r.team_id
+     ${phaseTeamsJoin} bg_tournament_phase_teams pt ON pt.phase_id = ? AND pt.team_id = r.team_id
      LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id AND m.phase_id = ?
      WHERE r.tournament_id = ? ${exclusion}
      GROUP BY r.team_id, r.seed, pt.seed`,
