@@ -1,6 +1,7 @@
 import type { ResultSetHeader, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
 import { normalizePseudo, parseRoles } from "@/lib/server/serialization";
+import { closeUserStreams } from "@/lib/server/session-streams";
 import { type PlatformRole, sanitizePlatformRoles } from "@/lib/shared/permissions";
 import type { TeamRole } from "@/lib/shared/types";
 
@@ -50,6 +51,13 @@ export async function setUserRoles(
   // le `SELECT` ci-dessus donne déjà, et le même geste que `updateOwnProfile`
   // et `updateUserAvatar`, qui refusent bruyamment sur la même condition.
   if (result.affectedRows === 0) throw new Error("USER_NOT_FOUND");
+
+  // Un flux SSE de tournoi ne lit les droits qu'à son ouverture : il gardait
+  // le palier, l'aperçu du plateau et l'accès aux tournois non publiés d'un
+  // rôle retiré tant que l'onglet restait ouvert. Le fermer fait reconnecter
+  // le client, et la route recalcule le contexte du lecteur sur les rôles
+  // enregistrés — retrait comme ajout (`session-streams.ts`).
+  closeUserStreams(targetUserId);
 
   return sanitized;
 }
