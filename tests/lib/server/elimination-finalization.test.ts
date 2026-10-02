@@ -6,7 +6,9 @@ jest.mock("@/lib/server/tournaments/repository");
 import {
   finalizeTournamentIfDone,
   isEliminationPhaseComplete,
+  orderEliminationRest,
   rankEliminationPhase,
+  type EliminationRestRow,
 } from "@/lib/server/tournaments/finalization";
 import { finishTournament, resetRegistrationRanks } from "@/lib/server/tournaments/repository";
 import { connectionMock, fakeConnection } from "../../helpers/sql-double";
@@ -111,7 +113,7 @@ describe("rankEliminationPhase", () => {
     // Le reste exclut les deux finalistes déjà placés.
     const rest = sqlCalls().find((c) => REST.test(c.sql));
     expect(rest?.sql).toContain("AND r.team_id NOT IN (?,?)");
-    expect(rest?.params).toEqual([0, 5, 1, 2]);
+    expect(rest?.params).toEqual([0, 0, 5, 1, 2]);
   });
 
   it("lit la petite finale quand le tableau en a une", async () => {
@@ -166,7 +168,105 @@ describe("rankEliminationPhase", () => {
     expect(ranks.map((r) => [r.teamId, r.rank])).toEqual([[4, 1], [9, 2]]);
     const rest = sqlCalls().find((c) => REST.test(c.sql));
     expect(rest?.sql).not.toContain("NOT IN");
-    expect(rest?.params).toEqual([0, 5]);
+    expect(rest?.params).toEqual([0, 0, 5]);
+  });
+
+  it("range le reste par le bilan puis le stade, jamais par l'heure de saisie", async () => {
+    route(UPPER_FINAL, [final(1, 2)]);
+    // Rendu dans le désordre : l'ordre vient du code, pas de la base.
+    route(REST, [
+      { team_id: 30, seed: 3, wins: 0, losses: 1, last_stage: 1001 },
+      { team_id: 40, seed: 4, wins: 1, losses: 1, last_stage: 1002 },
+      { team_id: 50, seed: 5, wins: "1", losses: "1", last_stage: "1003" },
+    ]);
+
+    const ranks = await rankEliminationPhase(conn(), 5, 0, "SINGLE", false);
+
+    expect(ranks.map((r) => r.teamId)).toEqual([1, 2, 50, 40, 30]);
+    const rest = sqlCalls().find((c) => REST.test(c.sql));
+    expect(rest?.sql).not.toContain("updated_at");
+    expect(rest?.sql).not.toContain("ORDER BY");
+    expect(rest?.sql).toContain("FIELD(m.bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') * 1000 + m.round_number");
+  });
+
+  it("départage sur le seed de la phase avant celui de l'inscription", async () => {
+    route(REST, [
+      { team_id: 4, seed: 2, wins: 0, losses: 1, last_stage: 1001 },
+      { team_id: 9, seed: 1, wins: 0, losses: 1, last_stage: 1001 },
+    ]);
+
+    const ranks = await rankEliminationPhase(conn(), 5, 3, "SINGLE", false);
+
+    expect(ranks.map((r) => r.teamId)).toEqual([9, 4]);
+    const rest = sqlCalls().find((c) => REST.test(c.sql));
+    expect(rest?.sql).toContain("COALESCE(pt.seed, r.seed) AS seed");
+    expect(rest?.sql).toContain(
+      "LEFT JOIN bg_tournament_phase_teams pt ON pt.phase_id = ? AND pt.team_id = r.team_id",
+    );
+    expect(rest?.params).toEqual([3, 3, 5]);
+  });
+});
+
+describe("orderEliminationRest", () => {
+  const row = (team_id: number, extra: Partial<EliminationRestRow> = {}): EliminationRestRow => ({
+    team_id,
+    wins: 1,
+    losses: 1,
+    last_stage: 1002,
+    seed: team_id,
+    ...extra,
+  });
+
+  it("classe par victoires décroissantes, puis défaites croissantes", () => {
+    expect(
+      orderEliminationRest([
+        row(1, { wins: 0 }),
+        row(2, { wins: 2, losses: 2 }),
+        row(3, { wins: 2, losses: 1 }),
+      ]),
+    ).toEqual([3, 2, 1]);
+  });
+
+  it("à bilan égal, place devant l'équipe sortie le plus loin dans le tableau", () => {
+    // Sortie au 4ᵉ tour du bas de tableau contre sortie au 3ᵉ ; le bas de
+    // tableau pèse plus que n'importe quel tour du haut.
+    expect(
+      orderEliminationRest([
+        row(1, { last_stage: 2003 }),
+        row(2, { last_stage: 2004 }),
+        row(3, { last_stage: 1005 }),
+      ]),
+    ).toEqual([2, 1, 3]);
+  });
+
+  it("à stade égal, départage par le seed puis par l'identifiant", () => {
+    expect(orderEliminationRest([row(9, { seed: 2 }), row(4, { seed: 7 }), row(8, { seed: 2 })])).toEqual([
+      8, 9, 4,
+    ]);
+  });
+
+  it("range un seed absent après tous les seeds connus", () => {
+    expect(orderEliminationRest([row(1, { seed: null }), row(2, { seed: 16 })])).toEqual([2, 1]);
+  });
+
+  it("tient une équipe sans rencontre décidée derrière celles qui en ont une", () => {
+    expect(orderEliminationRest([row(1, { wins: 0, losses: 0, last_stage: null }), row(2, { wins: 0, losses: 0 })])).toEqual([
+      2, 1,
+    ]);
+  });
+
+  it("rend le même ordre quel que soit l'ordre de lecture", () => {
+    const rows = [row(5), row(3, { seed: 1 }), row(7, { last_stage: 1001 }), row(2, { wins: 3 }), row(6)];
+    const expected = orderEliminationRest(rows);
+    expect(orderEliminationRest([...rows].reverse())).toEqual(expected);
+    expect(orderEliminationRest([rows[2], rows[0], rows[4], rows[1], rows[3]])).toEqual(expected);
+    expect(expected).toEqual([2, 3, 5, 6, 7]);
+  });
+
+  it("ne modifie pas le tableau reçu", () => {
+    const rows = [row(2), row(1)];
+    orderEliminationRest(rows);
+    expect(rows.map((r) => r.team_id)).toEqual([2, 1]);
   });
 });
 

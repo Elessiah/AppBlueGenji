@@ -473,10 +473,12 @@ describe("caractérisation du moteur pur", () => {
     expect(runCases(CASES * 2, (r, i) => randomPhases(r, i % 3 === 0), findPhaseIssue)).toMatchSnapshot();
   });
 
-  it("findPhaseIssue — valeurs non numériques reçues telles quelles", () => {
-    // Le contrôle porte sur « hors bornes » : une valeur qui n'est hors
-    // d'aucune borne (`NaN`, une chaîne, `undefined`) passe, `null` (qui vaut 0
-    // dans une comparaison) est refusé. Comportement d'origine, à garder.
+  it("findPhaseIssue — valeurs non numériques ou non finies refusées", () => {
+    // Toute valeur qui n'est pas un nombre fini est refusée : `NaN` (d'une
+    // saisie non numérique passée par `Number(...)`), une chaîne, `undefined`
+    // et `null` comme les bornes. Avant le correctif `phase-qualifier-nan`,
+    // `NaN`, une chaîne ou `undefined` passaient, aucune comparaison ne les
+    // jugeant « hors bornes ».
     const plan = (first: Partial<PhaseConfig>): PhaseConfig[] => [
       {
         position: 1,
@@ -505,15 +507,17 @@ describe("caractérisation du moteur pur", () => {
     const odd = (value: unknown): number => value as number;
     const code = (first: Partial<PhaseConfig>): string | null => findPhaseIssue(plan(first))?.code ?? null;
 
-    expect(code({ qualifierValue: Number.NaN })).toBeNull();
-    expect(code({ qualifierValue: odd("abc") })).toBeNull();
-    expect(code({ qualifierValue: odd(undefined) })).toBeNull();
+    expect(code({ qualifierValue: Number.NaN })).toBe("INVALID_PHASE_QUALIFIER");
+    expect(code({ qualifierValue: odd("abc") })).toBe("INVALID_PHASE_QUALIFIER");
+    expect(code({ qualifierValue: odd(undefined) })).toBe("INVALID_PHASE_QUALIFIER");
     expect(code({ qualifierValue: odd(null) })).toBe("INVALID_PHASE_QUALIFIER");
-    expect(code({ qualifierMode: "PERCENT", qualifierValue: Number.NaN })).toBeNull();
-    expect(code({ qualifierMode: "PERCENT", qualifierValue: odd("abc") })).toBeNull();
-    expect(code({ swissTotalRounds: Number.NaN })).toBeNull();
+    expect(code({ qualifierMode: "PERCENT", qualifierValue: Number.NaN })).toBe("INVALID_PHASE_QUALIFIER");
+    expect(code({ qualifierMode: "PERCENT", qualifierValue: odd("abc") })).toBe("INVALID_PHASE_QUALIFIER");
+    expect(code({ swissTotalRounds: Number.NaN })).toBe("INVALID_PHASE_SWISS_ROUNDS");
     expect(code({ swissTotalRounds: odd(undefined) })).toBe("INVALID_PHASE_SWISS_ROUNDS");
-    expect(code({ format: "SURVIVAL", survivalRoundsPerCut: Number.NaN })).toBeNull();
+    expect(code({ format: "SURVIVAL", survivalRoundsPerCut: Number.NaN })).toBe(
+      "INVALID_PHASE_SURVIVAL_ROUNDS",
+    );
     expect(code({ format: "SURVIVAL", survivalRoundsBeforeFirstCut: odd("2") })).toBe(
       "INVALID_PHASE_SURVIVAL_ROUNDS",
     );

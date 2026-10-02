@@ -45,7 +45,7 @@ continuait donc de recevoir les instantanés après une déconnexion, une
 révocation, une suspension ou une suppression de compte.
 
 `lib/server/session-streams.ts` range chaque flux ouvert par compte et par
-empreinte de session. Quatre gestes le ferment :
+empreinte de session. Cinq gestes le ferment :
 
 | Geste | Appel | Flux fermés |
 | --- | --- | --- |
@@ -53,6 +53,7 @@ empreinte de session. Quatre gestes le ferment :
 | « Déconnecter mes autres sessions », détachement d'une porte (`revokeOtherSessions`) | `closeUserStreams(id, { keepTokenHash })` | tous sauf ceux de la session courante |
 | Suspension (`suspendAccount`) | `closeUserStreams(id)`, **après le commit** | tous |
 | Suppression du compte (`deleteOwnAccount`, deux modes) | `closeUserStreams(id)`, **après le commit** | tous |
+| Changement des rôles de plateforme (`setUserRoles`, retrait comme ajout) | `closeUserStreams(id)`, **après l'écriture** | tous |
 
 Le flux s'inscrit **dès la session lue**, avant les lectures de l'instantané et
 du contexte : une révocation qui tombe pendant celles-ci le fait répondre 401
@@ -60,6 +61,12 @@ au lieu d'ouvrir. Fermé, le client se reconnecte et la route le refuse — c'es
 la porte ordinaire qui décide, pas une seconde règle. Relire la session au
 battement de cœur (25 s) aurait coûté une requête par flux et laissé encore
 jusqu'à 25 s de lecture.
+
+Le changement de rôles ne retire pas la session : le client qui se reconnecte
+est **accepté**, et la route recalcule le contexte du lecteur (palier, aperçu,
+tournoi non publié) sur les rôles enregistrés. Un flux qui s'ouvrait au même
+instant, sur des rôles lus avant l'écriture, est refusé une fois (401) puis
+rouvert par la reconnexion ordinaire du client.
 
 Le registre vit en mémoire du processus, comme les salles de diffusion qu'il
 accompagne : il suppose l'instance unique que le flux suppose déjà.

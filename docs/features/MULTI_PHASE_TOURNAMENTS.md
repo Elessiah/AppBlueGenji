@@ -59,6 +59,12 @@ Chaque entrée : `format`, `qualifierMode` (`COUNT` | `PERCENT`), `qualifierValu
 et selon le format `swissTotalRounds`, `survivalRoundsBeforeFirstCut`,
 `survivalRoundsPerCut`, `hasThirdPlaceMatch`.
 
+Une valeur qui n'est pas un nombre fini est refusée comme une valeur hors
+bornes (`findPhaseIssue`, champ désigné) : `normalizePhaseConfigs` convertit
+`qualifierValue` par `Number(...)`, qui rend `NaN` sur un texte, et aucune
+comparaison ne l'arrêtait. Seule la cible de la dernière phase, jamais lue,
+échappe au contrôle.
+
 Codes d'erreur (400) : `MISSING_PHASES`, `INVALID_PHASE_FORMAT`,
 `DOUBLE_MUST_BE_LAST_PHASE`, `INVALID_QUALIFIER_VALUE`, `INVALID_QUALIFIER_COUNT`
 (deux phases `COUNT` consécutives dont la seconde qualifie autant ou plus que la
@@ -129,6 +135,18 @@ Le classement d'une phase provient **toujours du moteur** de cette phase
 (`computeFinalRanks` en survie, `loadSwissRanking` en suisse,
 `rankEliminationPhase` en bracket) — jamais de l'ordre des standings en base, qui
 reste l'ordre de seeding tant que les rangs ne sont pas écrits.
+
+Hors podium, `rankEliminationPhase` range le tableau par `orderEliminationRest`
+(`lib/server/tournaments/finalization.ts`) : victoires décroissantes, défaites
+croissantes, **stade** le plus avancé (tableau `UPPER` < `LOWER` < `GRAND`, puis
+tour de la dernière rencontre décidée), seed — celui de la phase
+(`bg_tournament_phase_teams.seed`) s'il existe, sinon celui de l'inscription,
+`NULL` quand le plateau a été semé sur le classement du site —, identifiant. Ce départage
+remplace l'heure de la dernière rencontre (`updated_at`), qui rangeait deux
+équipes sorties au même tour selon la seconde de saisie de leurs scores — et
+donnait deux classements différents, à matchs identiques, d'une exécution du
+seed à l'autre. Il vaut aussi pour la qualification d'une phase à élimination
+et pour la clôture d'un tournoi `SINGLE` / `DOUBLE`.
 
 ## Verrouillage des scores
 

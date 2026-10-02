@@ -4,6 +4,7 @@ import {
   findPhaseIssue,
   MAX_PHASES,
   MIN_PHASES,
+  normalizePhaseConfigs,
   previousPowerOfTwo,
   resolvePhaseQualifiers,
   resolvePhasePlan,
@@ -789,6 +790,49 @@ describe("tournament-phases — findPhaseIssue", () => {
       phaseIndex: 1,
       field: "qualifierValue",
     });
+  });
+
+  it("désigne une qualification non finie, en nombre comme en pourcentage", () => {
+    for (const qualifierValue of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+      expect(findPhaseIssue(plan({ qualifierValue }, {}))).toEqual({
+        code: "INVALID_PHASE_QUALIFIER",
+        phaseIndex: 0,
+        field: "qualifierValue",
+      });
+      expect(findPhaseIssue(plan({ qualifierMode: "PERCENT", qualifierValue }, {}))).toEqual({
+        code: "INVALID_PHASE_QUALIFIER",
+        phaseIndex: 0,
+        field: "qualifierValue",
+      });
+    }
+  });
+
+  it("refuse la saisie brute non numérique que normalizePhaseConfigs change en NaN", () => {
+    // Charge HTTP telle qu'elle arrive : le type ne garantit rien à l'exécution.
+    const raw: Partial<PhaseConfig>[] = JSON.parse('[{"qualifierValue":"abc"},{"format":"DOUBLE"}]');
+    const phases = normalizePhaseConfigs(raw);
+    expect(phases[0].qualifierValue).toBeNaN();
+    expect(validatePhases(phases)).toBe("INVALID_PHASE_QUALIFIER");
+  });
+
+  it("ignore la qualification de la dernière phase, jamais lue, même non finie", () => {
+    expect(findPhaseIssue(plan({ qualifierValue: 8 }, { qualifierValue: Number.NaN }))).toBeNull();
+  });
+
+  it("accepte les bornes finies exactes", () => {
+    expect(findPhaseIssue(plan({ qualifierValue: 1 }, {}))).toBeNull();
+    expect(findPhaseIssue(plan({ qualifierMode: "PERCENT", qualifierValue: 1 }, {}))).toBeNull();
+    expect(findPhaseIssue(plan({ qualifierMode: "PERCENT", qualifierValue: 99 }, {}))).toBeNull();
+  });
+
+  it("désigne une cadence non finie", () => {
+    expect(findPhaseIssue(plan({ format: "SWISS", swissTotalRounds: Number.NaN }, {}))?.field).toBe(
+      "swissTotalRounds",
+    );
+    expect(
+      findPhaseIssue(plan({ format: "SURVIVAL", survivalRoundsBeforeFirstCut: Number.POSITIVE_INFINITY }, {}))
+        ?.field,
+    ).toBe("survivalRoundsBeforeFirstCut");
   });
 
   it("désigne la seconde de deux qualifications qui ne décroissent pas", () => {

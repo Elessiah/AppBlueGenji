@@ -108,9 +108,14 @@ et se diffuse dans la page de tournoi par le contexte
 ## Profil du joueur
 
 Les tournois joués en individuel comptent dans le palmarès et les statistiques
-du joueur au même titre que ceux joués en équipe : les requêtes de
-`lib/server/users/` passent par `USER_ENTRIES_SQL`, l'union de ses
-adhésions d'équipe et de son entrée solo.
+du joueur au même titre que ceux joués en équipe : `lib/server/stats-service.ts`
+lit ses périodes d'appartenance par `loadMemberships` (un joueur) et
+`loadMembershipsForUsers` (annuaire, plusieurs joueurs), l'union (`UNION ALL`)
+de ses adhésions (`bg_team_members`) et de son entrée solo (`bg_teams` où
+`solo_user_id` le désigne, appartenance ouverte depuis sa création). Les
+contrôles de visibilité de la fiche (`lib/server/users/full-profile.ts` :
+`isInActiveTournament`, `sharesLiveMatch`) portent la même alternative dans
+leurs propres requêtes.
 
 ## Champs exposés
 
