@@ -44,11 +44,11 @@ export async function reconcileDeletedAccounts(): Promise<DeletedAccountsReconci
   const db = await getDatabase();
   const trace = accountTraceSql();
   const [candidates] = await db.execute<(RowDataPacket & { id: number })[]>(
-    `SELECT u.id
+    String.raw`SELECT u.id
        FROM bg_users u
       WHERE u.is_deleted = 1
         AND (
-          u.pseudo LIKE 'compte\\_supprime\\_%'
+          u.pseudo LIKE 'compte\_supprime\_%'
           OR u.is_admin = 1
           OR u.platform_roles_json IS NOT NULL
           OR NOT (${trace.played} OR ${trace.soloRegistered} OR ${trace.organized} OR ${trace.owned})
