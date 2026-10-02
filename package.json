@@ -20,7 +20,7 @@
     "pretest:e2e:ui": "npm run e2e:install",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:report": "playwright show-report",
-    "seed": "tsx lib/server/seed.ts",
+    "seed": "tsx lib/server/seed/main.ts",
     "seed:view": "tsx lib/server/seed-view.ts",
     "backfill:avatars": "tsx lib/server/backfill-avatars.ts",
     "replay:deletions": "tsx lib/server/replay-account-deletions.ts",

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Pool } from "mysql2/promise";
 import { NamedLockUnavailableError } from "@/lib/server/named-lock";
-import { SEED_LOCK_NAME, SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "@/lib/server/seed-lock";
+import { SEED_LOCK_NAME, SEED_LOCK_TIMEOUT_SECONDS, withSeedLock } from "@/lib/server/seed/lock";
 
 /**
  * Deux `npm run seed` lancés ensemble sur la même base s'effaçaient l'un

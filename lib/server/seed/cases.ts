@@ -2,7 +2,7 @@
  * Matrice des cas couverts par `npm run seed`.
  *
  * Chaque entrée isole une combinaison état × format × effectif × situation de
- * match ; le seed (`lib/server/seed.ts`) se contente de la dérouler. Le fichier
+ * match ; le seed (`lib/server/seed/main.ts`) se contente de la dérouler. Le fichier
  * est volontairement sans effet de bord ni accès base pour rester testable.
  */
 
