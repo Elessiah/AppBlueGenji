@@ -40,7 +40,8 @@ const eslintConfig = [
       // lui respecte le préfixe `_` d'un paramètre volontairement ignoré).
       "sonarjs/no-unused-vars": "off",
       "sonarjs/unused-import": "off",
-      // S1135 est informatif ; le dépôt nomme d'ailleurs un fichier `TODO.md`.
+      // S1135 est informatif : il relève le mot-clé de tâche partout, y compris
+      // dans le nom du fichier de tâches à la racine du dépôt.
       "sonarjs/todo-tag": "off",
     },
   },
