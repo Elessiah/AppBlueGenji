@@ -3,14 +3,12 @@ import {
   describePhasePlan,
   findPhaseIssue,
   MAX_PHASES,
-  MIN_PHASES,
   normalizePhaseConfigs,
   previousPowerOfTwo,
   resolvePhaseQualifiers,
   resolvePhasePlan,
   validatePhases,
   type PhaseConfig,
-  type ResolvedPhase,
 } from "@/lib/shared/tournament-phases";
 
 function phaseConfig(overrides: Partial<PhaseConfig> = {}): PhaseConfig {

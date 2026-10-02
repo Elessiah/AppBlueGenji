@@ -11,7 +11,6 @@ import * as perms from "@/lib/shared/permissions";
 import { authUser } from "../../../helpers/auth-user";
 
 const admin = authUser({ id: 1, isAdmin: true });
-const noPerms = authUser({ id: 2, isAdmin: false });
 
 function jsonReq(body: unknown) {
   return new Request("http://localhost/api/tournaments", {

@@ -104,11 +104,29 @@ type World = {
 
 let state: World;
 
+/**
+ * Contexte du candidat relu hors verrou (tournoi, option de planification,
+ * statut fantôme) : le tournoi est passé deux fois.
+ */
+function candidateContextRows(world: World, params: unknown[]) {
+  const [tournamentId, , team1Id] = params.map(Number);
+  const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
+  if (!c) return [];
+  return [
+    {
+      tournament_state: c.tournament_state,
+      referee_scheduling: c.referee_scheduling ?? 0,
+      team1_is_ghost: c.team1_is_ghost,
+      team2_is_ghost: c.team2_is_ghost,
+    },
+  ];
+}
+
 function connectionFor(world: World): PoolConnection {
   const execute = async (rawSql: string, params: unknown[] = []) => {
     const sql = rawSql.replace(/\s+/g, " ").trim();
     world.reads.push(sql);
-    if (sql.includes("AS running")) return [[{ running: world.running ? 1 : 0 }], []];
+    if (sql.includes("AS running")) return [[{ running: Number(world.running) }], []];
     if (sql.startsWith("UPDATE")) {
       world.writes.push(sql);
       return [{ affectedRows: 1 }, []];
@@ -122,23 +140,7 @@ function connectionFor(world: World): PoolConnection {
       return [world.candidates.filter((c) => c.id === Number(params[0])), []];
     }
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
-      // Contexte du candidat relu hors verrou (tournoi, option de
-      // planification, statut fantôme) : le tournoi est passé deux fois.
-      const [tournamentId, , team1Id] = params.map(Number);
-      const c = world.candidates.find((x) => x.tournament_id === tournamentId && x.team1_id === team1Id);
-      return [
-        c
-          ? [
-              {
-                tournament_state: c.tournament_state,
-                referee_scheduling: c.referee_scheduling ?? 0,
-                team1_is_ghost: c.team1_is_ghost,
-                team2_is_ghost: c.team2_is_ghost,
-              },
-            ]
-          : [],
-        [],
-      ];
+      return [candidateContextRows(world, params), []];
     }
     if (sql.includes("WHERE m.tournament_id = ?")) {
       // Entretien : candidats au lancement du tournoi.

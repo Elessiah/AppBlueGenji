@@ -209,7 +209,7 @@ describe("aucune feuille ne redéfinit l'apparence", () => {
   it("trouve bien des feuilles à contrôler", () => {
     expect(sheets.some(({ path }) => path.endsWith("globals.css"))).toBe(true);
     expect(sheets.some(({ path }) => path.endsWith(".module.css"))).toBe(true);
-    expect(sheets.some(({ path }) => /bot\.css|docs\.css$/.test(path))).toBe(true);
+    expect(sheets.some(({ path }) => /(?:bot|docs)\.css$/.test(path))).toBe(true);
   });
 
   it("n'habille jamais un `input` nu sans exclure la case à cocher", () => {

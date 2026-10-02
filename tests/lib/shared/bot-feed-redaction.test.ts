@@ -103,7 +103,8 @@ describe("redactFeedPayload", () => {
 
 describe("redactSseLine", () => {
   it("réécrit une ligne de données JSON", () => {
-    const line = `data: ${JSON.stringify({ id: 9, target: ID, summary: `Code DM envoye a ${ID}` })}`;
+    const summary = `Code DM envoye a ${ID}`;
+    const line = `data: ${JSON.stringify({ id: 9, target: ID, summary })}`;
     expect(JSON.parse(redactSseLine(line).slice("data: ".length))).toEqual({
       id: 9,
       summary: `Code DM envoye a ${REDACTED_DISCORD_ID}`,

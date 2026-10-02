@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "@jest/globals";
-import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
+import type { PoolConnection, ResultSetHeader } from "mysql2/promise";
 import {
   initializeMultiTournament,
   reconcilePhases,
@@ -11,6 +11,20 @@ import type { TournamentPhaseStanding } from "@/lib/shared/types";
  * Mock database for phases orchestrator testing.
  * Simulates all phase-related queries without a real MySQL connection.
  */
+/**
+ * Lit la clause `SET` d'un `UPDATE bg_tournament_phases` : les paramètres
+ * suivent l'ordre des colonnes, les horodatages valent `NOW()`.
+ */
+function parsePhaseSetClause(setClauses: string, params: any[] | undefined): Record<string, any> {
+  const updates: Record<string, any> = {};
+  let paramIdx = 0;
+  for (const column of ["state", "entrants", "qualifiers", "max_rounds", "started_at", "finished_at", "current_phase_id"]) {
+    if (!setClauses.includes(column)) continue;
+    updates[column] = column.endsWith("_at") ? new Date() : params?.[paramIdx++];
+  }
+  return updates;
+}
+
 class PhasesTestDatabase {
   private tournaments: Map<number, any> = new Map();
   private phases: Map<number, any[]> = new Map();
@@ -110,7 +124,7 @@ class PhasesTestDatabase {
   }
 
   getPhase(phaseId: number) {
-    for (const [tournamentId, phases] of this.phases.entries()) {
+    for (const phases of this.phases.values()) {
       const phase = phases.find((p) => p.id === phaseId);
       if (phase) return phase;
     }
@@ -156,228 +170,231 @@ class PhasesTestDatabase {
       execute: async function (sql: string, params?: any[]) {
         const lowerSql = sql.toLowerCase();
 
-        // SELECT for tournament by format and state (with FOR UPDATE)
-        if (lowerSql.includes("select format, state from bg_tournaments")) {
-          const tournamentId = params?.[0];
-          const tournament = db.getTournament(tournamentId);
-          if (tournament) {
-            return [[{ format: tournament.format, state: tournament.state }], undefined];
-          }
-          return [[], undefined];
-        }
-
-        // SELECT tournament for loading (full row)
-        if (lowerSql.includes("select") && lowerSql.includes("from bg_tournaments") && !lowerSql.includes("format")) {
-          if (sql.includes("LIMIT 1") || sql.includes("limit 1")) {
+        // Lectures du tournoi.
+        const selectTournament = (): unknown => {
+          // SELECT for tournament by format and state (with FOR UPDATE)
+          if (lowerSql.includes("select format, state from bg_tournaments")) {
             const tournamentId = params?.[0];
             const tournament = db.getTournament(tournamentId);
             if (tournament) {
-              return [[tournament], undefined];
+              return [[{ format: tournament.format, state: tournament.state }], undefined];
             }
             return [[], undefined];
           }
-        }
 
-        // SELECT phases by tournament or by ID
-        if (lowerSql.includes("select") && lowerSql.includes("from bg_tournament_phases")) {
-          if (sql.includes("WHERE id = ?")) {
-            // Single phase by ID
-            const phaseId = params?.[0];
-            const phase = db.getPhase(phaseId);
-            if (phase) return [[phase], undefined];
-            return [[], undefined];
+          // SELECT tournament for loading (full row)
+          if (lowerSql.includes("select") && lowerSql.includes("from bg_tournaments") && !lowerSql.includes("format")) {
+            if (sql.includes("LIMIT 1") || sql.includes("limit 1")) {
+              const tournamentId = params?.[0];
+              const tournament = db.getTournament(tournamentId);
+              if (tournament) {
+                return [[tournament], undefined];
+              }
+              return [[], undefined];
+            }
           }
-          if (sql.includes("WHERE tournament_id = ?")) {
-            // Load all phases for tournament
+          return undefined;
+        };
+
+        // Lectures des phases.
+        const selectPhases = (): unknown => {
+          // SELECT phases by tournament or by ID
+          if (lowerSql.includes("select") && lowerSql.includes("from bg_tournament_phases")) {
+            if (sql.includes("WHERE id = ?")) {
+              // Single phase by ID
+              const phaseId = params?.[0];
+              const phase = db.getPhase(phaseId);
+              if (phase) return [[phase], undefined];
+              return [[], undefined];
+            }
+            if (sql.includes("WHERE tournament_id = ?")) {
+              // Load all phases for tournament
+              const tournamentId = params?.[0];
+              const phases = db.getPhases(tournamentId);
+              return [phases, undefined];
+            }
+          }
+          return undefined;
+        };
+
+        // Lectures des inscrites, des équipes de phase et des matchs.
+        const selectEntrants = (): unknown => {
+          // SELECT registrations with seeding (ROW_NUMBER)
+          if (lowerSql.includes("select") && lowerSql.includes("row_number")) {
             const tournamentId = params?.[0];
-            const phases = db.getPhases(tournamentId);
-            return [phases, undefined];
+            const regs = db.getRegistrations(tournamentId);
+            const seeded = regs.map((r, i) => ({
+              team_id: r.team_id,
+              seed: i + 1,
+            }));
+            return [seeded, undefined];
           }
-        }
 
-        // SELECT registrations with seeding (ROW_NUMBER)
-        if (lowerSql.includes("select") && lowerSql.includes("row_number")) {
-          const tournamentId = params?.[0];
-          const regs = db.getRegistrations(tournamentId);
-          const seeded = regs.map((r, i) => ({
-            team_id: r.team_id,
-            seed: i + 1,
-          }));
-          return [seeded, undefined];
-        }
+          // SELECT all registrations for a tournament
+          if (lowerSql.includes("select") && lowerSql.includes("bg_tournament_registrations")) {
+            const tournamentId = params?.[0];
+            const registrations = db.getRegistrations(tournamentId);
+            return [registrations, undefined];
+          }
 
-        // SELECT all registrations for a tournament
-        if (lowerSql.includes("select") && lowerSql.includes("bg_tournament_registrations")) {
-          const tournamentId = params?.[0];
-          const registrations = db.getRegistrations(tournamentId);
-          return [registrations, undefined];
-        }
+          // SELECT phase_teams by phase
+          if (lowerSql.includes("select") && lowerSql.includes("bg_tournament_phase_teams")) {
+            if (sql.includes("WHERE phase_id")) {
+              const phaseId = params?.[0];
+              const teams = db.getPhaseTeams(phaseId);
+              return [teams, undefined];
+            }
+          }
 
-        // SELECT phase_teams by phase
-        if (lowerSql.includes("select") && lowerSql.includes("bg_tournament_phase_teams")) {
-          if (sql.includes("WHERE phase_id")) {
+          // SELECT phase standings with joins
+          if (lowerSql.includes("select") && lowerSql.includes("pt.team_id")) {
             const phaseId = params?.[0];
-            const teams = db.getPhaseTeams(phaseId);
-            return [teams, undefined];
+            const standings = db.getPhaseStandings(phaseId);
+            return [standings, undefined];
           }
-        }
 
-        // SELECT phase standings with joins
-        if (lowerSql.includes("select") && lowerSql.includes("pt.team_id")) {
-          const phaseId = params?.[0];
-          const standings = db.getPhaseStandings(phaseId);
-          return [standings, undefined];
-        }
+          // SELECT matches (for checking if phase is complete - unfinished matches)
+          if (lowerSql.includes("select count(*) as c from bg_matches") && sql.includes("!= 'COMPLETED'")) {
+            const phaseId = params?.[1];
+            const matches = Array.from(db.matches.values()).filter((m) => m.phase_id === phaseId);
+            const unfinished = matches.filter((m) => m.status !== "COMPLETED").length;
+            return [[{ c: unfinished }], undefined];
+          }
 
-        // SELECT matches (for checking if phase is complete - unfinished matches)
-        if (lowerSql.includes("select count(*) as c from bg_matches") && sql.includes("!= 'COMPLETED'")) {
-          const phaseId = params?.[1];
-          const matches = Array.from(db.matches.values()).filter((m) => m.phase_id === phaseId);
-          const unfinished = matches.filter((m) => m.status !== "COMPLETED").length;
-          return [[{ c: unfinished }], undefined];
-        }
+          // SELECT swiss rounds info
+          if (lowerSql.includes("swiss_current_round")) {
+            return [[{ current: 0, total: 1 }], undefined];
+          }
+          return undefined;
+        };
 
-        // SELECT swiss rounds info
-        if (lowerSql.includes("swiss_current_round")) {
-          const phaseId = params?.[0];
-          return [[{ current: 0, total: 1 }], undefined];
-        }
+        // Insertions.
+        const insertRows = (): unknown => {
+          // INSERT phases
+          if (lowerSql.includes("insert into bg_tournament_phases")) {
+            const result: ResultSetHeader = { insertId: 1, affectedRows: 1 } as any;
+            return [result, undefined];
+          }
+          return undefined;
+        };
 
-        // INSERT phases
-        if (lowerSql.includes("insert into bg_tournament_phases")) {
-          const result: ResultSetHeader = { insertId: 1, affectedRows: 1 } as any;
-          return [result, undefined];
-        }
+        const insertPhaseTeams = (): unknown => {
+          // INSERT phase_teams
+          if (lowerSql.includes("insert into bg_tournament_phase_teams")) {
+            // Parse: INSERT INTO bg_tournament_phase_teams (phase_id, tournament_id, team_id, seed)
+            // VALUES (?, ?, ?, ?), (?, ?, ?, ?), ...
+            // Each row has 4 values: phaseId, tournamentId, teamId, seed
+            if (params && params.length >= 4) {
+              const teams: Array<{ team_id: number; seed: number; rank: null; qualified: boolean }> = [];
+              const phaseId = params[0]; // first row's phase_id
 
-        // INSERT phase_teams
-        if (lowerSql.includes("insert into bg_tournament_phase_teams")) {
-          // Parse: INSERT INTO bg_tournament_phase_teams (phase_id, tournament_id, team_id, seed)
-          // VALUES (?, ?, ?, ?), (?, ?, ?, ?), ...
-          // Each row has 4 values: phaseId, tournamentId, teamId, seed
-          if (params && params.length >= 4) {
-            const teams: Array<{ team_id: number; seed: number; rank: null; qualified: boolean }> = [];
-            const phaseId = params[0]; // first row's phase_id
+              // Each team takes 4 params in order
+              for (let i = 0; i + 3 < params.length; i += 4) {
+                const teamId = params[i + 2]; // team_id is 3rd value in each row
+                const seed = params[i + 3];   // seed is 4th value
+                if (teamId !== undefined && seed !== undefined) {
+                  teams.push({
+                    team_id: teamId,
+                    seed,
+                    rank: null,
+                    qualified: false,
+                  });
+                }
+              }
 
-            // Each team takes 4 params in order
-            for (let i = 0; i + 3 < params.length; i += 4) {
-              const teamId = params[i + 2]; // team_id is 3rd value in each row
-              const seed = params[i + 3];   // seed is 4th value
-              if (teamId !== undefined && seed !== undefined) {
-                teams.push({
-                  team_id: teamId,
-                  seed,
-                  rank: null,
-                  qualified: false,
-                });
+              if (teams.length > 0) {
+                db.phaseTeams.set(
+                  `${phaseId}`,
+                  teams,
+                );
               }
             }
-
-            if (teams.length > 0) {
-              db.phaseTeams.set(
-                `${phaseId}`,
-                teams,
-              );
-            }
+            return [{} as any, undefined];
           }
-          return [{} as any, undefined];
-        }
+          return undefined;
+        };
 
-        // UPDATE bg_tournament_phases
-        if (lowerSql.includes("update bg_tournament_phases")) {
-          // Parse SQL to find what columns are being updated
-          const setMatch = sql.match(/SET\s+(.*?)\s+WHERE/i);
-          const phaseId = params?.[params!.length - 1];
-          const updates: Record<string, any> = {};
+        // Mises à jour des phases.
+        const updatePhases = (): unknown => {
+          // UPDATE bg_tournament_phases
+          if (lowerSql.includes("update bg_tournament_phases")) {
+            // Parse SQL to find what columns are being updated
+            const setMatch = sql.match(/SET\s+(.*?)\s+WHERE/i);
+            const phaseId = params?.[params!.length - 1];
+            const updates = setMatch ? parsePhaseSetClause(setMatch[1], params) : {};
 
-          if (setMatch) {
-            const setClauses = setMatch[1];
-
-            // Map params to columns based on their order in the SQL
-            let paramIdx = 0;
-
-            if (setClauses.includes("state")) {
-              updates.state = params?.[paramIdx++];
+            if (phaseId) {
+              db.updatePhase(phaseId, updates);
             }
-            if (setClauses.includes("entrants")) {
-              updates.entrants = params?.[paramIdx++];
-            }
-            if (setClauses.includes("qualifiers")) {
-              updates.qualifiers = params?.[paramIdx++];
-            }
-            if (setClauses.includes("max_rounds")) {
-              updates.max_rounds = params?.[paramIdx++];
-            }
-            if (setClauses.includes("started_at")) {
-              updates.started_at = new Date();
-            }
-            if (setClauses.includes("finished_at")) {
-              updates.finished_at = new Date();
-            }
-            if (setClauses.includes("current_phase_id")) {
-              updates.current_phase_id = params?.[paramIdx++];
-            }
+            return [{ affectedRows: 1 }, undefined];
           }
+          return undefined;
+        };
 
-          if (phaseId) {
-            db.updatePhase(phaseId, updates);
-          }
-          return [{ affectedRows: 1 }, undefined];
-        }
-
-        // UPDATE bg_tournaments
-        if (lowerSql.includes("update bg_tournaments")) {
-          if (sql.includes("current_phase_id")) {
-            const currentPhaseId = params?.[0];
-            const tournamentId = params?.[1];
-            const tournament = db.getTournament(tournamentId);
-            if (tournament) tournament.current_phase_id = currentPhaseId;
-          }
-          if (sql.includes("state")) {
-            const stateIdx = sql.includes("current_phase_id") ? 1 : 0;
-            const state = params?.[stateIdx];
-            const tournamentId = params?.[params!.length - 1];
-            const tournament = db.getTournament(tournamentId);
-            if (tournament) tournament.state = state;
-          }
-          return [{ affectedRows: 1 }, undefined];
-        }
-
-        // UPDATE bg_tournament_phase_teams (rank, qualified)
-        if (lowerSql.includes("update bg_tournament_phase_teams")) {
-          const phaseId = params?.[params!.length - 1];
-          const teams = db.getPhaseTeams(phaseId);
-          // Parse CASE WHEN: alternates teamId, rank/qualified values
-          for (let i = 0; i < params!.length - 1; i += 4) {
-            const teamId = params![i];
-            const rank = params![i + 1];
-            const qualTeamId = params![i + 2];
-            const qualified = params![i + 3];
-            const team = teams.find((t) => t.team_id === teamId);
-            if (team) {
-              team.rank = rank;
-              team.qualified = qualified;
+        // Mises à jour du tournoi, des équipes de phase et des inscriptions.
+        const updateOthers = (): unknown => {
+          // UPDATE bg_tournaments
+          if (lowerSql.includes("update bg_tournaments")) {
+            if (sql.includes("current_phase_id")) {
+              const currentPhaseId = params?.[0];
+              const tournamentId = params?.[1];
+              const tournament = db.getTournament(tournamentId);
+              if (tournament) tournament.current_phase_id = currentPhaseId;
             }
+            if (sql.includes("state")) {
+              const stateIdx = sql.includes("current_phase_id") ? 1 : 0;
+              const state = params?.[stateIdx];
+              const tournamentId = params?.[params!.length - 1];
+              const tournament = db.getTournament(tournamentId);
+              if (tournament) tournament.state = state;
+            }
+            return [{ affectedRows: 1 }, undefined];
           }
-          return [{ affectedRows: teams.length }, undefined];
-        }
+          return undefined;
+        };
 
-        // UPDATE bg_tournament_registrations (final_rank)
-        if (lowerSql.includes("update bg_tournament_registrations")) {
-          if (sql.includes("final_rank")) {
-            const tournamentId = params?.[params!.length - 1];
-            const registrations = db.getRegistrations(tournamentId);
-            // Parse CASE WHEN: alternates teamId, rank
-            for (let i = 0; i < params!.length - 1; i += 2) {
+        const updatePhaseTeams = (): unknown => {
+          // UPDATE bg_tournament_phase_teams (rank, qualified)
+          if (lowerSql.includes("update bg_tournament_phase_teams")) {
+            const phaseId = params?.[params!.length - 1];
+            const teams = db.getPhaseTeams(phaseId);
+            // Parse CASE WHEN: alternates teamId, rank/qualified values
+            for (let i = 0; i < params!.length - 1; i += 4) {
               const teamId = params![i];
               const rank = params![i + 1];
-              const reg = registrations.find((r) => r.team_id === teamId);
-              if (reg) reg.final_rank = rank;
+              const qualified = params![i + 3];
+              const team = teams.find((t) => t.team_id === teamId);
+              if (team) {
+                team.rank = rank;
+                team.qualified = qualified;
+              }
             }
+            return [{ affectedRows: teams.length }, undefined];
           }
-          return [{ affectedRows: 1 }, undefined];
-        }
+          return undefined;
+        };
 
-        return [[], undefined];
+        const updateRegistrations = (): unknown => {
+          // UPDATE bg_tournament_registrations (final_rank)
+          if (lowerSql.includes("update bg_tournament_registrations")) {
+            if (sql.includes("final_rank")) {
+              const tournamentId = params?.[params!.length - 1];
+              const registrations = db.getRegistrations(tournamentId);
+              // Parse CASE WHEN: alternates teamId, rank
+              for (let i = 0; i < params!.length - 1; i += 2) {
+                const teamId = params![i];
+                const rank = params![i + 1];
+                const reg = registrations.find((r) => r.team_id === teamId);
+                if (reg) reg.final_rank = rank;
+              }
+            }
+            return [{ affectedRows: 1 }, undefined];
+          }
+          return undefined;
+        };
+
+        return selectTournament() ?? selectPhases() ?? selectEntrants() ?? insertRows() ?? insertPhaseTeams() ??
+          updatePhases() ?? updateOthers() ?? updatePhaseTeams() ?? updateRegistrations() ?? [[], undefined];
       },
       release: async () => {},
     } as unknown as PoolConnection;
@@ -635,7 +652,6 @@ describe("reconcilePhases — idempotency", () => {
     // First call
     await reconcilePhases(7, conn);
     const phase2AfterFirst = db.getPhase(702);
-    const phase2StartCountFirst = phase2AfterFirst.state === "RUNNING" ? 1 : 0;
 
     // Second call
     await reconcilePhases(7, conn);

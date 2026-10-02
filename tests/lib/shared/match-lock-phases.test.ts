@@ -1,7 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   dependentMatches,
-  hasScoreInput,
   isScoreEditLocked,
   type MatchScoreState,
 } from "@/lib/shared/match-lock";
@@ -134,7 +133,6 @@ describe("match-lock — tournois sans phases (retrocompatibilité)", () => {
     };
 
     const m1 = base.matches[0];
-    const m2 = base.matches[1];
 
     // Sans dépendances cross-phase, les deux règles se chevauchent
     // mais le résultat reste cohérent.

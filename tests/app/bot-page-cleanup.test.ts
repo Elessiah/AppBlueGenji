@@ -55,8 +55,8 @@ describe("/bot — la section « Modules » est partie", () => {
     expect(roadmap).not.toContain("[components/bot/mocks.ts](components/bot/mocks.ts)");
     // Et pas davantage les endpoints que cet appel consommait : une section
     // lue de haut en bas ferait construire au bot ce que le site ne lit plus.
-    expect(roadmap).not.toMatch(/^- \[ \] \*\*`GET  \/internal\/servers\/:id\/modules`/m);
-    expect(roadmap).not.toMatch(/^- \[ \] \*\*`PUT  \/internal\/servers\/:id\/modules/m);
+    expect(roadmap).not.toMatch(/^- \[ \] \*\*`GET {2}\/internal\/servers\/:id\/modules`/m);
+    expect(roadmap).not.toMatch(/^- \[ \] \*\*`PUT {2}\/internal\/servers\/:id\/modules/m);
     expect(roadmap).toContain("Section abandonnée côté site");
     expect(roadmap).not.toContain("mod-foot`)");
     // Une ligne barrée ne porte pas de case : vide elle se lit « à faire »,

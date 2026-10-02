@@ -89,228 +89,244 @@ function fakeDb(options: {
     execute: async (sql: string, params: unknown[] = []) => {
       const q = sql.replace(/\s+/g, " ").trim();
 
-      if (q.startsWith("SELECT format, state")) return [[{ ...tournament }], []];
+      // Lectures du tournoi, du classement et des inscrites.
+      const readTournament = (): unknown => {
+        if (q.startsWith("SELECT format, state")) return [[{ ...tournament }], []];
 
-      // Format de match du tournoi : c'est lui qui chiffre un forfait. La
-      // requête lit aussi le format **du tournoi** depuis que « BlueGenji
-      // Survie » joue deux formats de match (qualification / play-offs) : la
-      // Ronde suisse, elle, n'en a qu'un.
-      if (q.includes("match_format_type") && q.includes("FROM bg_tournaments")) {
-        return [
-          [
-            {
-              format: "SWISS",
-              match_format_type: options.matchFormat?.type ?? null,
-              match_format_value: options.matchFormat?.value ?? null,
-              match_format_max_maps: null,
-              match_format_draws: 0,
-              endurance_playoff_format_type: null,
-              endurance_playoff_format_value: null,
-            },
-          ],
-          [],
-        ];
-      }
-
-      if (q.includes("FROM bg_swiss_standings WHERE tournament_id = ?") && q.includes("ORDER BY seed")) {
-        return [
-          standings.map((s) => ({
-            team_id: s.teamId,
-            seed: s.seed,
-            status: s.status,
-            forfeit_round: s.forfeitRound,
-          })),
-          [],
-        ];
-      }
-
-      if (q.startsWith("SELECT status FROM bg_swiss_standings")) {
-        // (tournament_id, phase_id, team_id)
-        const found = standings.find((s) => s.teamId === Number(params[2]));
-        return [found ? [{ status: found.status }] : [], []];
-      }
-
-      // Rejeu du classement du site : aucune rencontre passée dans cette base
-      // factice, toutes les inscrites sont donc à la cote de départ et l'ordre
-      // se départage sur le nom.
-      if (q.includes("AS played_at")) {
-        return [[], []];
-      }
-
-      if (q.includes("FROM bg_tournament_registrations r")) {
-        return [
-          standings.map((s) => ({
-            team_id: s.teamId,
-            team_name: `Test - ${String(s.teamId).padStart(3, "0")}`,
-          })),
-          [],
-        ];
-      }
-
-      if (q.startsWith("SELECT round_number, status, team1_id")) {
-        return [
-          matches.map((m) => ({
-            round_number: m.round,
-            status: m.status,
-            team1_id: m.team1Id,
-            team2_id: m.team2Id,
-            winner_team_id: m.winnerTeamId,
-            loser_team_id: m.loserTeamId,
-            is_bye: m.isBye,
-          })),
-          [],
-        ];
-      }
-
-      if (q.startsWith("SELECT team1_id, team2_id, is_bye FROM bg_matches")) {
-        // (tournament_id, phase_id, round_number)
-        const round = Number(params[2]);
-        return [
-          matches
-            .filter((m) => m.round === round)
-            .sort((a, b) => a.matchNumber - b.matchNumber)
-            .map((m) => ({ team1_id: m.team1Id, team2_id: m.team2Id, is_bye: m.isBye })),
-          [],
-        ];
-      }
-
-      // roundHasScoreInput
-      if (q.includes("AND is_bye = 0 AND (team1_score IS NOT NULL")) {
-        const round = Number(params[2]);
-        const c = matches.filter((m) => m.round === round && !m.isBye && m.hasScoreInput).length;
-        return [[{ c }], []];
-      }
-
-      // Matchs non terminés de la ronde courante
-      if (q.includes("AND status <> 'COMPLETED'") && q.startsWith("SELECT COUNT(*)")) {
-        const round = Number(params[2]);
-        const c = matches.filter((m) => m.round === round && m.status !== "COMPLETED").length;
-        return [[{ c }], []];
-      }
-
-      // Match en cours d'une équipe (forfait)
-      if (q.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) {
-        // (tournament_id, phase_id, round_number, team_id, team_id)
-        const [, , round, teamId] = params.map(Number);
-        const found = matches.find(
-          (m) =>
-            m.round === round &&
-            m.status !== "COMPLETED" &&
-            (m.team1Id === teamId || m.team2Id === teamId),
-        );
-        return [found ? [{ id: found.id, team1_id: found.team1Id, team2_id: found.team2Id }] : [], []];
-      }
-
-      if (q.startsWith("INSERT INTO bg_matches")) {
-        const [, , round, matchNumber] = params.map(Number);
-        const id = ++nextMatchId;
-        matches.push({
-          id,
-          round,
-          matchNumber,
-          status: "PENDING",
-          team1Id: null,
-          team2Id: null,
-          winnerTeamId: null,
-          loserTeamId: null,
-          isBye: 0,
-          hasScoreInput: false,
-          team1Score: null,
-          team2Score: null,
-        });
-        return [{ insertId: id }, []];
-      }
-
-      if (q.startsWith("UPDATE bg_matches SET team1_id = ?, team2_id = ?, swiss_round")) {
-        const match = matches.find((m) => m.id === Number(params[3]))!;
-        match.team1Id = params[0] === null ? null : Number(params[0]);
-        match.team2Id = params[1] === null ? null : Number(params[1]);
-        match.status = "READY";
-        return [{}, []];
-      }
-
-      if (q.startsWith("UPDATE bg_matches SET team1_id = ?, team2_id = NULL")) {
-        const match = matches.find((m) => m.id === Number(params[3]))!;
-        match.team1Id = Number(params[0]);
-        match.team2Id = null;
-        match.isBye = 1;
-        match.status = "COMPLETED";
-        match.winnerTeamId = Number(params[2]);
-        return [{}, []];
-      }
-
-      // Résolution d'un match par forfait
-      if (q.startsWith("UPDATE bg_matches SET status = 'COMPLETED'")) {
-        const match = matches.find((m) => m.id === Number(params[5]))!;
-        match.status = "COMPLETED";
-        match.winnerTeamId = Number(params[0]);
-        match.loserTeamId = Number(params[1]);
-        match.team1Score = Number(params[3]);
-        match.team2Score = Number(params[4]);
-        match.hasScoreInput = true;
-        return [{}, []];
-      }
-
-      if (q.startsWith("DELETE FROM bg_matches")) {
-        const round = Number(params[2]);
-        for (let i = matches.length - 1; i >= 0; i--) {
-          if (matches[i].round === round) matches.splice(i, 1);
+        // Format de match du tournoi : c'est lui qui chiffre un forfait. La
+        // requête lit aussi le format **du tournoi** depuis que « BlueGenji
+        // Survie » joue deux formats de match (qualification / play-offs) : la
+        // Ronde suisse, elle, n'en a qu'un.
+        if (q.includes("match_format_type") && q.includes("FROM bg_tournaments")) {
+          return [
+            [
+              {
+                format: "SWISS",
+                match_format_type: options.matchFormat?.type ?? null,
+                match_format_value: options.matchFormat?.value ?? null,
+                match_format_max_maps: null,
+                match_format_draws: 0,
+                endurance_playoff_format_type: null,
+                endurance_playoff_format_value: null,
+              },
+            ],
+            [],
+          ];
         }
-        return [{}, []];
-      }
 
-      if (q.startsWith("INSERT INTO bg_swiss_standings")) {
-        // (tournament_id, phase_id, team_id, seed, rank)
-        const [, , teamId, seed] = params.map(Number);
-        const existing = standings.find((s) => s.teamId === teamId);
-        if (existing) {
-          existing.seed = seed;
-          existing.status = "ACTIVE";
-          existing.forfeitRound = null;
-        } else {
-          standings.push({ teamId, seed, status: "ACTIVE", forfeitRound: null });
+        if (q.includes("FROM bg_swiss_standings WHERE tournament_id = ?") && q.includes("ORDER BY seed")) {
+          return [
+            standings.map((s) => ({
+              team_id: s.teamId,
+              seed: s.seed,
+              status: s.status,
+              forfeit_round: s.forfeitRound,
+            })),
+            [],
+          ];
         }
-        return [{}, []];
-      }
 
-      if (q.startsWith("UPDATE bg_swiss_standings SET status = 'FORFEIT'")) {
-        // (forfeit_round, tournament_id, phase_id, team_id)
-        const found = standings.find((s) => s.teamId === Number(params[3]))!;
-        found.status = "FORFEIT";
-        found.forfeitRound = Number(params[0]);
-        return [{}, []];
-      }
-
-      // Persistance du classement : relue seulement par l'affichage.
-      if (q.startsWith("UPDATE bg_swiss_standings SET points")) return [{}, []];
-
-      if (q.startsWith("UPDATE bg_tournament_registrations SET final_rank")) {
-        // `CASE team_id WHEN ? THEN ? …` : les paramètres vont par paires.
-        const teamCount = standings.length;
-        for (let i = 0; i < teamCount * 2; i += 2) {
-          registrationRanks.set(Number(params[i]), Number(params[i + 1]));
+        if (q.startsWith("SELECT status FROM bg_swiss_standings")) {
+          // (tournament_id, phase_id, team_id)
+          const found = standings.find((s) => s.teamId === Number(params[2]));
+          return [found ? [{ status: found.status }] : [], []];
         }
-        return [{}, []];
-      }
 
-      if (q.startsWith("UPDATE bg_tournaments SET state = 'FINISHED'")) {
-        tournament.state = "FINISHED";
-        return [{}, []];
-      }
-      if (q.startsWith("UPDATE bg_tournaments SET swiss_total_rounds")) {
-        tournament.swiss_total_rounds = Number(params[0]);
-        return [{}, []];
-      }
-      if (q.startsWith("UPDATE bg_tournaments SET bracket_size")) {
-        tournament.bracket_size = Number(params[0]);
-        return [{}, []];
-      }
-      if (q.startsWith("UPDATE bg_tournaments SET swiss_current_round")) {
-        tournament.swiss_current_round = Number(params[0]);
-        return [{}, []];
-      }
+        // Rejeu du classement du site : aucune rencontre passée dans cette base
+        // factice, toutes les inscrites sont donc à la cote de départ et l'ordre
+        // se départage sur le nom.
+        if (q.includes("AS played_at")) {
+          return [[], []];
+        }
 
-      return [[], []];
+        if (q.includes("FROM bg_tournament_registrations r")) {
+          return [
+            standings.map((s) => ({
+              team_id: s.teamId,
+              team_name: `Test - ${String(s.teamId).padStart(3, "0")}`,
+            })),
+            [],
+          ];
+        }
+        return undefined;
+      };
+
+      // Lectures des matchs.
+      const readMatches = (): unknown => {
+        if (q.startsWith("SELECT round_number, status, team1_id")) {
+          return [
+            matches.map((m) => ({
+              round_number: m.round,
+              status: m.status,
+              team1_id: m.team1Id,
+              team2_id: m.team2Id,
+              winner_team_id: m.winnerTeamId,
+              loser_team_id: m.loserTeamId,
+              is_bye: m.isBye,
+            })),
+            [],
+          ];
+        }
+
+        if (q.startsWith("SELECT team1_id, team2_id, is_bye FROM bg_matches")) {
+          // (tournament_id, phase_id, round_number)
+          const round = Number(params[2]);
+          return [
+            matches
+              .filter((m) => m.round === round)
+              .sort((a, b) => a.matchNumber - b.matchNumber)
+              .map((m) => ({ team1_id: m.team1Id, team2_id: m.team2Id, is_bye: m.isBye })),
+            [],
+          ];
+        }
+
+        // roundHasScoreInput
+        if (q.includes("AND is_bye = 0 AND (team1_score IS NOT NULL")) {
+          const round = Number(params[2]);
+          const c = matches.filter((m) => m.round === round && !m.isBye && m.hasScoreInput).length;
+          return [[{ c }], []];
+        }
+
+        // Matchs non terminés de la ronde courante
+        if (q.includes("AND status <> 'COMPLETED'") && q.startsWith("SELECT COUNT(*)")) {
+          const round = Number(params[2]);
+          const c = matches.filter((m) => m.round === round && m.status !== "COMPLETED").length;
+          return [[{ c }], []];
+        }
+
+        // Match en cours d'une équipe (forfait)
+        if (q.startsWith("SELECT id, team1_id, team2_id FROM bg_matches")) {
+          // (tournament_id, phase_id, round_number, team_id, team_id)
+          const [, , round, teamId] = params.map(Number);
+          const found = matches.find(
+            (m) =>
+              m.round === round &&
+              m.status !== "COMPLETED" &&
+              (m.team1Id === teamId || m.team2Id === teamId),
+          );
+          return [found ? [{ id: found.id, team1_id: found.team1Id, team2_id: found.team2Id }] : [], []];
+        }
+        return undefined;
+      };
+
+      // Écritures des matchs.
+      const writeMatches = (): unknown => {
+        if (q.startsWith("INSERT INTO bg_matches")) {
+          const [, , round, matchNumber] = params.map(Number);
+          const id = ++nextMatchId;
+          matches.push({
+            id,
+            round,
+            matchNumber,
+            status: "PENDING",
+            team1Id: null,
+            team2Id: null,
+            winnerTeamId: null,
+            loserTeamId: null,
+            isBye: 0,
+            hasScoreInput: false,
+            team1Score: null,
+            team2Score: null,
+          });
+          return [{ insertId: id }, []];
+        }
+
+        if (q.startsWith("UPDATE bg_matches SET team1_id = ?, team2_id = ?, swiss_round")) {
+          const match = matches.find((m) => m.id === Number(params[3]))!;
+          match.team1Id = params[0] === null ? null : Number(params[0]);
+          match.team2Id = params[1] === null ? null : Number(params[1]);
+          match.status = "READY";
+          return [{}, []];
+        }
+
+        if (q.startsWith("UPDATE bg_matches SET team1_id = ?, team2_id = NULL")) {
+          const match = matches.find((m) => m.id === Number(params[3]))!;
+          match.team1Id = Number(params[0]);
+          match.team2Id = null;
+          match.isBye = 1;
+          match.status = "COMPLETED";
+          match.winnerTeamId = Number(params[2]);
+          return [{}, []];
+        }
+
+        // Résolution d'un match par forfait
+        if (q.startsWith("UPDATE bg_matches SET status = 'COMPLETED'")) {
+          const match = matches.find((m) => m.id === Number(params[5]))!;
+          match.status = "COMPLETED";
+          match.winnerTeamId = Number(params[0]);
+          match.loserTeamId = Number(params[1]);
+          match.team1Score = Number(params[3]);
+          match.team2Score = Number(params[4]);
+          match.hasScoreInput = true;
+          return [{}, []];
+        }
+
+        if (q.startsWith("DELETE FROM bg_matches")) {
+          const round = Number(params[2]);
+          for (let i = matches.length - 1; i >= 0; i--) {
+            if (matches[i].round === round) matches.splice(i, 1);
+          }
+          return [{}, []];
+        }
+        return undefined;
+      };
+
+      // Écritures du classement et du tournoi.
+      const writeStandings = (): unknown => {
+        if (q.startsWith("INSERT INTO bg_swiss_standings")) {
+          // (tournament_id, phase_id, team_id, seed, rank)
+          const [, , teamId, seed] = params.map(Number);
+          const existing = standings.find((s) => s.teamId === teamId);
+          if (existing) {
+            existing.seed = seed;
+            existing.status = "ACTIVE";
+            existing.forfeitRound = null;
+          } else {
+            standings.push({ teamId, seed, status: "ACTIVE", forfeitRound: null });
+          }
+          return [{}, []];
+        }
+
+        if (q.startsWith("UPDATE bg_swiss_standings SET status = 'FORFEIT'")) {
+          // (forfeit_round, tournament_id, phase_id, team_id)
+          const found = standings.find((s) => s.teamId === Number(params[3]))!;
+          found.status = "FORFEIT";
+          found.forfeitRound = Number(params[0]);
+          return [{}, []];
+        }
+
+        // Persistance du classement : relue seulement par l'affichage.
+        if (q.startsWith("UPDATE bg_swiss_standings SET points")) return [{}, []];
+
+        if (q.startsWith("UPDATE bg_tournament_registrations SET final_rank")) {
+          // `CASE team_id WHEN ? THEN ? …` : les paramètres vont par paires.
+          const teamCount = standings.length;
+          for (let i = 0; i < teamCount * 2; i += 2) {
+            registrationRanks.set(Number(params[i]), Number(params[i + 1]));
+          }
+          return [{}, []];
+        }
+
+        if (q.startsWith("UPDATE bg_tournaments SET state = 'FINISHED'")) {
+          tournament.state = "FINISHED";
+          return [{}, []];
+        }
+        if (q.startsWith("UPDATE bg_tournaments SET swiss_total_rounds")) {
+          tournament.swiss_total_rounds = Number(params[0]);
+          return [{}, []];
+        }
+        if (q.startsWith("UPDATE bg_tournaments SET bracket_size")) {
+          tournament.bracket_size = Number(params[0]);
+          return [{}, []];
+        }
+        if (q.startsWith("UPDATE bg_tournaments SET swiss_current_round")) {
+          tournament.swiss_current_round = Number(params[0]);
+          return [{}, []];
+        }
+        return undefined;
+      };
+
+      return readTournament() ?? readMatches() ?? writeMatches() ?? writeStandings() ?? [[], []];
     },
   } as unknown as PoolConnection;
 

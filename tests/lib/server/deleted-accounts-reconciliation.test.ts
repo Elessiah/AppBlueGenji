@@ -32,6 +32,8 @@ type Account = {
 
 type Query = { userId: number | null; sql: string; params: unknown[] };
 
+const bit = (value: unknown): number => (value ? 1 : 0);
+
 /**
  * Ce que la lecture de repérage retient : ce que la base rendrait pour
  * `is_deleted = 1 AND (ancien pseudo OU rôle OU aucune trace)`.
@@ -88,16 +90,16 @@ function fakeDb(
             pseudo: account.pseudo,
             // Relu **sous le verrou** : un compte peut avoir été traité par un
             // autre processus entre la liste et le verrou.
-            is_deleted: account.isDeleted === false ? 0 : 1,
-            is_admin: account.isAdmin ? 1 : 0,
+            is_deleted: bit(account.isDeleted !== false),
+            is_admin: bit(account.isAdmin),
             platform_roles_json: account.roles ?? null,
           }]];
         }
         if (q.includes("AS played")) {
           return [[{
-            played: account?.played ? 1 : 0,
-            organized: account?.organized ? 1 : 0,
-            owned: account?.owned ? 1 : 0,
+            played: bit(account?.played),
+            organized: bit(account?.organized),
+            owned: bit(account?.owned),
           }]];
         }
         return [[]];

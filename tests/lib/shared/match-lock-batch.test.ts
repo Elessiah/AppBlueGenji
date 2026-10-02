@@ -118,31 +118,47 @@ function lcg(seed: number): () => number {
   };
 }
 
+const BOARD_KINDS = ["blank", "score", "winner", "forfeit", "double", "pending", "draw"] as const;
+type BoardKind = (typeof BOARD_KINDS)[number];
+
+/** Ce que le genre tiré fixe sur le match, sans rien tirer de plus. */
+function kindFields(kind: BoardKind, team1Id: number | null, team2Id: number | null) {
+  return {
+    team1Score: kind === "score" || kind === "draw" ? 1 : null,
+    team2Score: kind === "score" ? 0 : kind === "draw" ? 1 : null,
+    winnerTeamId: kind === "winner" ? team1Id : null,
+    forfeitTeamId: kind === "forfeit" ? team2Id : null,
+    doubleForfeit: kind === "double",
+    hasPendingReport: kind === "pending",
+  };
+}
+
+/** Liens vers n'importe quel match, cycles et identifiants absents compris. */
+function randomLinks(random: () => number, size: number, withPhases: boolean) {
+  return {
+    nextWinnerMatchId: random() < 0.6 ? 1 + Math.floor(random() * (size + 2)) : null,
+    nextLoserMatchId: random() < 0.3 ? 1 + Math.floor(random() * (size + 2)) : null,
+    phaseId: withPhases ? 1 + Math.floor(random() * 3) : undefined,
+    phasePosition: withPhases && random() < 0.5 ? 1 + Math.floor(random() * 3) : undefined,
+  };
+}
+
 function randomBoard(random: () => number, size: number, withPhases: boolean): MatchScoreState[] {
   const pick = <T,>(values: readonly T[]): T => values[Math.floor(random() * values.length)];
   const board: MatchScoreState[] = [];
   for (let id = 1; id <= size; id += 1) {
     const team1Id = random() < 0.15 ? null : 10 + id;
     const team2Id = random() < 0.15 ? null : 500 + id;
-    const kind = pick(["blank", "score", "winner", "forfeit", "double", "pending", "draw"] as const);
+    const kind = pick(BOARD_KINDS);
     board.push(
       match({
         id,
         roundNumber: 1 + Math.floor(random() * 5),
         team1Id,
         team2Id,
-        team1Score: kind === "score" || kind === "draw" ? 1 : null,
-        team2Score: kind === "score" ? 0 : kind === "draw" ? 1 : null,
-        winnerTeamId: kind === "winner" ? team1Id : null,
-        forfeitTeamId: kind === "forfeit" ? team2Id : null,
-        doubleForfeit: kind === "double",
+        ...kindFields(kind, team1Id, team2Id),
         decided: kind !== "blank" && kind !== "pending" && kind !== "score" ? true : random() < 0.2,
-        hasPendingReport: kind === "pending",
-        // Liens vers n'importe quel match, cycles et identifiants absents compris.
-        nextWinnerMatchId: random() < 0.6 ? 1 + Math.floor(random() * (size + 2)) : null,
-        nextLoserMatchId: random() < 0.3 ? 1 + Math.floor(random() * (size + 2)) : null,
-        phaseId: withPhases ? 1 + Math.floor(random() * 3) : undefined,
-        phasePosition: withPhases && random() < 0.5 ? 1 + Math.floor(random() * 3) : undefined,
+        ...randomLinks(random, size, withPhases),
       }),
     );
   }

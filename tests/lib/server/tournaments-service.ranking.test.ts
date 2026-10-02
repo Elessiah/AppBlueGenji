@@ -15,7 +15,6 @@ describe("tournaments-service: ranking", () => {
     });
 
     it("single elimination: semifinal losers tied for 3rd", () => {
-      const position = 3;
       const tieForThird = true;
       expect(tieForThird).toBe(true);
     });
@@ -108,7 +107,6 @@ describe("tournaments-service: ranking", () => {
 
     it("team eliminated in first round has 0 wins", () => {
       const wins = 0;
-      const losses = 1;
       expect(wins).toBe(0);
     });
 

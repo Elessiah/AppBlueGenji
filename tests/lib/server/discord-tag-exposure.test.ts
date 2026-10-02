@@ -502,9 +502,7 @@ describe("updateOwnProfile — la case « Tag Discord »", () => {
  */
 describe("les lectures qui n'ont pas à connaître le tag", () => {
   it("ne le sélectionne ni dans l'annuaire ni sur la fiche d'un joueur", async () => {
-    const { queries } = fakeDb((q) =>
-      q.startsWith("SELECT id, pseudo, avatar_url") ? [[]] : [[]],
-    );
+    const { queries } = fakeDb(() => [[]]);
 
     await getUserById(7);
     await listPlayers(7);
@@ -607,14 +605,14 @@ describe("updateOwnProfile — un compte Discord rattaché possède son tag", ()
   });
 });
 
-describe("updateOwnProfile — retirer son tag reste possible", () => {
-  const lockedDb = (discordId: string | null, storedTag: string | null) =>
-    fakeDb((sql) =>
-      sql.includes("SELECT discord_id, discord_pseudo")
-        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
-        : undefined,
-    );
+const lockedDb = (discordId: string | null, storedTag: string | null) =>
+  fakeDb((sql) =>
+    sql.includes("SELECT discord_id, discord_pseudo")
+      ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
+      : undefined,
+  );
 
+describe("updateOwnProfile — retirer son tag reste possible", () => {
   it("laisse un compte rattaché effacer son tag — c'est le seul geste d'annulation", async () => {
     // Sans lui, un compte né par Discord n'a aucune sortie : son tag est
     // certifié donc lisible de l'arbitrage, et détacher Discord lui est refusé
@@ -645,13 +643,6 @@ describe("updateOwnProfile — retirer son tag reste possible", () => {
 });
 
 describe("updateOwnProfile — un tag vidé est un tag vidé", () => {
-  const lockedDb = (discordId: string | null, storedTag: string | null) =>
-    fakeDb((sql) =>
-      sql.includes("SELECT discord_id, discord_pseudo")
-        ? [[{ discord_id: discordId, discord_pseudo: storedTag }]]
-        : undefined,
-    );
-
   it("traite la chaîne vide comme `null` — c'est le même geste", async () => {
     // Un formulaire rend `""`, un appel direct rend `null` : les distinguer
     // faisait de l'un un effacement et de l'autre une réécriture, donc un 409

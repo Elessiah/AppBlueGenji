@@ -148,6 +148,16 @@ describe("seed — cohérence des définitions", () => {
     }
   });
 
+  /** Les options d'endurance n'existent qu'en BG_SURVIE, et y sont valides. */
+  const expectEnduranceOptions = (t: (typeof TOURNAMENTS)[number]) => {
+    if (t.endurancePoints === undefined && t.endurancePlayoffSize === undefined) return;
+    expect(formatOf(t)).toBe("BG_SURVIE");
+    if (t.endurancePoints !== undefined) expect(t.endurancePoints).toBeGreaterThan(0);
+    if (t.endurancePlayoffSize !== undefined) {
+      expect(t.endurancePlayoffSize).toBeGreaterThanOrEqual(2);
+    }
+  };
+
   it("réserve les options de format à leur format", () => {
     for (const t of TOURNAMENTS) {
       if (t.survivalRoundsPerCut !== undefined) {
@@ -166,13 +176,7 @@ describe("seed — cohérence des définitions", () => {
       if ((t.forfeits ?? 0) > 0) {
         expect(["SURVIVAL", "BG_SURVIE"]).toContain(formatOf(t));
       }
-      if (t.endurancePoints !== undefined || t.endurancePlayoffSize !== undefined) {
-        expect(formatOf(t)).toBe("BG_SURVIE");
-        if (t.endurancePoints !== undefined) expect(t.endurancePoints).toBeGreaterThan(0);
-        if (t.endurancePlayoffSize !== undefined) {
-          expect(t.endurancePlayoffSize).toBeGreaterThanOrEqual(2);
-        }
-      }
+      expectEnduranceOptions(t);
     }
   });
 

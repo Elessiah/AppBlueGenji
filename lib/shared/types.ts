@@ -248,6 +248,7 @@ export type VisibilitySettings = {
   discord: boolean;
 };
 
+// eslint-disable-next-line sonarjs/redundant-type-aliases -- voir le NOSONAR ci-dessous
 export type PlayerRole = TeamRole; // NOSONAR typescript:S6564 — alias de domaine (rôle vu depuis le joueur), importé par plusieurs modules
 
 export type PublicUserProfile = {

@@ -39,7 +39,7 @@ describe("stats-cache", () => {
   });
 
   it("fait partager un seul calcul aux lecteurs simultanés", async () => {
-    let release: (value: number) => void = () => undefined;
+    let release: (value: number) => void = (_value) => undefined;
     const loader = jest.fn(() => new Promise<number>((resolve) => (release = resolve)));
 
     const reads = Array.from({ length: 20 }, () => cachedStats("player-records", loader));

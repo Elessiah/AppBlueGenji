@@ -20,7 +20,7 @@ import { FOCUS_REFRESH_MIN_INTERVAL_MS } from "@/lib/shared/refresh-tiers";
  */
 
 class FakeEventSource {
-  static instances: FakeEventSource[] = [];
+  static readonly instances: FakeEventSource[] = [];
   onopen: (() => void) | null = null;
   onmessage: ((event: { data: string }) => void) | null = null;
   onerror: (() => void) | null = null;
@@ -89,7 +89,7 @@ async function settle() {
 beforeEach(() => {
   jest.useFakeTimers();
   jest.spyOn(Math, "random").mockReturnValue(1);
-  FakeEventSource.instances = [];
+  FakeEventSource.instances.length = 0;
   doc = Object.assign(new EventTarget(), { visibilityState: "visible" as const });
   win = new EventTarget();
   Object.assign(globalThis, { EventSource: FakeEventSource, document: doc, window: win });
@@ -244,7 +244,7 @@ describe("premier instantané", () => {
 
   it("aucun guet ne survit à un message, une erreur, une reconnexion ou à la fermeture", () => {
     for (const end of ["message", "error", "reconnect", "close"] as const) {
-      FakeEventSource.instances = [];
+      FakeEventSource.instances.length = 0;
       const { state, load } = open();
       state.detail = end === "error"; // l'erreur ne relit pas une page remplie
       latest().onopen!();

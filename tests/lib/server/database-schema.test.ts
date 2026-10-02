@@ -1,10 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { declaredColumns } from "@/lib/server/database/declared-tables";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { readDatabaseSource } from "../../helpers/read-source";
 
-const ROOT = join(__dirname, "..", "..", "..");
 const sql = readDatabaseSource();
 
 /**

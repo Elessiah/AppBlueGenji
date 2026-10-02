@@ -407,6 +407,7 @@ describe("computeDeepStats", () => {
         NOW,
       );
 
+      // eslint-disable-next-line sonarjs/no-floating-point-equality -- l'arrondi rend exactement 1.67 : un écart dirait qu'il a sauté
       expect(stats.averageRank).toBe(1.67);
     });
   });
