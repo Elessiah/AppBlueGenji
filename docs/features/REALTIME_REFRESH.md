@@ -564,7 +564,10 @@ main dans `site-visits-service.ts`, s'appuie maintenant sur le même module.
 | Fichier | Rôle |
 | --- | --- |
 | `tournois/[id]/_lib/live-state.ts` | Logique pure du flux : analyse, fusion, reconnexion, signal sonore. |
-| `tournois/[id]/_hooks/useTournamentLive.ts` | Le hook, réduit au câblage. |
+| `tournois/[id]/_lib/live-connection.ts` | Connexion au flux, hors React : reconnexion sans abandon, échec définitif, retour sur l'onglet, sondage de secours, guet du premier instantané, palier `?quiet=1` relu à chaque ouverture. |
+| `tournois/[id]/_lib/live-render-gate.ts` | Régime de charge : rendu de l'état reçu (immédiat, regroupé ou différé) et bascule au palier spectateur (`CLIENT_POWER_MODES.md`). |
+| `tournois/[id]/_lib/live-alerts.ts` | Annonces au lecteur sur l'état reçu : signal sonore, titre d'onglet, modale de lancement. |
+| `tournois/[id]/_hooks/useTournamentLive.ts` | Le hook, réduit au câblage de ces trois pièces et à la lecture REST de secours. |
 
 ## Détails qui comptent
 

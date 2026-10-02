@@ -11,8 +11,8 @@ ce soit. Voir `docs/features/BG_SURVIE_MODE.md`.
 | Où | Quoi |
 | --- | --- |
 | `lib/shared/endurance-penalty.ts` | Forme d'une sanction (bornes, motif, messages). Pur. |
-| `lib/shared/bg-survie.ts` | Rejeu : `EndurancePenalty`, `applyPenalty`, marque de case. Pur. |
-| `lib/server/tournaments/bg-survie.ts` | `applyEndurancePenalty`, `liftEndurancePenalty`, lecture. |
+| `lib/shared/bg-survie/replay.ts`, `replay-steps.ts` | Rejeu : `EndurancePenalty`, `applyPenalty`, marque de case. Pur. |
+| `lib/server/tournaments/bg-survie/penalties.ts`, `meta.ts` | `applyEndurancePenalty`, `liftEndurancePenalty` ; lecture du journal. |
 | `bg_endurance_penalties` | La table. Une ligne = une sanction. |
 | `POST /api/tournaments/[id]/penalties` | Infliger. Permission `tournaments`. |
 | `DELETE /api/tournaments/[id]/penalties/[penaltyId]` | Retirer. Permission `tournaments`. |

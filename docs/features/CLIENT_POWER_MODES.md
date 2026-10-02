@@ -118,9 +118,12 @@ Pour un diagnostic à distance, `<html data-power="full|eco|match|sleep">` et
 - **Flux du bot** (`/bot`) : fermé après une minute d'onglet caché ; au retour,
   la liste repart de l'historique que le bot rejoue à chaque connexion.
 - **Flux du tournoi** (`useTournamentLive`) : l'état *reçu* (`stateRef`) et
-  l'état *rendu* sont séparés ; le rendu suit la politique. Onglet caché
-  soixante secondes hors match → reconnexion en `?quiet=1`, au retour
-  reconnexion normale.
+  l'état *rendu* sont séparés ; le rendu suit la politique
+  (`createLiveRenderGate`, `tournois/[id]/_lib/live-render-gate.ts`). Onglet
+  caché soixante secondes hors match → reconnexion en `?quiet=1`, au retour
+  reconnexion normale (`createQuietStream`, même module). Les deux contrôleurs
+  vivent hors React et se testent sous minuteurs simulés
+  (`tests/tournois/live-render-gate.test.ts`).
 
 ## Serveur : `?quiet=1`
 

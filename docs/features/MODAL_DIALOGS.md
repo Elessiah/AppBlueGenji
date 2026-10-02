@@ -74,6 +74,19 @@ par `components/cyber/landing/LandingDialog.tsx`, qui applique les trois
 règles et porte le voile ; chaque section ne fournit que l'habillage de son
 panneau.
 
+## Fiche tournoi : `TournamentDialogFrame`
+
+Les dialogues staff de la fiche tournoi stylés en ligne — suppression, retour
+en arrière, pénalité, signalement, diffusion, et la coquille
+`TournamentDialogShell` (avancée, retrait d'un engagé) — empruntent le même
+voile et le même cadre : `app/(secured)/tournois/[id]/_components/TournamentDialogFrame.tsx`
+applique les trois règles et pose `.dialog-bounded`. Chaque dialogue lui passe
+son titre (`titleId`), sa largeur, sa couche (`zIndex`, que
+`tests/app/modal-dialogs.test.ts` vérifie appel par appel), une bordure
+destructive au besoin, et `deferMount` quand il peut être rendu dès le premier
+rendu de la page. Le rendu de chacun est figé par
+`tests/tournois/tournament-dialogs-render.test.tsx`.
+
 ## Hauteur bornée
 
 Une modale dont le contenu peut dépasser l'écran (paysage mobile, clavier

@@ -261,7 +261,7 @@ tables des notifications push (`bg_push_subscriptions`, `bg_push_topic_optouts`,
 `bg_match_start_notices` — `docs/features/PUSH_NOTIFICATIONS.md`) gardent un
 `catch` muet, parce que c'est le contrat qu'`isMissingTableError` décrit et sur
 lequel s'appuient les chemins de notification, `tournaments/deletion.ts`,
-`tournaments/rollback.ts` et les lectures des sanctions de `tournaments/bg-survie.ts`
+`tournaments/rollback.ts` et les lectures des sanctions de `tournaments/bg-survie/` (`replay-inputs.ts`, `meta.ts`, `penalties.ts`)
 (`rowsOrEmptyIfMissingTable` : une table absente se lit vide) — une base où leur
 création a échoué reste debout, et un rappel, une alerte ou une sanction perdus
 valent mieux qu'un report de score en erreur. Les autres tables ne sont pas tolérées : le site n'a rien à servir
