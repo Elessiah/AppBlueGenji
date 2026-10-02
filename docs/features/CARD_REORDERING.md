@@ -61,7 +61,9 @@ Ces routes, celle des annonces de recrutement et les `PUT` / `DELETE` sur
 session, permission, identifiant, corps, puis traduction de l'erreur du
 service (404 pour l'élément introuvable) — par
 `lib/server/admin-collection-routes.ts` (`itemRoutes`, `reorderRoute`) : chaque
-fichier de route ne dit que sa permission, son service et ses codes.
+fichier de route ne dit que sa permission, son service et ses codes. Un corps
+JSON qui n'est pas un objet (`null`, tableau, nombre…) est refusé en
+`INVALID_BODY` (400) avant le service.
 
 ## Interface
 
