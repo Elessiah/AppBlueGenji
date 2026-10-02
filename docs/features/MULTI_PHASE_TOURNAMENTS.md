@@ -148,6 +148,20 @@ donnait deux classements différents, à matchs identiques, d'une exécution du
 seed à l'autre. Il vaut aussi pour la qualification d'une phase à élimination
 et pour la clôture d'un tournoi `SINGLE` / `DOUBLE`.
 
+Une phase ne range et ne qualifie que **ses propres équipes**
+(`bg_tournament_phase_teams`). Dans une phase (`phase_id > 0`), le reste du
+classement de `rankEliminationPhase` joint le roster de la phase **strictement** ;
+hors phase (`phase_id = 0`), la jointure reste facultative, tout le plateau étant
+inscrit au tableau. `rankPhaseStandings` filtre en outre le classement du moteur
+sur ce roster avant de compter les qualifiées. Auparavant, dans une phase à
+élimination qui n'était pas la première, une équipe sortie plus tôt y figurait
+sur 0 V – 0 D : rangée devant les perdantes 0 V – 1 D de la phase, elle décalait
+leurs rangs — que `finalizeMultiTournament` reporte dans `final_rank` pour la
+dernière phase — et, la qualification se comptant par index, pouvait prendre une
+place laissée libre par un double forfait, puis rentrer dans la phase suivante.
+Une équipe sortie à une phase antérieure est classée par **sa** phase
+(`multi-phase-participants.test.ts`).
+
 ## Verrouillage des scores
 
 `lib/shared/match-lock.ts` applique deux règles cumulées :
