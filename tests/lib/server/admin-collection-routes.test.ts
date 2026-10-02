@@ -88,10 +88,9 @@ describe("itemRoutes — PUT", () => {
     expect(await reply(await item.PUT(request("{}"), params("1")))).toEqual({ status: 400, body: { error: "THING_UPDATE_FAILED" } });
   });
 
-  it("passe un corps JSON `null` tel quel au service (comportement conservé, voir ERREUR.txt)", async () => {
-    update.mockResolvedValue({});
-    await item.PUT(request("null"), params("1"));
-    expect(update.mock.calls[0]).toEqual([1, null]);
+  it.each(["null", "[]", "42", '"texte"', "true"])("refuse un corps JSON qui n'est pas un objet (%s)", async (raw) => {
+    expect(await reply(await item.PUT(request(raw), params("1")))).toEqual({ status: 400, body: { error: "INVALID_BODY" } });
+    expect(update).not.toHaveBeenCalled();
   });
 });
 
@@ -133,6 +132,11 @@ describe("reorderRoute", () => {
     expect((await order(request('{"ids":[1]}'))).status).toBe(403);
     expect(await reply(await order(request("{")))).toEqual({ status: 400, body: { error: "INVALID_BODY" } });
     expect(await reply(await order(request('{"ids":[]}')))).toEqual({ status: 400, body: { error: "IDS_EMPTY" } });
+    expect(reorder).not.toHaveBeenCalled();
+  });
+
+  it.each(["null", "[]", "42", '"texte"', "true"])("refuse un corps JSON qui n'est pas un objet (%s)", async (raw) => {
+    expect(await reply(await order(request(raw)))).toEqual({ status: 400, body: { error: "INVALID_BODY" } });
     expect(reorder).not.toHaveBeenCalled();
   });
 
