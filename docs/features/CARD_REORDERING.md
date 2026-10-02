@@ -56,6 +56,13 @@ Une route `PUT .../reorder` par section, réservée aux admins, corps
 Codes d'erreur : `UNAUTHORIZED` (401), `FORBIDDEN` (403), `INVALID_BODY` +
 erreurs de `validateReorderIds` (400).
 
+Ces routes, celle des annonces de recrutement et les `PUT` / `DELETE` sur
+`[id]` des mêmes listes (bénévoles compris) partagent leur déroulé —
+session, permission, identifiant, corps, puis traduction de l'erreur du
+service (404 pour l'élément introuvable) — par
+`lib/server/admin-collection-routes.ts` (`itemRoutes`, `reorderRoute`) : chaque
+fichier de route ne dit que sa permission, son service et ses codes.
+
 ## Interface
 
 Les quatre composants clients ajoutent une fonction `move(index, direction)` qui
