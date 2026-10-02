@@ -14,7 +14,6 @@ import {
   BORDER,
   ChampionBanner,
   FORFEIT_BUTTON_STYLE,
-  RoundBadge,
   RoundColumns,
 } from "./RoundColumns";
 import styles from "./RankingViews.module.css";
@@ -280,13 +279,11 @@ export function SurvivalRounds({
       allTournamentMatches={allTournamentMatches}
       format="SURVIVAL"
       ariaLabel="Manches du tournoi — défilement horizontal"
-      roundLabel={(roundNum) => <>Manche {roundNum}</>}
-      roundBadges={(roundNum) => (
-        <>
-          {barrageRounds > 0 && roundNum <= barrageRounds && <RoundBadge>⚖ Barrage</RoundBadge>}
-          {cutSchedule !== null && isCutRound(roundNum, cutSchedule) && <RoundBadge>⚔ Coupe</RoundBadge>}
-        </>
-      )}
+      roundNoun="Manche"
+      roundMarks={(roundNum) => [
+        ...(barrageRounds > 0 && roundNum <= barrageRounds ? ["⚖ Barrage"] : []),
+        ...(cutSchedule !== null && isCutRound(roundNum, cutSchedule) ? ["⚔ Coupe"] : []),
+      ]}
       adminResolvable={adminResolvable}
       onOpenAdminModal={onOpenAdminModal}
       emptyLabel={emptyLabel}

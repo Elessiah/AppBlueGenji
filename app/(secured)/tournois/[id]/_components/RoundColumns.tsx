@@ -32,7 +32,7 @@ export const FORFEIT_BUTTON_STYLE: CSSProperties = {
 };
 
 /** Marque ambrée accolée à l'intitulé d'une manche (barrage, coupe, dernière). */
-export function RoundBadge({ children }: Readonly<{ children: ReactNode }>) {
+function RoundBadge({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <span
       style={{
@@ -77,10 +77,10 @@ export interface RoundColumnsProps {
   format: TournamentFormat;
   /** Nom de la zone défilante (« Manches du tournoi — … »). */
   ariaLabel: string;
-  /** Intitulé d'une colonne : « Manche 3 », « Ronde 3 ». */
-  roundLabel: (roundNum: number) => ReactNode;
-  /** Marques accolées à l'intitulé (`RoundBadge`), propres au format. */
-  roundBadges: (roundNum: number) => ReactNode;
+  /** Nom d'une colonne, suivi de son numéro : « Manche », « Ronde ». */
+  roundNoun: string;
+  /** Marques accolées à l'intitulé d'une manche, propres au format (« ⚖ Barrage »). */
+  roundMarks: (roundNum: number) => string[];
   adminResolvable: (m: BracketMatch) => boolean;
   onOpenAdminModal: (match: BracketMatch) => void;
   emptyLabel: string;
@@ -98,8 +98,8 @@ export function RoundColumns({
   allTournamentMatches,
   format,
   ariaLabel,
-  roundLabel,
-  roundBadges,
+  roundNoun,
+  roundMarks,
   adminResolvable,
   onOpenAdminModal,
   emptyLabel,
@@ -144,9 +144,11 @@ export function RoundColumns({
                       fontWeight: 600,
                     }}
                   >
-                    {roundLabel(roundNum)}
+                    {`${roundNoun} `}{roundNum}
                   </span>
-                  {roundBadges(roundNum)}
+                  {roundMarks(roundNum).map((mark) => (
+                    <RoundBadge key={mark}>{mark}</RoundBadge>
+                  ))}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {roundMatches.map((match) => {

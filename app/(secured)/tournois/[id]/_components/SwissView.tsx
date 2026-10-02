@@ -11,7 +11,6 @@ import {
   BORDER,
   ChampionBanner,
   FORFEIT_BUTTON_STYLE,
-  RoundBadge,
   RoundColumns,
 } from "./RoundColumns";
 import styles from "./RankingViews.module.css";
@@ -367,8 +366,8 @@ export function SwissRounds({
       allTournamentMatches={allTournamentMatches}
       format="SWISS"
       ariaLabel="Rondes du tournoi — défilement horizontal"
-      roundLabel={(roundNum) => <>Ronde {roundNum}</>}
-      roundBadges={(roundNum) => roundNum === totalRounds && <RoundBadge>⚑ Dernière</RoundBadge>}
+      roundNoun="Ronde"
+      roundMarks={(roundNum) => (roundNum === totalRounds ? ["⚑ Dernière"] : [])}
       adminResolvable={adminResolvable}
       onOpenAdminModal={onOpenAdminModal}
       emptyLabel={emptyLabel}
