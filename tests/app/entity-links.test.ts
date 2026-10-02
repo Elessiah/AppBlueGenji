@@ -125,11 +125,13 @@ describe("Page de tournoi — engagés cliquables", () => {
   });
 
   it("nomme la championne d'une survie et d'une ronde suisse par un lien", () => {
+    // Les deux vues passent par le bandeau commun de `RoundColumns`.
     for (const path of [files["SurvivalView.tsx"], files["SwissView.tsx"]]) {
-      const code = stripComments(read(path));
-      const banner = code.slice(code.indexOf("Championne"));
-      expect(banner.slice(0, 200)).toContain("<EntrantName teamId={champion.teamId}");
+      expect(stripComments(read(path))).toContain("{champion && <ChampionBanner champion={champion} />}");
     }
+    const code = stripComments(read("app/(secured)/tournois/[id]/_components/RoundColumns.tsx"));
+    const banner = code.slice(code.indexOf("Championne"));
+    expect(banner.slice(0, 200)).toContain("<EntrantName teamId={champion.teamId}");
   });
 
   it("mène la liste des inscriptions vers la fiche de chaque engagé", () => {

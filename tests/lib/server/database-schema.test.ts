@@ -26,7 +26,10 @@ const sql = readFileSync(join(ROOT, "lib", "server", "database.ts"), "utf8");
 function table(name: string): string {
   const start = sql.indexOf(`CREATE TABLE IF NOT EXISTS ${name} (`);
   expect(start).toBeGreaterThan(-1);
-  return sql.slice(start, sql.indexOf("`);", start));
+  // Fin du gabarit : « `); » pour un appel, « `, » pour une entrée de liste
+  // (`SHOWCASE_TABLES`).
+  const ends = ["`);", "`,"].map((end) => sql.indexOf(end, start)).filter((at) => at > -1);
+  return sql.slice(start, Math.min(...ends));
 }
 
 describe("Schéma — les colonnes autrefois ajoutées par ALTER vivent dans leur table", () => {

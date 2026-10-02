@@ -1,0 +1,8 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`runMigrations — une base déjà à jour émet la passe à l'octet près (empreinte figée) 1`] = `
+{
+  "sha256": "388928797c24c8ca9c4f92413c7959e252aab63cbc06986699bc166d71efa7db",
+  "statements": 98,
+}
+`;
