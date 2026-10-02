@@ -136,6 +136,16 @@ Le classement d'une phase provient **toujours du moteur** de cette phase
 `rankEliminationPhase` en bracket) — jamais de l'ordre des standings en base, qui
 reste l'ordre de seeding tant que les rangs ne sont pas écrits.
 
+Hors podium, `rankEliminationPhase` range le tableau par `orderEliminationRest`
+(`lib/server/tournaments/finalization.ts`) : victoires décroissantes, défaites
+croissantes, **stade** le plus avancé (tableau `UPPER` < `LOWER` < `GRAND`, puis
+tour de la dernière rencontre décidée), seed, identifiant. Ce départage
+remplace l'heure de la dernière rencontre (`updated_at`), qui rangeait deux
+équipes sorties au même tour selon la seconde de saisie de leurs scores — et
+donnait deux classements différents, à matchs identiques, d'une exécution du
+seed à l'autre. Il vaut aussi pour la qualification d'une phase à élimination
+et pour la clôture d'un tournoi `SINGLE` / `DOUBLE`.
+
 ## Verrouillage des scores
 
 `lib/shared/match-lock.ts` applique deux règles cumulées :
