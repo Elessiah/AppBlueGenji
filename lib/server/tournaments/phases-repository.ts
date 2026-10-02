@@ -206,22 +206,20 @@ export async function savePhaseResults(
 ): Promise<void> {
   if (ranked.length === 0) return;
 
-  const caseRank: string[] = [];
-  const caseQualified: string[] = [];
-  const values: (number | boolean)[] = [];
-
-  for (const item of ranked) {
-    caseRank.push("WHEN ? THEN ?");
-    caseQualified.push("WHEN ? THEN ?");
-    values.push(item.teamId, item.rank, item.teamId, item.qualified ? 1 : 0);
-  }
+  // Une liste de valeurs **par CASE** : les `?` se lient dans l'ordre du texte,
+  // tous ceux du rang d'abord, puis ceux de la qualification. Une seule liste
+  // entrelacée (équipe, rang, équipe, qualifiée) ne tombait juste que pour une
+  // équipe ; dès la deuxième, les rangs glissaient dans la qualification.
+  const caseWhen = ranked.map(() => "WHEN ? THEN ?").join(" ");
+  const rankValues = ranked.flatMap((item) => [item.teamId, item.rank]);
+  const qualifiedValues = ranked.flatMap((item) => [item.teamId, item.qualified ? 1 : 0]);
 
   await connection.execute(
     `UPDATE bg_tournament_phase_teams
-     SET \`rank\` = CASE team_id ${caseRank.join(" ")} ELSE \`rank\` END,
-         qualified = CASE team_id ${caseQualified.join(" ")} ELSE qualified END
+     SET \`rank\` = CASE team_id ${caseWhen} ELSE \`rank\` END,
+         qualified = CASE team_id ${caseWhen} ELSE qualified END
      WHERE phase_id = ?`,
-    [...values, phaseId],
+    [...rankValues, ...qualifiedValues, phaseId],
   );
 }
 
