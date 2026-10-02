@@ -40,8 +40,7 @@ function teamRow(id: number, name: string, logo: string | null = null): Row {
  * pour la photo courante d'un onglet filtré.
  */
 async function mockDb(teams: Row[], current: Row[], previous: Row[] = current) {
-  const execute = jest.fn(async (sql: unknown, params: unknown) => {
-    void params;
+  const execute = jest.fn(async (sql: unknown, _params: unknown) => {
     const text = String(sql);
     if (text.includes("AS played_at")) {
       const bounded = text.includes("DATE_SUB(NOW()");

@@ -85,11 +85,9 @@ describe("adoptRemoteAvatar — la photo ne se pose pas sur une ligne morte", ()
   it("reprend le fichier quand la suppression est passée pendant le téléchargement", async () => {
     // La lecture voit une ligne vivante ; l'écriture, quelques secondes plus
     // tard, n'apparie plus rien. Le fichier, lui, est déjà sur le disque.
-    const queries: Query[] = [];
     let alive = true;
-    const execute = jest.fn(async (sql: string, params: unknown[] = []) => {
+    const execute = jest.fn(async (sql: string) => {
       const q = String(sql).replace(/\s+/g, " ").trim();
-      queries.push({ sql: q, params });
       if (q.startsWith("UPDATE bg_users")) return [{ affectedRows: 0 }];
       const rows = alive ? [{ avatar_url: null }] : [];
       alive = false;

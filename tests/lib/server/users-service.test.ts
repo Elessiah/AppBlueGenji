@@ -15,7 +15,6 @@ describe("users-service", () => {
     it("creates user from Google OAuth", () => {
       const googleSub = "google-id-123";
       const pseudo = "NewPlayer";
-      const email = "user@example.com";
       expect(googleSub).toBeTruthy();
       expect(pseudo).toBeTruthy();
     });
@@ -34,7 +33,6 @@ describe("users-service", () => {
     });
 
     it("applies unique pseudo suffix if needed", () => {
-      const basePseudo = "Player";
       const uniquePseudo = "Player_1";
       expect(uniquePseudo).toMatch(/^Player/);
     });

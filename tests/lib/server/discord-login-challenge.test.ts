@@ -69,6 +69,17 @@ function fakeDb(
   const trace: { origin: "pool" | "tx"; sql: string }[] = [];
   const lifecycle: string[] = [];
 
+  // Réservation d'un essai : la clause `WHERE attempts < ?` décide, et
+  // `affectedRows` la rapporte — comme le fait MySQL sous le verrou de ligne.
+  const reserveAttempt = (limit: number): number => {
+    if (state === null || state.consumed_at !== null || state.attempts >= limit) return 0;
+    // `consumed_at` lit `attempts` **avant** l'incrément, comme MySQL évalue
+    // les affectations de gauche à droite.
+    if (state.attempts + 1 >= limit) state.consumed_at = new Date();
+    state.attempts += 1;
+    return 1;
+  };
+
   const runner = (origin: "pool" | "tx") =>
     jest.fn(async (sql: string, params: unknown[] = []) => {
       const q = String(sql).replace(/\s+/g, " ").trim();
@@ -91,19 +102,8 @@ function fakeDb(
         return [[{ windowCount: String(recentCodes), dayCount: dayCodes }], []];
       }
 
-      // Réservation d'un essai : la clause `WHERE attempts < ?` décide, et
-      // `affectedRows` la rapporte — comme le fait MySQL sous le verrou de ligne.
       if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = CASE")) {
-        if (state === null) return [{ affectedRows: 0 }, []];
-        const limit = Number(params[0]);
-        if (state.consumed_at !== null || state.attempts >= limit) {
-          return [{ affectedRows: 0 }, []];
-        }
-        // `consumed_at` lit `attempts` **avant** l'incrément, comme MySQL évalue
-        // les affectations de gauche à droite.
-        if (state.attempts + 1 >= limit) state.consumed_at = new Date();
-        state.attempts += 1;
-        return [{ affectedRows: 1 }, []];
+        return [{ affectedRows: reserveAttempt(Number(params[0])) }, []];
       }
 
       if (q.startsWith("UPDATE bg_discord_login_challenges SET consumed_at = NOW()")) {

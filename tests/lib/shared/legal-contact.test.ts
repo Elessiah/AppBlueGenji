@@ -36,7 +36,7 @@ const EMAIL_GLOBAL = new RegExp(EMAIL.source, "g");
 /** Numéro français : `0X XX XX XX XX` ou `+33 X …`, séparé par espace, point ou tiret, ou collé. */
 const FRENCH_PHONE = /(?<![\w.+])(?:\+33[\s.-]?|0)[1-9](?:[\s.-]?\d{2}){4}(?!\d)/g;
 /** Domaines réservés aux exemples (RFC 2606) : jamais une adresse joignable. */
-const RESERVED_DOMAIN = /@[A-Za-z0-9.-]*\.(invalid|example|test)$/i;
+const RESERVED_DOMAIN = /@[a-z0-9.-]*\.(invalid|example|test)$/i;
 /** Le seul fichier qui porte les coordonnées — encodées. */
 const ENCODING_MODULE = join("lib", "shared", "obfuscated-contact.ts");
 

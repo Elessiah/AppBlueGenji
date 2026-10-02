@@ -1,9 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { readDatabaseSource } from "../../helpers/read-source";
 
-const ROOT = join(__dirname, "..", "..", "..");
 const SQL = readDatabaseSource();
 
 /**

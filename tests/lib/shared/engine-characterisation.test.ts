@@ -183,6 +183,42 @@ function randomEnduranceInput(r: Rng, index: number): ReplayEnduranceInput {
   };
 }
 
+/** Issue tirée d'un appariement d'endurance : double forfait, nul ou victoire. */
+function playedEnduranceMatch(
+  r: Rng,
+  round: number,
+  completed: boolean,
+  teamAId: number,
+  teamBId: number,
+): ReplayEnduranceInput["matches"][number] {
+  const kind = r.int(0, 11);
+  if (kind === 0) {
+    return { round, completed, winnerTeamId: null, loserTeamId: null, doubleForfeitTeamIds: [teamAId, teamBId] };
+  }
+  if (kind === 1) {
+    return { round, completed, winnerTeamId: null, loserTeamId: null, drawTeamIds: [teamAId, teamBId], drawMaps: r.int(0, 2) };
+  }
+  const aWins = r.chance(0.55);
+  return {
+    round,
+    completed,
+    winnerTeamId: aWins ? teamAId : teamBId,
+    loserTeamId: aWins ? teamBId : teamAId,
+    isForfeit: kind === 2,
+    winnerMaps: 3,
+    loserMaps: r.int(0, 2),
+  };
+}
+
+/** Forfait et pénalité tirés en fin de manche. */
+function drawEnduranceSanctions(r: Rng, input: ReplayEnduranceInput, round: number) {
+  const { teams } = input;
+  if (r.chance(0.15) && teams.length > 0) input.forfeits.push({ teamId: r.pick(teams).teamId, round });
+  if (r.chance(0.2) && teams.length > 0) {
+    input.penalties!.push({ teamId: r.pick(teams).teamId, round, points: r.int(1, 4) });
+  }
+}
+
 /** Tournoi joué manche par manche avec les appariements du moteur. */
 function simulatedEnduranceInput(r: Rng, index: number): ReplayEnduranceInput {
   const teams = teamsOf(SIZES[index % SIZES.length]);
@@ -206,28 +242,9 @@ function simulatedEnduranceInput(r: Rng, index: number): ReplayEnduranceInput {
     for (const { teamAId, teamBId } of pairings) {
       if (teamBId === null) continue;
       const completed = !(lastRoundUnfinished && r.chance(0.5));
-      const kind = r.int(0, 11);
-      if (kind === 0) {
-        input.matches.push({ round, completed, winnerTeamId: null, loserTeamId: null, doubleForfeitTeamIds: [teamAId, teamBId] });
-      } else if (kind === 1) {
-        input.matches.push({ round, completed, winnerTeamId: null, loserTeamId: null, drawTeamIds: [teamAId, teamBId], drawMaps: r.int(0, 2) });
-      } else {
-        const aWins = r.chance(0.55);
-        input.matches.push({
-          round,
-          completed,
-          winnerTeamId: aWins ? teamAId : teamBId,
-          loserTeamId: aWins ? teamBId : teamAId,
-          isForfeit: kind === 2,
-          winnerMaps: 3,
-          loserMaps: r.int(0, 2),
-        });
-      }
+      input.matches.push(playedEnduranceMatch(r, round, completed, teamAId, teamBId));
     }
-    if (r.chance(0.15) && teams.length > 0) input.forfeits.push({ teamId: r.pick(teams).teamId, round });
-    if (r.chance(0.2) && teams.length > 0) {
-      input.penalties!.push({ teamId: r.pick(teams).teamId, round, points: r.int(1, 4) });
-    }
+    drawEnduranceSanctions(r, input, round);
   }
   return input;
 }
@@ -273,6 +290,41 @@ function randomSurvivalInput(r: Rng, index: number): ReplaySurvivalInput {
   };
 }
 
+/** Issue tirée d'un appariement de survie : double forfait ou victoire. */
+function playedSurvivalMatch(
+  r: Rng,
+  round: number,
+  completed: boolean,
+  teamAId: number,
+  teamBId: number,
+): SurvivalMatchOutcome {
+  if (r.chance(0.08)) {
+    return { round, completed, winnerTeamId: null, loserTeamId: null, isBye: false, doubleForfeitTeamIds: [teamAId, teamBId] };
+  }
+  const aWins = r.chance(0.55);
+  return {
+    round,
+    completed,
+    winnerTeamId: aWins ? teamAId : teamBId,
+    loserTeamId: aWins ? teamBId : teamAId,
+    isBye: false,
+  };
+}
+
+/** Fin de manche : victoire d'office éventuelle, puis forfait tiré. */
+function closeSurvivalRound(
+  r: Rng,
+  input: ReplaySurvivalInput,
+  byeTeamId: number | null,
+  active: { teamId: number }[],
+  round: number,
+) {
+  if (byeTeamId !== null) {
+    input.matches.push({ round, completed: true, winnerTeamId: byeTeamId, loserTeamId: null, isBye: true });
+  }
+  if (r.chance(0.12) && active.length > 0) input.forfeits.push({ teamId: r.pick(active).teamId, round });
+}
+
 function simulatedSurvivalInput(r: Rng, index: number): ReplaySurvivalInput {
   const teams = teamsOf(SIZES[index % SIZES.length]);
   const input: ReplaySurvivalInput = { teams, matches: [], forfeits: [], lastRound: 0, ...survivalSchedule(r) };
@@ -286,23 +338,9 @@ function simulatedSurvivalInput(r: Rng, index: number): ReplaySurvivalInput {
     for (const { teamAId, teamBId } of plan.pairings) {
       if (teamBId === null) continue;
       const completed = !(unfinished && r.chance(0.5));
-      if (r.chance(0.08)) {
-        input.matches.push({ round, completed, winnerTeamId: null, loserTeamId: null, isBye: false, doubleForfeitTeamIds: [teamAId, teamBId] });
-        continue;
-      }
-      const aWins = r.chance(0.55);
-      input.matches.push({
-        round,
-        completed,
-        winnerTeamId: aWins ? teamAId : teamBId,
-        loserTeamId: aWins ? teamBId : teamAId,
-        isBye: false,
-      });
+      input.matches.push(playedSurvivalMatch(r, round, completed, teamAId, teamBId));
     }
-    if (plan.byeTeamId !== null) {
-      input.matches.push({ round, completed: true, winnerTeamId: plan.byeTeamId, loserTeamId: null, isBye: true });
-    }
-    if (r.chance(0.12) && active.length > 0) input.forfeits.push({ teamId: r.pick(active).teamId, round });
+    closeSurvivalRound(r, input, plan.byeTeamId, active, round);
   }
   return input;
 }
@@ -318,6 +356,30 @@ const TIEBREAKER_SETS: (SwissTiebreaker[] | undefined)[] = [
   ["sonneborn-berger", "buchholz", "opponent-mwp", "head-to-head"],
 ];
 
+/** Vainqueur tiré : aucun, une équipe errante, ou l'une des deux. */
+function randomSwissWinner(r: Rng, kind: number, team1Id: number | null, team2Id: number | null) {
+  if (kind === 0) return null;
+  if (kind === 1) return 999;
+  return r.chance(0.5) ? team1Id : team2Id;
+}
+
+/** Match suisse tiré au hasard, équipes errantes et issues incohérentes comprises. */
+function randomSwissMatch(r: Rng, round: number, firstId: number, secondId: number): SwissMatchOutcome {
+  const team1Id = r.chance(0.03) ? null : r.chance(0.03) ? 999 : firstId;
+  const team2Id = r.chance(0.03) ? null : secondId;
+  const kind = r.int(0, 9);
+  return {
+    round,
+    completed: !r.chance(0.12),
+    team1Id,
+    team2Id,
+    winnerTeamId: randomSwissWinner(r, kind, team1Id, team2Id),
+    loserTeamId: r.chance(0.3) ? null : r.chance(0.5) ? team1Id : team2Id,
+    isBye: kind === 2,
+    doubleForfeit: kind === 3 ? true : r.pick([undefined, false]),
+  };
+}
+
 function randomSwissInput(r: Rng, index: number): ReplaySwissInput & { tiebreakers: SwissTiebreaker[] | undefined } {
   const teams = teamsOf(SIZES[index % SIZES.length]);
   const rounds = r.int(0, 7);
@@ -325,19 +387,7 @@ function randomSwissInput(r: Rng, index: number): ReplaySwissInput & { tiebreake
   for (let round = r.int(1, 3); round >= 1 && round <= rounds; round += r.pick([1, 1, 2])) {
     const ids = r.chance(0.8) ? [...teams].sort(() => r.next() - 0.5) : teams;
     for (let i = 0; i + 1 < ids.length; i += 2) {
-      const team1Id = r.chance(0.03) ? null : r.chance(0.03) ? 999 : ids[i].teamId;
-      const team2Id = r.chance(0.03) ? null : ids[i + 1].teamId;
-      const kind = r.int(0, 9);
-      matches.push({
-        round,
-        completed: !r.chance(0.12),
-        team1Id,
-        team2Id,
-        winnerTeamId: kind === 0 ? null : kind === 1 ? 999 : r.chance(0.5) ? team1Id : team2Id,
-        loserTeamId: r.chance(0.3) ? null : r.chance(0.5) ? team1Id : team2Id,
-        isBye: kind === 2,
-        doubleForfeit: kind === 3 ? true : r.pick([undefined, false]),
-      });
+      matches.push(randomSwissMatch(r, round, ids[i].teamId, ids[i + 1].teamId));
     }
     if (ids.length % 2 === 1) {
       const last = ids.at(-1)!.teamId;

@@ -223,6 +223,64 @@ describe("survival — computeFinalRanks", () => {
   });
 });
 
+/** Forfaits programmés en début de round. */
+function applyScheduledForfeits(
+  byId: Map<number, SurvivalStanding>,
+  forfeits: Record<number, number>,
+  round: number,
+) {
+  for (const [teamIdStr, r] of Object.entries(forfeits)) {
+    const s = r === round ? byId.get(Number(teamIdStr)) : undefined;
+    if (s?.status === "ACTIVE") {
+      s.status = "FORFEIT";
+      s.eliminatedRound = round;
+    }
+  }
+}
+
+/** Le perdant du barrage sort, sauf si un forfait a déjà rétabli la parité. */
+function eliminateBarrageLoser(
+  standings: SurvivalStanding[],
+  byId: Map<number, SurvivalStanding>,
+  lastLoserId: number | null,
+  round: number,
+) {
+  const ranked = rankActiveTeams(standings);
+  const loser = lastLoserId === null ? undefined : byId.get(lastLoserId);
+  if (shouldEliminateBarrageLoser(ranked.length) && loser?.status === "ACTIVE") {
+    loser.status = "ELIMINATED";
+    loser.eliminatedRound = round;
+  }
+}
+
+/** Joue les appariements du round ; rend le dernier perdant (celui du barrage). */
+function playPairings(
+  pairings: { teamAId: number; teamBId: number | null }[],
+  byId: Map<number, SurvivalStanding>,
+  winnerOf: (a: number, b: number, round: number) => number,
+  round: number,
+): number | null {
+  let lastLoserId: number | null = null;
+  for (const p of pairings) {
+    const w = winnerOf(p.teamAId, p.teamBId!, round);
+    const l = w === p.teamAId ? p.teamBId! : p.teamAId;
+    byId.get(w)!.wins += 1;
+    byId.get(l)!.losses += 1;
+    lastLoserId = l;
+  }
+  return lastLoserId;
+}
+
+/** Coupe : les dernières du classement sortent. */
+function applyCut(standings: SurvivalStanding[], byId: Map<number, SurvivalStanding>, round: number) {
+  const ranked = rankActiveTeams(standings);
+  for (const id of selectEliminatedTeamIds(ranked, teamsToEliminate(ranked.length))) {
+    const s = byId.get(id)!;
+    s.status = "ELIMINATED";
+    s.eliminatedRound = round;
+  }
+}
+
 /**
  * Simulateur en mémoire reproduisant la logique de reconcileSurvival à partir
  * des seules fonctions pures : valide la convergence vers une unique championne.
@@ -250,16 +308,7 @@ function simulate(
   while (rankActiveTeams(standings).length > 1) {
     round += 1;
 
-    // Forfaits programmés en début de round.
-    for (const [teamIdStr, r] of Object.entries(forfeits)) {
-      if (r === round) {
-        const s = byId.get(Number(teamIdStr));
-        if (s && s.status === "ACTIVE") {
-          s.status = "FORFEIT";
-          s.eliminatedRound = round;
-        }
-      }
-    }
+    applyScheduledForfeits(byId, forfeits, round);
     if (rankActiveTeams(standings).length <= 1) break;
 
     const active = rankActiveTeams(standings);
@@ -275,31 +324,12 @@ function simulate(
       s.hasBye = true;
     }
 
-    let lastLoserId: number | null = null;
-    for (const p of pairings) {
-      const w = winnerOf(p.teamAId, p.teamBId!, round);
-      const l = w === p.teamAId ? p.teamBId! : p.teamAId;
-      byId.get(w)!.wins += 1;
-      byId.get(l)!.losses += 1;
-      lastLoserId = l;
-    }
+    const lastLoserId = playPairings(pairings, byId, winnerOf, round);
 
     if (isBarrage) {
-      // Le perdant du barrage sort, sauf si un forfait a déjà rétabli la parité.
-      const ranked = rankActiveTeams(standings);
-      const loser = lastLoserId === null ? undefined : byId.get(lastLoserId);
-      if (shouldEliminateBarrageLoser(ranked.length) && loser?.status === "ACTIVE") {
-        loser.status = "ELIMINATED";
-        loser.eliminatedRound = round;
-      }
+      eliminateBarrageLoser(standings, byId, lastLoserId, round);
     } else if (isCutRound(round, { roundsBeforeFirstCut: roundsPerCut, roundsPerCut, barrageRounds })) {
-      const ranked = rankActiveTeams(standings);
-      const out = selectEliminatedTeamIds(ranked, teamsToEliminate(ranked.length));
-      for (const id of out) {
-        const s = byId.get(id)!;
-        s.status = "ELIMINATED";
-        s.eliminatedRound = round;
-      }
+      applyCut(standings, byId, round);
     }
 
     if (round > 1000) throw new Error("boucle infinie");

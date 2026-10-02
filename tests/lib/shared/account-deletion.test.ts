@@ -4,7 +4,6 @@ import {
   BACKUP_RETENTION_DAYS,
 } from "@/lib/shared/account-deletion-journal";
 import {
-  ACCOUNT_DELETED_ERROR,
   RETENTION_UNKNOWN,
   ACCOUNT_DELETED_WRITE_MESSAGE,
   accountDeletionConfirmation,

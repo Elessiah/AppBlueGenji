@@ -332,10 +332,8 @@ describe("dispatchPrivacyChangeNotifications — notifications push", () => {
 
   it("retombe sur Discord seul si la table des abonnements manque", async () => {
     jest.mocked(webPushConfig).mockReturnValue(CONFIG);
-    const calls: string[] = [];
     const handler = async (sql: string) => {
       const q = flat(sql);
-      calls.push(q);
       if (q.startsWith("SELECT u.id, u.pseudo")) {
         if (q.includes("bg_push_subscriptions")) throw Object.assign(new Error("absente"), { code: "ER_NO_SUCH_TABLE" });
         return [[candidate()]];

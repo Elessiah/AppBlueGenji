@@ -30,7 +30,10 @@ function maxButtonDepth(code: string): number {
   let max = 0;
   for (const token of code.match(/<button\b|<\/button>/g) ?? []) {
     if (token === "</button>") depth -= 1;
-    else max = Math.max(max, (depth += 1));
+    else {
+      depth += 1;
+      max = Math.max(max, depth);
+    }
   }
   expect(depth).toBe(0); // balises appariées : sans quoi la mesure ne veut rien dire
   return max;

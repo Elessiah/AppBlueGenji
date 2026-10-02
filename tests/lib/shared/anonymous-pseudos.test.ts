@@ -27,7 +27,7 @@ describe("ANONYMOUS_PSEUDOS — la liste", () => {
 
   it("ne contient que des pseudos que la colonne accepte, suffixe compris", () => {
     for (const pseudo of ANONYMOUS_PSEUDOS) {
-      expect(pseudo).toMatch(/^[A-Za-z0-9_]+$/);
+      expect(pseudo).toMatch(/^\w+$/);
       // La marge garde la place d'un suffixe quand la liste est épuisée.
       expect(pseudoLength(pseudo) + 5).toBeLessThanOrEqual(PSEUDO_MAX_LENGTH);
     }

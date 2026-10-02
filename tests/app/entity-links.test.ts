@@ -43,7 +43,8 @@ function maxAnchorDepth(code: string): number {
     } else if (token.startsWith("</")) {
       depth -= 1;
     } else {
-      max = Math.max(max, (depth += 1));
+      depth += 1;
+      max = Math.max(max, depth);
     }
   }
   expect(depth).toBe(0); // balises appariées : sans quoi la mesure ne veut rien dire

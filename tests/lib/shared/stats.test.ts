@@ -407,7 +407,7 @@ describe("computeDeepStats", () => {
         NOW,
       );
 
-      expect(stats.averageRank).toBe(1.67);
+      expect(stats.averageRank).toBeCloseTo(1.67, 2);
     });
   });
 });

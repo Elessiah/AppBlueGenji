@@ -42,14 +42,15 @@ function makeConn(options: {
   lastRoundWithInput?: number | null;
 } = {}) {
   const calls: [string, unknown[]][] = [];
+  const tournament = options.tournament === undefined ? tournamentRow() : options.tournament;
+  const status = options.standingStatus === undefined ? "ACTIVE" : options.standingStatus;
 
   const execute = jest.fn(async (sql: unknown, params: unknown) => {
     const query = String(sql).replace(/\s+/g, " ").trim();
     calls.push([query, (params as unknown[]) ?? []]);
 
     if (query.includes("FROM bg_tournaments")) {
-      const row = options.tournament === undefined ? tournamentRow() : options.tournament;
-      return [row === null ? [] : [row], []];
+      return [tournament === null ? [] : [tournament], []];
     }
     if (query.startsWith("SELECT team_id, points, round_number FROM bg_endurance_penalties")) {
       return [options.penalties ?? [], []];
@@ -60,7 +61,6 @@ function makeConn(options: {
       return [[{ c: options.lastRoundWithInput ? 1 : 0 }], []];
     }
     if (query.includes("SELECT status FROM bg_endurance_standings")) {
-      const status = options.standingStatus === undefined ? "ACTIVE" : options.standingStatus;
       return [status === null ? [] : [{ status }], []];
     }
     // Réconciliation : classement vide, elle sort aussitôt.

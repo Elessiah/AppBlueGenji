@@ -4,7 +4,7 @@ import { SkipLink, focusMainContent } from "@/components/accessibility/SkipLink"
 import { readSource } from "../helpers/read-source";
 
 /** `skipTarget` → `data-skip-target`. */
-const dataAttr = (key: string) => `data-${key.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
+const dataAttr = (key: string) => `data-${key.replace(/[A-Z]/g, (c) => "-" + c.toLowerCase())}`;
 
 /**
  * Un élément du DOM réduit à ce que le lien d'évitement touche : attributs,

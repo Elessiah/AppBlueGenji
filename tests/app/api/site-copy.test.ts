@@ -23,7 +23,7 @@ function patchReq(body: unknown) {
 }
 
 const deleteReq = (key?: string) =>
-  new Request(`http://localhost/api/site-copy${key ? `?key=${encodeURIComponent(key)}` : ""}`, {
+  new Request("http://localhost/api/site-copy" + (key ? `?key=${encodeURIComponent(key)}` : ""), {
     method: "DELETE",
   });
 

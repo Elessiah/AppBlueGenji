@@ -39,7 +39,6 @@ function upstreamOk(chunks: string[] = ["data: {}\n\n"]): Response {
 /** Vide entièrement le corps de la réponse, comme le ferait un client. */
 async function drain(response: Response): Promise<void> {
   const reader = response.body!.getReader();
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const { done } = await reader.read();
     if (done) break;

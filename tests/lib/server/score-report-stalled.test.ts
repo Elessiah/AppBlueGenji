@@ -8,12 +8,6 @@ import { resolveExpiredScoreReports } from "@/lib/server/tournaments/finalizatio
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
 
-type Queued = { kind: string } & Record<string, unknown>;
-
-function queued(): Queued[] {
-  return jest.mocked(queueRefereeAlert).mock.calls.map((call) => call[1] as Queued);
-}
-
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
 function fakeConnection(options: {
   rows?: (sql: string) => unknown[] | null;

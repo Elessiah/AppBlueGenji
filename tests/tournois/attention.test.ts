@@ -56,7 +56,6 @@ afterEach(() => {
 function jestIsolate() {
   // Le module garde son état (titre d'origine) : un module neuf par cas.
   jest.isolateModules(() => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     attention = require("@/app/(secured)/tournois/[id]/_lib/attention");
   });
 }

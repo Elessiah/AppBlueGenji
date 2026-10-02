@@ -6,7 +6,7 @@ import {
   phaseSubtitle,
   visibleRulesFormat,
 } from "@/app/(secured)/tournois/[id]/_lib/phases";
-import type { PhaseFormat, PhaseState, TournamentFormat, TournamentPhase } from "@/lib/shared/types";
+import type { TournamentFormat, TournamentPhase } from "@/lib/shared/types";
 
 function tournamentPhase(overrides: Partial<TournamentPhase> = {}): TournamentPhase {
   return {

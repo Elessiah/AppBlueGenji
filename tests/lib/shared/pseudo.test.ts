@@ -1,7 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import { PSEUDO_MAX_LENGTH, pseudoLength } from "@/lib/shared/pseudo";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { readDatabaseSource } from "../../helpers/read-source";
 
 describe("pseudo — bornes de la colonne", () => {

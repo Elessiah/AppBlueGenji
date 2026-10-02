@@ -77,7 +77,16 @@ const connection = {
 function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
   const text = sql.replace(/\s+/g, " ");
   const members = inTransaction ? [...state.members, ...state.lateMembers] : state.members;
+  const result =
+    readMembers(text, params, members) ??
+    readInvitationsAndTeams(text, params) ??
+    insertRow(text, params) ??
+    updateRows(text, params);
+  if (result === undefined) throw new Error(`Requête non simulée : ${text}`);
+  return result;
+}
 
+function readMembers(text: string, params: unknown[], members: State["members"]): unknown {
   if (/SELECT roles_json FROM bg_team_members/.test(text)) {
     const [teamId, userId] = params as number[];
     const row = members.find((m) => m.team_id === teamId && m.user_id === userId);
@@ -91,6 +100,10 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
     const [userId] = params as number[];
     return [[{ is_deleted: state.deletedUsers.has(userId) ? 1 : 0 }]];
   }
+  return undefined;
+}
+
+function readInvitationsAndTeams(text: string, params: unknown[]): unknown {
   if (/SELECT id, kind, roles_json FROM bg_team_invitations/.test(text)) {
     const [teamId, userId] = params as number[];
     const inv = state.invitations
@@ -121,6 +134,10 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
     const team = state.teams[teamId];
     return [team ? [{ id: teamId, ...team }] : []];
   }
+  return undefined;
+}
+
+function insertRow(text: string, params: unknown[]): unknown {
   if (/INSERT INTO bg_team_invitations/.test(text)) {
     const kind = /'INVITE'/.test(text) ? "INVITE" : "REQUEST";
     const [teamId, userId, , roles] = params as [number, number, number, string | undefined];
@@ -140,6 +157,17 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
     state.members.push({ team_id: teamId, user_id: userId, roles: JSON.parse(roles) });
     return [{ affectedRows: 1 }];
   }
+  return undefined;
+}
+
+/** Annule les invitations en attente que `matches` désigne ; rend leur nombre. */
+function cancelPending(matches: (inv: Invitation) => boolean): number {
+  const pending = state.invitations.filter((inv) => inv.status === "PENDING" && matches(inv));
+  for (const inv of pending) inv.status = "CANCELLED";
+  return pending.length;
+}
+
+function updateRows(text: string, params: unknown[]): unknown {
   if (/UPDATE bg_team_invitations SET status = '(\w+)'.* WHERE id = \? AND status = 'PENDING'/.test(text)) {
     const status = text.match(/SET status = '(\w+)'/)![1] as Invitation["status"];
     const [id] = params as number[];
@@ -150,25 +178,11 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
   }
   if (/UPDATE bg_team_invitations SET status = 'CANCELLED'.* WHERE user_id = \? AND status = 'PENDING'/.test(text)) {
     const [userId] = params as number[];
-    let n = 0;
-    for (const inv of state.invitations) {
-      if (inv.user_id === userId && inv.status === "PENDING") {
-        inv.status = "CANCELLED";
-        n++;
-      }
-    }
-    return [{ affectedRows: n }];
+    return [{ affectedRows: cancelPending((inv) => inv.user_id === userId) }];
   }
   if (/UPDATE bg_team_invitations SET status = 'CANCELLED'.* WHERE team_id = \? AND status = 'PENDING'/.test(text)) {
     const [teamId] = params as number[];
-    let n = 0;
-    for (const inv of state.invitations) {
-      if (inv.team_id === teamId && inv.status === "PENDING") {
-        inv.status = "CANCELLED";
-        n++;
-      }
-    }
-    return [{ affectedRows: n }];
+    return [{ affectedRows: cancelPending((inv) => inv.team_id === teamId) }];
   }
   if (/UPDATE bg_teams SET is_ghost = 0 WHERE id = \?/.test(text)) {
     const [teamId] = params as number[];
@@ -182,7 +196,7 @@ function run(sql: string, params: unknown[], inTransaction: boolean): unknown {
     if (inv) inv.status = "DECLINED";
     return [{ affectedRows: inv ? 1 : 0 }];
   }
-  throw new Error(`Requête non simulée : ${text}`);
+  return undefined;
 }
 
 beforeEach(() => {

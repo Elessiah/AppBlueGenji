@@ -100,6 +100,14 @@ function world(overrides: Partial<World> = {}): World {
   };
 }
 
+/** Les trois signaux « prêt » : posés à `NOW()`, levés à `NULL`. */
+function applyReadyStamps(sql: string, set: (column: keyof MatchState, value: unknown) => void) {
+  for (const column of ["team1_ready_at", "team2_ready_at", "caster_ready_at"] as const) {
+    if (sql.includes(`${column} = NOW()`)) set(column, STAMP);
+    if (sql.includes(`${column} = NULL`)) set(column, null);
+  }
+}
+
 /** Rejoue une écriture sur la ligne du match — ce que ferait la base. */
 function applyUpdate(state: World, sql: string, params: unknown[]) {
   const match = state.match;
@@ -107,10 +115,7 @@ function applyUpdate(state: World, sql: string, params: unknown[]) {
   const set = (column: keyof MatchState, value: unknown) => {
     (match as Record<string, unknown>)[column] = value;
   };
-  for (const column of ["team1_ready_at", "team2_ready_at", "caster_ready_at"] as const) {
-    if (sql.includes(`${column} = NOW()`)) set(column, STAMP);
-    if (sql.includes(`${column} = NULL`)) set(column, null);
-  }
+  applyReadyStamps(sql, set);
   if (sql.includes("lobby_opened_at = COALESCE(lobby_opened_at, NOW())") && !match.lobby_opened_at) {
     set("lobby_opened_at", STAMP);
   }
@@ -125,6 +130,30 @@ function applyUpdate(state: World, sql: string, params: unknown[]) {
       set(column, null);
     }
   }
+}
+
+/** Contexte du match relu hors verrou (tournoi, statut fantôme). */
+function matchContextRows(state: World) {
+  const match = state.match;
+  if (!match) return [];
+  return [{
+    tournament_state: match.tournament_state,
+    team1_is_ghost: match.team1_is_ghost,
+    team2_is_ghost: match.team2_is_ghost,
+  }];
+}
+
+/** Candidat au lancement : prêt, jamais lancé (ou appariement périmé), deux équipes. */
+function launchCandidateRows(state: World) {
+  const match = state.match;
+  if (!match) return [];
+  const stale = match.launch_pairing !== `${match.team1_id}:${match.team2_id}`;
+  const candidate =
+    match.status === "READY" &&
+    (match.launched_at === null || stale) &&
+    match.team1_id &&
+    match.team2_id;
+  return candidate ? [{ ...match }] : [];
 }
 
 /** Le double de `execute`, non typé en `PoolConnection` : les tests le composent. */
@@ -157,29 +186,10 @@ function executeFor(state: World) {
       return [rows.slice(0, 1), []];
     }
     if (sql.includes("AS tournament_state") && !sql.includes("FROM bg_matches")) {
-      // Contexte du match relu hors verrou (tournoi, statut fantôme).
-      const match = state.match;
-      return [
-        match
-          ? [{
-              tournament_state: match.tournament_state,
-              team1_is_ghost: match.team1_is_ghost,
-              team2_is_ghost: match.team2_is_ghost,
-            }]
-          : [],
-        [],
-      ];
+      return [matchContextRows(state), []];
     }
     if (sql.includes("FROM bg_matches m") && sql.includes("WHERE m.tournament_id = ?")) {
-      const match = state.match;
-      const stale = match && match.launch_pairing !== `${match.team1_id}:${match.team2_id}`;
-      const candidate =
-        match &&
-        match.status === "READY" &&
-        (match.launched_at === null || stale) &&
-        match.team1_id &&
-        match.team2_id;
-      return [candidate ? [{ ...match }] : [], []];
+      return [launchCandidateRows(state), []];
     }
     if (sql.includes("FROM bg_matches m")) {
       return [state.match ? [{ ...state.match }] : [], []];
