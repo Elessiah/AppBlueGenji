@@ -159,7 +159,8 @@ et « la liste est un palmarès » énoncent le même fait, et trois paragraphes
 empilés au-dessus d'une liste ne se lisent plus. Le verrou de l'ordre parle le
 premier, il garde la parole.
 
-Le bouton ouvre une confirmation (`RemoveEntrantDialog.tsx`) — pas de recopie du
+Le bouton ouvre une confirmation (`RemoveEntrantDialog.tsx`, sur la coquille
+commune `TournamentDialogShell.tsx`) — pas de recopie du
 nom, contrairement à la suppression d'un tournoi : aucun historique n'est
 détruit, il n'y en a pas encore. Mais le bouton voisine des flèches à
 trente-deux pixels d'un geste anodin, et la confirmation nommant l'engagé est ce

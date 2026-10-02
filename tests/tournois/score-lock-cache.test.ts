@@ -68,8 +68,8 @@ describe("câblage dans les vues du plateau", () => {
   const views = [
     ["BracketTree.tsx", "format"],
     ["EnduranceRoundPanels.tsx", "format"],
-    ["SurvivalView.tsx", '"SURVIVAL"'],
-    ["SwissView.tsx", '"SWISS"'],
+    // Survie et ronde suisse : colonnes communes, format passé par la vue.
+    ["RoundColumns.tsx", "format"],
   ] as const;
 
   it("lit le verrou mutualisé au lieu de convertir tout le plateau par carte", () => {
@@ -79,6 +79,9 @@ describe("câblage dans les vues du plateau", () => {
         `scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, ${format})}`,
       );
       expect(source).not.toMatch(/allMatches=/);
+    }
+    for (const [file, format] of [["SurvivalView.tsx", '"SURVIVAL"'], ["SwissView.tsx", '"SWISS"']]) {
+      expect(readSource(`app/(secured)/tournois/[id]/_components/${file}`)).toContain(`format=${format}`);
     }
     expect(row).not.toMatch(/allMatches/);
     expect(row).not.toMatch(/isScoreEditLocked\(/);

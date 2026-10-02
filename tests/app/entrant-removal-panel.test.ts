@@ -11,6 +11,7 @@ const read = (path: string) => readFileSync(join(ROOT, path), "utf8");
 const PANEL = "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx";
 const PANEL_CSS = "app/(secured)/tournois/[id]/_components/RegistrationsPanel.module.css";
 const DIALOG = "app/(secured)/tournois/[id]/_components/RemoveEntrantDialog.tsx";
+const SHELL = "app/(secured)/tournois/[id]/_components/TournamentDialogShell.tsx";
 
 /**
  * Retrait d'un engagé — le câblage de l'interface.
@@ -214,12 +215,18 @@ describe("Dialogue de confirmation", () => {
 
   it("est une modale dans les règles de la page", () => {
     // Portail sur `document.body` (`.page-shell` enferme son contenu), fermeture
-    // par Échap et verrou de défilement partagés.
-    expect(dialog).toMatch(/createPortal\(/);
-    expect(dialog).toMatch(/useDialogBehavior\(\{ open: mounted, onClose, locked: busy \}\)/);
-    expect(dialog).toMatch(/aria-modal="true"/);
-    expect(dialog).toMatch(/aria-labelledby="remove-entrant-title"/);
-    expect(dialog).toMatch(/aria-describedby="remove-entrant-summary"/);
+    // par Échap et verrou de défilement partagés — portés par la coquille
+    // commune, que le dialogue nomme par ses identifiants.
+    const shell = stripComments(read(SHELL));
+    expect(shell).toMatch(/createPortal\(/);
+    expect(shell).toMatch(/useDialogBehavior\(\{ open: mounted, onClose, locked: busy \}\)/);
+    expect(shell).toMatch(/aria-modal="true"/);
+    expect(shell).toMatch(/aria-labelledby=\{titleId\}/);
+    expect(shell).toMatch(/aria-describedby=\{summaryId\}/);
+    expect(dialog).toMatch(/<TournamentDialogShell/);
+    expect(dialog).toMatch(/titleId="remove-entrant-title"/);
+    expect(dialog).toMatch(/summaryId="remove-entrant-summary"/);
+    expect(dialog).toMatch(/id="remove-entrant-summary"/);
   });
 });
 

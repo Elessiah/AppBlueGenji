@@ -130,7 +130,7 @@ describe("ScrollArea — indice de défilement tactile", () => {
 describe("ScrollArea — adoption", () => {
   const consumers = [
     "app/(secured)/tournois/[id]/_components/BracketTree.tsx",
-    "app/(secured)/tournois/[id]/_components/SurvivalView.tsx",
+    "app/(secured)/tournois/[id]/_components/RoundColumns.tsx",
     "components/rules/RuleDiagram.tsx",
   ];
 

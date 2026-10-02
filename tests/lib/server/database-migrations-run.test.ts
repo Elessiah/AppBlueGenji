@@ -1,7 +1,7 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, jest } from "@jest/globals";
 import type { Pool, PoolOptions } from "mysql2/promise";
 import type { OnceGate } from "@/lib/server/migration-lock";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { fakePool, type SqlQuery } from "../../helpers/sql-double";
 import { CONTACT_DISCORD_URL_KEY, CONTACT_EMAIL_KEY, SUPERSEDED_CONTACT_EMAILS } from "@/lib/shared/contact";
 import { DISCORD_INVITE_URL, SUPERSEDED_DISCORD_INVITE_URLS } from "@/lib/shared/discord";
@@ -57,10 +57,13 @@ let rules: Rule[] = [];
 const issued: string[] = [];
 /** `CREATE TABLE` tels qu'émis : aplatis, un commentaire `--` avalerait la suite. */
 const createdDdl: string[] = [];
+/** Instructions telles qu'émises, octet pour octet. */
+const rawIssued: string[] = [];
 const execute = jest.fn<SqlQuery>(async (sql, params) => {
   const line = flat(sql);
   issued.push(line);
   if (line.startsWith("CREATE TABLE")) createdDdl.push(sql);
+  rawIssued.push(sql);
   for (const rule of [...rules, ...healthyRules()]) {
     if (rule.match.test(line)) return rule.reply(line, params);
   }
@@ -146,6 +149,7 @@ beforeEach(() => {
   rules = [];
   issued.length = 0;
   createdDdl.length = 0;
+  rawIssued.length = 0;
   execute.mockClear();
   errorSpy = jest.spyOn(console, "error").mockImplementation(() => undefined);
   logSpy = jest.spyOn(console, "log").mockImplementation(() => undefined);
@@ -177,6 +181,17 @@ describe("runMigrations — une base déjà à jour", () => {
     expect(errorSpy).not.toHaveBeenCalled();
     expect(warnSpy).not.toHaveBeenCalled();
     expect(logSpy).not.toHaveBeenCalled();
+  });
+
+  it("émet la passe à l'octet près (empreinte figée)", async () => {
+    // Empreinte de la suite **brute** des instructions, ordre et blancs compris :
+    // une réécriture du module (mise en commun des `CREATE TABLE` en listes,
+    // par exemple) doit la laisser intacte. Un changement de schéma voulu la
+    // déplace : mettre l'instantané à jour (`npx jest <ce fichier> -u`).
+    await getDatabase();
+
+    const digest = createHash("sha256").update(rawIssued.join("\u0000")).digest("hex");
+    expect({ statements: rawIssued.length, sha256: digest }).toMatchSnapshot();
   });
 
   it("crée toutes les tables avant la première migration", async () => {

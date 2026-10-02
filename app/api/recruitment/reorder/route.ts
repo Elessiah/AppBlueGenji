@@ -1,32 +1,11 @@
-import { getCurrentUser } from "@/lib/server/auth";
-import { fail, ok } from "@/lib/server/http";
+import { reorderRoute } from "@/lib/server/admin-collection-routes";
 import { reorderRecruitmentAds } from "@/lib/server/recruitment-service";
-import { validateReorderIds } from "@/lib/shared/reorder";
-import { can } from "@/lib/shared/permissions";
-import { readJsonBody } from "@/lib/server/request-body";
 
-export async function PUT(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "recruitment")) return fail("FORBIDDEN", 403);
-
-  let body: { ids?: unknown };
-  try {
-    body = (await readJsonBody(req)) as typeof body;
-  } catch {
-    return fail("INVALID_BODY", 400);
-  }
-
-  const validation = validateReorderIds(body.ids);
-  if (!validation.ok) return fail(validation.error, 400);
-
-  try {
-    await reorderRecruitmentAds(validation.ids);
-    return ok({});
-  } catch (e) {
-    const msg = (e as Error).message;
-    // La saisie est bien formée : c'est l'état des annonces (leurs statuts) qui
-    // interdit cet ordre — typiquement un statut changé depuis un autre onglet.
-    return fail(msg || "RECRUITMENT_REORDER_FAILED", msg === "RECRUITMENT_ORDER_MIXES_PRIORITIES" ? 409 : 400);
-  }
-}
+export const PUT = reorderRoute({
+  permission: "recruitment",
+  reorder: reorderRecruitmentAds,
+  failed: "RECRUITMENT_REORDER_FAILED",
+  // La saisie est bien formée : c'est l'état des annonces (leurs statuts) qui
+  // interdit cet ordre — typiquement un statut changé depuis un autre onglet.
+  statusOf: (message) => (message === "RECRUITMENT_ORDER_MIXES_PRIORITIES" ? 409 : 400),
+});

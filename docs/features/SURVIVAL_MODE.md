@@ -117,7 +117,10 @@ admin, forfait).
   — panneau de classement (zone d'élimination surlignée, bouton « Abandonner »
   sur les équipes encore en lice) + rounds en colonnes défilables, dans le même
   esprit que les arbres simple/double élimination. Les cartes de match
-  réutilisent `MatchRow` (report des scores identique).
+  réutilisent `MatchRow` (report des scores identique). Colonnes de manches,
+  bandeau de la championne et bouton d'abandon sont communs avec la ronde
+  suisse (`RoundColumns.tsx`) ; la vue n'y ajoute que ses marques (barrage,
+  coupe).
 
 ## Cas limites gérés
 

@@ -58,7 +58,7 @@ describe("dialogues de la fiche tournoi — hauteur bornée", () => {
     );
   });
 
-  it.each(["MatchLiveDialog.tsx", "MatchScheduleDialog.tsx", "MatchReplayDialog.tsx", "IssueReportDialog.tsx", "EndurancePenaltyDialog.tsx", "AdvanceTournamentDialog.tsx", "DeleteTournamentDialog.tsx", "RemoveEntrantDialog.tsx", "RollbackRoundDialog.tsx", "TournamentImageDialog.tsx"])(
+  it.each(["MatchLiveDialog.tsx", "MatchScheduleDialog.tsx", "MatchReplayDialog.tsx", "IssueReportDialog.tsx", "EndurancePenaltyDialog.tsx", "TournamentDialogShell.tsx", "DeleteTournamentDialog.tsx", "RollbackRoundDialog.tsx", "TournamentImageDialog.tsx"])(
     "%s porte `.dialog-bounded` et aucune borne en `vh` en ligne",
     (name) => {
       const src = stripComments(read(join(DIR, name)));

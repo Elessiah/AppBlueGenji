@@ -34,7 +34,8 @@ describe("ancre d'un match — points de passage", () => {
 
   it("le fait dans `MatchRow`, passage unique de toutes les vues", () => {
     // Arbre, survie, suisse, endurance : les quatre vues rendent leurs cartes
-    // par `MatchRow`. Poser l'ancre ailleurs, c'est l'oublier dans trois vues.
+    // par `MatchRow` (survie et suisse via leurs colonnes communes,
+    // `RoundColumns`). Poser l'ancre ailleurs, c'est l'oublier dans trois vues.
     //
     // Une **inclusion**, pas un inventaire : lister exhaustivement les fichiers
     // qui utilisent `MatchRow` ne dirait rien du cas qu'on protège — une vue qui
@@ -48,8 +49,7 @@ describe("ancre d'un match — points de passage", () => {
     expect(renderers).toEqual(
       expect.arrayContaining([
         "BracketTree.tsx",
-        "SurvivalView.tsx",
-        "SwissView.tsx",
+        "RoundColumns.tsx",
         // Les manches de BlueGenji Survie : la page ne rend plus de carte
         // elle-même, la vue du mode a désormais ses propres volets.
         "EnduranceRoundPanels.tsx",

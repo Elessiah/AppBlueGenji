@@ -27,6 +27,7 @@ Statut : **ouvert à la création** (`/regles/ronde-suisse`, `status: "AVAILABLE
 | `lib/shared/swiss-pairing.ts` | Appariement pur : ronde 1 par seeding, rondes suivantes par retour sur trace. |
 | `lib/server/tournaments/swiss.ts` | Orchestration : initialisation, génération des rondes, réconciliation, abandon, chargement de l'affichage. |
 | `app/(secured)/tournois/[id]/_components/SwissView.tsx` | Classement + rondes en colonnes. |
+| `app/(secured)/tournois/[id]/_components/RoundColumns.tsx` | Colonnes de rondes, bandeau de la championne et bouton d'abandon, communs avec la survie. |
 | `lib/shared/tournament-rules.ts` | Règles publiques (`/regles/ronde-suisse`). |
 
 Tables : `bg_tournaments` (colonnes `swiss_*`), `bg_swiss_standings`,

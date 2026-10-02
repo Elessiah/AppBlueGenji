@@ -3,17 +3,17 @@
 import { type CSSProperties } from "react";
 import type { BracketMatch, SwissMeta, SwissStandingRow } from "@/lib/shared/types";
 import { formatPoints } from "@/lib/shared/swiss";
-import { MatchRow } from "./MatchRow";
-import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
 import { EntrantName } from "./EntrantName";
-import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
+import {
+  ACCENT,
+  AMBER,
+  BORDER,
+  ChampionBanner,
+  FORFEIT_BUTTON_STYLE,
+  RoundColumns,
+} from "./RoundColumns";
 import styles from "./RankingViews.module.css";
-
-const COL_W = 226;
-const BORDER = "var(--border, #444)";
-const ACCENT = "var(--accent-green, #4fe0a2)";
-const AMBER = "rgba(255,157,46,0.9)";
 
 interface SwissViewProps {
   swiss: SwissMeta;
@@ -43,17 +43,6 @@ const SUBGRID: CSSProperties = {
 
 const RIGHT: CSSProperties = { textAlign: "right" };
 const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--text-2)" };
-
-/** Bouton d'abandon du classement. */
-const FORFEIT_BUTTON_STYLE: CSSProperties = {
-  padding: "3px 8px",
-  fontSize: 11,
-  textTransform: "uppercase",
-  letterSpacing: "0.04em",
-  background: "rgba(255,157,46,0.12)",
-  borderColor: "rgba(255,157,46,0.4)",
-  color: AMBER,
-};
 
 const STATUS_META: Record<SwissStandingRow["status"], { label: string; color: string }> = {
   ACTIVE: { label: "En lice", color: ACCENT },
@@ -98,22 +87,7 @@ export function SwissView({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
-      {champion && (
-        <div
-          style={{
-            padding: "14px 18px",
-            border: `1px solid ${ACCENT}`,
-            borderRadius: 10,
-            background: "rgba(79,224,162,0.08)",
-            fontSize: 15,
-          }}
-        >
-          🏆 Championne —{" "}
-          <EntrantName teamId={champion.teamId} name={champion.teamName} logoSize={20}>
-            <strong>{champion.teamName}</strong>
-          </EntrantName>
-        </div>
-      )}
+      {champion && <ChampionBanner champion={champion} />}
 
       {/* Bandeau récap : où en est-on dans les rondes prévues. */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
@@ -376,10 +350,7 @@ interface SwissRoundsProps {
  * multi-phases : le serveur ne charge le classement suisse que de la phase en
  * cours, et celui d'une phase close s'affiche dessous (`PhaseStandingsBlock`) —
  * sans ce composant, ses rondes retombaient dans un arbre à élimination qui
- * les appelait « Quart de finale ».
- *
- * La zone s'ouvre sur la **dernière** ronde : c'est celle qui se joue, et
- * posées côte à côte elle était hors champ à droite sur mobile.
+ * les appelait « Quart de finale ». Colonnes communes : `RoundColumns`.
  */
 export function SwissRounds({
   matches,
@@ -389,114 +360,18 @@ export function SwissRounds({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<SwissRoundsProps>) {
-  const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
-  const lastRound = roundNums.at(-1) ?? null;
   return (
-    <ScrollArea
+    <RoundColumns
+      matches={matches}
+      allTournamentMatches={allTournamentMatches}
+      format="SWISS"
       ariaLabel="Rondes du tournoi — défilement horizontal"
-      style={{ flex: 1, minWidth: 0, paddingBottom: 12 }}
-      revealKey={lastRound}
-    >
-      {roundNums.length === 0 ? (
-        <p style={{ color: "var(--text-2)", fontSize: 14 }}>{emptyLabel}</p>
-      ) : (
-        <div style={{ display: "flex", gap: 16 }}>
-          {roundNums.map((roundNum) => {
-            const roundMatches = matches
-              .filter((m) => m.roundNumber === roundNum)
-              .sort((a, b) => a.matchNumber - b.matchNumber);
-            const isFinalRound = roundNum === totalRounds;
-            return (
-              <div
-                key={roundNum}
-                style={{ flexShrink: 0, width: COL_W }}
-                {...(roundNum === lastRound ? { [SCROLL_REVEAL_ATTRIBUTE]: "" } : {})}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    height: 26,
-                    marginBottom: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 11,
-                      textTransform: "uppercase",
-                      letterSpacing: "0.08em",
-                      color: "var(--text-2)",
-                      fontWeight: 600,
-                    }}
-                  >
-                    Ronde {roundNum}
-                  </span>
-                  {isFinalRound && (
-                    <span
-                      style={{
-                        fontSize: 11,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        color: AMBER,
-                        border: `1px solid ${AMBER}`,
-                        borderRadius: 5,
-                        padding: "1px 6px",
-                      }}
-                    >
-                      ⚑ Dernière
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {roundMatches.map((match) => {
-                    // L'exempté est la seule équipe posée sur la manche ;
-                    // le lier demande un identifiant non nul.
-                    const byeTeamId = match.team2Id === null ? match.team1Id : null;
-                    if (byeTeamId !== null) {
-                      return (
-                        <div
-                          key={match.id}
-                          style={{
-                            border: `1px dashed ${BORDER}`,
-                            borderRadius: 6,
-                            padding: "8px 10px",
-                            fontSize: 13,
-                            background: "var(--surface-1)",
-                          }}
-                        >
-                          <EntrantName
-                            teamId={byeTeamId}
-                            name={match.team1Name}
-                            title={match.team1Name ?? undefined}
-                            truncate
-                            style={{ display: "flex" }}
-                            textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
-                          />
-                          <span style={{ fontSize: 11, color: ACCENT }}>
-                            ✓ Victoire d&apos;office
-                          </span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <MatchRow
-                        key={match.id}
-                        match={match}
-                        adminResolvable={adminResolvable(match)}
-                        onOpenAdminModal={onOpenAdminModal}
-                        scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, "SWISS")}
-                        roundNumber={match.roundNumber}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </ScrollArea>
+      roundNoun="Ronde"
+      roundMarks={(roundNum) => (roundNum === totalRounds ? ["⚑ Dernière"] : [])}
+      adminResolvable={adminResolvable}
+      onOpenAdminModal={onOpenAdminModal}
+      emptyLabel={emptyLabel}
+    />
   );
 }
 

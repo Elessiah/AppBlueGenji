@@ -1,59 +1,18 @@
-import { getCurrentUser } from "@/lib/server/auth";
-import { can } from "@/lib/shared/permissions";
-import { fail, ok } from "@/lib/server/http";
+import { itemRoutes } from "@/lib/server/admin-collection-routes";
 import { deleteBureauMember, updateBureauMember } from "@/lib/server/bureau-service";
-import { readJsonBody } from "@/lib/server/request-body";
 
-function parseId(raw: string): number | null {
-  const id = Number(raw);
-  if (!Number.isInteger(id) || id <= 0) return null;
-  return id;
-}
-
-export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
-
-  const { id: rawId } = await context.params;
-  const id = parseId(rawId);
-  if (id === null) return fail("INVALID_ID", 400);
-
-  let body: { name?: unknown; role?: unknown; initials?: unknown; color?: unknown };
-  try {
-    body = (await readJsonBody(req)) as typeof body;
-  } catch {
-    return fail("INVALID_BODY", 400);
-  }
-
-  try {
-    const member = await updateBureauMember(id, {
+export const { PUT, DELETE } = itemRoutes({
+  permission: "showcase",
+  notFound: "BUREAU_MEMBER_NOT_FOUND",
+  updateFailed: "BUREAU_UPDATE_FAILED",
+  deleteFailed: "BUREAU_DELETE_FAILED",
+  update: async (id, body) => ({
+    member: await updateBureauMember(id, {
       name: typeof body.name === "string" ? body.name : "",
       role: typeof body.role === "string" ? body.role : "",
       initials: typeof body.initials === "string" ? body.initials : undefined,
       color: typeof body.color === "string" ? body.color : undefined,
-    });
-    return ok({ member });
-  } catch (e) {
-    const msg = (e as Error).message;
-    return fail(msg || "BUREAU_UPDATE_FAILED", msg === "BUREAU_MEMBER_NOT_FOUND" ? 404 : 400);
-  }
-}
-
-export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
-
-  const { id: rawId } = await context.params;
-  const id = parseId(rawId);
-  if (id === null) return fail("INVALID_ID", 400);
-
-  try {
-    await deleteBureauMember(id);
-    return ok({});
-  } catch (e) {
-    const msg = (e as Error).message;
-    return fail(msg || "BUREAU_DELETE_FAILED", msg === "BUREAU_MEMBER_NOT_FOUND" ? 404 : 400);
-  }
-}
+    }),
+  }),
+  remove: deleteBureauMember,
+});

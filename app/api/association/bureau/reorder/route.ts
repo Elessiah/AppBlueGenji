@@ -1,29 +1,8 @@
-import { getCurrentUser } from "@/lib/server/auth";
-import { can } from "@/lib/shared/permissions";
-import { fail, ok } from "@/lib/server/http";
+import { reorderRoute } from "@/lib/server/admin-collection-routes";
 import { reorderBureauMembers } from "@/lib/server/bureau-service";
-import { validateReorderIds } from "@/lib/shared/reorder";
-import { readJsonBody } from "@/lib/server/request-body";
 
-export async function PUT(req: Request) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
-
-  let body: { ids?: unknown };
-  try {
-    body = (await readJsonBody(req)) as typeof body;
-  } catch {
-    return fail("INVALID_BODY", 400);
-  }
-
-  const validation = validateReorderIds(body.ids);
-  if (!validation.ok) return fail(validation.error, 400);
-
-  try {
-    await reorderBureauMembers(validation.ids);
-    return ok({});
-  } catch (e) {
-    return fail((e as Error).message || "BUREAU_REORDER_FAILED", 400);
-  }
-}
+export const PUT = reorderRoute({
+  permission: "showcase",
+  reorder: reorderBureauMembers,
+  failed: "BUREAU_REORDER_FAILED",
+});

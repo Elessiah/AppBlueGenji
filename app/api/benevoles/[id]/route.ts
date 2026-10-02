@@ -1,19 +1,10 @@
-import { getCurrentUser } from "@/lib/server/auth";
-import { can } from "@/lib/shared/permissions";
-import { fail, ok } from "@/lib/server/http";
+import { itemRoutes } from "@/lib/server/admin-collection-routes";
 import {
   deleteBenevole,
   getBenevolePhotoUrl,
   updateBenevole,
 } from "@/lib/server/benevoles-service";
 import { deleteUnreferencedUpload } from "@/lib/server/stored-upload-cleanup";
-import { readJsonBody } from "@/lib/server/request-body";
-
-function parseId(raw: string): number | null {
-  const id = Number(raw);
-  if (!Number.isInteger(id) || id <= 0) return null;
-  return id;
-}
 
 /**
  * Supprime l'ancienne photo si elle a changé, qu'elle vit dans le dossier des
@@ -25,30 +16,12 @@ async function cleanupReplacedPhoto(previous: string | null, next: string | null
   await deleteUnreferencedUpload(previous, "benevoles");
 }
 
-export async function PUT(req: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
-
-  const { id: rawId } = await context.params;
-  const id = parseId(rawId);
-  if (id === null) return fail("INVALID_ID", 400);
-
-  let body: {
-    firstName?: unknown;
-    pseudo?: unknown;
-    lastName?: unknown;
-    category?: unknown;
-    photoUrl?: unknown;
-    joinedAt?: unknown;
-  };
-  try {
-    body = (await readJsonBody(req)) as typeof body;
-  } catch {
-    return fail("INVALID_BODY", 400);
-  }
-
-  try {
+export const { PUT, DELETE } = itemRoutes({
+  permission: "showcase",
+  notFound: "BENEVOLE_NOT_FOUND",
+  updateFailed: "BENEVOLE_UPDATE_FAILED",
+  deleteFailed: "BENEVOLE_DELETE_FAILED",
+  update: async (id, body) => {
     const previousPhoto = await getBenevolePhotoUrl(id);
     const benevole = await updateBenevole(id, {
       firstName: typeof body.firstName === "string" ? body.firstName : "",
@@ -59,29 +32,11 @@ export async function PUT(req: Request, context: { params: Promise<{ id: string 
       joinedAt: typeof body.joinedAt === "string" ? body.joinedAt : "",
     });
     await cleanupReplacedPhoto(previousPhoto, benevole.photoUrl);
-    return ok({ benevole });
-  } catch (e) {
-    const msg = (e as Error).message;
-    return fail(msg || "BENEVOLE_UPDATE_FAILED", msg === "BENEVOLE_NOT_FOUND" ? 404 : 400);
-  }
-}
-
-export async function DELETE(_req: Request, context: { params: Promise<{ id: string }> }) {
-  const user = await getCurrentUser();
-  if (!user) return fail("UNAUTHORIZED", 401);
-  if (!can(user, "showcase")) return fail("FORBIDDEN", 403);
-
-  const { id: rawId } = await context.params;
-  const id = parseId(rawId);
-  if (id === null) return fail("INVALID_ID", 400);
-
-  try {
+    return { benevole };
+  },
+  remove: async (id) => {
     const previousPhoto = await getBenevolePhotoUrl(id);
     await deleteBenevole(id);
     await cleanupReplacedPhoto(previousPhoto, null);
-    return ok({});
-  } catch (e) {
-    const msg = (e as Error).message;
-    return fail(msg || "BENEVOLE_DELETE_FAILED", msg === "BENEVOLE_NOT_FOUND" ? 404 : 400);
-  }
-}
+  },
+});

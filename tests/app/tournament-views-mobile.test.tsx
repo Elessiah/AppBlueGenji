@@ -21,6 +21,7 @@ const read = (...parts: string[]) => readFileSync(join(DIR, ...parts), "utf8");
 const page = read("page.tsx");
 const swiss = read("_components", "SwissView.tsx");
 const survival = read("_components", "SurvivalView.tsx");
+const rounds = read("_components", "RoundColumns.tsx");
 const css = read("_components", "RankingViews.module.css");
 
 const PAST = "2026-01-01T10:00:00.000Z";
@@ -47,12 +48,16 @@ describe("TournamentProgress — étape courante", () => {
 });
 
 describe("Rangées de manches — ouvertes sur la dernière", () => {
+  it("les colonnes communes défilent jusqu'à la dernière manche", () => {
+    expect(rounds).toContain("revealKey={lastRound}");
+    expect(rounds).toContain("roundNum === lastRound ? { [SCROLL_REVEAL_ATTRIBUTE]");
+  });
+
   it.each<[string, string]>([
     ["SwissView", swiss],
     ["SurvivalView", survival],
-  ])("%s défile jusqu'à la dernière manche", (_name, source) => {
-    expect(source).toContain("revealKey={lastRound}");
-    expect(source).toContain("roundNum === lastRound ? { [SCROLL_REVEAL_ATTRIBUTE]");
+  ])("%s passe par les colonnes communes", (_name, source) => {
+    expect(source).toContain("<RoundColumns");
   });
 });
 
