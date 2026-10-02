@@ -59,6 +59,12 @@ Chaque entrée : `format`, `qualifierMode` (`COUNT` | `PERCENT`), `qualifierValu
 et selon le format `swissTotalRounds`, `survivalRoundsBeforeFirstCut`,
 `survivalRoundsPerCut`, `hasThirdPlaceMatch`.
 
+Une valeur qui n'est pas un nombre fini est refusée comme une valeur hors
+bornes (`findPhaseIssue`, champ désigné) : `normalizePhaseConfigs` convertit
+`qualifierValue` par `Number(...)`, qui rend `NaN` sur un texte, et aucune
+comparaison ne l'arrêtait. Seule la cible de la dernière phase, jamais lue,
+échappe au contrôle.
+
 Codes d'erreur (400) : `MISSING_PHASES`, `INVALID_PHASE_FORMAT`,
 `DOUBLE_MUST_BE_LAST_PHASE`, `INVALID_QUALIFIER_VALUE`, `INVALID_QUALIFIER_COUNT`
 (deux phases `COUNT` consécutives dont la seconde qualifie autant ou plus que la
