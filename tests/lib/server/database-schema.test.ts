@@ -1,10 +1,11 @@
 import { describe, expect, it } from "@jest/globals";
-import { declaredColumns } from "@/lib/server/database";
+import { declaredColumns } from "@/lib/server/database/declared-tables";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { readDatabaseSource } from "../../helpers/read-source";
 
 const ROOT = join(__dirname, "..", "..", "..");
-const sql = readFileSync(join(ROOT, "lib", "server", "database.ts"), "utf8");
+const sql = readDatabaseSource();
 
 /**
  * Le schéma, **tel qu'il est** — et non l'histoire de la façon dont on y est
@@ -161,7 +162,7 @@ describe("Schéma — la règle des deux endroits", () => {
   // permanents », qui gardent volontairement un `catch` muet.
   const migrations = sql.slice(
     sql.indexOf("const RECENT_SCHEMA_CHANGES"),
-    sql.indexOf("// Rattrapages permanents"),
+    sql.indexOf("async function applyPermanentCatchUps"),
   );
 
   /**

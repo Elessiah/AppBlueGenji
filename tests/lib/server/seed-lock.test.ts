@@ -109,8 +109,8 @@ describe("withSeedLock", () => {
   });
 });
 
-describe("seed.ts", () => {
-  const source = readFileSync(join(process.cwd(), "lib", "server", "seed.ts"), "utf8");
+describe("seed/main.ts", () => {
+  const source = readFileSync(join(process.cwd(), "lib", "server", "seed", "main.ts"), "utf8");
 
   it("efface et régénère sous le verrou, jamais avant de l'avoir pris", () => {
     expect(source).toMatch(/withSeedLock\(\s*db,\s*\(\) => seed\(db\)/);

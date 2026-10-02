@@ -31,7 +31,8 @@ jest.mock("@/lib/server/migration-lock", () => ({
   withMigrationLock: (_pool: Pool, run: () => Promise<unknown>) => run(),
 }));
 
-import { declaredColumns, getDatabase, withConnection } from "@/lib/server/database";
+import { getDatabase, withConnection } from "@/lib/server/database";
+import { declaredColumns } from "@/lib/server/database/declared-tables";
 
 /** Erreur mysql2 minimale : seul `code` est lu par les prédicats. */
 function mysqlError(code: string): Error {
