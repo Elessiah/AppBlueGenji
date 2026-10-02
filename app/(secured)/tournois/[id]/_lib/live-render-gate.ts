@@ -3,6 +3,29 @@ import type { TournamentDetail } from "@/lib/shared/types";
 import { INITIAL_LIVE_STATE, type LiveState } from "./live-state";
 
 /**
+ * Un minuteur annulable, armé au plus une fois à la fois : réarmer un minuteur
+ * en cours ne fait rien, et il se libère de lui-même en se déclenchant.
+ */
+function createTimerSlot() {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  const cancel = () => {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+  };
+  return {
+    cancel,
+    armOnce(run: () => void, delay: number) {
+      timer ??= setTimeout(() => {
+        timer = null;
+        run();
+      }, delay);
+    },
+  };
+}
+
+/**
  * Régime de charge du suivi en direct (`lib/shared/client-power.ts`,
  * `docs/features/CLIENT_POWER_MODES.md`) : ce qui est *reçu* et ce qui est
  * *rendu* sont deux choses.
@@ -39,20 +62,13 @@ export type LiveRenderGate = {
 export function createLiveRenderGate(render: () => LiveState): LiveRenderGate {
   /** Un état reçu attend d'être rendu. */
   let pending = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  const timer = createTimerSlot();
   /** Dernier état **rendu**. */
   let rendered: LiveState = INITIAL_LIVE_STATE;
 
-  const cancelTimer = () => {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
-
   const flush = () => {
     pending = false;
-    cancelTimer();
+    timer.cancel();
     rendered = render();
   };
 
@@ -74,7 +90,7 @@ export function createLiveRenderGate(render: () => LiveState): LiveRenderGate {
         flush();
         return;
       }
-      timer ??= setTimeout(flush, delay);
+      timer.armOnce(flush, delay);
     },
     policyChanged(delay) {
       // Ce qui attendait est rendu dès qu'on peut le voir — et pas avant : un
@@ -83,15 +99,15 @@ export function createLiveRenderGate(render: () => LiveState): LiveRenderGate {
       if (!pending) return;
       // Une page encore vide ne patiente pas : les données sont là.
       if (delay === 0 || (delay !== null && !rendered.detail)) flush();
-      else if (delay === null) cancelTimer();
-      else timer ??= setTimeout(flush, delay);
+      else if (delay === null) timer.cancel();
+      else timer.armOnce(flush, delay);
     },
     reset() {
       pending = false;
-      cancelTimer();
+      timer.cancel();
       rendered = INITIAL_LIVE_STATE;
     },
-    dispose: cancelTimer,
+    dispose: timer.cancel,
   };
 }
 
@@ -115,20 +131,13 @@ export type QuietStream = {
 export function createQuietStream(reconnect: () => void): QuietStream {
   /** Flux ouvert au palier spectateur (`?quiet=1`). */
   let quiet = false;
-  let timer: ReturnType<typeof setTimeout> | null = null;
-
-  const cancelTimer = () => {
-    if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
-    }
-  };
+  const timer = createTimerSlot();
 
   return {
     isQuiet: () => quiet,
     policyChanged(previous, next) {
       if (next === previous) return;
-      cancelTimer();
+      timer.cancel();
       if (next === null) {
         if (quiet) {
           quiet = false;
@@ -136,8 +145,7 @@ export function createQuietStream(reconnect: () => void): QuietStream {
         }
         return;
       }
-      timer = setTimeout(() => {
-        timer = null;
+      timer.armOnce(() => {
         quiet = true;
         reconnect();
       }, next);
@@ -145,6 +153,6 @@ export function createQuietStream(reconnect: () => void): QuietStream {
     reset() {
       quiet = false;
     },
-    dispose: cancelTimer,
+    dispose: timer.cancel,
   };
 }
