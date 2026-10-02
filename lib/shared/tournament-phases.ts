@@ -301,11 +301,13 @@ function issue(code: string, phaseIndex: number | null = null, field: PhaseIssue
  * - `INVALID_PHASE_POSITIONS` : positions non exactement 1..n après tri.
  * - `INVALID_PHASE_FORMAT` : format invalide.
  * - `DOUBLE_MUST_BE_LAST_PHASE` : DOUBLE n'est pas la dernière.
- * - `INVALID_PHASE_QUALIFIER` : COUNT < 1 ou PERCENT hors 1..99.
+ * - `INVALID_PHASE_QUALIFIER` : COUNT < 1, PERCENT hors 1..99, ou valeur non
+ *   finie (`NaN` d'une saisie non numérique, `Infinity`).
  * - `NON_DECREASING_PHASE_QUALIFIERS` : deux COUNT consécutives non-décroissantes
  *   — la **seconde** est désignée : c'est elle qui devait être plus petite.
- * - `INVALID_PHASE_SWISS_ROUNDS` : SWISS sans rounds en 1..20.
- * - `INVALID_PHASE_SURVIVAL_ROUNDS` : SURVIVAL avec cadence hors 1..50.
+ * - `INVALID_PHASE_SWISS_ROUNDS` : SWISS sans rounds en 1..20 (non fini compris).
+ * - `INVALID_PHASE_SURVIVAL_ROUNDS` : SURVIVAL avec cadence hors 1..50 (non finie
+ *   comprise).
  *
  * @param phases Configurations des phases à valider.
  * @returns Le premier défaut, ou `null` si le plan est valide.
@@ -373,16 +375,21 @@ function findSinglePhaseIssue(phase: PhaseConfig, i: number, isLast: boolean): P
 /**
  * Vrai sur une qualification **hors bornes** : COUNT < 1, PERCENT hors 1..99.
  * Un autre mode n'est pas contrôlé ici.
+ *
+ * Le nombre non fini se refuse en premier : `normalizePhaseConfigs` convertit
+ * la saisie par `Number(...)`, qui rend `NaN` sur un texte, et toute
+ * comparaison avec `NaN` étant fausse, aucune borne ne l'aurait arrêté.
  */
 function qualifierOutOfBounds(phase: PhaseConfig): boolean {
-  if (phase.qualifierMode === "COUNT") return phase.qualifierValue < 1;
-  if (phase.qualifierMode === "PERCENT") return phase.qualifierValue < 1 || phase.qualifierValue > 99;
+  const value = phase.qualifierValue;
+  if (phase.qualifierMode === "COUNT") return !Number.isFinite(value) || value < 1;
+  if (phase.qualifierMode === "PERCENT") return !Number.isFinite(value) || value < 1 || value > 99;
   return false;
 }
 
-/** Vrai sur une cadence renseignée qui n'est pas un nombre de 1..max. */
+/** Vrai sur une cadence renseignée qui n'est pas un nombre fini de 1..max. */
 function roundsOutOfRange(value: number | null, max: number): boolean {
-  return value !== null && (typeof value !== "number" || value < 1 || value > max);
+  return value !== null && (!Number.isFinite(value) || value < 1 || value > max);
 }
 
 /**
