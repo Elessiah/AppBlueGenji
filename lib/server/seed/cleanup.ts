@@ -61,10 +61,11 @@ export function orphanSweepSql(fk: ForeignKeyRule): string {
   const column = quoteIdentifier(fk.column);
   const parent = quoteIdentifier(fk.parentTable);
   const parentColumn = quoteIdentifier(fk.parentColumn);
-  const orphan = `LEFT JOIN ${parent} p ON p.${parentColumn} = c.${column} WHERE c.${column} IS NOT NULL AND p.${parentColumn} IS NULL`;
-  return fk.deleteRule === "CASCADE"
-    ? `DELETE c FROM ${child} c ${orphan}`
-    : `UPDATE ${child} c ${orphan.replace("WHERE", `SET c.${column} = NULL WHERE`)}`;
+  const join = `LEFT JOIN ${parent} p ON p.${parentColumn} = c.${column}`;
+  const where = `WHERE c.${column} IS NOT NULL AND p.${parentColumn} IS NULL`;
+  if (fk.deleteRule === "CASCADE") return `DELETE c FROM ${child} c ${join} ${where}`;
+  const detach = `SET c.${column} = NULL`;
+  return `UPDATE ${child} c ${join} ${detach} ${where}`;
 }
 
 /** Clés étrangères à `ON DELETE CASCADE` ou `SET NULL` de la base courante. */
