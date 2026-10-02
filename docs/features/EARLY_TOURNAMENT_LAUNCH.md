@@ -152,7 +152,8 @@ quelque part (`advanceTarget`, la même fonction pure que le serveur rejoue sous
 verrou) — même principe que « Modifier » : pas de bouton grisé sur un tournoi
 déjà en cours. Son `title` nomme l'étape suivante.
 
-La confirmation (`AdvanceTournamentDialog`) n'exige pas de recopier le nom,
+La confirmation (`AdvanceTournamentDialog`, coquille commune
+`TournamentDialogShell`) n'exige pas de recopier le nom,
 contrairement à la suppression : le tournoi n'est pas détruit, il avance. Son
 titre et son bouton nomment le geste (« Ouvrir les inscriptions », « Clore les
 inscriptions », « Lancer maintenant »), et elle montre des choses concrètes

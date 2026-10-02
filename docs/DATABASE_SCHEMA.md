@@ -28,7 +28,11 @@ Le coût n'était pas théorique :
 Un `CREATE TABLE` par table, à son état final, groupé par domaine : comptes,
 équipes, tournois, classements des moteurs à rejeu, multi-phases, notifications
 envoyées, vitrine. Les colonnes y sont rangées par famille et commentées là où
-leur nom ne suffit pas.
+leur nom ne suffit pas. Le groupe le plus long, la vitrine, est une liste
+(`SHOWCASE_TABLES`) jouée dans l'ordre plutôt qu'une suite d'appels
+`createTable` identiques. Les instructions émises sont figées par une empreinte
+(`database-migrations-run.test.ts`) : une réécriture du fichier doit la laisser
+intacte, un changement de schéma voulu la met à jour (`-u`).
 
 ## La contrepartie, à connaître avant de toucher au fichier
 
