@@ -36,16 +36,18 @@ async function refuseAccess(permission: Permission): Promise<Response | null> {
 }
 
 /**
- * Corps JSON de la requête, enveloppé ; `null` s'il est illisible (ou trop
- * lourd). L'enveloppe distingue ce refus d'un corps JSON `null`, lu tel quel
- * (voir `ERREUR.txt`).
+ * Corps JSON de la requête ; `null` s'il est illisible, trop lourd ou n'est pas
+ * un objet (`null`, tableau, nombre, chaîne…) — refusé en `INVALID_BODY`.
  */
-async function readBody(req: Request): Promise<{ json: JsonBody } | null> {
+async function readBody(req: Request): Promise<JsonBody | null> {
+  let json: unknown;
   try {
-    return { json: (await readJsonBody(req)) as JsonBody };
+    json = await readJsonBody(req);
   } catch {
     return null;
   }
+  if (typeof json !== "object" || json === null || Array.isArray(json)) return null;
+  return json as JsonBody;
 }
 
 /** Message du service → code et statut renvoyés. */
@@ -80,7 +82,7 @@ export function itemRoutes(options: ItemRouteOptions) {
     if (body === null) return fail("INVALID_BODY", 400);
 
     try {
-      return ok(await options.update(id, body.json));
+      return ok(await options.update(id, body));
     } catch (e) {
       return serviceFailure(e, options.updateFailed, statusOf);
     }
@@ -123,7 +125,7 @@ export function reorderRoute(options: ReorderRouteOptions) {
     const body = await readBody(req);
     if (body === null) return fail("INVALID_BODY", 400);
 
-    const validation = validateReorderIds(body.json.ids);
+    const validation = validateReorderIds(body.ids);
     if (!validation.ok) return fail(validation.error, 400);
 
     try {
