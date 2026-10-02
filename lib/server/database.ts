@@ -956,9 +956,12 @@ async function createSentNotificationTables(db: Pool): Promise<void> {
 // Vitrine et association
 // ───────────────────────────────────────────────────────────────────────────
 
-/** Vitrine et association. */
-async function createShowcaseTables(db: Pool): Promise<void> {
-  await createTable(db, `
+/**
+ * Vitrine et association : les `CREATE TABLE`, joués dans cet ordre. Une liste
+ * plutôt qu'une suite d'appels identiques — chaque entrée garde son commentaire.
+ */
+const SHOWCASE_TABLES: readonly string[] = [
+  `
       CREATE TABLE IF NOT EXISTS bg_sponsors (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(120) NOT NULL,
@@ -974,9 +977,9 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_sponsors_active_order (active, display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_bureau_members (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(120) NOT NULL,
@@ -988,9 +991,9 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_bureau_order (display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_about_stats (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       value VARCHAR(40) NOT NULL,
@@ -1000,9 +1003,9 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_about_stats_order (display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_about_pillars (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(60) NOT NULL,
@@ -1012,17 +1015,17 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_about_pillars_order (display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_settings (
       setting_key VARCHAR(80) PRIMARY KEY,
       setting_value TEXT NOT NULL,
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_benevoles (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       first_name VARCHAR(80) NOT NULL,
@@ -1038,11 +1041,11 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       INDEX idx_bg_benevoles_category (category),
       INDEX idx_bg_benevoles_order (display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // `domain` porte le **pôle de bénévolat** visé (recrutement du staff
   // associatif) et non un jeu : la page a changé d'objet en cours de route.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_recruitment_ads (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(140) NOT NULL,
@@ -1061,7 +1064,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       INDEX idx_bg_recruitment_active_order (active, display_order)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Journal des données de connexion (obligation légale de l'hébergeur, LCEN
   // art. 6 — `lib/shared/connection-logs.ts`) : une ligne par ouverture de
@@ -1069,7 +1072,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
   // règle : la ligne doit survivre à la suppression du compte jusqu'à son
   // échéance (RGPD art. 17.3.b). Table neuve, donc créée telle quelle sur une
   // base qui tourne — aucune entrée de migration n'est due.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_connection_logs (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       user_id BIGINT NOT NULL,
@@ -1079,14 +1082,14 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       INDEX idx_bg_connection_logs_created_at (created_at),
       INDEX idx_bg_connection_logs_user (user_id, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Une ligne = une visite. `visitor_key` est un SHA-256 salé : ni IP ni
   // user-agent ne sont stockés en clair. Pas de clé étrangère sur `user_id` —
   // une suppression de compte ne doit pas réécrire l'historique de
   // fréquentation, qui n'est qu'un comptage (le lien est détaché à la main,
   // cf. `deleteOwnAccount`).
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_site_visits (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       visitor_key CHAR(64) NOT NULL,
@@ -1096,35 +1099,35 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       INDEX idx_bg_site_visits_created_at (created_at),
       INDEX idx_bg_site_visits_visitor (visitor_key, created_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Le détail ci-dessus n'est gardé que `SITE_VISIT_DETAIL_RETENTION_DAYS`
   // jours : les totaux « depuis toujours » vivent dans ces deux tables, qui ne
   // gardent ni page ni heure. Un jour révolu devient une ligne de compteur ; un
   // visiteur, une empreinte — c'est le seul moyen de compter les visiteurs
   // uniques depuis la mise en service sans relire tout l'historique.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_site_visit_days (
       day DATE PRIMARY KEY,
       visits INT UNSIGNED NOT NULL DEFAULT 0,
       first_visit_at DATETIME NOT NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
-  await createTable(db, `
+  `,
+  `
       CREATE TABLE IF NOT EXISTS bg_site_visitors (
       visitor_key CHAR(64) PRIMARY KEY,
       authenticated TINYINT(1) NOT NULL DEFAULT 0,
       last_seen_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_bg_site_visitors_last_seen (last_seen_at)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Changements du traitement des données (`lib/shared/privacy-changes.ts`) :
   // une ligne par changement **dont le joueur a pris connaissance**, avec sa
   // date — la trace de l'information, que l'export RGPD rend au joueur
   // (`accepted_at` garde son nom d'origine : aucun accord n'est demandé). Le registre vit dans le
   // code, pas en base : `change_id` n'a donc pas de clé étrangère.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_privacy_acknowledgments (
       user_id BIGINT NOT NULL,
       change_id VARCHAR(80) NOT NULL,
@@ -1133,12 +1136,12 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_privacy_ack_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Annonce Discord de ces changements, **réservée avant l'envoi** : la clé
   // primaire est ce qui interdit le doublon entre deux balayages concurrents
   // (`lib/server/privacy-change-notifications.ts`).
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_privacy_change_notifications (
       user_id BIGINT NOT NULL,
       change_id VARCHAR(80) NOT NULL,
@@ -1147,13 +1150,13 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_privacy_notif_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Acceptations des conditions d'utilisation (`lib/shared/terms-of-use.ts`) :
   // une ligne par acceptation, avec la version et l'écran où elle a été donnée.
   // `bg_users.terms_version` n'en garde que la dernière — c'est elle qu'on
   // consulte avant un geste de gestion ; cette table est la **preuve**.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_terms_acceptances (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       user_id BIGINT NOT NULL,
@@ -1164,7 +1167,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_terms_acceptances_user FOREIGN KEY (user_id)
         REFERENCES bg_users(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Signalements adressés à l'association (`lib/shared/content-reports.ts`).
   // Le signalant peut être anonyme : `reporter_user_id` est facultatif, et
@@ -1173,7 +1176,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
   // d'où l'index sur le couple que la purge balaie. Une contestation
   // (`CONTEST`) pend à son signalement d'origine (`parent_report_id`) et part
   // avec lui : elle n'a pas de sens seule.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_reports (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       category ENUM('COPYRIGHT', 'MODERATION', 'BUG', 'RGPD', 'HOSTING', 'OTHER', 'CONTEST') NOT NULL,
@@ -1208,7 +1211,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_reports_assignee FOREIGN KEY (assignee_user_id)
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Ce qu'un signalement désigne. **Aucune clé étrangère vers la cible** : une
   // équipe dissoute ou un compte effacé ne doivent pas emporter le signalement
@@ -1216,7 +1219,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
   // panneau dit encore de quoi il s'agissait quand la fiche n'existe plus.
   // `notified_at` : instant où la cible a été prévenue, `NULL` si rien ne lui a
   // été envoyé (tournoi, cible déjà prévenue, auteur retenu par son plafond).
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_report_targets (
       report_id BIGINT NOT NULL,
       target_type ENUM('USER', 'TEAM', 'TOURNAMENT') NOT NULL,
@@ -1228,7 +1231,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_report_targets_report FOREIGN KEY (report_id)
         REFERENCES bg_reports(id) ON DELETE CASCADE
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Logos d'équipe masqués après un signalement (`lib/shared/logo-quarantine.ts`).
   // Le fichier quitte `public/uploads` pour `data/quarantine` — il n'est plus
@@ -1240,7 +1243,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
   // entrée solo d'une équipe réelle sans énumération à tenir à jour. Une ligne
   // masque le logo d'une équipe (`team_id` posé) ou l'avatar d'un joueur
   // (`user_id` posé) ; jamais les deux, jamais aucun.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_logo_quarantines (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       team_id BIGINT NULL,
@@ -1265,7 +1268,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_logo_quarantines_hidden_by FOREIGN KEY (hidden_by_user_id)
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
 
   // Suspensions de compte prononcées par la modération
   // (`lib/shared/account-suspension.ts`). `ends_at` à `NULL` = durée
@@ -1275,7 +1278,7 @@ async function createShowcaseTables(db: Pool): Promise<void> {
   // emporte ses suspensions (`ON DELETE CASCADE`). L'index sert les deux
   // lectures chaudes — la session de chaque requête et le refus d'une connexion
   // —, qui cherchent une ligne non levée d'un compte.
-  await createTable(db, `
+  `
       CREATE TABLE IF NOT EXISTS bg_account_suspensions (
       id BIGINT AUTO_INCREMENT PRIMARY KEY,
       user_id BIGINT NOT NULL,
@@ -1294,7 +1297,12 @@ async function createShowcaseTables(db: Pool): Promise<void> {
       CONSTRAINT fk_bg_account_suspensions_lifted_by FOREIGN KEY (lifted_by)
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-  `);
+  `,
+];
+
+/** Vitrine et association. */
+async function createShowcaseTables(db: Pool): Promise<void> {
+  for (const ddl of SHOWCASE_TABLES) await createTable(db, ddl);
 }
 
 // ───────────────────────────────────────────────────────────────────────────

@@ -1,13 +1,11 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { FormEvent, useState } from "react";
 import { useToast } from "@/components/ui/toast";
-import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import { computeTournamentState } from "@/lib/shared/tournament-state";
 import type { TournamentCard } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
+import { TournamentDialogShell } from "./TournamentDialogShell";
 
 interface RemoveEntrantDialogProps {
   card: TournamentCard;
@@ -43,8 +41,7 @@ interface RemoveEntrantDialogProps {
  * ailleurs côté client : l'état stocké retombe à `UPCOMING` dans cet entre-deux,
  * et le serveur, lui, accepte toujours le retrait.
  *
- * Portail sur `document.body` pour la même raison que les autres dialogues de
- * cette page : `.page-shell` enferme son contenu sous la barre de navigation.
+ * Coquille (portail, voile, titre, boutons) : `TournamentDialogShell`.
  */
 export function RemoveEntrantDialog({
   card,
@@ -55,10 +52,6 @@ export function RemoveEntrantDialog({
 }: Readonly<RemoveEntrantDialogProps>) {
   const { showError, showSuccess } = useToast();
   const [busy, setBusy] = useState(false);
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: busy });
-  const backdrop = useBackdropDismiss(onClose, busy);
 
   // Figé à l'ouverture, comme la liste des étapes de `LaunchTournamentDialog` :
   // le dialogue reste monté pendant que le flux SSE redessine la page, et voir
@@ -86,105 +79,50 @@ export function RemoveEntrantDialog({
     }
   };
 
-  if (!mounted) return null;
-
-  return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
-      role="presentation"
-      {...backdrop}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 90,
-        background: "rgba(6, 8, 12, 0.72)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
+  return (
+    <TournamentDialogShell
+      titleId="remove-entrant-title"
+      summaryId="remove-entrant-summary"
+      maxWidth={440}
+      title={<>Retirer {entrantName} du tournoi</>}
+      busy={busy}
+      onClose={onClose}
+      onSubmit={submit}
+      submitLabel={busy ? "Retrait…" : "Retirer"}
     >
-      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        className="dialog-bounded"
-        aria-labelledby="remove-entrant-title"
-        // Le résumé est lu à l'ouverture, avant que le focus n'atteigne les
-        // boutons : le titre nomme l'engagé, le corps dit ce que « retirer »
-        // veut dire — sans lui, la modale s'annonce sans sa conséquence.
-        aria-describedby="remove-entrant-summary"
-        tabIndex={-1}
-        style={{
-          width: "100%",
-          maxWidth: 440,
-          background: "var(--cyber-bg-2, #14181f)",
-          border: "1px solid var(--line-strong-cy, #2a3340)",
-          borderRadius: "var(--r-cy-md, 12px)",
-          boxShadow: "0 24px 64px rgba(0,0,0,0.6)",
-          padding: 22,
-        }}
+      <p
+        id="remove-entrant-summary"
+        style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
       >
-        <h3 id="remove-entrant-title" style={{ margin: 0, fontSize: 18 }}>
-          Retirer {entrantName} du tournoi
-        </h3>
+        L&apos;inscription est <strong style={{ color: "var(--ink)" }}>effacée</strong> : rien
+        n&apos;indiquera que cet engagé a pris part au tournoi, à la différence d&apos;un abandon.
+        La place est rendue au plateau.
+      </p>
 
+      {registrationOpen ? (
         <p
-          id="remove-entrant-summary"
-          style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
+          style={{ marginTop: 12, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
         >
-          L&apos;inscription est <strong style={{ color: "var(--ink)" }}>effacée</strong> : rien
-          n&apos;indiquera que cet engagé a pris part au tournoi, à la différence d&apos;un abandon.
-          La place est rendue au plateau.
+          Les inscriptions sont ouvertes : la place libérée peut être reprise, et cet engagé
+          réinscrit.
         </p>
-
-        {registrationOpen ? (
-          <p
-            style={{ marginTop: 12, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
-          >
-            Les inscriptions sont ouvertes : la place libérée peut être reprise, et cet engagé
-            réinscrit.
-          </p>
-        ) : (
-          <p
-            // `role="note"` plutôt qu'une simple couleur : l'ambre est la seule
-            // chose qui distingue cet avertissement du paragraphe au-dessus, et
-            // il ne dit rien à qui ne le voit pas.
-            role="note"
-            style={{
-              marginTop: 12,
-              fontSize: 13,
-              lineHeight: 1.55,
-              color: "var(--amber, #ffb347)",
-            }}
-          >
-            Les inscriptions sont closes : plus personne ne peut prendre cette place, et cet engagé
-            ne pourra pas être réinscrit sans rouvrir les inscriptions.
-          </p>
-        )}
-
-        <form onSubmit={submit}>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
-            <button
-              type="button"
-              className="btn ghost"
-              onClick={onClose}
-              disabled={busy}
-              style={{ padding: "8px 18px", fontSize: 13 }}
-            >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              className="btn"
-              disabled={busy}
-              style={{ padding: "8px 20px", fontSize: 13 }}
-            >
-              {busy ? "Retrait…" : "Retirer"}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body,
+      ) : (
+        <p
+          // `role="note"` plutôt qu'une simple couleur : l'ambre est la seule
+          // chose qui distingue cet avertissement du paragraphe au-dessus, et
+          // il ne dit rien à qui ne le voit pas.
+          role="note"
+          style={{
+            marginTop: 12,
+            fontSize: 13,
+            lineHeight: 1.55,
+            color: "var(--amber, #ffb347)",
+          }}
+        >
+          Les inscriptions sont closes : plus personne ne peut prendre cette place, et cet engagé
+          ne pourra pas être réinscrit sans rouvrir les inscriptions.
+        </p>
+      )}
+    </TournamentDialogShell>
   );
 }
