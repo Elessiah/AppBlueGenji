@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { A11Y_SETTING_KEYS } from "@/lib/shared/accessibility-settings";
-import { globals, stripComments } from "./_lib/style-sweep";
+import { join, relative } from "node:path";
+import { globals, ROOT, stripComments, walk } from "./_lib/style-sweep";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -106,6 +107,50 @@ describe("réglages d'accessibilité — feuille globale", () => {
       expect(value).toBeDefined();
       expect(contrast(value!, surface)).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it("par défaut, les textes secondaires tiennent déjà 4,5:1 sur le fond le plus clair", () => {
+    const block = declarations(":root");
+    const surface = block.match(/--cyber-bg-3:\s*(#[0-9a-f]{6})/)?.[1];
+    expect(surface).toBe("#161a22");
+    for (const token of ["--ink", "--ink-mute", "--ink-dim", "--text-1", "--text-2"]) {
+      const value = block.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`))?.[1];
+      expect(value).toBeDefined();
+      expect(contrast(value!, surface!)).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("garde la hiérarchie ink > ink-mute > ink-dim > ink-faint, et le contraste renforcé au-dessus", () => {
+    const base = declarations(":root");
+    const boosted = declarations(':root[data-a11y~="contrast"],\n.a11y-always-contrast');
+    const bg = "#05060a";
+    const value = (block: string, token: string) => block.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`))![1];
+    const ratios = ["--ink", "--ink-mute", "--ink-dim", "--ink-faint"].map((token) => contrast(value(base, token), bg));
+    for (let i = 1; i < ratios.length; i += 1) expect(ratios[i]).toBeLessThan(ratios[i - 1]);
+    for (const token of ["--ink", "--ink-mute", "--ink-dim", "--ink-faint", "--text-1", "--text-2"]) {
+      expect(contrast(value(boosted, token), bg)).toBeGreaterThanOrEqual(contrast(value(base, token), bg));
+    }
+  });
+
+  it("réserve --ink-faint aux ornements : jamais la couleur d'un texte, hors séparateurs", () => {
+    // Séparateurs `/` et `·`, seuls textes autorisés à rester pâles.
+    const allowed = new Set([
+      ".bot-crumb .sep { color: var(--ink-faint); }",
+      '<span style={{ color: "var(--ink-faint)" }}>·</span>',
+    ]);
+    const files = [".css", ".tsx"].flatMap((suffix) => [
+      ...walk(join(ROOT, "app"), suffix),
+      ...walk(join(ROOT, "components"), suffix),
+    ]);
+    const offenders: string[] = [];
+    for (const path of files) {
+      for (const line of readSource(path).split("\n")) {
+        const usesAsText = /(?<![-\w])color:\s*"?var\(--ink-faint/.test(line);
+        if (usesAsText && !allowed.has(line.trim())) offenders.push(`${relative(ROOT, path)}: ${line.trim()}`);
+      }
+    }
+    expect(files.length).toBeGreaterThan(100);
+    expect(offenders).toEqual([]);
   });
 
   it("la police simplifiée surcharge les jetons posés en ligne sur <body>", () => {
