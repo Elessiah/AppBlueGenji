@@ -412,8 +412,15 @@ async function rankPhaseStandings(
   // suisse ou bracket) : surtout pas de l'ordre des standings en base, qui est
   // encore l'ordre de seeding tant que `savePhaseResults` n'a pas écrit les rangs.
   // S'y fier qualifierait les têtes de série, pas les équipes qui ont gagné.
+  // Seules les équipes **de la phase** y sont rangées et qualifiées : la
+  // qualification se compte par index, et une équipe sortie à une phase
+  // antérieure qui se glisserait dans la liste du moteur y prendrait une place
+  // — puis rentrerait dans la phase suivante. Ses rangs ne s'écriraient nulle
+  // part (`savePhaseResults` ne touche que les lignes de la phase), mais ils
+  // décaleraient ceux des engagées, et la finalisation les reporte.
   const standings = await loadPhaseStandings(conn, currentPhaseId);
-  const ordered = [...outcome.phaseFinalRanking];
+  const participants = new Set(standings.map((standing) => standing.teamId));
+  const ordered = outcome.phaseFinalRanking.filter((teamId) => participants.has(teamId));
   const alreadyRanked = new Set(ordered);
   for (const standing of standings) {
     if (!alreadyRanked.has(standing.teamId)) ordered.push(standing.teamId);
