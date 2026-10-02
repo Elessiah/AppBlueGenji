@@ -14,7 +14,7 @@ réglages d'accessibilité. Deux règles de conception, voulues ensemble :
 
 | Clé | Intitulé | Effet |
 |---|---|---|
-| `contrast` | Contraste renforcé | Jetons de texte secondaire au-dessus de 4,5:1 sur tous les fonds (`--ink-dim` n'atteint que 2,8:1 d'origine), bordures et séparateurs plus marqués, texte indicatif lisible |
+| `contrast` | Contraste renforcé | Jetons de texte secondaire encore au-dessus de leurs valeurs par défaut (déjà ≥ 4,5:1 sur tous les fonds), `--ink-faint` compris, bordures et séparateurs plus marqués, texte indicatif lisible |
 | `focus` | Focus très visible | Double anneau blanc + bleu sur liseré sombre, visible sur n'importe quel fond ; relayé sur la pastille de `Coche` |
 | `links` | Liens soulignés | Tous les liens de texte soulignés (WCAG 1.4.1) ; les liens habillés en bouton (`.btn`, `CyberButton`) et les plaques `cardOverlay` ne le sont pas |
 | `font` | Police simplifiée | Toutes les familles (`--font-title`, `--font-body`, `--font-mono`, `--font-display`) ramenées à Inter, sans capitales forcées ni lettres écartées |
