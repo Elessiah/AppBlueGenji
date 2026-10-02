@@ -53,6 +53,47 @@ export type EliminationRank = {
   eliminatedByDoubleForfeit: boolean;
 };
 
+/** Bilan d'une équipe hors podium, tel que la base le rend. */
+export type EliminationRestRow = {
+  team_id: number | string;
+  wins: number | string;
+  losses: number | string;
+  last_stage: number | string | null;
+  seed: number | string | null;
+};
+
+/** Poids d'un tableau dans {@link EliminationRestRow.last_stage} : plus loin, plus lourd. */
+const STAGE_BRACKET_WEIGHT = 1000;
+
+/**
+ * Ordre du reste d'un tableau (hors podium) : victoires décroissantes,
+ * défaites croissantes, puis le **stade** le plus avancé atteint (tableau puis
+ * tour de la dernière rencontre disputée), puis le seed, puis l'identifiant.
+ *
+ * Le stade remplace l'heure de la dernière rencontre (`updated_at`), qui
+ * départageait jusqu'ici les ex æquo : deux équipes sorties au même tour
+ * étaient rangées selon l'ordre — à la seconde près — de saisie de leurs
+ * scores, et deux exécutions du seed, à matchs identiques, ne donnaient pas
+ * le même classement. Le stade dit ce que l'heure approchait (une équipe
+ * sortie plus loin dans le tableau finit devant) sans dépendre du moment où
+ * le score a été saisi ; le seed puis l'identifiant tranchent le reste, pour
+ * que l'ordre soit **total**.
+ */
+export function orderEliminationRest(rows: readonly EliminationRestRow[]): number[] {
+  const seedOf = (row: EliminationRestRow): number =>
+    row.seed === null ? Number.MAX_SAFE_INTEGER : Number(row.seed);
+  return [...rows]
+    .sort(
+      (a, b) =>
+        Number(b.wins) - Number(a.wins) ||
+        Number(a.losses) - Number(b.losses) ||
+        Number(b.last_stage ?? 0) - Number(a.last_stage ?? 0) ||
+        seedOf(a) - seedOf(b) ||
+        Number(a.team_id) - Number(b.team_id),
+    )
+    .map((row) => Number(row.team_id));
+}
+
 type PodiumRow = RowDataPacket & {
   team1_id: number | null;
   team2_id: number | null;
@@ -145,30 +186,25 @@ export async function rankEliminationPhase(
   const doubleForfeited = `(m.status = 'COMPLETED' AND m.double_forfeit = 1 AND ${involved})`;
   const exclusion =
     placed.length > 0 ? `AND r.team_id NOT IN (${placed.map(() => "?").join(",")})` : "";
-  const [rankingRows] = await connection.execute<
-    (RowDataPacket & {
-      team_id: number;
-      wins: number;
-      losses: number;
-      last_progress_at: Date | null;
-    })[]
-  >(
+  // L'ordre est donné par `orderEliminationRest`, pas par un `ORDER BY` : il
+  // se teste sans base, et le départage s'y lit en entier.
+  const [rankingRows] = await connection.execute<(RowDataPacket & EliminationRestRow)[]>(
     `SELECT
       r.team_id,
+      r.seed,
       COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
       COALESCE(SUM(CASE
         WHEN m.loser_team_id = r.team_id OR ${doubleForfeited} THEN 1 ELSE 0
       END), 0) AS losses,
       MAX(CASE
         WHEN m.winner_team_id = r.team_id OR m.loser_team_id = r.team_id OR ${doubleForfeited}
-          THEN m.updated_at
+          THEN FIELD(m.bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') * ${STAGE_BRACKET_WEIGHT} + m.round_number
         ELSE NULL
-      END) AS last_progress_at
+      END) AS last_stage
      FROM bg_tournament_registrations r
      LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id AND m.phase_id = ?
      WHERE r.tournament_id = ? ${exclusion}
-     GROUP BY r.team_id
-     ORDER BY wins DESC, losses ASC, last_progress_at DESC`,
+     GROUP BY r.team_id, r.seed`,
     [phaseId, tournamentId, ...placed],
   );
 
@@ -176,7 +212,7 @@ export async function rankEliminationPhase(
   // forfaits en demi-finale) ne désigne personne, et le plateau se range alors
   // tout entier sur son bilan. La garde d'avant (aucun podium → aucun rang)
   // n'existait que pour éviter une liste `NOT IN` vide.
-  const rest = rankingRows.map((row) => Number(row.team_id));
+  const rest = orderEliminationRest(rankingRows);
 
   return appendSequentialRanks(podium, rest).map((entry) => ({
     ...entry,
