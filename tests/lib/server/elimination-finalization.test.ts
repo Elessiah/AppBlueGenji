@@ -113,7 +113,7 @@ describe("rankEliminationPhase", () => {
     // Le reste exclut les deux finalistes déjà placés.
     const rest = sqlCalls().find((c) => REST.test(c.sql));
     expect(rest?.sql).toContain("AND r.team_id NOT IN (?,?)");
-    expect(rest?.params).toEqual([0, 5, 1, 2]);
+    expect(rest?.params).toEqual([0, 0, 5, 1, 2]);
   });
 
   it("lit la petite finale quand le tableau en a une", async () => {
@@ -168,7 +168,7 @@ describe("rankEliminationPhase", () => {
     expect(ranks.map((r) => [r.teamId, r.rank])).toEqual([[4, 1], [9, 2]]);
     const rest = sqlCalls().find((c) => REST.test(c.sql));
     expect(rest?.sql).not.toContain("NOT IN");
-    expect(rest?.params).toEqual([0, 5]);
+    expect(rest?.params).toEqual([0, 0, 5]);
   });
 
   it("range le reste par le bilan puis le stade, jamais par l'heure de saisie", async () => {
@@ -187,6 +187,23 @@ describe("rankEliminationPhase", () => {
     expect(rest?.sql).not.toContain("updated_at");
     expect(rest?.sql).not.toContain("ORDER BY");
     expect(rest?.sql).toContain("FIELD(m.bracket, 'UPPER', 'LOWER', 'GRAND', 'THIRD_PLACE') * 1000 + m.round_number");
+  });
+
+  it("départage sur le seed de la phase avant celui de l'inscription", async () => {
+    route(REST, [
+      { team_id: 4, seed: 2, wins: 0, losses: 1, last_stage: 1001 },
+      { team_id: 9, seed: 1, wins: 0, losses: 1, last_stage: 1001 },
+    ]);
+
+    const ranks = await rankEliminationPhase(conn(), 5, 3, "SINGLE", false);
+
+    expect(ranks.map((r) => r.teamId)).toEqual([9, 4]);
+    const rest = sqlCalls().find((c) => REST.test(c.sql));
+    expect(rest?.sql).toContain("COALESCE(pt.seed, r.seed) AS seed");
+    expect(rest?.sql).toContain(
+      "LEFT JOIN bg_tournament_phase_teams pt ON pt.phase_id = ? AND pt.team_id = r.team_id",
+    );
+    expect(rest?.params).toEqual([3, 3, 5]);
   });
 });
 
