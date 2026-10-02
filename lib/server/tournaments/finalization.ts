@@ -78,6 +78,11 @@ const STAGE_BRACKET_WEIGHT = 1000;
  * sortie plus loin dans le tableau finit devant) sans dépendre du moment où
  * le score a été saisi ; le seed puis l'identifiant tranchent le reste, pour
  * que l'ordre soit **total**.
+ *
+ * Le seed est celui de la **phase** (`bg_tournament_phase_teams.seed`, rang
+ * hérité de la phase précédente) quand il y en a une, sinon celui de
+ * l'inscription — `NULL` quand le plateau a été semé sur le classement du
+ * site, auquel cas l'identifiant décide.
  */
 export function orderEliminationRest(rows: readonly EliminationRestRow[]): number[] {
   const seedOf = (row: EliminationRestRow): number =>
@@ -191,7 +196,7 @@ export async function rankEliminationPhase(
   const [rankingRows] = await connection.execute<(RowDataPacket & EliminationRestRow)[]>(
     `SELECT
       r.team_id,
-      r.seed,
+      COALESCE(pt.seed, r.seed) AS seed,
       COALESCE(SUM(CASE WHEN m.winner_team_id = r.team_id THEN 1 ELSE 0 END), 0) AS wins,
       COALESCE(SUM(CASE
         WHEN m.loser_team_id = r.team_id OR ${doubleForfeited} THEN 1 ELSE 0
@@ -202,10 +207,11 @@ export async function rankEliminationPhase(
         ELSE NULL
       END) AS last_stage
      FROM bg_tournament_registrations r
+     LEFT JOIN bg_tournament_phase_teams pt ON pt.phase_id = ? AND pt.team_id = r.team_id
      LEFT JOIN bg_matches m ON m.tournament_id = r.tournament_id AND m.phase_id = ?
      WHERE r.tournament_id = ? ${exclusion}
-     GROUP BY r.team_id, r.seed`,
-    [phaseId, tournamentId, ...placed],
+     GROUP BY r.team_id, r.seed, pt.seed`,
+    [phaseId, phaseId, tournamentId, ...placed],
   );
 
   // Le reste est rangé même sans podium — une finale fantôme (deux doubles
