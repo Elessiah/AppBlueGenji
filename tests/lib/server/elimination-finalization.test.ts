@@ -201,9 +201,32 @@ describe("rankEliminationPhase", () => {
     const rest = sqlCalls().find((c) => REST.test(c.sql));
     expect(rest?.sql).toContain("COALESCE(pt.seed, r.seed) AS seed");
     expect(rest?.sql).toContain(
-      "LEFT JOIN bg_tournament_phase_teams pt ON pt.phase_id = ? AND pt.team_id = r.team_id",
+      "JOIN bg_tournament_phase_teams pt ON pt.phase_id = ? AND pt.team_id = r.team_id",
     );
     expect(rest?.params).toEqual([3, 3, 5]);
+  });
+
+  it("ne range dans une phase que les équipes de cette phase", async () => {
+    route(REST, []);
+
+    await rankEliminationPhase(conn(), 5, 3, "DOUBLE", false);
+
+    // Jointure stricte : une inscription sans ligne dans la phase (sortie à une
+    // phase antérieure) n'entre pas dans le reste du classement.
+    const rest = sqlCalls().find((c) => REST.test(c.sql));
+    expect(rest?.sql).toContain("FROM bg_tournament_registrations r JOIN bg_tournament_phase_teams pt");
+    expect(rest?.sql).not.toContain("LEFT JOIN bg_tournament_phase_teams");
+  });
+
+  it("garde tout le plateau d'un tournoi sans phases", async () => {
+    route(REST, []);
+
+    await rankEliminationPhase(conn(), 5, 0, "SINGLE", false);
+
+    const rest = sqlCalls().find((c) => REST.test(c.sql));
+    expect(rest?.sql).toContain(
+      "FROM bg_tournament_registrations r LEFT JOIN bg_tournament_phase_teams pt",
+    );
   });
 });
 
