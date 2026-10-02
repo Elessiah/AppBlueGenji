@@ -101,7 +101,11 @@ inchangés.
    La ligne du tournoi est verrouillée (`FOR UPDATE`) pour sérialiser deux
    réconciliations concurrentes.
 3. Quand le moteur de la phase se déclare terminé, son **classement** est écrit
-   (`savePhaseResults`), la phase passe `FINISHED`, puis le **plan restant est
+   (`savePhaseResults`, une seule `UPDATE … CASE` : les paramètres du rang puis
+   ceux de la qualification, dans l'ordre de leurs `?` — entrelacés, ils
+   décalaient rangs et qualifications dès la deuxième équipe ; le chemin
+   d'avancement lit le classement en mémoire et n'en était pas affecté, seul le
+   classement de phase stocké l'était), la phase passe `FINISHED`, puis le **plan restant est
    re-résolu à partir du nombre réel de qualifiées** — des abandons peuvent rendre
    une phase suivante inutile, qui devient `SKIPPED` à la volée.
 4. La phase suivante démarre avec les qualifiées seedées par leur rang, et
