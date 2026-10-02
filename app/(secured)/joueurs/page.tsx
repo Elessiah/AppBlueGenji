@@ -183,7 +183,7 @@ export default function PlayersPage() {
           <div className={s.sortRow}>
             <div style={{ display: "flex", gap: 18, alignItems: "center" }}>
               <span>{filtered.length} joueur{filtered.length > 1 ? "s" : ""}</span>
-              <span style={{ color: "var(--ink-dim)" }}>·</span>
+              <span style={{ color: "var(--ink-faint)" }}>·</span>
               <div style={{ display: "flex", gap: 12 }}>
                 {(
                   [

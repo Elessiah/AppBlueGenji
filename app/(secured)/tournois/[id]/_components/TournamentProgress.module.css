@@ -172,8 +172,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.02em;
-  color: var(--text-2);
-  opacity: 0.75;
+  color: var(--ink-dim);
 }
 
 /* Réserve la hauteur des libellés, que le positionnement absolu des jalons

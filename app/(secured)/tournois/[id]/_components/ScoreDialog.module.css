@@ -280,7 +280,7 @@
 
 .forfeit[aria-pressed="true"] {
   border-color: rgba(255, 157, 46, 0.7);
-  background: rgba(255, 157, 46, 0.18);
+  background: rgba(var(--orange-rgb), 0.18);
   color: rgba(255, 157, 46, 1);
 }
 

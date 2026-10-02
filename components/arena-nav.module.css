@@ -283,7 +283,7 @@
 .navReports {
   color: var(--amber, #f5a524);
   border-color: rgba(245, 165, 36, 0.45);
-  background: rgba(245, 165, 36, 0.08);
+  background: rgba(var(--amber-rgb), 0.08);
   box-shadow: none;
   display: inline-flex;
   align-items: center;
@@ -293,7 +293,7 @@
 .navReports:hover {
   color: #ffc566;
   border-color: rgba(245, 165, 36, 0.7);
-  background: rgba(245, 165, 36, 0.14);
+  background: rgba(var(--amber-rgb), 0.14);
   box-shadow: none;
 }
 

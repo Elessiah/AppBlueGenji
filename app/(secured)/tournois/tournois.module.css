@@ -722,7 +722,7 @@ a.sectionNavLink:focus-visible {
 .cardRibbonOpen {
   color: #4fe0a2;
   border-color: rgba(79, 224, 162, 0.30);
-  background: rgba(79, 224, 162, 0.05);
+  background: rgba(var(--green-rgb), 0.05);
 }
 
 .cardRibbonOpen .dot {

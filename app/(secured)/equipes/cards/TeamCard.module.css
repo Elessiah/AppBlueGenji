@@ -59,7 +59,7 @@
 .rank.rankTop {
   color: #ff9d2e;
   border-color: rgba(255, 157, 46, 0.4);
-  background: rgba(255, 157, 46, 0.05);
+  background: rgba(var(--orange-rgb), 0.05);
 }
 
 .head {
@@ -281,7 +281,7 @@
 }
 
 .rosterItem.avatarMore {
-  background: rgba(255, 157, 46, 0.08);
+  background: rgba(var(--orange-rgb), 0.08);
   border-color: rgba(255, 157, 46, 0.25);
   color: #ff9d2e;
 }
@@ -308,13 +308,13 @@
 .gamePill.ow {
   color: #5ac8ff;
   border-color: rgba(90, 200, 255, 0.25);
-  background: rgba(90, 200, 255, 0.05);
+  background: rgba(var(--blue-500-rgb), 0.05);
 }
 
 .gamePill.mr {
   color: #a773ff;
   border-color: rgba(167, 115, 255, 0.25);
-  background: rgba(167, 115, 255, 0.05);
+  background: rgba(var(--purple-rgb), 0.05);
 }
 
 .foot {
@@ -338,7 +338,7 @@
   font-size: 12px;
   font-weight: 500;
   color: #ff9d2e;
-  background: rgba(255, 157, 46, 0.06);
+  background: rgba(var(--orange-rgb), 0.06);
   border: 1px solid rgba(255, 157, 46, 0.25);
   padding: 7px 12px;
   border-radius: var(--r-cy-sm);
@@ -394,7 +394,7 @@
 }
 
 .formCell.d {
-  background: var(--ink-dim);
+  background: var(--ink-faint);
 }
 
 /* Lien principal de la carte : une plaque transparente plutot qu'un `<a>` qui

@@ -39,7 +39,12 @@
   --cyber-bg-3: #161a22;
   --ink: #eaf2f7;
   --ink-mute: #93a3b2;
-  --ink-dim: #55636f;
+  /* Texte le plus atténué (mentions, sur-titres, légendes) : 4,79:1 sur
+     `--cyber-bg-3`, le fond le plus clair — au-dessus des 4,5:1 sur tout le
+     site. `--ink-faint` garde l'ancienne teinte pour ce qui n'est **pas** un
+     texte à lire : séparateurs, pastilles, traits en tirets. */
+  --ink-dim: #7a8894;
+  --ink-faint: #55636f;
   --blue-100: #dff2ff;
   --blue-300: #8fd5ff;
   --blue-500: #5ac8ff;
@@ -53,7 +58,9 @@
   --blue-700: #1b6a8f;
   --blue-glow: rgba(90, 200, 255, 0.14);
   --amber: #f5a524;
+  --amber-rgb: 245, 165, 36;
   --red-live: #ff4d5e;
+  --red-live-rgb: 255, 77, 94;
   --line-soft: rgba(180, 210, 230, 0.08);
   --line-strong-cy: rgba(180, 210, 230, 0.14);
   --r-cy-sm: 4px;
@@ -865,7 +872,7 @@ input[type="time"]::-webkit-inner-spin-button {
 
 .error {
   color: #ffd2db;
-  background: rgba(255, 110, 130, 0.2);
+  background: rgba(var(--danger-rgb), 0.2);
   border: 1px solid rgba(255, 110, 130, 0.4);
   border-radius: 8px;
   padding: 10px;
@@ -873,7 +880,7 @@ input[type="time"]::-webkit-inner-spin-button {
 
 .success {
   color: #d6ffeb;
-  background: rgba(79, 224, 162, 0.2);
+  background: rgba(var(--green-rgb), 0.2);
   border: 1px solid rgba(79, 224, 162, 0.35);
   border-radius: 8px;
   padding: 10px;
@@ -2002,9 +2009,10 @@ input[type="radio"]:disabled:checked {
    d'avant le menu. Une clé ajoutée au registre doit avoir sa règle ici
    (`tests/app/accessibility-styles.test.ts`). */
 
-/* Contraste renforcé : les jetons de texte secondaire passent au-dessus de
-   4,5:1 sur tous les fonds du site (`--ink-dim` n'atteignait que 2,8:1 sur
-   `--cyber-bg-3`), et les traits cessent d'être presque transparents. Les
+/* Contraste renforcé : les jetons de texte secondaire montent encore
+   au-dessus de leurs valeurs par défaut (déjà à 4,5:1 au moins), et les
+   traits cessent d'être presque transparents — `--ink-faint` (ornements)
+   compris. Les
    jetons étant déclarés sur `:root`, les redéfinir ici (plus spécifique)
    atteint tout ce qui les lit, sans toucher un composant.
    `.a11y-always-contrast` porte les mêmes jetons **en permanence** sur un
@@ -2015,6 +2023,7 @@ input[type="radio"]:disabled:checked {
   --ink: #f4f8fb;
   --ink-mute: #b9c6d2;
   --ink-dim: #95a3b1;
+  --ink-faint: #95a3b1;
   --text-0: #f4f8fb;
   --text-1: #dfe5ee;
   --text-2: #b3bccb;
