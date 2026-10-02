@@ -64,6 +64,6 @@ dont le `generateMetadata` ne pose **que** le titre :
   l'onglet ne doit pas nommer ce que la page tait.
 
 La règle est dans `lib/shared/entity-page-titles.ts` (pur) ; les lectures,
-une ligne chacune, sont `getTeamPageIdentity` (`teams-service`) et
-`getPlayerPageIdentity` (`users-service`) — pas `getTeamDetail` ni
+une ligne chacune, sont `getTeamPageIdentity` (`lib/server/teams/detail.ts`) et
+`getPlayerPageIdentity` (`lib/server/users/full-profile.ts`) — pas `getTeamDetail` ni
 `getFullProfile`, qui calculent statistiques et classement pour un titre.

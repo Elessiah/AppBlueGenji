@@ -7,7 +7,7 @@
  * le nom de ce qu'elle montre, suivi de sa nature — le gabarit du site ajoute
  * ensuite « · BlueGenji Esport ».
  *
- * Module pur : la lecture en base vit dans `teams-service` / `users-service`,
+ * Module pur : la lecture en base vit dans `teams/detail` / `users/full-profile`,
  * et la décision de ce qui peut être nommé est prise ici, une fois, pour que
  * les deux mises en page ne la réécrivent pas chacune à sa façon.
  */

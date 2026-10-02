@@ -20,7 +20,7 @@ import type { SqlParams } from "@/lib/server/database";
 import { TEAM_TAG_ALREADY_USED, checkTeamTag } from "@/lib/shared/team-tag";
 import { TEAM_NAME_ALREADY_USED } from "@/lib/shared/team-name";
 
-/** Nom de l'index unique posé par la migration (`lib/server/database.ts`). */
+/** Nom de l'index unique posé par la migration (`lib/server/database/schema/teams.ts`). */
 const TAG_INDEX = "uniq_bg_teams_tag";
 
 /**

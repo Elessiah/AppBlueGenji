@@ -185,7 +185,7 @@ nom d'aujourd'hui qu'il faut écrire.
 `bg_endurance_penalties` porte un `tournament_id` : elle fait partie de la liste
 relisible de ce qui part dans `purgeTournamentRows`
 (`docs/features/TOURNAMENT_DELETION.md`), sous `try` comme les alertes arbitre —
-sa création est avalée par un `catch` dans `database.ts`, et une base à qui la
+sa création est avalée par un `catch` dans `database/schema/standings.ts`, et une base à qui la
 table manquerait rendrait sinon tous les tournois indéboulonnables.
 
 ## Une base sans la table

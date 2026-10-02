@@ -175,7 +175,7 @@ l'instantané diffusé : ce sont des conditions publiques, rien de personnel.
 
 ## Jeu de test
 
-`lib/server/seed.ts` donne un tag Discord à tous les joueurs fictifs et en
+`lib/server/seed/users.ts` donne un tag Discord à tous les joueurs fictifs et en
 certifie **deux sur trois** ; il rattache un compte Blizzard à **un sur deux**
 (motifs déterministes, le seed reste reproductible). Un jeu où personne n'est
 certifié rendrait l'inscription impossible à essayer, un jeu où tout le monde

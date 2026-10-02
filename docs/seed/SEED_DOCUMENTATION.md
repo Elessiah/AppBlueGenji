@@ -12,7 +12,7 @@ A comprehensive test data system for the Blue Genji tournament application that 
 
 | File | Purpose | Usage |
 |------|---------|-------|
-| `lib/server/seed.ts` | Main seed script that generates all test data | `npm run seed` |
+| `lib/server/seed/main.ts` | Main seed script (modules under `lib/server/seed/`: users, teams, showcase, tournaments, simulation…) | `npm run seed` |
 | `lib/server/seed-view.ts` | View generated test data and bracket structures | `npm run seed:view` |
 | `TOURNAMENTS_TEST_DATA.md` | Detailed explanation of the 4 tournaments | Reference |
 | `TEST_DATA_SETUP.md` | Quick start guide | Getting started |
@@ -262,7 +262,7 @@ DELETE FROM bg_users WHERE pseudo LIKE 'Test_%';
 ## 🔧 Customization
 
 ### Modify Tournament Settings
-Edit `lib/server/seed.ts`:
+Edit the modules of `lib/server/seed/`:
 
 ```typescript
 // Change tournament format
@@ -331,7 +331,7 @@ This is normal - it's inserting a lot of data with matches
 - `TOURNAMENTS_TEST_DATA.md` - Detailed tournament specifications
 - `TEST_DATA_SETUP.md` - Quick start guide
 - `SEED_TESTING.md` - Original seed documentation
-- Database schema: `lib/server/database.ts`
+- Database schema: `lib/server/database/schema/`
 - Tournament API: `app/api/tournaments/`
 
 ## ✅ Verification Checklist

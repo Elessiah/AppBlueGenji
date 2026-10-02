@@ -24,7 +24,7 @@ export const CONTACT_DISCORD_URL_KEY = "contact_discord_url";
  * l'invitation canonique du site : un défaut qui pointerait ailleurs ferait
  * mentir la page contact de toute installation neuve. Aucun courriel par
  * défaut : le pied de page n'en montre qu'un que le staff a saisi, sur toute
- * base — le rattrapage qui vide l'ancien faux défaut (`lib/server/database.ts`)
+ * base — le rattrapage qui vide l'ancien faux défaut (`lib/server/database/catch-ups.ts`)
  * rend ainsi le même pied de page qu'une installation neuve. Le courriel de
  * l'association figure, lui, dans les mentions légales.
  */
@@ -36,7 +36,7 @@ export const DEFAULT_CONTACT: ContactInfo = {
 
 /**
  * Adresses de contact **fausses** qu'un défaut antérieur a pu écrire en base
- * (`bg_settings.contact_email`) : le rattrapage de `lib/server/database.ts` les
+ * (`bg_settings.contact_email`) : le rattrapage de `lib/server/database/catch-ups.ts` les
  * vide au démarrage. Encodées, pour la même raison que les autres coordonnées —
  * une adresse, même fausse, écrite dans le dépôt reste une adresse moissonnée.
  */

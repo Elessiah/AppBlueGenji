@@ -19,7 +19,7 @@
  * de ne pas s'en remettre à lui :
  *
  * 1. **Le schéma peut avoir dérivé.** Les migrations créent les tables en
- *    `CREATE TABLE IF NOT EXISTS` (`lib/server/database.ts`) : les clés
+ *    `CREATE TABLE IF NOT EXISTS` (`lib/server/database/schema/`) : les clés
  *    étrangères ne sont posées qu'à la **création**. Une base installée avant
  *    l'ajout d'une contrainte ne la gagnera jamais, et une cascade absente
  *    laisserait des lignes orphelines pointant sur un tournoi disparu.
@@ -80,7 +80,7 @@ async function purgeTournamentRows(
   // Les pénalités d'endurance portent un `tournament_id` : elles font partie de
   // la liste relisible de ce qui part, comme les classements au-dessus. Sous
   // `ignoreMissingTable` pour la même raison que les alertes arbitre : sa
-  // création est avalée par un `catch` dans `database.ts`, et une base à qui la
+  // création est avalée par un `catch` dans `database/schema/`, et une base à qui la
   // table manquerait rendrait sinon tous les tournois indéboulonnables.
   await ignoreMissingTable(
     connection.execute(`DELETE FROM bg_endurance_penalties WHERE tournament_id = ?`, [
@@ -103,7 +103,7 @@ async function purgeTournamentRows(
   // Même remarque pour les réservations d'alerte arbitre : elles pendent aux
   // manches, et la liste relisible de ce qui part vaut mieux qu'une cascade que
   // personne ne relit — d'autant que la création de la table est avalée par un
-  // `catch` dans `database.ts`, où une contrainte manquante passerait inaperçue.
+  // `catch` dans `database/schema/`, où une contrainte manquante passerait inaperçue.
   //
   // Sous `ignoreMissingTable`, comme les rappels et les pénalités : la
   // contrainte qui protège `bg_matches` vit sur cette table-là, donc une base

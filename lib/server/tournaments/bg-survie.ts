@@ -907,7 +907,7 @@ function rewrittenPlayoffMatchIds(reusable: PlayoffMatchRow[], plan: PlayoffRoun
  * Efface les rappels des rencontres réécrites.
  *
  * Sous `ignoreMissingTable` : la création de la table est avalée par un
- * `catch` dans `database.ts`, et une base à qui elle manque n'a aucun rappel
+ * `catch` dans `database/schema/standings.ts`, et une base à qui elle manque n'a aucun rappel
  * à effacer — ce n'est pas une raison de laisser l'arbre sur un tour périmé.
  */
 async function clearRewrittenReminders(conn: PoolConnection, rewritten: number[]): Promise<void> {

@@ -1,7 +1,23 @@
 # Le schéma MySQL
 
-> **`lib/server/database.ts` décrit le schéma tel qu'il est, pas l'histoire de la
+> **`lib/server/database/` décrit le schéma tel qu'il est, pas l'histoire de la
 > façon dont on y est arrivé.**
+
+## Où vit quoi
+
+| Fichier | Rôle |
+|---|---|
+| `lib/server/database.ts` | Pool MySQL (`getDatabase`, `withConnection`, `SqlParams`) et porte d'entrée : joue la passe une fois par processus, sous verrou (`MIGRATION_LOCK.md`). |
+| `lib/server/database/run-migrations.ts` | La passe, **dans l'ordre** : tables, migrations, rattrapages, filet. Cet ordre est celui des instructions émises (empreinte figée par `database-migrations-run.test.ts`). |
+| `lib/server/database/schema/*.ts` | Les `CREATE TABLE`, un fichier par domaine : `accounts`, `teams`, `tournaments`, `standings`, `phases`, `notifications`, `showcase`, `compliance` (journaux, visites, RGPD, signalements, modération). |
+| `lib/server/database/declared-tables.ts` | `createTable` retient chaque `CREATE TABLE` joué ; `declaredColumns` en lit les colonnes pour le filet. |
+| `lib/server/database/recent-schema-changes.ts` | `RECENT_SCHEMA_CHANGES`, la seconde moitié de la règle des deux endroits. |
+| `lib/server/database/data-migrations.ts` | Migrations de données ponctuelles et `DROP COLUMN`. |
+| `lib/server/database/catch-ups.ts` | Rattrapages permanents, rejoués à chaque démarrage. |
+| `lib/server/database/schema-check.ts` | `warnIfSchemaIsBehind`, le filet qui dit qu'une base est en retard. |
+
+Les tests qui relisent le schéma passent par `readDatabaseSource()`
+(`tests/helpers/read-source.ts`), qui lit ces fichiers dans l'ordre de la passe.
 
 ## Ce que ce fichier était
 
@@ -49,7 +65,7 @@ antérieure n'est **pas** rattrapée par ce fichier et doit être migrée à la 
 Un changement de schéma s'écrit **à deux endroits** :
 
 1. dans le `CREATE TABLE`, pour les bases neuves ;
-2. en `ALTER TABLE` tolérant dans la section « Migrations », pour celles qui
+2. en `ALTER TABLE` tolérant parmi les migrations (`lib/server/database/recent-schema-changes.ts`), pour celles qui
    tournent déjà.
 
 Une migration qu'on sait jouée partout peut ensuite être retirée de cette
@@ -61,7 +77,7 @@ Replier un `ALTER` dans son `CREATE TABLE` n'est sans danger que si **toute base
 vivante l'a déjà joué**. Les soixante-trois anciens remplissent cette condition.
 Les changements **récents** — ceux dont on ne peut pas affirmer que le serveur
 les a vus passer — restent donc écrits aux deux endroits, dans la liste
-`RECENT_SCHEMA_CHANGES` de `lib/server/database.ts`. Elle porte des
+`RECENT_SCHEMA_CHANGES` de `lib/server/database/recent-schema-changes.ts`. Elle porte des
 **instructions entières** et non des triplets table/colonne/type : un triplet ne
 sait dire qu'`ADD COLUMN`, si bien que la règle n'aurait couvert ni un `ENUM`
 élargi, ni un index posé, ni une clé primaire recomposée — la prochaine valeur de
@@ -256,7 +272,7 @@ sans elles.
 Un **retrait** de colonne n'a aucune contrepartie dans un `CREATE TABLE` : la
 colonne y est simplement absente, si bien qu'une table neuve ne la porte jamais
 et qu'une base existante la garde pour toujours. Les deux `ALTER … DROP COLUMN`
-restent donc dans la section « Migrations » quoi qu'il arrive, et ils disent la
+restent donc parmi les migrations (`lib/server/database/recent-schema-changes.ts`) quoi qu'il arrive, et ils disent la
 même chose — une adresse que plus personne ne lit :
 
 - `bg_recruitment_ads.contact_email`, qui a perdu son lecteur quand le contact
@@ -355,11 +371,11 @@ retenu par son plafond, rendre muet le signalement d'un autre.
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-### Database (`lib/server/database.ts`)
+### Database (`lib/server/database.ts` + `lib/server/database/`)
 Direct MySQL2 pool. Le schéma est joué automatiquement à la première requête. Tables : `bg_users`, `bg_teams`, `bg_team_members`, `bg_tournaments`, `bg_tournament_registrations`, `bg_matches`, `bg_user_sessions`, et une par moteur ou fonctionnalité (classements, phases, notifications envoyées, vitrine).
 
 **Le fichier décrit le schéma tel qu'il est, pas l'histoire de la façon dont on y est arrivé.** Soixante-trois `ALTER TABLE` s'y étaient empilés, chacun dans un `catch {}` vide pour retomber en silence sur une base qui l'avait déjà subi : on ne pouvait plus lire la définition d'une table sans parcourir mille lignes, l'ordre des colonnes racontait la chronologie des fonctionnalités plutôt que la structure de l'objet, et chaque démarrage rejouait des conversions d'ENUM et des backfills sans objet depuis des mois — certains en balayage de table complète. Ils sont désormais repliés dans les `CREATE TABLE`, groupés par domaine.
 
-**La contrepartie est à connaître avant de toucher au fichier** : sur une base qui existe déjà, `CREATE TABLE IF NOT EXISTS` ne fait **rien** — il ne rattrape ni une colonne ni un index. Le repli n'est sans danger que parce que la production porte déjà le schéma complet ; une base restée à une version antérieure doit être migrée à la main. **La règle pour la suite est donc inchangée** : un changement de schéma s'écrit à **deux** endroits — dans le `CREATE TABLE` (bases neuves) *et* en `ALTER TABLE` tolérant dans la section « Migrations » (bases qui tournent) —, cette seconde entrée pouvant être retirée une fois qu'on la sait jouée partout. Seuls trois **rattrapages permanents** subsistent, dont la cause peut se reproduire : l'invitation Discord périmée du pied de page, le faux courriel qu'un ancien défaut y avait écrit (`SUPERSEDED_CONTACT_EMAILS`, vidé) et le logo d'une entrée solo qui republierait un avatar masqué.
+**La contrepartie est à connaître avant de toucher au fichier** : sur une base qui existe déjà, `CREATE TABLE IF NOT EXISTS` ne fait **rien** — il ne rattrape ni une colonne ni un index. Le repli n'est sans danger que parce que la production porte déjà le schéma complet ; une base restée à une version antérieure doit être migrée à la main. **La règle pour la suite est donc inchangée** : un changement de schéma s'écrit à **deux** endroits — dans le `CREATE TABLE` (bases neuves) *et* en `ALTER TABLE` tolérant parmi les migrations (`lib/server/database/recent-schema-changes.ts`) (bases qui tournent) —, cette seconde entrée pouvant être retirée une fois qu'on la sait jouée partout. Seuls trois **rattrapages permanents** subsistent, dont la cause peut se reproduire : l'invitation Discord périmée du pied de page, le faux courriel qu'un ancien défaut y avait écrit (`SUPERSEDED_CONTACT_EMAILS`, vidé) et le logo d'une entrée solo qui republierait un avatar masqué.
 
 **`bg_users.email` n'existe plus.** La colonne n'avait plus aucun lecteur (le scope `email` a disparu de la demande faite à Google, un compte ne se revendique plus par son adresse) et gardait pourtant les adresses collectées avant la règle : garder une donnée que plus personne ne lit n'est pas de la prudence, c'est une fuite en attente. Le `DROP COLUMN` est l'un des trois chemins d'`ALTER` que le fichier porte encore, avec le retrait de `bg_recruitment_ads.contact_email` et la liste `RECENT_SCHEMA_CHANGES` (les changements trop récents pour qu'on sache la production passée dessus — des instructions entières, pour que la règle couvre aussi un `ENUM` élargi ou un index posé) ; il est **irréversible** et s'applique au prochain redémarrage — un retour en arrière de la version applicative après ce déploiement casserait les lectures de session. `AuthUser.email`, l'anonymisation, l'export RGPD et le jeu de test l'ont suivi. Voir `docs/DATABASE_SCHEMA.md`.

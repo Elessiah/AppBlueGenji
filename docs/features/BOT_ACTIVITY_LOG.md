@@ -119,7 +119,7 @@ par une règle pure et unique (`lib/shared/referee-alerts.ts`). Voir
 | Tri journal / canal arbitre (pur) | `lib/shared/referee-alerts.ts` |
 | Libellés format / jeu (pur, partagés avec l'en-tête) | `lib/shared/tournament-labels.ts` |
 | File par transaction et résolution | `lib/server/tournaments/bot-logs.ts` |
-| Déclenchement de l'inscription d'un joueur | `lib/server/users-service.ts` (`announcePlayerSignup`) |
+| Déclenchement de l'inscription d'un joueur | `lib/server/users/sign-in.ts` (`announcePlayerSignup`) |
 | Transport vers le bot | `lib/server/bot-integration.ts` (`sendBotLog`) |
 
 ## Pourquoi une file par transaction
@@ -190,7 +190,7 @@ nulle part ailleurs :
 - `finishTournament` (`./repository`) est le seul point de clôture d'un tournoi,
   quel que soit le format qui la décide (élimination, survie, ronde suisse,
   endurance, phases).
-- `createOrGetGoogleUser` et `createOrGetDiscordUser` (`lib/server/users-service.ts`)
+- `createOrGetGoogleUser` et `createOrGetDiscordUser` (`lib/server/users/sign-in.ts`)
   sont les deux seules naissances d'un compte, et l'annonce est posée sur leur
   `INSERT`. Hors d'une transaction — il n'y en a pas ici —, donc envoyée
   directement par `sendBotLog` et sans être attendue, comme le retrait d'un

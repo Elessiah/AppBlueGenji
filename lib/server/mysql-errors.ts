@@ -54,7 +54,7 @@ export function isDeadlockMessage(message: unknown): boolean {
 /**
  * `true` si la table n'existe pas.
  *
- * Six tables de `lib/server/database.ts` — et elles seules — sont créées dans
+ * Six tables de `lib/server/database/schema/` — et elles seules — sont créées dans
  * un `try` dont le `catch` est muet : `bg_match_reminders`,
  * `bg_referee_alerts`, `bg_endurance_penalties` et les trois tables des
  * notifications push (`bg_push_subscriptions`, `bg_push_topic_optouts`,
@@ -160,7 +160,7 @@ export function isUnknownColumnError(error: unknown): boolean {
  * `true` si la migration n'avait **rien à faire** — au regard de l'instruction
  * qu'elle jouait.
  *
- * C'est le cas nominal des migrations de `lib/server/database.ts`, rejouées à
+ * C'est le cas nominal des migrations de `lib/server/database/`, rejouées à
  * chaque démarrage, et le **seul** qu'un `catch` a le droit d'avaler. Tout autre
  * échec — droit `ALTER` manquant, verrou de métadonnées sur une table chaude —
  * laisse le schéma dans un état que le code ne suppose plus : la base démarre,

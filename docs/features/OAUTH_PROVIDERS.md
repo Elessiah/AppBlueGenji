@@ -285,7 +285,7 @@ rattachement aboutit quand même.
 | Cookie d'état | `lib/server/oauth-state.ts` |
 | Clients | `lib/server/{google,discord,blizzard}-oauth.ts` |
 | Service de rattachement | `lib/server/account-identities.ts` |
-| Création de compte | `lib/server/users-service.ts` (`createOrGet*User`) |
+| Création de compte | `lib/server/users/sign-in.ts` (`createOrGet*User`) |
 | Routes | `app/api/auth/<slug>/{start,callback}/route.ts` |
 | API du profil | `app/api/profile/connections/{route.ts,[provider]/route.ts}` |
 | Écrans | `app/connexion/_components/OAuthButtons.tsx`, `app/(secured)/profil/ConnectedAppsSection.tsx` |

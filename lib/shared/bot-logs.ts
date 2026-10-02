@@ -143,7 +143,7 @@ const SIGNUP_PROVIDER_LABELS: Record<PlayerSignupProvider, string> = OAUTH_PROVI
  * c'est ce qu'un community manager cherche le lendemain d'une annonce.
  *
  * Elle reste **une par compte**, pas une par connexion : la rédaction est
- * appelée depuis l'insertion elle-même (`lib/server/users-service.ts`), donc un
+ * appelée depuis l'insertion elle-même (`lib/server/users/sign-in.ts`), donc un
  * habitué qui se reconnecte chaque soir n'écrit rien, et un joueur qui rattache
  * un second fournisseur depuis `/profil` non plus — ce n'est pas un joueur de
  * plus.

@@ -163,7 +163,7 @@ Trois précautions dans le sélecteur et la modale :
 ## Jeu de test
 
 `npm run seed` pose une image sur cinq tournois (`image` dans
-`lib/server/seed-cases.ts`), les deux modes et les quatre états, dont un point
+`lib/server/seed/cases.ts`), les deux modes et les quatre états, dont un point
 focal décentré. Le seed **écrit un fichier par tournoi** (`seed-<id>.webp`) : un
 fichier partagé disparaîtrait de tous les tournois dès qu'on remplace l'image de
 l'un d'eux. Les fichiers `seed-*` d'une exécution précédente sont effacés au

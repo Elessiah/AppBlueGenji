@@ -303,7 +303,7 @@ format à moitié défini, quel que soit le mode.
 | Règle « quel format pour cette manche » | `lib/shared/bg-survie.ts` (`tournamentMatchFormat`) |
 | Lecture serveur du format d'une manche | `lib/server/tournaments/repository.ts` |
 | Rejeu d'endurance (branche du nul) | `lib/shared/bg-survie.ts` |
-| Barre de forme de l'annuaire (lettre `d`) | `lib/server/teams-service.ts` |
+| Barre de forme de l'annuaire (lettre `d`) | `lib/server/teams/directory.ts` |
 | « Jouée » / « nulle », partagés par les écrans | `lib/shared/match-outcome.ts` |
 | Verrou d'édition d'un score | `lib/shared/match-lock.ts` (`decided`) |
 | Cote de type Elo | `lib/shared/ranking.ts` (`ratingDrawTransfer`) |

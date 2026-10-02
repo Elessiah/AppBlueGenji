@@ -87,7 +87,7 @@ sauvegardes (`BACKUP_RETENTION_DAYS`), journal des suppressions
 (`SITE_VISIT_WINDOW_MINUTES`). Deux durées écrites en dur côté serveur ont été
 **déplacées ici** et y sont importées : `SESSION_RETENTION_DAYS` (cookie et
 ligne de session, `lib/server/auth.ts`) et `DISCORD_CODE_VALIDITY_MINUTES`
-(validité d'un code de connexion, `lib/server/users-service.ts`). Changer l'une
+(validité d'un code de connexion, `lib/server/users/discord-challenges.ts`). Changer l'une
 change le registre du même coup.
 
 ## Format de l'export
@@ -135,4 +135,4 @@ Ce que le registre dit honnêtement et qui mériterait une décision :
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Registre des traitements publié** (`lib/shared/processing-register.ts` pur → `/rgpd/registre` + `/rgpd/registre.csv`, bouton sur `/rgpd`) : le registre de l'article 30, tenu dans le code et récupérable par tous sans demande (CNIL, joueurs, staff) — une fiche par traitement aux rubriques du modèle CNIL, plus la base légale. **Un traitement ajouté au site (table qui garde une donnée personnelle, envoi vers un tiers) s'ajoute au registre dans la même PR**, et `REGISTER_UPDATED_AT` avance. Les durées citées sont les **constantes** du code : `SESSION_RETENTION_DAYS` et `DISCORD_CODE_VALIDITY_MINUTES` y vivent et sont importées par `auth.ts` / `users-service.ts`, si bien que le registre ne peut pas annoncer une durée que le serveur ne tient pas. Export CSV `;` + BOM UTF-8 (Excel), cellules protégées contre l'injection de formule. Voir `docs/features/PROCESSING_REGISTER.md`.
+- **Registre des traitements publié** (`lib/shared/processing-register.ts` pur → `/rgpd/registre` + `/rgpd/registre.csv`, bouton sur `/rgpd`) : le registre de l'article 30, tenu dans le code et récupérable par tous sans demande (CNIL, joueurs, staff) — une fiche par traitement aux rubriques du modèle CNIL, plus la base légale. **Un traitement ajouté au site (table qui garde une donnée personnelle, envoi vers un tiers) s'ajoute au registre dans la même PR**, et `REGISTER_UPDATED_AT` avance. Les durées citées sont les **constantes** du code : `SESSION_RETENTION_DAYS` et `DISCORD_CODE_VALIDITY_MINUTES` y vivent et sont importées par `auth.ts` / `users/discord-challenges.ts`, si bien que le registre ne peut pas annoncer une durée que le serveur ne tient pas. Export CSV `;` + BOM UTF-8 (Excel), cellules protégées contre l'injection de formule. Voir `docs/features/PROCESSING_REGISTER.md`.

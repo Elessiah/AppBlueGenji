@@ -61,7 +61,7 @@ export async function updateUserAvatar(
 /**
  * Retrait de l'avatar d'un joueur par la modération (permission `moderation`),
  * sans lien avec ce compte — même mécanique que
- * `removeTeamLogoAsModerator` (`lib/server/teams-service.ts`) : le geste qui
+ * `removeTeamLogoAsModerator` (`lib/server/teams/identity.ts`) : le geste qui
  * suit un signalement de droit d'auteur, ou une équipe (le logo d'une entrée
  * solo n'est que l'avatar de son joueur).
  *

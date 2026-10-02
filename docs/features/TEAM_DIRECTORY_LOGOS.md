@@ -13,7 +13,7 @@ d'importer son logo le voyait sur sa page et sur nulle part ailleurs.
 Rien n'était cassé : il manquait un rendu.
 
 Le champ voyageait de bout en bout — `listTeams` sélectionne `t.logo_url`
-(`lib/server/teams-service.ts`), `TeamListItem.logoUrl` le porte
+(`lib/server/teams/directory.ts`), `TeamListItem.logoUrl` le porte
 (`lib/shared/types.ts`), `GET /api/teams` le renvoie. Mais
 `app/(secured)/equipes/cards/TeamCard.tsx` affichait **toujours** l'initiale du
 nom dans son emblème, sans jamais lire `team.logoUrl`.

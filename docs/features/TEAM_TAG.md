@@ -47,8 +47,8 @@ MySQL n'oppose pas l'unicité à des `NULL`.
 | --- | --- |
 | `lib/shared/team-tag.ts` | **Module pur.** Bornes, normalisation, validation, messages français, affichage de repli. Partagé client / serveur. |
 | `lib/server/team-tags.ts` | Unicité côté serveur : `SELECT` préalable, traduction de la violation d'index. |
-| `lib/server/database.ts` | Colonne `bg_teams.tag` + index unique `uniq_bg_teams_tag`. |
-| `lib/server/teams-service.ts` | `createTeam`, `updateTeamMeta`, lecture (`listTeams`, `getTeamDetail`). |
+| `lib/server/database/schema/teams.ts` | Colonne `bg_teams.tag` + index unique `uniq_bg_teams_tag`. |
+| `lib/server/teams/` | `createTeam`, `updateTeamMeta` (`identity.ts`), lecture (`listTeams` dans `directory.ts`, `getTeamDetail` dans `detail.ts`). |
 | `lib/server/ghost-teams-service.ts` | `createGhostTeam` — même règle, même espace de noms. |
 | `app/api/teams/route.ts` · `app/api/teams/[id]/route.ts` | Codes HTTP. |
 
@@ -150,7 +150,7 @@ Le sigle entre aussi dans la recherche de `/equipes` : on cherche une équipe pa
 `npm run seed` attribue un sigle à chaque équipe — écrits à la main pour les
 équipes nommées (`DRGN`, `PHNX`, …), une équipe volontairement **sans** sigle
 pour couvrir l'affichage de repli, un sigle **numérique** (`ST01`) pour couvrir
-le jeu de caractères, et `bulkTeamTag(i)` (`lib/server/seed-cases.ts`) pour les
+le jeu de caractères, et `bulkTeamTag(i)` (`lib/server/seed/cases.ts`) pour les
 ~140 équipes de remplissage : « B » suivi du rang en base 36 sur trois
 caractères. Deux rangs distincts ne peuvent pas produire la même chaîne — sans
 quoi l'index unique ferait échouer le seed à la première collision.

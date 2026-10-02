@@ -190,7 +190,7 @@ secondes, un débordement), pas pour juger du calendrier de l'organisation.
 
 ## Jeu de test
 
-`npm run seed` produit trois tournois avec horaires (`lib/server/seed-cases.ts`,
+`npm run seed` produit trois tournois avec horaires (`lib/server/seed/cases.ts`,
 champ `matchSchedule` — décalage de la manche 1 et écart entre manches) :
 
 - **Live Horaire (heure passée)** — `START_TIME` dont l'heure est franchie : à
