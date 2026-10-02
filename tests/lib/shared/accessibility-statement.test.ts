@@ -76,12 +76,11 @@ describe("contenus non accessibles", () => {
     expect(statutes?.requestByContact).toBe(true);
   });
 
-  it("le contraste par défaut est déclaré, avec le réglage qui le contourne", () => {
-    // Choix d'apparence assumé (le contraste renforcé reste désactivé par
-    // défaut) : il doit donc figurer ici, et renvoyer au réglage par son nom.
-    const contrast = KNOWN_ISSUES.find((issue) => issue.criterion.includes("1.4.3"));
-    const setting = A11Y_SETTINGS.find((s) => s.key === "contrast");
-    expect(contrast?.workaround).toContain(`« ${setting?.label} »`);
+  it("le contraste par défaut, réglé, ne figure plus parmi les limites", () => {
+    // `--ink-dim` tient 4,5:1 sur tous les fonds depuis le 2026-10-02
+    // (tests/app/accessibility-styles.test.ts) : la limite 1.4.3 a été retirée.
+    expect(KNOWN_ISSUES.find((issue) => issue.criterion.includes("1.4.3"))).toBeUndefined();
+    expect(ACCESSIBILITY_STATEMENT_DATE >= "2026-10-02").toBe(true);
   });
 });
 

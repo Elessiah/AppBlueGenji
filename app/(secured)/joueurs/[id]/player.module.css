@@ -57,7 +57,7 @@
    l'état. Aucune teinte chaude : un compte supprimé n'est pas une alerte. */
 .deletedHeader {
   border-style: dashed;
-  border-color: var(--ink-dim);
+  border-color: var(--ink-faint);
   background: repeating-linear-gradient(
       -45deg,
       rgba(255, 255, 255, 0.018) 0 10px,
@@ -74,7 +74,7 @@
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  border: 1px dashed var(--ink-dim);
+  border: 1px dashed var(--ink-faint);
   background: rgba(255, 255, 255, 0.03);
   color: var(--ink-mute);
 }

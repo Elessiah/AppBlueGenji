@@ -24,7 +24,7 @@
 import { A11Y_SETTINGS } from "@/lib/shared/accessibility-settings";
 
 /** Date d'établissement (ou de dernière mise à jour) de la déclaration. */
-export const ACCESSIBILITY_STATEMENT_DATE = "2026-09-30";
+export const ACCESSIBILITY_STATEMENT_DATE = "2026-10-02";
 
 /** Référentiel suivi. */
 export const ACCESSIBILITY_STANDARD = "RGAA 4.1.2 (critères WCAG 2.1 niveau AA)";
@@ -96,18 +96,6 @@ export type KnownIssue = {
 
 /** Contenus connus pour ne pas être accessibles, et leur contournement. */
 export const KNOWN_ISSUES: readonly KnownIssue[] = [
-  {
-    title: "Contraste des textes secondaires",
-    criterion: "RGAA 3.2 · WCAG 1.4.3",
-    detail:
-      "Dans l'apparence par défaut, les textes les plus atténués (mentions, sur-titres, légendes) " +
-      "atteignent un rapport de contraste de 2,8:1 à 3,3:1 sur les fonds du site, sous les 4,5:1 attendus. " +
-      "C'est un choix d'apparence assumé.",
-    workaround:
-      "Le réglage « Contraste renforcé » du menu d'accessibilité (bouton au bord gauche de chaque page) " +
-      "porte les textes secondaires au-dessus de 4,5:1 ; vérifié sur les pages principales du site " +
-      "(vitrine, connexion, annuaires, fiches, profil, formulaires, fiches de tournoi).",
-  },
   {
     title: "Parcours au lecteur d'écran",
     criterion: "Ensemble du référentiel",

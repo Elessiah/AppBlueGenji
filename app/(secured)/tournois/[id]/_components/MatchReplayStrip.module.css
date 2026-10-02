@@ -26,7 +26,7 @@
 }
 
 .link:hover {
-  background: rgba(90, 200, 255, 0.12);
+  background: rgba(var(--blue-500-rgb), 0.12);
   color: #ffffff;
 }
 

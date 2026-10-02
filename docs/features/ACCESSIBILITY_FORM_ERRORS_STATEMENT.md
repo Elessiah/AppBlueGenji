@@ -153,17 +153,34 @@ montré une valeur valide. Ils lisent désormais `??`.
 
 ## 2. Contraste par défaut de `--ink-dim` (WCAG 1.4.3 · RGAA 3.2)
 
-**Décision : le rendu par défaut ne change pas** (règle du menu d'accessibilité :
-tout changement d'apparence est désactivé par défaut). La non-conformité est
-**déclarée** (section 3), et le réglage « Contraste renforcé » est le
-contournement.
+**Réglé dans l'apparence par défaut (2026-10-02).** `--ink-dim` passe de
+`#55636f` (2,8:1 à 3,3:1 selon le fond) à `#7a8894` : 4,79:1 sur
+`--cyber-bg-3`, le fond le plus clair, et davantage ailleurs. La hiérarchie
+`--ink` > `--ink-mute` > `--ink-dim` reste lisible (7,8:1 / 5,6:1 sur
+`--cyber-bg`). L'ancienne teinte survit sous `--ink-faint`, réservée à ce qui
+n'est **pas** un texte à lire : séparateurs (`/`, `·`), pastilles de forme et
+de présence, traits en tirets. La limite a donc quitté la déclaration
+(`KNOWN_ISSUES`). Une date de jalon de tournoi qui s'atténuait par `opacity`
+(4,0:1) lit désormais `--ink-dim`.
 
-Ce qui a été vérifié : un audit du rendu réel, réglage coché, sur vingt pages
-(vitrine, connexion, règles, bot et sa doc, RGPD, recrutement, bénévoles,
-mentions légales, annuaires, fiches d'équipe et de joueur, profil, création
-d'équipe et de tournoi, fiches de tournoi de plusieurs formats) — couleur
-effective du texte, opacités des ancêtres comprises, contre le fond effectif. **Aucun
-texte sous 4,5:1** (hors texte en dégradé découpé, que l'outil ne sait pas lire).
+Le réglage « Contraste renforcé » reste au-dessus des valeurs par défaut
+(`--ink-dim` et `--ink-faint` à `#95a3b1`) — `tests/app/accessibility-styles.test.ts`.
+
+Ce qui a été vérifié : un audit du rendu réel, apparence par défaut, sur les
+pages principales (vitrine, connexion, règles, bot et sa doc, RGPD, recrutement,
+bénévoles, partenaires, association, mentions légales, accessibilité,
+annuaires, fiche d'équipe, profil, signalements, création d'équipe et de
+tournoi, fiche de tournoi) — couleur effective du texte, opacités des ancêtres
+comprises, contre le fond effectif. **Aucun texte sous 4,5:1** hors les
+séparateurs décoratifs `--ink-faint` (et le texte en dégradé découpé, que
+l'outil ne sait pas lire).
+
+Les pastilles colorées (rôles, jeux, rubans, `.error`/`.success`) posent un
+texte vif sur un **voile translucide** de la même teinte : SonarQube (règle
+`css:S7924`) compose ce voile sur du blanc et y voit un échec, alors que sur les
+fonds sombres du site le rapport va de 5,1:1 à 13,7:1. Ces voiles passent par
+les composantes des jetons (`rgba(var(--orange-rgb), 0.05)`, `--amber-rgb`,
+`--red-live-rgb`, `--bot-*-rgb` dans `app/bot/bot.css`) — rendu identique.
 
 Le réglage ne tient que par les **jetons** : un texte qui écrirait sa couleur en
 dur lui échapperait. `tests/app/contrast-mode-coverage.test.ts` refuse donc
@@ -201,4 +218,4 @@ tâche 10.
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
 - **Erreurs rattachées aux champs** (`lib/shared/field-errors.ts` pur + `lib/shared/hooks/useFieldErrors.ts` + `components/ui/field-error-text.tsx`) : la notification reste la règle, mais un refus qui désigne un champ y est **aussi** posé — `aria-invalid`, `aria-describedby` (phrase du refus d'abord, puis l'aide existante, par `fieldAria`), focus ramené sur le champ, liseré rouge, levée à la frappe dans **ce** champ. La phrase n'est pas réécrite sous le champ : elle vit dans un texte `.sr-only` (`FieldErrorText`), jamais visible. **Pour un formulaire neuf** : une table « code → champ » dans `field-errors.ts`, `useFieldErrors(table, ids)`, `{...fieldErrors.aria("champ", "id-de-l-aide")}` sur le contrôle (pas d'`aria-describedby` écrit à côté : il remplacerait la décomposition ou serait remplacé par elle), `<FieldErrorText>` à côté, et un `report(code, message)` dans le `catch` — une page qui traduit le refus avant de le lever lève une `CodedError`, sans quoi le code est perdu. Un code inconnu ne marque rien, un refus sans champ efface le signalement précédent. Le focus ramené est **marqué** (`focusFlaggedField` / `isFieldErrorFocus`) : un contrôle qui s'ouvre au focus — la liste de `PlayerPseudoCombobox` — ne s'ouvre pas sur celui-là. Les phases d'un multi-phases valident en direct : `findPhaseIssue` situe le défaut (phase et réglage), `validatePhases` n'en rend que le code. Voir `docs/features/ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`.
-- **Déclaration d'accessibilité** (`lib/shared/accessibility-statement.ts` pur → `/accessibilite`, mention « Accessibilité : non conforme » au pied de page public et lien dans le menu d'accessibilité) : publiée volontairement, au modèle RGAA 4.1. Le statut **se déduit** du taux d'un audit (`conformityStatusFor`) et reste « non conforme » tant qu'aucun audit complet n'a été mené. **Une PR qui règle une limite de `KNOWN_ISSUES` la retire et avance `ACCESSIBILITY_STATEMENT_DATE`.** Le contraste par défaut de `--ink-dim` y est déclaré plutôt que corrigé (le rendu par défaut ne change pas) : « Contraste renforcé » porte tous les textes au-dessus de 4,5:1, et `tests/app/contrast-mode-coverage.test.ts` refuse toute couleur de texte littérale pâle, que le réglage ne pourrait pas atteindre — une couleur de texte passe par un jeton.
+- **Déclaration d'accessibilité** (`lib/shared/accessibility-statement.ts` pur → `/accessibilite`, mention « Accessibilité : non conforme » au pied de page public et lien dans le menu d'accessibilité) : publiée volontairement, au modèle RGAA 4.1. Le statut **se déduit** du taux d'un audit (`conformityStatusFor`) et reste « non conforme » tant qu'aucun audit complet n'a été mené. **Une PR qui règle une limite de `KNOWN_ISSUES` la retire et avance `ACCESSIBILITY_STATEMENT_DATE`.** Le contraste par défaut de `--ink-dim`, longtemps déclaré, est réglé depuis le 2026-10-02 (`#7a8894`, ≥ 4,5:1 sur tous les fonds ; `--ink-faint` pour les ornements) ; « Contraste renforcé » reste au-dessus, et `tests/app/contrast-mode-coverage.test.ts` refuse toute couleur de texte littérale pâle, que le réglage ne pourrait pas atteindre — une couleur de texte passe par un jeton.
