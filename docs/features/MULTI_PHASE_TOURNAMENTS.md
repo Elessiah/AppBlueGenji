@@ -139,7 +139,9 @@ reste l'ordre de seeding tant que les rangs ne sont pas écrits.
 Hors podium, `rankEliminationPhase` range le tableau par `orderEliminationRest`
 (`lib/server/tournaments/finalization.ts`) : victoires décroissantes, défaites
 croissantes, **stade** le plus avancé (tableau `UPPER` < `LOWER` < `GRAND`, puis
-tour de la dernière rencontre décidée), seed, identifiant. Ce départage
+tour de la dernière rencontre décidée), seed — celui de la phase
+(`bg_tournament_phase_teams.seed`) s'il existe, sinon celui de l'inscription,
+`NULL` quand le plateau a été semé sur le classement du site —, identifiant. Ce départage
 remplace l'heure de la dernière rencontre (`updated_at`), qui rangeait deux
 équipes sorties au même tour selon la seconde de saisie de leurs scores — et
 donnait deux classements différents, à matchs identiques, d'une exécution du
