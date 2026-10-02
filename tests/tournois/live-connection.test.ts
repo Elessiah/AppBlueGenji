@@ -201,12 +201,12 @@ describe("sondage de secours", () => {
 
     doc.visibilityState = "hidden";
     jest.advanceTimersByTime(30_000);
-    expect(load.mock.calls.length).toBe(polls);
+    expect(load.mock.calls).toHaveLength(polls);
 
     doc.visibilityState = "visible";
     latest().onopen!();
     jest.advanceTimersByTime(120_000);
-    expect(load.mock.calls.length).toBe(polls);
+    expect(load.mock.calls).toHaveLength(polls);
     await settle();
   });
 });
