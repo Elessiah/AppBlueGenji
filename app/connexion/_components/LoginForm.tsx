@@ -226,7 +226,12 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
       <div className="fabric" />
       <CyberCard
         ticks
-        style={{ padding: "clamp(24px, 6vw, 48px)", width: "min(480px, calc(100vw - 32px))" }}
+        style={{
+          padding: "clamp(24px, 6vw, 48px)",
+          width: "min(480px, calc(100vw - 32px))",
+          borderColor: "rgba(var(--blue-500-rgb), 0.3)",
+          boxShadow: "0 30px 80px -40px rgba(var(--violet-400-rgb), 0.6), 0 0 40px -24px var(--blue-glow)",
+        }}
       >
         {/*
           La page n'a pas d'en-tête : ce lien est la seule sortie vers le site.
@@ -247,9 +252,9 @@ export function LoginForm({ suspensionNotice = null }: Readonly<{ suspensionNoti
         </Link>
         <div style={{ textAlign: "center", marginBottom: 32 }}>
           <h1 className="display" style={{ fontSize: 36, marginTop: 20, marginBottom: 8 }}>
-            Connexion
+            <span className="text-gradient">Connexion</span>
           </h1>
-          <p className="mono" style={{ color: "var(--ink-mute)", letterSpacing: "0.18em", fontSize: 11, margin: 0 }}>
+          <p className="mono" style={{ color: "var(--blue-300)", letterSpacing: "0.18em", fontSize: 11, margin: 0 }}>
             BLUEGENJI · ACCÈS MEMBRE
           </p>
         </div>

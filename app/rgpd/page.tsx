@@ -132,7 +132,7 @@ export default async function RgpdPage() {
         <div className="fabric" />
         <span className="eyebrow">PROTECTION DES DONNÉES · RGPD</span>
         <h1 className="display" style={{ marginTop: 16, maxWidth: 600 }}>
-          Politique de<br />confidentialité
+          Politique de<br /><span className="text-gradient">confidentialité</span>
         </h1>
         <p style={{ marginTop: 20, fontSize: 15, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 560 }}>
           BlueGenji ne collecte que les données nécessaires au fonctionnement de la

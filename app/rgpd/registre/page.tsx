@@ -80,7 +80,7 @@ export default function RegistrePage() {
         <div className="fabric" />
         <span className="eyebrow">RGPD · ARTICLE 30</span>
         <h1 className="display" style={{ marginTop: 16, maxWidth: 640 }}>
-          Registre des<br />traitements
+          Registre des<br /><span className="text-gradient">traitements</span>
         </h1>
         <p style={{ marginTop: 20, fontSize: 15, color: "var(--ink-mute)", lineHeight: 1.7, maxWidth: 580 }}>
           {REGISTER_SCOPE}, rubrique par rubrique selon le modèle de la CNIL. Il est public :

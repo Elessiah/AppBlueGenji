@@ -65,7 +65,7 @@
   position: sticky;
   /* Sous l'en-tête collant, à sa hauteur mesurée (`lib/shared/sticky-header.ts`). */
   top: calc(var(--sticky-header-h, 96px) + 16px);
-  border-left: 1px solid var(--line-soft);
+  border-left: 2px solid rgba(var(--violet-400-rgb), 0.45);
   padding-left: 18px;
 }
 
@@ -79,7 +79,7 @@
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.2em;
-  color: var(--ink-mute);
+  color: var(--violet-300);
   margin: 0 0 12px;
 }
 
@@ -100,7 +100,7 @@
 }
 
 .toc a:hover {
-  color: var(--ink);
+  color: var(--blue-300);
 }
 
 .toc a:focus-visible,

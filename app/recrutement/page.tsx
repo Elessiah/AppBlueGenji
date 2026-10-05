@@ -36,7 +36,7 @@ export default async function RecrutementPage() {
         <span className="eyebrow">ASSOCIATION · BÉNÉVOLAT</span>
         <h1 className={`display ${styles.heroTitle}`}>
           L'asso recrute<br />
-          son staff.
+          <span className="text-gradient">son staff.</span>
         </h1>
         <p className={styles.heroSub}>
           Arbitres, casters, développeurs, community managers, graphistes, modérateurs…

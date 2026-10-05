@@ -27,7 +27,7 @@ export default async function BenevolesPage() {
         <span className="eyebrow">L'ÉQUIPE · BÉNÉVOLES</span>
         <h1 className={`display ${styles.heroTitle}`}>
           Celles et ceux qui font<br />
-          vivre BlueGenji.
+          <span className="text-gradient">vivre BlueGenji.</span>
         </h1>
         <p className={styles.heroSub}>
           Organisateurs, développeurs, casters, arbitres… chaque tournoi existe grâce à eux.

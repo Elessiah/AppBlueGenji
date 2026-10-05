@@ -10,7 +10,9 @@ import {
   upcomingRuleModes,
   type TournamentRuleMode,
 } from "@/lib/shared/tournament-rules";
+import { RULE_MODE_TONE, RULE_STATUS_PILL } from "@/lib/shared/rules-display";
 import styles from "./page.module.css";
+import tones from "./tones.module.css";
 
 /**
  * La description ne citait que quatre modes sur les six que le registre expose
@@ -31,11 +33,11 @@ export const metadata: Metadata = pageMetadata({
 function ModeCard({ mode }: Readonly<{ mode: TournamentRuleMode }>) {
   const soon = mode.status === "SOON";
   return (
-    <CyberCard lift ticks style={{ height: "100%" }}>
+    <CyberCard lift ticks className={`${styles.modeCard} ${tones.tone}`} tone={RULE_MODE_TONE[mode.diagram]} style={{ height: "100%" }}>
       <Link href={`/regles/${mode.slug}`} className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>{mode.label}</h3>
-          <Pill variant={soon ? "neutral" : "blue"}>{soon ? "Bientôt" : "Disponible"}</Pill>
+          <Pill variant={RULE_STATUS_PILL[mode.status]}>{soon ? "Bientôt" : "Disponible"}</Pill>
         </div>
         <p className={styles.cardTagline}>{mode.tagline}</p>
         <dl className={styles.facts}>
@@ -66,7 +68,7 @@ export default function ReglesPage() {
         <h1 className={`display ${styles.heroTitle}`}>
           Comment se joue
           <br />
-          un tournoi BlueGenji.
+          <span className="text-gradient">un tournoi BlueGenji.</span>
         </h1>
         <p className={styles.heroLead}>
           Chaque tournoi annonce son mode dès la page d&apos;inscription. Le mode détermine le

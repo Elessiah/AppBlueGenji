@@ -42,7 +42,7 @@ export function BotLegalDoc({ doc }: Readonly<{ doc: BilingualDoc }>) {
           {titleLine2 ? (
             <>
               <br />
-              {titleLine2}
+              <span className="text-gradient">{titleLine2}</span>
             </>
           ) : null}
         </h1>

@@ -33,7 +33,7 @@
 .tagline {
   max-width: 62ch;
   margin: 0 0 24px;
-  color: var(--ink-mute);
+  color: var(--text-1);
   font-size: 16px;
   line-height: 1.6;
 }
@@ -44,10 +44,11 @@
   gap: 1px;
   margin: 0;
   padding: 0;
-  background: var(--line-soft);
-  border: 1px solid var(--line-soft);
+  background: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.22);
+  border: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.32);
   border-radius: var(--r-cy-md);
   overflow: hidden;
+  box-shadow: 0 16px 44px -30px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.8);
 }
 
 .fact {
@@ -55,7 +56,9 @@
   flex-direction: column;
   gap: 5px;
   padding: 14px 16px;
-  background: var(--cyber-bg-1);
+  background:
+    linear-gradient(180deg, rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.07), transparent),
+    var(--cyber-bg-1);
 }
 
 .factLabel {
@@ -63,7 +66,7 @@
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--tone-ink, var(--ink-dim));
 }
 
 .factValue {
@@ -247,11 +250,13 @@
   width: 26px;
   height: 26px;
   margin-top: 1px;
-  border: 1px solid var(--blue-500);
+  border: 1px solid rgb(var(--tone-rgb, var(--blue-500-rgb)));
   border-radius: 50%;
+  background: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.12);
+  box-shadow: 0 0 14px -4px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.7);
   font-family: var(--font-mono);
   font-size: 12px;
-  color: var(--blue-300);
+  color: var(--tone-ink, var(--blue-300));
 }
 
 /* Règles du mode : des blocs de texte séparés par un filet, pas une pile de
@@ -264,11 +269,26 @@
   border-top: 1px solid var(--line-soft);
 }
 
+/* Titre d'une règle : un trait de la teinte du mode devant, le texte reste
+   en `--ink` (le poids visuel va au titre, pas à la couleur). */
 .ruleTitle {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin: 0 0 10px;
   font-size: 17px;
   font-weight: 600;
   color: var(--ink);
+}
+
+.ruleTitle::before {
+  content: "";
+  flex-shrink: 0;
+  align-self: center;
+  width: 14px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgb(var(--tone-rgb, var(--blue-500-rgb)));
 }
 
 .ruleBody {
@@ -297,7 +317,7 @@
 }
 
 .bullets li::marker {
-  color: var(--blue-500);
+  color: var(--tone-ink, var(--blue-500));
 }
 
 /* Règles communes : repliées, un titre par ligne. */
@@ -334,7 +354,7 @@
   flex-shrink: 0;
   font-family: var(--font-mono);
   font-size: 16px;
-  color: var(--blue-300);
+  color: var(--tone-ink, var(--blue-300));
 }
 
 .commonRule[open] > .commonSummary::after {
@@ -365,17 +385,19 @@
   align-items: center;
   gap: 8px;
   padding: 9px 16px;
-  border: 1px solid var(--line-strong-cy);
+  border: 1px solid rgba(var(--tone-rgb), 0.4);
   border-radius: 999px;
-  color: var(--ink-mute);
+  background: rgba(var(--tone-rgb), 0.08);
+  color: var(--tone-ink);
   font-size: 13.5px;
   text-decoration: none;
-  transition: border-color 0.2s ease, color 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .otherMode:hover {
-  border-color: var(--blue-500);
+  border-color: rgb(var(--tone-rgb));
   color: var(--ink);
+  box-shadow: 0 0 18px -6px rgba(var(--tone-rgb), 0.8);
 }
 
 .back:focus-visible,
@@ -390,7 +412,8 @@
   }
 }
 
+/* « bientôt » : même violet que la pastille `RULE_STATUS_PILL.SOON` de /regles. */
 .soonTag {
-  color: var(--amber);
+  color: var(--violet-300);
   font-size: 11px;
 }

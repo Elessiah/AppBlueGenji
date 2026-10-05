@@ -21,6 +21,10 @@
 
 Les cibles s'arrêtent sous l'en-tête collant (`html { scroll-padding-top }` calé sur la hauteur mesurée de l'en-tête, voir `docs/features/ERROR_PAGES_AND_ANCHORS.md`) ; le sommaire collant se pose à cette même hauteur (`--sticky-header-h`).
 
+## Teintes
+
+Chaque mode a **une** teinte froide (`RULE_MODE_TONE`, `lib/shared/rules-display.ts`, indexée par `diagram` ; cinq néons pour six modes : le multi-phases partage le violet de la double élimination, jamais voisins dans l'ordre du registre), posée en `data-tone` sur sa carte de `/regles` (via `CyberCard tone`), sur l'en-tête et le corps de sa page, et sur sa pastille dans « Autres modes » : on reconnaît un mode d'un écran à l'autre. La feuille commune `app/regles/tones.module.css` (classe `.tone`, posée avec `data-tone`) le traduit en `--tone-ink` (texte, AA sur le voile le plus teinté) et `--tone-rgb` (voiles, liserés, halos seulement). Le texte courant des règles reste en `--ink` / `--ink-mute` sur fond uni : aucun effet derrière un paragraphe. « Disponible » / « Bientôt » : `RULE_STATUS_PILL` (vert d'eau / violet). Les schémas (`components/rules/RuleDiagram.tsx`) n'emploient ni ambre ni rouge : bracket bas et rangée « 0 victoire » en violet, zone de coupe en rose — leurs légendes dans le registre le disent. Vérifié par `tests/app/public-bright-ui.test.ts`.
+
 ## Notes reprises de CLAUDE.md
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).

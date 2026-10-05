@@ -4,6 +4,7 @@ import { contrastRatio } from "@/lib/shared/color-contrast";
 import { REPORT_STATUSES, REPORT_STATUS_PILL } from "@/lib/shared/content-reports";
 import { PROFILE_SECTIONS, type ProfileSection } from "@/app/(secured)/profil/_lib/profile-sections";
 import { globals, ROOT, stripComments } from "./_lib/style-sweep";
+import { blend, COLD_TONE_TOKENS as TONE_TOKENS, tokenHex as hex, tokenTriplet as triplet } from "./_lib/tone-contrast";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -12,33 +13,10 @@ import { readSource } from "../helpers/read-source";
  * orange — et chaque texte coloré lisible (4,5:1) sur son fond teinté.
  */
 
-const root = stripComments(globals).match(/(?:^|\})\s*:root\s*\{([^}]*)\}/)![1];
-const hex = (name: string) => root.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`))![1];
-const triplet = (name: string) =>
-  root
-    .match(new RegExp(`${name}:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+);`))!
-    .slice(1, 4)
-    .map(Number);
-
-function blend(baseHex: string, tint: number[], alpha: number): string {
-  const base = [1, 3, 5].map((i) => Number.parseInt(baseHex.slice(i, i + 2), 16));
-  const mixed = base.map((c, i) => Math.round(c * (1 - alpha) + tint[i] * alpha));
-  return `#${mixed.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
-}
-
 const SURFACE = hex("--cyber-bg-3");
 const SECTIONS: readonly ProfileSection[] = PROFILE_SECTIONS;
 const PROFILE_CSS = stripComments(readSource(join(ROOT, "app", "(secured)", "profil", "profil.module.css")));
 const COLD_TONES = ["blue", "violet", "cyan", "teal", "pink"];
-
-/** Teinte de texte (`--tone-ink`) et de fond (`--tone-rgb`) de chaque `data-tone` de profil.module.css. */
-const TONE_TOKENS: Record<string, { ink: string; rgb: string }> = {
-  blue: { ink: "--blue-300", rgb: "--blue-500-rgb" },
-  violet: { ink: "--violet-300", rgb: "--violet-400-rgb" },
-  cyan: { ink: "--cyan-400", rgb: "--cyan-400-rgb" },
-  teal: { ink: "--teal-400", rgb: "--teal-400-rgb" },
-  pink: { ink: "--pink-400", rgb: "--pink-400-rgb" },
-};
 
 describe("teintes des sections de /profil", () => {
   it("donne à chaque section une teinte froide, le rouge à la seule zone de danger", () => {
