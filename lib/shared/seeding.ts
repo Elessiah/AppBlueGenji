@@ -93,13 +93,16 @@ export type SeedingEntry = {
   seed: number;
 };
 
-export type SeedingLockReason = "FINISHED" | "SCORES_ENTERED" | null;
+export type SeedingLockReason = "FINISHED" | "SCORES_ENTERED" | "STARTED" | null;
 
 /**
  * Pourquoi le seeding est-il figé ? `null` = encore modifiable.
  *
  * - `FINISHED` : tournoi terminé, l'ordre n'a plus aucun effet.
  * - `SCORES_ENTERED` : au moins un match porte une saisie.
+ * - `STARTED` : tournoi lancé (`RUNNING`). Dès le coup d'envoi, les matchs de
+ *   la première manche sont `READY` et les joueurs les voient : réordonner
+ *   régénérerait sous leurs yeux un plateau déjà annoncé, même sans score.
  */
 export function seedingLockReason(
   state: TournamentState,
@@ -107,6 +110,7 @@ export function seedingLockReason(
 ): SeedingLockReason {
   if (state === "FINISHED") return "FINISHED";
   if (matches.some(hasScoreInput)) return "SCORES_ENTERED";
+  if (state === "RUNNING") return "STARTED";
   return null;
 }
 

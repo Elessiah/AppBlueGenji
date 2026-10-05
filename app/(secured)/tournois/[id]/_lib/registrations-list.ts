@@ -47,7 +47,8 @@ export function mustExpandToShow(
 
 /**
  * Phrase du retrait à afficher, ou `null`. Sur un tournoi terminé, « l'ordre
- * n'a plus d'effet » et « la liste est un palmarès » disent le même fait : le
+ * n'a plus d'effet » et « la liste est un palmarès » disent le même fait ; sur
+ * un tournoi lancé, « l'ordre est figé » et « le tirage est fait » aussi : le
  * verrou de l'ordre garde alors seul la parole.
  */
 export function removalNotice(
@@ -56,18 +57,18 @@ export function removalNotice(
 ): EntrantRemovalBlockReason | null {
   if (removalBlock === null) return null;
   if (lockReason === "FINISHED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_FINISHED") return null;
+  if (lockReason === "STARTED" && removalBlock === "ENTRANT_REMOVAL_TOURNAMENT_STARTED") return null;
   return removalBlock;
 }
 
 /**
- * Colonne d'actions de la liste : gabarit de grille (poignée de glissement
- * seulement avec le réordonnancement, cellule d'actions dès qu'une commande
- * est là) et intitulé qui nomme ce qu'elle contient réellement.
+ * Colonne d'actions de la liste : gabarit de grille (cellule d'actions dès
+ * qu'une commande est là) et intitulé qui nomme ce qu'elle contient réellement.
  */
 export function registrationActionsColumn(
   reorderable: boolean,
   removable: boolean,
-): { grid: "reorderable" | "withActions" | null; label: "Actions" | "Ordre" | "Retrait" } {
-  if (reorderable) return { grid: "reorderable", label: removable ? "Actions" : "Ordre" };
+): { grid: "withActions" | null; label: "Actions" | "Ordre" | "Retrait" } {
+  if (reorderable) return { grid: "withActions", label: removable ? "Actions" : "Ordre" };
   return { grid: removable ? "withActions" : null, label: "Retrait" };
 }

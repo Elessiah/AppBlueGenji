@@ -165,7 +165,7 @@ const REORDER_DEADLOCK_ATTEMPTS = 3;
 /**
  * Applique un nouvel ordre de seeding.
  *
- * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | INVALID_SEED_ORDER
+ * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | SEEDING_LOCKED_STARTED | INVALID_SEED_ORDER
  */
 export async function reorderSeeding(tournamentId: number, orderedTeamIds: number[]): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
@@ -206,9 +206,9 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
     const entries = await loadEntries(connection, tournamentId);
     const matchRows = await getMatchRows(connection, tournamentId);
 
-    if (seedingLockReason(tournament.state, toScoreStates(matchRows)) !== null) {
-      throw new Error("SEEDING_LOCKED");
-    }
+    const lockReason = seedingLockReason(tournament.state, toScoreStates(matchRows));
+    if (lockReason === "STARTED") throw new Error("SEEDING_LOCKED_STARTED");
+    if (lockReason !== null) throw new Error("SEEDING_LOCKED");
 
     if (!isValidSeedOrder(entries.map((entry) => entry.teamId), orderedTeamIds)) {
       throw new Error("INVALID_SEED_ORDER");

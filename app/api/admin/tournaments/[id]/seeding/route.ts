@@ -54,7 +54,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   } catch (error) {
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
-    if (message === "SEEDING_LOCKED") return fail(message, 409);
+    if (message === "SEEDING_LOCKED" || message === "SEEDING_LOCKED_STARTED") return fail(message, 409);
     if (message === "INVALID_SEED_ORDER") return fail(message, 400);
     return fail(message || "SEEDING_REORDER_FAILED", 500);
   }
