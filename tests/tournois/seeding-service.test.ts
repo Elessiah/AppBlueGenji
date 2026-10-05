@@ -109,6 +109,14 @@ describe("loadSeedingBoard", () => {
     expect((await loadSeedingBoard(5))?.lockReason).toBe("SCORES_ENTERED");
   });
 
+  it("signale le verrouillage d'un tournoi lancé, même vierge de scores", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "RUNNING" }));
+    connection.execute.mockResolvedValue(registrationRows());
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow()]);
+
+    expect((await loadSeedingBoard(5))?.lockReason).toBe("STARTED");
+  });
+
   it("renvoie null pour un tournoi inconnu", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(null);
     expect(await loadSeedingBoard(5)).toBeNull();
@@ -151,7 +159,7 @@ describe("reorderSeeding", () => {
     // Réordonner un tournoi démarré rejoue son orchestration, qui peut le clore
     // et donc réserver une ligne. Sans flush/discard, l'entrée resterait
     // accrochée à une connexion que le pool réattribue.
-    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "RUNNING" }));
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "REGISTRATION" }));
     jest.mocked(getMatchRows).mockResolvedValue([matchRow()]);
 
     await reorderSeeding(5, [2, 1]);
@@ -171,9 +179,9 @@ describe("reorderSeeding", () => {
     expect(discardBotLogs).toHaveBeenCalledWith(connection as never);
   });
 
-  it("détruit le plateau existant pour qu'il soit régénéré", async () => {
+  it("détruit un plateau vierge resté avant le coup d'envoi pour qu'il soit régénéré", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(
-      tournament({ state: "RUNNING" }),
+      tournament({ state: "REGISTRATION" }),
     );
     jest.mocked(getMatchRows).mockResolvedValue([matchRow()]);
 
@@ -193,7 +201,7 @@ describe("reorderSeeding", () => {
     ["MULTI", () => initializeMultiTournament],
   ])("réamorce le moteur d'un tournoi %s déjà lancé", async (format, initializer) => {
     jest.mocked(loadTournamentRow).mockResolvedValue(
-      tournament({ state: "RUNNING", format }),
+      tournament({ state: "REGISTRATION", format }),
     );
     jest.mocked(getMatchRows).mockResolvedValue([matchRow()]);
 
@@ -207,7 +215,7 @@ describe("reorderSeeding", () => {
 
   it("purge l'état des phases avant de réamorcer un MULTI", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(
-      tournament({ state: "RUNNING", format: "MULTI" }),
+      tournament({ state: "REGISTRATION", format: "MULTI" }),
     );
     jest.mocked(getMatchRows).mockResolvedValue([matchRow()]);
 
@@ -237,7 +245,7 @@ describe("reorderSeeding", () => {
     });
     jest.mocked(loadTournamentRow).mockImplementation(async () => {
       order.push("tournament");
-      return tournament({ state: "RUNNING" });
+      return tournament({ state: "REGISTRATION" });
     });
     jest.mocked(getMatchRows).mockImplementation(async () => {
       order.push("matches");
@@ -314,11 +322,32 @@ describe("reorderSeeding", () => {
     expect(connection.rollback).toHaveBeenCalled();
   });
 
+  it("refuse un tournoi lancé, même sans aucun score (SEEDING_LOCKED_STARTED)", async () => {
+    // Coup d'envoi donné : la première manche est `READY`, les joueurs la
+    // voient. Un réordonnancement la régénérerait sous leurs yeux.
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "RUNNING" }));
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow()]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED_STARTED$/);
+    expect(deleteAllMatches).not.toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+    expect(
+      connection.execute.mock.calls.some(([sql]) => String(sql).includes("SET seed = ?")),
+    ).toBe(false);
+  });
+
+  it("refuse un tournoi lancé dont le plateau n'est pas encore généré", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "RUNNING" }));
+    jest.mocked(getMatchRows).mockResolvedValue([]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED_STARTED$/);
+  });
+
   it("refuse dès qu'un score est saisi", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "RUNNING" }));
     jest.mocked(getMatchRows).mockResolvedValue([matchRow({ team1_score: 0 })]);
 
-    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow("SEEDING_LOCKED");
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED$/);
     expect(connection.rollback).toHaveBeenCalled();
     expect(connection.commit).not.toHaveBeenCalled();
   });

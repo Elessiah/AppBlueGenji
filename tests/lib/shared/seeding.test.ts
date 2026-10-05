@@ -41,8 +41,14 @@ describe("seedingLockReason", () => {
     expect(canReorderSeeding("UPCOMING", [])).toBe(true);
   });
 
-  it("laisse modifiable un tournoi démarré tant qu'aucun score n'est saisi", () => {
-    expect(seedingLockReason("RUNNING", [match(), match({ id: 2 })])).toBeNull();
+  it("laisse modifiable un plateau vierge avant le coup d'envoi", () => {
+    expect(seedingLockReason("REGISTRATION", [match(), match({ id: 2 })])).toBeNull();
+  });
+
+  it("fige un tournoi lancé, même sans score ni match", () => {
+    expect(seedingLockReason("RUNNING", [match(), match({ id: 2 })])).toBe("STARTED");
+    expect(seedingLockReason("RUNNING", [])).toBe("STARTED");
+    expect(canReorderSeeding("RUNNING", [])).toBe(false);
   });
 
   it.each([
@@ -58,7 +64,7 @@ describe("seedingLockReason", () => {
   it("ignore les byes et matchs fantômes, dont le score est posé par le moteur", () => {
     const bye = match({ team2Id: null, team1Score: 1, team2Score: 0, winnerTeamId: 10 });
     const ghost = match({ id: 2, team1Id: null, team2Id: null, team1Score: 0, team2Score: 0 });
-    expect(seedingLockReason("RUNNING", [bye, ghost])).toBeNull();
+    expect(seedingLockReason("REGISTRATION", [bye, ghost])).toBeNull();
   });
 
   it("fige un tournoi terminé, même sans match", () => {

@@ -103,6 +103,16 @@ describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
     expect(await res.json()).toEqual({ error: "SEEDING_LOCKED" });
   });
 
+  it("renvoie 409 quand le tournoi est lancé", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
+    jest.mocked(reorderSeeding).mockRejectedValue(new Error("SEEDING_LOCKED_STARTED"));
+
+    const res = await PATCH(patchReq({ teamIds: [4, 9] }), params("5"));
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "SEEDING_LOCKED_STARTED" });
+  });
+
   it("renvoie 400 quand l'ordre proposé n'est pas une permutation", async () => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
     jest.mocked(reorderSeeding).mockRejectedValue(new Error("INVALID_SEED_ORDER"));

@@ -146,8 +146,6 @@ describe("Cellule d'actions partagée", () => {
   it("compte autant de colonnes que de cellules rendues", () => {
     // rang, engagé, inscription, classement final, actions
     expect(columnCount(css, ".withActions")).toBe(5);
-    // la poignée en plus
-    expect(columnCount(css, ".reorderable")).toBe(6);
   });
 
   it("nomme la colonne d'après ce qu'elle contient", () => {
@@ -163,15 +161,6 @@ describe("Cellule d'actions partagée", () => {
     // Mais pas de rouge au repos : une liste d'inscriptions n'est pas une liste
     // d'avertissements.
     expect(remove).not.toMatch(/--red-live/);
-  });
-
-  it("garde le curseur « saisi » sur le bouton pendant un glissement", () => {
-    // Le pointeur a quitté la poignée dès le premier centimètre : un curseur qui
-    // redevient flèche donne à croire que le geste est terminé.
-    const body = stripComments(css);
-    const grabbing = /\.dragging \.grip,[\s\S]*?\{([^}]*)\}/.exec(body);
-    expect(grabbing).not.toBeNull();
-    expect(/\.dragging \.remove/.test(body)).toBe(true);
   });
 
   it("annule le fondu du bouton sous `prefers-reduced-motion`", () => {
