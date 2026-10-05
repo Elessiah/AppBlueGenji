@@ -16,7 +16,7 @@ SonarQube Cloud reprend les avis de `npm audit`. Ce document consigne ceux qui r
 
 ## Réglés
 
-- `uri-js` 4.4.1 (via `ajv` 6 ← ESLint, dev) : non maintenu, sans correctif → surcharge npm `"uri-js": "npm:uri-js-replace@^1.0.1"` (fork maintenu, même API). Lint inchangé.
+- `uri-js` 4.4.1 (via `ajv` 6 ← ESLint, dev) : non maintenu, sans correctif → surcharge npm `"uri-js": "npm:uri-js-replace@^1.0.1"` (fork à API identique, un seul mainteneur, dernière publication 2024 — à surveiller). Lint inchangé.
 - `sprintf-js` 1.0.3 (via `argparse` 1 ← `@istanbuljs/load-nyc-config`, dev) → surcharge `^1.1.3` ; couverture (`npm run test:coverage`) vérifiée.
 - `next` 15.5.25 → 15.5.27 (plancher de plage relevé, `eslint-config-next` déjà en 15.5.27) et `source-map-js` 1.2.1 → 1.2.2 (via `postcss`, dans la plage).
 
