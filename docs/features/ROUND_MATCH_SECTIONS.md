@@ -62,9 +62,11 @@ Le rang figé est relu dans la table d'état écrite par le moteur au lancement
 peuplée en multi-phases) : la cote du moment, qui bouge avec les matchs du
 tournoi, n'est jamais relue — `frozenSeedsOf` la lit dans les classements que
 l'instantané a déjà chargés, sans requête de plus. C'est la tête de série **du
-tournoi** : les phases suivantes d'un multi-phases et l'arbre final de BG
-Survie, tirés sur le rang de la phase écoulée, trient leurs matchs par ce même
-rang de départ, pas par leur propre tirage. Aucun champ ajouté : le flux SSE et la lecture REST
+tournoi** : les phases suivantes (suisse, survie) d'un multi-phases, tirées sur
+le rang de la phase écoulée, trient leurs matchs par ce même rang de départ, pas
+par leur propre tirage. La tête de série **affichée** est partout ce rang de
+départ, arbre final de BG Survie compris — arbre dont les matchs, eux, ne sont
+jamais triés (hors périmètre, voir plus haut). Aucun champ ajouté : le flux SSE et la lecture REST
 de secours servent le même instantané (`buildSnapshot`).
 
 ## Horloge
