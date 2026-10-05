@@ -35,9 +35,10 @@ describe("zones de tap étendues", () => {
     ["app/(secured)/tournois/[id]/_components/SurvivalView.tsx", /btn tap-target"/],
     ["app/(secured)/tournois/[id]/_components/SwissView.tsx", /btn tap-target"/],
     ["app/(secured)/tournois/[id]/_components/EnduranceView.tsx", /btn tap-target"/],
-    ["app/(secured)/tournois/[id]/_components/MatchLiveStrip.tsx", /btn ghost tap-target/],
-    ["app/(secured)/tournois/[id]/_components/MatchLaunchStrip.tsx", /btn tap-target ghost/],
-    ["app/(secured)/tournois/[id]/_components/MatchReplayStrip.tsx", /btn ghost tap-target/],
+    // Pied d'action de la carte de match : action principale, éléments du
+    // panneau et bouton « Plus d'actions ».
+    ["app/(secured)/tournois/[id]/_components/MatchCardActions.tsx", /"tap-target",\s*inMenu \? styles\.item/],
+    ["app/(secured)/tournois/[id]/_components/MatchCardActions.tsx", /`tap-target \$\{styles\.toggle\}/],
     ["components/match-launch/MatchLaunchCenter.tsx", /\$\{styles\.copy\} tap-target/],
     ["app/(secured)/joueurs/cards/PlayerCard.tsx", /\$\{s\.aboveOverlay\} tap-target/],
     ["app/recrutement/RecruitmentSection.tsx", /\$\{styles\.readMore\} tap-target/],

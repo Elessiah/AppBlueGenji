@@ -60,7 +60,7 @@ et depuis deux endroits :
 ## Planifier
 
 La date se pose par le dialogue existant (`PUT /api/admin/matches/[id]/schedule`),
-ouvert depuis le bouton **« 🗓 Planifier »** de la carte d'un match à planifier ou
+ouvert depuis le bouton **« Planifier »** de la carte d'un match à planifier ou
 depuis **« Planifier le prochain »** du panneau de la fiche (premier match à
 planifier dans l'ordre du plateau). Déplacer une date dans le futur, ou l'effacer
 option allumée, fait **quitter le lancement** : ouverture et « Prêt » sont
@@ -89,7 +89,7 @@ s'ouvre de lui-même à l'heure dite, la phase suivant l'horloge.
 ## Interface
 
 - **Carte de match** (`MatchLaunchStrip`) : « 📅 À planifier » (ambre) et, pour
-  l'arbitrage, « 🗓 Planifier » ; « ⏱ En attente de départ » (bleu) ; puis
+  l'arbitrage, « Planifier » (action principale de la carte) ; « ⏱ En attente de départ » (bleu) ; puis
   « Lancement » et « Lancé » comme avant.
 - **Panneau de la fiche** (`MatchPlanningPanel`), sous la frise : annonce la règle
   à tous quand l'option est allumée ; pour l'arbitrage, l'interrupteur, le

@@ -13,12 +13,15 @@
 .card {
   /* Même largeur que la colonne de `BracketTree` (`CARD_W`), qui trace ses
      connecteurs sur elle. */
-  width: 210px;
+  width: 260px;
   background: var(--cyber-bg-2);
   border: 1px solid var(--line-strong-cy);
   border-radius: var(--r-cy-md);
+  /* Rogne les lignes teintées aux coins arrondis. Le panneau « Plus
+     d'actions » n'en souffre pas : en `position: fixed`, son repère est hors
+     de la carte, qui ne le rogne donc pas (`MatchCardActions`). */
   overflow: hidden;
-  font-size: 13px;
+  font-size: 14px;
   /* Marge de sécurité pour le saut natif du navigateur sur `#match-…`
      (rechargement d'une URL ancrée) : le défilement piloté par
      `useMatchAnchor` centre la carte, celui du navigateur la colle en haut.
@@ -32,11 +35,16 @@
   border-color: rgba(var(--blue-500-rgb), 0.4);
 }
 
+/* Ligne d'un engagé : le nom et le score sont ce qu'on vient lire — 14 px,
+   score en 16 px gras à chiffres tabulaires, plus haut que tout le reste. */
 .row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 5px 8px;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 12px;
+  font-size: 14px;
   color: var(--ink);
 }
 
@@ -59,10 +67,16 @@
 
 .name {
   flex: 1;
+  min-width: 0;
+  font-weight: 500;
 }
 
 .score {
-  margin-left: 8px;
+  min-width: 1.5em;
+  text-align: right;
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-mute);
 }
 
@@ -96,55 +110,49 @@
   background: color-mix(in srgb, var(--amber) 6%, transparent);
 }
 
+/* Zone d'état (horaire, diffusion, lancement, hôte, caster) : sous les
+   engagés, en 12 px. Vide, elle disparaît avec son filet. */
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line-strong-cy);
+}
+
+.meta:empty {
+  display: none;
+}
+
+/* Teinte de la diffusion sur toute la zone : rouge à l'antenne seulement
+   (`LIVE_STREAMS.md`), bleu glacier pour un direct annoncé. */
+.meta:has(> [data-state="LIVE"]) {
+  background: color-mix(in srgb, var(--red-live) 10%, transparent);
+}
+
+.meta:has(> [data-state="SCHEDULED"]) {
+  background: rgba(var(--blue-500-rgb), 0.06);
+}
+
 .reportNotice {
   margin: 0;
-  padding: 4px 8px;
+  padding: 6px 12px;
   border-top: 1px solid var(--line-strong-cy);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.4;
   text-align: center;
   color: var(--blue-300);
   background: rgba(var(--blue-500-rgb), 0.06);
 }
 
-/* Rangées d'action, sous les lignes des engagés. */
-.bar {
+/* Score verrouillé (arbitrage) : un constat, pas une action. */
+.locked {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 5px 6px;
+  padding: 6px 12px;
   border-top: 1px solid var(--line-strong-cy);
-}
-
-.playerBar {
-  background: color-mix(in srgb, var(--accent-green) 6%, transparent);
-}
-
-.adminBar {
-  background: rgba(var(--blue-500-rgb), 0.08);
-  border-top-color: rgba(var(--blue-500-rgb), 0.25);
-}
-
-/* Deux classes : l'emporte sur le gabarit de `CyberButton`, quel que soit
-   l'ordre de chargement des deux feuilles. */
-.bar .action {
-  padding: 4px 12px;
   font-size: 12px;
-  gap: 5px;
-}
-
-.bar .actionAccent {
-  border-color: rgba(var(--blue-500-rgb), 0.45);
-  background: rgba(var(--blue-500-rgb), 0.15);
-}
-
-.bar .actionMinor {
-  padding: 3px 10px;
-  font-size: 11px;
-}
-
-.locked {
-  font-size: 11px;
   color: var(--ink-mute);
 }

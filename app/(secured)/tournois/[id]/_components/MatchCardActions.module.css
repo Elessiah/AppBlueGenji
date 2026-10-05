@@ -1,0 +1,172 @@
+/*
+ * Pied d'action d'une carte de match (`MatchCardActions`) : une action
+ * principale pleine largeur, « Plus d'actions » à côté, et le panneau qui se
+ * déplie dans la carte. Cibles de 36 px (44 px au toucher), texte en 13 px.
+ */
+
+.root {
+  border-top: 1px solid var(--line-strong-cy);
+}
+
+.bar {
+  display: flex;
+  gap: 6px;
+  padding: 8px;
+}
+
+.primary,
+.toggle,
+.item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  border: 1px solid var(--line-strong-cy);
+  border-radius: var(--r-cy-md);
+  background: color-mix(in srgb, var(--ink) 4%, transparent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.primary {
+  flex: 1;
+  min-width: 0;
+  justify-content: center;
+  padding: 6px 12px;
+}
+
+.toggle {
+  flex: none;
+  justify-content: center;
+  width: 40px;
+  padding: 0;
+}
+
+/* Seul bouton du pied (aucune action principale) : il prend la largeur et
+   montre son libellé. */
+.toggleWide {
+  flex: 1;
+  width: auto;
+  padding: 6px 12px;
+}
+
+.toggle[aria-expanded="true"] {
+  border-color: rgba(var(--blue-500-rgb), 0.6);
+  background: rgba(var(--blue-500-rgb), 0.14);
+}
+
+.primary:hover,
+.toggle:hover,
+.item:hover {
+  background: color-mix(in srgb, var(--ink) 9%, transparent);
+}
+
+.primary:focus-visible,
+.toggle:focus-visible,
+.item:focus-visible {
+  outline: 2px solid var(--blue-300);
+  outline-offset: 2px;
+}
+
+.primary:disabled,
+.item:disabled {
+  cursor: progress;
+  color: var(--ink-mute);
+  background: transparent;
+}
+
+.label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Panneau déplié : posé **par-dessus** les cartes voisines, sous le pied (ou
+   au-dessus faute de place). Le déplier dans la carte la grandissait — et
+   l'arbre, qui mesure ses cartes (`useSlotHeight`), regrandissait alors tous
+   ses créneaux. En `position: fixed` (coordonnées posées par
+   `panelPlacement`), la carte garde sa taille et le panneau échappe aux
+   conteneurs qui rognent (cadre des plateaux, zones défilantes). */
+.panel {
+  position: fixed;
+  z-index: 40;
+  /* Origine connue avant le premier placement : `panelPlacement` en déduit
+     le repère réel (un ancêtre transformé le déplace). */
+  top: 0;
+  left: 0;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.45);
+  border-radius: var(--r-cy-md);
+  background: var(--cyber-bg-2);
+  box-shadow: var(--shadow);
+}
+
+/* Liste des actions (`ScrollArea` verticale, bornée par `maxHeight`). */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+}
+
+.item {
+  width: 100%;
+  justify-content: flex-start;
+  padding: 6px 10px;
+  font-weight: 500;
+  text-align: left;
+}
+
+/* Tons : engagé (vert), arbitrage (bleu glacier), geste qui presse (ambre). */
+.tonePrimary {
+  border-color: color-mix(in srgb, var(--accent-green) 50%, transparent);
+  background: color-mix(in srgb, var(--accent-green) 14%, transparent);
+}
+
+.toneStaff {
+  border-color: rgba(var(--blue-500-rgb), 0.5);
+  background: rgba(var(--blue-500-rgb), 0.14);
+}
+
+.toneWarn {
+  border-color: rgba(var(--amber-rgb), 0.5);
+  background: rgba(var(--amber-rgb), 0.12);
+}
+
+.tonePrimary:hover {
+  background: color-mix(in srgb, var(--accent-green) 22%, transparent);
+}
+
+.toneStaff:hover {
+  background: rgba(var(--blue-500-rgb), 0.22);
+}
+
+.toneWarn:hover {
+  background: rgba(var(--amber-rgb), 0.2);
+}
+
+@media (pointer: coarse) {
+  .primary,
+  .toggle,
+  .item {
+    min-height: 44px;
+  }
+
+  .toggle {
+    width: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .primary,
+  .toggle,
+  .item {
+    transition: none;
+  }
+}

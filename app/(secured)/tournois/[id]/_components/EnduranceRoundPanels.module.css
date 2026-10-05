@@ -12,7 +12,7 @@
 }
 
 /*
- * Les cartes de match ont une largeur fixe (210 px) : en `flex-wrap`, elles se
+ * Les cartes de match ont une largeur fixe (260 px) : en `flex-wrap`, elles se
  * répartissent d'elles-mêmes en autant de colonnes que la place le permet — une
  * manche de huit rencontres tient sur deux lignes au lieu de huit, et la même
  * règle donne une colonne unique sur un mobile, sans cas particulier.

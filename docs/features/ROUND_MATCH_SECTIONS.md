@@ -69,7 +69,7 @@ trait `--line-soft`. Le filet est un paragraphe lu comme une ligne de texte
 (« Lancement, 2 matchs », le nombre complété pour les lecteurs d'écran) : ni
 volet, ni repère, ni élément focalisable — et pas de `role="group"`, que le
 contrôle Sonar S6819 interdit (`sonar-a11y-semantics.test.tsx`). Le
-libellé passe à la ligne dans une colonne étroite (210 px).
+libellé passe à la ligne dans une colonne étroite (260 px).
 
 Filets et cartes sont **frères** dans le seul conteneur de la vue (grille de
 BG Survie, colonne de manche), chaque carte gardant pour clé l'id de son

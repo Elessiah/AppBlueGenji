@@ -8,7 +8,7 @@ import { MatchRow } from "./MatchRow";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 
 
-const CARD_W = 210;
+const CARD_W = 260;
 const CONN_W = 40;
 const BADGE_W = 190;
 const BORDER = "var(--border, #444)";

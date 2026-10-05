@@ -1,0 +1,50 @@
+/*
+ * Bandeau d'horaire et de diffusion d'une carte de match (`MatchLiveStrip`).
+ * Sur les jetons : le rouge n'y sert qu'à ce qui est réellement à l'antenne
+ * (`LIVE_STREAMS.md`), le bleu glacier à un direct annoncé.
+ */
+
+.strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+/* La teinte d'un direct (rouge à l'antenne, bleu annoncé) est posée sur toute
+   la zone d'état de la carte (`MatchRow.module.css`, `.meta`), d'après
+   `data-state` : une bande pleine, sans marge à rattraper. */
+
+.startAt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.missing {
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue-300);
+}
+
+.stateLive {
+  color: var(--red-live);
+}
+
+.link {
+  color: var(--blue-300);
+  text-decoration: underline;
+}

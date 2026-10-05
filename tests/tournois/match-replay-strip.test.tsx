@@ -1,6 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
 import { renderToStaticMarkup } from "react-dom/server";
-import { MatchReplayStrip } from "@/app/(secured)/tournois/[id]/_components/MatchReplayStrip";
+import { MatchReplayStrip, canEditReplay } from "@/app/(secured)/tournois/[id]/_components/MatchReplayStrip";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import type { BracketMatch } from "@/lib/shared/types";
 import { bracketMatch } from "../helpers/bracket-match";
@@ -67,26 +67,30 @@ describe("MatchReplayStrip — spectateur", () => {
   });
 });
 
-describe("MatchReplayStrip — permission live", () => {
-  it("offre l'ajout sur un match terminé sans rediff", () => {
-    const html = render(played, true);
-    expect(html).toContain("＋ Rediff");
-    expect(html).toContain('aria-label="Ajouter la rediff de Dragons contre Lions"');
-    expect(html).not.toContain("Rediff disponible");
+/**
+ * L'édition de la rediff a rejoint le pied d'action de la carte
+ * (`MatchCardActions`) : sa visibilité est `canEditReplay`, son libellé vient
+ * de `matchCardActionList` — le bandeau, lui, n'est plus qu'un lien.
+ */
+describe("rediff — édition par la permission live", () => {
+  it("offre l'ajout sur un match terminé sans rediff, et le bandeau reste muet", () => {
+    expect(canEditReplay(played, true)).toBe(true);
+    expect(render(played, true)).toBe("");
   });
 
-  it("offre la modification à côté du bandeau", () => {
-    const html = render({ ...played, replayUrl: VIDEO }, true);
-    expect(html).toContain("Rediff disponible");
-    // Pictogramme seul à côté du bandeau, nom accessible complet.
-    expect(html).toContain(">✎</button>");
-    expect(html).toContain('aria-label="Modifier la rediff de Dragons contre Lions"');
+  it("offre la modification d'une rediff posée, à côté du bandeau", () => {
+    const withReplay = { ...played, replayUrl: VIDEO };
+    expect(canEditReplay(withReplay, true)).toBe(true);
+    expect(render(withReplay, true)).toContain("Rediff disponible");
+    expect(render(withReplay, true)).not.toContain("<button");
   });
 
-  it("garde le bouton sur un match rouvert qui porte encore un lien, pour le retirer", () => {
-    const html = render({ ...played, status: "READY", replayUrl: VIDEO }, true);
-    expect(html).not.toContain("Rediff disponible");
-    expect(html).toContain("✎ Rediff");
+  it("garde l'édition sur un match rouvert qui porte encore un lien, pour le retirer", () => {
+    expect(canEditReplay({ ...played, status: "READY", replayUrl: VIDEO }, true)).toBe(true);
+  });
+
+  it("ne l'offre pas sans la permission live", () => {
+    expect(canEditReplay({ ...played, replayUrl: VIDEO }, false)).toBe(false);
   });
 
   it.each<[string, Partial<BracketMatch>]>([
@@ -94,6 +98,7 @@ describe("MatchReplayStrip — permission live", () => {
     ["une exemption", { team2Id: null }],
     ["un forfait", { forfeitTeamId: 2 }],
   ])("n'offre rien sur %s", (_label, overrides) => {
+    expect(canEditReplay({ ...played, ...overrides }, true)).toBe(false);
     expect(render({ ...played, ...overrides }, true)).toBe("");
   });
 });
