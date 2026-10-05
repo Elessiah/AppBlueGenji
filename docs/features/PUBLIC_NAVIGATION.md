@@ -36,8 +36,10 @@ chaude (ni rouge du direct, ni ambre, ni `--result-loss`), et porte
 les liens passent sur une seconde ligne qui se replie : pas de menu à part.
 Entre 721 et 1000 px, les quatre liens tiennent dans leur tiers de grille par
 un interlettrage resserré (0,08 em) et, en dernier recours, passent à la ligne
-plutôt que de décentrer le logo ou de rogner le pseudo (vérifié à 721, 768,
-900 et 1010 px : aucun débordement horizontal).
+plutôt que de décentrer le logo ou de rogner le pseudo, le trait du lien actif
+remonté sous son libellé (vérifié à 721, 768, 900 et 1010 px : aucun
+débordement horizontal). Sous 720 px, l'interlettrage passe à 0,06 em (nul
+sous 380 px) pour garder les quatre liens sur une seule ligne dès 360 px.
 
 Accessibilité du menu (Échap, sortie au clavier, `aria-current`) →
 `ACCESSIBILITY_LANDMARKS_FOCUS.md`.
