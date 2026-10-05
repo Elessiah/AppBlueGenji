@@ -67,18 +67,6 @@ export function launchStripControls(
   };
 }
 
-/** Le bandeau offre-t-il au moins un bouton ? Sans quoi, pas de conteneur d'actions. */
-export function hasLaunchStripAction(controls: LaunchStripControls): boolean {
-  return (
-    controls.showPlan ||
-    controls.showOpen ||
-    controls.showClaim ||
-    controls.showRelease ||
-    controls.showHostSwap ||
-    controls.showForce
-  );
-}
-
 /** Nom de l'équipe hôte, `null` sans hôte connu. */
 export function hostTeamName(match: StripMatch): string | null {
   if (match.hostTeamId === null) return null;
