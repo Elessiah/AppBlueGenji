@@ -68,7 +68,11 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
 
   return (
     <div ref={ref} className={className} style={{ minWidth: `${String(value).length}ch` }}>
-      {shown}
+      {/* Le chiffre qui défile est décoratif ; la valeur réelle reste dans la
+          page pour les lecteurs d'écran, la recherche et la traduction, même
+          pendant l'attente d'un chiffre hors de l'écran (parqué à 0). */}
+      <span aria-hidden="true">{shown}</span>
+      <span className="sr-only">{value}</span>
     </div>
   );
 }
