@@ -6,7 +6,7 @@ contre bas de tableau en élimination et en ronde suisse, couples adjacents en
 survie, plateau initial en multi-phases.
 
 Le staff (`can(user, "tournaments")`) le réordonne depuis la page du tournoi,
-**au glisser-déposer** ou avec des flèches ↑ / ↓.
+avec des flèches ↑ / ↓, **jusqu'au coup d'envoi**.
 
 ## Où on le règle
 
@@ -29,60 +29,33 @@ Deux conséquences de forme :
   rapporte le flux. Sans cet affichage optimiste, un aller-retour complet (écriture
   puis rafraîchissement) sépare le clic de son effet, et le bouton passe pour mort.
 
-## Deux gestes pour un même ordre
+## Des flèches, pas de glisser-déposer
 
-Les flèches déplacent d'**un cran**, et chaque cran est une écriture : amener le
-trentième rang en tête demandait vingt-neuf clics et vingt-neuf `PATCH`, chacun
-régénérant le plateau du tournoi. D'où la **poignée de glissement** (`⠿`, en tête
-de ligne) : un seul geste, un seul ordre écrit, quelle que soit la distance.
+L'ordre se règle **aux seules flèches** ↑ / ↓, qui déplacent une ligne d'un cran
+(une écriture par cran, `applyOrder`, avec aperçu optimiste et annonce vocale).
 
-Les flèches **restent**, et pas par nostalgie : un glisser-déposer n'a aucun
-équivalent au clavier. Les retirer priverait de l'ordre de départ qui ne tient
-pas une souris. Les deux chemins écrivent par la même fonction (`applyOrder`),
-donc avec le même aperçu optimiste, la même annonce vocale et le même refus.
+Une poignée de glissement (`⠿`) a existé à côté des flèches, pour amener le
+trentième rang en tête d'un seul geste. Elle a été **retirée** : sur téléphone,
+la poignée occupe le bord de chaque ligne, et un doigt posé dessus pour faire
+défiler la liste vers le bas déplaçait une équipe — autant de réordonnancements
+involontaires (retour d'utilisateur, octobre 2026). Le défilement est le geste
+le plus fréquent sur une longue liste ; un contrôle qui le confisque coûte plus
+qu'il ne fait gagner.
 
-La poignée est un `<span aria-hidden>`, **jamais un `<button>`** : un contrôle qui
-prend le focus et ne répond ni à Entrée ni à l'espace est un piège, pas une
-commande. Ce qu'elle offre au pointeur, les flèches l'offrent au clavier.
+Les flèches n'ont pas ce défaut :
 
-### Ce que le geste garantit
-
-| Question | Réponse | Pourquoi |
-| --- | --- | --- |
-| Où atterrit la ligne ? | `dropIndexAt` — l'ordonnée du pointeur contre les **milieux d'emplacement** | relevés **une fois**, au premier appui : les emplacements ne bougent pas pendant le geste, seul leur contenu permute. Les relire à chaque mouvement ferait osciller la cible entre deux rangs |
-| Que devient la liste ? | `moveToIndex` — **extraction puis insertion** | tirer le rang 30 sur le rang 1 décale les autres d'un cran ; un échange expédierait le rang 1 en trentième place, ce que personne ne demande |
-| Comment atteindre un rang hors écran ? | `autoScrollVelocity` — la page défile aux **bords** de la fenêtre | sans quoi le geste ne porterait que sur ce qui tient à l'écran, et trente engagés n'y tiennent pas. Vitesse **linéaire** avec l'enfoncement dans la bande, en pixels par **seconde** : le geste se comporte pareil à 60 Hz et à 144 Hz |
-| Comment renoncer ? | Échap, ou un `pointercancel` | un glissement sans annulation oblige à relâcher quelque part, donc à écrire un ordre dont on ne veut pas |
-
-Deux refus, pour deux gestes qui ne peuvent pas aboutir :
-
-- le rang d'accueil vit dans la **session du geste**, pas dans un miroir de
-  `useState`. La mise à jour naît d'un `pointermove`, donc de priorité continue :
-  React la planifie sans la commiter dans la tâche courante, et le `pointerup`
-  d'un geste vif arrive avant ce rendu. Un miroir y vaudrait `null` — le geste
-  avalé en silence — ou le rang du geste *précédent*, soit un ordre que personne
-  n'a demandé. L'état React reste, mais pour l'affichage seul ;
-- un geste dont la **liste a changé sous lui** est abandonné. Le flux SSE tient
-  la page à jour, et le moment où l'on réordonne est précisément celui où les
-  inscriptions sont ouvertes : l'ordre construit sur l'ancienne liste n'est plus
-  une permutation, et le serveur le refuserait au nom d'une faute que personne
-  n'a commise. Le contrôle est celui du serveur, mot pour mot
-  (`isValidSeedOrder`) — en écrire un second ici donnerait deux définitions du
-  refus.
-
-Deux points de mise en œuvre qui ne se devinent pas :
-
-- les géométries sont relevées en coordonnées **page** (`clientY + scrollY`), pas
-  fenêtre : le défilement automatique déplacerait sinon la cible sous un pointeur
-  immobile ;
-- `touch-action: none` sur la poignée n'est pas décoratif — sans lui, le
-  navigateur prend le premier mouvement du doigt pour un défilement et confisque
-  la suite des évènements pointeur : le geste ne marcherait qu'à la souris. C'est
-  aussi la raison des `PointerEvent` plutôt que de l'API HTML5 de glisser-déposer,
-  qui n'existe pas sur mobile.
-
-**Aucune écriture avant le relâchement.** Le geste ne produit qu'un aperçu ; un
-`PATCH` par ligne survolée écrirait des dizaines d'ordres intermédiaires.
+- ce sont de vrais `<button>` : focusables, actionnés à Entrée et à l'espace,
+  nommés d'après l'engagé (« Monter Alpha d'un rang ») ;
+- elles ne réagissent qu'au `click`, que le navigateur **n'émet pas** pour un
+  doigt qui glisse : faire défiler la page en partant d'une flèche ne déplace
+  rien. `touch-action: manipulation` retire en plus le délai du double-tap ;
+- au doigt (≤ 720 px), elles passent de 32 à **44 px** et s'écartent l'une de
+  l'autre, pour qu'on ne touche pas « ↓ » en visant « ↑ » ;
+- la flèche qui sortirait de la liste (↑ en tête, ↓ en queue) est désactivée, et
+  l'état désactivé se marque **par les couleurs** (`--ink-mute`, bordure
+  atténuée), jamais par `opacity` ;
+- après un clic, le focus reste sur la flèche actionnée — ou passe à l'autre si
+  la ligne vient d'atteindre une extrémité.
 
 ## Ce que la liste montre — et ce que le moteur jouera
 
@@ -110,15 +83,35 @@ réordonner fige l'ordre.
 Une fois le tournoi **lancé**, la liste retombe sur la colonne `seed` (ordre
 d'arrivée) : les matchs du tournoi font bouger les cotes, alors que le tirage,
 lui, est fait. Elle **n'est** alors **pas** le tirage, et le bloc le dit
-explicitement, à côté des flèches qui permettent d'y remédier — sans quoi le
-staff lit un ordre d'inscription en croyant lire un tirage.
+explicitement — sans quoi le staff lit un ordre d'inscription en croyant lire un
+tirage. L'ordre, lui, est figé (voir ci-dessous).
 
 ## Fenêtre d'édition
 
-L'ordre reste modifiable **jusqu'à la première saisie de score**, ce qui couvre
-la demande « ordonner avant que le tournoi soit visible pour les joueurs » : dès
-la création, avant l'ouverture des inscriptions, pendant celles-ci, et même
-après le lancement tant que personne n'a reporté de score.
+L'ordre reste modifiable **jusqu'au coup d'envoi** : dès la création, avant
+l'ouverture des inscriptions et pendant celles-ci (clôture comprise). Il se fige
+dès que le tournoi passe `RUNNING`, **même si aucun score n'est saisi**.
+
+La borne était d'abord « la première saisie de score », pour laisser corriger un
+tirage après le lancement. Elle a laissé passer un changement d'ordre **en
+pleine première manche** : au coup d'envoi, les matchs du premier tour sont
+`READY`, les joueurs les voient et commencent à jouer, mais tant que personne
+n'a reporté de score, le réordonnancement restait permis — et régénérait le
+plateau sous leurs yeux. `RUNNING` est le bon signal : c'est la bascule qui
+pose la première manche dans tous les formats (`SINGLE` / `DOUBLE` par
+l'entretien, les formats à classement par leur amorçage), et rien n'existe
+avant.
+
+Le coup d'envoi se lit sur **deux sources** (`seedingWindowState`) : l'état
+stocké **ou** celui de l'horloge (`computeTournamentState`). La colonne `state`
+ne bascule qu'au prochain entretien ; l'heure passée, elle peut dire encore
+`REGISTRATION` tant que personne n'a rien écrit ni ouvert. Lue seule, elle
+laissait réordonner après l'heure — et l'écriture déclenchait alors la
+synchronisation qui lance le tournoi avec cet ordre tardif. Le stocké rattrape
+un lancement anticipé, le calculé une heure passée sans recalage : même paire
+que le retrait d'un engagé (`ENTRANT_REMOVAL.md`). Côté client, l'heure vient de
+`useTournamentNow` (minuteur posé sur la prochaine bascule) : les flèches
+disparaissent à la seconde du coup d'envoi, sans attendre un instantané.
 
 Le verrou réutilise `hasScoreInput` de `lib/shared/match-lock.ts` : compte comme
 saisie un score (même 0), un vainqueur, un forfait ou un report en attente. Les
@@ -127,43 +120,32 @@ byes et matchs fantômes sont ignorés — leur score est posé par le moteur.
 La fenêtre se juge **sous verrou**. `reorderSeeding` ouvre sa transaction par `lockTournamentRow`
 puis par un `SELECT id FROM bg_matches WHERE tournament_id = ? FOR UPDATE` (table
 seule : MariaDB refuse `FOR UPDATE OF`), **avant** toute lecture ordinaire —
-sous `REPEATABLE READ`, c'est la première qui fige l'instantané. Tournoi
-d'abord, comme les gestes du staff qui écrivent des matchs sous ce verrou
-(avancée, retour en arrière, inscription). Aucun ordre n'exclut l'interblocage
-avec une saisie de score, qui tient son match (voire d'autres, par l'entretien)
-puis le tournoi dans la réconciliation. InnoDB défait alors l'une des deux —
-pas forcément le réordonnancement, qui tient les verrous de tous les matchs du
-tournoi. Défait, le réordonnancement **rejoue** sa transaction, jusqu'à trois
-fois (`REORDER_DEADLOCK_ATTEMPTS`) : il voit la saisie commitée et refuse en
-`SEEDING_LOCKED`. Si c'est la saisie qui est défaite, elle échoue en refus
-visible (ses chemins ne rejouent pas) et le réordonnancement passe — jamais un
-score perdu en silence. Ce refus est lisible : `fail()` (`lib/server/http.ts`)
-reconnaît le message d'interblocage (`isDeadlockMessage`,
-`lib/server/mysql-errors.ts`) et le rend en **409 `CONCURRENT_UPDATE_RETRY`**,
-que l'interface traduit en « rien n'a été enregistré, réessaie » — sur toute
-route qui transmet le message de l'erreur à `fail()` : report d'un joueur,
-arbitrage (enregistrer, valider), forfait de manche et gestes du lancement
-(`launchFailure`). Une route qui le remplace par un code fixe garde son refus
-générique.
-La saisie n'est pas rejouée d'office : c'est au joueur de la renvoyer, sur le
-plateau tel qu'il est devenu. Jugée sur des lectures ordinaires, la borne ne tenait que
-hors concurrence : un premier report validé entre le contrôle et
-`deleteAllMatches` échappait à l'instantané, et le plateau régénéré l'effaçait
-alors que le joueur avait reçu un succès. Toute écriture de score lit son match
-sous `FOR UPDATE` — report et forfait d'un joueur, enregistrement et validation
-de l'arbitrage (`adminSaveMatchScores`, `adminResolveMatch`, qui le lisaient
-sans verrou) : une saisie en cours fait attendre le réordonnancement, qui la
-voit et refuse en `SEEDING_LOCKED` ; une saisie arrivée après attend la fin du
-réordonnancement et trouve son match supprimé (`MATCH_NOT_FOUND`) — un refus
-visible, jamais une saisie perdue en silence.
+sous `REPEATABLE READ`, c'est la première qui fige l'instantané. Un lancement
+commité pendant l'attente est donc vu, et refusé. Tournoi d'abord, comme les
+gestes du staff qui écrivent des matchs sous ce verrou (avancée, inscription).
+Un interblocage reste possible avec un geste qui tient des matchs puis le
+tournoi ; défait, le réordonnancement **rejoue** sa transaction, jusqu'à trois
+fois (`REORDER_DEADLOCK_ATTEMPTS`), et refuse alors sur l'état qu'il relit. Le
+refus d'un geste défait est lisible : `fail()` (`lib/server/http.ts`) reconnaît
+le message d'interblocage (`isDeadlockMessage`, `lib/server/mysql-errors.ts`)
+et le rend en **409 `CONCURRENT_UPDATE_RETRY`** (« rien n'a été enregistré,
+réessaie »).
 
-Deux raisons de verrouillage, exposées à l'interface :
+Trois raisons de verrouillage, exposées à l'interface (`seedingLockReason`,
+dans cet ordre de priorité) :
 
-| `lockReason` | Sens |
-| --- | --- |
-| `null` | encore modifiable |
-| `SCORES_ENTERED` | au moins un match porte une saisie |
-| `FINISHED` | tournoi terminé |
+| `lockReason` | Sens | Refus de `PATCH` |
+| --- | --- | --- |
+| `null` | encore modifiable | — |
+| `FINISHED` | tournoi terminé | `SEEDING_LOCKED` (409) |
+| `SCORES_ENTERED` | au moins un match porte une saisie | `SEEDING_LOCKED` (409) |
+| `STARTED` | tournoi lancé (`RUNNING`), même sans score | `SEEDING_LOCKED_STARTED` (409) |
+
+`SCORES_ENTERED` reste jugé avant `STARTED`, pour garder la phrase la plus
+précise sur un tournoi où l'on joue déjà. Les deux codes ont leur phrase dans `_lib/error-map.ts`. Une fois
+figé, les flèches disparaissent et la phrase du verrou prend leur place ; sur
+un tournoi lancé, elle tait celle du retrait (« le tirage est fait »), qui
+dirait le même fait (`removalNotice`).
 
 ## Qui lit l'ordre
 
@@ -200,19 +182,20 @@ choisi par le staff, et le poser ferait basculer un tournoi qui seedait depuis l
 classement du site vers l'ordre d'inscription, sans que personne ne l'ait
 demandé.
 
-## Reconstruction du plateau
+## Aucun plateau à reconstruire
 
-Si des matchs ont déjà été générés (tournoi lancé mais vierge de scores), ils
-décrivent l'ancien ordre : `reorderSeeding` les supprime, remet les rangs à zéro
-et réamorce le format.
+Un plateau ne naît qu'au coup d'envoi (`SINGLE` / `DOUBLE` par l'entretien de
+`syncTournamentState`, les formats à classement par leur amorçage à la
+transition REGISTRATION → RUNNING), et la fenêtre se ferme à ce même instant :
+l'ordre s'écrit donc toujours **avant** qu'un match existe, et le lancement le
+lit tel quel. `reorderSeeding` n'a rien à détruire ni à réamorcer.
 
-- `SINGLE` / `DOUBLE` : `bracket_size` repasse à `NULL`, et l'entretien de
-  `syncTournamentState` régénère le plateau.
-- `SWISS` / `SURVIVAL` / `BG_SURVIE` / `MULTI` : réinitialisation explicite
-  (leur amorçage n'a lieu qu'à la transition REGISTRATION → RUNNING, déjà
-  passée). Pour `MULTI`, l'état des phases est d'abord purgé — équipes de phase,
-  états, compteurs et `current_phase_id` — sans quoi `startPhase` serait rejoué
-  sur une phase déjà marquée RUNNING avec un plateau mélangé.
+Le chemin qui le faisait (suppression des matchs, `bracket_size` remis à
+`NULL`, réamorçage des formats à classement et purge des phases `MULTI`) a été
+retiré avec le verrou au coup d'envoi. À sa place, un **invariant** : des
+matchs présents dans la transaction refusent l'écriture en
+`SEEDING_LOCKED_STARTED`, plutôt que de détruire un tirage et d'amorcer les
+manches d'un tournoi que la fenêtre dit encore ouvert.
 
 ## Liste repliée
 
@@ -223,21 +206,16 @@ suivies d'un bouton réversible « Voir toute la liste (N de plus) » /
 devenaient introuvables. L'état déplié est un drapeau, pas un compte figé : une
 liste dépliée le reste quand le flux y ajoute une ligne. Une flèche « ↓ » qui
 ferait passer une ligne sous la dernière visible déplie la liste d'elle-même,
-pour que la ligne déplacée et son bouton restent à l'écran. Un appui sur la
-poignée `⠿` la déplie aussi, de façon synchrone (`flushSync`), **avant** que le
-geste ne relève les emplacements : ils ne sont mesurés qu'une fois, au premier
-appui, et une ligne masquée à cet instant ne serait jamais une cible.
+pour que la ligne déplacée et son bouton restent à l'écran.
 
 ## Surfaces
 
 | Élément | Emplacement |
 | --- | --- |
 | Logique pure | `lib/shared/seeding.ts` |
-| Mécanique du geste (pure) | `lib/shared/drag-reorder.ts` |
 | Orchestration | `lib/server/tournaments/seeding.ts` |
 | API | `GET` / `PATCH /api/admin/tournaments/[id]/seeding` |
 | Interface | `app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx` |
-| Geste (DOM) | `app/(secured)/tournois/[id]/_hooks/useSeedingDrag.ts` |
 
 `GET` sert l'ordre courant et la fenêtre d'édition côté serveur ; l'interface,
 elle, dérive la fenêtre du détail déjà reçu et n'appelle que `PATCH`.
@@ -245,21 +223,23 @@ elle, dérive la fenêtre du détail déjà reçu et n'appelle que `PATCH`.
 `PATCH` attend `{ teamIds: number[] }` — la liste **complète** des inscrites dans
 le nouvel ordre. Toute liste qui n'est pas une permutation exacte est refusée
 (`INVALID_SEED_ORDER`, 400) : sans ce contrôle, un réordonnancement pourrait
-faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` (409).
+faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` ou
+`SEEDING_LOCKED_STARTED` (409), un code seul (`fail`).
 
 ## Tests
 
-- `tests/lib/shared/seeding.test.ts` — verrou, déplacement, validation d'ordre,
-  provenance de l'ordre (`seedingSource`, `isSeedOrderEffective`).
-- `tests/lib/shared/drag-reorder.test.ts` — rang d'accueil, extraction/insertion,
-  défilement automatique (bandes, continuité, plafond, fenêtre trop courte).
-- `tests/app/seeding-drag-handle.test.ts` — la poignée suit la fenêtre d'édition,
-  les flèches survivent, la poignée n'est pas focusable, `touch-action` posé, et
-  aucune écriture pendant le geste.
+- `tests/lib/shared/seeding.test.ts` — verrou (`STARTED` dès `RUNNING`, même
+  sans match), déplacement, validation d'ordre, provenance de l'ordre
+  (`seedingSource`, `isSeedOrderEffective`).
+- `tests/app/seeding-arrows.test.ts` — plus de poignée ni de geste, flèches
+  nommées d'après l'engagé, désactivées aux extrémités par les couleurs,
+  `touch-action: manipulation`, 44 px au doigt, phrase du code
+  `SEEDING_LOCKED_STARTED`.
 - `tests/lib/server/tournament-snapshot.test.ts` — `seedingSource` porté par
   l'instantané, `manual_seeding` compris.
-- `tests/tournois/seeding-service.test.ts` — écriture des seeds, reconstruction
-  du plateau, refus (verrou, permutation invalide, tournoi inconnu), verrous du
+- `tests/tournois/seeding-service.test.ts` — écriture des seeds, refus (tournoi
+  lancé — par l'état ou par l'heure —, plateau présent, score saisi,
+  permutation invalide, tournoi inconnu), verrous du
   tournoi et des matchs posés avant toute lecture.
 - `tests/app/api/admin/seeding.test.ts` — permissions et codes d'erreur.
 
@@ -267,4 +247,4 @@ faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` (409
 
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
-- **Ordre de seeding réordonnable** (`lib/shared/seeding.ts` pur + `lib/server/tournaments/seeding.ts`) : le staff `tournaments` ordonne les inscrites **au glisser-déposer** ou avec des flèches, **jusqu'à la première saisie de score** (même règle que `match-lock`). `bg_tournaments.manual_seeding` bascule Survie / Suisse / BG Survie / Multi du seeding par classement de site vers l'ordre saisi ; l'élimination lisait déjà `registrations.seed`. Un plateau déjà généré mais vierge est détruit puis régénéré. Les commandes vivent **sur les lignes de la liste des inscrites** (`RegistrationsPanel.tsx`, bloc « Inscriptions · ordre de départ ») et non dans un second tableau des mêmes équipes : de deux listes identiques, celle qu'on cherche porte le nom de la chose, et c'était justement celle qui n'avait pas de flèches. **Deux gestes, une seule écriture** : la poignée `⠿` glisse une ligne d'un bloc (mécanique pure dans `lib/shared/drag-reorder.ts` — `dropIndexAt` contre les milieux d'emplacement relevés **une fois** au premier appui, `moveToIndex` en **extraction puis insertion** et jamais en échange, `autoScrollVelocity` pour atteindre un rang hors écran ; `PointerEvent` et `touch-action: none`, l'API HTML5 de glisser-déposer n'existant pas sur mobile), les flèches restent le chemin du clavier — un glissement n'en a aucun — et les deux passent par la même `applyOrder`. La poignée est un `<span aria-hidden>`, jamais un `<button>` : un contrôle focusable qui ignore Entrée et l'espace est un piège. Rien n'est écrit avant le relâchement, Échap annule. La fenêtre d'édition est **dérivée du détail déjà reçu** (pas de requête à part : les flèches arrivent avec la page ; le serveur reste le juge, 409 sur écriture tardive) et le geste déplace la ligne tout de suite, corrigé ensuite par le flux. `TournamentSnapshot.seedingSource` (`MANUAL` / `RANKING` / `REGISTRATION`, règle unique `seedingSource()` partagée avec l'aperçu du plateau) dit si la liste triée par `seed` **est** le tirage : en `RANKING`, **avant le coup d'envoi** (clôture comprise, `isPreLaunchState`), l'instantané range lui-même les inscrites selon le classement du site (`registrationsFollowRanking` + `rankEntrantsBySiteRanking`, le tri de `loadEntrantsBySiteRanking` appliqué aux lignes déjà lues — même ordre que l'aperçu et le moteur) — chaque nouvelle inscrite prend sa place de cote, sans réécrire `seed` puisque les cotes peuvent encore bouger ; une fois lancé la liste retombe sur l'ordre d'arrivée, qui n'est pas le tirage, et le bloc le dit à côté des flèches. L'aperçu du plateau s'affiche sur tout l'avant-course, testé **avant** les vues des formats à classement (dont les métadonnées existent, vides, dès la création). Voir `docs/features/SEEDING_ORDER.md`.
+- **Ordre de seeding réordonnable** (`lib/shared/seeding.ts` pur + `lib/server/tournaments/seeding.ts`) : le staff `tournaments` ordonne les inscrites **aux flèches ↑ / ↓** (le glisser-déposer a été retiré : sur téléphone, il se déclenchait en voulant faire défiler la liste), **jusqu'au coup d'envoi** (`RUNNING` → `STARTED`, refus `SEEDING_LOCKED_STARTED`) et jamais après une saisie de score (`SCORES_ENTERED`, même règle que `match-lock`). `bg_tournaments.manual_seeding` bascule Survie / Suisse / BG Survie / Multi du seeding par classement de site vers l'ordre saisi ; l'élimination lisait déjà `registrations.seed`. Les commandes vivent **sur les lignes de la liste des inscrites** (`RegistrationsPanel.tsx`, bloc « Inscriptions · ordre de départ »). La fenêtre d'édition est **dérivée du détail déjà reçu** (le serveur reste le juge, 409 sur écriture tardive, verrous du tournoi puis des matchs en toute première instruction) et le clic déplace la ligne tout de suite, corrigé ensuite par le flux. `TournamentSnapshot.seedingSource` (`MANUAL` / `RANKING` / `REGISTRATION`, règle unique `seedingSource()` partagée avec l'aperçu du plateau) dit si la liste triée par `seed` **est** le tirage : en `RANKING`, **avant le coup d'envoi** (`isPreLaunchState`), l'instantané range lui-même les inscrites selon le classement du site. Voir `docs/features/SEEDING_ORDER.md`.

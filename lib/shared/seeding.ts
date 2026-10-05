@@ -5,12 +5,14 @@
  * de la première manche dans **tous** les formats (haut de tableau contre bas
  * de tableau en élimination et en ronde suisse, couples adjacents en survie).
  *
- * Il reste modifiable par le staff tant qu'**aucun score n'a été saisi** : au
- * premier score, le tournoi est engagé et rejouer les appariements réécrirait
- * des matchs déjà joués. C'est la même définition de « saisie » que le
- * verrouillage des scores (`match-lock.ts`), byes et matchs fantômes exclus.
+ * Il reste modifiable par le staff **jusqu'au coup d'envoi** : dès la première
+ * manche posée, les joueurs voient leurs matchs, et rejouer les appariements les
+ * réécrirait sous leurs yeux. Une saisie de score le fige aussi — même
+ * définition de « saisie » que le verrouillage des scores (`match-lock.ts`),
+ * byes et matchs fantômes exclus.
  */
 import { hasScoreInput, type MatchScoreState } from "./match-lock";
+import { computeTournamentState, type TournamentStateInput } from "./tournament-state";
 import type { SeedingSource, TournamentFormat, TournamentState } from "./types";
 
 export type { SeedingSource } from "./types";
@@ -93,13 +95,42 @@ export type SeedingEntry = {
   seed: number;
 };
 
-export type SeedingLockReason = "FINISHED" | "SCORES_ENTERED" | null;
+export type SeedingLockReason = "FINISHED" | "SCORES_ENTERED" | "STARTED" | null;
+
+/**
+ * État qui juge la fenêtre du seeding : le stocké **ou** celui de l'horloge.
+ *
+ * La colonne `state` ne bascule qu'au prochain entretien : l'heure de début
+ * passée, elle peut dire encore `REGISTRATION` tant que personne n'a écrit ni
+ * ouvert la liste. Lue seule, elle laissait réordonner après le coup d'envoi —
+ * et l'écriture déclenchait alors la synchronisation qui lance le tournoi avec
+ * ce nouvel ordre. Même paire que le retrait d'un engagé
+ * (`entrantRemovalBlockReason`) : le stocké rattrape un lancement anticipé, le
+ * calculé une heure passée sans recalage.
+ *
+ * @param tournament Dates et état stocké (une `TournamentCard` convient).
+ * @param now Instant de référence, en millisecondes.
+ */
+export function seedingWindowState(
+  tournament: TournamentStateInput,
+  now: number = Date.now(),
+): TournamentState {
+  if (tournament.state === "FINISHED" || tournament.finishedAt) return "FINISHED";
+  if (tournament.state === "RUNNING") return "RUNNING";
+  return computeTournamentState(tournament, now);
+}
 
 /**
  * Pourquoi le seeding est-il figé ? `null` = encore modifiable.
  *
+ * `state` est l'état qui juge la fenêtre — `seedingWindowState`, pas la seule
+ * colonne stockée.
+ *
  * - `FINISHED` : tournoi terminé, l'ordre n'a plus aucun effet.
  * - `SCORES_ENTERED` : au moins un match porte une saisie.
+ * - `STARTED` : tournoi lancé (`RUNNING`). Dès le coup d'envoi, les matchs de
+ *   la première manche sont `READY` et les joueurs les voient : réordonner
+ *   régénérerait sous leurs yeux un plateau déjà annoncé, même sans score.
  */
 export function seedingLockReason(
   state: TournamentState,
@@ -107,6 +138,7 @@ export function seedingLockReason(
 ): SeedingLockReason {
   if (state === "FINISHED") return "FINISHED";
   if (matches.some(hasScoreInput)) return "SCORES_ENTERED";
+  if (state === "RUNNING") return "STARTED";
   return null;
 }
 

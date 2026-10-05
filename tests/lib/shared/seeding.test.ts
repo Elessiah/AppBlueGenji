@@ -8,6 +8,7 @@ import {
   moveInOrder,
   registrationsFollowRanking,
   seedingLockReason,
+  seedingWindowState,
   SEEDING_SOURCE_LABELS,
   seedingSource,
 } from "@/lib/shared/seeding";
@@ -41,8 +42,14 @@ describe("seedingLockReason", () => {
     expect(canReorderSeeding("UPCOMING", [])).toBe(true);
   });
 
-  it("laisse modifiable un tournoi démarré tant qu'aucun score n'est saisi", () => {
-    expect(seedingLockReason("RUNNING", [match(), match({ id: 2 })])).toBeNull();
+  it("laisse modifiable un plateau vierge avant le coup d'envoi", () => {
+    expect(seedingLockReason("REGISTRATION", [match(), match({ id: 2 })])).toBeNull();
+  });
+
+  it("fige un tournoi lancé, même sans score ni match", () => {
+    expect(seedingLockReason("RUNNING", [match(), match({ id: 2 })])).toBe("STARTED");
+    expect(seedingLockReason("RUNNING", [])).toBe("STARTED");
+    expect(canReorderSeeding("RUNNING", [])).toBe(false);
   });
 
   it.each([
@@ -58,12 +65,44 @@ describe("seedingLockReason", () => {
   it("ignore les byes et matchs fantômes, dont le score est posé par le moteur", () => {
     const bye = match({ team2Id: null, team1Score: 1, team2Score: 0, winnerTeamId: 10 });
     const ghost = match({ id: 2, team1Id: null, team2Id: null, team1Score: 0, team2Score: 0 });
-    expect(seedingLockReason("RUNNING", [bye, ghost])).toBeNull();
+    expect(seedingLockReason("REGISTRATION", [bye, ghost])).toBeNull();
   });
 
   it("fige un tournoi terminé, même sans match", () => {
     expect(seedingLockReason("FINISHED", [])).toBe("FINISHED");
     expect(canReorderSeeding("FINISHED", [])).toBe(false);
+  });
+});
+
+describe("seedingWindowState", () => {
+  const START = Date.parse("2026-10-05T18:00:00.000Z");
+  const card = (state: TournamentState, finishedAt: string | null = null) => ({
+    state,
+    finishedAt,
+    registrationOpenAt: "2026-10-01T18:00:00.000Z",
+    registrationCloseAt: "2026-10-05T17:30:00.000Z",
+    startAt: "2026-10-05T18:00:00.000Z",
+  });
+
+  it("garde la fenêtre ouverte avant l'heure de début", () => {
+    expect(seedingWindowState(card("REGISTRATION"), START - 3_600_000 * 24)).toBe("REGISTRATION");
+    // Inscriptions closes, coup d'envoi pas encore donné : toujours réglable.
+    expect(seedingWindowState(card("REGISTRATION"), START - 1)).toBe("UPCOMING");
+    expect(seedingLockReason(seedingWindowState(card("REGISTRATION"), START - 1), [])).toBeNull();
+  });
+
+  it("ferme la fenêtre à l'heure de début, même si l'état stocké n'a pas basculé", () => {
+    expect(seedingWindowState(card("REGISTRATION"), START)).toBe("RUNNING");
+    expect(seedingLockReason(seedingWindowState(card("REGISTRATION"), START), [])).toBe("STARTED");
+  });
+
+  it("suit un lancement anticipé, avant l'heure prévue", () => {
+    expect(seedingWindowState(card("RUNNING"), START - 3_600_000)).toBe("RUNNING");
+  });
+
+  it("tient pour terminé un tournoi clos, par l'état ou par la date de clôture", () => {
+    expect(seedingWindowState(card("FINISHED"), START - 1)).toBe("FINISHED");
+    expect(seedingWindowState(card("RUNNING", "2026-10-05T20:00:00.000Z"), START)).toBe("FINISHED");
   });
 });
 

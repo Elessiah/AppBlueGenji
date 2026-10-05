@@ -86,9 +86,8 @@ sur la base seedée après une passe : 17 tournois retenus pour les byes avant,
 **Ce que le filtre n'a pas à couvrir**, et pas par oubli : la *reconstruction*
 d'un plateau dont l'effectif aurait changé. Les inscriptions sont closes avant
 le coup d'envoi et aucune n'est retirée ensuite — seule la suppression du
-tournoi les efface. Un plateau à refaire se signale donc toujours par un
-`bracket_size` remis à `NULL`, ce que fait précisément le réordonnancement du
-seeding pour demander sa régénération (`SEEDING_ORDER.md`).
+tournoi les efface. Le réordonnancement du seeding est lui aussi figé au coup
+d'envoi (`SEEDING_ORDER.md`) : il ne touche jamais un plateau existant.
 
 ### 2. Une transaction par tournoi
 

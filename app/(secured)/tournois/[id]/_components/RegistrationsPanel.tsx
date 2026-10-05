@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, type PointerEvent } from "react";
-import { flushSync } from "react-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { formatLocalDateTime } from "@/lib/shared/dates";
 import { useToast } from "@/components/ui/toast";
 import { Pill } from "@/components/cyber";
@@ -10,6 +9,7 @@ import {
   moveInOrder,
   registrationsFollowRanking,
   seedingLockReason,
+  seedingWindowState,
   SEEDING_SOURCE_LABELS,
   type SeedingLockReason,
 } from "@/lib/shared/seeding";
@@ -23,7 +23,6 @@ import { useParticipantWording } from "../_lib/entrant-link";
 import { EntrantName } from "./EntrantName";
 import { mapError } from "../_lib/error-map";
 import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
-import { useSeedingDrag } from "../_hooks/useSeedingDrag";
 import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
 import {
   hiddenRegistrationCount,
@@ -39,8 +38,8 @@ interface RegistrationsPanelProps {
   /** Le staff peut-il agir ? Faux quand le suivi du tournoi est en échec. */
   canAct: boolean;
   /**
-   * Rafraîchit le détail après une écriture du staff — réordonnancement (le
-   * plateau est régénéré) ou retrait d'un engagé.
+   * Rafraîchit le détail après une écriture du staff — réordonnancement (l'aperçu
+   * du plateau suit le nouvel ordre) ou retrait d'un engagé.
    */
   onChanged: () => void;
 }
@@ -48,6 +47,7 @@ interface RegistrationsPanelProps {
 const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
   FINISHED: "Tournoi terminé : l'ordre n'a plus d'effet.",
   SCORES_ENTERED: "Un score a été saisi : l'ordre est désormais figé.",
+  STARTED: "Le tournoi a commencé : l'ordre de départ est désormais figé.",
 };
 
 /**
@@ -58,13 +58,13 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
  * non dans un second tableau des mêmes équipes ailleurs dans la page : deux
  * listes identiques dont une seule se manipule, c'est celle qu'on ne trouve pas.
  *
- * **Deux gestes pour un même ordre.** La poignée de gauche se glisse : c'est le
- * chemin rapide, un seul geste amenant le trentième rang en tête. Les flèches de
- * droite restent le chemin du clavier — un glisser-déposer n'a pas d'équivalent
- * au clavier, et les retirer priverait de l'ordre de départ qui ne tient pas une
- * souris. Les deux écrivent par la même route, avec le même aperçu optimiste.
+ * **Des flèches, pas de glisser-déposer.** Sur téléphone, la poignée de
+ * glissement se déclenchait en voulant faire défiler la liste : autant de
+ * réordonnancements involontaires. Les flèches ↑ / ↓ ne réagissent qu'à un
+ * appui franc (un `click`, que le navigateur n'émet pas pour un défilement) et
+ * servent aussi le clavier.
  *
- * La fenêtre d'édition (jusqu'à la première saisie de score) est **déduite du
+ * La fenêtre d'édition (jusqu'au coup d'envoi) est **déduite du
  * détail déjà reçu** — même règle pure que le serveur, `lib/shared/seeding.ts` —
  * plutôt que d'une requête à part : les commandes apparaissent avec la page, et
  * le serveur reste le juge, qui refuse en 409 une écriture devenue interdite.
@@ -99,22 +99,22 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const order = pending ?? serverOrder;
   const byId = new Map(detail.registrations.map((reg) => [reg.teamId, reg]));
 
-  const lockReason = seedingLockReason(detail.card.state, detail.matches.map(fromBracketMatch));
+  // L'heure vient d'un minuteur posé sur la prochaine bascule d'état du tournoi,
+  // et non d'un `Date.now()` au rendu : les deux fenêtres (ordre et retrait) se
+  // ferment au coup d'envoi, une seconde connue d'avance qu'aucune écriture
+  // n'annonce — le flux ne pousse un instantané que si quelqu'un a écrit. Sans
+  // cela les commandes resteraient offertes après l'heure, pour un 409 au clic.
+  const now = useTournamentNow(detail.card);
+  const lockReason = seedingLockReason(
+    seedingWindowState(detail.card, now),
+    detail.matches.map(fromBracketMatch),
+  );
   const staff = detail.isAdmin && canAct;
   const reorderable = staff && lockReason === null && detail.registrations.length > 1;
 
-  // Le retrait a sa **propre** fenêtre, plus courte que celle de l'ordre de
-  // départ : celui-ci reste réglable jusqu'à la première saisie de score, donc
-  // encore après le coup d'envoi, alors qu'un engagé ne se retire que tant que
-  // le tirage n'est pas fait (`lib/shared/entrant-removal.ts`). Les deux
-  // commandes partagent une cellule mais pas une condition.
-  //
-  // L'heure vient d'un minuteur posé sur la prochaine bascule d'état du tournoi,
-  // et non d'un `Date.now()` au rendu : la fenêtre de retrait se ferme au coup
-  // d'envoi, une seconde connue d'avance qu'aucune écriture n'annonce — le flux
-  // ne pousse un instantané que si quelqu'un a écrit. Sans cela le bouton
-  // resterait offert après l'heure, pour un refus en 409 au clic.
-  const now = useTournamentNow(detail.card);
+  // Le retrait a sa fonction (`lib/shared/entrant-removal.ts`), mais la même
+  // borne que l'ordre de départ : le coup d'envoi, lu sur la même paire état
+  // stocké / heure. Le réordonnancement exige en plus deux engagés.
   const removalBlock = entrantRemovalBlockReason(detail.card, now);
   const removable = staff && removalBlock === null;
   const showActions = reorderable || removable;
@@ -123,8 +123,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // d'effet » et « la liste est un palmarès » disent le même fait, et trois
   // paragraphes empilés au-dessus d'une liste ne se lisent plus. Le verrou de
   // l'ordre parle le premier, il garde la parole ; la phrase du retrait ne
-  // s'affiche que lorsqu'elle apprend quelque chose — typiquement sur un
-  // tournoi lancé, où l'ordre reste réglable mais où le retrait, lui, est clos.
+  // s'affiche que lorsqu'elle apprend quelque chose qu'il ne dit pas.
   const removalNoticeReason = removalNotice(removalBlock, lockReason);
 
   // Engagé dont on confirme le retrait. La ligne est gardée en entier plutôt
@@ -165,21 +164,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     [detail.card.id, detail.registrations, onChanged, serverKey, showError, showSuccess],
   );
 
-  const onDrop = useCallback(
-    (next: number[], teamId: number) => {
-      // Lâchée sous la dernière ligne visible, la ligne ne doit pas disparaître.
-      if (mustExpandToShow(next.indexOf(teamId), expanded)) setExpanded(true);
-      void applyOrder(next, teamId);
-    },
-    [applyOrder, expanded],
-  );
-
-  const drag = useSeedingDrag({ order, enabled: reorderable && !busy, onDrop });
-
-  // L'aperçu du geste prime sur l'aperçu de l'écriture : tant qu'on tire une
-  // ligne, c'est la position sous le pointeur qui doit s'afficher.
-  const displayOrder = drag.previewOrder ?? order;
-  const rows = displayOrder.flatMap((teamId) => {
+  const rows = order.flatMap((teamId) => {
     const reg = byId.get(teamId);
     return reg ? [reg] : [];
   });
@@ -209,38 +194,18 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // du site : elle n'est plus l'ordre d'arrivée, mais le tirage prévu.
   const followsRanking = registrationsFollowRanking(source, detail.card.state);
 
-  // Une seule cellule d'actions, trois gabarits de grille : la poignée n'existe
-  // qu'avec le réordonnancement, la cellule d'actions dès que l'une des deux
-  // commandes est là. Les gabarits sont exclusifs — deux classes de même poids
-  // sur la même propriété se départageraient par l'ordre de la feuille, ce qui
-  // n'est pas une règle qu'on veut avoir à relire.
+  // Une seule cellule d'actions, présente dès que l'une des deux commandes est là.
   const actionsColumn = registrationActionsColumn(reorderable, removable);
   const gridClass = actionsColumn.grid ? styles[actionsColumn.grid] : "";
-  // L'intitulé nomme ce que la colonne contient réellement, et il n'y a pas
-  // toujours les deux : « Ordre » seul sur un tournoi lancé sans score,
-  // « Retrait » seul sur un plateau d'un unique engagé.
+  // L'intitulé nomme ce que la colonne contient réellement : « Retrait » seul
+  // sur un plateau d'un unique engagé, « Actions » sinon.
   const actionsLabel = actionsColumn.label;
   const seedingHint = reorderable
-    ? "Ce rang décide des appariements de la première manche. Glissez une ligne par sa poignée pour la déplacer d'un bloc, ou utilisez les flèches ci-contre — jusqu'à la première saisie de score."
+    ? "Ce rang décide des appariements de la première manche. Utilisez les flèches ci-contre pour le régler — jusqu'au coup d'envoi."
     : `Ce rang décidera des appariements de la première manche. Il se règlera ici dès qu'il y aura deux ${wording.manyEngaged}.`;
 
   const hiddenCount = hiddenRegistrationCount(rows.length);
   const visibleRows = rows.slice(0, visibleRegistrationCount(rows.length, expanded));
-
-  // `useSeedingDrag` relève les emplacements de **toutes** les lignes au premier
-  // appui, une seule fois : une ligne masquée à cet instant ne serait jamais une
-  // cible. La liste se déplie donc, de façon synchrone, avant la mesure.
-  const gripProps = (teamId: number) => {
-    const { onPointerDown } = drag.handleProps(teamId);
-    return {
-      onPointerDown: (event: PointerEvent<HTMLElement>) => {
-        if (!expanded && hiddenCount > 0 && !busy && event.button === 0) {
-          flushSync(() => setExpanded(true));
-        }
-        onPointerDown(event);
-      },
-    };
-  };
 
   return (
     <div className="ds-block">
@@ -282,9 +247,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
       {rows.length === 0 ? (
         <p className={styles.empty}>Aucune inscription pour le moment.</p>
       ) : (
-        <div className={`${styles.table} ${drag.draggingTeamId !== null ? styles.dragging : ""}`}>
+        <div className={styles.table}>
           <div className={`${styles.row} ${styles.header} ${gridClass}`}>
-            {reorderable && <span aria-hidden="true" />}
             <span>Rang</span>
             <span>{wording.oneCapitalized}</span>
             <span>Inscription</span>
@@ -292,30 +256,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
             {showActions && <span className={styles.actionsHead}>{actionsLabel}</span>}
           </div>
           {visibleRows.map((reg, index) => (
-            <div
-              key={reg.teamId}
-              ref={drag.setRowRef(reg.teamId)}
-              className={[
-                styles.row,
-                gridClass,
-                drag.draggingTeamId === reg.teamId ? styles.dragged : "",
-              ]
-                .filter(Boolean)
-                .join(" ")}
-            >
-              {reorderable && (
-                /* Poignée purement pointeur : le clavier a les flèches, et un
-                   bouton qui ne répondrait pas à la barre d'espace serait un
-                   piège. D'où un `<span>` décoratif plutôt qu'un contrôle. */
-                <span
-                  aria-hidden="true"
-                  className={styles.grip}
-                  title="Glisser pour réordonner"
-                  {...gripProps(reg.teamId)}
-                >
-                  ⠿
-                </span>
-              )}
+            <div key={reg.teamId} className={`${styles.row} ${gridClass}`}>
               <span className={styles.seed}>#{index + 1}</span>
               <EntrantName
                 teamId={reg.teamId}

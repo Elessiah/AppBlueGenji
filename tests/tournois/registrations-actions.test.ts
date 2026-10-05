@@ -12,6 +12,10 @@ describe("removalNotice", () => {
     expect(removalNotice("ENTRANT_REMOVAL_TOURNAMENT_FINISHED", "FINISHED")).toBeNull();
   });
 
+  it("se tait sur un tournoi lancé, dont l'ordre figé dit déjà le coup d'envoi", () => {
+    expect(removalNotice("ENTRANT_REMOVAL_TOURNAMENT_STARTED", "STARTED")).toBeNull();
+  });
+
   it("parle quand elle apprend quelque chose", () => {
     expect(removalNotice("ENTRANT_REMOVAL_TOURNAMENT_STARTED", null)).toBe("ENTRANT_REMOVAL_TOURNAMENT_STARTED");
     expect(removalNotice("ENTRANT_REMOVAL_TOURNAMENT_STARTED", "SCORES_ENTERED")).toBe(
@@ -25,8 +29,8 @@ describe("removalNotice", () => {
 
 describe("registrationActionsColumn", () => {
   it.each<[boolean, boolean, ReturnType<typeof registrationActionsColumn>]>([
-    [true, true, { grid: "reorderable", label: "Actions" }],
-    [true, false, { grid: "reorderable", label: "Ordre" }],
+    [true, true, { grid: "withActions", label: "Actions" }],
+    [true, false, { grid: "withActions", label: "Ordre" }],
     [false, true, { grid: "withActions", label: "Retrait" }],
     [false, false, { grid: null, label: "Retrait" }],
   ])("réordonnable=%p, retirable=%p", (reorderable, removable, expected) => {

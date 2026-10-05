@@ -222,6 +222,7 @@ export const ERROR_MESSAGES: Record<string, string> = {
   // Ordre de départ (`PATCH /api/admin/tournaments/[id]/seeding`). Sans ces
   // phrases, le refus s'affichait tel quel dans le toast — « SEEDING_LOCKED ».
   SEEDING_LOCKED: "Un score a été saisi : l'ordre de départ est désormais figé.",
+  SEEDING_LOCKED_STARTED: "Le tournoi a commencé : l'ordre de départ est désormais figé.",
   INVALID_SEED_ORDER: "Ordre invalide : la liste doit contenir tous les engagés, une seule fois.",
   SEEDING_REORDER_FAILED: "Erreur lors de l'enregistrement du nouvel ordre.",
   // Retrait d'un engagé avant le coup d'envoi
