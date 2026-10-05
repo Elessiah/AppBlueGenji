@@ -246,7 +246,16 @@ export function MatchCardActions({
     place();
     window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", schedule);
+    // La carte peut bouger sans défilement : une ligne ajoutée par le flux
+    // (caster, direct) au-dessus du pied, une carte voisine qui grandit. Tout
+    // déplacement de ce genre change la taille d'un ancêtre — on les observe
+    // tous, de la carte au corps de page (une dizaine d'éléments).
+    const resizes = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(schedule);
+    for (let node = rootRef.current?.parentElement ?? null; node && resizes; node = node.parentElement) {
+      resizes.observe(node);
+    }
     return () => {
+      resizes?.disconnect();
       cancelAnimationFrame(frame);
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", schedule);
