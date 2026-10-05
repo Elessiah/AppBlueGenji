@@ -87,8 +87,8 @@ export async function loadMatchMaps(
 
 /**
  * La proposition d'une engagée devient le résultat retenu (accord des deux, ou
- * report seul à l'échéance du délai). Les propositions sont effacées dans la
- * foulée : `finalizeMatch` vient d'effacer leurs colonnes de score.
+ * report seul à l'échéance du délai). À appeler **avant** `finalizeMatch`, qui
+ * efface ensuite les propositions avec leurs colonnes de score.
  */
 export async function promoteReportedMaps(
   connection: PoolConnection,
@@ -104,11 +104,38 @@ export async function promoteReportedMaps(
      WHERE match_id = ? AND source = ?`,
     [matchId, from],
   );
-  await connection.execute(
-    `DELETE FROM bg_match_maps WHERE match_id = ? AND source IN ('TEAM1', 'TEAM2')`,
-    [matchId],
-  );
 }
+
+/**
+ * Efface des jeux de maps sur plusieurs matchs, **s'il y en a** (même raison
+ * que `clearMatchMaps` : pas de verrou d'intervalle pour rien).
+ *
+ * Les propositions (`TEAM1`, `TEAM2`) partent dès que leurs colonnes de score
+ * partent — clôture (`finalizeMatch`), abandon d'un moteur à classement,
+ * retour en arrière : elles ne documentent plus aucun résultat, et `/rgpd`
+ * promet de ne garder un code que avec le résultat qu'il documente. Le retour
+ * en arrière emporte aussi `FINAL`, le résultat qu'il décrivait étant défait.
+ */
+export async function clearMapSets(
+  connection: PoolConnection,
+  matchIds: ReadonlyArray<number>,
+  sources: ReadonlyArray<MatchMapSource>,
+): Promise<void> {
+  if (matchIds.length === 0 || sources.length === 0) return;
+  const where = `match_id IN (${matchIds.map(() => "?").join(", ")})
+       AND source IN (${sources.map(() => "?").join(", ")})`;
+  const params = [...matchIds, ...sources];
+  const result = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_maps WHERE ${where} LIMIT 1`,
+    params,
+  );
+  const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];
+  if (rows.length === 0) return;
+  await connection.execute(`DELETE FROM bg_match_maps WHERE ${where}`, params);
+}
+
+/** Propositions d'équipe d'un match (voir {@link clearMapSets}). */
+export const REPORTED_MAP_SOURCES: ReadonlyArray<MatchMapSource> = ["TEAM1", "TEAM2"];
 
 export interface MatchMapSets {
   final: MatchMapResult[];

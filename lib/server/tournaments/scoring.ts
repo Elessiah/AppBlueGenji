@@ -15,7 +15,13 @@ import {
 } from "./bot-logs";
 import { resolveUserEntrant } from "./registration";
 import { loadTournamentMatchRules } from "./repository";
-import { loadMatchMaps, promoteReportedMaps, replaceMatchMaps } from "./match-maps";
+import {
+  REPORTED_MAP_SOURCES,
+  clearMapSets,
+  loadMatchMaps,
+  promoteReportedMaps,
+  replaceMatchMaps,
+} from "./match-maps";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
@@ -167,6 +173,10 @@ export async function finalizeMatch(
     match.next_loser_slot === null ? null : Number(match.next_loser_slot),
     result.loserTeamId,
   );
+
+  // Les propositions map par map partent avec leurs colonnes de score
+  // (`docs/features/MAP_SCORES.md`) : celle qui fait foi a déjà été promue.
+  await clearMapSets(connection, [Number(match.id)], REPORTED_MAP_SOURCES);
 }
 
 /**
@@ -508,13 +518,15 @@ export async function reportMatchScore(
       const side = matchWinnerSide(matchFormat, team1Score, team2Score);
       const { winnerTeamId, loserTeamId } = sideTeamIds(side, updated.team1_id, updated.team2_id);
 
+      // Le détail confirmé devient le résultat retenu, avant que la clôture
+      // n'efface les propositions.
+      await promoteReportedMaps(connection, matchId, reporterSource);
       await finalizeMatch(connection, tournamentId, updated, {
         team1Score,
         team2Score,
         winnerTeamId,
         loserTeamId,
       });
-      await promoteReportedMaps(connection, matchId, reporterSource);
     } else {
       await connection.execute(`UPDATE bg_matches SET status = 'AWAITING_CONFIRMATION' WHERE id = ?`, [
         matchId,

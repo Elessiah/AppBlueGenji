@@ -44,6 +44,7 @@
  * rejoue pas.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { clearMapSets } from "./match-maps";
 import { getDatabase } from "@/lib/server/database";
 import { ignoreMissingTable } from "@/lib/server/mysql-errors";
 import { PLAYOFF_ROUND_OFFSET } from "@/lib/shared/bg-survie/rounds";
@@ -226,6 +227,8 @@ async function clearMatchResults(
        WHERE id IN (${ids.map(() => "?").join(", ")})`,
       ids,
     );
+    // Le résultat défait emporte son détail map par map, retenu comme proposé.
+    await clearMapSets(connection, ids, ["TEAM1", "TEAM2", "FINAL"]);
   }
 }
 

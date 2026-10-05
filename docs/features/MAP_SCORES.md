@@ -102,7 +102,13 @@ bg_match_maps (
 ```
 
 - `TEAM1` / `TEAM2` : la proposition de chaque engagée, à côté de ses colonnes
-  `teamN_report_*`.
+  `teamN_report_*` — et effacée **avec** elles (`clearMapSets`) : clôture
+  (`finalizeMatch`, après promotion de celle qui fait foi), abandon en Survie /
+  Ronde suisse, retour en arrière (qui emporte aussi `FINAL`). Un code n'est
+  gardé qu'avec le résultat qu'il documente.
+- Effacements gardés par une lecture préalable : un `DELETE` qui ne trouve rien
+  pose un verrou d'intervalle InnoDB, source d'interblocage entre deux reports
+  simultanés sur des matchs voisins.
 - `FINAL` : le détail retenu. Promu depuis la proposition qui fait foi (accord
   des deux engagées — celle qui confirme —, ou report seul à l'échéance), ou
   écrit par l'arbitrage. Un forfait l'efface toujours (arbitrage ou engagée :

@@ -1,4 +1,5 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { REPORTED_MAP_SOURCES, clearMapSets } from "./match-maps";
 import type { SqlParam, SqlParams } from "@/lib/server/database";
 import {
   DEFAULT_SWISS_POINTS,
@@ -730,6 +731,8 @@ export async function forfeitSwissTeam(
           match.id,
         ],
       );
+      // Abandon : les propositions map par map partent avec leurs colonnes.
+      await clearMapSets(conn, [Number(match.id)], REPORTED_MAP_SOURCES);
     }
   }
 

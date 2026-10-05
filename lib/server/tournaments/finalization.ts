@@ -517,16 +517,17 @@ export async function resolveExpiredScoreReports(
       );
       const { winnerTeamId, loserTeamId } = resolveSides(match, format, team1Score, team2Score);
 
+      // Le détail map par map du report qui fait foi devient le résultat
+      // retenu (`docs/features/MAP_SCORES.md`), avant que la clôture n'efface
+      // les propositions.
+      const { promoteReportedMaps } = await import("./match-maps");
+      await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2");
       await finalizeMatch(connection, tournamentId, match, {
         team1Score,
         team2Score,
         winnerTeamId,
         loserTeamId,
       });
-      // Le détail map par map du report qui fait foi devient le résultat
-      // retenu (`docs/features/MAP_SCORES.md`).
-      const { promoteReportedMaps } = await import("./match-maps");
-      await promoteReportedMaps(connection, Number(match.id), team1Reported ? "TEAM1" : "TEAM2");
       resolved += 1;
       continue;
     }

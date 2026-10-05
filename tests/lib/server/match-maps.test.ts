@@ -1,5 +1,7 @@
 import { describe, expect, it, jest } from "@jest/globals";
 import {
+  REPORTED_MAP_SOURCES,
+  clearMapSets,
   loadMapsByMatch,
   loadMatchMaps,
   promoteReportedMaps,
@@ -50,7 +52,7 @@ describe("stockage map par map (bg_match_maps)", () => {
     expect(sqls.at(-1)).toMatch(/^INSERT INTO bg_match_maps/);
   });
 
-  it("promeut la proposition retenue en résultat, puis efface les propositions", async () => {
+  it("promeut la proposition retenue en résultat (les propositions partent à la clôture)", async () => {
     const { execute, connection } = conn([[[{ found: 1 }], []]]);
     await promoteReportedMaps(connection, 10, "TEAM1");
     const sqls = execute.mock.calls.map((c) => flat(c[0]));
@@ -58,7 +60,24 @@ describe("stockage map par map (bg_match_maps)", () => {
     expect(execute.mock.calls[1][1]).toEqual([10, "FINAL"]);
     expect(sqls[2]).toMatch(/INSERT INTO bg_match_maps .* SELECT match_id, 'FINAL'.* WHERE match_id = \? AND source = \?$/);
     expect(execute.mock.calls[2][1]).toEqual([10, "TEAM1"]);
-    expect(sqls[3]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source IN ('TEAM1', 'TEAM2')");
+    expect(sqls).toHaveLength(3);
+  });
+
+  it("efface des jeux sur plusieurs matchs, et seulement s'il y en a", async () => {
+    const present = conn([[[{ found: 1 }], []]]);
+    await clearMapSets(present.connection, [10, 11], REPORTED_MAP_SOURCES);
+    expect(flat(present.execute.mock.calls[1][0])).toBe(
+      "DELETE FROM bg_match_maps WHERE match_id IN (?, ?) AND source IN (?, ?)",
+    );
+    expect(present.execute.mock.calls[1][1]).toEqual([10, 11, "TEAM1", "TEAM2"]);
+
+    const absent = conn();
+    await clearMapSets(absent.connection, [10], ["FINAL"]);
+    expect(absent.execute).toHaveBeenCalledTimes(1);
+
+    const none = conn();
+    await clearMapSets(none.connection, [], ["FINAL"]);
+    expect(none.execute).not.toHaveBeenCalled();
   });
 
   it("lit un jeu dans l'ordre joué, et rien sur une réponse inattendue", async () => {
