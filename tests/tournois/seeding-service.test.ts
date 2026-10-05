@@ -37,12 +37,19 @@ async function mockDb() {
   }));
 }
 
+const DAY = 24 * 60 * 60 * 1000;
+
 function tournament(overrides: RowOverrides<TournamentRow> = {}): TournamentRow {
   return tournamentRow({
     id: 5,
     state: "REGISTRATION",
     format: "SINGLE",
     manual_seeding: 0,
+    // Dates relatives à l'horloge : la fenêtre se juge aussi sur l'heure
+    // (`seedingWindowState`), et des dates figées finiraient dans le passé.
+    registration_open_at: new Date(Date.now() - DAY),
+    registration_close_at: new Date(Date.now() + DAY),
+    start_at: new Date(Date.now() + 2 * DAY),
     ...overrides,
   });
 }
@@ -334,6 +341,30 @@ describe("reorderSeeding", () => {
     expect(
       connection.execute.mock.calls.some(([sql]) => String(sql).includes("SET seed = ?")),
     ).toBe(false);
+  });
+
+  it("refuse dès l'heure de début passée, même si l'état stocké n'a pas encore basculé", async () => {
+    // Personne n'a écrit ni ouvert la liste depuis l'heure : la colonne dit
+    // encore REGISTRATION. Accepter ici ferait lancer le tournoi, par la
+    // synchronisation que l'écriture déclenche, avec un ordre posé trop tard.
+    jest.mocked(loadTournamentRow).mockResolvedValue(
+      tournament({
+        state: "REGISTRATION",
+        registration_close_at: new Date(Date.now() - 2 * 60_000),
+        start_at: new Date(Date.now() - 60_000),
+      }),
+    );
+    jest.mocked(getMatchRows).mockResolvedValue([]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED_STARTED$/);
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("refuse un tournoi lancé par anticipation, avant son heure de début", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "RUNNING" }));
+    jest.mocked(getMatchRows).mockResolvedValue([]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED_STARTED$/);
   });
 
   it("refuse un tournoi lancé dont le plateau n'est pas encore généré", async () => {
