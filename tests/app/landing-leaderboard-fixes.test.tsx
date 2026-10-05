@@ -21,14 +21,26 @@ function leaderboardRow(partial: Partial<LandingLeaderboardRow> = {}): LandingLe
 }
 
 describe("Leaderboard", () => {
-  it("mène vers l'annuaire des équipes, pas des joueurs", () => {
+  it("mène vers la page dédiée du classement, ni l'annuaire ni les joueurs", () => {
     const markup = renderToStaticMarkup(
       <ToastProvider>
         <Leaderboard initialRows={[leaderboardRow()]} />
       </ToastProvider>,
     );
-    expect(markup).toContain('href="/equipes"');
+    expect(markup).toContain('href="/classement"');
+    expect(markup).not.toContain('href="/equipes"');
     expect(markup).not.toContain('href="/joueurs"');
+  });
+
+  it("colore les défaites, laisse neutre un compte nul", () => {
+    const render = (losses: number) =>
+      renderToStaticMarkup(
+        <ToastProvider>
+          <Leaderboard initialRows={[leaderboardRow({ losses })]} />
+        </ToastProvider>,
+      );
+    expect(render(2)).toContain('class="result-loss">2<');
+    expect(render(0)).not.toContain("result-loss");
   });
 
   it("affiche un état vide plutôt qu'un tableau muet, en structure de tableau valide", () => {
