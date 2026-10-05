@@ -167,7 +167,7 @@ export function ConnectedAppsSection({
       </p>
 
       {connections === null ? (
-        <p style={{ fontSize: 13, color: "var(--text-2)", margin: 0 }}>Chargement…</p>
+        <p style={{ fontSize: 13, color: "var(--ink-quiet)", margin: 0 }}>Chargement…</p>
       ) : (
         <div className="table-like">
           {connections.map((rawConnection) => (
@@ -256,7 +256,7 @@ function ConnectionRow({
             />
             <strong style={{ fontSize: 14 }}>{label}</strong>
           </span>
-          <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
+          <span id={detailsId} style={{ fontSize: 11, color: "var(--ink-quiet)", lineHeight: 1.5 }}>
             {details}
           </span>
           {/*
@@ -383,7 +383,7 @@ function DiscordBotRow({
     <div className="table-row" style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}>
       <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
         <strong style={{ fontSize: 14 }}>{DISCORD_BOT_CONNECTION_LABEL}</strong>
-        <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
+        <span id={detailsId} style={{ fontSize: 11, color: "var(--ink-quiet)", lineHeight: 1.5 }}>
           {row.note}
         </span>
         {row.refusal ? (

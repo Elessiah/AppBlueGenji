@@ -35,7 +35,13 @@
   --cyber-bg-2: #0f1218;
   --cyber-bg-3: #161a22;
   --ink: #eaf4ff;
+  /* Paliers intermédiaires repris des anciens `--text-1` / `--text-2` (valeurs
+     inchangées) : `--ink-soft` entre `--ink` et `--ink-mute` (sous-titres,
+     libellés de champ), `--ink-quiet` entre `--ink-mute` et `--ink-dim`
+     (mentions secondaires). */
+  --ink-soft: #c8d8ec;
   --ink-mute: #a3bcd8;
+  --ink-quiet: #93a8c6;
   /* Textes secondaires teintés de bleu froid, jamais un gris neutre (palette
      « néon froid », docs/features/DESIGN_SYSTEM.md). `--ink-dim`, le plus
      atténué (mentions, sur-titres, légendes) : 6,26:1 sur `--cyber-bg-3`, le
@@ -137,7 +143,7 @@ body {
 }
 
 body {
-  color: var(--text-0);
+  color: var(--ink);
   background:
     radial-gradient(520px 360px at 14% 2%, rgba(90, 200, 255, 0.16), transparent 58%),
     radial-gradient(420px 300px at 88% -4%, rgba(167, 139, 250, 0.13), transparent 58%),
@@ -251,7 +257,7 @@ a {
 }
 
 .hero p {
-  color: var(--text-1);
+  color: var(--ink-soft);
   max-width: 760px;
 }
 
@@ -334,7 +340,7 @@ a {
 }
 
 .card p {
-  color: var(--text-1);
+  color: var(--ink-soft);
   margin-bottom: 0;
 }
 
@@ -353,7 +359,7 @@ a {
 }
 
 .kpi-label {
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -380,7 +386,7 @@ a {
 }
 
 .muted {
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .btn,
@@ -452,7 +458,7 @@ textarea,
   border-radius: 999px;
   border: 1px solid var(--line-strong);
   background: rgba(89, 212, 255, 0.14);
-  color: var(--text-0);
+  color: var(--ink);
   padding: 10px 16px;
   font-weight: 600;
   cursor: pointer;
@@ -556,14 +562,14 @@ textarea,
   border-radius: 999px;
   border: 1px solid rgba(var(--search-color), 0.25);
   background: rgba(var(--search-color), 0.05);
-  color: var(--text-0);
+  color: var(--ink);
   padding: 9px 18px;
   transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   outline: none;
 }
 
 .searchbar-input::placeholder {
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 /* Un anneau et pas seulement une bordure qui fonce : de 0,25 à 0,55 d'opacité,
@@ -614,7 +620,7 @@ textarea,
 .field label,
 .field .field-label {
   font-size: 13px;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 /* `:not([type="checkbox"])` n'est pas décoratif : ces trois règles décrivent un
@@ -629,7 +635,7 @@ textarea,
   border-radius: 10px;
   border: 1px solid var(--line-strong);
   background: rgba(10, 11, 15, 0.88);
-  color: var(--text-0);
+  color: var(--ink);
   padding: 10px 11px;
   transition: border-color 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
 }
@@ -676,7 +682,7 @@ textarea,
 .field textarea[readonly] {
   background: rgba(10, 11, 15, 0.55);
   border-color: var(--line-soft);
-  color: var(--text-1);
+  color: var(--ink-soft);
   cursor: default;
   /* `.field input:focus` déclare le halo vert plus haut, à **specificité
      égale** : sans reset explicite ici, un clic de souris sur le champ
@@ -693,7 +699,7 @@ textarea,
    distinct de celui de la saisie. */
 .field input[readonly]:focus-visible,
 .field textarea[readonly]:focus-visible {
-  border-color: var(--text-2);
+  border-color: var(--ink-quiet);
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
   background: rgba(10, 11, 15, 0.55);
 }
@@ -812,7 +818,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 }
 
 .table-header {
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -825,7 +831,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 
 .bracket-title {
   margin: 0 0 10px;
-  color: var(--text-1);
+  color: var(--ink-soft);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   font-size: 12px;
@@ -873,7 +879,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
   display: flex;
   justify-content: space-between;
   gap: 10px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 12px;
   margin-bottom: 8px;
 }
@@ -903,7 +909,7 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 }
 
 .helper {
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 12px;
 }
 
@@ -1186,7 +1192,7 @@ html:has([aria-modal="true"]:not([hidden])) .cta-float-help {
 }
 
 .ds-stat-label {
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -2229,7 +2235,9 @@ input[type="radio"]:disabled:checked {
 :root[data-a11y~="contrast"],
 .a11y-always-contrast {
   --ink: #f4f8fb;
+  --ink-soft: #e3ecf7;
   --ink-mute: #c4d4e6;
+  --ink-quiet: #bccbdf;
   --ink-dim: #a6b9d0;
   --ink-faint: #a6b9d0;
   --text-0: #f4f8fb;

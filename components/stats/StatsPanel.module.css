@@ -30,7 +30,7 @@
 }
 
 .tileLabel {
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -46,12 +46,12 @@
 
 .tileHint {
   margin-top: 4px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 11px;
 }
 
 .subhead {
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.14em;
@@ -113,11 +113,11 @@
 .formDraw {
   background: rgba(var(--blue-500-rgb), 0.08);
   border-color: var(--line-soft);
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 .empty {
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-size: 13px;
 }
 
@@ -138,7 +138,7 @@
 
 .splitLabel {
   font-size: 13px;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .splitTrack {
@@ -159,7 +159,7 @@
 
 .splitValue {
   font-size: 12px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -191,7 +191,7 @@
 }
 
 .opponentName a {
-  color: var(--text-0);
+  color: var(--ink);
   text-decoration: none;
 }
 
@@ -202,7 +202,7 @@
 .opponentMeta {
   margin-top: 6px;
   font-size: 12px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-variant-numeric: tabular-nums;
 }
 
@@ -219,7 +219,7 @@
   gap: 16px;
   margin-top: 10px;
   font-size: 11px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 .legendItem {

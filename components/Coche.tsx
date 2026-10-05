@@ -125,7 +125,7 @@ export function Coche({
         >
           {checked && "✓"}
         </span>
-        <span style={{ color: checked ? "var(--text-0)" : "var(--text-1)" }}>
+        <span style={{ color: checked ? "var(--ink)" : "var(--ink-soft)" }}>
           {label}
         </span>
       </span>

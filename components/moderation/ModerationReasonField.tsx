@@ -43,7 +43,7 @@ export function ModerationReasonField({
         aria-describedby={helpId}
         data-autofocus
       />
-      <p id={helpId} style={{ fontSize: 12, color: "var(--text-1)", margin: "6px 0 0" }}>
+      <p id={helpId} style={{ fontSize: 12, color: "var(--ink-soft)", margin: "6px 0 0" }}>
         Envoyés à {recipient} avec la décision. Décris les faits sans nommer d&apos;autre joueur (
         {SUSPENSION_REASON_MIN_LENGTH} à {SUSPENSION_REASON_MAX_LENGTH} caractères — {length} saisis).
       </p>

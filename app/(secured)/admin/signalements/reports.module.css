@@ -543,5 +543,5 @@
 .muted {
   margin: 0;
   font-size: 12.5px;
-  color: var(--text-1, var(--ink-mute));
+  color: var(--ink-soft, var(--ink-mute));
 }

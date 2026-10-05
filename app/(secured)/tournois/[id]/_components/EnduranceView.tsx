@@ -158,7 +158,7 @@ function EnduranceHistory({
 
   return (
     <div style={{ marginBottom: 24 }}>
-      <div className="mono" style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}>
+      <div className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", marginBottom: 8 }}>
         ENDURANCE MANCHE PAR MANCHE
       </div>
       <ScrollArea fade ariaLabel="Capital d'endurance manche par manche">
@@ -220,7 +220,7 @@ function EnduranceHistory({
       {/* Une case rouge n'est lisible qu'accompagnée de ce qu'elle veut dire :
           la légende n'apparaît que s'il y a effectivement un forfait à lire. */}
       {endurance.standings.some((standing) => standing.status === "FORFEIT") && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "8px 0 0" }}>
+        <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
           FF = FORFAIT SUR TOUT LE RESTE DU TOURNOI
         </p>
       )}
@@ -232,7 +232,7 @@ function EnduranceHistory({
       {endurance.standings.some((standing) =>
         standing.rounds.some((cell) => enduranceCellPenalty(cell) > 0),
       ) && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "8px 0 0" }}>
+        <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "8px 0 0" }}>
           SOULIGNÉ EN AMBRE = PÉNALITÉ D&apos;ARBITRAGE SUR CETTE MANCHE
         </p>
       )}
@@ -267,7 +267,7 @@ function PenaltyLog({
       <div
         id="endurance-penalty-log"
         className="mono"
-        style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 8 }}
+        style={{ fontSize: 11, color: "var(--ink-quiet)", marginBottom: 8 }}
       >
         PÉNALITÉS D&apos;ARBITRAGE
       </div>
@@ -442,7 +442,7 @@ export function EnduranceView({
         point par match gagné, alors qu'un 3-0 en déplace trois — et c'est ce
         même compte qui chiffre un forfait.
       */}
-      <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "0 0 16px" }}>
+      <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 16px" }}>
         ENDURANCE {endurance.startPoints} PTS · +{endurance.winDelta} PAR MAP GAGNÉE · −
         {endurance.lossDelta} PAR MAP PERDUE · FORFAIT COMPTÉ {endurance.forfeitMaps}-0 ·{" "}
         {endurance.playoffsStarted
@@ -580,7 +580,7 @@ export function EnduranceView({
       </div>
 
       {showOutLegend && (
-        <p className="mono" style={{ fontSize: 11, color: "var(--text-2)", margin: "0 0 24px" }}>
+        <p className="mono" style={{ fontSize: 11, color: "var(--ink-quiet)", margin: "0 0 24px" }}>
           HORS COURSE = CAPITAL RESTANT, MAIS PLUS AUCUNE CHANCE D&apos;ATTEINDRE LES PLAY-OFFS
           {endurance.maxRounds === null ? "" : ` DANS LES ${endurance.maxRounds} MANCHES PRÉVUES`}
         </p>
@@ -674,7 +674,7 @@ export function EnduranceView({
         </>
       ) : (
         decisive.length === 0 && (
-          <p style={{ color: "var(--text-2)", margin: 0, fontSize: 14 }}>{emptyLabel}</p>
+          <p style={{ color: "var(--ink-quiet)", margin: 0, fontSize: 14 }}>{emptyLabel}</p>
         )
       )}
     </>

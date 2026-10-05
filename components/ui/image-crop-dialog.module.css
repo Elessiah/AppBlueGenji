@@ -162,7 +162,7 @@
   margin: 10px 0 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-1, #c4cad4);
+  color: var(--ink-soft, #c4cad4);
 }
 
 /* Sur un écran tactile, l'aide clavier quitte l'écran mais pas la description
@@ -194,7 +194,7 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-1, #c4cad4);
+  color: var(--ink-soft, #c4cad4);
 }
 
 .preview {
@@ -230,7 +230,7 @@
 .error {
   margin: 0;
   font-size: 13px;
-  color: var(--text-1, #c4cad4);
+  color: var(--ink-soft, #c4cad4);
 }
 
 .footer {
@@ -246,7 +246,7 @@
   background: none;
   border: none;
   padding: 6px 4px;
-  color: var(--text-1, #c4cad4);
+  color: var(--ink-soft, #c4cad4);
   font: inherit;
   font-size: 13px;
   text-decoration: underline;

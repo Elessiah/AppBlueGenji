@@ -97,7 +97,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
           <h3 id="match-replay-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
             Rediff du match
           </h3>
-          <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
+          <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
           </p>
 
@@ -111,7 +111,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
                 border: "1px solid rgba(var(--amber-rgb), 0.4)",
                 background: "rgba(var(--amber-rgb), 0.1)",
                 fontSize: 12,
-                color: "var(--text-1, #c3ccd8)",
+                color: "var(--ink-soft, #c3ccd8)",
               }}
             >
               Ce match n&apos;est pas (ou plus) terminé : sa rediff n&apos;est pas affichée. Tu
@@ -137,7 +137,7 @@ export function MatchReplayDialog({ match, onClose, onSaved }: Readonly<MatchRep
               style={{
                 margin: "6px 0 0",
                 fontSize: 12,
-                color: invalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+                color: invalid ? "rgba(255,74,92,0.95)" : "var(--ink-quiet, #9aa4b2)",
               }}
             >
               {invalid

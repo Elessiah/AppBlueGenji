@@ -38,7 +38,7 @@
   border: none;
   cursor: pointer;
   text-align: left;
-  color: var(--text-0);
+  color: var(--ink);
   font: inherit;
   transition: background 0.15s ease;
 }
@@ -92,7 +92,7 @@
 
 .pill {
   font-size: 11px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
   font-weight: 500;
   /* Même jeton que le cadre du volet, cf. plus haut. */
   border: 1px solid var(--border, #444);

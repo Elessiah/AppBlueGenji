@@ -98,7 +98,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
         <h3 id="match-live-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
           Diffusion du match
         </h3>
-        <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
+        <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
           {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
         </p>
 
@@ -109,7 +109,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
             gap: 10,
             margin: "18px 0",
             fontSize: 14,
-            color: "var(--text-0, #e6ebf2)",
+            color: "var(--ink, #e6ebf2)",
             cursor: "pointer",
           }}
         >
@@ -130,7 +130,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                   fontSize: 12,
                   textTransform: "uppercase",
                   letterSpacing: "0.06em",
-                  color: "var(--text-2, #9aa4b2)",
+                  color: "var(--ink-quiet, #9aa4b2)",
                   padding: 0,
                   marginBottom: 8,
                 }}
@@ -147,7 +147,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                       alignItems: "center",
                       gap: 8,
                       fontSize: 13,
-                      color: disabled ? "var(--text-2, #9aa4b2)" : "var(--text-1, #c3ccd8)",
+                      color: disabled ? "var(--ink-quiet, #9aa4b2)" : "var(--ink-soft, #c3ccd8)",
                       marginBottom: 6,
                       cursor: disabled ? "not-allowed" : "pointer",
                     }}
@@ -165,7 +165,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                   </label>
                 );
               })}
-              <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--text-2, #9aa4b2)" }}>
+              <p style={{ margin: "4px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}>
                 {startAtMissing
                   ? "Aucune date de début n'est fixée sur ce match : l'antenne à l'heure dite demande d'abord un horaire."
                   : "Le direct s'arrête tout seul dès qu'un score est saisi."}
@@ -188,7 +188,7 @@ export function MatchLiveDialog({ match, onClose, onSaved }: Readonly<MatchLiveD
                 style={{
                   margin: "6px 0 0",
                   fontSize: 12,
-                  color: urlInvalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+                  color: urlInvalid ? "rgba(255,74,92,0.95)" : "var(--ink-quiet, #9aa4b2)",
                 }}
               >
                 {urlInvalid

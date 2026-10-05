@@ -75,7 +75,7 @@
 }
 
 .description {
-  color: var(--text-1);
+  color: var(--ink-soft);
   margin: 0;
   font-size: 14px;
   max-width: 560px;

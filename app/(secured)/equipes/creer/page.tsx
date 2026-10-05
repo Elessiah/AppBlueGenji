@@ -163,7 +163,7 @@ export default function CreateTeamPage() {
                 placeholder="Mon équipe"
               />
               <FieldErrorText fieldId={FIELD_IDS.name} message={fieldErrors.message("name")} />
-              <p id="team-name-help" style={{ fontSize: 12, color: "var(--text-1)", margin: "6px 0 0" }}>
+              <p id="team-name-help" style={{ fontSize: 12, color: "var(--ink-soft)", margin: "6px 0 0" }}>
                 {TEAM_NAME_MIN_LENGTH} à {TEAM_NAME_MAX_LENGTH} caractères, unique sur le site.
               </p>
             </div>

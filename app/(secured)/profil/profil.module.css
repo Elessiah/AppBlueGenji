@@ -3,12 +3,12 @@
  *
  * Tout y était écrit en style en ligne, et tout y avait le même poids : un champ
  * d'identité et le bouton qui efface le compte se ressemblaient à quelques
- * pixels près. Les aides des champs étaient en `--text-2` à 11 px, sous la
+ * pixels près. Les aides des champs étaient en `--ink-quiet` à 11 px, sous la
  * taille où ce gris reste confortable — d'où un texte gris pâle omniprésent que
  * personne ne lit.
  *
  * Trois règles ici : une **hiérarchie** (titre de section > libellé de champ >
- * aide), un **contraste** relevé pour les aides (`--text-1` à 12 px, que l'on
+ * aide), un **contraste** relevé pour les aides (`--ink-soft` à 12 px, que l'on
  * réserve à ce qui s'adresse vraiment au lecteur), et une **zone de danger**
  * qui ne ressemble à rien d'autre.
  */
@@ -99,7 +99,7 @@
 }
 
 .subtitle {
-  color: var(--text-1);
+  color: var(--ink-soft);
   margin: 0;
   font-size: 14px;
   line-height: 1.6;
@@ -119,7 +119,7 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--tone-ink, var(--text-1));
+  color: var(--tone-ink, var(--ink-soft));
   padding: 7px 13px;
   border: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.3);
   border-radius: 999px;
@@ -218,7 +218,7 @@
 .sectionLead {
   font-size: 13px;
   line-height: 1.6;
-  color: var(--text-1);
+  color: var(--ink-soft);
   margin: 0;
   max-width: 68ch;
 }
@@ -230,12 +230,12 @@
 /* ── Champs ───────────────────────────────────────────────────────────────── */
 
 /* L'aide d'un champ s'adresse au lecteur : elle mérite mieux qu'un gris de
-   mention légale. 12 px et `--text-1`, contre 11 px et `--text-2` partout
+   mention légale. 12 px et `--ink-soft`, contre 11 px et `--ink-quiet` partout
    avant. */
 .hint {
   font-size: 12px;
   line-height: 1.65;
-  color: var(--text-1);
+  color: var(--ink-soft);
   margin: 7px 0 0;
   max-width: 68ch;
 }
@@ -246,11 +246,11 @@
    de `.field label`. */
 .groupLabel {
   font-size: 13px;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .hintMuted {
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 .fieldLabelRow {
@@ -290,7 +290,7 @@
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: var(--tone-ink, var(--text-1));
+  color: var(--tone-ink, var(--ink-soft));
   margin: 0;
 }
 
@@ -544,6 +544,6 @@
 }
 
 .inviteOwnership {
-  color: var(--text-1);
+  color: var(--ink-soft);
   font-size: 12px;
 }

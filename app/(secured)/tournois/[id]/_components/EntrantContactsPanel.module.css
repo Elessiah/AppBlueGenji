@@ -9,7 +9,7 @@
   margin: 0 0 12px;
   font-size: 12.5px;
   line-height: 1.55;
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 .list {
@@ -35,7 +35,7 @@
 
 .teamName {
   font-size: 14px;
-  color: var(--ink, var(--text-0));
+  color: var(--ink);
 }
 
 /*
@@ -71,5 +71,5 @@
 }
 
 .pseudo {
-  color: var(--text-1, var(--ink));
+  color: var(--ink-soft, var(--ink));
 }

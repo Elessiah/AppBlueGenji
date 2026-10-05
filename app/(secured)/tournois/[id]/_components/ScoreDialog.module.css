@@ -53,14 +53,14 @@
 .title {
   margin: 0;
   font-size: 17px;
-  color: var(--ink, var(--text-0));
+  color: var(--ink, var(--ink));
 }
 
 .opponents {
   margin: 5px 0 0;
   font-size: 12.5px;
   line-height: 1.45;
-  color: var(--text-2, #9aa4b2);
+  color: var(--ink-quiet, #9aa4b2);
 }
 
 /* Ce qui est déjà en base : une ligne sobre, sans cadre — c'est un rappel, pas
@@ -87,7 +87,7 @@
   background: rgba(var(--amber-rgb), 0.1);
   font-size: 12.5px;
   line-height: 1.5;
-  color: var(--text-1, #c3ccd8);
+  color: var(--ink-soft, #c3ccd8);
 }
 
 /* En bloc : le bouton est une action, pas la fin de la phrase — collé au texte,
@@ -131,7 +131,7 @@
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--text-2, #9aa4b2);
+  color: var(--ink-quiet, #9aa4b2);
 }
 
 .sideLabel {
@@ -195,7 +195,7 @@
   border: 1px solid rgba(90, 200, 255, 0.35);
   border-radius: 8px;
   background: var(--cyber-bg-1, var(--surface-1));
-  color: var(--ink, var(--text-0));
+  color: var(--ink, var(--ink));
   font-family: var(--font-mono);
   font-size: 22px;
   font-weight: 700;
@@ -222,7 +222,7 @@
   margin: 12px 0 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-2, #9aa4b2);
+  color: var(--ink-quiet, #9aa4b2);
 }
 
 .forfeitZone {
@@ -237,7 +237,7 @@
   margin: 0 0 10px;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-2, #9aa4b2);
+  color: var(--ink-quiet, #9aa4b2);
 }
 
 .forfeitRow {
@@ -302,14 +302,14 @@
   background: none;
   font: inherit;
   font-size: 12.5px;
-  color: var(--text-2, #9aa4b2);
+  color: var(--ink-quiet, #9aa4b2);
   text-decoration: underline;
   cursor: pointer;
   transition: color 0.15s ease;
 }
 
 .link:hover:not(:disabled) {
-  color: var(--ink, var(--text-0));
+  color: var(--ink, var(--ink));
 }
 
 .link:focus-visible {
@@ -329,7 +329,7 @@
   margin: 18px 0 0;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-2, #9aa4b2);
+  color: var(--ink-quiet, #9aa4b2);
 }
 
 .actions {

@@ -39,7 +39,7 @@ interface SurvivalViewProps {
 
 const STATUS_META: Record<SurvivalStandingRow["status"], { label: string; color: string }> = {
   ACTIVE: { label: "En lice", color: ACCENT },
-  ELIMINATED: { label: "Éliminée", color: "var(--text-2)" },
+  ELIMINATED: { label: "Éliminée", color: "var(--ink-quiet)" },
   FORFEIT: { label: "Forfait", color: AMBER },
 };
 
@@ -97,10 +97,10 @@ export function SurvivalView({
 
       {/* Bandeau récap + action forfait */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
-        <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
+        <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
           Manche {survival.currentRound || "—"} · {activeCount} équipe{activeCount > 1 ? "s" : ""} en lice
         </span>
-        <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
+        <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
           {cadenceLabel}
         </span>
         {!isFinished && upcomingCut > 0 && (
@@ -123,7 +123,7 @@ export function SurvivalView({
               fontSize: 11,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
-              color: "var(--text-2)",
+              color: "var(--ink-quiet)",
               fontWeight: 600,
               marginBottom: 10,
             }}
@@ -157,7 +157,7 @@ export function SurvivalView({
                     fontSize: 13,
                   }}
                 >
-                  <span className="num" style={{ width: 22, color: "var(--text-2)", fontWeight: 600 }}>
+                  <span className="num" style={{ width: 22, color: "var(--ink-quiet)", fontWeight: 600 }}>
                     {team.rank}
                   </span>
                   <EntrantName
@@ -172,7 +172,7 @@ export function SurvivalView({
                     style={{ flex: "1 1 72px" }}
                     textStyle={{ fontWeight: isMine ? 700 : 500 }}
                   />
-                  <span className="mono" style={{ fontSize: 12, color: "var(--text-2)" }}>
+                  <span className="mono" style={{ fontSize: 12, color: "var(--ink-quiet)" }}>
                     {team.wins}-<span className="result-loss">{team.losses}</span>
                   </span>
                   <span

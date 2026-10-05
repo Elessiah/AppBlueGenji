@@ -71,13 +71,13 @@ export function DeleteTournamentDialog({
         Supprimer définitivement ce tournoi
       </h3>
 
-      <p style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
+      <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
         Cette action est irréversible. Le tournoi{" "}
         <strong style={{ color: "var(--ink)" }}>{tournamentName}</strong> disparaîtra du site avec
         tous ses matchs, ses inscriptions et ses classements — y compris des palmarès et des
         statistiques de ses participants.
       </p>
-      <p style={{ marginTop: 8, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
+      <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
         Aucune équipe ni aucun joueur n&apos;est supprimé : seuls les résultats de ce tournoi le
         sont.
       </p>

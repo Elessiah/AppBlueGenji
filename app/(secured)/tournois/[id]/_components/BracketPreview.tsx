@@ -45,7 +45,7 @@ function EntrantCell({ pairing, side }: Readonly<{ pairing: PreviewPairing; side
   // Emplacement vide : dire ce qui se passe vaut mieux qu'un tiret muet.
   if (!entrant) {
     return (
-      <span style={{ color: "var(--text-2)", fontStyle: "italic" }}>
+      <span style={{ color: "var(--ink-quiet)", fontStyle: "italic" }}>
         {pairing.kind === "MATCH" ? "—" : KIND_LABELS[pairing.kind]}
       </span>
     );
@@ -53,7 +53,7 @@ function EntrantCell({ pairing, side }: Readonly<{ pairing: PreviewPairing; side
 
   return (
     <span style={{ display: "inline-flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
-      <span className="num" style={{ fontSize: 11, color: "var(--text-2)" }}>
+      <span className="num" style={{ fontSize: 11, color: "var(--ink-quiet)" }}>
         #{entrant.seed}
       </span>
       {/* Pas d'ellipse : sur une colonne étroite, un nom d'équipe qui passe à
@@ -99,7 +99,7 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
       >
         <span
           className="eyebrow"
-          style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--text-1)" }}
+          style={{ fontSize: 11, letterSpacing: "0.08em", color: "var(--ink-soft)" }}
         >
           Aperçu — non joué
         </span>
@@ -116,7 +116,7 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
         </Pill>
       </div>
 
-      <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--text-2)", lineHeight: 1.6 }}>
+      <p style={{ margin: "0 0 10px", fontSize: 13, color: "var(--ink-quiet)", lineHeight: 1.6 }}>
         Voici les appariements qu&apos;un lancement immédiat produirait. Ils se recalculent à
         chaque inscription et à chaque changement de seeding
         {canReorder
@@ -131,7 +131,7 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
             margin: "0 0 14px",
             padding: "0 0 0 18px",
             fontSize: 12,
-            color: "var(--text-1)",
+            color: "var(--ink-soft)",
             lineHeight: 1.7,
           }}
         >
@@ -147,7 +147,7 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
             margin: "0 0 14px",
             padding: "0 0 0 18px",
             fontSize: 12,
-            color: "var(--text-2)",
+            color: "var(--ink-quiet)",
             lineHeight: 1.7,
           }}
         >
@@ -164,7 +164,7 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
               fontSize: 11,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
-              color: "var(--text-2)",
+              color: "var(--ink-quiet)",
               fontWeight: 600,
               marginBottom: 10,
             }}
@@ -190,14 +190,14 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
                     fontSize: 13,
                   }}
                 >
-                  <span className="num" style={{ minWidth: 28, color: "var(--text-2)" }}>
+                  <span className="num" style={{ minWidth: 28, color: "var(--ink-quiet)" }}>
                     {pairing.position}
                   </span>
                   <EntrantCell pairing={pairing} side="A" />
                   <span
                     style={{
                       fontSize: 11,
-                      color: "var(--text-2)",
+                      color: "var(--ink-quiet)",
                       textAlign: "center",
                       whiteSpace: "nowrap",
                     }}
@@ -213,7 +213,7 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
       )}
 
       {preview.pairings.length === 0 && (
-        <p style={{ margin: 0, fontSize: 13, color: "var(--text-2)" }}>
+        <p style={{ margin: 0, fontSize: 13, color: "var(--ink-quiet)" }}>
           Aucun appariement à afficher pour l&apos;instant : il faut au moins deux inscriptions.
         </p>
       )}

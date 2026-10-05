@@ -42,7 +42,7 @@ const SUBGRID: CSSProperties = {
 };
 
 const RIGHT: CSSProperties = { textAlign: "right" };
-const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--text-2)" };
+const SECONDARY: CSSProperties = { fontSize: 12, color: "var(--ink-quiet)" };
 
 const STATUS_META: Record<SwissStandingRow["status"], { label: string; color: string }> = {
   ACTIVE: { label: "En lice", color: ACCENT },
@@ -91,11 +91,11 @@ export function SwissView({
 
       {/* Bandeau récap : où en est-on dans les rondes prévues. */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "center" }}>
-        <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
+        <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
           Ronde {swiss.currentRound || "—"}/{swiss.totalRounds || "—"} ·{" "}
           {activeCount} équipe{activeCount > 1 ? "s" : ""} en lice
         </span>
-        <span className="mono" style={{ fontSize: 13, color: "var(--text-2)" }}>
+        <span className="mono" style={{ fontSize: 13, color: "var(--ink-quiet)" }}>
           {scoreLabel}
         </span>
         {!isFinished && roundsLeft > 0 && (
@@ -113,7 +113,7 @@ export function SwissView({
               fontSize: 11,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
-              color: "var(--text-2)",
+              color: "var(--ink-quiet)",
               fontWeight: 600,
               marginBottom: 10,
             }}
@@ -139,7 +139,7 @@ export function SwissView({
               tableau de données est l'exception que prévoit la règle de
               redistribution (WCAG 1.4.10). */}
           {swiss.standings.length === 0 ? (
-            <p style={{ margin: 0, fontSize: 13, color: "var(--text-2)" }}>
+            <p style={{ margin: 0, fontSize: 13, color: "var(--ink-quiet)" }}>
               {isFinished ? "Aucune équipe classée." : "Aucune équipe classée pour l'instant."}
             </p>
           ) : (
@@ -162,7 +162,7 @@ export function SwissView({
                       fontSize: 11,
                       textTransform: "uppercase",
                       letterSpacing: "0.05em",
-                      color: "var(--text-2)",
+                      color: "var(--ink-quiet)",
                     }}
                   >
                     <span role="columnheader" aria-label="Rang">
@@ -233,7 +233,7 @@ export function SwissView({
                         <span
                           role="cell"
                           className="num"
-                          style={{ color: "var(--text-2)", fontWeight: 600 }}
+                          style={{ color: "var(--ink-quiet)", fontWeight: 600 }}
                         >
                           {team.rank}
                         </span>
@@ -315,7 +315,7 @@ export function SwissView({
             </ScrollArea>
           )}
 
-          <p style={{ margin: "8px 2px 0", fontSize: 12, color: "var(--text-2)" }}>
+          <p style={{ margin: "8px 2px 0", fontSize: 12, color: "var(--ink-quiet)" }}>
             À points égaux :{" "}
             {swiss.tiebreakers.map((t) => TIEBREAKER_LABELS[t]).join(", ")}.
           </p>
@@ -378,7 +378,7 @@ export function SwissRounds({
 /** Pastille d'une ligne du classement ; tournoi clos, une équipe en lice est classée. */
 function standingMeta(team: SwissStandingRow, isFinished: boolean): { label: string; color: string } {
   if (isFinished && team.status === "ACTIVE") {
-    return team.rank === 1 ? { label: "Championne", color: ACCENT } : { label: "Classée", color: "var(--text-2)" };
+    return team.rank === 1 ? { label: "Championne", color: ACCENT } : { label: "Classée", color: "var(--ink-quiet)" };
   }
   return STATUS_META[team.status];
 }
