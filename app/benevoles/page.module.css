@@ -19,7 +19,7 @@
 
 .heroSub {
   margin: 20px 0 0;
-  color: var(--ink-mute);
+  color: var(--text-1);
   font-size: 17px;
   line-height: 1.6;
   max-width: 560px;
@@ -48,7 +48,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--blue-300);
 }
 
 .headActions {
@@ -184,7 +184,8 @@
   height: 80px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid rgba(90, 200, 255, 0.25);
+  border: 2px solid rgba(var(--blue-500-rgb), 0.45);
+  box-shadow: 0 0 0 4px rgba(var(--violet-400-rgb), 0.12), 0 0 26px -8px rgba(var(--blue-500-rgb), 0.7);
   display: block;
 }
 
@@ -193,7 +194,8 @@
   height: 80px;
   border-radius: 50%;
   background: rgba(90, 200, 255, 0.1);
-  border: 2px solid rgba(90, 200, 255, 0.25);
+  border: 2px solid rgba(var(--blue-500-rgb), 0.45);
+  box-shadow: 0 0 0 4px rgba(var(--violet-400-rgb), 0.12), 0 0 26px -8px rgba(var(--blue-500-rgb), 0.7);
   display: flex;
   align-items: center;
   justify-content: center;

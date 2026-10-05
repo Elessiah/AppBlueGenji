@@ -32,7 +32,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--blue-300);
 }
 
 .heroGrid {
@@ -104,7 +104,7 @@
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--violet-300);
   margin: 0;
 }
 
@@ -298,7 +298,7 @@
 }
 
 .principleNum {
-  color: var(--blue-300);
+  color: var(--violet-300);
   letter-spacing: 0.16em;
   font-size: 11px;
   padding-top: 2px;

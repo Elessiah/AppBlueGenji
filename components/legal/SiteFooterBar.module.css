@@ -2,7 +2,8 @@
   position: relative;
   z-index: 1;
   margin-top: 48px;
-  border-top: 1px solid var(--line-soft);
+  border-top: 1px solid transparent;
+  border-image: linear-gradient(90deg, transparent, rgba(var(--blue-500-rgb), 0.45), rgba(var(--violet-400-rgb), 0.45), transparent) 1;
   padding: 16px 0 20px;
 }
 
@@ -67,7 +68,7 @@
 }
 
 .links a:hover {
-  color: var(--ink);
+  color: var(--blue-300);
   text-decoration-color: currentColor;
 }
 

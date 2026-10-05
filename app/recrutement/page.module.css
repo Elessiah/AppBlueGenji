@@ -19,7 +19,7 @@
 
 .heroSub {
   margin: 20px 0 0;
-  color: var(--ink-mute);
+  color: var(--text-1);
   font-size: 17px;
   line-height: 1.6;
   max-width: 560px;
@@ -48,7 +48,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--blue-300);
 }
 
 .headActions {
