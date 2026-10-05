@@ -68,6 +68,11 @@ const AMBER_WARNINGS: Record<string, string> = {
   "app/bot/bot.css": "relais en retard, latence élevée",
   "app/connexion/_components/OAuthButtons.tsx": "navigateur qui bloque la connexion",
   "app/recrutement/page.module.css": "« Prioritaire », compteur proche de la limite",
+  // Bouton « Signaler un problème » des pieds de page, repassé à l'ambre.
+  "components/cyber/landing/PublicFooter.module.css":
+    "signaler un problème = avertissement / appel à l'attention, décision utilisateur 2026-10-05",
+  "components/legal/SiteFooterBar.module.css":
+    "signaler un problème = avertissement / appel à l'attention, décision utilisateur 2026-10-05",
 };
 
 function sources(): string[] {

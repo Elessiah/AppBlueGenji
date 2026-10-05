@@ -1,10 +1,15 @@
 import { describe, expect, it } from "@jest/globals";
 import {
   RANKING_GAME_FILTERS,
+  RANKING_MAX_SHOWN,
+  RANKING_PAGE_SIZE,
   parseRankingFilter,
+  parseRankingShown,
   pointsBehind,
   rankingFilterGame,
   rankingFilterHref,
+  rankingMoreHref,
+  rankingRowId,
 } from "@/lib/shared/ranking-page";
 
 describe("filtre de jeu de /classement", () => {
@@ -53,5 +58,35 @@ describe("écart au rang au-dessus", () => {
 
   it("ne rend jamais d'écart négatif", () => {
     expect(pointsBehind([{ points: 500 }, { points: 600 }], 1)).toBe(0);
+  });
+});
+
+describe("affichage progressif (?n=)", () => {
+  it("rend la première page sans paramètre ou sur une valeur invalide", () => {
+    for (const value of [undefined, "", "abc", "-50", "12.5", "1e3", "0x40", ["100", "150"]]) {
+      expect(parseRankingShown(value)).toBe(RANKING_PAGE_SIZE);
+    }
+  });
+
+  it("arrondit à la page supérieure et borne aux limites", () => {
+    expect(parseRankingShown("0")).toBe(50);
+    expect(parseRankingShown("1")).toBe(50);
+    expect(parseRankingShown(" 100 ")).toBe(100);
+    expect(parseRankingShown("101")).toBe(150);
+    expect(parseRankingShown("1000")).toBe(RANKING_MAX_SHOWN);
+    expect(parseRankingShown("99999")).toBe(RANKING_MAX_SHOWN);
+    expect(parseRankingShown("9".repeat(40))).toBe(RANKING_PAGE_SIZE);
+  });
+
+  it("garde l'onglet de jeu dans l'adresse de la page suivante, ancrée sur sa première ligne", () => {
+    expect(rankingMoreHref("all", 50)).toBe("/classement?n=100#rang-51");
+    expect(rankingMoreHref("mr", 100)).toBe("/classement?jeu=mr&n=150#rang-101");
+    expect(rankingFilterHref("ow", 50)).toBe("/classement?jeu=ow");
+    expect(rankingRowId(51)).toBe("rang-51");
+  });
+
+  it("n'offre plus de page suivante une fois le plafond atteint", () => {
+    expect(rankingMoreHref("all", RANKING_MAX_SHOWN)).toBeNull();
+    expect(rankingMoreHref("all", RANKING_MAX_SHOWN - 10)).toBe(`/classement?n=${RANKING_MAX_SHOWN}#rang-${RANKING_MAX_SHOWN - 9}`);
   });
 });

@@ -42,8 +42,6 @@ describe("pages publiques — l'ambre trié", () => {
     ["app/bot/docs/docs.css"],
     ["app/rgpd/page.module.css"],
     ["app/regles/[slug]/page.module.css"],
-    ["components/cyber/landing/PublicFooter.module.css"],
-    ["components/legal/SiteFooterBar.module.css"],
   ])("%s ne prend plus ni ambre ni orange", (file) => {
     const css = readSource(file);
     expect(css).not.toMatch(AMBER);
@@ -52,6 +50,17 @@ describe("pages publiques — l'ambre trié", () => {
 
   it("les avertissements gardés passent par le jeton, sans repli codé en dur", () => {
     expect(readSource("app/recrutement/page.module.css")).not.toMatch(WARM);
+  });
+
+  it.each([
+    ["components/cyber/landing/PublicFooter.module.css"],
+    ["components/legal/SiteFooterBar.module.css"],
+  ])("%s : « Signaler un problème » reprend l'ambre par le jeton", (file) => {
+    const css = stripComments(readSource(file));
+    const rule = blockFor(/\.report\s*\{/, css);
+    expect(rule).toContain("color: var(--amber);");
+    expect(rule).toContain("rgba(var(--amber-rgb), 0.4)");
+    expect(css).not.toMatch(WARM);
   });
 
   it("le graphe de /bot nomme ses scrims sans ambre", () => {

@@ -1,8 +1,14 @@
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ push: jest.fn() }),
+}));
+
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { RankingBoard, podiumGapText } from "@/app/classement/RankingBoard";
+import { rankingAddedMessage } from "@/app/classement/RankingMore";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
 
 /**
@@ -47,7 +53,7 @@ describe("RankingBoard", () => {
   it("n'affiche pas de podium sous trois équipes", () => {
     const markup = render({ rows: [row(1), row(2)] });
     expect(markup).not.toContain('aria-label="Podium"');
-    expect(markup).toContain("Classement complet des équipes");
+    expect(markup).toContain("Tableau du classement des équipes");
   });
 
   it("mène chaque équipe à sa fiche et libelle les cellules chiffrées", () => {
@@ -123,5 +129,35 @@ describe("styles de /classement", () => {
   it("n'emploie aucune police sous le plancher de 11 px", () => {
     const sizes = [...css.matchAll(/font-size:\s*(\d+)px/g)].map((match) => Number(match[1]));
     expect(Math.min(...sizes)).toBeGreaterThanOrEqual(11);
+  });
+});
+
+describe("RankingBoard — affichage progressif", () => {
+  const page = Array.from({ length: 50 }, (_, index) => row(index + 1));
+
+  it("rend un vrai lien « Afficher plus » vers la page suivante, sans JavaScript", () => {
+    const markup = render({ rows: page, filter: "ow", forms: null, hasMore: true });
+    expect(markup).toMatch(/<a href="\/classement\?jeu=ow&amp;n=100#rang-51"[^>]*>Afficher plus<\/a>/);
+    expect(markup).toContain('<output class="sr-only">');
+  });
+
+  it("n'offre aucun lien quand tout est affiché, mais garde la région d'annonce", () => {
+    const markup = render({ rows: page, hasMore: false });
+    expect(markup).not.toContain("Afficher plus");
+    expect(markup).toContain('<output class="sr-only">');
+  });
+
+  it("garde des rangs absolus et une ancre focalisable sur chaque ligne d'une page suivante", () => {
+    const second = Array.from({ length: 100 }, (_, index) => row(index + 1));
+    const markup = render({ rows: second, hasMore: true });
+    expect(markup).toMatch(/id="rang-51" tabindex="-1"/);
+    expect(markup).toContain(">51</span>");
+    expect(markup).toContain(">100</span>");
+    expect(markup).toContain('href="/classement?n=150#rang-101"');
+  });
+
+  it("annonce le nombre de lignes ajoutées, et la fin du classement", () => {
+    expect(rankingAddedMessage(50, false)).toBe("50 équipes ajoutées.");
+    expect(rankingAddedMessage(1, true)).toBe("1 équipe ajoutée. Fin du classement.");
   });
 });
