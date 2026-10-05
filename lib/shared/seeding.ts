@@ -104,6 +104,52 @@ export function registrationsFollowFrozenDraw(
   return source === "RANKING" && !isPreLaunchState(state);
 }
 
+type SeededRow = { teamId: number; seed: number };
+
+/** Ce que l'instantané a déjà chargé, et qui porte les rangs figés au lancement. */
+export type FrozenSeedSources = {
+  format: TournamentFormat;
+  swiss: { standings: readonly SeededRow[] } | null;
+  survival: { standings: readonly SeededRow[] } | null;
+  endurance: { standings: readonly SeededRow[] } | null;
+  phases: ReadonlyArray<{ id: number; position: number }> | null;
+  phaseStandings: Readonly<Record<number, readonly SeededRow[]>> | null;
+};
+
+/**
+ * `teamId → seed` figé au coup d'envoi, lu dans les classements que
+ * l'instantané a déjà chargés — mêmes tables, même règle que
+ * `loadFrozenRankingSeeds` (`lib/server/tournaments/frozen-seeds.ts`, pour qui
+ * ne les a pas sous la main) : Suisse, Survie et BG Survie lisent leur
+ * classement, le multi-phases sa première phase peuplée. Un seed nul (défaut
+ * de colonne) est ignoré.
+ */
+export function frozenSeedsOf(sources: FrozenSeedSources): Map<number, number> {
+  const rowsOf = (): readonly SeededRow[] => {
+    switch (sources.format) {
+      case "SWISS":
+        return sources.swiss?.standings ?? [];
+      case "SURVIVAL":
+        return sources.survival?.standings ?? [];
+      case "BG_SURVIE":
+        return sources.endurance?.standings ?? [];
+      case "MULTI": {
+        const first = [...(sources.phases ?? [])]
+          .sort((a, b) => a.position - b.position)
+          .find((phase) => (sources.phaseStandings?.[phase.id]?.length ?? 0) > 0);
+        return first ? (sources.phaseStandings?.[first.id] ?? []) : [];
+      }
+      default:
+        return [];
+    }
+  };
+  const seeds = new Map<number, number>();
+  for (const row of rowsOf()) {
+    if (row.seed > 0) seeds.set(row.teamId, row.seed);
+  }
+  return seeds;
+}
+
 /**
  * Range les inscrites par leur tête de série figée (`teamId → seed`) et porte
  * ce rang dans `seed`. Une engagée sans rang figé (absente de la table d'état)

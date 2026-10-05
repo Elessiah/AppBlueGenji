@@ -33,12 +33,12 @@ import { loadSoloUserIds } from "@/lib/server/solo-entries-service";
 import { toIso } from "@/lib/server/serialization";
 import { isSoloTournament } from "@/lib/shared/participants";
 import {
+  frozenSeedsOf,
   orderByFrozenSeeds,
   registrationsFollowFrozenDraw,
   registrationsFollowRanking,
   seedingSource,
 } from "@/lib/shared/seeding";
-import { loadFrozenRankingSeeds } from "./frozen-seeds";
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
 import { mapCard, mapMatch, type TournamentRow } from "./_internal";
 import {
@@ -387,8 +387,9 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     // qui bouge ailleurs (score d'un autre tournoi) est rattrapée par le
     // battement d'entretien de la salle, qui relit l'instantané.
     // Une fois lancé, le tirage est fait : la liste suit les têtes de série que
-    // le moteur a **figées** au coup d'envoi (`loadFrozenRankingSeeds`), et non
-    // la cote du moment ni la colonne `seed` (ordre d'arrivée). Ainsi
+    // le moteur a **figées** au coup d'envoi, lues dans les classements déjà
+    // chargés ci-dessus (`frozenSeedsOf`, aucune requête de plus), et non la
+    // cote du moment ni la colonne `seed` (ordre d'arrivée). Ainsi
     // `registrations[].seed` est, dans tous les cas, la tête de série réelle —
     // celle que trient les sections de manche et qu'affichent les écrans.
     const loadOrderedRegistrations = async () => {
@@ -400,7 +401,14 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
       if (registrationsFollowFrozenDraw(source, card.state)) {
         return orderByFrozenSeeds(
           registrationRows,
-          await loadFrozenRankingSeeds(connection, tournamentId, card.format),
+          frozenSeedsOf({
+            format: card.format,
+            swiss,
+            survival,
+            endurance,
+            phases: phasesDetail?.phases ?? null,
+            phaseStandings: phasesDetail?.phaseStandings ?? null,
+          }),
         );
       }
       return registrationRows;

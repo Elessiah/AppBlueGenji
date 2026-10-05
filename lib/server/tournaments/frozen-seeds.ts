@@ -11,7 +11,10 @@
  * reclasse jamais.
  *
  * La colonne `bg_tournament_registrations.seed` n'y garde que l'ordre
- * d'inscription — d'où cette lecture. Voir `docs/features/SEEDING_ORDER.md`.
+ * d'inscription — d'où cette lecture, faite par la carte live de l'accueil.
+ * L'instantané d'un tournoi, qui a déjà chargé ces classements, applique la
+ * même règle en mémoire (`frozenSeedsOf`, `lib/shared/seeding.ts`).
+ * Voir `docs/features/SEEDING_ORDER.md`.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import type { TournamentFormat } from "@/lib/shared/types";
