@@ -28,6 +28,7 @@ import {
 } from "@/lib/shared/match-launch";
 import type { BracketMatch } from "@/lib/shared/types";
 import { focusLeftMenu, handleMenuEscape } from "@/components/cyber/landing/PublicNavMenu";
+import { ScrollArea } from "@/components/cyber/ScrollArea";
 import { useLiveControls } from "../_lib/live-context";
 import { mapError } from "../_lib/error-map";
 import {
@@ -68,31 +69,42 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
 
 const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-type PanelPlacement = { top: number; left: number; width: number; up: boolean };
+type PanelPlacement = { top: number; left: number; width: number; maxHeight: number; up: boolean };
 
 const samePlacement = (a: PanelPlacement | null, b: PanelPlacement) =>
-  a !== null && a.top === b.top && a.left === b.left && a.width === b.width && a.up === b.up;
+  a !== null &&
+  a.top === b.top &&
+  a.left === b.left &&
+  a.width === b.width &&
+  a.maxHeight === b.maxHeight &&
+  a.up === b.up;
+
+/** Marge entre le panneau et le bord de la fenêtre. */
+const EDGE = 8;
+/** Le panneau mord de 4 px sur le pied, pour s'y rattacher visuellement. */
+const OVERLAP = 4;
 
 /**
- * Où poser le panneau ouvert (coordonnées de la fenêtre) : sous le pied
- * d'action, à la largeur de la carte (bordure comprise) ; au-dessus quand la
- * place manque en bas et qu'il y en a davantage en haut.
+ * Où poser le panneau ouvert (coordonnées de la fenêtre), à la largeur de la
+ * carte (bordure comprise) : du côté du pied d'action qui a le plus de place —
+ * dessous de préférence — **sans jamais recouvrir le pied** ni sortir de la
+ * fenêtre. Plus haut que la place disponible, il défile (`maxHeight`).
  */
 export function panelPlacement(
   footer: Pick<DOMRect, "top" | "bottom" | "left" | "width">,
   panelHeight: number,
   viewportHeight: number,
 ): PanelPlacement {
-  const below = viewportHeight - footer.bottom;
-  const up = below < panelHeight + 8 && footer.top > below;
-  const wanted = up ? footer.top - panelHeight + 4 : footer.bottom - 4;
-  // Toujours dans la fenêtre (marge de 8 px) : un panneau fixe ne défile pas,
-  // ses premières actions ne doivent pas commencer hors de l'écran.
-  const top = Math.max(8, Math.min(wanted, viewportHeight - panelHeight - 8));
+  const spaceBelow = Math.max(0, viewportHeight - (footer.bottom - OVERLAP) - EDGE);
+  const spaceAbove = Math.max(0, footer.top + OVERLAP - EDGE);
+  const up = panelHeight > spaceBelow && spaceAbove > spaceBelow;
+  const maxHeight = up ? spaceAbove : spaceBelow;
+  const shown = Math.min(panelHeight, maxHeight);
   return {
-    top: Math.round(top),
+    top: Math.round(up ? footer.top + OVERLAP - shown : footer.bottom - OVERLAP),
     left: Math.round(footer.left - 1),
     width: Math.round(footer.width + 2),
+    maxHeight: Math.floor(maxHeight),
     up,
   };
 }
@@ -158,6 +170,7 @@ export function MatchCardActions({
   // retire le panneau ne doit pas le laisser « ouvert » en mémoire, prêt à
   // reparaître déplié sans clic au retour d'une action.
   const expanded = open && more.length > 0;
+  const moreKey = more.map((a) => `${a.id}:${a.label}`).join("|");
   // …et l'oublie : sans cette remise à zéro, `open` resterait vrai et le
   // panneau reviendrait déplié avec la prochaine action secondaire.
   if (open && more.length === 0) setOpen(false);
@@ -200,7 +213,11 @@ export function MatchCardActions({
       const rect = panel.getBoundingClientRect();
       const originTop = rect.top - (Number.parseFloat(panel.style.top) || 0);
       const originLeft = rect.left - (Number.parseFloat(panel.style.left) || 0);
-      const onScreen = panelPlacement(root.getBoundingClientRect(), panel.offsetHeight, window.innerHeight);
+      // Hauteur naturelle : celle du panneau, liste dépliée en entier (elle
+      // peut être bornée par le placement précédent).
+      const list = panel.firstElementChild;
+      const natural = list ? panel.offsetHeight - list.clientHeight + list.scrollHeight : panel.offsetHeight;
+      const onScreen = panelPlacement(root.getBoundingClientRect(), natural, window.innerHeight);
       const next = {
         ...onScreen,
         top: Math.round(onScreen.top - originTop),
@@ -234,7 +251,9 @@ export function MatchCardActions({
       window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", schedule);
     };
-  }, [expanded]);
+    // `moreKey` : une action ajoutée ou retirée par le flux, panneau ouvert,
+    // change sa hauteur — il se replace.
+  }, [expanded, moreKey]);
 
   if (actions.length === 0) return null;
 
@@ -369,7 +388,16 @@ export function MatchCardActions({
           // valeur qu'une feuille de style ne peut pas connaître.
           style={placement ? { top: placement.top, left: placement.left, width: placement.width } : undefined}
         >
-          {more.map((action) => renderButton(action, true))}
+          {/* Bornée à la place disponible : sur une fenêtre basse, la liste
+              défile plutôt que de déborder hors de l'écran. */}
+          <ScrollArea
+            orientation="y"
+            className={styles.list}
+            ariaLabel={matchCardActionName("Plus d'actions", matchLabel)}
+            style={placement ? { maxHeight: placement.maxHeight } : undefined}
+          >
+            {more.map((action) => renderButton(action, true))}
+          </ScrollArea>
         </div>
       )}
       {/* Refermée d'elle-même si l'action disparaît (match lancé entre-temps

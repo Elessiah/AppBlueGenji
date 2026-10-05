@@ -101,19 +101,18 @@
      le repère réel (un ancêtre transformé le déplace). */
   top: 0;
   left: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 8px;
   border: 1px solid rgba(var(--blue-500-rgb), 0.45);
   border-radius: var(--r-cy-md);
   background: var(--cyber-bg-2);
   box-shadow: var(--shadow);
 }
 
-/* `display: flex` l'emporterait sur l'attribut `hidden`. */
-.panel[hidden] {
-  display: none;
+/* Liste des actions (`ScrollArea` verticale, bornée par `maxHeight`). */
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
 }
 
 .item {
