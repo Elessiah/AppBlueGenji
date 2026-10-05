@@ -218,6 +218,23 @@
   }
 }
 
+/* ── Tablette étroite (721–1000 px) : quatre liens dans la colonne de gauche ──
+   Avec « Classement », les liens à 0,2 em débordaient de leur tiers de grille
+   et décentraient le logo en rognant la droite. Interlettrage et écarts
+   resserrés ; en dernier recours, les liens passent à la ligne plutôt que de
+   déborder. */
+@media (min-width: 721px) and (max-width: 1000px) {
+  .navLeft {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 4px 14px;
+  }
+
+  .navLink {
+    letter-spacing: 0.08em;
+  }
+}
+
 /* ── Mobile : passage sur deux lignes (logo + avatar en haut, liens en bas) ──
    Les raccourcis « Accueil » / « Mon équipe » sont masqués : l'accueil reste
    accessible par le logo, l'équipe par le menu du compte (sous l'avatar).
