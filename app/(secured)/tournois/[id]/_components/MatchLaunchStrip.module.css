@@ -34,7 +34,7 @@
 }
 
 .launched {
-  color: var(--accent-green);
+  color: var(--teal-400);
 }
 
 .fact {
@@ -54,7 +54,7 @@
 }
 
 .ok {
-  color: var(--accent-green);
+  color: var(--teal-400);
 }
 
 .wait {

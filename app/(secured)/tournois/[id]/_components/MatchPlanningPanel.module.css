@@ -48,7 +48,7 @@
 .done {
   margin: 0;
   font-size: 12px;
-  color: var(--green, #4fe0a2);
+  color: var(--teal-400);
 }
 
 .actions {
