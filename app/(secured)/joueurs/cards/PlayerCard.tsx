@@ -117,7 +117,7 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
         <div>
           <div className={s.plStatLbl}>V – D</div>
           <div className={s.plStatVal}>
-            {player.wins || 0}–{player.losses || 0}
+            {player.wins || 0}–<span className="result-loss">{player.losses || 0}</span>
           </div>
         </div>
       </div>

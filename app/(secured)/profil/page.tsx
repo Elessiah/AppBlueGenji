@@ -1042,7 +1042,7 @@ export default function ProfilePage() {
             { label: "Tournois joués", value: data.stats.tournamentsPlayed, tone: "blue" },
             { label: "Tournois gagnés", value: data.stats.tournamentsWon, tone: "pink" },
             { label: "Victoires", value: data.stats.matchesWon, tone: "teal" },
-            { label: "Défaites", value: data.stats.matchesLost, tone: "violet" },
+            { label: "Défaites", value: data.stats.matchesLost, tone: "loss" },
             { label: "Meilleur rang", value: data.stats.bestRank ?? "—", tone: "cyan" },
           ].map((stat) => (
             <div key={stat.label} className={s.stat} data-tone={stat.tone}>

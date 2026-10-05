@@ -87,6 +87,12 @@
   --tone-ink: var(--pink-400);
 }
 
+/* Défaite : teinte réservée (DESIGN_SYSTEM.md § Défaite), jamais une section. */
+.page [data-tone="loss"] {
+  --tone-rgb: var(--result-loss-rgb);
+  --tone-ink: var(--result-loss-ink);
+}
+
 .page [data-tone="danger"] {
   --tone-rgb: var(--danger-rgb);
   --tone-ink: var(--danger);

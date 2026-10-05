@@ -42,7 +42,7 @@ export function TeamHistory({ tournaments }: Readonly<{ tournaments: TeamHistory
                 </span>
                 <span role="cell">
                   <span className={styles.cellLabel}>Bilan </span>
-                  {entry.wins} V – {entry.losses} D
+                  {entry.wins} V – <span className="result-loss">{entry.losses} D</span>
                 </span>
                 <span role="cell">
                   <span className={styles.cellLabel}>Place </span>

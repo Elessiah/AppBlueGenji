@@ -34,7 +34,7 @@ export function HighlightStrip({ teams }: Readonly<{ teams: TeamListItem[] }>) {
           <div>
             <div className={s.name}>{t.name}</div>
             <div className={s.meta}>
-              {t.wins}V – {t.losses}D{t.region ? ` · ${t.region}` : ""}
+              {t.wins}V – <span className="result-loss">{t.losses}D</span>{t.region ? ` · ${t.region}` : ""}
             </div>
           </div>
           {/* Même nuance que sur la carte : un filtre par jeu peut laisser

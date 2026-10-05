@@ -295,7 +295,7 @@ export default function PlayerDetailPage() {
               <Link href={`/tournois/${entry.tournamentId}`}>{entry.tournamentName}</Link>
               <span data-label="Statut">{entry.state}</span>
               <span data-label="Bilan">
-                {entry.wins}W / {entry.losses}L
+                {entry.wins}W / <span className="result-loss">{entry.losses}L</span>
               </span>
               <span data-label="Classement">{entry.finalRank ?? "-"}</span>
             </div>

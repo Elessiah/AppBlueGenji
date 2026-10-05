@@ -540,7 +540,7 @@
   color: var(--teal-400);
 }
 .tmStatVal.loss {
-  color: var(--ink-mute);
+  color: var(--result-loss-ink);
 }
 
 .tmRoster {
@@ -653,7 +653,9 @@
   background: var(--teal-400);
 }
 .tmFormCell.l {
-  background: rgba(var(--pink-400-rgb), 0.75);
+  /* Défaite : cramoisi haché, halo propre (DESIGN_SYSTEM.md § Défaite). */
+  background: var(--result-loss-hatch);
+  box-shadow: var(--result-loss-glow);
 }
 .tmFormCell.d {
   background: var(--ink-faint);

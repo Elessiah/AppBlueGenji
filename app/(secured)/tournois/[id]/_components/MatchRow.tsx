@@ -124,8 +124,12 @@ export const MatchRow = memo(function MatchRow({
   const loserClass = hasWinner ? styles.decided : "";
   const rowClass = (win: boolean): string =>
     [styles.row, win ? styles.winner : loserClass].filter(Boolean).join(" ");
-  const scoreClass = (forfeits: boolean): string =>
-    forfeits ? `${styles.score} ${styles.forfeitScore}` : styles.score;
+  // Score du perdant en teinte de défaite — jamais sur la case vide d'une
+  // exemption (BYE, TBD) : personne n'y a perdu. Un forfait garde son ambre.
+  const scoreClass = (forfeits: boolean, lost: boolean): string => {
+    if (forfeits) return `${styles.score} ${styles.forfeitScore}`;
+    return lost ? `${styles.score} ${styles.lostScore}` : styles.score;
+  };
 
   const [side1, side2] = matchSideViews(match, roundNumber, isDoubleForfeit);
   const { win: team1Win, forfeits: team1Forfeits, score: team1Score } = side1;
@@ -191,7 +195,7 @@ export const MatchRow = memo(function MatchRow({
           truncate
           className={styles.name}
         />
-        <strong className={scoreClass(team1Forfeits)}>{team1Score}</strong>
+        <strong className={scoreClass(team1Forfeits, hasWinner && !team1Win && match.team1Id !== null)}>{team1Score}</strong>
       </div>
       <div className={rowClass(team2Win)}>
         <EntrantName
@@ -201,7 +205,7 @@ export const MatchRow = memo(function MatchRow({
           truncate
           className={styles.name}
         />
-        <strong className={scoreClass(team2Forfeits)}>{team2Score}</strong>
+        <strong className={scoreClass(team2Forfeits, hasWinner && !team2Win && match.team2Id !== null)}>{team2Score}</strong>
       </div>
 
       {(isDraw || isDoubleForfeit) && (

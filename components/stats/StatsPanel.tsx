@@ -57,11 +57,16 @@ function Group({ id, title, children }: Readonly<{ id: string; title: string; ch
   );
 }
 
-function Tile({ label, value, hint }: Readonly<{ label: string; value: string | number; hint?: string }>) {
+function Tile({
+  label,
+  value,
+  hint,
+  loss = false,
+}: Readonly<{ label: string; value: string | number; hint?: string; loss?: boolean }>) {
   return (
     <div className={s.tile}>
       <div className={s.tileLabel}>{label}</div>
-      <div className={s.tileValue}>{value}</div>
+      <div className={loss ? `${s.tileValue} result-loss` : s.tileValue}>{value}</div>
       {hint ? <div className={s.tileHint}>{hint}</div> : null}
     </div>
   );
@@ -269,7 +274,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
         <div className={s.grid}>
           <Tile label="Matchs joués" value={stats.matchesPlayed} />
           <Tile label="Victoires" value={stats.matchesWon} />
-          <Tile label="Défaites" value={stats.matchesLost} />
+          <Tile label="Défaites" value={stats.matchesLost} loss />
           {/* Les nuls ne s'affichent que s'il y en a : ils n'existent que dans un
               mode et un seul, et une tuile à zéro sur toutes les autres fiches
               poserait une question que rien n'y répond. */}

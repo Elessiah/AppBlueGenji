@@ -57,6 +57,26 @@ La pastille nue étant désormais bleutée, une pastille qui **oppose** un état
 
 `--amber` n'entre dans aucune nouvelle règle ; ses usages existants (avertissements, retour en arrière, « Urgente ») migrent dans les lots suivants (`LANDING_ANIMATIONS.md` § Lots suivants).
 
+### Défaite — teinte réservée (2026-10)
+
+Décision du 2026-10-05 : la défaite ne partage sa couleur avec **rien d'autre**. Elle était rose (`--pink-400`), le rose du rôle DPS, du podium et des « Inscriptions ouvertes » ; elle a désormais son propre jeu de jetons, déclarés en fin de `:root` dans `app/globals.css` :
+
+| Jeton | Valeur | Usage |
+| --- | --- | --- |
+| `--result-loss` (`-rgb` : `255, 31, 90`) | `#ff1f5a` | remplissages : barres de forme, liserés, halos |
+| `--result-loss-ink` | `#ff5c85` (contraste renforcé : `#ff7a9b`) | **tout texte** de défaite : 5,91:1 sur `--cyber-bg-3`, 5,07:1 sur ce fond teinté à 12 % de défaite |
+| `--result-loss-soft` | `--result-loss` à 14 % | fond d'une ligne perdante |
+| `--result-loss-glow` | halo statique de 2 px, plus court que l’écart de 3 px entre deux barres (il ne déborde pas sur la voisine) | barres de défaite |
+| `--result-loss-hatch` | hachures à 135° | barres de défaite |
+
+**Pourquoi ce cramoisi électrique.** Dans une palette de néons froids, seule une teinte rouge se lit d'emblée comme une défaite ; mais le rouge du direct (`--red-live` `#ff4d5e`, réservé à `.pill-live`) et le saumon des erreurs (`--danger` `#ff6e82`) occupent déjà le rouge chaud et pâle. `#ff1f5a` est plus froid (teinte 344°, tirée vers le magenta) et entièrement saturé : ni orangé comme le direct, ni pastel comme le rose de rehaut ou le saumon des erreurs.
+
+**Indice de forme.** Parce que deux rouges restent voisins pour un œil daltonien, une barre de défaite est **hachurée** et porte un halo — une barre de victoire (sarcelle) ou de nul reste pleine. Le direct, lui, est une pastille à point clignotant : les deux ne se confondent pas même en niveaux de gris.
+
+**Où.** Barres de forme V/D (`TeamCard`, `annuaire.module.css`), chiffre « Défaites » des cartes d'équipe, de l'en-tête d'équipe (`TeamHeader`), du profil (`data-tone="loss"`) et du panneau de statistiques (`StatsPanel`), part « D » des bilans (`TeamHistory`, historique de `/joueurs/[id]`, `PlayerCard`, `HighlightStrip`) via la classe globale `.result-loss`, score du perdant d'un match tranché (`MatchRow`, classe `lostScore` ; ni forfait, qui garde son ambre, ni case vide d'une exemption), ligne `.team-line.lose`. Même classe pour la part « D » des classements Survie, Suisse et Endurance (`SurvivalView`, `SwissView`, `EnduranceView`). Le classement de la vitrine (`components/cyber/landing/Leaderboard.tsx`) relève du lot des pages publiques.
+
+**Garde-fou.** `tests/app/loss-colour.test.ts` balaie `app/` et `components/` : `--result-loss*` et `.result-loss` n'apparaissent que dans une règle ou un composant de défaite, et aucune barre de défaite ne reprend le rose.
+
 ### Composants
 Primitives dans `components/cyber/` :
 - **CyberButton** — `variant="primary"|"ghost"`, support `asChild` (Radix Slot)

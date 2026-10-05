@@ -104,6 +104,13 @@
   color: var(--teal-400);
 }
 
+/* Score du perdant : la teinte réservée à la défaite (DESIGN_SYSTEM.md § Défaite).
+   Posée par `MatchRow` sur un vrai perdant seulement — ni case vide d'une
+   exemption, ni forfait, qui garde son ambre. */
+.lostScore {
+  color: var(--result-loss-ink);
+}
+
 /* « FF » : l'ambre du forfait, qu'il soit tranché ou seulement noté. */
 .forfeitScore {
   color: var(--amber);
