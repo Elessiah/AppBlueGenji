@@ -173,8 +173,19 @@ describe("fiche — filets de section, cartes de match, panneaux", () => {
 
   it("les titres de panneau en dégradé retombent sur un aplat sous « Contraste renforcé » et à l'impression", () => {
     expect(PAGE_CSS).toMatch(/\.sheet :global\(\.ds-section-title\.green\) h2[^{]*\{[^}]*var\(--grad-brand\)/);
+    // Variantes en dégradé seulement : « Zone de danger » garde son rouge.
     expect(PAGE_CSS).toMatch(
-      /:global\(:root\[data-a11y~="contrast"\]\) \.sheet :global\(\.ds-section-title\) h2\s*\{[^}]*color:\s*var\(--ink\)/,
+      /:global\(:root\[data-a11y~="contrast"\]\) \.sheet :global\(\.ds-section-title\.green\) h2,\s*:global\(:root\[data-a11y~="contrast"\]\) \.sheet :global\(\.ds-section-title\.blue\) h2\s*\{[^}]*color:\s*var\(--ink\)/,
+    );
+    expect(PAGE_CSS).not.toMatch(/\.sheet :global\(\.ds-section-title\) h2/);
+  });
+
+  it("« Contraste renforcé » rend aux liserés translucides leur bordure à jeton", () => {
+    expect(PAGE_CSS).toMatch(
+      /:global\(:root\[data-a11y~="contrast"\]\) \.sheet :global\(\.ds-block\.ds-block\):not\(\.danger\)\s*\{[^}]*border-color:\s*var\(--line\)/,
+    );
+    expect(LIST_CSS).toMatch(
+      /:global\(:root\[data-a11y~="contrast"\]\) \.sectionNavLink\[data-tone\]\s*\{[^}]*border-color:\s*var\(--line-strong-cy\)/,
     );
     // À l'impression, le repli reprend **les mêmes sélecteurs** que le dégradé :
     // moins spécifique, il perdrait, et le titre (texte transparent, fond non

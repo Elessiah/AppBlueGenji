@@ -277,6 +277,11 @@ a.sectionNavLink:focus-visible {
   background: linear-gradient(90deg, rgba(var(--tone-rgb), 0.08), var(--cyber-bg-1) 70%);
 }
 
+/* « Contraste renforcé » rend la bordure à jeton, que ce réglage renforce. */
+:global(:root[data-a11y~="contrast"]) .sectionNavLink[data-tone] {
+  border-color: var(--line-strong-cy);
+}
+
 a.sectionNavLink[data-tone="running"]:hover,
 a.sectionNavLink[data-tone="registration"]:hover,
 a.sectionNavLink[data-tone="upcoming"]:hover,

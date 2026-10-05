@@ -38,7 +38,9 @@
   margin-bottom: -0.12em;
 }
 
-:global(:root[data-a11y~="contrast"]) .sheet :global(.ds-section-title) h2 {
+/* Les seules variantes en dégradé : « Zone de danger » garde son rouge. */
+:global(:root[data-a11y~="contrast"]) .sheet :global(.ds-section-title.green) h2,
+:global(:root[data-a11y~="contrast"]) .sheet :global(.ds-section-title.blue) h2 {
   background: none;
   color: var(--ink);
 }
@@ -57,6 +59,12 @@
     transform 0.22s ease,
     box-shadow 0.22s ease,
     border-color 0.22s ease;
+}
+
+/* « Contraste renforcé » rend aux panneaux leur bordure à jeton (`--line`,
+   que ce réglage renforce) au lieu du liseré glacier translucide. */
+:global(:root[data-a11y~="contrast"]) .sheet :global(.ds-block.ds-block):not(.danger) {
+  border-color: var(--line);
 }
 
 @media (hover: hover) and (pointer: fine) {
