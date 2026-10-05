@@ -52,7 +52,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `TOURNAMENT_MATCH_CARD_STYLES.md` — Carte de match et fiche de tournoi sur les jetons.
 - `MATCH_CARD_LAYOUT.md` — Carte de match lisible : engagés et score d'abord, zone d'état, une action principale + « Plus d'actions » (inventaire par public).
 - `TOURNAMENT_RULES_SETTINGS.md` — Réglages d'un tournoi affichés sur sa page de règles.
-- `RULES_PAGE_LAYOUT.md` — Mise en page des pages de règles `/regles/[slug]`.
+- `RULES_PAGE_LAYOUT.md` — Mise en page des pages de règles `/regles/[slug]` ; teinte de chaque mode (carte, page, schémas).
 - `BRACKET_SECTIONS.md` — Sections repliables de l'arbre.
 - `BRACKET_SLOT_HEIGHT.md` — Hauteur des créneaux de l'arbre à élimination.
 - `LANDING_ANIMATIONS.md` — Animations de l'accueil (apparition au défilement, décompte, éclats, reflet, pastille d'attente) sous la porte unique du régime de charge ; plan des lots de couleur suivants.

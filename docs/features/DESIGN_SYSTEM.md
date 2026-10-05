@@ -60,8 +60,8 @@ La pastille nue étant désormais bleutée, une pastille qui **oppose** un état
 ### Composants
 Primitives dans `components/cyber/` :
 - **CyberButton** — `variant="primary"|"ghost"`, support `asChild` (Radix Slot)
-- **CyberCard** — `lift`, `ticks`, `as="div|section|article"`, style personnalisé
-- **Pill** — badges inline, variantes sémantiques (§ Pastilles et étiquettes)
+- **CyberCard** — `lift`, `ticks`, `as="div|section|article"`, style personnalisé, `tone` (posé en `data-tone`, lu par la feuille de la page)
+- **Pill** — badges inline, variantes sémantiques (§ Pastilles et étiquettes) ; tables de variante par sens : `REPORT_STATUS_PILL`, `RULE_STATUS_PILL`, `RECRUITMENT_DOMAIN_PILL`
 - **CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket** — composants spécialisés
 - **ScrollArea** — `orientation="x"|"y"|"both"`, `subtle`, `fade`, `ariaLabel`
 - **PublicHeader, PublicFooter** — layouts publics de landing
