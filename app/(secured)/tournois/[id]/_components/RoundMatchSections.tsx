@@ -28,18 +28,25 @@ export function RoundMatchSections({ matches, children }: Readonly<RoundMatchSec
   // bascule elle-même (`useMatchLaunchPhase`) : un seul minuteur, armé sur la
   // prochaine heure de début, jamais d'intervalle. `null` avant le montage —
   // l'heure du lecteur n'est pas celle du serveur.
+  //
+  // Les effets ne suivent que des primitives (même choix que
+  // `useMatchLaunchPhase`) : `RoundColumns` refait son tableau de matchs à
+  // chaque rendu, et une dépendance à son identité relancerait l'horloge à
+  // chaque instantané du flux.
   const [now, setNow] = useState<number | null>(null);
+  const signature = matches
+    .map((m) => `${m.id}:${m.status}:${m.team1Id}:${m.team2Id}:${m.startAt}:${m.launchedAt}`)
+    .join("|");
   useEffect(() => {
     setNow(Date.now());
-  }, [matches, refereeScheduling]);
+  }, [signature, refereeScheduling]);
+  const nextAt = now === null ? null : nextSectionChangeAt(matches, refereeScheduling, now);
   useEffect(() => {
-    if (now === null) return;
-    const at = nextSectionChangeAt(matches, refereeScheduling, now);
-    if (at === null) return;
-    const delay = Math.min(Math.max(0, at - Date.now()), 2_147_483_647);
-    const timer = setTimeout(() => setNow(Math.max(at, Date.now())), delay);
+    if (nextAt === null) return;
+    const delay = Math.min(Math.max(0, nextAt - Date.now()), 2_147_483_647);
+    const timer = setTimeout(() => setNow(Math.max(nextAt, Date.now())), delay);
     return () => clearTimeout(timer);
-  }, [matches, refereeScheduling, now]);
+  }, [nextAt]);
   const sections = useMemo(
     () => sectionRoundMatches(matches, { refereeScheduling, now, seeds }),
     [matches, refereeScheduling, now, seeds],
