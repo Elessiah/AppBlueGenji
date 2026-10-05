@@ -33,17 +33,24 @@ export function Reveal({ children }: Readonly<{ children: ReactNode }>) {
       return undefined;
     }
     element.classList.add("reveal-pending");
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        element.classList.add("reveal-in");
-        element.classList.remove("reveal-pending");
-        observer.disconnect();
-      },
-      { rootMargin: "0px 0px -8% 0px" },
-    );
+    const reveal = () => {
+      element.classList.add("reveal-in");
+      element.classList.remove("reveal-pending");
+      observer.disconnect();
+      element.removeEventListener("focusin", reveal);
+    };
+    // Dès le premier pixel à l'écran, et dès qu'un contrôle de la section prend
+    // le focus (tabulation, recherche) : un contrôle focalisé n'est jamais
+    // invisible, même si le défilement l'a posé tout en bas de la fenêtre.
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) reveal();
+    });
     observer.observe(element);
-    return () => observer.disconnect();
+    element.addEventListener("focusin", reveal);
+    return () => {
+      observer.disconnect();
+      element.removeEventListener("focusin", reveal);
+    };
   }, [decorativeMotion]);
 
   return <div ref={ref}>{children}</div>;
