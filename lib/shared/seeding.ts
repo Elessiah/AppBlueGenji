@@ -88,6 +88,23 @@ export function registrationsFollowRanking(
   return source === "RANKING" && isPreLaunchState(state);
 }
 
+/**
+ * Le prochain réordonnancement doit-il être confirmé ?
+ *
+ * Seulement le **premier** d'un tournoi seedé par le classement du site : il
+ * passe le tournoi en ordre manuel (`manual_seeding = 1`), sans retour — le
+ * classement ne rangera plus la liste, et les inscrites suivantes s'ajouteront
+ * en queue. Une fois l'ordre manuel, la source vaut `MANUAL` et les flèches
+ * repartent sans question : une confirmation par séance, pas par clic.
+ *
+ * Aucun horaire n'est en jeu : le serveur refuse tout réordonnancement dès
+ * qu'un match existe (`SEEDING_LOCKED_STARTED`), et un match ne naît qu'au
+ * coup d'envoi.
+ */
+export function seedingReorderNeedsConfirmation(source: SeedingSource): boolean {
+  return source === "RANKING";
+}
+
 export type SeedingEntry = {
   teamId: number;
   teamName: string;

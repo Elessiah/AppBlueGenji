@@ -22,7 +22,9 @@ import {
   forfeitParties,
   pendingScoreProposal,
   scoreBlockerMessage,
+  scoreCorrectionNeedsConfirmation,
 } from "../_lib/score-form";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";
@@ -156,12 +158,26 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const proposalNotice = adminProposalNotice(proposal, team1, team2, form.dirty);
   const forfeitToggleLabel = showForfeit ? "Annuler" : "Déclarer un forfait sur cette manche";
 
-  const run = async (action: "save" | "resolve") => {
+  // Correction d'un match déjà tranché : l'écriture attend la confirmation
+  // (`scoreCorrectionNeedsConfirmation`), le premier résultat part directement.
+  const [confirmingCorrection, setConfirmingCorrection] = useState<"save" | "resolve" | null>(null);
+  const storedLabel = storedResultLabel(match, team1, team2);
+
+  const perform = async (action: "save" | "resolve"): Promise<boolean> => {
     const ok = await form.submit(action);
     if (ok) {
       onSubmitted();
       onClose();
     }
+    return ok;
+  };
+
+  const run = async (action: "save" | "resolve") => {
+    if (scoreCorrectionNeedsConfirmation(match)) {
+      setConfirmingCorrection(action);
+      return;
+    }
+    await perform(action);
   };
 
   // `Entrée` dans un champ vaut « valider le résultat » : c'est l'issue
@@ -417,6 +433,22 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
           </div>
         </form>
       </div>
+      {confirmingCorrection !== null && (
+        <ConfirmActionDialog
+          title="Corriger un résultat déjà validé ?"
+          confirmLabel="Corriger le résultat"
+          pendingLabel="Correction…"
+          onClose={() => setConfirmingCorrection(null)}
+          onConfirm={() => perform(confirmingCorrection)}
+        >
+          {storedLabel !== null && <p>{storedLabel}</p>}
+          <p>Ce résultat publié sera remplacé par la nouvelle saisie.</p>
+          <p>
+            Si l&apos;issue change, ce qui en découlait est défait : l&apos;équipe qualifiée dans la rencontre
+            suivante (encore sans score) est remplacée, son horaire conservé, et le classement est recalculé.
+          </p>
+        </ConfirmActionDialog>
+      )}
     </div>,
     document.body,
   );

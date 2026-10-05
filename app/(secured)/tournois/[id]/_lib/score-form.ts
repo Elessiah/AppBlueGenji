@@ -133,6 +133,18 @@ export function storedResultSignature(match: BracketMatch | null): string {
 }
 
 /**
+ * L'écriture de l'arbitrage doit-elle être confirmée ? Seulement sur un match
+ * déjà **tranché** (`COMPLETED`, nul et double forfait compris) : elle remplace
+ * un résultat publié, et `adminResolveMatch` défait ce qu'il avait fait
+ * descendre (équipe qualifiée dans la rencontre suivante, exemptions closes
+ * d'office) avant de propager le nouveau. Un premier résultat part sans
+ * question : c'est le geste attendu du dialogue.
+ */
+export function scoreCorrectionNeedsConfirmation(match: Pick<BracketMatch, "status">): boolean {
+  return isMatchPlayed(match);
+}
+
+/**
  * Empreinte des **propositions d'équipe** en attente. Distincte du résultat
  * enregistré : une proposition arrivée pendant que le dialogue est ouvert
  * change ses valeurs d'ouverture, mais n'écrit rien — elle ne doit pas lever

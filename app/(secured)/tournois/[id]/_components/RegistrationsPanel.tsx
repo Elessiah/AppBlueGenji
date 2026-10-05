@@ -9,6 +9,7 @@ import {
   moveInOrder,
   registrationsFollowRanking,
   seedingLockReason,
+  seedingReorderNeedsConfirmation,
   seedingWindowState,
   SEEDING_SOURCE_LABELS,
   type SeedingLockReason,
@@ -24,6 +25,7 @@ import { EntrantName } from "./EntrantName";
 import { mapError } from "../_lib/error-map";
 import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
+import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import {
   hiddenRegistrationCount,
   mustExpandToShow,
@@ -135,7 +137,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
 
   /** Écrit un ordre complet, avec aperçu optimiste et annonce vocale. */
   const applyOrder = useCallback(
-    async (next: number[], teamId: number) => {
+    async (next: number[], teamId: number): Promise<boolean> => {
       const name = detail.registrations.find((reg) => reg.teamId === teamId)?.teamName ?? "";
       baseline.current = serverKey;
       setPending(next);
@@ -152,11 +154,13 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         // Tournure neutre : le genre de « équipe » et de « joueur » diverge.
         setAnnouncement(`Nouveau rang de ${name} : ${next.indexOf(teamId) + 1} sur ${next.length}.`);
         onChanged();
+        return true;
       } catch (e) {
         // L'ordre du serveur fait foi : on lâche l'affichage optimiste plutôt que
         // de laisser croire à une écriture qui n'a pas eu lieu.
         setPending(null);
         showError(mapError((e as Error).message));
+        return false;
       } finally {
         setBusy(false);
       }
@@ -181,14 +185,31 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     setRefocus(null);
   }, [refocus]);
 
-  const move = async (teamId: number, direction: "up" | "down") => {
+  // Premier réordonnancement d'un tournoi seedé par le classement : il passe
+  // l'ordre en manuel, sans retour — on le fait confirmer, une seule fois
+  // (`seedingReorderNeedsConfirmation`). Le geste attend ici, pas encore joué.
+  const [confirmingMove, setConfirmingMove] = useState<{ teamId: number; direction: "up" | "down" } | null>(null);
+  const [manualConfirmed, setManualConfirmed] = useState(false);
+
+  const performMove = async (teamId: number, direction: "up" | "down"): Promise<boolean> => {
     const next = moveInOrder(order, teamId, direction);
     if (mustExpandToShow(next.indexOf(teamId), expanded)) setExpanded(true);
-    await applyOrder(next, teamId);
+    const done = await applyOrder(next, teamId);
     setRefocus({ teamId, direction });
+    return done;
   };
 
   const source = detail.seedingSource;
+
+  const move = async (teamId: number, direction: "up" | "down") => {
+    // `manualConfirmed` couvre l'aller-retour : la source ne passe à `MANUAL`
+    // qu'au rafraîchissement du détail, et un second clic ne doit pas redemander.
+    if (!manualConfirmed && seedingReorderNeedsConfirmation(source)) {
+      setConfirmingMove({ teamId, direction });
+      return;
+    }
+    await performMove(teamId, direction);
+  };
   const showsRealDraw = isSeedOrderEffective(source);
   // Avant le coup d'envoi, le serveur range déjà la liste selon le classement
   // du site : elle n'est plus l'ordre d'arrivée, mais le tirage prévu.
@@ -343,6 +364,31 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
       <p aria-live="polite" className="sr-only">
         {announcement}
       </p>
+
+      {confirmingMove !== null && (
+        <ConfirmActionDialog
+          title="Fixer l'ordre de départ à la main ?"
+          confirmLabel="Fixer l'ordre"
+          pendingLabel="Enregistrement…"
+          tone="primary"
+          onClose={() => setConfirmingMove(null)}
+          onConfirm={async () => {
+            const done = await performMove(confirmingMove.teamId, confirmingMove.direction);
+            if (done) setManualConfirmed(true);
+            return done;
+          }}
+        >
+          <p>
+            L&apos;ordre de départ suit aujourd&apos;hui le classement du site. Le modifier le remplace,
+            définitivement, par un ordre fixé par le staff : le classement ne réordonnera plus la liste, et
+            les prochaines inscriptions s&apos;ajouteront en fin de liste.
+          </p>
+          <p>
+            Aucun match n&apos;existe encore : les appariements du premier tour seront tirés de cet ordre au
+            coup d&apos;envoi.
+          </p>
+        </ConfirmActionDialog>
+      )}
 
       {removing !== null && (
         <RemoveEntrantDialog
