@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { ReactNode } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { MatchRow } from "@/app/(secured)/tournois/[id]/_components/MatchRow";
+import { panelPlacement } from "@/app/(secured)/tournois/[id]/_components/MatchCardActions";
 import { LiveProvider } from "@/app/(secured)/tournois/[id]/_lib/live-context";
 import { IssueReportProvider } from "@/app/(secured)/tournois/[id]/_lib/issue-report-context";
 import { PlayerScoreProvider } from "@/app/(secured)/tournois/[id]/_lib/player-score-context";
@@ -302,6 +303,24 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
     expect(toggle?.[0]).toContain('aria-label="Plus d&#x27;actions : Alpha contre Bravo"');
     expect(html).toContain(`id="${toggle?.[1]}"`);
     expect(html).toMatch(new RegExp(`id="${toggle?.[1]}"[^>]*hidden=""`));
+  });
+});
+
+describe("panelPlacement — le panneau ouvert reste à l'écran", () => {
+  const footer = { top: 300, bottom: 352, left: 100, width: 258 };
+
+  it("se pose sous le pied, à la largeur de la carte bordure comprise", () => {
+    expect(panelPlacement(footer, 200, 900)).toEqual({ top: 348, left: 99, width: 260, up: false });
+  });
+
+  it("passe au-dessus quand la place manque en bas et abonde en haut", () => {
+    const low = { ...footer, top: 700, bottom: 752 };
+    expect(panelPlacement(low, 200, 800)).toEqual({ top: 504, left: 99, width: 260, up: true });
+  });
+
+  it("reste dessous quand le haut n'offre pas davantage", () => {
+    const high = { ...footer, top: 60, bottom: 112 };
+    expect(panelPlacement(high, 200, 250).up).toBe(false);
   });
 });
 
