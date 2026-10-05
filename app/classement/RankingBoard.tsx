@@ -213,7 +213,10 @@ export function RankingBoard({ rows, filter, forms, unavailable = false, hasMore
               );
             })}
           </div>
+          {/* Remonté à chaque onglet : un « Afficher plus » resté en vol ne
+              déplace pas le focus sur le classement d'un autre jeu. */}
           <RankingMore
+            key={filter}
             shown={rows.length}
             href={hasMore ? rankingMoreHref(filter, rows.length) : null}
             hasMore={hasMore}
