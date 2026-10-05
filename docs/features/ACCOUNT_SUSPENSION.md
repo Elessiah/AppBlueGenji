@@ -64,7 +64,8 @@ invoquée avec son lien, puis les recours : **réexamen par l'association**, pui
   cookie : Next fusionne dans la requête vue par la page (`cookies()` comme
   `headers()`) les cookies que le middleware pose, la page lirait la valeur
   vide de l'effacement (constaté sur `next dev`) : **lu une fois**, il ne rouvre pas la décision à
-  qui rouvrirait le lien depuis l'historique d'un ordinateur partagé.
+  qui rouvrirait le lien depuis l'historique d'un ordinateur partagé. Lu sur un **document**
+  seulement (`Sec-Fetch-Dest`) : un préchargement de la page ne le consomme pas.
 - Le journal du staff sur Discord ne porte ni le pseudo du joueur ni le motif ;
   l'auteur est nommé dans pm2 (`publishStaffAction`).
 
