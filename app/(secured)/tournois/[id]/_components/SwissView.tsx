@@ -252,7 +252,7 @@ export function SwissView({
                           {formatPoints(team.points)}
                         </span>
                         <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY }}>
-                          {team.wins}-{team.draws}-{team.losses}
+                          {team.wins}-{team.draws}-<span className="result-loss">{team.losses}</span>
                         </span>
                         <span role="cell" className="mono" style={{ ...RIGHT, ...SECONDARY }}>
                           {formatPoints(team.buchholz)}

@@ -173,7 +173,7 @@ export function SurvivalView({
                     textStyle={{ fontWeight: isMine ? 700 : 500 }}
                   />
                   <span className="mono" style={{ fontSize: 12, color: "var(--text-2)" }}>
-                    {team.wins}-{team.losses}
+                    {team.wins}-<span className="result-loss">{team.losses}</span>
                   </span>
                   <span
                     style={{

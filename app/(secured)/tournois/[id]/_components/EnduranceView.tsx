@@ -508,9 +508,8 @@ export function EnduranceView({
                 )}
               </span>
               <span data-label={hasDraws ? "V / N / D" : "V / D"}>
-                {hasDraws
-                  ? `${standing.wins} / ${standing.draws} / ${standing.losses}`
-                  : `${standing.wins} / ${standing.losses}`}
+                {hasDraws ? `${standing.wins} / ${standing.draws} / ` : `${standing.wins} / `}
+                <span className="result-loss">{standing.losses}</span>
               </span>
               <span data-label="Statut">
                 {STATUS_LABELS[standing.status]}
