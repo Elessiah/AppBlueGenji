@@ -12,8 +12,8 @@ import { toServedUploadUrl } from "@/lib/shared/uploads";
 
 export const FICTIONAL_BUREAU = [
   { name: "Léo Perreaut", role: "Président", initials: "LP", color: "rgb(89, 212, 255)" },
-  { name: "Bryan Boulleaux", role: "Trésorier", initials: "BB", color: "rgb(245, 195, 58)" },
-  { name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(255, 157, 46)" },
+  { name: "Bryan Boulleaux", role: "Trésorier", initials: "BB", color: "rgb(247, 138, 216)" },
+  { name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(62, 232, 176)" },
   { name: "Jérôme Dubois", role: "Responsable arbitrage", initials: "JD", color: "rgb(167, 115, 255)" },
 ];
 

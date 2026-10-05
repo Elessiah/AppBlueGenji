@@ -263,6 +263,26 @@ export const REPORT_STATUS_PILL: Record<ReportStatus, "info" | "accent" | "neutr
   RESOLVED: "neutral",
 };
 
+export type ReportSummaryKey = "open" | "inProgress" | "contested" | "archived";
+export type ReportStatTone = "info" | "accent" | "highlight" | "warning";
+
+const REPORT_SUMMARY_TONE: Record<ReportSummaryKey, Exclude<ReportStatTone, "warning">> = {
+  open: "info",
+  inProgress: "accent",
+  contested: "highlight",
+  archived: "info",
+};
+
+/**
+ * Teinte d'un compteur de la vue d'ensemble des signalements (`data-tone`).
+ * L'ambre (`warning`) est réservé aux avertissements : il ne marque qu'un
+ * compteur « à traiter » ou « contestés » non nul — ce qui attend une décision.
+ */
+export function reportStatTone(key: ReportSummaryKey, count: number): ReportStatTone {
+  if ((key === "open" || key === "contested") && count > 0) return "warning";
+  return REPORT_SUMMARY_TONE[key];
+}
+
 export const RIGHTS_RELATION_LABELS: Record<RightsRelation, string> = {
   HOLDER: "Je suis titulaire des droits",
   AGENT: "Je représente le titulaire des droits",

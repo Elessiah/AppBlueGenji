@@ -5,7 +5,9 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/toast";
 import {
   REPORT_CATEGORY_DEFINITIONS,
+  reportStatTone,
   type ReportAction,
+  type ReportSummaryKey,
   type ReportTargetRef,
   type ReportView,
 } from "@/lib/shared/content-reports";
@@ -24,6 +26,13 @@ import { adminFetch, adminReportErrorMessage, jsonBody } from "./_lib/admin-erro
 import { ReportDetail } from "./_components/ReportDetail";
 import { StatusPill } from "./_components/StatusPill";
 import styles from "./reports.module.css";
+
+const SUMMARY_STATS: readonly { key: ReportSummaryKey; label: string }[] = [
+  { key: "open", label: "à traiter" },
+  { key: "inProgress", label: "en cours" },
+  { key: "contested", label: "contestés" },
+  { key: "archived", label: "archivés" },
+];
 
 const ACTION_SUCCESS: Record<ReportAction, string> = {
   TAKE: "Signalement pris en charge.",
@@ -241,25 +250,15 @@ function ReportsPanel() {
       <header className={styles.head}>
         <div>
           <span className="eyebrow">MODÉRATION · ADMINISTRATEURS</span>
-          <h1 className={`display ${styles.title}`}>Signalements</h1>
+          <h1 className={`display text-gradient ${styles.title}`}>Signalements</h1>
         </div>
         <ul className={styles.summary} aria-label="Vue d'ensemble">
-          <li className={`${styles.stat} ${summary.open > 0 ? styles.statUrgent : ""}`}>
-            <span className={styles.statValue}>{summary.open}</span>
-            <span className={styles.statLabel}>à traiter</span>
-          </li>
-          <li className={styles.stat}>
-            <span className={styles.statValue}>{summary.inProgress}</span>
-            <span className={styles.statLabel}>en cours</span>
-          </li>
-          <li className={`${styles.stat} ${summary.contested > 0 ? styles.statUrgent : ""}`}>
-            <span className={styles.statValue}>{summary.contested}</span>
-            <span className={styles.statLabel}>contestés</span>
-          </li>
-          <li className={styles.stat}>
-            <span className={styles.statValue}>{summary.archived}</span>
-            <span className={styles.statLabel}>archivés</span>
-          </li>
+          {SUMMARY_STATS.map(({ key, label }) => (
+            <li key={key} className={styles.stat} data-tone={reportStatTone(key, summary[key])}>
+              <span className={styles.statValue}>{summary[key]}</span>
+              <span className={styles.statLabel}>{label}</span>
+            </li>
+          ))}
         </ul>
       </header>
 

@@ -34,7 +34,7 @@ import { TournamentImagePicker } from "./TournamentImagePicker";
 import { RefereeSchedulingField } from "./RefereeSchedulingField";
 import { initialImagePickerValue, type ImagePickerValue } from "../_lib/image-picker";
 import {
-  EYEBROW,
+  sectionEyebrow,
   FULL_WIDTH,
   GRID,
   HINT,
@@ -275,7 +275,7 @@ export function TournamentForm({
     <CyberCard ticks style={{ padding: "clamp(20px, 3vw, 32px)" }}>
       <form onSubmit={handleSubmit} style={SECTION_STACK}>
         <section>
-          <p className="eyebrow" style={EYEBROW}>
+          <p className="eyebrow" style={sectionEyebrow("identity")}>
             Identité
           </p>
           <div className="form-grid" style={GRID}>
@@ -321,7 +321,7 @@ export function TournamentForm({
 
         {mode === "create" && (
           <section style={SECTION_SEPARATOR}>
-            <p className="eyebrow" style={EYEBROW}>
+            <p className="eyebrow" style={sectionEyebrow("image")}>
               Image
             </p>
             <TournamentImagePicker existing={null} value={image} onChange={setImage} disabled={loading} />
@@ -329,7 +329,7 @@ export function TournamentForm({
         )}
 
         <section style={SECTION_SEPARATOR}>
-          <p className="eyebrow" style={EYEBROW}>
+          <p className="eyebrow" style={sectionEyebrow("format")}>
             Format
           </p>
           <div className="form-grid" style={GRID}>
@@ -508,7 +508,7 @@ export function TournamentForm({
         </section>
 
         <section style={SECTION_SEPARATOR}>
-          <p className="eyebrow" style={EYEBROW}>
+          <p className="eyebrow" style={sectionEyebrow("registration")}>
             Conditions d&apos;inscription
           </p>
           <p style={{ ...HINT, margin: "0 0 14px" }}>
@@ -614,7 +614,7 @@ export function TournamentForm({
         </section>
 
         <section style={SECTION_SEPARATOR}>
-          <p className="eyebrow" style={EYEBROW}>
+          <p className="eyebrow" style={sectionEyebrow("planning")}>
             Planning
           </p>
           <div className="form-grid" style={GRID}>
