@@ -18,6 +18,13 @@ propre au geste quand il a des paramètres : `MODAL_DIALOGS.md`). Jamais
   fois** par séance.
 - Annuler ne fait rien ; un refus du serveur laisse la modale ouverte
   (`onConfirm` rend `false`) pour réessayer ou renoncer.
+- La modale ne s'ouvre **que sur un clic**. Si son action cesse d'être offerte
+  (instantané du flux : match lancé par un autre arbitre, planification activée
+  ailleurs, ordre verrouillé), l'état « confirmation en attente » est **remis à
+  zéro au rendu** (`if (attente && !offerte) setAttente(…)`), pas seulement
+  masqué — sinon la modale se rouvrirait seule au retour de l'action
+  (`MatchCardActions`, `MatchPlanningPanel`, `RegistrationsPanel` ;
+  `tests/tournois/pending-confirmations.test.ts`).
 
 ## Ordre de départ (seeding)
 
