@@ -77,8 +77,12 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
   la grandissait, et l'arbre — qui mesure ses cartes (`useSlotHeight`) pour
   régler la hauteur de **tous** ses créneaux — sautait sous le pointeur ; en
   `absolute`, il était rogné par le cadre des plateaux et les zones
-  défilantes. Ses coordonnées (`panelPlacement`, bornées à la fenêtre avec
-  8 px de marge) suivent le défilement de la page et le redimensionnement,
+  défilantes. Ses coordonnées (`panelPlacement`) le posent du côté du pied
+  qui a le plus de place, **sans jamais recouvrir le pied** ni sortir de la
+  fenêtre (8 px de marge) ; plus haut que cette place, sa liste
+  (`<ScrollArea>` verticale) est bornée et défile. Elles suivent le
+  défilement de la page, le redimensionnement et l'ajout ou le retrait d'une
+  action par le flux,
   origine du repère retranchée (la page est sous un ancêtre transformé,
   `.fade-in`). Le défilement d'une zone **qui contient la carte** (arbre,
   colonnes de manche) le referme, focus rendu au bouton : la carte pourrait y
