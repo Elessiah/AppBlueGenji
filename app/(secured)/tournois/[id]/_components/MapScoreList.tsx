@@ -120,7 +120,7 @@ export function MapScoreList({
                   <FieldErrorText fieldId={codeId} message={fieldErrors.message(codeKey)} />
                 </label>
                 <label className={styles.score} htmlFor={t1Id}>
-                  <span className={styles.fieldLabel}>{team1Name}</span>
+                  <span className={styles.fieldLabel} title={team1Name}>{team1Name}</span>
                   <NumberInput
                     id={t1Id}
                     className={styles.scoreInput}
@@ -133,7 +133,7 @@ export function MapScoreList({
                   <FieldErrorText fieldId={t1Id} message={fieldErrors.message(t1Key)} />
                 </label>
                 <label className={styles.score} htmlFor={t2Id}>
-                  <span className={styles.fieldLabel}>{team2Name}</span>
+                  <span className={styles.fieldLabel} title={team2Name}>{team2Name}</span>
                   <NumberInput
                     id={t2Id}
                     className={styles.scoreInput}
