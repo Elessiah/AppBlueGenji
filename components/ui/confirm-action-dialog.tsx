@@ -45,6 +45,33 @@ export interface ConfirmActionDialogProps {
 }
 
 /**
+ * Joue le geste confirmé : bouton « en cours » pendant le vol, réarmé sur un
+ * refus (`false` ou exception) qui laisse la modale ouverte, fermeture sur un
+ * succès sauf `closeOnSuccess: false`. Rend l'issue.
+ */
+export async function runConfirmation({
+  onConfirm,
+  onClose,
+  setBusy,
+  closeOnSuccess,
+}: Readonly<{
+  onConfirm: () => Promise<boolean>;
+  onClose: () => void;
+  setBusy: (busy: boolean) => void;
+  closeOnSuccess: boolean;
+}>): Promise<boolean> {
+  setBusy(true);
+  let ok = false;
+  try {
+    ok = await onConfirm();
+  } finally {
+    if (!ok) setBusy(false);
+  }
+  if (ok && closeOnSuccess) onClose();
+  return ok;
+}
+
+/**
  * Confirmation commune de tous les gestes sans retour du site — fiche tournoi,
  * fiche d'équipe, modération d'un joueur, contenus publiés (bureau, bénévoles,
  * annonces, cartes « À propos », partenaires), profil, rôles de plateforme.
@@ -84,17 +111,10 @@ export function ConfirmActionDialog({
   const backdrop = useBackdropDismiss(onClose, busy);
   const armed = !disabled && (requireText === undefined || typed.trim() === requireText.trim());
 
-  const submit = async (event: FormEvent) => {
+  const submit = (event: FormEvent) => {
     event.preventDefault();
     if (busy || !armed) return;
-    setBusy(true);
-    let ok = false;
-    try {
-      ok = await onConfirm();
-    } finally {
-      if (!ok) setBusy(false);
-    }
-    if (ok && closeOnSuccess) onClose();
+    void runConfirmation({ onConfirm, onClose, setBusy, closeOnSuccess });
   };
 
   if (!mounted) return null;
