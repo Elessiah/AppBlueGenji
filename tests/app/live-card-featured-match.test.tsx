@@ -224,7 +224,9 @@ describe("LiveCard — état du match et état du tournoi", () => {
     const html = render(
       live({ currentMatch: match({ launchPhase: "SCHEDULED", startAt: "2099-03-04T19:30:00.000Z" }) }),
     );
-    expect(pillLabels(html)).toEqual(["En attente de lancement · 4 mars 2099 · 20:30"]);
+    // Pastille courte (une ligne à 320 px), horaire à côté avec la manche.
+    expect(pillLabels(html)).toEqual(["En attente de lancement"]);
+    expect(text(html)).toContain("4 MARS 2099 · 20:30 · ");
     expect(text(html)).not.toContain("Prochain match");
   });
 

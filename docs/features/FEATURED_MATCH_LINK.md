@@ -250,10 +250,11 @@ l'état du **tournoi**, mais se lisait comme celui du match — qui n'était que
   | à l'antenne (`liveState === "LIVE"`), quelle que soit la phase | « En direct » | rouge (`pill-live`) |
   | `LAUNCHED` | « En cours » | bleu |
   | `LOBBY`, ou `SCHEDULED` dont l'heure est passée (horloge) | « Lancement » | bleu |
-  | `SCHEDULED` | « En attente de lancement · 5 oct. · 21:00 » | neutre |
+  | `SCHEDULED` | « En attente de lancement », suivie de « 5 OCT. · 21:00 · MANCHE 1 » | neutre |
 
-  L'horaire tient dans la pastille : la ligne « Prochain match · … » est
-  retirée, elle redisait la même chose.
+  L'horaire (`featuredMatchPill().when`) s'écrit **à côté** de la pastille, avec
+  la manche, et non dedans : la pastille tient ainsi sur une ligne dès 320 px.
+  La ligne « Prochain match · … » est retirée, elle redisait la même chose.
 - **L'état du tournoi devient une mention secondaire**, sans pastille :
   « TOURNOI EN COURS · OVERWATCH » en tête de carte, au-dessus du nom du tournoi
   (`FEATURED_TOURNAMENT_STATE_LABEL`). Sans match mis en avant, c'est la seule

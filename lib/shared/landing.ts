@@ -105,8 +105,12 @@ export function isFeaturedMatchPhase(phase: MatchLaunchPhase): phase is Featured
 /** Teinte de la pastille d'état du match : le rouge est réservé à l'antenne. */
 export type FeaturedMatchPillTone = "live" | "blue" | "default";
 
-/** Pastille d'état **du match** mis en avant — jamais celle du tournoi. */
-export type FeaturedMatchPill = { label: string; tone: FeaturedMatchPillTone };
+/**
+ * Pastille d'état **du match** mis en avant — jamais celle du tournoi. `when` :
+ * horaire d'un match en attente (« 5 oct. · 21:00 »), écrit à côté de la
+ * pastille et non dedans, pour qu'elle tienne sur une ligne à 320 px.
+ */
+export type FeaturedMatchPill = { label: string; tone: FeaturedMatchPillTone; when: string | null };
 
 /** État du tournoi sur la carte : une mention secondaire, jamais une pastille. */
 export const FEATURED_TOURNAMENT_STATE_LABEL = "Tournoi en cours";
@@ -118,8 +122,8 @@ export const FEATURED_TOURNAMENT_STATE_LABEL = "Tournoi en cours";
  * - à l'antenne (`liveState === "LIVE"`) : « En direct », en rouge ;
  * - lancé : « En cours » ;
  * - heure venue : « Lancement » ;
- * - daté : « En attente de lancement · 5 oct. · 21:00 » — l'horaire tient dans
- *   la pastille, aucune autre ligne ne le redit.
+ * - daté : « En attente de lancement », horaire dans `when` — aucune autre
+ *   ligne ne le redit.
  *
  * La phase est figée au rendu serveur, et seule l'horloge fait passer un match
  * daté en lancement : sans relecture, la carte attendrait le sondage suivant.
@@ -130,13 +134,13 @@ export function featuredMatchPill(
   match: Pick<LandingLiveMatch, "launchPhase" | "startAt" | "liveState">,
   now: number | null = Date.now(),
 ): FeaturedMatchPill {
-  if (match.liveState === "LIVE") return { label: "En direct", tone: "live" };
-  if (match.launchPhase === "LAUNCHED") return { label: MATCH_SECTION_LABELS.PLAYING, tone: "blue" };
+  if (match.liveState === "LIVE") return { label: "En direct", tone: "live", when: null };
+  if (match.launchPhase === "LAUNCHED") return { label: MATCH_SECTION_LABELS.PLAYING, tone: "blue", when: null };
   if (match.launchPhase === "LOBBY" || (now !== null && startTime(match.startAt) <= now)) {
-    return { label: MATCH_SECTION_LABELS.LOBBY, tone: "blue" };
+    return { label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null };
   }
   const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now ?? Date.now());
-  return { label: when ? `${MATCH_SECTION_LABELS.WAITING} · ${when}` : MATCH_SECTION_LABELS.WAITING, tone: "default" };
+  return { label: MATCH_SECTION_LABELS.WAITING, tone: "default", when: when || null };
 }
 
 function startTime(iso: string | null): number {

@@ -239,11 +239,13 @@ describe("featuredMatchPill", () => {
   ) => featuredMatchPill({ launchPhase, startAt, liveState }, now);
 
   it("reprend les mots des sections de manche, phase par phase", () => {
-    expect(pill("LAUNCHED", null)).toEqual({ label: MATCH_SECTION_LABELS.PLAYING, tone: "blue" });
-    expect(pill("LOBBY", null)).toEqual({ label: MATCH_SECTION_LABELS.LOBBY, tone: "blue" });
+    expect(pill("LAUNCHED", null)).toEqual({ label: MATCH_SECTION_LABELS.PLAYING, tone: "blue", when: null });
+    expect(pill("LOBBY", null)).toEqual({ label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null });
+    // L'horaire est rendu à côté de la pastille, pas dedans : elle tient sur une ligne.
     expect(pill("SCHEDULED", "2026-10-05T18:30:00Z")).toEqual({
-      label: `${MATCH_SECTION_LABELS.WAITING} · 5 oct. · 20:30`,
+      label: MATCH_SECTION_LABELS.WAITING,
       tone: "default",
+      when: "5 oct. · 20:30",
     });
     expect(MATCH_SECTION_LABELS.PLAYING).toBe("En cours");
     expect(MATCH_SECTION_LABELS.WAITING).toBe("En attente de lancement");
@@ -251,7 +253,7 @@ describe("featuredMatchPill", () => {
 
   it("ne dit « En direct », en rouge, que pour un match réellement à l'antenne", () => {
     for (const phase of ["LAUNCHED", "LOBBY", "SCHEDULED"] as const) {
-      expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "LIVE")).toEqual({ label: "En direct", tone: "live" });
+      expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "LIVE")).toEqual({ label: "En direct", tone: "live", when: null });
       // Une diffusion seulement annoncée n'est pas à l'antenne.
       expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "SCHEDULED").tone).not.toBe("live");
     }
@@ -264,12 +266,14 @@ describe("featuredMatchPill", () => {
 
   it("s'en tient à la phase du serveur tant que l'horloge n'est pas montée", () => {
     // Rendu serveur et hydratation doivent coïncider : aucune lecture de l'heure.
-    expect(pill("SCHEDULED", "2020-01-01T00:00:00Z", null).label).toMatch(/^En attente de lancement · /);
+    const held = pill("SCHEDULED", "2020-01-01T00:00:00Z", null);
+    expect(held.label).toBe("En attente de lancement");
+    expect(held.when).toMatch(/2020 · /);
   });
 
   it("se passe d'un horaire illisible ou absent", () => {
-    expect(pill("SCHEDULED", "pas une date").label).toBe("En attente de lancement");
-    expect(pill("SCHEDULED", null).label).toBe("En attente de lancement");
+    expect(pill("SCHEDULED", "pas une date")).toEqual({ label: "En attente de lancement", tone: "default", when: null });
+    expect(pill("SCHEDULED", null).when).toBeNull();
   });
 
   it("ne confond jamais l'état du tournoi avec celui du match", () => {

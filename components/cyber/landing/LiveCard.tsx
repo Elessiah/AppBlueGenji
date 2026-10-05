@@ -123,7 +123,7 @@ function noLiveTournamentMessage(iso: string | null | undefined): string {
  */
 export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   // Seule l'horloge fait passer un match daté en lancement : sans elle, la
-  // carte annoncerait « Prochain match · 20:30 » jusqu'au sondage suivant.
+  // carte annoncerait « En attente de lancement » jusqu'au sondage suivant.
   // Elle ne tourne que pour un tel match (`useClock` respecte le mode économe).
   const clock = useClock(LIVE_CARD_CLOCK_MS, live?.currentMatch?.launchPhase === "SCHEDULED");
   if (!live) {
@@ -191,7 +191,10 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
               manche ; le rouge ne sert qu'à « En direct » (vraie diffusion). */}
           <div className={styles.matchHead}>
             <Pill variant={matchPill.tone === "default" ? undefined : matchPill.tone}>{matchPill.label}</Pill>
-            <span className="mono">{inferPhaseLabel(currentMatch)}</span>
+            <span className="mono">
+              {matchPill.when ? `${matchPill.when.toUpperCase()} · ` : ""}
+              {inferPhaseLabel(currentMatch)}
+            </span>
           </div>
           <MatchStreamBanner
             liveState={currentMatch.liveState}
