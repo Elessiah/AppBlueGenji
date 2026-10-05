@@ -16,7 +16,7 @@ import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
  * marques de manche propres (barrage et coupes, dernière ronde).
  */
 
-const COL_W = 226;
+const COL_W = 276;
 export const BORDER = "var(--border, #444)";
 export const ACCENT = "var(--accent-green, #4fe0a2)";
 export const AMBER = "rgba(255,157,46,0.9)";

@@ -11,18 +11,23 @@ import {
   playerScoreButtonLabel,
 } from "@/lib/shared/player-score-report";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
+import { useMatchLiveState } from "@/lib/shared/hooks/useMatchLiveState";
 import { SCORE_ENTRY_CLOSED_PHASES } from "@/lib/shared/match-launch";
+import { canConfigureLive, canToggleOnAir } from "@/lib/shared/live-streams";
+import { formatMatchStartAt } from "@/lib/shared/match-schedule";
 import { usePlayerScore } from "../_lib/player-score-context";
 import { useIssueReport } from "../_lib/issue-report-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useHighlightedMatch } from "../_lib/match-anchor-context";
 import { pendingScoreProposal } from "../_lib/score-form";
 import { matchSideViews } from "../_lib/match-row-sides";
+import { launchStripControls } from "../_lib/launch-strip";
+import { matchCardActionList } from "../_lib/match-card-actions";
 import { MatchLiveStrip } from "./MatchLiveStrip";
 import { MatchLaunchStrip } from "./MatchLaunchStrip";
-import { MatchReplayStrip } from "./MatchReplayStrip";
+import { MatchReplayStrip, canEditReplay } from "./MatchReplayStrip";
+import { MatchCardActions } from "./MatchCardActions";
 import { EntrantName } from "./EntrantName";
-import { CyberButton } from "@/components/cyber";
 import styles from "./MatchRow.module.css";
 
 
@@ -75,7 +80,7 @@ export const MatchRow = memo(function MatchRow({
   // Engagé du lecteur : déjà porté par `LiveContext` (diffusion, casting) — on
   // le relit ici plutôt que d'en garder une seconde copie sur le contexte de
   // signalement, qui décrirait la même donnée depuis deux sources.
-  const { myTeamId, refereeScheduling } = useLiveControls();
+  const { myTeamId, refereeScheduling, canManage, canSchedule, viewerUserId } = useLiveControls();
   // Phase de lancement, calculée **une fois par carte** et transmise aux deux
   // bandeaux : chacun posait sinon sa propre minuterie sur l'heure de départ —
   // trois `setTimeout` par match programmé, sur un plateau qui en compte 254.
@@ -130,6 +135,31 @@ export const MatchRow = memo(function MatchRow({
 
   const adminScoreLabel = adminScoreButtonLabel(scoreEntryClosed, pendingScoreProposal(match) !== null);
 
+  // État de diffusion, calculé une fois ici : le bandeau d'horaire l'affiche,
+  // le pied d'action en tire le bouton d'antenne — une seule minuterie.
+  const liveState = useMatchLiveState(match);
+  const launch = launchStripControls(match, launchPhase, { canManage, canSchedule, viewerUserId, myTeamId });
+  const matchLabel = `${team1Display} contre ${team2Display}`;
+  // Toutes les actions de la carte, rangées par `MatchCardActions` : une
+  // principale visible, le reste derrière « Plus d'actions »
+  // (`docs/features/MATCH_CARD_LAYOUT.md`). Chaque drapeau est celui qui
+  // décidait déjà du bouton dans son ancien bandeau.
+  const actions = matchCardActionList({
+    playerScoreLabel,
+    launch,
+    inLobby: launchPhase === "LOBBY",
+    adminScoreLabel: adminResolvable && !scoreLocked ? adminScoreLabel : null,
+    showSchedule: canSchedule && launchPhase !== "TO_PLAN",
+    hasStartAt: formatMatchStartAt(match.startAt) !== null,
+    showOnAir: canManage && canToggleOnAir(match),
+    onAir: liveState === "LIVE",
+    showLiveConfig: canManage && canConfigureLive(match),
+    liveConfigured: match.liveTrigger !== null,
+    showReplay: canEditReplay(match, canManage),
+    hasReplay: match.replayUrl !== null,
+    canReport: canReportMatch,
+  });
+
   return (
     <div
       // Ancre du lien profond `/tournois/[id]#match-[id]`, posée ici parce que
@@ -180,8 +210,12 @@ export const MatchRow = memo(function MatchRow({
         </p>
       )}
 
-      <MatchLiveStrip match={match} launchPhase={launchPhase} />
-      <MatchLaunchStrip match={match} phase={launchPhase} />
+      {/* Zone d'état : horaire et diffusion, phase de lancement, hôte, caster.
+          Vide (`:empty`), elle disparaît avec son filet. */}
+      <div className={styles.meta}>
+        <MatchLiveStrip match={match} state={liveState} />
+        <MatchLaunchStrip match={match} phase={launchPhase} />
+      </div>
 
       <MatchReplayStrip match={match} />
 
@@ -190,55 +224,21 @@ export const MatchRow = memo(function MatchRow({
           celle du lecteur engagé, vit dans sa modale. */}
       {reportNotice && <p className={styles.reportNotice}>{reportNotice}</p>}
 
-      {playerScoreLabel && (
-        <div className={`${styles.bar} ${styles.playerBar}`}>
-          <CyberButton
-            type="button"
-            variant="ghost"
-            onClick={() => playerScore.open(match)}
-            className={styles.action}
-          >
-            <span aria-hidden="true">✎</span> {playerScoreLabel}
-          </CyberButton>
-        </div>
-      )}
-
-      {adminResolvable && !scoreLocked && (
-        <div className={`${styles.bar} ${styles.adminBar}`}>
-          <CyberButton
-            type="button"
-            variant="ghost"
-            onClick={() => onOpenAdminModal(match)}
-            className={`${styles.action} ${styles.actionAccent}`}
-            // Le libellé visible ouvre le nom (WCAG 2.5.3), le match le complète :
-            // huit boutons identiques sur une ronde ne se distinguaient pas.
-            aria-label={`${adminScoreLabel} : ${team1Display} contre ${team2Display}`}
-          >
-            {/* Un score proposé attend une confirmation qui peut ne jamais
-                venir (adversaire fantôme) : le dialogue s'ouvre dessus, et le
-                bouton dit le geste qui reste à faire. */}
-            <span aria-hidden="true">✎</span> {adminScoreLabel}
-          </CyberButton>
-        </div>
-      )}
-
-      {canReportMatch && (
-        <div className={styles.bar}>
-          <CyberButton
-            type="button"
-            variant="ghost"
-            onClick={() => openReport(match)}
-            title="Prévenir le staff d'un problème sur ce match"
-            className={`${styles.action} ${styles.actionMinor}`}
-          >
-            <span aria-hidden="true">⚠</span> Signaler un problème
-          </CyberButton>
-        </div>
-      )}
+      <MatchCardActions
+        match={match}
+        phase={launchPhase}
+        actions={actions}
+        matchLabel={matchLabel}
+        isCaster={launch.isCaster}
+        onAir={liveState === "LIVE"}
+        onPlayerScore={() => playerScore.open(match)}
+        onAdminScore={() => onOpenAdminModal(match)}
+        onReport={() => openReport(match)}
+      />
 
       {adminResolvable && scoreLocked && (
         <div
-          className={`${styles.bar} ${styles.locked}`}
+          className={styles.locked}
           title="La manche suivante a déjà des scores : le résultat de ce match ne peut plus être modifié."
         >
           <span aria-hidden="true">🔒</span>

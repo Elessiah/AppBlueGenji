@@ -2,58 +2,26 @@
 
 import { canHaveReplay, visibleReplayUrl } from "@/lib/shared/match-replay";
 import type { BracketMatch } from "@/lib/shared/types";
-import { useLiveControls } from "../_lib/live-context";
 import styles from "./MatchReplayStrip.module.css";
 
 /**
- * Bandeau « Rediff disponible » d'un match terminé, sous sa carte.
+ * Bandeau « Rediff disponible » d'un match terminé, sous sa carte : tout le
+ * monde le voit dès qu'une rediff est posée sur une rencontre jouée — la carte
+ * entière du bandeau est le lien, pour qu'on ne puisse pas le manquer.
  *
- * Deux publics :
- * - **tout le monde** voit le bandeau dès qu'une rediff est posée sur une
- *   rencontre jouée — la carte entière du bandeau est le lien, pour qu'on ne
- *   puisse pas le manquer ;
- * - la permission `live` (admin, arbitre, caster) y trouve en plus le bouton
- *   qui pose, modifie ou retire le lien.
- *
- * Le lien stocké n'est pas montré tel quel : `visibleReplayUrl` le tait sur un
- * match rouvert par un retour en arrière. Le staff garde alors son bouton, pour
+ * Le bouton qui pose, modifie ou retire le lien (permission `live`) vit dans le
+ * pied d'action de la carte (`MatchCardActions`), sous `canEditReplay`. Le lien
+ * stocké n'est pas montré tel quel : `visibleReplayUrl` le tait sur un match
+ * rouvert par un retour en arrière — le staff garde alors son bouton, pour
  * pouvoir retirer un lien qui ne correspondrait plus.
  */
 export function MatchReplayStrip({ match }: Readonly<{ match: BracketMatch }>) {
-  const { canManage, openReplay } = useLiveControls();
-
   const replayUrl = visibleReplayUrl(match);
-  const showEdit = canManage && (canHaveReplay(match) || match.replayUrl !== null);
-  if (replayUrl === null && !showEdit) return null;
+  if (replayUrl === null) return null;
 
   // Sorti de son contexte visuel, « Rediff disponible » ne dit pas de quel match
-  // il s'agit : chaque contrôle porte le nom de la rencontre.
+  // il s'agit : le lien porte le nom de la rencontre.
   const matchLabel = `${match.team1Name ?? "TBD"} contre ${match.team2Name ?? "TBD"}`;
-
-  // À côté du bandeau, le bouton se réduit à son pictogramme : la carte fait
-  // 210 px, et un libellé complet repliait « Rediff disponible » sur deux
-  // lignes. Le nom accessible, lui, reste complet.
-  const compact = replayUrl !== null;
-  const editLabel = match.replayUrl === null ? "＋ Rediff" : "✎ Rediff";
-  const editButton = showEdit && (
-    <button
-      type="button"
-      className={`btn ghost tap-target ${styles.edit}`}
-      onClick={() => openReplay(match)}
-      title={compact ? "Modifier la rediff" : undefined}
-      aria-label={
-        match.replayUrl === null
-          ? `Ajouter la rediff de ${matchLabel}`
-          : `Modifier la rediff de ${matchLabel}`
-      }
-    >
-      {compact ? "✎" : editLabel}
-    </button>
-  );
-
-  if (replayUrl === null) {
-    return <div className={styles.staffOnly}>{editButton}</div>;
-  }
 
   return (
     <div className={styles.banner}>
@@ -72,7 +40,11 @@ export function MatchReplayStrip({ match }: Readonly<{ match: BracketMatch }>) {
         {/* NOSONAR S6772 — lien en flex avec `gap` */}
         Rediff disponible
       </a>
-      {editButton}
     </div>
   );
+}
+
+/** Le lecteur (permission `live`) peut-il poser, modifier ou retirer la rediff ? */
+export function canEditReplay(match: BracketMatch, canManage: boolean): boolean {
+  return canManage && (canHaveReplay(match) || match.replayUrl !== null);
 }
