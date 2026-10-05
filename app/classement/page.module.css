@@ -540,8 +540,15 @@
   }
 
   /* Les chiffres s'alignent sous le nom, pas sous le rang. */
-  .row > .points,
+  .row > .points {
+    margin-left: 44px;
+  }
+
+  /* La forme ouvre toujours sa propre ligne, alignée sous le nom : sur une
+     largeur intermédiaire elle tiendrait sinon à côté des chiffres, et le
+     retrait creuserait un trou au milieu de la ligne. */
   .row > .formCell {
+    flex-basis: calc(100% - 44px);
     margin-left: 44px;
   }
 
