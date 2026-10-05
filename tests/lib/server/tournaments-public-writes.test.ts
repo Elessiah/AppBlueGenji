@@ -522,6 +522,17 @@ describe("adminResolveMatchPublic", () => {
     expect(adminResolveMatch).toHaveBeenCalledWith(expect.anything(), 70, undefined, undefined, undefined, true, undefined);
   });
 
+  it("rejoue un arbitrage annulé par un interblocage (MAP_SCORES.md)", async () => {
+    connection.execute.mockResolvedValue([[{ tournament_id: 8 }], undefined]);
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(adminResolveMatch).mockRejectedValueOnce(deadlock).mockResolvedValueOnce(undefined);
+
+    await adminResolveMatchPublic(70, 2, 1);
+
+    expect(adminResolveMatch).toHaveBeenCalledTimes(2);
+    expect(connection.rollback).toHaveBeenCalledTimes(1);
+  });
+
   it("lève MATCH_NOT_FOUND sans rien trancher", async () => {
     await expect(adminResolveMatchPublic(70, 1, 0)).rejects.toThrow("MATCH_NOT_FOUND");
 

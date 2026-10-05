@@ -113,7 +113,9 @@ bg_match_maps (
   report d'avant les maps). Sur un intervalle vide, elles posent un verrou
   d'intervalle : deux reports simultanés sur des matchs voisins peuvent
   s'interbloquer, et `reportMatchScorePublic` rejoue alors la transaction
-  annulée (3 essais).
+  annulée (3 essais), comme les deux écritures d'arbitrage (`retryOnDeadlock`).
+- Dialogue d'arbitrage : un score posé à la main avant la première map est
+  rendu aux champs quand la dernière map est retirée.
 - `FINAL` : le détail retenu. Promu depuis la proposition qui fait foi (accord
   des deux engagées — celle qui confirme —, ou report seul à l'échéance), ou
   écrit par l'arbitrage. Un forfait l'efface toujours (arbitrage ou engagée :

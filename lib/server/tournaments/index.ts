@@ -1186,6 +1186,23 @@ async function readTournamentState(tournamentId: number): Promise<TournamentStat
 
 const REPORT_DEADLOCK_ATTEMPTS = 3;
 
+/**
+ * Rejoue une écriture de résultat annulée par un interblocage InnoDB : les
+ * verrous d'intervalle de `bg_match_maps` (`./match-maps`) peuvent opposer deux
+ * écritures sur des matchs voisins — report d'équipe ou geste d'arbitrage.
+ * Toute autre erreur remonte telle quelle.
+ */
+async function retryOnDeadlock(write: () => Promise<void>): Promise<void> {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await write();
+      return;
+    } catch (error) {
+      if (!isTransactionAborted(error) || attempt >= REPORT_DEADLOCK_ATTEMPTS) throw error;
+    }
+  }
+}
+
 export async function reportMatchScorePublic(
   tournamentId: number,
   matchId: number,
@@ -1193,18 +1210,13 @@ export async function reportMatchScorePublic(
   maps: ReadonlyArray<MatchMapInput>,
 ): Promise<void> {
   // Deux reports simultanés sur des matchs voisins peuvent s'interbloquer sur
-  // `bg_match_maps` (verrous d'intervalle, `./match-maps`) : InnoDB annule
-  // l'un, qui est rejoué tel quel plutôt que de rendre un 500 à l'équipe.
-  for (let attempt = 1; ; attempt += 1) {
-    try {
-      await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-        reportMatchScore(connection, tournamentId, matchId, userId, maps),
-      );
-      return;
-    } catch (error) {
-      if (!isTransactionAborted(error) || attempt >= REPORT_DEADLOCK_ATTEMPTS) throw error;
-    }
-  }
+  // `bg_match_maps` : InnoDB annule l'un, qui est rejoué tel quel plutôt que de
+  // rendre un 500 à l'équipe.
+  await retryOnDeadlock(() =>
+    runPlayerMatchWrite(tournamentId, matchId, (connection) =>
+      reportMatchScore(connection, tournamentId, matchId, userId, maps),
+    ),
+  );
 }
 
 /**
@@ -1283,6 +1295,17 @@ async function runPlayerMatchWrite(
 }
 
 export async function adminSaveMatchScoresPublic(
+  matchId: number,
+  team1Score?: number,
+  team2Score?: number,
+  forfeitTeamId?: number,
+  mapEntry?: AdminMapEntry,
+): Promise<void> {
+  // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
+  await retryOnDeadlock(() => adminSaveMatchScoresOnce(matchId, team1Score, team2Score, forfeitTeamId, mapEntry));
+}
+
+async function adminSaveMatchScoresOnce(
   matchId: number,
   team1Score?: number,
   team2Score?: number,
@@ -1528,6 +1551,20 @@ export async function liftEndurancePenaltyPublic(
 }
 
 export async function adminResolveMatchPublic(
+  matchId: number,
+  team1Score?: number,
+  team2Score?: number,
+  forfeitTeamId?: number,
+  doubleForfeit = false,
+  mapEntry?: AdminMapEntry,
+): Promise<void> {
+  // Même risque d'interblocage que le report d'un engagé (`retryOnDeadlock`).
+  await retryOnDeadlock(() =>
+    adminResolveMatchOnce(matchId, team1Score, team2Score, forfeitTeamId, doubleForfeit, mapEntry),
+  );
+}
+
+async function adminResolveMatchOnce(
   matchId: number,
   team1Score?: number,
   team2Score?: number,

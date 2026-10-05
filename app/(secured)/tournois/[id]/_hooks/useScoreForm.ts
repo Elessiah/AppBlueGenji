@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
 import {
@@ -126,9 +126,19 @@ export function useScoreForm(
     return true;
   };
 
+  // Score posé à la main avant la première map : rendu aux champs quand la
+  // dernière map est retirée, sans quoi un « Enregistrer » écrirait le 0-0
+  // dérivé d'une liste vide par-dessus.
+  const manualScores = useRef<{ score1: string; score2: string } | null>(null);
   const setMaps = (next: MatchMapInput[]) => {
+    if (maps.length === 0 && next.length > 0) manualScores.current = { score1: state.score1, score2: state.score2 };
     setMapsState(next);
-    if (next.length === 0) return;
+    if (next.length === 0) {
+      const restored = manualScores.current;
+      manualScores.current = null;
+      if (restored) setState((s) => ({ ...s, ...restored }));
+      return;
+    }
     const derived = deriveMatchScore(next);
     setState((s) => ({ ...s, score1: String(derived.team1), score2: String(derived.team2) }));
   };
