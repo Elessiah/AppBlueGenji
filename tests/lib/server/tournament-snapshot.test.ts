@@ -497,6 +497,27 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
     );
   });
 
+  /** Classement de survie chargé par l'instantané : il porte les rangs figés au lancement. */
+  function frozenSurvival(seeds: Array<[number, number]>) {
+    jest.mocked(loadSurvivalMeta).mockResolvedValue({
+      roundsBeforeFirstCut: 2,
+      roundsPerCut: 1,
+      currentRound: 1,
+      barrageRounds: 0,
+      standings: seeds.map(([teamId, seed]) => ({
+        teamId,
+        teamName: `Équipe ${teamId}`,
+        logoUrl: null,
+        seed,
+        wins: 0,
+        losses: 0,
+        status: "ACTIVE",
+        eliminatedRound: null,
+        rank: seed,
+      })),
+    });
+  }
+
   const order = (snapshot: Awaited<ReturnType<typeof getTournamentSnapshot>>) =>
     snapshot?.registrations.map((reg) => [reg.teamName, reg.seed]);
 
@@ -551,14 +572,65 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
     expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
   });
 
-  it("ne suit plus le classement une fois le tournoi lancé", async () => {
+  it("suit, une fois lancé, les rangs figés au coup d'envoi et non la cote du moment", async () => {
     // Les matchs du tournoi font bouger les cotes : le tirage, lui, est fait.
-    preLaunch("BG_SURVIE", "RUNNING");
+    preLaunch("SURVIVAL", "RUNNING");
+    frozenSurvival([[2, 1], [3, 2], [1, 3]]);
 
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
-    expect(order(snapshot)?.map(([name]) => name)).toEqual(["Alpha", "Beta", "Gamma"]);
+    expect(order(snapshot)).toEqual([
+      ["Beta", 1],
+      ["Gamma", 2],
+      ["Alpha", 3],
+    ]);
     expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
+  });
+
+  it("range en dernier, sans rang, une engagée absente du tirage figé", async () => {
+    preLaunch("SURVIVAL", "FINISHED");
+    frozenSurvival([[3, 1]]);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    // Alpha puis Beta gardent leur ordre d'arrivée, après la seule rangée.
+    expect(order(snapshot)).toEqual([
+      ["Gamma", 1],
+      ["Alpha", null],
+      ["Beta", null],
+    ]);
+  });
+
+  it("garde l'ordre saisi par le staff une fois lancé, sans relire le tirage", async () => {
+    preLaunch("SURVIVAL", "RUNNING", 1);
+    frozenSurvival([[3, 1], [2, 2], [1, 3]]);
+
+    const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    expect(order(snapshot)).toEqual([
+      ["Alpha", 1],
+      ["Beta", 2],
+      ["Gamma", 3],
+    ]);
+  });
+
+  it("porte les mêmes rangs figés dans la trame du flux que dans la lecture REST", async () => {
+    preLaunch("SURVIVAL", "RUNNING");
+    frozenSurvival([[3, 1], [1, 2], [2, 3]]);
+
+    const frame = (await getTournamentSnapshotFrame(TOURNAMENT_ID))!;
+    const streamed = JSON.parse(new TextDecoder().decode(frame.snapshotJson)) as {
+      registrations: Array<{ teamName: string; seed: number | null }>;
+    };
+    const rest = await getTournamentSnapshot(TOURNAMENT_ID);
+
+    const expected = [
+      ["Gamma", 1],
+      ["Alpha", 2],
+      ["Beta", 3],
+    ];
+    expect(streamed.registrations.map((reg) => [reg.teamName, reg.seed])).toEqual(expected);
+    expect(order(rest)).toEqual(expected);
   });
 });
 

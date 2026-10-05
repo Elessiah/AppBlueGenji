@@ -80,11 +80,20 @@ premier geste du staff part de cet ordre, un déplacement ne jette donc pas le
 classement pour revenir à l'ordre d'arrivée. Le bloc le dit, et rappelle que
 réordonner fige l'ordre.
 
-Une fois le tournoi **lancé**, la liste retombe sur la colonne `seed` (ordre
-d'arrivée) : les matchs du tournoi font bouger les cotes, alors que le tirage,
-lui, est fait. Elle **n'est** alors **pas** le tirage, et le bloc le dit
-explicitement — sans quoi le staff lit un ordre d'inscription en croyant lire un
-tirage. L'ordre, lui, est figé (voir ci-dessous).
+Une fois le tournoi **lancé**, les matchs du tournoi font bouger les cotes,
+alors que le tirage, lui, est fait : la liste suit les **rangs figés au coup
+d'envoi** (`registrationsFollowFrozenDraw`, `orderByFrozenSeeds`). Le moteur les
+a écrits au lancement dans sa table d'état (`bg_swiss_standings`,
+`bg_survival_standings`, `bg_endurance_standings`, ou `bg_tournament_phase_teams`
+de la première phase peuplée) ; l'instantané les reprend des classements qu'il a
+déjà chargés (`frozenSeedsOf`), l'accueil les relit par
+`loadFrozenRankingSeeds` (`lib/server/tournaments/frozen-seeds.ts`, mêmes
+tables) — jamais de reclassement.
+`registrations[].seed` porte ce rang (une engagée absente de la table passe en
+dernier, `seed` à `null`, affichée « — ») ; le bloc dit que les rangs sont ceux
+du tirage. La carte live de l'accueil (« SEED n ») lit le même rang figé. Les
+sections de manche s'en servent pour trier (`ROUND_MATCH_SECTIONS.md`). L'ordre,
+lui, est figé (voir ci-dessous).
 
 ## Fenêtre d'édition
 

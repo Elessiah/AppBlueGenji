@@ -37,7 +37,8 @@ import {
 } from "@/lib/shared/live-streams";
 import { loadTeamRanking } from "@/lib/server/ranking-service";
 import { entrantHref } from "@/lib/shared/participants";
-import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
+import { seedingSource } from "@/lib/shared/seeding";
+import { loadFrozenRankingSeeds } from "@/lib/server/tournaments/frozen-seeds";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { localUploadUrl } from "@/lib/shared/uploads";
 import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
@@ -284,17 +285,19 @@ async function loadLandingLive(): Promise<LandingLive | null> {
     // La colonne `seed` porte l'ordre d'inscription ; elle n'est le **tirage**
     // du tournoi que dans les formats qui seedent depuis elle (ou dès que le
     // staff a réordonné à la main). En Suisse, en Survie, en BG Survie et en
-    // multi-phases, le moteur seede depuis le classement du site : afficher
-    // « SEED 3 » y serait la même invention que le « SEED 1 » écrit en dur
-    // qu'on remplace.
-    const seedOrderIsTheDraw =
+    // multi-phases, le moteur seede depuis le classement du site et fige ce
+    // rang au coup d'envoi (`loadFrozenRankingSeeds`) : c'est lui qu'on montre,
+    // comme la fiche du tournoi — rien plutôt qu'un seed inventé s'il manque.
+    const frozenSeeds =
       currentRow !== null &&
-      isSeedOrderEffective(
-        seedingSource(tournament.format, Number(currentRow.manual_seeding ?? 0) === 1),
-      );
+      seedingSource(tournament.format, Number(currentRow.manual_seeding ?? 0) === 1) === "RANKING"
+        ? await loadFrozenRankingSeeds(db, tournament.id, tournament.format)
+        : null;
     const scoreOf = (value: number | null): number | null => (value === null ? null : Number(value));
-    const drawSeedOf = (value: number | null): number | null =>
-      seedOrderIsTheDraw ? toSeed(value) : null;
+    const drawSeedOf = (teamId: number | null, value: number | null): number | null => {
+      if (frozenSeeds === null) return toSeed(value);
+      return teamId === null ? null : (frozenSeeds.get(Number(teamId)) ?? null);
+    };
 
     const currentMatch: LandingLiveMatch | null = currentRow
       ? {
@@ -309,8 +312,8 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           team2LogoUrl: localUploadUrl(currentRow.team2_logo_url),
           team1Score: scoreOf(currentRow.team1_score),
           team2Score: scoreOf(currentRow.team2_score),
-          team1Seed: drawSeedOf(currentRow.team1_seed),
-          team2Seed: drawSeedOf(currentRow.team2_seed),
+          team1Seed: drawSeedOf(currentRow.team1_id, currentRow.team1_seed),
+          team2Seed: drawSeedOf(currentRow.team2_id, currentRow.team2_seed),
           bracket: currentRow.bracket,
           roundLabel: roundLabelFor(
             currentRow.bracket,

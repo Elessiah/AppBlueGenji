@@ -57,7 +57,9 @@ describe("liste des inscrites — classement du site", () => {
     expect(panel).toContain("registrationsFollowRanking(source, detail.card.state)");
   });
 
-  it("n'annonce « ordre d'arrivée » que lorsque la liste ne suit pas le classement", () => {
-    expect(panel).toContain("!showsRealDraw && !followsRanking && rows.length > 0");
+  it("montre, une fois lancé, les rangs figés et non l'ordre d'arrivée", () => {
+    expect(panel).toContain("registrationsFollowFrozenDraw(source, detail.card.state)");
+    expect(panel).toContain("followsFrozenDraw ? frozenSeedLabel(reg.seed)");
+    expect(panel).not.toContain("ne seront pas ceux du");
   });
 });

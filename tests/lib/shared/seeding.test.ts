@@ -5,7 +5,10 @@ import {
   isPreLaunchState,
   isSeedOrderEffective,
   isValidSeedOrder,
+  frozenSeedsOf,
   moveInOrder,
+  orderByFrozenSeeds,
+  registrationsFollowFrozenDraw,
   registrationsFollowRanking,
   seedingLockReason,
   seedingWindowState,
@@ -235,5 +238,97 @@ describe("registrationsFollowRanking", () => {
   it("ne le suit jamais quand l'ordre vient du staff ou des inscriptions", () => {
     expect(registrationsFollowRanking("MANUAL", "REGISTRATION")).toBe(false);
     expect(registrationsFollowRanking("REGISTRATION", "REGISTRATION")).toBe(false);
+  });
+});
+
+describe("registrationsFollowFrozenDraw", () => {
+  it("suit le tirage figé d'un tournoi seedé par le classement, une fois lancé", () => {
+    expect(registrationsFollowFrozenDraw("RANKING", "RUNNING")).toBe(true);
+    expect(registrationsFollowFrozenDraw("RANKING", "FINISHED")).toBe(true);
+  });
+
+  it("ne le suit ni avant le lancement ni hors classement", () => {
+    expect(registrationsFollowFrozenDraw("RANKING", "REGISTRATION")).toBe(false);
+    expect(registrationsFollowFrozenDraw("MANUAL", "RUNNING")).toBe(false);
+    expect(registrationsFollowFrozenDraw("REGISTRATION", "RUNNING")).toBe(false);
+  });
+});
+
+describe("frozenSeedsOf", () => {
+  const rows = (pairs: Array<[number, number]>) =>
+    pairs.map(([teamId, seed]) => ({ teamId, seed }));
+  const empty = {
+    swiss: null,
+    survival: null,
+    endurance: null,
+    phases: null,
+    phaseStandings: null,
+  };
+
+  it("lit le classement du format seedé par le classement", () => {
+    const standings = { standings: rows([[4, 1], [9, 2]]) };
+    expect([...frozenSeedsOf({ ...empty, format: "SWISS", swiss: standings })]).toEqual([
+      [4, 1],
+      [9, 2],
+    ]);
+    expect(frozenSeedsOf({ ...empty, format: "SURVIVAL", survival: standings }).get(9)).toBe(2);
+    expect(frozenSeedsOf({ ...empty, format: "BG_SURVIE", endurance: standings }).get(4)).toBe(1);
+  });
+
+  it("lit en multi-phases la première phase peuplée, pas celles seedées par le rang", () => {
+    const seeds = frozenSeedsOf({
+      ...empty,
+      format: "MULTI",
+      phases: [
+        { id: 30, position: 3 },
+        { id: 10, position: 1 },
+        { id: 20, position: 2 },
+      ],
+      phaseStandings: { 10: [], 20: rows([[5, 1], [6, 2]]), 30: rows([[6, 1]]) },
+    });
+    expect([...seeds]).toEqual([
+      [5, 1],
+      [6, 2],
+    ]);
+  });
+
+  it("rend une carte vide sans classement, hors format concerné ou pour un seed nul", () => {
+    expect(frozenSeedsOf({ ...empty, format: "SWISS" }).size).toBe(0);
+    expect(frozenSeedsOf({ ...empty, format: "MULTI" }).size).toBe(0);
+    expect(
+      frozenSeedsOf({ ...empty, format: "SINGLE", swiss: { standings: rows([[1, 1]]) } }).size,
+    ).toBe(0);
+    expect(
+      [...frozenSeedsOf({ ...empty, format: "SWISS", swiss: { standings: rows([[1, 0], [2, 3]]) } })],
+    ).toEqual([[2, 3]]);
+  });
+});
+
+describe("orderByFrozenSeeds", () => {
+  const rows = [
+    { teamId: 1, name: "A", seed: 1 },
+    { teamId: 2, name: "B", seed: 2 },
+    { teamId: 3, name: "C", seed: 3 },
+  ];
+
+  it("range par rang figé et porte ce rang, trous compris", () => {
+    expect(orderByFrozenSeeds(rows, new Map([[3, 1], [1, 4], [2, 2]]))).toEqual([
+      { teamId: 3, name: "C", seed: 1 },
+      { teamId: 2, name: "B", seed: 2 },
+      { teamId: 1, name: "A", seed: 4 },
+    ]);
+  });
+
+  it("met les engagées sans rang en dernier, seed nul, dans leur ordre d'origine", () => {
+    expect(orderByFrozenSeeds(rows, new Map([[2, 1]])).map((r) => [r.teamId, r.seed])).toEqual([
+      [2, 1],
+      [1, null],
+      [3, null],
+    ]);
+  });
+
+  it("ne modifie pas les lignes reçues", () => {
+    orderByFrozenSeeds(rows, new Map([[3, 1]]));
+    expect(rows[2].seed).toBe(3);
   });
 });

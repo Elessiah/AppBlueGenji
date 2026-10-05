@@ -5,8 +5,8 @@ import { formatLocalDateTime } from "@/lib/shared/dates";
 import { useToast } from "@/components/ui/toast";
 import { Pill } from "@/components/cyber";
 import {
-  isSeedOrderEffective,
   moveInOrder,
+  registrationsFollowFrozenDraw,
   registrationsFollowRanking,
   seedingLockReason,
   seedingReorderNeedsConfirmation,
@@ -51,6 +51,11 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
   SCORES_ENTERED: "Un score a été saisi : l'ordre est désormais figé.",
   STARTED: "Le tournoi a commencé : l'ordre de départ est désormais figé.",
 };
+
+/** Rang figé au coup d'envoi ; « — » pour une engagée absente du tirage. */
+function frozenSeedLabel(seed: number | null): string {
+  return seed === null ? "—" : `#${seed}`;
+}
 
 /**
  * Liste des inscrites, et — pour le staff — l'endroit où l'on en règle l'ordre.
@@ -218,7 +223,10 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     }
     await performMove(teamId, direction);
   };
-  const showsRealDraw = isSeedOrderEffective(source);
+  // Une fois lancé, le serveur range la liste par les têtes de série figées au
+  // coup d'envoi (`orderByFrozenSeeds`) : le rang montré est ce `seed`, que des
+  // retraits peuvent laisser troué, et « — » pour une engagée sans rang figé.
+  const followsFrozenDraw = registrationsFollowFrozenDraw(source, detail.card.state);
   // Avant le coup d'envoi, le serveur range déjà la liste selon le classement
   // du site : elle n'est plus l'ordre d'arrivée, mais le tirage prévu.
   const followsRanking = registrationsFollowRanking(source, detail.card.state);
@@ -262,12 +270,10 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
               autorité.
             </p>
           )}
-          {!showsRealDraw && !followsRanking && rows.length > 0 && (
-            <p className={styles.warning}>
-              Ce format seede depuis le classement du site : les rangs ci-dessous ne sont
-              que l&apos;ordre d&apos;arrivée des inscriptions et ne seront pas ceux du
-              tirage. Réordonnez la liste pour imposer votre propre ordre — il fera alors
-              autorité.
+          {followsFrozenDraw && rows.length > 0 && (
+            <p className={styles.hint}>
+              Rangs figés au coup d&apos;envoi selon le classement du site : ce sont ceux
+              du tirage, même si les cotes ont bougé depuis.
             </p>
           )}
         </>
@@ -286,7 +292,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
           </div>
           {visibleRows.map((reg, index) => (
             <div key={reg.teamId} className={`${styles.row} ${gridClass}`}>
-              <span className={styles.seed}>#{index + 1}</span>
+              <span className={styles.seed}>
+                {followsFrozenDraw ? frozenSeedLabel(reg.seed) : `#${index + 1}`}
+              </span>
               <EntrantName
                 teamId={reg.teamId}
                 name={reg.teamName}

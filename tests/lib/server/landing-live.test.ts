@@ -93,6 +93,14 @@ async function mockDb(rows: unknown[]) {
  * représenter un argument — un appelant passant une liste filtrée servirait son
  * direct à tous les visiteurs. Les tests injectent donc là où la production lit.
  */
+/** Première lecture : les matchs ; seconde : les rangs figés au coup d'envoi. */
+async function mockDbWithFrozenSeeds(rows: unknown[], frozen: unknown[]) {
+  const { getDatabase } = await import("@/lib/server/database");
+  const query = jest.fn<SqlQuery>().mockResolvedValueOnce([rows]).mockResolvedValue([frozen]);
+  jest.mocked(getDatabase).mockResolvedValue(fakePool({ execute: query }));
+  return query;
+}
+
 async function liveFrom(list: TournamentBuckets) {
   jest.mocked(listTournamentBuckets).mockResolvedValue(list);
   return getLandingLive();
@@ -426,9 +434,9 @@ describe("getLandingLive — fiche des engagés du match", () => {
  * sur tous les matchs de tous les tournois. Les remplacer par la colonne
  * `bg_tournament_registrations.seed` ne suffit pas : cette colonne porte l'ordre
  * d'inscription, qui n'est le **tirage** que dans les formats qui seedent depuis
- * elle (`isSeedOrderEffective`). En Suisse, en Survie, en BG Survie et en
- * multi-phases, le moteur seede depuis le classement du site — annoncer un seed
- * y serait la même invention, avec un chiffre plus crédible.
+ * elle. En Suisse, en Survie, en BG Survie et en multi-phases, le moteur seede
+ * depuis le classement du site et fige ce rang au coup d'envoi : c'est lui
+ * qu'on annonce (`loadFrozenRankingSeeds`), jamais l'ordre d'arrivée.
  */
 describe("getLandingLive — seeds du match mis en avant", () => {
   beforeEach(() => {
@@ -453,16 +461,36 @@ describe("getLandingLive — seeds du match mis en avant", () => {
     expect(live?.currentMatch?.team2Seed).toBe(7);
   });
 
-  it("n'annonce aucun seed dans les formats qui seedent depuis le classement du site", async () => {
+  it("annonce le seed figé au coup d'envoi dans les formats seedés par le classement", async () => {
+    const tables = {
+      SWISS: "bg_swiss_standings",
+      SURVIVAL: "bg_survival_standings",
+      BG_SURVIE: "bg_endurance_standings",
+      MULTI: "bg_tournament_phase_teams",
+    };
     for (const format of ["SWISS", "SURVIVAL", "BG_SURVIE", "MULTI"] as const) {
       clearCache();
-      await mockDb([matchRow({ team1_seed: 1, team2_seed: 2 })]);
+      const query = await mockDbWithFrozenSeeds(
+        [matchRow({ team1_seed: 1, team2_seed: 2 })],
+        [{ team_id: 11, seed: 7 }, { team_id: 12, seed: 3 }],
+      );
       const live = await liveFrom(buckets([card(1, "Coupe A", format)]));
-      // La colonne existe et vaut 1 et 2 : c'est l'ordre d'arrivée des
-      // inscriptions, pas le tirage. On préfère ne rien dire.
-      expect(live?.currentMatch?.team1Seed).toBeNull();
-      expect(live?.currentMatch?.team2Seed).toBeNull();
+      // La colonne vaut 1 et 2 (ordre d'arrivée) : c'est le rang figé qui parle.
+      expect(live?.currentMatch?.team1Seed).toBe(7);
+      expect(live?.currentMatch?.team2Seed).toBe(3);
+      expect(String(query.mock.calls[1][0])).toContain(tables[format]);
     }
+  });
+
+  it("n'invente aucun seed quand le rang figé manque", async () => {
+    await mockDbWithFrozenSeeds(
+      [matchRow({ team1_seed: 1, team2_seed: 2 })],
+      [{ team_id: 11, seed: 0 }],
+    );
+    const live = await liveFrom(buckets([card(1, "Coupe A", "SWISS")]));
+    // Seed 0 = valeur par défaut de colonne, pas un rang ; l'engagée 12 est absente.
+    expect(live?.currentMatch?.team1Seed).toBeNull();
+    expect(live?.currentMatch?.team2Seed).toBeNull();
   });
 
   it("rend son seed à une ronde suisse dont le staff a fixé l'ordre à la main", async () => {
