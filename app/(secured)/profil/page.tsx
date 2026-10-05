@@ -168,6 +168,11 @@ export default function ProfilePage() {
     subject: ConfirmationSubject;
     previewed: ConfirmationSubject;
   } | null>(null);
+  /**
+   * Le bouton se désarme avant l'aperçu, focus encore dessus : le navigateur le
+   * renvoie sur `body`, que la modale restaurerait. Annuler le rend au bouton.
+   */
+  const deleteButtonRef = useRef<HTMLButtonElement>(null);
   const [openToRecruitment, setOpenToRecruitment] = useState(false);
   const [visibility, setVisibility] = useState({
     avatar: false,
@@ -1056,6 +1061,7 @@ export default function ProfilePage() {
             <button
               type="button"
               className={`btn ghost ${s.accountButton} ${s.deleteButton}`}
+              ref={deleteButtonRef}
               onClick={onDeleteAccount}
               disabled={deleting}
             >
@@ -1089,6 +1095,7 @@ export default function ProfilePage() {
           onClose={() => {
             setPendingDeletion(null);
             setDeleting(false);
+            requestAnimationFrame(() => deleteButtonRef.current?.focus());
           }}
           onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
         >
