@@ -382,6 +382,10 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain("resizes?.disconnect();");
   });
 
+  it("ne monte la zone défilante qu'à l'ouverture (un plateau compte 254 cartes)", () => {
+    expect(source).toMatch(/\{expanded \? \(\s*<ScrollArea/);
+  });
+
   it("le lancement forcé garde sa confirmation", () => {
     expect(source).toContain("force: () => setConfirmForce(true),");
     expect(source).toContain("<ConfirmActionDialog");
