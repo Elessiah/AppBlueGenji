@@ -107,10 +107,25 @@ l'antenne en `START_TIME` — et les séparer ajouterait une ligne à une carte 
 ### Saisie sans année
 
 Le dialogue demande le **jour** (liste 1–31), le **mois** (liste janvier–décembre)
-et l'**heure** (`<input type="time">`), à l'**heure de Paris** quel que soit le
-fuseau du navigateur — **jamais l'année**. Les trois champs vidés (bouton
-« Vider la date ») = horaire effacé. Une date déjà posée pré-remplit les trois
-champs (`matchStartEntryOf`).
+et l'**heure** (liste des 48 **demi-heures**, `00:00` … `23:30`), à l'**heure de
+Paris** quel que soit le fuseau du navigateur — **jamais l'année**. Une date
+déjà posée pré-remplit les trois champs (`matchStartEntryOf`).
+
+- **Heure par défaut : 21:00** (`MATCH_ENTRY_DEFAULT_TIME`) pour un match sans
+  date — les matchs se jouent en soirée ; « Vider la date » y ramène aussi.
+- **Demi-heures seulement** (`MATCH_ENTRY_HALF_HOURS`) : une liste native se
+  parcourt au clavier (flèches, première lettre) et ouvre le sélecteur du
+  système sur mobile, sans saisie partielle à gérer.
+- **Heure déjà posée entre deux demi-heures** (`20:45`, venue d'un autre
+  chemin ou d'une date antérieure) : `matchEntryTimeOptions` l'insère à sa
+  place dans la liste, présélectionnée — elle s'affiche juste et reste gardée
+  si on enregistre sans y toucher ; la changer fait choisir une demi-heure.
+- **Le serveur ne l'impose pas** : `normalizeMatchStartAt` accepte toujours
+  n'importe quelle minute — les dates existantes et les autres chemins
+  d'écriture ne cassent pas. C'est une aide de saisie, pas une règle.
+- **Sans jour ni mois, aucune date** (`readMatchStartEntry` → `empty`) : la
+  liste des heures garde toujours une valeur, et une heure seule ne programme
+  rien. Jour et mois vidés (ou bouton « Vider la date ») = horaire effacé.
 
 Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
 (`resolveMatchStartEntry`, `lib/shared/match-start-entry.ts`, pur) :
@@ -138,7 +153,9 @@ Un match n'est jamais programmé à plus de trois mois : l'année se **déduit**
   (`localMatchTimeIfDifferent`), pour que l'organisateur reconnaisse l'horaire
   de la carte ;
 - l'aide est rattachée au champ jour et l'aperçu au champ heure
-  (`aria-describedby`) : chacun lu une fois, plutôt qu'à chaque champ ;
+  (`aria-describedby`) : chacun lu une fois, plutôt qu'à chaque champ. L'aide
+  n'explique plus la déduction de l'année (retiré à la demande des
+  organisateurs) : l'aperçu, qui montre l'année retenue, suffit ;
 - une saisie inachevée affiche une consigne neutre dans l'aperçu (« À
   compléter… », « Aucune date possible… ») ; le refus lui-même part en
   notification à l'envoi et se rattache au champ ;

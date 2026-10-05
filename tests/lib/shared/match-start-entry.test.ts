@@ -1,10 +1,13 @@
 import { describe, expect, it } from "@jest/globals";
 import {
+  MATCH_ENTRY_DEFAULT_TIME,
+  MATCH_ENTRY_HALF_HOURS,
   MATCH_ENTRY_MONTHS,
   formatMatchStartEntryPreview,
   isMatchStartEntryInRange,
   localMatchTimeIfDifferent,
   matchEntryReference,
+  matchEntryTimeOptions,
   matchEntryTimeValue,
   matchStartEntryOf,
   nextValidYearShift,
@@ -229,6 +232,31 @@ describe("heure du champ", () => {
     expect(parseMatchEntryTime("8:00")).toBeNull();
   });
 
+  it("propose les 48 demi-heures, 21:00 par défaut", () => {
+    expect(MATCH_ENTRY_HALF_HOURS).toHaveLength(48);
+    expect(MATCH_ENTRY_HALF_HOURS[0]).toBe("00:00");
+    expect(MATCH_ENTRY_HALF_HOURS[1]).toBe("00:30");
+    expect(MATCH_ENTRY_HALF_HOURS.at(-1)).toBe("23:30");
+    expect(MATCH_ENTRY_HALF_HOURS.every((value) => /^\d{2}:(00|30)$/.test(value))).toBe(true);
+    expect(MATCH_ENTRY_HALF_HOURS).toContain(MATCH_ENTRY_DEFAULT_TIME);
+    expect(MATCH_ENTRY_DEFAULT_TIME).toBe("21:00");
+  });
+
+  it("garde à sa place une heure posée entre deux demi-heures", () => {
+    expect(matchEntryTimeOptions()).toBe(MATCH_ENTRY_HALF_HOURS);
+    expect(matchEntryTimeOptions("20:30")).toBe(MATCH_ENTRY_HALF_HOURS);
+    const options = matchEntryTimeOptions("20:45");
+    expect(options).toHaveLength(49);
+    expect(options.slice(41, 44)).toEqual(["20:30", "20:45", "21:00"]);
+    expect(matchEntryTimeOptions("00:05").slice(0, 3)).toEqual(["00:00", "00:05", "00:30"]);
+    expect(matchEntryTimeOptions("23:59").at(-1)).toBe("23:59");
+  });
+
+  it("ignore une heure posée illisible", () => {
+    expect(matchEntryTimeOptions("")).toBe(MATCH_ENTRY_HALF_HOURS);
+    expect(matchEntryTimeOptions("24:10")).toBe(MATCH_ENTRY_HALF_HOURS);
+  });
+
   it("borne la saisie", () => {
     expect(isMatchStartEntryInRange({ day: 31, month: 12, hour: 23, minute: 59 })).toBe(true);
     expect(isMatchStartEntryInRange({ day: 1, month: 0, hour: 0, minute: 0 })).toBe(false);
@@ -269,7 +297,7 @@ describe("décalage d'année", () => {
       { tournamentStartAt: "2025-09-01T18:00:00.000Z", tournamentFinished: false },
       at("2026-10-01T10:00:00Z"),
     );
-    const deduced = readMatchStartEntry({ day: "15", month: "2", time: "20:00", timeBadInput: false }, reference);
+    const deduced = readMatchStartEntry({ day: "15", month: "2", time: "20:00" }, reference);
     expect(deduced).toEqual({ kind: "ready", instant: at("2027-02-15T19:00:00Z") });
     expect(withYearShift(deduced, -1)).toEqual({ kind: "ready", instant: at("2026-02-15T19:00:00Z") });
   });
@@ -277,7 +305,7 @@ describe("décalage d'année", () => {
   it("corrige une année déjà fausse sur le match", () => {
     const current = "2026-01-12T19:00:00.000Z";
     const kept = readMatchStartEntry(
-      { day: "12", month: "1", time: "21:00", timeBadInput: false },
+      { day: "12", month: "1", time: "21:00" },
       at("2026-12-20T10:00:00Z"),
       current,
     );
@@ -296,21 +324,27 @@ describe("décalage d'année", () => {
 
 describe("readMatchStartEntry", () => {
   const reference = at("2026-12-20T18:00:00Z");
-  const raw = (day: string, month: string, time: string, timeBadInput = false) => ({ day, month, time, timeBadInput });
+  const raw = (day: string, month: string, time: string) => ({ day, month, time });
 
-  it("trois champs vides : effacement", () => {
+  it("ni jour ni mois : effacement, quelle que soit l'heure", () => {
     expect(readMatchStartEntry(raw("", "", ""), reference)).toEqual({ kind: "empty" });
+    // L'heure par défaut de la liste ne programme rien à elle seule.
+    expect(readMatchStartEntry(raw("", "", MATCH_ENTRY_DEFAULT_TIME), reference)).toEqual({ kind: "empty" });
+    expect(readMatchStartEntry(raw("", "", "18:30"), reference)).toEqual({ kind: "empty" });
   });
 
   it("désigne le premier champ manquant", () => {
     expect(readMatchStartEntry(raw("", "1", "20:00"), reference)).toEqual({ kind: "incomplete", field: "day" });
-    expect(readMatchStartEntry(raw("3", "", ""), reference)).toEqual({ kind: "incomplete", field: "month" });
+    expect(readMatchStartEntry(raw("3", "", "21:00"), reference)).toEqual({ kind: "incomplete", field: "month" });
     expect(readMatchStartEntry(raw("3", "1", ""), reference)).toEqual({ kind: "incomplete", field: "time" });
+    expect(readMatchStartEntry(raw("3", "1", "25:00"), reference)).toEqual({ kind: "incomplete", field: "time" });
   });
 
-  it("une heure à moitié tapée n'est pas un effacement", () => {
-    expect(readMatchStartEntry(raw("", "", "", true), reference)).toEqual({ kind: "incomplete", field: "day" });
-    expect(readMatchStartEntry(raw("3", "1", "", true), reference)).toEqual({ kind: "incomplete", field: "time" });
+  it("une heure hors demi-heure reste acceptée (date déjà posée)", () => {
+    expect(readMatchStartEntry(raw("3", "1", "20:45"), reference)).toEqual({
+      kind: "ready",
+      instant: at("2027-01-03T19:45:00Z"),
+    });
   });
 
   it("un jour absent du mois est désigné sur le jour", () => {

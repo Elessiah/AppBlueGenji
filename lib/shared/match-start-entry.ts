@@ -229,9 +229,33 @@ export const MATCH_ENTRY_MONTHS: readonly string[] = [
   "décembre",
 ];
 
-/** Valeur `HH:MM` d'un `<input type="time">`. */
+/** Valeur `HH:MM` de la liste des heures. */
 export function matchEntryTimeValue(entry: Pick<MatchStartEntry, "hour" | "minute">): string {
   return `${String(entry.hour).padStart(2, "0")}:${String(entry.minute).padStart(2, "0")}`;
+}
+
+/**
+ * Heure proposée à l'ouverture du dialogue quand le match n'a pas encore de
+ * date : les matchs se jouent d'ordinaire en soirée.
+ */
+export const MATCH_ENTRY_DEFAULT_TIME = "21:00";
+
+/** Les 48 demi-heures d'une journée (`00:00`, `00:30` … `23:30`). */
+export const MATCH_ENTRY_HALF_HOURS: readonly string[] = Array.from({ length: 48 }, (_, index) =>
+  matchEntryTimeValue({ hour: Math.floor(index / 2), minute: (index % 2) * 30 }),
+);
+
+/**
+ * Choix de la liste des heures : les demi-heures, plus l'heure déjà posée si
+ * elle tombe entre deux (`20:45`, posée par un autre chemin) — insérée à sa
+ * place, pour qu'elle s'affiche telle quelle et reste gardée tant qu'on n'y
+ * touche pas. Une valeur illisible est ignorée.
+ */
+export function matchEntryTimeOptions(current: string | null = null): readonly string[] {
+  if (current === null || MATCH_ENTRY_HALF_HOURS.includes(current) || parseMatchEntryTime(current) === null) {
+    return MATCH_ENTRY_HALF_HOURS;
+  }
+  return [...MATCH_ENTRY_HALF_HOURS, current].sort((a, b) => a.localeCompare(b));
 }
 
 /** Heure et minute d'une valeur `HH:MM` (secondes tolérées), `null` si illisible. */
@@ -249,7 +273,7 @@ export type MatchStartEntryField = "day" | "month" | "time";
 
 /** Ce que les trois champs du dialogue, tels que saisis, produisent. */
 export type MatchStartEntryState =
-  /** Les trois champs vides : la date est effacée. */
+  /** Ni jour ni mois : la date est effacée. */
   | { kind: "empty" }
   /** Saisie commencée : `field` est le premier champ manquant ou illisible. */
   | { kind: "incomplete"; field: MatchStartEntryField }
@@ -258,10 +282,12 @@ export type MatchStartEntryState =
   | { kind: "ready"; instant: number };
 
 /**
- * Lecture des trois champs bruts du dialogue (`day`, `month` : valeur d'une
- * liste, `""` = non choisi ; `time` : valeur d'un `<input type="time">`).
- * `timeBadInput` : le champ heure porte une saisie partielle, qu'il rend comme
- * `""` — indiscernable d'un champ vide sans ce drapeau.
+ * Lecture des trois champs bruts du dialogue (valeurs de listes, `""` = non
+ * choisi ; `time` en `HH:MM`).
+ *
+ * **Sans jour ni mois, aucune date** (`empty`), quelle que soit l'heure : la
+ * liste des heures garde toujours une valeur (21:00 par défaut), et une heure
+ * seule ne programme rien.
  *
  * `currentStartAt` : date déjà posée sur le match. Tant que le jour et le mois
  * restent les siens, **son année est gardée** — retoucher l'heure, ou
@@ -269,16 +295,15 @@ export type MatchStartEntryState =
  * le jour ou le mois relance la déduction.
  */
 export function readMatchStartEntry(
-  raw: Readonly<{ day: string; month: string; time: string; timeBadInput: boolean }>,
+  raw: Readonly<{ day: string; month: string; time: string }>,
   reference: number,
   currentStartAt: MatchScheduleInput["startAt"] = null,
 ): MatchStartEntryState {
   const day = raw.day === "" ? null : Number(raw.day);
   const month = raw.month === "" ? null : Number(raw.month);
-  const timeBlank = raw.time.trim() === "";
-  const time = timeBlank ? null : parseMatchEntryTime(raw.time);
+  const time = parseMatchEntryTime(raw.time);
 
-  if (day === null && month === null && timeBlank && !raw.timeBadInput) return { kind: "empty" };
+  if (day === null && month === null) return { kind: "empty" };
   if (day === null || !isIntegerIn(day, 1, 31)) return { kind: "incomplete", field: "day" };
   if (month === null || !isIntegerIn(month, 1, 12)) return { kind: "incomplete", field: "month" };
   if (time === null) return { kind: "incomplete", field: "time" };
