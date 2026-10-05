@@ -56,35 +56,6 @@
   gap: 18px;
 }
 
-/* Teinte d'un mode (`RULE_MODE_TONE`, lib/shared/rules-display.ts) : la même
-   sur sa carte, sa page et sa pastille « Autres modes ». `--tone-ink` est un
-   texte (AA sur le voile le plus teinté, tests/app/public-bright-ui.test.ts),
-   `--tone-rgb` ne sert qu'aux voiles, liserés et halos. */
-.modeCard[data-tone="blue"] {
-  --tone-rgb: var(--blue-500-rgb);
-  --tone-ink: var(--blue-300);
-}
-
-.modeCard[data-tone="violet"] {
-  --tone-rgb: var(--violet-400-rgb);
-  --tone-ink: var(--violet-300);
-}
-
-.modeCard[data-tone="cyan"] {
-  --tone-rgb: var(--cyan-400-rgb);
-  --tone-ink: var(--cyan-400);
-}
-
-.modeCard[data-tone="teal"] {
-  --tone-rgb: var(--teal-400-rgb);
-  --tone-ink: var(--teal-400);
-}
-
-.modeCard[data-tone="pink"] {
-  --tone-rgb: var(--pink-400-rgb);
-  --tone-ink: var(--pink-400);
-}
-
 /* Carte d'un mode : voile et liseré haut de sa teinte (ombre intérieure : les
    pseudo-éléments portent déjà les coins de `.card-ticks`), halo au survol. */
 .modeCard[data-tone] {

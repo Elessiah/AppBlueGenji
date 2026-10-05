@@ -30,6 +30,7 @@ import {
 } from "@/lib/shared/rules-page-outline";
 import { RULE_MODE_TONE } from "@/lib/shared/rules-display";
 import styles from "./page.module.css";
+import tones from "../tones.module.css";
 
 type PageProps = {
   params: Promise<{ slug: string }>;
@@ -162,7 +163,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
         ])}
       />
 
-      <section className={`${styles.shell} ${styles.hero}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
+      <section className={`${styles.shell} ${styles.hero} ${tones.tone}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
         <div className="fabric" />
         <Link href="/regles" className={styles.back}>
           ← Règles des tournois
@@ -191,7 +192,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
         </dl>
       </section>
 
-      <div className={`${styles.shell} ${styles.layout}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
+      <div className={`${styles.shell} ${styles.layout} ${tones.tone}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
         <RulesToc entries={outline} />
 
         <div className={styles.content}>
@@ -285,7 +286,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
                 <Link
                   key={other.slug}
                   href={`/regles/${other.slug}`}
-                  className={styles.otherMode}
+                  className={`${styles.otherMode} ${tones.tone}`}
                   data-tone={RULE_MODE_TONE[other.diagram]}
                 >
                   {other.label}

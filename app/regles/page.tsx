@@ -12,6 +12,7 @@ import {
 } from "@/lib/shared/tournament-rules";
 import { RULE_MODE_TONE, RULE_STATUS_PILL } from "@/lib/shared/rules-display";
 import styles from "./page.module.css";
+import tones from "./tones.module.css";
 
 /**
  * La description ne citait que quatre modes sur les six que le registre expose
@@ -32,7 +33,7 @@ export const metadata: Metadata = pageMetadata({
 function ModeCard({ mode }: Readonly<{ mode: TournamentRuleMode }>) {
   const soon = mode.status === "SOON";
   return (
-    <CyberCard lift ticks className={styles.modeCard} tone={RULE_MODE_TONE[mode.diagram]} style={{ height: "100%" }}>
+    <CyberCard lift ticks className={`${styles.modeCard} ${tones.tone}`} tone={RULE_MODE_TONE[mode.diagram]} style={{ height: "100%" }}>
       <Link href={`/regles/${mode.slug}`} className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>{mode.label}</h3>

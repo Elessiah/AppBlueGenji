@@ -1,0 +1,30 @@
+/* Teinte d'un mode (`RULE_MODE_TONE`, lib/shared/rules-display.ts), commune à
+   /regles et /regles/[slug] : la même sur sa carte, sa page et sa pastille
+   « Autres modes ». Un élément porte `.tone` + `data-tone`. `--tone-ink` est un
+   texte (AA sur le voile le plus teinté, tests/app/public-bright-ui.test.ts),
+   `--tone-rgb` ne sert qu'aux voiles, liserés et halos — jamais derrière le
+   texte courant. */
+.tone[data-tone="blue"] {
+  --tone-rgb: var(--blue-500-rgb);
+  --tone-ink: var(--blue-300);
+}
+
+.tone[data-tone="violet"] {
+  --tone-rgb: var(--violet-400-rgb);
+  --tone-ink: var(--violet-300);
+}
+
+.tone[data-tone="cyan"] {
+  --tone-rgb: var(--cyan-400-rgb);
+  --tone-ink: var(--cyan-400);
+}
+
+.tone[data-tone="teal"] {
+  --tone-rgb: var(--teal-400-rgb);
+  --tone-ink: var(--teal-400);
+}
+
+.tone[data-tone="pink"] {
+  --tone-rgb: var(--pink-400-rgb);
+  --tone-ink: var(--pink-400);
+}

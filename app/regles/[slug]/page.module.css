@@ -6,40 +6,6 @@
   margin: 0 auto;
 }
 
-/* Teinte du mode (`RULE_MODE_TONE`, lib/shared/rules-display.ts), la même que
-   sur sa carte de /regles. `--tone-ink` est un texte (AA,
-   tests/app/public-bright-ui.test.ts), `--tone-rgb` ne sert qu'aux voiles,
-   liserés et halos — jamais derrière le texte courant. */
-.shell[data-tone="blue"],
-.otherMode[data-tone="blue"] {
-  --tone-rgb: var(--blue-500-rgb);
-  --tone-ink: var(--blue-300);
-}
-
-.shell[data-tone="violet"],
-.otherMode[data-tone="violet"] {
-  --tone-rgb: var(--violet-400-rgb);
-  --tone-ink: var(--violet-300);
-}
-
-.shell[data-tone="cyan"],
-.otherMode[data-tone="cyan"] {
-  --tone-rgb: var(--cyan-400-rgb);
-  --tone-ink: var(--cyan-400);
-}
-
-.shell[data-tone="teal"],
-.otherMode[data-tone="teal"] {
-  --tone-rgb: var(--teal-400-rgb);
-  --tone-ink: var(--teal-400);
-}
-
-.shell[data-tone="pink"],
-.otherMode[data-tone="pink"] {
-  --tone-rgb: var(--pink-400-rgb);
-  --tone-ink: var(--pink-400);
-}
-
 .hero {
   padding: 64px 0 36px;
 }
