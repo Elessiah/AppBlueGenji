@@ -4,7 +4,7 @@ La version du site vit dans `package.json` (et `package-lock.json`), au format [
 
 ## Comment la version monte
 
-Le workflow `.github/workflows/version-bump.yml` se déclenche à la **fusion** d'une PR dans `main`, par le `push` sur `main` qu'elle produit. Il tourne dans le contexte du dépôt : une PR venue d'un fork est versionnée comme les autres, et aucun déclencheur privilégié (`pull_request_target`) ne risque d'extraire du code de PR avec un jeton en écriture. Un push direct sur `main`, sans PR, ne monte rien ; une PR dont le titre porte `[skip ci]` non plus (GitHub ne lance alors aucun workflow) :
+Le workflow `.github/workflows/version-bump.yml` se déclenche à la **fusion** d'une PR dans `main`, par le `push` sur `main` qu'elle produit. Il tourne dans le contexte du dépôt : une PR venue d'un fork est versionnée comme les autres, et aucun déclencheur privilégié (`pull_request_target`) ne risque d'extraire du code de PR avec un jeton en écriture. Un push direct sur `main`, sans PR, ne monte rien. GitHub ne lance **aucun** workflow sur un push dont le message porte `[skip ci]` (ou `[ci skip]`, `[no ci]`, `[skip actions]`) — y compris un squash qui recopie un message de commit de la PR : on relance alors le workflow à la main (*Actions → Version bump → Run workflow*) avec le SHA du commit de fusion (`workflow_dispatch`, entrée `sha`) :
 
 1. il retrouve la PR fusionnée par l'API (`commits/<sha>/pulls`, trois essais) et lit le niveau sur ses **étiquettes** ;
 2. extrait `main` à jour (pas le commit de fusion : une autre fusion a pu passer entre-temps) et lance `npm version <niveau> --no-git-tag-version` ;

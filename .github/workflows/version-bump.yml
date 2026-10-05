@@ -12,6 +12,14 @@ name: Version bump
 on:
   push:
     branches: [main]
+  # Rattrapage : GitHub ne lance aucun workflow sur un push dont le message porte
+  # `[skip ci]` (ou `[ci skip]`, `[no ci]`, `[skip actions]`) — y compris un
+  # squash qui recopie un tel message de commit. Relancer à la main avec le SHA.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit de fusion sur main (défaut : tête de main)"
+        required: false
 
 permissions:
   contents: write
@@ -21,7 +29,7 @@ permissions:
 # annulerait les autres (un bump perdu sans erreur). Les fusions simultanées se
 # départagent au push, qui recalcule la version sur main à jour à chaque essai.
 concurrency:
-  group: version-bump-${{ github.sha }}
+  group: version-bump-${{ inputs.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
@@ -37,11 +45,17 @@ jobs:
       # de perdre la version sans bruit.
       - name: Retrouver la PR fusionnée
         id: pr
+        env:
+          MERGE_SHA: ${{ inputs.sha || github.sha }}
         run: |
+          if [[ ! "$MERGE_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::SHA invalide."
+            exit 1
+          fi
           pr=""
           api_failed=false
           for attempt in 1 2 3; do
-            if pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+            if pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$MERGE_SHA/pulls" \
               --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0] // empty'); then
               api_failed=false
               [ -n "$pr" ] && break
@@ -52,11 +66,11 @@ jobs:
             sleep $((attempt * 5))
           done
           if [ -z "$pr" ] && [ "$api_failed" = "true" ]; then
-            echo "::error::API GitHub injoignable : PR de $GITHUB_SHA introuvable."
+            echo "::error::API GitHub injoignable : PR de $MERGE_SHA introuvable."
             exit 1
           fi
           if [ -z "$pr" ]; then
-            echo "Aucune PR fusionnée pour $GITHUB_SHA : pas de bump."
+            echo "Aucune PR fusionnée pour $MERGE_SHA : pas de bump."
             echo "skip=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi

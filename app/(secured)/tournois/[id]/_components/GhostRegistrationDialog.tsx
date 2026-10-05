@@ -4,6 +4,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
@@ -298,7 +299,7 @@ export function GhostRegistrationDialog({
               }}
               placeholder="Rechercher…"
               aria-label="Filtrer la liste par nom"
-              autoFocus
+              ref={focusOnMount}
               data-autofocus
             />
 
@@ -360,7 +361,7 @@ export function GhostRegistrationDialog({
               minLength={3}
               maxLength={60}
               required
-              autoFocus
+              ref={focusOnMount}
               data-autofocus
             />
           </div>

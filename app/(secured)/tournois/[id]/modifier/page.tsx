@@ -180,9 +180,12 @@ export default function EditTournamentPage() {
       });
     };
     // Une coupure réseau pendant le chargement laissait la page sur
-    // « Chargement du tournoi... » sans rien dire.
+    // « Chargement du tournoi... » sans rien dire : même sortie que les
+    // autres échecs de chargement, message réseau en plus.
     load().catch(() => {
-      if (!cancelled) showError("Erreur réseau, réessaye.");
+      if (cancelled) return;
+      showError("Erreur réseau, réessaye.");
+      router.replace("/tournois");
     });
 
     return () => {

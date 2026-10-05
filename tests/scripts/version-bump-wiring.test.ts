@@ -19,7 +19,7 @@ describe("workflow de bump de version", () => {
   });
 
   it("ne bump que pour une PR fusionnée dans main, retrouvée par l'API", () => {
-    expect(workflow).toContain('gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls"');
+    expect(workflow).toContain('gh api "repos/$GITHUB_REPOSITORY/commits/$MERGE_SHA/pulls"');
     expect(workflow).toContain('select(.merged_at != null and .base.ref == "main")');
     // Chaque étape utile attend que la PR ait été retrouvée et non exclue.
     const guarded = workflow.match(/if: steps\.pr\.outputs\.skip == 'false'/g) ?? [];
@@ -41,7 +41,15 @@ describe("workflow de bump de version", () => {
   });
 
   it("ne met aucune fusion en file commune, où GitHub annulerait les attentes", () => {
-    expect(workflow).toMatch(/group: version-bump-\$\{\{ github\.sha \}\}\s*\n\s*cancel-in-progress: false/);
+    expect(workflow).toMatch(
+      /group: version-bump-\$\{\{ inputs\.sha \|\| github\.sha \}\}\s*\n\s*cancel-in-progress: false/,
+    );
+  });
+
+  it("se rattrape à la main quand un [skip ci] de squash a sauté le push", () => {
+    expect(workflow).toMatch(/workflow_dispatch:\s*\n\s*inputs:\s*\n\s*sha:/);
+    expect(workflow).toContain("MERGE_SHA: ${{ inputs.sha || github.sha }}");
+    expect(workflow).toContain('[[ ! "$MERGE_SHA" =~ ^[0-9a-f]{7,40}$ ]]');
   });
 
   it("pousse commit et tag ensemble, recalculés sur main à chaque essai", () => {
