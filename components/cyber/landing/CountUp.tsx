@@ -40,6 +40,9 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
     }
     let frame = 0;
     const from = countUpStart(value, onScreen);
+    // Hors de l'écran, le chiffre attend déjà à son départ : sans cela, il
+    // apparaîtrait plein le temps d'une image avant de retomber à 0.
+    if (!onScreen) setShown(from);
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect();
