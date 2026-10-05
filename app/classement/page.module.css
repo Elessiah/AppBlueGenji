@@ -46,7 +46,7 @@
 .heroSub {
   position: relative;
   margin: 20px 0 0;
-  color: var(--text-1);
+  color: var(--ink-soft);
   font-size: 17px;
   line-height: 1.6;
   max-width: 600px;
@@ -443,7 +443,7 @@
   border: 1px solid var(--line-soft);
   border-radius: var(--r-cy-lg);
   background: rgba(5, 8, 12, 0.6);
-  color: var(--text-1);
+  color: var(--ink-soft);
   font-size: 14px;
   line-height: 1.55;
 }

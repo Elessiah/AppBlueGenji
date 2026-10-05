@@ -9,9 +9,6 @@
   --bg-2: #14161c;
   --line: rgba(255, 255, 255, 0.12);
   --line-strong: rgba(255, 255, 255, 0.24);
-  --text-0: #eef5ff;
-  --text-1: #c8d8ec;
-  --text-2: #93a8c6;
   --accent-blue: #59d4ff;
   --accent-green: #4fe0a2;
   --danger: #ff6e82;
@@ -35,8 +32,7 @@
   --cyber-bg-2: #0f1218;
   --cyber-bg-3: #161a22;
   --ink: #eaf4ff;
-  /* Paliers intermédiaires repris des anciens `--text-1` / `--text-2` (valeurs
-     inchangées) : `--ink-soft` entre `--ink` et `--ink-mute` (sous-titres,
+  /* Paliers intermédiaires : `--ink-soft` entre `--ink` et `--ink-mute` (sous-titres,
      libellés de champ), `--ink-quiet` entre `--ink-mute` et `--ink-dim`
      (mentions secondaires). */
   --ink-soft: #c8d8ec;
@@ -2240,9 +2236,6 @@ input[type="radio"]:disabled:checked {
   --ink-quiet: #bccbdf;
   --ink-dim: #a6b9d0;
   --ink-faint: #a6b9d0;
-  --text-0: #f4f8fb;
-  --text-1: #e3ecf7;
-  --text-2: #bccbdf;
   --blue-700: #62b6e0;
   --line: rgba(255, 255, 255, 0.3);
   --line-strong: rgba(255, 255, 255, 0.5);
