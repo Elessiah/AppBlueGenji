@@ -104,7 +104,7 @@ export function SurvivalView({
           {cadenceLabel}
         </span>
         {!isFinished && upcomingCut > 0 && (
-          <span className="mono" style={{ fontSize: 13, color: AMBER }}>
+          <span className="mono" style={{ fontSize: 13, color: "var(--pink-400)" }}>
             Prochaine coupe : round {upcomingCut}
           </span>
         )}

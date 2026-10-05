@@ -281,8 +281,8 @@
 
 /* Lien de la modération : ambre, comme tout ce qui attend une décision. */
 .navReports {
-  color: var(--amber, #f5a524);
-  border-color: rgba(245, 165, 36, 0.45);
+  color: var(--amber);
+  border-color: rgba(var(--amber-rgb), 0.45);
   background: rgba(var(--amber-rgb), 0.08);
   box-shadow: none;
   display: inline-flex;
@@ -292,7 +292,7 @@
 
 .navReports:hover {
   color: #ffc566;
-  border-color: rgba(245, 165, 36, 0.7);
+  border-color: rgba(var(--amber-rgb), 0.7);
   background: rgba(var(--amber-rgb), 0.14);
   box-shadow: none;
 }
@@ -301,7 +301,7 @@
   min-width: 18px;
   padding: 1px 6px;
   border-radius: 999px;
-  background: var(--amber, #f5a524);
+  background: var(--amber);
   color: #111;
   font-size: 11px;
   letter-spacing: 0;

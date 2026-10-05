@@ -12,7 +12,7 @@
 }
 
 .panel[data-active="true"] {
-  border-color: rgba(255, 157, 46, 0.35);
+  border-color: rgba(var(--violet-400-rgb), 0.35);
 }
 
 .text {
@@ -59,8 +59,8 @@
 }
 
 .plan {
-  background: rgba(255, 157, 46, 0.16);
-  border-color: rgba(255, 157, 46, 0.5);
+  background: rgba(var(--violet-400-rgb), 0.16);
+  border-color: rgba(var(--violet-400-rgb), 0.5);
   white-space: nowrap;
 }
 

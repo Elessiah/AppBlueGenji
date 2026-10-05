@@ -670,16 +670,16 @@
   gap: 10px 14px;
   margin: 12px 0 0;
   padding: 10px 14px;
-  border: 1px solid rgba(245, 165, 36, 0.35);
+  border: 1px solid rgba(var(--amber-rgb), 0.35);
   border-radius: var(--r-cy-md, 10px);
-  background: rgba(245, 165, 36, 0.06);
+  background: rgba(var(--amber-rgb), 0.06);
 }
 
 .moderationLabel {
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.16em;
-  color: var(--amber, #f5a524);
+  color: var(--amber);
 }
 
 /* Reprises de fantôme proposées et encore sans réponse (zone sensible). */

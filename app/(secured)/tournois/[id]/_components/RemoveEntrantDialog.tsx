@@ -116,7 +116,7 @@ export function RemoveEntrantDialog({
             marginTop: 12,
             fontSize: 13,
             lineHeight: 1.55,
-            color: "var(--amber, #ffb347)",
+            color: "var(--amber)",
           }}
         >
           Les inscriptions sont closes : plus personne ne peut prendre cette place, et cet engagé

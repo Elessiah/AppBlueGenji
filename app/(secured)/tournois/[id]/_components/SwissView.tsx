@@ -99,7 +99,7 @@ export function SwissView({
           {scoreLabel}
         </span>
         {!isFinished && roundsLeft > 0 && (
-          <span className="mono" style={{ fontSize: 13, color: AMBER }}>
+          <span className="mono" style={{ fontSize: 13, color: "var(--pink-400)" }}>
             {roundsLeft} ronde{roundsLeft > 1 ? "s" : ""} restante{roundsLeft > 1 ? "s" : ""}
           </span>
         )}
@@ -262,7 +262,7 @@ export function SwissView({
                         <span
                           role="cell"
                           title={team.byes > 0 ? "Victoire d'office reçue (effectif impair)" : undefined}
-                          style={{ fontSize: 11, color: AMBER }}
+                          style={{ fontSize: 11, color: "var(--violet-300)" }}
                         >
                           {team.byes > 0 && (
                             <>

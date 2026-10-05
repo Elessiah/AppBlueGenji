@@ -50,7 +50,7 @@ export default function CreateTournamentPage() {
             alignItems: "center",
             gap: 6,
             fontSize: 13,
-            color: "var(--ink-mute)",
+            color: "var(--blue-300)",
           }}
         >
           ← Tournois
@@ -59,7 +59,7 @@ export default function CreateTournamentPage() {
           className="display"
           style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px", lineHeight: 1.1 }}
         >
-          Créer un tournoi
+          Créer <span className="text-gradient">un tournoi</span>
         </h1>
         <p style={{ color: "var(--ink-mute)", margin: 0, fontSize: 14 }}>
           Définis les phases temporelles, le jeu et le format de bracket.

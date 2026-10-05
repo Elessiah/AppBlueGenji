@@ -4,7 +4,7 @@ import { isMatchPlayed } from "@/lib/shared/match-outcome";
 /** Couleur d'accent par tableau — distingue d'un coup d'œil principal / perdants / finale. */
 export const ACCENT: Record<BracketType, string> = {
   UPPER: "var(--blue-500, #5ac8ff)",
-  LOWER: "var(--amber, #f5a524)",
+  LOWER: "var(--violet-400, #a78bfa)",
   GRAND: "var(--blue-300, #8fd5ff)",
   THIRD_PLACE: "var(--ink-mute, #93a3b2)",
 };

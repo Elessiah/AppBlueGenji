@@ -33,7 +33,7 @@ interface CocheProps
 const THEME_COLORS: Record<CocheTheme, { base: string; rgb: string }> = {
   tournoi: { base: "#4fe0a2", rgb: "79,224,162" },
   joueur: { base: "#59d4ff", rgb: "89,212,255" },
-  equipe: { base: "#ff9d2e", rgb: "255,157,46" },
+  equipe: { base: "#a78bfa", rgb: "167,139,250" },
 };
 
 export function Coche({

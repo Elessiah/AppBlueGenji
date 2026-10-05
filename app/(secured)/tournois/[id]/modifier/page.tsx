@@ -231,7 +231,7 @@ export default function EditTournamentPage() {
           ← Retour au tournoi
         </Link>
         <h1 className="display" style={{ fontSize: "clamp(30px, 6vw, 48px)", margin: "12px 0 8px" }}>
-          Modifier le tournoi
+          Modifier <span className="text-gradient">le tournoi</span>
         </h1>
         {notice && <p id={explanationId} style={{ color: "var(--amber)", margin: 0, fontSize: 14 }}>{notice}</p>}
       </div>

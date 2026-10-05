@@ -75,8 +75,8 @@
 .warning {
   margin: 0;
   padding: 8px 10px;
-  border-left: 3px solid var(--amber, #f5a524);
-  background: rgba(245, 165, 36, 0.08);
+  border-left: 3px solid var(--amber);
+  background: rgba(var(--amber-rgb), 0.08);
   font-size: 12px;
   color: var(--text-0);
 }
