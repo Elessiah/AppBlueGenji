@@ -17,7 +17,7 @@ diverger comme ils l'avaient fait entre le leaderboard et le seeding
 | --- | --- |
 | `lib/shared/stats.ts` | **Pur.** Types `StatsMatch` / `StatsTournament` en entrée, `DeepStats` en sortie. Aucune dépendance base. |
 | `lib/server/stats-service.ts` | Collecte SQL (`getTeamStats`, `getPlayerStats`, `getTeamRankingPosition`) puis délègue à `computeDeepStats`. |
-| `components/stats/StatsPanel.tsx` | Rendu partagé par les deux fiches, teinte d'accent au choix (bleu joueur / orange équipe). |
+| `components/stats/StatsPanel.tsx` | Rendu partagé par les deux fiches, teinte d'accent au choix (bleu joueur / violet néon équipe). |
 | `lib/shared/types.ts` | `ProfileStats` est un alias de `DeepStats` ; `TeamDetailResponse` gagne `stats` et `ranking`. |
 
 Le calcul n'est pas persisté : il est refait à chaque consultation de fiche, à
