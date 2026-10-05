@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
@@ -55,7 +55,8 @@ export function PrivacyChangesModal({ changes }: Readonly<{ changes: PrivacyChan
   // plus parler d'une modale que le joueur a quittée.
   const leftByLink = useRef(false);
 
-  const pathname = usePathname();
+  // Route sans préfixe de langue : `/en/rgpd` est la page de confidentialité.
+  const { path: pathname } = useLocalePathname();
   const open = changes.length > 0 && !answered && pathname !== PRIVACY_POLICY_PATH;
   const dialogRef = useDialogBehavior({
     open,

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { useLocalePathname } from "@/components/i18n/locale-navigation";
 import { createPortal } from "react-dom";
 import { CyberButton, ScrollArea } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
@@ -75,7 +75,8 @@ export function TermsAcceptanceModal({ initiallyRequired, request = null, privac
   const updated = request === "UPDATED";
   const { showError, showSuccess } = useToast();
   const titleId = useId();
-  const pathname = usePathname();
+  // Route sans préfixe de langue : `/en/rgpd` est la page de confidentialité.
+  const { path: pathname } = useLocalePathname();
   const [mounted, setMounted] = useState(false);
   const [requested, setRequested] = useState(initiallyRequired);
   const [privacyAnswered, setPrivacyAnswered] = useState(!privacyPending);
