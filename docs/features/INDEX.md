@@ -11,6 +11,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `ENDURANCE_NEXT_ROUND_PREVIEW.md` — BG Survie : aperçu, pour l'arbitrage, des rencontres de la manche suivante acquises quel que soit le score.
 - `ENDURANCE_PENALTIES.md` — BG Survie : pénalités, entrées du rejeu, qui se **retirent** (jamais une pénalité inverse).
 - `ENDURANCE_ROUND_PANELS.md` — BG Survie : un volet par manche, vrai arbre des play-offs.
+- `ROUND_MATCH_SECTIONS.md` — Matchs d'une manche (BG Survie, Survie, suisse) rangés en cinq sections d'état séparées par un filet, triés par date puis tête de série.
 - `SOLO_TOURNAMENTS.md` — Tournoi individuel (`SOLO`) : entrée solo par joueur, `resolveUserEntrantTeamId`.
 - `MATCH_FORMAT.md` — Format de match BO/FT, `checkMatchScores` unique client/serveur.
 - `MATCH_DRAWS.md` — Matchs nuls et plafond de maps : `isMatchPlayed`, `isMatchDrawn`, `matchWinnerSide`.
