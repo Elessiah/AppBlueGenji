@@ -96,6 +96,10 @@ describe("Correction d'un résultat — câblage", () => {
     expect(SCORE).toMatch(/useEffect\(\(\) => \{\s*setConfirmingCorrection\(null\);\s*\}, \[storedSignature\]\);/);
   });
 
+  it("seeding : la modale disparaît avec les flèches au coup d'envoi", () => {
+    expect(PANEL).toMatch(/\{confirmingMove !== null && reorderable && \(/);
+  });
+
   it("seeding : lâche le geste en attente si la liste change pendant la lecture", () => {
     expect(PANEL).toMatch(/useEffect\(\(\) => \{\s*setConfirmingMove\(null\);\s*\}, \[serverKey\]\);/);
   });

@@ -373,7 +373,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
         {announcement}
       </p>
 
-      {confirmingMove !== null && (
+      {/* `reorderable` : passé le coup d'envoi (ou sans droit), la modale
+          disparaît avec les flèches au lieu d'offrir un 409 en boucle. */}
+      {confirmingMove !== null && reorderable && (
         <ConfirmActionDialog
           title="Fixer l'ordre de départ à la main ?"
           confirmLabel="Fixer l'ordre"
