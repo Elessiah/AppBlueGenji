@@ -52,8 +52,10 @@ diffusées par `EntrantProvider` (`useEntrantSeeds`).
 
 Seul le temps fait passer « En attente de lancement » → « Lancement ». Le
 composant `RoundMatchSections` lit `useClock(15 s)` — régime de charge
-respecté (`CLIENT_POWER_MODES.md`) — et **seulement** si un match de la manche
-est daté et pas encore lancé. Avant le montage (`now` nul), un match daté est
+respecté (`CLIENT_POWER_MODES.md`) — et **seulement** tant qu'un match de la
+manche, ses deux engagées connues, attend une heure pas encore atteinte
+(`needsSectionClock`) : elle s'arrête d'elle-même ensuite, et seule une donnée
+nouvelle du flux la relance. Avant le montage (`now` nul), un match daté est
 tenu « en attente » : l'heure du lecteur n'est pas encore connue.
 
 ## Filet
