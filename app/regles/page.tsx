@@ -35,7 +35,7 @@ function ModeCard({ mode }: Readonly<{ mode: TournamentRuleMode }>) {
       <Link href={`/regles/${mode.slug}`} className={styles.card}>
         <div className={styles.cardHead}>
           <h3 className={styles.cardTitle}>{mode.label}</h3>
-          <Pill variant={soon ? "default" : "blue"}>{soon ? "Bientôt" : "Disponible"}</Pill>
+          <Pill variant={soon ? "neutral" : "blue"}>{soon ? "Bientôt" : "Disponible"}</Pill>
         </div>
         <p className={styles.cardTagline}>{mode.tagline}</p>
         <dl className={styles.facts}>

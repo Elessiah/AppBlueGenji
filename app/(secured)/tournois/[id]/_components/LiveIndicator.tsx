@@ -67,7 +67,7 @@ export function LiveIndicator({ isLive, tier, fatal = null }: Readonly<LiveIndic
 
   return (
     <Pill
-      variant={isLive ? "blue" : "default"}
+      variant={isLive ? "blue" : "neutral"}
       role="status"
       aria-live="polite"
       title={title}
