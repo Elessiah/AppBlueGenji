@@ -55,19 +55,23 @@ export function useScoreForm(
     // saisie courante pour savoir si le lecteur a tapé quelque chose. Comparer
     // au match qui *arrive* ne le dirait pas — il a précisément changé.
     baseline: scoreFormStateFor(match),
+    // Même rôle pour les maps : corriger un code ou ajouter une map nulle ne
+    // change pas le score, et doit pourtant compter comme une saisie.
+    mapsBaseline: initialAdminMaps(match),
   }));
   const [conflict, setConflict] = useState(false);
 
   const signature = storedResultSignature(match);
   const proposals = pendingProposalSignature(match);
   if (signature !== synced.signature || proposals !== synced.proposals) {
-    const untouched = sameFormState(state, synced.baseline);
+    const untouched = sameFormState(state, synced.baseline) && sameMaps(maps, synced.mapsBaseline);
     const next = scoreFormStateFor(match);
-    setSynced({ signature, proposals, baseline: next });
+    const nextMaps = initialAdminMaps(match);
+    setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
 
     if (untouched) {
       setState(next);
-      setMapsState(initialAdminMaps(match));
+      setMapsState(nextMaps);
       setConflict(false);
     } else if (signature !== synced.signature && !submitting) {
       // Seul un résultat **enregistré** fait conflit : une proposition
@@ -84,9 +88,10 @@ export function useScoreForm(
   /** Reprendre la valeur enregistrée, en abandonnant la saisie en cours. */
   const adoptStoredResult = () => {
     const next = scoreFormStateFor(match);
-    setSynced({ signature, proposals, baseline: next });
+    const nextMaps = initialAdminMaps(match);
+    setSynced({ signature, proposals, baseline: next, mapsBaseline: nextMaps });
     setState(next);
-    setMapsState(initialAdminMaps(match));
+    setMapsState(nextMaps);
     setConflict(false);
   };
 
@@ -174,7 +179,7 @@ export function useScoreForm(
     conflict,
     adoptStoredResult,
     /** Une saisie est en cours, non enregistrée. */
-    dirty: !isUntouched(state, match),
+    dirty: !isUntouched(state, match) || !sameMaps(maps, initialAdminMaps(match)),
     setScore1: (val: string) => setState((s) => ({ ...s, score1: val })),
     setScore2: (val: string) => setState((s) => ({ ...s, score2: val })),
     // Forfait nominatif et double forfait s'excluent : en choisir un retire
@@ -203,8 +208,14 @@ function adminScoreBody(
   if (state.doubleForfeit === true) return { doubleForfeit: true };
   if (state.forfeitTeamId !== undefined) return { forfeitTeamId: state.forfeitTeamId };
   if (maps) return { maps };
-  if (scores) return { team1Score: scores.team1, team2Score: scores.team2 };
+  // Score à la main : `maps: []` dit explicitement que le détail retenu ne
+  // décrit plus le résultat (l'arbitre a retiré toutes les maps).
+  if (scores) return { team1Score: scores.team1, team2Score: scores.team2, maps: [] };
   return null;
+}
+
+function sameMaps(a: ReadonlyArray<MatchMapInput>, b: ReadonlyArray<MatchMapInput>): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 function sameFormState(a: ScoreFormState, b: ScoreFormState): boolean {

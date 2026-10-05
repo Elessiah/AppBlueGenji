@@ -64,7 +64,10 @@ export function parseAdminScoreBody(body: AdminScoreBody): AdminScoreParse {
 export type AdminMapEntryParse =
   | {
       ok: true;
-      /** Maps saisies ; `null` = aucune (score posé à la main, ou forfait). */
+      /**
+       * Maps saisies ; `[]` = liste explicitement vide (le détail retenu est
+       * effacé), `null` = champ absent (le détail n'est pas touché).
+       */
       maps: MatchMapInput[] | null;
       /**
        * Scores de façade pour `parseAdminScoreBody` quand des maps sont
@@ -76,14 +79,15 @@ export type AdminMapEntryParse =
 
 /**
  * Lecture du détail map par map facultatif d'une saisie d'arbitrage
- * (`docs/features/MAP_SCORES.md`). Absent, `null` ou vide : pas de maps, la
- * saisie reste un score à la main. Les règles (codes, plafond, fin de match)
- * se jugent dans le service, qui connaît le format et le jeu.
+ * (`docs/features/MAP_SCORES.md`). Absent ou `null` : champ ignoré. Vide : la
+ * saisie est un score à la main qui efface le détail retenu. Les règles
+ * (codes, plafond, fin de match) se jugent dans le service, qui connaît le
+ * format et le jeu.
  */
 export function parseAdminMapEntry(raw: unknown): AdminMapEntryParse {
   const placeholderScores = { team1Score: 0, team2Score: 0 };
   if (raw === undefined || raw === null) return { ok: true, maps: null, placeholderScores };
   const maps = parseMapListBody(raw);
   if (maps === null) return { ok: false, error: "INVALID_MAPS" };
-  return { ok: true, maps: maps.length > 0 ? maps : null, placeholderScores };
+  return { ok: true, maps, placeholderScores };
 }

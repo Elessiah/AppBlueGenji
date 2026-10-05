@@ -32,11 +32,12 @@ export async function PATCH(req: Request, context: { params: Promise<{ matchId: 
   // il fait foi et le score se dérive des maps.
   const mapParse = parseAdminMapEntry(body.maps);
   if (!mapParse.ok) return fail(mapParse.error, 400);
-  const parsed = parseAdminScoreBody(mapParse.maps ? { ...body, ...mapParse.placeholderScores } : body);
+  const hasMaps = (mapParse.maps?.length ?? 0) > 0;
+  const parsed = parseAdminScoreBody(hasMaps ? { ...body, ...mapParse.placeholderScores } : body);
   if (!parsed.ok) return fail(parsed.error, 400);
   // L'égalité est autorisée sur cette route : on enregistre les scores sans déclarer de vainqueur.
   const { team1Score, team2Score, forfeitTeamId } = parsed.value;
-  const mapEntry = mapParse.maps ? { maps: mapParse.maps, userId: user.id } : undefined;
+  const mapEntry = mapParse.maps === null ? undefined : { maps: mapParse.maps, userId: user.id };
 
   try {
     await adminSaveMatchScores(matchId_, team1Score, team2Score, forfeitTeamId, mapEntry);

@@ -473,9 +473,10 @@ export async function adminSaveMatchScores(
        WHERE id = ?`,
       [scores.team1Score, scores.team2Score, forfeitTeamId, matchId],
     );
-    // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit plus.
-    if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", [], null);
-  } else if (mapEntry) {
+    // Un forfait n'a pas de maps jouées : un détail noté plus tôt ne le décrit
+    // plus, que le client ait envoyé des maps ou non.
+    await replaceMatchMaps(connection, matchId, "FINAL", [], null);
+  } else if (mapEntry && mapEntry.maps.length > 0) {
     // Sauvegarde **map par map** : le score se dérive des maps, contrôlées sans
     // exiger un match terminé (l'arbitrage note l'avancement).
     await assertScoreEntryOpen(connection, match);
@@ -508,6 +509,9 @@ export async function adminSaveMatchScores(
        WHERE id = ?`,
       [team1Score, team2Score, matchId],
     );
+    // Liste explicitement vide : l'arbitre a retiré toutes les maps, le
+    // détail retenu ne décrit plus ce score posé à la main.
+    if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", [], null);
   } else {
     throw new Error("INVALID_REQUEST");
   }
@@ -594,13 +598,13 @@ export async function adminResolveMatch(
   );
 
   // Détail map par map du résultat retenu (`docs/features/MAP_SCORES.md`) :
-  // les maps de l'arbitre sur un score, rien sur un forfait. Sans `mapEntry`
-  // (moteur, forfait déclaré par une engagée), le détail existant est laissé
-  // tel quel — l'affichage ne le montre que s'il explique le score.
-  if (mapEntry) {
-    const maps = forfeitTeamId === undefined && !doubleForfeit ? mapEntry.maps : [];
-    await replaceMatchMaps(connection, matchId, "FINAL", maps, mapEntry.userId);
-  }
+  // les maps de l'arbitre sur un score, **rien** sur un forfait — y compris
+  // celui qu'une engagée déclare (`./player-forfeit`, sans `mapEntry`), dont
+  // le score plein pourrait sinon coïncider avec un détail noté plus tôt.
+  // Sans `mapEntry` sur un score (moteur), le détail existant reste tel quel.
+  const forfeited = forfeitTeamId !== undefined || doubleForfeit;
+  if (forfeited) await replaceMatchMaps(connection, matchId, "FINAL", [], mapEntry?.userId ?? null);
+  else if (mapEntry) await replaceMatchMaps(connection, matchId, "FINAL", mapEntry.maps, mapEntry.userId);
 
   await tryAutoResolveByes(connection, tournamentId);
 }

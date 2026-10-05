@@ -48,10 +48,13 @@ describe("arbitrage — détail map par map (MAP_SCORES.md)", () => {
     expect(adminResolveMatch).toHaveBeenCalledWith(42, 3, 1, undefined, false, { maps: [], userId: 3 });
   });
 
-  it("« Enregistrer » transmet les maps ; sans maps, rien ne change", async () => {
+  it("« Enregistrer » transmet les maps ; une liste vide efface le détail, un champ absent n'y touche pas", async () => {
     await scoresRoute(req("PATCH", { maps: MAPS }), params);
     expect(adminSaveMatchScores).toHaveBeenCalledWith(42, 0, 0, undefined, { maps: NORMALIZED, userId: 3 });
     await scoresRoute(req("PATCH", { team1Score: 1, team2Score: 0, maps: [] }), params);
+    // Liste explicitement vide : score à la main qui efface le détail retenu.
+    expect(adminSaveMatchScores).toHaveBeenLastCalledWith(42, 1, 0, undefined, { maps: [], userId: 3 });
+    await scoresRoute(req("PATCH", { team1Score: 1, team2Score: 0 }), params);
     expect(adminSaveMatchScores).toHaveBeenLastCalledWith(42, 1, 0, undefined, undefined);
   });
 

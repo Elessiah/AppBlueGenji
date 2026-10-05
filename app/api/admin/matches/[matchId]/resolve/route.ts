@@ -45,7 +45,8 @@ export async function POST(req: Request, context: { params: Promise<{ matchId: s
   // il fait foi et le score se dérive des maps.
   const mapParse = parseAdminMapEntry(body.maps);
   if (!mapParse.ok) return fail(mapParse.error, 400);
-  const parsed = parseAdminScoreBody(mapParse.maps ? { ...body, ...mapParse.placeholderScores } : body);
+  const hasMaps = (mapParse.maps?.length ?? 0) > 0;
+  const parsed = parseAdminScoreBody(hasMaps ? { ...body, ...mapParse.placeholderScores } : body);
   if (!parsed.ok) return fail(parsed.error, 400);
   const { team1Score, team2Score, forfeitTeamId } = parsed.value;
 

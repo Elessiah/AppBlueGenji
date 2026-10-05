@@ -105,8 +105,14 @@ bg_match_maps (
   `teamN_report_*`.
 - `FINAL` : le détail retenu. Promu depuis la proposition qui fait foi (accord
   des deux engagées — celle qui confirme —, ou report seul à l'échéance), ou
-  écrit par l'arbitrage. Un forfait ou un score posé à la main par l'arbitrage
-  l'efface.
+  écrit par l'arbitrage. Un forfait l'efface toujours (arbitrage ou engagée :
+  son score plein pourrait sinon coïncider avec un détail noté plus tôt) ; un
+  score posé à la main l'efface quand le corps porte `maps: []` — ce que le
+  dialogue d'arbitrage envoie toujours sans map. `maps` absent : détail
+  inchangé (appelants hors interface).
+- Le dialogue d'arbitrage compte les maps dans « saisie en cours » : corriger
+  un code ou ajouter une map nulle, qui ne changent pas le score, n'est pas
+  écrasé par une proposition arrivée par le flux.
 - Scores toujours dans l'orientation du plateau. Un match sans ligne — tous ceux
   d'avant — se lit comme avant ; les rejeux ne lisent jamais cette table.
 
