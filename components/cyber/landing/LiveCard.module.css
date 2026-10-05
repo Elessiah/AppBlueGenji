@@ -236,11 +236,6 @@
   font-weight: 600;
 }
 
-.streamBanner .streamLabel {
-  animation: liveCardPulse 2s ease-in-out infinite;
-  animation-play-state: var(--deco-anim-state);
-}
-
 /* Acces au direct : un vrai bouton, et seulement quand le match est a
    l'antenne. Il herite du rouge de son bandeau — la seule couleur reservee a ce
    qui diffuse reellement. */
@@ -276,21 +271,5 @@
 @media (prefers-reduced-motion: reduce) {
   .streamButton {
     transition: none;
-  }
-}
-
-@keyframes liveCardPulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .streamBanner .streamLabel {
-    animation: none;
   }
 }
