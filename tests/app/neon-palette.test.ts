@@ -123,5 +123,7 @@ describe("palette néon froid", () => {
   it("l'impression montre les sections jamais atteintes", () => {
     expect(sheet).toMatch(/@media print\s*\{\s*\.reveal-pending\s*\{[^}]*opacity:\s*1/);
     expect(sheet).toMatch(/@media print\s*\{[^@]*\.text-gradient\s*\{[^}]*background:\s*none/);
+    expect(sheet).toMatch(/@media print\s*\{[^@]*\.count-up-anim\s*\{\s*display:\s*none/);
+    expect(sheet).toMatch(/@media print\s*\{[^@]*\.count-up-real\s*\{[^}]*position:\s*static/);
   });
 });

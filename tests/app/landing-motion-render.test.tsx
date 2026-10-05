@@ -42,9 +42,9 @@ describe("animations de l'accueil — contenu visible sans JavaScript", () => {
 
   it("CountUp écrit la valeur finale au rendu serveur, largeur réservée", () => {
     const html = renderToStaticMarkup(<CountUp value={1234} className="num" />);
-    expect(html).toContain('<span aria-hidden="true">1234</span>');
-    // La valeur réelle reste lisible des lecteurs d'écran pendant le décompte.
-    expect(html).toContain('<span class="sr-only">1234</span>');
+    expect(html).toContain('<span class="count-up-anim" aria-hidden="true">1234</span>');
+    // La valeur réelle reste lisible des lecteurs d'écran (et imprimée) pendant le décompte.
+    expect(html).toContain('<span class="sr-only count-up-real">1234</span>');
     expect(html).toContain("min-width:4ch");
   });
 
