@@ -356,6 +356,35 @@ describe("tournaments-service: match state machine", () => {
       expect(completion(calls)?.params).toEqual([1, 3, 200, 100, 10]);
     });
 
+    it("même score mais maps différentes : désaccord, l'arbitrage est alerté (MAP_SCORES.md)", async () => {
+      const { connection, calls } = reportConnection({
+        status: "AWAITING_CONFIRMATION",
+        team2_report_score: 1,
+        team2_report_opponent_score: 3,
+      });
+      const execute = connection.execute.bind(connection) as (sql: string, params?: unknown) => Promise<unknown>;
+      (connection as unknown as { execute: typeof execute }).execute = async (sql, params) => {
+        if (sql.includes("SELECT match_id, source, map_number")) {
+          await execute(sql, params);
+          // Proposition de l'engagée 2 : même 3-1, autres codes.
+          return [mapsFor(3, 1).map((m, i) => ({
+            match_id: 10,
+            source: "TEAM2",
+            map_number: i + 1,
+            replay_code: `OTHER${i}`,
+            team1_score: m.team1Score,
+            team2_score: m.team2Score,
+          })), []];
+        }
+        return execute(sql, params);
+      };
+
+      await reportMatchScore(connection, 1, 10, 42, mapsFor(3, 1));
+
+      expect(completion(calls)).toBeUndefined();
+      expect(queueRefereeAlert).toHaveBeenCalledWith(connection, { kind: "score_conflict", matchId: 10 });
+    });
+
     it("deux reports contradictoires laissent la rencontre en attente et alertent l'arbitrage", async () => {
       const { connection, calls } = reportConnection({
         status: "AWAITING_CONFIRMATION",

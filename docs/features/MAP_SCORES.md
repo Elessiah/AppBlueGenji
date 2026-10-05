@@ -118,10 +118,20 @@ bg_match_maps (
 
 ### Circuit inchangé
 
-La concordance de deux reports se juge sur le **score dérivé**, comme avant. La
-modale de l'adversaire s'ouvre sur la proposition (maps comprises) : confirmer
-d'un clic renvoie le même détail. Corriger un code à score égal reste une
-nouvelle proposition (le bouton ne se bloque pas sur « déjà envoyé »).
+Deux reports concordent quand le score dérivé **et** le détail concordent
+(codes normalisés, scores de map) : deux 2-1 aux codes différents ne décrivent
+pas la même série, et les codes sont ce que l'arbitrage vérifie. Un désaccord
+sur les maps suit le chemin de tout désaccord (arbitrage alerté) — la mécanique
+vainqueur / perdant ne change pas. Une proposition d'avant les maps ne se
+compare que sur le score. La modale de l'adversaire s'ouvre sur la proposition
+(maps comprises) : confirmer d'un clic renvoie le même détail. Corriger un code
+à score égal reste une nouvelle proposition (le bouton ne se bloque pas sur
+« déjà envoyé »). **Décision requise** : faut-il plutôt clore sur le seul score
+et retenir le détail de l'une des deux ?
+
+Un forfait n'affiche jamais de détail, quel que soit le chemin qui l'a posé
+(arbitrage, abandon en Survie / Ronde suisse / BG Survie) : `attachMatchMaps`
+le tait.
 
 ### Affichage
 

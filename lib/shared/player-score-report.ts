@@ -14,7 +14,7 @@
  */
 import type { BracketMatch, MatchScoreReport } from "./types";
 import { isMatchPlayed } from "./match-outcome";
-import type { MatchMapInput } from "./match-maps";
+import { sameMapLists, type MatchMapInput } from "./match-maps";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
 export type PlayerReportPhase =
@@ -36,14 +36,19 @@ export interface PlayerReportView {
 }
 
 /**
- * Deux propositions disent-elles le même score ? Le score **dérivé** des maps
- * fait foi, comme côté serveur (`MAP_SCORES.md`) : le détail ne change pas le
- * circuit de confirmation.
+ * Deux propositions disent-elles le même score — et, quand toutes deux portent
+ * leur détail, les mêmes maps (`MAP_SCORES.md`) ? C'est la règle du serveur :
+ * deux 2-1 aux codes de replay différents se contredisent.
  */
-type ReportedScore = Pick<MatchScoreReport, "team1Score" | "team2Score">;
+type ReportedScore = Pick<MatchScoreReport, "team1Score" | "team2Score"> & {
+  maps?: ReadonlyArray<MatchMapInput>;
+};
 
 export function sameReportedScore(a: ReportedScore, b: ReportedScore): boolean {
-  return a.team1Score === b.team1Score && a.team2Score === b.team2Score;
+  if (a.team1Score !== b.team1Score || a.team2Score !== b.team2Score) return false;
+  const aMaps = a.maps ?? [];
+  const bMaps = b.maps ?? [];
+  return aMaps.length === 0 || bMaps.length === 0 || sameMapLists(aMaps, bMaps);
 }
 
 /**

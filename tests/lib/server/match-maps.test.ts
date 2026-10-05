@@ -117,6 +117,14 @@ describe("attachMatchMaps — détail posé sur l'instantané (flux et REST de s
     expect(out.maps).toEqual([]);
   });
 
+  it("tait le détail d'un forfait, quel que soit le chemin qui l'a posé", () => {
+    const sets = new Map([[10, { final: [map("F1", 2, 0, 1), map("F2", 2, 0, 2)], team1: [], team2: [] }]]);
+    const forfeit = bracketMatch({ id: 10, team1Score: 2, team2Score: 0, forfeitTeamId: 2 });
+    expect(attachMatchMaps([forfeit], sets)[0].maps).toEqual([]);
+    const doubleForfeit = bracketMatch({ id: 10, team1Score: 2, team2Score: 0, doubleForfeit: true });
+    expect(attachMatchMaps([doubleForfeit], sets)[0].maps).toEqual([]);
+  });
+
   it("laisse un match sans ligne exactement comme avant", () => {
     const match = bracketMatch({ id: 12, team1Score: 2, team2Score: 1 });
     expect(attachMatchMaps([match], new Map())).toEqual([match]);

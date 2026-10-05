@@ -358,9 +358,14 @@ export function attachMatchMaps(
   return matches.map((match) => {
     const sets = mapsByMatch.get(match.id);
     if (!sets) return match;
+    // Un forfait n'a pas de maps jouées, quel que soit le chemin qui l'a posé
+    // (arbitrage, abandon en Survie / Ronde suisse / BG Survie) : son score
+    // plein pourrait coïncider avec un détail noté plus tôt.
+    const forfeited = match.forfeitTeamId !== null || match.doubleForfeit;
+    const final = !forfeited && mapsMatchStoredScore(sets.final, match.team1Score, match.team2Score);
     return {
       ...match,
-      maps: mapsMatchStoredScore(sets.final, match.team1Score, match.team2Score) ? sets.final : [],
+      maps: final ? sets.final : [],
       team1Report: withReport(match.team1Report, sets.team1),
       team2Report: withReport(match.team2Report, sets.team2),
     };

@@ -1,7 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
-import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
+import { checkMapList, sameMapLists, type MatchMapInput } from "@/lib/shared/match-maps";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
@@ -15,7 +15,7 @@ import {
 } from "./bot-logs";
 import { resolveUserEntrant } from "./registration";
 import { loadTournamentMatchRules } from "./repository";
-import { promoteReportedMaps, replaceMatchMaps } from "./match-maps";
+import { loadMatchMaps, promoteReportedMaps, replaceMatchMaps } from "./match-maps";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
@@ -282,6 +282,30 @@ function assertMatchLaunchedForPlayers(match: MatchRow): void {
 }
 
 /**
+ * Les deux reports concordent-ils ? Sur le score **et** le détail
+ * (`docs/features/MAP_SCORES.md`) : deux 2-1 aux codes de replay différents ne
+ * décrivent pas la même série, et les codes sont justement ce que l'arbitrage
+ * vérifie. Un désaccord sur les maps suit donc le chemin de tout désaccord —
+ * arbitrage alerté —, sans rien changer à la mécanique vainqueur / perdant.
+ * Une proposition adverse d'avant les maps (aucune ligne) ne se compare que
+ * sur le score.
+ */
+async function reportsConcord(
+  connection: PoolConnection,
+  updated: MatchRow,
+  maps: ReadonlyArray<MatchMapInput>,
+  reporterSource: "TEAM1" | "TEAM2",
+): Promise<boolean> {
+  const scoresAgree =
+    Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
+    Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
+  if (!scoresAgree) return false;
+  const otherSource = reporterSource === "TEAM1" ? "TEAM2" : "TEAM1";
+  const otherMaps = await loadMatchMaps(connection, Number(updated.id), otherSource);
+  return otherMaps.length === 0 || sameMapLists(maps, otherMaps);
+}
+
+/**
  * Score dérivé des maps, vu de l'engagée qui reporte (« mon score », « score
  * adverse » — le contrat des colonnes `teamN_report_*`). Lève le refus de la
  * liste, s'il y en a un.
@@ -474,13 +498,7 @@ export async function reportMatchScore(
     updated.team2_report_score !== null &&
     updated.team2_report_opponent_score !== null
   ) {
-    // La concordance se juge sur le **score dérivé**, comme avant les maps
-    // (`docs/features/MAP_SCORES.md`) : le détail ne change rien au circuit.
-    // Celui qui confirme d'un clic renvoie la proposition adverse à
-    // l'identique, et c'est son détail qui devient le résultat retenu.
-    const consistent =
-      Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
-      Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
+    const consistent = await reportsConcord(connection, updated, maps, reporterSource);
 
     if (consistent) {
       const team1Score = Number(updated.team1_report_score);
