@@ -164,3 +164,29 @@ export function isStaffMember(
   if (user.isAdmin) return true;
   return (user.roles?.length ?? 0) > 0;
 }
+
+/** Rôles accordés et retirés par un enregistrement, dans l'ordre d'affichage. */
+export interface PlatformRoleChange {
+  granted: PlatformRole[];
+  removed: PlatformRole[];
+}
+
+/**
+ * Écart entre les rôles enregistrés et la sélection à enregistrer — ce que la
+ * modale de confirmation de `PlayerRolesPanel` annonce. Un enregistrement sans
+ * écart (aucune case changée) part sans question : rien n'est accordé ni retiré.
+ */
+export function diffPlatformRoles(
+  before: readonly PlatformRole[],
+  after: readonly PlatformRole[],
+): PlatformRoleChange {
+  return {
+    granted: PLATFORM_ROLES.filter((role) => after.includes(role) && !before.includes(role)),
+    removed: PLATFORM_ROLES.filter((role) => before.includes(role) && !after.includes(role)),
+  };
+}
+
+/** Vrai quand l'enregistrement accorde ou retire au moins un rôle. */
+export function roleChangeNeedsConfirmation(change: PlatformRoleChange): boolean {
+  return change.granted.length > 0 || change.removed.length > 0;
+}

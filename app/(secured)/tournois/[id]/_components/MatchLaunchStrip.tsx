@@ -15,7 +15,7 @@ import { LAUNCH_PHASE_LABELS } from "@/lib/shared/match-planning";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useLiveControls } from "../_lib/live-context";
 import { hasLaunchStripAction, hostTeamName, launchStripControls } from "../_lib/launch-strip";
-import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import styles from "./MatchLaunchStrip.module.css";
 
 async function send(url: string, method: string, body?: unknown): Promise<void> {

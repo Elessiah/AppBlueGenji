@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard, Pill } from "@/components/cyber";
 import { ContactTags } from "@/components/recruitment/ContactTags";
 import { UrgentPill } from "@/components/recruitment/UrgentPill";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   type RecruiterContactDefaults,
@@ -196,25 +197,28 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
     }
   }
 
-  async function remove(ad: RecruitmentAd) {
-    if (!window.confirm(`Supprimer l'annonce « ${ad.title} » ?`)) return;
+  const [pendingRemoval, setPendingRemoval] = useState<RecruitmentAd | null>(null);
+
+  async function remove(ad: RecruitmentAd): Promise<boolean> {
     setBusy(true);
     try {
       const res = await fetch(`/api/recruitment/${ad.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
-        return;
+        return false;
       }
       setAds((prev) => prev.filter((a) => a.id !== ad.id));
       // Une annonce supprimée ne doit pas rester ouverte en lecture derrière.
       if (detailId === ad.id) closeDetail();
       showSuccess("Annonce supprimée.");
+      return true;
     } catch {
       showError("Erreur réseau, réessaye.");
     } finally {
       setBusy(false);
     }
+    return false;
   }
 
   // Déplace une annonce d'un cran (admin), **dans son statut** seulement.
@@ -391,7 +395,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
               <button
                 type="button"
                 className={`${styles.action} ${styles.actionDanger}`}
-                onClick={() => remove(ad)}
+                onClick={() => setPendingRemoval(ad)}
                 disabled={busy}
                 aria-label={`Supprimer ${ad.title}`}
               >
@@ -499,6 +503,20 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
           onSubmit={submit}
         />
       )}
+      {pendingRemoval ? (
+        <ConfirmActionDialog
+          title={`Supprimer l'annonce « ${pendingRemoval.title} » ?`}
+          confirmLabel="Supprimer l'annonce"
+          pendingLabel="Suppression…"
+          onClose={() => setPendingRemoval(null)}
+          onConfirm={() => remove(pendingRemoval)}
+        >
+          <p>
+            L&apos;annonce disparaît de la page Recrutement, avec sa description et ses moyens de
+            contact. Elle ne se restaure pas : il faudrait la rédiger à nouveau.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
     </>
   );
 }

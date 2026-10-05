@@ -1,11 +1,9 @@
 "use client";
 
-import { createPortal } from "react-dom";
-import { ReactNode, useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { ModerationReasonField, isModerationReasonReady } from "@/components/moderation/ModerationReasonField";
-import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
-import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   SUSPENSION_DURATION_PRESETS,
   SUSPENSION_GROUNDS,
@@ -127,11 +125,13 @@ function AvatarRemovalDialog({
   const [reason, setReason] = useState("");
   const pseudo = profile.profile.pseudo;
   return (
-    <ModerationDialog
+    <ConfirmActionDialog
       title={`Retirer l'avatar de ${pseudo} ?`}
       confirmLabel="Retirer l'avatar"
       pendingLabel="Retrait…"
-      armed={isModerationReasonReady(reason)}
+      disabled={!isModerationReasonReady(reason)}
+      focusContent
+      closeOnSuccess={false}
       onClose={onClose}
       onConfirm={async () => {
         const error = await moderationRequest(`/api/admin/users/${profile.profile.id}/avatar`, "DELETE", { reason });
@@ -149,7 +149,7 @@ function AvatarRemovalDialog({
         reste ; il pourra en envoyer un autre.
       </p>
       <ModerationReasonField value={reason} onChange={setReason} recipient="le joueur" />
-    </ModerationDialog>
+    </ConfirmActionDialog>
   );
 }
 
@@ -173,11 +173,13 @@ function SuspendDialog({
   const ready = isModerationReasonReady(reason) && ground !== "" && duration !== "";
 
   return (
-    <ModerationDialog
+    <ConfirmActionDialog
       title={`Suspendre le compte de ${pseudo} ?`}
       confirmLabel="Suspendre le compte"
       pendingLabel="Suspension…"
-      armed={ready}
+      disabled={!ready}
+      focusContent
+      closeOnSuccess={false}
       onClose={onClose}
       onConfirm={async () => {
         const error = await moderationRequest(`/api/admin/users/${profile.profile.id}/suspension`, "POST", {
@@ -232,7 +234,7 @@ function SuspendDialog({
           )}
         </select>
       </div>
-    </ModerationDialog>
+    </ConfirmActionDialog>
   );
 }
 
@@ -249,11 +251,11 @@ function LiftDialog({
 }>) {
   const { showError, showSuccess } = useToast();
   return (
-    <ModerationDialog
+    <ConfirmActionDialog
       title="Lever la suspension ?"
       confirmLabel="Lever la suspension"
       pendingLabel="Levée…"
-      armed
+      closeOnSuccess={false}
       onClose={onClose}
       onConfirm={async () => {
         const error = await moderationRequest(`/api/admin/users/${profile.profile.id}/suspension`, "DELETE");
@@ -270,101 +272,6 @@ function LiftDialog({
         La suspension {reference} de « {profile.profile.pseudo} » prend fin maintenant : le joueur peut de nouveau
         se connecter, et il en est prévenu.
       </p>
-    </ModerationDialog>
-  );
-}
-
-/**
- * Cadre commun des trois modales : portée dans `document.body`, focus, Échap
- * et voile par les deux crochets du projet (`docs/features/MODAL_DIALOGS.md`).
- * Ne se ferme que sur un succès.
- */
-function ModerationDialog({
-  title,
-  confirmLabel,
-  pendingLabel,
-  armed,
-  onClose,
-  onConfirm,
-  children,
-}: Readonly<{
-  title: string;
-  confirmLabel: string;
-  pendingLabel: string;
-  armed: boolean;
-  onClose: () => void;
-  onConfirm: () => Promise<boolean>;
-  children: ReactNode;
-}>) {
-  const titleId = useId();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-  const [pending, setPending] = useState(false);
-
-  const confirm = async () => {
-    if (pending || !armed) return;
-    setPending(true);
-    const ok = await onConfirm();
-    if (!ok) setPending(false);
-  };
-
-  const dialogRef = useDialogBehavior({ open: mounted, onClose, locked: pending });
-  const backdrop = useBackdropDismiss(onClose, pending);
-
-  if (!mounted) return null;
-
-  return createPortal(
-    <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */
-      role="presentation"
-      {...backdrop}
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 100,
-        display: "grid",
-        placeItems: "center",
-        padding: 16,
-        background: "rgba(4, 8, 14, 0.78)",
-        backdropFilter: "blur(4px)",
-      }}
-    >
-      <div /* NOSONAR S6819 — modale portée dans body (useDialogBehavior) : `<dialog>` changerait couche, Échap et ::backdrop */
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        style={{
-          width: "min(460px, calc(100vw - 32px))",
-          background: "var(--cyber-bg-1)",
-          border: "1px solid var(--line-strong-cy)",
-          borderRadius: "var(--r-cy-lg)",
-          padding: 24,
-        }}
-      >
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            void confirm();
-          }}
-        >
-          <h2 id={titleId} className="display" style={{ fontSize: 18, margin: "0 0 10px" }}>
-            {title}
-          </h2>
-          <div style={{ color: "var(--ink-mute)", fontSize: 13.5, lineHeight: 1.7, margin: "0 0 20px" }}>
-            {children}
-          </div>
-          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
-            <button type="button" className="btn ghost" onClick={onClose} disabled={pending}>
-              Annuler
-            </button>
-            <button type="submit" className="btn danger" disabled={pending || !armed}>
-              {pending ? pendingLabel : confirmLabel}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>,
-    document.body,
+    </ConfirmActionDialog>
   );
 }

@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Image from "next/image";
 import { CyberButton } from "@/components/cyber";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
 import {
@@ -212,15 +213,16 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
     }
   }
 
-  async function remove(sponsor: Sponsor) {
-    if (!window.confirm(`Supprimer le partenaire « ${sponsor.name} » ?`)) return;
+  const [pendingRemoval, setPendingRemoval] = useState<Sponsor | null>(null);
+
+  async function remove(sponsor: Sponsor): Promise<boolean> {
     setBusy(true);
     try {
       const res = await fetch(`/api/landing/sponsors/${sponsor.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
-        return;
+        return false;
       }
       // Si plus aucun sponsor réel, réafficher la vitrine de secours — c'est ce
       // que renverrait un rechargement (table vide → FALLBACK_SPONSORS).
@@ -229,11 +231,13 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
         return next.length === 0 ? FALLBACK_SPONSORS : next;
       });
       showSuccess("Partenaire supprimé.");
+      return true;
     } catch {
       showError("Erreur réseau, réessaye.");
     } finally {
       setBusy(false);
     }
+    return false;
   }
 
   // Logo et bandeau suivent le même chemin : contrôle local (le serveur refait
@@ -427,7 +431,7 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
                   <button
                     type="button"
                     className={`${styles.slotAction} ${styles.slotActionDanger}`}
-                    onClick={() => remove(sponsor)}
+                    onClick={() => setPendingRemoval(sponsor)}
                     disabled={busy}
                     aria-label={`Supprimer ${sponsor.name}`}
                   >
@@ -610,6 +614,20 @@ export function SponsorsGrid({ sponsors, copy, isAdmin = false }: Readonly<Spons
           </div>
         </LandingDialog>
       )}
+      {pendingRemoval ? (
+        <ConfirmActionDialog
+          title={`Supprimer le partenaire « ${pendingRemoval.name} » ?`}
+          confirmLabel="Supprimer le partenaire"
+          pendingLabel="Suppression…"
+          onClose={() => setPendingRemoval(null)}
+          onConfirm={() => remove(pendingRemoval)}
+        >
+          <p>
+            Le partenaire disparaît de l&apos;accueil, avec son texte, son lien, son logo et son
+            bandeau. Il ne se restaure pas : il faudrait le saisir et réimporter ses images.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
     </section>
   );
 }

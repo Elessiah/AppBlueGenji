@@ -8,7 +8,7 @@ import { PlayerLink } from "@/components/entity-link";
 import { formatLocalDate } from "@/lib/shared/dates";
 import { membershipErrorMessage, teamErrorMessage } from "../../_lib/team-errors";
 import { jsonRequest, teamApi } from "../_lib/team-api";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import styles from "../team.module.css";
 
 interface MembershipActionsProps {
@@ -269,7 +269,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
       )}
 
       {confirmLeave ? (
-        <ConfirmDialog
+        <ConfirmActionDialog
           title="Quitter l'équipe ?"
           confirmLabel="Quitter"
           pendingLabel="Départ…"
@@ -284,7 +284,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
             Tu quittes le roster de {team.team.name}. Tes matchs joués avec l&apos;équipe restent à
             ton palmarès ; pour revenir, il faudra une nouvelle invitation ou une demande acceptée.
           </p>
-        </ConfirmDialog>
+        </ConfirmActionDialog>
       ) : null}
     </>
   );

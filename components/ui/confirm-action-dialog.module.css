@@ -58,3 +58,12 @@
     flex: 1 1 100%;
   }
 }
+
+.confirmField {
+  margin-top: 12px;
+}
+
+.body ul {
+  margin: 6px 0 10px;
+  padding-left: 18px;
+}

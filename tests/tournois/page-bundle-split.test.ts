@@ -37,7 +37,6 @@ const LAZY = [
   "EndurancePenaltyDialog",
   "AdvanceTournamentDialog",
   "TournamentImageDialog",
-  "ConfirmActionDialog",
 ] as const;
 
 describe("paquet de la fiche tournoi", () => {
@@ -55,6 +54,14 @@ describe("paquet de la fiche tournoi", () => {
       expect(existsSync(file)).toBe(true);
       expect(readFileSync(file, "utf8")).toMatch(new RegExp(`export (function|const) ${name}\\b`));
     }
+  });
+
+  it("charge à la demande la confirmation commune (components/ui)", () => {
+    expect(page).toContain(
+      'const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });',
+    );
+    expect(page).not.toMatch(/^import[^;]*\bConfirmActionDialog\b[^;]*from/m);
+    expect(page).toContain("<ConfirmActionDialog");
   });
 
   it("n'importe aucun dialogue de façon statique", () => {

@@ -41,8 +41,8 @@ describe("confirmation d'inscription", () => {
     const page = read("app/(secured)/tournois/[id]/page.tsx");
     expect(page).toMatch(/const registerTeam = \(\) => \{[\s\S]*?setPendingConfirm\(/);
     expect(page).toContain("run: performRegister");
-    const dialog = read("app/(secured)/tournois/[id]/_components/ConfirmActionDialog.tsx");
-    expect(dialog).toMatch(/if \(busy\) return;/);
-    expect(dialog).toMatch(/type="submit"[^>]*disabled=\{busy\}/);
+    const dialog = read("components/ui/confirm-action-dialog.tsx");
+    expect(dialog).toMatch(/if \(busy \|\| !armed\) return;/);
+    expect(dialog).toMatch(/type="submit"[^>]*disabled=\{busy \|\| !armed\}/);
   });
 });

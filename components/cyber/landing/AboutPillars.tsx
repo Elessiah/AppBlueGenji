@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   type AboutPillar,
@@ -128,15 +129,16 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
     }
   }
 
-  async function remove(pillar: AboutPillar) {
-    if (!window.confirm(`Supprimer la carte « ${pillar.title} » ?`)) return;
+  const [pendingRemoval, setPendingRemoval] = useState<AboutPillar | null>(null);
+
+  async function remove(pillar: AboutPillar): Promise<boolean> {
     setBusy(true);
     try {
       const res = await fetch(`/api/association/about-pillars/${pillar.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
-        return;
+        return false;
       }
       // Si plus aucune carte réelle, réafficher les cartes de secours — c'est ce
       // que renverrait un rechargement (table vide → FALLBACK_ABOUT_PILLARS).
@@ -145,11 +147,13 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
         return next.length === 0 ? FALLBACK_ABOUT_PILLARS : next;
       });
       showSuccess("Carte supprimée.");
+      return true;
     } catch {
       showError("Erreur réseau, réessaye.");
     } finally {
       setBusy(false);
     }
+    return false;
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
@@ -197,7 +201,7 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
               <button
                 type="button"
                 className={`${styles.action} ${styles.actionDanger}`}
-                onClick={() => remove(p)}
+                onClick={() => setPendingRemoval(p)}
                 disabled={busy}
                 aria-label={`Supprimer la carte ${p.title}`}
               >
@@ -260,6 +264,20 @@ export function AboutPillars({ initialPillars, isAdmin }: Readonly<AboutPillarsP
           </div>
         </LandingDialog>
       )}
+      {pendingRemoval ? (
+        <ConfirmActionDialog
+          title={`Supprimer la carte « ${pendingRemoval.title} » ?`}
+          confirmLabel="Supprimer la carte"
+          pendingLabel="Suppression…"
+          onClose={() => setPendingRemoval(null)}
+          onConfirm={() => remove(pendingRemoval)}
+        >
+          <p>
+            La carte disparaît de la section « À propos » de l&apos;accueil, avec son texte. Elle ne
+            se restaure pas : il faudrait la rédiger à nouveau.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
     </>
   );
 }

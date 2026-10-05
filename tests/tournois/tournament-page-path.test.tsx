@@ -18,7 +18,7 @@ const connection = readSource(`${DIR}/_lib/live-connection.ts`);
 const page = readSource(`${DIR}/page.tsx`);
 const header = readSource(`${DIR}/_components/TournamentHeader.tsx`);
 const launchStrip = readSource(`${DIR}/_components/MatchLaunchStrip.tsx`);
-const dialog = readSource(`${DIR}/_components/ConfirmActionDialog.tsx`);
+const dialog = readSource("components/ui/confirm-action-dialog.tsx");
 
 /** Tranche de `source` qui s'ouvre sur `start` et se ferme au premier `end` qui suit. */
 function block(source: string, start: string, end: string): string {
@@ -128,8 +128,9 @@ describe("confirmations des gestes sans retour", () => {
     expect(dialog).toContain("useDialogBehavior({ open: mounted, onClose, locked: busy })");
     expect(dialog).toContain("useBackdropDismiss(onClose, busy)");
     expect(dialog).toContain("createPortal(");
-    expect(dialog).toContain("if (ok) onClose();\n    else setBusy(false);");
-    expect(dialog).toMatch(/onClick=\{onClose\} disabled=\{busy\} data-autofocus/);
+    expect(dialog).toContain("if (!ok) setBusy(false);");
+    expect(dialog).toContain("if (ok && closeOnSuccess) onClose();");
+    expect(dialog).toMatch(/onClick=\{onClose\}\s+disabled=\{busy\}\s+data-autofocus=/);
   });
 
   it("les gestes rendent leur issue plutôt que de l'avaler", () => {

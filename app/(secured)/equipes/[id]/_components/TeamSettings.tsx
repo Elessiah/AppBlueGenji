@@ -22,7 +22,7 @@ import { jsonRequest, teamApi } from "../_lib/team-api";
 import { TransferOwnershipDialog } from "./TransferOwnershipDialog";
 import { ClaimGhostTeamDialog } from "./ClaimGhostTeamDialog";
 import { useTeamPendingInvitations } from "../_hooks/useTeamPendingInvitations";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import styles from "../team.module.css";
 import { TEAM_IDENTITY_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
@@ -143,12 +143,13 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
       )}
 
       {deleteOpen && (
-        <ConfirmDialog
+        <ConfirmActionDialog
           title={managedAsGhost ? "Supprimer l'équipe fantôme ?" : "Dissoudre l'équipe ?"}
           confirmLabel={managedAsGhost ? "Supprimer" : "Dissoudre"}
           pendingLabel={managedAsGhost ? "Suppression…" : "Dissolution…"}
           requireText={team.team.name}
           onClose={() => setDeleteOpen(false)}
+          closeOnSuccess={false}
           onConfirm={deleteTeam}
         >
           <p>
@@ -158,7 +159,7 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
           <p>
             <strong>Action irréversible.</strong>
           </p>
-        </ConfirmDialog>
+        </ConfirmActionDialog>
       )}
     </section>
   );

@@ -265,3 +265,16 @@ export const ACCOUNT_DELETED_ERROR = "ACCOUNT_DELETED";
  */
 export const ACCOUNT_DELETED_WRITE_MESSAGE =
   "Ce compte vient d'être supprimé : la modification n'a pas été enregistrée.";
+
+/** La question posée par la modale de suppression du compte (son titre). */
+export const ACCOUNT_DELETION_QUESTION = "Supprimer définitivement ton compte ?";
+
+/**
+ * Le corps de la modale : `accountDeletionConfirmation` sans la question, déjà
+ * portée par le titre — sinon lue deux fois (nom puis description du dialogue).
+ */
+export function accountDeletionConsequences(reason: ConfirmationSubject): string {
+  const text = accountDeletionConfirmation(reason);
+  const prefix = `${ACCOUNT_DELETION_QUESTION} `;
+  return text.startsWith(prefix) ? text.slice(prefix.length) : text;
+}

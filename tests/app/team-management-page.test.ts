@@ -47,7 +47,7 @@ describe("modales de la fiche", () => {
     },
   );
 
-  it.each(["RolesDialog.tsx", "TransferOwnershipDialog.tsx", "ClaimGhostTeamDialog.tsx", "ConfirmDialog.tsx"])(
+  it.each(["RolesDialog.tsx", "TransferOwnershipDialog.tsx", "ClaimGhostTeamDialog.tsx"])(
     "%s passe par le cadre commun",
     (file) => {
       expect(read("_components", file)).toContain("<TeamDialog");
@@ -74,7 +74,7 @@ describe("roster et invitation", () => {
 
   it("confirme une exclusion au lieu de la lancer au premier clic", () => {
     expect(members).toMatch(/onClick=\{\(\) => setKickTarget\(member\)\}/);
-    expect(members).toContain("<ConfirmDialog");
+    expect(members).toContain("<ConfirmActionDialog");
   });
 
   it("ne vide le formulaire d'invitation que sur un succès", () => {
