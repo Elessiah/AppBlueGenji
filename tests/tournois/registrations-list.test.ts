@@ -37,18 +37,15 @@ describe("repli de la liste des inscrites", () => {
     expect(panel).toContain("mustExpandToShow(");
   });
 
-  it("déplie la liste avant que le glissement ne mesure les lignes, et au lâcher", () => {
+  it("déplie la liste avant d'écrire quand la flèche ↓ ferait sortir la ligne", () => {
     const panel = readFileSync(
       join(__dirname, "..", "..", "app/(secured)/tournois/[id]/_components/RegistrationsPanel.tsx"),
       "utf8",
     );
-    const grip = panel.slice(panel.indexOf("const gripProps"));
-    // Dépliée de façon synchrone **avant** l'appel du geste, qui relève les emplacements.
-    expect(grip.indexOf("flushSync(() => setExpanded(true))")).toBeGreaterThan(-1);
-    expect(grip.indexOf("flushSync(")).toBeLessThan(grip.indexOf("onPointerDown(event)"));
-    expect(panel).toContain("{...gripProps(reg.teamId)}");
-    expect(panel).not.toContain("{...drag.handleProps(reg.teamId)}");
-    const onDrop = panel.slice(panel.indexOf("const onDrop"), panel.indexOf("const drag ="));
-    expect(onDrop).toContain("mustExpandToShow(");
+    const move = panel.slice(panel.indexOf("const move = async"));
+    expect(move.indexOf("mustExpandToShow(")).toBeGreaterThan(-1);
+    expect(move.indexOf("setExpanded(true)")).toBeLessThan(move.indexOf("await applyOrder("));
+    // Plus de glissement : rien ne déplie la liste au pointeur.
+    expect(panel).not.toContain("gripProps");
   });
 });
