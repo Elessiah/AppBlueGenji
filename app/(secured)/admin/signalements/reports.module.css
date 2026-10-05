@@ -175,28 +175,19 @@
   background: var(--cyber-bg-1, #0c0f14);
   color: var(--ink);
   cursor: pointer;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
 .item:hover {
   border-color: rgba(var(--violet-400-rgb), 0.5);
 }
 
+/* Halo sans déplacement : une carte qui monterait sous un pointeur posé sur
+   son bord clignoterait (même règle que `.hover-lift`, `globals.css`). */
 @media (hover: hover) and (pointer: fine) {
   .item:hover {
     box-shadow: var(--glow-violet);
-    transform: translateY(-1px);
   }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .item:hover {
-    transform: none;
-  }
-}
-
-:global(:root[data-a11y~="motion"]) .item:hover {
-  transform: none;
 }
 
 .item[aria-current="true"] {
