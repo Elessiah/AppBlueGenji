@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { contrastRatio, relativeLuminance } from "@/lib/shared/color-contrast";
 import { globals, stripComments } from "./_lib/style-sweep";
+import { readSource } from "../helpers/read-source";
 
 /**
  * Palette « néon froid » (docs/features/DESIGN_SYSTEM.md) : chaque jeton de
@@ -99,6 +100,20 @@ describe("palette néon froid", () => {
     const pending = sheet.match(/\.reveal-pending\s*\{([^}]*)\}/)![1];
     const props = [...pending.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]).sort();
     expect(props).toEqual(["opacity", "transform"]);
+  });
+
+  it("le menu d'accessibilité fige les survols et le reflet comme la préférence système", () => {
+    expect(sheet).toMatch(/:root\[data-a11y~="motion"\] \.hover-lift:hover\s*\{[^}]*transform:\s*none/);
+    const modules: Array<[string, RegExp]> = [
+      ["components/cyber/CyberCard.module.css", /\.lift:hover\s*\{[^}]*transform:\s*none/],
+      ["components/cyber/CyberButton.module.css", /\.primary:hover[^{]*,[^{]*\.ghost:hover[^{]*\{[^}]*transform:\s*none/],
+      ["components/cyber/landing/LiveCard.module.css", /\.shimmer::before\s*\{[^}]*animation:\s*none/],
+    ];
+    for (const [file, rule] of modules) {
+      const css = stripComments(readSource(file));
+      const block = css.slice(css.indexOf(':global(:root[data-a11y~="motion"])'));
+      expect(block).toMatch(rule);
+    }
   });
 
   it("l'impression montre les sections jamais atteintes", () => {
