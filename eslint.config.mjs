@@ -21,6 +21,22 @@ const eslintConfig = [
       '@next/next/no-page-custom-font': 'off',
     },
   }),
+  // Confirmations : jamais la boîte système, toujours `ConfirmActionDialog`
+  // (`components/ui/confirm-action-dialog.tsx`, docs/features/MODAL_DIALOGS.md).
+  {
+    files: ["app/**", "components/**", "lib/**"],
+    rules: {
+      "no-restricted-globals": [
+        "error",
+        { name: "confirm", message: "Utiliser ConfirmActionDialog (components/ui/confirm-action-dialog)." },
+      ],
+      "no-restricted-properties": [
+        "error",
+        { object: "window", property: "confirm", message: "Utiliser ConfirmActionDialog (components/ui/confirm-action-dialog)." },
+        { object: "globalThis", property: "confirm", message: "Utiliser ConfirmActionDialog (components/ui/confirm-action-dialog)." },
+      ],
+    },
+  },
   // Règles SonarQube (docs/WORKFLOW.md) : la CI refuse tout nouveau constat.
   { ...sonarjs.configs.recommended, files: SONAR_FILES },
   {

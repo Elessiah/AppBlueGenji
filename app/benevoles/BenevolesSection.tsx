@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useMemo, useRef, useState } from "react";
 import { CyberButton, CyberCard } from "@/components/cyber";
 import { LandingDialog } from "@/components/cyber/landing/LandingDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-dialog";
 import {
@@ -161,23 +162,26 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
     }
   }
 
-  async function remove(b: Benevole) {
-    if (!window.confirm(`Retirer ${formatDisplayName(b)} de la liste des bénévoles ?`)) return;
+  const [pendingRemoval, setPendingRemoval] = useState<Benevole | null>(null);
+
+  async function remove(b: Benevole): Promise<boolean> {
     setBusy(true);
     try {
       const res = await fetch(`/api/benevoles/${b.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
-        return;
+        return false;
       }
       setBenevoles((prev) => prev.filter((x) => x.id !== b.id));
       showSuccess("Bénévole retiré.");
+      return true;
     } catch {
       showError("Erreur réseau, réessaye.");
     } finally {
       setBusy(false);
     }
+    return false;
   }
 
   async function onPhotoFile(event: React.ChangeEvent<HTMLInputElement>) {
@@ -357,7 +361,7 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
                           <button
                             type="button"
                             className={`${styles.action} ${styles.actionDanger}`}
-                            onClick={() => remove(b)}
+                            onClick={() => setPendingRemoval(b)}
                             disabled={busy}
                             aria-label={`Supprimer ${formatDisplayName(b)}`}
                           >
@@ -523,6 +527,20 @@ export function BenevolesSection({ initialBenevoles, isAdmin }: Readonly<Benevol
           </div>
         </LandingDialog>
       )}
+      {pendingRemoval ? (
+        <ConfirmActionDialog
+          title={`Retirer ${formatDisplayName(pendingRemoval)} des bénévoles ?`}
+          confirmLabel="Retirer"
+          pendingLabel="Retrait…"
+          onClose={() => setPendingRemoval(null)}
+          onConfirm={() => remove(pendingRemoval)}
+        >
+          <p>
+            {formatDisplayName(pendingRemoval)} disparaît de la page Bénévoles et sa photo est effacée.
+            Pour le remettre, il faudra le saisir à nouveau et réimporter la photo.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
     </>
   );
 }

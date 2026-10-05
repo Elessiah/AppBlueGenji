@@ -57,6 +57,7 @@ import s from "./profil.module.css";
 import { PROFILE_FIELD_ERRORS } from "@/lib/shared/field-errors";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { FieldErrorText } from "@/components/ui/field-error-text";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 
 /** Contrôles que peut désigner un refus de la sauvegarde du profil. */
 const PROFILE_FIELD_IDS = {
@@ -161,6 +162,11 @@ export default function ProfilePage() {
   const [verifyOpen, setVerifyOpen] = useState(false);
   const [isAdult, setIsAdult] = useState<string>("unknown");
   const [deleting, setDeleting] = useState(false);
+  /** Aperçu reçu, modale de suppression ouverte. */
+  const [pendingDeletion, setPendingDeletion] = useState<{
+    subject: ConfirmationSubject;
+    previewed: ConfirmationSubject;
+  } | null>(null);
   const [openToRecruitment, setOpenToRecruitment] = useState(false);
   const [visibility, setVisibility] = useState({
     avatar: false,
@@ -429,20 +435,17 @@ export default function ProfilePage() {
   };
 
   const [discordTagBusy, setDiscordTagBusy] = useState(false);
+  const [confirmingTagRemoval, setConfirmingTagRemoval] = useState(false);
 
   /**
    * Retirer son tag Discord — l'annulation de l'exposition.
    *
    * Passe par la sauvegarde ordinaire du profil : c'est `updateOwnProfile` qui
    * décertifie en même temps qu'il efface, et un second chemin laisserait un
-   * compte certifié sur un tag qu'il vient de retirer.
+   * compte certifié sur un tag qu'il vient de retirer. Joué par la modale de
+   * confirmation (`confirmingTagRemoval`) : rend `true` si le tag est parti.
    */
-  const onDiscordTagRemove = async () => {
-    if (!window.confirm(
-      "Retirer ton tag Discord ? L'organisation ne pourra plus te joindre pendant un tournoi.\n\nTa prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera invisible de tous tant que tu ne le certifieras pas de nouveau.",
-    )) {
-      return;
-    }
+  const onDiscordTagRemove = async (): Promise<boolean> => {
     setDiscordTagBusy(true);
     try {
       const response = await fetch("/api/profile", {
@@ -471,8 +474,10 @@ export default function ProfilePage() {
       setDiscordState((prev) => ({ ...prev, tag: null, verified: false, attested: false }));
       await loadDiscordState();
       showSuccess("Tag Discord retiré.");
+      return true;
     } catch (e) {
       showError(profileErrorMessage((e as Error).message));
+      return false;
     } finally {
       setDiscordTagBusy(false);
     }
@@ -480,10 +485,10 @@ export default function ProfilePage() {
 
   const onDeleteAccount = async () => {
     // Le bouton se ferme **avant** l'aller-retour d'aperçu, et non après la
-    // confirmation : `window.confirm` bloquait à lui seul le second clic tant
-    // qu'il était la première instruction, mais un `await` posé devant lui
-    // rouvre la fenêtre — deux clics, deux confirmations, deux `DELETE`, dont
-    // le second échoue en 400 et affiche une erreur juste après le succès.
+    // confirmation : un `await` posé devant la question rouvrirait la fenêtre
+    // — deux clics, deux confirmations, deux `DELETE`, dont le second échoue
+    // en 400 et affiche une erreur juste après le succès. Il ne se rouvre qu'à
+    // l'annulation de la modale.
     if (deleting) return;
     setDeleting(true);
 
@@ -515,11 +520,11 @@ export default function ProfilePage() {
     } catch {
       // Injoignable : la phrase qui ne promet ni conservation ni effacement.
     }
-    if (!window.confirm(accountDeletionConfirmation(subject))) {
-      setDeleting(false);
-      return;
-    }
+    setPendingDeletion({ subject, previewed });
+  };
 
+  /** Joué par la modale : rend `false` sur un refus, qui la laisse ouverte. */
+  const performAccountDeletion = async (previewed: ConfirmationSubject): Promise<boolean> => {
     try {
       const response = await fetch("/api/profile", { method: "DELETE" });
       const payload = (await response.json()) as { error?: string } & Partial<AccountDeletionPlan>;
@@ -536,9 +541,10 @@ export default function ProfilePage() {
       setTimeout(() => {
         window.location.href = "/";
       }, 1200);
+      return true;
     } catch (e) {
       showError(accountDeletionErrorMessage((e as Error).message));
-      setDeleting(false);
+      return false;
     }
   };
 
@@ -648,7 +654,7 @@ export default function ProfilePage() {
       discordStateBusy={discordStateBusy}
       loadDiscordState={loadDiscordState}
       discordTagBusy={discordTagBusy}
-      onDiscordTagRemove={onDiscordTagRemove}
+      onDiscordTagRemove={() => setConfirmingTagRemoval(true)}
       setVerifyOpen={setVerifyOpen}
     />
   );
@@ -1058,6 +1064,36 @@ export default function ProfilePage() {
           <LogoutButton />
         </div>
       </ProfileSection>
+      {confirmingTagRemoval ? (
+        <ConfirmActionDialog
+          title="Retirer ton tag Discord ?"
+          confirmLabel="Retirer mon tag"
+          pendingLabel="Retrait…"
+          onClose={() => setConfirmingTagRemoval(false)}
+          onConfirm={onDiscordTagRemove}
+        >
+          <p>L&apos;organisation ne pourra plus te joindre sur Discord pendant un tournoi, et ta certification est perdue.</p>
+          <p>
+            Ta prochaine connexion par Discord réenregistrera ton pseudo, mais sans le certifier : il restera
+            invisible de tous tant que tu ne le certifieras pas de nouveau.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
+      {pendingDeletion ? (
+        <ConfirmActionDialog
+          title="Supprimer définitivement ton compte ?"
+          confirmLabel="Supprimer mon compte"
+          pendingLabel="Suppression…"
+          closeOnSuccess={false}
+          onClose={() => {
+            setPendingDeletion(null);
+            setDeleting(false);
+          }}
+          onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
+        >
+          <p>{accountDeletionConfirmation(pendingDeletion.subject)}</p>
+        </ConfirmActionDialog>
+      ) : null}
     </section>
   );
 }
@@ -1068,7 +1104,7 @@ interface DiscordLockedActionsProps {
   discordStateBusy: boolean;
   loadDiscordState: () => Promise<void>;
   discordTagBusy: boolean;
-  onDiscordTagRemove: () => Promise<void>;
+  onDiscordTagRemove: () => void;
   setVerifyOpen: (open: boolean) => void;
 }
 

@@ -84,7 +84,7 @@ const RollbackRoundDialog = dynamic(() => orReload(import("./_components/Rollbac
 const EndurancePenaltyDialog = dynamic(() => orReload(import("./_components/EndurancePenaltyDialog").then((m) => m.EndurancePenaltyDialog)), { ssr: false });
 const AdvanceTournamentDialog = dynamic(() => orReload(import("./_components/AdvanceTournamentDialog").then((m) => m.AdvanceTournamentDialog)), { ssr: false });
 const TournamentImageDialog = dynamic(() => orReload(import("./_components/TournamentImageDialog").then((m) => m.TournamentImageDialog)), { ssr: false });
-const ConfirmActionDialog = dynamic(() => orReload(import("./_components/ConfirmActionDialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
+const ConfirmActionDialog = dynamic(() => orReload(import("@/components/ui/confirm-action-dialog").then((m) => m.ConfirmActionDialog)), { ssr: false });
 
 /** Confirmation en attente d'un geste irréversible (abandon, retrait de pénalité). */
 interface PendingConfirm {

@@ -13,7 +13,7 @@ import {
   toPlanCountLabel,
 } from "@/lib/shared/match-planning";
 import type { BracketMatch, TournamentDetail } from "@/lib/shared/types";
-import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import styles from "./MatchPlanningPanel.module.css";
 
 interface MatchPlanningPanelProps {

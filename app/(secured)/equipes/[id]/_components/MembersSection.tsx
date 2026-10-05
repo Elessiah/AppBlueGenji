@@ -15,7 +15,7 @@ import { useMemberManagement } from "../_hooks/useMemberManagement";
 import { RolesDialog, type RolesDialogTarget } from "./RolesDialog";
 import { RolePills } from "./RolePills";
 import { RolePicker } from "./RolePicker";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { PlayerPseudoCombobox } from "./PlayerPseudoCombobox";
 import styles from "../team.module.css";
 
@@ -274,7 +274,7 @@ export function MembersSection({
       ) : null}
 
       {kickTarget ? (
-        <ConfirmDialog
+        <ConfirmActionDialog
           title={`Exclure ${kickTarget.pseudo} ?`}
           confirmLabel="Exclure"
           pendingLabel="Exclusion…"
@@ -289,7 +289,7 @@ export function MembersSection({
             {kickTarget.pseudo} quitte le roster de {teamName} immédiatement. Ses matchs joués avec
             l&apos;équipe restent acquis, et une nouvelle invitation reste possible.
           </p>
-        </ConfirmDialog>
+        </ConfirmActionDialog>
       ) : null}
     </>
   );

@@ -25,7 +25,7 @@ import {
   scoreCorrectionNeedsConfirmation,
   storedResultSignature,
 } from "../_lib/score-form";
-import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import styles from "./ScoreDialog.module.css";

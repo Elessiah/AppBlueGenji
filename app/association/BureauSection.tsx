@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CyberCard, CyberButton, TeamSigil } from "@/components/cyber";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   type BureauMember,
@@ -139,15 +140,16 @@ export function BureauSection({ initialMembers, isAdmin }: Readonly<BureauSectio
     }
   }
 
-  async function remove(member: BureauMember) {
-    if (!window.confirm(`Supprimer ${member.name} du bureau ?`)) return;
+  const [pendingRemoval, setPendingRemoval] = useState<BureauMember | null>(null);
+
+  async function remove(member: BureauMember): Promise<boolean> {
     setBusy(true);
     try {
       const res = await fetch(`/api/association/bureau/${member.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
-        return;
+        return false;
       }
       // Si plus aucun membre réel, réafficher le bureau de secours — c'est ce
       // que renverrait un rechargement (table vide → FALLBACK_BUREAU).
@@ -156,11 +158,13 @@ export function BureauSection({ initialMembers, isAdmin }: Readonly<BureauSectio
         return next.length === 0 ? FALLBACK_BUREAU : next;
       });
       showSuccess("Membre du bureau supprimé.");
+      return true;
     } catch {
       showError("Erreur réseau, réessaye.");
     } finally {
       setBusy(false);
     }
+    return false;
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
@@ -229,7 +233,7 @@ export function BureauSection({ initialMembers, isAdmin }: Readonly<BureauSectio
                 <button
                   type="button"
                   className={`${styles.bureauAction} ${styles.bureauActionDanger}`}
-                  onClick={() => remove(b)}
+                  onClick={() => setPendingRemoval(b)}
                   disabled={busy}
                   aria-label={`Supprimer ${b.name}`}
                 >
@@ -307,6 +311,20 @@ export function BureauSection({ initialMembers, isAdmin }: Readonly<BureauSectio
           </div>
         </LandingDialog>
       )}
+      {pendingRemoval ? (
+        <ConfirmActionDialog
+          title={`Retirer ${pendingRemoval.name} du bureau ?`}
+          confirmLabel="Retirer du bureau"
+          pendingLabel="Retrait…"
+          onClose={() => setPendingRemoval(null)}
+          onConfirm={() => remove(pendingRemoval)}
+        >
+          <p>
+            {pendingRemoval.name} disparaît de la page Association, avec son rôle et sa présentation.
+            La fiche ne se restaure pas : il faudrait la saisir à nouveau.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
     </section>
   );
 }

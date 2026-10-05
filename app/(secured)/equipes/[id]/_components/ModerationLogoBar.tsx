@@ -5,7 +5,7 @@ import { useToast } from "@/components/ui/toast";
 import type { TeamDetailResponse } from "@/lib/shared/types";
 import { teamErrorMessage } from "../../_lib/team-errors";
 import { jsonRequest, teamApi } from "../_lib/team-api";
-import { ConfirmDialog } from "./ConfirmDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { ModerationReasonField, isModerationReasonReady } from "@/components/moderation/ModerationReasonField";
 import styles from "../team.module.css";
 
@@ -47,12 +47,14 @@ export function ModerationLogoBar({ team, onChanged }: Readonly<{ team: TeamDeta
         Retirer le logo
       </button>
       {confirming && (
-        <ConfirmDialog
+        <ConfirmActionDialog
           title="Retirer le logo de l'équipe ?"
           confirmLabel="Retirer le logo"
           pendingLabel="Retrait…"
           disabled={!isModerationReasonReady(reason)}
           onClose={() => setConfirming(false)}
+          focusContent
+          closeOnSuccess={false}
           onConfirm={remove}
         >
           <p>
@@ -60,7 +62,7 @@ export function ModerationLogoBar({ team, onChanged }: Readonly<{ team: TeamDeta
             tout le reste ; sa gestion pourra en envoyer un autre.
           </p>
           <ModerationReasonField value={reason} onChange={setReason} recipient="ses membres" />
-        </ConfirmDialog>
+        </ConfirmActionDialog>
       )}
     </fieldset>
   );

@@ -25,7 +25,7 @@ import { EntrantName } from "./EntrantName";
 import { mapError } from "../_lib/error-map";
 import { useTournamentNow } from "@/lib/shared/hooks/useTournamentNow";
 import { RemoveEntrantDialog } from "./RemoveEntrantDialog";
-import { ConfirmActionDialog } from "./ConfirmActionDialog";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import {
   hiddenRegistrationCount,
   mustExpandToShow,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useToast } from "@/components/ui/toast";
 import {
   type AboutStat,
@@ -128,15 +129,16 @@ export function AboutStats({ initialStats, isAdmin }: Readonly<AboutStatsProps>)
     }
   }
 
-  async function remove(stat: AboutStat) {
-    if (!window.confirm(`Supprimer la carte « ${stat.value} · ${stat.label} » ?`)) return;
+  const [pendingRemoval, setPendingRemoval] = useState<AboutStat | null>(null);
+
+  async function remove(stat: AboutStat): Promise<boolean> {
     setBusy(true);
     try {
       const res = await fetch(`/api/association/about-stats/${stat.id}`, { method: "DELETE" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         showError(data.error ? `Échec : ${data.error}` : "Échec de la suppression.");
-        return;
+        return false;
       }
       // Si plus aucune carte réelle, réafficher les cartes de secours — c'est ce
       // que renverrait un rechargement (table vide → FALLBACK_ABOUT_STATS).
@@ -145,11 +147,13 @@ export function AboutStats({ initialStats, isAdmin }: Readonly<AboutStatsProps>)
         return next.length === 0 ? FALLBACK_ABOUT_STATS : next;
       });
       showSuccess("Carte supprimée.");
+      return true;
     } catch {
       showError("Erreur réseau, réessaye.");
     } finally {
       setBusy(false);
     }
+    return false;
   }
 
   const submitLabel = editing ? "Enregistrer" : "Ajouter";
@@ -195,7 +199,7 @@ export function AboutStats({ initialStats, isAdmin }: Readonly<AboutStatsProps>)
                 <button
                   type="button"
                   className={`${styles.action} ${styles.actionDanger}`}
-                  onClick={() => remove(s)}
+                  onClick={() => setPendingRemoval(s)}
                   disabled={busy}
                   aria-label={`Supprimer la carte ${s.label}`}
                 >
@@ -262,6 +266,20 @@ export function AboutStats({ initialStats, isAdmin }: Readonly<AboutStatsProps>)
           </div>
         </LandingDialog>
       )}
+      {pendingRemoval ? (
+        <ConfirmActionDialog
+          title={`Supprimer le chiffre « ${pendingRemoval.value} · ${pendingRemoval.label} » ?`}
+          confirmLabel="Supprimer le chiffre"
+          pendingLabel="Suppression…"
+          onClose={() => setPendingRemoval(null)}
+          onConfirm={() => remove(pendingRemoval)}
+        >
+          <p>
+            Ce chiffre disparaît de la section « À propos » de l&apos;accueil. Il ne se restaure pas :
+            il faudrait le saisir à nouveau.
+          </p>
+        </ConfirmActionDialog>
+      ) : null}
     </>
   );
 }
