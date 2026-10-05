@@ -53,7 +53,7 @@ export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
           <div className={styles.tags}>
             <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
-            {!ad.active && <Pill>Inactif</Pill>}
+            {!ad.active && <Pill variant="neutral">Inactif</Pill>}
           </div>
           <button
             type="button"
