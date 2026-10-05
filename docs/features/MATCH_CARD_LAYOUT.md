@@ -77,9 +77,12 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
   la grandissait, et l'arbre — qui mesure ses cartes (`useSlotHeight`) pour
   régler la hauteur de **tous** ses créneaux — sautait sous le pointeur ; en
   `absolute`, il était rogné par le cadre des plateaux et les zones
-  défilantes. Ses coordonnées (`panelPlacement`) sont recalculées au
-  défilement et au redimensionnement, origine du repère retranchée (la page
-  est sous un ancêtre transformé, `.fade-in`). Le panneau reste dans le DOM de
+  défilantes. Ses coordonnées (`panelPlacement`, bornées à la fenêtre avec
+  8 px de marge) suivent le défilement de la page et le redimensionnement,
+  origine du repère retranchée (la page est sous un ancêtre transformé,
+  `.fade-in`). Le défilement d'une zone **qui contient la carte** (arbre,
+  colonnes de manche) le referme, focus rendu au bouton : la carte pourrait y
+  sortir de la partie visible. Le panneau reste dans le DOM de
   la carte — l'ordre de tabulation suit le bouton — toujours rendu, masqué par
   `hidden`. La carte n'a plus d'`overflow: hidden` (coins intérieurs arrondis
   à la main).
