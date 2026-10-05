@@ -88,4 +88,11 @@ describe("Refus d'un réordonnancement après le coup d'envoi", () => {
     expect(mapError("SEEDING_LOCKED_STARTED")).toMatch(/commencé/);
     expect(mapError("SEEDING_LOCKED")).toMatch(/score/);
   });
+
+  it("dit d'un tournoi terminé qu'il est terminé, sans parler de score", () => {
+    expect(ERROR_MESSAGES.SEEDING_LOCKED_FINISHED).toBeDefined();
+    expect(mapError("SEEDING_LOCKED_FINISHED")).toMatch(/^Tournoi terminé/);
+    expect(mapError("SEEDING_LOCKED_FINISHED")).not.toMatch(/score/);
+    expect(stripComments(read(PANEL))).toMatch(/FINISHED: "Tournoi terminé : l'ordre n'a plus d'effet\."/);
+  });
 });

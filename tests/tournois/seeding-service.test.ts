@@ -307,6 +307,22 @@ describe("reorderSeeding", () => {
     expect(connection.commit).not.toHaveBeenCalled();
   });
 
+  it("refuse un tournoi terminé par son propre code, scores saisis compris (SEEDING_LOCKED_FINISHED)", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "FINISHED" }));
+    jest.mocked(getMatchRows).mockResolvedValue([matchRow({ team1_score: 2, team2_score: 0 })]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED_FINISHED$/);
+    expect(connection.rollback).toHaveBeenCalled();
+    expect(connection.commit).not.toHaveBeenCalled();
+  });
+
+  it("refuse un tournoi terminé même sans aucun match (SEEDING_LOCKED_FINISHED)", async () => {
+    jest.mocked(loadTournamentRow).mockResolvedValue(tournament({ state: "FINISHED" }));
+    jest.mocked(getMatchRows).mockResolvedValue([]);
+
+    await expect(reorderSeeding(5, [2, 1])).rejects.toThrow(/^SEEDING_LOCKED_FINISHED$/);
+  });
+
   it("refuse un ordre qui n'est pas une permutation des inscrites", async () => {
     jest.mocked(loadTournamentRow).mockResolvedValue(tournament());
     jest.mocked(getMatchRows).mockResolvedValue([]);
