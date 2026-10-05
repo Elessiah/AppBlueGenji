@@ -51,17 +51,20 @@ export async function replaceMatchMaps(
 }
 
 /**
- * Efface un jeu de maps **s'il existe**. Un `DELETE` qui ne trouve rien pose
- * quand même un verrou d'intervalle (InnoDB, `REPEATABLE READ`) : deux reports
- * simultanés sur deux matchs encore sans ligne verrouillaient le même
- * intervalle, puis s'attendaient l'un l'autre à l'insertion — interblocage, et
- * un 500 pour l'une des deux équipes. La lecture préalable est une lecture
- * cohérente, sans verrou ; elle ne court aucune course pour ce match-ci, dont
- * la ligne `bg_matches` est déjà verrouillée par l'appelant.
+ * Efface un jeu de maps **s'il existe**.
+ *
+ * La lecture est **verrouillante** (`FOR UPDATE`, table seule — MariaDB) : une
+ * lecture cohérente lirait l'instantané pris au début de la transaction, avant
+ * le verrou du match, et manquerait les lignes qu'un report concurrent du même
+ * match vient de valider — l'insertion qui suit heurterait alors la clé unique.
+ * Sur un intervalle vide, elle pose un verrou d'intervalle comme le ferait le
+ * `DELETE` : deux reports simultanés sur des matchs voisins peuvent alors
+ * s'interbloquer, ce que le report d'un engagé rattrape en rejouant sa
+ * transaction (`reportMatchScorePublic`).
  */
 async function clearMatchMaps(connection: PoolConnection, matchId: number, source: MatchMapSource): Promise<void> {
   const result = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1`,
+    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE`,
     [matchId, source],
   );
   const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];
@@ -69,7 +72,12 @@ async function clearMatchMaps(connection: PoolConnection, matchId: number, sourc
   await connection.execute(`DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?`, [matchId, source]);
 }
 
-/** Maps d'un jeu précis, dans l'ordre joué. */
+/**
+ * Maps d'un jeu précis, dans l'ordre joué. Lecture verrouillante : elle voit
+ * la proposition qu'un report concurrent vient de valider (voir
+ * `clearMatchMaps`), sans quoi la comparaison des deux propositions la
+ * prendrait pour un report d'avant les maps.
+ */
 export async function loadMatchMaps(
   connection: PoolConnection,
   matchId: number,
@@ -79,7 +87,8 @@ export async function loadMatchMaps(
     `SELECT match_id, source, map_number, replay_code, team1_score, team2_score
      FROM bg_match_maps
      WHERE match_id = ? AND source = ?
-     ORDER BY map_number`,
+     ORDER BY map_number
+     FOR UPDATE`,
     [matchId, source],
   );
   return Array.isArray(rows) ? rows.map(toResult) : [];
@@ -126,7 +135,7 @@ export async function clearMapSets(
        AND source IN (${sources.map(() => "?").join(", ")})`;
   const params = [...matchIds, ...sources];
   const result = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps WHERE ${where} LIMIT 1`,
+    `SELECT 1 FROM bg_match_maps WHERE ${where} LIMIT 1 FOR UPDATE`,
     params,
   );
   const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];

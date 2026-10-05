@@ -106,9 +106,14 @@ bg_match_maps (
   (`finalizeMatch`, après promotion de celle qui fait foi), abandon en Survie /
   Ronde suisse, retour en arrière (qui emporte aussi `FINAL`). Un code n'est
   gardé qu'avec le résultat qu'il documente.
-- Effacements gardés par une lecture préalable : un `DELETE` qui ne trouve rien
-  pose un verrou d'intervalle InnoDB, source d'interblocage entre deux reports
-  simultanés sur des matchs voisins.
+- Lectures **verrouillantes** (`FOR UPDATE`, table seule) avant d'effacer et
+  pour comparer deux propositions : une lecture cohérente verrait l'instantané
+  pris avant le verrou du match et manquerait la proposition qu'un report
+  concurrent vient de valider (clé unique heurtée, ou désaccord pris pour un
+  report d'avant les maps). Sur un intervalle vide, elles posent un verrou
+  d'intervalle : deux reports simultanés sur des matchs voisins peuvent
+  s'interbloquer, et `reportMatchScorePublic` rejoue alors la transaction
+  annulée (3 essais).
 - `FINAL` : le détail retenu. Promu depuis la proposition qui fait foi (accord
   des deux engagées — celle qui confirme —, ou report seul à l'échéance), ou
   écrit par l'arbitrage. Un forfait l'efface toujours (arbitrage ou engagée :

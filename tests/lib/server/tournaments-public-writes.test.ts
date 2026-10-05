@@ -382,6 +382,21 @@ describe("écritures d'un engagé — report de score, forfait sur sa manche", (
       .mockResolvedValueOnce([after ? [{ state: after }] : [], undefined]);
   }
 
+  it("rejoue un report annulé par un interblocage, et seulement celui-là (MAP_SCORES.md)", async () => {
+    poolExecute.mockResolvedValue([[{ state: "RUNNING" }], undefined]);
+    const deadlock = Object.assign(new Error("Deadlock found when trying to get lock"), { code: "ER_LOCK_DEADLOCK" });
+    jest.mocked(reportMatchScore).mockRejectedValueOnce(deadlock).mockResolvedValueOnce(undefined);
+
+    await reportMatchScorePublic(5, 70, 12, mapsFor(3, 1));
+    expect(reportMatchScore).toHaveBeenCalledTimes(2);
+
+    jest.mocked(reportMatchScore).mockReset();
+    jest.mocked(reportMatchScore).mockRejectedValue(new Error("NOT_IN_MATCH"));
+    await expect(reportMatchScorePublic(5, 70, 12, mapsFor(3, 1))).rejects.toThrow("NOT_IN_MATCH");
+    expect(reportMatchScore).toHaveBeenCalledTimes(1);
+    jest.mocked(reportMatchScore).mockReset();
+  });
+
   it("réconcilie chaque mode, clôt, puis publie et prévient l'adversaire", async () => {
     statesBeforeAfter("RUNNING", "RUNNING");
 

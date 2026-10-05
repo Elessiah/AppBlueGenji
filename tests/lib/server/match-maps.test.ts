@@ -28,7 +28,7 @@ describe("stockage map par map (bg_match_maps)", () => {
       { replayCode: "BBB222", team1Score: 0, team2Score: 0 },
     ], 7);
 
-    expect(flat(execute.mock.calls[0][0])).toBe("SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1");
+    expect(flat(execute.mock.calls[0][0])).toBe("SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE");
     expect(flat(execute.mock.calls[1][0])).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?");
     expect(execute.mock.calls[1][1]).toEqual([10, "TEAM2"]);
     expect(flat(execute.mock.calls[2][0])).toMatch(/^INSERT INTO bg_match_maps .* VALUES \(\?, \?, \?, \?, \?, \?, \?\), \(\?, \?, \?, \?, \?, \?, \?\)$/);

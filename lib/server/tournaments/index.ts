@@ -168,6 +168,7 @@ import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
 import type { MatchMapInput } from "@/lib/shared/match-maps";
+import { isTransactionAborted } from "@/lib/server/mysql-errors";
 import type { AdminMapEntry } from "./admin";
 import {
   publishMatchUpdatedEvent,
@@ -1183,15 +1184,27 @@ async function readTournamentState(tournamentId: number): Promise<TournamentStat
   return rows[0]?.state ?? null;
 }
 
+const REPORT_DEADLOCK_ATTEMPTS = 3;
+
 export async function reportMatchScorePublic(
   tournamentId: number,
   matchId: number,
   userId: number,
   maps: ReadonlyArray<MatchMapInput>,
 ): Promise<void> {
-  await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-    reportMatchScore(connection, tournamentId, matchId, userId, maps),
-  );
+  // Deux reports simultanés sur des matchs voisins peuvent s'interbloquer sur
+  // `bg_match_maps` (verrous d'intervalle, `./match-maps`) : InnoDB annule
+  // l'un, qui est rejoué tel quel plutôt que de rendre un 500 à l'équipe.
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
+        reportMatchScore(connection, tournamentId, matchId, userId, maps),
+      );
+      return;
+    } catch (error) {
+      if (!isTransactionAborted(error) || attempt >= REPORT_DEADLOCK_ATTEMPTS) throw error;
+    }
+  }
 }
 
 /**
