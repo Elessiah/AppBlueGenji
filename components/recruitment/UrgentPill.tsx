@@ -7,10 +7,11 @@ import { Pill } from "@/components/cyber";
  * la banderole : la pastille est la promesse visible du statut, elle ne doit
  * pas changer de mot ni de forme d'un écran à l'autre. Le clignotement
  * (`.pill-urgent`) suit le régime de charge comme toute animation infinie.
+ * Ambre d'avertissement (`pill-warning`) : le rouge est réservé au direct.
  */
 export function UrgentPill({ className = "" }: Readonly<{ className?: string }>) {
   return (
-    <Pill variant="live" className={`pill-urgent ${className}`.trim()}>
+    <Pill variant="warning" className={`pill-urgent ${className}`.trim()}>
       Urgente
     </Pill>
   );

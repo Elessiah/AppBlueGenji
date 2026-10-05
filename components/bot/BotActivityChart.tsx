@@ -115,7 +115,7 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
                 <div key={i} /* NOSONAR S6479 — élément du i-ème intervalle de la plage, dessin sans état */ style={{ flex: 1, display: "flex", alignItems: "flex-end", gap: 1.5, height: "100%" }}>
                   <div className="bar" style={{ height: `${(relay / max) * 100}%`, flex: 1 }} title={`${relay} relais`} />
                   <div
-                    className="bar relais"
+                    className="bar scrims"
                     style={{ height: `${(scrim / max) * 100}%`, flex: 0.4 }}
                     title={`${scrim} scrims`}
                   />
@@ -136,7 +136,7 @@ export function BotActivityChart({ initial }: Readonly<{ initial: BotActivity | 
         </div>
         <div className="chart-legend">
           <span className="lg">RELAIS INTER-SERVEUR</span>
-          <span className="lg amber">SCRIMS PROPOSÉS</span>
+          <span className="lg scrims">SCRIMS PROPOSÉS</span>
           <span style={{ marginLeft: "auto" }}>
             {`MOY. ${avgLabel} / JOUR`}
           </span>

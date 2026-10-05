@@ -82,16 +82,16 @@
   max-width: 72ch;
   margin: 0 0 20px;
   padding: 14px 16px;
-  border: 1px solid rgba(245, 165, 36, 0.4);
+  border: 1px solid rgba(var(--violet-400-rgb), 0.4);
   border-radius: var(--r-cy-md);
-  background: rgba(245, 165, 36, 0.07);
+  background: rgba(var(--violet-400-rgb), 0.08);
   color: var(--ink-mute);
   font-size: 13.5px;
   line-height: 1.6;
 }
 
 .soonBanner strong {
-  color: var(--amber);
+  color: var(--violet-300);
 }
 
 /* Corps : sommaire à gauche, contenu à droite. Le sommaire passe au-dessus du
