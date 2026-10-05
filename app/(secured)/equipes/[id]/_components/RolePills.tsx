@@ -1,5 +1,5 @@
 import type { TeamRole } from "@/lib/shared/types";
-import { sortTeamRoles, teamRoleFamily, teamRoleLabel } from "@/lib/shared/team-role-display";
+import { sortTeamRoles, teamRoleFamily, teamRoleLabel, teamRoleTone } from "@/lib/shared/team-role-display";
 import styles from "../team.module.css";
 
 const FAMILY_ICON: Record<ReturnType<typeof teamRoleFamily>, string | null> = {
@@ -22,7 +22,7 @@ export function RolePills({ roles, label }: Readonly<{ roles: readonly TeamRole[
         const family = teamRoleFamily(role);
         const icon = FAMILY_ICON[family];
         return (
-          <li key={role} className={styles.rolePill} data-family={family}>
+          <li key={role} className={styles.rolePill} data-family={family} data-tone={teamRoleTone(role)}>
             {icon ? (
               <span className={styles.rolePillIcon} aria-hidden>
                 {icon}

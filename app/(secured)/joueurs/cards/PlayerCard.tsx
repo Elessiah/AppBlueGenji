@@ -11,17 +11,8 @@ import {
   playerRosterStatus,
 } from "@/lib/shared/player-roster-status";
 import { TeamLink } from "@/components/entity-link";
+import { teamRoleTone } from "@/lib/shared/team-role-display";
 import s from "../../_shared/annuaire.module.css";
-
-const ROLE_CLASS: Record<string, string> = {
-  DPS: s.dps,
-  TANK: s.tank,
-  HEAL: s.heal,
-  COACH: s.coach,
-  CAPITAINE: s.cap,
-  OWNER: s.cap,
-  MANAGER: "",
-};
 
 const ROLE_LABEL: Record<string, string> = {
   DPS: "DPS",
@@ -111,7 +102,7 @@ export function PlayerCard({ player }: Readonly<{ player: PublicUserProfile }>) 
       {(player.roles || []).length > 0 && (
         <div className={s.plRoles}>
           {(player.roles || []).slice(0, 4).map((r) => (
-            <span key={r} className={`${s.plRole} ${ROLE_CLASS[r] || ""}`}>
+            <span key={r} className={s.plRole} data-tone={teamRoleTone(r)}>
               {ROLE_LABEL[r] || r}
             </span>
           ))}
