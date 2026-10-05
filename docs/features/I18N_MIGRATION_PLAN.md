@@ -125,7 +125,20 @@ recomposer avec le nonce CSP. Proposition plus légère, compatible avec `locale
    l'en-tête de requête `x-bg-locale: en` (sinon `fr`) — **au même endroit** que le nonce,
    `content-security-policy` et `x-pathname`, dans les mêmes `requestHeaders`. L'en-tête reçu
    d'un client est toujours retiré (comme `SUSPENSION_NOTICE_HEADER`). `/fr/...` → **308** vers
-   l'adresse sans préfixe (une seule URL par contenu). `/api/` ne prend jamais de préfixe.
+   l'adresse sans préfixe (une seule URL par contenu). `x-pathname` reçoit le chemin **sans
+   préfixe** (le layout le compare à `/recrutement` pour taire la mise en avant ; le sélecteur
+   en dérive l'équivalent), la langue voyageant à part dans `x-bg-locale`.
+   **`/api/` ne prend jamais de préfixe — règle explicite, testée** : `/en/api/...` répond
+   **404** dans le middleware, jamais réécrit. Sinon un `POST /en/api/...` intersite serait
+   réécrit vers `/api/...` sans passer par `guardApiRequest`, qui ne garde que les chemins
+   commençant par `/api/` (contournement du 403 `CROSS_SITE_REQUEST`).
+   **Préchargement** : le premier `matcher` exclut aujourd'hui les requêtes portant
+   `next-router-prefetch` ou `purpose: prefetch` ; un préchargement de `/en/regles` ne serait
+   donc pas réécrit et viserait une route inexistante (404 mis en cache, navigation client
+   cassée). Le lot 0 ajoute une entrée de `matcher` dédiée à `/en/:path*` **sans** cette
+   exclusion (la réécriture seule, sans tirer de nonce), ou, à défaut, déclare la réécriture
+   dans `rewrites` de `next.config.ts` (appliquée à toutes les requêtes) et ne garde au
+   middleware que l'en-tête de langue.
 2. **Arborescence inchangée** : `app/regles/page.tsx` sert `/regles` et `/en/regles`.
 3. **`next-intl` « sans routage »** : `i18n/request.ts` → `getRequestConfig` lit
    `x-bg-locale` dans `headers()` (déjà lu par le layout : aucun coût de rendu) et charge les
@@ -136,8 +149,8 @@ recomposer avec le nonce CSP. Proposition plus légère, compatible avec `locale
 
 Points à **prouver dans le lot 0** (spike + tests) : `usePathname()` côté client après réécriture
 (doit rendre le chemin du navigateur, préfixe compris — sinon helper `useLocalePathname`) ;
-navigation client et préchargement RSC de `/en/...` (le middleware voit bien les requêtes RSC,
-le `matcher` actuel les inclut) ; nonce présent sur `/` **et** `/en/` (test e2e qui lit
+navigation client **et préchargement** RSC de `/en/...` (cf. exclusion des préchargements
+ci-dessus) ; `/en/api/x` → 404 ; nonce présent sur `/` **et** `/en/` (test e2e qui lit
 l'attribut `nonce` des scripts) ; `npm run typecheck` (TS 7) et `typecheck:ts5` acceptent
 l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 
@@ -184,8 +197,10 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 **Ordre** : 0 → 1 → 2 → 3 → 4 → 5 → 6 → (7 dès que D1 tranché, en parallèle possible) →
 8a → 8b → 9 → (10). Les lots 2 à 5 sont indépendants une fois 0 et 1 livrés.
 
-**Effort total** : **11 à 13 PR** (10 sans l'admin et avec D1 = option (b)). Lot 0 ≈ 2 à 3 fois
-un lot de pages ; lots 3, 8a, 8b les plus lourds en texte.
+**Effort total** : **12 PR** telles que listées (lots 0 à 10, le 8 en deux) ; **11** si l'admin
+reste en français (D4). Le lot 7 subsiste quelle que soit D1 (même l'option (b) demande une page
+de synthèse anglaise) ; il passe à deux PR si D1 = (a) vu son volume (~23 000 mots), soit 13 au
+plus. Lot 0 ≈ 2 à 3 fois un lot de pages ; lots 3, 8a, 8b les plus lourds en texte.
 
 **Pages connectées — recommandation (décision requise, D3)** : migrer les **tournois** et
 l'espace joueur (lots 8–9), car c'est là qu'un joueur anglophone passe son temps ; garder
