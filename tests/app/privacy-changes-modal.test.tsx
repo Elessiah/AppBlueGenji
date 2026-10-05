@@ -32,6 +32,11 @@ describe("PrivacyChangesModal — rendu serveur", () => {
     expect(render([...PRIVACY_CHANGES])).not.toMatch(/role="dialog"/);
   });
 
+  it("se tait aussi sur /en/rgpd : la route compte, pas le préfixe de langue", () => {
+    mockPathname = "/en/rgpd";
+    expect(render([...PRIVACY_CHANGES])).not.toMatch(/role="dialog"/);
+  });
+
   it("revient sur toute autre page, sous-pages de /rgpd comprises", () => {
     for (const path of ["/", "/profil", "/rgpd/autre", "/regles"]) {
       mockPathname = path;
