@@ -386,4 +386,25 @@ describe("reconcilePhases — le chemin ordinaire reste intact", () => {
       { teamId: 2, seed: 2 },
     ]);
   });
+
+  it("ne qualifie pas une équipe d'un tableau tronqué qui n'est plus en lice", async () => {
+    // Un double forfait au dernier tour laisse une seule gagnante : la perdante
+    // de l'autre rencontre, 2ᵉ, ne prend pas la place laissée vide.
+    tournamentState = "RUNNING";
+    phaseStates = { [PHASE_1]: "RUNNING", [PHASE_2]: "PENDING" };
+    currentPhaseId = PHASE_1;
+    jest.mocked(loadPhase).mockImplementation(async () => phaseRow(PHASE_1, 1));
+    jest.mocked(rankEliminationPhase).mockImplementation(async () =>
+      ranked([1, 2, 3, 4]).map((entry) => ({ ...entry, stillInContention: entry.teamId === 1 })),
+    );
+
+    await reconcilePhases(TOURNAMENT_ID, makeConn());
+
+    expect(phaseTeams.get(PHASE_1)?.map((team) => [team.teamId, team.qualified])).toEqual([
+      [1, true],
+      [2, false],
+      [3, false],
+      [4, false],
+    ]);
+  });
 });

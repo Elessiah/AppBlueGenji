@@ -62,7 +62,7 @@ const final = (winner: number, loser: number, extra: Row = {}): Row => ({
   double_forfeit: 0,
   ...extra,
 });
-const UPPER_FINAL = /bracket = 'UPPER' ORDER BY round_number DESC/;
+const UPPER_FINAL = /bracket = 'UPPER' ORDER BY round_number DESC, match_number ASC$/;
 const THIRD_PLACE = /bracket = 'THIRD_PLACE'/;
 const GRAND_FINAL = /bracket = 'GRAND' AND round_number = 1/;
 const FORFEITED = /^SELECT team1_id AS team_id FROM bg_matches/;
@@ -227,6 +227,78 @@ describe("rankEliminationPhase", () => {
     expect(rest?.sql).toContain(
       "FROM bg_tournament_registrations r LEFT JOIN bg_tournament_phase_teams pt",
     );
+  });
+});
+
+describe("rankEliminationPhase — élimination simple tronquée", () => {
+  const lastRound = (winner: number, loser: number): Row => final(winner, loser, { round_number: 2 });
+  const restRow = (team_id: number, seed: number, wins: number, losses: number): Row => ({
+    team_id, seed, wins, losses, last_stage: 1002,
+  });
+
+  it("qualifie les gagnantes de la dernière manche, dans un ordre fixe, sans podium", async () => {
+    route(UPPER_FINAL, [lastRound(3, 1), lastRound(2, 4)]);
+    route(REST, [
+      restRow(1, 1, 1, 1),
+      restRow(4, 4, 1, 1),
+      restRow(3, 3, 2, 0),
+      restRow(2, 2, 2, 0),
+    ]);
+
+    const ranks = await rankEliminationPhase(conn(), 5, 7, "SINGLE", true);
+
+    expect(ranks).toEqual([
+      { teamId: 2, rank: 1, eliminatedByDoubleForfeit: false, stillInContention: true },
+      { teamId: 3, rank: 2, eliminatedByDoubleForfeit: false, stillInContention: true },
+      { teamId: 1, rank: 3, eliminatedByDoubleForfeit: false, stillInContention: false },
+      { teamId: 4, rank: 4, eliminatedByDoubleForfeit: false, stillInContention: false },
+    ]);
+    // Personne n'est placé d'avance, et un tableau tronqué n'a pas de petite finale.
+    const rest = sqlCalls().find((c) => REST.test(c.sql));
+    expect(rest?.sql).not.toContain("NOT IN");
+    expect(sqlCalls().some((c) => THIRD_PLACE.test(c.sql))).toBe(false);
+  });
+
+  it("range quatre gagnantes devant toute perdante, même mieux semée", async () => {
+    route(UPPER_FINAL, [lastRound(5, 1), lastRound(6, 2), lastRound(7, 3), lastRound(8, 4)]);
+    // L'équipe 5, passée par exemption (1 V – 0 D), reste devant les perdantes
+    // têtes de série : elle est en lice, elles non.
+    route(REST, [
+      restRow(1, 1, 1, 1), restRow(2, 2, 1, 1), restRow(3, 3, 1, 1), restRow(4, 4, 1, 1),
+      restRow(5, 5, 1, 0), restRow(6, 6, 2, 0), restRow(7, 7, 2, 0), restRow(8, 8, 2, 0),
+    ]);
+
+    const ranks = await rankEliminationPhase(conn(), 5, 7, "SINGLE", false);
+
+    expect(ranks.map((r) => r.teamId)).toEqual([6, 7, 8, 5, 1, 2, 3, 4]);
+    expect(ranks.filter((r) => r.stillInContention).map((r) => r.teamId)).toEqual([6, 7, 8, 5]);
+  });
+
+  it("n'a pas de gagnante pour un double forfait au dernier tour", async () => {
+    route(UPPER_FINAL, [
+      lastRound(2, 3),
+      { ...lastRound(1, 4), winner_team_id: null, loser_team_id: null, double_forfeit: 1 },
+    ]);
+    route(FORFEITED, [{ team_id: 1 }, { team_id: 4 }]);
+    route(REST, [restRow(1, 1, 1, 1), restRow(4, 4, 1, 1), restRow(3, 3, 1, 1), restRow(2, 2, 2, 0)]);
+
+    const ranks = await rankEliminationPhase(conn(), 5, 7, "SINGLE", false);
+
+    expect(ranks.filter((r) => r.stillInContention).map((r) => r.teamId)).toEqual([2]);
+    expect(ranks.find((r) => r.teamId === 1)).toMatchObject({
+      eliminatedByDoubleForfeit: true,
+      stillInContention: false,
+    });
+  });
+
+  it("lit encore une dernière manche à une seule rencontre comme une finale", async () => {
+    route(UPPER_FINAL, [lastRound(4, 1)]);
+    route(REST, [restRow(2, 2, 1, 1), restRow(3, 3, 1, 1)]);
+
+    const ranks = await rankEliminationPhase(conn(), 5, 0, "SINGLE", false);
+
+    expect(ranks.map((r) => [r.teamId, r.rank])).toEqual([[4, 1], [1, 2], [2, 3], [3, 4]]);
+    expect(ranks.every((r) => r.stillInContention === undefined)).toBe(true);
   });
 });
 
