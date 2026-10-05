@@ -36,7 +36,7 @@ describe("RoundMatchSections", () => {
       bracketMatch({ id: 2, status: "READY", team1Id: 1, team2Id: 2, launchedAt: LAUNCHED }),
     ]);
     expect(html.indexOf("En cours")).toBeLessThan(html.indexOf("Terminé"));
-    expect(html.match(/role="group"/g)).toHaveLength(2);
+    expect(html.match(/data-section=/g)).toHaveLength(2);
     expect(html).toContain(", 1 match");
     expect(html).not.toContain("<button");
     expect(html).not.toContain("aria-expanded");
@@ -54,6 +54,6 @@ describe("RoundMatchSections", () => {
   });
 
   it("ne rend aucune section sans match", () => {
-    expect(render([])).not.toContain('role="group"');
+    expect(render([])).not.toContain("data-section=");
   });
 });
