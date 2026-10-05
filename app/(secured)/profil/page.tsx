@@ -8,7 +8,8 @@ import { appendCroppedImage, useImageCropper } from "@/components/ui/image-crop-
 import { Coche } from "@/components/Coche";
 import type { FullProfileResponse } from "@/lib/shared/types";
 import {
-  accountDeletionConfirmation,
+  ACCOUNT_DELETION_QUESTION,
+  accountDeletionConsequences,
   accountDeletionErrorMessage,
   accountDeletionOutcome,
   RETENTION_UNKNOWN,
@@ -1058,7 +1059,7 @@ export default function ProfilePage() {
               onClick={onDeleteAccount}
               disabled={deleting}
             >
-              {deleting ? "Suppression…" : "Supprimer mon compte"}
+              {deleteAccountLabel(deleting, pendingDeletion !== null)}
             </button>
           </div>
           <LogoutButton />
@@ -1081,7 +1082,7 @@ export default function ProfilePage() {
       ) : null}
       {pendingDeletion ? (
         <ConfirmActionDialog
-          title="Supprimer définitivement ton compte ?"
+          title={ACCOUNT_DELETION_QUESTION}
           confirmLabel="Supprimer mon compte"
           pendingLabel="Suppression…"
           closeOnSuccess={false}
@@ -1091,11 +1092,19 @@ export default function ProfilePage() {
           }}
           onConfirm={() => performAccountDeletion(pendingDeletion.previewed)}
         >
-          <p>{accountDeletionConfirmation(pendingDeletion.subject)}</p>
+          <p>{accountDeletionConsequences(pendingDeletion.subject)}</p>
         </ConfirmActionDialog>
       ) : null}
     </section>
   );
+}
+
+/**
+ * « Suppression… » pendant l'aperçu seulement : modale ouverte, rien n'est
+ * encore parti et le joueur peut renoncer.
+ */
+function deleteAccountLabel(deleting: boolean, confirming: boolean): string {
+  return deleting && !confirming ? "Suppression…" : "Supprimer mon compte";
 }
 
 /** Ce que les gestes d'un tag Discord verrouillé lisent et déclenchent. */

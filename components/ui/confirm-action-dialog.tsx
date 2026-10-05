@@ -126,7 +126,8 @@ export function ConfirmActionDialog({
         role="alertdialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        aria-describedby={bodyId}
+        // Un contenu à remplir (motif, listes) se lit champ par champ, pas d'un bloc.
+        aria-describedby={focusContent ? undefined : bodyId}
         tabIndex={-1}
         className={styles.dialog}
       >
