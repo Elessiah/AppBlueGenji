@@ -52,6 +52,11 @@ const LOCK_MESSAGES: Record<NonNullable<SeedingLockReason>, string> = {
   STARTED: "Le tournoi a commencé : l'ordre de départ est désormais figé.",
 };
 
+/** Rang figé au coup d'envoi ; « — » pour une engagée absente du tirage. */
+function frozenSeedLabel(seed: number | null): string {
+  return seed === null ? "—" : `#${seed}`;
+}
+
 /**
  * Liste des inscrites, et — pour le staff — l'endroit où l'on en règle l'ordre.
  *
@@ -288,7 +293,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
           {visibleRows.map((reg, index) => (
             <div key={reg.teamId} className={`${styles.row} ${gridClass}`}>
               <span className={styles.seed}>
-                {followsFrozenDraw ? (reg.seed === null ? "—" : `#${reg.seed}`) : `#${index + 1}`}
+                {followsFrozenDraw ? frozenSeedLabel(reg.seed) : `#${index + 1}`}
               </span>
               <EntrantName
                 teamId={reg.teamId}
