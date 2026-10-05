@@ -5,7 +5,7 @@ jest.mock("@/lib/shared/i18n-routes", () => ({
 }));
 
 import { NextRequest } from "next/server";
-import { config, middleware } from "@/middleware";
+import { LEGACY_SUSPENSION_NOTICE_PATH, config, middleware } from "@/middleware";
 import { CSP_HEADER, CSP_NONCE_HEADER, PATHNAME_HEADER } from "@/lib/shared/csp";
 import { LOCALE_HEADER } from "@/lib/shared/locales";
 import { SUSPENSION_NOTICE_COOKIE, SUSPENSION_NOTICE_HEADER } from "@/lib/shared/account-suspension";
@@ -124,6 +124,21 @@ describe("middleware — avis de suspension sous /en/connexion", () => {
       expect(setCookie).toMatch(new RegExp(`^${SUSPENSION_NOTICE_COOKIE}=;`));
       expect(setCookie).toMatch(/Path=\/(;|$)/i);
     }
+  });
+
+  it("efface aussi le cookie resté sous l'ancien chemin /connexion, sans perdre les autres effacements", () => {
+    const response = call("/connexion?error=suspended", {
+      headers: { cookie: `${SUSPENSION_NOTICE_COOKIE}=abc; g_state=0` },
+    });
+    const cookies = response.headers.getSetCookie();
+    expect(cookies).toHaveLength(3);
+    expect(cookies.some((c) => /^g_state=;/.test(c))).toBe(true);
+    const notices = cookies.filter((c) => c.startsWith(`${SUSPENSION_NOTICE_COOKIE}=;`));
+    expect(notices.map((c) => /Path=([^;]+)/i.exec(c)?.[1]).sort((a, b) => String(a).localeCompare(String(b)))).toEqual([
+      "/",
+      LEGACY_SUSPENSION_NOTICE_PATH,
+    ]);
+    for (const notice of notices) expect(notice).toMatch(/Max-Age=0/i);
   });
 
   it("ne lit pas le cookie ailleurs que sur la page de connexion", () => {
