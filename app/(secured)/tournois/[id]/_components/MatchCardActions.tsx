@@ -123,9 +123,16 @@ export function MatchCardActions({
 
   const { primary, more } = groupMatchCardActions(actions);
   const hasForce = actions.some((a) => a.id === "force");
+  // Ouvert **et** encore quelque chose à montrer : un instantané du flux qui
+  // retire le panneau ne doit pas le laisser « ouvert » en mémoire, prêt à
+  // reparaître déplié sans clic au retour d'une action.
+  const expanded = open && more.length > 0;
+  // …et l'oublie : sans cette remise à zéro, `open` resterait vrai et le
+  // panneau reviendrait déplié avec la prochaine action secondaire.
+  if (open && more.length === 0) setOpen(false);
 
   useEffect(() => {
-    if (!open) return;
+    if (!expanded) return;
     const onKey = (e: KeyboardEvent) => {
       handleMenuEscape(e.key, document.activeElement, rootRef.current, toggleRef.current, () => setOpen(false));
     };
@@ -138,7 +145,7 @@ export function MatchCardActions({
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onPointer);
     };
-  }, [open]);
+  }, [expanded]);
 
   if (actions.length === 0) return null;
 
@@ -236,7 +243,7 @@ export function MatchCardActions({
       ref={rootRef}
       className={styles.root}
       onBlur={(e) => {
-        if (open && focusLeftMenu(rootRef.current, e.relatedTarget)) setOpen(false);
+        if (expanded && focusLeftMenu(rootRef.current, e.relatedTarget)) setOpen(false);
       }}
     >
       <div className={styles.bar}>
@@ -246,11 +253,11 @@ export function MatchCardActions({
             ref={toggleRef}
             type="button"
             className={`tap-target ${styles.toggle} ${primary ? "" : styles.toggleWide}`}
-            aria-expanded={open}
+            aria-expanded={expanded}
             aria-controls={panelId}
             aria-label={matchCardActionName("Plus d'actions", matchLabel)}
             title={primary ? "Plus d'actions" : undefined}
-            onClick={() => setOpen((v) => !v)}
+            onClick={() => setOpen(!expanded)}
           >
             <Ellipsis size={18} aria-hidden />
             {/* Seul, le bouton dit son nom ; à côté de l'action principale, le
@@ -263,7 +270,7 @@ export function MatchCardActions({
           élément qui existe, et le panneau ne porte que des boutons — seuls
           l'arbitrage et la diffusion en ont plus d'un. */}
       {more.length > 0 && (
-        <div id={panelId} className={styles.panel} hidden={!open}>
+        <div id={panelId} className={styles.panel} hidden={!expanded}>
           {more.map((action) => renderButton(action, true))}
         </div>
       )}
