@@ -1,6 +1,7 @@
 import { describe, expect, it } from "@jest/globals";
 import { contrastRatio, relativeLuminance } from "@/lib/shared/color-contrast";
-import { globals, stripComments } from "./_lib/style-sweep";
+import { join } from "node:path";
+import { globals, ROOT, stripComments, walk } from "./_lib/style-sweep";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -88,6 +89,13 @@ describe("palette néon froid", () => {
 
   it("ne redéfinit pas la classe globale `.tag` du fil d'activité de /bot", () => {
     expect(sheet).not.toMatch(/(^|[\s,}])\.tag\s*[{,]/);
+  });
+
+  it("une pastille qui s'oppose à « blue » prend « neutral », pas la pastille nue désormais bleutée", () => {
+    const offenders = [...walk(join(ROOT, "app"), ".tsx"), ...walk(join(ROOT, "components"), ".tsx")].filter((file) =>
+      /variant=\{[^}]*"blue"[^}]*"default"[^}]*\}|variant=\{[^}]*"default"[^}]*"blue"[^}]*\}/.test(readSource(file)),
+    );
+    expect(offenders).toEqual([]);
   });
 
   it("la pastille d'attente respire, figée par le régime de charge", () => {
