@@ -24,12 +24,14 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
   const mountedAt = useRef<number | null>(null);
 
   useEffect(() => {
+    // Le montage réel, même animations coupées : la fenêtre de départ ne
+    // repart pas du moment où elles reviennent.
+    mountedAt.current ??= performance.now();
     const element = ref.current;
     if (!element || played.current || !decorativeMotion || typeof IntersectionObserver === "undefined") {
       setShown(value);
       return undefined;
     }
-    mountedAt.current ??= performance.now();
     const onScreen = element.getBoundingClientRect().top < window.innerHeight;
     if (!countUpMayStart(onScreen, performance.now() - mountedAt.current)) {
       played.current = true;
