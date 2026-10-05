@@ -90,8 +90,9 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
   colonnes de manche) le referme, focus rendu au bouton : la carte pourrait y
   sortir de la partie visible. Le panneau reste dans le DOM de
   la carte — l'ordre de tabulation suit le bouton — toujours rendu, masqué par
-  `hidden`. La carte n'a plus d'`overflow: hidden` (coins intérieurs arrondis
-  à la main).
+  `hidden` (sa zone défilante n'est montée qu'à l'ouverture). La carte garde
+  son `overflow: hidden` : un descendant en `position: fixed` a son repère
+  hors d'elle, elle ne le rogne pas.
 - Échap referme et rend le focus au bouton (`handleMenuEscape`) ; un clic
   extérieur ou une tabulation qui sort du pied le referme (`focusLeftMenu`).
 - Choisir une action referme le panneau et pose le focus sur « Plus
