@@ -191,3 +191,7 @@ générés sont toujours saisissables dans l'interface.
 Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à chaque session).
 
 - **Format de match** (`lib/shared/match-format.ts`, pur) : chaque tournoi peut fixer un **BO** (best of, nombre impair de manches jouées) ou un **FT** (first to, manches à gagner). Deux colonnes `bg_tournaments.match_format_type` / `match_format_value` (NULL = score libre, comportement des tournois antérieurs). `checkMatchScores` est l'unique implémentation, partagée : l'interface borne les champs et désactive « Gagnant », le serveur refuse en 400 (`SCORE_EXCEEDS_MATCH_FORMAT`, `SCORE_BELOW_MATCH_FORMAT`, `DRAW_NOT_ALLOWED`) dans `reportMatchScore` et dans l'arbitrage. Une sauvegarde intermédiaire ne contrôle que le plafond ; une saisie qui désigne un vainqueur exige un **résultat final**. Le réglage vaut pour **tout** le tournoi, phases comprises — sauf en BG Survie, seul mode à en jouer deux (voir `docs/features/MATCH_DRAWS.md`). Voir `docs/features/MATCH_FORMAT.md`.
+
+## Saisie map par map
+
+Le score contrôlé par `checkMatchScores` peut désormais être **dérivé** d'une liste de maps (map gagnée = un point, map nulle = rien) ; la règle de format est inchangée. Plafond de lignes et codes de replay : [MAP_SCORES.md](./MAP_SCORES.md).
