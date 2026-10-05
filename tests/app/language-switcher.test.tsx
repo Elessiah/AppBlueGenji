@@ -3,13 +3,33 @@ import { describe, expect, it, jest } from "@jest/globals";
 jest.mock("@/lib/shared/i18n-routes", () => ({ MIGRATED_ROUTES: ["/", "/regles", "/regles/[slug]"] }));
 
 let mockPathname: string | null = "/regles";
-jest.mock("next/navigation", () => ({ usePathname: () => mockPathname }));
+let mockQuery = "";
+jest.mock("next/navigation", () => ({
+  usePathname: () => mockPathname,
+  useSearchParams: () => new URLSearchParams(mockQuery),
+}));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { LanguageSwitcher } from "@/components/i18n/LanguageSwitcher";
+import { LanguageSwitcher, switcherHref } from "@/components/i18n/LanguageSwitcher";
 import { renderIntl } from "../helpers/intl";
 
+describe("switcherHref — l'état de la page suit", () => {
+  it("garde la requête et l'ancre, et rien de vide", () => {
+    expect(switcherHref("/en/regles", "mode=duo&x=1", "#bo5")).toBe("/en/regles?mode=duo&x=1#bo5");
+    expect(switcherHref("/en/regles", "")).toBe("/en/regles");
+    expect(switcherHref("/en/regles", "", "#")).toBe("/en/regles");
+    expect(switcherHref("/en/regles", "", "x")).toBe("/en/regles");
+  });
+});
+
 describe("LanguageSwitcher — même page, autre langue", () => {
+  it("reporte la requête de la page", () => {
+    mockPathname = "/regles";
+    mockQuery = "mode=duo";
+    expect(renderIntl(<LanguageSwitcher />)).toContain('href="/en/regles?mode=duo"');
+    mockQuery = "";
+  });
+
   it("mène d'une page française à son équivalent anglais", () => {
     mockPathname = "/regles/swiss";
     const html = renderIntl(<LanguageSwitcher />);
