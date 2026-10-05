@@ -4,6 +4,7 @@ import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { EntityLink, type EntityLinkProps } from "@/components/entity-link";
 import { entrantHref, participantWording, type ParticipantType } from "@/lib/shared/participants";
 import { entrantLogoUrl, type EntrantLogoMap } from "@/lib/shared/entrant-logos";
+import type { SeedMap } from "@/lib/shared/match-sections";
 
 /**
  * Contexte « type de participant » de la page de tournoi.
@@ -22,7 +23,11 @@ type EntrantContextValue = {
   soloUserIds: Record<number, number>;
   /** Logos des engagés, construits depuis les inscrites (`buildEntrantLogoMap`). */
   logos: EntrantLogoMap;
+  /** Têtes de série des engagés (`buildSeedMap`), pour le tri des sections de manche. */
+  seeds?: SeedMap;
 };
+
+const NO_SEEDS: SeedMap = {};
 
 const EntrantContext = createContext<EntrantContextValue>({
   participantType: "TEAM",
@@ -34,11 +39,12 @@ export function EntrantProvider({
   participantType,
   soloUserIds,
   logos,
+  seeds = NO_SEEDS,
   children,
 }: Readonly<EntrantContextValue & { children: ReactNode }>) {
   const value = useMemo(
-    () => ({ participantType, soloUserIds, logos }),
-    [participantType, soloUserIds, logos],
+    () => ({ participantType, soloUserIds, logos, seeds }),
+    [participantType, soloUserIds, logos, seeds],
   );
   return <EntrantContext.Provider value={value}>{children}</EntrantContext.Provider>;
 }
@@ -53,6 +59,11 @@ export function useEntrantLink(): (teamId: number) => string {
 export function useEntrantLogo(teamId: number | null): string | null {
   const { logos } = useContext(EntrantContext);
   return entrantLogoUrl(logos, teamId);
+}
+
+/** Têtes de série des engagés (`teamId` → seed) ; vide hors page de tournoi. */
+export function useEntrantSeeds(): SeedMap {
+  return useContext(EntrantContext).seeds ?? NO_SEEDS;
 }
 
 /** Vocabulaire du type de participant du tournoi affiché. */

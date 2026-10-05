@@ -26,7 +26,7 @@ import { MatchFormatProvider } from "./_lib/match-format-context";
 import { fromBracketMatch } from "@/lib/shared/match-lock";
 import { isViewerEntrant } from "@/lib/shared/match-card-viewer";
 import { canOpenPlayerScoreDialog } from "@/lib/shared/player-score-report";
-import { isPreLaunchState } from "@/lib/shared/seeding";
+import { isPreLaunchState, isSeedOrderEffective } from "@/lib/shared/seeding";
 import {
   planRoundRollback,
   rollbackStageLabelWithArticle,
@@ -55,6 +55,7 @@ import { TournamentLoading } from "./_components/TournamentLoading";
 import { TournamentHeader } from "./_components/TournamentHeader";
 import styles from "./page.module.css";
 import { orReload } from "./_lib/lazy-component";
+import { buildSeedMap } from "@/lib/shared/match-sections";
 
 // Découpage du paquet : un spectateur ne voit qu'un format et n'ouvre presque
 // jamais un dialogue. Les vues propres à un format et les panneaux du staff
@@ -463,6 +464,15 @@ export default function TournamentDetailPage() {
   const entrantLogos = useMemo(
     () => buildEntrantLogoMap(detail?.registrations ?? []),
     [detail?.registrations],
+  );
+  // Têtes de série, pour l'ordre des matchs dans les sections d'une manche
+  // (`lib/shared/match-sections.ts`). Seulement quand la colonne `seed` porte
+  // le vrai ordre (`isSeedOrderEffective`) : sous un seeding par classement,
+  // elle ne garde que l'ordre d'inscription, et départager par elle mentirait.
+  const seedOrderEffective = detail ? isSeedOrderEffective(detail.seedingSource) : false;
+  const entrantSeeds = useMemo(
+    () => buildSeedMap(seedOrderEffective ? (detail?.registrations ?? []) : []),
+    [seedOrderEffective, detail?.registrations],
   );
 
   // Le match est lancé et le lecteur y est engagé : la modale offre la saisie
@@ -912,6 +922,7 @@ export default function TournamentDetailPage() {
       participantType={detail.card.participantType}
       soloUserIds={detail.soloUserIds}
       logos={entrantLogos}
+      seeds={entrantSeeds}
     >
       <MatchAnchorProvider
         targetMatchId={targetMatchId}

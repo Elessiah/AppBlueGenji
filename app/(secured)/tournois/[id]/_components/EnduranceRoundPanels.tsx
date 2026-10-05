@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { BoardPanel, PanelPill } from "./BoardPanel";
 import { MatchRow } from "./MatchRow";
+import { RoundMatchSections } from "./RoundMatchSections";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import {
@@ -122,8 +123,8 @@ export function EnduranceRoundPanels({
               </>
             }
           >
-            <div className={styles.matchGrid}>
-              {section.matches.map((match) => (
+            <RoundMatchSections matches={section.matches} className={styles.matchGrid}>
+              {(match) => (
                 <MatchRow
                   key={match.id}
                   match={match}
@@ -132,8 +133,8 @@ export function EnduranceRoundPanels({
                   scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
                   roundNumber={match.roundNumber}
                 />
-              ))}
-            </div>
+              )}
+            </RoundMatchSections>
           </BoardPanel>
         );
       })}

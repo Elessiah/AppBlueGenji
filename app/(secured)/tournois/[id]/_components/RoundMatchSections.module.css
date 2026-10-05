@@ -1,0 +1,44 @@
+/*
+ * Sections d'état d'une manche : un filet discret titré, jamais un volet
+ * (`docs/features/ROUND_MATCH_SECTIONS.md`).
+ *
+ * Le filet est un frère des cartes dans le conteneur de la vue (grille en
+ * `flex-wrap` ou colonne) : `width: 100%` lui donne sa propre ligne dans la
+ * grille, sans rien changer dans une colonne.
+ */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  margin: 4px 0 0;
+}
+
+.divider:first-child {
+  margin-top: 0;
+}
+
+/* Le libellé peut passer à la ligne : une colonne de manche fait 210 px. */
+.label {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+
+.rule {
+  flex: 1;
+  min-width: 12px;
+  height: 1px;
+  background: var(--line-soft);
+}
