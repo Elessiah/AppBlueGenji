@@ -34,7 +34,9 @@ describe("middleware — exposé d'une suspension lu une seule fois", () => {
     const setCookie = response.headers.get("set-cookie") ?? "";
     expect(setCookie).toMatch(new RegExp(`^${SUSPENSION_NOTICE_COOKIE}=;`));
     expect(setCookie).toMatch(/Max-Age=0/i);
-    expect(setCookie).toMatch(/Path=\/connexion/i);
+    // Même chemin que celui de la pose (`oauth-flow.ts`), sans quoi
+    // l'effacement viserait un autre cookie.
+    expect(setCookie).toMatch(/Path=\/(;|$)/i);
     // La page le reçoit par un en-tête de requête, que l'effacement ne touche pas.
     expect(response.headers.get(`x-middleware-request-${SUSPENSION_NOTICE_HEADER}`)).toBe("abc");
   });
