@@ -39,7 +39,7 @@
 
 .accent {
   display: inline-block;
-  background: linear-gradient(180deg, var(--blue-300), var(--blue-500));
+  background: var(--grad-brand);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -89,7 +89,58 @@
 .sep {
   width: 1px;
   height: 32px;
-  background: var(--line-soft);
+  background: linear-gradient(180deg, rgba(var(--blue-500-rgb), 0.5), rgba(var(--violet-400-rgb), 0.5));
+}
+
+/* Chiffres du hero : dégradé de marque, largeur réservée par `CountUp`. */
+.statValue {
+  align-self: flex-start;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+/* Éclats lumineux du hero : deux halos (bleu, violet) qui dérivent lentement.
+   Dégradés radiaux sans `filter: blur` (coûteux), animés en transform seul ;
+   l'animation infinie lit `--deco-anim-state` (régime de charge, mouvement
+   réduit, menu d'accessibilité). */
+.glints {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.glint {
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  border-radius: 50%;
+  animation: hero-glint-drift 18s ease-in-out infinite alternate;
+  animation-play-state: var(--deco-anim-state);
+}
+
+.glintBlue {
+  top: -180px;
+  left: -120px;
+  background: radial-gradient(circle, rgba(var(--cyan-400-rgb), 0.22), transparent 65%);
+}
+
+.glintViolet {
+  top: 40px;
+  right: -160px;
+  background: radial-gradient(circle, rgba(var(--violet-400-rgb), 0.24), transparent 65%);
+  animation-duration: 22s;
+  animation-direction: alternate-reverse;
+}
+
+@keyframes hero-glint-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  to {
+    transform: translate3d(60px, 40px, 0) scale(1.12);
+  }
 }
 
 .right {

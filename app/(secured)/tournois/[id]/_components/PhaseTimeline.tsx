@@ -91,7 +91,7 @@ export function PhaseTimeline({
                   et le rouge est réservé à ce qui est réellement à l'antenne
                   (CLAUDE.md, « trois sens de live »). */}
               <Pill
-                variant={isCurrent ? "blue" : "default"}
+                variant={isCurrent ? "blue" : "neutral"}
                 style={{ fontSize: 11, padding: "2px 8px" }}
               >
                 {state}

@@ -305,7 +305,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
           <div className={styles.cardTags}>
             <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
-            {!ad.active && <Pill>Inactif</Pill>}
+            {!ad.active && <Pill variant="neutral">Inactif</Pill>}
             {/* Le statut ne se lit publiquement que par ses effets (pastille,
                 section) : la gestion, elle, a besoin de le voir nommé. */}
             {isAdmin && (

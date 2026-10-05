@@ -1,5 +1,8 @@
 .root {
-  background: linear-gradient(180deg, var(--cyber-bg-1), var(--cyber-bg));
+  /* Un voile bleu à peine perceptible en tête : la carte n'est plus un bloc gris. */
+  background:
+    radial-gradient(120% 60% at 0% 0%, rgba(var(--blue-500-rgb), 0.06), transparent 60%),
+    linear-gradient(180deg, var(--cyber-bg-1), var(--cyber-bg));
   border: 1px solid var(--line-soft);
   border-radius: var(--r-cy-lg);
   position: relative;
@@ -7,9 +10,33 @@
 }
 
 .lift {
-  transition: border-color 0.2s ease, transform 0.2s ease;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.lift:hover {
-  border-color: rgba(90, 200, 255, 0.3);
+/* Survol : la carte grandit à peine (transform seul, rien ne bouge autour) et
+   s'éclaire d'un halo bleu → violet. Un agrandissement et non une translation :
+   la carte ne quitte jamais le pointeur posé sur son bord, qui la ferait
+   retomber puis remonter en boucle. Pointeur fin seulement : au toucher, le
+   survol resterait collé après le tapotement. */
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    border-color: rgba(90, 200, 255, 0.45);
+    transform: scale(1.012);
+    box-shadow:
+      0 0 0 1px rgba(var(--blue-500-rgb), 0.2),
+      0 16px 40px -18px rgba(var(--violet-400-rgb), 0.5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lift,
+  .lift:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* « Réduire les animations » du menu d'accessibilité : même effet. */
+:global(:root[data-a11y~="motion"]) .lift:hover {
+  transform: none;
 }

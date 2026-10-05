@@ -7,14 +7,61 @@ Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à c
 La refonte « Cyber minimal » est complète (Phases 1–7). Design final : noir profond teinté cool, bleu glacier `#5ac8ff`, typographie Inter / JetBrains Mono / Orbitron, glow paramétrable.
 
 ### Tokens CSS
-- **Cyber tokens** : `--cyber-bg`, `--cyber-bg-1`, `--cyber-bg-2`, `--cyber-bg-3`, `--ink`, `--ink-mute`, `--ink-dim` (texte le plus atténué, ≥ 4,5:1), `--ink-faint` (ornements seulement, jamais un texte à lire), `--blue-100`–`--blue-700`, `--blue-glow`, `--amber`, `--red-live` (+ `--amber-rgb`, `--red-live-rgb` pour les voiles translucides), `--line-soft`, `--line-strong-cy`, `--r-cy-sm/md/lg`
+- **Cyber tokens** : `--cyber-bg`, `--cyber-bg-1`, `--cyber-bg-2`, `--cyber-bg-3`, `--ink`, `--ink-mute`, `--ink-dim` (texte le plus atténué, ≥ 4,5:1), `--ink-faint` (ornements seulement, jamais un texte à lire), `--blue-100`–`--blue-700`, `--blue-glow`, `--amber` (existant seulement, voir plus bas), `--red-live` (+ `--amber-rgb`, `--red-live-rgb` pour les voiles translucides), `--line-soft`, `--line-strong-cy`, `--r-cy-sm/md/lg`
+- **Néons froids** (2026-10) : `--cyan-400`, `--violet-300`, `--violet-400`, `--pink-400`, `--teal-400` (+ `-rgb`), `--grad-brand` (cyan → glacier → violet), `--grad-brand-soft`, `--glow-blue`, `--glow-violet` — voir § Palette « néon froid »
 - **Legacy tokens** conservés pour retrocompatibilité : `--bg-0`–`--bg-2`, `--text-0`–`--text-2`, `--accent-blue/orange/green`, `--radius`, `--shadow`
+
+### Palette « néon froid » (2026-10)
+
+Demande : un site plus lumineux, « qui fasse rêver » côté jeu, sans dégradés de gris tristes. Contraintes de marque : base noire à reflets bleutés, **le bleu glacier `#5ac8ff` reste l'accent de marque**, **aucune teinte chaude** (ambre, orange, rouille — déjà refusées). Le rouge reste réservé à ce qui est vraiment à l'antenne (`.pill-live`).
+
+- **Règle « jamais tout gris »** : un texte secondaire est teinté de bleu froid (composante bleue > rouge d'au moins 16), jamais un gris neutre ; une pastille, un badge ou une étiquette choisit une **variante sémantique** — le neutre seulement pour ce qui l'est vraiment.
+- **Dégradé de marque** `--grad-brand` sur la chute des titres (`.text-gradient`, accent du hero), les traits d'accent (`.eyebrow::before`, `.section-head::before`, titres de section de l'accueil), et le bouton principal (glacier → cyan, texte sombre).
+- **Halos** colorés (`--glow-blue`, `--glow-violet`) : `box-shadow` statiques ou au survol ; aucune `filter: blur` ni `backdrop-filter` ajoutée. Toute animation infinie lit `var(--deco-anim-state)` (`CLIENT_POWER_MODES.md`).
+- **Survol** : `.hover-lift`, `CyberCard lift` et `CyberButton` grandissent à peine (`scale`, aucun décalage de mise en page ; pas de translation, qui clignote sous un pointeur posé sur le bord), neutralisé sous `prefers-reduced-motion` et `data-a11y~="motion"`.
+
+#### Contrastes (WCAG 2.x, vérifiés par `tests/app/neon-palette.test.ts`, `lib/shared/color-contrast.ts`)
+
+| Jeton | Valeur | sur `--cyber-bg-3` `#161a22` | sur `--cyber-bg` `#05060a` |
+| --- | --- | --- | --- |
+| `--ink` | `#eaf4ff` | 15,67 | 18,21 |
+| `--text-1` | `#c8d8ec` | 12,02 | 13,97 |
+| `--ink-mute` | `#a3bcd8` | 8,91 | 10,36 |
+| `--text-2` | `#93a8c6` | 7,18 | 8,35 |
+| `--ink-dim` | `#859dbb` | 6,26 | 7,27 |
+| `--ink-faint` (ornement, pas un texte) | `#55698a` | 3,13 | 3,64 |
+| `--cyan-400` | `#3ee6ff` | 11,59 | 13,47 |
+| `--blue-500` | `#5ac8ff` | 9,25 | 10,74 |
+| `--violet-300` | `#c4b5fd` | 9,44 | 10,97 |
+| `--violet-400` | `#a78bfa` | 6,40 | 7,44 |
+| `--pink-400` | `#f78ad8` | 7,95 | 9,24 |
+| `--teal-400` | `#3ee8b0` | 11,10 | 12,90 |
+
+Contraste renforcé (`data-a11y~="contrast"`) : `--ink-mute` `#c4d4e6` (11,54), `--ink-dim` / `--ink-faint` `#a6b9d0` (8,69), `--text-1` `#e3ecf7`, `--text-2` `#bccbdf` — toujours au-dessus des valeurs par défaut (`accessibility-styles.test.ts`).
+
+#### Pastilles et étiquettes — variantes
+
+`.pill` (mono, capitales) et `.cy-tag` (sans-serif, 12 px ; préfixé car `.tag` sert déjà au fil d'activité de `/bot`) nus sont bleutés. Variantes, communes aux deux (`.pill-*` / `.cy-tag-*`) et au composant `<Pill variant>` (`pillVariantClass`) :
+
+| Variante | Couleur du texte | Sens |
+| --- | --- | --- |
+| `info` (et `blue`, historique) | `--blue-300` | information, en cours |
+| `accent` | `--violet-300` | mise en avant, état d'un tournoi |
+| `success` | `--teal-400` | réussite, validé |
+| `highlight` | `--pink-400` | rehaut ponctuel |
+| `neutral` | `--ink-mute` | vraiment neutre |
+| `waiting` | `--violet-300` + halo qui respire | « En attente de lancement » |
+| `live` | `--red-live` | **seulement** une vraie diffusion |
+
+La pastille nue étant désormais bleutée, une pastille qui **oppose** un état à `blue` (« À jour » / « Hors ligne », phase courante / autres, « Disponible » / « Bientôt », « Inactif ») prend `neutral` pour l'état éteint — sinon les deux se confondent (`tests/app/neon-palette.test.ts`).
+
+`--amber` n'entre dans aucune nouvelle règle ; ses usages existants (avertissements, retour en arrière, « Urgente ») migrent dans les lots suivants (`LANDING_ANIMATIONS.md` § Lots suivants).
 
 ### Composants
 Primitives dans `components/cyber/` :
 - **CyberButton** — `variant="primary"|"ghost"`, support `asChild` (Radix Slot)
 - **CyberCard** — `lift`, `ticks`, `as="div|section|article"`, style personnalisé
-- **Pill** — badges inline, variantes `.pill-live`, `.pill-blue`
+- **Pill** — badges inline, variantes sémantiques (§ Pastilles et étiquettes)
 - **CyberButton, TeamSigil, CountdownStrip, Ticker, MiniBracket** — composants spécialisés
 - **ScrollArea** — `orientation="x"|"y"|"both"`, `subtle`, `fade`, `ariaLabel`
 - **PublicHeader, PublicFooter** — layouts publics de landing

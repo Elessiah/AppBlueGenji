@@ -7,6 +7,7 @@ import type { TournamentCard } from "@/lib/shared/types";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import { DiscordCommunity } from "./DiscordCommunity";
 import { LiveCard } from "./LiveCard";
+import { CountUp } from "./CountUp";
 import { useLandingLive } from "./useLandingLive";
 import { EditableCopy } from "./EditableCopy";
 import type { SiteCopy } from "@/lib/shared/site-copy";
@@ -39,6 +40,11 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
   return (
     <section className={styles.root}>
       <div className="fabric" />
+      {/* Éclats lumineux qui dérivent derrière le hero : purement décoratifs. */}
+      <div className={styles.glints} aria-hidden="true">
+        <span className={`${styles.glint} ${styles.glintBlue}`} />
+        <span className={`${styles.glint} ${styles.glintViolet}`} />
+      </div>
       <div className={styles.inner}>
         <div className={styles.left}>
           <EditableCopy copyKey="home.hero.eyebrow" value={copy["home.hero.eyebrow"]} canEdit={canEditCopy}>
@@ -91,17 +97,17 @@ export function Hero({ stats, live: initialLive, nextUpcoming, copy, canEditCopy
 
           <div className={styles.stats}>
             <div className={styles.stat}>
-              <div className="num" style={{ fontSize: 28, color: "var(--blue-500)" }}>{stats.players}</div>
+              <CountUp value={stats.players} className={`num text-gradient ${styles.statValue}`} />
               <div className="mono">Joueurs inscrits</div>
             </div>
             <span className={styles.sep} />
             <div className={styles.stat}>
-              <div className="num" style={{ fontSize: 28, color: "var(--blue-500)" }}>{stats.teams}</div>
+              <CountUp value={stats.teams} className={`num text-gradient ${styles.statValue}`} />
               <div className="mono">Équipes actives</div>
             </div>
             <span className={styles.sep} />
             <div className={styles.stat}>
-              <div className="num" style={{ fontSize: 28, color: "var(--blue-500)" }}>{LEGACY_TOURNAMENT_COUNT + stats.tournaments}</div>
+              <CountUp value={LEGACY_TOURNAMENT_COUNT + stats.tournaments} className={`num text-gradient ${styles.statValue}`} />
               <div className="mono">Tournois organisés</div>
             </div>
           </div>

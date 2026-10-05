@@ -101,7 +101,7 @@ export function isFeaturedMatchPhase(phase: MatchLaunchPhase): phase is Featured
 }
 
 /** Teinte de la pastille d'état du match : le rouge est réservé à l'antenne. */
-export type FeaturedMatchPillTone = "live" | "blue" | "default";
+export type FeaturedMatchPillTone = "live" | "blue" | "waiting";
 
 /**
  * Pastille d'état **du match** mis en avant — jamais celle du tournoi. `when` :
@@ -120,8 +120,8 @@ export const FEATURED_TOURNAMENT_STATE_LABEL = "Tournoi en cours";
  * - à l'antenne (`liveState === "LIVE"`) : « En direct », en rouge ;
  * - lancé : « En cours » ;
  * - heure venue : « Lancement » ;
- * - daté : « En attente de lancement », horaire dans `when` — aucune autre
- *   ligne ne le redit.
+ * - daté : « En attente de lancement », en violet qui respire (`waiting`),
+ *   horaire dans `when` — aucune autre ligne ne le redit.
  *
  * La phase est figée au rendu serveur, et seule l'horloge fait passer un match
  * daté en lancement : sans relecture, la carte attendrait le sondage suivant.
@@ -138,7 +138,7 @@ export function featuredMatchPill(
     return { label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null };
   }
   const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now ?? Date.now());
-  return { label: MATCH_SECTION_LABELS.WAITING, tone: "default", when: when || null };
+  return { label: MATCH_SECTION_LABELS.WAITING, tone: "waiting", when: when || null };
 }
 
 function startTime(iso: string | null): number {
