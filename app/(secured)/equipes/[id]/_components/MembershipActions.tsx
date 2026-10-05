@@ -231,7 +231,7 @@ export function MembershipActions({ team, requests, onChanged, onRequestsChanged
 
       {team.canManage && requests.length > 0 && (
         <section className={`ds-block ${styles.block}`} aria-labelledby="team-requests-title">
-          <div className="ds-section-title orange">
+          <div className="ds-section-title purple">
             <h2 id="team-requests-title">Demandes d&apos;adhésion ({requests.length})</h2>
           </div>
           <ul className={styles.pendingList}>

@@ -36,7 +36,7 @@ export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
   }
 
   return (
-    <div className="ds-header orange">
+    <div className="ds-header purple">
       <div className="ds-header-body">
         <div className={headerStyles.top}>
           <div className={headerStyles.identity}>
@@ -56,7 +56,7 @@ export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
               </div>
             )}
             <div className={headerStyles.titles}>
-              <h1 className={`ds-title orange ${headerStyles.name}`}>
+              <h1 className={`ds-title purple ${headerStyles.name}`}>
                 {team.team.name}
                 {team.team.isGhost && (
                   <span className={`mono ${headerStyles.ghostBadge}`} title="Équipe fantôme, créée par le staff">
@@ -91,7 +91,7 @@ export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
 
         <div className={`ds-stats ${headerStyles.stats}`}>
           {stats.map((stat) => (
-            <div key={stat.label} className="ds-stat orange">
+            <div key={stat.label} className="ds-stat purple">
               <div className="ds-stat-label">{stat.label}</div>
               <div className="ds-stat-value">{stat.value}</div>
             </div>

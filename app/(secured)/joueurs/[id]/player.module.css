@@ -26,6 +26,13 @@
   overflow-wrap: anywhere;
 }
 
+/* Dégradé du pseudo : glacier puis violet néon (`.ds-title.blue` finissait en
+   bleu uni). Trois sélecteurs pour passer devant `.ds-title.blue`. */
+.titles h1.name {
+  --title-rgb-a: var(--blue-500-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
+}
+
 .back {
   padding: 9px 18px;
   font-size: 13px;

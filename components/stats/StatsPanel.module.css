@@ -5,8 +5,8 @@
   gap: 26px;
 }
 
-.panel.orange {
-  --stats-accent: var(--orange-rgb);
+.panel.violet {
+  --stats-accent: var(--violet-400-rgb);
 }
 
 .grid {
@@ -111,7 +111,7 @@
  * réclamer l'attention.
  */
 .formDraw {
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--blue-500-rgb), 0.08);
   border-color: var(--line-soft);
   color: var(--text-2);
 }
@@ -144,7 +144,7 @@
 .splitTrack {
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(var(--blue-500-rgb), 0.08);
   overflow: hidden;
   display: flex;
 }

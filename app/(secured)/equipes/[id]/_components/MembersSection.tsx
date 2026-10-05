@@ -95,7 +95,7 @@ export function MembersSection({
         className={`ds-block ${styles.block} ${canManage ? styles.overflowBlock : ""}`}
         aria-labelledby="team-members-title"
       >
-        <div className={`ds-section-title orange ${styles.sectionHead}`}>
+        <div className={`ds-section-title purple ${styles.sectionHead}`}>
           <h2 id="team-members-title">Membres</h2>
           <span className={styles.count}>
             {members.length} {members.length > 1 ? "joueurs" : "joueur"}

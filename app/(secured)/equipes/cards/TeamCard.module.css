@@ -13,7 +13,8 @@
 }
 
 .card:hover {
-  border-color: rgba(255, 157, 46, 0.3);
+  border-color: rgba(var(--violet-400-rgb), 0.45);
+  box-shadow: var(--glow-violet);
   transform: translateY(-2px);
 }
 
@@ -23,7 +24,7 @@
   position: absolute;
   width: 8px;
   height: 8px;
-  border: 1px solid #ff9d2e;
+  border: 1px solid var(--violet-400);
   opacity: 0.3;
   pointer-events: none;
 }
@@ -56,10 +57,12 @@
   border-radius: 999px;
 }
 
+/* Podium : rehaut rose (`highlight`), distinct du violet de la section. */
 .rank.rankTop {
-  color: #ff9d2e;
-  border-color: rgba(255, 157, 46, 0.4);
-  background: rgba(var(--orange-rgb), 0.05);
+  color: var(--pink-400);
+  border-color: rgba(var(--pink-400-rgb), 0.45);
+  background: rgba(var(--pink-400-rgb), 0.08);
+  box-shadow: 0 0 12px rgba(var(--pink-400-rgb), 0.22);
 }
 
 .head {
@@ -88,13 +91,13 @@
   height: 56px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--c, #ff9d2e);
-  color: var(--c, #ff9d2e);
+  border: 1px solid var(--c, var(--violet-400));
+  color: var(--c, var(--violet-400));
   border-radius: 8px;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: 26px;
-  background: color-mix(in oklab, var(--c, #ff9d2e) 10%, transparent);
+  background: color-mix(in oklab, var(--c, var(--violet-400)) 10%, transparent);
   flex-shrink: 0;
   position: relative;
 }
@@ -122,7 +125,7 @@
   content: "";
   position: absolute;
   inset: -3px;
-  border: 1px solid color-mix(in oklab, var(--c, #ff9d2e) 30%, transparent);
+  border: 1px solid color-mix(in oklab, var(--c, var(--violet-400)) 30%, transparent);
   border-radius: 10px;
   pointer-events: none;
   transition: border-color 0.2s;
@@ -132,7 +135,7 @@
    ne survole jamais l'emblème lui-même. C'est donc le survol de la carte qui
    allume son halo — la carte réagit d'un bloc, puisqu'elle est un seul lien. */
 .card:hover .sigil::after {
-  border-color: color-mix(in oklab, var(--c, #ff9d2e) 60%, transparent);
+  border-color: color-mix(in oklab, var(--c, var(--violet-400)) 60%, transparent);
 }
 
 .name {
@@ -157,12 +160,12 @@
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.2em;
-  color: #ff9d2e;
+  color: var(--violet-300);
   text-transform: uppercase;
 }
 
 /* Équipe fantôme (créée par le staff, sans joueur) : marqueur neutre, distinct
-   de l'accent orange des équipes réelles. */
+   de l'accent violet des équipes réelles. */
 .ghostBadge {
   display: inline-block;
   margin-left: 8px;
@@ -172,7 +175,7 @@
   font-weight: 400;
   letter-spacing: 0.18em;
   color: var(--ink-mute);
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(var(--blue-500-rgb), 0.04);
   border: 1px solid var(--line-soft);
   border-radius: 999px;
   padding: 2px 7px;
@@ -217,7 +220,7 @@
 }
 
 .statVal.win {
-  color: #4fe0a2;
+  color: var(--teal-400);
 }
 
 .statVal.loss {
@@ -281,9 +284,9 @@
 }
 
 .rosterItem.avatarMore {
-  background: rgba(var(--orange-rgb), 0.08);
-  border-color: rgba(255, 157, 46, 0.25);
-  color: #ff9d2e;
+  background: rgba(var(--violet-400-rgb), 0.08);
+  border-color: rgba(var(--violet-400-rgb), 0.25);
+  color: var(--violet-300);
 }
 
 .games {
@@ -306,15 +309,15 @@
 }
 
 .gamePill.ow {
-  color: #5ac8ff;
+  color: var(--blue-500);
   border-color: rgba(90, 200, 255, 0.25);
   background: rgba(var(--blue-500-rgb), 0.05);
 }
 
 .gamePill.mr {
-  color: #a773ff;
-  border-color: rgba(167, 115, 255, 0.25);
-  background: rgba(var(--purple-rgb), 0.05);
+  color: var(--violet-400);
+  border-color: rgba(var(--violet-400-rgb), 0.25);
+  background: rgba(var(--violet-400-rgb), 0.05);
 }
 
 .foot {
@@ -337,9 +340,9 @@
   font-family: var(--font-sans);
   font-size: 12px;
   font-weight: 500;
-  color: #ff9d2e;
-  background: rgba(var(--orange-rgb), 0.06);
-  border: 1px solid rgba(255, 157, 46, 0.25);
+  color: var(--violet-300);
+  background: rgba(var(--violet-400-rgb), 0.06);
+  border: 1px solid rgba(var(--violet-400-rgb), 0.25);
   padding: 7px 12px;
   border-radius: var(--r-cy-sm);
   cursor: pointer;
@@ -350,8 +353,8 @@
    lui-meme, c'est donc le survol de la carte qui l'allume. Plus juste, du
    reste — cliquer n'importe ou sur la carte fait ce que le bouton annonce. */
 .card:hover .cta {
-  background: rgba(255, 157, 46, 0.12);
-  border-color: rgba(255, 157, 46, 0.45);
+  background: rgba(var(--violet-400-rgb), 0.12);
+  border-color: rgba(var(--violet-400-rgb), 0.45);
 }
 
 .form {
@@ -386,11 +389,11 @@
 }
 
 .formCell.w {
-  background: #4fe0a2;
+  background: var(--teal-400);
 }
 
 .formCell.l {
-  background: rgba(255, 77, 94, 0.7);
+  background: rgba(var(--pink-400-rgb), 0.75);
 }
 
 .formCell.d {

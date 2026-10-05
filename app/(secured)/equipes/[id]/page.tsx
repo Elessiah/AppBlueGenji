@@ -72,10 +72,10 @@ export default function TeamDetailPage() {
       {team.canManage ? <TeamSettings team={team} onChanged={refresh} /> : null}
 
       <section className={`ds-block ${styles.block}`} aria-labelledby="team-stats-title">
-        <div className="ds-section-title orange">
+        <div className="ds-section-title purple">
           <h2 id="team-stats-title">Statistiques</h2>
         </div>
-        <StatsPanel stats={team.stats} accent="orange" ranking={team.ranking} />
+        <StatsPanel stats={team.stats} accent="violet" ranking={team.ranking} />
       </section>
 
       <TeamHistory tournaments={team.tournaments} />

@@ -93,7 +93,7 @@ export function TeamSettings({ team, onChanged }: Readonly<TeamSettingsProps>) {
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby="team-settings-title">
       {cropDialog}
-      <div className="ds-section-title orange">
+      <div className="ds-section-title purple">
         <h2 id="team-settings-title">Paramètres de l&apos;équipe</h2>
       </div>
 
