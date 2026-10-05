@@ -24,7 +24,7 @@ const CASES = [
   },
   {
     file: "MatchPlanningPanel.tsx",
-    reset: "if (confirmEnable && enabled) setConfirmEnable(false);",
+    reset: "if (confirmEnable && (enabled || !toggleable)) setConfirmEnable(false);",
     guard: "{confirmEnable && !enabled && (",
     opener: "setConfirmEnable(true)",
     openers: /setConfirmEnable\(true\)/g,
