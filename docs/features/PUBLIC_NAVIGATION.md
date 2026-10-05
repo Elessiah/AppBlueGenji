@@ -32,7 +32,10 @@ du pied de page (`components/cyber/landing/PublicFooter.tsx`).
 `--violet-400-rgb`), Tournois (vert d'eau `--teal-400-rgb`), **Classement**
 (`/classement`, rose `--pink-400-rgb`). Chaque lien a sa propre teinte, jamais
 chaude (ni rouge du direct, ni ambre, ni `--result-loss`), et porte
-`aria-current="page"` sur sa section (`isNavLinkActive`). En mobile (≤ 720 px)
+`aria-current="page"` sur sa section (`isNavLinkActive`). `/classement` est une
+page publique (hors `(secured)`) : on y arrive sous l'en-tête vitrine, la
+barre des connectés n'y est pas rendue — son `aria-current` ne s'allume donc
+que si la page passe un jour sous cette barre. En mobile (≤ 720 px)
 les liens passent sur une seconde ligne qui se replie : pas de menu à part.
 Entre 721 et 1000 px, les quatre liens tiennent dans leur tiers de grille par
 un interlettrage resserré (0,08 em) et, en dernier recours, passent à la ligne

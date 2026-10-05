@@ -86,11 +86,11 @@ départages ci-dessus tranchent, comme sur la page.
 - **Rangs absolus, coût de lecture.** Le rang dépend de l'ordre complet
   (rejeu de toute l'histoire des matchs puis tri `compareRankedTeams`, avec
   départage par nom fait en JavaScript) : il ne peut pas se couper en SQL.
-  `loadLeaderboardRows(game, n + 1)` rejoue et trie donc toutes les équipes,
-  puis ne garde que les `n + 1` premières (la `+ 1` dit s'il en reste) : la
-  tendance, le rendu et le poids de la page ne portent que sur les lignes
-  affichées, et le rang reste celui du classement complet d'une page à
-  l'autre.
+  `loadLeaderboardRows(game)` rejoue (sous `ranking-cache`) et trie donc
+  toutes les équipes ; la page en tire « il en reste » et la présence d'un
+  nul (colonne « N » stable d'une page à l'autre, `anyDraws`), puis ne rend
+  que les `n` premières : le rendu et le poids de la page sont bornés, et le
+  rang reste celui du classement complet.
 - **Comment marche la cote** : trois cartes dérivées des constantes
   (`RANKING_BASE_POINTS`, `RANKING_FLOOR_POINTS`), puis deux appels à
   l'action (`/tournois`, `/regles`).
