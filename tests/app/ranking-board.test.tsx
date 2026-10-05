@@ -97,6 +97,12 @@ describe("podiumGapText", () => {
     expect(podiumGapText([{ points: 500 }, { points: 500 }], 1)).toBe("À égalité avec la tête");
   });
 
+  it("dit l'égalité avec le rang au-dessus plutôt qu'un écart nul", () => {
+    expect(podiumGapText([{ points: 600 }, { points: 580 }, { points: 580 }], 2)).toBe(
+      "À 20 pts de la tête · à égalité avec le rang au-dessus",
+    );
+  });
+
   it("ajoute l'écart au rang au-dessus quand il diffère de celui à la tête", () => {
     expect(podiumGapText([{ points: 600 }, { points: 560 }, { points: 540 }], 2)).toBe(
       "À 60 pts de la tête · 20 du rang au-dessus",

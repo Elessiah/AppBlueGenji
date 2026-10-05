@@ -386,17 +386,18 @@ describe("getTeamRankingPosition", () => {
     expect(ranking.position).toBe(rows.findIndex((row) => row.teamId === 3) + 1);
   });
 
-  it("donne le même rang à deux équipes à égalité de cote", async () => {
-    // Deux paires symétriques : 1 et 3 finissent exactement à la même cote.
+  it("départage deux équipes à égalité de cote comme /classement", async () => {
+    // Deux paires symétriques : 1 et 3 finissent exactement à la même cote ;
+    // le nom tranche, comme dans la liste affichée.
     await mockDb(
       fakeDb(
         [matchRow(1, 1, 2, 1), matchRow(2, 3, 4, 3)],
-        [teamRow(1), teamRow(2), teamRow(3), teamRow(4)],
+        [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Charlie"), teamRow(4, "Delta")],
       ),
     );
 
     expect((await getTeamRankingPosition(1)).position).toBe(1);
-    expect((await getTeamRankingPosition(3)).position).toBe(1);
+    expect((await getTeamRankingPosition(3)).position).toBe(2);
   });
 
   // Retour du 2026-10-05 : la place de la fiche se compte sur la même liste
