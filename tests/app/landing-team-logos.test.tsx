@@ -127,6 +127,8 @@ function match(overrides: Partial<LandingLiveMatch> = {}): LandingLiveMatch {
     matchFormat: null,
     liveState: "OFF",
     liveUrl: null,
+    launchPhase: "LAUNCHED",
+    startAt: null,
     ...overrides,
   };
 }

@@ -67,6 +67,8 @@ function match(roundLabel: string, matchFormat: MatchFormat | null = null): Land
     matchFormat,
     liveState: "OFF",
     liveUrl: null,
+    launchPhase: "LAUNCHED",
+    startAt: null,
   };
 }
 

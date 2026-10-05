@@ -31,6 +31,15 @@ type LiveResponse = {
  */
 export function useLandingLive(initialLive: LandingLive | null): LandingLive | null {
   const [live, setLive] = useState<LandingLive | null>(initialLive);
+  // Un nouveau rendu serveur (`router.refresh()`, retour sur l'accueil gardé
+  // monté) apporte une valeur plus fraîche que le dernier sondage : sans cette
+  // reprise, `useState` gardait la première jusqu'au passage suivant, cinq
+  // minutes plus tard.
+  const [seenInitial, setSeenInitial] = useState(initialLive);
+  if (seenInitial !== initialLive) {
+    setSeenInitial(initialLive);
+    setLive(initialLive);
+  }
 
   useAutoRefresh(
     async (signal) => {

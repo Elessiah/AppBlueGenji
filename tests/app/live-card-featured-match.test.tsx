@@ -1,4 +1,6 @@
 import { describe, expect, it } from "@jest/globals";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { LiveCard } from "@/components/cyber/landing/LiveCard";
 import type { LandingLive, LandingLiveMatch } from "@/lib/shared/landing";
@@ -61,6 +63,8 @@ function match(overrides: Partial<LandingLiveMatch> = {}): LandingLiveMatch {
     matchFormat: null,
     liveState: "OFF",
     liveUrl: null,
+    launchPhase: "LAUNCHED",
+    startAt: null,
     ...overrides,
   };
 }
@@ -205,5 +209,32 @@ describe("LiveCard — plus aucune donnée inventée", () => {
     // casté, trois lignes plus bas.
     expect(render(live())).not.toContain("pill-live");
     expect(render(live())).toContain("pill-blue");
+  });
+});
+
+describe("LiveCard — match mis en avant pas encore commencé", () => {
+  it("annonce l'horaire d'un match daté plutôt que de le présenter comme joué", () => {
+    const html = render(
+      live({ currentMatch: match({ launchPhase: "SCHEDULED", startAt: "2099-03-04T19:30:00.000Z" }) }),
+    );
+    expect(text(html)).toContain("Prochain match · 4 mars 2099 · 20:30");
+  });
+
+  it("dit « Lancement » quand l'heure du match est venue", () => {
+    expect(text(render(live({ currentMatch: match({ launchPhase: "LOBBY" }) })))).toContain("Lancement");
+  });
+
+  it("relit l'horloge pour un match daté seulement, par `useClock`", () => {
+    // Le passage « Prochain match » → « Lancement » ne vient que de l'horloge :
+    // sans relecture, l'ancien libellé tiendrait jusqu'au sondage (5 min).
+    const source = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
+    expect(source).toMatch(/useClock\(LIVE_CARD_CLOCK_MS, live\?\.currentMatch\?\.launchPhase === "SCHEDULED"\)/);
+    expect(source).toContain("featuredMatchStatusLabel(currentMatch, clock)");
+  });
+
+  it("n'ajoute rien à un match lancé", () => {
+    const html = text(render(live()));
+    expect(html).not.toContain("Prochain match");
+    expect(html).not.toContain("Lancement");
   });
 });

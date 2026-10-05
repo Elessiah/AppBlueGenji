@@ -269,7 +269,7 @@ export async function syncVisibleTournaments(): Promise<void> {
       publishUpdatedEvent(id);
     }
     for (const id of launchIds) {
-      publishMatchUpdatedEvent(id);
+      publishMatchUpdatedEvent(id, { landingLive: true });
     }
   })();
 

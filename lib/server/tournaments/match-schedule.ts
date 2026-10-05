@@ -176,6 +176,6 @@ export async function setMatchStartAt(
     return written.tournamentId;
   });
 
-  publishMatchUpdatedEvent(tournamentId, { onAir: true });
+  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return startAt;
 }

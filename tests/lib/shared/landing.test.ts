@@ -3,6 +3,9 @@ import {
   activeTournamentCards,
   chooseFeaturedTournament,
   compareByStartAt,
+  featuredMatchStatusLabel,
+  pickFeaturedMatchIndex,
+  type FeaturedMatchCandidate,
   visibleLiveViewerCount,
 } from "@/lib/shared/landing";
 import type { TournamentBuckets, TournamentCard, TournamentState } from "@/lib/shared/types";
@@ -185,5 +188,72 @@ describe("compareByStartAt", () => {
     expect(compareByStartAt(broken, valid)).toBeGreaterThan(0);
     expect(compareByStartAt(broken, broken)).toBe(0);
     expect([broken, valid].sort(compareByStartAt).map((entry) => entry.id)).toEqual([1, 2]);
+  });
+});
+
+describe("pickFeaturedMatchIndex", () => {
+  const at = (
+    phase: FeaturedMatchCandidate["phase"],
+    startAt: string | null = null,
+    onAir = false,
+  ): FeaturedMatchCandidate => ({ onAir, phase, startAt });
+
+  it("préfère le match à l'antenne, quelle que soit sa phase", () => {
+    expect(pickFeaturedMatchIndex([at("LAUNCHED"), at("TO_PLAN", null, true)])).toBe(1);
+  });
+
+  it("préfère un match lancé, puis en lancement, puis daté", () => {
+    expect(pickFeaturedMatchIndex([at("SCHEDULED", "2026-10-05T18:00:00Z"), at("LOBBY"), at("LAUNCHED")])).toBe(2);
+    expect(pickFeaturedMatchIndex([at("SCHEDULED", "2026-10-05T18:00:00Z"), at("LOBBY")])).toBe(1);
+  });
+
+  it("retient le match daté le plus proche, l'ordre du plateau départageant les égalités", () => {
+    const candidates = [
+      at("SCHEDULED", "2026-10-05T20:00:00Z"),
+      at("SCHEDULED", "2026-10-05T18:00:00Z"),
+      at("SCHEDULED", "2026-10-05T18:00:00Z"),
+    ];
+    expect(pickFeaturedMatchIndex(candidates)).toBe(1);
+  });
+
+  it("ne retient jamais un match à planifier, terminé ou en attente d'adversaire", () => {
+    expect(pickFeaturedMatchIndex([at("TO_PLAN"), at("NONE")])).toBe(-1);
+    expect(pickFeaturedMatchIndex([])).toBe(-1);
+  });
+
+  it("garde l'ordre du plateau entre deux matchs lancés", () => {
+    expect(pickFeaturedMatchIndex([at("TO_PLAN"), at("LAUNCHED"), at("LAUNCHED")])).toBe(1);
+  });
+});
+
+describe("featuredMatchStatusLabel", () => {
+  const NOW = Date.parse("2026-10-05T12:00:00Z");
+
+  it("annonce l'horaire d'un match daté, à l'heure de Paris", () => {
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T18:30:00Z" }, NOW)).toBe(
+      "Prochain match · 5 oct. · 20:30",
+    );
+  });
+
+  it("dit « Lancement » dès l'heure atteinte, sans attendre une nouvelle phase du serveur", () => {
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T12:00:00Z" }, NOW)).toBe("Lancement");
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T11:55:00Z" }, NOW)).toBe("Lancement");
+  });
+
+  it("s'en tient à la phase du serveur tant que l'horloge n'est pas montée", () => {
+    // Rendu serveur et hydratation doivent coïncider : aucune lecture de l'heure.
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2020-01-01T00:00:00Z" }, null)).toMatch(
+      /^Prochain match · /,
+    );
+  });
+
+  it("se passe d'un horaire illisible ou absent", () => {
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "pas une date" }, NOW)).toBe("Prochain match");
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: null }, NOW)).toBe("Prochain match");
+  });
+
+  it("dit « Lancement » quand l'heure est venue, rien pour un match lancé", () => {
+    expect(featuredMatchStatusLabel({ launchPhase: "LOBBY", startAt: null }, NOW)).toBe("Lancement");
+    expect(featuredMatchStatusLabel({ launchPhase: "LAUNCHED", startAt: null }, NOW)).toBeNull();
   });
 });

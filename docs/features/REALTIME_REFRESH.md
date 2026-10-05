@@ -332,7 +332,7 @@ juste après l'écriture qui l'a rendue fausse.
 | `tournament-snapshot:<id>` | 3 s | toute publication d'événement du tournoi |
 | `tournaments-list:public` | 15 s | `updated` (plateau, inscrites, état), la création d'un tournoi, et une clôture détectée autour d'un score |
 | `landing:stats`, `landing:ticker`, `landing:leaderboard:<n>` | 60 s | — |
-| `landing:live` | 5 s | `updated`, et un changement de match qui touche l'antenne (chaîne, mode, ouverture, horaire) |
+| `landing:live` | 5 s | `updated`, et un changement de match qui déplace la carte du direct (antenne : chaîne, mode, ouverture ; horaire ; lancement : « Prêt », forçage, lancement d'office) |
 | `tournament-preview:<id>` | 3 s | `updated` (inscrites, seeding) |
 | `showcase:sponsors`, `:about-stats`, `:about-pillars`, `:site-copy` | 60 s | toute écriture du staff |
 | `mini-bracket:<id>` | 15 s | — |
@@ -358,7 +358,9 @@ diffusion d'un match, horaire, rediff : ces écritures ne touchent ni
 `publishMatchUpdatedEvent` (événement `match_updated`, distinct de `updated`
 pour qu'aucun abonné ne confonde les deux mesures), qui n'oublie que
 l'instantané du tournoi — plus le
-direct de l'accueil (`landing:live`) quand l'antenne bouge (`{ onAir: true }`).
+direct de l'accueil (`landing:live`) quand l'écriture change le match qu'il met en avant
+ou ce qu'il en dit (`{ landingLive: true }` : antenne, horaire, lancement — voir
+`FEATURED_MATCH_LINK.md` § 7).
 
 Elles passaient par `publishUpdatedEvent`, apparues avec le lancement des
 matchs, la diffusion et le calendrier. Or ce sont les écritures **les plus

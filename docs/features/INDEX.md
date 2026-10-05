@@ -52,7 +52,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `RULES_PAGE_LAYOUT.md` — Mise en page des pages de règles `/regles/[slug]`.
 - `BRACKET_SECTIONS.md` — Sections repliables de l'arbre.
 - `BRACKET_SLOT_HEIGHT.md` — Hauteur des créneaux de l'arbre à élimination.
-- `FEATURED_MATCH_LINK.md` — Lien profond vers un match (`#match-<id>`).
+- `FEATURED_MATCH_LINK.md` — Match mis en avant sur l'accueil (choix, jamais « À planifier ») et lien profond vers un match (`#match-<id>`).
 
 ## Authentification et comptes
 

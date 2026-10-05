@@ -223,7 +223,7 @@ describe("setMatchReady", () => {
     expect(state.match?.team1_ready_at).toBe(STAMP);
     expect(state.match?.lobby_opened_at).toBe(STAMP);
     expect(state.match?.launched_at).toBeNull();
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
   it("lance le match au dernier « Prêt » attendu", async () => {
@@ -371,7 +371,7 @@ describe("forceLaunchMatch", () => {
   it("lance un match en lancement sans attendre", async () => {
     await forceLaunchMatch(42);
     expect(state.match?.launched_at).toBe(STAMP);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7);
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
   it("lance aussi avant l'heure de début", async () => {
