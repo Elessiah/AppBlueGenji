@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
-import { COUNT_UP_MS, countUpValue } from "@/lib/shared/landing-motion";
+import { COUNT_UP_MS, countUpStart, countUpValue } from "@/lib/shared/landing-motion";
 
 /**
  * Chiffre du hero qui se décompte de 0 à sa valeur, une fois, quand il entre à
@@ -11,7 +11,8 @@ import { COUNT_UP_MS, countUpValue } from "@/lib/shared/landing-motion";
  * Le rendu serveur écrit la valeur finale (lisible sans JavaScript, indexée
  * telle quelle) ; la boucle `requestAnimationFrame` ne démarre que si le régime
  * de charge permet les animations décoratives, et s'arrête d'elle-même au bout
- * de `COUNT_UP_MS`. La largeur est réservée en `ch` sur la valeur finale
+ * de `COUNT_UP_MS`. Déjà à l'écran au chargement, il ne retombe pas à 0 : il
+ * roule des derniers 15 % (`countUpStart`). La largeur est réservée en `ch` sur la valeur finale
  * (chiffres tabulaires) : le décompte ne pousse rien.
  */
 export function CountUp({ value, className }: Readonly<{ value: number; className?: string }>) {
@@ -27,6 +28,7 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
       return undefined;
     }
     let frame = 0;
+    const from = countUpStart(value, element.getBoundingClientRect().top < window.innerHeight);
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect();
@@ -34,7 +36,7 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
       const start = performance.now();
       const step = (now: number) => {
         const progress = (now - start) / COUNT_UP_MS;
-        setShown(countUpValue(value, progress));
+        setShown(countUpValue(value, progress, from));
         if (progress < 1) frame = requestAnimationFrame(step);
       };
       frame = requestAnimationFrame(step);

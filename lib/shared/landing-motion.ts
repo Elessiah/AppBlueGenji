@@ -37,14 +37,28 @@ export function shouldDeferReveal(input: RevealInput): boolean {
 }
 
 /**
- * Valeur affichée par le décompte à l'avancement `progress` (0 → 1), en
- * décélération (cubique) : vite au début, posé à l'arrivée. Bornée, entière,
- * et toujours la cible exacte à la fin.
+ * Part de la cible d'où repart le décompte d'un chiffre **déjà à l'écran** au
+ * chargement : il a été lu à sa valeur finale (rendu serveur), le faire
+ * retomber à 0 serait un éclair « plein → vide → plein ». Il roule donc des
+ * derniers 15 %. Un chiffre encore hors de l'écran part de 0.
  */
-export function countUpValue(target: number, progress: number): number {
+export const COUNT_UP_ON_SCREEN_FROM = 0.85;
+
+/** Point de départ du décompte : 0 hors de l'écran, `COUNT_UP_ON_SCREEN_FROM` de la cible sinon. */
+export function countUpStart(target: number, onScreenAtMount: boolean): number {
+  if (!Number.isFinite(target)) return 0;
+  return onScreenAtMount ? Math.round(target * COUNT_UP_ON_SCREEN_FROM) : 0;
+}
+
+/**
+ * Valeur affichée par le décompte à l'avancement `progress` (0 → 1), de `from`
+ * à `target`, en décélération (cubique) : vite au début, posé à l'arrivée.
+ * Bornée, entière, et toujours la cible exacte à la fin.
+ */
+export function countUpValue(target: number, progress: number, from = 0): number {
   if (!Number.isFinite(target)) return 0;
   const clamped = Math.min(1, Math.max(0, Number.isFinite(progress) ? progress : 1));
   if (clamped >= 1) return target;
   const eased = 1 - (1 - clamped) ** 3;
-  return Math.round(target * eased);
+  return Math.round(from + (target - from) * eased);
 }
