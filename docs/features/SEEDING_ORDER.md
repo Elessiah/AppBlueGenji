@@ -85,8 +85,10 @@ alors que le tirage, lui, est fait : la liste suit les **rangs figés au coup
 d'envoi** (`registrationsFollowFrozenDraw`, `orderByFrozenSeeds`). Le moteur les
 a écrits au lancement dans sa table d'état (`bg_swiss_standings`,
 `bg_survival_standings`, `bg_endurance_standings`, ou `bg_tournament_phase_teams`
-de la première phase peuplée) ; `loadFrozenRankingSeeds`
-(`lib/server/tournaments/frozen-seeds.ts`) les relit sans jamais reclasser.
+de la première phase peuplée) ; l'instantané les reprend des classements qu'il a
+déjà chargés (`frozenSeedsOf`), l'accueil les relit par
+`loadFrozenRankingSeeds` (`lib/server/tournaments/frozen-seeds.ts`, mêmes
+tables) — jamais de reclassement.
 `registrations[].seed` porte ce rang (une engagée absente de la table passe en
 dernier, `seed` à `null`, affichée « — ») ; le bloc dit que les rangs sont ceux
 du tirage. La carte live de l'accueil (« SEED n ») lit le même rang figé. Les

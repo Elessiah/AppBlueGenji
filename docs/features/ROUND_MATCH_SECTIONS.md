@@ -54,13 +54,17 @@ toujours la **tête de série réelle** (`SEEDING_ORDER.md`) :
 | --- | --- |
 | `MANUAL`, `REGISTRATION` | colonne `seed` (l'ordre qui a fait le tirage) |
 | `RANKING`, avant le coup d'envoi | rang au classement du site (`rankEntrantsBySiteRanking`), renuméroté 1…N |
-| `RANKING`, lancé | rang **figé au coup d'envoi** (`loadFrozenRankingSeeds`), `null` si absent |
+| `RANKING`, lancé | rang **figé au coup d'envoi** (`frozenSeedsOf`), `null` si absent |
 
 Le rang figé est relu dans la table d'état écrite par le moteur au lancement
 (`bg_swiss_standings` / `bg_survival_standings` `phase_id = 0`,
 `bg_endurance_standings`, `bg_tournament_phase_teams` de la première phase
 peuplée en multi-phases) : la cote du moment, qui bouge avec les matchs du
-tournoi, n'est jamais relue. Aucun champ ajouté : le flux SSE et la lecture REST
+tournoi, n'est jamais relue — `frozenSeedsOf` la lit dans les classements que
+l'instantané a déjà chargés, sans requête de plus. C'est la tête de série **du
+tournoi** : les phases suivantes d'un multi-phases et l'arbre final de BG
+Survie, tirés sur le rang de la phase écoulée, trient leurs matchs par ce même
+rang de départ, pas par leur propre tirage. Aucun champ ajouté : le flux SSE et la lecture REST
 de secours servent le même instantané (`buildSnapshot`).
 
 ## Horloge
