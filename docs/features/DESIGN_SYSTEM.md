@@ -53,6 +53,8 @@ Contraste renforcé (`data-a11y~="contrast"`) : `--ink-mute` `#c4d4e6` (11,54), 
 | `waiting` | `--violet-300` + halo qui respire | « En attente de lancement » |
 | `live` | `--red-live` | **seulement** une vraie diffusion |
 
+La pastille nue étant désormais bleutée, une pastille qui **oppose** un état à `blue` (« À jour » / « Hors ligne », phase courante / autres, « Disponible » / « Bientôt », « Inactif ») prend `neutral` pour l'état éteint — sinon les deux se confondent (`tests/app/neon-palette.test.ts`).
+
 `--amber` n'entre dans aucune nouvelle règle ; ses usages existants (avertissements, retour en arrière, « Urgente ») migrent dans les lots suivants (`LANDING_ANIMATIONS.md` § Lots suivants).
 
 ### Composants
