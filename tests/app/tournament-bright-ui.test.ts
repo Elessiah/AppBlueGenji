@@ -176,7 +176,12 @@ describe("fiche — filets de section, cartes de match, panneaux", () => {
     expect(PAGE_CSS).toMatch(
       /:global\(:root\[data-a11y~="contrast"\]\) \.sheet :global\(\.ds-section-title\) h2\s*\{[^}]*color:\s*var\(--ink\)/,
     );
-    expect(PAGE_CSS).toMatch(/@media print\s*\{\s*\.sheet :global\(\.ds-section-title\) h2\s*\{[^}]*color:\s*var\(--ink\)/);
+    // À l'impression, le repli reprend **les mêmes sélecteurs** que le dégradé :
+    // moins spécifique, il perdrait, et le titre (texte transparent, fond non
+    // imprimé) sortirait blanc.
+    expect(PAGE_CSS).toMatch(
+      /@media print\s*\{\s*\.sheet :global\(\.ds-section-title\.green\) h2,\s*\.sheet :global\(\.ds-section-title\.blue\) h2\s*\{[^}]*color:\s*var\(--ink\)/,
+    );
     const page = readSource(join(tournamentDir, "[id]", "page.tsx"));
     expect(page).toContain("styles.sheet");
   });
