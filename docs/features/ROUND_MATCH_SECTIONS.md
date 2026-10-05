@@ -59,8 +59,10 @@ tenu « en attente » : l'heure du lecteur n'est pas encore connue.
 ## Filet
 
 Libellé en capitales 11 px (`--ink-mute`), nombre de matchs (`--ink-dim`),
-trait `--line-soft`. Chaque section est un `role="group"` nommé par son
-libellé (« Lancement, 2 matchs ») : aucun élément focalisable ajouté. Le
+trait `--line-soft`. Le filet est un paragraphe lu comme une ligne de texte
+(« Lancement, 2 matchs », le nombre complété pour les lecteurs d'écran) : ni
+volet, ni repère, ni élément focalisable — et pas de `role="group"`, que le
+contrôle Sonar S6819 interdit (`sonar-a11y-semantics.test.tsx`). Le
 libellé passe à la ligne dans une colonne étroite (210 px).
 
 ## Code
