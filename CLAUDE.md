@@ -87,7 +87,7 @@ Appels toujours app → bot, dégradation si injoignable.
 - Coordonnées (courriel, téléphone) jamais en clair : encodées, révélées au clic par `ProtectedContact` (`legal-contact.test.ts`) → `LEGAL_PAGE.md`.
 
 ## Design System — « Cyber minimal » → `docs/features/DESIGN_SYSTEM.md`
-Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`, primitives `components/cyber/`.
+Noir profond, bleu glacier `#5ac8ff`, jetons `--cyber-*` / `--ink*` / `--blue-*`, primitives `components/cyber/`. **Jamais tout gris** : texte secondaire teinté bleu, pastille/étiquette par variante sémantique (`.pill-*`/`.tag-*`), néons froids seulement (aucune teinte chaude), texte ≥ 4,5:1.
 
 ## Communication Style
 

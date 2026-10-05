@@ -55,6 +55,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `RULES_PAGE_LAYOUT.md` — Mise en page des pages de règles `/regles/[slug]`.
 - `BRACKET_SECTIONS.md` — Sections repliables de l'arbre.
 - `BRACKET_SLOT_HEIGHT.md` — Hauteur des créneaux de l'arbre à élimination.
+- `LANDING_ANIMATIONS.md` — Animations de l'accueil (apparition au défilement, décompte, éclats, reflet, pastille d'attente) sous la porte unique du régime de charge ; plan des lots de couleur suivants.
 - `FEATURED_MATCH_LINK.md` — Match mis en avant sur l'accueil (choix, jamais « À planifier ») et lien profond vers un match (`#match-<id>`).
 
 ## Authentification et comptes
