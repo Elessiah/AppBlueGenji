@@ -82,7 +82,7 @@ module.exports = {
       },
       JSXExpressionContainer(node) {
         // `<p>{"Bonjour"}</p>` : un littéral déguisé en expression.
-        if (node.parent && node.parent.type === "JSXAttribute") return;
+        if (node.parent?.type === "JSXAttribute") return;
         if (hasLetter(literalTexts(node.expression))) context.report({ node, messageId: "jsxText" });
       },
       JSXAttribute(node) {
