@@ -72,12 +72,17 @@ ne voit aucun bouton, l'arbitrage voit « Planifier » ou « Éditer le score »
 
 - Bouton de **divulgation** (`aria-expanded`, `aria-controls`), pas
   `role="menu"` : même motif que le menu du compte. Le panneau se déplie
-  sous le pied, **en position absolue par-dessus les cartes suivantes** : la
-  carte garde sa taille. Déplié dans la carte, il la grandissait, et l'arbre —
-  qui mesure ses cartes (`useSlotHeight`) pour régler la hauteur de **tous**
-  ses créneaux — sautait sous le pointeur. La carte n'a donc plus
-  d'`overflow: hidden` (ses coins intérieurs sont arrondis à la main). Le
-  panneau est toujours rendu, masqué par `hidden`.
+  sous le pied (au-dessus faute de place), **en `position: fixed` par-dessus
+  les cartes voisines** : la carte garde sa taille. Déplié dans la carte, il
+  la grandissait, et l'arbre — qui mesure ses cartes (`useSlotHeight`) pour
+  régler la hauteur de **tous** ses créneaux — sautait sous le pointeur ; en
+  `absolute`, il était rogné par le cadre des plateaux et les zones
+  défilantes. Ses coordonnées (`panelPlacement`) sont recalculées au
+  défilement et au redimensionnement, origine du repère retranchée (la page
+  est sous un ancêtre transformé, `.fade-in`). Le panneau reste dans le DOM de
+  la carte — l'ordre de tabulation suit le bouton — toujours rendu, masqué par
+  `hidden`. La carte n'a plus d'`overflow: hidden` (coins intérieurs arrondis
+  à la main).
 - Échap referme et rend le focus au bouton (`handleMenuEscape`) ; un clic
   extérieur ou une tabulation qui sort du pied le referme (`focusLeftMenu`).
 - Choisir une action referme le panneau et pose le focus sur « Plus
