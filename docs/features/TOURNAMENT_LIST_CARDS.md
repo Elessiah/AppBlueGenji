@@ -44,6 +44,33 @@ La logique d'affichage est pure, dans `app/(secured)/tournois/_lib/card-display.
 (`runningCardAction`, `upcomingCardFace`, `registrationFill`, `progressPercent`,
 `formatCardDate`).
 
+## Couleurs d'état
+
+Un état a **une seule teinte**, posée par `--tone` / `--tone-rgb` sur la carte
+(`data-state`), la section (`Section tone`) et son lien du sommaire
+(`data-tone`) — variantes sémantiques de `DESIGN_SYSTEM.md`, les mêmes que
+l'en-tête de la fiche (`STATE_META`) :
+
+| Carte (`data-state`) | Section | Variante | Texte |
+| --- | --- | --- | --- |
+| `running` | `running` | `info` | `--blue-300` |
+| `open` | `registration` | `highlight` | `--pink-400` |
+| `soon` | `upcoming` | `accent` | `--violet-300` |
+| `done` | `finished` | `success` | `--teal-400` |
+
+La teinte habille le ruban (texte, liseré, voile), les repères de coin,
+l'index et le dégradé de l'en-tête de section, le compte du sommaire, l'éclat
+du coin haut droit (sauf « terminé », qui garde son fond plat) et le **halo au
+survol** — liseré et ombre colorée, sans déplacement (une translation faisait
+clignoter la carte sous un pointeur posé sur son bord), sous
+`(hover: hover) and (pointer: fine)` seulement. Le point du ruban « en cours »
+et « inscriptions ouvertes » pulse au régime de charge
+(`var(--deco-anim-state)`). Jauge, mot fort du titre et index de « Mes
+tournois » prennent le dégradé de marque. Jamais de rouge (un tournoi en cours
+n'est pas une diffusion) ; l'ambre des avertissements (« Complet », clôture)
+reste en attente de décision (`LANDING_ANIMATIONS.md` § Lots suivants, lot 5).
+Contrastes : `tests/app/neon-palette.test.ts`.
+
 ## Nom accessible de la carte
 
 Chaque carte enveloppait tout son texte — ruban, méta, pied — dans un `<a>`

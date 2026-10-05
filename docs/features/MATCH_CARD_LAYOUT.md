@@ -15,8 +15,11 @@ l'arbitrage voyait « 🗓 Date », « ⚙ Live », « ⇄ Hôte », « ▶ Forc
 De haut en bas, par ordre d'importance :
 
 1. **Engagés et score** — 14 px (graisse 500), score en 16 px gras à chiffres
-   tabulaires, lignes de 40 px. Vainqueur en vert, perdant en retrait
-   (inchangé). Les noms passent toujours par `EntrantName`.
+   tabulaires, lignes de 40 px. Vainqueur en turquoise (`--teal-400`, variante
+   `success`), perdant en retrait. Les noms passent toujours par `EntrantName`.
+   Au survol (pointeur fin), liseré glacier et halo néon froid, sans
+   déplacement — la carte porte les connecteurs de `BracketTree` ; la carte
+   visée par une ancre garde son anneau.
 2. Mention « Match nul » / « Double forfait » (inchangée).
 3. **Zone d'état** (`.meta`, 12 px) — `MatchLiveStrip` (horaire, « sans date »
    pour le staff, en direct / programmé, lien de la chaîne) puis

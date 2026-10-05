@@ -82,8 +82,13 @@ d'avancer l'horloge.
 
 ## Filet
 
-Libellé en capitales 11 px (`--ink-mute`), nombre de matchs (`--ink-dim`),
-trait `--line-soft`. Le filet est un paragraphe lu comme une ligne de texte
+Libellé en capitales 11 px **teinté par section** (variantes sémantiques de
+`DESIGN_SYSTEM.md`, par `data-section`) : « À planifier » `--pink-400`
+(`highlight`, un geste attendu), « En attente de lancement » `--violet-300`
+(`accent`, comme sa pastille `waiting`), « Lancement » et « En cours »
+`--blue-300` (`info`), « Terminé » `--teal-400` (`success`) ; jamais de rouge.
+Nombre de matchs en `--ink-dim`, trait qui part de la teinte de la section et
+s'efface vers `--line-soft`. Le filet est un paragraphe lu comme une ligne de texte
 (« Lancement, 2 matchs », le nombre complété pour les lecteurs d'écran) : ni
 volet, ni repère, ni élément focalisable — et pas de `role="group"`, que le
 contrôle Sonar S6819 interdit (`sonar-a11y-semantics.test.tsx`). Le
