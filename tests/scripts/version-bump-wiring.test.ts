@@ -13,29 +13,43 @@ import { readSource } from "../helpers/read-source";
 const workflow = readSource(".github/workflows/version-bump.yml");
 
 describe("workflow de bump de version", () => {
-  it("ne se déclenche qu'à la fusion d'une PR dans main", () => {
-    expect(workflow).toMatch(/pull_request_target:\s*\n\s*types: \[closed\]\s*\n\s*branches: \[main\]/);
-    expect(workflow).toContain("github.event.pull_request.merged == true");
+  it("se déclenche au push sur main, sans déclencheur privilégié", () => {
+    expect(workflow).toMatch(/on:\s*\n\s*push:\s*\n\s*branches: \[main\]/);
+    expect(workflow).not.toMatch(/^\s*pull_request(_target)?:/m);
+  });
+
+  it("ne bump que pour une PR fusionnée dans main, retrouvée par l'API", () => {
+    expect(workflow).toContain('gh api "repos/$GITHUB_REPOSITORY/commits/$MERGE_SHA/pulls"');
+    expect(workflow).toContain('select(.merged_at != null and .base.ref == "main")');
+    // Chaque étape utile attend que la PR ait été retrouvée et non exclue.
+    const guarded = workflow.match(/if: steps\.pr\.outputs\.skip == 'false'/g) ?? [];
+    expect(guarded).toHaveLength(4);
   });
 
   it("respecte release:skip et ne boucle pas sur ses propres commits", () => {
-    expect(workflow).toContain("!contains(github.event.pull_request.labels.*.name, 'release:skip')");
-    expect(workflow).toContain("!startsWith(github.event.pull_request.head.ref, 'release/')");
-    expect(workflow).toContain("github.event.pull_request.user.login != 'github-actions[bot]'");
+    expect(workflow).toContain('*",release:skip,"*) skip=true');
+    expect(workflow).toContain("release/*) skip=true");
+    expect(workflow).toContain('if [ "$author" = "github-actions[bot]" ]; then skip=true; fi');
     expect(workflow).toContain('marker="(#$PR_NUMBER) [skip ci]"');
     expect(workflow).toContain('git commit -q -m "release $version $marker"');
   });
 
   it("lit le niveau sur les étiquettes major puis minor, patch par défaut", () => {
-    expect(workflow).toContain("contains(github.event.pull_request.labels.*.name, 'release:major')");
-    expect(workflow).toContain("contains(github.event.pull_request.labels.*.name, 'release:minor')");
-    expect(workflow).toMatch(/IS_MAJOR[\s\S]*level=major[\s\S]*IS_MINOR[\s\S]*level=minor[\s\S]*else level=patch/);
+    expect(workflow).toMatch(
+      /",release:major,"[\s\S]*level=major[\s\S]*",release:minor,"[\s\S]*level=minor[\s\S]*else level=patch/,
+    );
   });
 
   it("ne met aucune fusion en file commune, où GitHub annulerait les attentes", () => {
     expect(workflow).toMatch(
-      /group: version-bump-\$\{\{ github\.event\.pull_request\.number \}\}\s*\n\s*cancel-in-progress: false/,
+      /group: version-bump-\$\{\{ inputs\.sha \|\| github\.sha \}\}\s*\n\s*cancel-in-progress: false/,
     );
+  });
+
+  it("se rattrape à la main quand un [skip ci] de squash a sauté le push", () => {
+    expect(workflow).toMatch(/workflow_dispatch:\s*\n\s*inputs:\s*\n\s*sha:/);
+    expect(workflow).toContain("MERGE_SHA: ${{ inputs.sha || github.sha }}");
+    expect(workflow).toContain('[[ ! "$MERGE_SHA" =~ ^[0-9a-f]{7,40}$ ]]');
   });
 
   it("pousse commit et tag ensemble, recalculés sur main à chaque essai", () => {

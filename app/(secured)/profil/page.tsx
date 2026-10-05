@@ -233,8 +233,8 @@ export default function ProfilePage() {
   };
 
   useEffect(() => {
-    loadInvitations();
-    loadDiscordState();
+    void loadInvitations();
+    void loadDiscordState();
   }, []);
 
   const respondInvitation = async (invitationId: number, accept: boolean) => {

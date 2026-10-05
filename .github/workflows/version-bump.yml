@@ -3,63 +3,115 @@
 # release:skip = aucun bump. Le commit de version porte [skip ci] et n'ouvre aucune PR,
 # donc il ne relance ni ce workflow ni le CI.
 #
-# pull_request_target et non pull_request : une PR venue d'un fork recevrait sinon un
-# jeton en lecture seule et ne serait jamais versionnée. C'est sans danger ici, le job
-# n'extrait que main et n'exécute aucun code de la PR.
+# Déclenché par le push sur main (la fusion elle-même), pas par pull_request_target :
+# le job tourne dans le contexte du dépôt, une PR venue d'un fork est versionnée comme
+# les autres, et aucun déclencheur privilégié n'a l'occasion d'extraire le code d'une
+# PR. La PR fusionnée est retrouvée par l'API à partir du commit poussé.
 name: Version bump
 
 on:
-  pull_request_target:
-    types: [closed]
+  push:
     branches: [main]
+  # Rattrapage : GitHub ne lance aucun workflow sur un push dont le message porte
+  # `[skip ci]` (ou `[ci skip]`, `[no ci]`, `[skip actions]`) — y compris un
+  # squash qui recopie un tel message de commit. Relancer à la main avec le SHA.
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: "Commit de fusion sur main (défaut : tête de main)"
+        required: false
 
 permissions:
   contents: write
+  pull-requests: read
 
 # Pas de groupe global : GitHub ne garde qu'une exécution en attente par groupe et
 # annulerait les autres (un bump perdu sans erreur). Les fusions simultanées se
 # départagent au push, qui recalcule la version sur main à jour à chaque essai.
 concurrency:
-  group: version-bump-${{ github.event.pull_request.number }}
+  group: version-bump-${{ inputs.sha || github.sha }}
   cancel-in-progress: false
 
 jobs:
   bump:
-    if: >-
-      github.event.pull_request.merged == true &&
-      !contains(github.event.pull_request.labels.*.name, 'release:skip') &&
-      !startsWith(github.event.pull_request.head.ref, 'release/') &&
-      github.event.pull_request.user.login != 'github-actions[bot]'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
-      IS_MAJOR: ${{ contains(github.event.pull_request.labels.*.name, 'release:major') }}
-      IS_MINOR: ${{ contains(github.event.pull_request.labels.*.name, 'release:minor') }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
+      # Un push direct sur main (sans PR) ne monte aucune version. Le lien
+      # commit → PR peut apparaître quelques secondes après le push : trois essais.
+      # Une erreur passagère de l'API est retentée elle aussi (le `if` évite que
+      # `bash -e` n'arrête le pas) ; trois erreurs font échouer le job plutôt que
+      # de perdre la version sans bruit.
+      - name: Retrouver la PR fusionnée
+        id: pr
+        env:
+          MERGE_SHA: ${{ inputs.sha || github.sha }}
+        run: |
+          if [[ ! "$MERGE_SHA" =~ ^[0-9a-f]{7,40}$ ]]; then
+            echo "::error::SHA invalide."
+            exit 1
+          fi
+          pr=""
+          api_failed=false
+          for attempt in 1 2 3; do
+            if pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$MERGE_SHA/pulls" \
+              --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0] // empty'); then
+              api_failed=false
+              [ -n "$pr" ] && break
+            else
+              api_failed=true
+              pr=""
+            fi
+            sleep $((attempt * 5))
+          done
+          if [ -z "$pr" ] && [ "$api_failed" = "true" ]; then
+            echo "::error::API GitHub injoignable : PR de $MERGE_SHA introuvable."
+            exit 1
+          fi
+          if [ -z "$pr" ]; then
+            echo "Aucune PR fusionnée pour $MERGE_SHA : pas de bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          labels=",$(jq -r '[.labels[].name] | join(",")' <<< "$pr"),"
+          head_ref=$(jq -r '.head.ref' <<< "$pr")
+          author=$(jq -r '.user.login' <<< "$pr")
+          # Garde anti-boucle : release:skip, branches release/*, PR du bot.
+          skip=false
+          case "$labels" in *",release:skip,"*) skip=true ;; esac
+          case "$head_ref" in release/*) skip=true ;; esac
+          if [ "$author" = "github-actions[bot]" ]; then skip=true; fi
+          if [[ "$labels" == *",release:major,"* ]]; then level=major
+          elif [[ "$labels" == *",release:minor,"* ]]; then level=minor
+          else level=patch
+          fi
+          {
+            echo "skip=$skip"
+            echo "number=$(jq -r '.number' <<< "$pr")"
+            echo "level=$level"
+          } >> "$GITHUB_OUTPUT"
+
+      # Le push sur main est du code déjà fusionné ; on extrait tout de même main
+      # à jour (pas le commit poussé) : une autre fusion a pu passer entre-temps.
       - uses: actions/checkout@v4
+        if: steps.pr.outputs.skip == 'false'
         with:
           ref: main
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - uses: actions/setup-node@v4
+        if: steps.pr.outputs.skip == 'false'
         with:
           node-version: '20'
 
-      - name: Choisir le niveau
-        id: level
-        run: |
-          if [ "$IS_MAJOR" = "true" ]; then level=major
-          elif [ "$IS_MINOR" = "true" ]; then level=minor
-          else level=patch
-          fi
-          echo "level=$level" >> "$GITHUB_OUTPUT"
-
       - name: Monter la version, commiter, taguer et pousser
         id: bump
+        if: steps.pr.outputs.skip == 'false'
         env:
-          LEVEL: ${{ steps.level.outputs.level }}
+          LEVEL: ${{ steps.pr.outputs.level }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -98,6 +150,7 @@ jobs:
           exit 1
 
       - name: Publier la release
+        if: steps.pr.outputs.skip == 'false'
         env:
           VERSION: ${{ steps.bump.outputs.version }}
         run: |

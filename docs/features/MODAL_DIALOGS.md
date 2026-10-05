@@ -38,6 +38,11 @@ Le focus initial va au premier élément focalisable, **sauf** s'il existe un
 le premier (le bureau place un bouton « Couleur aléatoire » avant le champ
 Nom).
 
+Jamais l'attribut `autoFocus` (Sonar S9379). Un champ qui n'apparaît qu'après
+un geste — éditeur en ligne ouvert par « Modifier », onglet d'une modale déjà
+ouverte — prend le focus par `ref={focusOnMount}` (`lib/shared/focus-on-mount.ts`) :
+le focus suit le geste, jamais un chargement de page.
+
 ## 3. Le voile : `useBackdropDismiss`
 
 `onClick={onClose}` sur le voile et `stopPropagation()` sur le panneau ne

@@ -73,13 +73,14 @@ export function TargetPicker({ type, selected, onChange, full }: Readonly<Target
     const timer = setTimeout(() => {
       fetch(`/api/reports/targets?type=${type}&q=${encodeURIComponent(q)}`, { cache: "no-store" })
         .then(async (response) => (response.ok ? ((await response.json()) as { options: ReportTargetOption[] }).options : []))
-        .catch(() => [])
+        .catch((): ReportTargetOption[] => [])
         .then((found) => {
           if (ticket !== requestRef.current) return;
           setOptions(found);
           setSearched(true);
           setActive(-1);
-        });
+        })
+        .catch(() => undefined);
     }, SEARCH_DEBOUNCE_MS);
     return () => clearTimeout(timer);
   }, [query, type]);

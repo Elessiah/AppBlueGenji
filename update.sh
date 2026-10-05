@@ -28,7 +28,12 @@ echo "▸ Récupération du code"
 git pull --ff-only
 
 echo "▸ Dépendances (npm ci — respecte package-lock.json)"
-npm ci
+# `--ignore-scripts` : aucun script d'installation de dépendance ne s'exécute.
+# Rien n'en dépend aujourd'hui — `sharp` (≥ 0.33) arrive en binaire précompilé
+# par `@img/sharp-<plateforme>`, et les trois paquets à script sont déjà
+# refusés par `allowScripts` (docs/DEPLOYMENT.md). Un paquet qui en aurait
+# réellement besoin se relance ici, nommément : `npm rebuild <paquet>`.
+npm ci --ignore-scripts
 
 echo "▸ Build"
 npm run build
@@ -42,7 +47,7 @@ pm2 restart bluegenji --update-env
 echo "▸ Contrôle"
 sleep 3
 code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "http://127.0.0.1:${PORT:-3000}/" || true)"
-if [ "$code" = "200" ]; then
+if [[ "$code" == "200" ]]; then
   echo "✓ En ligne (HTTP $code)"
 else
   echo "✗ Le serveur ne répond pas (HTTP $code) — voir: pm2 logs bluegenji" >&2

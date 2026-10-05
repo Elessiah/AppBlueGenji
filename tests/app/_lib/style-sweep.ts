@@ -36,6 +36,32 @@ export function stripComments(css: string): string {
 }
 
 /**
+ * Les blocs **les plus internes** `sélecteur { corps }`, en un seul passage —
+ * ce que donnait `/([^{}]+)\{([^{}]*)\}/g`, sans son retour arrière
+ * quadratique sur un long texte privé d'accolade ouvrante (Sonar S8786).
+ * Le sélecteur rendu est brut (non rogné), comme la capture du motif.
+ */
+export function innermostBlocks(css: string): Array<[selector: string, body: string]> {
+  const blocks: Array<[string, string]> = [];
+  let segmentStart = 0;
+  let open: { selector: string; bodyStart: number } | null = null;
+  for (let i = 0; i < css.length; i++) {
+    const char = css[i];
+    if (char === "{") {
+      open = { selector: css.slice(segmentStart, i), bodyStart: i + 1 };
+      segmentStart = i + 1;
+    } else if (char === "}") {
+      if (open && open.bodyStart === segmentStart && open.selector !== "") {
+        blocks.push([open.selector, css.slice(open.bodyStart, i)]);
+      }
+      open = null;
+      segmentStart = i + 1;
+    }
+  }
+  return blocks;
+}
+
+/**
  * Le corps de la première règle dont le sélecteur correspond.
  *
  * La recherche se fait sur un **motif** et non sur une chaîne : un sélecteur
@@ -284,7 +310,7 @@ export function bareInputOffenders(path: string, css: string): Offender[] {
   const stripped = stripComments(css);
   // Découpage volontairement naïf (`sélecteur { déclarations }`) : ces feuilles
   // n'ont ni `@media` imbriqué dans une règle ni accolade dans une valeur.
-  for (const [, rawSelector, body] of stripped.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+  for (const [rawSelector, body] of innermostBlocks(stripped)) {
     const selector = rawSelector.trim().replace(/\s+/g, " ");
     if (selector.startsWith("@") || selector === "") continue;
     const bare = splitSelectorList(selector)
@@ -403,10 +429,8 @@ export type CssRule = { selectors: string[]; body: string };
  */
 export function cssRules(css: string): CssRule[] {
   const found: CssRule[] = [];
-  const pattern = /([^{}]+)\{([^{}]*)\}/g;
-  let match: RegExpExecArray | null;
-  while ((match = pattern.exec(stripComments(css))) !== null) {
-    found.push({ selectors: splitSelectorList(match[1].trim()), body: match[2] });
+  for (const [selector, body] of innermostBlocks(stripComments(css))) {
+    found.push({ selectors: splitSelectorList(selector.trim()), body });
   }
   return found;
 }

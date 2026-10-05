@@ -3,6 +3,7 @@ import {
   bareInputOffenders,
   cssRules,
   inlineOffenders,
+  innermostBlocks,
   splitSelectorList,
   subjectCompound,
 } from "./_lib/style-sweep";
@@ -153,5 +154,25 @@ describe("cssRules — règles d'une feuille", () => {
       { selectors: [".a", ".b:focus"], body: " color: red; " },
       { selectors: [".c"], body: " outline: 0; " },
     ]);
+  });
+});
+
+describe("innermostBlocks — découpage linéaire des blocs", () => {
+  it("rend les blocs les plus internes, sélecteur brut", () => {
+    expect(innermostBlocks(".a { x: 1; }\n@media (m) { .b{y:2} }")).toEqual([
+      [".a ", " x: 1; "],
+      [" .b", "y:2"],
+    ]);
+  });
+
+  it("ignore un bloc sans sélecteur et une accolade orpheline", () => {
+    expect(innermostBlocks("{ x: 1 } } .c { }")).toEqual([[" .c ", " "]]);
+  });
+
+  it("reste linéaire sur un long texte sans accolade ouvrante", () => {
+    // Le motif d'origine revenait en arrière à chaque position : quadratique.
+    const started = Date.now();
+    expect(innermostBlocks("a".repeat(200_000) + "}")).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(1000);
   });
 });

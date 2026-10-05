@@ -240,7 +240,7 @@ export function AboutStats({ initialStats, isAdmin }: Readonly<AboutStatsProps>)
               placeholder="Bénévole"
               enterKeyHint="done"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !busy) submit();
+                if (e.key === "Enter" && !busy) void submit();
               }}
               onChange={(e) => setForm((f) => ({ ...f, label: e.target.value }))}
             />

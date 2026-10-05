@@ -8,7 +8,7 @@ légales et le registre des traitements, qui le lisent tous deux dans
 module à jour.
 
 ```bash
-./update.sh          # git pull --ff-only → npm ci → build → restart → contrôle HTTP
+./update.sh          # git pull --ff-only → npm ci --ignore-scripts → build → restart → contrôle HTTP
 ```
 
 Le script s'arrête à la première erreur et **vérifie que le site répond** avant
@@ -66,10 +66,16 @@ explicitement** (`false`), ce qui fait taire l'avertissement sans rien casser :
 | `unrs-resolver` (ESLint, Jest) | repli si la liaison native manque | idem, `@unrs/resolver-binding-<plateforme>` |
 | `@parcel/watcher` (Jest) | compilation depuis les sources si aucun binaire | idem, et ne sert qu'au mode `--watch` |
 
+`./update.sh` et le CI vont plus loin : `npm ci --ignore-scripts` n'exécute
+**aucun** script d'installation, approuvé ou non. `sharp` (0.35) n'en a pas —
+son binaire vient de `@img/sharp-<plateforme>` —, si bien que rien ne change
+aujourd'hui.
+
 Un nouveau paquet à script apparaîtra de nouveau dans l'avertissement : le
 relire (`npm install-scripts ls`), puis le refuser (`npm install-scripts deny
 <pkg>`) ou, s'il en a réellement besoin, l'approuver (`npm install-scripts
-approve <pkg>`, épinglé à la version relue).
+approve <pkg>`, épinglé à la version relue) **et** ajouter `npm rebuild <pkg>`
+juste après `npm ci --ignore-scripts` dans `update.sh` et le CI.
 
 Les avertissements `deprecated` de `glob@7`/`inflight` venaient de Jest 29 ;
 Jest 30 et l'override `test-exclude@^8` (le dernier à tirer `glob@10`, lui

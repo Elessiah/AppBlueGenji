@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { CyberButton } from "@/components/cyber";
 import { useToast } from "@/components/ui/toast";
+import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import {
   isValidStreamUrl,
   LIVE_PLATFORMS,
@@ -104,7 +105,7 @@ export function TournamentLiveLink({
             aria-label="Chaîne officielle du tournoi"
             aria-invalid={draftInvalid}
             aria-describedby="tournament-live-hint"
-            autoFocus
+            ref={focusOnMount}
             style={{ width: "100%" }}
           />
           <p

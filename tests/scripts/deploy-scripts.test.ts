@@ -75,6 +75,10 @@ describe("update.sh — un déploiement s'arrête à la première erreur", () =>
     expect(source).not.toMatch(/npm\s+install\s+--force/);
   });
 
+  it("n'exécute aucun script d'installation de dépendance", () => {
+    expect(source).toMatch(/^npm ci --ignore-scripts$/m);
+  });
+
   it("construit avant de redémarrer, jamais après", () => {
     expect(source.indexOf("npm run build")).toBeGreaterThan(-1);
     expect(source.indexOf("npm run build")).toBeLessThan(source.indexOf("pm2 restart"));

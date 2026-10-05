@@ -137,12 +137,14 @@ export default function EditTournamentPage() {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
-      const me = await fetch("/api/auth/me", { cache: "no-store" })
-        .then(async (r) =>
-          r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } }) : null,
-        )
-        .catch(() => null);
+    const load = async () => {
+      // Une coupure réseau rejette ici et file vers « Erreur réseau » plus bas,
+      // au lieu de se faire passer pour un refus de droits.
+      const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+      const me = meResponse.ok
+        ? ((await meResponse.json().catch(() => null)) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } } | null)
+        : null;
+      if (cancelled) return;
       if (!can(me?.user, "tournaments")) {
         showError("Modification de tournoi réservée aux arbitres et administrateurs.");
         router.replace("/tournois");
@@ -178,7 +180,15 @@ export default function EditTournamentPage() {
         state: successPayload.state,
         refereeScheduling: successPayload.refereeScheduling,
       });
-    })();
+    };
+    // Une coupure réseau pendant le chargement laissait la page sur
+    // « Chargement du tournoi... » sans rien dire : même sortie que les
+    // autres échecs de chargement, message réseau en plus.
+    load().catch(() => {
+      if (cancelled) return;
+      showError("Erreur réseau, réessaye.");
+      router.replace("/tournois");
+    });
 
     return () => {
       cancelled = true;

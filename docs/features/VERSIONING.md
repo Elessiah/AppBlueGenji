@@ -4,9 +4,9 @@ La version du site vit dans `package.json` (et `package-lock.json`), au format [
 
 ## Comment la version monte
 
-Le workflow `.github/workflows/version-bump.yml` se déclenche à la **fusion** d'une PR dans `main` (`pull_request_target` `closed`, `merged == true` — `pull_request_target` pour qu'une PR venue d'un fork reçoive un jeton en écriture ; sans danger, le job n'extrait que `main` et n'exécute aucun code de la PR) :
+Le workflow `.github/workflows/version-bump.yml` se déclenche à la **fusion** d'une PR dans `main`, par le `push` sur `main` qu'elle produit. Il tourne dans le contexte du dépôt : une PR venue d'un fork est versionnée comme les autres, et aucun déclencheur privilégié (`pull_request_target`) ne risque d'extraire du code de PR avec un jeton en écriture. Un push direct sur `main`, sans PR, ne monte rien. GitHub ne lance **aucun** workflow sur un push dont le message porte `[skip ci]` (ou `[ci skip]`, `[no ci]`, `[skip actions]`) — y compris un squash qui recopie un message de commit de la PR : on relance alors le workflow à la main (*Actions → Version bump → Run workflow*) avec le SHA du commit de fusion (`workflow_dispatch`, entrée `sha`) :
 
-1. il lit le niveau sur les **étiquettes** de la PR ;
+1. il retrouve la PR fusionnée par l'API (`commits/<sha>/pulls`, trois essais) et lit le niveau sur ses **étiquettes** ;
 2. extrait `main` à jour (pas le commit de fusion : une autre fusion a pu passer entre-temps) et lance `npm version <niveau> --no-git-tag-version` ;
 3. commite `release vX.Y.Z (#N) [skip ci]` au nom de `github-actions[bot]` et pousse ce commit **et** le tag `vX.Y.Z` d'un seul push atomique ; en cas de refus (une autre fusion est passée), il repart de `main` à jour et recalcule la version, cinq essais au plus ;
 4. publie la release GitHub avec `gh release create --generate-notes`.
@@ -15,7 +15,7 @@ Aucun groupe de concurrence global : GitHub n'y garde qu'une exécution en atten
 
 **Relancer un job** est sûr : si `main` porte déjà le commit `(#N)` de la PR, le job reprend cette version (tag reposé au besoin, release publiée si elle manque) au lieu d'en monter une seconde.
 
-Pas de boucle : le commit de version ne passe par aucune PR, et le job ignore les branches `release/*` et les PR ouvertes par `github-actions[bot]`. `[skip ci]` évite de rejouer le CI sur ce seul changement de numéro.
+Pas de boucle : le commit de version porte `[skip ci]`, qui empêche son push de relancer ce workflow, et le job ignore les branches `release/*` et les PR ouvertes par `github-actions[bot]`. `[skip ci]` évite de rejouer le CI sur ce seul changement de numéro.
 
 ## Étiquettes
 
