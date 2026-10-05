@@ -125,7 +125,7 @@ export default function ReglesPage() {
         </div>
         <div className={styles.commonGrid}>
           {COMMON_RULES.map((rule) => (
-            <CyberCard key={rule.title} className={styles.commonCard} lift>
+            <CyberCard key={rule.title} className={styles.commonCard}>
               <h3 className={styles.commonTitle}>{rule.title}</h3>
               {rule.body.map((paragraph) => (
                 <p key={paragraph} className={styles.commonBody}>
