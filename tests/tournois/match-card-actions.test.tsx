@@ -214,15 +214,16 @@ describe("MatchCardActions — rendu du pied", () => {
     expect(html).not.toContain("aria-expanded");
   });
 
-  it("replié : la principale seule est montée, le panneau est un conteneur vide masqué", () => {
+  it("replié : la principale seule est montée, aucun panneau", () => {
     const html = renderFooter({ adminScoreLabel: "Éditer le score", showSchedule: true, showOnAir: true });
     expect(html).toContain('data-action="adminScore"');
     expect(html).not.toContain('data-action="schedule"');
     expect(html).not.toContain('data-action="onAir"');
-    const toggle = /<button[^>]*aria-expanded="false"[^>]*aria-controls="([^"]+)"[^>]*>/.exec(html);
+    const toggle = /<button[^>]*aria-expanded="false"[^>]*>/.exec(html);
     expect(toggle).not.toBeNull();
     expect(toggle?.[0]).toContain('aria-label="Plus d&#x27;actions : Alpha contre Bravo"');
-    expect(html).toMatch(new RegExp(`<div id="${toggle?.[1]}"[^>]*hidden=""[^>]*></div>`));
+    // `aria-controls` ne vise le panneau que lorsqu'il existe (ouvert).
+    expect(toggle?.[0]).not.toContain("aria-controls");
   });
 
   it("sans principale : « Plus d'actions » prend la largeur et montre son libellé", () => {
@@ -247,18 +248,26 @@ describe("panelPlacement — le panneau ouvert reste à l'écran", () => {
     return placed.up ? placed.top + shown <= f.top + 4 : placed.top >= f.bottom - 4;
   };
 
+  const view = (height: number, width = 1280) => ({ width, height });
+
   it("se pose sous le pied, à la largeur de la carte bordure comprise", () => {
-    expect(panelPlacement(footer, 200, 900)).toEqual({ top: 348, left: 99, width: 260, maxHeight: 544, up: false });
+    expect(panelPlacement(footer, 200, view(900))).toEqual({
+      top: 348,
+      left: 99,
+      width: 260,
+      maxHeight: 544,
+      up: false,
+    });
   });
 
   it("passe au-dessus quand la place manque en bas et abonde en haut", () => {
     const low = { ...footer, top: 700, bottom: 752 };
-    expect(panelPlacement(low, 200, 800)).toEqual({ top: 504, left: 99, width: 260, maxHeight: 696, up: true });
+    expect(panelPlacement(low, 200, view(800))).toEqual({ top: 504, left: 99, width: 260, maxHeight: 696, up: true });
   });
 
   it("trop haut pour la place : borné (la liste défile), jamais hors de l'écran", () => {
     const mid = { ...footer, top: 400, bottom: 452 };
-    const placed = panelPlacement(mid, 480, 700);
+    const placed = panelPlacement(mid, 480, view(700));
     expect(placed).toMatchObject({ up: true, top: 8, maxHeight: 396 });
     expect(clearsFooter(placed, mid, 480)).toBe(true);
   });
@@ -266,7 +275,7 @@ describe("panelPlacement — le panneau ouvert reste à l'écran", () => {
   it("ne recouvre jamais le pied d'action, même quand aucun côté ne suffit", () => {
     // Pied à 300–350, panneau de 400 px, fenêtre de 700 px.
     const bar = { ...footer, top: 300, bottom: 350 };
-    const placed = panelPlacement(bar, 400, 700);
+    const placed = panelPlacement(bar, 400, view(700));
     expect(placed).toMatchObject({ up: false, top: 346, maxHeight: 346 });
     expect(clearsFooter(placed, bar, 400)).toBe(true);
     expect(placed.top + Math.min(400, placed.maxHeight)).toBeLessThanOrEqual(700 - 8);
@@ -274,7 +283,15 @@ describe("panelPlacement — le panneau ouvert reste à l'écran", () => {
 
   it("reste dessous quand le haut n'offre pas davantage", () => {
     const high = { ...footer, top: 60, bottom: 112 };
-    expect(panelPlacement(high, 200, 250)).toMatchObject({ up: false, maxHeight: 134 });
+    expect(panelPlacement(high, 200, view(250))).toMatchObject({ up: false, maxHeight: 134 });
+  });
+
+  it("reste dans la fenêtre en largeur : carte à demi défilée hors d'une manche", () => {
+    // Téléphone de 375 px : carte décalée de 180 px à gauche, puis à droite.
+    expect(panelPlacement({ ...footer, left: -180 }, 200, view(800, 375))).toMatchObject({ left: 8, width: 260 });
+    expect(panelPlacement({ ...footer, left: 300 }, 200, view(800, 375))).toMatchObject({ left: 107, width: 260 });
+    // Fenêtre plus étroite que la carte : le panneau s'y réduit.
+    expect(panelPlacement(footer, 200, view(800, 240))).toMatchObject({ left: 8, width: 224 });
   });
 });
 
@@ -284,12 +301,24 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     "utf8",
   );
 
-  it("Échap referme et rend le focus au bouton, comme le menu du compte", () => {
-    expect(source).toContain("handleMenuEscape(e.key, document.activeElement, rootRef.current, toggleRef.current");
+  it("le panneau est porté dans document.body, comme les modales", () => {
+    expect(source).toMatch(/createPortal\([\s\S]*?document\.body,\s*\)/);
   });
 
-  it("la tabulation qui sort du pied le referme", () => {
-    expect(source).toContain("focusLeftMenu(rootRef.current, e.relatedTarget)");
+  it("Échap referme et rend le focus au bouton, comme le menu du compte — pied et panneau compris", () => {
+    expect(source).toContain("handleMenuEscape(e.key, document.activeElement, menu, toggleRef.current");
+    expect(source).toMatch(/rootRef\.current\?\.contains\(node\) \|\| panelRef\.current\?\.contains\(node\)/);
+  });
+
+  it("le focus entre dans le panneau à l'ouverture", () => {
+    expect(source).toContain('panelRef.current?.querySelector("button")?.focus({ preventScroll: true });');
+  });
+
+  it("la tabulation qui sort du pied et du panneau le referme ; par un bout du panneau, rend le focus", () => {
+    expect(source).toContain("focusLeftMenu(menu, e.relatedTarget)");
+    expect(source).toMatch(
+      /\(e\.shiftKey && index === 0\) \|\| \(!e\.shiftKey && index === buttons\.length - 1\)[\s\S]{0,120}setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);/,
+    );
   });
 
   it("une action du menu rend le focus au bouton avant de s'exécuter", () => {
@@ -299,8 +328,8 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
   it("un panneau retiré par le flux se referme, et ne revient pas déplié", () => {
     expect(source).toContain("const expanded = open && more.length > 0;");
     expect(source).toContain("if (open && more.length === 0) setOpen(false);");
-    expect(source).toContain("hidden={!expanded}");
     expect(source).toContain("aria-expanded={expanded}");
+    expect(source).toContain("aria-controls={expanded ? panelId : undefined}");
   });
 
   it("se referme quand la zone défilante de la carte défile, suit la page sinon", () => {
@@ -314,8 +343,8 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain("resizes?.disconnect();");
   });
 
-  it("ne monte la zone défilante qu'à l'ouverture (un plateau compte 254 cartes)", () => {
-    expect(source).toMatch(/\{expanded && \(\s*<ScrollArea/);
+  it("ne monte le panneau qu'à l'ouverture (un plateau compte 254 cartes)", () => {
+    expect(source).toMatch(/\{expanded &&\s*createPortal\(/);
   });
 
   it("le lancement forcé garde sa confirmation", () => {
