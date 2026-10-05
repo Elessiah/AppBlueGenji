@@ -27,8 +27,6 @@ jest.mock("@/lib/server/tournaments/bg-survie/meta");
 // l'ordre qu'il rend.
 jest.mock("@/lib/server/ranking-service");
 jest.mock("@/lib/server/tournaments/player-pushes");
-// Rangs figés au coup d'envoi : bouchonnés, seule compte la carte qu'ils rendent.
-jest.mock("@/lib/server/tournaments/frozen-seeds");
 
 import {
   getTournamentSnapshot,
@@ -54,7 +52,6 @@ import { loadSwissMeta } from "@/lib/server/tournaments/swiss";
 import { loadSurvivalMeta } from "@/lib/server/tournaments/survival";
 import { loadEnduranceMeta } from "@/lib/server/tournaments/bg-survie/meta";
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
-import { loadFrozenRankingSeeds } from "@/lib/server/tournaments/frozen-seeds";
 import { clearCache } from "@/lib/server/cache";
 import { dispatchMatchStartNotices } from "@/lib/server/tournaments/player-pushes";
 import type { TournamentListRow, TournamentRow } from "@/lib/server/tournaments/_internal";
@@ -500,6 +497,27 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
     );
   });
 
+  /** Classement de survie chargé par l'instantané : il porte les rangs figés au lancement. */
+  function frozenSurvival(seeds: Array<[number, number]>) {
+    jest.mocked(loadSurvivalMeta).mockResolvedValue({
+      roundsBeforeFirstCut: 2,
+      roundsPerCut: 1,
+      currentRound: 1,
+      barrageRounds: 0,
+      standings: seeds.map(([teamId, seed]) => ({
+        teamId,
+        teamName: `Équipe ${teamId}`,
+        logoUrl: null,
+        seed,
+        wins: 0,
+        losses: 0,
+        status: "ACTIVE",
+        eliminatedRound: null,
+        rank: seed,
+      })),
+    });
+  }
+
   const order = (snapshot: Awaited<ReturnType<typeof getTournamentSnapshot>>) =>
     snapshot?.registrations.map((reg) => [reg.teamName, reg.seed]);
 
@@ -556,8 +574,8 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
 
   it("suit, une fois lancé, les rangs figés au coup d'envoi et non la cote du moment", async () => {
     // Les matchs du tournoi font bouger les cotes : le tirage, lui, est fait.
-    preLaunch("BG_SURVIE", "RUNNING");
-    jest.mocked(loadFrozenRankingSeeds).mockResolvedValue(new Map([[2, 1], [3, 2], [1, 3]]));
+    preLaunch("SURVIVAL", "RUNNING");
+    frozenSurvival([[2, 1], [3, 2], [1, 3]]);
 
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
@@ -567,16 +585,11 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
       ["Alpha", 3],
     ]);
     expect(rankEntrantsBySiteRanking).not.toHaveBeenCalled();
-    expect(loadFrozenRankingSeeds).toHaveBeenCalledWith(
-      connection as never,
-      TOURNAMENT_ID,
-      "BG_SURVIE",
-    );
   });
 
   it("range en dernier, sans rang, une engagée absente du tirage figé", async () => {
-    preLaunch("SWISS", "FINISHED");
-    jest.mocked(loadFrozenRankingSeeds).mockResolvedValue(new Map([[3, 1]]));
+    preLaunch("SURVIVAL", "FINISHED");
+    frozenSurvival([[3, 1]]);
 
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
@@ -589,7 +602,8 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
   });
 
   it("garde l'ordre saisi par le staff une fois lancé, sans relire le tirage", async () => {
-    preLaunch("SWISS", "RUNNING", 1);
+    preLaunch("SURVIVAL", "RUNNING", 1);
+    frozenSurvival([[3, 1], [2, 2], [1, 3]]);
 
     const snapshot = await getTournamentSnapshot(TOURNAMENT_ID);
 
@@ -598,12 +612,11 @@ describe("getTournamentSnapshot — inscrites rangées par le classement du site
       ["Beta", 2],
       ["Gamma", 3],
     ]);
-    expect(loadFrozenRankingSeeds).not.toHaveBeenCalled();
   });
 
   it("porte les mêmes rangs figés dans la trame du flux que dans la lecture REST", async () => {
     preLaunch("SURVIVAL", "RUNNING");
-    jest.mocked(loadFrozenRankingSeeds).mockResolvedValue(new Map([[3, 1], [1, 2], [2, 3]]));
+    frozenSurvival([[3, 1], [1, 2], [2, 3]]);
 
     const frame = (await getTournamentSnapshotFrame(TOURNAMENT_ID))!;
     const streamed = JSON.parse(new TextDecoder().decode(frame.snapshotJson)) as {
