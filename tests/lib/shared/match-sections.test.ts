@@ -4,7 +4,7 @@ import {
   compareSectionMatches,
   matchSectionOf,
   MATCH_SECTION_ORDER,
-  needsSectionClock,
+  nextSectionChangeAt,
   sectionCountLabel,
   sectionRoundMatches,
 } from "@/lib/shared/match-sections";
@@ -47,7 +47,11 @@ describe("matchSectionOf", () => {
 
   it("garde en attente un match dont une engagée manque, même à son heure", () => {
     expect(matchSectionOf(bracketMatch({ team1Id: 1, startAt: PAST }), false, NOW)).toBe("WAITING");
-    expect(matchSectionOf(bracketMatch({ team1Id: 1 }), false, NOW)).toBe("TO_PLAN");
+    expect(matchSectionOf(bracketMatch({ team1Id: 1 }), true, NOW)).toBe("TO_PLAN");
+  });
+
+  it("ne dit pas « À planifier » un match sans engagées quand l'arbitrage ne pose pas les dates", () => {
+    expect(matchSectionOf(bracketMatch({ team1Id: 1 }), false, NOW)).toBe("WAITING");
   });
 
   it("bascule d'« En attente » à « Lancement » quand l'heure passe", () => {
@@ -127,22 +131,23 @@ describe("sectionRoundMatches", () => {
   });
 });
 
-describe("needsSectionClock", () => {
-  it("ne fait tourner l'horloge que pour un match daté non lancé", () => {
-    expect(needsSectionClock([bracketMatch({ ...ready, startAt: FUTURE })], false)).toBe(true);
-    expect(
-      needsSectionClock([bracketMatch({ ...ready, startAt: FUTURE, launchedAt: PAST })], false),
-    ).toBe(false);
-    expect(
-      needsSectionClock([bracketMatch({ ...ready, status: "COMPLETED", startAt: FUTURE })], false),
-    ).toBe(false);
-    expect(needsSectionClock([bracketMatch(ready)], true)).toBe(false);
+describe("nextSectionChangeAt", () => {
+  it("rend la plus proche heure de début d'un match en attente", () => {
+    const matches = [
+      bracketMatch({ id: 1, ...ready, startAt: LATER }),
+      bracketMatch({ id: 2, ...ready, startAt: FUTURE }),
+    ];
+    expect(nextSectionChangeAt(matches, false, NOW)).toBe(Date.parse(FUTURE));
   });
 
-  it("s'arrête une fois l'heure passée, ou si une engagée manque", () => {
-    expect(needsSectionClock([bracketMatch({ ...ready, startAt: PAST })], false, NOW)).toBe(false);
-    expect(needsSectionClock([bracketMatch({ ...ready, startAt: FUTURE })], false, NOW)).toBe(true);
-    expect(needsSectionClock([bracketMatch({ team1Id: 1, startAt: FUTURE })], false, NOW)).toBe(false);
+  it("rend null sans bascule horaire à attendre", () => {
+    expect(nextSectionChangeAt([bracketMatch({ ...ready, startAt: PAST })], false, NOW)).toBeNull();
+    expect(
+      nextSectionChangeAt([bracketMatch({ ...ready, startAt: FUTURE, launchedAt: PAST })], false, NOW),
+    ).toBeNull();
+    expect(nextSectionChangeAt([bracketMatch({ team1Id: 1, startAt: FUTURE })], false, NOW)).toBeNull();
+    expect(nextSectionChangeAt([bracketMatch(ready)], true, NOW)).toBeNull();
+    expect(nextSectionChangeAt([], false, NOW)).toBeNull();
   });
 });
 
