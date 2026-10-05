@@ -40,7 +40,6 @@ interface PlayerPseudoComboboxProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
-  autoFocus?: boolean;
   /**
    * `aria-invalid` et `aria-describedby` du champ (`useFieldErrors().aria`) :
    * l'aide, et la phrase du refus quand le pseudo en a essuyé un.
@@ -69,7 +68,6 @@ export function PlayerPseudoCombobox({
   value,
   onChange,
   placeholder,
-  autoFocus,
   aria,
   excludeUserIds = [],
 }: Readonly<PlayerPseudoComboboxProps>) {
@@ -168,7 +166,6 @@ export function PlayerPseudoCombobox({
         onBlur={() => setOpen(false)}
         onKeyDown={onKeyDown}
         placeholder={placeholder}
-        autoFocus={autoFocus}
         autoComplete="off"
         spellCheck={false}
       />

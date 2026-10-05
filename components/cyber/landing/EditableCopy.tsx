@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { focusOnMount } from "@/lib/shared/focus-on-mount";
 import { useToast } from "@/components/ui/toast";
 import { siteCopyField, type SiteCopyKey } from "@/lib/shared/site-copy";
 import styles from "./EditableCopy.module.css";
@@ -89,7 +90,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             maxLength={field.maxLength}
             rows={Math.min(8, Math.max(3, draft.split("\n").length + 1))}
             onChange={(e) => setDraft(e.target.value)}
-            autoFocus
+            ref={focusOnMount}
           />
         ) : (
           <input
@@ -98,7 +99,7 @@ export function EditableCopy({ copyKey, value, canEdit, children }: Readonly<Edi
             value={draft}
             maxLength={field?.maxLength}
             onChange={(e) => setDraft(e.target.value)}
-            autoFocus
+            ref={focusOnMount}
           />
         )}
         <div className={styles.actions}>

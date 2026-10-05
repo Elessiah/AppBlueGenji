@@ -3,63 +3,88 @@
 # release:skip = aucun bump. Le commit de version porte [skip ci] et n'ouvre aucune PR,
 # donc il ne relance ni ce workflow ni le CI.
 #
-# pull_request_target et non pull_request : une PR venue d'un fork recevrait sinon un
-# jeton en lecture seule et ne serait jamais versionnée. C'est sans danger ici, le job
-# n'extrait que main et n'exécute aucun code de la PR.
+# Déclenché par le push sur main (la fusion elle-même), pas par pull_request_target :
+# le job tourne dans le contexte du dépôt, une PR venue d'un fork est versionnée comme
+# les autres, et aucun déclencheur privilégié n'a l'occasion d'extraire le code d'une
+# PR. La PR fusionnée est retrouvée par l'API à partir du commit poussé.
 name: Version bump
 
 on:
-  pull_request_target:
-    types: [closed]
+  push:
     branches: [main]
 
 permissions:
   contents: write
+  pull-requests: read
 
 # Pas de groupe global : GitHub ne garde qu'une exécution en attente par groupe et
 # annulerait les autres (un bump perdu sans erreur). Les fusions simultanées se
 # départagent au push, qui recalcule la version sur main à jour à chaque essai.
 concurrency:
-  group: version-bump-${{ github.event.pull_request.number }}
+  group: version-bump-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
   bump:
-    if: >-
-      github.event.pull_request.merged == true &&
-      !contains(github.event.pull_request.labels.*.name, 'release:skip') &&
-      !startsWith(github.event.pull_request.head.ref, 'release/') &&
-      github.event.pull_request.user.login != 'github-actions[bot]'
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.RELEASE_TOKEN || github.token }}
-      IS_MAJOR: ${{ contains(github.event.pull_request.labels.*.name, 'release:major') }}
-      IS_MINOR: ${{ contains(github.event.pull_request.labels.*.name, 'release:minor') }}
-      PR_NUMBER: ${{ github.event.pull_request.number }}
     steps:
+      # Un push direct sur main (sans PR) ne monte aucune version. Le lien
+      # commit → PR peut apparaître quelques secondes après le push : trois essais.
+      - name: Retrouver la PR fusionnée
+        id: pr
+        run: |
+          pr=""
+          for attempt in 1 2 3; do
+            pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+              --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0] // empty')
+            [ -n "$pr" ] && break
+            sleep $((attempt * 5))
+          done
+          if [ -z "$pr" ]; then
+            echo "Aucune PR fusionnée pour $GITHUB_SHA : pas de bump."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          labels=",$(jq -r '[.labels[].name] | join(",")' <<< "$pr"),"
+          head_ref=$(jq -r '.head.ref' <<< "$pr")
+          author=$(jq -r '.user.login' <<< "$pr")
+          # Garde anti-boucle : release:skip, branches release/*, PR du bot.
+          skip=false
+          case "$labels" in *",release:skip,"*) skip=true ;; esac
+          case "$head_ref" in release/*) skip=true ;; esac
+          if [ "$author" = "github-actions[bot]" ]; then skip=true; fi
+          if [[ "$labels" == *",release:major,"* ]]; then level=major
+          elif [[ "$labels" == *",release:minor,"* ]]; then level=minor
+          else level=patch
+          fi
+          {
+            echo "skip=$skip"
+            echo "number=$(jq -r '.number' <<< "$pr")"
+            echo "level=$level"
+          } >> "$GITHUB_OUTPUT"
+
+      # Le push sur main est du code déjà fusionné ; on extrait tout de même main
+      # à jour (pas le commit poussé) : une autre fusion a pu passer entre-temps.
       - uses: actions/checkout@v4
+        if: steps.pr.outputs.skip == 'false'
         with:
           ref: main
           fetch-depth: 0
           token: ${{ secrets.RELEASE_TOKEN || github.token }}
 
       - uses: actions/setup-node@v4
+        if: steps.pr.outputs.skip == 'false'
         with:
           node-version: '20'
 
-      - name: Choisir le niveau
-        id: level
-        run: |
-          if [ "$IS_MAJOR" = "true" ]; then level=major
-          elif [ "$IS_MINOR" = "true" ]; then level=minor
-          else level=patch
-          fi
-          echo "level=$level" >> "$GITHUB_OUTPUT"
-
       - name: Monter la version, commiter, taguer et pousser
         id: bump
+        if: steps.pr.outputs.skip == 'false'
         env:
-          LEVEL: ${{ steps.level.outputs.level }}
+          LEVEL: ${{ steps.pr.outputs.level }}
+          PR_NUMBER: ${{ steps.pr.outputs.number }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -98,6 +123,7 @@ jobs:
           exit 1
 
       - name: Publier la release
+        if: steps.pr.outputs.skip == 'false'
         env:
           VERSION: ${{ steps.bump.outputs.version }}
         run: |

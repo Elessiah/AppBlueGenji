@@ -137,7 +137,7 @@ export default function EditTournamentPage() {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const load = async () => {
       const me = await fetch("/api/auth/me", { cache: "no-store" })
         .then(async (r) =>
           r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } }) : null,
@@ -178,7 +178,12 @@ export default function EditTournamentPage() {
         state: successPayload.state,
         refereeScheduling: successPayload.refereeScheduling,
       });
-    })();
+    };
+    // Une coupure réseau pendant le chargement laissait la page sur
+    // « Chargement du tournoi... » sans rien dire.
+    load().catch(() => {
+      if (!cancelled) showError("Erreur réseau, réessaye.");
+    });
 
     return () => {
       cancelled = true;

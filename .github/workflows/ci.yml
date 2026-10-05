@@ -15,7 +15,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Lint
         run: npm run lint
       # `next build` ne vérifie que le code de l'application : `tests/` est
@@ -34,7 +34,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Build
         run: npm run build
 
@@ -48,7 +48,7 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       - name: Run tests
         run: npm test
 
@@ -62,10 +62,10 @@ jobs:
           node-version: '20'
           cache: 'npm'
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --ignore-scripts
       # --with-deps installe aussi les libs système Linux requises par Chromium.
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: ./node_modules/.bin/playwright install --with-deps chromium
       # Pas de DB en CI : seuls les tests auth (sans prérequis) s'exécutent ;
       # le parcours authentifié reste skippé tant que E2E_AUTH_USER n'est pas défini.
       - name: Run E2E tests

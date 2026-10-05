@@ -90,7 +90,7 @@ export function GhostRegistrationDialog({
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       try {
         const res = await fetch(`/api/admin/tournaments/${tournamentId}/ghost-registrations`, {
           cache: "no-store",

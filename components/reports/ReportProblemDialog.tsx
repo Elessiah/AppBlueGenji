@@ -152,9 +152,11 @@ export function ReportProblemDialog({
       .then(async (response) =>
         response.ok ? ((await response.json()) as { reports: ContestableReportOption[] }).reports : [],
       )
-      .catch(() => [])
       .then((reports) => {
         if (!cancelled) setContestable(reports);
+      })
+      .catch(() => {
+        if (!cancelled) setContestable([]);
       });
     return () => {
       cancelled = true;
