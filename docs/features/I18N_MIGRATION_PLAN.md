@@ -1,9 +1,9 @@
 # Site bilingue FR/EN — plan de migration
 
-> **Statut : plan, rien n'est implémenté.** Décision du 2026-10-05 : le site devient bilingue
-> avec des **adresses indexées distinctes** par langue. Ce document mesure le chantier, fixe le
-> choix technique et découpe le travail en lots livrables chacun en une PR. Chaque point marqué
-> **« décision requise »** attend un arbitrage avant le lot qui en dépend.
+> **Statut : lot 0 (infrastructure) livré — aucune page traduite.** Ce qui existe est décrit dans
+> `I18N.md` ; ce document garde la mesure, le choix technique et le découpage en lots. Décision du
+> 2026-10-05 : le site devient bilingue avec des **adresses indexées distinctes** par langue.
+> Les arbitrages sont rendus (§ Décisions prises, 2026-10-06).
 
 ## Forme retenue (rappel de la décision)
 
@@ -146,12 +146,13 @@ recomposer avec le nonce CSP. Proposition plus légère, compatible avec `locale
    `/en/connexion` le motif ne serait ni envoyé ni effacé. La comparaison se fait sur le chemin
    sans préfixe, et le cookie prend `path: "/"` limité par le contrôle de chemin du middleware
    (ou un second cookie par langue) — tranché et testé au lot 6, `/en/connexion` restant hors
-   liste blanche d'ici là.
+   liste blanche d'ici là. **Fait au lot 0** (demande du 2026-10-06) : `path: "/"`, comparaison
+   sans préfixe ; le lot 6 n'a plus qu'à vérifier l'écran.
 2. **Arborescence inchangée** : `app/regles/page.tsx` sert `/regles` et `/en/regles`.
-3. **`next-intl` « sans routage »** : `i18n/request.ts` → `getRequestConfig` lit
+3. **`next-intl` « sans routage »** : `lib/server/i18n-request.ts` → `getRequestConfig` lit
    `x-bg-locale` dans `headers()` (déjà lu par le layout : aucun coût de rendu) et charge les
    messages de la langue.
-4. **Liste blanche des routes migrées** (`lib/shared/locales.ts`) : `/en/<x>` pour une route
+4. **Liste blanche des routes migrées** (`lib/shared/i18n-routes.ts`) : `/en/<x>` pour une route
    pas encore traduite → **307 vers `/<x>`** (pas un contenu français dupliqué sous `/en`, qui
    serait un doublon pour les moteurs). Ce n'est pas une redirection sur `Accept-Language`.
 
@@ -161,6 +162,35 @@ navigation client **et préchargement** RSC de `/en/...` (cf. exclusion des pré
 ci-dessus) ; `/en/api/x` → 404 ; nonce présent sur `/` **et** `/en/` (test e2e qui lit
 l'attribut `nonce` des scripts) ; `npm run typecheck` (TS 7) et `typecheck:ts5` acceptent
 l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
+
+### Ce que le lot 0 a établi (2026-10-06) — écarts au plan
+
+- **`usePathname()`** rend le chemin du navigateur (`/en/regles`) côté client ; le rendu serveur
+  voit la route réécrite. Aucun écart d'hydratation constaté (sélecteur rendu identique), parce que
+  tout passe par `splitLocalePrefix` (`useLocalePathname`) et que la langue vient d'un contexte,
+  jamais du chemin.
+- **Préchargements** : le middleware **ne peut pas** les reconnaître — Next retire
+  `next-router-prefetch` et `rsc` de la requête qu'il lui remet ; seul le `matcher` les voit. Un
+  préchargement de `/en/…` suit donc le chemin commun (réécrit, `x-bg-locale: en`) et tire un nonce
+  inutile, sans effet. Le « sans tirer de nonce » du plan est abandonné.
+- **Pas de `createNextIntlPlugin`** : son module charge à l'import le binaire natif de
+  `@swc/core` (extracteur de messages, inutilisé), qui échouait localement et alourdit chaque
+  build. `next.config.ts` pose lui-même les deux alias `next-intl/config` (Turbopack et webpack)
+  que le greffon aurait posés. Fichiers déplacés en conséquence : `lib/server/i18n-request.ts`
+  (et non `i18n/request.ts`, hors du périmètre de `npm run lint`).
+- **Une navigation qui change de langue est complète** (`<a>` nu, `location.assign`) : la mise en
+  page racine (`<html lang>`, messages du client) n'est pas rendue de nouveau par une navigation
+  client. `LocaleLink`/`useLocaleRouter` le font seuls ; un `next/link` nu dans un dossier traduit
+  est refusé par ESLint.
+- **Contexte de langue propre** (`useAppLocale`, `fr` par défaut) en plus de celui de
+  `next-intl` : un lien d'entité se rend sans fournisseur (tests, écrans non migrés).
+- **`/fr/api/…` → 404** (et non 308) : comme `/en/api/…`, aucune adresse préfixée ne mène à
+  l'API.
+- **Formateurs** : seul le fuseau commun (`Europe/Paris`) est posé ; la migration de
+  `lib/shared/dates.ts` / `plural.ts` reste au lot 4. **Image OG** par langue : au lot 2.
+- **Test e2e** : `e2e/i18n.spec.ts` (307, 404 `/en/api`, `Accept-Language`, `lang`, nonce) ; les
+  contrôles `lang="en"`/`hreflang` d'une page anglaise s'y ajoutent avec la première route
+  traduite.
 
 ### Raccordement, sujet par sujet
 

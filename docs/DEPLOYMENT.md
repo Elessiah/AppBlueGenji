@@ -64,7 +64,8 @@ explicitement** (`false`), ce qui fait taire l'avertissement sans rien casser :
 |---|---|---|
 | `esbuild` (via `tsx`) | vérifie le binaire, remplace le lanceur JS | le binaire arrive par la dépendance optionnelle `@esbuild/<plateforme>` — vérifié en prod : `tsx` et `esbuild` fonctionnent sans lui |
 | `unrs-resolver` (ESLint, Jest) | repli si la liaison native manque | idem, `@unrs/resolver-binding-<plateforme>` |
-| `@parcel/watcher` (Jest) | compilation depuis les sources si aucun binaire | idem, et ne sert qu'au mode `--watch` |
+| `@parcel/watcher` (Jest, `next-intl`) | compilation depuis les sources si aucun binaire | idem, et ne sert qu'au mode `--watch` et à l'extracteur de messages de `next-intl`, inutilisé |
+| `@swc/core` (via `next-intl`) | vérifie le binaire, repli WebAssembly | ne sert qu'à l'extracteur et au greffon de `next-intl`, que le site n'importe pas (`next.config.ts`, `docs/features/I18N.md`) |
 
 `./update.sh` et le CI vont plus loin : `npm ci --ignore-scripts` n'exécute
 **aucun** script d'installation, approuvé ou non. `sharp` (0.35) n'en a pas —
