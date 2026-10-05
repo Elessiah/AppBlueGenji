@@ -12,7 +12,7 @@
 }
 
 .hero {
-  padding: 80px 0 24px;
+  padding: 56px 0 16px;
   overflow: hidden;
 }
 
@@ -136,6 +136,7 @@
   border-color: transparent;
   background:
     linear-gradient(180deg, rgba(var(--blue-500-rgb), 0.16), rgba(5, 8, 12, 0.92) 72%) padding-box,
+    linear-gradient(var(--cyber-bg), var(--cyber-bg)) padding-box,
     var(--grad-brand) border-box;
   border-width: 2px;
 }
@@ -378,9 +379,9 @@
   gap: 3px;
 }
 
-.form_w,
-.form_l,
-.form_d {
+.formWin,
+.formLoss,
+.formDraw {
   display: inline-grid;
   place-items: center;
   width: 20px;
@@ -390,18 +391,18 @@
   font-weight: 700;
 }
 
-.form_w {
+.formWin {
   color: var(--cyber-bg);
   background: var(--blue-300);
 }
 
-.form_l {
+.formLoss {
   color: var(--result-loss-ink);
   background: var(--result-loss-soft);
   box-shadow: inset 0 0 0 1px rgba(var(--result-loss-rgb), 0.6);
 }
 
-.form_d {
+.formDraw {
   color: var(--ink-dim);
   box-shadow: inset 0 0 0 1px var(--line-soft);
 }
@@ -509,7 +510,7 @@
 
   /* Ligne en carte : rang + équipe en haut, les chiffres libellés en dessous
      (`data-label`, RESPONSIVE_TABLES.md). */
-  .head {
+  .row.head {
     display: none;
   }
 
@@ -539,7 +540,8 @@
   }
 
   /* Les chiffres s'alignent sous le nom, pas sous le rang. */
-  .row > .points {
+  .row > .points,
+  .row > .formCell {
     margin-left: 44px;
   }
 

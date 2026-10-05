@@ -24,7 +24,14 @@ export type RankingBoardProps = {
   unavailable?: boolean;
 };
 
-const PLACE_LABELS = ["1re place", "2e place", "3e place"] as const;
+/** Case de forme : victoire glacier, défaite dans sa teinte réservée, nul neutre. */
+const FORM_CLASSES: Record<FormResult, string | undefined> = {
+  w: styles.formWin,
+  l: styles.formLoss,
+  d: styles.formDraw,
+};
+
+const PLACE_LABELS =["1re place", "2e place", "3e place"] as const;
 
 /** Une défaite se lit dans sa couleur ; zéro défaite reste neutre (`DESIGN_SYSTEM.md`). */
 function lossClass(losses: number): string {
@@ -48,7 +55,7 @@ function FormStrip({ form }: Readonly<{ form: readonly FormResult[] }>) {
   return (
     <span className={styles.form} role="img" aria-label={`Forme récente, du plus récent au plus ancien : ${spoken}`}>
       {recent.map((result, index) => (
-        <span key={index} className={styles[`form_${result}`]} aria-hidden="true">
+        <span key={index} className={FORM_CLASSES[result]} aria-hidden="true">
           {FORM_LETTERS[result]}
         </span>
       ))}
