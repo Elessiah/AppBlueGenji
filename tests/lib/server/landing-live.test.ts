@@ -72,6 +72,7 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     live_url: null,
     live_started_at: null,
     launched_at: null,
+    launch_pairing: null,
     referee_scheduling: 0,
     ...overrides,
   };
@@ -238,13 +239,27 @@ describe("getLandingLive", () => {
     jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([
       matchRow({ id: 100, start_at: new Date(Date.now() + 3_600_000) }),
-      matchRow({ id: 101, launched_at: new Date(Date.now() - 60_000) }),
+      matchRow({ id: 101, launched_at: new Date(Date.now() - 60_000), launch_pairing: "11:12" }),
     ]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
     expect(live?.currentMatch?.id).toBe(101);
     expect(live?.currentMatch?.launchPhase).toBe("LAUNCHED");
+  });
+
+  it("ignore un lancement posé pour une autre paire d'engagés", async () => {
+    // Arbitre revenu en arrière : le lancement stocké vise l'ancienne paire,
+    // la fiche du tournoi (`currentLaunchState`) remet le match à planifier.
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([
+      matchRow({ id: 100, referee_scheduling: 1, launched_at: new Date(), launch_pairing: "11:99" }),
+      matchRow({ id: 101, referee_scheduling: 1, start_at: new Date(Date.now() + 3_600_000) }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.id).toBe(101);
   });
 
   it("garde « lancé » un match à l'antenne encore à planifier", async () => {

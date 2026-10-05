@@ -240,6 +240,13 @@ describe("featuredMatchStatusLabel", () => {
     expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T11:55:00Z" }, NOW)).toBe("Lancement");
   });
 
+  it("s'en tient à la phase du serveur tant que l'horloge n'est pas montée", () => {
+    // Rendu serveur et hydratation doivent coïncider : aucune lecture de l'heure.
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2020-01-01T00:00:00Z" }, null)).toMatch(
+      /^Prochain match · /,
+    );
+  });
+
   it("se passe d'un horaire illisible ou absent", () => {
     expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "pas une date" }, NOW)).toBe("Prochain match");
     expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: null }, NOW)).toBe("Prochain match");

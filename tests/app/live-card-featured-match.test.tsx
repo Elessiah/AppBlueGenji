@@ -229,7 +229,7 @@ describe("LiveCard — match mis en avant pas encore commencé", () => {
     // sans relecture, l'ancien libellé tiendrait jusqu'au sondage (5 min).
     const source = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
     expect(source).toMatch(/useClock\(LIVE_CARD_CLOCK_MS, live\?\.currentMatch\?\.launchPhase === "SCHEDULED"\)/);
-    expect(source).toContain("featuredMatchStatusLabel(currentMatch, clock ?? undefined)");
+    expect(source).toContain("featuredMatchStatusLabel(currentMatch, clock)");
   });
 
   it("n'ajoute rien à un match lancé", () => {
