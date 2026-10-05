@@ -1705,6 +1705,14 @@ html {
   transform: none;
 }
 
+/* Décompte des chiffres du hero (`components/cyber/landing/CountUp.tsx`) : le
+   chiffre qui défile est un pseudo-élément au texte alternatif vide — ni lu,
+   ni copié —, la valeur réelle reste le seul texte de la page. */
+.count-up[data-count]::before {
+  content: attr(data-count);
+  content: attr(data-count) / "";
+}
+
 /* Apparition au défilement (`components/cyber/landing/Reveal.tsx`) : la classe
    `reveal-pending` n'est posée **que par JavaScript**, et seulement si les
    animations décoratives sont permises — sans JS, le contenu est visible. */
@@ -1737,8 +1745,8 @@ html {
 
   /* Décompte (`CountUp`) : un chiffre hors de l'écran attend à 0 — l'imprimé
      montre la valeur réelle, pas le chiffre qui défile. */
-  .count-up-anim {
-    display: none;
+  .count-up[data-count]::before {
+    content: none;
   }
 
   .count-up-real {

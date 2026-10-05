@@ -70,13 +70,20 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
     };
   }, [value, decorativeMotion]);
 
+  const animating = shown !== value;
+
   return (
-    <div ref={ref} className={className} style={{ minWidth: `${String(value).length}ch` }}>
-      {/* Le chiffre qui défile est décoratif ; la valeur réelle reste dans la
-          page pour les lecteurs d'écran, la recherche et la traduction, même
-          pendant l'attente d'un chiffre hors de l'écran (parqué à 0). */}
-      <span className="count-up-anim" aria-hidden="true">{shown}</span>
-      <span className="sr-only count-up-real">{value}</span>
+    <div
+      ref={ref}
+      className={`${className ?? ""} count-up`.trim()}
+      // Le chiffre qui défile est peint par `::before` (`content: attr(…) / ""`,
+      // ni lu, ni copié, ni indexé) ; la page ne porte qu'un nœud de texte, la
+      // valeur réelle — masquée à l'œil seulement le temps du décompte ou de
+      // l'attente d'un chiffre hors de l'écran (parqué à 0).
+      data-count={animating ? shown : undefined}
+      style={{ minWidth: `${String(value).length}ch` }}
+    >
+      <span className={animating ? "sr-only count-up-real" : "count-up-real"}>{value}</span>
     </div>
   );
 }

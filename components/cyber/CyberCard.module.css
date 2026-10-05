@@ -16,13 +16,16 @@
 /* Survol : la carte grandit à peine (transform seul, rien ne bouge autour) et
    s'éclaire d'un halo bleu → violet. Un agrandissement et non une translation :
    la carte ne quitte jamais le pointeur posé sur son bord, qui la ferait
-   retomber puis remonter en boucle. */
-.lift:hover {
-  border-color: rgba(90, 200, 255, 0.45);
-  transform: scale(1.012);
-  box-shadow:
-    0 0 0 1px rgba(var(--blue-500-rgb), 0.2),
-    0 16px 40px -18px rgba(var(--violet-400-rgb), 0.5);
+   retomber puis remonter en boucle. Pointeur fin seulement : au toucher, le
+   survol resterait collé après le tapotement. */
+@media (hover: hover) and (pointer: fine) {
+  .lift:hover {
+    border-color: rgba(90, 200, 255, 0.45);
+    transform: scale(1.012);
+    box-shadow:
+      0 0 0 1px rgba(var(--blue-500-rgb), 0.2),
+      0 16px 40px -18px rgba(var(--violet-400-rgb), 0.5);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
