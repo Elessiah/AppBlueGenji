@@ -157,7 +157,16 @@ describe("RankingBoard — affichage progressif", () => {
   });
 
   it("annonce le nombre de lignes ajoutées, et la fin du classement", () => {
-    expect(rankingAddedMessage(50, false)).toBe("50 équipes ajoutées.");
-    expect(rankingAddedMessage(1, true)).toBe("1 équipe ajoutée. Fin du classement.");
+    expect(rankingAddedMessage(50, "more")).toBe("50 équipes ajoutées.");
+    expect(rankingAddedMessage(1, "end")).toBe("1 équipe ajoutée. Fin du classement.");
+    expect(rankingAddedMessage(50, "capped")).toBe("50 équipes ajoutées. Affichage limité aux 1000 premières équipes.");
+  });
+
+  it("au plafond, dit qu'il reste des équipes au lieu d'un faux « fin du classement »", () => {
+    const capped = Array.from({ length: 1000 }, (_, index) => row(index + 1));
+    const markup = render({ rows: capped, forms: null, hasMore: true });
+    expect(markup).not.toContain("Afficher plus");
+    expect(markup).toContain("Affichage limité aux 1000 premières équipes.");
+    expect(render({ rows: capped, forms: null, hasMore: false })).not.toContain("Affichage limité");
   });
 });
