@@ -8,9 +8,9 @@
  * garde son comportement d'origine, dès qu'un arbitre réordonne il passe à 1 et
  * l'ordre saisi fait autorité partout.
  *
- * Fenêtre d'édition : jusqu'à la première saisie de score (cf. `lib/shared/seeding.ts`).
- * Si des matchs ont déjà été générés mais qu'aucun score n'a été posé, ils sont
- * détruits et régénérés depuis le nouvel ordre.
+ * Fenêtre d'édition : jusqu'au coup d'envoi (cf. `lib/shared/seeding.ts`). Dès
+ * qu'un match existe, le réordonnancement est refusé (`SEEDING_LOCKED_STARTED`) :
+ * aucun plateau ni horaire de match n'est jamais détruit ni régénéré ici.
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
