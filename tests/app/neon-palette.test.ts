@@ -95,4 +95,8 @@ describe("palette néon froid", () => {
     const props = [...pending.matchAll(/([a-z-]+)\s*:/g)].map((m) => m[1]).sort();
     expect(props).toEqual(["opacity", "transform"]);
   });
+
+  it("l'impression montre les sections jamais atteintes", () => {
+    expect(sheet).toMatch(/@media print\s*\{\s*\.reveal-pending\s*\{[^}]*opacity:\s*1/);
+  });
 });

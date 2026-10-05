@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
-import { COUNT_UP_MS, countUpValue, shouldDeferReveal } from "@/lib/shared/landing-motion";
+import { COUNT_UP_MS, COUNT_UP_ON_SCREEN_FROM, countUpStart, countUpValue, shouldDeferReveal } from "@/lib/shared/landing-motion";
 import { powerPolicy } from "@/lib/shared/client-power";
 
 const base = { motion: true, observerSupported: true, top: 1200, viewportHeight: 800 };
@@ -64,6 +64,19 @@ describe("countUpValue", () => {
     expect(countUpValue(50, Number.NaN)).toBe(50);
     expect(countUpValue(Number.NaN, 0.5)).toBe(0);
     expect(countUpValue(0, 0.5)).toBe(0);
+  });
+
+  it("part d'une valeur donnée et y reste à l'avancement 0", () => {
+    expect(countUpValue(353, 0, 300)).toBe(300);
+    expect(countUpValue(353, 0.5, 300)).toBeGreaterThan(300);
+    expect(countUpValue(353, 1, 300)).toBe(353);
+  });
+
+  it("un chiffre déjà à l'écran ne retombe pas à 0 ; hors de l'écran, il part de 0", () => {
+    expect(countUpStart(353, false)).toBe(0);
+    expect(countUpStart(353, true)).toBe(Math.round(353 * COUNT_UP_ON_SCREEN_FROM));
+    expect(countUpStart(353, true)).toBeGreaterThan(250);
+    expect(countUpStart(Number.NaN, true)).toBe(0);
   });
 
   it("dure un peu plus d'une seconde", () => {
