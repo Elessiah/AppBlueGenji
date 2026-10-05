@@ -4,7 +4,8 @@ import { contrastRatio } from "@/lib/shared/color-contrast";
 import { RECRUITMENT_DOMAINS, RECRUITMENT_DOMAIN_PILL } from "@/lib/shared/recruitment";
 import { RULE_MODE_TONE, RULE_STATUS_PILL } from "@/lib/shared/rules-display";
 import { TOURNAMENT_RULE_MODES } from "@/lib/shared/tournament-rules";
-import { globals, ROOT, stripComments } from "./_lib/style-sweep";
+import { ROOT, stripComments } from "./_lib/style-sweep";
+import { blend, COLD_TONE_TOKENS, tokenHex as hex, tokenTriplet as triplet } from "./_lib/tone-contrast";
 import { readSource } from "../helpers/read-source";
 
 /**
@@ -13,31 +14,10 @@ import { readSource } from "../helpers/read-source";
  * de marque — et chaque texte coloré lisible (4,5:1) sur son fond teinté.
  */
 
-const root = stripComments(globals).match(/(?:^|\})\s*:root\s*\{([^}]*)\}/)![1];
-const hex = (name: string) => root.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`))![1];
-const triplet = (name: string) =>
-  root
-    .match(new RegExp(`${name}:\\s*(\\d+),\\s*(\\d+),\\s*(\\d+);`))!
-    .slice(1, 4)
-    .map(Number);
-
-function blend(baseHex: string, tint: number[], alpha: number): string {
-  const base = [1, 3, 5].map((i) => Number.parseInt(baseHex.slice(i, i + 2), 16));
-  const mixed = base.map((c, i) => Math.round(c * (1 - alpha) + tint[i] * alpha));
-  return `#${mixed.map((c) => c.toString(16).padStart(2, "0")).join("")}`;
-}
-
-const TONE_TOKENS: Record<string, { ink: string; rgb: string }> = {
-  blue: { ink: "--blue-300", rgb: "--blue-500-rgb" },
-  violet: { ink: "--violet-300", rgb: "--violet-400-rgb" },
-  cyan: { ink: "--cyan-400", rgb: "--cyan-400-rgb" },
-  teal: { ink: "--teal-400", rgb: "--teal-400-rgb" },
-  pink: { ink: "--pink-400", rgb: "--pink-400-rgb" },
-};
-
+const TONE_TOKENS = COLD_TONE_TOKENS;
 const css = (...segments: string[]) => stripComments(readSource(join(ROOT, ...segments)));
 const INDEX_CSS = css("app", "regles", "page.module.css");
-const MODE_CSS = css("app", "regles", "[slug]", "page.module.css");
+const TONES_CSS = css("app", "regles", "tones.module.css");
 
 describe("teintes des modes de tournoi", () => {
   it("donne à chaque mode publié une teinte froide", () => {
@@ -55,13 +35,11 @@ describe("teintes des modes de tournoi", () => {
     }
   });
 
-  it("définit chaque teinte, texte et fond, dans les deux feuilles des règles", () => {
+  it("définit chaque teinte, texte et fond, dans la feuille commune des règles", () => {
     for (const [tone, { ink, rgb }] of Object.entries(TONE_TOKENS)) {
-      for (const sheet of [INDEX_CSS, MODE_CSS]) {
-        const block = sheet.match(new RegExp(`\\[data-tone="${tone}"\\]\\s*\\{([^}]*)\\}`))![1];
-        expect(block).toContain(`var(${ink})`);
-        expect(block).toContain(`var(${rgb})`);
-      }
+      const block = TONES_CSS.match(new RegExp(`\\.tone\\[data-tone="${tone}"\\]\\s*\\{([^}]*)\\}`))![1];
+      expect(block).toContain(`var(${ink})`);
+      expect(block).toContain(`var(${rgb})`);
     }
   });
 
@@ -79,6 +57,9 @@ describe("teintes des modes de tournoi", () => {
     expect(index).toContain("tone={RULE_MODE_TONE[mode.diagram]}");
     expect(page).toContain("data-tone={RULE_MODE_TONE[mode.diagram]}");
     expect(page).toContain("data-tone={RULE_MODE_TONE[other.diagram]}");
+    // `data-tone` ne vaut rien sans la classe de la feuille commune qui le lit.
+    expect(index).toContain("tones.tone");
+    expect(page.match(/tones\.tone/g)).toHaveLength(3);
   });
 
   it("n'ajoute aucune teinte chaude aux feuilles d'index", () => {
