@@ -15,8 +15,9 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+  min-height: 32px;
   padding: 6px 8px;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -45,25 +46,6 @@
   color: #06080c;
   font-size: 11px;
   line-height: 1;
-}
-
-.staffOnly {
-  display: flex;
-  justify-content: flex-end;
-  padding: 4px 6px;
-  border-top: 1px solid var(--border, #444);
-}
-
-.edit {
-  align-self: center;
-  margin: 0 6px 0 0;
-  padding: 2px 8px;
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.staffOnly .edit {
-  margin: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -19,7 +19,7 @@
   margin-top: 0;
 }
 
-/* Le libellé peut passer à la ligne : une colonne de manche fait 210 px. */
+/* Le libellé peut passer à la ligne : une colonne de manche fait 260 px. */
 .label {
   min-width: 0;
   font-size: 11px;
