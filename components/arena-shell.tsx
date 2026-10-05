@@ -22,9 +22,9 @@ export async function ArenaShell({
   mainClassName,
   mainStyle,
 }: Readonly<{ user: AuthUser; children: ReactNode; mainClassName?: string; mainStyle?: CSSProperties }>) {
-  const activeTeam = await getUserActiveTeam(user.id);
-  // Le compteur ne doit jamais faire tomber la page : une lecture ratée
-  // l'affiche à zéro, le panneau dira la vérité.
+  // Ni l'équipe active ni le compteur ne doivent faire tomber la page : une
+  // lecture ratée masque le raccourci d'équipe ou affiche le compteur à zéro.
+  const activeTeam = await getUserActiveTeam(user.id).catch(() => null);
   const openReports = can(user, "moderation") ? await countOpenReports().catch(() => 0) : null;
 
   return (
