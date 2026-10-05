@@ -54,6 +54,13 @@ describe("animations de l'accueil — contenu visible sans JavaScript", () => {
     }
   });
 
+  it("Reveal montre la section dès qu'un de ses contrôles prend le focus", () => {
+    const source = readSource("components/cyber/landing/Reveal.tsx");
+    expect(source).toContain('addEventListener("focusin", reveal)');
+    expect(source).toContain('removeEventListener("focusin", reveal)');
+    expect(source).not.toMatch(/rootMargin:\s*"[^"]*-\d/);
+  });
+
   it("l'accueil enveloppe ses sections sous le hero, pas le hero (LCP)", () => {
     const page = readSource("app/page.tsx");
     expect(page).not.toMatch(/<Reveal>\s*<Hero/);
