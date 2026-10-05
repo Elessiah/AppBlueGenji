@@ -30,7 +30,7 @@ export async function replaceMatchMaps(
   maps: ReadonlyArray<MatchMapInput>,
   userId: number | null,
 ): Promise<void> {
-  await connection.execute(`DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?`, [matchId, source]);
+  await clearMatchMaps(connection, matchId, source);
   if (maps.length === 0) return;
   const placeholders = maps.map(() => "(?, ?, ?, ?, ?, ?, ?)").join(", ");
   const values = maps.flatMap((map, index) => [
@@ -48,6 +48,25 @@ export async function replaceMatchMaps(
      VALUES ${placeholders}`,
     values,
   );
+}
+
+/**
+ * Efface un jeu de maps **s'il existe**. Un `DELETE` qui ne trouve rien pose
+ * quand même un verrou d'intervalle (InnoDB, `REPEATABLE READ`) : deux reports
+ * simultanés sur deux matchs encore sans ligne verrouillaient le même
+ * intervalle, puis s'attendaient l'un l'autre à l'insertion — interblocage, et
+ * un 500 pour l'une des deux équipes. La lecture préalable est une lecture
+ * cohérente, sans verrou ; elle ne court aucune course pour ce match-ci, dont
+ * la ligne `bg_matches` est déjà verrouillée par l'appelant.
+ */
+async function clearMatchMaps(connection: PoolConnection, matchId: number, source: MatchMapSource): Promise<void> {
+  const result = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1`,
+    [matchId, source],
+  );
+  const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];
+  if (rows.length === 0) return;
+  await connection.execute(`DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?`, [matchId, source]);
 }
 
 /** Maps d'un jeu précis, dans l'ordre joué. */
@@ -76,7 +95,7 @@ export async function promoteReportedMaps(
   matchId: number,
   from: "TEAM1" | "TEAM2",
 ): Promise<void> {
-  await connection.execute(`DELETE FROM bg_match_maps WHERE match_id = ? AND source = 'FINAL'`, [matchId]);
+  await clearMatchMaps(connection, matchId, "FINAL");
   await connection.execute(
     `INSERT INTO bg_match_maps
        (match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at)

@@ -19,36 +19,46 @@ function conn(results: unknown[] = []) {
 const flat = (sql: string) => sql.replace(/\s+/g, " ").trim();
 
 describe("stockage map par map (bg_match_maps)", () => {
-  it("remplace un jeu : efface puis insère une ligne par map, numérotées depuis 1", async () => {
-    const { execute, connection } = conn();
+  it("remplace un jeu : efface l'existant puis insère une ligne par map, numérotées depuis 1", async () => {
+    const { execute, connection } = conn([[[{ found: 1 }], []]]);
     await replaceMatchMaps(connection, 10, "TEAM2", [
       { replayCode: "AAA111", team1Score: 2, team2Score: 1 },
       { replayCode: "BBB222", team1Score: 0, team2Score: 0 },
     ], 7);
 
-    expect(flat(execute.mock.calls[0][0])).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?");
-    expect(execute.mock.calls[0][1]).toEqual([10, "TEAM2"]);
-    expect(flat(execute.mock.calls[1][0])).toMatch(/^INSERT INTO bg_match_maps .* VALUES \(\?, \?, \?, \?, \?, \?, \?\), \(\?, \?, \?, \?, \?, \?, \?\)$/);
-    expect(execute.mock.calls[1][1]).toEqual([
+    expect(flat(execute.mock.calls[0][0])).toBe("SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1");
+    expect(flat(execute.mock.calls[1][0])).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?");
+    expect(execute.mock.calls[1][1]).toEqual([10, "TEAM2"]);
+    expect(flat(execute.mock.calls[2][0])).toMatch(/^INSERT INTO bg_match_maps .* VALUES \(\?, \?, \?, \?, \?, \?, \?\), \(\?, \?, \?, \?, \?, \?, \?\)$/);
+    expect(execute.mock.calls[2][1]).toEqual([
       10, "TEAM2", 1, "AAA111", 2, 1, 7,
       10, "TEAM2", 2, "BBB222", 0, 0, 7,
     ]);
   });
 
   it("une liste vide efface seulement", async () => {
-    const { execute, connection } = conn();
+    const { execute, connection } = conn([[[{ found: 1 }], []]]);
     await replaceMatchMaps(connection, 10, "FINAL", [], null);
-    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it("n'efface rien quand il n'y a rien : pas de verrou d'intervalle, pas d'interblocage", async () => {
+    const { execute, connection } = conn();
+    await replaceMatchMaps(connection, 10, "TEAM1", [{ replayCode: "AAA111", team1Score: 1, team2Score: 0 }], 7);
+    const sqls = execute.mock.calls.map((c) => flat(c[0]));
+    expect(sqls.some((sql) => sql.startsWith("DELETE"))).toBe(false);
+    expect(sqls.at(-1)).toMatch(/^INSERT INTO bg_match_maps/);
   });
 
   it("promeut la proposition retenue en résultat, puis efface les propositions", async () => {
-    const { execute, connection } = conn();
+    const { execute, connection } = conn([[[{ found: 1 }], []]]);
     await promoteReportedMaps(connection, 10, "TEAM1");
     const sqls = execute.mock.calls.map((c) => flat(c[0]));
-    expect(sqls[0]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = 'FINAL'");
-    expect(sqls[1]).toMatch(/INSERT INTO bg_match_maps .* SELECT match_id, 'FINAL'.* WHERE match_id = \? AND source = \?$/);
-    expect(execute.mock.calls[1][1]).toEqual([10, "TEAM1"]);
-    expect(sqls[2]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source IN ('TEAM1', 'TEAM2')");
+    expect(sqls[1]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?");
+    expect(execute.mock.calls[1][1]).toEqual([10, "FINAL"]);
+    expect(sqls[2]).toMatch(/INSERT INTO bg_match_maps .* SELECT match_id, 'FINAL'.* WHERE match_id = \? AND source = \?$/);
+    expect(execute.mock.calls[2][1]).toEqual([10, "TEAM1"]);
+    expect(sqls[3]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source IN ('TEAM1', 'TEAM2')");
   });
 
   it("lit un jeu dans l'ordre joué, et rien sur une réponse inattendue", async () => {

@@ -19,6 +19,8 @@ function fakeConnection(matchFormat: { type: string; value: number }) {
   const conn = {
     execute: async (sql: string, params: unknown[] = []) => {
       const q = sql.replace(/\s+/g, " ").trim();
+      // Un détail existe déjà : l'effacement a lieu (`clearMatchMaps`).
+      if (q.startsWith("SELECT 1 FROM bg_match_maps")) return [[{ found: 1 }], []];
       if (q.includes("bg_match_maps")) {
         maps.push({ sql: q, params });
         return [[], []];

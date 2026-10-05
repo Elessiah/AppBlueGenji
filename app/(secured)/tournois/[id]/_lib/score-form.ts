@@ -146,7 +146,14 @@ export function storedResultSignature(match: BracketMatch | null): string {
     match.doubleForfeit ? "FF2" : "∅",
     match.winnerTeamId ?? "∅",
     match.status,
+    // Le détail map par map compte aussi (`MAP_SCORES.md`) : un code corrigé
+    // à score égal doit réaligner le dialogue. Absent, l'empreinte d'avant.
+    ...mapsSignature(match.maps),
   ].join("|");
+}
+
+function mapsSignature(maps: ReadonlyArray<MatchMapInput> | undefined): string[] {
+  return maps && maps.length > 0 ? [JSON.stringify(maps.map((m) => [m.replayCode, m.team1Score, m.team2Score]))] : [];
 }
 
 /**
@@ -173,7 +180,8 @@ export function pendingProposalSignature(match: BracketMatch | null): string {
 }
 
 function reportSignature(report: BracketMatch["team1Report"] | undefined): string {
-  return report ? `${report.team1Score}-${report.team2Score}` : "∅";
+  if (!report) return "∅";
+  return [`${report.team1Score}-${report.team2Score}`, ...mapsSignature(report.maps)].join(":");
 }
 
 /** Le formulaire est-il resté sur les valeurs du match, sans une saisie ? */
