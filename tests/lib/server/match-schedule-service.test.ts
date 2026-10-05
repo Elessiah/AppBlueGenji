@@ -88,7 +88,7 @@ describe("setMatchStartAt", () => {
     expect(update?.params[1]).toBe(42);
     expect(connection.beginTransaction).toHaveBeenCalled();
     expect(connection.commit).toHaveBeenCalled();
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
   it("accepte la valeur brute d'un champ datetime-local", async () => {
@@ -103,7 +103,7 @@ describe("setMatchStartAt", () => {
     expect(await setMatchStartAt(42, null)).toBeNull();
     const update = writes.find((w) => w.sql.startsWith("UPDATE bg_matches"));
     expect(update?.params[0]).toBeNull();
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
   });
 
   it("traite une chaîne vide comme un effacement — le formulaire renvoie « »", async () => {

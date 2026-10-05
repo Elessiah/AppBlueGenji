@@ -134,7 +134,7 @@ describe("notifications — invalidation des caches", () => {
   });
 
   it("oublie aussi le direct de l'accueil quand l'antenne d'un match bouge", () => {
-    publishMatchUpdatedEvent(7, { onAir: true });
+    publishMatchUpdatedEvent(7, { landingLive: true });
     expect(invalidateSnapshot).toHaveBeenCalledWith(7);
     expect(invalidateLandingLive).toHaveBeenCalledTimes(1);
     // Le reste de la vitrine (compteurs, classement, ticker) ne lit pas l'antenne.
@@ -177,7 +177,7 @@ describe("notifications — événements publiés", () => {
     invalidateSnapshot.mockImplementation(() => order.push("cache"));
     publishEvent.mockImplementation(() => order.push("publish"));
 
-    publishMatchUpdatedEvent(7, { onAir: true });
+    publishMatchUpdatedEvent(7, { landingLive: true });
     expect(order).toEqual(["cache", "publish"]);
   });
 

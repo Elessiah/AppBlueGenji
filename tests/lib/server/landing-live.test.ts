@@ -40,6 +40,12 @@ function buckets(running: TournamentCard[]): TournamentBuckets {
   return { upcoming: [], registration: [], running, finished: [] };
 }
 
+/**
+ * Un match sans adversaire désigné n'est mis en avant qu'à l'antenne : hors
+ * antenne, il n'est pas jouable (`matchLaunchPhase` → `NONE`).
+ */
+const ON_AIR = { live_trigger: "MANUAL", live_started_at: new Date() };
+
 /** Ligne de match telle que la lit `getLandingLive`. */
 function matchRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -65,6 +71,8 @@ function matchRow(overrides: Record<string, unknown> = {}) {
     live_trigger: null,
     live_url: null,
     live_started_at: null,
+    launched_at: null,
+    referee_scheduling: 0,
     ...overrides,
   };
 }
@@ -200,6 +208,57 @@ describe("getLandingLive", () => {
     expect(live?.currentMatch?.liveState).toBe("OFF");
   });
 
+  it("ne met jamais en avant un match « À planifier »", async () => {
+    // Retour terrain : l'arbitrage avait daté tous les matchs sauf un, et
+    // l'accueil présentait justement celui-là comme le match du moment.
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([
+      matchRow({ id: 100, referee_scheduling: 1 }),
+      matchRow({ id: 101, referee_scheduling: 1, start_at: new Date(Date.now() + 3_600_000) }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.id).toBe(101);
+    expect(live?.currentMatch?.launchPhase).toBe("SCHEDULED");
+    expect(live?.currentMatch?.startAt).not.toBeNull();
+  });
+
+  it("n'expose aucun match quand tous attendent l'arbitrage", async () => {
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([matchRow({ id: 100, referee_scheduling: 1 }), matchRow({ id: 101, referee_scheduling: 1 })]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.tournament.id).toBe(1);
+    expect(live?.currentMatch).toBeNull();
+  });
+
+  it("préfère un match lancé au prochain match daté", async () => {
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([
+      matchRow({ id: 100, start_at: new Date(Date.now() + 3_600_000) }),
+      matchRow({ id: 101, launched_at: new Date(Date.now() - 60_000) }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.id).toBe(101);
+    expect(live?.currentMatch?.launchPhase).toBe("LAUNCHED");
+  });
+
+  it("garde « lancé » un match à l'antenne encore à planifier", async () => {
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([
+      matchRow({ id: 100, referee_scheduling: 1, live_trigger: "MANUAL", live_started_at: new Date() }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.id).toBe(100);
+    expect(live?.currentMatch?.launchPhase).toBe("LAUNCHED");
+  });
+
   it("expose l'état programmé d'un match casté hors antenne", async () => {
     jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([matchRow({ live_trigger: "MANUAL" })]);
@@ -291,7 +350,7 @@ describe("getLandingLive — fiche des engagés du match", () => {
   it("ne mène nulle part sur une place vide", async () => {
     // Bye, ou adversaire pas encore désigné : il n'y a rien à ouvrir. La carte
     // affiche alors le nom sans lien plutôt qu'un lien mort.
-    await mockDb([matchRow({ team2_id: null, team2_name: null })]);
+    await mockDb([matchRow({ team2_id: null, team2_name: null, ...ON_AIR })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
 
@@ -399,7 +458,7 @@ describe("getLandingLive — seeds du match mis en avant", () => {
   });
 
   it("laisse le seed à null sur une place vide, et sur une colonne non renseignée", async () => {
-    await mockDb([matchRow({ team2_id: null, team2_name: null, team2_seed: null })]);
+    await mockDb([matchRow({ team2_id: null, team2_name: null, team2_seed: null, ...ON_AIR })]);
 
     const live = await liveFrom(buckets([card(1, "Coupe A")]));
 

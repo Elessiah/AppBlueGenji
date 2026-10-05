@@ -112,7 +112,7 @@ describe("setMatchLiveConfig", () => {
     // direct ne doit pas couper l'antenne déjà ouverte.
     expect(sql).not.toMatch(/live_started_at/);
     expect(params).toEqual(["MANUAL", "https://kick.com/bg", 42]);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     // Un réglage d'antenne ne touche que le plateau et le direct de l'accueil.
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });
@@ -252,7 +252,7 @@ describe("setMatchOnAir", () => {
     expect(sql).toMatch(/UPDATE bg_matches SET live_started_at = \?/);
     expect(params[0]).toBeInstanceOf(Date);
     expect(params[1]).toBe(42);
-    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { onAir: true });
+    expect(publishMatchUpdatedEvent).toHaveBeenCalledWith(7, { landingLive: true });
     // Un réglage d'antenne ne touche que le plateau et le direct de l'accueil.
     expect(publishUpdatedEvent).not.toHaveBeenCalled();
   });

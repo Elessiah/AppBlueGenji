@@ -61,6 +61,8 @@ function match(overrides: Partial<LandingLiveMatch> = {}): LandingLiveMatch {
     matchFormat: null,
     liveState: "OFF",
     liveUrl: null,
+    launchPhase: "LAUNCHED",
+    startAt: null,
     ...overrides,
   };
 }
@@ -205,5 +207,24 @@ describe("LiveCard — plus aucune donnée inventée", () => {
     // casté, trois lignes plus bas.
     expect(render(live())).not.toContain("pill-live");
     expect(render(live())).toContain("pill-blue");
+  });
+});
+
+describe("LiveCard — match mis en avant pas encore commencé", () => {
+  it("annonce l'horaire d'un match daté plutôt que de le présenter comme joué", () => {
+    const html = render(
+      live({ currentMatch: match({ launchPhase: "SCHEDULED", startAt: "2099-03-04T19:30:00.000Z" }) }),
+    );
+    expect(text(html)).toContain("Prochain match · 4 mars 2099 · 20:30");
+  });
+
+  it("dit « Lancement » quand l'heure du match est venue", () => {
+    expect(text(render(live({ currentMatch: match({ launchPhase: "LOBBY" }) })))).toContain("Lancement");
+  });
+
+  it("n'ajoute rien à un match lancé", () => {
+    const html = text(render(live()));
+    expect(html).not.toContain("Prochain match");
+    expect(html).not.toContain("Lancement");
   });
 });
