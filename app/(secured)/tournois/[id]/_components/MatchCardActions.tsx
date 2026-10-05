@@ -383,9 +383,8 @@ export function MatchCardActions({
           </button>
         )}
       </div>
-      {/* Toujours rendu, masqué par `hidden` : `aria-controls` désigne un
-          élément qui existe, et le panneau ne porte que des boutons — seuls
-          l'arbitrage et la diffusion en ont plus d'un. */}
+      {/* Conteneur toujours rendu, masqué par `hidden` : `aria-controls`
+          désigne un élément qui existe. */}
       {more.length > 0 && (
         <div
           id={panelId}
@@ -399,10 +398,10 @@ export function MatchCardActions({
         >
           {/* Bornée à la place disponible : sur une fenêtre basse, la liste
               défile plutôt que de déborder hors de l'écran. */}
-          {/* Zone défilante montée à l'ouverture seulement : chaque
-              `ScrollArea` pose ses observateurs, et un plateau compte jusqu'à
-              254 cartes. Repliée, la liste est un simple bloc masqué. */}
-          {expanded ? (
+          {/* Liste montée à l'ouverture seulement : un plateau compte jusqu'à
+              254 cartes, et chaque `ScrollArea` pose ses observateurs. Repliée,
+              il ne reste que le conteneur vide que vise `aria-controls`. */}
+          {expanded && (
             <ScrollArea
               orientation="y"
               className={styles.list}
@@ -411,8 +410,6 @@ export function MatchCardActions({
             >
               {more.map((action) => renderButton(action, true))}
             </ScrollArea>
-          ) : (
-            <div className={styles.list}>{more.map((action) => renderButton(action, true))}</div>
           )}
         </div>
       )}
