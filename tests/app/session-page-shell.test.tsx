@@ -86,6 +86,14 @@ describe("SessionPageShell — en-tête selon la session", () => {
   });
 });
 
+describe("ArenaShell — lectures en échec", () => {
+  it("une équipe active illisible ne fait pas tomber la page", async () => {
+    jest.mocked(getCurrentUser).mockResolvedValue(authUser());
+    jest.mocked(getUserActiveTeam).mockRejectedValue(new Error("pool"));
+    expect(await render()).toContain("<h1>Classement</h1>");
+  });
+});
+
 describe("/classement — gabarit suivant la session", () => {
   it("la page passe par SessionPageShell et reste rendue à la demande", () => {
     const src = readSource("app/classement/page.tsx");
