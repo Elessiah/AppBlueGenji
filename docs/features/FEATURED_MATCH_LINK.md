@@ -241,9 +241,10 @@ l'état du **tournoi**, mais se lisait comme celui du match — qui n'était que
 
 - **La seule pastille est celle du match** (`featuredMatchPill`,
   `lib/shared/landing.ts`), posée juste au-dessus des engagés, à côté de la
-  manche. Elle reprend les mots des sections de manche (`MATCH_SECTION_LABELS`,
-  `ROUND_MATCH_SECTIONS.md`), pour que l'accueil et la fiche du tournoi disent
-  la même chose :
+  manche. Pour « En cours » et « Lancement », elle reprend les mots des sections
+  de manche (`MATCH_SECTION_LABELS`, `ROUND_MATCH_SECTIONS.md`) ; pour un match
+  daté, elle garde « En attente de lancement » (`FEATURED_PILL_WAITING_LABEL`),
+  là où la section de manche dit « Planifié » :
 
   | Match | Pastille | Teinte |
   |---|---|---|
