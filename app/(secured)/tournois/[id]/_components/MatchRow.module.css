@@ -104,6 +104,12 @@
   color: var(--teal-400);
 }
 
+/* Score du perdant : la teinte réservée à la défaite (DESIGN_SYSTEM.md § Défaite) ;
+   un forfait garde son ambre. */
+.decided .score:not(.forfeitScore) {
+  color: var(--result-loss-ink);
+}
+
 /* « FF » : l'ambre du forfait, qu'il soit tranché ou seulement noté. */
 .forfeitScore {
   color: var(--amber);

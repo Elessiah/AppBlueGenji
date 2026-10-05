@@ -224,7 +224,7 @@
 }
 
 .statVal.loss {
-  color: var(--ink-mute);
+  color: var(--result-loss-ink);
 }
 
 .roster {
@@ -393,7 +393,9 @@
 }
 
 .formCell.l {
-  background: rgba(var(--pink-400-rgb), 0.75);
+  /* Défaite : cramoisi haché, halo propre (DESIGN_SYSTEM.md § Défaite). */
+  background: var(--result-loss-hatch);
+  box-shadow: var(--result-loss-glow);
 }
 
 .formCell.d {

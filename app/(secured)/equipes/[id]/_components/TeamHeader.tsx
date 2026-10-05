@@ -20,11 +20,11 @@ interface TeamHeaderProps {
  * désormais dans `TeamSettings`, sous le roster.
  */
 export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
-  const stats: { label: string; value: string | number }[] = [
+  const stats: { label: string; value: string | number; loss?: true }[] = [
     { label: "Tournois joués", value: team.stats.tournamentsPlayed },
     { label: "Podiums", value: team.stats.podiums },
     { label: "Victoires", value: team.stats.matchesWon },
-    { label: "Défaites", value: team.stats.matchesLost },
+    { label: "Défaites", value: team.stats.matchesLost, loss: true },
     { label: "Ratio de victoires", value: formatRate(team.stats.winRate) },
   ];
   // Absent des réponses de mutation, qui ne calculent pas le classement.
@@ -93,7 +93,7 @@ export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
           {stats.map((stat) => (
             <div key={stat.label} className="ds-stat purple">
               <div className="ds-stat-label">{stat.label}</div>
-              <div className="ds-stat-value">{stat.value}</div>
+              <div className={stat.loss ? "ds-stat-value result-loss" : "ds-stat-value"}>{stat.value}</div>
             </div>
           ))}
         </div>

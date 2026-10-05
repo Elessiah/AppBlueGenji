@@ -85,6 +85,30 @@
   --r-cy-sm: 4px;
   --r-cy-md: 8px;
   --r-cy-lg: 14px;
+  /* Défaite — teinte réservée, rien d'autre ne la porte (DESIGN_SYSTEM.md
+     § Défaite, `tests/app/loss-colour.test.ts`). Cramoisi électrique saturé :
+     ni le rose pastel des rehauts, ni le rouge du direct (`--red-live`, plus
+     orangé et cantonné à `.pill-live`), ni le saumon des erreurs (`--danger`).
+     Les barres portent en plus des hachures : la forme distingue la défaite
+     même sans la couleur. `--result-loss` remplit (barres, liserés, halos) ;
+     tout **texte** de défaite prend `--result-loss-ink`, plus clair : 5,9:1
+     sur `--cyber-bg-3`, 5,1:1 sur ce fond teinté à 12 % de défaite. */
+  --result-loss: #ff1f5a;
+  --result-loss-rgb: 255, 31, 90;
+  --result-loss-ink: #ff5c85;
+  --result-loss-soft: rgba(var(--result-loss-rgb), 0.14);
+  --result-loss-glow: 0 0 8px rgba(var(--result-loss-rgb), 0.6);
+  --result-loss-hatch: repeating-linear-gradient(
+    135deg,
+    var(--result-loss) 0 3px,
+    rgba(var(--result-loss-rgb), 0.45) 3px 5px
+  );
+}
+
+/* Chiffre de défaite dans un texte (« 3 V – 2 D »). */
+.result-loss {
+  color: var(--result-loss-ink);
+  font-weight: 600;
 }
 
 /* Régime de charge (`lib/shared/client-power.ts`) : toute animation décorative
@@ -877,8 +901,8 @@ input[type="datetime-local"]::-webkit-inner-spin-button {
 }
 
 .team-line.lose {
-  background: rgba(255, 110, 130, 0.12);
-  border: 1px solid rgba(255, 110, 130, 0.3);
+  background: var(--result-loss-soft);
+  border: 1px solid rgba(var(--result-loss-rgb), 0.45);
 }
 
 .helper {
@@ -2241,6 +2265,7 @@ input[type="radio"]:disabled:checked {
   --line-strong: rgba(255, 255, 255, 0.5);
   --line-soft: rgba(180, 210, 230, 0.28);
   --line-strong-cy: rgba(180, 210, 230, 0.42);
+  --result-loss-ink: #ff7a9b;
 }
 
 :root[data-a11y~="contrast"] ::placeholder {
