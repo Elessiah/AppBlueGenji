@@ -38,9 +38,54 @@ export function rankingFilterGame(filter: RankingGameFilter): TournamentGame | u
   return undefined;
 }
 
-/** Adresse d'une pastille : le général n'a pas de paramètre. */
-export function rankingFilterHref(filter: RankingGameFilter): string {
-  return filter === "all" ? "/classement" : `/classement?jeu=${filter}`;
+/** Lignes affichées d'entrée, puis ajoutées par chaque « Afficher plus ». */
+export const RANKING_PAGE_SIZE = 50;
+
+/**
+ * Plafond de `?n=` : au-delà, une adresse forgée ferait rendre des milliers de
+ * lignes d'un coup. Le lien « Afficher plus » disparaît une fois ce nombre atteint.
+ */
+export const RANKING_MAX_SHOWN = 1000;
+
+/**
+ * Lit `?n=` (nombre de lignes affichées) : un entier positif, arrondi au
+ * multiple de {@link RANKING_PAGE_SIZE} supérieur, borné à
+ * [`RANKING_PAGE_SIZE`, `RANKING_MAX_SHOWN`]. Toute autre valeur (absente,
+ * répétée, négative, décimale, non numérique) rend la première page.
+ */
+export function parseRankingShown(value: string | string[] | undefined): number {
+  if (typeof value !== "string") return RANKING_PAGE_SIZE;
+  const trimmed = value.trim();
+  if (!/^\d{1,7}$/.test(trimmed)) return RANKING_PAGE_SIZE;
+  const pages = Math.ceil(Number(trimmed) / RANKING_PAGE_SIZE);
+  return Math.min(RANKING_MAX_SHOWN, Math.max(RANKING_PAGE_SIZE, pages * RANKING_PAGE_SIZE));
+}
+
+/**
+ * Adresse d'une pastille ou d'une page : le général n'a pas de `jeu`, la
+ * première page pas de `n`. Changer de jeu repart de la première page.
+ */
+export function rankingFilterHref(filter: RankingGameFilter, shown: number = RANKING_PAGE_SIZE): string {
+  const params = new URLSearchParams();
+  if (filter !== "all") params.set("jeu", filter);
+  if (shown > RANKING_PAGE_SIZE) params.set("n", String(shown));
+  const query = params.toString();
+  return query ? `/classement?${query}` : "/classement";
+}
+
+/** Ancre d'une ligne du tableau — cible du lien « Afficher plus » sans JavaScript. */
+export function rankingRowId(rank: number): string {
+  return `rang-${rank}`;
+}
+
+/**
+ * Lien « Afficher plus » : la page suivante, ancrée sur sa première ligne (sans
+ * JavaScript, le navigateur y descend). `null` quand le plafond est atteint.
+ */
+export function rankingMoreHref(filter: RankingGameFilter, shown: number): string | null {
+  if (shown >= RANKING_MAX_SHOWN) return null;
+  const next = Math.min(RANKING_MAX_SHOWN, shown + RANKING_PAGE_SIZE);
+  return `${rankingFilterHref(filter, next)}#${rankingRowId(shown + 1)}`;
 }
 
 /**

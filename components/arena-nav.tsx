@@ -22,12 +22,14 @@ type ArenaNavProps = {
 /**
  * Teinte de chaque section, en jetons de la palette « néon froid »
  * (DESIGN_SYSTEM.md) : joueurs glacier, équipes violet (comme leurs pages),
- * tournois vert d'eau. Aucune teinte chaude.
+ * tournois vert d'eau, classement rose. Aucune teinte chaude (ni rouge du direct,
+ * ni ambre, ni couleur de défaite).
  */
 export const ARENA_NAV_LINKS = [
   { href: "/joueurs", label: "Joueurs", rgb: "var(--blue-500-rgb)" },
   { href: "/equipes", label: "Équipes", rgb: "var(--violet-400-rgb)" },
   { href: "/tournois", label: "Tournois", rgb: "var(--teal-400-rgb)" },
+  { href: "/classement", label: "Classement", rgb: "var(--pink-400-rgb)" },
 ] as const;
 const links = ARENA_NAV_LINKS;
 

@@ -9,8 +9,11 @@ import {
   RANKING_GAME_FILTERS,
   pointsBehind,
   rankingFilterHref,
+  rankingMoreHref,
+  rankingRowId,
   type RankingGameFilter,
 } from "@/lib/shared/ranking-page";
+import { RankingMore } from "./RankingMore";
 import styles from "./page.module.css";
 
 type FormResult = "w" | "l" | "d";
@@ -22,6 +25,8 @@ export type RankingBoardProps = {
   forms: ReadonlyMap<number, readonly FormResult[]> | null;
   /** Le chargement a échoué : on le dit plutôt qu'un « aucune équipe » trompeur. */
   unavailable?: boolean;
+  /** Il reste des lignes au-delà de `rows` : le lien « Afficher plus » est rendu. */
+  hasMore?: boolean;
 };
 
 /** Case de forme : victoire glacier, défaite dans sa teinte réservée, nul neutre. */
@@ -120,11 +125,12 @@ function Podium({ rows }: Readonly<{ rows: readonly LandingLeaderboardRow[] }>) 
 }
 
 /**
- * Le classement complet : pastilles de jeu, podium des trois premières, puis
- * le tableau de toutes les lignes. Composant serveur, sans état : tout se lit
- * dans l'adresse et s'affiche sans JavaScript.
+ * Le classement : pastilles de jeu, podium des trois premières, puis le
+ * tableau des lignes affichées (`?n=`, par pages de `RANKING_PAGE_SIZE`) et
+ * « Afficher plus ». Composant serveur, sans état : tout se lit dans
+ * l'adresse et s'affiche sans JavaScript.
  */
-export function RankingBoard({ rows, filter, forms, unavailable = false }: Readonly<RankingBoardProps>) {
+export function RankingBoard({ rows, filter, forms, unavailable = false, hasMore = false }: Readonly<RankingBoardProps>) {
   const showDraws = rows.some((row) => row.draws > 0);
   const showForm = forms !== null;
 
@@ -157,7 +163,7 @@ export function RankingBoard({ rows, filter, forms, unavailable = false }: Reado
           <div
             className={styles.table}
             role="table"
-            aria-label="Classement complet des équipes"
+            aria-label="Tableau du classement des équipes"
             data-draws={showDraws ? "true" : undefined}
             data-form={showForm ? "true" : undefined}
           >
@@ -174,7 +180,13 @@ export function RankingBoard({ rows, filter, forms, unavailable = false }: Reado
             {rows.map((row) => {
               const trend = trendText(row);
               return (
-                <div key={row.teamId} className={styles.row} role="row" data-place={row.rank <= 3 ? row.rank : undefined}>
+                <div
+                  key={row.teamId}
+                  id={rankingRowId(row.rank)}
+                  tabIndex={-1}
+                  className={styles.row}
+                  role="row"
+                  data-place={row.rank <= 3 ? row.rank : undefined}>
                   <span className={styles.rank} role="cell">{String(row.rank).padStart(2, "0")}</span>
                   <span className={styles.team} role="cell">
                     <TeamSigil label={row.teamName.charAt(0)} size={32} logoUrl={row.logoUrl} />
@@ -201,6 +213,7 @@ export function RankingBoard({ rows, filter, forms, unavailable = false }: Reado
               );
             })}
           </div>
+          <RankingMore shown={rows.length} href={hasMore ? rankingMoreHref(filter, rows.length) : null} />
         </>
       )}
     </>
