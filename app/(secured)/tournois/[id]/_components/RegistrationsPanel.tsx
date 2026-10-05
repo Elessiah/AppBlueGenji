@@ -190,6 +190,12 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // (`seedingReorderNeedsConfirmation`). Le geste attend ici, pas encore joué.
   const [confirmingMove, setConfirmingMove] = useState<{ teamId: number; direction: "up" | "down" } | null>(null);
   const [manualConfirmed, setManualConfirmed] = useState(false);
+  // La liste a bougé pendant la lecture (inscription, retrait, autre arbitre) :
+  // le geste en attente visait un ordre qui n'existe plus — on le lâche plutôt
+  // que d'écrire un déplacement que personne n'a vu.
+  useEffect(() => {
+    setConfirmingMove(null);
+  }, [serverKey]);
 
   const performMove = async (teamId: number, direction: "up" | "down"): Promise<boolean> => {
     const next = moveInOrder(order, teamId, direction);

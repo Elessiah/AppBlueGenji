@@ -23,6 +23,7 @@ import {
   pendingScoreProposal,
   scoreBlockerMessage,
   scoreCorrectionNeedsConfirmation,
+  storedResultSignature,
 } from "../_lib/score-form";
 import { ConfirmActionDialog } from "./ConfirmActionDialog";
 import { useMatchFormat } from "../_lib/match-format-context";
@@ -164,12 +165,13 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const storedLabel = storedResultLabel(match, team1, team2);
   // Un autre arbitre écrit pendant qu'on lit la confirmation : l'avertissement
   // de conflit s'affiche dans le dialogue de score, que la confirmation
-  // recouvre. On la referme pour qu'il soit lu avant tout envoi. L'effet ne
-  // suit que `form.conflict` : un conflit déjà affiché (et lu) à l'ouverture
-  // ne la referme pas.
+  // recouvre. On la referme à **chaque** changement du résultat stocké (et non
+  // au seul passage de `form.conflict` à vrai, qui ne bouge plus s'il l'était
+  // déjà) pour que la nouvelle valeur soit lue avant tout envoi.
+  const storedSignature = storedResultSignature(match);
   useEffect(() => {
-    if (form.conflict) setConfirmingCorrection(null);
-  }, [form.conflict]);
+    setConfirmingCorrection(null);
+  }, [storedSignature]);
 
   const perform = async (action: "save" | "resolve"): Promise<boolean> => {
     const ok = await form.submit(action);
