@@ -3,10 +3,12 @@ import type { PoolConnection } from "mysql2/promise";
 
 jest.mock("@/lib/server/tournaments/scoring");
 jest.mock("@/lib/server/tournaments/bot-logs");
+jest.mock("@/lib/server/tournaments/match-maps");
 
 import { resolveExpiredScoreReports } from "@/lib/server/tournaments/finalization";
 import { finalizeMatch } from "@/lib/server/tournaments/scoring";
 import { queueBotLog, queueRefereeAlert } from "@/lib/server/tournaments/bot-logs";
+import { promoteReportedMaps } from "@/lib/server/tournaments/match-maps";
 
 /** Connexion factice : `rows` répond aux SELECT, les écritures sont comptées. */
 function fakeConnection(options: {
@@ -100,6 +102,7 @@ describe("resolveExpiredScoreReports", () => {
       }),
     );
 
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, expect.any(Number), "TEAM1");
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });
@@ -148,6 +151,8 @@ describe("resolveExpiredScoreReports", () => {
       }),
     );
 
+    // Le détail map par map du report qui fait foi devient le résultat retenu.
+    expect(promoteReportedMaps).toHaveBeenCalledWith(connection, 32, "TEAM2");
     // Aucune alerte n'est réservée
     expect(queueRefereeAlert).not.toHaveBeenCalled();
   });

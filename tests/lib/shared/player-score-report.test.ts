@@ -15,6 +15,7 @@ const report = (team1Score: number, team2Score: number): MatchScoreReport => ({
   team1Score,
   team2Score,
   reportedAt: "2026-09-28T20:00:00.000Z",
+  maps: [],
 });
 
 const base = bracketMatch({

@@ -513,7 +513,7 @@ describe("PRIVACY_CHANGES — mesure d'audience, opposition et durée", () => {
   it("précède l'entrée du contact données, datée du même jour que les rectificatifs, pour tous les comptes", () => {
     // Suivie de l'entrée du contact données, de celle des suspensions puis de
     // celle du registre complété, publiées le même jour.
-    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-7)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe(rectificatifs.publishedAt);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
@@ -540,7 +540,7 @@ describe("PRIVACY_CHANGES — personne à contacter pour les données", () => {
 
   it("précède l'entrée des suspensions, publiée le même jour que les rectificatifs, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-6)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -574,7 +574,7 @@ describe("PRIVACY_CHANGES — suspension d'un compte", () => {
 
   it("précède l'entrée du registre complété, publiée le lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-5)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -599,7 +599,7 @@ describe("PRIVACY_CHANGES — registre complété (support, retransmission, cour
 
   it("précède l'entrée des sauvegardes chez Hetzner, datée du 1er octobre 2026, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-4)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-01");
     expect(entry.audience).toBeUndefined();
   });
@@ -639,7 +639,7 @@ describe("PRIVACY_CHANGES — sauvegardes chez Hetzner (changement de sous-trait
 
   it("précède l'entrée des durées du bot, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-3)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -671,9 +671,9 @@ describe("PRIVACY_CHANGES — durées du bot (fil d'activité, journal du staff,
   const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-bot-durees-journaux")!;
   const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
 
-  it("est la dernière entrée, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
+  it("précède l'entrée des scores map par map, datée du lendemain de sa mise en ligne, pour tous les comptes", () => {
     expect(entry).toBeDefined();
-    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(PRIVACY_CHANGES.at(-2)?.id).toBe(entry.id);
     expect(entry.publishedAt).toBe("2026-10-02");
     expect(entry.audience).toBeUndefined();
   });
@@ -690,5 +690,28 @@ describe("PRIVACY_CHANGES — durées du bot (fil d'activité, journal du staff,
   it("tient dans un message privé à elle seule, sans nommer personne", () => {
     expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
     expect(text()).not.toContain(DATA_CONTACT_NAME);
+  });
+});
+
+describe("PRIVACY_CHANGES — scores map par map (codes de replay)", () => {
+  const entry = PRIVACY_CHANGES.find((c) => c.id === "2026-10-scores-map-par-map")!;
+  const text = () => [entry.title, entry.summary, ...entry.details].join(" ");
+
+  it("est la dernière entrée, datée de sa mise en ligne, pour tous les comptes", () => {
+    expect(entry).toBeDefined();
+    expect(PRIVACY_CHANGES.at(-1)?.id).toBe(entry.id);
+    expect(entry.publishedAt).toBe("2026-10-05");
+    expect(entry.audience).toBeUndefined();
+  });
+
+  it("dit ce qu'un code de replay révèle, qui le voit, et ce qu'emporte une suppression", () => {
+    expect(text()).toMatch(/identifiants de jeu/);
+    expect(text()).toMatch(/membres connectés/);
+    expect(text()).toMatch(/effacé à la suppression du compte/);
+    expect(entry.links?.map((link) => link.href)).toEqual(["/rgpd"]);
+  });
+
+  it("tient dans un message privé à elle seule", () => {
+    expect(buildPrivacyChangesMessage([entry], "https://site.test").length).toBeLessThanOrEqual(PRIVACY_DM_MAX_LENGTH);
   });
 });

@@ -140,6 +140,7 @@ describe("mapMatch — propositions de score en attente", () => {
       team1Score: 2,
       team2Score: 1,
       reportedAt: "2026-05-20T10:05:00.000Z",
+      maps: [],
     });
     expect(match.team2Report).toBeNull();
   });
@@ -157,6 +158,7 @@ describe("mapMatch — propositions de score en attente", () => {
       team1Score: 0,
       team2Score: 2,
       reportedAt: "2026-05-20T10:06:00.000Z",
+      maps: [],
     });
   });
 

@@ -20,6 +20,7 @@ import { syncTournamentState } from "@/lib/server/tournaments/state";
 import type { TournamentRow } from "@/lib/server/tournaments/_internal";
 import type { RowOverrides } from "../../helpers/row-overrides";
 import { tournamentRow } from "../../helpers/tournament-rows";
+import { mapsFor } from "../../helpers/match-maps";
 
 /**
  * Les évènements sont réservés **au point de passage unique** de chaque fait —
@@ -271,19 +272,19 @@ describe("reportMatchScore", () => {
   });
 
   it("ne réserve rien sur un premier report : le match n'est pas tranché", async () => {
-    await reportMatchScore(reportConnection(null), 12, 31, 42, 2, 1);
+    await reportMatchScore(reportConnection(null), 12, 31, 42, mapsFor(2, 1));
 
     expect(queueBotLog).not.toHaveBeenCalled();
   });
 
   it("réserve le résultat quand les deux reports concordent", async () => {
-    await reportMatchScore(reportConnection({ score: 1, opponent: 2 }), 12, 31, 42, 2, 1);
+    await reportMatchScore(reportConnection({ score: 1, opponent: 2 }), 12, 31, 42, mapsFor(2, 1));
 
     expect(queued()).toEqual([{ kind: "match_finished", matchId: 31 }]);
   });
 
   it("réserve un conflit quand les deux reports se contredisent", async () => {
-    await reportMatchScore(reportConnection({ score: 2, opponent: 0 }), 12, 31, 42, 2, 1);
+    await reportMatchScore(reportConnection({ score: 2, opponent: 0 }), 12, 31, 42, mapsFor(2, 1));
 
     // Par le chemin des alertes, pas par la simple mise en file : le conflit
     // doit être réservé, sans quoi deux engagées qui resaisissent leur score en

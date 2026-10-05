@@ -14,7 +14,7 @@ import { bracketMatch } from "../helpers/bracket-match";
 const BO3: MatchFormat = { type: "BO", value: 3 };
 
 function report(team1Score: number, team2Score: number): MatchScoreReport {
-  return { team1Score, team2Score, reportedAt: "2026-09-28T18:00:00.000Z" };
+  return { team1Score, team2Score, reportedAt: "2026-09-28T18:00:00.000Z", maps: [] };
 }
 
 function match(overrides: Partial<BracketMatch> = {}): BracketMatch {

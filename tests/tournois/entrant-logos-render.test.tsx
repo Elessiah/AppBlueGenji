@@ -167,6 +167,7 @@ function match(overrides: Partial<BracketMatch> = {}): BracketMatch {
     scoreDeadlineAt: null,
     team1Report: null,
     team2Report: null,
+    maps: [],
     updatedAt: "2026-09-01T18:00:00.000Z",
     phaseId: 0,
     phasePosition: null,

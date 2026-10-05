@@ -32,6 +32,7 @@ export function bracketMatch(overrides: Partial<BracketMatch> = {}): BracketMatc
     scoreDeadlineAt: null,
     team1Report: null,
     team2Report: null,
+    maps: [],
     updatedAt: "2026-01-01T00:00:00.000Z",
     phaseId: 0,
     phasePosition: null,
