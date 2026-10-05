@@ -46,7 +46,7 @@
 /*
  * Teinte de section (variantes sémantiques de `DESIGN_SYSTEM.md`) : le
  * libellé et le filet, qui part de la teinte et s'efface. « À planifier »
- * attend un geste (`highlight`), « En attente de lancement » est daté
+ * attend un geste (`highlight`), « Planifié » est daté
  * (`accent`, comme sa pastille `waiting`), « Lancement » et « En cours » sont
  * de l'information (`info`), « Terminé » une réussite (`success`). Jamais de
  * rouge : un match joué n'est pas une diffusion. Le compte reste atténué.

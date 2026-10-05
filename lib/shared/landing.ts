@@ -114,8 +114,15 @@ export type FeaturedMatchPill = { label: string; tone: FeaturedMatchPillTone; wh
 export const FEATURED_TOURNAMENT_STATE_LABEL = "Tournoi en cours";
 
 /**
+ * Pastille d'un match daté à venir. Sa section de manche se dit « Planifié »
+ * (`MATCH_SECTION_LABELS.WAITING`) ; la pastille de l'accueil garde ce libellé.
+ */
+export const FEATURED_PILL_WAITING_LABEL = "En attente de lancement";
+
+/**
  * État du match mis en avant, dans les mots des sections de manche
- * (`MATCH_SECTION_LABELS`, `docs/features/ROUND_MATCH_SECTIONS.md`) :
+ * (`MATCH_SECTION_LABELS`, `docs/features/ROUND_MATCH_SECTIONS.md`) pour
+ * « En cours » et « Lancement » :
  *
  * - à l'antenne (`liveState === "LIVE"`) : « En direct », en rouge ;
  * - lancé : « En cours » ;
@@ -138,7 +145,7 @@ export function featuredMatchPill(
     return { label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null };
   }
   const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now ?? Date.now());
-  return { label: MATCH_SECTION_LABELS.WAITING, tone: "waiting", when: when || null };
+  return { label: FEATURED_PILL_WAITING_LABEL, tone: "waiting", when: when || null };
 }
 
 function startTime(iso: string | null): number {

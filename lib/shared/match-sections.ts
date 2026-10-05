@@ -12,10 +12,10 @@
  * | `COMPLETED`                                  | Terminé                    |
  * | phase `LAUNCHED` (lancé, ou score à confirmer) | En cours                 |
  * | phase `LOBBY` (heure venue, ou sans date hors planification) | Lancement  |
- * | phase `SCHEDULED` (date à venir)             | En attente de lancement    |
+ * | phase `SCHEDULED` (date à venir)             | Planifié                   |
  * | phase `TO_PLAN` (planification, sans date)   | À planifier                |
  * | engagé inconnu (`PENDING`…), sans date, planification | À planifier       |
- * | engagé inconnu, autrement                    | En attente de lancement    |
+ * | engagé inconnu, autrement                    | Planifié                   |
  *
  * Un match dont une engagée manque ne peut pas se lancer, même à son heure :
  * il attend, daté ou non, jamais « Lancement ».
@@ -33,18 +33,27 @@ import type { BracketMatch } from "./types";
 
 export type MatchSectionKey = "TO_PLAN" | "WAITING" | "LOBBY" | "PLAYING" | "DONE";
 
-/** Ordre d'affichage, figé. */
+/**
+ * Ordre d'affichage, figé, l'urgence d'abord : « Lancement » (heure venue, pas
+ * encore lancé) suit « En cours », geste le plus pressant après les matchs qui
+ * se jouent.
+ */
 export const MATCH_SECTION_ORDER: readonly MatchSectionKey[] = [
-  "TO_PLAN",
-  "WAITING",
-  "LOBBY",
   "PLAYING",
+  "LOBBY",
+  "WAITING",
+  "TO_PLAN",
   "DONE",
 ];
 
+/**
+ * Libellés des filets de section. La pastille du match mis en avant à l'accueil
+ * garde, pour un match daté, son propre libellé « En attente de lancement »
+ * (`FEATURED_PILL_WAITING_LABEL`, `lib/shared/landing.ts`).
+ */
 export const MATCH_SECTION_LABELS: Readonly<Record<MatchSectionKey, string>> = {
   TO_PLAN: "À planifier",
-  WAITING: "En attente de lancement",
+  WAITING: "Planifié",
   LOBBY: "Lancement",
   PLAYING: "En cours",
   DONE: "Terminé",
@@ -138,7 +147,7 @@ export function sectionRoundMatches<T extends SectionMatch>(
 
 /**
  * Prochain instant (ms) où une section changera **par le seul temps** : la plus
- * proche heure de début d'un match « En attente de lancement » dont les deux
+ * proche heure de début d'un match « Planifié » dont les deux
  * engagées sont connues (`nextLaunchPhaseChangeAt`, la règle de la carte de
  * match). `null` : aucune bascule horaire à attendre.
  */

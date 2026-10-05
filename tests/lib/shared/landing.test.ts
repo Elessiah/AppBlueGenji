@@ -5,6 +5,7 @@ import {
   compareByStartAt,
   FEATURED_TOURNAMENT_STATE_LABEL,
   featuredMatchPill,
+  FEATURED_PILL_WAITING_LABEL,
   pickFeaturedMatchIndex,
   type FeaturedMatchCandidate,
   visibleLiveViewerCount,
@@ -243,12 +244,17 @@ describe("featuredMatchPill", () => {
     expect(pill("LOBBY", null)).toEqual({ label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null });
     // L'horaire est rendu à côté de la pastille, pas dedans : elle tient sur une ligne.
     expect(pill("SCHEDULED", "2026-10-05T18:30:00Z")).toEqual({
-      label: MATCH_SECTION_LABELS.WAITING,
+      label: FEATURED_PILL_WAITING_LABEL,
       tone: "waiting",
       when: "5 oct. · 20:30",
     });
     expect(MATCH_SECTION_LABELS.PLAYING).toBe("En cours");
-    expect(MATCH_SECTION_LABELS.WAITING).toBe("En attente de lancement");
+  });
+
+  it("garde « En attente de lancement » sur la pastille quand la section de manche dit « Planifié »", () => {
+    expect(FEATURED_PILL_WAITING_LABEL).toBe("En attente de lancement");
+    expect(MATCH_SECTION_LABELS.WAITING).toBe("Planifié");
+    expect(pill("SCHEDULED", "2026-10-05T18:30:00Z").label).toBe("En attente de lancement");
   });
 
   it("ne dit « En direct », en rouge, que pour un match réellement à l'antenne", () => {

@@ -19,22 +19,26 @@ BG Survie), dont l'ordre des cartes porte la structure de l'arbre.
 
 ## Sections et correspondance
 
-Ordre fixe ; une section vide n'est pas affichée. La section se dérive de la
-phase de lancement (`matchLaunchPhase`, `lib/shared/match-launch.ts`) — aucune
-nouvelle notion d'état :
+Ordre fixe (`MATCH_SECTION_ORDER`, demande du 2026-10-05), l'urgence d'abord ;
+une section vide n'est pas affichée. La section se dérive de la phase de
+lancement (`matchLaunchPhase`, `lib/shared/match-launch.ts`) — aucune nouvelle
+notion d'état :
 
-| Match | Section |
-| --- | --- |
-| phase `TO_PLAN` (planification par l'arbitrage, sans date) | À planifier |
-| engagée inconnue (`PENDING`…), sans date | À planifier |
-| phase `SCHEDULED` (date à venir) | En attente de lancement |
-| engagée inconnue, datée (même heure passée : il ne peut pas se lancer) | En attente de lancement |
-| phase `LOBBY` (heure atteinte, ou sans date hors planification) | Lancement |
-| phase `LAUNCHED` (`launched_at` posé, ou `AWAITING_CONFIRMATION`) | En cours |
-| `COMPLETED` (exemptions comprises) | Terminé |
+| Ordre | Section | Match |
+| --- | --- | --- |
+| 1 | En cours | phase `LAUNCHED` (`launched_at` posé, ou `AWAITING_CONFIRMATION`) |
+| 2 | Lancement | phase `LOBBY` (heure atteinte, ou sans date hors planification) |
+| 3 | Planifié | phase `SCHEDULED` (date à venir) ; engagée inconnue, datée (même heure passée : il ne peut pas se lancer) |
+| 4 | À planifier | phase `TO_PLAN` (planification par l'arbitrage, sans date) ; engagée inconnue (`PENDING`…), sans date |
+| 5 | Terminé | `COMPLETED` (exemptions comprises) |
 
-« En attente de lancement » est le libellé de section de la phase que la carte
-de match appelle « En attente de départ » (`LAUNCH_PHASE_LABELS`).
+« Lancement » (heure venue, match pas encore lancé) suit directement « En
+cours » : c'est le geste le plus pressant après les matchs qui se jouent.
+
+« Planifié » est le libellé de section de la phase que la carte de match
+appelle « En attente de départ » (`LAUNCH_PHASE_LABELS`) et la pastille de
+l'accueil « En attente de lancement » (`FEATURED_PILL_WAITING_LABEL`,
+`FEATURED_MATCH_LINK.md`) : seule la section a été renommée.
 
 ## Tri dans une section
 
@@ -71,7 +75,7 @@ de secours servent le même instantané (`buildSnapshot`).
 
 ## Horloge
 
-Seul le temps fait passer « En attente de lancement » → « Lancement ».
+Seul le temps fait passer « Planifié » → « Lancement ».
 `RoundMatchSections` arme **un seul minuteur** sur la prochaine heure de début
 (`nextSectionChangeAt`, qui reprend `nextLaunchPhaseChangeAt`) — la règle de la
 carte de match (`useMatchLaunchPhase`) : la carte et son filet basculent à la
@@ -84,7 +88,7 @@ d'avancer l'horloge.
 
 Libellé en capitales 11 px **teinté par section** (variantes sémantiques de
 `DESIGN_SYSTEM.md`, par `data-section`) : « À planifier » `--pink-400`
-(`highlight`, un geste attendu), « En attente de lancement » `--violet-300`
+(`highlight`, un geste attendu), « Planifié » `--violet-300`
 (`accent`, comme sa pastille `waiting`), « Lancement » et « En cours »
 `--blue-300` (`info`), « Terminé » `--teal-400` (`success`) ; jamais de rouge.
 Nombre de matchs en `--ink-dim`, trait qui part de la teinte de la section et
