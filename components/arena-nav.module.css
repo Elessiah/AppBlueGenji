@@ -218,6 +218,28 @@
   }
 }
 
+/* ── Tablette étroite (721–1000 px) : quatre liens dans la colonne de gauche ──
+   Avec « Classement », les liens à 0,2 em débordaient de leur tiers de grille
+   et décentraient le logo en rognant la droite. Interlettrage et écarts
+   resserrés ; en dernier recours, les liens passent à la ligne plutôt que de
+   déborder, et le trait du lien actif remonte sous son libellé (comme en
+   mobile) pour ne pas barrer la ligne suivante. */
+@media (min-width: 721px) and (max-width: 1000px) {
+  .navLeft {
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+  }
+
+  .navLink {
+    letter-spacing: 0.08em;
+  }
+
+  .navLinkActive::after {
+    bottom: -5px;
+  }
+}
+
 /* ── Mobile : passage sur deux lignes (logo + avatar en haut, liens en bas) ──
    Les raccourcis « Accueil » / « Mon équipe » sont masqués : l'accueil reste
    accessible par le logo, l'équipe par le menu du compte (sous l'avatar).
@@ -259,7 +281,13 @@
     grid-area: left;
     justify-content: center;
     flex-wrap: wrap;
-    gap: 14px 20px;
+    gap: 14px 16px;
+  }
+
+  /* Quatre liens sur une seule ligne dès 360 px : chaque ligne de plus
+     alourdit la barre collante. */
+  .navLink {
+    letter-spacing: 0.06em;
   }
 
   .navHome {
@@ -270,12 +298,12 @@
 /* ── Très petits écrans : liens plus compacts ── */
 @media (max-width: 380px) {
   .navLeft {
-    gap: 10px 14px;
+    gap: 10px 8px;
   }
 
   .navLink {
     font-size: 11px;
-    letter-spacing: 0.14em;
+    letter-spacing: 0;
   }
 }
 

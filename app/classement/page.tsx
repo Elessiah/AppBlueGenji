@@ -6,7 +6,7 @@ import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
 import { pageMetadata } from "@/lib/shared/page-metadata";
 import { RANKING_BASE_POINTS, RANKING_FLOOR_POINTS } from "@/lib/shared/ranking";
-import { parseRankingFilter, rankingFilterGame } from "@/lib/shared/ranking-page";
+import { parseRankingFilter, parseRankingShown, rankingFilterGame } from "@/lib/shared/ranking-page";
 import { RankingBoard } from "./RankingBoard";
 import styles from "./page.module.css";
 
@@ -27,16 +27,25 @@ type PageProps = {
 };
 
 export default async function ClassementPage({ searchParams }: Readonly<PageProps>) {
-  const filter = parseRankingFilter((await searchParams).jeu);
+  const params = await searchParams;
+  const filter = parseRankingFilter(params.jeu);
   const game = rankingFilterGame(filter);
+  // Affichage progressif : `?n=` lignes (validé et borné). Le classement
+  // complet est rejoué et trié de toute façon (le rang en dépend) : on le garde
+  // entier pour savoir s'il en reste et si une colonne « N » existe, puis on
+  // coupe — le rang reste absolu d'une page à l'autre, le rendu borné.
+  const shown = parseRankingShown(params.n);
 
   // Les deux lectures sont indépendantes : en parallèle, chacune avec son repli.
   // La forme couvre tous les jeux : elle n'accompagne que le classement général.
-  const [rows, forms] = await Promise.all([
+  const [loaded, forms] = await Promise.all([
     loadLeaderboardRows(game).catch((): LandingLeaderboardRow[] | null => null),
     game === undefined ? loadCachedTeamForms().catch(() => null) : Promise.resolve(null),
   ]);
-  const unavailable = rows === null;
+  const unavailable = loaded === null;
+  const rows = loaded?.slice(0, shown) ?? [];
+  const hasMore = (loaded?.length ?? 0) > shown;
+  const anyDraws = loaded?.some((row) => row.draws > 0) ?? false;
 
   return (
     <PublicPageShell>
@@ -57,7 +66,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
       <section className={styles.section} aria-labelledby="classement-board">
         {/* Titre de section pour la hiérarchie (h1 → h2 → noms du podium en h3). */}
         <h2 id="classement-board" className="sr-only">Classement des équipes</h2>
-        <RankingBoard rows={rows ?? []} filter={filter} forms={forms} unavailable={unavailable} />
+        <RankingBoard rows={rows} filter={filter} forms={forms} unavailable={unavailable} hasMore={hasMore} anyDraws={anyDraws} />
       </section>
 
       <section className={`${styles.section} ${styles.how}`} aria-labelledby="classement-how">

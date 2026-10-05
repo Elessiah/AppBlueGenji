@@ -7,7 +7,7 @@ jest.mock("next/navigation", () => ({
 }));
 
 import { renderToStaticMarkup } from "react-dom/server";
-import { ArenaNav } from "@/components/arena-nav";
+import { ARENA_NAV_LINKS, ArenaNav } from "@/components/arena-nav";
 import { ToastProvider } from "@/components/ui/toast";
 import {
   PUBLIC_NAV_LINKS,
@@ -37,9 +37,30 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     expect(currentLinks(arenaNav())).toEqual(["Équipes"]);
   });
 
-  it("n'annonce aucune page courante hors de ses trois sections", () => {
+  it("n'annonce aucune page courante hors de ses sections", () => {
     mockPathname = "/profil";
     expect(arenaNav()).not.toContain("aria-current");
+  });
+
+  it("propose « Classement » aux connectés, page courante comprise", () => {
+    expect(arenaNav()).toMatch(/<a [^>]*href="\/classement"[^>]*>Classement<\/a>/);
+    mockPathname = "/classement";
+    expect(currentLinks(arenaNav())).toEqual(["Classement"]);
+  });
+
+  it("donne à chaque section une teinte froide qui lui est propre", () => {
+    const tints = ARENA_NAV_LINKS.map((link) => link.rgb);
+    expect(new Set(tints).size).toBe(tints.length);
+    for (const tint of tints) expect(tint).not.toMatch(/amber|orange|red|result-loss/);
+  });
+
+  it("ne déborde pas entre 721 et 1000 px : liens resserrés, repli plutôt que débordement", () => {
+    const css = readSource("components/arena-nav.module.css");
+    const block = css.slice(css.indexOf("@media (min-width: 721px) and (max-width: 1000px)"));
+    expect(block).toMatch(/\.navLeft\s*\{[^}]*min-width:\s*0;[^}]*flex-wrap:\s*wrap;/);
+    expect(block).toMatch(/\.navLink\s*\{[^}]*letter-spacing:\s*0\.08em;/);
+    // Replié, le trait du lien actif ne barre pas la ligne suivante.
+    expect(block).toMatch(/\.navLinkActive::after\s*\{\s*bottom:\s*-5px;/);
   });
 
   it("nomme sa navigation", () => {
