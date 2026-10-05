@@ -61,6 +61,19 @@ function scoreText(report: MatchScoreReport): string {
   return `${report.team1Score} – ${report.team2Score}`;
 }
 
+/**
+ * Phrase du désaccord. À score égal, ce sont les maps qui diffèrent (codes de
+ * replay ou scores de map, `MAP_SCORES.md`) : le dire, sans quoi « toi : 2 – 1,
+ * eux : 2 – 1 » n'expliquerait rien.
+ */
+function conflictText(mine: MatchScoreReport, theirs: MatchScoreReport, opponentName: string): string {
+  const what =
+    mine.team1Score === theirs.team1Score && mine.team2Score === theirs.team2Score
+      ? `Même score (${scoreText(mine)}), mais le détail des maps diffère de celui de ${opponentName} : codes de replay ou scores de map.`
+      : `Les scores se contredisent — toi : ${scoreText(mine)}, ${opponentName} : ${scoreText(theirs)}.`;
+  return `${what} L'arbitrage est alerté ; tu peux encore corriger ta proposition.`;
+}
+
 /** Heure d'échéance du délai de confirmation, dans le fuseau du lecteur. */
 function deadlineText(iso: string | null): string | null {
   if (!iso) return null;
@@ -235,7 +248,7 @@ export function PlayerScoreDialog({
       case "THEIRS_PENDING":
         return `${opponentName} propose ${scoreText(view.theirs!)}. Confirme-le, ou saisis le score constaté : un désaccord alerte l'arbitrage.`;
       case "CONFLICT":
-        return `Les scores se contredisent — toi : ${scoreText(view.mine!)}, ${opponentName} : ${scoreText(view.theirs!)}. L'arbitrage est alerté ; tu peux encore corriger ta proposition.`;
+        return conflictText(view.mine!, view.theirs!, opponentName);
       default:
         return canReportScore
           ? `${opponentName} devra confirmer le score que tu envoies.`

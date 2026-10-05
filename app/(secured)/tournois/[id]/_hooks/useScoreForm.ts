@@ -13,7 +13,13 @@ import {
 } from "../_lib/score-form";
 import { useToast } from "@/components/ui/toast";
 import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
-import { checkMapList, deriveMatchScore, mapListViolationMessage, type MatchMapInput } from "@/lib/shared/match-maps";
+import {
+  checkMapList,
+  deriveMatchScore,
+  mapListViolationMessage,
+  type MapField,
+  type MatchMapInput,
+} from "@/lib/shared/match-maps";
 // « Tranché » se lit sur le statut, pas sur la présence d'un vainqueur : un
 // match nul n'en a pas et est pourtant terminé. Sur `winnerTeamId`,
 // « Enregistrer » restait actif sur une rencontre finie, et la route
@@ -26,7 +32,14 @@ import { isMatchPlayed } from "@/lib/shared/match-outcome";
  */
 export function useScoreForm(
   match: BracketMatch | null,
-  options: { scoreEntryClosed?: boolean } = {},
+  options: {
+    scoreEntryClosed?: boolean;
+    /**
+     * Rattache un refus de map à son champ (`useFieldErrors`), en plus de la
+     * notification — avant l'envoi comme après un refus du serveur.
+     */
+    onMapRefusal?: (field: { index: number; field: MapField }, message: string) => void;
+  } = {},
 ) {
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
@@ -95,6 +108,24 @@ export function useScoreForm(
     setConflict(false);
   };
 
+  // Le serveur ne rend qu'un code : la même règle, rejouée ici, retrouve le
+  // champ qu'il désigne.
+  const flagMapRefusal = (code: string, decisive: boolean) => {
+    const local = checkMapList(matchFormat, game, maps, { decisive });
+    if (!local.field || local.error !== code || !options.onMapRefusal) return;
+    const index = Math.min(local.field.index, Math.max(maps.length - 1, 0));
+    options.onMapRefusal({ index, field: local.field.field }, mapListViolationMessage(local.error, matchFormat, game));
+  };
+
+  /** Contrôle des maps avant l'envoi ; `true` (refus signalé) bloque l'envoi. */
+  const refuseMaps = (decisive: boolean): boolean => {
+    const mapCheck = checkMapList(matchFormat, game, maps, { decisive });
+    if (!mapCheck.error) return false;
+    flagMapRefusal(mapCheck.error, decisive);
+    showError(mapListViolationMessage(mapCheck.error, matchFormat, game));
+    return true;
+  };
+
   const setMaps = (next: MatchMapInput[]) => {
     setMapsState(next);
     if (next.length === 0) return;
@@ -120,13 +151,8 @@ export function useScoreForm(
     // doit décrire un match terminé, un enregistrement seulement rester dans
     // les limites. Un forfait les écarte.
     const sendMaps = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;
-    if (sendMaps) {
-      const mapCheck = checkMapList(matchFormat, game, maps, { decisive: action === "resolve" });
-      if (mapCheck.error) {
-        showError(mapListViolationMessage(mapCheck.error, matchFormat, game));
-        return false;
-      }
-    }
+    const decisive = action === "resolve";
+    if (sendMaps && refuseMaps(decisive)) return false;
 
     setSubmitting(true);
     try {
@@ -158,7 +184,9 @@ export function useScoreForm(
       );
       return true;
     } catch (e) {
-      showError(mapError((e as Error).message));
+      const code = (e as Error).message;
+      if (sendMaps) flagMapRefusal(code, decisive);
+      showError(mapError(code));
       return false;
     } finally {
       setSubmitting(false);

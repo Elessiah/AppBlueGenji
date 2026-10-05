@@ -146,6 +146,9 @@ export async function clearMapSets(
 /** Propositions d'équipe d'un match (voir {@link clearMapSets}). */
 export const REPORTED_MAP_SOURCES: ReadonlyArray<MatchMapSource> = ["TEAM1", "TEAM2"];
 
+/** Tout le détail d'un match : propositions et résultat retenu. */
+export const ALL_MAP_SOURCES: ReadonlyArray<MatchMapSource> = ["TEAM1", "TEAM2", "FINAL"];
+
 export interface MatchMapSets {
   final: MatchMapResult[];
   team1: MatchMapResult[];

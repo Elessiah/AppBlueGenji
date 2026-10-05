@@ -29,6 +29,7 @@ import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
 import { MapScoreList, mapFieldIds } from "./MapScoreList";
+import { mapFieldKey } from "@/lib/shared/match-maps";
 import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
 
@@ -106,6 +107,9 @@ function storedResultLabel(match: BracketMatch, team1: string, team2: string): s
  * Comportement modal complet via `useDialogBehavior` : `Échap`, piège à focus,
  * arrière-plan figé, focus rendu au déclencheur à la fermeture.
  */
+/** Lignes de maps adressables par `useFieldErrors` — au-delà de tout plafond. */
+const MAP_FIELD_ID_SLOTS = 32;
+
 export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<AdminScoreDialogProps>) {
   // Aucun score avant le lancement, arbitrage compris (`isScoreEntryOpen`) :
   // la phase suit l'horloge, si bien que le dialogue ouvert sur un match « en
@@ -113,8 +117,13 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const { refereeScheduling } = useLiveControls();
   const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
   const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
-  const form = useScoreForm(match, { scoreEntryClosed });
-  const mapFieldErrors = useFieldErrors<string>({}, mapFieldIds("admin-score", form.maps.length));
+  // Déclaré avant le formulaire : un refus de map s'y rattache à son champ.
+  // Les `id` couvrent tout plafond de lignes possible (`mapListLimit`).
+  const mapFieldErrors = useFieldErrors<string>({}, mapFieldIds("admin-score", MAP_FIELD_ID_SLOTS));
+  const form = useScoreForm(match, {
+    scoreEntryClosed,
+    onMapRefusal: (field, message) => mapFieldErrors.flag(mapFieldKey(field.index, field.field), message),
+  });
   const matchFormat = useMatchFormat(match);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.

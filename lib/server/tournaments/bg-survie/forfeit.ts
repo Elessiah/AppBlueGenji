@@ -3,6 +3,7 @@
  */
 
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
+import { ALL_MAP_SOURCES, clearMapSets } from "../match-maps";
 import { forfeitMapCount } from "@/lib/shared/match-format";
 import { reconcileEndurance } from "./reconcile";
 import { loadTournament, matchFormatOf } from "./tournament-row";
@@ -103,6 +104,9 @@ export async function forfeitEnduranceTeam(
         match.id,
       ],
     );
+    // Le détail map par map — propositions, détail noté par l'arbitrage — ne
+    // décrit pas un forfait (`docs/features/MAP_SCORES.md`).
+    await clearMapSets(conn, [Number(match.id)], ALL_MAP_SOURCES);
   }
 
   await reconcileEndurance(tournamentId, conn);

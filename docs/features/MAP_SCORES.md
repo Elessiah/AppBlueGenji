@@ -103,8 +103,8 @@ bg_match_maps (
 
 - `TEAM1` / `TEAM2` : la proposition de chaque engagée, à côté de ses colonnes
   `teamN_report_*` — et effacée **avec** elles (`clearMapSets`) : clôture
-  (`finalizeMatch`, après promotion de celle qui fait foi), abandon en Survie /
-  Ronde suisse, retour en arrière (qui emporte aussi `FINAL`). Un code n'est
+  (`finalizeMatch`, après promotion de celle qui fait foi) ; un abandon en Survie /
+  Ronde suisse / BG Survie et un retour en arrière emportent aussi `FINAL`. Un code n'est
   gardé qu'avec le résultat qu'il documente.
 - Lectures **verrouillantes** (`FOR UPDATE`, table seule) avant d'effacer et
   pour comparer deux propositions : une lecture cohérente verrait l'instantané
