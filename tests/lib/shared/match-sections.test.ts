@@ -138,6 +138,12 @@ describe("needsSectionClock", () => {
     ).toBe(false);
     expect(needsSectionClock([bracketMatch(ready)], true)).toBe(false);
   });
+
+  it("s'arrête une fois l'heure passée, ou si une engagée manque", () => {
+    expect(needsSectionClock([bracketMatch({ ...ready, startAt: PAST })], false, NOW)).toBe(false);
+    expect(needsSectionClock([bracketMatch({ ...ready, startAt: FUTURE })], false, NOW)).toBe(true);
+    expect(needsSectionClock([bracketMatch({ team1Id: 1, startAt: FUTURE })], false, NOW)).toBe(false);
+  });
 });
 
 describe("buildSeedMap et sectionCountLabel", () => {
