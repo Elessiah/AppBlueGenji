@@ -24,7 +24,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `SCORE_EDIT_DIALOG.md` — Dialogue d'arbitrage : « Enregistrer » (avancement) vs « Valider le résultat » (propagation).
 - `PLAYER_SCORE_ENTRY.md` — Saisie, confirmation et contestation du score par un joueur ; forfait sur la manche.
 - `TOURNAMENT_PREVIEW.md` — Aperçu du plateau pendant les inscriptions (staff et cast), sans écriture.
-- `SEEDING_ORDER.md` — Ordre de seeding au glisser-déposer, jusqu'à la première saisie de score.
+- `SEEDING_ORDER.md` — Ordre de seeding aux flèches ↑ / ↓, figé au coup d'envoi.
 - `ENTRANT_REMOVAL.md` — Retrait d'un engagé, jusqu'au coup d'envoi seulement.
 - `TOURNAMENT_EDITING.md` — Édition après création : fenêtres `FULL` / `RESTRICTED` / `LOCKED`.
 - `EARLY_TOURNAMENT_LAUNCH.md` — Avancer le tournoi d'une étape : on ne fait jamais avancer une date, seulement la reculer.
