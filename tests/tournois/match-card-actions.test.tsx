@@ -376,6 +376,12 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain('window.addEventListener("scroll", onScroll, true);');
   });
 
+  it("se replace quand la carte bouge sans défilement (ancêtres observés)", () => {
+    expect(source).toContain("new ResizeObserver(schedule)");
+    expect(source).toMatch(/node = node\.parentElement\)\s*\{\s*resizes\.observe\(node\);/);
+    expect(source).toContain("resizes?.disconnect();");
+  });
+
   it("le lancement forcé garde sa confirmation", () => {
     expect(source).toContain("force: () => setConfirmForce(true),");
     expect(source).toContain("<ConfirmActionDialog");
