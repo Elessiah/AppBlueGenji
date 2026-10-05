@@ -18,7 +18,9 @@ export const DEFAULT_LOCALE: Locale = "fr";
 
 /**
  * En-tête de **requête** par lequel le middleware remet la langue au rendu.
- * Celui d'un client est toujours retiré (`middleware.ts`).
+ * Celui d'un client est remplacé sur toute requête que voit le middleware
+ * (`middleware.ts`) ; seuls les préchargements de pages françaises lui
+ * échappent, où un en-tête forgé ne change que la réponse de son auteur.
  */
 export const LOCALE_HEADER = "x-bg-locale";
 
