@@ -399,14 +399,21 @@ export function MatchCardActions({
         >
           {/* Bornée à la place disponible : sur une fenêtre basse, la liste
               défile plutôt que de déborder hors de l'écran. */}
-          <ScrollArea
-            orientation="y"
-            className={styles.list}
-            ariaLabel={matchCardActionName("Plus d'actions", matchLabel)}
-            style={placement ? { maxHeight: placement.maxHeight } : undefined}
-          >
-            {more.map((action) => renderButton(action, true))}
-          </ScrollArea>
+          {/* Zone défilante montée à l'ouverture seulement : chaque
+              `ScrollArea` pose ses observateurs, et un plateau compte jusqu'à
+              254 cartes. Repliée, la liste est un simple bloc masqué. */}
+          {expanded ? (
+            <ScrollArea
+              orientation="y"
+              className={styles.list}
+              ariaLabel={matchCardActionName("Plus d'actions", matchLabel)}
+              style={placement ? { maxHeight: placement.maxHeight } : undefined}
+            >
+              {more.map((action) => renderButton(action, true))}
+            </ScrollArea>
+          ) : (
+            <div className={styles.list}>{more.map((action) => renderButton(action, true))}</div>
+          )}
         </div>
       )}
       {/* Refermée d'elle-même si l'action disparaît (match lancé entre-temps
