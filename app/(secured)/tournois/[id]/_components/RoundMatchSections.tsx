@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useClock } from "@/lib/shared/hooks/useClock";
 import {
@@ -29,11 +29,13 @@ interface RoundMatchSectionsProps {
 export function RoundMatchSections({ matches, children }: Readonly<RoundMatchSectionsProps>) {
   const { refereeScheduling } = useLiveControls();
   const seeds = useEntrantSeeds();
-  const clockNeeded = useMemo(
-    () => needsSectionClock(matches, refereeScheduling),
-    [matches, refereeScheduling],
-  );
+  // L'horloge s'arrête d'elle-même une fois le dernier match daté entré en
+  // lancement : `now` l'y fait voir, et seule une nouvelle donnée la relance.
+  const [clockNeeded, setClockNeeded] = useState(() => needsSectionClock(matches, refereeScheduling));
   const now = useClock(SECTION_CLOCK_MS, clockNeeded);
+  useEffect(() => {
+    setClockNeeded(needsSectionClock(matches, refereeScheduling, now));
+  }, [matches, refereeScheduling, now]);
   const sections = useMemo(
     () => sectionRoundMatches(matches, { refereeScheduling, now, seeds }),
     [matches, refereeScheduling, now, seeds],

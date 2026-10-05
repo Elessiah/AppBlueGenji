@@ -132,12 +132,22 @@ export function sectionRoundMatches<T extends SectionMatch>(
   });
 }
 
-/** Une section attend-elle encore l'heure d'un match ? (l'horloge n'a à tourner que là) */
+/**
+ * L'horloge a-t-elle à tourner ? Seulement si un match peut encore passer
+ * d'« En attente de lancement » à « Lancement » par le seul temps : daté,
+ * heure pas encore atteinte (à `now`, ou inconnue avant le montage), ses deux
+ * engagées connues. Un match daté dont une engagée manque ne bouge que par une
+ * écriture, que le flux apporte.
+ */
 export function needsSectionClock(
   matches: readonly SectionMatch[],
   refereeScheduling: boolean,
+  now: number | null = null,
 ): boolean {
-  return matches.some((match) => matchSectionOf(match, refereeScheduling, null) === "WAITING");
+  return matches.some((match) => {
+    if (match.team1Id === null || match.team2Id === null) return false;
+    return matchSectionOf(match, refereeScheduling, now) === "WAITING";
+  });
 }
 
 /** « 3 matchs » — accord sur le nombre, pour le filet. */
