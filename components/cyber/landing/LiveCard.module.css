@@ -81,10 +81,20 @@
   padding-block: 4px;
 }
 
-.matchStatus {
-  font-size: 12px;
-  letter-spacing: 0.08em;
+/* État du tournoi : mention secondaire, sans pastille (voir LiveCard.tsx). */
+.tournamentMeta {
+  font-size: 11px;
+  letter-spacing: 0.1em;
   color: var(--ink-dim);
+}
+
+/* Pastille d'état du match et manche, juste au-dessus des engagés. */
+.matchHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 .vs {
@@ -226,11 +236,6 @@
   font-weight: 600;
 }
 
-.streamBanner .streamLabel {
-  animation: liveCardPulse 2s ease-in-out infinite;
-  animation-play-state: var(--deco-anim-state);
-}
-
 /* Acces au direct : un vrai bouton, et seulement quand le match est a
    l'antenne. Il herite du rouge de son bandeau — la seule couleur reservee a ce
    qui diffuse reellement. */
@@ -266,21 +271,5 @@
 @media (prefers-reduced-motion: reduce) {
   .streamButton {
     transition: none;
-  }
-}
-
-@keyframes liveCardPulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.55;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .streamBanner .streamLabel {
-    animation: none;
   }
 }

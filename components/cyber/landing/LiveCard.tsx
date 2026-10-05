@@ -5,8 +5,13 @@ import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
-import { featuredMatchStatusLabel, inferPhaseLabel, visibleLiveViewerCount } from "@/lib/shared/landing";
-import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
+import {
+  FEATURED_TOURNAMENT_STATE_LABEL,
+  featuredMatchPill,
+  inferPhaseLabel,
+  visibleLiveViewerCount,
+} from "@/lib/shared/landing";
+import { PLATFORM_LABELS, streamPlatform, type MatchLiveState } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
 import { useClock } from "@/lib/shared/hooks/useClock";
@@ -39,6 +44,48 @@ function EntrantName({ href, name }: Readonly<{ href: string | null; name: strin
     <EntityLink href={href} className={`${styles.nested} ${styles.entrantLink}`} title={`Voir la fiche de ${name}`}>
       {name}
     </EntityLink>
+  );
+}
+
+/**
+ * Bandeau de diffusion du match mis en avant.
+ *
+ * Le bouton n'apparaît **que** pour un match réellement à l'antenne.
+ * `SCHEDULED` annonce un cast à venir : la chaîne ne montre pas encore ce
+ * match, et l'y envoyer serait la même impasse que le bouton « Regarder le
+ * live » du hero, qui ne se rend qu'à l'antenne ouverte. À l'antenne, la
+ * pastille « En direct » le dit déjà : le bandeau ne porte plus que le bouton,
+ * et disparaît sans lien public.
+ */
+function MatchStreamBanner({
+  liveState,
+  liveUrl,
+  matchLabel,
+}: Readonly<{ liveState: MatchLiveState; liveUrl: string | null; matchLabel: string }>) {
+  const streamHref = liveState === "LIVE" ? liveUrl : null;
+  if (liveState === "SCHEDULED") {
+    return (
+      <div className={styles.streamBannerScheduled}>
+        <span className={styles.streamLabel}>○ DIFFUSION ANNONCÉE</span>
+      </div>
+    );
+  }
+  if (!streamHref) return null;
+  const platform = streamPlatform(streamHref);
+  const onPlatform = platform ? ` sur ${PLATFORM_LABELS[platform]}` : "";
+  return (
+    <div className={styles.streamBanner}>
+      <a
+        className={`${styles.streamButton} ${styles.nested}`}
+        href={streamHref}
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label={`Regarder ${matchLabel} en direct${onPlatform} (nouvel onglet)`}
+      >
+        <span aria-hidden="true">▶</span>
+        {platform ? `Regarder${onPlatform}` : "Regarder le live"}
+      </a>
+    </div>
   );
 }
 
@@ -76,7 +123,7 @@ function noLiveTournamentMessage(iso: string | null | undefined): string {
  */
 export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   // Seule l'horloge fait passer un match daté en lancement : sans elle, la
-  // carte annoncerait « Prochain match · 20:30 » jusqu'au sondage suivant.
+  // carte annoncerait « En attente de lancement » jusqu'au sondage suivant.
   // Elle ne tourne que pour un tel match (`useClock` respecte le mode économe).
   const clock = useClock(LIVE_CARD_CLOCK_MS, live?.currentMatch?.launchPhase === "SCHEDULED");
   if (!live) {
@@ -101,15 +148,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   // maps de la qualification. Le serveur l'a déjà résolu (`LandingLiveMatch`).
   const matchFormat = currentMatch?.matchFormat ?? null;
   const title = live.tournament.name.toUpperCase();
-  const matchIsLive = currentMatch?.liveState === "LIVE";
-  const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
-  const matchStatus = currentMatch ? featuredMatchStatusLabel(currentMatch, clock) : null;
-  const matchPlatform = streamPlatform(currentMatch?.liveUrl);
-  // Le bouton de diffusion n'apparaît **que** pour un match réellement à
-  // l'antenne. `SCHEDULED` annonce un cast à venir : la chaîne ne montre pas
-  // encore ce match, et l'y envoyer serait la même impasse que le bouton
-  // « Regarder le live » du hero, qui ne se rend qu'à l'antenne ouverte.
-  const streamHref = matchIsLive ? currentMatch?.liveUrl ?? null : null;
+  const matchPill = currentMatch ? featuredMatchPill(currentMatch, clock) : null;
 
   const visibleViewers = visibleLiveViewerCount(live.viewers);
   const team1Label = currentMatch?.team1Name ?? "Équipe 1";
@@ -129,13 +168,13 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
           dans l'ordre du DOM autant que par le `z-index`. */}
       <Link href={href} className={styles.cardOverlay} aria-label={openLabel} />
 
+      {/* L'état du **tournoi** est une mention secondaire, collée au jeu et au
+          nom du tournoi — jamais une pastille : « EN COURS » en tête de carte
+          se lisait comme l'état du match, alors que celui-ci n'était que daté. */}
       <div className={styles.head}>
-        {/* Bleu, et non `variant="live"` : « EN COURS » est l'**état du
-            tournoi**, pas une diffusion. Le rouge n'habille que ce qui est
-            réellement à l'antenne — désormais le bandeau du match casté, à
-            trois lignes d'ici, avec lequel il se confondait. */}
-        <Pill variant="blue">EN COURS</Pill>
-        <span className="mono">{live.game.toUpperCase()} · {inferPhaseLabel(currentMatch)}</span>
+        <span className={`${styles.tournamentMeta} mono`}>
+          {FEATURED_TOURNAMENT_STATE_LABEL.toUpperCase()} · {live.game.toUpperCase()}
+        </span>
         {visibleViewers !== null && (
           <span className={styles.viewers}>
             <Eye size={12} />
@@ -145,32 +184,23 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
       </div>
 
       <div className={styles.title}>{title}</div>
-      {/* Un match pas encore commencé ne passe pas pour le match du moment. */}
-      {matchStatus && <div className={`${styles.matchStatus} mono`}>{matchStatus}</div>}
 
-      {currentMatch ? (
+      {currentMatch && matchPill ? (
         <div className={styles.match}>
-          {(matchIsLive || matchIsScheduled) && (
-            <div className={matchIsLive ? styles.streamBanner : styles.streamBannerScheduled}>
-              <span className={styles.streamLabel}>
-                {matchIsLive ? "● CE MATCH EST EN DIRECT" : "○ DIFFUSION ANNONCÉE"}
-              </span>
-              {streamHref && (
-                <a
-                  className={`${styles.streamButton} ${styles.nested}`}
-                  href={streamHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  aria-label={`Regarder ${team1Label} contre ${team2Label} en direct${
-                    matchPlatform ? ` sur ${PLATFORM_LABELS[matchPlatform]}` : ""
-                  } (nouvel onglet)`}
-                >
-                  <span aria-hidden="true">▶</span>
-                  {matchPlatform ? `Regarder sur ${PLATFORM_LABELS[matchPlatform]}` : "Regarder le live"}
-                </a>
-              )}
-            </div>
-          )}
+          {/* La pastille dit l'état **du match**, dans les mots des sections de
+              manche ; le rouge ne sert qu'à « En direct » (vraie diffusion). */}
+          <div className={styles.matchHead}>
+            <Pill variant={matchPill.tone === "default" ? undefined : matchPill.tone}>{matchPill.label}</Pill>
+            <span className="mono">
+              {matchPill.when ? `${matchPill.when.toUpperCase()} · ` : ""}
+              {inferPhaseLabel(currentMatch)}
+            </span>
+          </div>
+          <MatchStreamBanner
+            liveState={currentMatch.liveState}
+            liveUrl={currentMatch.liveUrl}
+            matchLabel={`${team1Label} contre ${team2Label}`}
+          />
 
           <div className={styles.team}>
             <TeamSigil label={sigilFor(currentMatch.team1Name)} size={40} logoUrl={currentMatch.team1LogoUrl} />

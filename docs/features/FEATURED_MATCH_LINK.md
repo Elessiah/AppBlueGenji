@@ -178,8 +178,8 @@ il n'apparaît **que** pour un match réellement à l'antenne :
 
 | État (`resolveMatchLiveState`) | Bandeau | Bouton |
 |---|---|---|
-| `LIVE` + `liveUrl` | « ● CE MATCH EST EN DIRECT » (rouge) | « Regarder sur Twitch » |
-| `LIVE` sans `liveUrl` | idem | — (casté sans lien public) |
+| `LIVE` + `liveUrl` | bouton seul (rouge) — la pastille « En direct » le dit déjà | « Regarder sur Twitch » |
+| `LIVE` sans `liveUrl` | — (pastille « En direct » seule) | — (casté sans lien public) |
 | `SCHEDULED` | « ○ DIFFUSION ANNONCÉE » (bleu) | — |
 | `OFF` | — | — |
 
@@ -192,10 +192,10 @@ chaîne officielle — et elle est bornée par la liste blanche de
 
 ### Vocabulaire et couleur
 
-La pastille d'en-tête de la carte est passée de `pill-live` (rouge) à
-`pill-blue`. « EN COURS » est l'**état du tournoi**, pas une diffusion, et le
-rouge n'habille que ce qui est réellement à l'antenne (`CLAUDE.md`) — ici le
-bandeau du match casté, trois lignes plus bas, avec lequel il se confondait.
+La carte porte **une seule pastille, celle du match** (voir § 7, « État du match
+et état du tournoi »). Le rouge (`pill-live`) n'habille que « En direct », un
+match réellement à l'antenne (`LIVE_STREAMS.md`) ; « En cours » et « Lancement »
+sont bleus, « En attente de lancement » neutre.
 
 ## 6. Ce que la carte n'invente plus
 
@@ -233,9 +233,36 @@ Un match « À planifier » (`TO_PLAN`), terminé ou sans adversaire (`NONE`) n'
 jamais retenu ; sans candidat, la carte se réduit au tournoi. À rang égal,
 l'ordre du plateau départage.
 
-La carte dit ce qu'elle montre (`featuredMatchStatusLabel`) : « Prochain match ·
-21 sept. · 20:30 » pour un match daté, « Lancement » quand l'heure est venue,
-rien pour un match lancé. La pastille « EN COURS » reste l'état du **tournoi**.
+### État du match et état du tournoi
+
+Retour terrain (2026-10-05) : la pastille « EN COURS », en tête de carte, était
+l'état du **tournoi**, mais se lisait comme celui du match — qui n'était que daté
+(« Prochain match · 5 oct. · 21:00 » juste en dessous).
+
+- **La seule pastille est celle du match** (`featuredMatchPill`,
+  `lib/shared/landing.ts`), posée juste au-dessus des engagés, à côté de la
+  manche. Elle reprend les mots des sections de manche (`MATCH_SECTION_LABELS`,
+  `ROUND_MATCH_SECTIONS.md`), pour que l'accueil et la fiche du tournoi disent
+  la même chose :
+
+  | Match | Pastille | Teinte |
+  |---|---|---|
+  | à l'antenne (`liveState === "LIVE"`), quelle que soit la phase | « En direct » | rouge (`pill-live`) |
+  | `LAUNCHED` | « En cours » | bleu |
+  | `LOBBY`, ou `SCHEDULED` dont l'heure est passée (horloge) | « Lancement » | bleu |
+  | `SCHEDULED` | « En attente de lancement », suivie de « 5 OCT. · 21:00 · MANCHE 1 » | neutre |
+
+  L'horaire (`featuredMatchPill().when`) s'écrit **à côté** de la pastille, avec
+  la manche, et non dedans : la pastille tient ainsi sur une ligne dès 320 px.
+  La ligne « Prochain match · … » est retirée, elle redisait la même chose.
+- **L'état du tournoi devient une mention secondaire**, sans pastille :
+  « TOURNOI EN COURS · OVERWATCH » en tête de carte, au-dessus du nom du tournoi
+  (`FEATURED_TOURNAMENT_STATE_LABEL`). Sans match mis en avant, c'est la seule
+  mention d'état de la carte.
+
+La bascule « En attente » → « Lancement » ne vient que de l'horloge (`useClock`,
+active pour un match daté seulement) ; `now = null` au rendu serveur et à
+l'hydratation s'en tient à la phase du serveur.
 
 **Fraîcheur.** Le choix dépend de l'horaire et du lancement : `match-schedule.ts`
 (horaire), `setMatchReady` / `forceLaunchMatch` et le lancement d'office
@@ -263,7 +290,8 @@ au lieu de garder la première jusqu'au sondage suivant.
 | Fichier | Ce qu'il tient |
 |---|---|
 | `tests/lib/shared/match-anchor.test.ts` | Réciprocité écriture/relecture, refus des formes convertibles, résolution de phase. |
-| `tests/app/live-card-featured-match.test.tsx` | Cible du lien, intitulé accessible, bouton de direct réservé à `LIVE`, plus aucune donnée inventée. |
+| `tests/app/live-card-featured-match.test.tsx` | Cible du lien, intitulé accessible, bouton de direct réservé à `LIVE`, plus aucune donnée inventée, pastille du match distincte de l'état du tournoi. |
+| `tests/lib/shared/landing.test.ts` | `featuredMatchPill` : libellé par section, cas « En direct », bascule par l'horloge. |
 | `tests/lib/server/landing-live.test.ts` | Seeds exposés format par format, seed aberrant écarté. |
 | `tests/tournois/match-anchor-wiring.test.ts` | Points de passage (l'ancre est dans `MatchRow`, le hook est branché) et unicité du préfixe. |
 

@@ -3,11 +3,14 @@ import {
   activeTournamentCards,
   chooseFeaturedTournament,
   compareByStartAt,
-  featuredMatchStatusLabel,
+  FEATURED_TOURNAMENT_STATE_LABEL,
+  featuredMatchPill,
   pickFeaturedMatchIndex,
   type FeaturedMatchCandidate,
   visibleLiveViewerCount,
 } from "@/lib/shared/landing";
+import type { MatchLiveState } from "@/lib/shared/live-streams";
+import { MATCH_SECTION_LABELS } from "@/lib/shared/match-sections";
 import type { TournamentBuckets, TournamentCard, TournamentState } from "@/lib/shared/types";
 import { tournamentCard } from "../../helpers/tournament-card";
 
@@ -226,34 +229,59 @@ describe("pickFeaturedMatchIndex", () => {
   });
 });
 
-describe("featuredMatchStatusLabel", () => {
+describe("featuredMatchPill", () => {
   const NOW = Date.parse("2026-10-05T12:00:00Z");
+  const pill = (
+    launchPhase: "LAUNCHED" | "LOBBY" | "SCHEDULED",
+    startAt: string | null,
+    now: number | null = NOW,
+    liveState: MatchLiveState = "OFF",
+  ) => featuredMatchPill({ launchPhase, startAt, liveState }, now);
 
-  it("annonce l'horaire d'un match daté, à l'heure de Paris", () => {
-    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T18:30:00Z" }, NOW)).toBe(
-      "Prochain match · 5 oct. · 20:30",
-    );
+  it("reprend les mots des sections de manche, phase par phase", () => {
+    expect(pill("LAUNCHED", null)).toEqual({ label: MATCH_SECTION_LABELS.PLAYING, tone: "blue", when: null });
+    expect(pill("LOBBY", null)).toEqual({ label: MATCH_SECTION_LABELS.LOBBY, tone: "blue", when: null });
+    // L'horaire est rendu à côté de la pastille, pas dedans : elle tient sur une ligne.
+    expect(pill("SCHEDULED", "2026-10-05T18:30:00Z")).toEqual({
+      label: MATCH_SECTION_LABELS.WAITING,
+      tone: "default",
+      when: "5 oct. · 20:30",
+    });
+    expect(MATCH_SECTION_LABELS.PLAYING).toBe("En cours");
+    expect(MATCH_SECTION_LABELS.WAITING).toBe("En attente de lancement");
   });
 
-  it("dit « Lancement » dès l'heure atteinte, sans attendre une nouvelle phase du serveur", () => {
-    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T12:00:00Z" }, NOW)).toBe("Lancement");
-    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T11:55:00Z" }, NOW)).toBe("Lancement");
+  it("ne dit « En direct », en rouge, que pour un match réellement à l'antenne", () => {
+    for (const phase of ["LAUNCHED", "LOBBY", "SCHEDULED"] as const) {
+      expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "LIVE")).toEqual({ label: "En direct", tone: "live", when: null });
+      // Une diffusion seulement annoncée n'est pas à l'antenne.
+      expect(pill(phase, "2026-10-05T18:30:00Z", NOW, "SCHEDULED").tone).not.toBe("live");
+    }
+  });
+
+  it("passe en « Lancement » dès l'heure atteinte, sans attendre une nouvelle phase du serveur", () => {
+    expect(pill("SCHEDULED", "2026-10-05T12:00:00Z").label).toBe("Lancement");
+    expect(pill("SCHEDULED", "2026-10-05T11:55:00Z").label).toBe("Lancement");
   });
 
   it("s'en tient à la phase du serveur tant que l'horloge n'est pas montée", () => {
     // Rendu serveur et hydratation doivent coïncider : aucune lecture de l'heure.
-    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2020-01-01T00:00:00Z" }, null)).toMatch(
-      /^Prochain match · /,
-    );
+    const held = pill("SCHEDULED", "2020-01-01T00:00:00Z", null);
+    expect(held.label).toBe("En attente de lancement");
+    expect(held.when).toMatch(/2020 · /);
   });
 
   it("se passe d'un horaire illisible ou absent", () => {
-    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "pas une date" }, NOW)).toBe("Prochain match");
-    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: null }, NOW)).toBe("Prochain match");
+    expect(pill("SCHEDULED", "pas une date")).toEqual({ label: "En attente de lancement", tone: "default", when: null });
+    expect(pill("SCHEDULED", null).when).toBeNull();
   });
 
-  it("dit « Lancement » quand l'heure est venue, rien pour un match lancé", () => {
-    expect(featuredMatchStatusLabel({ launchPhase: "LOBBY", startAt: null }, NOW)).toBe("Lancement");
-    expect(featuredMatchStatusLabel({ launchPhase: "LAUNCHED", startAt: null }, NOW)).toBeNull();
+  it("ne confond jamais l'état du tournoi avec celui du match", () => {
+    expect(FEATURED_TOURNAMENT_STATE_LABEL).toBe("Tournoi en cours");
+    for (const phase of ["LAUNCHED", "LOBBY", "SCHEDULED"] as const) {
+      for (const liveState of ["OFF", "SCHEDULED", "LIVE"] as const) {
+        expect(pill(phase, null, NOW, liveState).label).not.toBe(FEATURED_TOURNAMENT_STATE_LABEL);
+      }
+    }
   });
 });

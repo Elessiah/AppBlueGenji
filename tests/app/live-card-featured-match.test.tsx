@@ -178,10 +178,11 @@ describe("LiveCard — accès au direct", () => {
   });
 
   it("annonce le direct sans bouton quand la chaîne n'est pas publique", () => {
-    // Un match peut être casté sans lien saisi : le bandeau le dit, il n'y a
+    // Un match peut être casté sans lien saisi : la pastille le dit, il n'y a
     // simplement nulle part où cliquer.
     const html = withStream("LIVE", null);
-    expect(text(html)).toContain("CE MATCH EST EN DIRECT");
+    expect(text(html)).toContain("En direct");
+    expect(html).toContain("pill-live");
     expect(text(html)).not.toContain("Regarder");
   });
 });
@@ -204,37 +205,55 @@ describe("LiveCard — plus aucune donnée inventée", () => {
   });
 
   it("réserve le rouge à ce qui est réellement à l'antenne", () => {
-    // « EN COURS » est l'**état du tournoi**, pas une diffusion : il se met en
-    // bleu (`pill-blue`), sans quoi il se confondait avec le bandeau du match
-    // casté, trois lignes plus bas.
+    // Un match lancé mais non casté : « En cours » en bleu, jamais `pill-live`.
     expect(render(live())).not.toContain("pill-live");
     expect(render(live())).toContain("pill-blue");
   });
 });
 
-describe("LiveCard — match mis en avant pas encore commencé", () => {
-  it("annonce l'horaire d'un match daté plutôt que de le présenter comme joué", () => {
+/** Libellés des pastilles rendues, dans l'ordre du document. */
+function pillLabels(html: string): string[] {
+  // La pastille rouge porte un point animé (`<span class="dot">`) avant son texte.
+  return [...html.matchAll(/<span class="pill[^"]*">((?:<span class="dot"><\/span>)?[^<]*)<\/span>/g)].map((m) =>
+    text(m[1]).trim(),
+  );
+}
+
+describe("LiveCard — état du match et état du tournoi", () => {
+  it("annonce un match daté comme en attente, horaire compris, sans le redire ailleurs", () => {
     const html = render(
       live({ currentMatch: match({ launchPhase: "SCHEDULED", startAt: "2099-03-04T19:30:00.000Z" }) }),
     );
-    expect(text(html)).toContain("Prochain match · 4 mars 2099 · 20:30");
+    // Pastille courte (une ligne à 320 px), horaire à côté avec la manche.
+    expect(pillLabels(html)).toEqual(["En attente de lancement"]);
+    expect(text(html)).toContain("4 MARS 2099 · 20:30 · ");
+    expect(text(html)).not.toContain("Prochain match");
   });
 
   it("dit « Lancement » quand l'heure du match est venue", () => {
-    expect(text(render(live({ currentMatch: match({ launchPhase: "LOBBY" }) })))).toContain("Lancement");
+    expect(pillLabels(render(live({ currentMatch: match({ launchPhase: "LOBBY" }) })))).toEqual(["Lancement"]);
+  });
+
+  it("dit « En cours » pour un match lancé, « En direct » pour un match à l'antenne", () => {
+    expect(pillLabels(render(live()))).toEqual(["En cours"]);
+    expect(pillLabels(render(live({ currentMatch: match({ liveState: "LIVE" }) })))).toEqual(["En direct"]);
+  });
+
+  it("ne met l'état du tournoi dans aucune pastille", () => {
+    const html = render(live());
+    expect(text(html)).toContain("TOURNOI EN COURS · ");
+    for (const label of pillLabels(html)) expect(label.toUpperCase()).not.toContain("TOURNOI");
+    // Sans match mis en avant, la carte n'a aucune pastille d'état.
+    const empty = render(live({ currentMatch: null }));
+    expect(pillLabels(empty)).toEqual([]);
+    expect(text(empty)).toContain("TOURNOI EN COURS · ");
   });
 
   it("relit l'horloge pour un match daté seulement, par `useClock`", () => {
-    // Le passage « Prochain match » → « Lancement » ne vient que de l'horloge :
+    // Le passage « En attente » → « Lancement » ne vient que de l'horloge :
     // sans relecture, l'ancien libellé tiendrait jusqu'au sondage (5 min).
     const source = readFileSync(join(process.cwd(), "components/cyber/landing/LiveCard.tsx"), "utf8");
     expect(source).toMatch(/useClock\(LIVE_CARD_CLOCK_MS, live\?\.currentMatch\?\.launchPhase === "SCHEDULED"\)/);
-    expect(source).toContain("featuredMatchStatusLabel(currentMatch, clock)");
-  });
-
-  it("n'ajoute rien à un match lancé", () => {
-    const html = text(render(live()));
-    expect(html).not.toContain("Prochain match");
-    expect(html).not.toContain("Lancement");
+    expect(source).toContain("featuredMatchPill(currentMatch, clock)");
   });
 });
