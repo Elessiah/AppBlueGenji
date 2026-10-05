@@ -28,6 +28,11 @@ describe("bluegenji/no-literal-ui-text", () => {
         { code: 'const a = <a href="/regles" aria-label={t("rules")} />;' },
         { code: 'const a = <div className="Bonjour" data-x="Texte" />;' },
         { code: "const a = <p>{`${count}`}</p>;" },
+        { code: 'const a = <p>{ok ? t("open") : t("closed")}</p>;' },
+        { code: 'const a = <p>{isOwner && t("manage")}</p>;' },
+        { code: 'const a = <p>{"label" === mode && t("x")}</p>;' },
+        { code: 'const a = <p>{value ?? "—"}</p>;' },
+        { code: 'const a = <div className={open ? "on" : "off"} />;' },
       ],
       invalid: [],
     });
@@ -45,7 +50,13 @@ describe("bluegenji/no-literal-ui-text", () => {
         { code: 'const a = <input placeholder={"Rechercher"} />;', errors: [{ messageId: "attribute" }] },
         { code: 'const a = <img alt="Logo" />;', errors: [{ messageId: "attribute" }] },
         { code: 'const a = <X title="Règles" label="Équipe" ariaLabel="Zone" />;', errors: 3 },
-      ],
+        // Les formes les plus courantes d'un texte d'interface, derrière une expression.
+        { code: 'const a = <p>{ok ? "Inscrit" : "Fermé"}</p>;', errors: [{ messageId: "jsxText" }] },
+        { code: "const a = <p>{isOwner && \"Gérer l'équipe\"}</p>;", errors: [{ messageId: "jsxText" }] },
+        { code: 'const a = <p>{name || "Anonyme"}</p>;', errors: [{ messageId: "jsxText" }] },
+        { code: 'const a = <p>{"Équipe " + n}</p>;', errors: [{ messageId: "jsxText" }] },
+        { code: "const a = <p>{`${n} équipes`}</p>;", errors: [{ messageId: "jsxText" }] },
+        { code: 'const a = <button aria-label={open ? "Fermer" : "Ouvrir"} />;', errors: [{ messageId: "attribute" }] },      ],
     });
     expect(run).not.toThrow();
   });
