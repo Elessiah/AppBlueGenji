@@ -90,4 +90,10 @@ describe("Correction d'un résultat — câblage", () => {
     expect(SCORE).toContain("son horaire conservé");
     expect(SCORE).toContain("terminé repasse en cours");
   });
+
+  it("referme la confirmation quand un autre arbitre écrit, pour que l'avertissement soit lu", () => {
+    expect(SCORE).toMatch(
+      /useEffect\(\(\) => \{\s*if \(form\.conflict\) setConfirmingCorrection\(null\);\s*\}, \[form\.conflict\]\);/,
+    );
+  });
 });

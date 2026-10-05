@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Pill } from "@/components/cyber";
 import type { BracketMatch } from "@/lib/shared/types";
@@ -162,6 +162,14 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   // (`scoreCorrectionNeedsConfirmation`), le premier résultat part directement.
   const [confirmingCorrection, setConfirmingCorrection] = useState<"save" | "resolve" | null>(null);
   const storedLabel = storedResultLabel(match, team1, team2);
+  // Un autre arbitre écrit pendant qu'on lit la confirmation : l'avertissement
+  // de conflit s'affiche dans le dialogue de score, que la confirmation
+  // recouvre. On la referme pour qu'il soit lu avant tout envoi. L'effet ne
+  // suit que `form.conflict` : un conflit déjà affiché (et lu) à l'ouverture
+  // ne la referme pas.
+  useEffect(() => {
+    if (form.conflict) setConfirmingCorrection(null);
+  }, [form.conflict]);
 
   const perform = async (action: "save" | "resolve"): Promise<boolean> => {
     const ok = await form.submit(action);
