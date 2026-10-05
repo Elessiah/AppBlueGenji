@@ -14,7 +14,7 @@ import styles from "../team.module.css";
 export function TeamHistory({ tournaments }: Readonly<{ tournaments: TeamHistoryRow[] }>) {
   return (
     <section className={`ds-block ${styles.block}`} aria-labelledby="team-history-title">
-      <div className="ds-section-title orange">
+      <div className="ds-section-title purple">
         <h2 id="team-history-title">Historique des tournois</h2>
       </div>
       {tournaments.length === 0 ? (

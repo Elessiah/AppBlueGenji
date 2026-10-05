@@ -15,9 +15,10 @@ import { GhostTeamDialog } from "./GhostTeamDialog";
 import { teamErrorMessage } from "./_lib/team-errors";
 import s from "../_shared/annuaire.module.css";
 
-const ACCENT_RGB = "255, 157, 46";
-const ACCENT_300 = "#ffc18a";
-const ACCENT_500 = "#ff9d2e";
+// Violet néon (`--violet-400-rgb`, littéral : le canevas de fond ne lit pas les variables CSS).
+const ACCENT_RGB = "167, 139, 250";
+const ACCENT_300 = "var(--violet-300)";
+const ACCENT_500 = "var(--violet-400)";
 
 type GameFilter = "all" | "ow" | "mr";
 type SortKey = "rank" | "name" | "wins" | "members";

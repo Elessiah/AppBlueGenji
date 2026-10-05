@@ -97,3 +97,27 @@ export function sortTeamMembers<T extends { pseudo: string; roles: readonly Team
     (a, b) => weight(a) - weight(b) || a.pseudo.localeCompare(b.pseudo, "fr", { sensitivity: "base" }),
   );
 }
+
+/**
+ * Teinte néon d'un rôle (DESIGN_SYSTEM.md § Palette « néon froid »), la même
+ * partout où il s'affiche (fiche d'équipe, cartes de joueur). Les places de jeu
+ * suivent l'usage des jeux — tank bleu, DPS rose, soutien vert d'eau ; le
+ * pouvoir sur l'équipe se dit en violet. La couleur double toujours un libellé
+ * (et, sur la fiche, un pictogramme) : elle ne porte jamais seule le sens. Un
+ * code inconnu reste neutre.
+ */
+export type TeamRoleTone = "pink" | "violet" | "cyan" | "blue" | "teal" | "neutral";
+
+const TEAM_ROLE_TONES: Record<TeamRole, TeamRoleTone> = {
+  OWNER: "pink",
+  MANAGER: "violet",
+  CAPITAINE: "cyan",
+  COACH: "violet",
+  TANK: "blue",
+  DPS: "pink",
+  HEAL: "teal",
+};
+
+export function teamRoleTone(role: string): TeamRoleTone {
+  return Object.hasOwn(TEAM_ROLE_TONES, role) ? TEAM_ROLE_TONES[role as TeamRole] : "neutral";
+}

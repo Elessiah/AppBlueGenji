@@ -143,7 +143,7 @@ export default function PlayerDetailPage() {
                   {data.displayRoles.map((role) => (
                     <span
                       key={role}
-                      className="pill pill-blue"
+                      className="pill pill-accent"
                       style={{ fontSize: 11 }}
                       title={ROLE_DESCRIPTIONS[role]}
                     >

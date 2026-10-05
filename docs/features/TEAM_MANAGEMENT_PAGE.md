@@ -65,8 +65,13 @@ transfert, attribution d'une fantôme, confirmations).
 familles (`owner` / `management` / `game`), tri du roster (propriétaire, puis
 gestion, puis pseudo).
 
-- Affichés en **pastilles** (`RolePills`) : la famille se dit par la couleur **et**
-  un pictogramme (★ propriétaire, ⚙ gestion).
+- Affichés en **pastilles** (`RolePills`) : chaque rôle a sa teinte néon
+  (`teamRoleTone` → `data-tone` : tank bleu, DPS rose, soutien vert d'eau,
+  capitaine cyan, coach et manager violet, propriétaire rose avec halo), la même
+  sur les cartes de `/joueurs` ; la famille se dit **aussi** par un pictogramme
+  (★ propriétaire, ⚙ gestion) — la couleur ne porte jamais seule le sens. Toute
+  la section équipes (annuaire, fiche, statistiques) est en violet néon, plus
+  en orange (`DESIGN_SYSTEM.md` § Palette « néon froid »).
 - Choisis par `RolePicker`, en deux groupes : « Rôles de jeu » et « Gestion de
   l'équipe ». `MANAGER` se cochait comme `TANK`, alors qu'il donne la main sur
   l'équipe ; son effet est écrit sous lui. `OWNER` ne se coche jamais.

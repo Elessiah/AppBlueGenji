@@ -24,8 +24,8 @@ import { plural } from "@/lib/shared/plural";
 
 interface StatsPanelProps {
   stats: DeepStats;
-  /** Teinte d'accent : bleu côté joueur, orange côté équipe. */
-  accent?: "blue" | "orange";
+  /** Teinte d'accent : bleu côté joueur, violet côté équipe. */
+  accent?: "blue" | "violet";
   /** Place au classement du site — réservé aux équipes. */
   ranking?: TeamRankingPosition | null;
 }
@@ -208,7 +208,7 @@ export function StatsPanel({ stats, accent = "blue", ranking = null }: Readonly<
   const hasPlayed = stats.matchesPlayed > 0;
 
   return (
-    <div className={`${s.panel} ${accent === "orange" ? s.orange : ""}`}>
+    <div className={`${s.panel} ${accent === "violet" ? s.violet : ""}`}>
       <Group id="stats-palmares" title="Palmarès">
         <div className={s.grid}>
           <Tile
