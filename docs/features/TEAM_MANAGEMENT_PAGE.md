@@ -51,7 +51,7 @@ transfert, attribution d'une fantôme, confirmations).
   `useMemberManagement` avalait l'erreur après l'avoir signalée, si bien que la
   modale des rôles se refermait sur un refus et que le formulaire d'invitation se
   vidait sur un pseudo mal tapé.
-- Les gestes destructeurs passent par `ConfirmDialog` : exclure un membre (qui
+- Les gestes destructeurs passent par `ConfirmActionDialog` (`components/ui/`) : exclure un membre (qui
   partait sans question), quitter l'équipe, dissoudre (qui exige désormais de
   **recopier le nom**, comme la suppression d'un tournoi). La dissolution
   efface aussi le **fichier** du logo, après le commit (`softDeleteTeam` →

@@ -4,8 +4,9 @@
 
 Un geste du staff (arbitrage, modération, administration) qui **défait** quelque
 chose — résultat, horaire, inscription, ordre, rôle, donnée — passe par une
-modale de confirmation (`ConfirmActionDialog`, ou la modale propre au geste
-quand il a des paramètres : `MODAL_DIALOGS.md`). Jamais `window.confirm`.
+modale de confirmation (`ConfirmActionDialog`, `components/ui/`, ou la modale
+propre au geste quand il a des paramètres : `MODAL_DIALOGS.md`). Jamais
+`window.confirm` : ESLint le refuse.
 
 - La modale dit **concrètement** ce qui sera perdu ou changé, et ce qui ne
   l'est pas (« son horaire conservé »).
@@ -62,20 +63,23 @@ valable pour tous les formats, avec ou sans liens de plateau.
 | Forfait d'équipe | Matchs restants | `ConfirmActionDialog` |
 | Modifier un tournoi | — (verrouillé au coup d'envoi) | aucune, inutile |
 | Programmer / dater un match | Horaire (formulaire dédié, réversible) | aucune, inutile |
-| Modération joueur (avatar, suspension, levée) | Compte, avatar | modale de `PlayerModerationBar` |
-| Retirer le logo d'une équipe | Logo | modale de `ModerationLogoBar` |
+| Modération joueur (avatar, suspension, levée) | Compte, avatar | `ConfirmActionDialog` (`PlayerModerationBar`, motif requis) |
+| Retirer le logo d'une équipe | Logo | `ConfirmActionDialog` (`ModerationLogoBar`, motif requis) |
 | Purger un logo en quarantaine | Fichier | `ArmedButton` (deux temps) |
 | Masquer / restaurer un logo signalé | — (réversible) | aucune, inutile |
-| Rôles & permissions d'un joueur | Droits d'administration | **à faire** (lot suivant) |
-| Supprimer membre du bureau, bénévole, annonce, carte « À propos », chiffre, partenaire | Donnée publiée | `window.confirm` — **à remplacer** (lot suivant) |
+| Rôles & permissions d'un joueur | Droits, administration comprise | **Ajoutée** (`ConfirmActionDialog` dès qu'un rôle est accordé ou retiré) |
+| Supprimer membre du bureau, bénévole, annonce, carte « À propos », chiffre, partenaire | Donnée publiée (photo du bénévole effacée) | **Ajoutée** (`ConfirmActionDialog`, remplace `window.confirm`) |
+| Retirer son tag Discord (`/profil`) | Tag et sa certification | **Ajoutée** (`ConfirmActionDialog`, remplace `window.confirm`) |
+| Supprimer son compte (`/profil`) | Compte (texte selon l'aperçu de suppression) | **Ajoutée** (`ConfirmActionDialog`, remplace `window.confirm`) |
 
-### Lot suivant
+## Rôles de plateforme
 
-- `window.confirm` restants (`BureauSection`, `BenevolesSection`,
-  `RecruitmentSection`, `AboutPillars`, `AboutStats`, `SponsorsGrid`, et le
-  retrait du tag Discord sur `/profil`) : la modale de confirmation vit sous
-  `tournois/[id]/_components/`, et trois variantes coexistent (`ConfirmActionDialog`,
-  `equipes/[id]/_components/ConfirmDialog`, celle de `PlayerModerationBar`) —
-  à unifier dans `components/ui/` avant de les remplacer.
-- `PlayerRolesPanel` : confirmer quand l'enregistrement accorde ou retire le
-  rôle administrateur.
+`PlayerRolesPanel` : « Enregistrer les rôles » calcule l'écart
+(`diffPlatformRoles`, `lib/shared/permissions.ts`). Sans écart, l'envoi part
+sans question ; sinon la modale liste ce que le joueur **gagne** et **perd**,
+rôle par rôle avec son périmètre (`ROLE_DESCRIPTIONS`), et souligne
+l'administration accordée (tous les droits, dont retirer ceux de l'auteur) ou
+retirée (ne restent que les rôles encore cochés). Ton `danger` dès qu'un rôle
+est retiré ou que l'administration est accordée, `primary` sinon. Retirer
+**son propre** accès est impossible : le panneau n'est pas rendu sur sa propre
+fiche et la route refuse en `CANNOT_MODIFY_SELF` — aucune phrase dédiée.

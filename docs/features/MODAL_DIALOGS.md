@@ -102,7 +102,30 @@ hauteur et laissait les boutons hors écran, défilement de la page verrouillé.
 Les dialogues de la fiche tournoi (diffusion, horaire, rediff, signalement,
 pénalité, avancée, suppression, retrait, retour en arrière, image) la
 portent ; les feuilles de module (`ScoreDialog.module.css`,
-`ConfirmActionDialog.module.css`) posent la même borne.
+`components/ui/confirm-action-dialog.module.css`) posent la même borne.
+
+## Confirmation d'un geste : `ConfirmActionDialog`
+
+**Une seule** modale de confirmation pour tout le site :
+`components/ui/confirm-action-dialog.tsx`. Elle a remplacé trois variantes
+(celle de la fiche tournoi, `ConfirmDialog` de la fiche d'équipe et la
+`ModerationDialog` de `PlayerModerationBar`) et tous les `window.confirm`.
+`window.confirm` / `confirm` sont refusés par ESLint (`no-restricted-globals`,
+`no-restricted-properties` dans `eslint.config.mjs`).
+
+- `alertdialog`, portée dans `body`, `useDialogBehavior`, `useBackdropDismiss` ;
+  rien ne la ferme tant que le geste est en vol (`locked`).
+- `onConfirm` rend `true` si le geste a abouti : la modale se referme alors
+  (`closeOnSuccess`, défaut) ; `false` la laisse ouverte, bouton réarmé, pour
+  réessayer ou renoncer — le refus s'affiche en toast. `closeOnSuccess={false}` :
+  l'appelant la démonte lui-même (navigation, rechargement), le bouton reste
+  « en cours » jusque-là.
+- Focus d'ouverture sur « Annuler » ; sur le champ quand un texte est à
+  recopier (`requireText`, dissolution d'équipe) ou que le contenu porte un
+  champ (`focusContent`, motif de modération). `disabled` désarme le bouton
+  tant qu'un champ requis du contenu est vide.
+- `tone` : `danger` (défaut) pour une perte, `primary` pour un engagement.
+- Le texte dit **concrètement** ce qui est perdu (`ADMIN_CONFIRMATIONS.md`).
 
 ## Notes reprises de CLAUDE.md
 
