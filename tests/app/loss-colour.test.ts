@@ -57,6 +57,11 @@ describe("jetons de la défaite", () => {
     }
   });
 
+  it("garde le halo des barres plus court que l'écart de 3 px qui les sépare", () => {
+    const blur = Number(root.match(/--result-loss-glow:\s*0 0 (\d+)px/)![1]);
+    expect(blur).toBeLessThan(3);
+  });
+
   it("garde l'encre lisible (AA) sur le fond le plus clair et sur un fond teinté de défaite", () => {
     expect(contrastRatio(LOSS_INK, SURFACE)).toBeGreaterThanOrEqual(4.5);
     expect(contrastRatio(LOSS_INK, blend(SURFACE, LOSS_RGB, 0.12))).toBeGreaterThanOrEqual(4.5);
