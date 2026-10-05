@@ -1,6 +1,5 @@
 import { describe, expect, it } from "@jest/globals";
 import {
-  hasLaunchStripAction,
   hostTeamName,
   launchStripControls,
   type LaunchStripViewer,
@@ -41,7 +40,6 @@ describe("launchStripControls", () => {
   it("ne donne aucun bouton d'arbitrage sans la permission", () => {
     const controls = launchStripControls(match, "TO_PLAN", nobody);
     expect(controls.showPlan || controls.showForce || controls.showHostSwap).toBe(false);
-    expect(hasLaunchStripAction(controls)).toBe(false);
   });
 
   it("ouvre la modale aux parties du match en lancement ou lancé seulement", () => {

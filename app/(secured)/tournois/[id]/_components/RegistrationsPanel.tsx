@@ -194,6 +194,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // l'ordre en manuel, sans retour — on le fait confirmer, une seule fois
   // (`seedingReorderNeedsConfirmation`). Le geste attend ici, pas encore joué.
   const [confirmingMove, setConfirmingMove] = useState<{ teamId: number; direction: "up" | "down" } | null>(null);
+  // Réordonnancement retiré entre-temps : la confirmation en attente est
+  // oubliée, pour ne pas se rouvrir seule à son retour.
+  if (confirmingMove !== null && !reorderable) setConfirmingMove(null);
   const [manualConfirmed, setManualConfirmed] = useState(false);
   // La liste a bougé pendant la lecture (inscription, retrait, autre arbitre) :
   // le geste en attente visait un ordre qui n'existe plus — on le lâche plutôt

@@ -171,6 +171,10 @@ export function MatchCardActions({
 
   const { primary, more } = groupMatchCardActions(actions);
   const hasForce = actions.some((a) => a.id === "force");
+  // Une confirmation en attente ne survit pas à la disparition de son action :
+  // sans cette remise à zéro, la modale se rouvrirait seule au retour de
+  // « Forcer » (instantané du flux), sans clic.
+  if (confirmForce && !hasForce) setConfirmForce(false);
   // Ouvert **et** encore quelque chose à montrer : un instantané du flux qui
   // retire le panneau ne doit pas le laisser « ouvert » en mémoire, prêt à
   // reparaître déplié sans clic au retour d'une action.
@@ -443,7 +447,7 @@ export function MatchCardActions({
           </div>,
           document.body,
         )}
-      {/* Refermée d'elle-même si l'action disparaît (match lancé entre-temps
+      {/* Refermée — et oubliée — si l'action disparaît (match lancé entre-temps
           par un autre arbitre). */}
       {confirmForce && hasForce && (
         <ConfirmActionDialog
