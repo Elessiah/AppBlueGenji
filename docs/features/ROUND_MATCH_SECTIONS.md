@@ -45,11 +45,23 @@ de match appelle « En attente de départ » (`LAUNCH_PHASE_LABELS`).
 4. identifiant du match (ordre stable).
 
 Une engagée sans tête de série (inconnue, ou seed `null`) compte après toutes
-les autres. Les têtes de série viennent des inscrites (`buildSeedMap`),
-diffusées par `EntrantProvider` (`useEntrantSeeds`) — **seulement** quand la
-colonne `seed` porte l'ordre réel (`isSeedOrderEffective`, `SEEDING_ORDER.md`) : sous
-un seeding par classement du site, elle ne garde que l'ordre d'inscription, et
-le départage retombe alors sur l'identifiant du match.
+les autres ; deux telles engagées se départagent par l'identifiant du match.
+Les têtes de série viennent des inscrites de l'instantané (`buildSeedMap`),
+diffusées par `EntrantProvider` (`useEntrantSeeds`). L'instantané y porte
+toujours la **tête de série réelle** (`SEEDING_ORDER.md`) :
+
+| Source du seeding | `registrations[].seed` |
+| --- | --- |
+| `MANUAL`, `REGISTRATION` | colonne `seed` (l'ordre qui a fait le tirage) |
+| `RANKING`, avant le coup d'envoi | rang au classement du site (`rankEntrantsBySiteRanking`), renuméroté 1…N |
+| `RANKING`, lancé | rang **figé au coup d'envoi** (`loadFrozenRankingSeeds`), `null` si absent |
+
+Le rang figé est relu dans la table d'état écrite par le moteur au lancement
+(`bg_swiss_standings` / `bg_survival_standings` `phase_id = 0`,
+`bg_endurance_standings`, `bg_tournament_phase_teams` de la première phase
+peuplée en multi-phases) : la cote du moment, qui bouge avec les matchs du
+tournoi, n'est jamais relue. Aucun champ ajouté : le flux SSE et la lecture REST
+de secours servent le même instantané (`buildSnapshot`).
 
 ## Horloge
 
