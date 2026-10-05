@@ -78,8 +78,8 @@ export function PlayerRolesPanel({
   };
 
   return (
-    <div className="ds-block" style={{ marginBottom: 20 }}>
-      <div className="ds-section-title blue">
+    <div className="ds-block" style={{ marginBottom: 20, borderColor: "rgba(var(--violet-400-rgb), 0.3)" }}>
+      <div className="ds-section-title purple">
         <h2>Rôles &amp; permissions</h2>
       </div>
       <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 16 }}>
@@ -102,7 +102,7 @@ export function PlayerRolesPanel({
               />
               <span>
                 <span style={{ display: "block", fontSize: 14, color: "var(--text-0)" }}>{ROLE_LABELS[role]}</span>
-                <span style={{ display: "block", fontSize: 12, color: "var(--text-2)" }}>{ROLE_DESCRIPTIONS[role]}</span>
+                <span style={{ display: "block", fontSize: 12, color: "var(--ink-mute)" }}>{ROLE_DESCRIPTIONS[role]}</span>
               </span>
             </label>
           );

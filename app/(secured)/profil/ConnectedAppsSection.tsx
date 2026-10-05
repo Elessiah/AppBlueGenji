@@ -246,7 +246,16 @@ function ConnectionRow({
         style={{ alignItems: "center", gap: 12, flexWrap: "wrap" }}
       >
         <span style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}>
-          <strong style={{ fontSize: 14 }}>{label}</strong>
+          <span className={s.connectionName}>
+            {/* Témoin décoratif : vert d'eau lumineux si rattaché. L'état se
+                lit déjà en toutes lettres dans la ligne de détail (« Rattaché »
+                ou le pseudo) — aucun texte en double. */}
+            <span
+              aria-hidden="true"
+              className={`${s.connectionDot} ${connection.linked ? s.connectionDotOn : ""}`}
+            />
+            <strong style={{ fontSize: 14 }}>{label}</strong>
+          </span>
           <span id={detailsId} style={{ fontSize: 11, color: "var(--text-2)", lineHeight: 1.5 }}>
             {details}
           </span>

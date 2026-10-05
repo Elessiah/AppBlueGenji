@@ -45,6 +45,53 @@
   margin: 0 0 4px;
 }
 
+/* Le titre glisse du glacier au violet (deux classes : plus fort que
+   `.ds-title`, qui pose l'orange historique en seconde teinte). */
+.header .title {
+  --title-rgb-a: var(--blue-500-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
+}
+
+.eyebrow {
+  margin-bottom: 6px;
+}
+
+/* ── Teintes ──────────────────────────────────────────────────────────────── */
+
+/* Une teinte par section (registre `profile-sections.ts`), reprise par son
+   lien de navigation ; une par statistique. `--tone-ink` est un texte (AA sur
+   les fonds teintés, `tests/app/profile-bright-ui.test.ts`), `--tone-rgb` ne
+   sert qu'aux liserés, fonds et halos. */
+.page [data-tone="blue"] {
+  --tone-rgb: var(--blue-500-rgb);
+  --tone-ink: var(--blue-300);
+}
+
+.page [data-tone="violet"] {
+  --tone-rgb: var(--violet-400-rgb);
+  --tone-ink: var(--violet-300);
+}
+
+.page [data-tone="cyan"] {
+  --tone-rgb: var(--cyan-400-rgb);
+  --tone-ink: var(--cyan-400);
+}
+
+.page [data-tone="teal"] {
+  --tone-rgb: var(--teal-400-rgb);
+  --tone-ink: var(--teal-400);
+}
+
+.page [data-tone="pink"] {
+  --tone-rgb: var(--pink-400-rgb);
+  --tone-ink: var(--pink-400);
+}
+
+.page [data-tone="danger"] {
+  --tone-rgb: var(--danger-rgb);
+  --tone-ink: var(--danger);
+}
+
 .subtitle {
   color: var(--text-1);
   margin: 0;
@@ -66,24 +113,39 @@
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--text-2);
+  color: var(--tone-ink, var(--text-1));
   padding: 7px 13px;
-  border: 1px solid var(--line);
+  border: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.3);
   border-radius: 999px;
+  background: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.06);
   text-decoration: none;
-  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+/* Pastille de couleur : la teinte de la section, avant même d'y arriver. */
+.navLink::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(var(--tone-rgb, var(--blue-500-rgb)));
+  box-shadow: 0 0 6px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.7);
 }
 
 .navLink:hover,
 .navLink:focus-visible {
-  color: var(--text-0);
-  border-color: rgba(var(--blue-rgb), 0.45);
-  background: rgba(var(--blue-rgb), 0.07);
+  color: var(--ink);
+  border-color: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.6);
+  background: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.12);
+  box-shadow: 0 0 14px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.22);
 }
 
 .navLink:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 3px rgba(var(--blue-rgb), 0.24);
+  box-shadow: 0 0 0 3px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.32);
 }
 
 /* ── Sections ─────────────────────────────────────────────────────────────── */
@@ -93,6 +155,32 @@
    de la barre (`lib/shared/sticky-header.ts`) — aussi quand on arrive par une
    URL collée. Une marge en dur s'y ajouterait. */
 
+/* Carte teintée : liseré, filet lumineux en tête et halo au survol, de la
+   teinte de la section. Le survol ne change que l'ombre (aucun déplacement). */
+.section {
+  border-color: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.22);
+  background:
+    radial-gradient(120% 90% at 0% 0%, rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.07), transparent 60%),
+    rgba(17, 19, 25, 0.85);
+}
+
+.section::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 24px;
+  right: 24px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.7), transparent);
+  pointer-events: none;
+}
+
+.section:hover {
+  box-shadow:
+    0 6px 16px rgba(0, 0, 0, 0.25),
+    0 0 26px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.14);
+}
+
 .sectionHead {
   margin-bottom: 18px;
 }
@@ -101,8 +189,22 @@
   font-size: 18px;
   font-weight: 500;
   letter-spacing: -0.01em;
-  color: var(--text-0);
+  color: var(--ink);
   margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* Trait d'accent du titre, dans la teinte de la section. */
+.sectionTitle::before {
+  content: "";
+  flex: none;
+  width: 4px;
+  height: 18px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--tone-ink, var(--blue-300)), rgb(var(--tone-rgb, var(--blue-500-rgb))));
+  box-shadow: 0 0 10px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.55);
 }
 
 .sectionLead {
@@ -180,7 +282,7 @@
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: var(--text-1);
+  color: var(--tone-ink, var(--text-1));
   margin: 0;
 }
 
@@ -263,10 +365,42 @@
   left: -100%;
 }
 
+/* La seule sauvegarde de la page : le bouton principal du site, en dégradé de
+   marque et texte sombre (`--cyber-bg`, AA sur chaque arrêt du dégradé). */
 .save {
   padding: 11px 28px;
-  background: rgba(var(--blue-rgb), 0.15);
-  border-color: rgba(var(--blue-rgb), 0.35);
+  background: var(--grad-brand);
+  border-color: transparent;
+  color: var(--cyber-bg);
+  box-shadow: var(--glow-blue);
+}
+
+.save:hover:not(:disabled) {
+  background: var(--grad-brand);
+  box-shadow: var(--glow-violet);
+}
+
+/* ── Applications connectées ──────────────────────────────────────────────── */
+
+.connectionName {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Témoin d'état, décoratif (l'état est écrit dans la ligne de détail). */
+.connectionDot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid var(--ink-faint);
+}
+
+.connectionDotOn {
+  border-color: var(--teal-400);
+  background: var(--teal-400);
+  box-shadow: 0 0 8px rgba(var(--teal-400-rgb), 0.7);
 }
 
 /* ── Invitations ──────────────────────────────────────────────────────────── */
@@ -331,25 +465,36 @@
   gap: 12px;
 }
 
+/* Chaque chiffre a sa teinte (`data-tone` posé par la page) : un bilan de
+   joueur se lit comme un tableau de scores, pas comme un relevé gris. */
 .stat {
-  border: 1px solid var(--line);
+  position: relative;
+  border: 1px solid rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.28);
   border-radius: var(--radius-sm);
   padding: 14px 16px;
-  background: rgba(255, 255, 255, 0.02);
+  background: linear-gradient(160deg, rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.1), rgba(255, 255, 255, 0.01) 70%);
+  overflow: hidden;
+  transition: box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.stat:hover {
+  border-color: rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.55);
+  box-shadow: 0 0 18px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.2);
 }
 
 .statLabel {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-2);
-  margin-bottom: 6px;
+  color: var(--ink-mute);
+  margin-bottom: 8px;
 }
 
 .statValue {
   font-family: var(--font-mono);
-  font-size: 24px;
-  color: var(--text-0);
+  font-size: 26px;
+  color: var(--tone-ink, var(--ink));
+  text-shadow: 0 0 14px rgba(var(--tone-rgb, var(--blue-500-rgb)), 0.45);
   line-height: 1;
 }
 

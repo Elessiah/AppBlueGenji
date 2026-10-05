@@ -35,11 +35,18 @@
   color: var(--ink);
 }
 
+/* Carte teintée glacier → violet : un liseré et un voile, sans halo criard —
+   la page parle d'un litige, elle reste posée. */
 .card {
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 24px;
+  border-color: rgba(var(--violet-400-rgb), 0.28);
+  background:
+    radial-gradient(110% 80% at 100% 0%, rgba(var(--violet-400-rgb), 0.08), transparent 60%),
+    radial-gradient(90% 70% at 0% 100%, rgba(var(--blue-500-rgb), 0.06), transparent 60%),
+    var(--cyber-bg-2, #10141b);
 }
 
 .facts {
@@ -54,7 +61,7 @@
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--blue-300);
 }
 
 .facts dd {
@@ -69,7 +76,18 @@
   font-family: var(--font-mono);
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--violet-300);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.subtitle::before {
+  content: "";
+  width: 18px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--grad-brand);
 }
 
 .targets {
@@ -91,8 +109,9 @@
 .quote {
   margin: 0;
   padding: 12px 16px;
-  border-left: 2px solid rgba(90, 200, 255, 0.45);
-  background: var(--cyber-bg-2, #10141b);
+  border-left: 2px solid rgba(var(--violet-400-rgb), 0.7);
+  border-radius: 0 var(--r-cy-md, 10px) var(--r-cy-md, 10px) 0;
+  background: rgba(var(--violet-400-rgb), 0.07);
   font-size: 14px;
   line-height: 1.65;
   white-space: pre-wrap;
