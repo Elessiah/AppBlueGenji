@@ -126,17 +126,19 @@ export function useScoreForm(
     return true;
   };
 
-  // Score posé à la main avant la première map : rendu aux champs quand la
-  // dernière map est retirée, sans quoi un « Enregistrer » écrirait le 0-0
-  // dérivé d'une liste vide par-dessus.
+  // Score d'avant les maps — celui posé à la main avant la première, sinon
+  // celui d'ouverture du dialogue (résultat enregistré, proposition) : rendu
+  // aux champs quand la dernière map est retirée, sans quoi un « Enregistrer »
+  // écrirait par-dessus le score dérivé des maps restantes, que personne n'a
+  // saisi.
   const manualScores = useRef<{ score1: string; score2: string } | null>(null);
   const setMaps = (next: MatchMapInput[]) => {
     if (maps.length === 0 && next.length > 0) manualScores.current = { score1: state.score1, score2: state.score2 };
     setMapsState(next);
     if (next.length === 0) {
-      const restored = manualScores.current;
+      const restored = manualScores.current ?? { score1: synced.baseline.score1, score2: synced.baseline.score2 };
       manualScores.current = null;
-      if (restored) setState((s) => ({ ...s, ...restored }));
+      setState((s) => ({ ...s, ...restored }));
       return;
     }
     const derived = deriveMatchScore(next);
