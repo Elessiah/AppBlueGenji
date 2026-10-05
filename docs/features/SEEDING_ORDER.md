@@ -120,35 +120,16 @@ byes et matchs fantômes sont ignorés — leur score est posé par le moteur.
 La fenêtre se juge **sous verrou**. `reorderSeeding` ouvre sa transaction par `lockTournamentRow`
 puis par un `SELECT id FROM bg_matches WHERE tournament_id = ? FOR UPDATE` (table
 seule : MariaDB refuse `FOR UPDATE OF`), **avant** toute lecture ordinaire —
-sous `REPEATABLE READ`, c'est la première qui fige l'instantané. Tournoi
-d'abord, comme les gestes du staff qui écrivent des matchs sous ce verrou
-(avancée, retour en arrière, inscription). Aucun ordre n'exclut l'interblocage
-avec une saisie de score, qui tient son match (voire d'autres, par l'entretien)
-puis le tournoi dans la réconciliation. InnoDB défait alors l'une des deux —
-pas forcément le réordonnancement, qui tient les verrous de tous les matchs du
-tournoi. Défait, le réordonnancement **rejoue** sa transaction, jusqu'à trois
-fois (`REORDER_DEADLOCK_ATTEMPTS`) : il voit la saisie commitée et refuse en
-`SEEDING_LOCKED`. Si c'est la saisie qui est défaite, elle échoue en refus
-visible (ses chemins ne rejouent pas) et le réordonnancement passe — jamais un
-score perdu en silence. Ce refus est lisible : `fail()` (`lib/server/http.ts`)
-reconnaît le message d'interblocage (`isDeadlockMessage`,
-`lib/server/mysql-errors.ts`) et le rend en **409 `CONCURRENT_UPDATE_RETRY`**,
-que l'interface traduit en « rien n'a été enregistré, réessaie » — sur toute
-route qui transmet le message de l'erreur à `fail()` : report d'un joueur,
-arbitrage (enregistrer, valider), forfait de manche et gestes du lancement
-(`launchFailure`). Une route qui le remplace par un code fixe garde son refus
-générique.
-La saisie n'est pas rejouée d'office : c'est au joueur de la renvoyer, sur le
-plateau tel qu'il est devenu. Jugée sur des lectures ordinaires, la borne ne tenait que
-hors concurrence : un premier report validé entre le contrôle et
-`deleteAllMatches` échappait à l'instantané, et le plateau régénéré l'effaçait
-alors que le joueur avait reçu un succès. Toute écriture de score lit son match
-sous `FOR UPDATE` — report et forfait d'un joueur, enregistrement et validation
-de l'arbitrage (`adminSaveMatchScores`, `adminResolveMatch`, qui le lisaient
-sans verrou) : une saisie en cours fait attendre le réordonnancement, qui la
-voit et refuse en `SEEDING_LOCKED` ; une saisie arrivée après attend la fin du
-réordonnancement et trouve son match supprimé (`MATCH_NOT_FOUND`) — un refus
-visible, jamais une saisie perdue en silence.
+sous `REPEATABLE READ`, c'est la première qui fige l'instantané. Un lancement
+commité pendant l'attente est donc vu, et refusé. Tournoi d'abord, comme les
+gestes du staff qui écrivent des matchs sous ce verrou (avancée, inscription).
+Un interblocage reste possible avec un geste qui tient des matchs puis le
+tournoi ; défait, le réordonnancement **rejoue** sa transaction, jusqu'à trois
+fois (`REORDER_DEADLOCK_ATTEMPTS`), et refuse alors sur l'état qu'il relit. Le
+refus d'un geste défait est lisible : `fail()` (`lib/server/http.ts`) reconnaît
+le message d'interblocage (`isDeadlockMessage`, `lib/server/mysql-errors.ts`)
+et le rend en **409 `CONCURRENT_UPDATE_RETRY`** (« rien n'a été enregistré,
+réessaie »).
 
 Trois raisons de verrouillage, exposées à l'interface (`seedingLockReason`,
 dans cet ordre de priorité) :
@@ -160,9 +141,8 @@ dans cet ordre de priorité) :
 | `SCORES_ENTERED` | au moins un match porte une saisie | `SEEDING_LOCKED` (409) |
 | `STARTED` | tournoi lancé (`RUNNING`), même sans score | `SEEDING_LOCKED_STARTED` (409) |
 
-`SCORES_ENTERED` reste jugé avant `STARTED` : il couvre aussi un plateau qui
-aurait survécu à un retour en arrière de l'état (voir « Reconstruction du
-plateau »). Les deux codes ont leur phrase dans `_lib/error-map.ts`. Une fois
+`SCORES_ENTERED` reste jugé avant `STARTED`, pour garder la phrase la plus
+précise sur un tournoi où l'on joue déjà. Les deux codes ont leur phrase dans `_lib/error-map.ts`. Une fois
 figé, les flèches disparaissent et la phrase du verrou prend leur place ; sur
 un tournoi lancé, elle tait celle du retrait (« le tirage est fait »), qui
 dirait le même fait (`removalNotice`).
@@ -202,21 +182,20 @@ choisi par le staff, et le poser ferait basculer un tournoi qui seedait depuis l
 classement du site vers l'ordre d'inscription, sans que personne ne l'ait
 demandé.
 
-## Reconstruction du plateau
+## Aucun plateau à reconstruire
 
-Depuis le verrou au coup d'envoi, ce chemin n'est plus qu'un **filet** : les
-matchs naissent à la bascule `RUNNING`, que la fenêtre refuse de franchir. Il
-reste pour un plateau vierge qui aurait survécu à un retour de l'état avant le
-lancement. Si des matchs existent, ils décrivent l'ancien ordre : `reorderSeeding` les supprime, remet les rangs à zéro
-et réamorce le format.
+Un plateau ne naît qu'au coup d'envoi (`SINGLE` / `DOUBLE` par l'entretien de
+`syncTournamentState`, les formats à classement par leur amorçage à la
+transition REGISTRATION → RUNNING), et la fenêtre se ferme à ce même instant :
+l'ordre s'écrit donc toujours **avant** qu'un match existe, et le lancement le
+lit tel quel. `reorderSeeding` n'a rien à détruire ni à réamorcer.
 
-- `SINGLE` / `DOUBLE` : `bracket_size` repasse à `NULL`, et l'entretien de
-  `syncTournamentState` régénère le plateau.
-- `SWISS` / `SURVIVAL` / `BG_SURVIE` / `MULTI` : réinitialisation explicite
-  (leur amorçage n'a lieu qu'à la transition REGISTRATION → RUNNING, déjà
-  passée). Pour `MULTI`, l'état des phases est d'abord purgé — équipes de phase,
-  états, compteurs et `current_phase_id` — sans quoi `startPhase` serait rejoué
-  sur une phase déjà marquée RUNNING avec un plateau mélangé.
+Le chemin qui le faisait (suppression des matchs, `bracket_size` remis à
+`NULL`, réamorçage des formats à classement et purge des phases `MULTI`) a été
+retiré avec le verrou au coup d'envoi. À sa place, un **invariant** : des
+matchs présents dans la transaction refusent l'écriture en
+`SEEDING_LOCKED_STARTED`, plutôt que de détruire un tirage et d'amorcer les
+manches d'un tournoi que la fenêtre dit encore ouvert.
 
 ## Liste repliée
 
@@ -258,9 +237,9 @@ faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` ou
   `SEEDING_LOCKED_STARTED`.
 - `tests/lib/server/tournament-snapshot.test.ts` — `seedingSource` porté par
   l'instantané, `manual_seeding` compris.
-- `tests/tournois/seeding-service.test.ts` — écriture des seeds, reconstruction
-  du plateau, refus (tournoi lancé, score saisi, permutation invalide, tournoi
-  inconnu), verrous du
+- `tests/tournois/seeding-service.test.ts` — écriture des seeds, refus (tournoi
+  lancé — par l'état ou par l'heure —, plateau présent, score saisi,
+  permutation invalide, tournoi inconnu), verrous du
   tournoi et des matchs posés avant toute lecture.
 - `tests/app/api/admin/seeding.test.ts` — permissions et codes d'erreur.
 

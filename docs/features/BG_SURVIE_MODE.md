@@ -512,9 +512,9 @@ même état, la prennent aussi.
 - **Finalisation générique** — `finalizeTournamentIfDone` ignore ce format, qui
   écrit lui-même son podium ; sinon un instant où tous les matchs sont terminés
   (entre deux manches) clôturerait le tournoi avec un classement d'élimination.
-- **Réordonnancement du seeding** — `reorderSeeding` réamorce explicitement le
-  mode (classement resemé, première manche régénérée) : les seeds vivent dans
-  `bg_endurance_standings`, ils ne se recalculent pas tout seuls.
+- **Réordonnancement du seeding** — figé au coup d'envoi (`SEEDING_ORDER.md`) :
+  l'ordre est donc toujours posé avant que `bg_endurance_standings` ne soit
+  semé, et l'amorçage le lit tel quel.
 - **Pénalités d'endurance** — une entrée du rejeu au même titre qu'un abandon,
   posée sur la manche courante et refusée dès les play-offs lancés, dans les deux
   sens (poser comme retirer). Voir `ENDURANCE_PENALTIES.md`.
