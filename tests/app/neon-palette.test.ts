@@ -19,9 +19,8 @@ const TEXT_TOKENS = [
   "--ink",
   "--ink-mute",
   "--ink-dim",
-  "--text-0",
-  "--text-1",
-  "--text-2",
+  "--ink-soft",
+  "--ink-quiet",
   "--blue-300",
   "--blue-500",
   "--cyan-400",
@@ -56,7 +55,7 @@ describe("palette néon froid", () => {
   });
 
   it("les textes secondaires sont teintés de bleu, jamais d'un gris neutre", () => {
-    for (const name of ["--ink", "--ink-mute", "--ink-dim", "--ink-faint", "--text-1", "--text-2"]) {
+    for (const name of ["--ink", "--ink-mute", "--ink-dim", "--ink-faint", "--ink-soft", "--ink-quiet"]) {
       const [r, g, b] = rgb(token(name)!);
       expect(b).toBeGreaterThan(r);
       expect(b - r).toBeGreaterThanOrEqual(16);

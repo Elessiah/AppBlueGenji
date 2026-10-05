@@ -60,9 +60,9 @@ describe("Tokens hérités de `app/globals.css`", () => {
   });
 
   it.each([
-    "--text-0",
-    "--text-1",
-    "--text-2",
+    "--ink",
+    "--ink-soft",
+    "--ink-quiet",
     "--bg-0",
     "--line",
     "--accent-blue",
@@ -73,8 +73,37 @@ describe("Tokens hérités de `app/globals.css`", () => {
   });
 
   it("garde la couleur du corps de page adossée à un token déclaré", () => {
-    // `body { color: var(--text-0) }` sans `--text-0` ne dégrade pas vers une
+    // `body { color: var(--ink) }` sans `--ink` ne dégrade pas vers une
     // valeur claire : la déclaration devient invalide et le texte tombe en noir.
-    expect(source).toMatch(/body \{\r?\n {2}color: var\(--text-0\);/);
+    expect(source).toMatch(/body \{\r?\n {2}color: var\(--ink\);/);
+  });
+});
+
+/**
+ * Les anciens jetons de texte `--text-0` / `--text-1` / `--text-2` sont
+ * remplacés par la famille `--ink*` (`--ink`, `--ink-soft`, `--ink-quiet`,
+ * docs/features/DESIGN_SYSTEM.md) et ne sont plus déclarés : une lecture qui
+ * réapparaîtrait sans repli rendrait du noir sur fond noir, sans qu'aucun build
+ * ni lint ne le signale.
+ */
+describe("Anciens jetons `--text-*`", () => {
+  const sources = execFileSync(
+    "git",
+    ["ls-files", "app", "components", "lib", "*.css"],
+    { cwd: ROOT, encoding: "utf8" },
+  )
+    .split("\n")
+    .filter((file) => /\.(css|tsx?|jsx?)$/.test(file));
+
+  it("trouve bien les sources à contrôler", () => {
+    expect(sources.length).toBeGreaterThan(100);
+    expect(sources).toContain("app/globals.css");
+  });
+
+  it("ne sont plus ni déclarés ni lus dans les sources", () => {
+    const offenders = sources.filter((file) =>
+      /--text-\d/.test(readFileSync(join(ROOT, file), "utf8")),
+    );
+    expect(offenders).toEqual([]);
   });
 });

@@ -102,7 +102,7 @@ describe("réglages d'accessibilité — feuille globale", () => {
   it("le contraste renforcé porte les textes secondaires au-dessus de 4,5:1 sur le fond le plus clair", () => {
     const block = declarations(':root[data-a11y~="contrast"],\n.a11y-always-contrast');
     const surface = "#161a22"; // --cyber-bg-3, le fond le plus clair du site
-    for (const token of ["--ink-dim", "--ink-mute", "--text-1", "--text-2", "--blue-700"]) {
+    for (const token of ["--ink-dim", "--ink-mute", "--ink-soft", "--ink-quiet", "--blue-700"]) {
       const value = block.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`))?.[1];
       expect(value).toBeDefined();
       expect(contrast(value!, surface)).toBeGreaterThanOrEqual(4.5);
@@ -113,21 +113,21 @@ describe("réglages d'accessibilité — feuille globale", () => {
     const block = declarations(":root");
     const surface = block.match(/--cyber-bg-3:\s*(#[0-9a-f]{6})/)?.[1];
     expect(surface).toBe("#161a22");
-    for (const token of ["--ink", "--ink-mute", "--ink-dim", "--text-1", "--text-2"]) {
+    for (const token of ["--ink", "--ink-mute", "--ink-dim", "--ink-soft", "--ink-quiet"]) {
       const value = block.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`))?.[1];
       expect(value).toBeDefined();
       expect(contrast(value!, surface!)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
-  it("garde la hiérarchie ink > ink-mute > ink-dim > ink-faint, et le contraste renforcé au-dessus", () => {
+  it("garde la hiérarchie ink > ink-soft > ink-mute > ink-quiet > ink-dim > ink-faint, et le contraste renforcé au-dessus", () => {
     const base = declarations(":root");
     const boosted = declarations(':root[data-a11y~="contrast"],\n.a11y-always-contrast');
     const bg = "#05060a";
     const value = (block: string, token: string) => block.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`))![1];
-    const ratios = ["--ink", "--ink-mute", "--ink-dim", "--ink-faint"].map((token) => contrast(value(base, token), bg));
+    const ratios = ["--ink", "--ink-soft", "--ink-mute", "--ink-quiet", "--ink-dim", "--ink-faint"].map((token) => contrast(value(base, token), bg));
     for (let i = 1; i < ratios.length; i += 1) expect(ratios[i]).toBeLessThan(ratios[i - 1]);
-    for (const token of ["--ink", "--ink-mute", "--ink-dim", "--ink-faint", "--text-1", "--text-2"]) {
+    for (const token of ["--ink", "--ink-mute", "--ink-dim", "--ink-faint", "--ink-soft", "--ink-quiet"]) {
       expect(contrast(value(boosted, token), bg)).toBeGreaterThanOrEqual(contrast(value(base, token), bg));
     }
   });
