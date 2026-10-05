@@ -22,8 +22,7 @@ import {
   type SeedingLockReason,
 } from "@/lib/shared/seeding";
 import type { MatchScoreState } from "@/lib/shared/match-lock";
-import { loadTournamentRow, getMatchRows, deleteAllMatches, resetRegistrationRanks } from "./repository";
-import { discardBotLogs, flushBotLogs } from "./bot-logs";
+import { loadTournamentRow, getMatchRows } from "./repository";
 import { lockTournamentRow } from "./registration";
 import type { TournamentRow } from "./_internal";
 import { publishUpdatedEvent } from "./notifications";
@@ -50,8 +49,8 @@ export type SeedingBoard = {
  * dans l'index peut attendre la fin du réordonnancement. Verrouiller par clé
  * primaire l'éviterait, mais exigerait de lire d'abord les identifiants par une
  * lecture ordinaire, qui figerait l'instantané **avant** le verrou : c'est le
- * piège que ce verrou referme. `deleteAllMatches` pose de toute façon les mêmes
- * intervalles dès qu'un plateau existe.
+ * piège que ce verrou referme. Avant le coup d'envoi, le tournoi n'a d'ailleurs
+ * aucun match : les intervalles verrouillés sont vides.
  */
 async function lockTournamentMatches(connection: PoolConnection, tournamentId: number): Promise<void> {
   await connection.execute(`SELECT id FROM bg_matches WHERE tournament_id = ? FOR UPDATE`, [
@@ -208,11 +207,9 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
 
     // Deux verrous, en toute première instruction, avant la moindre lecture
     // ordinaire : sous `REPEATABLE READ`, c'est elle qui fige l'instantané de
-    // la transaction (voir `lockTournamentRow`). La fenêtre « jusqu'à la
-    // première saisie de score » se juge ensuite sur les matchs relus **après**
-    // l'attente. Sans cela, un premier report validé entre ce contrôle et
-    // `deleteAllMatches` échappait à l'instantané : le plateau régénéré
-    // l'effaçait, et le joueur, qui avait reçu un succès, n'en savait rien.
+    // la transaction (voir `lockTournamentRow`). La fenêtre « jusqu'au coup
+    // d'envoi » se juge ensuite sur l'état et les matchs relus **après**
+    // l'attente : un lancement commité pendant celle-ci est vu, et refusé.
     // Le verrou du tournoi sérialise les gestes du staff (avancée, retour en
     // arrière, inscription, retrait, autre réordonnancement), celui des matchs
     // les saisies de score (reports, forfaits, arbitrage), qui verrouillent
@@ -230,6 +227,10 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
     const lockReason = seedingLockReason(windowState(tournament), toScoreStates(matchRows));
     if (lockReason === "STARTED") throw new Error("SEEDING_LOCKED_STARTED");
     if (lockReason !== null) throw new Error("SEEDING_LOCKED");
+    // Invariant : un plateau ne naît qu'au coup d'envoi, que la fenêtre vient de
+    // refuser. Des matchs ici décriraient un tirage déjà fait — on refuse plutôt
+    // que de le détruire et d'amorcer les manches d'un tournoi non lancé.
+    if (matchRows.length > 0) throw new Error("SEEDING_LOCKED_STARTED");
 
     if (!isValidSeedOrder(entries.map((entry) => entry.teamId), orderedTeamIds)) {
       throw new Error("INVALID_SEED_ORDER");
@@ -246,110 +247,12 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
 
     await connection.execute(`UPDATE bg_tournaments SET manual_seeding = 1 WHERE id = ?`, [tournamentId]);
 
-    // Des matchs déjà générés (tournoi démarré mais vierge de scores) décrivent
-    // l'ancien ordre : on les détruit pour que l'orchestration les recrée.
-    if (matchRows.length > 0) {
-      await deleteAllMatches(connection, tournamentId);
-      await resetRegistrationRanks(connection, tournamentId);
-      await connection.execute(`UPDATE bg_tournaments SET bracket_size = NULL WHERE id = ?`, [
-        tournamentId,
-      ]);
-      await rebuildStartedTournament(connection, tournamentId, tournament.format);
-    }
-
     await connection.commit();
-    // Réordonner un tournoi déjà démarré rejoue son orchestration, qui peut le
-    // clore (un plan multi-phases entièrement sauté) et donc réserver une ligne
-    // de journal. Sans ce couple flush/discard, l'entrée resterait accrochée à
-    // la connexion — que le pool réattribue — et partirait au nom d'une requête
-    // sans rapport, voire après un `rollback`.
-    flushBotLogs(connection);
-
     publishUpdatedEvent(tournamentId);
   } catch (error) {
     await connection.rollback();
     throw error;
   } finally {
-    discardBotLogs(connection);
     connection.release();
-  }
-}
-
-/**
- * Reconstruit le plateau d'un tournoi déjà démarré après réordonnancement.
- *
- * Les formats à classement s'initialisent normalement lors de la transition
- * REGISTRATION → RUNNING, qui a déjà eu lieu : il faut donc les réamorcer
- * explicitement. Les formats à plateau, eux, sont régénérés par l'entretien de
- * `syncTournamentState` (déclenché par `bracket_size = NULL`).
- */
-async function rebuildStartedTournament(
-  connection: PoolConnection,
-  tournamentId: number,
-  format: string,
-): Promise<void> {
-  if (format === "BG_SURVIE") {
-    // Le classement d'endurance porte les seeds : il doit être resemé depuis le
-    // nouvel ordre, sans quoi le tournoi resterait figé sur l'ancien.
-    const { initializeEnduranceTournament, generateEnduranceRound } = await import("./bg-survie/qualification");
-    const { reconcileEndurance } = await import("./bg-survie/reconcile");
-    await initializeEnduranceTournament(tournamentId, connection);
-    await generateEnduranceRound(tournamentId, connection);
-    await reconcileEndurance(tournamentId, connection);
-    return;
-  }
-
-  if (format === "SWISS") {
-    const { initializeSwissTournament, generateSwissRound, reconcileSwiss } = await import("./swiss");
-    await initializeSwissTournament(tournamentId, connection);
-    await generateSwissRound(tournamentId, connection);
-    await reconcileSwiss(tournamentId, connection);
-    return;
-  }
-
-  if (format === "SURVIVAL") {
-    const { initializeSurvivalTournament, generateSurvivalRound, reconcileSurvival } = await import(
-      "./survival"
-    );
-    await initializeSurvivalTournament(tournamentId, connection);
-    await generateSurvivalRound(tournamentId, connection);
-    await reconcileSurvival(tournamentId, connection);
-    return;
-  }
-
-  if (format === "MULTI") {
-    // `initializeMultiTournament` réamorce la phase 1, mais ne nettoie pas ce
-    // que la précédente exécution a laissé : sans cette purge, les équipes de
-    // phase de l'ancien ordre subsistent et `startPhase` serait rejoué sur une
-    // phase déjà marquée RUNNING.
-    await connection.execute(
-      `DELETE FROM bg_tournament_phase_teams
-       WHERE phase_id IN (SELECT id FROM bg_tournament_phases WHERE tournament_id = ?)`,
-      [tournamentId],
-    );
-    await connection.execute(
-      `UPDATE bg_tournament_phases
-       SET state = 'PENDING', started_at = NULL, finished_at = NULL,
-           entrants = NULL, qualifiers = NULL, max_rounds = NULL, bracket_size = NULL,
-           swiss_current_round = 0, survival_current_round = 0, survival_barrage_rounds = 0
-       WHERE tournament_id = ?`,
-      [tournamentId],
-    );
-    await connection.execute(
-      `DELETE FROM bg_swiss_standings WHERE tournament_id = ?`,
-      [tournamentId],
-    );
-    await connection.execute(
-      `DELETE FROM bg_survival_standings WHERE tournament_id = ?`,
-      [tournamentId],
-    );
-    await connection.execute(
-      `UPDATE bg_tournaments SET current_phase_id = NULL WHERE id = ?`,
-      [tournamentId],
-    );
-
-    const { initializeMultiTournament, reconcilePhases } = await import("./phases");
-    await initializeMultiTournament(tournamentId, connection);
-    await reconcilePhases(tournamentId, connection);
   }
 }

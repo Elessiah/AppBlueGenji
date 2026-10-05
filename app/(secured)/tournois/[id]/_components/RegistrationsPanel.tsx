@@ -38,8 +38,8 @@ interface RegistrationsPanelProps {
   /** Le staff peut-il agir ? Faux quand le suivi du tournoi est en échec. */
   canAct: boolean;
   /**
-   * Rafraîchit le détail après une écriture du staff — réordonnancement (le
-   * plateau est régénéré) ou retrait d'un engagé.
+   * Rafraîchit le détail après une écriture du staff — réordonnancement (l'aperçu
+   * du plateau suit le nouvel ordre) ou retrait d'un engagé.
    */
   onChanged: () => void;
 }
@@ -112,11 +112,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const staff = detail.isAdmin && canAct;
   const reorderable = staff && lockReason === null && detail.registrations.length > 1;
 
-  // Le retrait a sa **propre** fenêtre (`lib/shared/entrant-removal.ts`) : un
-  // engagé ne se retire que tant que le tirage n'est pas fait, l'ordre de départ
-  // se règle jusqu'au coup d'envoi. Proches, les deux fenêtres ne se jugent pas
-  // sur les mêmes données. Les deux commandes partagent une cellule mais pas
-  // une condition.
+  // Le retrait a sa fonction (`lib/shared/entrant-removal.ts`), mais la même
+  // borne que l'ordre de départ : le coup d'envoi, lu sur la même paire état
+  // stocké / heure. Le réordonnancement exige en plus deux engagés.
   const removalBlock = entrantRemovalBlockReason(detail.card, now);
   const removable = staff && removalBlock === null;
   const showActions = reorderable || removable;
@@ -125,8 +123,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // d'effet » et « la liste est un palmarès » disent le même fait, et trois
   // paragraphes empilés au-dessus d'une liste ne se lisent plus. Le verrou de
   // l'ordre parle le premier, il garde la parole ; la phrase du retrait ne
-  // s'affiche que lorsqu'elle apprend quelque chose — typiquement aux
-  // inscriptions closes, où l'ordre reste réglable mais où le retrait est clos.
+  // s'affiche que lorsqu'elle apprend quelque chose qu'il ne dit pas.
   const removalNoticeReason = removalNotice(removalBlock, lockReason);
 
   // Engagé dont on confirme le retrait. La ligne est gardée en entier plutôt
@@ -200,9 +197,8 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // Une seule cellule d'actions, présente dès que l'une des deux commandes est là.
   const actionsColumn = registrationActionsColumn(reorderable, removable);
   const gridClass = actionsColumn.grid ? styles[actionsColumn.grid] : "";
-  // L'intitulé nomme ce que la colonne contient réellement, et il n'y a pas
-  // toujours les deux : « Ordre » seul aux inscriptions closes, « Retrait » seul
-  // sur un plateau d'un unique engagé.
+  // L'intitulé nomme ce que la colonne contient réellement : « Retrait » seul
+  // sur un plateau d'un unique engagé, « Actions » sinon.
   const actionsLabel = actionsColumn.label;
   const seedingHint = reorderable
     ? "Ce rang décide des appariements de la première manche. Utilisez les flèches ci-contre pour le régler — jusqu'au coup d'envoi."
