@@ -6,7 +6,9 @@ import {
 import {
   RETENTION_UNKNOWN,
   ACCOUNT_DELETED_WRITE_MESSAGE,
+  ACCOUNT_DELETION_QUESTION,
   accountDeletionConfirmation,
+  accountDeletionConsequences,
   accountDeletionErrorMessage,
   accountDeletionMode,
   accountDeletionOutcome,
@@ -266,5 +268,21 @@ describe("inscription solo jamais jouée", () => {
 
   it("figure dans la phrase prudente de l'aperçu injoignable", () => {
     expect(accountDeletionConfirmation(RETENTION_UNKNOWN)).toContain("inscription à un tournoi individuel");
+  });
+});
+
+describe("accountDeletionConsequences — corps de la modale", () => {
+  const reasons: Array<[Parameters<typeof accountDeletionConfirmation>[0]]> = [
+    ["TOURNAMENTS"],
+    ["SOLO_REGISTRATIONS"],
+    ["ORGANIZED_TOURNAMENTS"],
+    ["OWNED_TEAMS"],
+    [null],
+    [RETENTION_UNKNOWN],
+  ];
+  it.each(reasons)("%s : la question vit dans le titre, pas dans le corps", (reason) => {
+    const body = accountDeletionConsequences(reason);
+    expect(body).not.toContain(ACCOUNT_DELETION_QUESTION);
+    expect(`${ACCOUNT_DELETION_QUESTION} ${body}`).toBe(accountDeletionConfirmation(reason));
   });
 });

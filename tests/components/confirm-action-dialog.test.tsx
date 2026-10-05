@@ -98,6 +98,7 @@ describe("ConfirmActionDialog — balisage", () => {
     );
     expect(html).toContain('role="alertdialog"');
     expect(html).toContain('aria-modal="true"');
+    expect(html).toContain("aria-describedby=");
     expect(html).toMatch(/<button type="button" class="btn ghost" data-autofocus="true">Annuler<\/button>/);
     expect(html).toMatch(/<button type="submit" class="btn danger">Supprimer<\/button>/);
     expect(html).toContain("<p>Perdu.</p>");
@@ -132,6 +133,7 @@ describe("ConfirmActionDialog — balisage", () => {
       </ConfirmActionDialog>,
     );
     expect(html).not.toContain("data-autofocus");
+    expect(html).not.toContain("aria-describedby");
     expect(html).toMatch(/<button type="submit" class="btn danger" disabled="">Retirer<\/button>/);
   });
 });
@@ -206,7 +208,9 @@ describe("plus de window.confirm", () => {
     expect(page).toContain("onDiscordTagRemove={() => setConfirmingTagRemoval(true)}");
     expect(page).toContain("onConfirm={onDiscordTagRemove}");
     expect(page).toContain("setPendingDeletion({ subject, previewed });");
-    expect(page).toContain("{accountDeletionConfirmation(pendingDeletion.subject)}");
+    expect(page).toContain("title={ACCOUNT_DELETION_QUESTION}");
+    expect(page).toContain("{accountDeletionConsequences(pendingDeletion.subject)}");
+    expect(page).toContain("{deleteAccountLabel(deleting, pendingDeletion !== null)}");
     // Annuler rouvre le bouton « Supprimer mon compte ».
     expect(page).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);/);
   });
