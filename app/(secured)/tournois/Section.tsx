@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useId, useState } from "react";
+import type { PageSectionKey } from "./_lib/page-sections";
 import s from "./tournois.module.css";
 
 interface SectionProps {
@@ -21,8 +22,12 @@ interface SectionProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   dataCols?: "1" | "2" | "3";
-  /** Variante d'en-tête : « Mes tournois » se distingue des sections publiques. */
-  tone?: "default" | "mine";
+  /**
+   * Variante d'en-tête : « Mes tournois » se distingue des sections publiques,
+   * et une section d'état prend la teinte sémantique de ses cartes (index et
+   * liseré — `docs/features/TOURNAMENT_LIST_CARDS.md` § Couleurs d'état).
+   */
+  tone?: "default" | PageSectionKey;
   children: ReactNode;
 }
 

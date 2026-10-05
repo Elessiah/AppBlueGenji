@@ -103,7 +103,7 @@ export function BracketPreview({ preview, canReorder }: Readonly<BracketPreviewP
         >
           Aperçu — non joué
         </span>
-        <Pill variant="blue">{SEEDING_SOURCE_LABELS[preview.seedingSource]}</Pill>
+        <Pill variant="accent">{SEEDING_SOURCE_LABELS[preview.seedingSource]}</Pill>
         {preview.bracketSize !== null && <Pill variant="blue">Plateau de {preview.bracketSize}</Pill>}
         {preview.rounds !== null && (
           <Pill variant="blue">

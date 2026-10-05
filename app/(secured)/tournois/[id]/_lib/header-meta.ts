@@ -36,15 +36,20 @@ export { FORMAT_LABELS, GAME_LABELS };
  * réellement à l'antenne. Un tournoi « en cours » n'est pas une diffusion — la
  * confusion des trois sens de « live » est justement ce que ces libellés
  * évitent (voir CLAUDE.md).
+ *
+ * Les tons sont les variantes sémantiques des pastilles (`DESIGN_SYSTEM.md`),
+ * les mêmes que les cartes de `/tournois` : `accent` (violet) à venir,
+ * `highlight` (rose) inscriptions ouvertes, `info` (glacier) en cours,
+ * `success` (turquoise) terminé — aucun état n'est un gris.
  */
 export const STATE_META: Record<TournamentState, { label: string; tone: HeaderTone }> = {
-  UPCOMING: { label: "Prochainement", tone: "neutral" },
-  REGISTRATION: { label: "Inscriptions ouvertes", tone: "green" },
-  RUNNING: { label: "En cours", tone: "blue" },
-  FINISHED: { label: "Terminé", tone: "muted" },
+  UPCOMING: { label: "Prochainement", tone: "accent" },
+  REGISTRATION: { label: "Inscriptions ouvertes", tone: "highlight" },
+  RUNNING: { label: "En cours", tone: "info" },
+  FINISHED: { label: "Terminé", tone: "success" },
 };
 
-export type HeaderTone = "neutral" | "green" | "blue" | "muted";
+export type HeaderTone = "accent" | "highlight" | "info" | "success";
 
 export type HeaderMetaItem = {
   key: string;

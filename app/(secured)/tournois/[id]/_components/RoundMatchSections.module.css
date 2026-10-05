@@ -42,3 +42,40 @@
   height: 1px;
   background: var(--line-soft);
 }
+
+/*
+ * Teinte de section (variantes sémantiques de `DESIGN_SYSTEM.md`) : le
+ * libellé et le filet, qui part de la teinte et s'efface. « À planifier »
+ * attend un geste (`highlight`), « En attente de lancement » est daté
+ * (`accent`, comme sa pastille `waiting`), « Lancement » et « En cours » sont
+ * de l'information (`info`), « Terminé » une réussite (`success`). Jamais de
+ * rouge : un match joué n'est pas une diffusion. Le compte reste atténué.
+ */
+.divider[data-section="TO_PLAN"] {
+  --section-ink: var(--pink-400);
+  --section-rgb: var(--pink-400-rgb);
+}
+
+.divider[data-section="WAITING"] {
+  --section-ink: var(--violet-300);
+  --section-rgb: var(--violet-400-rgb);
+}
+
+.divider[data-section="LOBBY"],
+.divider[data-section="PLAYING"] {
+  --section-ink: var(--blue-300);
+  --section-rgb: var(--blue-500-rgb);
+}
+
+.divider[data-section="DONE"] {
+  --section-ink: var(--teal-400);
+  --section-rgb: var(--teal-400-rgb);
+}
+
+.divider[data-section] .label {
+  color: var(--section-ink, var(--ink-mute));
+}
+
+.divider[data-section] .rule {
+  background: linear-gradient(90deg, rgba(var(--section-rgb, var(--blue-500-rgb)), 0.45), var(--line-soft) 60%);
+}

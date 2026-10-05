@@ -959,7 +959,7 @@ export default function TournamentDetailPage() {
         open={openPlayerScore}
       >
       <RulesHelpFab format={visibleFormat} contextLabel={contextLabel} tournamentId={detail.card.id} />
-      <section className="fade-in">
+      <section className={`fade-in ${styles.sheet}`}>
         <TournamentHeader
           detail={detail}
           isLive={isLive}

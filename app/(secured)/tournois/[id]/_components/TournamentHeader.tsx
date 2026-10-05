@@ -43,10 +43,10 @@ function readSiteBackInput() {
 }
 
 const TONE_CLASS: Record<HeaderTone, string> = {
-  neutral: s.stateNeutral,
-  green: s.stateGreen,
-  blue: s.stateBlue,
-  muted: s.stateMuted,
+  accent: s.stateAccent,
+  highlight: s.stateHighlight,
+  info: s.stateInfo,
+  success: s.stateSuccess,
 };
 
 interface TournamentHeaderProps {
@@ -102,7 +102,7 @@ export function TournamentHeader({
 }: Readonly<TournamentHeaderProps>) {
   const { card } = detail;
   const wording = participantWording(card.participantType);
-  const state = STATE_META[card.state] ?? { label: card.state, tone: "neutral" as HeaderTone };
+  const state = STATE_META[card.state] ?? { label: card.state, tone: "info" as HeaderTone };
   const items = headerMetaItems(card, detail.phases, detail.currentPhaseId);
   // Le seul refus d'inscription qui ne se lise pas tout seul sur la page :
   // avoir une équipe sans en avoir la charge (`_lib/register-entry.ts`).
@@ -128,7 +128,7 @@ export function TournamentHeader({
   };
 
   return (
-    <div className="ds-header green">
+    <div className={`ds-header ${s.header}`}>
       <div className={`ds-header-body ${s.shell}`}>
         <div className={s.utility}>
           <Link href="/tournois" onClick={onBackClick} className={`${s.back} tap-target`}>
@@ -139,7 +139,7 @@ export function TournamentHeader({
                 recharge par précaution même quand tout arrive tout seul. */}
             <LiveIndicator isLive={isLive} tier={tier} fatal={fatal} />
             {detail.isAdmin && !frozen && (
-              <Pill title="Tu disposes des droits d'organisation sur ce tournoi.">⚙ Admin</Pill>
+              <Pill variant="accent" title="Tu disposes des droits d'organisation sur ce tournoi.">⚙ Admin</Pill>
             )}
           </div>
         </div>
@@ -161,7 +161,7 @@ export function TournamentHeader({
               <span className={`${s.state} ${TONE_CLASS[state.tone]}`}>{state.label}</span>
               <span className={s.identityLine}>{headerIdentityLine(card)}</span>
             </div>
-            <h1 className={`ds-title green ${s.title}`}>{card.name}</h1>
+            <h1 className={`ds-title ${s.title}`}>{card.name}</h1>
             {card.description && <p className={s.description}>{card.description}</p>}
           </div>
 

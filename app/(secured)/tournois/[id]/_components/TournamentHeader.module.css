@@ -2,6 +2,23 @@
    informations affichées. Trois étages, séparés par du vide plutôt que par des
    traits : outils du lecteur, identité, faits du tournoi, puis actions. */
 
+/* Cadre en néon froid (`DESIGN_SYSTEM.md` § Palette « néon froid ») : liseré
+   haut au dégradé de marque, éclats glacier à gauche et violet à droite. La
+   classe doublée passe devant `.ds-header` (globale, même spécificité sinon,
+   ordre de chargement non garanti). */
+.header.header {
+  --header-rgb: var(--blue-500-rgb);
+  border-color: rgba(var(--blue-500-rgb), 0.22);
+  background:
+    radial-gradient(ellipse at 100% 0%, rgba(var(--violet-400-rgb), calc(0.12 * var(--glow, 1))) 0%, transparent 55%),
+    linear-gradient(135deg, rgba(12, 14, 18, 0.97) 0%, rgba(20, 23, 30, 0.95) 100%);
+}
+
+.header.header::after {
+  background: var(--grad-brand);
+  opacity: 0.9;
+}
+
 .shell {
   display: flex;
   flex-direction: column;
@@ -28,12 +45,12 @@
   cursor: pointer;
   font-size: 14px;
   font-weight: 500;
-  color: rgba(79, 224, 162, 0.72);
+  color: var(--blue-300);
   transition: color 0.2s ease, gap 0.2s ease;
 }
 
 .back:hover {
-  color: rgba(79, 224, 162, 1);
+  color: var(--cyan-400);
   gap: 12px;
 }
 
@@ -100,28 +117,30 @@
   box-shadow: 0 0 8px currentColor;
 }
 
-.stateNeutral {
-  --state-ink: var(--ink-mute, #9aa4b2);
-  --state-line: var(--line-strong-cy, rgba(180, 210, 230, 0.18));
-  --state-fill: rgba(180, 210, 230, 0.04);
+/* Tons d'état : variantes sémantiques des pastilles (`STATE_META`), mêmes
+   teintes que les rubans des cartes de `/tournois`. */
+.stateAccent {
+  --state-ink: var(--violet-300);
+  --state-line: rgba(var(--violet-400-rgb), 0.45);
+  --state-fill: rgba(var(--violet-400-rgb), 0.12);
 }
 
-.stateGreen {
-  --state-ink: #4fe0a2;
-  --state-line: rgba(79, 224, 162, 0.35);
-  --state-fill: rgba(79, 224, 162, 0.07);
+.stateHighlight {
+  --state-ink: var(--pink-400);
+  --state-line: rgba(var(--pink-400-rgb), 0.4);
+  --state-fill: rgba(var(--pink-400-rgb), 0.1);
 }
 
-.stateBlue {
-  --state-ink: var(--blue-300, #5ac8ff);
-  --state-line: rgba(90, 200, 255, 0.35);
-  --state-fill: rgba(90, 200, 255, 0.07);
+.stateInfo {
+  --state-ink: var(--blue-300);
+  --state-line: rgba(var(--blue-500-rgb), 0.4);
+  --state-fill: rgba(var(--blue-500-rgb), 0.1);
 }
 
-.stateMuted {
-  --state-ink: var(--ink-mute, #9aa4b2);
-  --state-line: rgba(180, 210, 230, 0.2);
-  --state-fill: rgba(180, 210, 230, 0.03);
+.stateSuccess {
+  --state-ink: var(--teal-400);
+  --state-line: rgba(var(--teal-400-rgb), 0.4);
+  --state-fill: rgba(var(--teal-400-rgb), 0.1);
 }
 
 .identityLine {
@@ -130,6 +149,14 @@
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--ink-mute, #9aa4b2);
+}
+
+/* Nom du tournoi : blanc glacé qui file vers le cyan puis le violet (dégradé
+   de `.ds-title`, teintes de `--grad-brand`). Classe doublée : passe devant
+   `.ds-title` (globale). */
+.title.title {
+  --title-rgb-a: var(--cyan-400-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
 }
 
 .title {
@@ -212,7 +239,8 @@
 .gaugeFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, rgba(90, 200, 255, 0.5), var(--blue-300, #5ac8ff));
+  background: var(--grad-brand);
+  box-shadow: 0 0 calc(8px * var(--glow, 1)) rgba(var(--blue-500-rgb), calc(0.45 * var(--glow, 1)));
   transition: width 0.4s ease;
 }
 

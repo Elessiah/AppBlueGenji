@@ -29,7 +29,7 @@ export function PhaseStandingsTable({ standings }: Readonly<PhaseStandingsTableP
           <span data-label="Rang">{standing.rank ?? "-"}</span>
           <span data-label="Qualifiée">
             {standing.qualified ? (
-              <Pill variant="blue" style={{ fontSize: 12 }}>
+              <Pill variant="success" style={{ fontSize: 12 }}>
                 ✓
               </Pill>
             ) : (

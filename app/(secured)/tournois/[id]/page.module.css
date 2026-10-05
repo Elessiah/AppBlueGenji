@@ -7,6 +7,66 @@
  * jetons, que « Contraste renforcé » atteint.
  */
 
+/*
+ * Néon froid de la fiche (`DESIGN_SYSTEM.md` § Palette « néon froid ») : posé
+ * sur la section qui enveloppe la fiche, il ne touche que ses panneaux — pas
+ * ceux des autres pages, qui partagent les classes globales.
+ *
+ * - Titres de panneau (`.ds-section-title`, sauf « Zone de danger », sans
+ *   variante) : trait d'accent et texte au dégradé de marque. Ses trois
+ *   teintes dépassent 7:1 sur le fond des panneaux. « Contraste renforcé » et
+ *   l'impression reprennent un aplat : un texte peint par son fond n'a pas de
+ *   couleur que ce réglage puisse éclaircir.
+ * - Panneaux (`.ds-block`) : liseré glacier, halo au survol (pointeur fin).
+ *
+ * Sélecteurs à trois classes : ils passent devant les variantes globales
+ * (`.ds-section-title.green`), quel que soit l'ordre de chargement.
+ */
+.sheet :global(.ds-section-title.green),
+.sheet :global(.ds-section-title.blue) {
+  --title-rgb-a: var(--cyan-400-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
+}
+
+.sheet :global(.ds-section-title.green) h2,
+.sheet :global(.ds-section-title.blue) h2 {
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+:global(:root[data-a11y~="contrast"]) .sheet :global(.ds-section-title) h2 {
+  background: none;
+  color: var(--ink);
+}
+
+@media print {
+  .sheet :global(.ds-section-title) h2 {
+    background: none;
+    color: var(--ink);
+  }
+}
+
+.sheet :global(.ds-block.ds-block):not(.danger) {
+  border-color: rgba(var(--blue-500-rgb), 0.14);
+  transition:
+    transform 0.22s ease,
+    box-shadow 0.22s ease,
+    border-color 0.22s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sheet :global(.ds-block.ds-block):not(.danger):hover {
+    border-color: rgba(var(--blue-500-rgb), 0.3);
+    box-shadow:
+      0 8px 28px -10px rgba(var(--blue-500-rgb), 0.3),
+      0 0 0 1px rgba(var(--violet-400-rgb), 0.08);
+  }
+}
+
 /* Échec définitif ou chargement : un texte seul dans son panneau. */
 .status {
   color: var(--ink-mute);

@@ -251,7 +251,7 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     <div className="ds-block">
       <div className="ds-section-title green" style={{ alignItems: "center" }}>
         <h2>Inscriptions · ordre de départ</h2>
-        {staff && <Pill variant="blue">{SEEDING_SOURCE_LABELS[source]}</Pill>}
+        {staff && <Pill variant="accent">{SEEDING_SOURCE_LABELS[source]}</Pill>}
       </div>
 
       {staff && (
