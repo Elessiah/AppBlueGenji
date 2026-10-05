@@ -74,10 +74,10 @@ describe("dialogues de la fiche tournoi — hauteur bornée", () => {
     },
   );
 
-  it.each(["ScoreDialog.module.css", "ConfirmActionDialog.module.css"])(
+  it.each([join(DIR, "ScoreDialog.module.css"), join(ROOT, "components", "ui", "confirm-action-dialog.module.css")])(
     "%s borne `.dialog` en `dvh`",
-    (name) => {
-      const dialog = rule(stripComments(read(join(DIR, name))), ".dialog");
+    (path) => {
+      const dialog = rule(stripComments(read(path)), ".dialog");
       expect(dialog).toContain("max-height: calc(100dvh - 32px)");
       expect(dialog).toMatch(/overflow(-y)?: auto/);
     },
