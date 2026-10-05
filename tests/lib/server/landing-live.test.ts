@@ -259,6 +259,19 @@ describe("getLandingLive", () => {
     expect(live?.currentMatch?.launchPhase).toBe("LAUNCHED");
   });
 
+  it("garde « lancé » un match daté dont l'antenne s'ouvre en avance", async () => {
+    // Sinon la carte dirait « En direct » et « Prochain match · 20:30 » à la fois.
+    jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
+    await mockDb([
+      matchRow({ id: 100, start_at: new Date(Date.now() + 3_600_000), ...ON_AIR }),
+    ]);
+
+    const live = await liveFrom(buckets([card(1, "Coupe A")]));
+
+    expect(live?.currentMatch?.liveState).toBe("LIVE");
+    expect(live?.currentMatch?.launchPhase).toBe("LAUNCHED");
+  });
+
   it("expose l'état programmé d'un match casté hors antenne", async () => {
     jest.mocked(findBroadcastingTournament).mockResolvedValue(null);
     await mockDb([matchRow({ live_trigger: "MANUAL" })]);

@@ -235,6 +235,11 @@ describe("featuredMatchStatusLabel", () => {
     );
   });
 
+  it("dit « Lancement » dès l'heure atteinte, sans attendre une nouvelle phase du serveur", () => {
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T12:00:00Z" }, NOW)).toBe("Lancement");
+    expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "2026-10-05T11:55:00Z" }, NOW)).toBe("Lancement");
+  });
+
   it("se passe d'un horaire illisible ou absent", () => {
     expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: "pas une date" }, NOW)).toBe("Prochain match");
     expect(featuredMatchStatusLabel({ launchPhase: "SCHEDULED", startAt: null }, NOW)).toBe("Prochain match");
