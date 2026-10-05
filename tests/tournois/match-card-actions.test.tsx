@@ -323,6 +323,13 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toMatch(/setOpen\(false\);\s*toggleRef\.current\?\.focus\(\);\s*\}\s*handlers\[action\.id\]\(\);/);
   });
 
+  it("un panneau retiré par le flux se referme, et ne revient pas déplié", () => {
+    expect(source).toContain("const expanded = open && more.length > 0;");
+    expect(source).toContain("if (open && more.length === 0) setOpen(false);");
+    expect(source).toContain("hidden={!expanded}");
+    expect(source).toContain("aria-expanded={expanded}");
+  });
+
   it("le lancement forcé garde sa confirmation", () => {
     expect(source).toContain("force: () => setConfirmForce(true),");
     expect(source).toContain("<ConfirmActionDialog");
