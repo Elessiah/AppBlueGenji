@@ -6,6 +6,8 @@ import {
   isSeedOrderEffective,
   isValidSeedOrder,
   moveInOrder,
+  orderByFrozenSeeds,
+  registrationsFollowFrozenDraw,
   registrationsFollowRanking,
   seedingLockReason,
   seedingWindowState,
@@ -235,5 +237,47 @@ describe("registrationsFollowRanking", () => {
   it("ne le suit jamais quand l'ordre vient du staff ou des inscriptions", () => {
     expect(registrationsFollowRanking("MANUAL", "REGISTRATION")).toBe(false);
     expect(registrationsFollowRanking("REGISTRATION", "REGISTRATION")).toBe(false);
+  });
+});
+
+describe("registrationsFollowFrozenDraw", () => {
+  it("suit le tirage figé d'un tournoi seedé par le classement, une fois lancé", () => {
+    expect(registrationsFollowFrozenDraw("RANKING", "RUNNING")).toBe(true);
+    expect(registrationsFollowFrozenDraw("RANKING", "FINISHED")).toBe(true);
+  });
+
+  it("ne le suit ni avant le lancement ni hors classement", () => {
+    expect(registrationsFollowFrozenDraw("RANKING", "REGISTRATION")).toBe(false);
+    expect(registrationsFollowFrozenDraw("MANUAL", "RUNNING")).toBe(false);
+    expect(registrationsFollowFrozenDraw("REGISTRATION", "RUNNING")).toBe(false);
+  });
+});
+
+describe("orderByFrozenSeeds", () => {
+  const rows = [
+    { teamId: 1, name: "A", seed: 1 },
+    { teamId: 2, name: "B", seed: 2 },
+    { teamId: 3, name: "C", seed: 3 },
+  ];
+
+  it("range par rang figé et porte ce rang, trous compris", () => {
+    expect(orderByFrozenSeeds(rows, new Map([[3, 1], [1, 4], [2, 2]]))).toEqual([
+      { teamId: 3, name: "C", seed: 1 },
+      { teamId: 2, name: "B", seed: 2 },
+      { teamId: 1, name: "A", seed: 4 },
+    ]);
+  });
+
+  it("met les engagées sans rang en dernier, seed nul, dans leur ordre d'origine", () => {
+    expect(orderByFrozenSeeds(rows, new Map([[2, 1]])).map((r) => [r.teamId, r.seed])).toEqual([
+      [2, 1],
+      [1, null],
+      [3, null],
+    ]);
+  });
+
+  it("ne modifie pas les lignes reçues", () => {
+    orderByFrozenSeeds(rows, new Map([[3, 1]]));
+    expect(rows[2].seed).toBe(3);
   });
 });

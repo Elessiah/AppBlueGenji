@@ -8,6 +8,7 @@ import {
   sectionCountLabel,
   sectionRoundMatches,
 } from "@/lib/shared/match-sections";
+import { orderByFrozenSeeds } from "@/lib/shared/seeding";
 import { bracketMatch } from "../../helpers/bracket-match";
 
 const NOW = Date.parse("2026-10-05T20:00:00Z");
@@ -128,6 +129,35 @@ describe("sectionRoundMatches", () => {
       seeds: {},
     });
     expect(only.map((s) => s.key)).toEqual(["DONE"]);
+  });
+});
+
+describe("sectionRoundMatches — têtes de série selon la source du seeding", () => {
+  // Ordre d'arrivée : équipes 1, 2, 3, 4 (colonne `seed` 1…4).
+  const arrivals = [1, 2, 3, 4].map((teamId) => ({ teamId, seed: teamId }));
+  const matches = [
+    bracketMatch({ id: 10, status: "READY", team1Id: 1, team2Id: 2, startAt: FUTURE }),
+    bracketMatch({ id: 11, status: "READY", team1Id: 3, team2Id: 4, startAt: FUTURE }),
+  ];
+  const ids = (seeds: ReturnType<typeof buildSeedMap>) =>
+    sectionRoundMatches(matches, { refereeScheduling: false, now: NOW, seeds })[0].matches.map(
+      (m) => m.id,
+    );
+
+  it("trie un tournoi seedé par le classement par les rangs figés de l'instantané", () => {
+    // `orderByFrozenSeeds` a porté le rang figé dans `seed` : l'équipe 4 est tête 1.
+    const frozen = orderByFrozenSeeds(arrivals, new Map([[4, 1], [1, 2], [2, 3], [3, 4]]));
+    expect(ids(buildSeedMap(frozen))).toEqual([11, 10]);
+  });
+
+  it("garde la colonne `seed` en ordre manuel", () => {
+    expect(ids(buildSeedMap(arrivals))).toEqual([10, 11]);
+  });
+
+  it("range les engagées sans rang figé en dernier, puis par identifiant de match", () => {
+    const partial = orderByFrozenSeeds(arrivals, new Map([[3, 1]]));
+    expect(ids(buildSeedMap(partial))).toEqual([11, 10]);
+    expect(ids(buildSeedMap(orderByFrozenSeeds(arrivals, new Map())))).toEqual([10, 11]);
   });
 });
 
