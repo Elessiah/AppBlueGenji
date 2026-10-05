@@ -45,15 +45,20 @@ function SwitcherLink({ href, target, className }: Readonly<{ href: string; targ
   // La requête suit (un filtre, un onglet, le `?redirect=` de la connexion) :
   // changer de langue ne doit pas perdre l'état de la page.
   const query = useSearchParams()?.toString() ?? "";
+  // L'ancre n'atteint jamais le serveur : ajoutée côté client, dès le survol ou
+  // le focus — avant un clic du milieu ou un « Ouvrir dans un onglet » — et au
+  // clic.
+  const withAnchor = (event: { currentTarget: HTMLAnchorElement }) => {
+    event.currentTarget.href = switcherHref(href, query, globalThis.location?.hash);
+  };
   return (
     <a
       href={switcherHref(href, query)}
       hrefLang={target}
       className={className ? `${styles.link} ${className}` : styles.link}
-      // L'ancre n'atteint jamais le serveur : ajoutée au clic seulement.
-      onClick={(event) => {
-        event.currentTarget.href = switcherHref(href, query, globalThis.location?.hash);
-      }}
+      onPointerEnter={withAnchor}
+      onFocus={withAnchor}
+      onClick={withAnchor}
     >
       <span lang={target}>{LOCALE_NATIVE_NAME[target]}</span>
       <span className="sr-only"> — {t("label")}</span>

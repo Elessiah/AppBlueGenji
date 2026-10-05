@@ -74,7 +74,14 @@ export function middleware(request: NextRequest) {
   // connexion est la même sous `/connexion` et `/en/connexion`, et le cookie
   // est posé sur `/` pour atteindre l'une comme l'autre — c'est ce contrôle-ci,
   // pas le chemin du cookie, qui borne sa lecture à la page de connexion.
-  const onLoginPage = path === "/connexion";
+  //
+  // Et seulement sur un **document** : le retour OAuth y mène toujours par une
+  // redirection, donc un chargement complet. Un préchargement de
+  // `/en/connexion` (troisième entrée du `matcher`, que le middleware ne sait
+  // pas reconnaître autrement) effacerait sinon l'exposé dans une réponse que
+  // personne ne lit. `Sec-Fetch-Dest` absent (navigateur ancien, client hors
+  // navigateur) vaut document : l'exposé ne doit jamais devenir illisible.
+  const onLoginPage = path === "/connexion" && isDocumentRequest(request);
   const suspensionNotice = onLoginPage ? request.cookies.get(SUSPENSION_NOTICE_COOKIE)?.value : undefined;
   requestHeaders.delete(SUSPENSION_NOTICE_HEADER);
   if (suspensionNotice) requestHeaders.set(SUSPENSION_NOTICE_HEADER, suspensionNotice);
@@ -123,6 +130,12 @@ function localeGate(request: NextRequest, path: string, prefixed: Locale | null)
   const target = request.nextUrl.clone();
   target.pathname = path;
   return NextResponse.redirect(target, prefixed === "en" ? 307 : 308);
+}
+
+/** Chargement d'un document, et non `fetch` du routeur (préchargement, navigation client). */
+function isDocumentRequest(request: NextRequest): boolean {
+  const dest = request.headers.get("sec-fetch-dest");
+  return dest === null || dest === "document";
 }
 
 /**
