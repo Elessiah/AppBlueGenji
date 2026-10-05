@@ -41,7 +41,7 @@ Contraste renforcé (`data-a11y~="contrast"`) : `--ink-mute` `#c4d4e6` (11,54), 
 
 #### Pastilles et étiquettes — variantes
 
-`.pill` (mono, capitales) et `.tag` (sans-serif, 12 px) nus sont bleutés. Variantes, communes aux deux (`.pill-*` / `.tag-*`) et au composant `<Pill variant>` (`pillVariantClass`) :
+`.pill` (mono, capitales) et `.cy-tag` (sans-serif, 12 px ; préfixé car `.tag` sert déjà au fil d'activité de `/bot`) nus sont bleutés. Variantes, communes aux deux (`.pill-*` / `.cy-tag-*`) et au composant `<Pill variant>` (`pillVariantClass`) :
 
 | Variante | Couleur du texte | Sens |
 | --- | --- | --- |
