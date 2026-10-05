@@ -14,11 +14,18 @@
  */
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { getDatabase } from "@/lib/server/database";
-import { isValidSeedOrder, seedingLockReason, type SeedingEntry, type SeedingLockReason } from "@/lib/shared/seeding";
+import {
+  isValidSeedOrder,
+  seedingLockReason,
+  seedingWindowState,
+  type SeedingEntry,
+  type SeedingLockReason,
+} from "@/lib/shared/seeding";
 import type { MatchScoreState } from "@/lib/shared/match-lock";
 import { loadTournamentRow, getMatchRows, deleteAllMatches, resetRegistrationRanks } from "./repository";
 import { discardBotLogs, flushBotLogs } from "./bot-logs";
 import { lockTournamentRow } from "./registration";
+import type { TournamentRow } from "./_internal";
 import { publishUpdatedEvent } from "./notifications";
 import { isTransactionAborted } from "@/lib/server/mysql-errors";
 
@@ -124,6 +131,20 @@ export async function resequenceSeeds(
   }
 }
 
+/** État qui juge la fenêtre, depuis la ligne du tournoi (`seedingWindowState`). */
+function windowState(tournament: TournamentRow, now: number = Date.now()) {
+  return seedingWindowState(
+    {
+      state: tournament.state,
+      finishedAt: tournament.finished_at,
+      registrationOpenAt: tournament.registration_open_at,
+      registrationCloseAt: tournament.registration_close_at,
+      startAt: tournament.start_at,
+    },
+    now,
+  );
+}
+
 /** État du seeding d'un tournoi : ordre courant et fenêtre d'édition. */
 export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoard | null> {
   const db = await getDatabase();
@@ -137,7 +158,7 @@ export async function loadSeedingBoard(tournamentId: number): Promise<SeedingBoa
 
     return {
       entries,
-      lockReason: seedingLockReason(tournament.state, matches),
+      lockReason: seedingLockReason(windowState(tournament), matches),
       manualSeeding: Number(tournament.manual_seeding ?? 0) === 1,
     };
   } finally {
@@ -206,7 +227,7 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
     const entries = await loadEntries(connection, tournamentId);
     const matchRows = await getMatchRows(connection, tournamentId);
 
-    const lockReason = seedingLockReason(tournament.state, toScoreStates(matchRows));
+    const lockReason = seedingLockReason(windowState(tournament), toScoreStates(matchRows));
     if (lockReason === "STARTED") throw new Error("SEEDING_LOCKED_STARTED");
     if (lockReason !== null) throw new Error("SEEDING_LOCKED");
 

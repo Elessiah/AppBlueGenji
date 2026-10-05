@@ -9,6 +9,7 @@ import {
   moveInOrder,
   registrationsFollowRanking,
   seedingLockReason,
+  seedingWindowState,
   SEEDING_SOURCE_LABELS,
   type SeedingLockReason,
 } from "@/lib/shared/seeding";
@@ -98,7 +99,16 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   const order = pending ?? serverOrder;
   const byId = new Map(detail.registrations.map((reg) => [reg.teamId, reg]));
 
-  const lockReason = seedingLockReason(detail.card.state, detail.matches.map(fromBracketMatch));
+  // L'heure vient d'un minuteur posé sur la prochaine bascule d'état du tournoi,
+  // et non d'un `Date.now()` au rendu : les deux fenêtres (ordre et retrait) se
+  // ferment au coup d'envoi, une seconde connue d'avance qu'aucune écriture
+  // n'annonce — le flux ne pousse un instantané que si quelqu'un a écrit. Sans
+  // cela les commandes resteraient offertes après l'heure, pour un 409 au clic.
+  const now = useTournamentNow(detail.card);
+  const lockReason = seedingLockReason(
+    seedingWindowState(detail.card, now),
+    detail.matches.map(fromBracketMatch),
+  );
   const staff = detail.isAdmin && canAct;
   const reorderable = staff && lockReason === null && detail.registrations.length > 1;
 
@@ -107,13 +117,6 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
   // se règle jusqu'au coup d'envoi. Proches, les deux fenêtres ne se jugent pas
   // sur les mêmes données. Les deux commandes partagent une cellule mais pas
   // une condition.
-  //
-  // L'heure vient d'un minuteur posé sur la prochaine bascule d'état du tournoi,
-  // et non d'un `Date.now()` au rendu : la fenêtre de retrait se ferme au coup
-  // d'envoi, une seconde connue d'avance qu'aucune écriture n'annonce — le flux
-  // ne pousse un instantané que si quelqu'un a écrit. Sans cela le bouton
-  // resterait offert après l'heure, pour un refus en 409 au clic.
-  const now = useTournamentNow(detail.card);
   const removalBlock = entrantRemovalBlockReason(detail.card, now);
   const removable = staff && removalBlock === null;
   const showActions = reorderable || removable;
