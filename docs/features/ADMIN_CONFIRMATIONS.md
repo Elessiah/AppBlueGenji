@@ -37,18 +37,21 @@ rapporte `MANUAL`.
 
 `AdminScoreDialog` : sur un match déjà tranché (`COMPLETED`, nul et double
 forfait compris — `scoreCorrectionNeedsConfirmation`, `_lib/score-form.ts`),
-« Enregistrer » comme « Valider le résultat » demandent confirmation. La modale
-rappelle le résultat publié et dit ce que `adminResolveMatch` défait : l'équipe
-qualifiée dans la rencontre suivante (encore sans score — sinon le serveur
-refuse en `CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES`) est remplacée, son
-horaire conservé, et le classement est recalculé.
+« Valider le résultat » demande confirmation (« Enregistrer » y est déjà
+désactivé, `canSave: false`, et refusé en `MATCH_ALREADY_COMPLETED` ; il passe
+quand même par la même porte, `run`). La modale rappelle le résultat publié et
+dit ce que `adminResolveMatch` défait : une rencontre suivante encore sans score
+(sinon le serveur refuse en `CANNOT_MODIFY_COMPLETED_DEPENDENT_MATCHES`) peut
+changer d'adversaire, son horaire conservé ; le classement est recalculé ; un
+tournoi déjà terminé repasse en cours (`reopenAfterCascade`). Le texte reste
+valable pour tous les formats, avec ou sans liens de plateau.
 
 ## Audit (2026-10-05)
 
 | Geste | Ce qu'il peut défaire | Confirmation |
 |---|---|---|
 | Réordonner le seeding (flèches) | Passe l'ordre en manuel, sans retour (si `RANKING`) | **Ajoutée** (`RANKING` seulement, une fois) |
-| Corriger le score d'un match tranché | Résultat publié, équipe qualifiée en aval, classement | **Ajoutée** (match `COMPLETED` seulement) |
+| Corriger le score d'un match tranché | Résultat publié, adversaire en aval, classement, tournoi terminé rouvert | **Ajoutée** (match `COMPLETED` seulement) |
 | Retirer un engagé | Inscription | `RemoveEntrantDialog` |
 | Retour en arrière d'un stade | Résultats du stade, palmarès | `RollbackRoundDialog` (liste les rencontres effacées) |
 | Avancer l'état / lancer maintenant | Fenêtre d'inscription, tirage | `AdvanceTournamentDialog` |

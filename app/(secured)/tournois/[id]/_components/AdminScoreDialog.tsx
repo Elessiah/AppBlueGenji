@@ -444,8 +444,9 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
           {storedLabel !== null && <p>{storedLabel}</p>}
           <p>Ce résultat publié sera remplacé par la nouvelle saisie.</p>
           <p>
-            Si l&apos;issue change, ce qui en découlait est défait : l&apos;équipe qualifiée dans la rencontre
-            suivante (encore sans score) est remplacée, son horaire conservé, et le classement est recalculé.
+            Si l&apos;issue change, ce qui en découlait est défait : une rencontre suivante encore sans score peut
+            changer d&apos;adversaire (son horaire conservé), le classement est recalculé, et un tournoi déjà
+            terminé repasse en cours.
           </p>
         </ConfirmActionDialog>
       )}

@@ -76,7 +76,7 @@ describe("scoreCorrectionNeedsConfirmation", () => {
 });
 
 describe("Correction d'un résultat — câblage", () => {
-  it("aucune écriture n'échappe à la règle : Enregistrer comme Valider passent par run", () => {
+  it("aucune écriture n'échappe à la règle : toute saisie passe par run (Enregistrer, désactivé sur un match tranché, compris)", () => {
     expect(SCORE).toMatch(/onClick=\{\(\) => void run\("save"\)\}/);
     expect(SCORE).toMatch(/void run\("resolve"\)/);
     expect(SCORE.match(/form\.submit\(/g)).toHaveLength(1);
@@ -88,5 +88,6 @@ describe("Correction d'un résultat — câblage", () => {
     expect(SCORE).toMatch(/onClose=\{\(\) => setConfirmingCorrection\(null\)\}/);
     expect(SCORE).toMatch(/onConfirm=\{\(\) => perform\(confirmingCorrection\)\}/);
     expect(SCORE).toContain("son horaire conservé");
+    expect(SCORE).toContain("terminé repasse en cours");
   });
 });
