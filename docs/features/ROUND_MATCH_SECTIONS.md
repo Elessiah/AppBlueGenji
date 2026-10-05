@@ -46,7 +46,10 @@ de match appelle « En attente de départ » (`LAUNCH_PHASE_LABELS`).
 
 Une engagée sans tête de série (inconnue, ou seed `null`) compte après toutes
 les autres. Les têtes de série viennent des inscrites (`buildSeedMap`),
-diffusées par `EntrantProvider` (`useEntrantSeeds`).
+diffusées par `EntrantProvider` (`useEntrantSeeds`) — **seulement** quand la
+colonne `seed` porte l'ordre réel (`isSeedOrderEffective`, `SEEDING_ORDER.md`) : sous
+un seeding par classement du site, elle ne garde que l'ordre d'inscription, et
+le départage retombe alors sur l'identifiant du match.
 
 ## Horloge
 
@@ -55,8 +58,9 @@ Seul le temps fait passer « En attente de lancement » → « Lancement ».
 (`nextSectionChangeAt`, qui reprend `nextLaunchPhaseChangeAt`) — la règle de la
 carte de match (`useMatchLaunchPhase`) : la carte et son filet basculent à la
 même seconde. Aucun intervalle ; sans match daté en attente, aucun minuteur.
-Avant le montage (`now` nul), un match daté est tenu « en attente » : l'heure
-du lecteur n'est pas encore connue.
+L'instant est lu dès le premier rendu (les matchs n'arrivent qu'au client) ;
+un délai plafonné (~24,8 jours) relit l'heure réelle au réveil au lieu
+d'avancer l'horloge.
 
 ## Filet
 
