@@ -30,16 +30,13 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
   const filter = parseRankingFilter((await searchParams).jeu);
   const game = rankingFilterGame(filter);
 
-  let rows: LandingLeaderboardRow[] = [];
-  let unavailable = false;
-  try {
-    rows = await loadLeaderboardRows(game);
-  } catch {
-    unavailable = true;
-  }
-
+  // Les deux lectures sont indépendantes : en parallèle, chacune avec son repli.
   // La forme couvre tous les jeux : elle n'accompagne que le classement général.
-  const forms = game === undefined ? await loadCachedTeamForms().catch(() => null) : null;
+  const [rows, forms] = await Promise.all([
+    loadLeaderboardRows(game).catch((): LandingLeaderboardRow[] | null => null),
+    game === undefined ? loadCachedTeamForms().catch(() => null) : Promise.resolve(null),
+  ]);
+  const unavailable = rows === null;
 
   return (
     <PublicPageShell>
@@ -60,7 +57,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
       <section className={styles.section} aria-labelledby="classement-board">
         {/* Titre de section pour la hiérarchie (h1 → h2 → noms du podium en h3). */}
         <h2 id="classement-board" className="sr-only">Classement des équipes</h2>
-        <RankingBoard rows={rows} filter={filter} forms={forms} unavailable={unavailable} />
+        <RankingBoard rows={rows ?? []}filter={filter} forms={forms} unavailable={unavailable} />
       </section>
 
       <section className={`${styles.section} ${styles.how}`} aria-labelledby="classement-how">
