@@ -103,7 +103,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   const title = live.tournament.name.toUpperCase();
   const matchIsLive = currentMatch?.liveState === "LIVE";
   const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
-  const matchStatus = currentMatch ? featuredMatchStatusLabel(currentMatch, clock ?? undefined) : null;
+  const matchStatus = currentMatch ? featuredMatchStatusLabel(currentMatch, clock) : null;
   const matchPlatform = streamPlatform(currentMatch?.liveUrl);
   // Le bouton de diffusion n'apparaît **que** pour un match réellement à
   // l'antenne. `SCHEDULED` annonce un cast à venir : la chaîne ne montre pas

@@ -40,7 +40,7 @@ import { entrantHref } from "@/lib/shared/participants";
 import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { localUploadUrl } from "@/lib/shared/uploads";
-import { matchLaunchPhase } from "@/lib/shared/match-launch";
+import { launchPairingKey, matchLaunchPhase } from "@/lib/shared/match-launch";
 import { toIso } from "@/lib/server/serialization";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
 
@@ -130,6 +130,7 @@ type LiveMatchRow = RowDataPacket & {
   live_url: string | null;
   live_started_at: Date | string | null;
   launched_at: Date | string | null;
+  launch_pairing: string | null;
   referee_scheduling: number | null;
 };
 
@@ -229,6 +230,7 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         m.live_url,
         m.live_started_at,
         m.launched_at,
+        m.launch_pairing,
         t.referee_scheduling
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
@@ -256,7 +258,13 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           team1Id: row.team1_id,
           team2Id: row.team2_id,
           startAt: toIso(row.start_at),
-          launchedAt: toIso(row.launched_at),
+          // Un lancement posé pour une autre paire d'engagés (arbitre revenu
+          // en arrière, seeding réordonné) ne compte pas — même règle que
+          // `currentLaunchState`, que lit la fiche du tournoi.
+          launchedAt:
+            row.launch_pairing !== null && row.launch_pairing === launchPairingKey(row.team1_id, row.team2_id)
+              ? toIso(row.launched_at)
+              : null,
           refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
         },
         now,
