@@ -244,7 +244,7 @@ describe("featuredMatchPill", () => {
     // L'horaire est rendu à côté de la pastille, pas dedans : elle tient sur une ligne.
     expect(pill("SCHEDULED", "2026-10-05T18:30:00Z")).toEqual({
       label: MATCH_SECTION_LABELS.WAITING,
-      tone: "default",
+      tone: "waiting",
       when: "5 oct. · 20:30",
     });
     expect(MATCH_SECTION_LABELS.PLAYING).toBe("En cours");
@@ -272,7 +272,7 @@ describe("featuredMatchPill", () => {
   });
 
   it("se passe d'un horaire illisible ou absent", () => {
-    expect(pill("SCHEDULED", "pas une date")).toEqual({ label: "En attente de lancement", tone: "default", when: null });
+    expect(pill("SCHEDULED", "pas une date")).toEqual({ label: "En attente de lancement", tone: "waiting", when: null });
     expect(pill("SCHEDULED", null).when).toBeNull();
   });
 
