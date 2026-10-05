@@ -2,18 +2,14 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
-import { useClock } from "@/lib/shared/hooks/useClock";
 import {
-  needsSectionClock,
+  nextSectionChangeAt,
   sectionCountLabel,
   sectionRoundMatches,
 } from "@/lib/shared/match-sections";
 import { useLiveControls } from "../_lib/live-context";
 import { useEntrantSeeds } from "../_lib/entrant-link";
 import styles from "./RoundMatchSections.module.css";
-
-/** Pas de l'horloge : seule l'heure d'un match fait passer « En attente » → « Lancement ». */
-const SECTION_CLOCK_MS = 15_000;
 
 interface RoundMatchSectionsProps {
   matches: readonly BracketMatch[];
@@ -23,18 +19,26 @@ interface RoundMatchSectionsProps {
 
 /**
  * Matchs d'une manche découpés par état (`lib/shared/match-sections.ts`) : un
- * filet discret titré par section, jamais un volet. L'horloge (`useClock`) ne
- * tourne que si un match attend son heure.
+ * filet discret titré par section, jamais un volet.
  */
 export function RoundMatchSections({ matches, children }: Readonly<RoundMatchSectionsProps>) {
   const { refereeScheduling } = useLiveControls();
   const seeds = useEntrantSeeds();
-  // L'horloge s'arrête d'elle-même une fois le dernier match daté entré en
-  // lancement : `now` l'y fait voir, et seule une nouvelle donnée la relance.
-  const [clockNeeded, setClockNeeded] = useState(() => needsSectionClock(matches, refereeScheduling));
-  const now = useClock(SECTION_CLOCK_MS, clockNeeded);
+  // Bascule « En attente » → « Lancement » à la seconde où la carte de match
+  // bascule elle-même (`useMatchLaunchPhase`) : un seul minuteur, armé sur la
+  // prochaine heure de début, jamais d'intervalle. `null` avant le montage —
+  // l'heure du lecteur n'est pas celle du serveur.
+  const [now, setNow] = useState<number | null>(null);
   useEffect(() => {
-    setClockNeeded(needsSectionClock(matches, refereeScheduling, now));
+    setNow(Date.now());
+  }, [matches, refereeScheduling]);
+  useEffect(() => {
+    if (now === null) return;
+    const at = nextSectionChangeAt(matches, refereeScheduling, now);
+    if (at === null) return;
+    const delay = Math.min(Math.max(0, at - Date.now()), 2_147_483_647);
+    const timer = setTimeout(() => setNow(Math.max(at, Date.now())), delay);
+    return () => clearTimeout(timer);
   }, [matches, refereeScheduling, now]);
   const sections = useMemo(
     () => sectionRoundMatches(matches, { refereeScheduling, now, seeds }),

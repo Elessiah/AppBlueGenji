@@ -14,8 +14,8 @@
  * | phase `LOBBY` (heure venue, ou sans date hors planification) | Lancement  |
  * | phase `SCHEDULED` (date à venir)             | En attente de lancement    |
  * | phase `TO_PLAN` (planification, sans date)   | À planifier                |
- * | engagé inconnu (`PENDING`…), sans date       | À planifier                |
- * | engagé inconnu, daté                         | En attente de lancement    |
+ * | engagé inconnu (`PENDING`…), sans date, planification | À planifier       |
+ * | engagé inconnu, autrement                    | En attente de lancement    |
  *
  * Un match dont une engagée manque ne peut pas se lancer, même à son heure :
  * il attend, daté ou non, jamais « Lancement ».
@@ -26,7 +26,7 @@
  *
  * Voir `docs/features/ROUND_MATCH_SECTIONS.md`.
  */
-import { matchLaunchPhase } from "./match-launch";
+import { matchLaunchPhase, nextLaunchPhaseChangeAt } from "./match-launch";
 import type { BracketMatch } from "./types";
 
 export type MatchSectionKey = "TO_PLAN" | "WAITING" | "LOBBY" | "PLAYING" | "DONE";
@@ -75,7 +75,7 @@ function isoTime(iso: string | null): number | null {
 
 /**
  * Section d'un match à l'instant `now` (ms). `now` vaut `null` avant le
- * montage (`useClock`) : un match daté est alors tenu « en attente », l'heure
+ * montage (`RoundMatchSections`) : un match daté est alors tenu « en attente », l'heure
  * du lecteur n'étant pas encore connue.
  */
 export function matchSectionOf(
@@ -90,7 +90,9 @@ export function matchSectionOf(
   if (phase === "SCHEDULED") return "WAITING";
   if (phase === "TO_PLAN") return "TO_PLAN";
   // `NONE` hors terminé : une engagée manque, le match ne peut pas se lancer.
-  return isoTime(match.startAt) === null ? "TO_PLAN" : "WAITING";
+  // Sans date, il n'est « à planifier » que si l'arbitrage pose les dates ;
+  // sinon il attend simplement ses adversaires.
+  return refereeScheduling && isoTime(match.startAt) === null ? "TO_PLAN" : "WAITING";
 }
 
 function seedOf(seeds: SeedMap, teamId: number | null): number {
@@ -133,21 +135,22 @@ export function sectionRoundMatches<T extends SectionMatch>(
 }
 
 /**
- * L'horloge a-t-elle à tourner ? Seulement si un match peut encore passer
- * d'« En attente de lancement » à « Lancement » par le seul temps : daté,
- * heure pas encore atteinte (à `now`, ou inconnue avant le montage), ses deux
- * engagées connues. Un match daté dont une engagée manque ne bouge que par une
- * écriture, que le flux apporte.
+ * Prochain instant (ms) où une section changera **par le seul temps** : la plus
+ * proche heure de début d'un match « En attente de lancement » dont les deux
+ * engagées sont connues (`nextLaunchPhaseChangeAt`, la règle de la carte de
+ * match). `null` : aucune bascule horaire à attendre.
  */
-export function needsSectionClock(
+export function nextSectionChangeAt(
   matches: readonly SectionMatch[],
   refereeScheduling: boolean,
-  now: number | null = null,
-): boolean {
-  return matches.some((match) => {
-    if (match.team1Id === null || match.team2Id === null) return false;
-    return matchSectionOf(match, refereeScheduling, now) === "WAITING";
-  });
+  now: number,
+): number | null {
+  let next: number | null = null;
+  for (const match of matches) {
+    const at = nextLaunchPhaseChangeAt({ ...match, refereeScheduling }, now);
+    if (at !== null && (next === null || at < next)) next = at;
+  }
+  return next;
 }
 
 /** « 3 matchs » — accord sur le nombre, pour le filet. */
