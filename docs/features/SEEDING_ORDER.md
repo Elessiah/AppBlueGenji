@@ -137,12 +137,14 @@ dans cet ordre de priorité) :
 | `lockReason` | Sens | Refus de `PATCH` |
 | --- | --- | --- |
 | `null` | encore modifiable | — |
-| `FINISHED` | tournoi terminé | `SEEDING_LOCKED` (409) |
+| `FINISHED` | tournoi terminé | `SEEDING_LOCKED_FINISHED` (409) |
 | `SCORES_ENTERED` | au moins un match porte une saisie | `SEEDING_LOCKED` (409) |
 | `STARTED` | tournoi lancé (`RUNNING`), même sans score | `SEEDING_LOCKED_STARTED` (409) |
 
 `SCORES_ENTERED` reste jugé avant `STARTED`, pour garder la phrase la plus
-précise sur un tournoi où l'on joue déjà. Les deux codes ont leur phrase dans `_lib/error-map.ts`. Une fois
+précise sur un tournoi où l'on joue déjà. Un tournoi terminé a son propre code :
+il portait jadis `SEEDING_LOCKED`, dont la phrase (« Un score a été saisi ») ne
+décrivait pas un tournoi clos. Les trois codes ont leur phrase dans `_lib/error-map.ts`. Une fois
 figé, les flèches disparaissent et la phrase du verrou prend leur place ; sur
 un tournoi lancé, elle tait celle du retrait (« le tirage est fait »), qui
 dirait le même fait (`removalNotice`).
@@ -223,8 +225,8 @@ elle, dérive la fenêtre du détail déjà reçu et n'appelle que `PATCH`.
 `PATCH` attend `{ teamIds: number[] }` — la liste **complète** des inscrites dans
 le nouvel ordre. Toute liste qui n'est pas une permutation exacte est refusée
 (`INVALID_SEED_ORDER`, 400) : sans ce contrôle, un réordonnancement pourrait
-faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` ou
-`SEEDING_LOCKED_STARTED` (409), un code seul (`fail`).
+faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED`,
+`SEEDING_LOCKED_STARTED` ou `SEEDING_LOCKED_FINISHED` (409), un code seul (`fail`).
 
 ## Tests
 
@@ -234,12 +236,13 @@ faire disparaître une équipe du tournoi. Ordre figé → `SEEDING_LOCKED` ou
 - `tests/app/seeding-arrows.test.ts` — plus de poignée ni de geste, flèches
   nommées d'après l'engagé, désactivées aux extrémités par les couleurs,
   `touch-action: manipulation`, 44 px au doigt, phrase du code
-  `SEEDING_LOCKED_STARTED`.
+  `SEEDING_LOCKED_STARTED` et `SEEDING_LOCKED_FINISHED`, aucune flèche sur un
+  tournoi terminé.
 - `tests/lib/server/tournament-snapshot.test.ts` — `seedingSource` porté par
   l'instantané, `manual_seeding` compris.
 - `tests/tournois/seeding-service.test.ts` — écriture des seeds, refus (tournoi
   lancé — par l'état ou par l'heure —, plateau présent, score saisi,
-  permutation invalide, tournoi inconnu), verrous du
+  tournoi terminé, permutation invalide, tournoi inconnu), verrous du
   tournoi et des matchs posés avant toute lecture.
 - `tests/app/api/admin/seeding.test.ts` — permissions et codes d'erreur.
 
