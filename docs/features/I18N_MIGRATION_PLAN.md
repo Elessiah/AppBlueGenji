@@ -76,12 +76,12 @@ n'ont que 34 littéraux : la règle « une erreur ne porte qu'un code » paie ic
 | Canal | Proposition | Justification |
 |---|---|---|
 | Toasts / erreurs d'API | **Dans le périmètre**, résolus côté client par la langue de la page | L'API ne renvoie que des codes ; rien ne change côté serveur. |
-| Notifications push | **Dans le périmètre, lot tardif** : langue = préférence du compte | Une push n'a pas d'URL d'où lire la langue. **Décision requise** (D5). |
-| Messages Discord (bot, annonces, journaux staff) | **Hors périmètre, restent en français** | Communauté Discord francophone ; le bot gère déjà sa propre langue (`help.md` / `helpfr.md`). **Décision requise** (D6). |
+| Notifications push | **Dans le périmètre, lot 9** : langue = préférence du compte (`bg_users.locale`) | Une push n'a pas d'URL d'où lire la langue. **Décidé** (D5). |
+| Messages Discord (bot, annonces, journaux staff) | **Hors périmètre, restent en français** | Communauté Discord francophone ; le bot gère déjà sa propre langue (`help.md` / `helpfr.md`). **Décidé** (D6). |
 | Journaux pm2 | Hors périmètre (français) | Lus par l'équipe seulement. |
 | Courriels | Sans objet | Le site n'en envoie pas. |
 
-### Textes légaux — **décision requise** (D1)
+### Textes légaux — **décidé** (D1, voir la décision sous le tableau)
 
 | Texte | Source | Remarque |
 |---|---|---|
@@ -100,6 +100,24 @@ d'accessibilité en français avec un résumé anglais. **Recommandation : (c)**
 humain compétent, avec la clause « la version française fait foi ». Quel que soit le choix, la
 traduction ne change pas `TERMS_VERSION` ; toute modification **de fond** ultérieure doit être
 portée dans les deux langues dans la même PR (test de parité, § Garde-fous).
+
+**Décision (2026-10-06) — option (a), en réutilisant l'existant :**
+
+- **Chercher d'abord une version anglaise existante.** Trouvé : les documents du bot
+  (`/privacy-policy-bot`, `/terms-of-service-bot`, `components/legal/BotLegalDoc.tsx`,
+  `BOT_LEGAL_PAGES.md`) sont déjà bilingues (`BilingualDoc { fr, en }` avec une bascule de langue
+  **dans la page** ; sources dans le dépôt `blueGenjiBot`, `LegalTerms/PolicyPrivacy.md` et
+  `TermsOfServices.md`). Le lot 7 les **réutilise** et remplace la bascule interne par les adresses
+  `/en/privacy-policy-bot`, `/en/terms-of-service-bot` (une langue par URL, `hreflang`).
+- **Textes propres au site** (CGU, `/rgpd`, mentions légales, registre, déclaration
+  d'accessibilité) : aucun anglais n'existe ; ils sont **traduits par l'agent de traduction Opus**
+  (D2). CGU et politique de confidentialité portent en tête « the French version prevails ».
+  Mentions légales, registre et déclaration d'accessibilité sont **traduits aussi**, sauf si le
+  lot 7 trouve une raison juridique de ne pas le faire — il la **signale** alors au lieu de
+  trancher seul.
+- Relecture par un anglophone natif : **facultative**, conseillée pour les seuls textes légaux.
+- `TERMS_VERSION` ne bouge pas pour la traduction ; parité FR/EN de toute modification de fond
+  ultérieure, dans la même PR.
 
 ## 2. Choix technique
 
@@ -206,8 +224,8 @@ l'augmentation `AppConfig` et l'import JSON (`resolveJsonModule`).
 | Sitemap | `app/sitemap.ts` : une entrée par langue et par route migrée, avec `alternates.languages` (supporté par `MetadataRoute.Sitemap`). `robots.ts` inchangé. |
 | JSON-LD | `inLanguage` sur `WebSite`/`WebPage` ; `BreadcrumbList` aux noms traduits ; organisation inchangée. |
 | Image OG | `opengraph-image.tsx` lit `x-bg-locale` (accessible via `/en/opengraph-image` réécrite) ; `DEFAULT_SHARE_IMAGE` préfixé selon la langue. |
-| Textes éditables | Clé de base `copy_<clé>` (français, inchangée — aucune migration de données) + `copy_<clé>__en` ; repli **sur le défaut anglais du code**, jamais sur la valeur française éditée. L'éditeur admin gagne un onglet de langue. Changement de schéma : aucun (`bg_settings` clé/valeur) — vérifier la longueur de colonne de la clé. |
-| Préférence de langue | **URL = source de vérité.** Pas de cookie au lot 0 (rien à déclarer). Langue **du compte** (`bg_users.locale`) seulement au lot des push, pour choisir la langue d'une notification — **décision requise** (D5), avec entrée `PRIVACY_CHANGES` + registre si retenu. |
+| Textes éditables | Clé de base `copy_<clé>` (français, inchangée — aucune migration de données) + `copy_<clé>__en`. **Anglais obligatoire à la saisie** (D9) : l'éditeur montre FR et EN côte à côte et refuse d'enregistrer sans l'anglais. Le contenu déjà en base reçoit son anglais **au lot qui migre l'écran** (rattrapage, § Textes saisis par l'administration) — aucun repli FR sous `/en`. Changement de schéma : aucun (`bg_settings` clé/valeur) — vérifier la longueur de colonne de la clé. |
+| Préférence de langue | **URL = source de vérité.** Pas de cookie au lot 0 (rien à déclarer). Langue **du compte** (`bg_users.locale`) au lot 9, pour choisir la langue d'une notification — **décidé** (D5), avec entrée `PRIVACY_CHANGES`, mise à jour de `/rgpd` et du registre des traitements. |
 | Discord | Inchangé (français), voir D6. |
 | CSP | Inchangée ; le nonce suit la requête réécrite (à tester). |
 
@@ -221,41 +239,59 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 |---|---|---|---:|---|---|
 | 0 | **Infrastructure** | `next-intl`, `i18n/request.ts`, `messages/fr/*.json` + `messages/en/*.json` par espace de noms, réécriture `/en` dans `middleware.ts`, en-tête `x-bg-locale`, liste blanche, `<html lang>`, `LocaleLink`/`localeHref`/`useLocaleRouter`, sélecteur, `pageMetadata` + sitemap + JSON-LD multilingues, formateurs, test de parité des clés, règle ESLint, glossaire, doc `I18N.md`, règle `CLAUDE.md`. **Aucune page migrée** (liste blanche vide → `/en/*` redirige). | ~0 | Middleware (CSP, provenance API, suspension) ; `usePathname` après réécriture ; double TypeScript | **Critique** : deux cycles propres consécutifs + sécurité + performance |
 | 1 | Coquille partagée | Nav, pied de page, `PublicPageShell`, lien d'évitement, menu d'accessibilité, toasts, `ConfirmActionDialog`, pages d'erreur / 404 / `global-error` | ~250 (C1 + part de C2) | Composants partout : tester FR inchangé | Standard + UI |
-| 2 | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue (+ éditeur admin), OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais | Standard + UI + sécurité (éditeur) |
-| 3 | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard + relecture humaine du fond |
+| 2 | Accueil | `app/page.tsx`, `components/cyber/landing`, `<EditableCopy>` par langue + éditeur admin FR/EN **anglais obligatoire** (D9), rattrapage de l'anglais des `copy_*` déjà saisis, OG, JSON-LD de l'accueil | ~300 | Textes édités en base sans équivalent anglais → rattrapage avant d'ouvrir `/en` | Standard + UI + sécurité (éditeur) |
+| 3 | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard (relecture du fond contre le glossaire, D2) |
 | 4 | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
-| 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`), documents du bot sous `/en` | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI |
-| 6 | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension lisible et effacé sous `/en/connexion` (cookie `path`, comparaison de chemin du middleware) | **Critique** (auth) |
-| 7 | Légal | Selon D1 | 0 à ~1 285 (jusqu'à 23 000 mots) | Valeur juridique ; parité FR/EN | Cycle **juridique** (+ deux propres si RGPD) |
+| 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`) ; éditeurs de la page association (bureau, bénévoles, cartes « À propos », chiffres, partenaires, annonces de recrutement) en FR/EN **anglais obligatoire** (D9) + rattrapage de l'existant | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI + sécurité (éditeurs) |
+| 6 | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension sous `/en/connexion` (cookie et middleware déjà prêts au lot 0 : vérifier l'écran) | **Critique** (auth) |
+| 7a | Légal — documents du bot | `/privacy-policy-bot`, `/terms-of-service-bot` : la bascule interne de `BotLegalDoc` cède la place aux adresses `/en/…` (D1) | ~0 (contenu existant) | Une langue par URL, `hreflang` | Cycle **juridique** |
+| 7b | Légal — textes du site | CGU, `/rgpd`, mentions légales, registre, déclaration d'accessibilité traduits (D1, « the French version prevails » sur CGU et confidentialité) | ~1 285 (~23 000 mots) | Valeur juridique ; parité FR/EN ; raison juridique de ne pas traduire un texte → **la signaler** | Cycle **juridique** + deux propres (RGPD) |
 | 8a | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
-| 9 | Équipes, joueurs, profil, signalements | + préférence de langue du compte et push par langue (si D5) | ~620 (U + S7) | RGPD si stockage de la langue | Critique si D5 (RGPD) |
-| 10 | Admin | Selon D4 — recommandé : **reste en français** | 0 / ~90 + part de `lib/server` | — | Standard |
+| 9 | Équipes, joueurs, profil, signalements | + langue du compte (`bg_users.locale`, D5) et push par langue | ~620 (U + S7) | RGPD : stockage de la langue → `PRIVACY_CHANGES` + `/rgpd` + registre | **Critique** (RGPD) |
+| ~~10~~ | ~~Admin~~ | **Abandonné** : l'admin reste en français (D4) | — | — | — |
 
-**Ordre** : 0 → 1 → 2 → 3 → 4 → 5 → 6 → (7 dès que D1 tranché, en parallèle possible) →
-8a → 8b → 9 → (10). Les lots 2 à 5 sont indépendants une fois 0 et 1 livrés.
+**Ordre** : 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7a/7b (en parallèle possible) → 8a → 8b → 9. Les lots
+2 à 5 sont indépendants une fois 0 et 1 livrés.
 
-**Effort total** : **12 PR** telles que listées (lots 0 à 10, le 8 en deux) ; **11** si l'admin
-reste en français (D4). Le lot 7 subsiste quelle que soit D1 (même l'option (b) demande une page
-de synthèse anglaise) ; il passe à deux PR si D1 = (a) vu son volume (~23 000 mots), soit 13 au
-plus. Lot 0 ≈ 2 à 3 fois un lot de pages ; lots 3, 8a, 8b les plus lourds en texte.
+**Effort total** : **12 PR** (lots 0 à 9, le 7 et le 8 en deux ; pas de lot admin). Lot 0 ≈ 2 à
+3 fois un lot de pages ; lots 3, 7b, 8a, 8b les plus lourds en texte.
 
-**Pages connectées — recommandation (décision requise, D3)** : migrer les **tournois** et
-l'espace joueur (lots 8–9), car c'est là qu'un joueur anglophone passe son temps ; garder
-l'**admin en français** (D4) : public restreint, équipe francophone, ~90 chaînes mais beaucoup
-de libellés serveur à trier pour un gain nul. Ces pages restent **hors sitemap** et sans valeur
-SEO (carte « Connexion requise ») : leur `/en` ne sert qu'au confort de lecture.
+**Pages connectées — décidé (D3, D4)** : les **tournois** et l'espace joueur sont traduits
+(lots 8–9) ; l'**admin reste en français**. Ces pages restent **hors sitemap** et sans valeur SEO
+(carte « Connexion requise ») : leur `/en` ne sert qu'au confort de lecture.
 
-### Rédaction de l'anglais — **décision requise** (D2)
+### Rédaction de l'anglais — **décidé** (D2)
 
-Proposition : brouillon rédigé par l'IA **dans la PR du lot**, à partir du glossaire ; relecture
-par un membre anglophone de l'équipe avant fusion (PR en brouillon tant qu'elle n'est pas
-relue) ; textes légaux relus par une personne compétente (D1). Ton : le français tutoie →
-anglais direct et informel (« you »), pas de « Please kindly… ».
+L'anglais est rédigé **par un agent de traduction Opus dédié**, dans la PR du lot, à partir du
+glossaire (`I18N.md`) — sans étape de relecture humaine imposée. Une relecture par un anglophone
+natif reste **facultative**, conseillée pour les seuls textes légaux (lot 7b). Ton : le français
+tutoie → anglais direct et informel (« you »), pas de « Please kindly… ».
 
-### Glossaire (à figer au lot 0 dans `docs/features/I18N.md`)
+### Textes saisis par l'administration — **décidé** (D9)
 
-| Français | Anglais proposé | Note |
+Quand un administrateur saisit ou modifie un texte de l'accueil (`<EditableCopy>`, clés `copy_*`
+de `lib/shared/site-copy.ts`) ou de la page association (bureau, bénévoles, cartes « À propos »,
+chiffres, partenaires, annonces de recrutement), l'éditeur demande **aussi sa traduction
+anglaise** :
+
+- champs **FR et EN côte à côte** ; l'anglais est **obligatoire** : l'enregistrement est refusé
+  sans lui, par un code d'erreur rattaché au champ EN (`CodedError`, `useFieldErrors`,
+  `ACCESSIBILITY_FORM_ERRORS_STATEMENT.md`) ;
+- stockage **par langue** (`copy_<clé>__en` pour les textes éditables ; colonne ou ligne `en` à
+  côté du français pour les contenus de la page association, schéma tranché au lot 5) ;
+- **aucun repli FR** n'est nécessaire pour un contenu saisi après la migration de son éditeur ;
+- **rattrapage** : le contenu déjà en base sans anglais reçoit le sien **dans le lot qui migre
+  l'écran** (2 pour l'accueil, 5 pour l'association), traduit par l'agent de traduction Opus et
+  écrit par une migration de données (ou un script d'exploitation rejoué une fois), **avant**
+  d'ajouter la route à la liste blanche — une page anglaise n'ouvre qu'une fois tout son contenu
+  traduit.
+
+### Glossaire (figé au lot 0 dans `docs/features/I18N.md`, D7 et D8 appliqués)
+
+La référence est désormais `I18N.md` ; cette table en garde l'historique.
+
+| Français | Anglais | Note |
 |---|---|---|
 | Tournoi / Équipe / Joueur | Tournament / Team / Player | |
 | Inscriptions (état `REGISTRATION`) | Registration open | |
@@ -265,7 +301,7 @@ anglais direct et informel (« you »), pas de « Please kindly… ».
 | Simple / Double élimination | Single / Double elimination | |
 | Ronde suisse | Swiss | |
 | Survie par coupes | Survival (cuts) | |
-| BlueGenji Survie | BlueGenji Survival | Nom de mode : **décision requise** (D7) — traduire ou garder la marque. |
+| BlueGenji Survie | BlueGenji's Survival | Nom de mode traduit (D7). |
 | Multi-phases | Multi-stage | |
 | Manche | Round | Unité d'un arbre / d'une ronde. |
 | Map / carte | Map | Une manche d'un match (score par map). |
@@ -275,7 +311,7 @@ anglais direct et informel (« you »), pas de « Please kindly… ».
 | Arbitre | Referee | |
 | Signalement | Report | |
 | Capitaine / Propriétaire / Manager / Coach | Captain / Owner / Manager / Coach | |
-| TANK / DPS / HEAL | Tank / DPS / Support | **Décision requise** (D8) : « Heal » est l'usage de la communauté, « Support » le terme officiel Overwatch (Marvel Rivals : Vanguard / Duelist / Strategist). |
+| TANK / DPS / HEAL | Tank / DPS / Support | « Support », terme officiel Overwatch (D8) ; le code `HEAL` ne change pas. |
 | Équipe fantôme / Entrée solo | Ghost team / Solo entry | |
 | Bénévoles / Partenaires / L'association | Volunteers / Partners / The association | |
 
@@ -326,15 +362,16 @@ anglais direct et informel (« you »), pas de « Please kindly… ».
   publique. Pas de chargement de dictionnaire côté client au changement de langue (c'est une
   navigation, l'URL change).
 
-## Décisions requises (récapitulatif)
+## Décisions prises (2026-10-06)
 
-| # | Décision | Recommandation | Bloque |
+| # | Question | Décision | Lot |
 |---|---|---|---|
-| D1 | Textes légaux : tout traduire / FR seul + synthèse anglaise / mixte | (c) CGU + RGPD traduits, « la version française fait foi » ; le reste en FR + résumé EN | Lot 7 |
-| D2 | Qui rédige l'anglais | IA en brouillon + relecture humaine anglophone avant fusion | Lots 1+ |
-| D3 | Pages connectées traduites ou non | Tournois et espace joueur oui (lots 8–9) | Lots 8–9 |
-| D4 | Admin | Reste en français | Lot 10 |
-| D5 | Langue des notifications push : stockée sur le compte ? | Oui, `bg_users.locale` mis à jour par le sélecteur une fois connecté ; déclaration `PRIVACY_CHANGES` + registre | Lot 9 |
-| D6 | Messages Discord | Restent en français | — |
-| D7 | Nom du mode « BlueGenji Survie » | À trancher (marque) | Lot 3 |
-| D8 | Rôle `HEAL` en anglais | « Support » ou « Heal » | Lot 3 |
+| D1 | Textes légaux | Chercher d'abord l'anglais existant : les documents du bot sont déjà bilingues (`BilingualDoc`) — réutilisés, bascule interne remplacée par les adresses `/en`. Textes du site traduits par l'agent Opus, « the French version prevails » sur CGU et confidentialité ; mentions légales, registre et déclaration d'accessibilité traduits aussi, sauf raison juridique trouvée au lot 7 (alors **signalée**). | 7a, 7b |
+| D2 | Qui rédige l'anglais | Un agent de traduction Opus dédié ; pas de relecture humaine imposée. Relecture native **facultative**, conseillée pour les textes légaux seulement. | 1+ |
+| D3 | Pages connectées | Tournois et espace joueur traduits. | 8–9 |
+| D4 | Admin | Reste en français (lot 10 abandonné). | — |
+| D5 | Langue des push | Oui : `bg_users.locale`, avec entrée `PRIVACY_CHANGES`, `/rgpd` et registre des traitements à jour. | 9 |
+| D6 | Messages Discord | Restent en français. | — |
+| D7 | Mode « BlueGenji Survie » | Traduit : « BlueGenji's Survival ». | 3 |
+| D8 | Rôle `HEAL` | « Support ». | 3 |
+| D9 | Textes saisis dans les éditeurs de l'accueil et de la page association | Anglais **obligatoire** à la saisie (FR + EN côte à côte, enregistrement refusé sans EN, code d'erreur rattaché au champ EN) ; stockage par langue ; pas de repli FR ; rattrapage de l'existant par l'agent Opus dans le lot qui migre l'écran, avant d'ouvrir la route. | 2, 5 |
