@@ -195,7 +195,9 @@ export function RegistrationsPanel({ detail, canAct, onChanged }: Readonly<Regis
     const next = moveInOrder(order, teamId, direction);
     if (mustExpandToShow(next.indexOf(teamId), expanded)) setExpanded(true);
     const done = await applyOrder(next, teamId);
-    setRefocus({ teamId, direction });
+    // Sur un refus, la modale de confirmation reste ouverte : le focus ne doit
+    // pas repartir vers une flèche derrière elle.
+    if (done) setRefocus({ teamId, direction });
     return done;
   };
 
