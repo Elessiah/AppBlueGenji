@@ -161,6 +161,11 @@ pas qui avait raison, il ne prend donc ni le vert ni le rouge.
   (`ArmedButton`).
 - La navigation de l'espace connecté porte un lien « Signalements » avec le
   nombre à traiter, pour la seule permission `moderation`.
+- Teintes (`DESIGN_SYSTEM.md`) : chaque compteur de la vue d'ensemble a la
+  sienne (`reportStatTone`, `data-tone`) ; « à traiter » et « contestés »
+  passent à l'ambre dès qu'ils ne sont pas nuls — l'ambre ne dit
+  qu'« avertissement ». L'état d'un dossier reprend `REPORT_STATUS_PILL`
+  (`cy-tag-*`), comme la page de la personne visée.
 
 ## Conservation
 

@@ -46,10 +46,10 @@
  */
 .unreachable {
   padding: 2px 8px;
-  border: 1px solid color-mix(in srgb, var(--amber, #ffb347) 45%, transparent);
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
   border-radius: 999px;
   font-size: 11.5px;
-  color: var(--amber, #ffb347);
+  color: var(--amber);
 }
 
 .members {

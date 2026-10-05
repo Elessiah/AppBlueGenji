@@ -139,7 +139,7 @@ export function TournamentImageDialog({ tournamentId, image, onClose, onSaved }:
                   fontSize: 13,
                   lineHeight: 1.5,
                   color: "var(--amber)",
-                  border: "1px solid rgba(255, 176, 32, 0.35)",
+                  border: "1px solid rgba(var(--amber-rgb), 0.35)",
                   borderRadius: "var(--r-cy-sm, 8px)",
                 }}
               >

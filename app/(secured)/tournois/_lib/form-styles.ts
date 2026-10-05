@@ -16,6 +16,25 @@ export const SECTION_SEPARATOR: CSSProperties = {
   borderTop: "1px solid var(--line-soft)",
 };
 export const EYEBROW: CSSProperties = { margin: "0 0 16px" };
+
+/**
+ * Teinte du titre de chaque section du formulaire (néons froids de
+ * `DESIGN_SYSTEM.md`) : on se repère d'un coup d'œil dans un long formulaire.
+ * Le trait d'accent (`.eyebrow::before`) garde le dégradé de marque.
+ */
+export const FORM_SECTION_TONE = {
+  identity: "var(--blue-300)",
+  image: "var(--cyan-400)",
+  format: "var(--violet-300)",
+  registration: "var(--pink-400)",
+  planning: "var(--teal-400)",
+} as const;
+
+export type FormSection = keyof typeof FORM_SECTION_TONE;
+
+export function sectionEyebrow(section: FormSection): CSSProperties {
+  return { ...EYEBROW, color: FORM_SECTION_TONE[section] };
+}
 export const GRID: CSSProperties = { gap: 16 };
 export const FULL_WIDTH: CSSProperties = { gridColumn: "1 / -1" };
 export const HINT: CSSProperties = {

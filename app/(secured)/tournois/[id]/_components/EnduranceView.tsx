@@ -86,7 +86,7 @@ function BoardHeading({ children }: Readonly<{ children: React.ReactNode }>) {
   );
 }
 
-const AMBER = "rgba(255,157,46,0.9)";
+const AMBER = "var(--amber)";
 
 /**
  * Classe de gabarit du classement (cf. `EnduranceView.module.css`) : cinq
@@ -529,8 +529,8 @@ export function EnduranceView({
                         fontSize: 11,
                         textTransform: "uppercase",
                         letterSpacing: "0.04em",
-                        background: "rgba(255,157,46,0.12)",
-                        borderColor: "rgba(255,157,46,0.4)",
+                        background: "rgba(var(--amber-rgb), 0.12)",
+                        borderColor: "rgba(var(--amber-rgb), 0.4)",
                         color: AMBER,
                       }}
                     >
@@ -557,8 +557,8 @@ export function EnduranceView({
                         fontSize: 11,
                         textTransform: "uppercase",
                         letterSpacing: "0.04em",
-                        background: "rgba(255,157,46,0.12)",
-                        borderColor: "rgba(255,157,46,0.4)",
+                        background: "rgba(var(--amber-rgb), 0.12)",
+                        borderColor: "rgba(var(--amber-rgb), 0.4)",
                         color: AMBER,
                       }}
                     >

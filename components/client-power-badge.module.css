@@ -56,10 +56,11 @@
   background: var(--blue-300, #5ac8ff);
 }
 
-/* En match, la pastille prend l'ambre : un régime choisi par le site pour le
-   joueur, pas une limite de sa machine. */
+/* En match, la pastille prend le violet : un régime choisi par le site pour le
+   joueur, pas une limite de sa machine — ni un avertissement (l'ambre est
+   réservé aux avertissements). */
 .root[data-mode="match"] .dot {
-  background: var(--amber, #ffb547);
+  background: var(--violet-400);
 }
 
 .panel {

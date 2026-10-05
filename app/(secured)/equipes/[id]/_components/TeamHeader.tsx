@@ -48,7 +48,7 @@ export function TeamHeader({ team }: Readonly<TeamHeaderProps>) {
                 height={56}
                 size="sm"
                 borderRadius={12}
-                borderColor="rgba(255,157,46,0.3)"
+                borderColor="rgba(var(--violet-400-rgb), 0.35)"
               />
             ) : (
               <div className={headerStyles.logoFallback} aria-hidden>

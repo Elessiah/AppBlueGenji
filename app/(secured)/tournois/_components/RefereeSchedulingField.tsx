@@ -100,8 +100,8 @@ export function RefereeSchedulingField({
             marginTop: 8,
             padding: "8px 10px",
             borderRadius: 8,
-            border: "1px solid rgba(255,157,46,0.4)",
-            background: "rgba(255,157,46,0.1)",
+            border: "1px solid rgba(var(--amber-rgb), 0.4)",
+            background: "rgba(var(--amber-rgb), 0.1)",
             fontSize: 12,
             color: "var(--text-1, #c3ccd8)",
           }}

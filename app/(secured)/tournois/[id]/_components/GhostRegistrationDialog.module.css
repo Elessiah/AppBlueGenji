@@ -69,7 +69,7 @@
 }
 
 .countOver {
-  color: var(--amber, #f0b429);
+  color: var(--amber);
 }
 
 /* Le champ n'est pas dans un `.field` (qui habille ses champs) : sans ces

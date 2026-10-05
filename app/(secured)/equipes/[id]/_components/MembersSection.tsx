@@ -143,7 +143,7 @@ export function MembersSection({
                         pseudo={member.pseudo}
                         size={28}
                         borderWidth={1}
-                        borderColor="rgba(255,157,46,0.3)"
+                        borderColor="rgba(var(--violet-400-rgb), 0.35)"
                         decorative
                       />
                       <PlayerLink userId={member.userId} className={styles.playerName}>

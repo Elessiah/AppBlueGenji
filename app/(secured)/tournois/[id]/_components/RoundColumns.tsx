@@ -19,7 +19,7 @@ import { SCROLL_REVEAL_ATTRIBUTE } from "@/lib/shared/scroll-reveal";
 const COL_W = 276;
 export const BORDER = "var(--border, #444)";
 export const ACCENT = "var(--teal-400)";
-export const AMBER = "rgba(255,157,46,0.9)";
+export const AMBER = "var(--amber)";
 
 /** Bouton « Abandonner » d'une ligne du classement. */
 export const FORFEIT_BUTTON_STYLE: CSSProperties = {
@@ -27,12 +27,16 @@ export const FORFEIT_BUTTON_STYLE: CSSProperties = {
   fontSize: 11,
   textTransform: "uppercase",
   letterSpacing: "0.04em",
-  background: "rgba(255,157,46,0.12)",
-  borderColor: "rgba(255,157,46,0.4)",
+  background: "rgba(var(--amber-rgb), 0.12)",
+  borderColor: "rgba(var(--amber-rgb), 0.4)",
   color: AMBER,
 };
 
-/** Marque ambrée accolée à l'intitulé d'une manche (barrage, coupe, dernière). */
+/**
+ * Marque rose néon (rehaut, `--pink-400`) accolée à l'intitulé d'une manche
+ * (barrage, coupe, dernière) : une information, pas un avertissement — l'ambre
+ * reste à « Abandonner » et aux forfaits.
+ */
 function RoundBadge({ children }: Readonly<{ children: ReactNode }>) {
   return (
     <span
@@ -40,8 +44,8 @@ function RoundBadge({ children }: Readonly<{ children: ReactNode }>) {
         fontSize: 11,
         textTransform: "uppercase",
         letterSpacing: "0.05em",
-        color: AMBER,
-        border: `1px solid ${AMBER}`,
+        color: "var(--pink-400)",
+        border: "1px solid rgba(var(--pink-400-rgb), 0.6)",
         borderRadius: 5,
         padding: "1px 6px",
       }}

@@ -82,9 +82,9 @@
 .conflict {
   margin: 14px 0 0;
   padding: 10px 12px;
-  border: 1px solid rgba(255, 157, 46, 0.4);
+  border: 1px solid rgba(var(--amber-rgb), 0.4);
   border-radius: 8px;
-  background: rgba(255, 157, 46, 0.1);
+  background: rgba(var(--amber-rgb), 0.1);
   font-size: 12.5px;
   line-height: 1.5;
   color: var(--text-1, #c3ccd8);
@@ -250,10 +250,10 @@
 .forfeit {
   flex: 1 1 130px;
   padding: 9px 12px;
-  border: 1px solid rgba(255, 157, 46, 0.3);
+  border: 1px solid rgba(var(--amber-rgb), 0.3);
   border-radius: 6px;
   background: transparent;
-  color: rgba(255, 157, 46, 0.8);
+  color: rgba(var(--amber-rgb), 0.8);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -275,17 +275,17 @@
 }
 
 .forfeit:hover:not(:disabled) {
-  background: rgba(255, 157, 46, 0.12);
+  background: rgba(var(--amber-rgb), 0.12);
 }
 
 .forfeit[aria-pressed="true"] {
-  border-color: rgba(255, 157, 46, 0.7);
-  background: rgba(var(--orange-rgb), 0.18);
-  color: rgba(255, 157, 46, 1);
+  border-color: rgba(var(--amber-rgb), 0.7);
+  background: rgba(var(--amber-rgb), 0.18);
+  color: rgba(var(--amber-rgb), 1);
 }
 
 .forfeit:focus-visible {
-  outline: 2px solid rgba(255, 157, 46, 0.9);
+  outline: 2px solid rgba(var(--amber-rgb), 0.9);
   outline-offset: 2px;
 }
 

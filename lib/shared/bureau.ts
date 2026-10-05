@@ -20,21 +20,24 @@ export type BureauMemberInput = {
  */
 export const FALLBACK_BUREAU: BureauMember[] = [
   { id: -1, name: "Léo Perreaut", role: "Président", initials: "LP", color: "rgb(89, 212, 255)" },
-  { id: -2, name: "Bryan Boulleaux", role: "Trésorier", initials: "BB", color: "rgb(245, 195, 58)" },
-  { id: -3, name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(255, 157, 46)" },
+  { id: -2, name: "Bryan Boulleaux", role: "Trésorier", initials: "BB", color: "rgb(247, 138, 216)" },
+  { id: -3, name: "Sophie Martin", role: "Secrétaire", initials: "SM", color: "rgb(62, 232, 176)" },
   { id: -4, name: "Jérôme Dubois", role: "Responsable arbitrage", initials: "JD", color: "rgb(167, 115, 255)" },
 ];
 
-/** Palette de couleurs « cyber » utilisée pour les sigles du bureau. */
+/**
+ * Palette « néon froid » des sigles du bureau (`DESIGN_SYSTEM.md`) : aucune
+ * teinte chaude — l'ambre est réservé aux avertissements. Les couleurs déjà
+ * enregistrées en base restent telles quelles.
+ */
 export const BUREAU_COLORS = [
   "rgb(89, 212, 255)", // bleu glacier
-  "rgb(245, 195, 58)", // ambre
-  "rgb(255, 157, 46)", // orange
-  "rgb(167, 115, 255)", // violet
-  "rgb(79, 224, 162)", // vert
-  "rgb(255, 110, 130)", // rose/rouge
-  "rgb(120, 200, 120)", // vert tendre
-  "rgb(255, 214, 102)", // jaune doux
+  "rgb(62, 230, 255)", // cyan
+  "rgb(167, 139, 250)", // violet
+  "rgb(196, 181, 253)", // lavande
+  "rgb(247, 138, 216)", // rose néon
+  "rgb(62, 232, 176)", // vert d'eau
+  "rgb(143, 213, 255)", // bleu clair
 ] as const;
 
 /** Renvoie une couleur aléatoire de la palette du bureau. */
