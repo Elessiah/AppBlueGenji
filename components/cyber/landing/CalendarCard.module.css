@@ -88,9 +88,11 @@
 }
 
 .bar {
-  width: 1px;
+  width: 2px;
   height: 38px;
-  background: var(--line-soft);
+  border-radius: 2px;
+  background: linear-gradient(180deg, var(--blue-500), var(--violet-400));
+  opacity: 0.7;
 }
 
 .body {
@@ -123,8 +125,9 @@
   background: rgba(90, 200, 255, 0.04);
 }
 
+/* État du tournoi : violet d'accent, plus un gris (DESIGN_SYSTEM.md § Pastilles). */
 .tag {
-  color: var(--ink-mute);
+  color: var(--violet-300);
 }
 
 .title {

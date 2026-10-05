@@ -23,6 +23,18 @@
   letter-spacing: -0.02em;
 }
 
+/* Accent de section : trait de marque cyan → violet sous le titre. */
+.sectionTitle::after {
+  content: "";
+  display: block;
+  width: 56px;
+  height: 3px;
+  margin-top: 12px;
+  border-radius: 3px;
+  background: var(--grad-brand);
+  box-shadow: 0 0 12px rgba(var(--violet-400-rgb), 0.45);
+}
+
 .meta {
   font-family: var(--font-mono);
   font-size: 11px;
