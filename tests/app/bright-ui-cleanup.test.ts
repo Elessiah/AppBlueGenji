@@ -78,11 +78,14 @@ describe("pages publiques — l'ambre trié", () => {
       ["--blue-300", "--blue-500-rgb", 0.12], // « Signaler un problème » au survol
       ["--violet-300", "--violet-400-rgb", 0.08], // bandeau « Bientôt disponible », bases légales
       ["--pink-400", "--pink-400-rgb", 0.05], // étiquette « scrim » du fil de /bot
-      ["--violet-300", "--blue-500-rgb", 0.1], // titre de la page ouverte de /bot/docs
+      ["--blue-300", "--blue-500-rgb", 0.1], // titre de la page ouverte de /bot/docs
+      ["--violet-300", "--violet-400-rgb", 0.06], // idem, côté violet du voile
     ];
     for (const [ink, tint, alpha] of pairs) {
       expect(contrastRatio(hex(ink), blend(hex(SURFACE), triplet(tint), alpha))).toBeGreaterThanOrEqual(4.5);
     }
+    // Sous-titres violets et code de la doc absente de /bot/docs, sur le panneau.
+    expect(contrastRatio(hex("--violet-300"), hex(SURFACE))).toBeGreaterThanOrEqual(4.5);
   });
 });
 
