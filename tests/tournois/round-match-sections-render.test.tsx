@@ -16,14 +16,8 @@ function render(matches: BracketMatch[], seeds: Record<number, number> = {}): st
       logos={buildEntrantLogoMap([])}
       seeds={seeds}
     >
-      <RoundMatchSections matches={matches}>
-        {(list) => (
-          <ol>
-            {list.map((m) => (
-              <li key={m.id}>{`m${m.id}`}</li>
-            ))}
-          </ol>
-        )}
+      <RoundMatchSections matches={matches} className="grid">
+        {(m) => <div>{`m${m.id}`}</div>}
       </RoundMatchSections>
     </EntrantProvider>,
   );
@@ -40,6 +34,16 @@ describe("RoundMatchSections", () => {
     expect(html).toContain(", 1 match");
     expect(html).not.toContain("<button");
     expect(html).not.toContain("aria-expanded");
+  });
+
+  it("pose filets et cartes en frères d'un seul conteneur (une carte déplacée n'est pas reconstruite)", () => {
+    const html = render([
+      bracketMatch({ id: 1, status: "COMPLETED", team1Id: 1, team2Id: 2 }),
+      bracketMatch({ id: 2, status: "READY", team1Id: 1, team2Id: 2, launchedAt: LAUNCHED }),
+    ]);
+    expect(html).toMatch(
+      /^<div class="grid"><p [^>]*data-section="PLAYING".*?<\/p><div>m2<\/div><p [^>]*data-section="DONE".*?<\/p><div>m1<\/div><\/div>$/,
+    );
   });
 
   it("ordonne une section par tête de série lue du contexte", () => {
