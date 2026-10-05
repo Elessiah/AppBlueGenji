@@ -113,6 +113,10 @@ export function featuredMatchStatusLabel(
 ): string | null {
   if (match.launchPhase === "LOBBY") return "Lancement";
   if (match.launchPhase !== "SCHEDULED") return null;
+  // La phase est figée au rendu serveur, et seule l'horloge fait passer un
+  // match daté en lancement : sans cette relecture, la carte annoncerait
+  // « Prochain match · 20:30 » jusqu'au sondage suivant, cinq minutes plus tard.
+  if (startTime(match.startAt) <= now) return "Lancement";
   const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now);
   return when ? `Prochain match · ${when}` : "Prochain match";
 }

@@ -262,15 +262,17 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         now,
       ),
     );
-    const currentIndex = pickFeaturedMatchIndex(
-      rows.map((row, index) => ({
-        onAir: isMatchLive(toLiveInput(row)),
-        phase: phases[index],
-        startAt: toIso(row.start_at),
-      })),
-    );
+    const candidates = rows.map((row, index) => ({
+      onAir: isMatchLive(toLiveInput(row)),
+      phase: phases[index],
+      startAt: toIso(row.start_at),
+    }));
+    const currentIndex = pickFeaturedMatchIndex(candidates);
     const currentRow = currentIndex === -1 ? null : rows[currentIndex];
-    const currentPhase = currentIndex === -1 ? "NONE" : phases[currentIndex];
+    // Un match à l'antenne se joue, quelle que soit sa phase de lancement : la
+    // carte ne doit pas dire « En direct » et « Prochain match » à la fois.
+    const currentPhase =
+      currentIndex === -1 || candidates[currentIndex].onAir ? "LAUNCHED" : phases[currentIndex];
     // La colonne `seed` porte l'ordre d'inscription ; elle n'est le **tirage**
     // du tournoi que dans les formats qui seedent depuis elle (ou dès que le
     // staff a réordonné à la main). En Suisse, en Survie, en BG Survie et en
@@ -318,7 +320,6 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           ),
           liveState: resolveMatchLiveState(toLiveInput(currentRow)),
           liveUrl: normalizeStreamUrl(currentRow.live_url),
-          // Un match à l'antenne se joue, quelle que soit sa phase de lancement.
           launchPhase: isFeaturedMatchPhase(currentPhase) ? currentPhase : "LAUNCHED",
           startAt: toIso(currentRow.start_at),
         }
