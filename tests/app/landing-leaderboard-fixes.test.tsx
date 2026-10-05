@@ -12,6 +12,7 @@ function leaderboardRow(partial: Partial<LandingLeaderboardRow> = {}): LandingLe
     logoUrl: null,
     wins: 5,
     losses: 1,
+    draws: 0,
     points: 500,
     trend: "flat",
     trendValue: 0,

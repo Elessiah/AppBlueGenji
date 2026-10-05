@@ -84,7 +84,7 @@ describe("leaderboard de la landing", () => {
 
   // Elles restent visibles — le classement part de 500 pour tout le monde —
   // mais elles ne peuvent pas voler la tête du tableau à une équipe qui joue.
-  it("garde les équipes sans match, à la cote de départ et en fin de liste", async () => {
+  it("garde les équipes sans match, à la cote de départ", async () => {
     await mockDb([teamRow(1, "Alpha"), teamRow(2, "Bravo")], [matchRow(1, 1, 2, 1)]);
 
     const rows = await getLandingLeaderboard(8);
@@ -92,20 +92,34 @@ describe("leaderboard de la landing", () => {
     expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Bravo"]);
   });
 
-  it("ne laisse pas une équipe jamais engagée passer devant une équipe battue", async () => {
+  // Retour du 2026-10-05, scénario exact : un seul match sur le site, la
+  // perdante passait deuxième devant toutes les équipes restées à 500.
+  it("range la seule équipe battue derrière toutes les équipes à la cote de départ", async () => {
     await mockDb(
-      [teamRow(1, "Alpha"), teamRow(2, "Bravo"), teamRow(3, "Aaa jamais jouée")],
+      [
+        teamRow(1, "Alpha"),
+        teamRow(2, "Bravo"),
+        teamRow(3, "Charlie"),
+        teamRow(4, "Delta"),
+        teamRow(5, "Echo"),
+      ],
       [matchRow(1, 1, 2, 1)],
     );
 
     const rows = await getLandingLeaderboard(8);
 
-    expect(rows[2]).toMatchObject({
-      teamName: "Aaa jamais jouée",
-      points: RANKING_BASE_POINTS,
-      wins: 0,
-      losses: 0,
-    });
+    expect(rows.map((row) => row.teamName)).toEqual(["Alpha", "Charlie", "Delta", "Echo", "Bravo"]);
+    expect(rows[4].points).toBeLessThan(RANKING_BASE_POINTS);
+    expect(rows[4]).toMatchObject({ rank: 5, wins: 0, losses: 1 });
+    expect(rows.slice(1, 4).every((row) => row.points === RANKING_BASE_POINTS)).toBe(true);
+  });
+
+  it("porte les nuls de chaque ligne", async () => {
+    await mockDb([teamRow(1, "Alpha"), teamRow(2, "Bravo")], [matchRow(1, 1, 2, 1)]);
+
+    const rows = await getLandingLeaderboard(8);
+
+    expect(rows.every((row) => row.draws === 0)).toBe(true);
   });
 
   it("borne le classement de référence à une semaine, sur l'horloge de la base", async () => {

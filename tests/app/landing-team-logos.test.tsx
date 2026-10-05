@@ -57,6 +57,7 @@ function row(overrides: Partial<LandingLeaderboardRow> = {}): LandingLeaderboard
     logoUrl: null,
     wins: 3,
     losses: 1,
+    draws: 0,
     points: 540,
     trend: "flat",
     trendValue: 0,

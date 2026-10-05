@@ -66,6 +66,7 @@ describe("GET /api/landing/leaderboard", () => {
         logoUrl: null,
         wins: 1,
         losses: 0,
+        draws: 0,
         points: 520,
         trend: "flat" as const,
         trendValue: 0,
