@@ -57,7 +57,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
       <section className={styles.section} aria-labelledby="classement-board">
         {/* Titre de section pour la hiérarchie (h1 → h2 → noms du podium en h3). */}
         <h2 id="classement-board" className="sr-only">Classement des équipes</h2>
-        <RankingBoard rows={rows ?? []}filter={filter} forms={forms} unavailable={unavailable} />
+        <RankingBoard rows={rows ?? []} filter={filter} forms={forms} unavailable={unavailable} />
       </section>
 
       <section className={`${styles.section} ${styles.how}`} aria-labelledby="classement-how">
