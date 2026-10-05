@@ -446,7 +446,8 @@
   }
 }
 
+/* « bientôt » : même violet que la pastille `RULE_STATUS_PILL.SOON` de /regles. */
 .soonTag {
-  color: var(--amber);
+  color: var(--violet-300);
   font-size: 11px;
 }
