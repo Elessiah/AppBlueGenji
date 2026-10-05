@@ -46,9 +46,15 @@ export function RoundMatchSections({
   const signature = matches
     .map((m) => `${m.id}:${m.status}:${m.team1Id}:${m.team2Id}:${m.startAt}:${m.launchedAt}`)
     .join("|");
-  useEffect(() => {
+  // Données nouvelles : l'instant se relit **pendant le rendu** (état ajusté au
+  // rendu, motif documenté de React), pas dans un effet qui peindrait d'abord
+  // la carte dans sa section périmée avant de la déplacer.
+  const dataKey = `${refereeScheduling}|${signature}`;
+  const [seenDataKey, setSeenDataKey] = useState(dataKey);
+  if (seenDataKey !== dataKey) {
+    setSeenDataKey(dataKey);
     setNow(Date.now());
-  }, [signature, refereeScheduling]);
+  }
   const nextAt = nextSectionChangeAt(matches, refereeScheduling, now);
   useEffect(() => {
     if (nextAt === null) return;
