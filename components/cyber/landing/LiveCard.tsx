@@ -5,7 +5,12 @@ import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
-import { featuredMatchStatusLabel, inferPhaseLabel, visibleLiveViewerCount } from "@/lib/shared/landing";
+import {
+  FEATURED_TOURNAMENT_STATE_LABEL,
+  featuredMatchPill,
+  inferPhaseLabel,
+  visibleLiveViewerCount,
+} from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
@@ -103,7 +108,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   const title = live.tournament.name.toUpperCase();
   const matchIsLive = currentMatch?.liveState === "LIVE";
   const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
-  const matchStatus = currentMatch ? featuredMatchStatusLabel(currentMatch, clock) : null;
+  const matchPill = currentMatch ? featuredMatchPill(currentMatch, clock) : null;
   const matchPlatform = streamPlatform(currentMatch?.liveUrl);
   // Le bouton de diffusion n'apparaît **que** pour un match réellement à
   // l'antenne. `SCHEDULED` annonce un cast à venir : la chaîne ne montre pas
@@ -129,13 +134,13 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
           dans l'ordre du DOM autant que par le `z-index`. */}
       <Link href={href} className={styles.cardOverlay} aria-label={openLabel} />
 
+      {/* L'état du **tournoi** est une mention secondaire, collée au jeu et au
+          nom du tournoi — jamais une pastille : « EN COURS » en tête de carte
+          se lisait comme l'état du match, alors que celui-ci n'était que daté. */}
       <div className={styles.head}>
-        {/* Bleu, et non `variant="live"` : « EN COURS » est l'**état du
-            tournoi**, pas une diffusion. Le rouge n'habille que ce qui est
-            réellement à l'antenne — désormais le bandeau du match casté, à
-            trois lignes d'ici, avec lequel il se confondait. */}
-        <Pill variant="blue">EN COURS</Pill>
-        <span className="mono">{live.game.toUpperCase()} · {inferPhaseLabel(currentMatch)}</span>
+        <span className={`${styles.tournamentMeta} mono`}>
+          {FEATURED_TOURNAMENT_STATE_LABEL.toUpperCase()} · {live.game.toUpperCase()}
+        </span>
         {visibleViewers !== null && (
           <span className={styles.viewers}>
             <Eye size={12} />
@@ -145,16 +150,20 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
       </div>
 
       <div className={styles.title}>{title}</div>
-      {/* Un match pas encore commencé ne passe pas pour le match du moment. */}
-      {matchStatus && <div className={`${styles.matchStatus} mono`}>{matchStatus}</div>}
 
-      {currentMatch ? (
+      {currentMatch && matchPill ? (
         <div className={styles.match}>
-          {(matchIsLive || matchIsScheduled) && (
+          {/* La pastille dit l'état **du match**, dans les mots des sections de
+              manche ; le rouge ne sert qu'à « En direct » (vraie diffusion). */}
+          <div className={styles.matchHead}>
+            <Pill variant={matchPill.tone === "default" ? undefined : matchPill.tone}>{matchPill.label}</Pill>
+            <span className="mono">{inferPhaseLabel(currentMatch)}</span>
+          </div>
+          {((matchIsLive && streamHref) || matchIsScheduled) && (
             <div className={matchIsLive ? styles.streamBanner : styles.streamBannerScheduled}>
-              <span className={styles.streamLabel}>
-                {matchIsLive ? "● CE MATCH EST EN DIRECT" : "○ DIFFUSION ANNONCÉE"}
-              </span>
+              {/* À l'antenne, la pastille « En direct » le dit déjà : le
+                  bandeau ne porte plus que le bouton. */}
+              {matchIsScheduled && <span className={styles.streamLabel}>○ DIFFUSION ANNONCÉE</span>}
               {streamHref && (
                 <a
                   className={`${styles.streamButton} ${styles.nested}`}

@@ -81,10 +81,20 @@
   padding-block: 4px;
 }
 
-.matchStatus {
-  font-size: 12px;
-  letter-spacing: 0.08em;
+/* État du tournoi : mention secondaire, sans pastille (voir LiveCard.tsx). */
+.tournamentMeta {
+  font-size: 11px;
+  letter-spacing: 0.1em;
   color: var(--ink-dim);
+}
+
+/* Pastille d'état du match et manche, juste au-dessus des engagés. */
+.matchHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 12px;
 }
 
 .vs {

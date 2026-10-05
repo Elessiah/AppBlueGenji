@@ -3,6 +3,7 @@ import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { MatchFormat } from "@/lib/shared/match-format";
 import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
 import { formatBoardStartAt } from "@/lib/shared/landing-board";
+import { MATCH_SECTION_LABELS } from "@/lib/shared/match-sections";
 import type { TournamentBuckets, TournamentCard, TournamentGame } from "@/lib/shared/types";
 
 export type LandingStats = {
@@ -101,26 +102,41 @@ export function isFeaturedMatchPhase(phase: MatchLaunchPhase): phase is Featured
   return FEATURED_PHASE_RANK[phase] !== undefined;
 }
 
+/** Teinte de la pastille d'état du match : le rouge est réservé à l'antenne. */
+export type FeaturedMatchPillTone = "live" | "blue" | "default";
+
+/** Pastille d'état **du match** mis en avant — jamais celle du tournoi. */
+export type FeaturedMatchPill = { label: string; tone: FeaturedMatchPillTone };
+
+/** État du tournoi sur la carte : une mention secondaire, jamais une pastille. */
+export const FEATURED_TOURNAMENT_STATE_LABEL = "Tournoi en cours";
+
 /**
- * Ce que la carte du direct dit d'un match mis en avant qui ne se joue pas
- * encore : « Prochain match · 21 sept. · 20:30 » pour un match daté,
- * « Lancement » quand son heure est venue. `null` pour un match lancé — la
- * carte n'a alors rien à ajouter au score.
+ * État du match mis en avant, dans les mots des sections de manche
+ * (`MATCH_SECTION_LABELS`, `docs/features/ROUND_MATCH_SECTIONS.md`) :
+ *
+ * - à l'antenne (`liveState === "LIVE"`) : « En direct », en rouge ;
+ * - lancé : « En cours » ;
+ * - heure venue : « Lancement » ;
+ * - daté : « En attente de lancement · 5 oct. · 21:00 » — l'horaire tient dans
+ *   la pastille, aucune autre ligne ne le redit.
+ *
+ * La phase est figée au rendu serveur, et seule l'horloge fait passer un match
+ * daté en lancement : sans relecture, la carte attendrait le sondage suivant.
+ * `now = null` (rendu serveur, hydratation) : on s'en tient à la phase du
+ * serveur, pour que les deux rendus coïncident.
  */
-export function featuredMatchStatusLabel(
-  match: Pick<LandingLiveMatch, "launchPhase" | "startAt">,
+export function featuredMatchPill(
+  match: Pick<LandingLiveMatch, "launchPhase" | "startAt" | "liveState">,
   now: number | null = Date.now(),
-): string | null {
-  if (match.launchPhase === "LOBBY") return "Lancement";
-  if (match.launchPhase !== "SCHEDULED") return null;
-  // La phase est figée au rendu serveur, et seule l'horloge fait passer un
-  // match daté en lancement : sans cette relecture, la carte annoncerait
-  // « Prochain match · 20:30 » jusqu'au sondage suivant, cinq minutes plus tard.
-  // `null` = horloge pas encore montée (rendu serveur, hydratation) : on s'en
-  // tient à la phase du serveur, pour que les deux rendus coïncident.
-  if (now !== null && startTime(match.startAt) <= now) return "Lancement";
+): FeaturedMatchPill {
+  if (match.liveState === "LIVE") return { label: "En direct", tone: "live" };
+  if (match.launchPhase === "LAUNCHED") return { label: MATCH_SECTION_LABELS.PLAYING, tone: "blue" };
+  if (match.launchPhase === "LOBBY" || (now !== null && startTime(match.startAt) <= now)) {
+    return { label: MATCH_SECTION_LABELS.LOBBY, tone: "blue" };
+  }
   const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now ?? Date.now());
-  return when ? `Prochain match · ${when}` : "Prochain match";
+  return { label: when ? `${MATCH_SECTION_LABELS.WAITING} · ${when}` : MATCH_SECTION_LABELS.WAITING, tone: "default" };
 }
 
 function startTime(iso: string | null): number {
