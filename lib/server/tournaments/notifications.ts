@@ -72,17 +72,18 @@ export function publishUpdatedEvent(tournamentId: number): void {
  * « Prêt » par manche, plus l'antenne et l'horaire. Elles gardaient donc froids
  * les caches les plus rentables du site au moment précis où il est le plus lu.
  *
- * `onAir` : l'écriture déplace l'état d'antenne d'un match (chaîne, mode,
- * ouverture, horaire d'un mode `START_TIME`) — le direct de l'accueil, seul
- * agrégat de la vitrine qui la lise, est alors oublié lui aussi.
+ * `landingLive` : l'écriture change le match que l'accueil met en avant ou ce
+ * qu'il en dit — état d'antenne (chaîne, mode, ouverture), horaire, lancement
+ * (« Prêt », forçage, lancement d'office). Le direct de l'accueil, seul agrégat
+ * de la vitrine qui les lise, est alors oublié lui aussi.
  */
 export function publishMatchUpdatedEvent(
   tournamentId: number,
-  options: { onAir?: boolean } = {},
+  options: { landingLive?: boolean } = {},
 ): void {
   scheduleMatchStartNotices();
   invalidateTournamentSnapshot(tournamentId);
-  if (options.onAir) invalidateLandingLive();
+  if (options.landingLive) invalidateLandingLive();
   publishTournamentEvent({
     type: "match_updated",
     tournamentId,

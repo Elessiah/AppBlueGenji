@@ -343,7 +343,7 @@ export async function setMatchReady(
     const launchedNow = ready ? await launchIfAllReady(connection, matchId) : false;
     return { tournamentId: Number(row.tournament_id), launched: launchedNow };
   });
-  publishMatchUpdatedEvent(tournamentId);
+  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
   return { launched };
 }
 
@@ -372,7 +372,7 @@ export async function forceLaunchMatch(matchId: number): Promise<void> {
     );
     return Number(row.tournament_id);
   });
-  publishMatchUpdatedEvent(tournamentId);
+  publishMatchUpdatedEvent(tournamentId, { landingLive: true });
 }
 
 /** Identité d'un caster telle que la règle de `castBlockReason` la lit. */

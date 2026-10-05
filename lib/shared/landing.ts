@@ -1,6 +1,8 @@
 import type { DiscordCommunityStats } from "@/lib/shared/discord";
 import type { MatchLiveState } from "@/lib/shared/live-streams";
 import type { MatchFormat } from "@/lib/shared/match-format";
+import type { MatchLaunchPhase } from "@/lib/shared/match-launch";
+import { formatBoardStartAt } from "@/lib/shared/landing-board";
 import type { TournamentBuckets, TournamentCard, TournamentGame } from "@/lib/shared/types";
 
 export type LandingStats = {
@@ -67,7 +69,88 @@ export type LandingLiveMatch = {
   liveState: MatchLiveState;
   /** Chaîne diffusant ce match ; `null` = casté sans lien, ou non casté. */
   liveUrl: string | null;
+  /**
+   * Phase de lancement du match (`matchLaunchPhase`) — jamais « À planifier » :
+   * un tel match n'est pas mis en avant ({@link pickFeaturedMatchIndex}).
+   * `SCHEDULED` = pas encore commencé ; la carte l'annonce avec son horaire.
+   */
+  launchPhase: FeaturedMatchPhase;
+  /** Horaire annoncé (ISO) ; `null` = aucun. */
+  startAt: string | null;
 };
+
+/** Phases qu'un match mis en avant peut porter. */
+export type FeaturedMatchPhase = Extract<MatchLaunchPhase, "LAUNCHED" | "LOBBY" | "SCHEDULED">;
+
+/** Ce que la sélection du match mis en avant lit d'un match du plateau. */
+export type FeaturedMatchCandidate = {
+  /** Match réellement à l'antenne (`isMatchLive`). */
+  onAir: boolean;
+  phase: MatchLaunchPhase;
+  startAt: string | null;
+};
+
+const FEATURED_PHASE_RANK: Readonly<Partial<Record<MatchLaunchPhase, number>>> = {
+  LAUNCHED: 1,
+  LOBBY: 2,
+  SCHEDULED: 3,
+};
+
+/** La phase peut-elle être celle du match mis en avant ? */
+export function isFeaturedMatchPhase(phase: MatchLaunchPhase): phase is FeaturedMatchPhase {
+  return FEATURED_PHASE_RANK[phase] !== undefined;
+}
+
+/**
+ * Ce que la carte du direct dit d'un match mis en avant qui ne se joue pas
+ * encore : « Prochain match · 21 sept. · 20:30 » pour un match daté,
+ * « Lancement » quand son heure est venue. `null` pour un match lancé — la
+ * carte n'a alors rien à ajouter au score.
+ */
+export function featuredMatchStatusLabel(
+  match: Pick<LandingLiveMatch, "launchPhase" | "startAt">,
+  now: number = Date.now(),
+): string | null {
+  if (match.launchPhase === "LOBBY") return "Lancement";
+  if (match.launchPhase !== "SCHEDULED") return null;
+  const when = match.startAt === null ? "" : formatBoardStartAt(match.startAt, now);
+  return when ? `Prochain match · ${when}` : "Prochain match";
+}
+
+function startTime(iso: string | null): number {
+  const parsed = iso === null ? Number.NaN : Date.parse(iso);
+  return Number.isNaN(parsed) ? Number.POSITIVE_INFINITY : parsed;
+}
+
+/**
+ * Index du match que l'accueil met en avant, `-1` si aucun ne s'y prête.
+ *
+ * Ordre : le match à l'antenne, puis un match lancé (il se joue), puis un match
+ * en lancement (son heure est venue), puis le **prochain** match daté. Un match
+ * « À planifier » n'est jamais retenu : l'accueil le présentait comme le match
+ * du moment d'un tournoi « En cours », alors que la fiche du tournoi le range
+ * dans l'arbitrage, en attente d'une date. À rang égal, l'ordre du plateau
+ * départage — l'horaire le plus proche d'abord pour les matchs datés.
+ */
+export function pickFeaturedMatchIndex(candidates: readonly FeaturedMatchCandidate[]): number {
+  const onAir = candidates.findIndex((candidate) => candidate.onAir);
+  if (onAir !== -1) return onAir;
+  let best = -1;
+  let bestRank = Number.POSITIVE_INFINITY;
+  let bestStart = Number.POSITIVE_INFINITY;
+  candidates.forEach((candidate, index) => {
+    const rank = FEATURED_PHASE_RANK[candidate.phase];
+    if (rank === undefined) return;
+    const start = startTime(candidate.startAt);
+    const earlierSameRank = rank === bestRank && candidate.phase === "SCHEDULED" && start < bestStart;
+    if (rank < bestRank || earlierSameRank) {
+      best = index;
+      bestRank = rank;
+      bestStart = start;
+    }
+  });
+  return best;
+}
 
 /**
  * Cible du bouton « Regarder le live » de l'accueil.

@@ -81,6 +81,12 @@
   padding-block: 4px;
 }
 
+.matchStatus {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--ink-dim);
+}
+
 .vs {
   text-align: center;
   font-size: 11px;

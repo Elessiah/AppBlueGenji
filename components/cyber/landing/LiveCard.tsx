@@ -5,7 +5,7 @@ import { Eye } from "lucide-react";
 import { CyberCard, Pill, TeamSigil } from "@/components/cyber";
 import { EntityLink } from "@/components/entity-link";
 import type { LandingLive } from "@/lib/shared/landing";
-import { inferPhaseLabel, visibleLiveViewerCount } from "@/lib/shared/landing";
+import { featuredMatchStatusLabel, inferPhaseLabel, visibleLiveViewerCount } from "@/lib/shared/landing";
 import { PLATFORM_LABELS, streamPlatform } from "@/lib/shared/live-streams";
 import { matchFormatLabel } from "@/lib/shared/match-format";
 import { tournamentMatchHref } from "@/lib/shared/match-anchor";
@@ -95,6 +95,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
   const title = live.tournament.name.toUpperCase();
   const matchIsLive = currentMatch?.liveState === "LIVE";
   const matchIsScheduled = currentMatch?.liveState === "SCHEDULED";
+  const matchStatus = currentMatch ? featuredMatchStatusLabel(currentMatch) : null;
   const matchPlatform = streamPlatform(currentMatch?.liveUrl);
   // Le bouton de diffusion n'apparaît **que** pour un match réellement à
   // l'antenne. `SCHEDULED` annonce un cast à venir : la chaîne ne montre pas
@@ -136,6 +137,8 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
       </div>
 
       <div className={styles.title}>{title}</div>
+      {/* Un match pas encore commencé ne passe pas pour le match du moment. */}
+      {matchStatus && <div className={`${styles.matchStatus} mono`}>{matchStatus}</div>}
 
       {currentMatch ? (
         <div className={styles.match}>

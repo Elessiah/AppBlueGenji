@@ -11,6 +11,8 @@ import { listTournamentBuckets } from "@/lib/server/tournaments-service";
 import {
   compareByStartAt,
   inferPhaseLabel,
+  isFeaturedMatchPhase,
+  pickFeaturedMatchIndex,
   type LandingCalendarEvent,
   type LandingLeaderboardRow,
   type LandingLive,
@@ -38,6 +40,8 @@ import { entrantHref } from "@/lib/shared/participants";
 import { isSeedOrderEffective, seedingSource } from "@/lib/shared/seeding";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { localUploadUrl } from "@/lib/shared/uploads";
+import { matchLaunchPhase } from "@/lib/shared/match-launch";
+import { toIso } from "@/lib/server/serialization";
 import { getDiscordCommunity } from "@/lib/server/discord-community";
 
 const DEFAULT_SITE_COUNTS: SiteCounts = {
@@ -125,6 +129,8 @@ type LiveMatchRow = RowDataPacket & {
   live_trigger: MatchLiveTrigger | null;
   live_url: string | null;
   live_started_at: Date | string | null;
+  launched_at: Date | string | null;
+  referee_scheduling: number | null;
 };
 
 /**
@@ -221,7 +227,9 @@ async function loadLandingLive(): Promise<LandingLive | null> {
         m.start_at,
         m.live_trigger,
         m.live_url,
-        m.live_started_at
+        m.live_started_at,
+        m.launched_at,
+        t.referee_scheduling
        FROM bg_matches m
        JOIN bg_tournaments t ON t.id = m.tournament_id
        LEFT JOIN bg_teams t1 ON t1.id = m.team1_id
@@ -237,12 +245,32 @@ async function loadLandingLive(): Promise<LandingLive | null> {
       [tournament.id],
     );
 
-    // Un match à l'antenne est la mise en avant recherchée ; à défaut on retombe
-    // sur le premier match jouable ou en attente de confirmation.
-    const currentRow =
-      rows.find((row) => isMatchLive(toLiveInput(row))) ??
-      rows.find((row) => row.status === "READY" || row.status === "AWAITING_CONFIRMATION") ??
-      null;
+    // Un match à l'antenne est la mise en avant recherchée ; à défaut, celui qui
+    // se joue, puis le prochain daté — jamais un match « À planifier », que la
+    // carte présentait comme le match du moment (`pickFeaturedMatchIndex`).
+    const now = Date.now();
+    const phases = rows.map((row) =>
+      matchLaunchPhase(
+        {
+          status: row.status,
+          team1Id: row.team1_id,
+          team2Id: row.team2_id,
+          startAt: toIso(row.start_at),
+          launchedAt: toIso(row.launched_at),
+          refereeScheduling: Number(row.referee_scheduling ?? 0) === 1,
+        },
+        now,
+      ),
+    );
+    const currentIndex = pickFeaturedMatchIndex(
+      rows.map((row, index) => ({
+        onAir: isMatchLive(toLiveInput(row)),
+        phase: phases[index],
+        startAt: toIso(row.start_at),
+      })),
+    );
+    const currentRow = currentIndex === -1 ? null : rows[currentIndex];
+    const currentPhase = currentIndex === -1 ? "NONE" : phases[currentIndex];
     // La colonne `seed` porte l'ordre d'inscription ; elle n'est le **tirage**
     // du tournoi que dans les formats qui seedent depuis elle (ou dès que le
     // staff a réordonné à la main). En Suisse, en Survie, en BG Survie et en
@@ -290,6 +318,9 @@ async function loadLandingLive(): Promise<LandingLive | null> {
           ),
           liveState: resolveMatchLiveState(toLiveInput(currentRow)),
           liveUrl: normalizeStreamUrl(currentRow.live_url),
+          // Un match à l'antenne se joue, quelle que soit sa phase de lancement.
+          launchPhase: isFeaturedMatchPhase(currentPhase) ? currentPhase : "LAUNCHED",
+          startAt: toIso(currentRow.start_at),
         }
       : null;
 

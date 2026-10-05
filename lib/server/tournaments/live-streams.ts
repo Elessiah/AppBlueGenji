@@ -143,7 +143,7 @@ export async function setMatchLiveConfig(
        WHERE id = ?`,
       [matchId],
     );
-    publishMatchUpdatedEvent(Number(row.tournament_id), { onAir: true });
+    publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
     return;
   }
 
@@ -169,7 +169,7 @@ export async function setMatchLiveConfig(
     );
   }
 
-  publishMatchUpdatedEvent(Number(row.tournament_id), { onAir: true });
+  publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
 }
 
 /**
@@ -193,7 +193,7 @@ export async function setMatchOnAir(matchId: number, onAir: boolean): Promise<vo
     matchId,
   ]);
 
-  publishMatchUpdatedEvent(Number(row.tournament_id), { onAir: true });
+  publishMatchUpdatedEvent(Number(row.tournament_id), { landingLive: true });
 }
 
 /**
