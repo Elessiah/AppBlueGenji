@@ -1583,10 +1583,11 @@ html {
 }
 
 /* Variantes sémantiques — « jamais tout gris » (DESIGN_SYSTEM.md § Pastilles).
-   `.pill` / `.tag` nus restent bleutés ; une pastille colorée choisit son sens :
+   `.pill` / `.cy-tag` nus restent bleutés (préfixe : `.tag` sert déjà au fil
+   d'activité de `/bot`) ; une pastille colorée choisit son sens :
    info (bleu), accent (violet), succès (sarcelle), rehaut (rose), neutre
    seulement pour ce qui l'est vraiment. Le rouge reste à `.pill-live`. */
-.tag {
+.cy-tag {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1600,35 +1601,35 @@ html {
 }
 
 .pill-info,
-.tag-info {
+.cy-tag-info {
   color: var(--blue-300);
   border-color: rgba(var(--blue-500-rgb), 0.4);
   background: rgba(var(--blue-500-rgb), 0.1);
 }
 
 .pill-accent,
-.tag-accent {
+.cy-tag-accent {
   color: var(--violet-300);
   border-color: rgba(var(--violet-400-rgb), 0.45);
   background: rgba(var(--violet-400-rgb), 0.12);
 }
 
 .pill-success,
-.tag-success {
+.cy-tag-success {
   color: var(--teal-400);
   border-color: rgba(var(--teal-400-rgb), 0.4);
   background: rgba(var(--teal-400-rgb), 0.1);
 }
 
 .pill-highlight,
-.tag-highlight {
+.cy-tag-highlight {
   color: var(--pink-400);
   border-color: rgba(var(--pink-400-rgb), 0.4);
   background: rgba(var(--pink-400-rgb), 0.1);
 }
 
 .pill-neutral,
-.tag-neutral {
+.cy-tag-neutral {
   color: var(--ink-mute);
   border-color: var(--line-strong-cy);
   background: transparent;
