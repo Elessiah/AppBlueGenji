@@ -53,14 +53,22 @@ describe("stockage map par map (bg_match_maps)", () => {
   });
 
   it("promeut la proposition retenue en résultat (les propositions partent à la clôture)", async () => {
-    const { execute, connection } = conn([[[{ found: 1 }], []]]);
+    const { execute, connection } = conn([[[{ found: 1 }], []], [[{ found: 1 }], []]]);
     await promoteReportedMaps(connection, 10, "TEAM1");
     const sqls = execute.mock.calls.map((c) => flat(c[0]));
-    expect(sqls[1]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?");
-    expect(execute.mock.calls[1][1]).toEqual([10, "FINAL"]);
-    expect(sqls[2]).toMatch(/INSERT INTO bg_match_maps .* SELECT match_id, 'FINAL'.* WHERE match_id = \? AND source = \?$/);
-    expect(execute.mock.calls[2][1]).toEqual([10, "TEAM1"]);
-    expect(sqls).toHaveLength(3);
+    expect(sqls[0]).toBe("SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE");
+    expect(execute.mock.calls[0][1]).toEqual([10, "TEAM1"]);
+    expect(sqls[2]).toBe("DELETE FROM bg_match_maps WHERE match_id = ? AND source = ?");
+    expect(execute.mock.calls[2][1]).toEqual([10, "FINAL"]);
+    expect(sqls[3]).toMatch(/INSERT INTO bg_match_maps .* SELECT match_id, 'FINAL'.* WHERE match_id = \? AND source = \?$/);
+    expect(execute.mock.calls[3][1]).toEqual([10, "TEAM1"]);
+    expect(sqls).toHaveLength(4);
+  });
+
+  it("ne touche à rien quand la proposition a déjà été promue (clôture concurrente)", async () => {
+    const { execute, connection } = conn();
+    await promoteReportedMaps(connection, 10, "TEAM2");
+    expect(execute).toHaveBeenCalledTimes(1);
   });
 
   it("efface des jeux sur plusieurs matchs, et seulement s'il y en a", async () => {

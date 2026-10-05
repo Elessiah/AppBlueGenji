@@ -104,6 +104,16 @@ export async function promoteReportedMaps(
   matchId: number,
   from: "TEAM1" | "TEAM2",
 ): Promise<void> {
+  // Rien à promouvoir, rien à effacer : une clôture concurrente du même report
+  // expiré (l'entretien tourne à chaque écriture et à chaque chargement) a déjà
+  // promu la proposition puis l'a effacée. Sans cette garde, la seconde
+  // effaçait le détail retenu par la première sans rien remettre.
+  const pending = await connection.execute<RowDataPacket[]>(
+    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE`,
+    [matchId, from],
+  );
+  const rows = Array.isArray(pending) && Array.isArray(pending[0]) ? pending[0] : [];
+  if (rows.length === 0) return;
   await clearMatchMaps(connection, matchId, "FINAL");
   await connection.execute(
     `INSERT INTO bg_match_maps
