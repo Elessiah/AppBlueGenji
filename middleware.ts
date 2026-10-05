@@ -9,6 +9,9 @@ import { LOCALE_HEADER, isApiPath, isMigratedRoute, splitLocalePrefix, type Loca
 /** Cookie de l'invite Google One Tap (retirée), effacé chez qui le porte encore. */
 export const LEGACY_GOOGLE_ONE_TAP_COOKIE = "g_state";
 
+/** Ancien chemin du cookie d'avis de suspension, avant `path: "/"` (i18n, lot 0). */
+export const LEGACY_SUSPENSION_NOTICE_PATH = "/connexion";
+
 /**
  * Pose la politique de sécurité du contenu, avec un nonce par requête, et la
  * langue de la page (`docs/features/I18N.md`).
@@ -87,6 +90,13 @@ export function middleware(request: NextRequest) {
   }
   if (onLoginPage && request.cookies.has(SUSPENSION_NOTICE_COOKIE)) {
     response.cookies.set(SUSPENSION_NOTICE_COOKIE, "", { path: "/", maxAge: 0 });
+    // Transition : un cookie posé avant le passage à `path: "/"` vit encore
+    // dix minutes sous `/connexion`, et c'est lui que le navigateur envoie en
+    // premier (chemin plus précis). Un effacement ne vise qu'un chemin : sans
+    // ce second `Set-Cookie`, l'exposé serait relu à chaque visite. Ajouté
+    // **après** tout `response.cookies.*`, qui réécrit l'en-tête en entier.
+    // À retirer une fois le lot 0 de l'i18n déployé depuis plus de dix minutes.
+    response.headers.append("set-cookie", `${SUSPENSION_NOTICE_COOKIE}=; Path=${LEGACY_SUSPENSION_NOTICE_PATH}; Max-Age=0`);
   }
   return response;
 }
