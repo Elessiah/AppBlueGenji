@@ -44,6 +44,19 @@ export function shouldDeferReveal(input: RevealInput): boolean {
  */
 export const COUNT_UP_ON_SCREEN_FROM = 0.85;
 
+/**
+ * Délai après le montage au-delà duquel un chiffre **déjà à l'écran** ne se
+ * décompte plus : une page ouverte dans une fenêtre sans focus n'a pas le droit
+ * d'animer, et le décompte partirait au premier clic, minutes plus tard, sur des
+ * chiffres déjà lus. Hors de l'écran, il part à son entrée, quand qu'elle vienne.
+ */
+export const COUNT_UP_START_WINDOW_MS = 1500;
+
+/** Le décompte peut-il encore partir ? */
+export function countUpMayStart(onScreenAtMount: boolean, msSinceMount: number): boolean {
+  return !onScreenAtMount || msSinceMount <= COUNT_UP_START_WINDOW_MS;
+}
+
 /** Point de départ du décompte : 0 hors de l'écran, `COUNT_UP_ON_SCREEN_FROM` de la cible sinon. */
 export function countUpStart(target: number, onScreenAtMount: boolean): number {
   if (!Number.isFinite(target)) return 0;

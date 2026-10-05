@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useClientPower } from "@/lib/shared/hooks/useClientPower";
-import { COUNT_UP_MS, countUpStart, countUpValue } from "@/lib/shared/landing-motion";
+import { COUNT_UP_MS, countUpMayStart, countUpStart, countUpValue } from "@/lib/shared/landing-motion";
 
 /**
  * Chiffre du hero qui se décompte de 0 à sa valeur, une fois, quand il entre à
@@ -12,7 +12,8 @@ import { COUNT_UP_MS, countUpStart, countUpValue } from "@/lib/shared/landing-mo
  * telle quelle) ; la boucle `requestAnimationFrame` ne démarre que si le régime
  * de charge permet les animations décoratives, et s'arrête d'elle-même au bout
  * de `COUNT_UP_MS`. Déjà à l'écran au chargement, il ne retombe pas à 0 : il
- * roule des derniers 15 % (`countUpStart`). La largeur est réservée en `ch` sur la valeur finale
+ * roule des derniers 15 % (`countUpStart`), et seulement juste après le
+ * chargement (`countUpMayStart`). La largeur est réservée en `ch` sur la valeur finale
  * (chiffres tabulaires) : le décompte ne pousse rien.
  */
 export function CountUp({ value, className }: Readonly<{ value: number; className?: string }>) {
@@ -20,6 +21,7 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
   const [shown, setShown] = useState(value);
   const { decorativeMotion } = useClientPower();
   const played = useRef(false);
+  const mountedAt = useRef<number | null>(null);
 
   useEffect(() => {
     const element = ref.current;
@@ -27,8 +29,15 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
       setShown(value);
       return undefined;
     }
+    mountedAt.current ??= performance.now();
+    const onScreen = element.getBoundingClientRect().top < window.innerHeight;
+    if (!countUpMayStart(onScreen, performance.now() - mountedAt.current)) {
+      played.current = true;
+      setShown(value);
+      return undefined;
+    }
     let frame = 0;
-    const from = countUpStart(value, element.getBoundingClientRect().top < window.innerHeight);
+    const from = countUpStart(value, onScreen);
     const observer = new IntersectionObserver((entries) => {
       if (!entries.some((entry) => entry.isIntersecting)) return;
       observer.disconnect();

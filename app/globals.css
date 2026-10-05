@@ -1668,8 +1668,9 @@ html {
   margin-bottom: -0.12em;
 }
 
-/* Survol des cartes et appels à l'action : léger soulèvement, en transform
-   seulement (aucun décalage de mise en page). */
+/* Survol des cartes et appels à l'action : léger agrandissement, en transform
+   seulement (aucun décalage de mise en page) ; jamais une translation, qui
+   ferait clignoter l'élément sous un pointeur posé sur son bord. */
 .hover-lift {
   transition:
     transform 0.2s ease,
@@ -1677,7 +1678,7 @@ html {
 }
 
 .hover-lift:hover {
-  transform: translateY(-3px);
+  transform: scale(1.02);
   box-shadow: var(--glow-blue);
 }
 

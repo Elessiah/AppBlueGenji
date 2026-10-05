@@ -24,7 +24,7 @@
 }
 
 .primary:hover:not(:disabled):not([aria-disabled="true"]) {
-  transform: translateY(-2px);
+  transform: scale(1.03);
   box-shadow:
     0 0 0 1px rgba(90, 200, 255, 0.5),
     0 0 28px rgba(var(--cyan-400-rgb), 0.35),
@@ -40,7 +40,7 @@
 .ghost:hover:not(:disabled):not([aria-disabled="true"]) {
   border-color: var(--blue-500);
   color: var(--blue-300);
-  transform: translateY(-2px);
+  transform: scale(1.03);
   box-shadow: var(--glow-blue);
 }
 
