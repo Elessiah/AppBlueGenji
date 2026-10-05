@@ -699,7 +699,8 @@ export default function ProfilePage() {
         <div className={`ds-header-body ${s.header}`}>
           <UserAvatar src={data.profile.avatarUrl} pseudo={data.profile.pseudo} size={64} />
           <div className={s.headerText}>
-            <h1 className={`ds-title blue ${s.title}`}>Mon profil</h1>
+            <span className={`eyebrow ${s.eyebrow}`}>Espace joueur</span>
+            <h1 className={`ds-title ${s.title}`}>Mon profil</h1>
             <p className={s.subtitle}>
               Ton pseudo et ton avatar sont publics ; tout le reste se règle ici, champ par
               champ.
@@ -713,7 +714,7 @@ export default function ProfilePage() {
           cesse d'exiger de traverser le reste. */}
       <nav className={s.nav} aria-label="Sections du profil">
         {sections.map((entry) => (
-          <a key={entry.id} href={`#${entry.id}`} className={s.navLink}>
+          <a key={entry.id} href={`#${entry.id}`} className={s.navLink} data-tone={entry.tone}>
             {entry.title}
           </a>
         ))}
@@ -1038,13 +1039,13 @@ export default function ProfilePage() {
       <ProfileSection section={sectionById.statistiques}>
         <div className={s.stats}>
           {[
-            { label: "Tournois joués", value: data.stats.tournamentsPlayed },
-            { label: "Tournois gagnés", value: data.stats.tournamentsWon },
-            { label: "Victoires", value: data.stats.matchesWon },
-            { label: "Défaites", value: data.stats.matchesLost },
-            { label: "Meilleur rang", value: data.stats.bestRank ?? "—" },
+            { label: "Tournois joués", value: data.stats.tournamentsPlayed, tone: "blue" },
+            { label: "Tournois gagnés", value: data.stats.tournamentsWon, tone: "pink" },
+            { label: "Victoires", value: data.stats.matchesWon, tone: "teal" },
+            { label: "Défaites", value: data.stats.matchesLost, tone: "violet" },
+            { label: "Meilleur rang", value: data.stats.bestRank ?? "—", tone: "cyan" },
           ].map((stat) => (
-            <div key={stat.label} className={s.stat}>
+            <div key={stat.label} className={s.stat} data-tone={stat.tone}>
               <div className={s.statLabel}>{stat.label}</div>
               <div className={s.statValue}>{stat.value}</div>
             </div>

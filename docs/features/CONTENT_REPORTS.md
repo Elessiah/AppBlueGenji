@@ -138,6 +138,10 @@ masqué. **Jamais** l'identité du signalant. Un signalement qui n'existe pas et
 un signalement qui ne la vise pas rendent le même 404 : les identifiants sont
 consécutifs.
 
+L'état s'y lit en pastille (`REPORT_STATUS_PILL`, `lib/shared/content-reports.ts`) :
+`info` à traiter, `accent` en cours, `neutral` archivé — un archivage ne dit
+pas qui avait raison, il ne prend donc ni le vert ni le rouge.
+
 ## Le panneau
 
 - Onglets par catégorie (pastille = signalements actifs), vue « Actifs » /
