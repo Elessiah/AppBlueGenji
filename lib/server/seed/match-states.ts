@@ -7,6 +7,7 @@ import type { Pool, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
 import { normalizeStreamUrl } from "@/lib/shared/live-streams";
 import { normalizeReplayUrl } from "@/lib/shared/match-replay";
+import { mapListLimit } from "@/lib/shared/match-maps";
 import type { ReportStateCounts, TournamentDef } from "./cases";
 
 // Transforme des matchs READY en états intermédiaires du cycle de report :
@@ -227,12 +228,16 @@ export async function applyMatchMapDetails(
        AND team2_score IS NOT NULL`,
     [tournamentId]
   );
+  // Plafond le plus serré des deux phases possibles (format à égalités, où la
+  // map nulle consomme une map) : la map nulle n'est ajoutée que s'il reste
+  // de la place, si bien que la liste se resaisit telle quelle.
+  const limit = mapListLimit(
+    def.matchFormat ? { ...def.matchFormat, drawsAllowed: true } : null,
+  );
   for (const row of rows) {
-    const maps: [number, number][] = [];
-    if (Number(row.id) % 3 === 0) maps.push([1, 1]);
-    for (let i = 0; i < Number(row.team2_score); i += 1) maps.push([0, 2]);
-    for (let i = 0; i < Number(row.team1_score); i += 1) maps.push([2, 0]);
+    const maps = seedMapSequence(Number(row.team1_score), Number(row.team2_score));
     if (maps.length === 0) continue;
+    if (Number(row.id) % 3 === 0 && maps.length < limit) maps.unshift([1, 1]);
     const values = maps.flatMap(([t1, t2], index) => [
       Number(row.id),
       index + 1,
@@ -246,4 +251,28 @@ export async function applyMatchMapDetails(
       values
     );
   }
+}
+
+/**
+ * Maps qui dérivent `team1Wins`-`team2Wins`, en alternance, la dernière revenant
+ * au camp qui mène : la rencontre ne se décide qu'à la dernière map, comme dans
+ * une vraie série (sans quoi la liste porterait une map après la fin acquise).
+ */
+function seedMapSequence(team1Wins: number, team2Wins: number): [number, number][] {
+  const maps: [number, number][] = [];
+  const leader: 1 | 2 = team1Wins >= team2Wins ? 1 : 2;
+  let a = team1Wins - (leader === 1 && team1Wins > 0 ? 1 : 0);
+  let b = team2Wins - (leader === 2 && team2Wins > 0 ? 1 : 0);
+  while (a > 0 || b > 0) {
+    if (a > 0) {
+      maps.push([2, 0]);
+      a -= 1;
+    }
+    if (b > 0) {
+      maps.push([0, 2]);
+      b -= 1;
+    }
+  }
+  if (team1Wins + team2Wins > 0) maps.push(leader === 1 ? [2, 0] : [0, 2]);
+  return maps;
 }

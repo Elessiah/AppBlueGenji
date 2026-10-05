@@ -129,6 +129,13 @@ export async function anonymizeAccount(connection: PoolConnection, userId: numbe
   // manque n'a rien à effacer.
   await ignoreMissingTable(connection.execute(`DELETE FROM bg_account_suspensions WHERE user_id = ?`, [userId]));
   await connection.execute(`UPDATE bg_reports SET reporter_user_id = NULL WHERE reporter_user_id = ?`, [userId]);
+  // Détail map par map (`docs/features/MAP_SCORES.md`) : le résultat reste,
+  // le lien vers le compte qui l'a saisi disparaît — c'est ce que promettent
+  // `/rgpd` et le registre. L'anonymisation garde la ligne `bg_users`, la clé
+  // étrangère `SET NULL` ne joue donc pas ici. Table tolérée.
+  await ignoreMissingTable(
+    connection.execute(`UPDATE bg_match_maps SET submitted_by_user_id = NULL WHERE submitted_by_user_id = ?`, [userId]),
+  );
   // Les invitations et demandes **en attente** sont annulées, et c'est le seul
   // chemin par lequel un compte supprimé rejoignait encore une équipe vivante.
   // Une demande d'adhésion (`REQUEST`) déposée avant la suppression reste
