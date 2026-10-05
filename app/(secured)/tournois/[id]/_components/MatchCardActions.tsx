@@ -85,8 +85,12 @@ export function panelPlacement(
 ): PanelPlacement {
   const below = viewportHeight - footer.bottom;
   const up = below < panelHeight + 8 && footer.top > below;
+  const wanted = up ? footer.top - panelHeight + 4 : footer.bottom - 4;
+  // Toujours dans la fenêtre (marge de 8 px) : un panneau fixe ne défile pas,
+  // ses premières actions ne doivent pas commencer hors de l'écran.
+  const top = Math.max(8, Math.min(wanted, viewportHeight - panelHeight - 8));
   return {
-    top: Math.round(up ? footer.top - panelHeight + 4 : footer.bottom - 4),
+    top: Math.round(top),
     left: Math.round(footer.left - 1),
     width: Math.round(footer.width + 2),
     up,
@@ -204,18 +208,30 @@ export function MatchCardActions({
       };
       setPlacement((previous) => (samePlacement(previous, next) ? previous : next));
     };
-    // Défilement d'une zone quelconque (capture) ou de la fenêtre : le
-    // panneau suit sa carte, une fois par image au plus.
+    // Défilement de la page : le panneau suit sa carte, une fois par image au
+    // plus. Défilement d'une zone qui contient la carte (arbre, colonnes de
+    // manche) : il se referme — la carte peut y sortir de la partie visible,
+    // et un panneau fixe flotterait alors sur l'en-tête ou la barre latérale.
     const schedule = () => {
       cancelAnimationFrame(frame);
       frame = requestAnimationFrame(place);
     };
+    const onScroll = (event: Event) => {
+      const target = event.target;
+      if (target instanceof Element && target.contains(rootRef.current)) {
+        // Le focus ne disparaît pas avec le panneau : il revient au bouton.
+        if (panelRef.current?.contains(document.activeElement)) toggleRef.current?.focus({ preventScroll: true });
+        setOpen(false);
+        return;
+      }
+      schedule();
+    };
     place();
-    window.addEventListener("scroll", schedule, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", schedule);
     return () => {
       cancelAnimationFrame(frame);
-      window.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", schedule);
     };
   }, [expanded]);
