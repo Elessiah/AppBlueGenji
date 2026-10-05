@@ -19,11 +19,17 @@ type ArenaNavProps = {
   openReports?: number | null;
 };
 
-const links = [
-  { href: "/joueurs", label: "Joueurs", rgb: "90, 200, 255" },
-  { href: "/equipes", label: "Équipes", rgb: "255, 157, 46" },
-  { href: "/tournois", label: "Tournois", rgb: "79, 224, 162" },
-];
+/**
+ * Teinte de chaque section, en jetons de la palette « néon froid »
+ * (DESIGN_SYSTEM.md) : joueurs glacier, équipes violet (comme leurs pages),
+ * tournois vert d'eau. Aucune teinte chaude.
+ */
+export const ARENA_NAV_LINKS = [
+  { href: "/joueurs", label: "Joueurs", rgb: "var(--blue-500-rgb)" },
+  { href: "/equipes", label: "Équipes", rgb: "var(--violet-400-rgb)" },
+  { href: "/tournois", label: "Tournois", rgb: "var(--teal-400-rgb)" },
+] as const;
+const links = ARENA_NAV_LINKS;
 
 export function ArenaNav({ pseudo, avatarUrl, activeTeam, openReports = null }: Readonly<ArenaNavProps>) {
   const pathname = usePathname();

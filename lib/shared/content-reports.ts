@@ -251,6 +251,18 @@ export const REPORT_STATUS_LABELS: Record<ReportStatus, string> = {
   RESOLVED: "Archivé",
 };
 
+/**
+ * Variante de pastille (`.pill-*`, DESIGN_SYSTEM.md) de chaque état, pour la
+ * personne visée : bleu « information » tant que rien n'est fait, violet quand
+ * la modération s'en occupe, neutre une fois archivé — un archivage ne dit pas
+ * qui avait raison, il ne prend donc ni le vert ni le rouge.
+ */
+export const REPORT_STATUS_PILL: Record<ReportStatus, "info" | "accent" | "neutral"> = {
+  OPEN: "info",
+  IN_PROGRESS: "accent",
+  RESOLVED: "neutral",
+};
+
 export const RIGHTS_RELATION_LABELS: Record<RightsRelation, string> = {
   HOLDER: "Je suis titulaire des droits",
   AGENT: "Je représente le titulaire des droits",

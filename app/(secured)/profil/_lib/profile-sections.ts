@@ -19,6 +19,14 @@
  * s'il y en a) sont filtrées par l'appelant, qui seul sait ce qu'il a reçu.
  */
 
+/**
+ * Teinte d'une section (DESIGN_SYSTEM.md § Palette « néon froid ») : le trait
+ * d'accent de son titre, son liseré et la pastille de navigation qui y mène.
+ * Néons froids seulement ; `danger` (rouge) est réservé à la zone qui efface le
+ * compte, déjà rouge — jamais à une autre section.
+ */
+export type ProfileSectionTone = "blue" | "violet" | "cyan" | "teal" | "pink" | "danger";
+
 /** Une section de la page : son ancre, son titre, et ce qu'elle promet. */
 export type ProfileSection = {
   /** Identifiant d'ancre, repris tel quel dans l'URL (`/profil#discord`). */
@@ -27,6 +35,8 @@ export type ProfileSection = {
   title: string;
   /** Une phrase sous le titre — ce que la section règle, pas ce qu'elle contient. */
   lead: string;
+  /** Teinte de la section et de son lien de navigation. */
+  tone: ProfileSectionTone;
   /**
    * Ce qu'il faut avoir reçu pour que la section ait un sens.
    *
@@ -50,47 +60,56 @@ export const PROFILE_SECTIONS = [
     id: "identite",
     title: "Identité",
     lead: "Ton pseudo et ton avatar, visibles partout où tu joues.",
+    tone: "blue",
   },
   {
     id: "jeux",
     title: "Comptes de jeu",
     lead: "Les identifiants qui permettent aux autres joueurs de t'ajouter.",
+    tone: "violet",
   },
   {
     id: "discord",
     title: "Discord",
     lead: "Le tag par lequel l'organisation te joint pendant un tournoi.",
+    tone: "cyan",
   },
   {
     id: "confidentialite",
     title: "Confidentialité",
     lead: "Ce que les autres voient de toi, et si les équipes peuvent te démarcher.",
+    tone: "teal",
   },
   {
     id: "connexions",
     title: "Applications connectées",
     lead: "Les portes par lesquelles tu entres sur le site, et les sessions encore ouvertes.",
+    tone: "blue",
   },
   {
     id: "notifications",
     title: "Notifications",
     lead: "Être prévenu sur ton téléphone ou ton ordinateur, même le site fermé.",
+    tone: "pink",
   },
   {
     id: "invitations",
     title: "Invitations d'équipe",
     lead: "Les équipes qui t'ont proposé de les rejoindre.",
+    tone: "violet",
     requires: "invitations",
   },
   {
     id: "statistiques",
     title: "Statistiques",
     lead: "Ton bilan sur la plateforme.",
+    tone: "cyan",
   },
   {
     id: "compte",
     title: "Mon compte",
     lead: "Exporter tes données, te déconnecter, ou tout effacer.",
+    tone: "danger",
   },
 ] as const satisfies readonly ProfileSection[];
 

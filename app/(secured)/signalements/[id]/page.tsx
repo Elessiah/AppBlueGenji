@@ -9,6 +9,7 @@ import { TargetThumb } from "@/components/reports/TargetPicker";
 import {
   REPORT_CATEGORY_DEFINITIONS,
   REPORT_STATUS_LABELS,
+  REPORT_STATUS_PILL,
   reportTargetHref,
   type ConcernedReportView,
 } from "@/lib/shared/content-reports";
@@ -141,7 +142,11 @@ export default function ConcernedReportPage() {
           </div>
           <div>
             <dt>État</dt>
-            <dd>{REPORT_STATUS_LABELS[report.status]}</dd>
+            <dd>
+              <span className={`pill pill-${REPORT_STATUS_PILL[report.status]}`}>
+                {REPORT_STATUS_LABELS[report.status]}
+              </span>
+            </dd>
           </div>
         </dl>
 
