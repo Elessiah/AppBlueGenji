@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { MatchRow } from "./MatchRow";
+import { RoundMatchSections } from "./RoundMatchSections";
 import { isMatchScoreLocked } from "../_lib/score-lock";
 import { ScrollArea } from "@/components/cyber";
 import { EntrantName } from "./EntrantName";
@@ -150,49 +151,53 @@ export function RoundColumns({
                     <RoundBadge key={mark}>{mark}</RoundBadge>
                   ))}
                 </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {roundMatches.map((match) => {
-                    // L'exempté est la seule équipe posée sur la manche ;
-                    // le lier demande un identifiant non nul.
-                    const byeTeamId = match.team2Id === null ? match.team1Id : null;
-                    if (byeTeamId !== null) {
-                      return (
-                        <div
-                          key={match.id}
-                          style={{
-                            border: `1px dashed ${BORDER}`,
-                            borderRadius: 6,
-                            padding: "8px 10px",
-                            fontSize: 13,
-                            background: "var(--surface-1)",
-                          }}
-                        >
-                          <EntrantName
-                            teamId={byeTeamId}
-                            name={match.team1Name}
-                            title={match.team1Name ?? undefined}
-                            truncate
-                            style={{ display: "flex" }}
-                            textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
+                <RoundMatchSections matches={roundMatches}>
+                  {(sectionMatches) => (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {sectionMatches.map((match) => {
+                        // L'exempté est la seule équipe posée sur la manche ;
+                        // le lier demande un identifiant non nul.
+                        const byeTeamId = match.team2Id === null ? match.team1Id : null;
+                        if (byeTeamId !== null) {
+                          return (
+                            <div
+                              key={match.id}
+                              style={{
+                                border: `1px dashed ${BORDER}`,
+                                borderRadius: 6,
+                                padding: "8px 10px",
+                                fontSize: 13,
+                                background: "var(--surface-1)",
+                              }}
+                            >
+                              <EntrantName
+                                teamId={byeTeamId}
+                                name={match.team1Name}
+                                title={match.team1Name ?? undefined}
+                                truncate
+                                style={{ display: "flex" }}
+                                textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
+                              />
+                              <span style={{ fontSize: 11, color: ACCENT }}>
+                                ✓ Victoire d&apos;office
+                              </span>
+                            </div>
+                          );
+                        }
+                        return (
+                          <MatchRow
+                            key={match.id}
+                            match={match}
+                            adminResolvable={adminResolvable(match)}
+                            onOpenAdminModal={onOpenAdminModal}
+                            scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
+                            roundNumber={match.roundNumber}
                           />
-                          <span style={{ fontSize: 11, color: ACCENT }}>
-                            ✓ Victoire d&apos;office
-                          </span>
-                        </div>
-                      );
-                    }
-                    return (
-                      <MatchRow
-                        key={match.id}
-                        match={match}
-                        adminResolvable={adminResolvable(match)}
-                        onOpenAdminModal={onOpenAdminModal}
-                        scoreLocked={isMatchScoreLocked(match.id, allTournamentMatches, format)}
-                        roundNumber={match.roundNumber}
-                      />
-                    );
-                  })}
-                </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </RoundMatchSections>
               </div>
             );
           })}

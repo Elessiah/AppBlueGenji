@@ -1,0 +1,41 @@
+/*
+ * Sections d'état d'une manche : un filet discret titré, jamais un volet
+ * (`docs/features/ROUND_MATCH_SECTIONS.md`).
+ */
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 8px;
+  min-width: 0;
+}
+
+/* Le libellé peut passer à la ligne : une colonne de manche fait 210 px. */
+.label {
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-mute);
+}
+
+.count {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-dim);
+}
+
+.rule {
+  flex: 1;
+  min-width: 12px;
+  height: 1px;
+  background: var(--line-soft);
+}

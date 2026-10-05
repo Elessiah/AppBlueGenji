@@ -55,6 +55,7 @@ import { TournamentLoading } from "./_components/TournamentLoading";
 import { TournamentHeader } from "./_components/TournamentHeader";
 import styles from "./page.module.css";
 import { orReload } from "./_lib/lazy-component";
+import { buildSeedMap } from "@/lib/shared/match-sections";
 
 // Découpage du paquet : un spectateur ne voit qu'un format et n'ouvre presque
 // jamais un dialogue. Les vues propres à un format et les panneaux du staff
@@ -462,6 +463,12 @@ export default function TournamentDetailPage() {
   // liste reçue, pour ne pas redessiner chaque carte à chaque rendu de la page.
   const entrantLogos = useMemo(
     () => buildEntrantLogoMap(detail?.registrations ?? []),
+    [detail?.registrations],
+  );
+  // Têtes de série, pour l'ordre des matchs dans les sections d'une manche
+  // (`lib/shared/match-sections.ts`).
+  const entrantSeeds = useMemo(
+    () => buildSeedMap(detail?.registrations ?? []),
     [detail?.registrations],
   );
 
@@ -912,6 +919,7 @@ export default function TournamentDetailPage() {
       participantType={detail.card.participantType}
       soloUserIds={detail.soloUserIds}
       logos={entrantLogos}
+      seeds={entrantSeeds}
     >
       <MatchAnchorProvider
         targetMatchId={targetMatchId}
