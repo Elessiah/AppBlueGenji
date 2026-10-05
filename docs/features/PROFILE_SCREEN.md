@@ -18,7 +18,7 @@ Trois défauts, et ils se renforçaient :
    compte se ressemblaient à quelques pixels près. Le second était en bas, après
    tout le reste, sans rien qui le sépare des réglages.
 2. **Le texte était trop pâle pour être lu.** Chaque aide de champ s'écrivait en
-   `--text-2` à 11 px — sous la taille où ce gris reste confortable —, si bien
+   `--ink-quiet` à 11 px — sous la taille où ce gris reste confortable —, si bien
    que la page entière portait un voile gris que personne ne lisait. Tout était
    en style **en ligne**, 554 lignes dont une bonne part de mise en forme.
 3. **Il fallait tout traverser.** Aucun moyen d'atteindre « Applications
@@ -180,8 +180,8 @@ revenait à cacher le plus lourd des trois au milieu des autres.
 
 ## Le contraste
 
-Les aides de champ passent de `--text-2` / 11 px à **`--text-1` / 12 px**, avec
-une interligne de 1,65 et une largeur bornée à 68 caractères. `--text-2` est
+Les aides de champ passent de `--ink-quiet` / 11 px à **`--ink-soft` / 12 px**, avec
+une interligne de 1,65 et une largeur bornée à 68 caractères. `--ink-quiet` est
 réservé à ce qui est vraiment secondaire (le format accepté d'une image, par
 exemple). Les styles quittent le JSX pour `profil.module.css`, qui porte la
 hiérarchie : titre de section > libellé de champ > aide.
