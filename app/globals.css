@@ -97,7 +97,7 @@
   --result-loss-rgb: 255, 31, 90;
   --result-loss-ink: #ff5c85;
   --result-loss-soft: rgba(var(--result-loss-rgb), 0.14);
-  --result-loss-glow: 0 0 8px rgba(var(--result-loss-rgb), 0.6);
+  --result-loss-glow: 0 0 2px rgba(var(--result-loss-rgb), 0.8);
   --result-loss-hatch: repeating-linear-gradient(
     135deg,
     var(--result-loss) 0 3px,
