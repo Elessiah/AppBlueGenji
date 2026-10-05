@@ -76,7 +76,9 @@ départages ci-dessus tranchent, comme sur la page.
   (`router.push(…, { scroll: false })`, sans rechargement), le focus va à la
   première ligne ajoutée (`tabIndex={-1}`) et une région `<output>` (rôle `status`),
   toujours présente, annonce « 50 équipes ajoutées. » (« … Fin du
-  classement. » à la dernière page). `?n=` est validé côté serveur
+  classement. » à la dernière page). Au plafond, s'il reste des équipes, le
+  lien laisse place à « Affichage limité aux 1000 premières équipes. », à
+  l'écran comme dans l'annonce — jamais un faux « Fin du classement ». `?n=` est validé côté serveur
   (`parseRankingShown`) : entier seulement, arrondi à la page supérieure,
   borné à [50, 1000] (`RANKING_MAX_SHOWN`) ; toute autre valeur rend la
   première page. Changer d'onglet repart de la première page. Le canonique
