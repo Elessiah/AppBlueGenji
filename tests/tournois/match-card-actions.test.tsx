@@ -318,6 +318,17 @@ describe("panelPlacement — le panneau ouvert reste à l'écran", () => {
     expect(panelPlacement(low, 200, 800)).toEqual({ top: 504, left: 99, width: 260, up: true });
   });
 
+  it("ne commence jamais hors de l'écran, même ouvert vers le haut", () => {
+    const mid = { ...footer, top: 400, bottom: 452 };
+    // 480 px de panneau, 700 px de fenêtre : vers le haut, il partirait à -76.
+    const placed = panelPlacement(mid, 480, 700);
+    expect(placed.up).toBe(true);
+    expect(placed.top).toBe(8);
+    // Vers le bas, il ne dépasse pas le bas de la fenêtre.
+    expect(panelPlacement({ ...footer, top: 100, bottom: 152 }, 480, 700).top).toBe(148);
+    expect(panelPlacement({ ...footer, top: 198, bottom: 250 }, 480, 700).top).toBe(212);
+  });
+
   it("reste dessous quand le haut n'offre pas davantage", () => {
     const high = { ...footer, top: 60, bottom: 112 };
     expect(panelPlacement(high, 200, 250).up).toBe(false);
@@ -347,6 +358,11 @@ describe("MatchCardActions — clavier et focus (branchements)", () => {
     expect(source).toContain("if (open && more.length === 0) setOpen(false);");
     expect(source).toContain("hidden={!expanded}");
     expect(source).toContain("aria-expanded={expanded}");
+  });
+
+  it("se referme quand la zone défilante de la carte défile, suit la page sinon", () => {
+    expect(source).toMatch(/target\.contains\(rootRef\.current\)\)\s*\{[\s\S]{0,400}?setOpen\(false\);\s*return;/);
+    expect(source).toContain('window.addEventListener("scroll", onScroll, true);');
   });
 
   it("le lancement forcé garde sa confirmation", () => {
