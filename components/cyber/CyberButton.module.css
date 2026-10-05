@@ -10,11 +10,12 @@
   letter-spacing: 0.01em;
   border: 1px solid transparent;
   cursor: pointer;
-  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .primary {
-  background: var(--blue-500);
+  /* Dégradé glacier → cyan : reste un bleu, texte sombre à plus de 9:1. */
+  background: linear-gradient(100deg, var(--blue-500), var(--cyan-400));
   color: #001520;
   box-shadow:
     0 0 0 1px rgba(90, 200, 255, 0.35),
@@ -23,7 +24,11 @@
 }
 
 .primary:hover:not(:disabled):not([aria-disabled="true"]) {
-  transform: translateY(-1px);
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 1px rgba(90, 200, 255, 0.5),
+    0 0 28px rgba(var(--cyan-400-rgb), 0.35),
+    0 0 44px rgba(var(--violet-400-rgb), 0.18);
 }
 
 .ghost {
@@ -35,6 +40,8 @@
 .ghost:hover:not(:disabled):not([aria-disabled="true"]) {
   border-color: var(--blue-500);
   color: var(--blue-300);
+  transform: translateY(-2px);
+  box-shadow: var(--glow-blue);
 }
 
 /*
@@ -61,4 +68,14 @@
   opacity: 0.45;
   cursor: not-allowed;
   transform: none;
+}
+
+/* Mouvement réduit : le bouton s'éclaire au survol sans se déplacer. */
+@media (prefers-reduced-motion: reduce) {
+  .root,
+  .primary:hover:not(:disabled):not([aria-disabled="true"]),
+  .ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+    transition: none;
+    transform: none;
+  }
 }

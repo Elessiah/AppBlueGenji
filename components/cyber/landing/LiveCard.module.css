@@ -273,3 +273,61 @@
     transition: none;
   }
 }
+
+/* Carte mise en avant : halo bleu → violet, et reflet qui balaie la bordure
+   haute (transform seul, sur une barre de 2 px — coût négligeable). Le reflet
+   est une animation infinie : il lit `--deco-anim-state` et se fige avec le
+   régime de charge, le mouvement réduit et le menu d'accessibilité. */
+.root {
+  box-shadow:
+    0 0 0 1px rgba(var(--blue-500-rgb), 0.18),
+    0 18px 48px -20px rgba(var(--violet-400-rgb), 0.45);
+}
+
+/* Horaire d'un match « En attente de lancement » : l'information de la carte. */
+.when {
+  color: var(--cyan-400);
+  font-weight: 700;
+}
+
+.shimmer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.shimmer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 40%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, var(--cyan-400), var(--violet-400), transparent);
+  transform: translateX(-100%);
+  animation: live-card-shimmer 4.5s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+@keyframes live-card-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+
+  60%,
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+/* Mouvement réduit : le reflet devient un filet fixe sur toute la largeur. */
+@media (prefers-reduced-motion: reduce) {
+  .shimmer::before {
+    animation: none;
+    transform: none;
+    width: 100%;
+    opacity: 0.5;
+  }
+}

@@ -8,8 +8,25 @@ import { ReactNode, CSSProperties, ComponentPropsWithoutRef } from "react";
  * porte une explication au survol (`title`), et il n'y a aucune raison de
  * dupliquer le composant pour cela.
  */
+export type PillVariant =
+  | "default"
+  | "live"
+  | "blue"
+  | "info"
+  | "accent"
+  | "success"
+  | "highlight"
+  | "neutral"
+  | "waiting";
+
+/** Classe CSS globale d'une variante (`app/globals.css`), `null` pour la pastille de base. */
+export function pillVariantClass(variant: PillVariant): string | null {
+  return variant === "default" ? null : `pill-${variant}`;
+}
+
 interface PillProps extends Omit<ComponentPropsWithoutRef<"span">, "children" | "className" | "style"> {
-  variant?: "default" | "live" | "blue";
+  /** Sens de la pastille (DESIGN_SYSTEM.md § Pastilles) : jamais tout gris. */
+  variant?: PillVariant;
   children: ReactNode;
   className?: string;
   style?: CSSProperties;
@@ -18,8 +35,7 @@ interface PillProps extends Omit<ComponentPropsWithoutRef<"span">, "children" | 
 export function Pill({ variant = "default", children, className = "", style, ...rest }: Readonly<PillProps>) {
   const classes = [
     "pill",
-    variant === "live" && "pill-live",
-    variant === "blue" && "pill-blue",
+    pillVariantClass(variant),
     className,
   ]
     .filter(Boolean)

@@ -6,6 +6,7 @@ import { Hero } from "@/components/cyber/landing/Hero";
 import { JoinCTA } from "@/components/cyber/landing/JoinCTA";
 import { LeaderCal } from "@/components/cyber/landing/LeaderCal";
 import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
+import { Reveal } from "@/components/cyber/landing/Reveal";
 import { SponsorsGrid } from "@/components/cyber/landing/SponsorsGrid";
 import { TournamentBoard } from "@/components/cyber/landing/TournamentBoard";
 import {
@@ -97,11 +98,22 @@ export default async function HomePage() {
       />
       <Hero stats={stats} live={live} nextUpcoming={featured} copy={copy} canEditCopy={isAdmin} />
       <Ticker items={ticker.items} />
-      <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
-      <LeaderCal leaderboard={leaderboard} events={events} />
-      <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} />
-      <SponsorsGrid sponsors={sponsors} copy={copy} isAdmin={isAdmin} />
-      <JoinCTA isAuthenticated={!!user} copy={copy} canEditCopy={isAdmin} />
+      {/* Apparition au défilement, une fois : sans JavaScript, tout est visible. */}
+      <Reveal>
+        <TournamentBoard buckets={buckets} featured={featured} miniBracket={miniBracket} />
+      </Reveal>
+      <Reveal>
+        <LeaderCal leaderboard={leaderboard} events={events} />
+      </Reveal>
+      <Reveal>
+        <AboutSection stats={aboutStats} pillars={aboutPillars} isAdmin={isAdmin} copy={copy} />
+      </Reveal>
+      <Reveal>
+        <SponsorsGrid sponsors={sponsors} copy={copy} isAdmin={isAdmin} />
+      </Reveal>
+      <Reveal>
+        <JoinCTA isAuthenticated={!!user} copy={copy} canEditCopy={isAdmin} />
+      </Reveal>
     </PublicPageShell>
   );
 }

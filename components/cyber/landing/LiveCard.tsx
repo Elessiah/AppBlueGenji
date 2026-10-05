@@ -167,6 +167,8 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
       {/* Plaque de lien : posée en premier pour rester sous les liens imbriqués
           dans l'ordre du DOM autant que par le `z-index`. */}
       <Link href={href} className={styles.cardOverlay} aria-label={openLabel} />
+      {/* Reflet qui balaie la bordure haute : décoratif, figé avec le régime de charge. */}
+      <span className={styles.shimmer} aria-hidden="true" />
 
       {/* L'état du **tournoi** est une mention secondaire, collée au jeu et au
           nom du tournoi — jamais une pastille : « EN COURS » en tête de carte
@@ -190,9 +192,16 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
           {/* La pastille dit l'état **du match**, dans les mots des sections de
               manche ; le rouge ne sert qu'à « En direct » (vraie diffusion). */}
           <div className={styles.matchHead}>
-            <Pill variant={matchPill.tone === "default" ? undefined : matchPill.tone}>{matchPill.label}</Pill>
+            <Pill variant={matchPill.tone}>{matchPill.label}</Pill>
             <span className="mono">
-              {matchPill.when ? `${matchPill.when.toUpperCase()} · ` : ""}
+              {/* L'horaire d'un match en attente est l'information de la carte :
+                  en cyan gras, pas noyé dans la ligne de phase. */}
+              {matchPill.when ? (
+                <>
+                  <span className={styles.when}>{matchPill.when.toUpperCase()}</span>
+                  {" · "}
+                </>
+              ) : null}
               {inferPhaseLabel(currentMatch)}
             </span>
           </div>
@@ -241,7 +250,7 @@ export function LiveCard({ live, nextUpcomingISO }: Readonly<LiveCardProps>) {
           <div className={styles.team}>
             <TeamSigil
               label={sigilFor(currentMatch.team2Name)}
-              color="var(--amber)"
+              color="var(--violet-400)"
               size={40}
               logoUrl={currentMatch.team2LogoUrl}
             />

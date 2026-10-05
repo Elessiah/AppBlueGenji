@@ -9,9 +9,9 @@
   --bg-2: #14161c;
   --line: rgba(255, 255, 255, 0.12);
   --line-strong: rgba(255, 255, 255, 0.24);
-  --text-0: #eef3fa;
-  --text-1: #c4ccd8;
-  --text-2: #8c95a6;
+  --text-0: #eef5ff;
+  --text-1: #c8d8ec;
+  --text-2: #93a8c6;
   --accent-blue: #59d4ff;
   --accent-orange: #ff9d2e;
   --accent-green: #4fe0a2;
@@ -37,14 +37,15 @@
   --cyber-bg-1: #0a0c11;
   --cyber-bg-2: #0f1218;
   --cyber-bg-3: #161a22;
-  --ink: #eaf2f7;
-  --ink-mute: #93a3b2;
-  /* Texte le plus atténué (mentions, sur-titres, légendes) : 4,79:1 sur
-     `--cyber-bg-3`, le fond le plus clair — au-dessus des 4,5:1 sur tout le
-     site. `--ink-faint` garde l'ancienne teinte pour ce qui n'est **pas** un
-     texte à lire : séparateurs, pastilles, traits en tirets. */
-  --ink-dim: #7a8894;
-  --ink-faint: #55636f;
+  --ink: #eaf4ff;
+  --ink-mute: #a3bcd8;
+  /* Textes secondaires teintés de bleu froid, jamais un gris neutre (palette
+     « néon froid », docs/features/DESIGN_SYSTEM.md). `--ink-dim`, le plus
+     atténué (mentions, sur-titres, légendes) : 6,26:1 sur `--cyber-bg-3`, le
+     fond le plus clair. `--ink-faint` (3,13:1) ne sert qu'à ce qui n'est **pas**
+     un texte à lire : séparateurs, pastilles, traits en tirets. */
+  --ink-dim: #859dbb;
+  --ink-faint: #55698a;
   --blue-100: #dff2ff;
   --blue-300: #8fd5ff;
   --blue-500: #5ac8ff;
@@ -61,6 +62,24 @@
   --amber-rgb: 245, 165, 36;
   --red-live: #ff4d5e;
   --red-live-rgb: 255, 77, 94;
+  /* Néons froids autour du bleu glacier, qui reste l'accent de marque : cyan
+     électrique, violet, rose néon (rehauts), sarcelle (succès). Aucune teinte
+     chaude — `--amber` n'est gardé que pour l'existant. Ratios de texte sur
+     `--cyber-bg-3` : cyan 11,6, violet-300 9,4, violet-400 6,4, rose 8,0,
+     sarcelle 11,1 (`tests/app/neon-palette.test.ts`). */
+  --cyan-400: #3ee6ff;
+  --cyan-400-rgb: 62, 230, 255;
+  --violet-300: #c4b5fd;
+  --violet-400: #a78bfa;
+  --violet-400-rgb: 167, 139, 250;
+  --pink-400: #f78ad8;
+  --pink-400-rgb: 247, 138, 216;
+  --teal-400: #3ee8b0;
+  --teal-400-rgb: 62, 232, 176;
+  --grad-brand: linear-gradient(100deg, var(--cyan-400), var(--blue-500) 45%, var(--violet-400));
+  --grad-brand-soft: linear-gradient(100deg, rgba(var(--blue-500-rgb), 0.16), rgba(var(--violet-400-rgb), 0.14));
+  --glow-blue: 0 0 24px rgba(var(--blue-500-rgb), 0.28);
+  --glow-violet: 0 0 24px rgba(var(--violet-400-rgb), 0.3);
   --line-soft: rgba(180, 210, 230, 0.08);
   --line-strong-cy: rgba(180, 210, 230, 0.14);
   --r-cy-sm: 4px;
@@ -100,7 +119,8 @@ body {
   color: var(--text-0);
   background:
     radial-gradient(520px 360px at 14% 2%, rgba(90, 200, 255, 0.16), transparent 58%),
-    radial-gradient(420px 300px at 88% -4%, rgba(90, 200, 255, 0.1), transparent 58%),
+    radial-gradient(420px 300px at 88% -4%, rgba(167, 139, 250, 0.13), transparent 58%),
+    radial-gradient(600px 420px at 70% 38%, rgba(62, 230, 255, 0.05), transparent 64%),
     linear-gradient(180deg, #06070a, var(--bg-0) 55%, #06070a);
   /* Inter par défaut : Exo 2 (`--font-body`) est dépréciée, et un texte qui
      n'en demandait aucune y retombait — d'où des modales mi-Inter, mi-Exo 2. */
@@ -1398,7 +1418,7 @@ html {
   font-size: 11px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--blue-300);
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -1407,9 +1427,9 @@ html {
 .eyebrow::before {
   content: "";
   width: 18px;
-  height: 1px;
-  background: currentColor;
-  opacity: 0.5;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--grad-brand);
 }
 
 .display {
@@ -1503,7 +1523,8 @@ html {
   font-size: 11px;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--ink-mute);
+  color: var(--blue-300);
+  background: rgba(var(--blue-500-rgb), 0.05);
 }
 
 .pill-live {
@@ -1557,8 +1578,130 @@ html {
 
 .pill-blue {
   color: var(--blue-300);
-  border-color: rgba(90, 200, 255, 0.3);
-  background: rgba(90, 200, 255, 0.04);
+  border-color: rgba(90, 200, 255, 0.4);
+  background: rgba(90, 200, 255, 0.1);
+}
+
+/* Variantes sémantiques — « jamais tout gris » (DESIGN_SYSTEM.md § Pastilles).
+   `.pill` / `.tag` nus restent bleutés ; une pastille colorée choisit son sens :
+   info (bleu), accent (violet), succès (sarcelle), rehaut (rose), neutre
+   seulement pour ce qui l'est vraiment. Le rouge reste à `.pill-live`. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.3);
+  border-radius: 999px;
+  background: rgba(var(--blue-500-rgb), 0.05);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue-300);
+}
+
+.pill-info,
+.tag-info {
+  color: var(--blue-300);
+  border-color: rgba(var(--blue-500-rgb), 0.4);
+  background: rgba(var(--blue-500-rgb), 0.1);
+}
+
+.pill-accent,
+.tag-accent {
+  color: var(--violet-300);
+  border-color: rgba(var(--violet-400-rgb), 0.45);
+  background: rgba(var(--violet-400-rgb), 0.12);
+}
+
+.pill-success,
+.tag-success {
+  color: var(--teal-400);
+  border-color: rgba(var(--teal-400-rgb), 0.4);
+  background: rgba(var(--teal-400-rgb), 0.1);
+}
+
+.pill-highlight,
+.tag-highlight {
+  color: var(--pink-400);
+  border-color: rgba(var(--pink-400-rgb), 0.4);
+  background: rgba(var(--pink-400-rgb), 0.1);
+}
+
+.pill-neutral,
+.tag-neutral {
+  color: var(--ink-mute);
+  border-color: var(--line-strong-cy);
+  background: transparent;
+}
+
+/* « En attente de lancement » : un match daté, à venir — teinte violette et
+   halo doux qui respire, l'horaire mis en valeur à côté (`LiveCard` `.when`). Le
+   halo est une `box-shadow` animée sur la pastille seule (petite surface) et se
+   fige avec le régime de charge. */
+.pill-waiting {
+  color: var(--violet-300);
+  border-color: rgba(var(--violet-400-rgb), 0.55);
+  background: rgba(var(--violet-400-rgb), 0.14);
+  animation: pill-waiting-glow 2.8s ease-in-out infinite;
+  animation-play-state: var(--deco-anim-state);
+}
+
+@keyframes pill-waiting-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--violet-400-rgb), 0);
+  }
+  50% {
+    box-shadow: 0 0 14px 1px rgba(var(--violet-400-rgb), 0.38);
+  }
+}
+
+/* Titre en dégradé de marque (bleu → violet). Le dégradé ne peint que la
+   boîte : les jambages sont gardés par un léger rembourrage compensé. */
+.text-gradient {
+  background: var(--grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  padding-bottom: 0.12em;
+  margin-bottom: -0.12em;
+}
+
+/* Survol des cartes et appels à l'action : léger soulèvement, en transform
+   seulement (aucun décalage de mise en page). */
+.hover-lift {
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--glow-blue);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hover-lift,
+  .hover-lift:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* Apparition au défilement (`components/cyber/landing/Reveal.tsx`) : la classe
+   `reveal-pending` n'est posée **que par JavaScript**, et seulement si les
+   animations décoratives sont permises — sans JS, le contenu est visible. */
+.reveal-pending {
+  opacity: 0;
+  transform: translateY(18px);
+}
+
+.reveal-in {
+  opacity: 1;
+  transform: none;
+  transition:
+    opacity 0.6s ease,
+    transform 0.6s ease;
 }
 
 .card-ticks {
@@ -1599,6 +1742,20 @@ html {
   justify-content: space-between;
   border-top: 1px solid var(--line-soft);
   padding: 24px 0 28px;
+  position: relative;
+}
+
+/* Accent coloré de section : un trait de marque (cyan → violet) sur le filet. */
+.section-head::before {
+  content: "";
+  position: absolute;
+  top: -1px;
+  left: 0;
+  width: 72px;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--grad-brand);
+  pointer-events: none;
 }
 
 @media (max-width: 920px) {
@@ -2017,12 +2174,12 @@ input[type="radio"]:disabled:checked {
 :root[data-a11y~="contrast"],
 .a11y-always-contrast {
   --ink: #f4f8fb;
-  --ink-mute: #b9c6d2;
-  --ink-dim: #95a3b1;
-  --ink-faint: #95a3b1;
+  --ink-mute: #c4d4e6;
+  --ink-dim: #a6b9d0;
+  --ink-faint: #a6b9d0;
   --text-0: #f4f8fb;
-  --text-1: #dfe5ee;
-  --text-2: #b3bccb;
+  --text-1: #e3ecf7;
+  --text-2: #bccbdf;
   --blue-700: #62b6e0;
   --line: rgba(255, 255, 255, 0.3);
   --line-strong: rgba(255, 255, 255, 0.5);
