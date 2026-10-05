@@ -75,8 +75,8 @@ export function CountUp({ value, className }: Readonly<{ value: number; classNam
       {/* Le chiffre qui défile est décoratif ; la valeur réelle reste dans la
           page pour les lecteurs d'écran, la recherche et la traduction, même
           pendant l'attente d'un chiffre hors de l'écran (parqué à 0). */}
-      <span aria-hidden="true">{shown}</span>
-      <span className="sr-only">{value}</span>
+      <span className="count-up-anim" aria-hidden="true">{shown}</span>
+      <span className="sr-only count-up-real">{value}</span>
     </div>
   );
 }

@@ -1734,6 +1734,22 @@ html {
     background: none;
     color: var(--blue-500);
   }
+
+  /* Décompte (`CountUp`) : un chiffre hors de l'écran attend à 0 — l'imprimé
+     montre la valeur réelle, pas le chiffre qui défile. */
+  .count-up-anim {
+    display: none;
+  }
+
+  .count-up-real {
+    position: static;
+    width: auto;
+    height: auto;
+    margin: 0;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+  }
 }
 
 .card-ticks {

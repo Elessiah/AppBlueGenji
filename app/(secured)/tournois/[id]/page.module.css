@@ -107,16 +107,17 @@
 }
 
 /* Le survol du bouton fantôme vire au bleu : ici, la couleur dit la nature du
-   geste, elle ne change pas sous le pointeur. Sélecteur alourdi pour dépasser
+   geste, elle ne change pas sous le pointeur — ni le halo bleu des boutons
+   fantômes. Sélecteur alourdi pour dépasser
    celui de `CyberButton` (`.ghost:hover:not(…):not(…)`). */
 .danger .dangerRow .rollbackAction:hover:not([aria-disabled="true"]) {
   border-color: var(--amber);
   color: var(--amber);
-  box-shadow: 0 0 18px rgba(var(--amber-rgb), 0.3);
+  box-shadow: none;
 }
 
 .danger .dangerRow .deleteAction:hover:not(:disabled) {
   border-color: var(--red-live);
   color: var(--red-live);
-  box-shadow: 0 0 18px rgba(var(--red-live-rgb), 0.3);
+  box-shadow: none;
 }
