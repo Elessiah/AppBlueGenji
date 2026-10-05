@@ -104,9 +104,10 @@
   color: var(--teal-400);
 }
 
-/* Score du perdant : la teinte réservée à la défaite (DESIGN_SYSTEM.md § Défaite) ;
-   un forfait garde son ambre. */
-.decided .score:not(.forfeitScore) {
+/* Score du perdant : la teinte réservée à la défaite (DESIGN_SYSTEM.md § Défaite).
+   Posée par `MatchRow` sur un vrai perdant seulement — ni case vide d'une
+   exemption, ni forfait, qui garde son ambre. */
+.lostScore {
   color: var(--result-loss-ink);
 }
 
