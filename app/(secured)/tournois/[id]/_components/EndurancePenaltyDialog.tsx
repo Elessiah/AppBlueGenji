@@ -105,7 +105,7 @@ export function EndurancePenaltyDialog({
         <h3 id="endurance-penalty-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
           Pénalité d&apos;endurance
         </h3>
-        <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
+        <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
           {teamName} · {currentPoints} point{currentPoints > 1 ? "s" : ""} ·{" "}
           {round > 0 ? `manche ${round}` : "avant la première manche"}
         </p>
@@ -152,7 +152,7 @@ export function EndurancePenaltyDialog({
             style={{
               margin: "6px 0 0",
               fontSize: 12,
-              color: hintIsWarning ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+              color: hintIsWarning ? "rgba(255,74,92,0.95)" : "var(--ink-quiet, #9aa4b2)",
             }}
           >
             {hint}

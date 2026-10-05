@@ -49,7 +49,7 @@ describe("Régions nommées des panneaux flottants", () => {
 describe("Intitulé d'un `.field` sans contrôle", () => {
   it("`.field-label` reprend le style d'un `<label>` de champ", () => {
     const css = read("app/globals.css");
-    expect(css).toMatch(/\.field label,\s*\.field \.field-label\s*\{\s*font-size: 13px;\s*color: var\(--text-1\);/);
+    expect(css).toMatch(/\.field label,\s*\.field \.field-label\s*\{\s*font-size: 13px;\s*color: var\(--ink-soft\);/);
   });
 
   it.each<[string, string]>([

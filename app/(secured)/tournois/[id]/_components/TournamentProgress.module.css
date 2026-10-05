@@ -21,13 +21,13 @@
 .headLabel {
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-0);
+  color: var(--ink);
   letter-spacing: -0.01em;
 }
 
 .headHint {
   font-size: 13px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 .percent {
@@ -156,12 +156,12 @@
 .captionLabel {
   font-size: 12px;
   font-weight: 600;
-  color: var(--text-2);
+  color: var(--ink-quiet);
   transition: color 0.25s ease;
 }
 
 .captionLabelDone {
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .captionLabelCurrent {
@@ -190,11 +190,11 @@
   flex-wrap: wrap;
   margin-top: 18px;
   font-size: 13px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 .footStrong {
-  color: var(--text-1);
+  color: var(--ink-soft);
   font-weight: 600;
 }
 

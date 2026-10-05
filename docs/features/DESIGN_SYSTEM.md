@@ -7,9 +7,9 @@ Texte déplacé tel quel depuis `CLAUDE.md` (allègement du fichier chargé à c
 La refonte « Cyber minimal » est complète (Phases 1–7). Design final : noir profond teinté cool, bleu glacier `#5ac8ff`, typographie Inter / JetBrains Mono / Orbitron, glow paramétrable.
 
 ### Tokens CSS
-- **Cyber tokens** : `--cyber-bg`, `--cyber-bg-1`, `--cyber-bg-2`, `--cyber-bg-3`, `--ink`, `--ink-mute`, `--ink-dim` (texte le plus atténué, ≥ 4,5:1), `--ink-faint` (ornements seulement, jamais un texte à lire), `--blue-100`–`--blue-700`, `--blue-glow`, `--amber` (existant seulement, voir plus bas), `--red-live` (+ `--amber-rgb`, `--red-live-rgb` pour les voiles translucides), `--line-soft`, `--line-strong-cy`, `--r-cy-sm/md/lg`
+- **Cyber tokens** : `--cyber-bg`, `--cyber-bg-1`, `--cyber-bg-2`, `--cyber-bg-3`, `--ink`, `--ink-soft`, `--ink-mute`, `--ink-quiet`, `--ink-dim` (texte le plus atténué, ≥ 4,5:1), `--ink-faint` (ornements seulement, jamais un texte à lire), `--blue-100`–`--blue-700`, `--blue-glow`, `--amber` (existant seulement, voir plus bas), `--red-live` (+ `--amber-rgb`, `--red-live-rgb` pour les voiles translucides), `--line-soft`, `--line-strong-cy`, `--r-cy-sm/md/lg`
 - **Néons froids** (2026-10) : `--cyan-400`, `--violet-300`, `--violet-400`, `--pink-400`, `--teal-400` (+ `-rgb`), `--grad-brand` (cyan → glacier → violet), `--grad-brand-soft`, `--glow-blue`, `--glow-violet` — voir § Palette « néon froid »
-- **Legacy tokens** conservés pour retrocompatibilité (encore lus) : `--bg-0`–`--bg-2`, `--line`, `--line-strong`, `--text-0`–`--text-2`, `--accent-blue`, `--accent-green`, `--danger`, `--blue-rgb`, `--green-rgb`, `--danger-rgb`, `--radius`, `--radius-sm`, `--shadow`. Retirés (lot « Nettoyage ») : `--accent-orange`, `--orange-rgb`, `--purple-rgb` (classes `purple` des équipes → `--violet-400-rgb`)
+- **Legacy tokens** conservés pour retrocompatibilité (encore lus) : `--bg-0`–`--bg-2`, `--line`, `--line-strong`, `--accent-blue`, `--accent-green`, `--danger`, `--blue-rgb`, `--green-rgb`, `--danger-rgb`, `--radius`, `--radius-sm`, `--shadow`. Retirés (lot « Nettoyage ») : `--accent-orange`, `--orange-rgb`, `--purple-rgb` (classes `purple` des équipes → `--violet-400-rgb`). Retirés (migration des jetons de texte) : `--text-0` → `--ink`, `--text-1` → `--ink-soft`, `--text-2` → `--ink-quiet` — mêmes valeurs, contraste renforcé compris, sauf `--text-0` (`#eef5ff`) qui rejoint `--ink` (`#eaf4ff`, écart imperceptible ; identiques en contraste renforcé). Garde : `tests/app/css-tokens.test.ts` refuse tout `--text-<chiffre>` dans les sources
 
 ### Palette « néon froid » (2026-10)
 
@@ -25,9 +25,9 @@ Demande : un site plus lumineux, « qui fasse rêver » côté jeu, sans dégrad
 | Jeton | Valeur | sur `--cyber-bg-3` `#161a22` | sur `--cyber-bg` `#05060a` |
 | --- | --- | --- | --- |
 | `--ink` | `#eaf4ff` | 15,67 | 18,21 |
-| `--text-1` | `#c8d8ec` | 12,02 | 13,97 |
+| `--ink-soft` | `#c8d8ec` | 12,02 | 13,97 |
 | `--ink-mute` | `#a3bcd8` | 8,91 | 10,36 |
-| `--text-2` | `#93a8c6` | 7,18 | 8,35 |
+| `--ink-quiet` | `#93a8c6` | 7,18 | 8,35 |
 | `--ink-dim` | `#859dbb` | 6,26 | 7,27 |
 | `--ink-faint` (ornement, pas un texte) | `#55698a` | 3,13 | 3,64 |
 | `--cyan-400` | `#3ee6ff` | 11,59 | 13,47 |
@@ -37,7 +37,7 @@ Demande : un site plus lumineux, « qui fasse rêver » côté jeu, sans dégrad
 | `--pink-400` | `#f78ad8` | 7,95 | 9,24 |
 | `--teal-400` | `#3ee8b0` | 11,10 | 12,90 |
 
-Contraste renforcé (`data-a11y~="contrast"`) : `--ink-mute` `#c4d4e6` (11,54), `--ink-dim` / `--ink-faint` `#a6b9d0` (8,69), `--text-1` `#e3ecf7`, `--text-2` `#bccbdf` — toujours au-dessus des valeurs par défaut (`accessibility-styles.test.ts`).
+Contraste renforcé (`data-a11y~="contrast"`) : `--ink-mute` `#c4d4e6` (11,54), `--ink-dim` / `--ink-faint` `#a6b9d0` (8,69), `--ink-soft` `#e3ecf7`, `--ink-quiet` `#bccbdf` — toujours au-dessus des valeurs par défaut (`accessibility-styles.test.ts`).
 
 #### Pastilles et étiquettes — variantes
 

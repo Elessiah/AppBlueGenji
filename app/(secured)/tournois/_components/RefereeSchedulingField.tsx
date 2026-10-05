@@ -103,7 +103,7 @@ export function RefereeSchedulingField({
             border: "1px solid rgba(var(--amber-rgb), 0.4)",
             background: "rgba(var(--amber-rgb), 0.1)",
             fontSize: 12,
-            color: "var(--text-1, #c3ccd8)",
+            color: "var(--ink-soft, #c3ccd8)",
           }}
         >
           {ENABLE_PLANNING_WHILE_RUNNING_WARNING}

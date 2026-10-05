@@ -36,11 +36,11 @@ export default function PlayerDetailPage() {
     },
   );
   if (status === "loading")
-    return <section className="ds-block" style={{ color: "var(--text-2)" }}>Chargement du profil joueur...</section>;
+    return <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>Chargement du profil joueur...</section>;
 
   if (status === "not-found")
     return (
-      <section className="ds-block" style={{ color: "var(--text-2)" }}>
+      <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>
         Joueur non trouvé.{" "}
         <Link href="/joueurs" style={{ color: "var(--blue-100)" }}>
           Retour aux joueurs
@@ -51,7 +51,7 @@ export default function PlayerDetailPage() {
   if (status === "error") {
     showError(error ?? "PLAYER_LOAD_FAILED");
     return (
-      <section className="ds-block" style={{ color: "var(--text-2)" }}>
+      <section className="ds-block" style={{ color: "var(--ink-quiet)" }}>
         Erreur lors du chargement du joueur.{" "}
         <Link href="/joueurs" style={{ color: "var(--blue-100)" }}>
           Retour aux joueurs

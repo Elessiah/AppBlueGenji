@@ -116,7 +116,7 @@ export function AdvanceTournamentDialog({
     >
       <p
         id="advance-tournament-summary"
-        style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
+        style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}
       >
         {target === "REGISTRATION" && (
           <>
@@ -161,7 +161,7 @@ export function AdvanceTournamentDialog({
           alignItems: "baseline",
         }}
       >
-        <dt style={{ color: "var(--text-2, #9aa4b2)" }}>Étape</dt>
+        <dt style={{ color: "var(--ink-quiet, #9aa4b2)" }}>Étape</dt>
         <dd
           style={{
             margin: 0,
@@ -176,7 +176,7 @@ export function AdvanceTournamentDialog({
             inscriptions et au coup d'envoi. Les ouvrir ne le fige pas. */}
         {target !== "REGISTRATION" && (
           <>
-            <dt style={{ color: "var(--text-2, #9aa4b2)" }}>
+            <dt style={{ color: "var(--ink-quiet, #9aa4b2)" }}>
               {target === "RUNNING"
                 ? `${entrantNoun} au départ`
                 : "Effectif final"}
@@ -189,7 +189,7 @@ export function AdvanceTournamentDialog({
       </dl>
 
       {publishes && (
-        <p style={{ marginTop: 14, fontSize: 13, lineHeight: 1.55, color: "var(--text-2, #9aa4b2)" }}>
+        <p style={{ marginTop: 14, fontSize: 13, lineHeight: 1.55, color: "var(--ink-quiet, #9aa4b2)" }}>
           Ce tournoi n&apos;était pas encore publié : ouvrir ses inscriptions le rend visible de
           tous.
         </p>

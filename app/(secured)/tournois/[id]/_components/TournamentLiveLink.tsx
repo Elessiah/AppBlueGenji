@@ -113,7 +113,7 @@ export function TournamentLiveLink({
             style={{
               margin: "6px 0 0",
               fontSize: 12,
-              color: draftInvalid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+              color: draftInvalid ? "rgba(255,74,92,0.95)" : "var(--ink-quiet, #9aa4b2)",
             }}
           >
             {draftInvalid

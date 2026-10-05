@@ -110,7 +110,7 @@
   font-size: 11px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-2, #8c95a6);
+  color: var(--ink-quiet, #8c95a6);
 }
 
 /*
@@ -140,7 +140,7 @@
 
 /* Capital vidé : la case reste un nombre, mais elle ne se lit plus comme un score sain. */
 .historyZero {
-  color: var(--text-2, #8c95a6);
+  color: var(--ink-quiet, #8c95a6);
 }
 
 /*
@@ -162,7 +162,7 @@
 
 /* Manche que l'équipe n'a pas disputée : rien à montrer, sans trou dans la grille. */
 .historyOut {
-  color: var(--text-2, #8c95a6);
+  color: var(--ink-quiet, #8c95a6);
   opacity: 0.45;
 }
 
@@ -191,7 +191,7 @@
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--text-2, #8c95a6);
+  color: var(--ink-quiet, #8c95a6);
 }
 
 /*
@@ -241,7 +241,7 @@
   gap: 8px;
   flex-wrap: wrap;
   font-size: 12px;
-  color: var(--text-1, #c3cad6);
+  color: var(--ink-soft, #c3cad6);
   padding: 6px 10px;
   border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
   border-radius: var(--r-cy-sm, 6px);
@@ -255,7 +255,7 @@
 
 .penaltyMeta {
   font-size: 11px;
-  color: var(--text-2, #8c95a6);
+  color: var(--ink-quiet, #8c95a6);
 }
 
 /* Le motif prend la place restante : c'est lui qu'on vient lire. */

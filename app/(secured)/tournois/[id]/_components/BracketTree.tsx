@@ -185,7 +185,7 @@ export function BracketTree({
                 justifyContent: "center",
                 width: CARD_W + (isLast ? 0 : CONN_W),
                 fontSize: 11,
-                color: "var(--text-2)",
+                color: "var(--ink-quiet)",
                 letterSpacing: "0.08em",
                 textTransform: "uppercase",
                 fontWeight: 600,
@@ -210,7 +210,7 @@ export function BracketTree({
                         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: label || isTarget ? 2 : 0 }}
                       >
                         {(label || isTarget) && (
-                          <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--text-2)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
+                          <div style={{ fontSize: 11, color: isTarget ? accentColor : "var(--ink-quiet)", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", lineHeight: 1 }}>
                             {isTarget ? `★ ${label ?? "Votre match"}` : label}
                           </div>
                         )}

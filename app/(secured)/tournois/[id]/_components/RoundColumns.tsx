@@ -130,7 +130,7 @@ export function RoundColumns({
       revealKey={lastRound}
     >
       {roundNums.length === 0 ? (
-        <p style={{ color: "var(--text-2)", fontSize: 14 }}>{emptyLabel}</p>
+        <p style={{ color: "var(--ink-quiet)", fontSize: 14 }}>{emptyLabel}</p>
       ) : (
         <div style={{ display: "flex", gap: 16 }}>
           {roundNums.map((roundNum) => {
@@ -155,7 +155,7 @@ export function RoundColumns({
                       fontSize: 11,
                       textTransform: "uppercase",
                       letterSpacing: "0.08em",
-                      color: "var(--text-2)",
+                      color: "var(--ink-quiet)",
                       fontWeight: 600,
                     }}
                   >
@@ -191,7 +191,7 @@ export function RoundColumns({
                             title={match.team1Name ?? undefined}
                             truncate
                             style={{ display: "flex" }}
-                            textStyle={{ color: "var(--text-0)", fontWeight: 600 }}
+                            textStyle={{ color: "var(--ink)", fontWeight: 600 }}
                           />
                           <span style={{ fontSize: 11, color: ACCENT }}>
                             ✓ Victoire d&apos;office

@@ -33,7 +33,7 @@
 .tagline {
   max-width: 62ch;
   margin: 0 0 24px;
-  color: var(--text-1);
+  color: var(--ink-soft);
   font-size: 16px;
   line-height: 1.6;
 }

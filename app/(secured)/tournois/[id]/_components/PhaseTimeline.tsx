@@ -72,18 +72,18 @@ export function PhaseTimeline({
                   style={{
                     fontSize: 11,
                     fontWeight: 700,
-                    color: "var(--text-2)",
+                    color: "var(--ink-quiet)",
                     minWidth: 20,
                   }}
                 >
                   {idx + 1}
                 </span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-0)" }}>
+                <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
                   {label}
                 </span>
               </div>
               {subtitle && (
-                <div style={{ fontSize: 11, color: "var(--text-2)", marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: "var(--ink-quiet)", marginBottom: 6 }}>
                   {subtitle}
                 </div>
               )}

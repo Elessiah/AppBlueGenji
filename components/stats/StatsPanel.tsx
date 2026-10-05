@@ -181,7 +181,7 @@ function ActivityChart({ stats }: Readonly<{ stats: DeepStats }>) {
                 y={height - 6}
                 textAnchor="middle"
                 fontSize={11}
-                style={{ fill: "var(--text-2)" }}
+                style={{ fill: "var(--ink-quiet)" }}
               >
                 {monthLabel(point.month)}
               </text>

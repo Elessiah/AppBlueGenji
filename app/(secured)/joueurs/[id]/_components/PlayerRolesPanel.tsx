@@ -82,7 +82,7 @@ export function PlayerRolesPanel({
       <div className="ds-section-title purple">
         <h2>Rôles &amp; permissions</h2>
       </div>
-      <p style={{ color: "var(--text-2)", fontSize: 13, marginBottom: 16 }}>
+      <p style={{ color: "var(--ink-quiet)", fontSize: 13, marginBottom: 16 }}>
         Les rôles sont cumulables. Un administrateur dispose de tous les droits, dont l&apos;attribution des rôles.
       </p>
       <fieldset className="native-group" aria-label="Rôles de permission" style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -101,7 +101,7 @@ export function PlayerRolesPanel({
                 style={{ marginTop: 3 }}
               />
               <span>
-                <span style={{ display: "block", fontSize: 14, color: "var(--text-0)" }}>{ROLE_LABELS[role]}</span>
+                <span style={{ display: "block", fontSize: 14, color: "var(--ink)" }}>{ROLE_LABELS[role]}</span>
                 <span style={{ display: "block", fontSize: 12, color: "var(--ink-mute)" }}>{ROLE_DESCRIPTIONS[role]}</span>
               </span>
             </label>

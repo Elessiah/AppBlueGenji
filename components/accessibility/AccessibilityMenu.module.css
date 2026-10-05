@@ -115,7 +115,7 @@
      transparaît derrière des réglages de lisibilité serait un contresens. */
   background: var(--cyber-bg-1, #0a0c11);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.6);
-  color: var(--text-1, #c4ccd8);
+  color: var(--ink-soft, #c4ccd8);
   font-family: var(--font-sans), sans-serif;
   transform-origin: left center;
   animation: a11yPanelIn 0.16s ease-out;
@@ -246,7 +246,7 @@
 }
 
 .optionDescription {
-  color: var(--text-1, #c4ccd8);
+  color: var(--ink-soft, #c4ccd8);
   font-size: 12px;
   line-height: 1.45;
 }

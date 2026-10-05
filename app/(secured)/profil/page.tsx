@@ -640,7 +640,7 @@ export default function ProfilePage() {
 
   if (!data) {
     return (
-      <section className="ds-block" style={{ color: "var(--text-1)" }}>
+      <section className="ds-block" style={{ color: "var(--ink-soft)" }}>
         Chargement du profil…
       </section>
     );

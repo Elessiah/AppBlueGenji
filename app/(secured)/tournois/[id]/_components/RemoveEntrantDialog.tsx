@@ -92,7 +92,7 @@ export function RemoveEntrantDialog({
     >
       <p
         id="remove-entrant-summary"
-        style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
+        style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}
       >
         L&apos;inscription est <strong style={{ color: "var(--ink)" }}>effacée</strong> : rien
         n&apos;indiquera que cet engagé a pris part au tournoi, à la différence d&apos;un abandon.
@@ -101,7 +101,7 @@ export function RemoveEntrantDialog({
 
       {registrationOpen ? (
         <p
-          style={{ marginTop: 12, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}
+          style={{ marginTop: 12, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}
         >
           Les inscriptions sont ouvertes : la place libérée peut être reprise, et cet engagé
           réinscrit.

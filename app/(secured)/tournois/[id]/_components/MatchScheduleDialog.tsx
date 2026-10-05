@@ -100,7 +100,7 @@ function ScheduleWarning({ children }: Readonly<{ children: ReactNode }>) {
         border: "1px solid rgba(var(--amber-rgb), 0.4)",
         background: "rgba(var(--amber-rgb), 0.1)",
         fontSize: 12,
-        color: "var(--text-1, #c3ccd8)",
+        color: "var(--ink-soft, #c3ccd8)",
       }}
     >
       {children}
@@ -304,7 +304,7 @@ export function MatchScheduleDialog({
           <h3 id="match-schedule-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
             {planning ? "Planifier le match" : "Date de début du match"}
           </h3>
-          <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
+          <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
             {match.team1Name ?? "TBD"} vs {match.team2Name ?? "TBD"}
           </p>
 
@@ -447,7 +447,7 @@ export function MatchScheduleDialog({
           )}
           <p
             id={HINT_ID}
-            style={{ margin: "6px 0 0", fontSize: 12, color: "var(--text-2, #9aa4b2)" }}
+            style={{ margin: "6px 0 0", fontSize: 12, color: "var(--ink-quiet, #9aa4b2)" }}
           >
             {startAtHint(refereeScheduling)}
           </p>

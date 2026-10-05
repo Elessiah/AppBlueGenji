@@ -125,12 +125,12 @@ export function RollbackRoundDialog({
         Effacer {stageLabel}
       </h3>
 
-      <p style={{ marginTop: 10, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
+      <p style={{ marginTop: 10, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
         <strong style={{ color: "var(--ink)" }}>{stageLabel}</strong> perd tout ce qui y a été
         saisi : scores, vainqueurs, forfaits de match et reports en attente. Les rencontres
         restent en place, avec les mêmes équipes, et redeviennent à jouer.
       </p>
-      <p style={{ marginTop: 8, fontSize: 13, color: "var(--text-2, #9aa4b2)", lineHeight: 1.55 }}>
+      <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)", lineHeight: 1.55 }}>
         C&apos;est ce qui rouvre la manche précédente à la correction. Le geste se répète : chaque
         fois, le tournoi recule d&apos;une manche. Les abandons et les pénalités déjà déclarés,
         eux, restent en vigueur.
@@ -207,7 +207,7 @@ export function RollbackRoundDialog({
                 background: "var(--cyber-bg-3, #1b2029)",
               }}
             >
-              <span style={{ color: "var(--text-2, #9aa4b2)" }}>
+              <span style={{ color: "var(--ink-quiet, #9aa4b2)" }}>
                 {teamLabel(match.team1Name, match.team1Placeholder, "À venir")} vs{" "}
                 {teamLabel(match.team2Name, match.team2Placeholder, "À venir")}
               </span>
@@ -231,7 +231,7 @@ export function RollbackRoundDialog({
             marginTop: 16,
             fontSize: 13,
             lineHeight: 1.5,
-            color: "var(--text-2, #9aa4b2)",
+            color: "var(--ink-quiet, #9aa4b2)",
             cursor: busy ? "default" : "pointer",
           }}
         >

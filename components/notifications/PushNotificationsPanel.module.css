@@ -51,7 +51,7 @@
   margin: 0;
   font-size: 13px;
   line-height: 1.6;
-  color: var(--text-1);
+  color: var(--ink-soft);
   max-width: 68ch;
 }
 
@@ -59,7 +59,7 @@
   margin: 0;
   font-size: 12px;
   line-height: 1.65;
-  color: var(--text-1);
+  color: var(--ink-soft);
   max-width: 68ch;
 }
 
@@ -79,7 +79,7 @@
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.09em;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .topicList {
@@ -123,5 +123,5 @@
 .topicDesc {
   font-size: 12px;
   line-height: 1.5;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }

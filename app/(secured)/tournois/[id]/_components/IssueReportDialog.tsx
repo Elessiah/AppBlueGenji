@@ -74,7 +74,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
         <h3 id="issue-report-title" style={{ margin: 0, fontSize: 18, color: "var(--ink)" }}>
           Signaler un problème
         </h3>
-        <p style={{ marginTop: 6, fontSize: 13, color: "var(--text-2, #9aa4b2)" }}>
+        <p style={{ marginTop: 6, fontSize: 13, color: "var(--ink-quiet, #9aa4b2)" }}>
           {match
             ? `Match : ${match.team1Name ?? "TBD"} vs ${match.team2Name ?? "TBD"}`
             : "Portée : tournoi entier"}
@@ -98,7 +98,7 @@ export function IssueReportDialog({ tournamentId, match, onClose }: Readonly<Iss
             style={{
               margin: "6px 0 0",
               fontSize: 12,
-              color: touched && !valid ? "rgba(255,74,92,0.95)" : "var(--text-2, #9aa4b2)",
+              color: touched && !valid ? "rgba(255,74,92,0.95)" : "var(--ink-quiet, #9aa4b2)",
             }}
           >
             {touched && !valid

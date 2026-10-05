@@ -16,7 +16,7 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid var(--line-soft, rgba(255, 255, 255, 0.08));
   box-sizing: border-box;
-  color: var(--ink-mute, var(--text-2));
+  color: var(--ink-mute, var(--ink-quiet));
   font-size: max(11px, calc(var(--size) * 0.56));
   font-weight: 600;
   line-height: 1;

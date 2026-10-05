@@ -50,14 +50,14 @@
   flex: 0 0 auto;
   font-family: var(--font-mono);
   font-size: 11px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
   text-transform: uppercase;
 }
 
 .bye {
   flex: 1 1 auto;
   font-size: 12px;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .tag {
@@ -69,7 +69,7 @@
   font-size: 11px;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .warning {
@@ -78,19 +78,19 @@
   border-left: 3px solid var(--amber);
   background: rgba(var(--amber-rgb), 0.08);
   font-size: 12px;
-  color: var(--text-0);
+  color: var(--ink);
 }
 
 .empty {
   margin: 0;
   font-size: 13px;
-  color: var(--text-1);
+  color: var(--ink-soft);
 }
 
 .footnote {
   margin: 0;
   font-size: 11px;
-  color: var(--text-2);
+  color: var(--ink-quiet);
 }
 
 @media (max-width: 620px) {
