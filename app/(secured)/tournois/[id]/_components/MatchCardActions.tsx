@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import {
   ArrowLeftRight,
   CalendarClock,
@@ -65,6 +65,33 @@ const ICONS: Record<MatchCardActionId, LucideIcon> = {
   replay: Film,
   report: TriangleAlert,
 };
+
+const useIsomorphicLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
+
+type PanelPlacement = { top: number; left: number; width: number; up: boolean };
+
+const samePlacement = (a: PanelPlacement | null, b: PanelPlacement) =>
+  a !== null && a.top === b.top && a.left === b.left && a.width === b.width && a.up === b.up;
+
+/**
+ * Où poser le panneau ouvert (coordonnées de la fenêtre) : sous le pied
+ * d'action, à la largeur de la carte (bordure comprise) ; au-dessus quand la
+ * place manque en bas et qu'il y en a davantage en haut.
+ */
+export function panelPlacement(
+  footer: Pick<DOMRect, "top" | "bottom" | "left" | "width">,
+  panelHeight: number,
+  viewportHeight: number,
+): PanelPlacement {
+  const below = viewportHeight - footer.bottom;
+  const up = below < panelHeight + 8 && footer.top > below;
+  return {
+    top: Math.round(up ? footer.top - panelHeight + 4 : footer.bottom - 4),
+    left: Math.round(footer.left - 1),
+    width: Math.round(footer.width + 2),
+    up,
+  };
+}
 
 const TONE_CLASS = {
   primary: styles.tonePrimary,
@@ -144,6 +171,52 @@ export function MatchCardActions({
     return () => {
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onPointer);
+    };
+  }, [expanded]);
+
+  // Placement du panneau ouvert, en coordonnées de la fenêtre : il est en
+  // `position: fixed`, ce qui le sort des conteneurs qui rognent (cadre des
+  // plateaux, zones défilantes de l'arbre et des manches) sans le sortir du
+  // DOM de la carte — l'ordre de tabulation reste celui de la carte.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [placement, setPlacement] = useState<PanelPlacement | null>(null);
+  useIsomorphicLayoutEffect(() => {
+    if (!expanded) {
+      setPlacement(null);
+      return;
+    }
+    let frame = 0;
+    const place = () => {
+      const root = rootRef.current;
+      const panel = panelRef.current;
+      if (!root || !panel) return;
+      // Un ancêtre transformé (l'apparition `.fade-in` de la page garde sa
+      // matrice) devient le repère d'un `position: fixed` : on mesure où ce
+      // repère se trouve à l'écran, et on retranche son origine.
+      const rect = panel.getBoundingClientRect();
+      const originTop = rect.top - (Number.parseFloat(panel.style.top) || 0);
+      const originLeft = rect.left - (Number.parseFloat(panel.style.left) || 0);
+      const onScreen = panelPlacement(root.getBoundingClientRect(), panel.offsetHeight, window.innerHeight);
+      const next = {
+        ...onScreen,
+        top: Math.round(onScreen.top - originTop),
+        left: Math.round(onScreen.left - originLeft),
+      };
+      setPlacement((previous) => (samePlacement(previous, next) ? previous : next));
+    };
+    // Défilement d'une zone quelconque (capture) ou de la fenêtre : le
+    // panneau suit sa carte, une fois par image au plus.
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(place);
+    };
+    place();
+    window.addEventListener("scroll", schedule, true);
+    window.addEventListener("resize", schedule);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule, true);
+      window.removeEventListener("resize", schedule);
     };
   }, [expanded]);
 
@@ -270,7 +343,16 @@ export function MatchCardActions({
           élément qui existe, et le panneau ne porte que des boutons — seuls
           l'arbitrage et la diffusion en ont plus d'un. */}
       {more.length > 0 && (
-        <div id={panelId} className={styles.panel} hidden={!expanded}>
+        <div
+          id={panelId}
+          ref={panelRef}
+          className={styles.panel}
+          hidden={!expanded}
+          data-placement={placement?.up ? "top" : "bottom"}
+          // Coordonnées calculées à l'ouverture (`panelPlacement`) : seule
+          // valeur qu'une feuille de style ne peut pas connaître.
+          style={placement ? { top: placement.top, left: placement.left, width: placement.width } : undefined}
+        >
           {more.map((action) => renderButton(action, true))}
         </div>
       )}

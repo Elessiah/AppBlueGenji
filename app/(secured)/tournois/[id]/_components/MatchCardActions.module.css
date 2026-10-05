@@ -88,20 +88,19 @@
   white-space: nowrap;
 }
 
-/* Panneau déplié : posé **par-dessus** les cartes suivantes, sous le pied.
-   Le déplier dans la carte la grandissait — et l'arbre, qui mesure ses cartes
-   (`useSlotHeight`), regrandissait alors tous ses créneaux : toute la page
-   sautait sous le pointeur. En position absolue, la carte garde sa taille. */
-.root {
-  position: relative;
-}
-
+/* Panneau déplié : posé **par-dessus** les cartes voisines, sous le pied (ou
+   au-dessus faute de place). Le déplier dans la carte la grandissait — et
+   l'arbre, qui mesure ses cartes (`useSlotHeight`), regrandissait alors tous
+   ses créneaux. En `position: fixed` (coordonnées posées par
+   `panelPlacement`), la carte garde sa taille et le panneau échappe aux
+   conteneurs qui rognent (cadre des plateaux, zones défilantes). */
 .panel {
-  position: absolute;
-  z-index: 20;
-  top: calc(100% - 4px);
-  left: -1px;
-  right: -1px;
+  position: fixed;
+  z-index: 40;
+  /* Origine connue avant le premier placement : `panelPlacement` en déduit
+     le repère réel (un ancêtre transformé le déplace). */
+  top: 0;
+  left: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
