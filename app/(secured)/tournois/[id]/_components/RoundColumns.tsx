@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import { useMemo, type CSSProperties, type ReactNode } from "react";
 import type { BracketMatch, TournamentFormat } from "@/lib/shared/types";
 import { MatchRow } from "./MatchRow";
 import { RoundMatchSections } from "./RoundMatchSections";
@@ -105,7 +105,20 @@ export function RoundColumns({
   onOpenAdminModal,
   emptyLabel,
 }: Readonly<RoundColumnsProps>) {
-  const roundNums = [...new Set(matches.map((m) => m.roundNumber))].sort((a, b) => a - b);
+  // Matchs par manche, mémorisés sur la liste reçue : `RoundMatchSections`
+  // trie et découpe sur l'identité de ce tableau, qu'un tableau refait à
+  // chaque rendu (chaque instantané du flux) rendrait inutile.
+  const matchesByRound = useMemo(() => {
+    const byRound = new Map<number, BracketMatch[]>();
+    for (const match of matches) {
+      const round = byRound.get(match.roundNumber);
+      if (round) round.push(match);
+      else byRound.set(match.roundNumber, [match]);
+    }
+    for (const round of byRound.values()) round.sort((a, b) => a.matchNumber - b.matchNumber);
+    return byRound;
+  }, [matches]);
+  const roundNums = [...matchesByRound.keys()].sort((a, b) => a - b);
   const lastRound = roundNums.at(-1) ?? null;
   return (
     <ScrollArea
@@ -118,9 +131,7 @@ export function RoundColumns({
       ) : (
         <div style={{ display: "flex", gap: 16 }}>
           {roundNums.map((roundNum) => {
-            const roundMatches = matches
-              .filter((m) => m.roundNumber === roundNum)
-              .sort((a, b) => a.matchNumber - b.matchNumber);
+            const roundMatches = matchesByRound.get(roundNum) ?? [];
             return (
               <div
                 key={roundNum}
