@@ -309,29 +309,40 @@ describe("MatchRow — chaque public retrouve ses actions", () => {
 describe("panelPlacement — le panneau ouvert reste à l'écran", () => {
   const footer = { top: 300, bottom: 352, left: 100, width: 258 };
 
+  /** Le panneau posé laisse-t-il le pied d'action (top → bottom) découvert ? */
+  const clearsFooter = (placed: ReturnType<typeof panelPlacement>, f: typeof footer, height: number) => {
+    const shown = Math.min(height, placed.maxHeight);
+    return placed.up ? placed.top + shown <= f.top + 4 : placed.top >= f.bottom - 4;
+  };
+
   it("se pose sous le pied, à la largeur de la carte bordure comprise", () => {
-    expect(panelPlacement(footer, 200, 900)).toEqual({ top: 348, left: 99, width: 260, up: false });
+    expect(panelPlacement(footer, 200, 900)).toEqual({ top: 348, left: 99, width: 260, maxHeight: 544, up: false });
   });
 
   it("passe au-dessus quand la place manque en bas et abonde en haut", () => {
     const low = { ...footer, top: 700, bottom: 752 };
-    expect(panelPlacement(low, 200, 800)).toEqual({ top: 504, left: 99, width: 260, up: true });
+    expect(panelPlacement(low, 200, 800)).toEqual({ top: 504, left: 99, width: 260, maxHeight: 696, up: true });
   });
 
-  it("ne commence jamais hors de l'écran, même ouvert vers le haut", () => {
+  it("trop haut pour la place : borné (la liste défile), jamais hors de l'écran", () => {
     const mid = { ...footer, top: 400, bottom: 452 };
-    // 480 px de panneau, 700 px de fenêtre : vers le haut, il partirait à -76.
     const placed = panelPlacement(mid, 480, 700);
-    expect(placed.up).toBe(true);
-    expect(placed.top).toBe(8);
-    // Vers le bas, il ne dépasse pas le bas de la fenêtre.
-    expect(panelPlacement({ ...footer, top: 100, bottom: 152 }, 480, 700).top).toBe(148);
-    expect(panelPlacement({ ...footer, top: 198, bottom: 250 }, 480, 700).top).toBe(212);
+    expect(placed).toMatchObject({ up: true, top: 8, maxHeight: 396 });
+    expect(clearsFooter(placed, mid, 480)).toBe(true);
+  });
+
+  it("ne recouvre jamais le pied d'action, même quand aucun côté ne suffit", () => {
+    // Pied à 300–350, panneau de 400 px, fenêtre de 700 px.
+    const bar = { ...footer, top: 300, bottom: 350 };
+    const placed = panelPlacement(bar, 400, 700);
+    expect(placed).toMatchObject({ up: false, top: 346, maxHeight: 346 });
+    expect(clearsFooter(placed, bar, 400)).toBe(true);
+    expect(placed.top + Math.min(400, placed.maxHeight)).toBeLessThanOrEqual(700 - 8);
   });
 
   it("reste dessous quand le haut n'offre pas davantage", () => {
     const high = { ...footer, top: 60, bottom: 112 };
-    expect(panelPlacement(high, 200, 250).up).toBe(false);
+    expect(panelPlacement(high, 200, 250)).toMatchObject({ up: false, maxHeight: 134 });
   });
 });
 
