@@ -13,21 +13,9 @@
   line-height: 1.4;
 }
 
-/* Teinte d'un direct, en bande pleine largeur : la zone d'état de la carte
-   (`MatchRow`, `.meta`) porte 12 px de marge que la bande récupère. */
-.strip[data-state="LIVE"],
-.strip[data-state="SCHEDULED"] {
-  margin: 0 -12px;
-  padding: 4px 12px;
-}
-
-.strip[data-state="LIVE"] {
-  background: color-mix(in srgb, var(--red-live) 10%, transparent);
-}
-
-.strip[data-state="SCHEDULED"] {
-  background: rgba(var(--blue-500-rgb), 0.06);
-}
+/* La teinte d'un direct (rouge à l'antenne, bleu annoncé) est posée sur toute
+   la zone d'état de la carte (`MatchRow.module.css`, `.meta`), d'après
+   `data-state` : une bande pleine, sans marge à rattraper. */
 
 .startAt {
   display: inline-flex;

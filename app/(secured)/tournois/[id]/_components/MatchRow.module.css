@@ -124,6 +124,16 @@
   display: none;
 }
 
+/* Teinte de la diffusion sur toute la zone : rouge à l'antenne seulement
+   (`LIVE_STREAMS.md`), bleu glacier pour un direct annoncé. */
+.meta:has(> [data-state="LIVE"]) {
+  background: color-mix(in srgb, var(--red-live) 10%, transparent);
+}
+
+.meta:has(> [data-state="SCHEDULED"]) {
+  background: rgba(var(--blue-500-rgb), 0.06);
+}
+
 .reportNotice {
   margin: 0;
   padding: 6px 12px;

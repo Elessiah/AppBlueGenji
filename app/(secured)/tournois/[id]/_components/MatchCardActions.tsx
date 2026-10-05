@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import {
   ArrowLeftRight,
   CalendarClock,
@@ -88,22 +89,26 @@ const OVERLAP = 4;
  * Où poser le panneau ouvert (coordonnées de la fenêtre), à la largeur de la
  * carte (bordure comprise) : du côté du pied d'action qui a le plus de place —
  * dessous de préférence — **sans jamais recouvrir le pied** ni sortir de la
- * fenêtre. Plus haut que la place disponible, il défile (`maxHeight`).
+ * fenêtre, en hauteur comme en largeur (une carte à demi défilée hors d'une
+ * manche garde son panneau à l'écran). Plus haut que la place disponible, il
+ * défile (`maxHeight`).
  */
 export function panelPlacement(
   footer: Pick<DOMRect, "top" | "bottom" | "left" | "width">,
   panelHeight: number,
-  viewportHeight: number,
+  viewport: Readonly<{ width: number; height: number }>,
 ): PanelPlacement {
-  const spaceBelow = Math.max(0, viewportHeight - (footer.bottom - OVERLAP) - EDGE);
+  const spaceBelow = Math.max(0, viewport.height - (footer.bottom - OVERLAP) - EDGE);
   const spaceAbove = Math.max(0, footer.top + OVERLAP - EDGE);
   const up = panelHeight > spaceBelow && spaceAbove > spaceBelow;
   const maxHeight = up ? spaceAbove : spaceBelow;
   const shown = Math.min(panelHeight, maxHeight);
+  const width = Math.min(footer.width + 2, viewport.width - 2 * EDGE);
+  const left = Math.max(EDGE, Math.min(footer.left - 1, viewport.width - width - EDGE));
   return {
     top: Math.round(up ? footer.top + OVERLAP - shown : footer.bottom - OVERLAP),
-    left: Math.round(footer.left - 1),
-    width: Math.round(footer.width + 2),
+    left: Math.round(left),
+    width: Math.round(width),
     maxHeight: Math.floor(maxHeight),
     up,
   };
@@ -175,13 +180,24 @@ export function MatchCardActions({
   // panneau reviendrait déplié avec la prochaine action secondaire.
   if (open && more.length === 0) setOpen(false);
 
+  // Le panneau est porté dans `document.body` : le « menu » est le pied **et**
+  // le panneau, deux sous-arbres DOM distincts.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const menu = {
+    contains: (node: Node | null) =>
+      Boolean(rootRef.current?.contains(node) || panelRef.current?.contains(node)),
+  };
+
   useEffect(() => {
     if (!expanded) return;
+    // À l'ouverture, le focus entre dans le panneau : porté hors de la carte,
+    // il n'est pas sur le chemin de la tabulation depuis le bouton.
+    panelRef.current?.querySelector("button")?.focus({ preventScroll: true });
     const onKey = (e: KeyboardEvent) => {
-      handleMenuEscape(e.key, document.activeElement, rootRef.current, toggleRef.current, () => setOpen(false));
+      handleMenuEscape(e.key, document.activeElement, menu, toggleRef.current, () => setOpen(false));
     };
     const onPointer = (e: MouseEvent) => {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) setOpen(false);
+      if (!menu.contains(e.target as Node)) setOpen(false);
     };
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onPointer);
@@ -189,13 +205,14 @@ export function MatchCardActions({
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onPointer);
     };
+    // `menu` ne lit que des refs : le recréer à chaque rendu ne change rien.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [expanded]);
 
-  // Placement du panneau ouvert, en coordonnées de la fenêtre : il est en
-  // `position: fixed`, ce qui le sort des conteneurs qui rognent (cadre des
-  // plateaux, zones défilantes de l'arbre et des manches) sans le sortir du
-  // DOM de la carte — l'ordre de tabulation reste celui de la carte.
-  const panelRef = useRef<HTMLDivElement>(null);
+  // Placement du panneau ouvert, en coordonnées de la fenêtre : porté dans
+  // `document.body` et en `position: fixed`, il échappe à tout ce qui rogne ou
+  // masque autour de la carte (cadre des plateaux, zones défilantes et leur
+  // dégradé de bord).
   const [placement, setPlacement] = useState<PanelPlacement | null>(null);
   useIsomorphicLayoutEffect(() => {
     if (!expanded) {
@@ -207,9 +224,9 @@ export function MatchCardActions({
       const root = rootRef.current;
       const panel = panelRef.current;
       if (!root || !panel) return;
-      // Un ancêtre transformé (l'apparition `.fade-in` de la page garde sa
-      // matrice) devient le repère d'un `position: fixed` : on mesure où ce
-      // repère se trouve à l'écran, et on retranche son origine.
+      // Un ancêtre transformé deviendrait le repère d'un `position: fixed` :
+      // on mesure où le repère se trouve à l'écran, et on retranche son
+      // origine (nulle dans `document.body`, sauf réglage qui le transforme).
       const rect = panel.getBoundingClientRect();
       const originTop = rect.top - (Number.parseFloat(panel.style.top) || 0);
       const originLeft = rect.left - (Number.parseFloat(panel.style.left) || 0);
@@ -217,7 +234,10 @@ export function MatchCardActions({
       // peut être bornée par le placement précédent).
       const list = panel.firstElementChild;
       const natural = list ? panel.offsetHeight - list.clientHeight + list.scrollHeight : panel.offsetHeight;
-      const onScreen = panelPlacement(root.getBoundingClientRect(), natural, window.innerHeight);
+      const onScreen = panelPlacement(root.getBoundingClientRect(), natural, {
+        width: document.documentElement.clientWidth,
+        height: window.innerHeight,
+      });
       const next = {
         ...onScreen,
         top: Math.round(onScreen.top - originTop),
@@ -355,14 +375,25 @@ export function MatchCardActions({
     );
   };
 
+  // La tabulation qui quitte le pied et le panneau referme ce dernier.
+  const onMenuBlur = (e: { relatedTarget: EventTarget | null }) => {
+    if (expanded && focusLeftMenu(menu, e.relatedTarget)) setOpen(false);
+  };
+  // Porté en fin de page, le panneau n'a pas de « suivant » naturel : la
+  // tabulation qui en sort par un bout le referme et rend le focus au bouton.
+  const onPanelKeyDown = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (e.key !== "Tab") return;
+    const buttons = Array.from(e.currentTarget.querySelectorAll("button"));
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    if ((e.shiftKey && index === 0) || (!e.shiftKey && index === buttons.length - 1)) {
+      e.preventDefault();
+      setOpen(false);
+      toggleRef.current?.focus();
+    }
+  };
+
   return (
-    <div
-      ref={rootRef}
-      className={styles.root}
-      onBlur={(e) => {
-        if (expanded && focusLeftMenu(rootRef.current, e.relatedTarget)) setOpen(false);
-      }}
-    >
+    <div ref={rootRef} className={styles.root} onBlur={onMenuBlur}>
       <div className={styles.bar}>
         {primary && renderButton(primary, false)}
         {more.length > 0 && (
@@ -371,7 +402,7 @@ export function MatchCardActions({
             type="button"
             className={`tap-target ${styles.toggle} ${primary ? "" : styles.toggleWide}`}
             aria-expanded={expanded}
-            aria-controls={panelId}
+            aria-controls={expanded ? panelId : undefined}
             aria-label={matchCardActionName("Plus d'actions", matchLabel)}
             title={primary ? "Plus d'actions" : undefined}
             onClick={() => setOpen(!expanded)}
@@ -383,25 +414,24 @@ export function MatchCardActions({
           </button>
         )}
       </div>
-      {/* Conteneur toujours rendu, masqué par `hidden` : `aria-controls`
-          désigne un élément qui existe. */}
-      {more.length > 0 && (
-        <div
-          id={panelId}
-          ref={panelRef}
-          className={styles.panel}
-          hidden={!expanded}
-          data-placement={placement?.up ? "top" : "bottom"}
-          // Coordonnées calculées à l'ouverture (`panelPlacement`) : seule
-          // valeur qu'une feuille de style ne peut pas connaître.
-          style={placement ? { top: placement.top, left: placement.left, width: placement.width } : undefined}
-        >
-          {/* Bornée à la place disponible : sur une fenêtre basse, la liste
-              défile plutôt que de déborder hors de l'écran. */}
-          {/* Liste montée à l'ouverture seulement : un plateau compte jusqu'à
-              254 cartes, et chaque `ScrollArea` pose ses observateurs. Repliée,
-              il ne reste que le conteneur vide que vise `aria-controls`. */}
-          {expanded && (
+      {/* Monté à l'ouverture seulement (un plateau compte jusqu'à 254 cartes,
+          et chaque `ScrollArea` pose ses observateurs), porté dans
+          `document.body` comme les modales. */}
+      {expanded &&
+        createPortal(
+          <div
+            id={panelId}
+            ref={panelRef}
+            className={styles.panel}
+            data-placement={placement?.up ? "top" : "bottom"}
+            // Coordonnées calculées à l'ouverture (`panelPlacement`) : seule
+            // valeur qu'une feuille de style ne peut pas connaître.
+            style={placement ? { top: placement.top, left: placement.left, width: placement.width } : undefined}
+            onBlur={onMenuBlur}
+            onKeyDown={onPanelKeyDown}
+          >
+            {/* Bornée à la place disponible : sur une fenêtre basse, la liste
+                défile plutôt que de déborder hors de l'écran. */}
             <ScrollArea
               orientation="y"
               className={styles.list}
@@ -410,9 +440,9 @@ export function MatchCardActions({
             >
               {more.map((action) => renderButton(action, true))}
             </ScrollArea>
-          )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
       {/* Refermée d'elle-même si l'action disparaît (match lancé entre-temps
           par un autre arbitre). */}
       {confirmForce && hasForce && (
