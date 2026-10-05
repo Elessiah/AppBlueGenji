@@ -59,6 +59,8 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     const block = css.slice(css.indexOf("@media (min-width: 721px) and (max-width: 1000px)"));
     expect(block).toMatch(/\.navLeft\s*\{[^}]*min-width:\s*0;[^}]*flex-wrap:\s*wrap;/);
     expect(block).toMatch(/\.navLink\s*\{[^}]*letter-spacing:\s*0\.08em;/);
+    // Replié, le trait du lien actif ne barre pas la ligne suivante.
+    expect(block).toMatch(/\.navLinkActive::after\s*\{\s*bottom:\s*-5px;/);
   });
 
   it("nomme sa navigation", () => {
