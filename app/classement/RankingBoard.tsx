@@ -27,6 +27,13 @@ export type RankingBoardProps = {
   unavailable?: boolean;
   /** Il reste des lignes au-delà de `rows` : le lien « Afficher plus » est rendu. */
   hasMore?: boolean;
+  /**
+   * Au moins une équipe du classement **entier** a un nul. Lu sur tout le
+   * classement et non sur la page : sans quoi la colonne « N » apparaîtrait au
+   * milieu d'un « Afficher plus » et décalerait toutes les lignes déjà lues.
+   * Absent : déduit des lignes reçues.
+   */
+  anyDraws?: boolean;
 };
 
 /** Case de forme : victoire glacier, défaite dans sa teinte réservée, nul neutre. */
@@ -130,8 +137,15 @@ function Podium({ rows }: Readonly<{ rows: readonly LandingLeaderboardRow[] }>) 
  * « Afficher plus ». Composant serveur, sans état : tout se lit dans
  * l'adresse et s'affiche sans JavaScript.
  */
-export function RankingBoard({ rows, filter, forms, unavailable = false, hasMore = false }: Readonly<RankingBoardProps>) {
-  const showDraws = rows.some((row) => row.draws > 0);
+export function RankingBoard({
+  rows,
+  filter,
+  forms,
+  unavailable = false,
+  hasMore = false,
+  anyDraws,
+}: Readonly<RankingBoardProps>) {
+  const showDraws = anyDraws ?? rows.some((row) => row.draws > 0);
   const showForm = forms !== null;
 
   return (
