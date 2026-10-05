@@ -8,8 +8,10 @@
  *   ponctuation et les espaces seuls (`" — "`, `·`) restent permis ;
  * - une chaîne littérale qui contient une lettre dans un attribut lu par
  *   l'utilisateur ou un lecteur d'écran (`aria-label`, `ariaLabel`, `title`,
- *   `placeholder`, `alt`, `label`, `aria-description`, `aria-valuetext`),
- *   y compris dans `{"…"}` ou un gabarit sans interpolation.
+ *   `placeholder`, `alt`, `label`, `aria-description`, `aria-valuetext`) ;
+ *
+ * dans les deux cas, y compris derrière une condition, un `&&`/`||`/`??`,
+ * une concaténation ou un gabarit (voir {@link literalTexts}).
  *
  * Les noms propres et marques qui ne se traduisent pas (« BlueGenji »,
  * « Discord ») se mettent quand même dans les messages : la règle ne sait pas
@@ -32,13 +34,36 @@ const UI_ATTRIBUTES = new Set([
 /** Une lettre de n'importe quel alphabet : le reste n'est que ponctuation. */
 const LETTER = /\p{L}/u;
 
-function literalText(node) {
-  if (!node) return null;
-  if (node.type === "Literal" && typeof node.value === "string") return node.value;
-  if (node.type === "TemplateLiteral" && node.expressions.length === 0) return node.quasis[0].value.cooked;
-  if (node.type === "JSXExpressionContainer") return literalText(node.expression);
-  return null;
+/**
+ * Les morceaux de texte littéral qu'une expression peut **afficher** : la
+ * chaîne elle-même, mais aussi les branches d'une condition
+ * (`ok ? "Inscrit" : "Fermé"`), la valeur d'un `&&` / `||` / `??`
+ * (`isOwner && "Gérer"`), les morceaux d'une concaténation (`"Équipe " + n`)
+ * et les parties fixes d'un gabarit (`` `${n} équipes` ``) — les formes les
+ * plus courantes d'un texte d'interface. Le test d'un `&&` (à gauche) n'est
+ * jamais affiché : seul son côté droit compte.
+ */
+function literalTexts(node) {
+  if (!node) return [];
+  switch (node.type) {
+    case "Literal":
+      return typeof node.value === "string" ? [node.value] : [];
+    case "TemplateLiteral":
+      return node.quasis.map((quasi) => quasi.value.cooked ?? "");
+    case "JSXExpressionContainer":
+      return literalTexts(node.expression);
+    case "ConditionalExpression":
+      return [...literalTexts(node.consequent), ...literalTexts(node.alternate)];
+    case "LogicalExpression":
+      return node.operator === "&&" ? literalTexts(node.right) : [...literalTexts(node.left), ...literalTexts(node.right)];
+    case "BinaryExpression":
+      return node.operator === "+" ? [...literalTexts(node.left), ...literalTexts(node.right)] : [];
+    default:
+      return [];
+  }
 }
+
+const hasLetter = (texts) => texts.some((text) => LETTER.test(text));
 
 module.exports = {
   meta: {
@@ -58,14 +83,12 @@ module.exports = {
       JSXExpressionContainer(node) {
         // `<p>{"Bonjour"}</p>` : un littéral déguisé en expression.
         if (node.parent && node.parent.type === "JSXAttribute") return;
-        const text = literalText(node.expression);
-        if (text !== null && LETTER.test(text)) context.report({ node, messageId: "jsxText" });
+        if (hasLetter(literalTexts(node.expression))) context.report({ node, messageId: "jsxText" });
       },
       JSXAttribute(node) {
         const name = node.name.type === "JSXIdentifier" ? node.name.name : null;
         if (!name || !UI_ATTRIBUTES.has(name)) return;
-        const text = literalText(node.value);
-        if (text !== null && LETTER.test(text)) context.report({ node, messageId: "attribute", data: { name } });
+        if (hasLetter(literalTexts(node.value))) context.report({ node, messageId: "attribute", data: { name } });
       },
     };
   },
