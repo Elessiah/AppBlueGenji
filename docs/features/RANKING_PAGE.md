@@ -60,13 +60,35 @@ départages ci-dessus tranchent, comme sur la page.
   2-1-3 en bureau (CSS `order`), 1-2-3 en mobile. Chaque marche : numéro,
   sigle/logo, nom (`TeamLink`), cote, bilan, et l'écart à la tête
   (`podiumGapText`) — de quoi donner envie de monter.
-- **Tableau complet** : rang, équipe (`TeamSigil` + `TeamLink`), cote, V, D,
+- **Tableau** : rang, équipe (`TeamSigil` + `TeamLink`), cote, V, D,
   N (colonne présente seulement s'il existe un nul), forme (cinq derniers
   résultats, **général seulement** : la forme couvre tous les jeux), tendance
   sur 7 jours (même calcul que le leaderboard). Rôles ARIA de tableau ; en
   mobile (≤ 720 px), chaque ligne devient une carte et les cellules chiffrées
   portent leur intitulé par `data-label` (`RESPONSIVE_TABLES.md`). Pas de zone
   défilante interne : la page défile.
+- **Affichage progressif** : podium + 50 premières lignes
+  (`RANKING_PAGE_SIZE`), puis « Afficher plus » ajoute les 50 suivantes.
+  C'est un **lien** (`?n=100#rang-51`, onglet `jeu` conservé) : sans
+  JavaScript, la page se rend côté serveur avec `n` lignes et descend sur la
+  première ajoutée (chaque ligne porte `id="rang-<rang>"`). Avec JavaScript
+  (`RankingMore`, client), le clic devient une navigation côté client
+  (`router.push(…, { scroll: false })`, sans rechargement), le focus va à la
+  première ligne ajoutée (`tabIndex={-1}`) et une région `<output>` (rôle `status`),
+  toujours présente, annonce « 50 équipes ajoutées. » (« … Fin du
+  classement. » à la dernière page). `?n=` est validé côté serveur
+  (`parseRankingShown`) : entier seulement, arrondi à la page supérieure,
+  borné à [50, 1000] (`RANKING_MAX_SHOWN`) ; toute autre valeur rend la
+  première page. Changer d'onglet repart de la première page. Le canonique
+  reste `/classement` (métadonnées inchangées).
+- **Rangs absolus, coût de lecture.** Le rang dépend de l'ordre complet
+  (rejeu de toute l'histoire des matchs puis tri `compareRankedTeams`, avec
+  départage par nom fait en JavaScript) : il ne peut pas se couper en SQL.
+  `loadLeaderboardRows(game, n + 1)` rejoue et trie donc toutes les équipes,
+  puis ne garde que les `n + 1` premières (la `+ 1` dit s'il en reste) : la
+  tendance, le rendu et le poids de la page ne portent que sur les lignes
+  affichées, et le rang reste celui du classement complet d'une page à
+  l'autre.
 - **Comment marche la cote** : trois cartes dérivées des constantes
   (`RANKING_BASE_POINTS`, `RANKING_FLOOR_POINTS`), puis deux appels à
   l'action (`/tournois`, `/regles`).
@@ -109,6 +131,9 @@ complète sans JavaScript.
 - Leaderboard de l'accueil : « Voir le classement complet » → `/classement`.
 - Menu burger de la vitrine (`PUBLIC_NAV_LINKS`) : « Classement », après
   « Équipes ».
+- Barre de navigation des connectés (`ARENA_NAV_LINKS`,
+  `components/arena-nav.tsx`) : « Classement », après « Tournois », teinte
+  rose (`--pink-400-rgb`) — voir `PUBLIC_NAVIGATION.md`.
 - Pied de page, COMPÉTITIONS : « Classement » → `/classement` (menait à
   `/joueurs`).
 - Plan du site (`lib/shared/sitemap.ts`), quotidien.
@@ -119,8 +144,9 @@ complète sans JavaScript.
 |---|---|
 | Page (serveur, métadonnées) | `app/classement/page.tsx` |
 | Podium + tableau | `app/classement/RankingBoard.tsx` |
+| « Afficher plus » (client) | `app/classement/RankingMore.tsx` |
 | Styles | `app/classement/page.module.css` |
-| Logique pure (filtre, écarts) | `lib/shared/ranking-page.ts` |
+| Logique pure (filtre, `?n=`, écarts) | `lib/shared/ranking-page.ts` |
 | Lignes (cote, bilan, tendance) | `loadLeaderboardRows` (`lib/server/landing-service.ts`) |
 | Forme | `loadCachedTeamForms` (`lib/server/teams/directory.ts`) |
 | Ordre | `compareRankedTeams` (`lib/shared/ranking.ts`) |
@@ -133,6 +159,9 @@ complète sans JavaScript.
   (un match, perdante derrière toutes les équipes à 500).
 - `tests/lib/server/ranking-service.test.ts` — liste et seeding avec le même
   ordre.
-- `tests/lib/shared/ranking-page.test.ts` — filtre, adresses, écarts.
+- `tests/lib/shared/ranking-page.test.ts` — filtre, adresses, écarts,
+  lecture et bornes de `?n=`, lien de page suivante (onglet gardé, ancre).
 - `tests/app/ranking-board.test.tsx` — podium, couleurs de défaite, forme,
-  colonne des nuls, filtres, panne, animations en pause, plancher 11 px.
+  colonne des nuls, filtres, panne, animations en pause, plancher 11 px ;
+  lien « Afficher plus » sans JavaScript, région d'annonce, rangs absolus et
+  ancres focalisables d'une page suivante.
