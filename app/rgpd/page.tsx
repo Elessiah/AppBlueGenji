@@ -269,7 +269,7 @@ export default async function RgpdPage() {
               <DataCell column={0}>{DONNEE_TOURNOIS.donnee}</DataCell>
               <DataCell column={1}>{DONNEE_TOURNOIS.finalite}</DataCell>
               <DataCell column={2}>
-                <span className={styles.badgeAmber}>{DONNEE_TOURNOIS.base}</span>
+                <span className={`${styles.badge} ${styles.badgeAccent}`}>{DONNEE_TOURNOIS.base}</span>
               </DataCell>
               <DataCell column={3}>{DONNEE_TOURNOIS.duree}</DataCell>
             </tr>
@@ -277,7 +277,7 @@ export default async function RgpdPage() {
               <DataCell column={0}>{DONNEE_SAUVEGARDES.donnee}</DataCell>
               <DataCell column={1}>{DONNEE_SAUVEGARDES.finalite}</DataCell>
               <DataCell column={2}>
-                <span className={styles.badgeAmber}>{DONNEE_SAUVEGARDES.base}</span>
+                <span className={`${styles.badge} ${styles.badgeAccent}`}>{DONNEE_SAUVEGARDES.base}</span>
               </DataCell>
               <DataCell column={3}>{DONNEE_SAUVEGARDES.duree} **</DataCell>
             </tr>
@@ -285,7 +285,7 @@ export default async function RgpdPage() {
               <DataCell column={0}>{DONNEE_CONNEXIONS.donnee}</DataCell>
               <DataCell column={1}>{DONNEE_CONNEXIONS.finalite}</DataCell>
               <DataCell column={2}>
-                <span className={styles.badgeAmber}>{DONNEE_CONNEXIONS.base}</span>
+                <span className={`${styles.badge} ${styles.badgeAccent}`}>{DONNEE_CONNEXIONS.base}</span>
               </DataCell>
               <DataCell column={3}>{DONNEE_CONNEXIONS.duree} ***</DataCell>
             </tr>

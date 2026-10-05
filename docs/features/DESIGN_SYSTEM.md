@@ -9,7 +9,7 @@ La refonte « Cyber minimal » est complète (Phases 1–7). Design final : noir
 ### Tokens CSS
 - **Cyber tokens** : `--cyber-bg`, `--cyber-bg-1`, `--cyber-bg-2`, `--cyber-bg-3`, `--ink`, `--ink-mute`, `--ink-dim` (texte le plus atténué, ≥ 4,5:1), `--ink-faint` (ornements seulement, jamais un texte à lire), `--blue-100`–`--blue-700`, `--blue-glow`, `--amber` (existant seulement, voir plus bas), `--red-live` (+ `--amber-rgb`, `--red-live-rgb` pour les voiles translucides), `--line-soft`, `--line-strong-cy`, `--r-cy-sm/md/lg`
 - **Néons froids** (2026-10) : `--cyan-400`, `--violet-300`, `--violet-400`, `--pink-400`, `--teal-400` (+ `-rgb`), `--grad-brand` (cyan → glacier → violet), `--grad-brand-soft`, `--glow-blue`, `--glow-violet` — voir § Palette « néon froid »
-- **Legacy tokens** conservés pour retrocompatibilité : `--bg-0`–`--bg-2`, `--text-0`–`--text-2`, `--accent-blue/orange/green`, `--radius`, `--shadow`
+- **Legacy tokens** conservés pour retrocompatibilité (encore lus) : `--bg-0`–`--bg-2`, `--line`, `--line-strong`, `--text-0`–`--text-2`, `--accent-blue`, `--accent-green`, `--danger`, `--blue-rgb`, `--green-rgb`, `--danger-rgb`, `--radius`, `--radius-sm`, `--shadow`. Retirés (lot « Nettoyage ») : `--accent-orange`, `--orange-rgb`, `--purple-rgb` (classes `purple` des équipes → `--violet-400-rgb`)
 
 ### Palette « néon froid » (2026-10)
 
@@ -50,6 +50,7 @@ Contraste renforcé (`data-a11y~="contrast"`) : `--ink-mute` `#c4d4e6` (11,54), 
 | `success` | `--teal-400` | réussite, validé |
 | `highlight` | `--pink-400` | rehaut ponctuel |
 | `neutral` | `--ink-mute` | vraiment neutre |
+| `warning` | `--amber` | avertissement (« Urgente ») — § Ambre |
 | `waiting` | `--violet-300` + halo qui respire | « En attente de lancement » |
 | `live` | `--red-live` | **seulement** une vraie diffusion |
 
@@ -59,9 +60,9 @@ La pastille nue étant désormais bleutée, une pastille qui **oppose** un état
 
 `--amber` (`--amber-rgb` pour les voiles) est **gardé, mais seulement pour un avertissement** : ce qui demande de l'attention ou annonce un geste à risque — « Urgente », « Complet », clôture proche, retour en arrière, « Abandonner », forfait (un forfait n'est pas une défaite : il garde l'ambre, `--result-loss` reste aux défaites), pénalité d'endurance, désaccord de score, bandeau de modération, lien « Signalements » de la barre, compteurs « à traiter » / « contestés » non nuls, logo en quarantaine. Repères : on ne se perd pas si l'ambre veut toujours dire « attention ».
 
-Tout le reste passe aux néons froids : sections, marques informatives (barrage, coupe, dernière manche, « N rondes restantes » → rose de rehaut ; exemption → violet), tableau des perdants (violet), panneau de planification, régime « match » du badge de puissance, cases et liserés des équipes, palette du bureau (`BUREAU_COLORS`). L'orange hérité (`--accent-orange`, `--orange-rgb`, `255, 157, 46`) n'a plus aucun lecteur hors de `globals.css` (lot « Nettoyage »).
+Tout le reste passe aux néons froids : sections, marques informatives (barrage, coupe, dernière manche, « N rondes restantes » → rose de rehaut ; exemption → violet), tableau des perdants (violet), panneau de planification, régime « match » du badge de puissance, cases et liserés des équipes, palette du bureau (`BUREAU_COLORS`). L'orange hérité (`--accent-orange`, `--orange-rgb`, `255, 157, 46`) a disparu, `globals.css` compris (lot « Nettoyage »).
 
-**Garde-fou.** `tests/app/admin-bright-ui.test.ts` tient la liste des fichiers où l'ambre a droit de cité, chacun avec son avertissement : un nouveau fichier qui le prend échoue (s'il avertit, il s'ajoute à la liste avec sa raison ; sinon il prend un néon froid), un fichier qui ne le prend plus doit en sortir, et l'orange hérité n'apparaît plus nulle part. Les fichiers du lot des pages publiques y figurent en attente de tri.
+**Garde-fou.** `tests/app/admin-bright-ui.test.ts` tient la liste des fichiers où l'ambre a droit de cité, chacun avec son avertissement : un nouveau fichier qui le prend échoue (s'il avertit, il s'ajoute à la liste avec sa raison ; sinon il prend un néon froid), un fichier qui ne le prend plus doit en sortir, et l'orange hérité n'apparaît plus nulle part. Pages publiques triées (lot « Nettoyage ») : seuls l'avis d'environnement de `/connexion`, le relais en retard et la latence de `/bot`, « Prioritaire » et le compteur de `/recrutement` gardent l'ambre.
 
 ### Défaite — teinte réservée (2026-10)
 

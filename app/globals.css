@@ -13,14 +13,11 @@
   --text-1: #c8d8ec;
   --text-2: #93a8c6;
   --accent-blue: #59d4ff;
-  --accent-orange: #ff9d2e;
   --accent-green: #4fe0a2;
   --danger: #ff6e82;
   --blue-rgb: 89, 212, 255;
-  --orange-rgb: 255, 157, 46;
   --green-rgb: 79, 224, 162;
   --danger-rgb: 255, 110, 130;
-  --purple-rgb: 167, 115, 255;
   --radius: 16px;
   --radius-sm: 10px;
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.35);
@@ -492,7 +489,7 @@ textarea,
 }
 
 .btn.secondary {
-  background: rgba(255, 157, 46, 0.15);
+  background: rgba(var(--violet-400-rgb), 0.15);
 }
 
 .btn.ghost {
@@ -1068,14 +1065,6 @@ html:has([aria-modal="true"]:not([hidden])) .cta-float-help {
   margin-bottom: 24px;
 }
 
-.ds-header.orange {
-  --header-rgb: var(--orange-rgb);
-}
-
-.ds-header.green {
-  --header-rgb: var(--green-rgb);
-}
-
 .ds-header::before {
   content: "";
   position: absolute;
@@ -1132,7 +1121,7 @@ html:has([aria-modal="true"]:not([hidden])) .cta-float-help {
 
 .ds-section-title {
   --title-rgb-a: var(--blue-rgb);
-  --title-rgb-b: var(--orange-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
   display: flex;
   align-items: flex-start;
   gap: 12px;
@@ -1161,24 +1150,14 @@ html:has([aria-modal="true"]:not([hidden])) .cta-float-help {
   --title-rgb-b: var(--blue-rgb);
 }
 
-.ds-section-title.orange {
-  --title-rgb-a: var(--orange-rgb);
-  --title-rgb-b: var(--blue-rgb);
-}
-
 .ds-section-title.green {
   --title-rgb-a: var(--green-rgb);
   --title-rgb-b: var(--blue-rgb);
 }
 
-.ds-section-title.red {
-  --title-rgb-a: var(--danger-rgb);
-  --title-rgb-b: var(--orange-rgb);
-}
-
 .ds-title {
   --title-rgb-a: var(--blue-rgb);
-  --title-rgb-b: var(--orange-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
   font-family: var(--font-title), sans-serif;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -1191,16 +1170,6 @@ html:has([aria-modal="true"]:not([hidden])) .cta-float-help {
 
 .ds-title.blue {
   --title-rgb-a: var(--blue-rgb);
-  --title-rgb-b: var(--blue-rgb);
-}
-
-.ds-title.orange {
-  --title-rgb-a: var(--orange-rgb);
-  --title-rgb-b: var(--orange-rgb);
-}
-
-.ds-title.green {
-  --title-rgb-a: var(--green-rgb);
   --title-rgb-b: var(--blue-rgb);
 }
 
@@ -1229,26 +1198,24 @@ html:has([aria-modal="true"]:not([hidden])) .cta-float-help {
   font-weight: 700;
 }
 
+/* « purple » (équipes) : le violet de la palette, `--violet-400`, et non plus
+   un violet à part. */
 .ds-header.purple {
-  --header-rgb: var(--purple-rgb);
+  --header-rgb: var(--violet-400-rgb);
 }
 
 .ds-section-title.purple {
-  --title-rgb-a: var(--purple-rgb);
-  --title-rgb-b: var(--purple-rgb);
+  --title-rgb-a: var(--violet-400-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
 }
 
 .ds-title.purple {
-  --title-rgb-a: var(--purple-rgb);
-  --title-rgb-b: var(--purple-rgb);
+  --title-rgb-a: var(--violet-400-rgb);
+  --title-rgb-b: var(--violet-400-rgb);
 }
 
 .ds-stat.purple {
-  --stat-rgb: var(--purple-rgb);
-}
-
-.ds-stat.orange {
-  --stat-rgb: var(--orange-rgb);
+  --stat-rgb: var(--violet-400-rgb);
 }
 
 /* Number input sans flèches */
@@ -1657,6 +1624,14 @@ html {
   color: var(--ink-mute);
   border-color: var(--line-strong-cy);
   background: transparent;
+}
+
+/* Avertissement (« Urgente ») : seul usage de l'ambre dans les pastilles
+   (DESIGN_SYSTEM.md § Ambre) — le rouge reste à `.pill-live`. */
+.pill-warning {
+  color: var(--amber);
+  border-color: rgba(var(--amber-rgb), 0.4);
+  background: rgba(var(--amber-rgb), 0.08);
 }
 
 /* « En attente de lancement » : un match daté, à venir — teinte violette et

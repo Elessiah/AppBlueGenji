@@ -179,7 +179,7 @@ Les pastilles colorées (rôles, jeux, rubans, `.error`/`.success`) posent un
 texte vif sur un **voile translucide** de la même teinte : SonarQube (règle
 `css:S7924`) compose ce voile sur du blanc et y voit un échec, alors que sur les
 fonds sombres du site le rapport va de 5,1:1 à 13,7:1. Ces voiles passent par
-les composantes des jetons (`rgba(var(--orange-rgb), 0.05)`, `--amber-rgb`,
+les composantes des jetons (`rgba(var(--violet-400-rgb), 0.05)`, `--amber-rgb`,
 `--red-live-rgb`, `--bot-*-rgb` dans `app/bot/bot.css`) — rendu identique.
 
 Le réglage ne tient que par les **jetons** : un texte qui écrirait sa couleur en

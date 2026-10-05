@@ -64,15 +64,10 @@ const AMBER_WARNINGS: Record<string, string> = {
   "app/(secured)/tournois/_components/RefereeSchedulingField.tsx": "planification arbitre",
   "app/(secured)/tournois/tournois.module.css": "« Complet », clôture proche",
   "components/arena-nav.module.css": "lien de modération (décision attendue)",
-  // Lot des pages publiques (#392) puis nettoyage : à trier là-bas.
-  "app/bot/bot.css": "lot pages publiques",
-  "app/bot/docs/docs.css": "lot pages publiques",
-  "app/connexion/_components/OAuthButtons.tsx": "lot pages publiques",
-  "app/recrutement/page.module.css": "lot pages publiques",
-  "app/regles/[slug]/page.module.css": "lot pages publiques",
-  "app/rgpd/page.module.css": "lot pages publiques",
-  "components/cyber/landing/PublicFooter.module.css": "lot pages publiques",
-  "components/legal/SiteFooterBar.module.css": "lot pages publiques",
+  // Pages publiques, triées au lot « Nettoyage ».
+  "app/bot/bot.css": "relais en retard, latence élevée",
+  "app/connexion/_components/OAuthButtons.tsx": "navigateur qui bloque la connexion",
+  "app/recrutement/page.module.css": "« Prioritaire », compteur proche de la limite",
 };
 
 function sources(): string[] {

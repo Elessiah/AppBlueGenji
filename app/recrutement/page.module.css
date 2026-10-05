@@ -464,8 +464,8 @@ select.modalInput {
 }
 
 .priorityBadgeUrgent {
-  color: var(--amber, #ffb45c);
-  border-color: rgba(255, 180, 92, 0.4);
+  color: var(--amber);
+  border-color: rgba(var(--amber-rgb), 0.4);
 }
 
 .priorityBadgeImportant {
@@ -522,7 +522,7 @@ select.modalInput {
 }
 
 .counterWarn {
-  color: var(--amber, #ffb45c);
+  color: var(--amber);
 }
 
 /* Responsive */

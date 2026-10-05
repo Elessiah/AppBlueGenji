@@ -17,6 +17,7 @@ export type PillVariant =
   | "success"
   | "highlight"
   | "neutral"
+  | "warning"
   | "waiting";
 
 /** Classe CSS globale d'une variante (`app/globals.css`), `null` pour la pastille de base. */
