@@ -63,7 +63,7 @@ deux.
 | `rankingMatchJoinSql` | la jointure équipe ↔ matchs comptés | inchangé |
 | `rankingWinsSql` / `rankingLossesSql` | les agrégats — une défaite est « avoir joué sans gagner » | retirés : le rejeu les compte |
 | `rankingPointsForTeamSql` | les deux composés, pour un `ORDER BY` | retiré : une cote ne s'écrit pas en SQL |
-| `compareRankedTeams` | l'**ordre** — points, victoires, nom | étendu : les non classées passent après |
+| `compareRankedTeams` | l'**ordre** — points, victoires, nom | cote stricte, puis victoires, défaites, nuls, nom — une équipe sans match se range à sa cote (`RANKING_PAGE.md`) |
 
 Le module reste pur : il ne produit que des chaînes SQL, dont les seules valeurs
 interpolées sont ses propres constantes et les expressions passées par

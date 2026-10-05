@@ -70,7 +70,10 @@ dans l'ordre du classement du site (`registrationsFollowRanking`,
 moteur au lancement : `rankEntrantsBySiteRanking`, celui que
 `loadEntrantsBySiteRanking` applique après sa lecture des inscriptions, appelé
 ici sur les lignes que l'instantané a déjà en main (lecture mutualisée du
-classement). Chaque nouvelle inscrite prend sa place de cote au lieu de
+classement). Ce tri est `compareRankedTeams` : cote stricte, une inscrite sans
+match comptée à 500 (depuis le 2026-10-05 — elle passait avant derrière toutes
+les inscrites ayant joué ; les rangs figés des tournois lancés n'en bougent
+pas, `RANKING_PAGE.md`). Chaque nouvelle inscrite prend sa place de cote au lieu de
 s'ajouter en queue, et les rangs affichés sont renumérotés de 1 à N. La colonne
 `seed` n'est pas réécrite — le classement peut encore bouger d'ici le lancement
 (matchs d'autres tournois), c'est donc une **lecture**, refaite à chaque
