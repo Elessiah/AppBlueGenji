@@ -213,5 +213,8 @@ describe("plus de window.confirm", () => {
     expect(page).toContain("{deleteAccountLabel(deleting, pendingDeletion !== null)}");
     // Annuler rouvre le bouton « Supprimer mon compte ».
     expect(page).toMatch(/setPendingDeletion\(null\);\s*setDeleting\(false\);/);
+    // … et lui rend le focus, perdu sur `body` quand il s'est désarmé.
+    expect(page).toContain("requestAnimationFrame(() => deleteButtonRef.current?.focus());");
+    expect(page).toContain("ref={deleteButtonRef}");
   });
 });
