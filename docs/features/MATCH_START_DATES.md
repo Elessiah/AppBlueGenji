@@ -96,13 +96,13 @@ bandeau, avertissement dans le dialogue de date) à ceux qui peuvent le défaire
 Tout tient sur le bandeau existant sous la feuille de score
 (`MatchLiveStrip`) : horaire et diffusion se répondent — c'est la date qui ouvre
 l'antenne en `START_TIME` — et les séparer ajouterait une ligne à une carte de
-210 px pour montrer deux moitiés de la même information.
+260 px pour montrer deux moitiés de la même information.
 
 | Public | Ce qu'il voit |
 |---|---|
 | Tout le monde | `🕑 29/08 20:30` (date complète en infobulle), l'état de diffusion, le lien. |
 | `live` | + bouton d'antenne (`MANUAL`) et configuration de diffusion. |
-| `tournaments` | + bouton `🗓 Date` ouvrant `MatchScheduleDialog`. |
+| `tournaments` | + action « Programmer une date » / « Modifier la date » (menu « Plus d'actions » de la carte, `MATCH_CARD_LAYOUT.md`) ouvrant `MatchScheduleDialog`. |
 
 ### Saisie sans année
 

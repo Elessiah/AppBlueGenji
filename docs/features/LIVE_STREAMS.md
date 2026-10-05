@@ -76,8 +76,8 @@ Choisis **par match**, au moment où on le marque comme casté :
 
 - **`AUTO`** — le direct s'ouvre dès que le match devient jouable (`READY`),
   c'est-à-dire quand le tournoi atteint le round concerné.
-- **`MANUAL`** — le direct s'ouvre au clic (« ▶ Antenne »), et se referme au clic
-  (« ■ Couper ») ou tout seul à la saisie du score. C'est le mode qui convient
+- **`MANUAL`** — le direct s'ouvre au clic (« Lancer le direct », menu « Plus d'actions » de la carte), et se referme au clic
+  (« Couper le direct ») ou tout seul à la saisie du score. C'est le mode qui convient
   aux tournois étalés sur plusieurs jours, où un match peut être jouable des
   heures avant que le cast commence.
 

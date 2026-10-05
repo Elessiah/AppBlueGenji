@@ -50,6 +50,7 @@ Une ligne par document de `docs/features/`, rangée par domaine. Lire le documen
 - `TOURNAMENT_IMAGE.md` — Illustration ou logo d'un tournoi, cadrage au rendu.
 - `TOURNAMENT_ENTRANT_LOGOS.md` — Logos des engagés, rendus par `EntrantName`.
 - `TOURNAMENT_MATCH_CARD_STYLES.md` — Carte de match et fiche de tournoi sur les jetons.
+- `MATCH_CARD_LAYOUT.md` — Carte de match lisible : engagés et score d'abord, zone d'état, une action principale + « Plus d'actions » (inventaire par public).
 - `TOURNAMENT_RULES_SETTINGS.md` — Réglages d'un tournoi affichés sur sa page de règles.
 - `RULES_PAGE_LAYOUT.md` — Mise en page des pages de règles `/regles/[slug]`.
 - `BRACKET_SECTIONS.md` — Sections repliables de l'arbre.

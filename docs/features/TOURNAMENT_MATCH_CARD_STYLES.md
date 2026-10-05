@@ -24,9 +24,9 @@ des couleurs littérales et des jetons d'avant la refonte :
 - `MatchRow.module.css` : la carte passe sur les jetons cyber (`--cyber-bg-2`,
   `--line-strong-cy`, `--ink`, `--ink-mute`, `--amber`, `--blue-300`,
   `--blue-500-rgb`) ; le vert du vainqueur reste `--accent-green`, seul vert du
-  système. Les boutons d'action sont des `CyberButton` fantômes, compactés par
-  une règle à deux classes (qui l'emporte sur le gabarit du composant quel que
-  soit l'ordre de chargement des feuilles).
+  système. Les boutons d'action vivent dans le pied d'action de la carte
+  (`MatchCardActions.module.css`, sur les mêmes jetons) — voir
+  `MATCH_CARD_LAYOUT.md`.
 - `page.module.css` : ce que la page pose autour de ses panneaux (textes vides,
   espacement des tableaux, aperçu, zone de danger). Le cadre des panneaux
   (`.ds-block`, `.ds-section-title`) **reste la classe globale** : c'est celui de

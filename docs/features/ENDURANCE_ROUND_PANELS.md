@@ -80,7 +80,7 @@ partagent leur chrome ; leur ouverture ne pouvait pas suivre deux règles.
 
 ### Disposition des cartes
 
-Les cartes de match ont une **largeur fixe** (210 px) : rangées en `flex-wrap`,
+Les cartes de match ont une **largeur fixe** (260 px) : rangées en `flex-wrap`,
 elles se répartissent d'elles-mêmes en autant de colonnes que la place le
 permet. Une manche de huit rencontres tient alors sur deux lignes au lieu de
 huit, et la même vue reste juste sur un mobile, où il n'y a qu'une colonne.

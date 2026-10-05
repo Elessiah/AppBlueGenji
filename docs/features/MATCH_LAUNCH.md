@@ -139,7 +139,7 @@ balayage des notifications ne l'appelle plus au départ du match. Voir
 
 Le motif voyage dans `TournamentViewerContext.castBlock`, par les deux portes
 (flux et lecture REST). L'ancien libellé « ＋ Caster » du bandeau de diffusion,
-qui ouvrait la configuration du stream, devient « ＋ Live » : deux boutons
+qui ouvrait la configuration du stream, devient « ＋ Live » (aujourd'hui « Diffuser ce match ») : deux boutons
 « Caster » sur la même carte auraient désigné deux gestes différents.
 
 Un compte supprimé (anonymisé) perd son inscription sur les matchs non joués ;
@@ -208,7 +208,7 @@ Changement déclaré dans `PRIVACY_CHANGES` (`2026-09-lancement-des-matchs`),
   d'être rognés.
 - **Carte de match** — `MatchLaunchStrip` : « Lancement · N/M prêts », hôte,
   caster ; pour les parties, un bouton qui ouvre la modale
-  (`MATCH_LAUNCH_OPEN_EVENT`) ; pour l'arbitrage, « ⇄ Hôte » et « ▶ Forcer ».
+  (`MATCH_LAUNCH_OPEN_EVENT`) ; pour l'arbitrage, « Changer l'équipe hôte » et « Forcer le lancement » (menu « Plus d'actions », `MATCH_CARD_LAYOUT.md`).
 
 ## Routes
 

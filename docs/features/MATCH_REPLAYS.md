@@ -42,7 +42,7 @@ disparaître sans écriture — et le rejouer le fait revenir.
 
 - `MatchReplayStrip` (sous `MatchLiveStrip`, dans `MatchRow` — passage unique de
   toutes les vues du plateau) : bandeau bleu glacier pour tous, bouton
-  « ＋ Rediff » / « ✎ » pour la permission `live`. Le rouge reste réservé à ce qui
+  « Ajouter la rediff » / « Modifier la rediff » (menu « Plus d'actions » de la carte) pour la permission `live`. Le rouge reste réservé à ce qui
   est réellement à l'antenne. Le nom accessible du lien **commence par son texte
   visible** (WCAG 2.5.3) et nomme le match.
 - Sur un match rouvert qui porte encore un lien, le staff garde son bouton, pour
