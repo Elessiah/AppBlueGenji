@@ -32,16 +32,29 @@ jobs:
     steps:
       # Un push direct sur main (sans PR) ne monte aucune version. Le lien
       # commit → PR peut apparaître quelques secondes après le push : trois essais.
+      # Une erreur passagère de l'API est retentée elle aussi (le `if` évite que
+      # `bash -e` n'arrête le pas) ; trois erreurs font échouer le job plutôt que
+      # de perdre la version sans bruit.
       - name: Retrouver la PR fusionnée
         id: pr
         run: |
           pr=""
+          api_failed=false
           for attempt in 1 2 3; do
-            pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
-              --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0] // empty')
-            [ -n "$pr" ] && break
+            if pr=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/pulls" \
+              --jq '[.[] | select(.merged_at != null and .base.ref == "main")][0] // empty'); then
+              api_failed=false
+              [ -n "$pr" ] && break
+            else
+              api_failed=true
+              pr=""
+            fi
             sleep $((attempt * 5))
           done
+          if [ -z "$pr" ] && [ "$api_failed" = "true" ]; then
+            echo "::error::API GitHub injoignable : PR de $GITHUB_SHA introuvable."
+            exit 1
+          fi
           if [ -z "$pr" ]; then
             echo "Aucune PR fusionnée pour $GITHUB_SHA : pas de bump."
             echo "skip=true" >> "$GITHUB_OUTPUT"
