@@ -136,9 +136,17 @@ recomposer avec le nonce CSP. Proposition plus légère, compatible avec `locale
    `next-router-prefetch` ou `purpose: prefetch` ; un préchargement de `/en/regles` ne serait
    donc pas réécrit et viserait une route inexistante (404 mis en cache, navigation client
    cassée). Le lot 0 ajoute une entrée de `matcher` dédiée à `/en/:path*` **sans** cette
-   exclusion (la réécriture seule, sans tirer de nonce), ou, à défaut, déclare la réécriture
-   dans `rewrites` de `next.config.ts` (appliquée à toutes les requêtes) et ne garde au
-   middleware que l'en-tête de langue.
+   exclusion ; sur un préchargement, le middleware fait la réécriture **et** pose
+   `x-bg-locale: en` (en retirant celui du client, comme partout), sans tirer de nonce — sinon
+   la page préchargée serait rendue en français puis réutilisée à la navigation. Pas de repli
+   par `rewrites` de `next.config.ts` : ces réécritures passent **après** le middleware, qui
+   verrait `/en/api/...` sans le garder (contournement ci-dessus) et ne poserait pas la langue.
+   **Avis de suspension** : le cookie est posé avec `path: "/connexion"` (`oauth-flow.ts`) et le
+   middleware compare `pathname === "/connexion"` sur le chemin **demandé** ; sous
+   `/en/connexion` le motif ne serait ni envoyé ni effacé. La comparaison se fait sur le chemin
+   sans préfixe, et le cookie prend `path: "/"` limité par le contrôle de chemin du middleware
+   (ou un second cookie par langue) — tranché et testé au lot 6, `/en/connexion` restant hors
+   liste blanche d'ici là.
 2. **Arborescence inchangée** : `app/regles/page.tsx` sert `/regles` et `/en/regles`.
 3. **`next-intl` « sans routage »** : `i18n/request.ts` → `getRequestConfig` lit
    `x-bg-locale` dans `headers()` (déjà lu par le layout : aucun coût de rendu) et charge les
@@ -187,7 +195,7 @@ anglaise, ajout des routes à la liste blanche, `hreflang`/sitemap automatiques,
 | 3 | Règles | `/regles`, `/regles/[slug]`, `lib/shared/tournament-rules.ts`, `components/rules` | ~330 (**4 100 mots**, le plus long texte public) | Exactitude du vocabulaire de jeu → glossaire | Standard + relecture humaine du fond |
 | 4 | Classement | `/classement`, `components/stats`, libellés de formats/états partagés, `dates.ts`/`plural.ts` → ICU | ~150 | Pluriels, formats de nombres | Standard + performance |
 | 5 | Reste de la vitrine | Association, bénévoles, partenaires, recrutement, `/bot` + `/bot/docs` (branchement de `help.md`), documents du bot sous `/en` | ~250 | Contenu en base (piliers, stats, bureau) : même schéma que les textes éditables | Standard + UI |
-| 6 | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe | **Critique** (auth) |
+| 6 | Connexion | `/connexion`, tables d'erreurs d'authentification, écran de suspension | ~80 | Parcours OAuth : `redirect`/`next` doivent garder le préfixe ; avis de suspension lisible et effacé sous `/en/connexion` (cookie `path`, comparaison de chemin du middleware) | **Critique** (auth) |
 | 7 | Légal | Selon D1 | 0 à ~1 285 (jusqu'à 23 000 mots) | Valeur juridique ; parité FR/EN | Cycle **juridique** (+ deux propres si RGPD) |
 | 8a | Tournois — consultation | Liste, cartes, fiche, arbre, phases, labels de format/état | ~500 | Volume ; SSE | Standard + UI + performance |
 | 8b | Tournois — actions | Inscription, déclaration de score, litiges, lancement de match, création/édition | ~500 | Messages d'erreur nombreux (`error-map.ts`) | Standard + UI + sécurité |
