@@ -304,10 +304,12 @@ type PhaseOutcome = {
    */
   eliminationRanks: Map<number, number>;
   doubleForfeited: Set<number>;
+  /** Phase tronquée : équipes qui n'ont pas gagné la dernière manche jouée. */
+  outOfContention: Set<number>;
 };
 
 function strictOutcome(isDone: boolean, phaseFinalRanking: number[] = []): PhaseOutcome {
-  return { isDone, phaseFinalRanking, eliminationRanks: new Map(), doubleForfeited: new Set() };
+  return { isDone, phaseFinalRanking, eliminationRanks: new Map(), doubleForfeited: new Set(), outOfContention: new Set() };
 }
 
 function evaluatePhase(
@@ -398,6 +400,9 @@ async function evaluateEliminationPhase(
     doubleForfeited: new Set(
       ranking.filter((entry) => entry.eliminatedByDoubleForfeit).map((entry) => entry.teamId),
     ),
+    outOfContention: new Set(
+      ranking.filter((entry) => entry.stillInContention === false).map((entry) => entry.teamId),
+    ),
   };
 }
 
@@ -431,10 +436,15 @@ async function rankPhaseStandings(
   // rang tombe dans la cible : elle a perdu, comme toute perdante d'un tableau
   // à élimination. Sa place n'est pas repêchée — la phase suivante se joue à
   // une qualifiée de moins, le plan restant étant re-résolu sur l'effectif réel.
+  // De même, dans un tableau tronqué, une perdante de la dernière manche jouée
+  // n'est plus en lice : elle ne comble pas une place laissée vide.
   return ordered.map((teamId, index) => ({
     teamId,
     rank: outcome.eliminationRanks.get(teamId) ?? index + 1,
-    qualified: index < qualifiersCount && !outcome.doubleForfeited.has(teamId),
+    qualified:
+      index < qualifiersCount &&
+      !outcome.doubleForfeited.has(teamId) &&
+      !outcome.outOfContention.has(teamId),
   }));
 }
 

@@ -51,6 +51,13 @@ export type EliminationRank = {
    * perdante, et la place laissée vide ne se repêche pas.
    */
   eliminatedByDoubleForfeit: boolean;
+  /**
+   * Phase **tronquée** seulement (élimination simple arrêtée avant sa finale,
+   * `max_rounds`) : `false` pour une équipe qui n'a pas gagné sa rencontre de
+   * la dernière manche jouée. Elle n'est plus en lice et ne se qualifie
+   * jamais, même si son rang tombe dans la cible. Absent hors phase tronquée.
+   */
+  stillInContention?: boolean;
 };
 
 /** Bilan d'une équipe hors podium, tel que la base le rend. */
@@ -100,6 +107,7 @@ export function orderEliminationRest(rows: readonly EliminationRestRow[]): numbe
 }
 
 type PodiumRow = RowDataPacket & {
+  round_number?: number | string;
   team1_id: number | null;
   team2_id: number | null;
   winner_team_id: number | null;
@@ -129,6 +137,8 @@ export async function rankEliminationPhase(
   hasThirdPlaceMatch: boolean,
 ): Promise<EliminationRank[]> {
   const podiumMatches: (PodiumMatch | null)[] = [];
+  // Gagnantes de la dernière manche d'un tableau tronqué ; `null` sinon.
+  let truncatedWinners: Set<number> | null = null;
 
   if (format === "DOUBLE") {
     const [grandFinalRows] = await connection.execute<PodiumRow[]>(
@@ -139,17 +149,30 @@ export async function rankEliminationPhase(
     );
     podiumMatches.push(toPodiumMatch(grandFinalRows[0]));
   } else {
-    const [upperFinalRows] = await connection.execute<PodiumRow[]>(
-      `SELECT ${PODIUM_COLUMNS}
+    // Toute la **dernière manche** du haut de tableau, dans l'ordre du tableau :
+    // une rencontre seule est une finale ; plusieurs disent un tableau tronqué
+    // (phase intermédiaire d'un `MULTI`, `max_rounds`), qui n'a pas de podium.
+    const [upperRows] = await connection.execute<PodiumRow[]>(
+      `SELECT round_number, ${PODIUM_COLUMNS}
        FROM bg_matches
        WHERE tournament_id = ? AND phase_id = ? AND bracket = 'UPPER'
-       ORDER BY round_number DESC
-       LIMIT 1`,
+       ORDER BY round_number DESC, match_number ASC`,
       [tournamentId, phaseId],
     );
-    podiumMatches.push(toPodiumMatch(upperFinalRows[0]));
+    const lastRound = upperRows.filter((row) => row.round_number === upperRows[0]?.round_number);
+    if (lastRound.length > 1) {
+      truncatedWinners = new Set(
+        lastRound
+          .map((row) => row.winner_team_id)
+          .filter((teamId): teamId is number => teamId !== null)
+          .map(Number),
+      );
+    } else {
+      podiumMatches.push(toPodiumMatch(lastRound[0]));
+    }
 
-    if (hasThirdPlaceMatch) {
+    // Un tableau tronqué n'a pas de petite finale (`bracket-single.ts`).
+    if (hasThirdPlaceMatch && !truncatedWinners) {
       const [thirdPlaceRows] = await connection.execute<PodiumRow[]>(
         `SELECT ${PODIUM_COLUMNS}
          FROM bg_matches
@@ -226,11 +249,23 @@ export async function rankEliminationPhase(
   // forfaits en demi-finale) ne désigne personne, et le plateau se range alors
   // tout entier sur son bilan. La garde d'avant (aucun podium → aucun rang)
   // n'existait que pour éviter une liste `NOT IN` vide.
-  const rest = orderEliminationRest(rankingRows);
+  const ordered = orderEliminationRest(rankingRows);
+  // Tableau tronqué : les gagnantes de la dernière manche (exemptions
+  // comprises) passent devant tout le reste, chacun gardant l'ordre de
+  // `orderEliminationRest` — total, donc déterministe. Une perdante de cette
+  // manche ne peut plus être rangée parmi elles, ni qualifiée à leur place.
+  const winners = truncatedWinners;
+  const rest = winners
+    ? [
+        ...ordered.filter((teamId) => winners.has(teamId)),
+        ...ordered.filter((teamId) => !winners.has(teamId)),
+      ]
+    : ordered;
 
   return appendSequentialRanks(podium, rest).map((entry) => ({
     ...entry,
     eliminatedByDoubleForfeit: forfeited.has(entry.teamId),
+    ...(winners ? { stillInContention: winners.has(entry.teamId) } : {}),
   }));
 }
 
