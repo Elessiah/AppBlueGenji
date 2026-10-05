@@ -85,6 +85,7 @@ function podiumRow(m: Match | undefined) {
   if (!m) return [];
   return [
     {
+      round_number: m.round,
       team1_id: m.team1,
       team2_id: m.team2,
       winner_team_id: m.winner,
@@ -131,8 +132,10 @@ function answer(rawSql: string, params: unknown[]): unknown[] {
     return podiumRow(inPhase.find((m) => m.bracket === "GRAND" && m.round === 1));
   }
   if (sql.includes("bracket = 'UPPER' ORDER BY round_number DESC")) {
-    const upper = inPhase.filter((m) => m.bracket === "UPPER").sort((a, b) => b.round - a.round);
-    return podiumRow(upper[0]);
+    // Toute la dernière manche, dans l'ordre de la liste (celui du tableau).
+    const upper = inPhase.filter((m) => m.bracket === "UPPER");
+    const last = Math.max(...upper.map((m) => m.round));
+    return upper.filter((m) => m.round === last).flatMap((m) => podiumRow(m));
   }
   if (sql.includes("bracket = 'THIRD_PLACE'")) {
     return podiumRow(inPhase.find((m) => m.bracket === "THIRD_PLACE"));
@@ -390,12 +393,12 @@ describe("Ronde suisse, puis double élimination finale à exemption et double f
  * compte trois engagées : la tête de série passe par exemption, les deux
  * autres s'affrontent.
  *
- * Les rencontres d'une manche tronquée sont toutes au même tour : laquelle la
- * requête « finale » relève n'est pas fixée par la base. La base simulée rend
- * la première de la liste — l'exemption, posée en tête ici.
+ * Les rencontres d'une manche tronquée sont toutes au même tour : il n'y a pas
+ * de finale, donc pas de podium. Les qualifiées sont les gagnantes de cette
+ * manche, quel que soit l'ordre où la base rend ses rencontres.
  */
 describe("Survie, puis élimination simple tronquée, puis double élimination (trois phases)", () => {
-  function plan(secondMatch: Match) {
+  function plan(secondMatch: Match, byeFirst = true) {
     phases = [
       phase({ id: 41, position: 1, format: "SURVIVAL", qualifier_value: 3, state: "RUNNING", entrants: 8, qualifiers: 3 }),
       phase({ id: 42, position: 2, format: "SINGLE", qualifier_value: 2, entrants: 3, qualifiers: 2, max_rounds: 1 }),
@@ -404,9 +407,9 @@ describe("Survie, puis élimination simple tronquée, puis double élimination (
     currentPhaseId = 41;
     seedFirstPhase(41);
     survivalPhaseDone([1, 2, 3, 4, 5, 6, 7, 8]);
+    const bye: Match = { phaseId: 42, bracket: "UPPER", round: 1, team1: 1, team2: null, winner: 1 };
     matches = [
-      { phaseId: 42, bracket: "UPPER", round: 1, team1: 1, team2: null, winner: 1 },
-      secondMatch,
+      ...(byeFirst ? [bye, secondMatch] : [secondMatch, bye]),
       { phaseId: 43, bracket: "UPPER", round: 1, team1: 1, team2: 2, winner: 1 },
       { phaseId: 43, bracket: "GRAND", round: 1, team1: 1, team2: 2, winner: 2 },
     ];
@@ -430,6 +433,21 @@ describe("Survie, puis élimination simple tronquée, puis double élimination (
     });
   });
 
+  it("qualifie les deux gagnantes, et non la battue, quand l'exemption vient en second", async () => {
+    // Avant : le « podium » était lu dans la seule première rencontre (2 contre
+    // 3) — sa perdante, 2ᵉ, prenait la place de l'exemptée.
+    plan({ phaseId: 42, bracket: "UPPER", round: 1, team1: 2, team2: 3, winner: 2 }, false);
+
+    await reconcilePhases(TOURNAMENT_ID, conn());
+
+    expect(savedResults(42)).toEqual([
+      { teamId: 1, rank: 1, qualified: true },
+      { teamId: 2, rank: 2, qualified: true },
+      { teamId: 3, rank: 3, qualified: false },
+    ]);
+    expect(insertedTeams(43)).toEqual([1, 2]);
+  });
+
   describe("quand l'autre rencontre se clôt sur un double forfait", () => {
     const doubleForfeit: Match = {
       phaseId: 42, bracket: "UPPER", round: 1, team1: 2, team2: 3, winner: null, doubleForfeit: true,
@@ -443,10 +461,11 @@ describe("Survie, puis élimination simple tronquée, puis double élimination (
       // Cible de 2 : la seconde place revient à une équipe du double forfait,
       // qui n'est jamais qualifiée. Elle n'est pas repêchée — et surtout pas par
       // une sortie de Survie, sans match dans ce tableau.
+      // Sans podium (tableau tronqué), les rangs se suivent.
       expect(savedResults(42)).toEqual([
         { teamId: 1, rank: 1, qualified: true },
-        { teamId: 2, rank: 3, qualified: false },
-        { teamId: 3, rank: 4, qualified: false },
+        { teamId: 2, rank: 2, qualified: false },
+        { teamId: 3, rank: 3, qualified: false },
       ]);
       // Une seule qualifiée : la finale n'a plus lieu d'être, le tournoi se clôt.
       expect(insertedTeams(43)).toEqual([]);

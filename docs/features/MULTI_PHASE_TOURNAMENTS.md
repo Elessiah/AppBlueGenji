@@ -148,6 +148,20 @@ donnait deux classements différents, à matchs identiques, d'une exécution du
 seed à l'autre. Il vaut aussi pour la qualification d'une phase à élimination
 et pour la clôture d'un tournoi `SINGLE` / `DOUBLE`.
 
+**Phase `SINGLE` tronquée** (§4) : sa dernière manche jouée compte plusieurs
+rencontres, toutes au même tour — il n'y a pas de finale, donc **pas de
+podium**. `rankEliminationPhase` relit toute cette manche (dans l'ordre du
+tableau, `match_number`) et range d'abord ses **gagnantes** (exemptions
+comprises, doubles forfaits exclus), puis le reste, chaque groupe dans l'ordre
+de `orderEliminationRest`. Chaque entrée porte alors `stillInContention` ;
+`rankPhaseStandings` ne qualifie jamais une équipe qui ne l'est plus, même si
+son rang tombe dans la cible (un double forfait au dernier tour laisse donc une
+place vide, comme ailleurs). Auparavant, le « podium » était lu dans **une**
+rencontre de cette manche (`LIMIT 1` sans ordre fixé) : sa perdante était
+rangée 2ᵉ et, la qualification se comptant par index, prenait la place d'une
+autre gagnante. Une dernière manche à une seule rencontre reste lue comme une
+finale (podium inchangé). `DOUBLE` n'est jamais tronqué (phase finale seule).
+
 Une phase ne range et ne qualifie que **ses propres équipes**
 (`bg_tournament_phase_teams`). Dans une phase (`phase_id > 0`), le reste du
 classement de `rankEliminationPhase` joint le roster de la phase **strictement** ;
