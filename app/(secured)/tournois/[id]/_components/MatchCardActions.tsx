@@ -75,9 +75,10 @@ const TONE_CLASS = {
 
 /**
  * Pied d'action d'une carte de match : l'action principale du lecteur, et un
- * bouton de divulgation « Plus d'actions » qui déplie le reste **dans** la
- * carte (aucune surcouche : la carte rogne son contenu, et un panneau
- * flottant sur un arbre de 254 cartes recouvrirait ses voisines).
+ * bouton de divulgation « Plus d'actions » qui déplie le reste sous le pied,
+ * **par-dessus** les cartes suivantes : la carte garde sa taille, sans quoi
+ * l'arbre (qui mesure ses cartes, `useSlotHeight`) regrandirait tous ses
+ * créneaux et ferait sauter la page.
  *
  * Mêmes règles clavier que le menu du compte : Échap referme et rend le focus
  * au bouton, la tabulation qui sort du pied le referme. Choisir une action

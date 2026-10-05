@@ -17,7 +17,9 @@
   background: var(--cyber-bg-2);
   border: 1px solid var(--line-strong-cy);
   border-radius: var(--r-cy-md);
-  overflow: hidden;
+  /* Pas d'`overflow: hidden` : le panneau « Plus d'actions » déborde de la
+     carte par-dessus ses voisines (`MatchCardActions`). Les coins des lignes
+     teintées sont arrondis ci-dessous à la place. */
   font-size: 14px;
   /* Marge de sécurité pour le saut natif du navigateur sur `#match-…`
      (rechargement d'une URL ancrée) : le défilement piloté par
@@ -25,6 +27,17 @@
      Horizontale seulement : la marge du haut est celle de `html`, calée sur
      l'en-tête collant mesuré — une marge ici s'y ajouterait. */
   scroll-margin-inline: 96px;
+}
+
+/* Coins intérieurs : le rayon de la carte, moins sa bordure. */
+.card > :first-child {
+  border-top-left-radius: calc(var(--r-cy-md) - 1px);
+  border-top-right-radius: calc(var(--r-cy-md) - 1px);
+}
+
+.card > :last-child {
+  border-bottom-left-radius: calc(var(--r-cy-md) - 1px);
+  border-bottom-right-radius: calc(var(--r-cy-md) - 1px);
 }
 
 /* Carte que le lecteur peut arbitrer : un liseré bleu la distingue des autres. */

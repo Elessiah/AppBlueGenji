@@ -88,12 +88,28 @@
   white-space: nowrap;
 }
 
-/* Panneau déplié : une colonne de boutons pleine largeur, dans la carte. */
+/* Panneau déplié : posé **par-dessus** les cartes suivantes, sous le pied.
+   Le déplier dans la carte la grandissait — et l'arbre, qui mesure ses cartes
+   (`useSlotHeight`), regrandissait alors tous ses créneaux : toute la page
+   sautait sous le pointeur. En position absolue, la carte garde sa taille. */
+.root {
+  position: relative;
+}
+
 .panel {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% - 4px);
+  left: -1px;
+  right: -1px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 0 8px 8px;
+  padding: 8px;
+  border: 1px solid rgba(var(--blue-500-rgb), 0.45);
+  border-radius: var(--r-cy-md);
+  background: var(--cyber-bg-2);
+  box-shadow: var(--shadow);
 }
 
 /* `display: flex` l'emporterait sur l'attribut `hidden`. */
