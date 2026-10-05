@@ -138,11 +138,13 @@ export default function EditTournamentPage() {
     let cancelled = false;
 
     const load = async () => {
-      const me = await fetch("/api/auth/me", { cache: "no-store" })
-        .then(async (r) =>
-          r.ok ? ((await r.json()) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } }) : null,
-        )
-        .catch(() => null);
+      // Une coupure réseau rejette ici et file vers « Erreur réseau » plus bas,
+      // au lieu de se faire passer pour un refus de droits.
+      const meResponse = await fetch("/api/auth/me", { cache: "no-store" });
+      const me = meResponse.ok
+        ? ((await meResponse.json().catch(() => null)) as { user?: { isAdmin?: boolean; roles?: PlatformRole[] } } | null)
+        : null;
+      if (cancelled) return;
       if (!can(me?.user, "tournaments")) {
         showError("Modification de tournoi réservée aux arbitres et administrateurs.");
         router.replace("/tournois");
