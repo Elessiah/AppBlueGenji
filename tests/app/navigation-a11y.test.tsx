@@ -54,6 +54,13 @@ describe("ArenaNav — page courante et pictogrammes", () => {
     for (const tint of tints) expect(tint).not.toMatch(/amber|orange|red|result-loss/);
   });
 
+  it("ne déborde pas entre 721 et 1000 px : liens resserrés, repli plutôt que débordement", () => {
+    const css = readSource("components/arena-nav.module.css");
+    const block = css.slice(css.indexOf("@media (min-width: 721px) and (max-width: 1000px)"));
+    expect(block).toMatch(/\.navLeft\s*\{[^}]*min-width:\s*0;[^}]*flex-wrap:\s*wrap;/);
+    expect(block).toMatch(/\.navLink\s*\{[^}]*letter-spacing:\s*0\.08em;/);
+  });
+
   it("nomme sa navigation", () => {
     expect(arenaNav()).toContain('<nav class="nav" aria-label="Navigation principale" data-sticky-header="true">');
   });
