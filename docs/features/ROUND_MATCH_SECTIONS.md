@@ -71,6 +71,13 @@ volet, ni repère, ni élément focalisable — et pas de `role="group"`, que le
 contrôle Sonar S6819 interdit (`sonar-a11y-semantics.test.tsx`). Le
 libellé passe à la ligne dans une colonne étroite (210 px).
 
+Filets et cartes sont **frères** dans le seul conteneur de la vue (grille de
+BG Survie, colonne de manche), chaque carte gardant pour clé l'id de son
+match : un match qui change de section est **déplacé**, pas reconstruit. Le
+bouton qui a ouvert une modale (score de l'arbitrage, report) existe donc
+encore à sa fermeture, et le focus y revient (WCAG 2.4.3). Le filet prend
+`width: 100%` pour occuper sa propre ligne dans la grille.
+
 ## Code
 
 - `lib/shared/match-sections.ts` — `matchSectionOf`, `compareSectionMatches`,
