@@ -350,7 +350,7 @@ function SurvivalDiagram() {
             width={150}
             height={22}
             rx={5}
-            fill={inCut ? "rgba(255,77,94,0.10)" : SURFACE}
+            fill={inCut ? "rgba(var(--pink-400-rgb), 0.1)" : SURFACE}
             stroke={inCut ? CUT : LINE}
             strokeWidth={1.1}
           />
@@ -430,7 +430,7 @@ function SurvivalDiagram() {
         width={264}
         height={62}
         rx={8}
-        fill="rgba(245,165,36,0.08)"
+        fill="rgba(var(--violet-400-rgb), 0.08)"
         stroke={LOWER}
         strokeWidth={1.2}
       />
@@ -581,7 +581,7 @@ function BgSurvieDiagram() {
               width={200}
               height={26}
               rx={5}
-              fill={out ? "rgba(255,77,94,0.10)" : SURFACE}
+              fill={out ? "rgba(var(--pink-400-rgb), 0.1)" : SURFACE}
               stroke={out ? CUT : LINE}
               strokeWidth={1.1}
             />
@@ -676,7 +676,7 @@ function BgSurvieDiagram() {
         width={158}
         height={58}
         rx={8}
-        fill="rgba(245,165,36,0.08)"
+        fill="rgba(var(--violet-400-rgb), 0.08)"
         stroke={LOWER}
         strokeWidth={1.2}
       />
