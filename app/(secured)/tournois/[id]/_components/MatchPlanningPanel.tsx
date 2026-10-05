@@ -43,11 +43,11 @@ export function MatchPlanningPanel({ detail, onPlan, frozen }: Readonly<MatchPla
   const [busy, setBusy] = useState(false);
   const [confirmEnable, setConfirmEnable] = useState(false);
   const enabled = detail.card.refereeScheduling;
-  // Activé ailleurs entre-temps : la confirmation en attente est oubliée, pour
-  // ne pas se rouvrir seule si l'arbitrage est désactivé plus tard.
-  if (confirmEnable && enabled) setConfirmEnable(false);
   const canManage = detail.isAdmin && !frozen;
   const toggleable = canManage && canToggleRefereeScheduling(detail.card.state);
+  // Activé ailleurs, ou geste retiré (droit, plateau figé) entre-temps : la
+  // confirmation en attente est oubliée, pour ne pas se rouvrir seule plus tard.
+  if (confirmEnable && (enabled || !toggleable)) setConfirmEnable(false);
 
   // Ce que l'allumage ferait passer « à planifier », et ce qui l'est déjà :
   // la même fonction, lue avec l'option allumée. Rien n'est calculé pour un panneau qui ne rendra rien — le cas de la
