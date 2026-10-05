@@ -26,27 +26,35 @@ export function RoundMatchSections({ matches, children }: Readonly<RoundMatchSec
   const seeds = useEntrantSeeds();
   // Bascule « En attente » → « Lancement » à la seconde où la carte de match
   // bascule elle-même (`useMatchLaunchPhase`) : un seul minuteur, armé sur la
-  // prochaine heure de début, jamais d'intervalle. `null` avant le montage —
-  // l'heure du lecteur n'est pas celle du serveur.
+  // prochaine heure de début, jamais d'intervalle. L'instant est lu dès le
+  // premier rendu : les matchs n'arrivent qu'au client (détail chargé par
+  // `fetch`), et un premier rendu sans heure ferait sauter les cartes d'une
+  // section à l'autre à chaque ouverture de volet.
   //
   // Les effets ne suivent que des primitives (même choix que
-  // `useMatchLaunchPhase`) : `RoundColumns` refait son tableau de matchs à
-  // chaque rendu, et une dépendance à son identité relancerait l'horloge à
-  // chaque instantané du flux.
-  const [now, setNow] = useState<number | null>(null);
+  // `useMatchLaunchPhase`) : un tableau de matchs refait par la vue ne relance
+  // pas l'horloge.
+  const [now, setNow] = useState(() => Date.now());
   const signature = matches
     .map((m) => `${m.id}:${m.status}:${m.team1Id}:${m.team2Id}:${m.startAt}:${m.launchedAt}`)
     .join("|");
   useEffect(() => {
     setNow(Date.now());
   }, [signature, refereeScheduling]);
-  const nextAt = now === null ? null : nextSectionChangeAt(matches, refereeScheduling, now);
+  const nextAt = nextSectionChangeAt(matches, refereeScheduling, now);
   useEffect(() => {
     if (nextAt === null) return;
+    // Un délai au-delà de ~24,8 jours est plafonné : le réveil tombe alors
+    // avant l'heure, relit l'instant réel (`now` change, l'effet se réarme) au
+    // lieu d'avancer l'horloge. À l'approche de l'heure, `Math.max` franchit la
+    // frontière même sur un réveil précoce de quelques millisecondes.
     const delay = Math.min(Math.max(0, nextAt - Date.now()), 2_147_483_647);
-    const timer = setTimeout(() => setNow(Math.max(nextAt, Date.now())), delay);
+    const timer = setTimeout(() => {
+      const current = Date.now();
+      setNow(nextAt - current <= 1_000 ? Math.max(nextAt, current) : current);
+    }, delay);
     return () => clearTimeout(timer);
-  }, [nextAt]);
+  }, [nextAt, now]);
   const sections = useMemo(
     () => sectionRoundMatches(matches, { refereeScheduling, now, seeds }),
     [matches, refereeScheduling, now, seeds],
