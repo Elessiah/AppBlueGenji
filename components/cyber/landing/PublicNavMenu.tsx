@@ -17,6 +17,7 @@ type NavLink = { href: string; label: string };
 export const PUBLIC_NAV_LINKS: readonly NavLink[] = [
   { href: "/tournois", label: "Tournois" },
   { href: "/equipes", label: "Équipes" },
+  { href: "/classement", label: "Classement" },
   { href: "/joueurs", label: "Joueurs" },
   { href: "/recrutement", label: "Recrutement" },
   { href: "/bot", label: "Bot" },

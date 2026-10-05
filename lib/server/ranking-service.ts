@@ -74,9 +74,8 @@ export type TeamRankingOptions = {
    * (annuaire, leaderboard). Par défaut, seules les équipes classées sont
    * retournées.
    *
-   * Elles ne peuvent pas pour autant se glisser au milieu du tableau :
-   * `compareRankedTeams` range toute équipe sans match **après** les classées,
-   * quelle que soit sa cote.
+   * Elles se rangent à leur cote de départ (`compareRankedTeams`) : derrière
+   * toute équipe qui a gagné des points, devant toute équipe qui en a perdu.
    */
   includeUnplayed?: boolean;
   /**
@@ -475,8 +474,7 @@ function rankingKey(state: RankedTeamState) {
  *
  * Une équipe sans match n'est pas classée : `total` compte les équipes ayant
  * réellement joué, là où le leaderboard de la landing part de **toutes** les
- * équipes (une équipe sans match y figure à la cote de départ, rangée après les
- * classées). Les deux vues n'ont pas le même dénominateur, mais bien la même
+ * équipes (une équipe sans match y figure, rangée à sa cote de départ). Les deux vues n'ont pas le même dénominateur, mais bien la même
  * cote par équipe.
  */
 export async function getTeamRankingPosition(teamId: number): Promise<TeamRankingPosition> {

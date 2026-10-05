@@ -52,7 +52,7 @@ export async function PublicFooter() {
             <div className={styles.heading}>COMPÉTITIONS</div>
             <ul>
               <li><Link className="tap-target" href="/tournois">Tournois</Link></li>
-              <li><Link className="tap-target" href="/joueurs">Classement</Link></li>
+              <li><Link className="tap-target" href="/classement">Classement</Link></li>
               <li><Link className="tap-target" href="/bot">Bot</Link></li>
             </ul>
           </div>

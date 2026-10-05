@@ -210,6 +210,8 @@ export type LandingLeaderboardRow = {
   logoUrl: string | null;
   wins: number;
   losses: number;
+  /** Matchs clos sans vainqueur — affichés seulement s'il y en a. */
+  draws: number;
   points: number;
   trend: "up" | "down" | "flat";
   trendValue: number;

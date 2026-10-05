@@ -47,6 +47,7 @@ export type SitemapRoute = {
 const SHOWCASE_ROUTES: readonly SitemapRoute[] = [
   { path: "/", changeFrequency: "daily", priority: 1 },
   { path: "/association", changeFrequency: "monthly", priority: 0.8 },
+  { path: "/classement", changeFrequency: "daily", priority: 0.8 },
   { path: "/regles", changeFrequency: "monthly", priority: 0.7 },
   { path: "/bot", changeFrequency: "monthly", priority: 0.6 },
   { path: "/recrutement", changeFrequency: "weekly", priority: 0.6 },

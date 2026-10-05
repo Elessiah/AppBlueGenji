@@ -63,7 +63,8 @@ import { MIN_PLACEMENT_ENTRANTS, placementDeltas } from "./tournament-placement"
 /**
  * Cote de départ, commune à tout le monde. Une équipe qui n'a jamais joué vaut
  * ce nombre : ni un zéro qui la ferait passer pour mauvaise, ni un rang gagné
- * sans rien disputer — {@link compareRankedTeams} la range après les classées.
+ * sans rien disputer — {@link compareRankedTeams} la range à sa cote, derrière
+ * les équipes qui ont des victoires à cote égale.
  */
 export const RANKING_BASE_POINTS = 500;
 
@@ -448,10 +449,9 @@ export function rankingMatchJoinSql(teamExpr: string, match = "m"): string {
 /**
  * Une équipe est **classée** dès qu'elle a disputé un match compté.
  *
- * Avant cela, sa cote est celle de tout le monde : la laisser se mêler aux
- * classées la placerait au milieu du tableau sans avoir rien joué — et le
- * leaderboard de l'accueil, qui n'affiche que les huit premières, se serait
- * rempli d'équipes de remplissage devant des équipes qui jouent.
+ * Ce drapeau ne décide **pas** de l'ordre ({@link compareRankedTeams} ne lit
+ * que la cote et le bilan) : il choisit la légende de la cote (« Aucun match
+ * joué ») et le dénominateur « n-ième sur N équipes classées » de la fiche.
  */
 export function isRankedTeam(team: { wins: number; losses: number; draws?: number }): boolean {
   // Le nul compte : une équipe dont l'unique rencontre s'est close sur 2-2 a
@@ -462,8 +462,18 @@ export function isRankedTeam(team: { wins: number; losses: number; draws?: numbe
 
 /**
  * Ordre du classement du site, appliqué **en mémoire** pour que toutes les vues
- * trient à l'identique : les classées d'abord, puis la cote, puis les
- * victoires, puis le nom.
+ * trient à l'identique — leaderboard, page `/classement`, annuaire **et**
+ * seeding : la **cote** d'abord, strictement, puis, à cote égale, les victoires
+ * (plus d'abord), les défaites (moins d'abord), les nuls (plus de matchs joués
+ * d'abord), et enfin le nom.
+ *
+ * La cote prime sur tout le reste, bilan vide compris. La règle d'avant rangeait
+ * les équipes classées (au moins un match) devant toutes les autres : une seule
+ * rencontre jouée sur le site suffisait alors à poser la perdante, à 483, en
+ * **deuxième** place, devant toutes les équipes restées à 500 (retour du
+ * 2026-10-05). Une équipe sans match vaut la cote de départ, ni plus ni moins :
+ * elle passe derrière toute équipe qui a gagné des points, devant toute équipe
+ * qui en a perdu — et, à 500 contre 500, derrière une équipe qui a des victoires.
  *
  * Le tri final se fait ici et non en SQL — la collation MySQL et
  * `localeCompare("fr")` ne départagent pas les noms de la même façon, et deux
@@ -473,11 +483,12 @@ export function compareRankedTeams(
   a: { points: number; wins: number; losses: number; draws?: number; name: string },
   b: { points: number; wins: number; losses: number; draws?: number; name: string },
 ): number {
-  const rankedA = isRankedTeam(a);
-  const rankedB = isRankedTeam(b);
-  if (rankedA !== rankedB) return rankedA ? -1 : 1;
   if (b.points !== a.points) return b.points - a.points;
   if (b.wins !== a.wins) return b.wins - a.wins;
+  if (a.losses !== b.losses) return a.losses - b.losses;
+  const drawsA = a.draws ?? 0;
+  const drawsB = b.draws ?? 0;
+  if (drawsB !== drawsA) return drawsB - drawsA;
   return a.name.localeCompare(b.name, "fr");
 }
 

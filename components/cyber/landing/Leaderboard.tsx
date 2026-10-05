@@ -129,7 +129,9 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
                 </span>
                 <span className={styles.wl} role="cell">
                   <span className={styles.wins}>{row.wins}</span>
-                  <span className={styles.losses}>–{row.losses}</span>
+                  <span className={styles.losses}>–</span>
+                  {/* Une défaite se lit dans sa couleur ; zéro reste neutre. */}
+                  <span className={row.losses > 0 ? "result-loss" : styles.losses}>{row.losses}</span>
                 </span>
                 <span className="num" role="cell">{row.points}</span>
                 <span className={`${styles.trend} ${trendClass}`} role="cell">{trend}</span>
@@ -140,7 +142,7 @@ export function Leaderboard({ initialRows }: Readonly<LeaderboardProps>) {
       </div>
 
       <div className={styles.footer}>
-        <Link href="/equipes" className="mono">VOIR LE CLASSEMENT COMPLET →</Link>
+        <Link href="/classement" className="mono">VOIR LE CLASSEMENT COMPLET →</Link>
       </div>
     </div>
   );

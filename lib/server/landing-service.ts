@@ -383,6 +383,23 @@ async function loadLandingLeaderboard(
   safeLimit: number,
   game: TournamentGame | undefined,
 ): Promise<LandingLeaderboardRow[]> {
+  try {
+    return await loadLeaderboardRows(game, safeLimit);
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Le classement tel que le leaderboard **et** la page `/classement` le
+ * montrent : rang, cote, bilan et tendance sur une semaine. `limit` absent rend
+ * toutes les lignes (la page complète) ; l'erreur remonte à l'appelant, qui
+ * choisit comment se dégrader.
+ */
+export async function loadLeaderboardRows(
+  game: TournamentGame | undefined,
+  limit?: number,
+): Promise<LandingLeaderboardRow[]> {
   // « Général » (pas de jeu demandé) garde toutes les équipes du site, jouées
   // ou non — c'est le classement général, il les concerne toutes. Un onglet
   // par jeu, lui, ne doit garder que les équipes qui ont **joué ce jeu** :
@@ -392,47 +409,43 @@ async function loadLandingLeaderboard(
   // jamais dans ce jeu.
   const includeUnplayed = game === undefined;
 
-  try {
-    const [currentRows, previousRows] = await Promise.all([
-      loadTeamRanking({ includeUnplayed, game }),
-      // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
-      // compare deux photos du même calcul plutôt que deux barèmes.
-      loadTeamRanking({ includeUnplayed, completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
-    ]);
-    const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
+  const [currentRows, previousRows] = await Promise.all([
+    loadTeamRanking({ includeUnplayed, game }),
+    // Le classement d'il y a une semaine : **même chargeur**, donc la flèche
+    // compare deux photos du même calcul plutôt que deux barèmes.
+    loadTeamRanking({ includeUnplayed, completedMoreThanDaysAgo: TREND_WINDOW_DAYS, game }),
+  ]);
+  const previousRanks = new Map(previousRows.map((row, index) => [row.teamId, index + 1]));
+  const shown = limit === undefined ? currentRows : currentRows.slice(0, limit);
 
-    return currentRows.slice(0, safeLimit).map((row, index) => {
-      const rank = index + 1;
-      const teamId = row.teamId;
-      const points = row.points;
-      const previousRank = previousRanks.get(teamId);
-      let trend: "up" | "down" | "flat" = "flat";
-      let trendValue = 0;
-      if (previousRank !== undefined) {
-        const delta = previousRank - rank;
-        if (delta > 0) {
-          trend = "up";
-          trendValue = delta;
-        } else if (delta < 0) {
-          trend = "down";
-          trendValue = Math.abs(delta);
-        }
+  return shown.map((row, index) => {
+    const rank = index + 1;
+    const previousRank = previousRanks.get(row.teamId);
+    let trend: "up" | "down" | "flat" = "flat";
+    let trendValue = 0;
+    if (previousRank !== undefined) {
+      const delta = previousRank - rank;
+      if (delta > 0) {
+        trend = "up";
+        trendValue = delta;
+      } else if (delta < 0) {
+        trend = "down";
+        trendValue = Math.abs(delta);
       }
-      return {
-        rank,
-        teamId,
-        teamName: row.teamName,
-        logoUrl: localUploadUrl(row.logoUrl),
-        wins: row.wins,
-        losses: row.losses,
-        points,
-        trend,
-        trendValue,
-      };
-    });
-  } catch {
-    return [];
-  }
+    }
+    return {
+      rank,
+      teamId: row.teamId,
+      teamName: row.teamName,
+      logoUrl: localUploadUrl(row.logoUrl),
+      wins: row.wins,
+      losses: row.losses,
+      draws: row.draws,
+      points: row.points,
+      trend,
+      trendValue,
+    };
+  });
 }
 
 function toCalendarEvent(card: TournamentCard): LandingCalendarEvent {
