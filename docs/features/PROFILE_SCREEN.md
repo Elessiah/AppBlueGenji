@@ -186,6 +186,28 @@ réservé à ce qui est vraiment secondaire (le format accepté d'une image, par
 exemple). Les styles quittent le JSX pour `profil.module.css`, qui porte la
 hiérarchie : titre de section > libellé de champ > aide.
 
+## Les teintes (lot « Profil », 2026-10)
+
+Chaque section porte une **teinte** dans le registre (`tone` de
+`PROFILE_SECTIONS` : glacier, violet, cyan, vert d'eau, rose ; `danger` pour
+« Mon compte » seulement, déjà rouge). `<ProfileSection>` la pose en
+`data-tone`, et `profil.module.css` en tire deux variables : `--tone-ink`
+(texte, AA sur les fonds teintés) et `--tone-rgb` (liseré, voile, halo). La
+section en reçoit un liseré, un voile radial, un filet lumineux en tête, un
+trait d'accent devant le titre et un halo au survol (ombre seule, aucun
+déplacement) ; le lien de navigation qui y mène reprend la même teinte et une
+pastille de couleur. Les titres de groupe de cases prennent la teinte de leur
+section.
+
+- **Statistiques** : une teinte par chiffre (`data-tone` posé par la page),
+  chiffre lumineux sur une carte au dégradé de sa teinte.
+- **Applications connectées** : un témoin décoratif (`aria-hidden`) devant le
+  nom du fournisseur, vert d'eau lumineux si rattaché — l'état reste écrit dans
+  la ligne de détail, aucun texte en double.
+- **En-tête** : sur-titre « Espace joueur » et titre en dégradé glacier →
+  violet ; « Enregistrer » prend le dégradé de marque, texte sombre.
+- Contrastes et absence de teinte chaude : `tests/app/profile-bright-ui.test.ts`.
+
 ## Ce que le site dit de vos identifiants
 
 `lib/shared/identity-sharing.ts` porte les phrases qui **engagent le site**, et
