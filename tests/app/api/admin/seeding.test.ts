@@ -93,24 +93,18 @@ describe("PATCH /api/admin/tournaments/[id]/seeding", () => {
     expect(await res.json()).toEqual(board);
   });
 
-  it("renvoie 409 quand un score a déjà été saisi", async () => {
+  it.each([
+    ["un score a déjà été saisi", "SEEDING_LOCKED"],
+    ["le tournoi est lancé", "SEEDING_LOCKED_STARTED"],
+    ["le tournoi est terminé", "SEEDING_LOCKED_FINISHED"],
+  ])("renvoie 409 quand %s (%s)", async (_reason, code) => {
     jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(reorderSeeding).mockRejectedValue(new Error("SEEDING_LOCKED"));
+    jest.mocked(reorderSeeding).mockRejectedValue(new Error(code));
 
     const res = await PATCH(patchReq({ teamIds: [4, 9] }), params("5"));
 
     expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "SEEDING_LOCKED" });
-  });
-
-  it("renvoie 409 quand le tournoi est lancé", async () => {
-    jest.mocked(getCurrentUser).mockResolvedValue(arbitre);
-    jest.mocked(reorderSeeding).mockRejectedValue(new Error("SEEDING_LOCKED_STARTED"));
-
-    const res = await PATCH(patchReq({ teamIds: [4, 9] }), params("5"));
-
-    expect(res.status).toBe(409);
-    expect(await res.json()).toEqual({ error: "SEEDING_LOCKED_STARTED" });
+    expect(await res.json()).toEqual({ error: code });
   });
 
   it("renvoie 400 quand l'ordre proposé n'est pas une permutation", async () => {

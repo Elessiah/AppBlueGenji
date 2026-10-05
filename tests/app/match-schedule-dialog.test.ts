@@ -11,6 +11,22 @@ const SOURCE = readFileSync(
   "utf8",
 );
 
+describe("globals.css — champs d'heure", () => {
+  const GLOBALS = readFileSync(join(__dirname, "..", "..", "app", "globals.css"), "utf8");
+
+  it("ne garde plus de style mort pour `input[type=\"time\"]`, que plus aucune page ne rend", () => {
+    expect(GLOBALS).not.toContain('input[type="time"]');
+  });
+
+  it("conserve l'habillage des champs date-heure du formulaire de tournoi", () => {
+    expect(GLOBALS).toMatch(/input\[type="datetime-local"\]\s*\{\s*appearance: none;/);
+    expect(GLOBALS).toContain('input[type="datetime-local"]::-webkit-calendar-picker-indicator {');
+    expect(GLOBALS).toMatch(
+      /input\[type="datetime-local"\]::-webkit-outer-spin-button,\s*input\[type="datetime-local"\]::-webkit-inner-spin-button \{\s*display: none;/,
+    );
+  });
+});
+
 describe("MatchScheduleDialog — heure", () => {
   it("propose une liste de demi-heures, pas un champ libre", () => {
     expect(SOURCE).not.toContain('type="time"');
