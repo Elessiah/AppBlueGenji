@@ -3,6 +3,7 @@ import type { BracketMatch } from "@/lib/shared/types";
 import { mapError } from "../_lib/error-map";
 import {
   decideScoreForm,
+  initialAdminMaps,
   isUntouched,
   pendingProposalSignature,
   scoreBlockerMessage,
@@ -11,7 +12,8 @@ import {
   type ScoreFormState,
 } from "../_lib/score-form";
 import { useToast } from "@/components/ui/toast";
-import { useMatchFormat } from "../_lib/match-format-context";
+import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
+import { checkMapList, deriveMatchScore, mapListViolationMessage, type MatchMapInput } from "@/lib/shared/match-maps";
 // « Tranché » se lit sur le statut, pas sur la présence d'un vainqueur : un
 // match nul n'en a pas et est pourtant terminé. Sur `winnerTeamId`,
 // « Enregistrer » restait actif sur une rencontre finie, et la route
@@ -28,7 +30,11 @@ export function useScoreForm(
 ) {
   const { showError, showSuccess } = useToast();
   const matchFormat = useMatchFormat(match);
+  const game = useTournamentGame();
   const [state, setState] = useState<ScoreFormState>(() => scoreFormStateFor(match));
+  // Détail map par map (`docs/features/MAP_SCORES.md`) : quand l'arbitre en
+  // saisit, il **fait** le score — les deux champs suivent le score dérivé.
+  const [maps, setMapsState] = useState<MatchMapInput[]>(() => initialAdminMaps(match));
   const [submitting, setSubmitting] = useState(false);
 
   // Le dialogue reste monté entre deux ouvertures : sans resynchronisation, il
@@ -61,6 +67,7 @@ export function useScoreForm(
 
     if (untouched) {
       setState(next);
+      setMapsState(initialAdminMaps(match));
       setConflict(false);
     } else if (signature !== synced.signature && !submitting) {
       // Seul un résultat **enregistré** fait conflit : une proposition
@@ -79,7 +86,15 @@ export function useScoreForm(
     const next = scoreFormStateFor(match);
     setSynced({ signature, proposals, baseline: next });
     setState(next);
+    setMapsState(initialAdminMaps(match));
     setConflict(false);
+  };
+
+  const setMaps = (next: MatchMapInput[]) => {
+    setMapsState(next);
+    if (next.length === 0) return;
+    const derived = deriveMatchScore(next);
+    setState((s) => ({ ...s, score1: String(derived.team1), score2: String(derived.team2) }));
   };
 
   const decision = decideScoreForm(state, {
@@ -96,6 +111,17 @@ export function useScoreForm(
       showError(scoreBlockerMessage(blocker, matchFormat));
       return false;
     }
+    // Les maps se jugent par la règle du report d'équipe : un résultat validé
+    // doit décrire un match terminé, un enregistrement seulement rester dans
+    // les limites. Un forfait les écarte.
+    const sendMaps = maps.length > 0 && state.forfeitTeamId === undefined && state.doubleForfeit !== true;
+    if (sendMaps) {
+      const mapCheck = checkMapList(matchFormat, game, maps, { decisive: action === "resolve" });
+      if (mapCheck.error) {
+        showError(mapListViolationMessage(mapCheck.error, matchFormat, game));
+        return false;
+      }
+    }
 
     setSubmitting(true);
     try {
@@ -105,22 +131,8 @@ export function useScoreForm(
           : `/api/admin/matches/${match.id}/resolve`;
       const method = action === "save" ? "PATCH" : "POST";
 
-      const body: {
-        team1Score?: number;
-        team2Score?: number;
-        forfeitTeamId?: number;
-        doubleForfeit?: true;
-      } = {};
-      if (state.doubleForfeit === true) {
-        body.doubleForfeit = true;
-      } else if (state.forfeitTeamId !== undefined) {
-        body.forfeitTeamId = state.forfeitTeamId;
-      } else if (decision.scores) {
-        body.team1Score = decision.scores.team1;
-        body.team2Score = decision.scores.team2;
-      } else {
-        // `decideScoreForm` a déjà écarté ce cas : sans scores ni forfait, les
-        // deux actions sont bloquées. Garde-fou de dernier recours.
+      const body = adminScoreBody(state, sendMaps ? maps : null, decision.scores);
+      if (!body) {
         showError(scoreBlockerMessage("INCOMPLETE", matchFormat));
         return false;
       }
@@ -151,6 +163,9 @@ export function useScoreForm(
   return {
     score1: state.score1,
     score2: state.score2,
+    maps,
+    setMaps,
+    game,
     forfeitTeamId: state.forfeitTeamId,
     doubleForfeit: state.doubleForfeit === true,
     submitting,
@@ -174,6 +189,22 @@ export function useScoreForm(
       })),
     submit,
   };
+}
+
+/**
+ * Corps d'une saisie d'arbitrage : double forfait, forfait, maps, ou score à la
+ * main — dans cet ordre de priorité. `null` quand il n'y a rien à envoyer.
+ */
+function adminScoreBody(
+  state: ScoreFormState,
+  maps: MatchMapInput[] | null,
+  scores: { team1: number; team2: number } | null,
+): { team1Score?: number; team2Score?: number; forfeitTeamId?: number; doubleForfeit?: true; maps?: MatchMapInput[] } | null {
+  if (state.doubleForfeit === true) return { doubleForfeit: true };
+  if (state.forfeitTeamId !== undefined) return { forfeitTeamId: state.forfeitTeamId };
+  if (maps) return { maps };
+  if (scores) return { team1Score: scores.team1, team2Score: scores.team2 };
+  return null;
 }
 
 function sameFormState(a: ScoreFormState, b: ScoreFormState): boolean {

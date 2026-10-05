@@ -199,3 +199,51 @@ export async function applyMatchReplays(
     [normalizeReplayUrl("https://www.youtube.com/watch?v=dQw4w9WgXcQ"), tournamentId]
   );
 }
+
+/**
+ * Détail map par map (`docs/features/MAP_SCORES.md`) des matchs joués d'un cas
+ * qui le demande : une map gagnée 2-0 / 0-2 par point du score, plus — un match
+ * sur trois — une map nulle 1-1 jouée d'abord (elle ne rapporte rien, le score
+ * stocké reste juste). Codes de replay au format Overwatch (six caractères),
+ * uniques, déterministes. Les matchs sans score (forfaits, exemptions) n'en
+ * reçoivent pas : leur carte s'affiche comme avant.
+ */
+export async function applyMatchMapDetails(
+  db: Pool,
+  tournamentId: number,
+  def: TournamentDef
+): Promise<void> {
+  if (!def.mapDetails) return;
+  const [rows] = await db.execute<(RowDataPacket & { id: number; team1_score: number; team2_score: number })[]>(
+    `SELECT id, team1_score, team2_score
+     FROM bg_matches
+     WHERE tournament_id = ?
+       AND status = 'COMPLETED'
+       AND team1_id IS NOT NULL
+       AND team2_id IS NOT NULL
+       AND forfeit_team_id IS NULL
+       AND double_forfeit = 0
+       AND team1_score IS NOT NULL
+       AND team2_score IS NOT NULL`,
+    [tournamentId]
+  );
+  for (const row of rows) {
+    const maps: [number, number][] = [];
+    if (Number(row.id) % 3 === 0) maps.push([1, 1]);
+    for (let i = 0; i < Number(row.team2_score); i += 1) maps.push([0, 2]);
+    for (let i = 0; i < Number(row.team1_score); i += 1) maps.push([2, 0]);
+    if (maps.length === 0) continue;
+    const values = maps.flatMap(([t1, t2], index) => [
+      Number(row.id),
+      index + 1,
+      (Number(row.id) * 16 + index).toString(36).toUpperCase().padStart(6, "0").slice(-6),
+      t1,
+      t2,
+    ]);
+    await db.execute(
+      `INSERT INTO bg_match_maps (match_id, source, map_number, replay_code, team1_score, team2_score)
+       VALUES ${maps.map(() => "(?, 'FINAL', ?, ?, ?, ?)").join(", ")}`,
+      values
+    );
+  }
+}

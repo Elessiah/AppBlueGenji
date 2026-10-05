@@ -1,6 +1,7 @@
 import type { PoolConnection, RowDataPacket } from "mysql2/promise";
 import { SCORE_REPORT_TIMEOUT_MINUTES } from "@/lib/shared/constants";
-import { checkMatchScores, matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
+import { matchWinnerSide, sideTeamIds } from "@/lib/shared/match-format";
+import { checkMapList, type MatchMapInput } from "@/lib/shared/match-maps";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
 import { canPlayersReportScore, launchPairingKey } from "@/lib/shared/match-launch";
 import { plausibleSeriesMinutes } from "@/lib/shared/score-report-deadline";
@@ -13,7 +14,8 @@ import {
   queueRefereeAlert,
 } from "./bot-logs";
 import { resolveUserEntrant } from "./registration";
-import { loadTournamentMatchFormat } from "./repository";
+import { loadTournamentMatchRules } from "./repository";
+import { promoteReportedMaps, replaceMatchMaps } from "./match-maps";
 import { syncTournamentState } from "./state";
 import { tryAutoResolveByes } from "./byes";
 
@@ -217,16 +219,6 @@ function scoreDeadlineAssignment(otherSide: "team1" | "team2"): string {
            END`;
 }
 
-function validateScoreValue(value: number): number {
-  if (!Number.isFinite(value)) {
-    throw new TypeError("INVALID_SCORE");
-  }
-  if (value < 0 || value > 99) {
-    throw new Error("INVALID_SCORE_RANGE");
-  }
-  return Math.trunc(value);
-}
-
 /**
  * Engagé au nom duquel le joueur reporte, après synchronisation du tournoi :
  * refuse un tournoi absent ou pas en cours, un joueur sans engagé, et un
@@ -289,17 +281,29 @@ function assertMatchLaunchedForPlayers(match: MatchRow): void {
   }
 }
 
+/**
+ * Score dérivé des maps, vu de l'engagée qui reporte (« mon score », « score
+ * adverse » — le contrat des colonnes `teamN_report_*`). Lève le refus de la
+ * liste, s'il y en a un.
+ */
+function reporterView(
+  check: ReturnType<typeof checkMapList>,
+  isTeam1Reporter: boolean,
+): { myScore: number; opponentScore: number; reporterSource: "TEAM1" | "TEAM2" } {
+  if (check.error) throw new Error(check.error);
+  const { team1, team2 } = check.score;
+  return isTeam1Reporter
+    ? { myScore: team1, opponentScore: team2, reporterSource: "TEAM1" }
+    : { myScore: team2, opponentScore: team1, reporterSource: "TEAM2" };
+}
+
 export async function reportMatchScore(
   connection: PoolConnection,
   tournamentId: number,
   matchId: number,
   userId: number,
-  myScoreRaw: number,
-  opponentScoreRaw: number,
+  maps: ReadonlyArray<MatchMapInput>,
 ): Promise<void> {
-  const myScore = validateScoreValue(myScoreRaw);
-  const opponentScore = validateScoreValue(opponentScoreRaw);
-
   const reporterTeamId = await resolveReportingTeamId(connection, tournamentId, userId);
 
   const [matches] = await connection.execute<MatchRow[]>(
@@ -371,15 +375,20 @@ export async function reportMatchScore(
   // deux formats, et sa qualification tolère l'égalité (`checkMatchScores`).
   // D'où le contrôle **ici** et non avant le chargement du match : il lui faut
   // le numéro de manche.
-  const matchFormat = await loadTournamentMatchFormat(
+  //
+  // Le score se **dérive** des maps (`lib/shared/match-maps.ts`) : une map
+  // gagnée vaut un point, une map nulle n'en vaut à personne. Chaque map porte
+  // son code de replay, jugé selon le jeu du tournoi — d'où la lecture du jeu
+  // avec le format, dans la même requête.
+  const { format: matchFormat, game } = await loadTournamentMatchRules(
     connection,
     tournamentId,
     Number(match.round_number),
   );
-  const matchFormatViolation = checkMatchScores(matchFormat, myScore, opponentScore, {
-    decisive: true,
-  });
-  if (matchFormatViolation) throw new Error(matchFormatViolation);
+  const { myScore, opponentScore, reporterSource } = reporterView(
+    checkMapList(matchFormat, game, maps, { decisive: true }),
+    isTeam1Reporter,
+  );
 
   // Durée d'une série complète au format de la manche : l'échéance d'un report
   // seul ne court qu'après sa fin plausible (`lib/shared/score-report-deadline.ts`).
@@ -430,6 +439,10 @@ export async function reportMatchScore(
     );
   }
 
+  // La proposition map par map, à côté de ses colonnes de score : c'est elle
+  // que l'adversaire confirme d'un clic, et elle qui devient le résultat retenu.
+  await replaceMatchMaps(connection, matchId, reporterSource, maps, userId);
+
   const [updatedRows] = await connection.execute<MatchRow[]>(
     `SELECT
       id,
@@ -461,6 +474,10 @@ export async function reportMatchScore(
     updated.team2_report_score !== null &&
     updated.team2_report_opponent_score !== null
   ) {
+    // La concordance se juge sur le **score dérivé**, comme avant les maps
+    // (`docs/features/MAP_SCORES.md`) : le détail ne change rien au circuit.
+    // Celui qui confirme d'un clic renvoie la proposition adverse à
+    // l'identique, et c'est son détail qui devient le résultat retenu.
     const consistent =
       Number(updated.team1_report_score) === Number(updated.team2_report_opponent_score) &&
       Number(updated.team1_report_opponent_score) === Number(updated.team2_report_score);
@@ -479,6 +496,7 @@ export async function reportMatchScore(
         winnerTeamId,
         loserTeamId,
       });
+      await promoteReportedMaps(connection, matchId, reporterSource);
     } else {
       await connection.execute(`UPDATE bg_matches SET status = 'AWAITING_CONFIRMATION' WHERE id = ?`, [
         matchId,

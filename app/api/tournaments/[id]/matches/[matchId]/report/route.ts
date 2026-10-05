@@ -3,6 +3,7 @@ import { fail, ok } from "@/lib/server/http";
 import { canActOnTournament } from "@/lib/server/tournaments/write-visibility";
 import { reportMatchScore } from "@/lib/server/tournaments-service";
 import { readJsonBody } from "@/lib/server/request-body";
+import { MAP_LIST_ERROR_CODES, parseMapListBody } from "@/lib/shared/match-maps";
 
 export async function POST(req: Request, context: { params: Promise<{ id: string; matchId: string }> }) {
   const user = await getCurrentUser();
@@ -27,15 +28,16 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
   if (!(await canActOnTournament(tournamentId, user))) return fail("TOURNAMENT_NOT_FOUND", 404);
 
   try {
-    const body = (await readJsonBody(req)) as { myScore?: number; opponentScore?: number };
+    const body = (await readJsonBody(req)) as { maps?: unknown };
 
-    await reportMatchScore(
-      tournamentId,
-      matchId,
-      user.id,
-      Number(body.myScore),
-      Number(body.opponentScore),
-    );
+    // Un score se déclare **map par map** (`docs/features/MAP_SCORES.md`) :
+    // l'ancien corps `myScore` / `opponentScore` n'a plus cours, et se refuse
+    // comme une liste vide.
+    if (body.maps === undefined || body.maps === null) return fail("MAP_LIST_EMPTY", 400);
+    const maps = parseMapListBody(body.maps);
+    if (maps === null) return fail("INVALID_MAPS", 400);
+
+    await reportMatchScore(tournamentId, matchId, user.id, maps);
 
     return ok({ success: true });
   } catch (error) {
@@ -51,6 +53,7 @@ export async function POST(req: Request, context: { params: Promise<{ id: string
       || message === "MATCH_ALREADY_COMPLETED"
       || message === "SCORE_EXCEEDS_MATCH_FORMAT"
       || message === "SCORE_BELOW_MATCH_FORMAT"
+      || MAP_LIST_ERROR_CODES.has(message)
     ) {
       return fail(message, 400);
     }

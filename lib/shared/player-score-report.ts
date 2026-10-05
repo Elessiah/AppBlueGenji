@@ -14,6 +14,7 @@
  */
 import type { BracketMatch, MatchScoreReport } from "./types";
 import { isMatchPlayed } from "./match-outcome";
+import type { MatchMapInput } from "./match-maps";
 
 /** Où en est le cycle de report, **vu par un engagé du match**. */
 export type PlayerReportPhase =
@@ -34,11 +35,28 @@ export interface PlayerReportView {
   theirs: MatchScoreReport | null;
 }
 
-/** Deux propositions disent-elles le même score ? */
+/**
+ * Deux propositions disent-elles le même score ? Le score **dérivé** des maps
+ * fait foi, comme côté serveur (`MAP_SCORES.md`) : le détail ne change pas le
+ * circuit de confirmation.
+ */
 type ReportedScore = Pick<MatchScoreReport, "team1Score" | "team2Score">;
 
 export function sameReportedScore(a: ReportedScore, b: ReportedScore): boolean {
   return a.team1Score === b.team1Score && a.team2Score === b.team2Score;
+}
+
+/**
+ * Maps à l'ouverture de la modale : la proposition du lecteur, sinon celle de
+ * l'adversaire (confirmer d'un clic), sinon une liste vide.
+ */
+export function playerReportInitialMaps(view: PlayerReportView | null): MatchMapInput[] {
+  const source = view?.mine ?? view?.theirs ?? null;
+  return (source?.maps ?? []).map(({ replayCode, team1Score, team2Score }) => ({
+    replayCode,
+    team1Score,
+    team2Score,
+  }));
 }
 
 /**

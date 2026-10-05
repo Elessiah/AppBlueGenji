@@ -932,6 +932,7 @@ export default function TournamentDetailPage() {
         format={detail.card.matchFormat}
         playoffFormat={detail.card.endurancePlayoffFormat}
         tournamentFormat={detail.card.format}
+        game={detail.card.game}
       >
       <LiveProvider
         canManage={detail.canManageLive}

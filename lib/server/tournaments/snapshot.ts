@@ -40,7 +40,8 @@ import {
   seedingSource,
 } from "@/lib/shared/seeding";
 import { rankEntrantsBySiteRanking } from "@/lib/server/ranking-service";
-import { mapCard, mapMatch, type TournamentRow } from "./_internal";
+import { attachMatchMaps, mapCard, mapMatch, type TournamentRow } from "./_internal";
+import { loadMapsByMatch } from "./match-maps";
 import {
   getMatchRows,
   getRegistrationRows,
@@ -415,7 +416,13 @@ async function buildSnapshot(tournamentId: number): Promise<TournamentSnapshotFr
     };
     const orderedRegistrations = await loadOrderedRegistrations();
 
-    const mappedMatches = matches.map(mapMatch);
+    // Détail map par map, d'une requête pour tout le plateau — dans
+    // l'instantané commun, donc servi à l'identique par le flux et par le REST
+    // de secours (`docs/features/MAP_SCORES.md`).
+    const mappedMatches = attachMatchMaps(
+      matches.map(mapMatch),
+      await loadMapsByMatch(connection, matches.map((row) => Number(row.id))),
+    );
     const phases = phasesDetail?.phases ?? null;
     const currentPhaseId = phasesDetail?.currentPhaseId ?? null;
 

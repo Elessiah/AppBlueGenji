@@ -1,4 +1,5 @@
-﻿import type { EnduranceRoundCell } from "./bg-survie/replay";
+﻿import type { MatchMapResult } from "./match-maps";
+import type { EnduranceRoundCell } from "./bg-survie/replay";
 import type { EnduranceStatus } from "./bg-survie/standings";
 import type { AccountSuspensionView } from "./account-suspension";
 import type { ConnectionMethod } from "./account-connections";
@@ -498,6 +499,11 @@ export type MatchScoreReport = {
   team1Score: number;
   team2Score: number;
   reportedAt: string;
+  /**
+   * Détail map par map de la proposition (`docs/features/MAP_SCORES.md`),
+   * orientation du plateau ; vide pour une proposition d'avant les maps.
+   */
+  maps: MatchMapResult[];
 };
 
 export type BracketMatch = {
@@ -534,6 +540,13 @@ export type BracketMatch = {
   team1Report: MatchScoreReport | null;
   /** Proposition de score de l'équipe 2 en attente ; `null` = aucune. */
   team2Report: MatchScoreReport | null;
+  /**
+   * Détail map par map du résultat **retenu** (`docs/features/MAP_SCORES.md`) :
+   * code de replay et score de chaque map. Vide pour un match d'avant les maps,
+   * un forfait, une exemption, ou un score corrigé à la main par l'arbitrage —
+   * le score du match s'affiche alors seul, comme avant.
+   */
+  maps: MatchMapResult[];
   updatedAt: string;
   /** ID de la phase du tournoi (0 pour un tournoi sans phases). */
   phaseId: number;

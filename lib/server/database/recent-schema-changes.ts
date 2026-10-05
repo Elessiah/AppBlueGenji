@@ -177,6 +177,12 @@ export async function applyRecentSchemaChanges(db: Pool): Promise<void> {
     // tournoi existant ne change de comportement.
     `ALTER TABLE bg_tournaments ADD COLUMN referee_scheduling TINYINT(1) NOT NULL DEFAULT 0
        AFTER registration_min_players`,
+    // Détail map par map (`docs/features/MAP_SCORES.md`) : table neuve, son
+    // `CREATE TABLE IF NOT EXISTS` est sa migration. L'entrée tient la règle
+    // des deux endroits pour l'index de lecture de l'instantané (par match) :
+    // sans effet (nom de clé déjà pris, erreur tolérée) quand la table vient
+    // d'être créée avec lui.
+    `ALTER TABLE bg_match_maps ADD INDEX idx_bg_match_maps_match (match_id, source)`,
   ];
 
   for (const statement of RECENT_SCHEMA_CHANGES) {

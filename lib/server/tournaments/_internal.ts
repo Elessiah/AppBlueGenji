@@ -2,6 +2,7 @@ import type { RowDataPacket } from "mysql2/promise";
 import { toIso } from "@/lib/server/serialization";
 import { toParticipantType } from "@/lib/shared/participants";
 import type { BracketMatch, MatchScoreReport, TournamentCard, TournamentPhase } from "@/lib/shared/types";
+import { mapsMatchStoredScore, type MatchMapResult } from "@/lib/shared/match-maps";
 import { parseMatchFormat } from "@/lib/shared/match-format";
 import {
   parseRegistrationFilters,
@@ -302,6 +303,8 @@ export function mapMatch(row: MatchRow): BracketMatch {
       row.team2_reported_at,
       2,
     ),
+    // Rempli après coup, par lot, depuis `bg_match_maps` (`attachMatchMaps`).
+    maps: [],
     updatedAt: toIso(row.updated_at)!,
     phaseId: Number(row.phase_id ?? 0),
     phasePosition: row.phase_position == null ? null : Number(row.phase_position),
@@ -334,7 +337,34 @@ function mapScoreReport(
     team1Score: side === 1 ? own : other,
     team2Score: side === 1 ? other : own,
     reportedAt: toIso(reportedAt ?? null) ?? "",
+    maps: [],
   };
+}
+
+/**
+ * Pose le détail map par map sur des matchs déjà sérialisés
+ * (`docs/features/MAP_SCORES.md`). Un jeu de maps ne s'affiche que s'il
+ * **explique** le score qu'il accompagne : un score corrigé à la main par
+ * l'arbitrage, ou un reste d'avant une correction, ne porte pas un détail qui
+ * le contredit.
+ */
+export function attachMatchMaps(
+  matches: BracketMatch[],
+  mapsByMatch: ReadonlyMap<number, { final: MatchMapResult[]; team1: MatchMapResult[]; team2: MatchMapResult[] }>,
+): BracketMatch[] {
+  if (mapsByMatch.size === 0) return matches;
+  const withReport = (report: MatchScoreReport | null, maps: MatchMapResult[]): MatchScoreReport | null =>
+    report && mapsMatchStoredScore(maps, report.team1Score, report.team2Score) ? { ...report, maps } : report;
+  return matches.map((match) => {
+    const sets = mapsByMatch.get(match.id);
+    if (!sets) return match;
+    return {
+      ...match,
+      maps: mapsMatchStoredScore(sets.final, match.team1Score, match.team2Score) ? sets.final : [],
+      team1Report: withReport(match.team1Report, sets.team1),
+      team2Report: withReport(match.team2Report, sets.team2),
+    };
+  });
 }
 
 function nullableId(value: number | null | undefined): number | null {

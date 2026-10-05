@@ -1,0 +1,76 @@
+/* Détail map par map d'une carte de match (`docs/features/MAP_SCORES.md`). */
+
+.details {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.summary {
+  cursor: pointer;
+  color: var(--blue-400, #5ac8ff);
+  font-weight: 600;
+}
+
+.summary:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.label {
+  color: var(--ink-quiet, #9aa4b2);
+  white-space: nowrap;
+}
+
+.score {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--ink, #e6edf5);
+  white-space: nowrap;
+}
+
+.code {
+  font-family: var(--font-mono);
+  color: var(--ink, #e6edf5);
+  letter-spacing: 0.06em;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+
+.copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(90, 200, 255, 0.22);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--blue-400, #5ac8ff);
+  cursor: pointer;
+}
+
+.copy:hover {
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.copy:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}

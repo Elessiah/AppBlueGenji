@@ -1,5 +1,5 @@
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from "mysql2/promise";
-import type { TournamentState } from "@/lib/shared/types";
+import type { TournamentGame, TournamentState } from "@/lib/shared/types";
 import { forfeitMapCount, parseMatchFormat, type MatchFormat } from "@/lib/shared/match-format";
 import { tournamentMatchFormat } from "@/lib/shared/bg-survie/rounds";
 import { TournamentRow, RegistrationRow, MatchRow, TournamentListRow } from "./_internal";
@@ -27,9 +27,25 @@ export async function loadTournamentMatchFormat(
   tournamentId: number,
   round?: number | null,
 ): Promise<MatchFormat | null> {
+  return (await loadTournamentMatchRules(connection, tournamentId, round)).format;
+}
+
+/**
+ * Format de la manche **et** jeu du tournoi, lus d'une seule requête : la
+ * saisie map par map en a besoin pour juger le code de replay
+ * (`lib/shared/match-maps.ts`). `game` vaut `null` sur un tournoi introuvable
+ * ou une ligne qui ne le porte pas — le contrôle retombe alors sur le motif
+ * permissif.
+ */
+export async function loadTournamentMatchRules(
+  connection: PoolConnection,
+  tournamentId: number,
+  round?: number | null,
+): Promise<{ format: MatchFormat | null; game: TournamentGame | null }> {
   const [rows] = await connection.execute<
     (RowDataPacket & {
       format: string;
+      game?: TournamentGame | null;
       match_format_type: "BO" | "FT" | null;
       match_format_value: number | null;
       match_format_max_maps: number | null;
@@ -38,7 +54,7 @@ export async function loadTournamentMatchFormat(
       endurance_playoff_format_value: number | null;
     })[]
   >(
-    `SELECT format,
+    `SELECT format, game,
             match_format_type, match_format_value,
             match_format_max_maps, match_format_draws,
             endurance_playoff_format_type, endurance_playoff_format_value
@@ -49,7 +65,7 @@ export async function loadTournamentMatchFormat(
   );
 
   const row = rows[0];
-  if (!row) return null;
+  if (!row) return { format: null, game: null };
 
   const qualification = parseMatchFormat(
     row.match_format_type,
@@ -58,12 +74,14 @@ export async function loadTournamentMatchFormat(
     row.match_format_draws,
   );
 
-  return tournamentMatchFormat(
+  const format = tournamentMatchFormat(
     row.format,
     qualification,
     parseMatchFormat(row.endurance_playoff_format_type, row.endurance_playoff_format_value),
     round,
   );
+  const game = row.game === "OW" || row.game === "MR" ? row.game : null;
+  return { format, game };
 }
 
 /**

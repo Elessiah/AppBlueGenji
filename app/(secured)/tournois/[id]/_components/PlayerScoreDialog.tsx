@@ -11,23 +11,29 @@ import {
   forfeitMapCount,
   matchFormatDescription,
   matchFormatLabel,
-  matchWinsRequired,
 } from "@/lib/shared/match-format";
+import {
+  checkMapList,
+  mapFieldKey,
+  mapListViolationMessage,
+  sameMapLists,
+  type MatchMapInput,
+} from "@/lib/shared/match-maps";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import { isMyTeamTeam1, scoreSubmittedMessage, teamLabel } from "@/lib/shared/match-card-viewer";
 import {
-  playerReportInitialScores,
+  playerReportInitialMaps,
   enteredScoreRelation,
   playerReportView,
   toReporterScores,
 } from "@/lib/shared/player-score-report";
-import { decideScoreForm, parseScoreInput, scoreBlockerMessage } from "../_lib/score-form";
-import { useMatchFormat } from "../_lib/match-format-context";
+import { useMatchFormat, useTournamentGame } from "../_lib/match-format-context";
 import { useLiveControls } from "../_lib/live-context";
 import { useMatchLaunchPhase } from "@/lib/shared/hooks/useMatchLaunchPhase";
 import { playerScoreClosedNotice } from "@/lib/shared/match-planning";
 import { formatMatchStartAtFull } from "@/lib/shared/match-schedule";
 import { mapError } from "../_lib/error-map";
-import { ScoreStepper } from "./ScoreStepper";
+import { MapScoreList, mapFieldIds } from "./MapScoreList";
 import styles from "./ScoreDialog.module.css";
 
 interface PlayerScoreDialogProps {
@@ -46,7 +52,8 @@ interface PlayerScoreDialogProps {
 
 /** Empreinte des propositions en attente : ce que le flux peut changer sous la saisie. */
 function reportsSignature(match: BracketMatch): string {
-  const one = (r: MatchScoreReport | null) => (r ? `${r.team1Score}-${r.team2Score}` : "∅");
+  const one = (r: MatchScoreReport | null) =>
+    r ? [r.team1Score, r.team2Score, JSON.stringify(r.maps)].join("|") : "∅";
   return `${match.id}|${one(match.team1Report)}|${one(match.team2Report)}`;
 }
 
@@ -105,41 +112,63 @@ export function PlayerScoreDialog({
   const team2 = teamLabel(match.team2Name, match.team2Placeholder, "Équipe 2");
   const [myName, opponentName] = myTeamIsTeam1 ? [team1, team2] : [team2, team1];
 
-  const [scores, setScores] = useState(() => playerReportInitialScores(view));
+  const game = useTournamentGame();
+  // Saisie **map par map** (`docs/features/MAP_SCORES.md`) : le score du match
+  // se dérive des maps, chacune avec son code de replay.
+  const [maps, setMaps] = useState<MatchMapInput[]>(() => playerReportInitialMaps(view));
+  const fieldErrors = useFieldErrors<string>({}, mapFieldIds("player-score", maps.length));
   // Réalignement sur le flux : tant que le lecteur n'a rien touché, une
   // proposition qui arrive (l'adversaire vient d'envoyer la sienne) remplit les
   // champs. Une saisie en cours, elle, n'est jamais écrasée en silence.
-  const baseline = useRef(scores);
+  const baseline = useRef(maps);
   const signature = reportsSignature(match);
   useEffect(() => {
-    const next = playerReportInitialScores(playerReportView(match, myTeamId));
-    setScores((current) =>
-      current.score1 === baseline.current.score1 && current.score2 === baseline.current.score2
-        ? next
-        : current,
+    const next = playerReportInitialMaps(playerReportView(match, myTeamId));
+    setMaps((current) =>
+      JSON.stringify(current) === JSON.stringify(baseline.current) ? next : current,
     );
     baseline.current = next;
     // `signature` résume exactement ce qui change la valeur d'ouverture.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature]);
 
-  const decision = decideScoreForm(scores, { format: matchFormat, decided: false });
+  const check = checkMapList(matchFormat, game, maps, { decisive: true });
   const entered =
-    decision.scores === null
+    maps.length === 0
       ? null
-      : { team1Score: decision.scores.team1, team2Score: decision.scores.team2 };
+      : { team1Score: check.score.team1, team2Score: check.score.team2, maps };
   // Renvoyer à l'identique la proposition déjà envoyée ne change rien : le
   // bouton le dit plutôt que de réécrire la même ligne.
-  const { unchangedMine, confirmsTheirs } = enteredScoreRelation(entered, view);
+  // Un code de replay corrigé à score égal est bien une nouvelle proposition.
+  const relation = enteredScoreRelation(entered, view);
+  const unchangedMine = relation.unchangedMine && sameMapLists(maps, view?.mine?.maps ?? []);
+  const { confirmsTheirs } = relation;
 
-  const maxScore = matchFormat ? matchWinsRequired(matchFormat) : 99;
   const forfeitMaps = forfeitMapCount(matchFormat);
   const deadline = deadlineText(match.scoreDeadlineAt);
 
+  // Un refus qui désigne une map est rattaché à son champ, en plus de la
+  // notification — avant l'envoi comme après un refus du serveur, qui ne rend
+  // qu'un code : la même règle, rejouée ici, retrouve le champ.
+  const flagRefusal = (code: string): boolean => {
+    const local = checkMapList(matchFormat, game, maps, { decisive: true });
+    if (!local.field || local.error !== code) return false;
+    fieldErrors.flag(
+      mapFieldKey(Math.min(local.field.index, Math.max(maps.length - 1, 0)), local.field.field),
+      mapListViolationMessage(local.error, matchFormat, game),
+    );
+    return true;
+  };
+
   const submitScore = async () => {
-    if (!decision.canResolve || decision.scores === null || submitting || unchangedMine) return;
-    const entered1 = decision.scores.team1;
-    const entered2 = decision.scores.team2;
+    if (submitting || unchangedMine) return;
+    if (check.error) {
+      flagRefusal(check.error);
+      showError(mapListViolationMessage(check.error, matchFormat, game));
+      return;
+    }
+    const entered1 = check.score.team1;
+    const entered2 = check.score.team2;
     const body = toReporterScores(myTeamIsTeam1, entered1, entered2);
     setSubmitting(true);
     try {
@@ -148,7 +177,7 @@ export function PlayerScoreDialog({
         {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ maps }),
         },
       );
       const payload = (await response.json().catch(() => ({}))) as { error?: string };
@@ -161,7 +190,9 @@ export function PlayerScoreDialog({
       onSubmitted();
       onClose();
     } catch (error) {
-      showError(mapError((error as Error).message));
+      const code = (error as Error).message;
+      flagRefusal(code);
+      showError(mapError(code));
     } finally {
       setSubmitting(false);
     }
@@ -215,14 +246,10 @@ export function PlayerScoreDialog({
   const submitLabel = confirmsTheirs ? "Confirmer le score" : "Envoyer le score";
   let blocker: string | null = null;
   if (unchangedMine) blocker = `Score déjà envoyé : en attente de ${opponentName}.`;
-  else if (decision.resolveBlocker) blocker = scoreBlockerMessage(decision.resolveBlocker, matchFormat);
-  // Une saisie partielle n'est pas un refus : la raison ne s'affiche qu'une
-  // fois un champ rempli, pour ne pas ouvrir la modale sur un reproche.
-  const showBlocker =
-    blocker !== null &&
-    (unchangedMine ||
-      parseScoreInput(scores.score1) !== null ||
-      parseScoreInput(scores.score2) !== null);
+  else if (check.error) blocker = mapListViolationMessage(check.error, matchFormat, game);
+  // Une saisie vide n'est pas un refus : la raison ne s'affiche qu'une fois
+  // une map ajoutée, pour ne pas ouvrir la modale sur un reproche.
+  const showBlocker = blocker !== null && (unchangedMine || maps.length > 0);
 
   return createPortal(
     <div /* NOSONAR S6819 — voile de modale, sans équivalent natif */ className={styles.backdrop} role="presentation" {...backdrop}>
@@ -257,29 +284,17 @@ export function PlayerScoreDialog({
 
           {canReportScore ? (
             <>
-              <div className={styles.scores}>
-                <ScoreStepper
-                  id="player-score-team1"
-                  teamId={match.team1Id}
-                  teamName={team1}
-                  value={scores.score1}
-                  max={maxScore}
-                  disabled={submitting}
-                  onChange={(value) => setScores((s) => ({ ...s, score1: value }))}
-                />
-                <span className={styles.versus} aria-hidden="true">
-                  VS
-                </span>
-                <ScoreStepper
-                  id="player-score-team2"
-                  teamId={match.team2Id}
-                  teamName={team2}
-                  value={scores.score2}
-                  max={maxScore}
-                  disabled={submitting}
-                  onChange={(value) => setScores((s) => ({ ...s, score2: value }))}
-                />
-              </div>
+              <MapScoreList
+                idPrefix="player-score"
+                maps={maps}
+                onChange={setMaps}
+                format={matchFormat}
+                game={game}
+                team1Name={team1}
+                team2Name={team2}
+                disabled={submitting}
+                fieldErrors={fieldErrors}
+              />
               {matchFormat && (
                 <p className={styles.formatHint}>{matchFormatDescription(matchFormat)}</p>
               )}
@@ -348,7 +363,7 @@ export function PlayerScoreDialog({
               <button
                 type="submit"
                 className="btn"
-                disabled={!decision.canResolve || unchangedMine || submitting}
+                disabled={maps.length === 0 || unchangedMine || submitting}
               >
                 {submitting ? "…" : submitLabel}
               </button>

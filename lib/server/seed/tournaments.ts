@@ -11,6 +11,7 @@ import { seedRng } from "./match-play";
 import {
   applyLiveStreams,
   applyMatchReplays,
+  applyMatchMapDetails,
   applyMatchSchedule,
   applyReportStates,
 } from "./match-states";
@@ -274,6 +275,7 @@ export async function createTournament(
   await applyMatchSchedule(db, tournamentId, def);
   await applyLiveStreams(db, tournamentId, def);
   await applyMatchReplays(db, tournamentId, def);
+  await applyMatchMapDetails(db, tournamentId, def);
   await applyTournamentImage(db, tournamentId, def);
 
   const gameLabel = def.game === "OW" ? "Overwatch" : "Marvel Rivals";

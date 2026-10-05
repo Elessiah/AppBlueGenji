@@ -28,6 +28,8 @@ import {
 import { ConfirmActionDialog } from "@/components/ui/confirm-action-dialog";
 import { useMatchFormat } from "../_lib/match-format-context";
 import { ScoreStepper } from "./ScoreStepper";
+import { MapScoreList, mapFieldIds } from "./MapScoreList";
+import { useFieldErrors } from "@/lib/shared/hooks/useFieldErrors";
 import styles from "./ScoreDialog.module.css";
 
 /**
@@ -112,6 +114,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
   const launchPhase = useMatchLaunchPhase({ ...match, refereeScheduling });
   const scoreEntryClosed = SCORE_ENTRY_CLOSED_PHASES.includes(launchPhase);
   const form = useScoreForm(match, { scoreEntryClosed });
+  const mapFieldErrors = useFieldErrors<string>({}, mapFieldIds("admin-score", form.maps.length));
   const matchFormat = useMatchFormat(match);
   // `locked` pendant l'envoi : Échap ne doit pas refermer une modale en train
   // d'écrire.
@@ -285,7 +288,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
               teamName={team1}
               value={form.score1}
               max={maxScore}
-              disabled={form.submitting || anyForfeit || scoreEntryClosed}
+              disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
               onChange={form.setScore1}
             />
             <span className={styles.versus} aria-hidden="true">
@@ -297,7 +300,7 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
               teamName={team2}
               value={form.score2}
               max={maxScore}
-              disabled={form.submitting || anyForfeit || scoreEntryClosed}
+              disabled={form.submitting || anyForfeit || scoreEntryClosed || form.maps.length > 0}
               onChange={form.setScore2}
             />
           </div>
@@ -307,6 +310,23 @@ export function AdminScoreDialog({ match, onClose, onSubmitted }: Readonly<Admin
               ni au doigt, et c'est la seule chose qui borne la saisie. */}
           {matchFormat && (
             <p className={styles.formatHint}>{matchFormatDescription(matchFormat)}</p>
+          )}
+
+          {/* Détail map par map (`MAP_SCORES.md`) : dès qu'une map est saisie,
+              le score ci-dessus en découle. Sans map, l'arbitre pose le score
+              à la main, comme avant (replay perdu, saisie de secours). */}
+          {!anyForfeit && !scoreEntryClosed && (
+            <MapScoreList
+              idPrefix="admin-score"
+              maps={form.maps}
+              onChange={form.setMaps}
+              format={matchFormat}
+              game={form.game}
+              team1Name={team1}
+              team2Name={team2}
+              disabled={form.submitting}
+              fieldErrors={mapFieldErrors}
+            />
           )}
 
           <div className={styles.forfeitZone}>

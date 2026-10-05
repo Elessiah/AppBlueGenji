@@ -183,4 +183,30 @@ export async function createTournamentTables(db: Pool): Promise<void> {
         REFERENCES bg_users(id) ON DELETE SET NULL
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+
+  // Détail map par map d'un match (`docs/features/MAP_SCORES.md`). `source`
+  // sépare la proposition de chaque engagée (`TEAM1`, `TEAM2`) du résultat
+  // retenu (`FINAL`) ; les scores sont toujours dans l'orientation du plateau.
+  // Le score du match reste écrit dans `bg_matches` (dérivé des maps) : un
+  // match sans ligne ici — tous ceux d'avant — se lit exactement comme avant.
+  // `submitted_by_user_id` passe à NULL quand le compte est supprimé.
+  await createTable(db, `
+      CREATE TABLE IF NOT EXISTS bg_match_maps (
+      id BIGINT AUTO_INCREMENT PRIMARY KEY,
+      match_id BIGINT NOT NULL,
+      source ENUM('TEAM1', 'TEAM2', 'FINAL') NOT NULL,
+      map_number TINYINT UNSIGNED NOT NULL,
+      replay_code VARCHAR(32) NOT NULL,
+      team1_score TINYINT UNSIGNED NOT NULL,
+      team2_score TINYINT UNSIGNED NOT NULL,
+      submitted_by_user_id BIGINT NULL,
+      submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_bg_match_maps_slot (match_id, source, map_number),
+      KEY idx_bg_match_maps_match (match_id, source),
+      CONSTRAINT fk_bg_match_maps_match FOREIGN KEY (match_id)
+        REFERENCES bg_matches(id) ON DELETE CASCADE,
+      CONSTRAINT fk_bg_match_maps_user FOREIGN KEY (submitted_by_user_id)
+        REFERENCES bg_users(id) ON DELETE SET NULL
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+  `);
 }

@@ -1,0 +1,202 @@
+/* Saisie map par map (`docs/features/MAP_SCORES.md`) : liste verticale, une
+   ligne par map — numéro, code de replay, score de chaque camp, retrait. */
+
+.list {
+  margin: 18px 0 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.legend {
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--blue-400, #5ac8ff);
+}
+
+.limit {
+  color: var(--ink-quiet, #9aa4b2);
+  font-weight: 600;
+}
+
+.hint {
+  margin: 6px 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-quiet, #9aa4b2);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: end;
+  padding: 10px;
+  border: 1px solid rgba(90, 200, 255, 0.18);
+  border-radius: 8px;
+  background: var(--cyber-bg-1, var(--surface-1));
+}
+
+.mapLabel {
+  align-self: center;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink, #e6edf5);
+  white-space: nowrap;
+}
+
+.code,
+.score {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-quiet, #9aa4b2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codeInput,
+.scoreInput {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  padding: 0 8px;
+  border: 1px solid rgba(90, 200, 255, 0.35);
+  border-radius: 6px;
+  background: var(--cyber-bg-1, var(--surface-1));
+  color: var(--ink, #e6edf5);
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.codeInput {
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scoreInput {
+  text-align: center;
+}
+
+.codeInput:focus-visible,
+.scoreInput:focus-visible {
+  outline: none;
+  border-color: var(--blue-400, #5ac8ff);
+  box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.18);
+}
+
+.codeInput[aria-invalid="true"],
+.scoreInput[aria-invalid="true"] {
+  border-color: rgba(255, 74, 92, 0.75);
+}
+
+.remove {
+  width: 36px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(90, 200, 255, 0.22);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-quiet, #9aa4b2);
+  cursor: pointer;
+}
+
+.remove:hover:not(:disabled) {
+  color: var(--ink, #e6edf5);
+  background: rgba(90, 200, 255, 0.1);
+}
+
+.remove:focus-visible,
+.add:focus-visible {
+  outline: 2px solid var(--blue-400, #5ac8ff);
+  outline-offset: 2px;
+}
+
+.add {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px dashed rgba(90, 200, 255, 0.4);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--blue-400, #5ac8ff);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add:hover:not(:disabled) {
+  background: rgba(90, 200, 255, 0.1);
+}
+
+/* État désactivé par couleurs, jamais par opacité. */
+.add:disabled,
+.remove:disabled {
+  border-color: rgba(154, 164, 178, 0.25);
+  color: var(--ink-quiet, #9aa4b2);
+  cursor: not-allowed;
+}
+
+.summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(90, 200, 255, 0.22);
+  font-size: 13px;
+}
+
+.summaryScore {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--ink, #e6edf5);
+  overflow-wrap: anywhere;
+}
+
+.summaryLabel {
+  font-weight: 700;
+  color: var(--ink-quiet, #9aa4b2);
+}
+
+@media (max-width: 560px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 36px;
+  }
+
+  .mapLabel {
+    grid-column: 1 / -1;
+  }
+
+  .code {
+    grid-column: 1 / -1;
+  }
+}

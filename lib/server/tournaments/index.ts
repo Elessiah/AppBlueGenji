@@ -167,6 +167,8 @@ import { mapCard } from "./_internal";
 import { loadCardSummaries, type CardSummary } from "./list-summary";
 import { getTournamentListRow, loadTournamentRow } from "./repository";
 import { reportMatchScore } from "./scoring";
+import type { MatchMapInput } from "@/lib/shared/match-maps";
+import type { AdminMapEntry } from "./admin";
 import {
   publishMatchUpdatedEvent,
   publishUpdatedEvent,
@@ -1185,11 +1187,10 @@ export async function reportMatchScorePublic(
   tournamentId: number,
   matchId: number,
   userId: number,
-  myScoreRaw: number,
-  opponentScoreRaw: number,
+  maps: ReadonlyArray<MatchMapInput>,
 ): Promise<void> {
   await runPlayerMatchWrite(tournamentId, matchId, (connection) =>
-    reportMatchScore(connection, tournamentId, matchId, userId, myScoreRaw, opponentScoreRaw),
+    reportMatchScore(connection, tournamentId, matchId, userId, maps),
   );
 }
 
@@ -1273,6 +1274,7 @@ export async function adminSaveMatchScoresPublic(
   team1Score?: number,
   team2Score?: number,
   forfeitTeamId?: number,
+  mapEntry?: AdminMapEntry,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1281,7 +1283,7 @@ export async function adminSaveMatchScoresPublic(
     await connection.beginTransaction();
 
     const { adminSaveMatchScores: adminSaveInternal } = await import("./admin");
-    await adminSaveInternal(connection, matchId, team1Score, team2Score, forfeitTeamId);
+    await adminSaveInternal(connection, matchId, team1Score, team2Score, forfeitTeamId, mapEntry);
 
     // Need to get tournament ID for event + Survival reconciliation
     const [matchData] = await connection.execute<(RowDataPacket & { tournament_id: number })[]>(
@@ -1518,6 +1520,7 @@ export async function adminResolveMatchPublic(
   team2Score?: number,
   forfeitTeamId?: number,
   doubleForfeit = false,
+  mapEntry?: AdminMapEntry,
 ): Promise<void> {
   const db = await getDatabase();
   const connection = await db.getConnection();
@@ -1542,6 +1545,7 @@ export async function adminResolveMatchPublic(
       team2Score,
       forfeitTeamId,
       doubleForfeit,
+      mapEntry,
     );
 
     await tryAutoResolveByes(connection, tournamentId);

@@ -5,6 +5,7 @@ import {
   type MatchFormat,
 } from "@/lib/shared/match-format";
 import { isMatchPlayed } from "@/lib/shared/match-outcome";
+import type { MatchMapInput } from "@/lib/shared/match-maps";
 
 export interface ScoreFormState {
   score1: string;
@@ -61,6 +62,22 @@ export function pendingScoreProposal(match: BracketMatch | null): PendingScorePr
     team2Score: report.team2Score,
     proposedBy: team1Report ? "team1" : "team2",
   };
+}
+
+/**
+ * Maps d'ouverture du dialogue d'arbitrage (`docs/features/MAP_SCORES.md`) :
+ * le détail retenu s'il y en a un, sinon celui de la proposition unique qui
+ * pré-remplit déjà le score (`pendingScoreProposal`), sinon rien — l'arbitre
+ * peut alors poser un score à la main, comme avant.
+ */
+export function initialAdminMaps(match: BracketMatch | null): MatchMapInput[] {
+  if (!match) return [];
+  const proposal = pendingScoreProposal(match);
+  let source = match.maps ?? [];
+  if (source.length === 0 && proposal) {
+    source = (proposal.proposedBy === "team1" ? match.team1Report : match.team2Report)?.maps ?? [];
+  }
+  return source.map(({ replayCode, team1Score, team2Score }) => ({ replayCode, team1Score, team2Score }));
 }
 
 /**
