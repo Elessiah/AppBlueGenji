@@ -62,9 +62,14 @@ export async function replaceMatchMaps(
  * s'interbloquer, ce que le report d'un engagé rattrape en rejouant sa
  * transaction (`reportMatchScorePublic`).
  */
-async function clearMatchMaps(connection: PoolConnection, matchId: number, source: MatchMapSource): Promise<void> {
+async function clearMatchMaps(
+  connection: PoolConnection,
+  matchId: number,
+  source: MatchMapSource,
+  locking = true,
+): Promise<void> {
   const result = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1 FOR UPDATE`,
+    `SELECT 1 FROM bg_match_maps WHERE match_id = ? AND source = ? LIMIT 1${locking ? " FOR UPDATE" : ""}`,
     [matchId, source],
   );
   const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];
@@ -114,7 +119,11 @@ export async function promoteReportedMaps(
   );
   const rows = Array.isArray(pending) && Array.isArray(pending[0]) ? pending[0] : [];
   if (rows.length === 0) return;
-  await clearMatchMaps(connection, matchId, "FINAL");
+  // `FINAL` lu sans verrou : sur un intervalle vide, un verrou y poserait un
+  // verrou d'intervalle sur un chemin (l'entretien) qui ne rejoue pas ses
+  // transactions. La course qu'il couvrirait est fermée en amont : le report
+  // ici promu appartient à un match verrouillé et relu (`finalization.ts`).
+  await clearMatchMaps(connection, matchId, "FINAL", false);
   await connection.execute(
     `INSERT INTO bg_match_maps
        (match_id, source, map_number, replay_code, team1_score, team2_score, submitted_by_user_id, submitted_at)
@@ -126,8 +135,15 @@ export async function promoteReportedMaps(
 }
 
 /**
- * Efface des jeux de maps sur plusieurs matchs, **s'il y en a** (même raison
- * que `clearMatchMaps` : pas de verrou d'intervalle pour rien).
+ * Efface des jeux de maps sur plusieurs matchs, **s'il y en a**.
+ *
+ * Lecture **sans verrou** : ces effacements suivent la clôture, l'abandon ou le
+ * retour en arrière d'un match — chemins qui ne rejouent pas leur transaction
+ * sur interblocage, et où un verrou d'intervalle sur une plage vide (le cas
+ * ordinaire : pas de proposition) en ferait naître. Le seul angle mort — une
+ * proposition validée par un report concurrent après l'instantané de la
+ * transaction — laisse une ligne orpheline que l'affichage tait (plus de
+ * colonnes de report) et que la clôture suivante du match emporte.
  *
  * Les propositions (`TEAM1`, `TEAM2`) partent dès que leurs colonnes de score
  * partent — clôture (`finalizeMatch`), abandon d'un moteur à classement,
@@ -145,7 +161,7 @@ export async function clearMapSets(
        AND source IN (${sources.map(() => "?").join(", ")})`;
   const params = [...matchIds, ...sources];
   const result = await connection.execute<RowDataPacket[]>(
-    `SELECT 1 FROM bg_match_maps WHERE ${where} LIMIT 1 FOR UPDATE`,
+    `SELECT 1 FROM bg_match_maps WHERE ${where} LIMIT 1`,
     params,
   );
   const rows = Array.isArray(result) && Array.isArray(result[0]) ? result[0] : [];

@@ -508,6 +508,12 @@ export async function resolveExpiredScoreReports(
     // la règle vit dans `matchWinnerSide`, partagée avec l'arbitrage et
     // l'accord des deux engagés.
     if (team1Reported !== team2Reported) {
+      // Verrou du match et relecture de son statut avant de le clore : la
+      // sélection ci-dessus ne verrouille rien, et l'entretien tourne à chaque
+      // écriture comme à chaque chargement. Deux clôtures concurrentes du même
+      // report réécrivaient le même score sans dommage ; avec le détail map par
+      // map, la seconde effaçait celui que la première venait de retenir.
+      if (!(await stillAwaitingConfirmation(connection, Number(match.id)))) continue;
       const { team1Score, team2Score } = singleReportScores(match);
 
       const format = await loadTournamentMatchFormat(
@@ -548,6 +554,20 @@ export async function resolveExpiredScoreReports(
   }
 
   return resolved;
+}
+
+/**
+ * Le match attend-il toujours une confirmation, une fois sa ligne verrouillée
+ * (table seule, sans jointure — MariaDB) ? Une ligne introuvable ne bloque
+ * rien : la suite n'écrira rien de plus qu'avant.
+ */
+async function stillAwaitingConfirmation(connection: PoolConnection, matchId: number): Promise<boolean> {
+  const result = await connection.execute<(RowDataPacket & { status?: string })[]>(
+    `SELECT status FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE`,
+    [matchId],
+  );
+  const status = Array.isArray(result) && Array.isArray(result[0]) ? result[0][0]?.status : undefined;
+  return status === undefined || status === "AWAITING_CONFIRMATION";
 }
 
 /** L'engagé 1 a-t-il déposé son report (son score et celui de l'adversaire) ? */

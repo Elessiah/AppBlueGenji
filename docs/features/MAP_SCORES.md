@@ -114,6 +114,11 @@ bg_match_maps (
   d'intervalle : deux reports simultanés sur des matchs voisins peuvent
   s'interbloquer, et `reportMatchScorePublic` rejoue alors la transaction
   annulée (3 essais), comme les deux écritures d'arbitrage (`retryOnDeadlock`).
+  Les chemins qui ne rejouent pas leur transaction (clôture d'un match,
+  abandons, retour en arrière, entretien des reports expirés) lisent **sans
+  verrou** avant d'effacer (`clearMapSets`) ; l'entretien verrouille et relit
+  d'abord le match (`stillAwaitingConfirmation`), ce qui ferme la double
+  clôture d'un même report expiré.
 - Dialogue d'arbitrage : un score posé à la main avant la première map est
   rendu aux champs quand la dernière map est retirée.
 - `FINAL` : le détail retenu. Promu depuis la proposition qui fait foi (accord

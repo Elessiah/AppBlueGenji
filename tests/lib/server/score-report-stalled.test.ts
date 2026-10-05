@@ -59,6 +59,24 @@ beforeEach(() => {
 describe("resolveExpiredScoreReports", () => {
   // Un seul report : le silence de l'adversaire vaut accord, le moteur
   // tranche seul. Rien à arbitrer, donc aucune alerte.
+  it("ne clôt pas deux fois un report qu'une clôture concurrente vient de trancher (MAP_SCORES.md)", async () => {
+    const seen: string[] = [];
+    const connection = fakeConnection({
+      seen,
+      rows: (q) => {
+        if (q.startsWith("SELECT status FROM bg_matches WHERE id = ?")) return [{ status: "COMPLETED" }];
+        if (q.includes("FROM bg_matches")) return [expiredRow({ id: 31, team2_report_score: null, team2_report_opponent_score: null })];
+        return [];
+      },
+    });
+
+    await resolveExpiredScoreReports(connection, 12);
+
+    expect(seen).toContain("SELECT status FROM bg_matches WHERE id = ? LIMIT 1 FOR UPDATE");
+    expect(promoteReportedMaps).not.toHaveBeenCalled();
+    expect(finalizeMatch).not.toHaveBeenCalled();
+  });
+
   it("résout un report expiré quand seul team1 a saisi le score", async () => {
     const connection = fakeConnection({
       rows: (q) => {
