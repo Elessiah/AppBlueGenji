@@ -141,6 +141,23 @@ describe("middleware — avis de suspension sous /en/connexion", () => {
     for (const notice of notices) expect(notice).toMatch(/Max-Age=0/i);
   });
 
+  it("ne consomme pas l'avis sur un fetch du routeur (préchargement de /en/connexion)", () => {
+    const response = call("/en/connexion", {
+      headers: { cookie: `${SUSPENSION_NOTICE_COOKIE}=abc`, "sec-fetch-dest": "empty" },
+    });
+    expect(forwarded(response, SUSPENSION_NOTICE_HEADER)).toBeNull();
+    expect(response.headers.get("set-cookie")).toBeNull();
+    // La réécriture, elle, a bien lieu.
+    expect(forwarded(response, LOCALE_HEADER)).toBe("en");
+  });
+
+  it("le consomme sur le document que charge le retour OAuth", () => {
+    const response = call("/en/connexion?error=suspended", {
+      headers: { cookie: `${SUSPENSION_NOTICE_COOKIE}=abc`, "sec-fetch-dest": "document" },
+    });
+    expect(forwarded(response, SUSPENSION_NOTICE_HEADER)).toBe("abc");
+  });
+
   it("ne lit pas le cookie ailleurs que sur la page de connexion", () => {
     const response = call("/en/regles", { headers: { cookie: `${SUSPENSION_NOTICE_COOKIE}=abc` } });
     expect(forwarded(response, SUSPENSION_NOTICE_HEADER)).toBeNull();
