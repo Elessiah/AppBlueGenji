@@ -25,7 +25,8 @@ describe("« Signaler un problème » sur toutes les pages", () => {
   it("dans l'espace connecté, connecté ou non", () => {
     const layout = read("app/(secured)/layout.tsx");
     expect(layout).toContain("<SiteFooterBar authenticated={false} />");
-    expect(layout).toContain("<SiteFooterBar authenticated />");
+    expect(layout).toContain("<ArenaShell");
+    expect(read("components/arena-shell.tsx")).toContain("<SiteFooterBar authenticated />");
   });
 
   it("sur la page de connexion", () => {

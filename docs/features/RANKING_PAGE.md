@@ -1,9 +1,27 @@
 # Page Classement (`/classement`)
 
-Page publique (vitrine, `PublicPageShell` : en-tête, `<main>`, pied de page en
+Page publique (`SessionPageShell` : en-tête, `<main>`, pied de page en
 frères) qui montre **tout** le classement des équipes. Elle remplace la cible
 du lien « Voir le classement complet » du leaderboard de l'accueil, qui menait
 à l'annuaire `/equipes` (retour du 2026-10-05 : « déroutant »).
+
+## En-tête selon la session
+
+`/classement` est aussi listé par la barre des connectés (`ARENA_NAV_LINKS`).
+La page passe donc par **`SessionPageShell`**
+(`components/cyber/landing/SessionPageShell.tsx`) : déconnecté — robots
+d'indexation compris —, l'en-tête et le pied vitrine (`PublicPageShell`) ;
+connecté, le gabarit de l'espace `(secured)` (**`ArenaShell`**,
+`components/arena-shell.tsx` : `ArenaNav`, `<main>`, `SiteFooterBar`), lien
+« Classement » en `aria-current="page"`. Le choix se fait au serveur
+(`getCurrentUser`, mémoïsé par requête et déjà lu par le layout racine) : ni
+flash, ni requête côté client ; un connecté coûte au serveur la lecture de son
+équipe active (et du compteur de signalements pour la modération), chacune
+avec son repli. Une session illisible retombe sur la vitrine. La
+page était déjà `force-dynamic` : lire le cookie ne change pas son mode de
+rendu. Le `<main>` garde le style vitrine dans les deux cas (contenu, SEO,
+repères uniques, lien d'évitement et pagination sans JS inchangés). Tests :
+`tests/app/session-page-shell.test.tsx`.
 
 ## Ordre du classement
 
