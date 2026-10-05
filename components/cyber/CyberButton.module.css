@@ -70,7 +70,13 @@
   transform: none;
 }
 
-/* Mouvement réduit : le bouton s'éclaire au survol sans se déplacer. */
+/* Mouvement réduit (préférence système ou menu d'accessibilité) : le bouton
+   s'éclaire au survol sans se déplacer. */
+:global(:root[data-a11y~="motion"]) .primary:hover:not(:disabled):not([aria-disabled="true"]),
+:global(:root[data-a11y~="motion"]) .ghost:hover:not(:disabled):not([aria-disabled="true"]) {
+  transform: none;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .root,
   .primary:hover:not(:disabled):not([aria-disabled="true"]),

@@ -322,7 +322,15 @@
   }
 }
 
-/* Mouvement réduit : le reflet devient un filet fixe sur toute la largeur. */
+/* Mouvement réduit (préférence système ou menu d'accessibilité) : le reflet
+   devient un filet fixe sur toute la largeur. */
+:global(:root[data-a11y~="motion"]) .shimmer::before {
+  animation: none !important;
+  transform: none;
+  width: 100%;
+  opacity: 0.5;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shimmer::before {
     animation: none;

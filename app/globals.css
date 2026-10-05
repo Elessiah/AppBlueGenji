@@ -1689,6 +1689,10 @@ html {
   }
 }
 
+:root[data-a11y~="motion"] .hover-lift:hover {
+  transform: none;
+}
+
 /* Apparition au défilement (`components/cyber/landing/Reveal.tsx`) : la classe
    `reveal-pending` n'est posée **que par JavaScript**, et seulement si les
    animations décoratives sont permises — sans JS, le contenu est visible. */

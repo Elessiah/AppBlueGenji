@@ -30,3 +30,8 @@
     transform: none;
   }
 }
+
+/* « Réduire les animations » du menu d'accessibilité : même effet. */
+:global(:root[data-a11y~="motion"]) .lift:hover {
+  transform: none;
+}
