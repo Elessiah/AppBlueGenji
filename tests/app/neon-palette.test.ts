@@ -91,9 +91,13 @@ describe("palette néon froid", () => {
   });
 
   it("la pastille d'attente respire, figée par le régime de charge", () => {
-    const waiting = sheet.match(/\.pill-waiting\s*\{([^}]*)\}/)![1];
+    const waiting = sheet.match(/\.pill-waiting::after\s*\{([^}]*)\}/)![1];
     expect(waiting).toMatch(/animation:[^;]*infinite/);
     expect(waiting).toMatch(/animation-play-state:\s*var\(--deco-anim-state\)/);
+    // Seule l'opacité s'anime : aucun repeint d'ombre à chaque image.
+    const frames = sheet.match(/@keyframes pill-waiting-glow\s*\{([\s\S]*?)\n\}/)![1];
+    expect(frames).not.toMatch(/box-shadow/);
+    expect(frames).toMatch(/opacity/);
   });
 
   it("l'apparition au défilement n'est qu'un état posé par JavaScript, en transform/opacité", () => {
@@ -118,5 +122,6 @@ describe("palette néon froid", () => {
 
   it("l'impression montre les sections jamais atteintes", () => {
     expect(sheet).toMatch(/@media print\s*\{\s*\.reveal-pending\s*\{[^}]*opacity:\s*1/);
+    expect(sheet).toMatch(/@media print\s*\{[^@]*\.text-gradient\s*\{[^}]*background:\s*none/);
   });
 });

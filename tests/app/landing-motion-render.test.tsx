@@ -68,6 +68,12 @@ describe("animations de l'accueil — contenu visible sans JavaScript", () => {
     expect(readSource("components/cyber/landing/CountUp.tsx")).toContain("if (element && !decorativeMotion) played.current = true;");
   });
 
+  it("CountUp ne décompte pas un chiffre déjà dépassé (au-dessus de la fenêtre)", () => {
+    const source = readSource("components/cyber/landing/CountUp.tsx");
+    expect(source).toContain("rect.top < window.innerHeight && rect.bottom > 0");
+    expect(source).toMatch(/if \(above \|\| !countUpMayStart/);
+  });
+
   it("l'accueil enveloppe ses sections sous le hero, pas le hero (LCP)", () => {
     const page = readSource("app/page.tsx");
     expect(page).not.toMatch(/<Reveal>\s*<Hero/);
