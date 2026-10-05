@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, type ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import type { BracketMatch } from "@/lib/shared/types";
 import { useClock } from "@/lib/shared/hooks/useClock";
 import {
@@ -38,17 +38,17 @@ export function RoundMatchSections({ matches, children }: Readonly<RoundMatchSec
     () => sectionRoundMatches(matches, { refereeScheduling, now, seeds }),
     [matches, refereeScheduling, now, seeds],
   );
-  const baseId = useId();
 
   return (
     <div className={styles.sections}>
       {sections.map((section) => {
-        const labelId = `${baseId}-${section.key}`;
         const count = sectionCountLabel(section.matches.length);
         return (
-          <div key={section.key} role="group" aria-labelledby={labelId}>
-            <div className={styles.divider} data-section={section.key}>
-              <span id={labelId} className={styles.label}>
+          <div key={section.key}>
+            {/* Filet lu comme une ligne de texte (« Lancement, 2 matchs ») :
+                ni volet, ni repère, ni élément focalisable. */}
+            <p className={styles.divider} data-section={section.key}>
+              <span className={styles.label}>
                 {section.label}
                 <span className="sr-only">, {count}</span>
               </span>
@@ -56,7 +56,7 @@ export function RoundMatchSections({ matches, children }: Readonly<RoundMatchSec
                 {section.matches.length}
               </span>
               <span className={styles.rule} aria-hidden="true" />
-            </div>
+            </p>
             {children(section.matches)}
           </div>
         );
