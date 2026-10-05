@@ -1,12 +1,9 @@
 import { Suspense } from "react";
 import type { Metadata } from "next";
 import { getCurrentUser } from "@/lib/server/auth";
-import { getUserActiveTeam } from "@/lib/server/teams/roster";
-import { ArenaNav } from "@/components/arena-nav";
+import { ArenaShell } from "@/components/arena-shell";
 import { AuthGate } from "./_shared/AuthGate";
 import { SiteFooterBar } from "@/components/legal/SiteFooterBar";
-import { countOpenReports } from "@/lib/server/content-reports";
-import { can } from "@/lib/shared/permissions";
 
 /**
  * L'espace sécurisé répond `200` aux visiteurs non connectés — une carte
@@ -42,21 +39,9 @@ export default async function SecuredLayout({ children }: Readonly<{ children: R
     );
   }
 
-  const activeTeam = await getUserActiveTeam(user.id);
-  // Le compteur ne doit jamais faire tomber la page : une lecture ratée
-  // l'affiche à zéro, le panneau dira la vérité.
-  const openReports = can(user, "moderation") ? await countOpenReports().catch(() => 0) : null;
-
   return (
-    <>
-      <ArenaNav
-        pseudo={user.pseudo}
-        avatarUrl={user.avatarUrl}
-        activeTeam={activeTeam}
-        openReports={openReports}
-      />
-      <main className="page-shell">{children}</main>
-      <SiteFooterBar authenticated />
-    </>
+    <ArenaShell user={user} mainClassName="page-shell">
+      {children}
+    </ArenaShell>
   );
 }

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PublicPageShell } from "@/components/cyber/landing/PublicPageShell";
+import { SessionPageShell } from "@/components/cyber/landing/SessionPageShell";
 import { loadLeaderboardRows } from "@/lib/server/landing-service";
 import { loadCachedTeamForms } from "@/lib/server/teams/directory";
 import type { LandingLeaderboardRow } from "@/lib/shared/landing";
@@ -48,7 +48,7 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
   const anyDraws = loaded?.some((row) => row.draws > 0) ?? false;
 
   return (
-    <PublicPageShell>
+    <SessionPageShell>
       <section className={`${styles.section} ${styles.hero}`} aria-labelledby="classement-title">
         <div className="fabric" />
         <div className={styles.heroAurora} aria-hidden="true" />
@@ -90,6 +90,6 @@ export default async function ClassementPage({ searchParams }: Readonly<PageProp
           <Link href="/regles" className={styles.ctaSecondary}>Lire les règles</Link>
         </div>
       </section>
-    </PublicPageShell>
+    </SessionPageShell>
   );
 }
