@@ -85,7 +85,7 @@ export default async function AssociationPage() {
               >
                 <h1 className={`display ${styles.heroTitle}`}>
                   {copy["association.hero.title"].split("\n").map((line, index, lines) => (
-                    <span key={line + index}>
+                    <span key={line + index} className={index > 0 && index === lines.length - 1 ? "text-gradient" : undefined}>
                       {line}
                       {index < lines.length - 1 ? <br /> : null}
                     </span>

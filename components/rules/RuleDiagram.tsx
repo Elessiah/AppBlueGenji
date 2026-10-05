@@ -2,7 +2,7 @@
  * Schémas explicatifs des modes de tournoi (`/regles/[slug]`).
  *
  * Tout est en SVG inline : aucune dépendance externe, thème respecté via les
- * tokens CSS (`--blue-500`, `--amber`, `--ink`…), et le rendu reste net à toutes
+ * tokens CSS (`--blue-500`, `--violet-400`, `--pink-400`, `--ink`…), et le rendu reste net à toutes
  * les tailles. Les schémas sont dessinés à largeur fixe et défilent
  * horizontalement sur mobile (cf. `.scroll` / `.svg` dans le module CSS) plutôt
  * que de se comprimer jusqu'à l'illisibilité.
@@ -12,8 +12,10 @@ import styles from "./RuleDiagram.module.css";
 import { ScrollArea } from "@/components/cyber";
 
 const BLUE = "var(--blue-500)";
-const AMBER = "var(--amber)";
-const RED = "var(--red-live)";
+/** Bracket bas, rangée des perdants : violet néon (aucune teinte chaude, DESIGN_SYSTEM.md). */
+const LOWER = "var(--violet-400)";
+/** Zone de coupe : rose néon — le rouge est réservé au direct (`.pill-live`). */
+const CUT = "var(--pink-400)";
 const INK = "var(--ink)";
 const MUTE = "var(--ink-mute)";
 const LINE = "var(--line-strong-cy)";
@@ -219,11 +221,11 @@ function DoubleEliminationDiagram() {
       <Elbow from={[318, 49]} to={[352, 49]} color={BLUE} />
 
       <ColumnLabel x={20} y={216}>Bracket bas · une défaite</ColumnLabel>
-      <Box x={20} y={228} lines={["Tour 1 bas"]} h={38} accent={AMBER} />
-      <Box x={186} y={228} lines={["Tour 2 bas"]} h={38} accent={AMBER} />
-      <Box x={352} y={228} lines={["Finale basse"]} h={38} accent={AMBER} />
-      <Elbow from={[152, 247]} to={[186, 247]} color={AMBER} />
-      <Elbow from={[318, 247]} to={[352, 247]} color={AMBER} />
+      <Box x={20} y={228} lines={["Tour 1 bas"]} h={38} accent={LOWER} />
+      <Box x={186} y={228} lines={["Tour 2 bas"]} h={38} accent={LOWER} />
+      <Box x={352} y={228} lines={["Finale basse"]} h={38} accent={LOWER} />
+      <Elbow from={[152, 247]} to={[186, 247]} color={LOWER} />
+      <Elbow from={[318, 247]} to={[352, 247]} color={LOWER} />
 
       {/* Chutes du bracket haut vers le bracket bas. */}
       {[
@@ -237,16 +239,16 @@ function DoubleEliminationDiagram() {
             y1={68}
             x2={cx}
             y2={222}
-            stroke={AMBER}
+            stroke={LOWER}
             strokeWidth={1.2}
             strokeDasharray="4 3"
             markerEnd="url(#rule-arrow)"
-            style={{ color: AMBER }}
+            style={{ color: LOWER }}
           />
           <text
             x={cx + 8}
             y={150}
-            fill={AMBER}
+            fill={LOWER}
             fontSize={10.5}
             fontFamily={MONO}
             aria-hidden={boxX < 0}
@@ -273,7 +275,7 @@ function DoubleEliminationDiagram() {
         un seul match
       </text>
       <Elbow from={[484, 49]} to={[528, 132]} color={BLUE} />
-      <Elbow from={[484, 247]} to={[528, 164]} color={AMBER} />
+      <Elbow from={[484, 247]} to={[528, 164]} color={LOWER} />
 
       <text x={20} y={312} fill={MUTE} fontSize={11.5} fontFamily={MONO}>
         Deux défaites = sortie du tournoi. Pas de belle en grande finale.
@@ -287,12 +289,12 @@ function SwissDiagram() {
     [{ label: "Seeding", teams: "8 équipes · 4 matchs", y: 120, accent: LINE }],
     [
       { label: "1 victoire", teams: "4 équipes · 2 matchs", y: 60, accent: BLUE },
-      { label: "0 victoire", teams: "4 équipes · 2 matchs", y: 180, accent: AMBER },
+      { label: "0 victoire", teams: "4 équipes · 2 matchs", y: 180, accent: LOWER },
     ],
     [
       { label: "2 victoires", teams: "2 équipes · 1 match", y: 30, accent: BLUE },
       { label: "1 victoire", teams: "4 équipes · 2 matchs", y: 120, accent: MUTE },
-      { label: "0 victoire", teams: "2 équipes · 1 match", y: 210, accent: AMBER },
+      { label: "0 victoire", teams: "2 équipes · 1 match", y: 210, accent: LOWER },
     ],
   ];
   const colX = [20, 250, 480];
@@ -322,12 +324,12 @@ function SwissDiagram() {
 
       {/* Ronde 1 → groupes de score. */}
       <Elbow from={[188, 145]} to={[250, 85]} color={BLUE} />
-      <Elbow from={[188, 145]} to={[250, 205]} color={AMBER} />
+      <Elbow from={[188, 145]} to={[250, 205]} color={LOWER} />
       {/* Ronde 2 → ronde 3. */}
       <Elbow from={[418, 85]} to={[480, 55]} color={BLUE} />
       <Elbow from={[418, 85]} to={[480, 145]} color={MUTE} />
       <Elbow from={[418, 205]} to={[480, 145]} color={MUTE} />
-      <Elbow from={[418, 205]} to={[480, 235]} color={AMBER} />
+      <Elbow from={[418, 205]} to={[480, 235]} color={LOWER} />
 
       <text x={20} y={288} fill={MUTE} fontSize={11.5} fontFamily={MONO}>
         Personne n&apos;est éliminé : toutes les équipes jouent chaque ronde.
@@ -349,13 +351,13 @@ function SurvivalDiagram() {
             height={22}
             rx={5}
             fill={inCut ? "rgba(255,77,94,0.10)" : SURFACE}
-            stroke={inCut ? RED : LINE}
+            stroke={inCut ? CUT : LINE}
             strokeWidth={1.1}
           />
           <text x={x + 9} y={y + i * 26 + 15} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
             {i + 1}
           </text>
-          <text x={x + 26} y={y + i * 26 + 15} fill={inCut ? RED : INK} fontSize={11} fontFamily={MONO}>
+          <text x={x + 26} y={y + i * 26 + 15} fill={inCut ? CUT : INK} fontSize={11} fontFamily={MONO}>
             {`Équipe ${String.fromCodePoint(65 + i)}`}
           </text>
         </g>
@@ -405,10 +407,10 @@ function SurvivalDiagram() {
         strokeWidth={1.1}
         strokeDasharray="3 3"
       />
-      <text x={244} y={230} fill={RED} fontSize={11} fontFamily={MONO}>
+      <text x={244} y={230} fill={CUT} fontSize={11} fontFamily={MONO}>
         coupe : les 2
       </text>
-      <text x={244} y={248} fill={RED} fontSize={11} fontFamily={MONO}>
+      <text x={244} y={248} fill={CUT} fontSize={11} fontFamily={MONO}>
         dernières sortent
       </text>
 
@@ -429,10 +431,10 @@ function SurvivalDiagram() {
         height={62}
         rx={8}
         fill="rgba(245,165,36,0.08)"
-        stroke={AMBER}
+        stroke={LOWER}
         strokeWidth={1.2}
       />
-      <text x={426} y={260} fill={AMBER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
+      <text x={426} y={260} fill={LOWER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
         ⚖ EFFECTIF IMPAIR
       </text>
       <text x={426} y={278} fill={MUTE} fontSize={11} fontFamily={MONO}>
@@ -580,19 +582,19 @@ function BgSurvieDiagram() {
               height={26}
               rx={5}
               fill={out ? "rgba(255,77,94,0.10)" : SURFACE}
-              stroke={out ? RED : LINE}
+              stroke={out ? CUT : LINE}
               strokeWidth={1.1}
             />
             <text x={30} y={48 + index * 32} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
               {index + 1}
             </text>
-            <text x={48} y={48 + index * 32} fill={out ? RED : INK} fontSize={11} fontFamily={MONO}>
+            <text x={48} y={48 + index * 32} fill={out ? CUT : INK} fontSize={11} fontFamily={MONO}>
               {`Équipe ${team}`}
             </text>
             <text
               x={196}
               y={48 + index * 32}
-              fill={out ? RED : BLUE}
+              fill={out ? CUT : BLUE}
               fontSize={12}
               fontFamily={MONO}
               textAnchor="end"
@@ -606,7 +608,7 @@ function BgSurvieDiagram() {
       <text x={20} y={214} fill={MUTE} fontSize={11} fontFamily={MONO}>
         +1 par map gagnée · −1 par map perdue
       </text>
-      <text x={20} y={232} fill={RED} fontSize={11} fontFamily={MONO}>
+      <text x={20} y={232} fill={CUT} fontSize={11} fontFamily={MONO}>
         à 0 : éliminée sur-le-champ
       </text>
       <text x={20} y={256} fill={MUTE} fontSize={11} fontFamily={MONO}>
@@ -675,10 +677,10 @@ function BgSurvieDiagram() {
         height={58}
         rx={8}
         fill="rgba(245,165,36,0.08)"
-        stroke={AMBER}
+        stroke={LOWER}
         strokeWidth={1.2}
       />
-      <text x={534} y={122} fill={AMBER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
+      <text x={534} y={122} fill={LOWER} fontSize={11} fontFamily={MONO} letterSpacing="0.08em">
         🥉 PETITE FINALE
       </text>
       <text x={534} y={142} fill={MUTE} fontSize={10.5} fontFamily={MONO}>
@@ -704,16 +706,16 @@ const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
   ],
   DOUBLE: [
     { color: BLUE, label: "Bracket haut" },
-    { color: AMBER, label: "Bracket bas" },
+    { color: LOWER, label: "Bracket bas" },
   ],
   SWISS: [
     { color: BLUE, label: "Groupe de tête" },
-    { color: AMBER, label: "Groupe de queue" },
+    { color: LOWER, label: "Groupe de queue" },
   ],
   SURVIVAL: [
     { color: BLUE, label: "Appariement" },
-    { color: RED, label: "Zone de coupe" },
-    { color: AMBER, label: "Barrage" },
+    { color: CUT, label: "Zone de coupe" },
+    { color: LOWER, label: "Barrage" },
   ],
   MULTI: [
     { color: BLUE, label: "Flux des qualifiées" },
@@ -721,8 +723,8 @@ const LEGENDS: Record<RuleDiagram, { color: string; label: string }[]> = {
   ],
   BG_SURVIE: [
     { color: BLUE, label: "Endurance restante" },
-    { color: RED, label: "Capital épuisé" },
-    { color: AMBER, label: "Petite finale" },
+    { color: CUT, label: "Capital épuisé" },
+    { color: LOWER, label: "Petite finale" },
   ],
 };
 

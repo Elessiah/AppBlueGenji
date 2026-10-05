@@ -12,6 +12,8 @@ interface CyberCardProps {
   style?: CSSProperties;
   /** Ancre DOM de la carte (cible d'un lien profond `#...`). */
   id?: string;
+  /** Teinte de la carte (`data-tone`), lue par la feuille de la page qui la pose. */
+  tone?: string;
 }
 
 export function CyberCard({
@@ -22,6 +24,7 @@ export function CyberCard({
   children,
   style,
   id,
+  tone,
 }: Readonly<CyberCardProps>) {
   const classes = [
     styles.root,
@@ -32,5 +35,5 @@ export function CyberCard({
     .filter(Boolean)
     .join(" ");
 
-  return createElement(as, { className: classes, style, id }, children);
+  return createElement(as, { className: classes, style, id, "data-tone": tone }, children);
 }

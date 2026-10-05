@@ -31,7 +31,9 @@ export default function TermsOfUsePage() {
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">LÉGAL · CONDITIONS GÉNÉRALES</span>
-        <h1 className={`display ${styles.heroTitle}`}>Conditions d&apos;utilisation</h1>
+        <h1 className={`display ${styles.heroTitle}`}>
+          <span className="text-gradient">Conditions d&apos;utilisation</span>
+        </h1>
         <p className={styles.heroLead}>
           Ce que chacun s&apos;engage à respecter en utilisant le site, en y créant une équipe et en y
           publiant un logo ou un avatar. Le traitement des données personnelles est décrit dans la{" "}

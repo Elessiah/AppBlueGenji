@@ -31,6 +31,23 @@ export const RECRUITMENT_DOMAIN_LABELS: Record<RecruitmentDomain, string> = {
 };
 
 /**
+ * Pastille (`.pill-*`, DESIGN_SYSTEM.md) du domaine d'une annonce : une teinte
+ * froide par famille de métiers, pour qu'on repère d'un coup d'œil les annonces
+ * de son domaine — jamais le rouge (direct) ni le gris (le domaine a un sens).
+ */
+export const RECRUITMENT_DOMAIN_PILL: Record<RecruitmentDomain, "info" | "accent" | "success" | "highlight"> = {
+  ARBITRAGE: "info",
+  CASTING: "highlight",
+  DEV: "accent",
+  COMMUNICATION: "success",
+  DESIGN: "highlight",
+  MODERATION: "info",
+  EVENEMENTIEL: "success",
+  ADMIN: "accent",
+  AUTRE: "info",
+};
+
+/**
  * Statut d'importance d'une annonce. Il décide à lui seul **où** l'annonce se
  * montre, et remplace l'ancien mode de mise en avant (`NONE` / `BANNER` /
  * `MODAL`), qui ne servait qu'**une** annonce à la fois : on pouvait cocher

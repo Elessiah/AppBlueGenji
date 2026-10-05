@@ -9,6 +9,7 @@ import { useBackdropDismiss } from "@/lib/shared/hooks/useBackdropDismiss";
 import { useDialogBehavior } from "@/lib/shared/hooks/useDialogBehavior";
 import {
   RECRUITMENT_DOMAIN_LABELS,
+  RECRUITMENT_DOMAIN_PILL,
   RECRUITMENT_PRIORITY_EXPOSURE,
   type RecruitmentAd,
   formatRecruitmentBody,
@@ -51,7 +52,7 @@ export function AdDetailModal({ ad, onClose }: Readonly<AdDetailModalProps>) {
       >
         <header className={styles.head}>
           <div className={styles.tags}>
-            <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
+            <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
             {!ad.active && <Pill variant="neutral">Inactif</Pill>}
           </div>

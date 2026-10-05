@@ -20,6 +20,7 @@ import {
   splitRecruitmentAds,
   RECRUITMENT_DOMAINS,
   RECRUITMENT_DOMAIN_LABELS,
+  RECRUITMENT_DOMAIN_PILL,
   RECRUITMENT_PRIORITY_DESCRIPTIONS,
   RECRUITMENT_PRIORITY_EXPOSURE,
   RECRUITMENT_PRIORITY_LABELS,
@@ -303,7 +304,7 @@ export function RecruitmentSection({ initialAds, isAdmin, contactDefaults }: Rea
       >
         <div className={styles.cardHead}>
           <div className={styles.cardTags}>
-            <Pill variant="blue">{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
+            <Pill variant={RECRUITMENT_DOMAIN_PILL[ad.domain]}>{RECRUITMENT_DOMAIN_LABELS[ad.domain]}</Pill>
             {RECRUITMENT_PRIORITY_EXPOSURE[ad.priority].urgent && <UrgentPill />}
             {!ad.active && <Pill variant="neutral">Inactif</Pill>}
             {/* Le statut ne se lit publiquement que par ses effets (pastille,

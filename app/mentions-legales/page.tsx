@@ -57,7 +57,9 @@ export default function MentionsLegalesPage() {
         <span className="eyebrow">LÉGAL · LOI 1901</span>
         <div className={styles.heroGrid}>
           <div>
-            <h1 className={`display ${styles.heroTitle}`}>Mentions légales</h1>
+            <h1 className={`display ${styles.heroTitle}`}>
+              <span className="text-gradient">Mentions légales</span>
+            </h1>
           </div>
           {/* Un `<div>` : même raison que sur `/association` — un `<aside>` dans
               `<main>` n'est pas un repère de premier niveau (RGAA 12.6). */}

@@ -189,7 +189,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
     ],
     diagram: "DOUBLE",
     diagramCaption:
-      "Bracket haut en bleu, bracket bas en ambre : chaque défaite en haut redescend d'un cran.",
+      "Bracket haut en bleu, bracket bas en violet : chaque défaite en haut redescend d'un cran.",
     sections: [
       {
         title: "Bracket haut et bracket bas",
@@ -355,7 +355,7 @@ export const TOURNAMENT_RULE_MODES: TournamentRuleMode[] = [
     ],
     diagram: "SURVIVAL",
     diagramCaption:
-      "Le classement est rejoué à chaque round ; la zone rouge est la zone de coupe.",
+      "Le classement est rejoué à chaque round ; la zone rose est la zone de coupe.",
     sections: [
       {
         title: "Classement de départ",

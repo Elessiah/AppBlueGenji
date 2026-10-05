@@ -28,6 +28,7 @@ import {
   ruleSectionAnchors,
   rulesPageOutline,
 } from "@/lib/shared/rules-page-outline";
+import { RULE_MODE_TONE } from "@/lib/shared/rules-display";
 import styles from "./page.module.css";
 
 type PageProps = {
@@ -161,12 +162,14 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
         ])}
       />
 
-      <section className={`${styles.shell} ${styles.hero}`}>
+      <section className={`${styles.shell} ${styles.hero}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
         <div className="fabric" />
         <Link href="/regles" className={styles.back}>
           ← Règles des tournois
         </Link>
-        <h1 className={`display ${styles.title}`}>{mode.label}</h1>
+        <h1 className={`display ${styles.title}`}>
+          <span className="text-gradient">{mode.label}</span>
+        </h1>
         <p className={styles.tagline}>{mode.tagline}</p>
         {mode.status === "SOON" && (
           <p className={styles.soonBanner}>
@@ -188,7 +191,7 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
         </dl>
       </section>
 
-      <div className={`${styles.shell} ${styles.layout}`}>
+      <div className={`${styles.shell} ${styles.layout}`} data-tone={RULE_MODE_TONE[mode.diagram]}>
         <RulesToc entries={outline} />
 
         <div className={styles.content}>
@@ -279,7 +282,12 @@ export default async function RuleModePage({ params, searchParams }: Readonly<Pa
             <SectionHead id={RULES_PAGE_ANCHORS.others} eyebrow="COMPARER" title="Autres modes" />
             <div className={styles.otherModes}>
               {others.map((other) => (
-                <Link key={other.slug} href={`/regles/${other.slug}`} className={styles.otherMode}>
+                <Link
+                  key={other.slug}
+                  href={`/regles/${other.slug}`}
+                  className={styles.otherMode}
+                  data-tone={RULE_MODE_TONE[other.diagram]}
+                >
                   {other.label}
                   {other.status === "SOON" && <span className={styles.soonTag}>bientôt</span>}
                 </Link>

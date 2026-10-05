@@ -70,7 +70,9 @@ export default function AccessibilityStatementPage() {
       <section className={`${styles.section} ${styles.heroSection}`}>
         <div className="fabric" />
         <span className="eyebrow">ACCESSIBILITÉ · RGAA 4.1.2</span>
-        <h1 className={`display ${styles.heroTitle}`}>Déclaration d&apos;accessibilité</h1>
+        <h1 className={`display ${styles.heroTitle}`}>
+          <span className="text-gradient">Déclaration d&apos;accessibilité</span>
+        </h1>
         <p className={styles.lede}>
           L&apos;association BlueGenji Esport veut que chacun puisse s&apos;inscrire, suivre un
           tournoi et reporter un score, quelle que soit sa façon de naviguer. À notre connaissance,
