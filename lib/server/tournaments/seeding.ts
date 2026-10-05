@@ -185,7 +185,7 @@ const REORDER_DEADLOCK_ATTEMPTS = 3;
 /**
  * Applique un nouvel ordre de seeding.
  *
- * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | SEEDING_LOCKED_STARTED | INVALID_SEED_ORDER
+ * @throws TOURNAMENT_NOT_FOUND | SEEDING_LOCKED | SEEDING_LOCKED_STARTED | SEEDING_LOCKED_FINISHED | INVALID_SEED_ORDER
  */
 export async function reorderSeeding(tournamentId: number, orderedTeamIds: number[]): Promise<void> {
   for (let attempt = 1; ; attempt += 1) {
@@ -225,8 +225,9 @@ async function reorderSeedingOnce(tournamentId: number, orderedTeamIds: number[]
     const matchRows = await getMatchRows(connection, tournamentId);
 
     const lockReason = seedingLockReason(windowState(tournament), toScoreStates(matchRows));
+    if (lockReason === "FINISHED") throw new Error("SEEDING_LOCKED_FINISHED");
     if (lockReason === "STARTED") throw new Error("SEEDING_LOCKED_STARTED");
-    if (lockReason !== null) throw new Error("SEEDING_LOCKED");
+    if (lockReason === "SCORES_ENTERED") throw new Error("SEEDING_LOCKED");
     // Invariant : un plateau ne naît qu'au coup d'envoi, que la fenêtre vient de
     // refuser. Des matchs ici décriraient un tirage déjà fait — on refuse plutôt
     // que de le détruire et d'amorcer les manches d'un tournoi non lancé.

@@ -26,6 +26,13 @@ export async function GET(_: Request, context: { params: Promise<{ id: string }>
  * Réordonne le seeding. Corps : `{ teamIds: number[] }` — la liste complète des
  * équipes inscrites, dans le nouvel ordre.
  */
+/** Refus de fenêtre : l'ordre est figé (score saisi, coup d'envoi, tournoi terminé). */
+const SEEDING_LOCK_CODES: ReadonlySet<string> = new Set([
+  "SEEDING_LOCKED",
+  "SEEDING_LOCKED_STARTED",
+  "SEEDING_LOCKED_FINISHED",
+]);
+
 export async function PATCH(req: Request, context: { params: Promise<{ id: string }> }) {
   const user = await getCurrentUser();
   if (!user) return fail("UNAUTHORIZED", 401);
@@ -54,7 +61,7 @@ export async function PATCH(req: Request, context: { params: Promise<{ id: strin
   } catch (error) {
     const message = (error as Error).message;
     if (message === "TOURNAMENT_NOT_FOUND") return fail(message, 404);
-    if (message === "SEEDING_LOCKED" || message === "SEEDING_LOCKED_STARTED") return fail(message, 409);
+    if (SEEDING_LOCK_CODES.has(message)) return fail(message, 409);
     if (message === "INVALID_SEED_ORDER") return fail(message, 400);
     return fail(message || "SEEDING_REORDER_FAILED", 500);
   }
