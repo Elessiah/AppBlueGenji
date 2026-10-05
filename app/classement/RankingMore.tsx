@@ -2,20 +2,30 @@
 
 import { useEffect, useRef, useState, useTransition, type MouseEvent } from "react";
 import { useRouter } from "next/navigation";
-import { rankingRowId } from "@/lib/shared/ranking-page";
+import { RANKING_MAX_SHOWN, rankingRowId } from "@/lib/shared/ranking-page";
 import styles from "./page.module.css";
 
 type RankingMoreProps = {
   /** Lignes affichées (= rang de la dernière). */
   shown: number;
-  /** Page suivante (`?n=` + ancre), `null` quand tout est affiché. */
+  /** Page suivante (`?n=` + ancre), `null` quand tout est affiché ou le plafond atteint. */
   href: string | null;
+  /** Il reste des équipes au-delà des lignes affichées (même au plafond). */
+  hasMore: boolean;
 };
 
+/** Ce qui suit les lignes affichées : une page de plus, la fin, ou le plafond. */
+export type RankingMoreState = "more" | "end" | "capped";
+
+/** Le plafond atteint, dit à l'écran comme à la lecture vocale. */
+export const RANKING_CAP_NOTE = `Affichage limité aux ${RANKING_MAX_SHOWN} premières équipes.`;
+
 /** Texte annoncé après un ajout — exporté pour les tests. */
-export function rankingAddedMessage(added: number, done: boolean): string {
-  const count = added === 1 ? "1 équipe ajoutée" : `${added} équipes ajoutées`;
-  return done ? `${count}. Fin du classement.` : `${count}.`;
+export function rankingAddedMessage(added: number, state: RankingMoreState): string {
+  const count = added === 1 ? "1 équipe ajoutée." : `${added} équipes ajoutées.`;
+  if (state === "end") return `${count} Fin du classement.`;
+  if (state === "capped") return `${count} ${RANKING_CAP_NOTE}`;
+  return count;
 }
 
 /**
@@ -28,19 +38,22 @@ export function rankingAddedMessage(added: number, done: boolean): string {
  * Toujours rendu sous le tableau, même sans page suivante : la région vivante
  * doit exister avant l'annonce, et l'état survit au rafraîchissement.
  */
-export function RankingMore({ shown, href }: Readonly<RankingMoreProps>) {
+export function RankingMore({ shown, href, hasMore }: Readonly<RankingMoreProps>) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const from = useRef<number | null>(null);
+
+  let state: RankingMoreState = "end";
+  if (hasMore) state = href === null ? "capped" : "more";
 
   useEffect(() => {
     const start = from.current;
     if (start === null || shown <= start) return;
     from.current = null;
     document.getElementById(rankingRowId(start + 1))?.focus();
-    setMessage(rankingAddedMessage(shown - start, href === null));
-  }, [shown, href]);
+    setMessage(rankingAddedMessage(shown - start, state));
+  }, [shown, state]);
 
   function onClick(event: MouseEvent<HTMLAnchorElement>) {
     // Nouvel onglet, fenêtre, téléchargement : le navigateur s'en charge.
@@ -60,6 +73,7 @@ export function RankingMore({ shown, href }: Readonly<RankingMoreProps>) {
           {pending ? "Chargement…" : "Afficher plus"}
         </a>
       ) : null}
+      {state === "capped" ? <p className={styles.moreNote}>{RANKING_CAP_NOTE}</p> : null}
     </div>
   );
 }

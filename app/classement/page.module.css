@@ -609,3 +609,10 @@
   color: var(--ink-mute);
   cursor: progress;
 }
+
+.moreNote {
+  margin: 0;
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}

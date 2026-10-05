@@ -213,7 +213,11 @@ export function RankingBoard({ rows, filter, forms, unavailable = false, hasMore
               );
             })}
           </div>
-          <RankingMore shown={rows.length} href={hasMore ? rankingMoreHref(filter, rows.length) : null} />
+          <RankingMore
+            shown={rows.length}
+            href={hasMore ? rankingMoreHref(filter, rows.length) : null}
+            hasMore={hasMore}
+          />
         </>
       )}
     </>
