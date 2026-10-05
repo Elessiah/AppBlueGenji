@@ -79,9 +79,14 @@ describe("palette néon froid", () => {
   it("chaque variante de pastille a sa couleur, et le rouge reste à .pill-live", () => {
     for (const variant of ["info", "accent", "success", "highlight", "neutral", "waiting"]) {
       expect(sheet).toMatch(new RegExp(`\\.pill-${variant}\\b[^{]*\\{[^}]*color:`));
+      if (variant !== "waiting") expect(sheet).toMatch(new RegExp(`\\.cy-tag-${variant}\\s*\\{[^}]*color:`));
     }
-    const nonLive = [...sheet.matchAll(/\.(?:pill|tag)-(?!live)[a-z]+[^{]*\{([^}]*)\}/g)].map((m) => m[1]).join("\n");
+    const nonLive = [...sheet.matchAll(/\.(?:pill|cy-tag)-(?!live)[a-z]+[^{]*\{([^}]*)\}/g)].map((m) => m[1]).join("\n");
     expect(nonLive).not.toMatch(/--red-live/);
+  });
+
+  it("ne redéfinit pas la classe globale `.tag` du fil d'activité de /bot", () => {
+    expect(sheet).not.toMatch(/(^|[\s,}])\.tag\s*[{,]/);
   });
 
   it("la pastille d'attente respire, figée par le régime de charge", () => {
